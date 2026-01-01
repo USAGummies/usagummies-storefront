@@ -13,14 +13,17 @@ import { getProductByHandle, money } from "@/lib/storefront";
 
 type Params = { handle: string };
 
-export async function generateMetadata(props: { params: Promise<Params> }): Promise<Metadata> {
+export async function generateMetadata(props: {
+  params: Promise<Params>;
+}): Promise<Metadata> {
   const { handle } = await props.params;
   const data = await getProductByHandle(handle);
   const product = data?.product;
   if (!product) return {};
 
   const title = product.title;
-  const description = product.description || "Premium American-made gummy bears. Fast shipping.";
+  const description =
+    product.description || "Premium American-made gummy bears. Fast shipping.";
   const image = product.featuredImage?.url;
 
   return {
@@ -84,76 +87,190 @@ export default async function ProductPage(props: {
   };
 
   return (
-    <main style={{ padding: "18px 0 60px" }}>
+    <main className="pdp-root">
       <JsonLd data={jsonLd} />
 
       <div className="container">
-        <div style={{ opacity: 0.78, fontSize: 13 }}>
-          <Link href="/" style={{ color: "inherit", textDecoration: "none" }}>
+        {/* Breadcrumb */}
+        <div className="pdp-breadcrumb">
+          <Link href="/" className="pdp-crumb">
             Home
-          </Link>{" "}
-          <span style={{ opacity: 0.45 }}>›</span>{" "}
-          <Link href="/shop" style={{ color: "inherit", textDecoration: "none" }}>
+          </Link>
+          <span className="pdp-sep">›</span>
+          <Link href="/shop" className="pdp-crumb">
             Shop
-          </Link>{" "}
-          <span style={{ opacity: 0.45 }}>›</span>{" "}
-          <span style={{ fontWeight: 950 }}>{product.title}</span>
+          </Link>
+          <span className="pdp-sep">›</span>
+          <span className="pdp-crumb-current">{product.title}</span>
         </div>
 
-        <div
-          style={{
-            marginTop: 14,
-            display: "grid",
-            gap: 14,
-            gridTemplateColumns: "1.15fr 0.85fr",
-          }}
-          className="pdp-grid"
-        >
-          <div>
+        {/* Main grid */}
+        <div className="pdp-grid">
+          {/* LEFT: Gallery + content */}
+          <section className="pdp-left">
             <ProductGallery
               title={product.title}
               featured={product.featuredImage}
               images={images}
             />
 
-            <div style={{ marginTop: 14 }}>
+            {/* On mobile, we want trust immediately after gallery */}
+            <div className="pdp-mobile-only pdp-section">
               <ProductTrustStack />
             </div>
 
-            <div style={{ marginTop: 14 }}>
+            <div className="pdp-section">
               <America250Blocks />
             </div>
 
-            <div style={{ marginTop: 14 }}>
+            <div className="pdp-section">
               <ReviewHighlights />
             </div>
-          </div>
+          </section>
 
-          <div>
-            <div className="card" style={{ padding: 16 }}>
-              <div className="kicker">USA Gummies</div>
-              <div style={{ fontFamily: "var(--font-display)", fontWeight: 950, fontSize: 34, lineHeight: 0.95, marginTop: 8 }}>
-                {product.title}
-              </div>
-              {price ? (
-                <div style={{ marginTop: 10, fontWeight: 950, fontSize: 18, opacity: 0.9 }}>
-                  {price}
+          {/* RIGHT: Sticky purchase column */}
+          <aside className="pdp-right">
+            <div className="pdp-sticky">
+              <div className="card pdp-titlecard">
+                <div className="kicker">USA Gummies</div>
+
+                <h1 className="pdp-title">{product.title}</h1>
+
+                {price ? <div className="pdp-price">{price}</div> : null}
+
+                {/* Desktop trust near the decision point */}
+                <div className="pdp-desktop-only pdp-mini-proof">
+                  <ProductTrustStack />
                 </div>
-              ) : null}
-              <div style={{ marginTop: 10, opacity: 0.82, lineHeight: 1.6 }}>
-                {product.description}
+
+                <div className="pdp-desc">{product.description}</div>
+              </div>
+
+              <div className="pdp-section">
+                <PurchaseBox product={purchaseProduct as any} focus={focus} />
+              </div>
+
+              {/* Micro-proof + CTA reassurance under purchase */}
+              <div className="card pdp-guarantee">
+                <div className="pdp-guarantee-title">🇺🇸 The USA Gummies promise</div>
+                <ul className="pdp-guarantee-list">
+                  <li>Fast shipping, packed with care</li>
+                  <li>Real American-made gummy bears</li>
+                  <li>Easy checkout through Shopify</li>
+                </ul>
               </div>
             </div>
-
-            <div style={{ marginTop: 14 }}>
-              <PurchaseBox product={purchaseProduct as any} focus={focus} />
-            </div>
-          </div>
+          </aside>
         </div>
 
         <style>{`
+          .pdp-root{
+            padding: 18px 0 80px;
+          }
+
+          .pdp-breadcrumb{
+            opacity: 0.82;
+            font-size: 13px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+          }
+          .pdp-crumb{
+            color: inherit;
+            text-decoration: none;
+          }
+          .pdp-crumb:hover{
+            text-decoration: underline;
+          }
+          .pdp-sep{ opacity: 0.45; }
+          .pdp-crumb-current{
+            font-weight: 950;
+            opacity: 0.95;
+          }
+
+          .pdp-grid{
+            margin-top: 16px;
+            display: grid;
+            gap: 16px;
+            grid-template-columns: minmax(0, 1fr) 420px;
+            align-items: start;
+          }
+
+          .pdp-left{ min-width: 0; }
+          .pdp-right{ min-width: 0; }
+
+          .pdp-sticky{
+            position: sticky;
+            top: 16px;
+            display: grid;
+            gap: 14px;
+          }
+
+          .pdp-titlecard{
+            padding: 18px;
+          }
+
+          .pdp-title{
+            font-family: var(--font-display);
+            font-weight: 950;
+            font-size: 34px;
+            line-height: 0.98;
+            margin: 8px 0 0;
+            letter-spacing: -0.02em;
+          }
+
+          .pdp-price{
+            margin-top: 10px;
+            font-weight: 950;
+            font-size: 18px;
+            opacity: 0.9;
+          }
+
+          .pdp-desc{
+            margin-top: 10px;
+            opacity: 0.84;
+            line-height: 1.6;
+          }
+
+          .pdp-section{
+            margin-top: 14px;
+          }
+
+          .pdp-mini-proof{
+            margin-top: 12px;
+          }
+
+          .pdp-guarantee{
+            padding: 14px 16px;
+          }
+          .pdp-guarantee-title{
+            font-weight: 950;
+            margin-bottom: 8px;
+          }
+          .pdp-guarantee-list{
+            margin: 0;
+            padding-left: 18px;
+            opacity: 0.88;
+            line-height: 1.6;
+            font-size: 14px;
+          }
+
+          .pdp-desktop-only{ display: block; }
+          .pdp-mobile-only{ display: none; }
+
+          @media (max-width: 1100px){
+            .pdp-grid{ grid-template-columns: minmax(0,1fr) 380px; }
+          }
+
           @media (max-width: 980px){
-            .pdp-grid{ grid-template-columns: 1fr !important; }
+            .pdp-root{ padding: 14px 0 90px; }
+            .pdp-grid{ grid-template-columns: 1fr; }
+            .pdp-sticky{ position: static; }
+            .pdp-desktop-only{ display: none; }
+            .pdp-mobile-only{ display: block; }
+            .pdp-section{ margin-top: 12px; }
+            .pdp-title{ font-size: 30px; }
           }
         `}</style>
       </div>
