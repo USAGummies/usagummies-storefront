@@ -1,0 +1,15 @@
+/* src/app/globals.css (FULL REPLACE) */
+@import "tailwindcss";
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+}
