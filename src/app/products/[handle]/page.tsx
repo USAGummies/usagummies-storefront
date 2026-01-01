@@ -120,7 +120,7 @@ export default async function ProductPage(props: {
             </div>
 
             <div className="pdp-section">
-              <America250Blocks />
+              <America250Blocks productTitle={product.title} />
             </div>
 
             <div className="pdp-section">
