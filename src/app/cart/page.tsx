@@ -7,7 +7,9 @@ import { ReviewsSummary } from "@/components/reviews/ReviewsSummary";
 import { PatriotBanner } from "@/components/ui/PatriotBanner";
 import { PatriotRibbon } from "@/components/ui/PatriotRibbon";
 
-function formatMoney(amount: any) {
+type MoneyV2 = { amount: string; currencyCode: string };
+
+function formatMoney(amount: MoneyV2 | null | undefined) {
   const n = Number(amount?.amount ?? 0);
   const currency = String(amount?.currencyCode ?? "USD");
   try {
@@ -56,7 +58,7 @@ function ShippingMission({
         }}
       >
         <div style={{ fontWeight: 950, fontSize: 16 }}>
-          {unlocked ? "Free shipping unlocked" : "Unlock free shipping"}
+          {unlocked ? "Free shipping unlocked 🎉" : "Unlock free shipping"}
         </div>
         <div style={{ opacity: 0.78, fontSize: 13 }}>{label}</div>
       </div>
@@ -101,10 +103,27 @@ function ShippingMission({
           </Link>
         </div>
       ) : (
-        <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <span className="badge">✅ Free shipping active</span>
-          <span className="badge">🇺🇸 Made in USA</span>
-          <span className="badge">🚚 Ships fast</span>
+        <div style={{ marginTop: 12 }}>
+          <div
+            style={{
+              padding: "12px 14px",
+              borderRadius: 14,
+              background: "rgba(0,0,0,0.04)",
+              fontSize: 14,
+              lineHeight: 1.5,
+            }}
+          >
+            ✅ Free shipping is locked in.
+            <br />
+            <strong>Pro tip:</strong>{" "}
+            8+ bags is usually the best value per checkout.
+          </div>
+
+          <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <span className="badge">✅ Free shipping active</span>
+            <span className="badge">🇺🇸 Made in USA</span>
+            <span className="badge">🚚 Ships fast</span>
+          </div>
         </div>
       )}
     </div>
@@ -112,7 +131,7 @@ function ShippingMission({
 }
 
 export default async function CartPage() {
-  const cart = await getCart();
+  const cart: any = await getCart();
 
   const lines =
     (cart?.lines as any)?.nodes ??
@@ -127,7 +146,7 @@ export default async function CartPage() {
   const remaining = Math.max(0, 5 - totalQty);
 
   const subtotal = cart?.cost?.subtotalAmount
-    ? formatMoney(cart.cost.subtotalAmount)
+    ? formatMoney(cart.cost.subtotalAmount as MoneyV2)
     : "";
 
   const estimatedTotal = subtotal;
@@ -162,7 +181,9 @@ export default async function CartPage() {
               className="btn btn-navy"
               href={cart?.checkoutUrl || "#"}
               aria-disabled={!cart?.checkoutUrl}
-              style={!cart?.checkoutUrl ? { opacity: 0.55, pointerEvents: "none" } : undefined}
+              style={
+                !cart?.checkoutUrl ? { opacity: 0.55, pointerEvents: "none" } : undefined
+              }
             >
               Checkout →
             </a>
@@ -199,10 +220,26 @@ export default async function CartPage() {
           </div>
         </div>
 
-        <div style={{ marginTop: 16, display: "grid", gap: 14, gridTemplateColumns: "1.7fr 1fr" }} className="cart-grid">
+        <div
+          style={{
+            marginTop: 16,
+            display: "grid",
+            gap: 14,
+            gridTemplateColumns: "1.7fr 1fr",
+          }}
+          className="cart-grid"
+        >
           {/* Lines */}
           <div className="card" style={{ padding: 14 }}>
-            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "baseline",
+                justifyContent: "space-between",
+                gap: 10,
+                flexWrap: "wrap",
+              }}
+            >
               <div style={{ fontWeight: 950, fontSize: 16 }}>Items</div>
               <div style={{ opacity: 0.78, fontSize: 13 }}>
                 {lines.length ? `${lines.length} line(s)` : "No items yet"}
@@ -216,7 +253,15 @@ export default async function CartPage() {
                   <div style={{ marginTop: 8, opacity: 0.78 }}>
                     Let’s fix that. Bundles are the best way to buy.
                   </div>
-                  <div style={{ marginTop: 12, display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+                  <div
+                    style={{
+                      marginTop: 12,
+                      display: "flex",
+                      gap: 10,
+                      justifyContent: "center",
+                      flexWrap: "wrap",
+                    }}
+                  >
                     <Link className="btn btn-primary" href="/shop">
                       Shop gummies →
                     </Link>
@@ -230,12 +275,29 @@ export default async function CartPage() {
                   {lines.map((l: any) => {
                     const title = l?.merchandise?.product?.title || "Item";
                     const variant = l?.merchandise?.title || "";
-                    const img = l?.merchandise?.image?.url || l?.merchandise?.product?.featuredImage?.url || null;
+                    const img =
+                      l?.merchandise?.image?.url ||
+                      l?.merchandise?.product?.featuredImage?.url ||
+                      null;
 
                     return (
                       <div key={l.id} className="card-solid" style={{ padding: 14 }}>
-                        <div style={{ display: "flex", gap: 12, alignItems: "flex-start", justifyContent: "space-between" }}>
-                          <div style={{ display: "flex", gap: 12, alignItems: "flex-start", minWidth: 0 }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: 12,
+                            alignItems: "flex-start",
+                            justifyContent: "space-between",
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: 12,
+                              alignItems: "flex-start",
+                              minWidth: 0,
+                            }}
+                          >
                             <div
                               style={{
                                 position: "relative",
@@ -260,26 +322,41 @@ export default async function CartPage() {
                             </div>
 
                             <div style={{ minWidth: 0 }}>
-                              <div style={{ fontWeight: 950, lineHeight: 1.2 }}>{title}</div>
+                              <div style={{ fontWeight: 950, lineHeight: 1.2 }}>
+                                {title}
+                              </div>
                               {variant ? (
                                 <div style={{ marginTop: 6, opacity: 0.75, fontSize: 13 }}>
                                   {variant}
                                 </div>
                               ) : null}
-                              <div style={{ marginTop: 8, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+
+                              <div
+                                style={{
+                                  marginTop: 8,
+                                  display: "flex",
+                                  gap: 10,
+                                  flexWrap: "wrap",
+                                  alignItems: "center",
+                                }}
+                              >
                                 <span className="badge">Qty: {l.quantity}</span>
                                 <span className="badge">🇺🇸 Made in USA</span>
                                 <span className="badge">✅ Dye-free</span>
                               </div>
 
-                              <div style={{ marginTop: 10 }}><CartLineControls lineId={l.id} quantity={l.quantity} /></div>
+                              <div style={{ marginTop: 10 }}>
+                                <CartLineControls lineId={l.id} quantity={l.quantity} />
+                              </div>
                             </div>
                           </div>
 
                           <div style={{ textAlign: "right", flex: "0 0 auto" }}>
                             <div style={{ opacity: 0.72, fontSize: 12 }}>Line total</div>
                             <div style={{ fontWeight: 950, fontSize: 16, marginTop: 4 }}>
-                              {l.cost?.totalAmount ? formatMoney(l.cost.totalAmount) : ""}
+                              {l.cost?.totalAmount
+                                ? formatMoney(l.cost.totalAmount as MoneyV2)
+                                : ""}
                             </div>
                           </div>
                         </div>
@@ -287,7 +364,9 @@ export default async function CartPage() {
                         <div style={{ marginTop: 10, opacity: 0.78, fontSize: 13 }}>
                           Want bundle pricing?{" "}
                           <Link
-                            href={`/products/${l?.merchandise?.product?.handle || ""}?focus=bundles`}
+                            href={`/products/${
+                              l?.merchandise?.product?.handle || ""
+                            }?focus=bundles`}
                             className="underline decoration-black/20 hover:decoration-black/40"
                           >
                             See bundle ladder →
@@ -309,11 +388,25 @@ export default async function CartPage() {
               <div className="kicker">Order summary</div>
 
               <div style={{ marginTop: 10, display: "grid", gap: 10, fontSize: 14 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, opacity: 0.85 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 10,
+                    opacity: 0.85,
+                  }}
+                >
                   <span>Subtotal</span>
                   <span style={{ fontWeight: 950 }}>{subtotal}</span>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, opacity: 0.85 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 10,
+                    opacity: 0.85,
+                  }}
+                >
                   <span>Estimated total</span>
                   <span style={{ fontWeight: 950 }}>{estimatedTotal}</span>
                 </div>
