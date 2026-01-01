@@ -1,6 +1,8 @@
 // src/app/shop/error.tsx
 "use client";
 
+import Link from "next/link";
+
 export default function ShopError({
   error,
   reset,
@@ -11,7 +13,10 @@ export default function ShopError({
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-16">
       <div className="rounded-2xl border border-neutral-200 bg-white p-8 shadow-sm">
-        <h1 className="text-2xl font-bold text-neutral-900">Shop is having a moment</h1>
+        <h1 className="text-2xl font-bold text-neutral-900">
+          Shop is having a moment
+        </h1>
+
         <p className="mt-3 text-neutral-700">
           Something went wrong loading products. Try again.
         </p>
@@ -21,7 +26,7 @@ export default function ShopError({
             Technical details
           </summary>
           <pre className="mt-3 overflow-auto text-xs text-neutral-800">
-{error.message}
+            {error.message}
           </pre>
         </details>
 
@@ -32,12 +37,13 @@ export default function ShopError({
           >
             Retry
           </button>
-          <a
+
+          <Link
             href="/"
             className="rounded-xl border border-neutral-200 bg-white px-4 py-2 text-sm font-semibold text-neutral-900 hover:bg-neutral-50"
           >
             Go home
-          </a>
+          </Link>
         </div>
       </div>
     </main>

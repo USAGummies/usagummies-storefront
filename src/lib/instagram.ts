@@ -45,7 +45,7 @@ export async function fetchInstagramFeed(opts?: { limit?: number }): Promise<Ins
   url.searchParams.set("limit", String(limit));
   url.searchParams.set("access_token", accessToken);
 
-  // @ts-expect-error Next.js fetch cache options
+
   const res = await fetch(url.toString(), {
     // cache on the server / edge; the route will add Cache-Control too.
     next: { revalidate: 60 * 15 }, // 15 minutes
