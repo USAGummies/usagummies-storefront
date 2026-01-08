@@ -1,6 +1,5 @@
 // src/app/products/[handle]/page.tsx (FULL REPLACE)
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
 import Link from "next/link";
 import { JsonLd } from "@/components/JsonLd";
 import { ProductGallery } from "@/components/product/ProductGallery.client";
@@ -13,13 +12,104 @@ import { getProductByHandle, money } from "@/lib/storefront";
 
 type Params = { handle: string };
 
+function resolveSiteUrl() {
+  const fromEnv = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "");
+  if (fromEnv) return fromEnv;
+  const vercel = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL.replace(/\/$/, "")}` : null;
+  if (vercel) return vercel;
+  if (process.env.NODE_ENV !== "production") return "http://localhost:3000";
+  return "https://www.usagummies.com";
+}
+
+const SITE_URL = resolveSiteUrl();
+
+function extractPriceRange(pr?: {
+  minVariantPrice?: { amount?: string; currencyCode?: string };
+  maxVariantPrice?: { amount?: string; currencyCode?: string };
+}) {
+  const min = pr?.minVariantPrice;
+  const max = pr?.maxVariantPrice;
+  const minAmount = min?.amount;
+  const maxAmount = max?.amount;
+  const currency = min?.currencyCode || max?.currencyCode;
+
+  return {
+    min: minAmount && currency ? { amount: minAmount, currencyCode: currency } : undefined,
+    max: maxAmount && currency ? { amount: maxAmount, currencyCode: currency } : undefined,
+  };
+}
+
+function validateProductJsonLd(data: any) {
+  if (process.env.NODE_ENV === "production") return;
+  try {
+    const offers = data?.offers;
+    if (!offers) return;
+    const errs: string[] = [];
+
+    const checkOffer = (offer: any, label: string) => {
+      if (!offer?.priceCurrency) errs.push(`${label}: missing priceCurrency`);
+      if (offer?.url && typeof offer.url === "string" && !offer.url.startsWith("http")) {
+        errs.push(`${label}: url not absolute`);
+      }
+      if (offer?.lowPrice && Number.isNaN(Number(offer.lowPrice))) {
+        errs.push(`${label}: lowPrice not a number`);
+      }
+      if (offer?.highPrice && Number.isNaN(Number(offer.highPrice))) {
+        errs.push(`${label}: highPrice not a number`);
+      }
+      if (offer?.price && Number.isNaN(Number(offer.price))) {
+        errs.push(`${label}: price not a number`);
+      }
+    };
+
+    if (Array.isArray(offers)) {
+      offers.forEach((o, idx) => checkOffer(o, `offer[${idx}]`));
+    } else {
+      checkOffer(offers, "offers");
+    }
+
+    if (errs.length) {
+      // eslint-disable-next-line no-console
+      console.warn("[SEO JSON-LD validation]", errs);
+    }
+  } catch {
+    // ignore in dev validation
+  }
+}
+
 export async function generateMetadata(props: {
   params: Promise<Params>;
 }): Promise<Metadata> {
   const { handle } = await props.params;
-  const data = await getProductByHandle(handle);
+  let data: Awaited<ReturnType<typeof getProductByHandle>> | null = null;
+  try {
+    data = await getProductByHandle(handle);
+  } catch {
+    data = null;
+  }
+
   const product = data?.product;
-  if (!product) return {};
+  const canonical = `${SITE_URL}/products/${handle}`;
+
+  if (!product) {
+    const fallbackTitle = "USA Gummies | Product";
+    const fallbackDescription = "Premium American-made gummy bears. Fast shipping.";
+    return {
+      title: fallbackTitle,
+      description: fallbackDescription,
+      alternates: { canonical },
+      openGraph: {
+        title: fallbackTitle,
+        description: fallbackDescription,
+        url: canonical,
+      },
+      twitter: {
+        card: "summary_large_image",
+        title: fallbackTitle,
+        description: fallbackDescription,
+      },
+    };
+  }
 
   const title = product.title;
   const description =
@@ -29,10 +119,20 @@ export async function generateMetadata(props: {
   return {
     title,
     description,
+    alternates: {
+      canonical,
+    },
     openGraph: {
       title,
       description,
+      url: canonical,
       images: image ? [{ url: image }] : undefined,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: image ? [image] : undefined,
     },
   };
 }
@@ -45,9 +145,39 @@ export default async function ProductPage(props: {
   const sp = (await props.searchParams) ?? {};
   const focus = sp.focus;
 
-  const data = await getProductByHandle(handle);
+  let data: Awaited<ReturnType<typeof getProductByHandle>> | null = null;
+  try {
+    data = await getProductByHandle(handle);
+  } catch {
+    data = null;
+  }
   const product = data?.product;
-  if (!product) return notFound();
+
+  if (!product) {
+    return (
+      <main className="pdp-root">
+        <div className="container pdp-container">
+          <div className="glass-card p-6 space-y-3">
+            <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">
+              USA Gummies
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black text-[var(--text)]">Product is temporarily unavailable</h1>
+            <p className="text-sm text-[var(--muted)]">
+              We could not load this product from Shopify right now. Please try again in a moment or shop bundles instead.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Link href="/shop" className="btn btn-red pressable">
+                Shop bundles
+              </Link>
+              <Link href="/" className="btn pressable">
+                Go home
+              </Link>
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   const variants = (product.variants?.edges ?? []).map((e: any) => e.node);
   const v0 = variants[0];
@@ -61,9 +191,12 @@ export default async function ProductPage(props: {
   const purchaseProduct = {
     title: product.title,
     handle: product.handle,
+    description: product.description,
     variants: { nodes: variants },
     priceRange: product.priceRange,
   };
+
+  const priceRange = extractPriceRange(product?.priceRange);
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -73,24 +206,47 @@ export default async function ProductPage(props: {
     image: product.featuredImage?.url ? [product.featuredImage.url] : undefined,
     sku: v0?.id,
     brand: { "@type": "Brand", name: "USA Gummies" },
-    offers: v0?.price?.amount
-      ? {
+    offers: (() => {
+      const minPrice = priceRange.min;
+      const maxPrice = priceRange.max;
+      const anyAvailable = variants.some((v: any) => v.availableForSale);
+      const availability = anyAvailable
+        ? "https://schema.org/InStock"
+        : "https://schema.org/OutOfStock";
+
+      if (minPrice?.amount && maxPrice?.amount) {
+        return {
+          "@type": "AggregateOffer",
+          priceCurrency: minPrice.currencyCode,
+          lowPrice: minPrice.amount,
+          highPrice: maxPrice.amount,
+          availability,
+          url: `${SITE_URL}/products/${product.handle}`,
+          itemCondition: "https://schema.org/NewCondition",
+        };
+      }
+
+      if (v0?.price?.amount) {
+        return {
           "@type": "Offer",
           priceCurrency: v0.price.currencyCode,
           price: v0.price.amount,
-          availability: v0.availableForSale
-            ? "https://schema.org/InStock"
-            : "https://schema.org/OutOfStock",
-          url: `/products/${product.handle}`,
-        }
-      : undefined,
+          availability,
+          url: `${SITE_URL}/products/${product.handle}`,
+          itemCondition: "https://schema.org/NewCondition",
+        };
+      }
+
+      return undefined;
+    })(),
   };
+  validateProductJsonLd(jsonLd);
 
   return (
     <main className="pdp-root">
       <JsonLd data={jsonLd} />
 
-      <div className="container">
+      <div className="container pdp-container">
         {/* Breadcrumb */}
         <div className="pdp-breadcrumb">
           <Link href="/" className="pdp-crumb">
@@ -131,8 +287,8 @@ export default async function ProductPage(props: {
           {/* RIGHT: Sticky purchase column */}
           <aside className="pdp-right">
             <div className="pdp-sticky">
-              <div className="card pdp-titlecard">
-                <div className="kicker">USA Gummies</div>
+              <div className="glass-card pdp-titlecard">
+                <div className="pdp-kicker">USA Gummies</div>
 
                 <h1 className="pdp-title">{product.title}</h1>
 
@@ -151,7 +307,7 @@ export default async function ProductPage(props: {
               </div>
 
               {/* Micro-proof + CTA reassurance under purchase */}
-              <div className="card pdp-guarantee">
+              <div className="glass-card pdp-guarantee">
                 <div className="pdp-guarantee-title">🇺🇸 The USA Gummies promise</div>
                 <ul className="pdp-guarantee-list">
                   <li>Fast shipping, packed with care</li>
@@ -166,6 +322,12 @@ export default async function ProductPage(props: {
         <style>{`
           .pdp-root{
             padding: 18px 0 80px;
+          }
+
+          .pdp-container{
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 16px;
           }
 
           .pdp-breadcrumb{
@@ -208,16 +370,32 @@ export default async function ProductPage(props: {
           }
 
           .pdp-titlecard{
-            padding: 18px;
+            padding: 20px;
+            border: 1px solid var(--border);
+            background: var(--surface-strong);
+          }
+
+          .pdp-kicker{
+            display:inline-flex;
+            align-items:center;
+            gap:6px;
+            padding:4px 8px;
+            border-radius:999px;
+            border:1px solid var(--border);
+            font-size:11px;
+            letter-spacing:0.08em;
+            text-transform:uppercase;
+            color: var(--muted);
+            background: rgba(255,255,255,0.06);
           }
 
           .pdp-title{
             font-family: var(--font-display);
             font-weight: 950;
-            font-size: 34px;
-            line-height: 0.98;
+            font-size: 32px;
+            line-height: 1.08;
             margin: 8px 0 0;
-            letter-spacing: -0.02em;
+            letter-spacing: -0.015em;
           }
 
           .pdp-price{
@@ -229,8 +407,12 @@ export default async function ProductPage(props: {
 
           .pdp-desc{
             margin-top: 10px;
-            opacity: 0.84;
+            opacity: 0.88;
             line-height: 1.6;
+            border-top: 1px solid var(--border);
+            padding-top: 10px;
+            max-width: 640px;
+            color: var(--muted);
           }
 
           .pdp-section{
@@ -243,6 +425,8 @@ export default async function ProductPage(props: {
 
           .pdp-guarantee{
             padding: 14px 16px;
+            border: 1px solid var(--border);
+            background: var(--surface);
           }
           .pdp-guarantee-title{
             font-weight: 950;

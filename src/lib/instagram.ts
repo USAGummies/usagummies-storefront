@@ -46,38 +46,42 @@ export async function fetchInstagramFeed(opts?: { limit?: number }): Promise<Ins
   url.searchParams.set("access_token", accessToken);
 
 
-  const res = await fetch(url.toString(), {
-    // cache on the server / edge; the route will add Cache-Control too.
-    next: { revalidate: 60 * 15 }, // 15 minutes
-  });
+  try {
+    const res = await fetch(url.toString(), {
+      // cache on the server / edge; the route will add Cache-Control too.
+      next: { revalidate: 60 * 15 }, // 15 minutes
+    });
 
-  if (!res.ok) {
+    if (!res.ok) {
+      throw new Error("non-200");
+    }
+
+    const json: any = await res.json();
+    const items: InstagramMediaItem[] = Array.isArray(json?.data)
+      ? json.data
+          .filter(Boolean)
+          .map((x: any) => ({
+            id: String(x?.id ?? ""),
+            caption: x?.caption ?? null,
+            media_type: x?.media_type,
+            media_url: x?.media_url,
+            permalink: x?.permalink ?? null,
+            thumbnail_url: x?.thumbnail_url ?? null,
+            timestamp: x?.timestamp ?? null,
+          }))
+          .filter((x: any) => x.id && x.media_type && x.media_url)
+      : [];
+
+    return {
+      source: "live",
+      fetchedAt: new Date().toISOString(),
+      items,
+    };
+  } catch {
     return {
       source: "fallback",
       fetchedAt: new Date().toISOString(),
       items: [],
     };
   }
-
-  const json: any = await res.json();
-  const items: InstagramMediaItem[] = Array.isArray(json?.data)
-    ? json.data
-        .filter(Boolean)
-        .map((x: any) => ({
-          id: String(x?.id ?? ""),
-          caption: x?.caption ?? null,
-          media_type: x?.media_type,
-          media_url: x?.media_url,
-          permalink: x?.permalink ?? null,
-          thumbnail_url: x?.thumbnail_url ?? null,
-          timestamp: x?.timestamp ?? null,
-        }))
-        .filter((x: any) => x.id && x.media_type && x.media_url)
-    : [];
-
-  return {
-    source: "live",
-    fetchedAt: new Date().toISOString(),
-    items,
-  };
 }

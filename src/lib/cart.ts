@@ -1,11 +1,12 @@
 // src/lib/cart.ts
 import { cookies } from "next/headers";
+import { shopifyRequest } from "./shopify/fetch";
 
 const CART_COOKIE = "cartId";
 
 function getShopifyEndpoint() {
   const explicit = process.env.SHOPIFY_STOREFRONT_API_ENDPOINT;
-  if (explicit) return explicit;
+  if (explicit) return { endpoint: explicit, source: "explicit" as const };
 
   const domain =
     process.env.SHOPIFY_STORE_DOMAIN ||
@@ -19,10 +20,13 @@ function getShopifyEndpoint() {
 
   if (domain && version) {
     const clean = domain.replace(/^https?:\/\//, "").replace(/\/$/, "");
-    return `https://${clean}/api/${version}/graphql.json`;
+    return {
+      endpoint: `https://${clean}/api/${version}/graphql.json`,
+      source: "derived" as const,
+    };
   }
 
-  return undefined;
+  return { endpoint: undefined, source: "missing" as const };
 }
 
 function getShopifyToken() {
@@ -34,35 +38,19 @@ function getShopifyToken() {
   );
 }
 
-const SHOPIFY_ENDPOINT = getShopifyEndpoint();
+const { endpoint: SHOPIFY_ENDPOINT } = getShopifyEndpoint();
 const SHOPIFY_TOKEN = getShopifyToken();
 
-async function shopify<T>(query: string, variables?: Record<string, any>): Promise<T> {
-  if (!SHOPIFY_ENDPOINT) {
-    throw new Error(
-      "Missing Shopify endpoint. Set SHOPIFY_STOREFRONT_API_ENDPOINT OR (SHOPIFY_STORE_DOMAIN + SHOPIFY_STOREFRONT_API_VERSION)."
-    );
-  }
-  if (!SHOPIFY_TOKEN) {
-    throw new Error(
-      "Missing Shopify token. Set SHOPIFY_STOREFRONT_API_TOKEN (or a supported token env var)."
-    );
-  }
-
-  const res = await fetch(SHOPIFY_ENDPOINT, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Shopify-Storefront-Access-Token": SHOPIFY_TOKEN,
-    },
-    body: JSON.stringify({ query, variables }),
+async function shopify<T>(query: string, variables?: Record<string, any>): Promise<T | null> {
+  const result = await shopifyRequest<T>({
+    endpoint: SHOPIFY_ENDPOINT,
+    token: SHOPIFY_TOKEN,
+    body: { query, variables },
     cache: "no-store",
+    warnPrefix: "Shopify cart",
   });
 
-  const json = (await res.json()) as { data?: T; errors?: Array<{ message: string }> };
-  if (json.errors?.length) throw new Error(json.errors.map((e) => e.message).join(" | "));
-  if (!json.data) throw new Error("No data returned from Shopify.");
-  return json.data;
+  return result.ok ? result.data : null;
 }
 
 const CART_CREATE = /* GraphQL */ `
@@ -102,6 +90,8 @@ const CART_GET = /* GraphQL */ `
               ... on ProductVariant {
                 id
                 title
+                bundleQty: metafield(namespace: "custom", key: "bundle_qty") { value }
+                bundleBags: metafield(namespace: "custom", key: "bundle_bags") { value }
                 product {
                   title
                   handle
@@ -178,6 +168,8 @@ type CartGetResult = {
           merchandise: {
             id: string;
             title: string;
+            bundleQty: { value: string | null } | null;
+            bundleBags: { value: string | null } | null;
             product: { title: string; handle: string };
             image: { url: string; altText: string | null; width: number; height: number } | null;
             price: { amount: string; currencyCode: string };
@@ -202,14 +194,11 @@ type CartLinesUpdateResult = {
   };
 };
 
-async function createCartId(): Promise<string> {
+async function createCartId(): Promise<string | null> {
   const data = await shopify<CartCreateResult>(CART_CREATE);
-
-  const errs = data.cartCreate.userErrors;
-  if (errs?.length) throw new Error(errs.map((e) => e.message).join(" | "));
-
-  const cart = data.cartCreate.cart;
-  if (!cart?.id) throw new Error("Failed to create cart.");
+  const cart = data?.cartCreate?.cart;
+  const errs = data?.cartCreate?.userErrors;
+  if (errs?.length || !cart?.id) return null;
 
   const jar = await cookies();
   jar.set(CART_COOKIE, cart.id, { path: "/", httpOnly: true, sameSite: "lax" });
@@ -217,7 +206,7 @@ async function createCartId(): Promise<string> {
   return cart.id;
 }
 
-async function getOrCreateCartId(): Promise<string> {
+async function getOrCreateCartId(): Promise<string | null> {
   const jar = await cookies();
   const existing = jar.get(CART_COOKIE)?.value;
   if (existing) return existing;
@@ -231,22 +220,23 @@ export async function getCart() {
   if (!cartId) return null;
 
   const data = await shopify<CartGetResult>(CART_GET, { cartId });
-  return data.cart;
+  return data?.cart ?? null;
 }
 
 export async function addToCart(variantId: string, quantity: number) {
   "use server";
   const cartId = await getOrCreateCartId();
+  if (!cartId) return null;
 
   const data = await shopify<CartLinesAddResult>(CART_LINES_ADD, {
     cartId,
     lines: [{ merchandiseId: variantId, quantity }],
   });
 
-  const errs = data.cartLinesAdd.userErrors;
-  if (errs?.length) throw new Error(errs.map((e) => e.message).join(" | "));
+  const errs = data?.cartLinesAdd?.userErrors;
+  if (errs?.length) return null;
 
-  const cart = data.cartLinesAdd.cart;
+  const cart = data?.cartLinesAdd?.cart;
   if (cart?.id) {
     const jar = await cookies();
     jar.set(CART_COOKIE, cart.id, { path: "/", httpOnly: true, sameSite: "lax" });
@@ -256,23 +246,25 @@ export async function addToCart(variantId: string, quantity: number) {
 export async function buyNow(variantId: string, quantity: number) {
   "use server";
   const cartId = await getOrCreateCartId();
+  if (!cartId) return null;
 
   const data = await shopify<CartLinesAddResult>(CART_LINES_ADD, {
     cartId,
     lines: [{ merchandiseId: variantId, quantity }],
   });
 
-  const errs = data.cartLinesAdd.userErrors;
-  if (errs?.length) throw new Error(errs.map((e) => e.message).join(" | "));
+  const errs = data?.cartLinesAdd?.userErrors;
+  if (errs?.length) return null;
 
-  const cart = data.cartLinesAdd.cart;
-  if (!cart?.checkoutUrl) throw new Error("Missing checkoutUrl from Shopify cart.");
+  const cart = data?.cartLinesAdd?.cart;
+  if (!cart?.checkoutUrl) return null;
   return cart.checkoutUrl;
 }
 
 export async function updateLineQuantity(lineId: string, quantity: number) {
   "use server";
   const cartId = await getOrCreateCartId();
+  if (!cartId) return null;
 
   const nextQty = Math.max(0, Math.min(99, quantity));
 
@@ -281,10 +273,10 @@ export async function updateLineQuantity(lineId: string, quantity: number) {
     lines: [{ id: lineId, quantity: nextQty }],
   });
 
-  const errs = data.cartLinesUpdate.userErrors;
-  if (errs?.length) throw new Error(errs.map((e) => e.message).join(" | "));
+  const errs = data?.cartLinesUpdate?.userErrors;
+  if (errs?.length) return null;
 
-  const cart = data.cartLinesUpdate.cart;
+  const cart = data?.cartLinesUpdate?.cart;
   if (cart?.id) {
     const jar = await cookies();
     jar.set(CART_COOKIE, cart.id, { path: "/", httpOnly: true, sameSite: "lax" });
@@ -298,10 +290,11 @@ export async function updateLineQuantity(lineId: string, quantity: number) {
 export async function replaceCartWithVariant(variantId: string, quantity: number) {
   "use server";
   const cartId = await getOrCreateCartId();
+  if (!cartId) return null;
 
   // Read cart to get line IDs
   const data = await shopify<CartGetResult>(CART_GET, { cartId });
-  const cart = data.cart;
+  const cart = data?.cart;
 
   // Clear existing lines (set qty=0)
   const lineUpdates =
@@ -313,8 +306,8 @@ export async function replaceCartWithVariant(variantId: string, quantity: number
       lines: lineUpdates,
     });
 
-    const errs = cleared.cartLinesUpdate.userErrors;
-    if (errs?.length) throw new Error(errs.map((e) => e.message).join(" | "));
+    const errs = cleared?.cartLinesUpdate?.userErrors;
+    if (errs?.length) return null;
   }
 
   // Add the target variant
@@ -324,10 +317,10 @@ export async function replaceCartWithVariant(variantId: string, quantity: number
     lines: [{ merchandiseId: variantId, quantity: nextQty }],
   });
 
-  const errs2 = added.cartLinesAdd.userErrors;
-  if (errs2?.length) throw new Error(errs2.map((e) => e.message).join(" | "));
+  const errs2 = added?.cartLinesAdd?.userErrors;
+  if (errs2?.length) return null;
 
-  const nextCart = added.cartLinesAdd.cart;
+  const nextCart = added?.cartLinesAdd?.cart;
   if (nextCart?.id) {
     const jar = await cookies();
     jar.set(CART_COOKIE, nextCart.id, { path: "/", httpOnly: true, sameSite: "lax" });

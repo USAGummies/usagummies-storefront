@@ -18,81 +18,32 @@ The build is designed to be **stable and regression-resistant**:
 
 ---
 
-## 1) Required environment variables (Shopify)
+## Shopify environment variables (required)
 
-Create `.env.local` in the project root:
+Create `.env.local` in the project root (or set these in your shell/CI):
 
-```bash
-SHOPIFY_STORE_DOMAIN=your-store.myshopify.com
-SHOPIFY_STOREFRONT_ACCESS_TOKEN=your_storefront_token
-```
+- `SHOPIFY_STORE_DOMAIN=your-store.myshopify.com`
+- `SHOPIFY_STOREFRONT_ACCESS_TOKEN=<your storefront token>`
+- `SHOPIFY_STOREFRONT_API_VERSION=2024-07` (optional, defaults to 2024-07 if omitted)
+- Optional override: `SHOPIFY_STOREFRONT_API_ENDPOINT=https://your-store.myshopify.com/api/2024-07/graphql.json`
 
 Optional (recommended for canonical URLs in metadata):
 
-```bash
-NEXT_PUBLIC_SITE_URL=https://www.usagummies.com
+- `NEXT_PUBLIC_SITE_URL=https://www.usagummies.com`
+
+### Bundle tier mapping (5/8/12)
+
+Preferred: product metafield `usagummies.bundle_tiers` with JSON:
+
+```json
+{
+  "5":  { "variantId": "gid://shopify/ProductVariant/...", "qty": 5 },
+  "8":  { "variantId": "gid://shopify/ProductVariant/...", "qty": 8 },
+  "12": { "variantId": "gid://shopify/ProductVariant/...", "qty": 12 }
+}
 ```
 
----
+## Canonical UI module: BundleQuickBuy
 
-## 2) Optional integrations (plug-and-play)
-
-These are **safe** when unset. The site remains fast and functional without them.
-
-### Google Analytics 4
-
-```bash
-NEXT_PUBLIC_GA4_ID=G-XXXXXXXXXX
-```
-
-### Meta Pixel
-
-```bash
-NEXT_PUBLIC_META_PIXEL_ID=1234567890
-```
-
-### Instagram feed (@usagummies)
-
-The site uses a **server-side** fetch via `/api/instagram` so tokens are never exposed to the browser.
-
-```bash
-INSTAGRAM_USER_ID=your_instagram_user_id
-INSTAGRAM_ACCESS_TOKEN=your_long_lived_token
-```
-
-If unset, the Instagram section renders a clean fallback CTA instead of breaking the page.
-
----
-
-## 3) Amazon reviews (single source of truth)
-
-Reviews are intentionally implemented as a **stable trust system** (not scraping).
-
-Paste real review data into:
-
-`src/data/amazonReviews.ts`
-
-Once filled, reviews automatically render:
-
-- Home hero trust line
-- PDP purchase area (near bundles/pricing)
-- Cart confidence area
-
----
-
-## 4) Local development
-
-```bash
-npm install
-npm run dev
-```
-
-Open: http://localhost:3000
-
----
-
-## 5) Deploy
-
-Deploy to Vercel (recommended) or any Node host.
-
-Ensure your environment variables are set in the host dashboard.
+- `src/components/home/BundleQuickBuy.client.tsx` is the canonical bundle selector UI and must be reused across Homepage/Shop/PDP/Cart surfaces.
+- Its design language, copy, pill/tier mapping, savings framing, and CTA behavior are locked; only bug fixes/accessibility fixes/approved strategy changes may alter it.

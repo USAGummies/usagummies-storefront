@@ -20,18 +20,53 @@ type VariantNode = {
   availableForSale?: boolean;
   price?: MoneyLike;
   priceV2?: MoneyLike;
+  bundleBadge?: { value?: string | null } | null;
 };
 
 type Product = {
   title: string;
   handle: string;
+  description?: string;
   variants?: { nodes?: VariantNode[] };
   priceRange?: { minVariantPrice?: MoneyLike; maxVariantPrice?: MoneyLike };
 };
 
-function money(amount?: number) {
-  if (!Number.isFinite(amount || 0)) return "$0.00";
-  return `$${(amount || 0).toFixed(2)}`;
+type BundleBadge = "most_popular" | "best_deal";
+
+type BundleOption = {
+  qty: number;
+  label: string;
+  sub: string;
+  accent?: boolean;
+  variant: VariantNode;
+  totalPrice?: number;
+  perBag?: number;
+  freeShipping: boolean;
+  badges: BundleBadge[];
+  savingsAmount: number;
+  savingsPct?: number;
+  currencyCode?: string;
+};
+
+function money(amount?: number, currencyCode = "USD") {
+  const n = Number(amount);
+  if (!Number.isFinite(n)) return "—";
+
+  try {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: currencyCode,
+      maximumFractionDigits: n % 1 === 0 ? 0 : 2,
+    }).format(n);
+  } catch {
+    return `$${n.toFixed(2)}`;
+  }
+}
+
+function formatPercent(n?: number) {
+  if (typeof n !== "number" || !Number.isFinite(n)) return "";
+  const rounded = n >= 10 ? Math.round(n) : Math.round(n * 10) / 10;
+  return `${rounded}%`;
 }
 
 function asNumberAmount(v?: MoneyLike) {
@@ -40,15 +75,53 @@ function asNumberAmount(v?: MoneyLike) {
   return Number.isFinite(n) ? n : undefined;
 }
 
-function pickBaseVariant(variants: VariantNode[]) {
-  const byTitle = [...variants].sort((a, b) => {
-    const at = (a.title || "").toLowerCase();
-    const bt = (b.title || "").toLowerCase();
-    const aSingle = at.includes("single") || at.includes("1") || at.includes("one");
-    const bSingle = bt.includes("single") || bt.includes("1") || bt.includes("one");
-    return Number(bSingle) - Number(aSingle);
-  });
-  return byTitle[0] || variants[0];
+// Parse bundle quantity from Shopify variant titles like:
+// "5 bag Starter Bundle for $23.99 ..."
+// "2 bags for $9.98 ..."
+// "Single bag for ..."
+function parseQtyFromTitle(title?: string): number | undefined {
+  const t = (title || "").toLowerCase();
+
+  if (t.includes("single")) return 1;
+
+  const m1 = t.match(/(\d+)\s*(?:bag|bags)\b/); // "5 bag", "2 bags"
+  if (m1?.[1]) {
+    const n = Number(m1[1]);
+    return Number.isFinite(n) ? n : undefined;
+  }
+
+  // Fallback: first integer in title
+  const m2 = t.match(/(\d+)/);
+  if (m2?.[1]) {
+    const n = Number(m2[1]);
+    return Number.isFinite(n) ? n : undefined;
+  }
+
+  return undefined;
+}
+
+function isFreeShippingTitle(title?: string) {
+  const t = (title || "").toLowerCase();
+  return t.includes("free shipping") || t.includes("free-ship") || t.includes("freeshipping");
+}
+
+function normalizeBadge(raw?: string | null): BundleBadge | undefined {
+  if (!raw) return undefined;
+  const v = raw.toString().trim().toLowerCase().replace(/\s+/g, "_");
+
+  if (v === "most_popular" || v === "mostpopular" || v === "popular") return "most_popular";
+  if (v === "best_deal" || v === "bestdeal" || v === "deal") return "best_deal";
+  return undefined;
+}
+
+function variantPriceNumber(v?: VariantNode) {
+  return asNumberAmount(v?.price) ?? asNumberAmount(v?.priceV2);
+}
+
+function pickSingleVariant(variants: VariantNode[]) {
+  const matches = variants.filter((v) => parseQtyFromTitle(v.title) === 1);
+  const avail = matches.find((v) => v.availableForSale !== false);
+  return avail || matches[0] || variants[0];
 }
 
 export default function PurchaseBox({
@@ -61,28 +134,164 @@ export default function PurchaseBox({
   const router = useRouter();
 
   const variants = (product?.variants?.nodes || []) as VariantNode[];
-  const baseVariant = pickBaseVariant(variants);
+  const subtitleText =
+    product?.description?.trim() ||
+    "Premium, dye-free gummy bears made in the USA — bundle & save on your favorites.";
 
-  const basePriceNumber =
-    asNumberAmount(baseVariant?.price) ??
-    asNumberAmount(baseVariant?.priceV2) ??
-    asNumberAmount(product?.priceRange?.minVariantPrice) ??
-    0;
-
+  // Canonical ladder. We'll show a tier only if Shopify actually has that variant.
   const ladder = useMemo(
     () => [
-      { qty: 1, label: "1 Bag", tag: "Try it", accent: false },
-      { qty: 2, label: "2 Bags", tag: "Stock up", accent: false },
-      { qty: 4, label: "4 Bags", tag: "Better value", accent: false },
-      { qty: 5, label: "5 Bags", tag: "FREE SHIPPING", accent: true, popular: true },
-      { qty: 8, label: "8 Bags", tag: "Best deal", accent: true },
-      { qty: 12, label: "12 Bags", tag: "Party pack", accent: true },
+      { qty: 1, label: "1 Bag", sub: "Try it" },
+      { qty: 2, label: "2 Bags", sub: "Stock up" },
+      { qty: 4, label: "4 Bags", sub: "Better value" },
+      { qty: 5, label: "5 Bags", sub: "FREE SHIPPING", accent: true },
+      { qty: 8, label: "Best Value (8 bags) — Lowest price per bag", sub: "Best deal", accent: true },
+      { qty: 12, label: "12 Bags", sub: "Party pack", accent: true },
     ],
     []
   );
 
-  const [selectedQty, setSelectedQty] = useState<number>(5);
+  // Build a qty->variant map from Shopify titles
+  const qtyToVariant = useMemo(() => {
+    const map = new Map<number, VariantNode>();
+    for (const v of variants) {
+      const q = parseQtyFromTitle(v.title);
+      if (!q) continue;
+      // Prefer available variants if duplicates
+      const existing = map.get(q);
+      if (!existing) {
+        map.set(q, v);
+      } else {
+        const eAvail = existing.availableForSale !== false;
+        const vAvail = v.availableForSale !== false;
+        if (!eAvail && vAvail) map.set(q, v);
+      }
+    }
+    return map;
+  }, [variants]);
+
+  const availableTiers = useMemo(() => {
+    return ladder.filter((t) => qtyToVariant.get(t.qty));
+  }, [ladder, qtyToVariant]);
+
+  const baselineVariant = useMemo(() => {
+    const sorted = Array.from(qtyToVariant.entries()).sort((a, b) => a[0] - b[0]);
+    if (sorted[0]?.[1]) return sorted[0][1];
+    return pickSingleVariant(variants);
+  }, [qtyToVariant, variants]);
+
+  const baselinePrice =
+    variantPriceNumber(baselineVariant) ??
+    asNumberAmount(product?.priceRange?.minVariantPrice) ??
+    0;
+
+  const baselineCurrency =
+    (baselineVariant?.price as any)?.currencyCode ||
+    (baselineVariant?.priceV2 as any)?.currencyCode ||
+    (product?.priceRange?.minVariantPrice as any)?.currencyCode ||
+    "USD";
+
+  const bundleOptions = useMemo<BundleOption[]>(() => {
+    return availableTiers.map((t) => {
+      const variant = qtyToVariant.get(t.qty)!;
+      const totalPrice = variantPriceNumber(variant);
+      const perBag = t.qty > 0 && Number.isFinite(totalPrice) ? (totalPrice as number) / t.qty : undefined;
+      const savingsAmount =
+        Number.isFinite(baselinePrice) && Number.isFinite(totalPrice)
+          ? Math.max(0, (baselinePrice as number) * t.qty - (totalPrice as number))
+          : 0;
+      const savingsPct =
+        baselinePrice && savingsAmount > 0
+          ? (savingsAmount / ((baselinePrice as number) * t.qty)) * 100
+          : undefined;
+
+      const badgeMeta = normalizeBadge(
+        (variant as any)?.bundleBadge?.value ?? (variant as any)?.metafield?.value
+      );
+
+      const currencyCode =
+        (variant.price as any)?.currencyCode ||
+        (variant.priceV2 as any)?.currencyCode ||
+        baselineCurrency;
+
+      return {
+        ...t,
+        variant,
+        totalPrice,
+        perBag,
+        freeShipping: isFreeShippingTitle(variant?.title),
+        badges: badgeMeta ? [badgeMeta] : [],
+        savingsAmount,
+        savingsPct,
+        currencyCode,
+      };
+    });
+  }, [availableTiers, qtyToVariant, baselinePrice, baselineCurrency]);
+
+  const bundleOptionsWithBadges = useMemo<BundleOption[]>(() => {
+    const opts = bundleOptions.map((o) => ({ ...o, badges: [...o.badges] }));
+
+    let mostTaken = false;
+    let bestTaken = false;
+
+    for (const o of opts) {
+      const hasMost = o.badges.includes("most_popular");
+      const hasBest = o.badges.includes("best_deal");
+
+      o.badges = [
+        ...(hasMost && !mostTaken ? ((mostTaken = true), ["most_popular"] as const) : []),
+        ...(hasBest && !bestTaken ? ((bestTaken = true), ["best_deal"] as const) : []),
+      ];
+    }
+
+    // Ensure 5-bag shows as Most Popular when available
+    const fiveTier = opts.find((o) => o.qty === 5);
+    if (fiveTier && !fiveTier.badges.includes("most_popular") && !mostTaken) {
+      fiveTier.badges.push("most_popular");
+      mostTaken = true;
+    }
+
+    if (!mostTaken && opts.length) {
+      const sortedByQty = [...opts].sort((a, b) => a.qty - b.qty);
+      const median = sortedByQty[Math.floor(sortedByQty.length / 2)];
+      if (median && !median.badges.includes("most_popular")) {
+        median.badges.push("most_popular");
+        mostTaken = true;
+      }
+    }
+
+    if (!bestTaken) {
+      const best = [...opts]
+        .filter((o) => (o.savingsPct ?? 0) > 0)
+        .sort((a, b) => (b.savingsPct ?? 0) - (a.savingsPct ?? 0) || b.qty - a.qty)[0];
+      if (best && !best.badges.includes("best_deal")) {
+        best.badges.push("best_deal");
+        bestTaken = true;
+      }
+    }
+
+    return opts;
+  }, [bundleOptions]);
+
+  const defaultVariantId = useMemo(() => {
+    const preferred = bundleOptionsWithBadges.find((o) => o.qty === 5);
+    if (preferred?.variant?.id) return preferred.variant.id;
+    return bundleOptionsWithBadges[0]?.variant.id ?? pickSingleVariant(variants)?.id ?? null;
+  }, [bundleOptionsWithBadges, variants]);
+
+  const [bagCount, setBagCount] = useState<number>(() => bundleOptionsWithBadges.find((o) => o.qty === 5)?.qty || bundleOptionsWithBadges[0]?.qty || 1);
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(defaultVariantId);
   const [adding, setAdding] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Keep selection valid as data hydrates
+  useEffect(() => {
+    if (!bundleOptionsWithBadges.length) return;
+    setSelectedVariantId((prev) => {
+      if (prev && bundleOptionsWithBadges.some((o) => o.variant.id === prev)) return prev;
+      return defaultVariantId;
+    });
+  }, [bundleOptionsWithBadges, defaultVariantId]);
 
   const bundlesRef = useRef<HTMLDivElement | null>(null);
   const [focusGlow, setFocusGlow] = useState(false);
@@ -93,71 +302,121 @@ export default function PurchaseBox({
         bundlesRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
         setFocusGlow(true);
         setTimeout(() => setFocusGlow(false), 1400);
-      }, 100);
+      }, 120);
     }
   }, [focus]);
 
-  async function addToCart(qty: number) {
-    if (!baseVariant?.id) return;
+  // Map bag count to the nearest available variant (favor rounding up for value/free-ship nudges)
+  useEffect(() => {
+    if (!bundleOptionsWithBadges.length) return;
+    const sorted = [...bundleOptionsWithBadges].sort((a, b) => a.qty - b.qty);
+    const exact = sorted.find((o) => o.qty === bagCount);
+    if (exact) {
+      setSelectedVariantId(exact.variant.id);
+      return;
+    }
+    // choose smallest qty >= bagCount, else largest
+    const up = sorted.find((o) => o.qty >= bagCount);
+    const target = up ?? sorted[sorted.length - 1];
+    setSelectedVariantId(target?.variant.id ?? null);
+  }, [bagCount, bundleOptionsWithBadges]);
+
+  const selectedOption =
+    bundleOptionsWithBadges.find((o) => o.variant.id === selectedVariantId) ??
+    bundleOptionsWithBadges[0];
+
+  const selectedVariant = selectedOption?.variant ?? pickSingleVariant(variants);
+  const selectedPriceRaw = variantPriceNumber(selectedVariant);
+  const selectedPrice =
+    typeof selectedPriceRaw === "number" && Number.isFinite(selectedPriceRaw)
+      ? selectedPriceRaw
+      : undefined;
+  const selectedQty = selectedOption?.qty ?? parseQtyFromTitle(selectedVariant?.title) ?? 1;
+  const selectedCurrency =
+    (selectedVariant?.price as any)?.currencyCode ||
+    (selectedVariant?.priceV2 as any)?.currencyCode ||
+    baselineCurrency;
+  const freeShip = isFreeShippingTitle(selectedVariant?.title);
+
+  const startingAt =
+    baselinePrice > 0
+      ? baselinePrice
+      : asNumberAmount(product?.priceRange?.minVariantPrice) ?? 0;
+
+  const perBag = selectedQty > 0 && selectedPrice !== undefined ? selectedPrice / selectedQty : undefined;
+
+  async function addToCart() {
+    setError(null);
+
+    if (!selectedVariant?.id) {
+      setError("No purchasable variant found for this product.");
+      return;
+    }
+
     setAdding(true);
     try {
-      await fetch("/api/cart", {
+      const res = await fetch("/api/cart", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "add",
-          variantId: baseVariant.id,
-          quantity: qty,
+          variantId: selectedVariant.id,
+          quantity: 1, // IMPORTANT: bundle is represented by the variant itself
         }),
       });
 
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        throw new Error(txt || "Cart request failed");
+      }
+
       router.push("/cart");
       router.refresh();
+    } catch {
+      setError("Couldn’t add to cart. Please try again.");
+      setAdding(false);
     } finally {
       setAdding(false);
     }
   }
 
-  const total = basePriceNumber * Number(selectedQty || 1);
-
-  const selected = ladder.find((x) => x.qty === selectedQty);
-  const selectedTag = selected?.tag || "";
-  const selectedAccent = Boolean(selected?.accent);
+  const selectedSavingsAmount = selectedOption?.savingsAmount ?? 0;
+  const selectedSavingsPct = selectedOption?.savingsPct ?? 0;
 
   return (
-    <section data-purchase-section="true">
+    <section data-purchase-section="true" className="pbx">
       {/* Top strip */}
-      <div className="patriot-banner">
-        <div className="patriot-banner__content" style={{ padding: 16 }}>
-          <div style={{ display: "flex", gap: 12, alignItems: "flex-start", justifyContent: "space-between" }}>
-            <div>
-              <div className="kicker">Bundle & Save</div>
-              <div style={{ fontWeight: 950, fontSize: 18, marginTop: 8 }}>
-                {product?.title || "USA Gummies"}
-              </div>
-              <div className="muted" style={{ marginTop: 6, fontSize: 14 }}>
-                Pick a bundle — the cart does the nudging. Free shipping at 5+.
+      <div className="pbx__banner">
+        <div className="pbx__bannerInner">
+          <div className="pbx__bannerGrid">
+            <div className="pbx__left">
+              <div className="pbx__kicker">Bundle &amp; Save</div>
+              <div className="pbx__title">{product?.title || "USA Gummies"}</div>
+              <div className="pbx__subtitle">{subtitleText}</div>
+              <div className="pbx__muted">
+                Choose a bundle.{" "}
+                <strong>
+                  {freeShip
+                    ? "Free shipping unlocked."
+                    : "Free shipping on bundle variants marked free-ship."}
+                </strong>
               </div>
 
-              <div className="badge-row" style={{ marginTop: 10 }}>
-                <span className="badge">🇺🇸 Made in USA</span>
-                <span className="badge">✅ Dye-free</span>
-                <span className="badge">🚚 Ships fast</span>
+              <div className="pbx__badges">
+                <span className="pbx__badge">🇺🇸 Made in USA</span>
+                <span className="pbx__badge">✅ Dye-free</span>
+                <span className="pbx__badge">🚚 Ships fast</span>
               </div>
             </div>
 
-            <div style={{ textAlign: "right" }}>
-              <div className="kicker">Starting at</div>
-              <div style={{ fontFamily: "var(--font-display)", fontWeight: 950, fontSize: 24, marginTop: 6 }}>
-                {money(basePriceNumber)}
-              </div>
-              <div style={{ opacity: 0.75, fontSize: 12, marginTop: 4 }}>
-                per bag (base)
-              </div>
+            <div className="pbx__right">
+              <div className="pbx__kicker">Starting at</div>
+              <div className="pbx__price">{money(startingAt, baselineCurrency)}</div>
+              <div className="pbx__tiny">single bag</div>
             </div>
           </div>
 
-          <div style={{ marginTop: 12 }}>
+          <div className="pbx__ribbon">
             <PatriotRibbon />
           </div>
         </div>
@@ -166,187 +425,492 @@ export default function PurchaseBox({
       {/* Bundle ladder */}
       <div
         ref={bundlesRef}
-        className={cx(
-          "card-solid",
-          "purchase-ladder",
-          focusGlow && "purchase-glow"
-        )}
-        style={{ marginTop: 14, padding: 14 }}
+        className={cx("pbx__card", focusGlow && "pbx__glow")}
+        aria-label="Bundle selection"
       >
-        <div style={{ display: "flex", gap: 10, alignItems: "baseline", justifyContent: "space-between", flexWrap: "wrap" }}>
-          <div style={{ fontWeight: 950, fontSize: 16 }}>Choose your bundle</div>
-          <div style={{ opacity: 0.78, fontSize: 13 }}>
-            Free shipping at <span style={{ fontWeight: 950 }}>5+</span>
+        <div className="pbx__cardHeader">
+          <div>
+            <div className="pbx__cardTitle">Choose your bundle</div>
+            <div className="pbx__cardHint">
+              Prices are pulled from Shopify variants (no math).
+            </div>
+            <div className="pbx__guidance">
+              Most customers choose 5+ bags for free shipping; best value per bag is 8+.
+            </div>
+          </div>
+          <div className="pbx__cardMini">
+            <div className="pbx__miniTitle">Why bundles</div>
+            <div className="pbx__miniCopy">
+              Better per-bag value, free shipping at 5+, and most customers choose 5 bags.
+            </div>
           </div>
         </div>
+        <div className="pbx__nudge" aria-live="polite">
+          Bundle &amp; save — free shipping unlocks at 5+ bags.
+        </div>
 
-        <div
-          style={{
-            marginTop: 12,
-            display: "grid",
-            gap: 10,
-            gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-          }}
-          className="bundle-grid"
-        >
-          {ladder.map((b) => {
-            const active = selectedQty === b.qty;
-            const accent = Boolean(b.accent);
-            const bundleTotal = basePriceNumber * b.qty;
+        <div className="pbx__bagControls" aria-label="Choose bag quantity">
+          <div className="pbx__bagLabel">Bags</div>
+          <div className="pbx__bagStepper">
+            <button
+              type="button"
+              onClick={() => setBagCount((c) => Math.max(1, c - 1))}
+              aria-label="Decrease bags"
+            >
+              −
+            </button>
+            <div className="pbx__bagCount">{bagCount}</div>
+            <button
+              type="button"
+              onClick={() => setBagCount((c) => Math.min(12, c + 1))}
+              aria-label="Increase bags"
+            >
+              +
+            </button>
+          </div>
+          <div className="pbx__bagHint">We select the best-value bundle automatically.</div>
+        </div>
+
+        <div className="pbx__grid">
+          {bundleOptionsWithBadges.map((o) => {
+            const active = selectedVariantId === o.variant.id;
+            const accent = Boolean((o as any).accent);
+            const showSavings = o.savingsAmount > 0;
+            const savingsPctLabel =
+              o.savingsPct && o.savingsPct >= 5 ? formatPercent(o.savingsPct) : "";
+            const glow = o.badges.includes("most_popular") || o.badges.includes("best_deal");
 
             return (
               <button
-                key={b.qty}
+                key={o.variant.id}
                 type="button"
-                onClick={() => setSelectedQty(b.qty)}
+                onClick={() => setBagCount(o.qty)}
                 className={cx(
-                  "bundle-tile",
-                  active && "bundle-tile--active",
-                  accent && "bundle-tile--accent",
-                  active && accent && "bundle-tile--active-accent"
+                  "pbx__tile",
+                  accent && "pbx__tile--accent",
+                  active && "pbx__tile--active",
+                  active && accent && "pbx__tile--activeAccent",
+                  glow && "pbx__tile--glow"
                 )}
+                aria-pressed={active}
               >
-                <div style={{ display: "flex", gap: 10, alignItems: "flex-start", justifyContent: "space-between" }}>
-                  <div>
-                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                      <div style={{ fontWeight: 950, fontSize: 16 }}>{b.label}</div>
-                      {b.popular ? (
-                        <span
-                          style={{
-                            borderRadius: 999,
-                            padding: "6px 10px",
-                            border: "1px solid rgba(193,18,31,0.20)",
-                            background: "rgba(193,18,31,0.10)",
-                            fontWeight: 950,
-                            fontSize: 11,
-                          }}
-                        >
-                          Most Popular
-                        </span>
+                <div className="pbx__tileTop">
+                  <div className="pbx__tileLeft">
+                    <div className="pbx__tileLabelRow">
+                      <span className={cx("pbx__check", active && "pbx__check--active")} aria-hidden="true">
+                        {active ? "✓" : ""}
+                      </span>
+                      <div className="pbx__tileLabel">{o.label}</div>
+                      {o.badges.length ? (
+                        <div className="pbx__tileBadges">
+                          {o.badges.includes("most_popular") ? (
+                            <span className="pbx__pill">Most Popular</span>
+                          ) : null}
+                          {o.badges.includes("best_deal") ? (
+                            <span className="pbx__pill pbx__pill--navy">Best Deal</span>
+                          ) : null}
+                        </div>
                       ) : null}
                     </div>
-                    <div style={{ opacity: 0.75, marginTop: 6, fontSize: 12 }}>
-                      {b.tag}
+                    <div className={cx("pbx__tileSub", accent && "pbx__tileSub--accent")}>
+                      {o.sub}
                     </div>
                   </div>
 
-                  <div style={{ textAlign: "right" }}>
-                    <div style={{ opacity: 0.7, fontSize: 12 }}>Total</div>
-                    <div style={{ fontWeight: 950, fontSize: 16 }}>
-                      {money(bundleTotal)}
-                    </div>
+                  <div className="pbx__tileRight">
+                    <div className="pbx__tiny">Price</div>
+                    <div className="pbx__tileTotal">{money(o.totalPrice, o.currencyCode)}</div>
+                    <div className="pbx__tilePer">Per bag: {money(o.perBag, o.currencyCode)}</div>
+                    {showSavings ? (
+                      <div className="pbx__save">
+                        Save {money(o.savingsAmount, o.currencyCode)} vs single bag
+                        {savingsPctLabel ? (
+                          <span className="pbx__savePct">{` ${savingsPctLabel}`}</span>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
 
-                {accent ? (
-                  <div style={{ marginTop: 10, opacity: 0.78, fontSize: 12, display: "flex", justifyContent: "space-between", gap: 10 }}>
-                    <span>🔥 Better bundle value</span>
-                    <span>🇺🇸 Premium deal tier</span>
-                  </div>
-                ) : (
-                  <div style={{ marginTop: 10, opacity: 0.6, fontSize: 12 }}>
-                    Great starter option
-                  </div>
-                )}
+                <div className="pbx__tileBottom">
+                  {o.freeShipping ? (
+                    <span>✅ Free shipping variant</span>
+                  ) : (
+                    <span>Standard shipping</span>
+                  )}
+                  <span>
+                    {money(o.perBag, o.currencyCode)} {o.qty ? `/ bag` : ""}
+                  </span>
+                </div>
               </button>
             );
           })}
         </div>
 
         {/* Decision row */}
-        <div className="card" style={{ marginTop: 12, padding: 14 }}>
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
-            <div>
-              <div style={{ fontWeight: 950 }}>
-                Selected:{" "}
-                <span style={{ color: selectedAccent ? "var(--red)" : "inherit" }}>
-                  {selectedQty} bag(s)
-                </span>
-              </div>
-              <div style={{ opacity: 0.75, marginTop: 6, fontSize: 13 }}>
-                {selectedTag} • Bundle total shown below
-              </div>
+        <div className="pbx__summary" aria-live="polite" role="status">
+          <div className="pbx__summaryLeft">
+            <div className="pbx__summaryTitle">
+              Selected:{" "}
+              <span className={cx("pbx__em", freeShip && "pbx__em--red")}>
+                {selectedOption?.label || `${selectedQty} bags`}
+              </span>
             </div>
 
-            <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-              <div style={{ textAlign: "right" }}>
-                <div style={{ opacity: 0.7, fontSize: 12 }}>Bundle total</div>
-                <div style={{ fontFamily: "var(--font-display)", fontWeight: 950, fontSize: 26 }}>
-                  {money(total)}
-                </div>
+            <div className="pbx__summarySub">
+              {freeShip ? (
+                <span className="pbx__good">Free shipping on this bundle</span>
+              ) : (
+                <span>Ships via standard rates</span>
+              )}
+              {" • "}
+              <span>
+                <strong>{money(perBag, selectedCurrency)}</strong> / bag
+              </span>
+            </div>
+
+            {selectedSavingsAmount > 0 ? (
+              <div className="pbx__saveLine">
+                You save {money(selectedSavingsAmount, selectedCurrency)} vs single bag
+                {selectedSavingsPct >= 5 ? ` (${formatPercent(selectedSavingsPct)})` : ""}
               </div>
+            ) : null}
 
-              <button
-                id="add-to-cart-hidden-submit"
-                type="button"
-                onClick={() => addToCart(selectedQty)}
-                style={{ display: "none" }}
-                aria-hidden="true"
-                tabIndex={-1}
-              />
+            {error ? <div className="pbx__error">{error}</div> : null}
+          </div>
 
-              <button
-                type="button"
-                disabled={adding}
-                onClick={() => addToCart(selectedQty)}
-                className={cx(
-                  "btn",
-                  selectedAccent ? "btn-primary" : "btn-navy",
-                  adding && "opacity-70"
-                )}
-                style={{
-                  padding: "12px 18px",
-                  borderRadius: 999,
-                  border: "none",
-                }}
-              >
-                {adding ? "Adding..." : "Add Bundle to Cart →"}
-              </button>
+          <div className="pbx__summaryRight">
+            <div className="pbx__totals">
+              <div className="pbx__tiny">Bundle price</div>
+              <div className="pbx__grand">{money(selectedPrice, selectedCurrency)}</div>
+              <div className="pbx__tilePer">Per bag: {money(perBag, selectedCurrency)}</div>
+            </div>
+
+            <button
+              type="button"
+              disabled={adding}
+              onClick={addToCart}
+              className={cx("pbx__cta", "pbx__cta--primary")}
+            >
+              {adding ? "Adding…" : "Add to Cart"}
+            </button>
+            <div className="pbx__ctaNote" aria-live="polite">
+              {selectedQty >= 5
+                ? "Free shipping unlocked ✅"
+                : "Free shipping unlocks at 5+ bags."}
+            </div>
+            <div className="pbx__ctaMicro">Secure checkout • Free ship 5+ • Easy returns</div>
+            <div className="pbx__badges pbx__badges--compact" aria-hidden="true">
+              <span className="pbx__badge">🇺🇸 Made in USA</span>
+              <span className="pbx__badge">✅ Dye-free</span>
+              <span className="pbx__badge">🚚 Ships fast</span>
+            </div>
+            <div className="pbx__trustInline" aria-hidden="true">
+              <span className="pbx__badge">🇺🇸 Made in USA</span>
+              <span className="pbx__badge">✅ Dye-free</span>
+              <span className="pbx__badge">🚚 Ships fast</span>
             </div>
           </div>
+        </div>
 
-          <div style={{ marginTop: 10, opacity: 0.75, fontSize: 13, lineHeight: 1.5 }}>
-            <strong>Tip:</strong> 5+ bags unlocks free shipping. 8+ is usually the best value per checkout.
+        <div className="pbx__tip">
+          <strong>Note:</strong> Bundles are Shopify variants (e.g., “5 bag Starter Bundle”). The price you see here is the variant price.
+        </div>
+
+        <div className="pbx__mobileSticky" aria-live="polite">
+          <div className="pbx__stickyLeft">
+            <div className="pbx__stickyLabel">{selectedOption?.label || `${selectedQty} bags`}</div>
+            <div className="pbx__stickySub">
+              {selectedQty >= 5 ? "Free shipping unlocked" : "Free shipping at 5+ bags"}
+            </div>
           </div>
+          <button
+            type="button"
+            onClick={addToCart}
+            disabled={adding}
+            className="pbx__stickyBtn"
+          >
+            {adding ? "Adding…" : "Add bundle"}
+          </button>
         </div>
       </div>
 
       <style>{`
-        @media (max-width: 520px){
-          .bundle-grid{ grid-template-columns: repeat(1, minmax(0, 1fr)) !important; }
-        }
-
-        .purchase-glow{
-          outline: 2px solid rgba(242,193,78,0.65);
-          box-shadow: 0 0 0 6px rgba(242,193,78,0.18), 0 18px 55px rgba(0,0,0,0.16);
-        }
-
-        .bundle-tile{
-          width: 100%;
-          text-align: left;
+        .pbx{ display:block; color: var(--text); }
+        .pbx__banner{
           border-radius: 18px;
-          border: 1px solid rgba(0,0,0,0.10);
-          background: rgba(255,255,255,0.78);
-          backdrop-filter: blur(10px);
-          padding: 14px;
-          cursor: pointer;
-          transition: transform .08s ease, box-shadow .18s ease, border-color .18s ease;
+          border: 1px solid var(--border);
+          background: var(--surface-strong);
+          overflow:hidden;
         }
-        .bundle-tile:hover{
-          transform: translateY(-1px);
-          box-shadow: 0 16px 34px rgba(0,0,0,0.12);
-          border-color: rgba(0,0,0,0.14);
+        .pbx__bannerInner{ padding: 16px; }
+        .pbx__bannerGrid{
+          display:flex; gap:14px; align-items:flex-start; justify-content:space-between;
         }
-        .bundle-tile--accent{
-          border-color: rgba(193,18,31,0.18);
+        .pbx__left{ min-width: 0; }
+        .pbx__right{ text-align:right; white-space:nowrap; }
+        .pbx__kicker{ font-size:12px; font-weight:900; letter-spacing:.06em; text-transform:uppercase; color: var(--muted); }
+    .pbx__title{ margin-top:8px; font-weight:950; font-size:18px; color: var(--text); }
+        .pbx__subtitle{ margin-top:6px; font-size:13px; color: var(--muted); line-height:1.5; }
+        .pbx__muted{ margin-top:6px; font-size:14px; color: var(--muted); }
+        .pbx__badges{ margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; }
+        .pbx__badges--compact{ margin-top:8px; }
+        .pbx__badge{
+          font-size:12px; font-weight:900;
+          border-radius:999px; padding:6px 10px;
+          border:1px solid var(--border);
+          background: var(--surface);
+          color: var(--text);
         }
-        .bundle-tile--active{
-          border-color: rgba(11,30,59,0.22);
-          box-shadow: 0 18px 38px rgba(0,0,0,0.14);
+        .pbx__price{ margin-top:6px; font-family: var(--font-display); font-weight:950; font-size:24px; color: var(--text); }
+        .pbx__tiny{ font-size:12px; color: var(--muted); margin-top:4px; }
+        .pbx__ribbon{ margin-top:12px; }
+
+        .pbx__card{
+          margin-top:14px;
+          border-radius:18px;
+          border:1px solid var(--border);
+          background: var(--surface-strong);
+          padding:14px;
         }
-        .bundle-tile--active-accent{
-          border-color: rgba(193,18,31,0.30);
-          box-shadow: 0 18px 44px rgba(193,18,31,0.10);
+        .pbx__glow{
+          outline: 2px solid rgba(21,36,65,0.35);
+          box-shadow: 0 0 0 6px rgba(21,36,65,0.12), 0 18px 55px rgba(21,36,65,0.16);
+        }
+        .pbx__cardHeader{
+          display:flex; gap:10px; align-items:flex-start; justify-content:space-between; flex-wrap:wrap;
+        }
+        .pbx__cardTitle{ font-weight:950; font-size:16px; color: var(--text); }
+        .pbx__cardHint{ font-size:13px; color: var(--muted); }
+        .pbx__guidance{ margin-top:6px; font-size:12px; color: var(--muted); }
+        .pbx__cardMini{
+          max-width: 260px;
+          background: var(--surface-strong);
+          border: 1px solid var(--border);
+          border-radius: 12px;
+          padding: 10px;
+        }
+        .pbx__miniTitle{
+          font-weight:900; font-size:12px; color: var(--text); text-transform:uppercase; letter-spacing:0.05em;
+        }
+        .pbx__miniCopy{
+          margin-top:4px; font-size:12px; color: var(--muted); line-height:1.4;
+        }
+        .pbx__nudge{
+          margin-top:8px;
+          font-size:13px;
+          font-weight:900;
+          color: var(--muted);
+        }
+
+        .pbx__grid{
+          margin-top:12px;
+          display:grid;
+          gap:8px;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        @media (max-width: 520px){
+          .pbx__grid{ grid-template-columns: repeat(1, minmax(0, 1fr)); }
+          .pbx__right{ display:none; }
+        }
+
+        .pbx__tile{
+          width:100%;
+          text-align:left;
+          border-radius:18px;
+          border:1px solid var(--border);
+          background: var(--surface);
+          padding:12px;
+          cursor:pointer;
+          transition: transform var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out), border-color var(--dur-2) var(--ease-out), background var(--dur-2) var(--ease-out);
+        }
+        .pbx__tile:hover{
+          transform: translateY(-2px);
+          box-shadow: 0 16px 34px rgba(21,36,65,0.14);
+          border-color: rgba(21,36,65,0.18);
+        }
+        .pbx__tile:focus-visible{
+          outline: 3px solid rgba(21,36,65,0.35);
+          outline-offset: 2px;
+        }
+        .pbx__tile--accent{ border-color: rgba(205,53,50,0.30); }
+        .pbx__tile--active{
+          border-color: rgba(21,36,65,0.34);
+          box-shadow: 0 18px 38px rgba(21,36,65,0.16);
+          background: linear-gradient(140deg, rgba(21,36,65,0.18), rgba(21,36,65,0.08));
+          transform: translateY(-2px) scale(1.01);
+        }
+        .pbx__tile--activeAccent{
+          border-color: rgba(205,53,50,0.38);
+          box-shadow: 0 18px 44px rgba(205,53,50,0.12);
+          animation: pbxPulse 3s ease-in-out infinite;
+        }
+        .pbx__tile--glow{
+          box-shadow: 0 22px 58px rgba(219,170,121,0.18), 0 0 0 1px rgba(219,170,121,0.24), 0 0 0 8px rgba(219,170,121,0.04);
+          background: rgba(219,170,121,0.06);
+        }
+
+        .pbx__tileTop{ display:flex; gap:10px; align-items:flex-start; justify-content:space-between; }
+        .pbx__tileLabelRow{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+        .pbx__tileLabel{ font-weight:950; font-size:15px; color: var(--text); }
+        .pbx__tileBadges{ display:flex; gap:6px; flex-wrap:wrap; }
+        .pbx__check{
+          width:18px; height:18px; border-radius:999px;
+          border:1px solid var(--border);
+          display:inline-flex; align-items:center; justify-content:center;
+          font-size:12px; font-weight:900; color: transparent;
+          background: rgba(255,255,255,0.08);
+        }
+        .pbx__check--active{
+          color: white;
+          background: linear-gradient(145deg, rgba(21,36,65,0.98), rgba(21,36,65,0.86));
+          border-color: rgba(21,36,65,0.4);
+          box-shadow: 0 8px 18px rgba(21,36,65,0.24);
+        }
+        .pbx__pill{
+          border-radius:999px; padding:6px 10px;
+          border:1px solid var(--red);
+          background: var(--red);
+          font-weight:950; font-size:11px; color: var(--white);
+        }
+        .pbx__pill--gold{
+          border-color: rgba(219,170,121,0.55);
+          background: rgba(219,170,121,0.2);
+          color: #7a531f;
+        }
+        .pbx__pill--navy{
+          border-color: rgba(219,170,121,0.45);
+          background: rgba(255,255,255,0.08);
+          color: var(--text);
+        }
+        .pbx__tileSub{ margin-top:6px; font-size:12px; color: var(--muted); }
+        .pbx__tileSub--accent{ color: var(--red); font-weight:900; }
+        .pbx__tileRight{ text-align:right; min-width:110px; color: var(--text); }
+        .pbx__tileTotal{ font-weight:950; font-size:16px; color: var(--text); }
+        .pbx__tilePer{ margin-top:4px; font-size:12px; color: var(--muted); }
+        .pbx__save{
+          margin-top:6px;
+          font-size:12px;
+          font-weight:900;
+          color: var(--text);
+        }
+        .pbx__savePct{ font-weight:800; color: var(--red); }
+        .pbx__tileBottom{
+          margin-top:10px;
+          font-size:12px;
+          color: var(--muted);
+          display:flex;
+          justify-content:space-between;
+          gap:10px;
+        }
+
+        .pbx__summary{
+          margin-top:12px;
+          border-radius:16px;
+          border:1px solid var(--border);
+          background: var(--surface);
+          padding:14px;
+          display:flex;
+          gap:12px;
+          align-items:center;
+          justify-content:space-between;
+          flex-wrap:wrap;
+          position: sticky;
+          bottom: 12px;
+          z-index: 2;
+        }
+        .pbx__summaryTitle{ font-weight:950; }
+        .pbx__em{ font-weight:950; color: var(--text); }
+        .pbx__em--red{ color: var(--red); }
+        .pbx__summarySub{ margin-top:6px; font-size:13px; color: var(--muted); }
+        .pbx__good{ font-weight:900; }
+        .pbx__saveLine{
+          margin-top:8px;
+          font-size:13px;
+          font-weight:900;
+          color: var(--text);
+        }
+        .pbx__error{
+          margin-top:10px;
+          font-size:13px;
+          font-weight:900;
+          color: rgba(193,18,31,0.95);
+        }
+
+        .pbx__summaryRight{ display:flex; gap:12px; align-items:center; }
+        .pbx__totals{ text-align:right; }
+        .pbx__grand{ font-family: var(--font-display); font-weight:950; font-size:26px; color: var(--text); }
+
+        .pbx__cta{
+          border:none;
+          border-radius:999px;
+          padding:12px 18px;
+          font-weight:950;
+          cursor:pointer;
+          transition: transform .08s ease, opacity .18s ease;
+          white-space:nowrap;
+          background: var(--navy);
+          color: white;
+        }
+        .pbx__cta:disabled{ opacity:.65; cursor:not-allowed; }
+        .pbx__cta:active{ transform: translateY(1px); background: #0f1d36; }
+        .pbx__ctaNote{
+          margin-top:6px;
+          font-size:12px;
+          color: var(--muted);
+        }
+        .pbx__ctaMicro{
+          margin-top:4px;
+          font-size:11px;
+          color: rgba(255,255,255,0.7);
+        }
+        .pbx__trustInline{
+          margin-top:8px;
+          display:flex;
+          gap:6px;
+          flex-wrap:wrap;
+        }
+
+        .pbx__tip{ margin-top:10px; font-size:13px; opacity:.78; line-height:1.5; }
+
+        .pbx__mobileSticky{
+          position: sticky;
+          bottom: 0;
+          display:none;
+          background: rgba(21,36,65,0.97);
+          color: white;
+          padding: 10px 12px;
+          border-radius: 14px;
+          margin-top:12px;
+          gap:10px;
+          align-items:center;
+          justify-content:space-between;
+        }
+        .pbx__stickyLeft{ min-width:0; }
+        .pbx__stickyLabel{ font-weight:900; }
+        .pbx__stickySub{ font-size:12px; opacity:0.82; margin-top:2px; }
+        .pbx__stickyBtn{
+          background: var(--red);
+          color: white;
+          border:none;
+          border-radius:999px;
+          padding:10px 14px;
+          font-weight:900;
+        }
+        @media (max-width: 640px){
+          .pbx__mobileSticky{ display:flex; }
+        }
+
+        @media (prefers-reduced-motion: reduce){
+          .pbx__tile,
+          .pbx__tile:hover,
+          .pbx__tile--active,
+          .pbx__tile--activeAccent,
+          .pbx__tile--glow{
+            transition: none !important;
+            animation: none !important;
+            transform: none !important;
+          }
         }
       `}</style>
     </section>

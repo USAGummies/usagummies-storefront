@@ -1,13 +1,17 @@
-// src/app/page.tsx (FULL REPLACE)
 import Link from "next/link";
 import Image from "next/image";
 import type { Metadata } from "next";
 import { getProductsPage } from "@/lib/shopify/products";
+import { getProductByHandle } from "@/lib/storefront";
+import BundleQuickBuy from "@/components/home/BundleQuickBuy.client";
+import ReviewsSection from "@/components/home/ReviewsSection";
+import { getBundleVariants } from "@/lib/bundles/getBundleVariants";
+import HeroCTAWatcher from "@/components/home/HeroCTAWatcher";
 
 export const metadata: Metadata = {
-  title: "USA Gummies | Premium American-Made Gummy Bears",
+  title: "USA Gummies | American-Made Clean Gummies",
   description:
-    "Premium American-made gummy bears. Bundle-first pricing. Fast shipping. Secure Shopify checkout.",
+    "Premium American-made gummy bears with clean ingredients, no dyes, and free shipping at 5+ bags.",
 };
 
 function formatMoney(amount: string | number, currency = "USD") {
@@ -21,299 +25,261 @@ function formatMoney(amount: string | number, currency = "USD") {
 }
 
 export default async function HomePage() {
-  // You have ONE product — grab just 1
-  const productsPage = await getProductsPage({
-    pageSize: 1,
-    sort: "best-selling",
-  });
+  let productsPage: Awaited<ReturnType<typeof getProductsPage>> | null = null;
+  try {
+    productsPage = await getProductsPage({ pageSize: 1, sort: "best-selling" });
+  } catch {
+    productsPage = null;
+  }
 
-  // Cast to any so TS stops complaining about fields (description, priceRange, etc.)
   const product = (productsPage?.nodes?.[0] as any) ?? null;
-
-  // Fallbacks if Shopify returns nothing (keeps homepage from exploding)
   const handle =
-    product?.handle?.toString?.() || "all-american-gummy-bears-7-5-oz-single-bag";
+    product?.handle?.toString?.() ||
+    "all-american-gummy-bears-7-5-oz-single-bag";
+
+  let detailedProduct: any = null;
+  try {
+    const detail = await getProductByHandle(handle);
+    detailedProduct = detail?.product || null;
+  } catch {
+    detailedProduct = null;
+  }
+
   const title =
-    product?.title?.toString?.() || "All American Gummy Bears – 7.5 oz bag";
+    detailedProduct?.title?.toString?.() ||
+    product?.title?.toString?.() ||
+    "All American Gummy Bears – 7.5 oz bag";
+
   const description =
+    detailedProduct?.description?.toString?.() ||
     product?.description?.toString?.() ||
-    "All natural flavors. No artificial dyes. Built in America. Shipped fast.";
+    "All natural flavors. Free from artificial dyes. Built in America. Shipped fast.";
 
-  const priceAmount =
-    product?.priceRange?.minVariantPrice?.amount ??
-    product?.variants?.nodes?.[0]?.price?.amount ??
-    "5.99";
-
-  const currency =
-    product?.priceRange?.minVariantPrice?.currencyCode ??
-    product?.variants?.nodes?.[0]?.price?.currencyCode ??
-    "USD";
-
-  // ✅ This file exists in your public/brand folder
   const heroImg = "/brand/hero.jpg";
+  let bundleVariants: Awaited<ReturnType<typeof getBundleVariants>> | null = null;
+  try {
+    bundleVariants = await getBundleVariants();
+  } catch {
+    bundleVariants = null;
+  }
+
+  const homepageTiers = (bundleVariants?.tiers || []).filter((t) =>
+    [5, 8, 12].includes(t.qty)
+  );
 
   return (
-    <main className="bg-[#fbf1e7]">
-      {/* HERO */}
-      <section className="mx-auto max-w-6xl px-4 pt-10 pb-12">
-        <div className="grid gap-10 md:grid-cols-2 md:items-center">
-          {/* Left */}
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-black/15 bg-white/70 px-3 py-1 text-sm shadow-sm">
-              <span>🇺🇸</span>
-              <span>Made in the USA</span>
-            </div>
-
-            <h1 className="mt-4 text-4xl font-black leading-[1.05] tracking-tight md:text-6xl">
-              Premium gummy bears.
-              <br />
-              Loud flavor.
-              <br />
-              Patriotic backbone.
-            </h1>
-
-            <p className="mt-4 max-w-prose text-base text-black/70">
-              Bundle-first pricing built for higher value and faster decisions.
-              Free shipping unlocks at 5+ bags. Checkout is powered by Shopify.
-            </p>
-
-            <div className="mt-6 flex flex-wrap gap-3">
-              <Link
-                href="/shop"
-                className="inline-flex items-center justify-center rounded-full bg-black px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
-              >
-                Shop →
-              </Link>
-              <Link
-                href="/america-250"
-                className="inline-flex items-center justify-center rounded-full border border-black/20 bg-white px-5 py-3 text-sm font-semibold shadow-sm transition hover:bg-white/80"
-              >
-                America 250 →
-              </Link>
-              <Link
-                href="/cart"
-                className="inline-flex items-center justify-center rounded-full border border-black/20 bg-white px-5 py-3 text-sm font-semibold shadow-sm transition hover:bg-white/80"
-              >
-                View cart →
-              </Link>
-            </div>
-
-            <div className="mt-6 grid grid-cols-2 gap-3">
-              {[
-                ["American-Made", "Built with pride. No fluff."],
-                ["Fast Shipping", "Quick fulfillment & tracking."],
-                ["Secure Checkout", "Shopify checkout protection."],
-                ["Bundle & Save", "Bigger cart = better deal."],
-              ].map(([h, p]) => (
-                <div
-                  key={h}
-                  className="rounded-2xl border border-black/15 bg-white/70 p-4 shadow-sm"
-                >
-                  <div className="text-sm font-bold">{h}</div>
-                  <div className="mt-1 text-xs text-black/65">{p}</div>
+    <main
+      className="bg-[var(--bg)] text-[var(--text)] min-h-screen pb-16 lg:pb-0"
+      style={{ backgroundColor: "var(--bg, #0c1426)", color: "var(--text, #f2f6ff)" }}
+    >
+      <section
+        className="relative overflow-hidden border-b border-gold-soft"
+        style={{
+          backgroundImage:
+            "linear-gradient(135deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.04) 40%, rgba(255,255,255,0.02) 100%), radial-gradient(circle at 10% 20%, rgba(255,255,255,0.05), rgba(255,255,255,0) 35%), radial-gradient(circle at 80% 0%, rgba(255,255,255,0.05), rgba(255,255,255,0) 30%)",
+        }}
+      >
+        <div className="absolute inset-0 pointer-events-none" aria-hidden="true" />
+        <div className="relative mx-auto max-w-6xl px-4 py-3 sm:py-5 lg:py-9">
+          <div className="grid gap-4 lg:gap-9 lg:grid-cols-2 lg:items-stretch">
+            <div className="flex flex-col gap-2.5">
+              <div className="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--muted)]">
+                American-made gummies
+              </div>
+              <div className="space-y-1.5">
+                <h1 className="text-3xl font-black leading-tight text-white sm:text-4xl lg:text-5xl">
+                  Bold Flavor. Clean Label. Gummy Bears Done Right.
+                </h1>
+                <div className="text-[13px] font-semibold uppercase tracking-[0.22em] text-[var(--gold)]">
+                  Fan-favorite
                 </div>
-              ))}
+                <p className="text-sm text-[var(--muted)] sm:text-base max-w-prose">
+                  Dye-free, all-natural gummies — free shipping on 5+ bags.
+                </p>
+                {/* Mobile pills: exactly two, never wrap */}
+                <div className="flex md:hidden flex-nowrap items-center gap-2 overflow-hidden text-[11px] font-semibold text-white/75">
+                  <span className="badge px-2 py-1 opacity-80">🇺🇸 Made in USA</span>
+                  <span className="badge px-2 py-1 opacity-80">✅ Dye-free</span>
+                </div>
+                {/* Desktop/tablet pills: three pills */}
+                <div className="hidden md:flex flex-nowrap items-center gap-2 overflow-hidden text-xs font-semibold text-white/80">
+                  <span className="badge px-3 py-1.5">🇺🇸 Made in USA</span>
+                  <span className="badge px-3 py-1.5">✅ Dye-free</span>
+                  <span className="badge px-3 py-1.5">🚚 Ships fast</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-1 text-sm font-semibold text-[var(--muted)]">
+                  <span>Bundle & save</span>
+                  <span className="text-[var(--muted)]">•</span>
+                  <span>8+ bags is the sweet spot</span>
+                </div>
+              </div>
+              <div className="flex flex-col gap-1 sm:flex-row sm:flex-wrap">
+                <div className="text-sm text-white/80 font-semibold">
+                  <span className="text-[var(--gold)]">★★★★★</span> 4.9 stars • Real reviews
+                </div>
+                <div id="hero-primary-cta" className="w-full sm:w-auto">
+                  <a href="#bundle-pricing" className="btn btn-red w-full sm:w-auto">
+                    Build my bundle
+                  </a>
+                </div>
+              </div>
+              <div className="lg:hidden">
+                <div className="usa-hero__frame h-full min-h-[130px] sm:min-h-[180px] rounded-2xl border border-gold-soft">
+                  <Image
+                    src={heroImg}
+                    alt="USA Gummies hero"
+                    fill
+                    priority
+                    unoptimized
+                    sizes="(max-width: 640px) 90vw, (max-width: 1024px) 60vw, 560px"
+                    className="object-cover"
+                  />
+                  <div className="hero-fade" />
+                </div>
+                {/* hide link on mobile to avoid overlap */}
+                <div className="mt-2">
+                  <Link
+                    href="/products/all-american-gummy-bears-7-5-oz-single-bag"
+                    className="hidden lg:inline-flex text-xs sm:text-sm text-white/65 underline underline-offset-4 hover:text-white focus-ring w-fit"
+                  >
+                    See ingredients & single bag →
+                  </Link>
+                </div>
+              </div>
+              <div className="hidden lg:block">
+                <Link
+                  href="/products/all-american-gummy-bears-7-5-oz-single-bag"
+                  className="text-xs sm:text-sm text-white/65 underline underline-offset-4 hover:text-white focus-ring w-fit inline-flex"
+                >
+                  See ingredients & single bag →
+                </Link>
+              </div>
             </div>
-          </div>
 
-          {/* Right */}
-          <div className="relative">
-            <div className="relative mx-auto aspect-[4/3] w-full max-w-lg overflow-hidden rounded-[28px] border border-black/15 bg-white shadow-sm">
-              <Image
-                src={heroImg}
-                alt="USA Gummies hero"
-                fill
-                priority
-                sizes="(max-width: 768px) 92vw, 520px"
-                className="object-cover"
+            <div className="flex flex-col gap-3 lg:gap-5">
+              <div className="relative hidden lg:block">
+                <div className="usa-hero__frame h-full min-h-[230px] lg:min-h-[360px] rounded-2xl border border-gold-soft">
+                  <Image
+                    src={heroImg}
+                    alt="USA Gummies hero"
+                    fill
+                    priority
+                    unoptimized
+                    sizes="(max-width: 640px) 90vw, (max-width: 1024px) 60vw, 560px"
+                    className="object-cover"
+                  />
+                  <div className="hero-fade" />
+                </div>
+              </div>
+
+              <BundleQuickBuy
+                anchorId="bundle-pricing"
+                productHandle={handle}
+                tiers={homepageTiers}
               />
             </div>
-
-            {/* Mini price chip */}
-            <div className="mx-auto mt-4 w-full max-w-lg">
-              <div className="inline-flex items-center gap-2 rounded-full border border-black/15 bg-white/80 px-4 py-2 text-sm shadow-sm">
-                <span className="font-semibold">Starting at</span>
-                <span className="font-black">
-                  {formatMoney(priceAmount, currency)}
-                </span>
-                <span className="text-black/60">per bag</span>
-              </div>
-            </div>
           </div>
         </div>
       </section>
 
-      {/* PRODUCT PREVIEW (single product) */}
-      <section className="border-t border-black/10 bg-white">
-        <div className="mx-auto max-w-6xl px-4 py-12">
-          <div className="flex items-end justify-between gap-6">
+      <section className="border-t border-gold-soft bg-transparent">
+        <div className="mx-auto max-w-6xl px-4 py-5 lg:py-8">
+          <ReviewsSection />
+        </div>
+      </section>
+
+      <section className="border-t border-gold-soft bg-[rgba(255,255,255,0.02)]">
+        <div className="mx-auto max-w-6xl px-4 py-5 lg:py-8 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-2xl font-black text-[var(--text)]">Why USA Gummies</h2>
+            <div className="text-sm font-semibold text-[var(--muted)]">
+              American-made. Clean ingredients. Bundle-first value.
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {[
+              {
+                title: "American-made",
+                bullets: ["Built in the USA", "Fast shipping", "Founder-led"],
+              },
+              {
+                title: "Clean, dye-free",
+                bullets: ["No artificial dyes", "All-natural ingredients", "Soft, bold flavor"],
+              },
+              {
+                title: "Bundle value",
+                bullets: ["Free ship 5+", "Best per-bag at 8+", "Easy, secure checkout"],
+              },
+            ].map((card) => (
+              <div
+                key={card.title}
+                className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[0_14px_32px_rgba(0,0,0,0.22)]"
+              >
+                <div className="text-lg font-black text-white">{card.title}</div>
+                <ul className="mt-3 space-y-2 text-sm text-[var(--muted)]">
+                  {card.bullets.map((b) => (
+                    <li key={b} className="flex items-start gap-2">
+                      <span className="mt-[6px] h-[6px] w-[6px] rounded-full bg-[var(--gold)]" aria-hidden="true" />
+                      <span>{b}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="border-t border-gold-soft bg-transparent">
+        <div className="mx-auto max-w-6xl px-4 py-5 lg:py-8 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-2xl font-black tracking-tight">Best seller</h2>
-              <p className="mt-1 text-sm text-black/60">
-                One flagship product. Bundle pricing does the heavy lifting.
+              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">
+                Join the movement
+              </div>
+              <h3 className="mt-1 text-xl font-black text-[var(--text)]">
+                Follow @usagummies for drops & hauls
+              </h3>
+              <p className="mt-1 text-sm text-[var(--muted)]">
+                Real customers. Real bundles. Built in America.
               </p>
             </div>
-
             <Link
-              href={`/products/${handle}`}
-              className="text-sm font-semibold underline underline-offset-4"
+              href="https://www.instagram.com/usagummies"
+              className="btn btn-navy"
             >
-              View product →
+              Follow @usagummies
             </Link>
           </div>
-
-          <div className="mt-8 grid gap-6 md:grid-cols-2">
-            {/* Left card */}
-            <div className="rounded-3xl border border-black/10 bg-[#fbf1e7] p-8 shadow-sm">
-              <div className="text-xs font-semibold tracking-[0.22em] text-black/50">
-                USA GUMMIES
-              </div>
-
-              <div className="mt-3 flex items-start justify-between gap-6">
-                <h3 className="text-2xl font-black leading-tight">{title}</h3>
-                <div className="text-right">
-                  <div className="text-xs text-black/50">Starting at</div>
-                  <div className="text-2xl font-black">
-                    {formatMoney(priceAmount, currency)}
-                  </div>
-                  <div className="text-xs text-black/50">per bag (base)</div>
-                </div>
-              </div>
-
-              <p className="mt-3 max-w-prose text-sm text-black/70">
-                {description}
-              </p>
-
-              <div className="mt-5 flex flex-wrap gap-2">
-                {["🇺🇸 Made in USA", "✅ Dye-free", "🚚 Ships fast"].map((t) => (
-                  <span
-                    key={t}
-                    className="rounded-full border border-black/15 bg-white/70 px-3 py-1 text-xs font-semibold"
-                  >
-                    {t}
-                  </span>
-                ))}
-              </div>
-
-              <div className="mt-6 rounded-2xl border border-black/10 bg-white p-4">
-                <div className="text-sm font-bold">Why this converts</div>
-                <div className="mt-1 text-sm text-black/65">
-                  Choose a bundle on the product page. The cart handles the
-                  nudging. Free shipping at 5+.
-                </div>
-              </div>
-
-              <div className="mt-6 flex flex-wrap gap-3">
-                <Link
-                  href={`/products/${handle}`}
-                  className="inline-flex items-center justify-center rounded-full bg-black px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
-                >
-                  Build a bundle →
-                </Link>
-                <Link
-                  href="/cart"
-                  className="inline-flex items-center justify-center rounded-full border border-black/20 bg-white px-5 py-3 text-sm font-semibold shadow-sm transition hover:bg-white/80"
-                >
-                  Go to cart →
-                </Link>
-              </div>
-            </div>
-
-            {/* Right card: bundle ladder preview (static, points to PDP) */}
-            <div className="rounded-3xl border border-black/10 bg-white p-8 shadow-sm">
-              <div className="flex items-start justify-between gap-6">
-                <div>
-                  <div className="text-xs font-semibold tracking-[0.22em] text-black/50">
-                    BUNDLE & SAVE
-                  </div>
-                  <div className="mt-2 text-2xl font-black">Pick your bundle</div>
-                  <div className="mt-2 text-sm text-black/60">
-                    Bundle totals shown below. Free shipping unlocks at 5+.
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-xs text-black/50">Base price</div>
-                  <div className="text-lg font-black">
-                    {formatMoney(priceAmount, currency)}
-                    <span className="text-xs font-semibold text-black/50">
-                      /bag
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-6 grid grid-cols-2 gap-4">
-                {[
-                  ["1 Bag", "Try it", 1],
-                  ["2 Bags", "Stock up", 2],
-                  ["4 Bags", "Better value", 4],
-                  ["5 Bags", "Free shipping tier", 5, "Most popular"],
-                  ["8 Bags", "Best deal", 8, "Best value"],
-                  ["12 Bags", "Party pack", 12, "Best value"],
-                ].map(([label, sub, qty, badge]) => {
-                  const total = Number(priceAmount) * (qty as number);
-                  const isPopular = label === "5 Bags";
-                  const isFreeShip = (qty as number) >= 5;
-
-                  return (
-                    <div
-                      key={label as string}
-                      className={[
-                        "rounded-2xl border p-4 shadow-sm",
-                        isPopular
-                          ? "border-red-300 bg-red-50"
-                          : "border-black/10 bg-white",
-                      ].join(" ")}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <div className="text-base font-black leading-tight">
-                            {label}
-                          </div>
-                          <div className="mt-1 text-sm text-black/60">
-                            {sub}
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-xs text-black/50">Total</div>
-                          <div className="text-lg font-black">
-                            {formatMoney(total.toFixed(2), currency)}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        {badge ? (
-                          <span className="rounded-full bg-white px-2 py-1 text-xs font-bold">
-                            {badge as string}
-                          </span>
-                        ) : null}
-                        {isFreeShip ? (
-                          <span className="text-xs font-black text-red-600">
-                            FREE SHIPPING
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="mt-5 rounded-2xl border border-black/10 bg-[#fbf1e7] p-4 text-sm text-black/70">
-                Tip: 5+ bags unlocks free shipping. 8+ is usually the best value
-                per checkout.
-              </div>
-
-              <Link
-                href={`/products/${handle}`}
-                className="mt-6 inline-flex w-full items-center justify-center rounded-full bg-black px-5 py-4 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
-              >
-                Build your bundle on the product page →
-              </Link>
-            </div>
-          </div>
         </div>
       </section>
+
+      <section className="border-t border-gold-soft bg-[rgba(255,255,255,0.02)]">
+        <div className="mx-auto max-w-6xl px-4 py-5 lg:py-8 space-y-3">
+          <div className="text-xs font-semibold uppercase tracking-[0.2em] text-white/60">
+            Get updates
+          </div>
+          <h3 className="text-2xl font-black text-white">Don’t miss the next drop</h3>
+          <p className="text-sm text-white/70">
+            Bundles sell out. Early access + deals via email.
+          </p>
+          <form className="flex flex-wrap gap-3 items-center">
+            <input
+              type="email"
+              name="email"
+              placeholder="Enter your email"
+              className="usa-input flex-1 min-w-[240px]"
+              aria-label="Enter your email for updates"
+              required
+            />
+            <button type="submit" className="btn btn-red pressable px-5 py-3 font-black w-full sm:w-auto">
+              Sign me up
+            </button>
+          </form>
+        </div>
+      </section>
+
+      <HeroCTAWatcher />
     </main>
   );
 }

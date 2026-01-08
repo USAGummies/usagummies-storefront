@@ -35,7 +35,7 @@ export async function buyNow(formData: FormData) {
   const quantity = Math.max(1, Number(formData.get("quantity") ?? 1) || 1);
   if (!variantId) throw new Error("Missing merchandiseId (variant id).");
   const checkoutUrl = await buyNowInternal(variantId, quantity);
-  redirect(checkoutUrl);
+  redirect(checkoutUrl || "/cart");
 }
 
 export async function updateLine(formData: FormData) {

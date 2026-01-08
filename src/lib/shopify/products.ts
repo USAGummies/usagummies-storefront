@@ -58,6 +58,16 @@ type CollectionQueryResponse = {
   };
 };
 
+const EMPTY_PRODUCTS_PAGE: ProductsPageResult = {
+  nodes: [],
+  pageInfo: {
+    hasNextPage: false,
+    hasPreviousPage: false,
+    startCursor: null,
+    endCursor: null,
+  },
+};
+
 function toShopifySort(sort: SortValue): { sortKey: string | null; reverse: boolean } {
   switch (sort) {
     case "best-selling":
@@ -218,37 +228,17 @@ async function tryFeaturedCollection(params: {
   const pagination = buildPaginationVars(params);
 
   for (const handle of FEATURED_COLLECTION_HANDLES) {
-    try {
-      const data = await storefrontFetch<CollectionQueryResponse>({
-        query: COLLECTION_FEATURED_QUERY,
-        variables: { handle, ...pagination },
-        tags: ["products", `collection:${handle}`],
-        revalidate: 120,
-      });
+    const data = await storefrontFetch<CollectionQueryResponse>({
+      query: COLLECTION_FEATURED_QUERY,
+      variables: { handle, ...pagination },
+      tags: ["products", `collection:${handle}`],
+      revalidate: 120,
+    });
 
-      const collection = data.collectionByHandle;
-      if (collection?.products) {
-        if (process.env.NODE_ENV !== "production") {
-          // eslint-disable-next-line no-console
-          console.log(`[Shop] Featured collection resolved: "${collection.handle}"`);
-        }
-        return collection.products;
-      }
-    } catch (err) {
-      if (process.env.NODE_ENV !== "production") {
-        // eslint-disable-next-line no-console
-        console.warn(`[Shop] Featured collection "${handle}" query failed.`, err);
-      }
+    const collection = data?.collectionByHandle;
+    if (collection?.products) {
+      return collection.products;
     }
-  }
-
-  if (process.env.NODE_ENV !== "production") {
-    // eslint-disable-next-line no-console
-    console.warn(
-      `[Shop] No featured collection found for handles: ${FEATURED_COLLECTION_HANDLES.join(
-        ", "
-      )}. Falling back to products() query.`
-    );
   }
 
   return null;
@@ -299,7 +289,7 @@ export async function getProductsPage(params: {
     revalidate: 120,
   });
 
-  return data.products;
+  return data?.products ?? EMPTY_PRODUCTS_PAGE;
 }
 
 /**

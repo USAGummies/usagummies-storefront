@@ -47,15 +47,15 @@ export function ProductGallery({
   const main = imgs[active] || imgs[0];
 
   return (
-    <div className="glass overflow-hidden">
-      <div className="relative aspect-square w-full">
+    <div className="glass-card overflow-hidden">
+      <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-[var(--surface)]">
         <Image
           src={main?.url || "/home-patriotic-product.jpg"}
           alt={main?.altText || title}
           fill
           sizes="(max-width: 1024px) 100vw, 50vw"
-          className="object-cover"
-          priority
+          className="object-contain"
+          priority={active === 0}
         />
         {/* Subtle gold edge glow */}
         <div className="pointer-events-none absolute inset-0 ring-1 ring-white/10 shadow-[0_0_80px_rgba(212,175,55,0.08)]" />
@@ -69,7 +69,7 @@ export function ProductGallery({
               type="button"
               onClick={() => setActive(idx)}
               className={cn(
-                "relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border",
+                "relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border bg-[var(--surface)]",
                 idx === active
                   ? "border-[#d4af37]/40 ring-1 ring-[#d4af37]/25"
                   : "border-white/10 hover:border-white/20"
@@ -81,7 +81,8 @@ export function ProductGallery({
                 alt={im.altText || title}
                 fill
                 sizes="64px"
-                className="object-cover"
+                className="object-contain"
+                priority={idx === 0}
               />
             </button>
           ))}
