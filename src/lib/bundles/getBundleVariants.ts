@@ -1,120 +1,45 @@
 import "server-only";
-import { storefrontFetch } from "@/lib/shopify/storefront";
 
-type VariantNode = {
-  id: string;
-  title: string;
-  availableForSale: boolean;
-  price?: { amount: string; currencyCode?: string | null };
-};
+export interface BundleVariant {
+  quantity: number;
+  perBagPrice: number;
+  totalPrice: number;
+  freeShipping: boolean;
+}
 
-export type BundleTier = {
-  qty: number;
-  title: string;
-  descriptor: string;
-  variantId: string;
-  price: number | null;
-  perBag: number | null;
-  currencyCode: string | null | undefined;
-  available: boolean;
-  shippingText: string;
-  badge?: string;
-};
+export function getBundleVariants(): BundleVariant[] {
+  const basePrice = 5.99;
+  const minPrice = 4.25;
+  const maxQty = 12;
+  const variants: BundleVariant[] = [];
+  const round = (n: number): number => Math.round(n * 100) / 100;
+  const discountSteps = maxQty - 3;
+  const stepSize = (basePrice - minPrice) / discountSteps;
 
-export type BundleVariantsResult = {
-  tiers: BundleTier[];
-  productHandle: string;
-};
-
-const DEFAULT_HANDLE = "all-american-gummy-bears-7-5-oz-single-bag";
-const BUNDLE_HANDLE = DEFAULT_HANDLE;
-
-const QUERY = /* GraphQL */ `
-  query BundleVariants($handle: String!) {
-    product(handle: $handle) {
-      handle
-      variants(first: 50) {
-        edges {
-          node {
-            id
-            title
-            availableForSale
-            price {
-              amount
-              currencyCode
-            }
-          }
-        }
-      }
+  for (let qty = 1; qty <= maxQty; qty++) {
+    let perBag: number;
+    if (qty <= 3) {
+      perBag = basePrice;
+    } else if (qty < maxQty) {
+      const rawPrice = basePrice - stepSize * (qty - 3);
+      perBag = Math.max(rawPrice, minPrice + Number.EPSILON);
+    } else {
+      perBag = minPrice;
     }
-  }
-`;
-
-function parseQtyFromTitle(title?: string | null): number | null {
-  if (!title) return null;
-  const m = title.match(/^(\d+)\s*(bag|bags)?/i);
-  if (!m) return null;
-  const qty = Number(m[1]);
-  return Number.isFinite(qty) ? qty : null;
-}
-
-function descriptorForQty(qty: number) {
-  if (qty === 5) return "Starter bundle";
-  if (qty === 8) return "Most popular bundle";
-  if (qty === 12) return "Stock up case";
-  if (qty >= 9) return "Stock-up bundle";
-  if (qty >= 6) return "Bundle & save";
-  return "Smaller pack";
-}
-
-export async function getBundleVariants(): Promise<BundleVariantsResult | null> {
-  const data = await storefrontFetch<{
-    product: {
-      handle: string;
-      variants: { edges: Array<{ node: VariantNode }> };
-    } | null;
-  }>({
-    query: QUERY,
-    variables: { handle: BUNDLE_HANDLE },
-    tags: ["product", `bundle:${BUNDLE_HANDLE}`],
-    revalidate: 120,
-  });
-
-  if (!data?.product) return null;
-
-  const tiers: BundleTier[] = [];
-  for (const edge of data.product.variants.edges || []) {
-    const node = edge?.node;
-    if (!node?.id) continue;
-    const qty = parseQtyFromTitle(node.title);
-    if (!qty || qty < 2) continue; // skip single bag for homepage; still return 2+ for PDP use
-    const priceNum = Number(node.price?.amount);
-    const price = Number.isFinite(priceNum) ? priceNum : null;
-    const shippingText = qty >= 5 ? "Free shipping" : "+ $7.99 shipping";
-    const badge =
-      qty === 8
-        ? "Most popular"
-        : qty === 12
-        ? "Stock up"
-        : qty >= 9
-        ? "Stock up"
-        : undefined;
-
-    tiers.push({
-      qty,
-      title: node.title || `${qty} bags`,
-      descriptor: descriptorForQty(qty),
-      variantId: node.id,
-      price,
-      perBag: price && qty ? price / qty : null,
-      currencyCode: node.price?.currencyCode ?? null,
-      available: Boolean(node.availableForSale),
-      shippingText,
-      badge,
+    perBag = round(perBag);
+    const total = round(perBag * qty);
+    variants.push({
+      quantity: qty,
+      perBagPrice: perBag,
+      totalPrice: total,
+      freeShipping: qty >= 5,
     });
   }
 
-  tiers.sort((a, b) => a.qty - b.qty);
+  return variants;
+}
 
-  return { tiers, productHandle: data.product.handle };
+export function getRecommendedVariant(): BundleVariant {
+  const variants = getBundleVariants();
+  return variants.find(v => v.quantity === 8)!;
 }
