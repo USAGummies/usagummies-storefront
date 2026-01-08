@@ -26,10 +26,17 @@ export function AddBagButton({
       fd.set("lineId", lineId);
       fd.set("quantity", String(currentQty + 1));
       await updateLine(fd);
-      onAdded?.();
-      onPending?.(false);
-    });
-  }
+            window.dispatchEvent(new Event("cart:updated"));
+            onAdded?.();
+            onPending?.(false);
+          });
+    }
+    }
+  
+    
+      
+      
+   
 
   return (
     <button
