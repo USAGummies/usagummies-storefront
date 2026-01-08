@@ -17,26 +17,30 @@ export function CartLineControls({
   const [pending, startTransition] = useTransition();
 
   function submitUpdate(nextQty: number) {
-    if (pending) return;
-    startTransition(async () => {
-      const fd = new FormData();
-      fd.set("lineId", lineId);
-      fd.set("quantity", String(Math.max(0, nextQty)));
-      await updateLine(fd);
-      onChange?.();
-    });
-  }
+  if (pending) return;
+  startTransition(async () => {
+    const fd = new FormData();
+    fd.set("lineId", lineId);
+    fd.set("quantity", String(Math.max(0, nextQty)));
+    await updateLine(fd);
+    window.dispatchEvent(new Event("cart:updated"));
+    onChange?.();
+  });
+}
+
 
   function submitRemove() {
-    if (pending) return;
-    startTransition(async () => {
-      const fd = new FormData();
-      fd.set("lineId", lineId);
-      await removeLine(fd);
-      onChange?.();
-    });
-  }
+  if (pending) return;
+  startTransition(async () => {
+    const fd = new FormData();
+    fd.set("lineId", lineId);
+    await removeLine(fd);
+    window.dispatchEvent(new Event("cart:updated"));
+    onChange?.();
+  });
+}
 
+  
   return (
     <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
       <div className="flex overflow-hidden rounded-full border border-[var(--border)] bg-[var(--surface)]">
