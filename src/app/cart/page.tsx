@@ -16,7 +16,7 @@ export default async function CartPage() {
 
   return (
     <main className="pb-16">
-      <div className="container mx-auto max-w-6xl px-4">
+      <div classN"container mx-auto px-4"
         {/* Top nav */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-4 text-[var(--muted)] text-sm">
           <div className="flex items-center gap-2">
