@@ -37,7 +37,7 @@ function money(amount?: number | null, currency = "USD") {
   }).format(n);
 }
 
-const FEATURED_QTYS: TierKey[] = ["5", "8", "12"];
+const FEATURED_QTYS: TierKey[] = ["1", "4", "5", "8", "12"];
 
 export default function BundleQuickBuy({ tiers = [], productHandle, anchorId, singleBagVariantId, availableForSale = true }: Props) {
   const router = useRouter();
@@ -157,6 +157,7 @@ export default function BundleQuickBuy({ tiers = [], productHandle, anchorId, si
     const isFive = tier.quantity === 5;
     const isEight = tier.quantity === 8;
     const isTwelve = tier.quantity === 12;
+    const isSmall = tier.quantity < 5;
 
     const savings = !isFive ? savingsFor(tier) : null;
     const savingsValue =
@@ -171,6 +172,8 @@ export default function BundleQuickBuy({ tiers = [], productHandle, anchorId, si
     } else if (isTwelve) {
       pills.push("Best price per bag");
       pills.push(FREE_SHIPPING_PHRASE);
+    } else if (isSmall) {
+      pills.push("Standard price");
     }
 
     const cardTone = isEight ? "bg-white/[0.15]" : "bg-white/[0.04]";
@@ -372,10 +375,8 @@ export default function BundleQuickBuy({ tiers = [], productHandle, anchorId, si
           {error ? (
             <div className="text-xs font-semibold text-red-200">{error}</div>
           ) : null}
-          {ctaDisabled && !error ? (
-            <div className="text-xs text-white/60">
-              Pricing or inventory unavailable. View product page to continue.
-            </div>
+          {ctaDisabled && availableForSale === false && !error ? (
+            <div className="text-xs text-white/60">Out of stock.</div>
           ) : null}
         </div>
       </div>

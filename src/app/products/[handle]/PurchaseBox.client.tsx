@@ -149,11 +149,10 @@ export default function PurchaseBox({
   const ladder = useMemo(
     () => [
       { qty: 1, label: "1 Bag", sub: "Try it" },
-      { qty: 2, label: "2 Bags", sub: "Stock up" },
-      { qty: 4, label: "4 Bags", sub: "Better value" },
-      { qty: 5, label: "5 Bags", sub: "FREE SHIPPING", accent: true },
-      { qty: 8, label: "Best Value (8 bags) — Lowest price per bag", sub: "Best deal", accent: true },
-      { qty: 12, label: "12 Bags", sub: "Party pack", accent: true },
+      { qty: 4, label: "4 Bags", sub: "Discount starts", accent: true },
+      { qty: 5, label: "5 Bags", sub: "Free shipping", accent: true },
+      { qty: 8, label: "Best Value (8 bags) — Lowest price per bag", sub: "Recommended", accent: true },
+      { qty: 12, label: "12 Bags", sub: "Lowest price per bag", accent: true },
     ],
     []
   );
@@ -243,10 +242,14 @@ export default function PurchaseBox({
   }, [bundleOptions]);
 
   const defaultQty = useMemo(() => {
-    return bundleOptionsWithBadges.find((o) => o.qty === 5)?.qty || bundleOptionsWithBadges[0]?.qty || 1;
+    return (
+      bundleOptionsWithBadges.find((o) => o.qty === 8)?.qty ||
+      bundleOptionsWithBadges.find((o) => o.qty === 5)?.qty ||
+      bundleOptionsWithBadges[0]?.qty ||
+      1
+    );
   }, [bundleOptionsWithBadges]);
 
-  const [bagCount, setBagCount] = useState<number>(() => defaultQty);
   const [selectedQty, setSelectedQty] = useState<number>(defaultQty);
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -258,7 +261,6 @@ export default function PurchaseBox({
       if (bundleOptionsWithBadges.some((o) => o.qty === prev)) return prev;
       return defaultQty;
     });
-    setBagCount((prev) => (prev ? prev : defaultQty));
   }, [bundleOptionsWithBadges, defaultQty]);
 
   const bundlesRef = useRef<HTMLDivElement | null>(null);
@@ -274,19 +276,6 @@ export default function PurchaseBox({
     }
   }, [focus]);
 
-  // Map bag count to the nearest available variant (favor rounding up for value/free-ship nudges)
-  useEffect(() => {
-    if (!bundleOptionsWithBadges.length) return;
-    const sorted = [...bundleOptionsWithBadges].sort((a, b) => a.qty - b.qty);
-    const exact = sorted.find((o) => o.qty === bagCount);
-    if (exact) {
-      setSelectedQty(exact.qty);
-      return;
-    }
-    const up = sorted.find((o) => o.qty >= bagCount);
-    const target = up ?? sorted[sorted.length - 1];
-    setSelectedQty(target?.qty ?? defaultQty);
-  }, [bagCount, bundleOptionsWithBadges, defaultQty]);
 
   const selectedOption =
     bundleOptionsWithBadges.find((o) => o.qty === selectedQty) ??
@@ -419,25 +408,7 @@ export default function PurchaseBox({
         </div>
 
         <div className="pbx__bagControls" aria-label="Choose bag quantity">
-          <div className="pbx__bagLabel">Bags</div>
-          <div className="pbx__bagStepper">
-            <button
-              type="button"
-              onClick={() => setBagCount((c) => Math.max(1, c - 1))}
-              aria-label="Decrease bags"
-            >
-              −
-            </button>
-            <div className="pbx__bagCount">{bagCount}</div>
-            <button
-              type="button"
-              onClick={() => setBagCount((c) => Math.min(12, c + 1))}
-              aria-label="Increase bags"
-            >
-              +
-            </button>
-          </div>
-          <div className="pbx__bagHint">We select the best-value bundle automatically.</div>
+          <div className="pbx__bagLabel">How many bags?</div>
         </div>
 
         <div className="pbx__grid">
@@ -453,7 +424,7 @@ export default function PurchaseBox({
               <button
                 key={`${o.qty}-${o.variant.id}`}
                 type="button"
-                onClick={() => setBagCount(o.qty)}
+                onClick={() => setSelectedQty(o.qty)}
                 className={cx(
                   "pbx__tile",
                   accent && "pbx__tile--accent",

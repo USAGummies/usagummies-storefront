@@ -42,20 +42,32 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
     return () => window.removeEventListener("cart:updated", refresh);
   }, []);
 
-  if (!mounted) return null;
+  useEffect(() => {
+    if (!open) return;
+    if (typeof document === "undefined") return;
+    const original = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = original;
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open, onClose]);
+
+  if (!mounted || !open) return null;
 
   return (
     <>
-      <div
-        className={cn(
-          "fixed inset-0 z-50 flex justify-end md:justify-center",
-          open ? "pointer-events-auto" : "pointer-events-none"
-        )}
-      >
+      <div className="fixed inset-0 z-50 flex justify-end md:justify-center">
         <div
           className={cn(
             "absolute inset-0 bg-[rgba(0,0,0,0.55)] transition-opacity duration-200 ease-out",
-            open ? "opacity-100" : "opacity-0"
+            "opacity-100"
           )}
           onClick={onClose}
           aria-hidden="true"
@@ -63,8 +75,8 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
 
         <div
           className={cn(
-            "relative h-full w-full max-w-[430px] transform-gpu transition-transform duration-200 ease-out",
-            open ? "translate-x-0 opacity-100" : "translate-x-full opacity-0"
+            "relative h-full w-full max-w-lg transform-gpu transition-transform duration-200 ease-out",
+            "translate-x-0 opacity-100"
           )}
           aria-hidden={!open}
         >

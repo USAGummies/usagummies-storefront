@@ -36,12 +36,10 @@ function formatPrice(product: ProductCardData) {
 
 export function ShopProductCard({
   product,
-  addToCartAction,
   campaign,
   hasBundle,
 }: {
   product: ProductCardData;
-  addToCartAction?: (fd: FormData) => Promise<void>;
   campaign?: string | null;
   hasBundle?: boolean;
 }) {
@@ -125,9 +123,7 @@ export function ShopProductCard({
           View product
         </Link>
 
-        {addToCartAction ? (
-          <QuickBuy product={product} addToCartAction={addToCartAction} campaign={campaign || null} />
-        ) : null}
+        <QuickBuy product={product} campaign={campaign || null} />
       </div>
     </div>
   );

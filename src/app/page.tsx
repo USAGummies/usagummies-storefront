@@ -65,7 +65,7 @@ export default async function HomePage() {
   }
 
   const homepageTiers = (bundleVariants?.variants || []).filter((t) =>
-    [5, 8, 12].includes(t.quantity)
+    [1, 4, 5, 8, 12].includes(t.quantity)
   );
 
   return (
@@ -178,6 +178,8 @@ export default async function HomePage() {
                 anchorId="bundle-pricing"
                 productHandle={handle}
                 tiers={homepageTiers}
+                singleBagVariantId={bundleVariants?.singleBagVariantId}
+                availableForSale={bundleVariants?.availableForSale}
               />
             </div>
           </div>

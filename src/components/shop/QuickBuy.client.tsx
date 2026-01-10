@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { useFormStatus } from "react-dom";
 import { SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
 
 type AnyProduct = any;
@@ -25,25 +24,6 @@ function getFirstVariantId(product: AnyProduct): string | null {
   );
 }
 
-function SubmitButton({ disabled }: { disabled?: boolean }) {
-  const { pending } = useFormStatus();
-
-  return (
-    <button
-      type="submit"
-      disabled={disabled || pending}
-      className={[
-        "inline-flex items-center justify-center rounded-2xl",
-        "border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white",
-        "transition-colors hover:bg-white/10",
-        "disabled:cursor-not-allowed disabled:opacity-60",
-      ].join(" ")}
-    >
-      {pending ? "Adding…" : "Quick add"}
-    </button>
-  );
-}
-
 /**
  * QuickBuy
  * - Client component that can call a Server Action via <form action={...}>
@@ -51,14 +31,14 @@ function SubmitButton({ disabled }: { disabled?: boolean }) {
  */
 export default function QuickBuy({
   product,
-  addToCartAction,
   campaign,
 }: {
   product: AnyProduct;
-  addToCartAction: (fd: FormData) => Promise<void>;
   campaign?: string | null;
 }) {
   const variantId = SINGLE_BAG_VARIANT_ID || getFirstVariantId(product);
+  const [pending, setPending] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
 
   // If product is missing variants (or Shopify returned something unexpected),
   // don't hard-crash the UI.
@@ -75,14 +55,47 @@ export default function QuickBuy({
     );
   }
 
-  return (
-    <form action={addToCartAction}>
-      {/* Server action inputs */}
-      <input type="hidden" name="merchandiseId" value={variantId} />
-      <input type="hidden" name="quantity" value="1" />
-      {campaign ? <input type="hidden" name="campaign" value={campaign} /> : null}
+  async function handleAdd() {
+    if (pending) return;
+    setPending(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/cart", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "add",
+          variantId,
+          quantity: 1,
+          campaign: campaign || undefined,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json?.ok === false) throw new Error(json?.error || "Add failed");
+      window.dispatchEvent(new Event("cart:updated"));
+    } catch (e: any) {
+      setError(e?.message || "Could not add");
+    } finally {
+      setPending(false);
+    }
+  }
 
-      <SubmitButton />
-    </form>
+  return (
+    <div className="flex flex-col gap-1">
+      <button
+        type="button"
+        onClick={handleAdd}
+        disabled={pending}
+        className={[
+          "inline-flex items-center justify-center rounded-2xl",
+          "border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white",
+          "transition-colors hover:bg-white/10",
+          "disabled:cursor-not-allowed disabled:opacity-60",
+        ].join(" ")}
+      >
+        {pending ? "Adding…" : "Quick add"}
+      </button>
+      {error ? <span className="text-[11px] text-red-200">{error}</span> : null}
+    </div>
   );
 }
