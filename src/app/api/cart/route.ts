@@ -7,6 +7,7 @@ import {
   replaceCartWithVariant,
   getCart,
 } from "@/lib/cart";
+import { normalizeSingleBagVariant } from "@/lib/bundles/atomic";
 
 type Body = {
   action?: "add" | "buy" | "update" | "replace" | "get";
@@ -49,8 +50,10 @@ export async function POST(req: Request) {
     if (action === "replace") {
       const variantId = String(body.variantId ?? "");
       const quantity = Math.max(1, Number(body.quantity ?? 1) || 1);
-      if (!variantId) return json({ ok: false, error: "Missing variantId." }, 400);
-      await replaceCartWithVariant(variantId, quantity);
+      const safeVariantId = normalizeSingleBagVariant(variantId);
+      if (!safeVariantId)
+        return json({ ok: false, error: "Invalid variantId." }, 400);
+      await replaceCartWithVariant(safeVariantId, quantity);
       const cart = await getCart();
       return json({ ok: true, cart });
     }
@@ -58,16 +61,18 @@ export async function POST(req: Request) {
     // add/buy
     const variantId = String(body.variantId ?? "");
     const quantity = Math.max(1, Number(body.quantity ?? 1) || 1);
-    if (!variantId) return json({ ok: false, error: "Missing variantId." }, 400);
+    const safeVariantId = normalizeSingleBagVariant(variantId);
+    if (!safeVariantId)
+      return json({ ok: false, error: "Invalid variantId." }, 400);
 
     if (action === "add") {
-      await addToCart(variantId, quantity);
+      await addToCart(safeVariantId, quantity);
       const cart = await getCart();
       return json({ ok: true, cart });
     }
 
     // default: buy
-    const checkoutUrl = await buyNow(variantId, quantity);
+    const checkoutUrl = await buyNow(safeVariantId, quantity);
     return json({ ok: true, checkoutUrl });
   } catch (err: any) {
     return json({ ok: false, error: err?.message || "Cart API error" }, 500);

@@ -47,3 +47,42 @@ Preferred: product metafield `usagummies.bundle_tiers` with JSON:
 
 - `src/components/home/BundleQuickBuy.client.tsx` is the canonical bundle selector UI and must be reused across Homepage/Shop/PDP/Cart surfaces.
 - Its design language, copy, pill/tier mapping, savings framing, and CTA behavior are locked; only bug fixes/accessibility fixes/approved strategy changes may alter it.
+
+## Atomic inventory + pricing ladder (locked)
+
+- Only the single-bag variant is real inventory.
+- Bundles are UI-only and add multiples of the single-bag variant to cart.
+- Pricing ladder is enforced in UI and checkout:
+  - Base price: $5.99 / bag
+  - No discount qty 1–3
+  - Discounts start at qty 4
+  - Free shipping at 5+
+  - Floor: $4.25 / bag at qty 12 ($51.00 total)
+
+Single-bag variant:
+
+- GID: `gid://shopify/ProductVariant/62295921099123`
+- SKU: `199284624702`
+
+### Shopify Product Discount function (checkout pricing)
+
+Location: `shopify/functions/atomic-price-ladder`
+
+Deploy steps:
+
+1) Generate schema for the function:
+   `shopify app function schema --path shopify/functions/atomic-price-ladder`
+2) Build and deploy:
+   `shopify app function build --path shopify/functions/atomic-price-ladder`
+   `shopify app function deploy --path shopify/functions/atomic-price-ladder`
+3) Enable in Shopify Admin:
+   `Discounts → Create discount → Automatic → “atomic-price-ladder”`
+
+Test ladder in checkout:
+
+- Qty 1 → $5.99
+- Qty 3 → $17.97
+- Qty 4 → ladder total (discount begins)
+- Qty 5 → ladder total + free shipping
+- Qty 8 → ladder total
+- Qty 12 → $51.00 total ($4.25/bag)

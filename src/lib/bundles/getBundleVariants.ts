@@ -1,5 +1,9 @@
 import "server-only";
 
+import { storefrontFetch } from "@/lib/shopify/storefront";
+import { pricingForQty, FREE_SHIP_QTY } from "./pricing";
+import { SINGLE_BAG_VARIANT_ID, SINGLE_BAG_SKU } from "./atomic";
+
 export interface BundleVariant {
   quantity: number;
   perBagPrice: number;
@@ -7,39 +11,94 @@ export interface BundleVariant {
   freeShipping: boolean;
 }
 
-export function getBundleVariants(): BundleVariant[] {
-  const basePrice = 5.99;
-  const minPrice = 4.25;
-  const maxQty = 12;
-  const variants: BundleVariant[] = [];
-  const round = (n: number): number => Math.round(n * 100) / 100;
-  const discountSteps = maxQty - 3;
-  const stepSize = (basePrice - minPrice) / discountSteps;
+type VariantNode = {
+  id: string;
+  title: string;
+  sku?: string | null;
+  availableForSale: boolean;
+  price?: { amount: string; currencyCode?: string | null };
+};
 
-  for (let qty = 1; qty <= maxQty; qty++) {
-    let perBag: number;
-    if (qty <= 3) {
-      perBag = basePrice;
-    } else if (qty < maxQty) {
-      const rawPrice = basePrice - stepSize * (qty - 3);
-      perBag = Math.max(rawPrice, minPrice + Number.EPSILON);
-    } else {
-      perBag = minPrice;
+const VARIANTS_QUERY = /* GraphQL */ `
+  query BundleVariants($first: Int!) {
+    products(first: 20) {
+      nodes {
+        variants(first: $first) {
+          nodes {
+            id
+            title
+            sku
+            availableForSale
+            price {
+              amount
+              currencyCode
+            }
+          }
+        }
+      }
     }
-    perBag = round(perBag);
-    const total = round(perBag * qty);
+  }
+`;
+
+export async function getBundleVariants(): Promise<{
+  variants: BundleVariant[];
+  singleBagVariantId: string;
+  singleBagSku: string;
+  availableForSale: boolean;
+}> {
+  let availableForSale = true;
+
+  try {
+    const data = await storefrontFetch<{
+      products: { nodes: Array<{ variants: { nodes: VariantNode[] } }> };
+    }>({
+      query: VARIANTS_QUERY,
+      variables: { first: 250 },
+    });
+
+    const allVariants =
+      data?.products?.nodes?.flatMap((p) => p.variants?.nodes ?? []) ?? [];
+
+    const single = allVariants.find(
+      (v) => v.id === SINGLE_BAG_VARIANT_ID || v.sku === SINGLE_BAG_SKU
+    );
+
+    if (single) availableForSale = !!single.availableForSale;
+  } catch {
+    availableForSale = true;
+  }
+
+  const variants: BundleVariant[] = [];
+
+  for (let qty = 1; qty <= 12; qty++) {
+    const p = pricingForQty(qty);
     variants.push({
       quantity: qty,
-      perBagPrice: perBag,
-      totalPrice: total,
-      freeShipping: qty >= 5,
+      perBagPrice: p.perBag,
+      totalPrice: p.total,
+      freeShipping: qty >= FREE_SHIP_QTY,
     });
   }
 
-  return variants;
+  return {
+    variants,
+    singleBagVariantId: SINGLE_BAG_VARIANT_ID,
+    singleBagSku: SINGLE_BAG_SKU,
+    availableForSale,
+  };
 }
 
 export function getRecommendedVariant(): BundleVariant {
-  const variants = getBundleVariants();
-  return variants.find(v => v.quantity === 8)!;
+  const variants = Array.from({ length: 12 }, (_, i) => {
+    const qty = i + 1;
+    const p = pricingForQty(qty);
+    return {
+      quantity: qty,
+      perBagPrice: p.perBag,
+      totalPrice: p.total,
+      freeShipping: qty >= FREE_SHIP_QTY,
+    };
+  });
+
+  return variants.find((v) => v.quantity === 8)!;
 }

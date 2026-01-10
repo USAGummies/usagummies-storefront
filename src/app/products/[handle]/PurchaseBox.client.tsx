@@ -4,6 +4,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PatriotRibbon } from "@/components/ui/PatriotRibbon";
+import { pricingForQty, BASE_PRICE, FREE_SHIP_QTY } from "@/lib/bundles/pricing";
+import { SINGLE_BAG_SKU, SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
 
 function cx(...a: Array<string | false | null | undefined>) {
   return a.filter(Boolean).join(" ");
@@ -17,6 +19,7 @@ type MoneyLike =
 type VariantNode = {
   id: string;
   title: string;
+  sku?: string | null;
   availableForSale?: boolean;
   price?: MoneyLike;
   priceV2?: MoneyLike;
@@ -119,9 +122,13 @@ function variantPriceNumber(v?: VariantNode) {
 }
 
 function pickSingleVariant(variants: VariantNode[]) {
+  const byId = variants.find((v) => v.id === SINGLE_BAG_VARIANT_ID);
+  if (byId) return byId;
+  const bySku = variants.find((v) => (v.sku || "").toString() === SINGLE_BAG_SKU);
+  if (bySku) return bySku;
   const matches = variants.filter((v) => parseQtyFromTitle(v.title) === 1);
   const avail = matches.find((v) => v.availableForSale !== false);
-  return avail || matches[0] || variants[0];
+  return avail || matches[0];
 }
 
 export default function PurchaseBox({
@@ -151,82 +158,44 @@ export default function PurchaseBox({
     []
   );
 
-  // Build a qty->variant map from Shopify titles
-  const qtyToVariant = useMemo(() => {
-    const map = new Map<number, VariantNode>();
-    for (const v of variants) {
-      const q = parseQtyFromTitle(v.title);
-      if (!q) continue;
-      // Prefer available variants if duplicates
-      const existing = map.get(q);
-      if (!existing) {
-        map.set(q, v);
-      } else {
-        const eAvail = existing.availableForSale !== false;
-        const vAvail = v.availableForSale !== false;
-        if (!eAvail && vAvail) map.set(q, v);
-      }
-    }
-    return map;
-  }, [variants]);
-
-  const availableTiers = useMemo(() => {
-    return ladder.filter((t) => qtyToVariant.get(t.qty));
-  }, [ladder, qtyToVariant]);
-
-  const baselineVariant = useMemo(() => {
-    const sorted = Array.from(qtyToVariant.entries()).sort((a, b) => a[0] - b[0]);
-    if (sorted[0]?.[1]) return sorted[0][1];
-    return pickSingleVariant(variants);
-  }, [qtyToVariant, variants]);
-
-  const baselinePrice =
-    variantPriceNumber(baselineVariant) ??
-    asNumberAmount(product?.priceRange?.minVariantPrice) ??
-    0;
+  const singleVariant = useMemo(() => pickSingleVariant(variants), [variants]);
 
   const baselineCurrency =
-    (baselineVariant?.price as any)?.currencyCode ||
-    (baselineVariant?.priceV2 as any)?.currencyCode ||
+    (singleVariant?.price as any)?.currencyCode ||
+    (singleVariant?.priceV2 as any)?.currencyCode ||
     (product?.priceRange?.minVariantPrice as any)?.currencyCode ||
     "USD";
 
+  const availableTiers = useMemo(() => ladder, [ladder]);
+
   const bundleOptions = useMemo<BundleOption[]>(() => {
+    if (!singleVariant?.id) return [];
+    const available = singleVariant.availableForSale !== false;
+
     return availableTiers.map((t) => {
-      const variant = qtyToVariant.get(t.qty)!;
-      const totalPrice = variantPriceNumber(variant);
-      const perBag = t.qty > 0 && Number.isFinite(totalPrice) ? (totalPrice as number) / t.qty : undefined;
-      const savingsAmount =
-        Number.isFinite(baselinePrice) && Number.isFinite(totalPrice)
-          ? Math.max(0, (baselinePrice as number) * t.qty - (totalPrice as number))
-          : 0;
+      const pricing = pricingForQty(t.qty);
+      const totalPrice = Number.isFinite(pricing.total) ? pricing.total : undefined;
+      const perBag = Number.isFinite(pricing.perBag) ? pricing.perBag : undefined;
+      const savingsAmount = Math.max(0, BASE_PRICE * t.qty - (totalPrice ?? 0));
       const savingsPct =
-        baselinePrice && savingsAmount > 0
-          ? (savingsAmount / ((baselinePrice as number) * t.qty)) * 100
+        totalPrice && savingsAmount > 0
+          ? (savingsAmount / (BASE_PRICE * t.qty)) * 100
           : undefined;
-
-      const badgeMeta = normalizeBadge(
-        (variant as any)?.bundleBadge?.value ?? (variant as any)?.metafield?.value
-      );
-
-      const currencyCode =
-        (variant.price as any)?.currencyCode ||
-        (variant.priceV2 as any)?.currencyCode ||
-        baselineCurrency;
 
       return {
         ...t,
-        variant,
+        variant: singleVariant,
         totalPrice,
         perBag,
-        freeShipping: isFreeShippingTitle(variant?.title),
-        badges: badgeMeta ? [badgeMeta] : [],
+        freeShipping: t.qty >= FREE_SHIP_QTY,
+        badges: [],
         savingsAmount,
         savingsPct,
-        currencyCode,
+        currencyCode: baselineCurrency,
+        accent: t.accent,
       };
     });
-  }, [availableTiers, qtyToVariant, baselinePrice, baselineCurrency]);
+  }, [availableTiers, singleVariant, baselineCurrency]);
 
   const bundleOptionsWithBadges = useMemo<BundleOption[]>(() => {
     const opts = bundleOptions.map((o) => ({ ...o, badges: [...o.badges] }));
@@ -273,25 +242,24 @@ export default function PurchaseBox({
     return opts;
   }, [bundleOptions]);
 
-  const defaultVariantId = useMemo(() => {
-    const preferred = bundleOptionsWithBadges.find((o) => o.qty === 5);
-    if (preferred?.variant?.id) return preferred.variant.id;
-    return bundleOptionsWithBadges[0]?.variant.id ?? pickSingleVariant(variants)?.id ?? null;
-  }, [bundleOptionsWithBadges, variants]);
+  const defaultQty = useMemo(() => {
+    return bundleOptionsWithBadges.find((o) => o.qty === 5)?.qty || bundleOptionsWithBadges[0]?.qty || 1;
+  }, [bundleOptionsWithBadges]);
 
-  const [bagCount, setBagCount] = useState<number>(() => bundleOptionsWithBadges.find((o) => o.qty === 5)?.qty || bundleOptionsWithBadges[0]?.qty || 1);
-  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(defaultVariantId);
+  const [bagCount, setBagCount] = useState<number>(() => defaultQty);
+  const [selectedQty, setSelectedQty] = useState<number>(defaultQty);
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Keep selection valid as data hydrates
   useEffect(() => {
     if (!bundleOptionsWithBadges.length) return;
-    setSelectedVariantId((prev) => {
-      if (prev && bundleOptionsWithBadges.some((o) => o.variant.id === prev)) return prev;
-      return defaultVariantId;
+    setSelectedQty((prev) => {
+      if (bundleOptionsWithBadges.some((o) => o.qty === prev)) return prev;
+      return defaultQty;
     });
-  }, [bundleOptionsWithBadges, defaultVariantId]);
+    setBagCount((prev) => (prev ? prev : defaultQty));
+  }, [bundleOptionsWithBadges, defaultQty]);
 
   const bundlesRef = useRef<HTMLDivElement | null>(null);
   const [focusGlow, setFocusGlow] = useState(false);
@@ -312,44 +280,42 @@ export default function PurchaseBox({
     const sorted = [...bundleOptionsWithBadges].sort((a, b) => a.qty - b.qty);
     const exact = sorted.find((o) => o.qty === bagCount);
     if (exact) {
-      setSelectedVariantId(exact.variant.id);
+      setSelectedQty(exact.qty);
       return;
     }
-    // choose smallest qty >= bagCount, else largest
     const up = sorted.find((o) => o.qty >= bagCount);
     const target = up ?? sorted[sorted.length - 1];
-    setSelectedVariantId(target?.variant.id ?? null);
-  }, [bagCount, bundleOptionsWithBadges]);
+    setSelectedQty(target?.qty ?? defaultQty);
+  }, [bagCount, bundleOptionsWithBadges, defaultQty]);
 
   const selectedOption =
-    bundleOptionsWithBadges.find((o) => o.variant.id === selectedVariantId) ??
+    bundleOptionsWithBadges.find((o) => o.qty === selectedQty) ??
     bundleOptionsWithBadges[0];
 
   const selectedVariant = selectedOption?.variant ?? pickSingleVariant(variants);
-  const selectedPriceRaw = variantPriceNumber(selectedVariant);
-  const selectedPrice =
-    typeof selectedPriceRaw === "number" && Number.isFinite(selectedPriceRaw)
-      ? selectedPriceRaw
-      : undefined;
-  const selectedQty = selectedOption?.qty ?? parseQtyFromTitle(selectedVariant?.title) ?? 1;
+  const selectedPrice = selectedOption?.totalPrice;
+  const selectedQty = selectedOption?.qty ?? 1;
   const selectedCurrency =
     (selectedVariant?.price as any)?.currencyCode ||
     (selectedVariant?.priceV2 as any)?.currencyCode ||
     baselineCurrency;
-  const freeShip = isFreeShippingTitle(selectedVariant?.title);
+  const freeShip = selectedQty >= FREE_SHIP_QTY;
 
-  const startingAt =
-    baselinePrice > 0
-      ? baselinePrice
-      : asNumberAmount(product?.priceRange?.minVariantPrice) ?? 0;
+  const startingAt = BASE_PRICE;
 
-  const perBag = selectedQty > 0 && selectedPrice !== undefined ? selectedPrice / selectedQty : undefined;
+  const perBag =
+    selectedQty > 0 && selectedPrice !== undefined ? selectedPrice / selectedQty : undefined;
 
   async function addToCart() {
     setError(null);
 
     if (!selectedVariant?.id) {
       setError("No purchasable variant found for this product.");
+      return;
+    }
+
+    if (selectedVariant.availableForSale === false) {
+      setError("Out of stock.");
       return;
     }
 
@@ -361,7 +327,7 @@ export default function PurchaseBox({
         body: JSON.stringify({
           action: "add",
           variantId: selectedVariant.id,
-          quantity: 1, // IMPORTANT: bundle is represented by the variant itself
+          quantity: Math.max(1, selectedQty),
         }),
       });
 
@@ -473,7 +439,7 @@ export default function PurchaseBox({
 
         <div className="pbx__grid">
           {bundleOptionsWithBadges.map((o) => {
-            const active = selectedVariantId === o.variant.id;
+            const active = selectedQty === o.qty;
             const accent = Boolean((o as any).accent);
             const showSavings = o.savingsAmount > 0;
             const savingsPctLabel =
@@ -482,7 +448,7 @@ export default function PurchaseBox({
 
             return (
               <button
-                key={o.variant.id}
+                key={`${o.qty}-${o.variant.id}`}
                 type="button"
                 onClick={() => setBagCount(o.qty)}
                 className={cx(

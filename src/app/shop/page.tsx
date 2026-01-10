@@ -5,6 +5,7 @@ import { ShopToolbar } from "@/components/shop/ShopToolbar";
 import { ShopProductCard } from "@/components/shop/ShopProductCard";
 import { getProductsPage, type SortValue } from "@/lib/shopify/products";
 import { getProductByHandle, money } from "@/lib/storefront";
+import { pricingForQty, FREE_SHIP_QTY } from "@/lib/bundles/pricing";
 
 const PAGE_SIZE = 18;
 function resolveSiteUrl() {
@@ -118,59 +119,22 @@ export default async function ShopPage(props: {
     detailedProduct = null;
   }
 
-  function parseQty(title?: string) {
-    if (!title) return null;
-    const m = title.match(/(\d+)\s*bag/i);
-    return m ? Number(m[1]) : null;
-  }
-
-  const variants =
-    detailedProduct?.variants?.edges?.map((e: any) => e.node) ||
-    primaryProduct?.variants?.nodes ||
-    [];
-
-  const baselineVariant = variants.find((v: any) => parseQty(v?.title) === 1) || variants[0];
-  const baselinePrice = baselineVariant?.price?.amount
-    ? Number(baselineVariant.price.amount)
-    : primaryProduct?.priceRange?.minVariantPrice?.amount
-      ? Number(primaryProduct.priceRange.minVariantPrice.amount)
-      : 5.99;
   const currency =
-    baselineVariant?.price?.currencyCode ||
+    detailedProduct?.priceRange?.minVariantPrice?.currencyCode ||
     primaryProduct?.priceRange?.minVariantPrice?.currencyCode ||
     "USD";
 
-  let bundles =
-    variants
-      ?.map((v: any) => {
-        const qty = parseQty(v?.title);
-        if (!qty || !v?.price?.amount) return null;
-        const total = Number(v.price.amount);
-        return {
-          qty,
-          total,
-          perBag: total / qty,
-          id: v.id,
-          title: v.title,
-        };
-      })
-      .filter(Boolean)
-      ?.sort((a: any, b: any) => a.qty - b.qty) || [];
-
-  const fallbackLadder = [1, 2, 4, 5, 8, 12].map((qty) => {
-    const total = qty * baselinePrice;
+  const ladder = [1, 2, 4, 5, 8, 12];
+  const bundles = ladder.map((qty) => {
+    const pricing = pricingForQty(qty);
     return {
       qty,
-      total,
-      perBag: total / qty,
-      id: `fallback-${qty}`,
+      total: pricing.total,
+      perBag: pricing.perBag,
+      id: `ladder-${qty}`,
       title: `${qty} Bag${qty > 1 ? "s" : ""}`,
     };
   });
-
-  if (!bundles || bundles.length === 0) {
-    bundles = fallbackLadder;
-  }
 
   const mostPopular = bundles.find((b: any) => b.qty === 5) || bundles[Math.min(1, bundles.length - 1)];
   const bestValue =
@@ -242,7 +206,7 @@ export default async function ShopPage(props: {
                   </div>
                   <div className="mt-2 text-xl font-black text-[var(--text)]">{totalText}</div>
                   <div className="text-sm font-semibold text-[var(--muted)]">~ {perBagText} per bag</div>
-                  {b.qty >= 5 ? (
+                  {b.qty >= FREE_SHIP_QTY ? (
                     <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-[rgba(205,53,50,0.4)] bg-[rgba(205,53,50,0.12)] px-3 py-1 text-[11px] font-bold text-[var(--red)]">
                       Free shipping unlocked
                     </div>

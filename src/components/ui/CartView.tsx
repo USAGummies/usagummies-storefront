@@ -8,6 +8,7 @@ import { CartLineControls } from "@/components/cart/CartLineControls.client";
 import { AddBagButton } from "@/components/cart/AddBagButton.client";
 import { PatriotRibbon } from "@/components/ui/PatriotRibbon";
 import { cn } from "@/lib/cn";
+import { pricingForQty, FREE_SHIP_QTY } from "@/lib/bundles/pricing";
 
 type MoneyV2 = { amount: string; currencyCode: string };
 
@@ -85,15 +86,18 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
     const qty = Number(l?.quantity) || 0;
     return sum + bagsPerUnit * qty;
   }, 0);
-  const remaining = Math.max(0, 5 - totalBags);
+  const remaining = Math.max(0, FREE_SHIP_QTY - totalBags);
   const primaryLine = lines[0] || null;
 
-  const subtotal = localCart?.cost?.subtotalAmount
-    ? formatMoney(localCart.cost.subtotalAmount as MoneyV2)
-    : "";
+  const bundlePricing = totalBags > 0 ? pricingForQty(totalBags) : null;
+  const subtotal = bundlePricing
+    ? formatMoney({ amount: bundlePricing.total.toFixed(2), currencyCode: "USD" })
+    : localCart?.cost?.subtotalAmount
+      ? formatMoney(localCart.cost.subtotalAmount as MoneyV2)
+      : "";
 
-  const pct = clampPct(Math.round((totalBags / 5) * 100));
-  const unlocked = totalBags >= 5;
+  const pct = clampPct(Math.round((totalBags / FREE_SHIP_QTY) * 100));
+  const unlocked = totalBags >= FREE_SHIP_QTY;
   const [justUnlocked, setJustUnlocked] = useState(false);
   const [upgrading, setUpgrading] = useState(false);
 
@@ -158,6 +162,15 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
               l?.merchandise?.image?.url ||
               l?.merchandise?.product?.featuredImage?.url ||
               null;
+            const lineQty = Number(l?.quantity) || 0;
+            const bagsPerUnit = getBagsPerUnit(l?.merchandise);
+            const lineBags = bagsPerUnit * lineQty;
+            const lineCurrency = l?.cost?.totalAmount?.currencyCode || "USD";
+            const lineTotal = lineBags
+              ? formatMoney({ amount: pricingForQty(lineBags).total.toFixed(2), currencyCode: lineCurrency })
+              : l.cost?.totalAmount
+                ? formatMoney(l.cost.totalAmount as MoneyV2)
+                : "";
             return (
               <div key={l.id} className="glass-card p-4 flex gap-3 hover-lift">
                 <div
@@ -178,7 +191,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                   </div>
                 </div>
                 <div className="text-right text-sm font-black text-white">
-                  {l.cost?.totalAmount ? formatMoney(l.cost.totalAmount as MoneyV2) : ""}
+                  {lineTotal}
                 </div>
               </div>
             );

@@ -9,6 +9,7 @@ import {
   replaceCartWithVariant,
   getCart as getCartInternal,
 } from "@/lib/cart";
+import { normalizeSingleBagVariant } from "@/lib/bundles/atomic";
 
 /**
  * Server actions wrapper layer.
@@ -24,17 +25,19 @@ export async function getCart() {
 
 export async function addToCart(formData: FormData) {
   const variantId = String(formData.get("merchandiseId") ?? "");
+  const safeVariantId = normalizeSingleBagVariant(variantId);
   const quantity = Math.max(1, Number(formData.get("quantity") ?? 1) || 1);
-  if (!variantId) throw new Error("Missing merchandiseId (variant id).");
-  await addLine(variantId, quantity);
+  if (!safeVariantId) throw new Error("Invalid merchandiseId (variant id).");
+  await addLine(safeVariantId, quantity);
   return { ok: true };
 }
 
 export async function buyNow(formData: FormData) {
   const variantId = String(formData.get("merchandiseId") ?? "");
+  const safeVariantId = normalizeSingleBagVariant(variantId);
   const quantity = Math.max(1, Number(formData.get("quantity") ?? 1) || 1);
-  if (!variantId) throw new Error("Missing merchandiseId (variant id).");
-  const checkoutUrl = await buyNowInternal(variantId, quantity);
+  if (!safeVariantId) throw new Error("Invalid merchandiseId (variant id).");
+  const checkoutUrl = await buyNowInternal(safeVariantId, quantity);
   redirect(checkoutUrl || "/cart");
 }
 
@@ -58,9 +61,10 @@ export async function removeLine(formData: FormData) {
  */
 export async function replaceWithVariant(formData: FormData) {
   const variantId = String(formData.get("merchandiseId") ?? "");
+  const safeVariantId = normalizeSingleBagVariant(variantId);
   const quantity = Math.max(1, Number(formData.get("quantity") ?? 1) || 1);
-  if (!variantId) throw new Error("Missing merchandiseId (variant id).");
-  await replaceCartWithVariant(variantId, quantity);
+  if (!safeVariantId) throw new Error("Invalid merchandiseId (variant id).");
+  await replaceCartWithVariant(safeVariantId, quantity);
   return { ok: true };
 }
 

@@ -1,6 +1,7 @@
 // src/lib/cart.ts
 import { cookies } from "next/headers";
 import { shopifyRequest } from "./shopify/fetch";
+import { normalizeSingleBagVariant } from "@/lib/bundles/atomic";
 
 const CART_COOKIE = "cartId";
 
@@ -225,12 +226,16 @@ export async function getCart() {
 
 export async function addToCart(variantId: string, quantity: number) {
   "use server";
+  const safeVariantId = normalizeSingleBagVariant(variantId);
+  if (!safeVariantId) {
+    throw new Error("Only the single-bag variant can be added to cart.");
+  }
   const cartId = await getOrCreateCartId();
   if (!cartId) return null;
 
   const data = await shopify<CartLinesAddResult>(CART_LINES_ADD, {
     cartId,
-    lines: [{ merchandiseId: variantId, quantity }],
+    lines: [{ merchandiseId: safeVariantId, quantity }],
   });
 
   const errs = data?.cartLinesAdd?.userErrors;
@@ -245,12 +250,16 @@ export async function addToCart(variantId: string, quantity: number) {
 
 export async function buyNow(variantId: string, quantity: number) {
   "use server";
+  const safeVariantId = normalizeSingleBagVariant(variantId);
+  if (!safeVariantId) {
+    throw new Error("Only the single-bag variant can be purchased.");
+  }
   const cartId = await getOrCreateCartId();
   if (!cartId) return null;
 
   const data = await shopify<CartLinesAddResult>(CART_LINES_ADD, {
     cartId,
-    lines: [{ merchandiseId: variantId, quantity }],
+    lines: [{ merchandiseId: safeVariantId, quantity }],
   });
 
   const errs = data?.cartLinesAdd?.userErrors;
@@ -289,6 +298,10 @@ export async function updateLineQuantity(lineId: string, quantity: number) {
  */
 export async function replaceCartWithVariant(variantId: string, quantity: number) {
   "use server";
+  const safeVariantId = normalizeSingleBagVariant(variantId);
+  if (!safeVariantId) {
+    throw new Error("Only the single-bag variant can be used for bundles.");
+  }
   const cartId = await getOrCreateCartId();
   if (!cartId) return null;
 
@@ -314,7 +327,7 @@ export async function replaceCartWithVariant(variantId: string, quantity: number
   const nextQty = Math.max(1, Math.min(99, Number(quantity) || 1));
   const added = await shopify<CartLinesAddResult>(CART_LINES_ADD, {
     cartId,
-    lines: [{ merchandiseId: variantId, quantity: nextQty }],
+    lines: [{ merchandiseId: safeVariantId, quantity: nextQty }],
   });
 
   const errs2 = added?.cartLinesAdd?.userErrors;

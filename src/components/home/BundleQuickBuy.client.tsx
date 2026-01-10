@@ -102,7 +102,7 @@ export default function BundleQuickBuy({ tiers = [], productHandle, anchorId }: 
           action: "add",
           variantId: selectedTier.variantId,
           merchandiseId: selectedTier.variantId,
-          quantity: 1,
+          quantity: selectedTier.qty,
         }),
       });
       const json = await res.json().catch(() => ({}));

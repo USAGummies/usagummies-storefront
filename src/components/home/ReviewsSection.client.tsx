@@ -35,7 +35,11 @@ const MENTION_PRESETS: Mention[] = [
 
 const CTA_LINK =
   "/products/all-american-gummy-bears-7-5-oz-single-bag?focus=bundles&bundle=5";
+
 const MAX_SUPPORTING = 8;
+
+const RED = "#D6403A";
+const BLUE = "#2563EB";
 
 function clsx(...a: Array<string | false | null | undefined>) {
   return a.filter(Boolean).join(" ");
@@ -73,7 +77,7 @@ function Stars({ rating }: { rating: number }) {
 function VerifiedBadge({ source }: { source: ReviewSource }) {
   if (source === "shopify") {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/60 bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-100">
+      <span className="inline-flex items-center gap-1 rounded-full border border-blue-300/35 bg-blue-500/10 px-3 py-1 text-xs font-semibold text-blue-100">
         Shopify • Verified buyer
       </span>
     );
@@ -82,6 +86,35 @@ function VerifiedBadge({ source }: { source: ReviewSource }) {
     <span className="inline-flex items-center gap-1 rounded-full border border-white/25 bg-white/10 px-3 py-1 text-xs font-semibold text-white/80">
       Verified buyer (prior store)
     </span>
+  );
+}
+
+function StarFieldOverlay() {
+  return (
+    <div
+      className="pointer-events-none absolute inset-0 opacity-[0.16]"
+      style={{
+        backgroundImage:
+          "radial-gradient(circle, rgba(255,255,255,0.26) 1px, transparent 1px)",
+        backgroundSize: "22px 22px",
+        backgroundPosition: "6px 10px",
+        maskImage: "radial-gradient(circle at 28% 10%, black 0%, transparent 60%)",
+        WebkitMaskImage:
+          "radial-gradient(circle at 28% 10%, black 0%, transparent 60%)",
+      }}
+    />
+  );
+}
+
+function CardTopEdge() {
+  return (
+    <div className="pointer-events-none absolute left-0 right-0 top-0 h-[5px] overflow-hidden">
+      <div className="flex h-full w-full opacity-[0.85]">
+        <div style={{ width: "33.33%", backgroundColor: RED }} />
+        <div style={{ width: "33.33%", backgroundColor: "rgba(255,255,255,0.95)" }} />
+        <div style={{ width: "33.33%", backgroundColor: BLUE }} />
+      </div>
+    </div>
   );
 }
 
@@ -111,15 +144,28 @@ function CardShell({
       tabIndex={tabIndex}
       className={clsx(
         "relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.06] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-xl",
-        clickable
-          ? "cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-300/70"
-          : "",
+        clickable ? "cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400/60" : "",
         className
       )}
     >
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(231,181,81,0.12),transparent_35%),radial-gradient(circle_at_90%_10%,rgba(255,255,255,0.08),transparent_38%),linear-gradient(135deg,rgba(214,64,58,0.06),transparent_30%,rgba(38,99,235,0.08))]" />
+      <CardTopEdge />
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          backgroundImage: [
+            "radial-gradient(circle at 12% 10%, rgba(214,64,58,0.10), transparent 44%)",
+            "radial-gradient(circle at 88% 10%, rgba(37,99,235,0.10), transparent 46%)",
+          ].join(","),
+        }}
+      />
       {accent ? (
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_30%,rgba(240,196,106,0.12),transparent_45%)]" />
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 50% 20%, rgba(255,255,255,0.06), transparent 60%)",
+          }}
+        />
       ) : null}
       <div className="relative z-10">{children}</div>
     </div>
@@ -348,7 +394,17 @@ export default function ReviewsSectionClient({ reviews }: Props) {
 
   return (
     <section className="relative mx-auto max-w-6xl px-4 py-12 sm:py-14">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(231,181,81,0.12),transparent_35%),radial-gradient(circle_at_80%_10%,rgba(255,255,255,0.06),transparent_40%),linear-gradient(135deg,rgba(214,64,58,0.07),transparent_32%,rgba(38,99,235,0.06))]" />
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          backgroundImage: [
+            "radial-gradient(circle at 14% 0%, rgba(214,64,58,0.08), transparent 36%)",
+            "radial-gradient(circle at 88% 10%, rgba(37,99,235,0.08), transparent 38%)",
+            "linear-gradient(180deg, rgba(11,20,38,0.0), rgba(11,20,38,0.35))",
+          ].join(","),
+        }}
+      />
+      <StarFieldOverlay />
       <div className="relative z-10 space-y-6">
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/70">
@@ -392,7 +448,6 @@ export default function ReviewsSectionClient({ reviews }: Props) {
               tabIndex={0}
               accent
             >
-              <div className="mb-3 h-1 rounded-full bg-gradient-to-r from-red-500/60 via-amber-300/70 to-blue-500/60 blur-[1px]" />
               <div className="space-y-3">
                 <div className="flex items-start gap-3">
                   <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 text-base font-bold text-white">

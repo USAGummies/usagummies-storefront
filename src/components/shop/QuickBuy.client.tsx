@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useFormStatus } from "react-dom";
+import { SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
 
 type AnyProduct = any;
 
@@ -57,7 +58,7 @@ export default function QuickBuy({
   addToCartAction: (fd: FormData) => Promise<void>;
   campaign?: string | null;
 }) {
-  const variantId = getFirstVariantId(product);
+  const variantId = SINGLE_BAG_VARIANT_ID || getFirstVariantId(product);
 
   // If product is missing variants (or Shopify returned something unexpected),
   // don't hard-crash the UI.
@@ -77,7 +78,7 @@ export default function QuickBuy({
   return (
     <form action={addToCartAction}>
       {/* Server action inputs */}
-      <input type="hidden" name="variantId" value={variantId} />
+      <input type="hidden" name="merchandiseId" value={variantId} />
       <input type="hidden" name="quantity" value="1" />
       {campaign ? <input type="hidden" name="campaign" value={campaign} /> : null}
 
