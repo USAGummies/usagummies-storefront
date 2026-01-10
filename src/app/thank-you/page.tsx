@@ -78,7 +78,7 @@ export default function ThankYouPage() {
           <Reveal className="glass-card p-5 space-y-3">
             <div className="text-lg font-black text-white">Build your next bundle</div>
             <div className="text-sm text-[var(--muted)]">
-              Free shipping at 5+ bags. Most customers go bigger on the next run.
+              Free shipping on 5+ bags. Most customers go bigger on the next run.
             </div>
             <div className="flex flex-wrap gap-2">
               <Link href="/shop" className="btn btn-red pressable">

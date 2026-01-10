@@ -31,14 +31,14 @@ export default function ShippingPolicyPage() {
           <h1 className="text-3xl font-semibold tracking-tight">Shipping Policy</h1>
           <p className="mt-3 text-white/75">
             We keep shipping simple and predictable. Bundle pricing is clear on every product page,
-            and free shipping unlocks on 5+ bags.
+            and free shipping on 5+ bags.
           </p>
 
           <div className="mt-8 space-y-6 text-white/80">
             <div className="glass-soft p-5">
               <h2 className="text-lg font-semibold text-white">Free shipping</h2>
               <p className="mt-2 text-sm text-white/75">
-                Free shipping is unlocked on orders of <strong className="text-white">5+ bags</strong>.
+                Free shipping on orders of <strong className="text-white">5+ bags</strong>.
                 The product page and cart will reflect this automatically.
               </p>
             </div>

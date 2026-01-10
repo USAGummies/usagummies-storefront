@@ -4,6 +4,7 @@
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { PatriotRibbon } from "@/components/ui/PatriotRibbon";
+import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 
 type Props = {
   title: string;
@@ -125,8 +126,7 @@ export function StickyAddToCartBar({
                 <span style={{ fontWeight: 900 }}>{priceText}</span>{" "}
                 <span style={{ opacity: 0.55 }}>•</span>{" "}
                 <span style={{ opacity: 0.85 }}>
-                  Bundle & save — free shipping at{" "}
-                  <span style={{ fontWeight: 950 }}>5+</span>
+                  Bundle &amp; save — {FREE_SHIPPING_PHRASE}
                 </span>
               </div>
 

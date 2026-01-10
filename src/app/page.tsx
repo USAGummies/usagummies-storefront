@@ -6,12 +6,13 @@ import { getProductByHandle } from "@/lib/storefront";
 import BundleQuickBuy from "@/components/home/BundleQuickBuy.client";
 import ReviewsSection from "@/components/home/ReviewsSection";
 import { getBundleVariants } from "@/lib/bundles/getBundleVariants";
+import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import HeroCTAWatcher from "@/components/home/HeroCTAWatcher";
 
 export const metadata: Metadata = {
   title: "USA Gummies | American-Made Clean Gummies",
   description:
-    "Premium American-made gummy bears with clean ingredients, no dyes, and free shipping at 5+ bags.",
+    "Premium American-made gummy bears with clean ingredients, no dyes, and free shipping on 5+ bags.",
 };
 
 function formatMoney(amount: string | number, currency = "USD") {
@@ -88,13 +89,14 @@ export default async function HomePage() {
               </div>
               <div className="space-y-1.5">
                 <h1 className="text-3xl font-black leading-tight text-white sm:text-4xl lg:text-5xl">
-                  Bold Flavor. Clean Label. Gummy Bears Done Right.
+                  Dye-Free Gummy Bears — Made in the USA.
                 </h1>
                 <div className="text-[13px] font-semibold uppercase tracking-[0.22em] text-[var(--gold)]">
                   Fan-favorite
                 </div>
                 <p className="text-sm text-[var(--muted)] sm:text-base max-w-prose">
-                  Dye-free, all-natural gummies — free shipping on 5+ bags.
+                  All-natural flavors. No artificial dyes. Build a bundle to save more —{" "}
+                  {FREE_SHIPPING_PHRASE.toLowerCase()}.
                 </p>
                 {/* Mobile pills: exactly two, never wrap */}
                 <div className="flex md:hidden flex-nowrap items-center gap-2 overflow-hidden text-[11px] font-semibold text-white/75">
@@ -115,7 +117,7 @@ export default async function HomePage() {
               </div>
               <div className="flex flex-col gap-1 sm:flex-row sm:flex-wrap">
                 <div className="text-sm text-white/80 font-semibold">
-                  <span className="text-[var(--gold)]">★★★★★</span> 4.9 stars • Real reviews
+                  Verified reviews from real customers
                 </div>
                 <div id="hero-primary-cta" className="w-full sm:w-auto">
                   <a href="#bundle-pricing" className="btn btn-red w-full sm:w-auto">
@@ -208,7 +210,7 @@ export default async function HomePage() {
               },
               {
                 title: "Bundle value",
-                bullets: ["Free ship 5+", "Best per-bag at 8+", "Easy, secure checkout"],
+                bullets: [FREE_SHIPPING_PHRASE, "Best per-bag at 8+", "Easy, secure checkout"],
               },
             ].map((card) => (
               <div

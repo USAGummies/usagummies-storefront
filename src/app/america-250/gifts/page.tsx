@@ -29,7 +29,7 @@ export default function America250GiftsPage() {
         <div className="mt-8 rounded-3xl border border-white/10 bg-white/5 p-6">
           <div className="text-sm font-semibold">Quick picks</div>
           <ul className="mt-3 grid gap-2 text-sm text-white/75">
-            <li>• 5 bags: easy gift, free shipping</li>
+            <li>• 5 bags: easy gift, free shipping on 5+ bags</li>
             <li>• 8 bags: most popular for hosting + sharing</li>
             <li>• 12 bags: stock-up / party table</li>
           </ul>

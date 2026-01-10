@@ -8,7 +8,7 @@ import { CartLineControls } from "@/components/cart/CartLineControls.client";
 import AddBagButton from "@/components/cart/AddBagButton.client";
 import { PatriotRibbon } from "@/components/ui/PatriotRibbon";
 import { cn } from "@/lib/cn";
-import { pricingForQty, FREE_SHIP_QTY } from "@/lib/bundles/pricing";
+import { pricingForQty, FREE_SHIP_QTY, FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 
 type MoneyV2 = { amount: string; currencyCode: string };
 
@@ -113,12 +113,12 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
     <div className="px-4 py-4 flex flex-col gap-4 text-[var(--text)]">
       <div className="glass-bar">
         <div className="text-sm font-black text-white">
-          {unlocked ? "Free shipping unlocked 🇺🇸" : "Free shipping mission"}
+          {FREE_SHIPPING_PHRASE}
         </div>
         <div className="mt-1 text-xs text-[var(--muted)]">
           {unlocked
-            ? "Keep it locked in while you checkout."
-            : `Add ${remaining} more bag${remaining === 1 ? "" : "s"} to unlock free shipping.`}
+            ? `${FREE_SHIPPING_PHRASE} is unlocked.`
+            : `Add ${remaining} more bag${remaining === 1 ? "" : "s"} to get ${FREE_SHIPPING_PHRASE.toLowerCase()}.`}
         </div>
         <div
           className={cn(
@@ -217,21 +217,6 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
           <Link href="/cart" className="btn w-full justify-center pressable" onClick={onClose}>
             View cart
           </Link>
-        </div>
-      </div>
-
-      <div className="glass-card p-4">
-        <div className="text-xs font-semibold tracking-[0.22em] text-[var(--muted)] uppercase">
-          Amazon halo
-        </div>
-        <div className="mt-1 text-sm font-black text-white">
-          Thousands of Americans choose us on Amazon.
-        </div>
-        <div className="mt-1 text-xs text-[var(--muted)]">
-          Same American-made quality here, with bundle pricing and free ship at 5+ bags.
-        </div>
-        <div className="mt-2 flex items-center gap-2 text-[var(--red)] font-black">
-          ★ ★ ★ ★ ★ <span className="text-xs text-[var(--muted)]">4.8/5</span>
         </div>
       </div>
 

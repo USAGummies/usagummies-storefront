@@ -14,6 +14,7 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { BundleTier } from "@/lib/bundles/getBundleVariants";
+import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 
 type TierKey = "5" | "8" | "12";
 
@@ -163,13 +164,13 @@ export default function BundleQuickBuy({ tiers = [], productHandle, anchorId, si
 
     const pills: string[] = [];
     if (isFive) {
-      pills.push("Free shipping");
+      pills.push(FREE_SHIPPING_PHRASE);
     } else if (isEight) {
       pills.push("Most popular • Best value");
-      pills.push("Free shipping");
+      pills.push(FREE_SHIPPING_PHRASE);
     } else if (isTwelve) {
       pills.push("Best price per bag");
-      pills.push("Free shipping");
+      pills.push(FREE_SHIPPING_PHRASE);
     }
 
     const cardTone = isEight ? "bg-white/[0.15]" : "bg-white/[0.04]";
@@ -322,7 +323,7 @@ export default function BundleQuickBuy({ tiers = [], productHandle, anchorId, si
         Pick your bundle
       </div>
       <p className="relative mt-1.5 text-sm text-white/70 max-w-[52ch]">
-        Free shipping at 5+ bags. 8 bags is the sweet spot.
+        {FREE_SHIPPING_PHRASE}. 8 bags is the sweet spot.
       </p>
 
       <div className="mt-2.5 flex flex-col gap-1.25 sm:gap-2">
@@ -366,7 +367,7 @@ export default function BundleQuickBuy({ tiers = [], productHandle, anchorId, si
             </span>
           </button>
           <div className="text-xs text-white/75">
-            Free shipping • Secure checkout
+            {FREE_SHIPPING_PHRASE} • Secure checkout
           </div>
           {error ? (
             <div className="text-xs font-semibold text-red-200">{error}</div>

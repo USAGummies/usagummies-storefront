@@ -18,7 +18,8 @@ Simple, direct, high-trust.
 
 ## Conversion model
 - Bundles are the primary value driver.
-- Best value typically begins at 5+ bags (often free shipping).
+- Free shipping on 5+ bags.
+- Pricing ladder: base $5.99/bag, discounts start at 4 bags, lowest $4.25/bag at 12.
 - Shopify checkout only.
 
 ## What to emphasize when summarizing

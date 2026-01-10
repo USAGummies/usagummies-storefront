@@ -4,6 +4,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useMemo } from "react";
+import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 
 function cx(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
@@ -18,12 +19,12 @@ export function AnnouncementBar() {
     if (isAmerica250) {
       return {
         left: "America 250 limited bundles",
-        right: "Free shipping on 5+ bags",
+        right: FREE_SHIPPING_PHRASE,
         href: "/shop?campaign=america250",
       };
     }
     return {
-      left: "Free shipping on 5+ bags",
+      left: FREE_SHIPPING_PHRASE,
       right: "Fast U.S. fulfillment • No subscriptions",
       href: "/shop",
     };

@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PatriotRibbon } from "@/components/ui/PatriotRibbon";
-import { pricingForQty, BASE_PRICE, FREE_SHIP_QTY } from "@/lib/bundles/pricing";
+import { pricingForQty, BASE_PRICE, FREE_SHIP_QTY, FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import { SINGLE_BAG_SKU, SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
 
 function cx(...a: Array<string | false | null | undefined>) {
@@ -336,6 +336,9 @@ export default function PurchaseBox({
         throw new Error(txt || "Cart request failed");
       }
 
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("cart:updated"));
+      }
       router.push("/cart");
       router.refresh();
     } catch {
@@ -363,8 +366,8 @@ export default function PurchaseBox({
                 Choose a bundle.{" "}
                 <strong>
                   {freeShip
-                    ? "Free shipping unlocked."
-                    : "Free shipping on bundle variants marked free-ship."}
+                    ? FREE_SHIPPING_PHRASE
+                    : FREE_SHIPPING_PHRASE}
                 </strong>
               </div>
 
@@ -398,21 +401,21 @@ export default function PurchaseBox({
           <div>
             <div className="pbx__cardTitle">Choose your bundle</div>
             <div className="pbx__cardHint">
-              Prices are pulled from Shopify variants (no math).
+              Bundle pricing follows the USA Gummies ladder.
             </div>
             <div className="pbx__guidance">
-              Most customers choose 5+ bags for free shipping; best value per bag is 8+.
+              Most customers choose 8+ bags for best value; {FREE_SHIPPING_PHRASE.toLowerCase()}.
             </div>
           </div>
           <div className="pbx__cardMini">
             <div className="pbx__miniTitle">Why bundles</div>
             <div className="pbx__miniCopy">
-              Better per-bag value, free shipping at 5+, and most customers choose 5 bags.
+              Better per-bag value, {FREE_SHIPPING_PHRASE.toLowerCase()}, and most customers choose 5 bags.
             </div>
           </div>
         </div>
         <div className="pbx__nudge" aria-live="polite">
-          Bundle &amp; save — free shipping unlocks at 5+ bags.
+          Bundle &amp; save — {FREE_SHIPPING_PHRASE.toLowerCase()}.
         </div>
 
         <div className="pbx__bagControls" aria-label="Choose bag quantity">
@@ -500,7 +503,7 @@ export default function PurchaseBox({
 
                 <div className="pbx__tileBottom">
                   {o.freeShipping ? (
-                    <span>✅ Free shipping variant</span>
+                    <span>✅ {FREE_SHIPPING_PHRASE}</span>
                   ) : (
                     <span>Standard shipping</span>
                   )}
@@ -525,7 +528,7 @@ export default function PurchaseBox({
 
             <div className="pbx__summarySub">
               {freeShip ? (
-                <span className="pbx__good">Free shipping on this bundle</span>
+                <span className="pbx__good">{FREE_SHIPPING_PHRASE}</span>
               ) : (
                 <span>Ships via standard rates</span>
               )}
@@ -562,10 +565,10 @@ export default function PurchaseBox({
             </button>
             <div className="pbx__ctaNote" aria-live="polite">
               {selectedQty >= 5
-                ? "Free shipping unlocked ✅"
-                : "Free shipping unlocks at 5+ bags."}
+                ? FREE_SHIPPING_PHRASE
+                : FREE_SHIPPING_PHRASE}
             </div>
-            <div className="pbx__ctaMicro">Secure checkout • Free ship 5+ • Easy returns</div>
+            <div className="pbx__ctaMicro">Secure checkout • {FREE_SHIPPING_PHRASE} • Easy returns</div>
             <div className="pbx__badges pbx__badges--compact" aria-hidden="true">
               <span className="pbx__badge">🇺🇸 Made in USA</span>
               <span className="pbx__badge">✅ Dye-free</span>
@@ -587,7 +590,7 @@ export default function PurchaseBox({
           <div className="pbx__stickyLeft">
             <div className="pbx__stickyLabel">{selectedOption?.label || `${selectedQty} bags`}</div>
             <div className="pbx__stickySub">
-              {selectedQty >= 5 ? "Free shipping unlocked" : "Free shipping at 5+ bags"}
+              {selectedQty >= 5 ? FREE_SHIPPING_PHRASE : FREE_SHIPPING_PHRASE}
             </div>
           </div>
           <button

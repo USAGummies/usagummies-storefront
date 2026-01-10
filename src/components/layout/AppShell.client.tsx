@@ -6,6 +6,7 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { CartDrawer } from "@/components/layout/CartDrawer.client";
 import { usePathname } from "next/navigation";
+import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 
 function cx(...a: Array<string | false | null | undefined>) {
   return a.filter(Boolean).join(" ");
@@ -13,10 +14,8 @@ function cx(...a: Array<string | false | null | undefined>) {
 
 const navLinks = [
   { href: "/shop", label: "Shop" },
-  { href: "/america-250", label: "America 250" },
   { href: "/about", label: "About" },
   { href: "/contact", label: "Contact" },
-  { href: "/policies", label: "Policies" },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -67,9 +66,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-[var(--bg,#0c1426)] text-[var(--text)]">
+      <div className="mx-auto w-full max-w-[430px] lg:max-w-[430px] min-h-screen bg-[var(--bg,#0c1426)] shadow-[0_0_0_1px_rgba(255,255,255,0.06),0_20px_80px_rgba(0,0,0,0.45)]">
       {/* Header is the only light surface */}
       <header className="sticky top-0 z-40 bg-white text-[var(--rebel)] border-b border-[var(--red)] shadow-[0_10px_28px_rgba(0,0,0,0.12)]">
-        <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between gap-3">
+        <div className="px-4 py-3 flex items-center justify-between gap-3">
           <Link href="/" className="flex items-center gap-3 pressable focus-ring">
             <div className="relative h-9 w-32">
               <Image
@@ -135,7 +135,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         {mobileOpen ? (
           <div className="md:hidden border-t border-[rgba(0,0,0,0.08)] bg-white/96 backdrop-blur-md">
-            <div className="mx-auto max-w-6xl px-4 py-3 flex flex-col gap-2 text-[var(--rebel)]">
+          <div className="px-4 py-3 flex flex-col gap-2 text-[var(--rebel)]">
               {navLinks.map((link) => {
                 const active = pathname === link.href;
                 return (
@@ -168,7 +168,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <main className="pb-16 text-[var(--text)]">{children}</main>
 
       <footer className="border-top border-[var(--border)] bg-[rgba(12,20,38,0.92)] backdrop-blur-md text-white">
-        <div className="mx-auto max-w-6xl px-4 py-8 text-sm text-[var(--muted)] space-y-6">
+        <div className="px-4 py-8 text-sm text-[var(--muted)] space-y-6">
           <div className="grid gap-4 md:grid-cols-[1.1fr_auto] md:items-start">
             <div className="space-y-2">
               <div className="text-lg font-black text-white">USA Gummies</div>
@@ -179,7 +179,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </ul>
             </div>
             <div className="text-xs text-[var(--muted)]">
-              Secure checkout • Free ship 5+ • Easy returns
+              Secure checkout • {FREE_SHIPPING_PHRASE} • Easy returns
             </div>
           </div>
 
@@ -204,6 +204,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </footer>
+      </div>
     </div>
   );
 }

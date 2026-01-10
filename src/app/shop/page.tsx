@@ -5,7 +5,7 @@ import { ShopToolbar } from "@/components/shop/ShopToolbar";
 import { ShopProductCard } from "@/components/shop/ShopProductCard";
 import { getProductsPage, type SortValue } from "@/lib/shopify/products";
 import { getProductByHandle, money } from "@/lib/storefront";
-import { pricingForQty, FREE_SHIP_QTY } from "@/lib/bundles/pricing";
+import { pricingForQty, FREE_SHIP_QTY, FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 
 const PAGE_SIZE = 18;
 function resolveSiteUrl() {
@@ -52,7 +52,7 @@ function hasBundleVariants(product: any) {
 export async function generateMetadata(): Promise<Metadata> {
   const title = "Shop USA Gummies | Bundle & Save on American-Made Gummies";
   const description =
-    "Explore USA Gummies bundles and best sellers. Made in the USA, all natural, dye-free. Free shipping unlocks at 5+ bags.";
+    "Explore USA Gummies bundles and best sellers. Made in the USA, all natural, dye-free. Free shipping on 5+ bags.";
   const canonical = `${SITE_URL}/shop`;
 
   return {
@@ -153,7 +153,7 @@ export default async function ShopPage(props: {
             <div>
               <h1 className="text-3xl font-black text-[var(--text)] sm:text-4xl">Shop USA Gummies</h1>
               <p className="mt-1 text-sm font-semibold text-[var(--muted)]">
-                Made in the USA • All Natural • Dye-Free • Free shipping at 5+ bags
+                Made in the USA • All Natural • Dye-Free • {FREE_SHIPPING_PHRASE}
               </p>
             </div>
             <Link href="/products/all-american-gummy-bears-7-5-oz-single-bag?focus=bundles" className="btn btn-navy">
@@ -167,7 +167,7 @@ export default async function ShopPage(props: {
             <span className="badge">✅ Dye-Free</span>
             <span className="badge badge--red">Bundle &amp; save</span>
             <span className="text-sm font-semibold text-[var(--muted)]">
-              Free shipping unlocks at 5+ bags.
+              {FREE_SHIPPING_PHRASE}
             </span>
           </div>
 
@@ -208,10 +208,10 @@ export default async function ShopPage(props: {
                   <div className="text-sm font-semibold text-[var(--muted)]">~ {perBagText} per bag</div>
                   {b.qty >= FREE_SHIP_QTY ? (
                     <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-[rgba(205,53,50,0.4)] bg-[rgba(205,53,50,0.12)] px-3 py-1 text-[11px] font-bold text-[var(--red)]">
-                      Free shipping unlocked
+                      {FREE_SHIPPING_PHRASE}
                     </div>
                   ) : (
-                    <div className="mt-2 text-xs font-semibold text-[var(--muted)]">Free ship unlocks at 5+ bags</div>
+                    <div className="mt-2 text-xs font-semibold text-[var(--muted)]">{FREE_SHIPPING_PHRASE}</div>
                   )}
                   <div className="mt-4 grid gap-2">
                     <Link href={href} className="btn btn-red justify-center">

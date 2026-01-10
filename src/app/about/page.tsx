@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import Image from "next/image";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 
@@ -35,7 +36,7 @@ export default function AboutPage() {
             </Pill>
             <Pill>No artificial dyes</Pill>
             <Pill>Made in USA</Pill>
-            <Pill>Free shipping 5+</Pill>
+            <Pill>{FREE_SHIPPING_PHRASE}</Pill>
           </div>
 
           <h1 className="mt-5 text-4xl font-semibold tracking-tight">
@@ -83,7 +84,7 @@ export default function AboutPage() {
               </p>
               <p className="mt-3 text-white/75">
                 That’s why we built bundle pricing directly into the product pages,
-                and why <span className="text-white font-semibold">free shipping unlocks at 5+ bags</span>.
+                and why <span className="text-white font-semibold">{FREE_SHIPPING_PHRASE.toLowerCase()}</span>.
                 Simple, clear, and built to be shared.
               </p>
 

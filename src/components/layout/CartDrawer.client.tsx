@@ -48,7 +48,7 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
     <>
       <div
         className={cn(
-          "fixed inset-0 z-50 flex justify-end",
+          "fixed inset-0 z-50 flex justify-end md:justify-center",
           open ? "pointer-events-auto" : "pointer-events-none"
         )}
       >
@@ -63,7 +63,7 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
 
         <div
           className={cn(
-            "relative h-full w-full max-w-lg transform-gpu transition-transform duration-200 ease-out",
+            "relative h-full w-full max-w-[430px] transform-gpu transition-transform duration-200 ease-out",
             open ? "translate-x-0 opacity-100" : "translate-x-full opacity-0"
           )}
           aria-hidden={!open}

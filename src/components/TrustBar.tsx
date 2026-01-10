@@ -19,7 +19,7 @@ export function TrustBar({
           <div className="flex flex-col gap-3 sm:flex-row">
             <Pill title="Fast Shipping" desc="Ships quickly from the USA" />
             <Pill title="Secure Checkout" desc="Shopify-powered checkout" />
-            <Pill title="Best Value at 5+" desc="Bundle savings + free shipping" />
+            <Pill title="Free Shipping 5+" desc="Free shipping on 5+ bags" />
           </div>
         </div>
       </div>

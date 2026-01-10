@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { money } from "@/lib/storefront";
+import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import QuickBuy from "@/components/shop/QuickBuy.client";
 
 type ProductCardData = any;
@@ -82,7 +83,7 @@ export function ShopProductCard({
           ) : null}
 
           <div className="absolute bottom-2 right-2 rounded-full border border-white/15 bg-[rgba(12,20,38,0.72)] px-3 py-1 text-[11px] font-semibold text-white backdrop-blur-md">
-            Free ship 5+
+            {FREE_SHIPPING_PHRASE}
           </div>
         </div>
 

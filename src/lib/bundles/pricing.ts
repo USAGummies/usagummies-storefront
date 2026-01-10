@@ -5,6 +5,7 @@ export const MIN_PER_BAG = 4.25;
 export const DISCOUNT_START_QTY = 4;
 export const MAX_DISCOUNT_QTY = 12;
 export const FREE_SHIP_QTY = 5;
+export const FREE_SHIPPING_PHRASE = "Free shipping on 5+ bags";
 
 export function perBagForQty(qty: number) {
   const q = Number(qty) || 0;
