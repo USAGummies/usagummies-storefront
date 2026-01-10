@@ -118,7 +118,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
         <div className="mt-1 text-xs text-[var(--muted)]">
           {unlocked
             ? "Unlocked."
-            : `Add ${remaining} more bag${remaining === 1 ? "" : "s"} to unlock it.`}
+            : `Add ${remaining} more bag${remaining === 1 ? "" : "s"} to unlock ${FREE_SHIPPING_PHRASE}.`}
         </div>
         <div
           className={cn(
@@ -221,11 +221,11 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
       </div>
 
       <div className="glass-card p-4">
-        <div className="kicker text-[var(--muted)]">Pro move</div>
+        <div className="kicker text-[var(--muted)]">Pro tip</div>
         <div className="mt-1 text-sm text-white">
           {totalBags >= 8
-            ? "You’re at best value. Checkout to lock it in."
-            : "Pro tip: 8+ bags is usually the best value per checkout."}
+            ? "You’re at the best per-bag price. Checkout to lock it in."
+            : "Pro tip: 8+ bags gives you the best per-bag price."}
         </div>
       </div>
 

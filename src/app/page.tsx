@@ -242,7 +242,7 @@ export default async function HomePage() {
                 Join the movement
               </div>
               <h3 className="mt-1 text-xl font-black text-[var(--text)]">
-                Follow @usagummies for drops & hauls
+                Follow @usagummies for new flavors & customer stories
               </h3>
               <p className="mt-1 text-sm text-[var(--muted)]">
                 Real customers. Real bundles. Built in America.
@@ -263,9 +263,9 @@ export default async function HomePage() {
           <div className="text-xs font-semibold uppercase tracking-[0.2em] text-white/60">
             Get updates
           </div>
-          <h3 className="text-2xl font-black text-white">Don’t miss the next drop</h3>
+          <h3 className="text-2xl font-black text-white">Get exclusive deals & new flavor alerts</h3>
           <p className="text-sm text-white/70">
-            Bundles sell out. Early access + deals via email.
+            Be the first to know when bundles restock.
           </p>
           <form className="flex flex-wrap gap-3 items-center">
             <input
