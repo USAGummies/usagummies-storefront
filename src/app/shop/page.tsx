@@ -124,7 +124,7 @@ export default async function ShopPage(props: {
     primaryProduct?.priceRange?.minVariantPrice?.currencyCode ||
     "USD";
 
-  const ladder = [1, 4, 5, 8, 12];
+  const ladder = [1, 2, 3, 4, 5, 8, 12];
   const bundles = ladder.map((qty) => {
     const pricing = pricingForQty(qty);
     return {

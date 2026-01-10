@@ -117,8 +117,8 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
         </div>
         <div className="mt-1 text-xs text-[var(--muted)]">
           {unlocked
-            ? `${FREE_SHIPPING_PHRASE} is unlocked.`
-            : `Add ${remaining} more bag${remaining === 1 ? "" : "s"} to get ${FREE_SHIPPING_PHRASE.toLowerCase()}.`}
+            ? "Unlocked."
+            : `Add ${remaining} more bag${remaining === 1 ? "" : "s"} to unlock it.`}
         </div>
         <div
           className={cn(

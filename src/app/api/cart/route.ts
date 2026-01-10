@@ -6,6 +6,7 @@ import {
   updateLineQuantity,
   replaceCartWithVariant,
   getCart,
+  getCartById,
 } from "@/lib/cart";
 import { normalizeSingleBagVariant } from "@/lib/bundles/atomic";
 
@@ -43,8 +44,11 @@ export async function POST(req: Request) {
       const lineId = String(body.lineId ?? "");
       const quantity = Math.max(0, Number(body.quantity ?? 0) || 0);
       if (!lineId) return json({ ok: false, error: "Missing lineId." }, 400);
-      await updateLineQuantity(lineId, quantity);
-      return json({ ok: true });
+      const cartId = await updateLineQuantity(lineId, quantity);
+      if (!cartId) return json({ ok: false, error: "Cart update failed." }, 500);
+      const cart = await getCartById(cartId);
+      if (!cart) return json({ ok: false, error: "Cart unavailable." }, 500);
+      return json({ ok: true, cart });
     }
 
     if (action === "replace") {
@@ -53,8 +57,10 @@ export async function POST(req: Request) {
       const safeVariantId = normalizeSingleBagVariant(variantId);
       if (!safeVariantId)
         return json({ ok: false, error: "Invalid variantId." }, 400);
-      await replaceCartWithVariant(safeVariantId, quantity);
-      const cart = await getCart();
+      const cartId = await replaceCartWithVariant(safeVariantId, quantity);
+      if (!cartId) return json({ ok: false, error: "Cart replace failed." }, 500);
+      const cart = await getCartById(cartId);
+      if (!cart) return json({ ok: false, error: "Cart unavailable." }, 500);
       return json({ ok: true, cart });
     }
 
@@ -66,13 +72,17 @@ export async function POST(req: Request) {
       return json({ ok: false, error: "Invalid variantId." }, 400);
 
     if (action === "add") {
-      await addToCart(safeVariantId, quantity);
-      const cart = await getCart();
+      const cartId = await addToCart(safeVariantId, quantity);
+      if (!cartId) return json({ ok: false, error: "Cart add failed." }, 500);
+      const cart = await getCartById(cartId);
+      if (!cart) return json({ ok: false, error: "Cart unavailable." }, 500);
       return json({ ok: true, cart });
     }
 
     // default: buy
     const checkoutUrl = await buyNow(safeVariantId, quantity);
+    if (!checkoutUrl)
+      return json({ ok: false, error: "Checkout unavailable." }, 500);
     return json({ ok: true, checkoutUrl });
   } catch (err: any) {
     return json({ ok: false, error: err?.message || "Cart API error" }, 500);

@@ -47,7 +47,7 @@ export default function TermsPage() {
               <h2 className="text-lg font-semibold text-white">Pricing</h2>
               <p className="mt-2 text-sm text-white/75">
                 Prices are shown in your cart at checkout. Bundle pricing and shipping eligibility
-                (including free shipping on 5+ bags) are displayed clearly before you purchase.
+                (including Free shipping on 5+ bags) are displayed clearly before you purchase.
               </p>
             </div>
 

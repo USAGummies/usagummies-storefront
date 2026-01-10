@@ -16,7 +16,7 @@ import { useRouter } from "next/navigation";
 import type { BundleTier } from "@/lib/bundles/getBundleVariants";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 
-type TierKey = "5" | "8" | "12";
+type TierKey = "1" | "2" | "3" | "4" | "5" | "8" | "12";
 
 type Props = {
   tiers?: BundleTier[] | null;
@@ -37,7 +37,7 @@ function money(amount?: number | null, currency = "USD") {
   }).format(n);
 }
 
-const FEATURED_QTYS: TierKey[] = ["1", "4", "5", "8", "12"];
+const FEATURED_QTYS: TierKey[] = ["1", "2", "3", "4", "5", "8", "12"];
 
 export default function BundleQuickBuy({ tiers = [], productHandle, anchorId, singleBagVariantId, availableForSale = true }: Props) {
   const router = useRouter();

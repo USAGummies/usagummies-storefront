@@ -149,8 +149,10 @@ export default function PurchaseBox({
   const ladder = useMemo(
     () => [
       { qty: 1, label: "1 Bag", sub: "Try it" },
+      { qty: 2, label: "2 Bags", sub: "Standard price" },
+      { qty: 3, label: "3 Bags", sub: "Standard price" },
       { qty: 4, label: "4 Bags", sub: "Discount starts", accent: true },
-      { qty: 5, label: "5 Bags", sub: "Free shipping", accent: true },
+      { qty: 5, label: "5 Bags", sub: FREE_SHIPPING_PHRASE, accent: true },
       { qty: 8, label: "Best Value (8 bags) — Lowest price per bag", sub: "Recommended", accent: true },
       { qty: 12, label: "12 Bags", sub: "Lowest price per bag", accent: true },
     ],
@@ -393,18 +395,18 @@ export default function PurchaseBox({
               Bundle pricing follows the USA Gummies ladder.
             </div>
             <div className="pbx__guidance">
-              Most customers choose 8+ bags for best value; {FREE_SHIPPING_PHRASE.toLowerCase()}.
+              Most customers choose 8+ bags for best value. {FREE_SHIPPING_PHRASE}
             </div>
           </div>
           <div className="pbx__cardMini">
             <div className="pbx__miniTitle">Why bundles</div>
             <div className="pbx__miniCopy">
-              Better per-bag value, {FREE_SHIPPING_PHRASE.toLowerCase()}, and most customers choose 5 bags.
+              Better per-bag value, {FREE_SHIPPING_PHRASE}, and most customers choose 5 bags.
             </div>
           </div>
         </div>
         <div className="pbx__nudge" aria-live="polite">
-          Bundle &amp; save — {FREE_SHIPPING_PHRASE.toLowerCase()}.
+          Bundle &amp; save — {FREE_SHIPPING_PHRASE}.
         </div>
 
         <div className="pbx__bagControls" aria-label="Choose bag quantity">
@@ -554,7 +556,7 @@ export default function PurchaseBox({
         </div>
 
         <div className="pbx__tip">
-          <strong>Note:</strong> Bundles are Shopify variants (e.g., “5 bag Starter Bundle”). The price you see here is the variant price.
+          <strong>Note:</strong> Bundles add multiples of the single-bag item. Inventory is tracked on the single-bag SKU.
         </div>
 
         <div className="pbx__mobileSticky" aria-live="polite">
@@ -649,9 +651,13 @@ export default function PurchaseBox({
           gap:8px;
           grid-template-columns: repeat(2, minmax(0, 1fr));
         }
-        @media (max-width: 520px){
+        @media (max-width: 640px){
           .pbx__grid{ grid-template-columns: repeat(1, minmax(0, 1fr)); }
           .pbx__right{ display:none; }
+          .pbx__cardMini{ display:none; }
+          .pbx__tileTop{ flex-direction: column; align-items:flex-start; }
+          .pbx__tileRight{ text-align:left; min-width: 0; }
+          .pbx__tileBottom{ flex-direction: column; align-items:flex-start; }
         }
 
         .pbx__tile{
@@ -755,9 +761,10 @@ export default function PurchaseBox({
           align-items:center;
           justify-content:space-between;
           flex-wrap:wrap;
-          position: sticky;
-          bottom: 12px;
-          z-index: 2;
+          position: relative;
+        }
+        @media (min-width: 768px){
+          .pbx__summary{ position: sticky; bottom: 12px; z-index: 2; }
         }
         .pbx__summaryTitle{ font-weight:950; }
         .pbx__em{ font-weight:950; color: var(--text); }
@@ -814,17 +821,7 @@ export default function PurchaseBox({
         .pbx__tip{ margin-top:10px; font-size:13px; opacity:.78; line-height:1.5; }
 
         .pbx__mobileSticky{
-          position: sticky;
-          bottom: 0;
           display:none;
-          background: rgba(21,36,65,0.97);
-          color: white;
-          padding: 10px 12px;
-          border-radius: 14px;
-          margin-top:12px;
-          gap:10px;
-          align-items:center;
-          justify-content:space-between;
         }
         .pbx__stickyLeft{ min-width:0; }
         .pbx__stickyLabel{ font-weight:900; }
@@ -838,7 +835,7 @@ export default function PurchaseBox({
           font-weight:900;
         }
         @media (max-width: 640px){
-          .pbx__mobileSticky{ display:flex; }
+          .pbx__mobileSticky{ display:none; }
         }
 
         @media (prefers-reduced-motion: reduce){

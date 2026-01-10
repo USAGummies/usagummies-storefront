@@ -7,7 +7,7 @@ import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 export const metadata: Metadata = {
   title: "About USA Gummies | All Natural, Dye-Free, Made in the USA",
   description:
-    "USA Gummies makes premium gummy bears with all natural flavors, no artificial dyes, and proud U.S. manufacturing. Bundle pricing is built in, with free shipping on 5+ bags.",
+    "USA Gummies makes premium gummy bears with all natural flavors, no artificial dyes, and proud U.S. manufacturing. Bundle pricing is built in. Free shipping on 5+ bags.",
 };
 
 function Pill({ children }: { children: React.ReactNode }) {
@@ -84,7 +84,7 @@ export default function AboutPage() {
               </p>
               <p className="mt-3 text-white/75">
                 That’s why we built bundle pricing directly into the product pages,
-                and why <span className="text-white font-semibold">{FREE_SHIPPING_PHRASE.toLowerCase()}</span>.
+                and why <span className="text-white font-semibold">{FREE_SHIPPING_PHRASE}</span>.
                 Simple, clear, and built to be shared.
               </p>
 

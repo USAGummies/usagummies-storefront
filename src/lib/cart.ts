@@ -4,6 +4,7 @@ import { shopifyRequest } from "./shopify/fetch";
 import { normalizeSingleBagVariant } from "@/lib/bundles/atomic";
 
 const CART_COOKIE = "cartId";
+const DEFAULT_STOREFRONT_API_VERSION = "2024-07";
 
 function getShopifyEndpoint() {
   const explicit = process.env.SHOPIFY_STOREFRONT_API_ENDPOINT;
@@ -17,7 +18,8 @@ function getShopifyEndpoint() {
 
   const version =
     process.env.SHOPIFY_STOREFRONT_API_VERSION ||
-    process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_API_VERSION;
+    process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_API_VERSION ||
+    DEFAULT_STOREFRONT_API_VERSION;
 
   if (domain && version) {
     const clean = domain.replace(/^https?:\/\//, "").replace(/\/$/, "");
@@ -39,13 +41,13 @@ function getShopifyToken() {
   );
 }
 
-const { endpoint: SHOPIFY_ENDPOINT } = getShopifyEndpoint();
-const SHOPIFY_TOKEN = getShopifyToken();
-
 async function shopify<T>(query: string, variables?: Record<string, any>): Promise<T | null> {
+  const { endpoint } = getShopifyEndpoint();
+  const token = getShopifyToken();
+  if (!endpoint || !token) return null;
   const result = await shopifyRequest<T>({
-    endpoint: SHOPIFY_ENDPOINT,
-    token: SHOPIFY_TOKEN,
+    endpoint,
+    token,
     body: { query, variables },
     cache: "no-store",
     warnPrefix: "Shopify cart",
@@ -214,14 +216,19 @@ async function getOrCreateCartId(): Promise<string | null> {
   return createCartId();
 }
 
+async function getCartById(cartId: string) {
+  if (!cartId) return null;
+  const data = await shopify<CartGetResult>(CART_GET, { cartId });
+  return data?.cart ?? null;
+}
+
 export async function getCart() {
   "use server";
   const jar = await cookies();
   const cartId = jar.get(CART_COOKIE)?.value;
   if (!cartId) return null;
 
-  const data = await shopify<CartGetResult>(CART_GET, { cartId });
-  return data?.cart ?? null;
+  return getCartById(cartId);
 }
 
 export async function addToCart(variantId: string, quantity: number) {
@@ -245,7 +252,9 @@ export async function addToCart(variantId: string, quantity: number) {
   if (cart?.id) {
     const jar = await cookies();
     jar.set(CART_COOKIE, cart.id, { path: "/", httpOnly: true, sameSite: "lax" });
+    return cart.id;
   }
+  return null;
 }
 
 export async function buyNow(variantId: string, quantity: number) {
@@ -289,7 +298,9 @@ export async function updateLineQuantity(lineId: string, quantity: number) {
   if (cart?.id) {
     const jar = await cookies();
     jar.set(CART_COOKIE, cart.id, { path: "/", httpOnly: true, sameSite: "lax" });
+    return cart.id;
   }
+  return null;
 }
 
 /**
@@ -337,5 +348,9 @@ export async function replaceCartWithVariant(variantId: string, quantity: number
   if (nextCart?.id) {
     const jar = await cookies();
     jar.set(CART_COOKIE, nextCart.id, { path: "/", httpOnly: true, sameSite: "lax" });
+    return nextCart.id;
   }
+  return null;
 }
+
+export { getCartById };

@@ -12,7 +12,7 @@ import HeroCTAWatcher from "@/components/home/HeroCTAWatcher";
 export const metadata: Metadata = {
   title: "USA Gummies | American-Made Clean Gummies",
   description:
-    "Premium American-made gummy bears with clean ingredients, no dyes, and free shipping on 5+ bags.",
+    "Premium American-made gummy bears with clean ingredients and no dyes. Free shipping on 5+ bags.",
 };
 
 function formatMoney(amount: string | number, currency = "USD") {
@@ -65,7 +65,7 @@ export default async function HomePage() {
   }
 
   const homepageTiers = (bundleVariants?.variants || []).filter((t) =>
-    [1, 4, 5, 8, 12].includes(t.quantity)
+    [1, 2, 3, 4, 5, 8, 12].includes(t.quantity)
   );
 
   return (
@@ -96,7 +96,7 @@ export default async function HomePage() {
                 </div>
                 <p className="text-sm text-[var(--muted)] sm:text-base max-w-prose">
                   All-natural flavors. No artificial dyes. Build a bundle to save more —{" "}
-                  {FREE_SHIPPING_PHRASE.toLowerCase()}.
+                  {FREE_SHIPPING_PHRASE}.
                 </p>
                 {/* Mobile pills: exactly two, never wrap */}
                 <div className="flex md:hidden flex-nowrap items-center gap-2 overflow-hidden text-[11px] font-semibold text-white/75">
