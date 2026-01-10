@@ -21,6 +21,8 @@ type Props = {
   tiers?: BundleTier[] | null;
   productHandle?: string | null;
   anchorId?: string;
+  singleBagVariantId?: string | null;
+  availableForSale?: boolean;
 };
 
 function money(amount?: number | null, currency = "USD") {
@@ -36,7 +38,7 @@ function money(amount?: number | null, currency = "USD") {
 
 const FEATURED_QTYS: TierKey[] = ["5", "8", "12"];
 
-export default function BundleQuickBuy({ tiers = [], productHandle, anchorId }: Props) {
+export default function BundleQuickBuy({ tiers = [], productHandle, anchorId, singleBagVariantId, availableForSale = true }: Props) {
   const router = useRouter();
   const ctaRef = React.useRef<HTMLDivElement | null>(null);
   const [selected, setSelected] = React.useState<TierKey>("8");
@@ -45,24 +47,24 @@ export default function BundleQuickBuy({ tiers = [], productHandle, anchorId }: 
 
   const featured = React.useMemo(() => {
     const allowed = (tiers || []).filter(
-      (t) => t && FEATURED_QTYS.includes(String(t.qty) as TierKey)
+      (t) => t && FEATURED_QTYS.includes(String(t.quantity) as TierKey)
     );
-    allowed.sort((a, b) => a.qty - b.qty);
+    allowed.sort((a, b) => a.quantity - b.quantity);
     return allowed;
   }, [tiers]);
 
   React.useEffect(() => {
     const preferred =
-      featured.find((t) => t.qty === 8) ||
-      featured.find((t) => t.qty === 5) ||
+      featured.find((t) => t.quantity === 8) ||
+      featured.find((t) => t.quantity === 5) ||
       featured[0];
     if (preferred) {
-      setSelected(String(preferred.qty) as TierKey);
+      setSelected(String(preferred.quantity) as TierKey);
     }
   }, [featured]);
 
   const selectedTier =
-    featured.find((t) => String(t.qty) === selected) || featured[0] || null;
+    featured.find((t) => String(t.quantity) === selected) || featured[0] || null;
 
   function scrollToCTA() {
     if (!ctaRef.current) return;
@@ -84,12 +86,12 @@ export default function BundleQuickBuy({ tiers = [], productHandle, anchorId }: 
     }
   }
 
-  const hasPrice = Number.isFinite(selectedTier?.price ?? NaN);
-  const ctaDisabled = !selectedTier?.variantId || !hasPrice || selectedTier?.available === false;
+  const hasPrice = Number.isFinite(selectedTier?.totalPrice ?? NaN);
+  const ctaDisabled = !singleBagVariantId || !hasPrice || availableForSale === false;
 
   async function addToCart() {
-    if (!selectedTier?.variantId || ctaDisabled) {
-      setError(selectedTier?.available === false ? "Out of stock" : "Select a bundle to continue.");
+    if (!singleBagVariantId || ctaDisabled) {
+      setError(availableForSale === false ? "Out of stock" : "Select a bundle to continue.");
       return;
     }
     setAdding(true);
@@ -100,9 +102,9 @@ export default function BundleQuickBuy({ tiers = [], productHandle, anchorId }: 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "add",
-          variantId: selectedTier.variantId,
-          merchandiseId: selectedTier.variantId,
-          quantity: selectedTier.qty,
+          variantId: singleBagVariantId,
+          merchandiseId: singleBagVariantId,
+          quantity: selectedTier.quantity,
         }),
       });
       const json = await res.json().catch(() => ({}));
@@ -128,32 +130,32 @@ export default function BundleQuickBuy({ tiers = [], productHandle, anchorId }: 
     }
   }
 
-  const tier5 = featured.find((t) => t.qty === 5);
+  const tier5 = featured.find((t) => t.quantity === 5);
   const baselinePerBag =
-    tier5 && Number.isFinite(tier5.price ?? NaN) ? (tier5.price as number) / 5 : null;
+    tier5 && Number.isFinite(tier5.totalPrice ?? NaN) ? (tier5.totalPrice as number) / 5 : null;
 
   function savingsFor(tier: BundleTier) {
-    if (!baselinePerBag || !Number.isFinite(tier.price ?? NaN)) return null;
-    const baselineTotal = baselinePerBag * tier.qty;
-    const s = baselineTotal - (tier.price as number);
+    if (!baselinePerBag || !Number.isFinite(tier.totalPrice ?? NaN)) return null;
+    const baselineTotal = baselinePerBag * tier.quantity;
+    const s = baselineTotal - (tier.totalPrice as number);
     return s > 0 ? s : 0;
   }
 
   function renderRow(tier: BundleTier) {
-    const isActive = String(tier.qty) === selected;
+    const isActive = String(tier.quantity) === selected;
     const displayTotal =
-      Number.isFinite(tier.price ?? NaN) && tier.price !== null
-        ? money(tier.price, tier.currencyCode || "USD")
+      Number.isFinite(tier.totalPrice ?? NaN) && tier.totalPrice !== null
+        ? money(tier.totalPrice, "USD")
         : null;
     const displayPerBag =
-      tier.perBag && Number.isFinite(tier.perBag)
-        ? `~${money(tier.perBag, tier.currencyCode || "USD")} / bag`
+      tier.perBagPrice && Number.isFinite(tier.perBagPrice)
+        ? `~${money(tier.perBagPrice, "USD")} / bag`
         : null;
-    const unavailable = tier.available === false || !displayTotal;
+    const unavailable = availableForSale === false || !displayTotal;
 
-    const isFive = tier.qty === 5;
-    const isEight = tier.qty === 8;
-    const isTwelve = tier.qty === 12;
+    const isFive = tier.quantity === 5;
+    const isEight = tier.quantity === 8;
+    const isTwelve = tier.quantity === 12;
 
     const savings = !isFive ? savingsFor(tier) : null;
     const savingsValue =
@@ -179,11 +181,11 @@ export default function BundleQuickBuy({ tiers = [], productHandle, anchorId }: 
 
     return (
       <button
-        key={tier.variantId || tier.qty}
+        key={tier.quantity}
         type="button"
         aria-pressed={isActive}
         disabled={!canSelect}
-        onClick={() => handleSelect(tier.qty, canSelect)}
+        onClick={() => handleSelect(tier.quantity, canSelect)}
         className={[
           "bundleTierBtn",
           cardTone,
@@ -220,13 +222,13 @@ export default function BundleQuickBuy({ tiers = [], productHandle, anchorId }: 
                       isEight ? "text-xl" : "text-lg",
                     ].join(" ")}
                   >
-                    {tier.qty} bags
+                    {tier.quantity} bags
                   </div>
                 </div>
                 <div className="text-xs text-white/70">
-                  {tier.qty === 5
+                  {tier.quantity === 5
                     ? "Starter bundle"
-                    : tier.qty === 8
+                    : tier.quantity === 8
                     ? "Most choose this"
                     : "Stock up case"}
                 </div>
@@ -245,7 +247,7 @@ export default function BundleQuickBuy({ tiers = [], productHandle, anchorId }: 
                   >
                     <span aria-hidden="true">★</span>
                     <span className="leading-none font-extrabold">
-                      Save {money(savingsValue, tier.currencyCode || "USD")}
+                      Save {money(savingsValue, "USD")}
                     </span>
                     <span className="text-[10px] text-white/65 whitespace-nowrap">(vs 5-bag)</span>
                   </div>
@@ -335,13 +337,13 @@ export default function BundleQuickBuy({ tiers = [], productHandle, anchorId }: 
           <div className="flex items-start justify-between gap-3 border-b border-white/12 pb-2 mb-2">
             <div className="text-sm font-semibold text-white/90 flex items-baseline gap-1">
               <span className="text-[12px] text-white/70">
-                {selectedTier.qty === 8 ? "Your best value bundle:" : "Your bundle:"}
+                {selectedTier.quantity === 8 ? "Your best value bundle:" : "Your bundle:"}
               </span>
-              <span className="text-[15px] font-extrabold text-white">{selectedTier.qty} bags</span>
+              <span className="text-[15px] font-extrabold text-white">{selectedTier.quantity} bags</span>
             </div>
             <div className="text-right text-xs text-white/60">
-              {selectedTier.perBag && Number.isFinite(selectedTier.perBag)
-                ? `~${money(selectedTier.perBag, selectedTier.currencyCode || "USD")} / bag`
+              {selectedTier.perBagPrice && Number.isFinite(selectedTier.perBagPrice)
+                ? `~${money(selectedTier.perBagPrice, "USD")} / bag`
                 : ""}
             </div>
           </div>
@@ -358,11 +360,8 @@ export default function BundleQuickBuy({ tiers = [], productHandle, anchorId }: 
             <span className="relative">
               {adding
                 ? "Adding…"
-                : selectedTier && selectedTier.price
-                ? `Add ${selectedTier.qty}-bag bundle — ${money(
-                    selectedTier.price,
-                    selectedTier.currencyCode || "USD"
-                  )} →`
+                : selectedTier && selectedTier.totalPrice
+                ? `Add ${selectedTier.quantity}-bag bundle — ${money(selectedTier.totalPrice, "USD")} →`
                 : "Add bundle to cart →"}
             </span>
           </button>

@@ -1,52 +1,83 @@
-// src/components/cart/AddBagButton.client.tsx
 "use client";
 
-import { useTransition } from "react";
-import { updateLine } from "@/app/actions/cart";
+import * as React from "react";
 
-export function AddBagButton({
-  lineId,
-  currentQty,
+type Props = {
+  label?: string;
+  pendingLabel?: string;
+  disabled?: boolean;
+
+  // New-style API (preferred)
+  onAdd?: () => Promise<void> | void;
+
+  // Legacy API (used by CartView.tsx right now)
+  lineId?: string;
+  currentQty?: number;
+  onAdded?: () => void;
+  onPending?: (p: boolean) => void;
+};
+
+export default function AddBagButton({
   label,
+  pendingLabel = "Adding…",
+  disabled,
+  onAdd,
+  lineId,
+  currentQty = 1,
   onAdded,
   onPending,
-}: {
-  lineId: string;
-  currentQty: number;
-  label?: string;
-  onAdded?: () => void;
-  onPending?: (pending: boolean) => void;
-}) {
-  const [pending, startTransition] = useTransition();
+}: Props) {
+  const [pending, startTransition] = React.useTransition();
 
-  function addOne() {
-    onPending?.(true);
-    startTransition(async () => {
-      const fd = new FormData();
-      fd.set("lineId", lineId);
-      fd.set("quantity", String(currentQty + 1));
-      await updateLine(fd);
-            window.dispatchEvent(new Event("cart:updated"));
+  const addOne = () => {
+    startTransition(() => {
+      void (async () => {
+        onPending?.(true);
+        try {
+          if (onAdd) {
+            await onAdd();
             onAdded?.();
-            onPending?.(false);
+            return;
+          }
+
+          if (!lineId) {
+            throw new Error("AddBagButton: missing onAdd or lineId");
+          }
+
+          const res = await fetch("/api/cart", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "update",
+              lineId,
+              quantity: (currentQty || 1) + 1,
+            }),
           });
-    }
-    }
-  
-    
-      
-      
-   
+
+          const json = await res.json().catch(() => ({}));
+          if (!res.ok || json?.ok === false) {
+            throw new Error(json?.error || "Could not update cart.");
+          }
+
+          onAdded?.();
+        } catch (err) {
+          console.error(err);
+        } finally {
+          onPending?.(false);
+        }
+      })();
+    });
+  };
 
   return (
     <button
       type="button"
       onClick={addOne}
-      disabled={pending}
+      disabled={Boolean(disabled) || pending}
       className="btn btn-navy pressable focus-ring"
       style={{ opacity: pending ? 0.6 : 1, minWidth: 120 }}
     >
-      {pending ? "Adding…" : label || "Add 1 bag"}
+      {pending ? pendingLabel : label || "Add 1 bag"}
     </button>
   );
 }

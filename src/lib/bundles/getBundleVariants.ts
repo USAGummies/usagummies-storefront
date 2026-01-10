@@ -102,3 +102,6 @@ export function getRecommendedVariant(): BundleVariant {
 
   return variants.find((v) => v.quantity === 8)!;
 }
+
+// Back-compat: older components import BundleTier
+export type BundleTier = BundleVariant;

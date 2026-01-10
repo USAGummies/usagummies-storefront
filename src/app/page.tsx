@@ -63,8 +63,8 @@ export default async function HomePage() {
     bundleVariants = null;
   }
 
-  const homepageTiers = (bundleVariants?.tiers || []).filter((t) =>
-    [5, 8, 12].includes(t.qty)
+  const homepageTiers = (bundleVariants?.variants || []).filter((t) =>
+    [5, 8, 12].includes(t.quantity)
   );
 
   return (

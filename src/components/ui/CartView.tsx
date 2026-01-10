@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { CartLineControls } from "@/components/cart/CartLineControls.client";
-import { AddBagButton } from "@/components/cart/AddBagButton.client";
+import AddBagButton from "@/components/cart/AddBagButton.client";
 import { PatriotRibbon } from "@/components/ui/PatriotRibbon";
 import { cn } from "@/lib/cn";
 import { pricingForQty, FREE_SHIP_QTY } from "@/lib/bundles/pricing";

@@ -294,17 +294,17 @@ export default function PurchaseBox({
 
   const selectedVariant = selectedOption?.variant ?? pickSingleVariant(variants);
   const selectedPrice = selectedOption?.totalPrice;
-  const selectedQty = selectedOption?.qty ?? 1;
+  const optionQty = selectedOption?.qty ?? selectedQty ?? 1;
   const selectedCurrency =
     (selectedVariant?.price as any)?.currencyCode ||
     (selectedVariant?.priceV2 as any)?.currencyCode ||
     baselineCurrency;
-  const freeShip = selectedQty >= FREE_SHIP_QTY;
+  const freeShip = optionQty >= FREE_SHIP_QTY;
 
   const startingAt = BASE_PRICE;
 
   const perBag =
-    selectedQty > 0 && selectedPrice !== undefined ? selectedPrice / selectedQty : undefined;
+    optionQty > 0 && selectedPrice !== undefined ? selectedPrice / optionQty : undefined;
 
   async function addToCart() {
     setError(null);
