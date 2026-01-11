@@ -228,6 +228,7 @@ export default async function HomePage() {
                 tiers={homepageTiers}
                 singleBagVariantId={bundleVariants?.singleBagVariantId}
                 availableForSale={bundleVariants?.availableForSale}
+                variant="compact"
               />
             </div>
           </div>

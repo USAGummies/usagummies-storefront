@@ -3,7 +3,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { PatriotRibbon } from "@/components/ui/PatriotRibbon";
 import { pricingForQty, BASE_PRICE, FREE_SHIP_QTY, FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import { SINGLE_BAG_SKU, SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
 
@@ -153,10 +152,6 @@ export default function PurchaseBox({
   const router = useRouter();
 
   const variants = (product?.variants?.nodes || []) as VariantNode[];
-  const subtitleText =
-    product?.description?.trim() ||
-    "Premium, dye-free gummy bears made in the USA — bundle & save on your favorites.";
-
   // Canonical ladder. We'll show a tier only if Shopify actually has that variant.
   const ladder = useMemo(
     () => [
@@ -304,8 +299,6 @@ export default function PurchaseBox({
     baselineCurrency;
   const freeShip = optionQty >= FREE_SHIP_QTY;
 
-  const startingAt = BASE_PRICE;
-
   const perBag =
     optionQty > 0 && selectedPrice !== undefined ? selectedPrice / optionQty : undefined;
 
@@ -353,48 +346,8 @@ export default function PurchaseBox({
     }
   }
 
-  const selectedSavingsAmount = selectedOption?.savingsAmount ?? 0;
-  const selectedSavingsPct = selectedOption?.savingsPct ?? 0;
-
   return (
     <section data-purchase-section="true" className="pbx">
-      {/* Top strip */}
-      <div className="pbx__banner">
-        <div className="pbx__bannerInner">
-          <div className="pbx__bannerGrid">
-            <div className="pbx__left">
-              <div className="pbx__kicker">Bundle &amp; Save</div>
-              <div className="pbx__title">{product?.title || "USA Gummies"}</div>
-              <div className="pbx__subtitle">{subtitleText}</div>
-              <div className="pbx__muted">
-                Choose a bundle.{" "}
-                <strong>
-                  {freeShip
-                    ? FREE_SHIPPING_PHRASE
-                    : FREE_SHIPPING_PHRASE}
-                </strong>
-              </div>
-
-              <div className="pbx__badges">
-                <span className="pbx__badge">🇺🇸 Made in USA</span>
-                <span className="pbx__badge">✅ Dye-free</span>
-                <span className="pbx__badge">🚚 Ships fast</span>
-              </div>
-            </div>
-
-            <div className="pbx__right">
-              <div className="pbx__kicker">Starting at</div>
-              <div className="pbx__price">{money(startingAt, baselineCurrency)}</div>
-              <div className="pbx__tiny">single bag</div>
-            </div>
-          </div>
-
-          <div className="pbx__ribbon">
-            <PatriotRibbon />
-          </div>
-        </div>
-      </div>
-
       {/* Bundle ladder */}
       <div
         ref={bundlesRef}
@@ -411,19 +364,6 @@ export default function PurchaseBox({
               Most customers choose 8+ bags for best value. {FREE_SHIPPING_PHRASE}
             </div>
           </div>
-          <div className="pbx__cardMini">
-            <div className="pbx__miniTitle">Why bundles</div>
-            <div className="pbx__miniCopy">
-              Better per-bag value, {FREE_SHIPPING_PHRASE}, and most customers choose 5 bags.
-            </div>
-          </div>
-        </div>
-        <div className="pbx__nudge" aria-live="polite">
-          Bundle &amp; save — {FREE_SHIPPING_PHRASE}.
-        </div>
-
-        <div className="pbx__bagControls" aria-label="Choose bag quantity">
-          <div className="pbx__bagLabel">How many bags?</div>
         </div>
 
         <div className="pbx__sliderWrap">
@@ -433,9 +373,6 @@ export default function PurchaseBox({
             {bundleOptionsWithBadges.map((o) => {
             const active = selectedQty === o.qty;
             const accent = Boolean((o as any).accent);
-            const showSavings = o.savingsAmount > 0;
-            const savingsPctLabel =
-              o.savingsPct && o.savingsPct >= 5 ? formatPercent(o.savingsPct) : "";
             const glow = o.badges.includes("most_popular") || o.badges.includes("best_deal");
 
             return (
@@ -458,50 +395,28 @@ export default function PurchaseBox({
                       <span className={cx("pbx__check", active && "pbx__check--active")} aria-hidden="true">
                         {active ? "✓" : ""}
                       </span>
-                      <div className="pbx__tileLabel">{o.label}</div>
-                      {o.badges.length ? (
-                        <div className="pbx__tileBadges">
-                          {o.badges.includes("most_popular") ? (
-                            <span className="pbx__pill">Most Popular</span>
-                          ) : null}
-                          {o.badges.includes("best_deal") ? (
-                            <span className="pbx__pill pbx__pill--navy">Best Deal</span>
-                          ) : null}
-                        </div>
-                      ) : null}
-                    </div>
-                    <div className={cx("pbx__tileSub", accent && "pbx__tileSub--accent")}>
-                      {o.sub}
-                    </div>
-                  </div>
-
-                  <div className="pbx__tileRight">
-                    <div className="pbx__tiny">Price</div>
-                    <div className="pbx__tileTotal">{money(o.totalPrice, o.currencyCode)}</div>
-                    <div className="pbx__tilePer">Per bag: {money(o.perBag, o.currencyCode)}</div>
-                    {showSavings ? (
-                      <div className="pbx__save">
-                        Save {money(o.savingsAmount, o.currencyCode)} vs single bag
-                        {savingsPctLabel ? (
-                          <span className="pbx__savePct">{` ${savingsPctLabel}`}</span>
+                    <div className="pbx__tileLabel">{o.label}</div>
+                    {o.badges.length ? (
+                      <div className="pbx__tileBadges">
+                        {o.badges.includes("most_popular") ? (
+                          <span className="pbx__pill">Most Popular</span>
+                        ) : null}
+                        {o.badges.includes("best_deal") ? (
+                          <span className="pbx__pill pbx__pill--navy">Best Deal</span>
                         ) : null}
                       </div>
                     ) : null}
                   </div>
                 </div>
 
-                <div className="pbx__tileBottom">
-                  {o.freeShipping ? (
-                    <span>✅ {FREE_SHIPPING_PHRASE}</span>
-                  ) : (
-                    <span>Standard shipping</span>
-                  )}
-                  <span>
-                    {money(o.perBag, o.currencyCode)} {o.qty ? `/ bag` : ""}
-                  </span>
+                <div className="pbx__tileRight">
+                  <div className="pbx__tiny">Price</div>
+                  <div className="pbx__tileTotal">{money(o.totalPrice, o.currencyCode)}</div>
+                  <div className="pbx__tilePer">Per bag: {money(o.perBag, o.currencyCode)}</div>
                 </div>
-              </button>
-            );
+              </div>
+            </button>
+          );
           })}
           </div>
         </div>
@@ -516,25 +431,6 @@ export default function PurchaseBox({
               </span>
             </div>
 
-            <div className="pbx__summarySub">
-              {freeShip ? (
-                <span className="pbx__good">{FREE_SHIPPING_PHRASE}</span>
-              ) : (
-                <span>Ships via standard rates</span>
-              )}
-              {" • "}
-              <span>
-                <strong>{money(perBag, selectedCurrency)}</strong> / bag
-              </span>
-            </div>
-
-            {selectedSavingsAmount > 0 ? (
-              <div className="pbx__saveLine">
-                You save {money(selectedSavingsAmount, selectedCurrency)} vs single bag
-                {selectedSavingsPct >= 5 ? ` (${formatPercent(selectedSavingsPct)})` : ""}
-              </div>
-            ) : null}
-
             {error ? <div className="pbx__error">{error}</div> : null}
           </div>
 
@@ -542,7 +438,6 @@ export default function PurchaseBox({
             <div className="pbx__totals">
               <div className="pbx__tiny">Bundle price</div>
               <div className="pbx__grand">{money(selectedPrice, selectedCurrency)}</div>
-              <div className="pbx__tilePer">Per bag: {money(perBag, selectedCurrency)}</div>
             </div>
 
             <button
@@ -557,17 +452,6 @@ export default function PurchaseBox({
               {selectedQty >= 5
                 ? FREE_SHIPPING_PHRASE
                 : FREE_SHIPPING_PHRASE}
-            </div>
-            <div className="pbx__ctaMicro">Secure checkout • {FREE_SHIPPING_PHRASE} • Easy returns</div>
-            <div className="pbx__badges pbx__badges--compact" aria-hidden="true">
-              <span className="pbx__badge">🇺🇸 Made in USA</span>
-              <span className="pbx__badge">✅ Dye-free</span>
-              <span className="pbx__badge">🚚 Ships fast</span>
-            </div>
-            <div className="pbx__trustInline" aria-hidden="true">
-              <span className="pbx__badge">🇺🇸 Made in USA</span>
-              <span className="pbx__badge">✅ Dye-free</span>
-              <span className="pbx__badge">🚚 Ships fast</span>
             </div>
           </div>
         </div>
@@ -592,36 +476,11 @@ export default function PurchaseBox({
 
       <style>{`
         .pbx{ display:block; color: var(--text); }
-        .pbx__banner{
-          border-radius: 18px;
-          border: 1px solid var(--border);
-          background: linear-gradient(180deg, #ffffff 0%, #f8f4ed 100%);
-          box-shadow: 0 18px 40px rgba(15,27,45,0.12);
-          overflow:hidden;
-        }
-        .pbx__bannerInner{ padding: 16px; }
-        .pbx__bannerGrid{
-          display:flex; gap:14px; align-items:flex-start; justify-content:space-between;
-        }
         .pbx__left{ min-width: 0; }
         .pbx__right{ text-align:right; white-space:nowrap; }
         .pbx__kicker{ font-size:12px; font-weight:900; letter-spacing:.06em; text-transform:uppercase; color: var(--muted); }
-    .pbx__title{ margin-top:8px; font-weight:950; font-size:18px; color: var(--text); }
-        .pbx__subtitle{ margin-top:6px; font-size:13px; color: var(--muted); line-height:1.5; }
-        .pbx__muted{ margin-top:6px; font-size:14px; color: var(--muted); }
-        .pbx__badges{ margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; }
-        .pbx__badges--compact{ margin-top:8px; }
-        .pbx__badge{
-          font-size:12px; font-weight:900;
-          border-radius:999px; padding:6px 10px;
-          border:1px solid var(--border);
-          background: var(--surface);
-          color: var(--text);
-        }
         .pbx__price{ margin-top:6px; font-family: var(--font-display); font-weight:950; font-size:24px; color: var(--text); }
         .pbx__tiny{ font-size:12px; color: var(--muted); margin-top:4px; }
-        .pbx__ribbon{ margin-top:12px; }
-
         .pbx__card{
           margin-top:14px;
           border-radius:18px;
@@ -640,25 +499,6 @@ export default function PurchaseBox({
         .pbx__cardTitle{ font-weight:950; font-size:16px; color: var(--text); }
         .pbx__cardHint{ font-size:13px; color: var(--muted); }
         .pbx__guidance{ margin-top:6px; font-size:12px; color: var(--muted); }
-        .pbx__cardMini{
-          max-width: 260px;
-          background: var(--surface-strong);
-          border: 1px solid var(--border);
-          border-radius: 12px;
-          padding: 10px;
-        }
-        .pbx__miniTitle{
-          font-weight:900; font-size:12px; color: var(--text); text-transform:uppercase; letter-spacing:0.05em;
-        }
-        .pbx__miniCopy{
-          margin-top:4px; font-size:12px; color: var(--muted); line-height:1.4;
-        }
-        .pbx__nudge{
-          margin-top:8px;
-          font-size:13px;
-          font-weight:900;
-          color: var(--muted);
-        }
 
         .pbx__sliderWrap{
           position: relative;
@@ -691,27 +531,25 @@ export default function PurchaseBox({
         .pbx__grid::-webkit-scrollbar{ display:none; }
         @media (max-width: 640px){
           .pbx__right{ display:none; }
-          .pbx__cardMini{ display:none; }
           .pbx__tileTop{ flex-direction: column; align-items:flex-start; }
           .pbx__tileRight{ text-align:left; min-width: 0; }
-          .pbx__tileBottom{ flex-direction: column; align-items:flex-start; }
         }
 
         .pbx__tile{
           width:100%;
-          min-width: 240px;
+          min-width: 220px;
           flex: 0 0 auto;
           scroll-snap-align: start;
           text-align:left;
           border-radius:18px;
           border:1px solid var(--border);
           background: var(--surface);
-          padding:12px;
+          padding:10px;
           cursor:pointer;
           transition: transform var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out), border-color var(--dur-2) var(--ease-out), background var(--dur-2) var(--ease-out);
         }
         @media (min-width: 768px){
-          .pbx__tile{ min-width: 280px; }
+          .pbx__tile{ min-width: 240px; }
         }
         .pbx__tile:hover{
           transform: translateY(-2px);
@@ -741,7 +579,7 @@ export default function PurchaseBox({
 
         .pbx__tileTop{ display:flex; gap:10px; align-items:flex-start; justify-content:space-between; }
         .pbx__tileLabelRow{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-        .pbx__tileLabel{ font-weight:950; font-size:15px; color: var(--text); }
+        .pbx__tileLabel{ font-weight:950; font-size:14px; color: var(--text); }
         .pbx__tileBadges{ display:flex; gap:6px; flex-wrap:wrap; }
         .pbx__check{
           width:18px; height:18px; border-radius:999px;
@@ -772,35 +610,18 @@ export default function PurchaseBox({
           background: var(--surface-strong);
           color: var(--navy);
         }
-        .pbx__tileSub{ margin-top:6px; font-size:12px; color: var(--muted); }
-        .pbx__tileSub--accent{ color: var(--red); font-weight:900; }
-        .pbx__tileRight{ text-align:right; min-width:110px; color: var(--text); }
-        .pbx__tileTotal{ font-weight:950; font-size:16px; color: var(--text); }
+        .pbx__tileRight{ text-align:right; min-width:100px; color: var(--text); }
+        .pbx__tileTotal{ font-weight:950; font-size:15px; color: var(--text); }
         .pbx__tilePer{ margin-top:4px; font-size:12px; color: var(--muted); }
-        .pbx__save{
-          margin-top:6px;
-          font-size:12px;
-          font-weight:900;
-          color: var(--text);
-        }
-        .pbx__savePct{ font-weight:800; color: var(--red); }
-        .pbx__tileBottom{
-          margin-top:10px;
-          font-size:12px;
-          color: var(--muted);
-          display:flex;
-          justify-content:space-between;
-          gap:10px;
-        }
 
         .pbx__summary{
-          margin-top:12px;
+          margin-top:10px;
           border-radius:16px;
           border:1px solid var(--border);
           background: var(--surface);
-          padding:14px;
+          padding:12px;
           display:flex;
-          gap:12px;
+          gap:10px;
           align-items:center;
           justify-content:space-between;
           flex-wrap:wrap;
@@ -812,14 +633,6 @@ export default function PurchaseBox({
         .pbx__summaryTitle{ font-weight:950; }
         .pbx__em{ font-weight:950; color: var(--text); }
         .pbx__em--red{ color: var(--red); }
-        .pbx__summarySub{ margin-top:6px; font-size:13px; color: var(--muted); }
-        .pbx__good{ font-weight:900; }
-        .pbx__saveLine{
-          margin-top:8px;
-          font-size:13px;
-          font-weight:900;
-          color: var(--text);
-        }
         .pbx__error{
           margin-top:10px;
           font-size:13px;

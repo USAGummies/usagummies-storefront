@@ -188,15 +188,14 @@ export default async function ShopPage(props: {
               </div>
             </div>
 
-            <div className="rounded-3xl border border-[rgba(255,255,255,0.12)] bg-[var(--navy)] p-4 shadow-[0_30px_70px_rgba(7,12,20,0.45)]">
-              <BundleQuickBuy
-                anchorId="shop-bundle-pricing"
-                productHandle={primaryHandle}
-                tiers={quickBuyTiers}
-                singleBagVariantId={bundleVariants?.singleBagVariantId}
-                availableForSale={bundleVariants?.availableForSale}
-              />
-            </div>
+            <BundleQuickBuy
+              anchorId="shop-bundle-pricing"
+              productHandle={primaryHandle}
+              tiers={quickBuyTiers}
+              singleBagVariantId={bundleVariants?.singleBagVariantId}
+              availableForSale={bundleVariants?.availableForSale}
+              variant="compact"
+            />
           </div>
         </section>
 
