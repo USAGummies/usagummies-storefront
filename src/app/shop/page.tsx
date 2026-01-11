@@ -181,7 +181,7 @@ export default async function ShopPage(props: {
             <div className="text-xl font-black text-[var(--text)]">Pick your bundle</div>
             <div className="text-sm font-semibold text-[var(--muted)]">Most popular: 5 bags · Best value: 8+ bags</div>
           </div>
-          <div className="grid grid-cols-1 justify-items-center gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 sm:grid sm:grid-cols-2 sm:gap-5 sm:overflow-visible lg:grid-cols-3 xl:grid-cols-4">
             {bundles.map((b: any) => {
               const isPopular = mostPopular && b.qty === mostPopular.qty;
               const isBest = bestValue && b.qty === bestValue.qty;
@@ -191,7 +191,7 @@ export default async function ShopPage(props: {
               return (
                 <article
                   key={b.id}
-                  className="glass-card w-full max-w-[340px] rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
+                  className="glass-card w-full max-w-[340px] min-w-[260px] snap-start rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
                 >
                   <div className="flex items-center justify-between">
                     <div className="text-base font-black text-[var(--text)]">{b.title || `${b.qty} Bags`}</div>
@@ -215,10 +215,7 @@ export default async function ShopPage(props: {
                   )}
                   <div className="mt-4 grid gap-2">
                     <Link href={href} className="btn btn-red justify-center">
-                      Select bundle
-                    </Link>
-                    <Link href={`/products/${primaryHandle}?focus=bundles`} className="btn btn-outline justify-center">
-                      View details
+                      Build bundle
                     </Link>
                   </div>
                 </article>

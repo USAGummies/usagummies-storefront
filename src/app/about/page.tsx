@@ -75,6 +75,43 @@ export default function AboutPage() {
             </div>
           </div>
 
+          <div className="mt-8 grid gap-6 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
+            <div className="space-y-3">
+              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-white/60">
+                Founder-led, quality-first
+              </div>
+              <h2 className="text-2xl font-semibold">American-made candy, done right.</h2>
+              <p className="text-white/75">
+                USA Gummies started with a simple goal: make gummy bears that taste
+                incredible and feel good to share — without the artificial dyes.
+                We keep production close, ingredients clean, and quality consistent.
+              </p>
+              <div className="flex flex-wrap gap-2 text-xs text-white/70">
+                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
+                  Made in America
+                </span>
+                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
+                  Small-batch care
+                </span>
+                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
+                  Clean ingredients
+                </span>
+              </div>
+            </div>
+
+            <div className="glass-soft p-4">
+              <div className="aspect-[4/3] overflow-hidden rounded-3xl border border-white/10 bg-white/5">
+                <Image
+                  src="/brand/hero.jpg"
+                  alt="USA Gummies made in the USA"
+                  width={1200}
+                  height={900}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+            </div>
+          </div>
+
           <div className="mt-8 grid gap-8 md:grid-cols-2 md:items-center">
             <div>
               <h2 className="text-2xl font-semibold">Why bundles?</h2>

@@ -68,13 +68,52 @@ export default async function HomePage() {
     [1, 2, 3, 4, 5, 8, 12].includes(t.quantity)
   );
 
+  const whyCards = [
+    {
+      title: "American-made craft",
+      copy: "Built in the USA with clean ingredients and tight quality control.",
+      icon: (
+        <svg viewBox="0 0 24 24" className="h-6 w-6 text-[var(--gold)]" aria-hidden="true">
+          <path
+            fill="currentColor"
+            d="M3 10.2 12 5l9 5.2v8.3H3v-8.3zm9-2.9-6.2 3.6h12.4L12 7.3zM7 12h2v5H7v-5zm4 0h2v5h-2v-5zm4 0h2v5h-2v-5z"
+          />
+        </svg>
+      ),
+    },
+    {
+      title: "Clean, dye-free",
+      copy: "All-natural flavors with no artificial dyes or neon aftertaste.",
+      icon: (
+        <svg viewBox="0 0 24 24" className="h-6 w-6 text-[var(--gold)]" aria-hidden="true">
+          <path
+            fill="currentColor"
+            d="M12 3c4 3 6 6.3 6 9.6A6 6 0 0 1 6 12.6C6 9.3 8 6 12 3zm0 3.2C9.4 8.2 8 10.2 8 12.6a4 4 0 1 0 8 0c0-2.4-1.4-4.4-4-6.4z"
+          />
+        </svg>
+      ),
+    },
+    {
+      title: "Bundle value",
+      copy: `Save more as you add bags. ${FREE_SHIPPING_PHRASE}.`,
+      icon: (
+        <svg viewBox="0 0 24 24" className="h-6 w-6 text-[var(--gold)]" aria-hidden="true">
+          <path
+            fill="currentColor"
+            d="M4 6h16v3H4V6zm0 5h16v7H4v-7zm5-4h6v-1H9v1zm3 6 3.5 2-1.2 1.8L12 15l-2.3 1.8-1.2-1.8L12 13z"
+          />
+        </svg>
+      ),
+    },
+  ];
+
   return (
     <main
       className="bg-[var(--bg)] text-[var(--text)] min-h-screen pb-16 lg:pb-0"
       style={{ backgroundColor: "var(--bg, #0c1426)", color: "var(--text, #f2f6ff)" }}
     >
       <section
-        className="relative overflow-hidden border-b border-gold-soft"
+        className="relative overflow-hidden border-b border-gold-soft hero-parallax"
         style={{
           backgroundImage:
             "linear-gradient(135deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.04) 40%, rgba(255,255,255,0.02) 100%), radial-gradient(circle at 10% 20%, rgba(255,255,255,0.05), rgba(255,255,255,0) 35%), radial-gradient(circle at 80% 0%, rgba(255,255,255,0.05), rgba(255,255,255,0) 30%)",
@@ -99,12 +138,12 @@ export default async function HomePage() {
                   {FREE_SHIPPING_PHRASE}.
                 </p>
                 {/* Mobile pills: exactly two, never wrap */}
-                <div className="flex md:hidden flex-nowrap items-center gap-2 overflow-hidden text-[11px] font-semibold text-white/75">
+                <div className="flex md:hidden flex-nowrap items-center gap-2 overflow-hidden text-[11px] font-semibold text-white/75 hero-badge-fade">
                   <span className="badge px-2 py-1 opacity-80">🇺🇸 Made in USA</span>
                   <span className="badge px-2 py-1 opacity-80">✅ Dye-free</span>
                 </div>
                 {/* Desktop/tablet pills: three pills */}
-                <div className="hidden md:flex flex-nowrap items-center gap-2 overflow-hidden text-xs font-semibold text-white/80">
+                <div className="hidden md:flex flex-nowrap items-center gap-2 overflow-hidden text-xs font-semibold text-white/80 hero-badge-fade">
                   <span className="badge px-3 py-1.5">🇺🇸 Made in USA</span>
                   <span className="badge px-3 py-1.5">✅ Dye-free</span>
                   <span className="badge px-3 py-1.5">🚚 Ships fast</span>
@@ -115,14 +154,23 @@ export default async function HomePage() {
                   <span>8+ bags is the sweet spot</span>
                 </div>
               </div>
-              <div className="flex flex-col gap-1 sm:flex-row sm:flex-wrap">
-                <div className="text-sm text-white/80 font-semibold">
-                  Verified reviews from real customers
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                <div className="text-sm text-amber-200 font-semibold">
+                  ★★★★★ Verified buyer rating
                 </div>
                 <div id="hero-primary-cta" className="w-full sm:w-auto">
                   <a href="#bundle-pricing" className="btn btn-red w-full sm:w-auto">
                     Build my bundle
                   </a>
+                </div>
+                <div className="text-xs text-white/70">{FREE_SHIPPING_PHRASE}</div>
+                <div className="flex flex-wrap items-center gap-2 text-xs text-white/75">
+                  <span className="rounded-full border border-white/15 bg-white/5 px-3 py-1">
+                    100% Satisfaction Guarantee
+                  </span>
+                  <span className="rounded-full border border-white/15 bg-white/5 px-3 py-1">
+                    50,000+ bags shipped nationwide
+                  </span>
                 </div>
               </div>
               <div className="lg:hidden">
@@ -134,7 +182,7 @@ export default async function HomePage() {
                     priority
                     unoptimized
                     sizes="(max-width: 640px) 90vw, (max-width: 1024px) 60vw, 560px"
-                    className="object-cover"
+                    className="object-cover hero-media__img"
                   />
                   <div className="hero-fade" />
                 </div>
@@ -168,7 +216,7 @@ export default async function HomePage() {
                     priority
                     unoptimized
                     sizes="(max-width: 640px) 90vw, (max-width: 1024px) 60vw, 560px"
-                    className="object-cover"
+                    className="object-cover hero-media__img"
                   />
                   <div className="hero-fade" />
                 </div>
@@ -197,37 +245,20 @@ export default async function HomePage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-2xl font-black text-[var(--text)]">Why USA Gummies</h2>
             <div className="text-sm font-semibold text-[var(--muted)]">
-              American-made. Clean ingredients. Bundle-first value.
+              American-made, clean, and built for bundles.
             </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {[
-              {
-                title: "American-made",
-                bullets: ["Built in the USA", "Fast shipping", "Founder-led"],
-              },
-              {
-                title: "Clean, dye-free",
-                bullets: ["No artificial dyes", "All-natural ingredients", "Soft, bold flavor"],
-              },
-              {
-                title: "Bundle value",
-                bullets: [FREE_SHIPPING_PHRASE, "Best per-bag at 8+", "Easy, secure checkout"],
-              },
-            ].map((card) => (
+            {whyCards.map((card) => (
               <div
                 key={card.title}
-                className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[0_14px_32px_rgba(0,0,0,0.22)]"
+                className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[0_14px_32px_rgba(0,0,0,0.22)] transition-transform duration-200 hover:-translate-y-1"
               >
-                <div className="text-lg font-black text-white">{card.title}</div>
-                <ul className="mt-3 space-y-2 text-sm text-[var(--muted)]">
-                  {card.bullets.map((b) => (
-                    <li key={b} className="flex items-start gap-2">
-                      <span className="mt-[6px] h-[6px] w-[6px] rounded-full bg-[var(--gold)]" aria-hidden="true" />
-                      <span>{b}</span>
-                    </li>
-                  ))}
-                </ul>
+                <div className="flex items-center gap-3">
+                  <div className="icon-float">{card.icon}</div>
+                  <div className="text-lg font-black text-white">{card.title}</div>
+                </div>
+                <p className="mt-3 text-sm text-[var(--muted)]">{card.copy}</p>
               </div>
             ))}
           </div>

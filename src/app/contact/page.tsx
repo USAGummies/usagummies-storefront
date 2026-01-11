@@ -34,6 +34,39 @@ export default function ContactPage() {
             We respond within one business day.
           </p>
 
+          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+            {[
+              {
+                title: "Fast response",
+                copy: "We reply within one business day on weekdays.",
+              },
+              {
+                title: "Order help",
+                copy: "Include your order number for faster support.",
+              },
+              {
+                title: "Shipping & returns",
+                copy: "See our policies for timing and return details.",
+                link: "/policies",
+              },
+            ].map((item) => (
+              <div
+                key={item.title}
+                className="glass-soft rounded-2xl border border-white/10 p-4 text-sm text-white/75"
+              >
+                <div className="text-sm font-semibold text-white">{item.title}</div>
+                <div className="mt-2">
+                  {item.copy}{" "}
+                  {item.link ? (
+                    <Link href={item.link} className="underline underline-offset-4">
+                      View policies
+                    </Link>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </div>
+
           <div className="mt-6 glass-soft p-5 text-sm text-white/75">
             <div className="font-semibold text-white">What can we help with?</div>
             <ul className="mt-2 list-disc space-y-1 pl-5 text-white/75">

@@ -275,11 +275,11 @@ a:hover {
 }
 .usa-hero__frame{
   position: relative;
-  border: 2px solid rgba(255,255,255,0.9);
+  border: 1px solid rgba(219,170,121,0.55);
   border-radius: 26px;
   overflow: hidden;
   box-shadow: 0 28px 70px rgba(0,0,0,0.28);
-  background: #ffffff;
+  background: #0c1426;
   max-width: 520px;
   margin-left: auto;
   margin-right: auto;
@@ -288,6 +288,26 @@ a:hover {
 }
 .usa-hero__frame img{
   object-fit: cover;
+}
+
+.hero-media__img{
+  will-change: transform;
+  animation: heroDrift 18s ease-in-out infinite;
+}
+.hero-badge-fade{
+  animation: fadeIn var(--dur-3) var(--ease-out) both;
+}
+.hero-parallax{
+  background-attachment: fixed;
+  background-size: 120% 120%;
+}
+@media (max-width: 768px){
+  .hero-parallax{
+    background-attachment: scroll;
+  }
+  .hero-media__img{
+    animation-duration: 22s;
+  }
 }
 
 .hero-fade{
@@ -351,6 +371,21 @@ a:hover {
   0%{ transform: scale(0.9); }
   60%{ transform: scale(1.08); }
   100%{ transform: scale(1); }
+}
+
+@keyframes heroDrift{
+  0%{ transform: scale(1) translate3d(0,0,0); }
+  50%{ transform: scale(1.05) translate3d(0,-1.5%,0); }
+  100%{ transform: scale(1.02) translate3d(1%,0,0); }
+}
+
+@keyframes iconFloat{
+  0%{ transform: translateY(0); }
+  50%{ transform: translateY(-4px); }
+  100%{ transform: translateY(0); }
+}
+.icon-float{
+  animation: iconFloat 6s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce){

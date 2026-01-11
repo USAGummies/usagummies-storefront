@@ -450,6 +450,8 @@ export default async function ProductPage(props: {
           @media (max-width: 980px){
             .pdp-root{ padding: 14px 0 90px; }
             .pdp-grid{ grid-template-columns: 1fr; }
+            .pdp-right{ order: 1; }
+            .pdp-left{ order: 2; }
             .pdp-sticky{ position: static; }
             .pdp-desktop-only{ display: none; }
             .pdp-mobile-only{ display: block; }

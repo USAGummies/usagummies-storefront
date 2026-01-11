@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { money } from "@/lib/storefront";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
-import QuickBuy from "@/components/shop/QuickBuy.client";
+import QuickView from "@/components/shop/QuickView.client";
 
 type ProductCardData = any;
 
@@ -57,74 +57,92 @@ export function ShopProductCard({
     : `${basePath}?focus=bundles`;
 
   return (
-    <div className="group flex h-full w-full max-w-[340px] flex-col rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-[14px] shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-xl glass-card">
-      <Link href={href} className="block">
-        <div className="relative aspect-square overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06),0_14px_28px_rgba(0,0,0,0.18)]">
-          {img?.url ? (
-            <Image
-              src={img.url}
-              alt={img.altText || product.title}
-              fill
-              sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
-              className="object-contain transition-transform duration-300 group-hover:scale-[1.02]"
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center text-xs text-[var(--muted)]">
-              No image
-            </div>
-          )}
-
-          {hasBundle ? (
-            <div className="absolute left-2 top-2 rounded-full border border-[rgba(205,53,50,0.35)] bg-[rgba(205,53,50,0.12)] px-3 py-1 text-[11px] font-bold text-[var(--red)]">
-              Bundle deals inside
-            </div>
-          ) : null}
-
-          <div className="absolute bottom-2 right-2 rounded-full border border-white/15 bg-[rgba(12,20,38,0.72)] px-3 py-1 text-[11px] font-semibold text-white backdrop-blur-md">
-            {FREE_SHIPPING_PHRASE}
-          </div>
-        </div>
-
-        <div className="mt-3 space-y-1">
-          <div
-            className="text-base font-black leading-tight text-[var(--text)]"
-            style={{
-              display: "-webkit-box",
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
-            }}
-          >
-            {product.title}
-          </div>
-
-          <div className="text-sm text-[var(--muted)]">
-            {priceText ? (
-              <>
-                Starting at <span className="font-semibold text-[var(--text)]">{priceText}</span>
-              </>
+    <QuickView product={product} href={href}>
+      {(open) => (
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={open}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              open();
+            }
+          }}
+          className="group flex h-full w-full max-w-[340px] flex-col rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-[14px] shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-xl glass-card focus:outline-none focus:ring-2 focus:ring-[var(--gold)]"
+        >
+          <div className="relative aspect-square overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06),0_14px_28px_rgba(0,0,0,0.18)]">
+            {img?.url ? (
+              <Image
+                src={img.url}
+                alt={img.altText || product.title}
+                fill
+                sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                className="object-contain transition-transform duration-300 group-hover:scale-[1.02]"
+              />
             ) : (
-              <span>See pricing</span>
+              <div className="flex h-full w-full items-center justify-center text-xs text-[var(--muted)]">
+                No image
+              </div>
             )}
+
+            {hasBundle ? (
+              <div className="absolute left-2 top-2 rounded-full border border-[rgba(205,53,50,0.35)] bg-[rgba(205,53,50,0.12)] px-3 py-1 text-[11px] font-bold text-[var(--red)]">
+                Bundle deals inside
+              </div>
+            ) : null}
+
+            <div className="absolute bottom-2 right-2 rounded-full border border-white/15 bg-[rgba(12,20,38,0.72)] px-3 py-1 text-[11px] font-semibold text-white backdrop-blur-md">
+              {FREE_SHIPPING_PHRASE}
+            </div>
           </div>
 
-          <div className="flex flex-wrap gap-2 pt-1">
-            {["🇺🇸 Made in USA", "🌿 All Natural", "✅ Dye-Free"].map((t) => (
-              <span key={t} className="badge">
-                {t}
+          <div className="mt-3 space-y-1">
+            <div
+              className="text-base font-black leading-tight text-[var(--text)]"
+              style={{
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              }}
+            >
+              {product.title}
+            </div>
+
+            <div className="flex items-center justify-between gap-2 text-sm text-[var(--muted)]">
+              {priceText ? (
+                <>
+                  Starting at <span className="font-semibold text-[var(--text)]">{priceText}</span>
+                </>
+              ) : (
+                <span>See pricing</span>
+              )}
+              <span className="text-xs font-semibold text-white/70 underline underline-offset-4">
+                Quick view
               </span>
-            ))}
+            </div>
+
+            <div className="flex flex-wrap gap-2 pt-1">
+              {["🇺🇸 Made in USA", "🌿 All Natural", "✅ Dye-Free"].map((t) => (
+                <span key={t} className="badge">
+                  {t}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-3 grid gap-2">
+            <Link
+              href={bundleHref}
+              className="btn btn-red justify-center min-h-[44px]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              Build bundle
+            </Link>
           </div>
         </div>
-      </Link>
-
-      <div className="mt-3 grid gap-2">
-        <Link href={bundleHref} className="btn btn-navy justify-center min-h-[44px]">
-          View product
-        </Link>
-
-        <QuickBuy product={product} campaign={campaign || null} />
-      </div>
-    </div>
+      )}
+    </QuickView>
   );
 }

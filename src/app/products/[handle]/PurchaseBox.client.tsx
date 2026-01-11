@@ -663,9 +663,22 @@ export default function PurchaseBox({
           display:grid;
           gap:8px;
           grid-template-columns: repeat(2, minmax(0, 1fr));
+          scrollbar-width: none;
         }
+        .pbx__grid::-webkit-scrollbar{ display:none; }
         @media (max-width: 640px){
-          .pbx__grid{ grid-template-columns: repeat(1, minmax(0, 1fr)); }
+          .pbx__grid{
+            display:flex;
+            overflow-x:auto;
+            gap:10px;
+            scroll-snap-type: x mandatory;
+            padding-bottom: 8px;
+          }
+          .pbx__tile{
+            min-width: 240px;
+            flex: 0 0 auto;
+            scroll-snap-align: start;
+          }
           .pbx__right{ display:none; }
           .pbx__cardMini{ display:none; }
           .pbx__tileTop{ flex-direction: column; align-items:flex-start; }

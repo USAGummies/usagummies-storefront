@@ -205,6 +205,7 @@ export default function BundleQuickBuy({ tiers = [], productHandle, anchorId, si
         onClick={() => handleSelect(tier.quantity, canSelect)}
         className={[
           "bundleTierBtn",
+          "min-w-[220px] sm:min-w-[240px] snap-start",
           cardTone,
           isActive
             ? "bundleTierBtn--active ring-1 ring-[rgba(212,167,75,0.8)] shadow-[0_18px_46px_rgba(0,0,0,0.32)]"
@@ -217,7 +218,7 @@ export default function BundleQuickBuy({ tiers = [], productHandle, anchorId, si
         <div className="relative">
           {isEight ? (
             <>
-              <span className="absolute left-0 top-3 bottom-3 w-[5px] rounded-full bg-gradient-to-b from-[#d6403a] via-[var(--gold, #d4a74b)] to-[#0a3c8a] opacity-90" />
+              <span className="absolute left-0 top-3 bottom-3 w-[4px] rounded-full bg-gradient-to-b from-[#d6403a] via-[var(--gold, #d4a74b)] to-[#0a3c8a] opacity-90" />
               <span className="absolute -top-2 left-3 inline-flex items-center rounded-b-xl rounded-tr-xl bg-[linear-gradient(135deg,rgba(212,167,75,0.96),rgba(214,64,58,0.82))] px-2.5 py-0.5 text-[10px] font-semibold tracking-[0.24em] text-[#0c1426] uppercase shadow-[0_8px_18px_rgba(0,0,0,0.3)]">
                 Recommended
               </span>
@@ -226,34 +227,26 @@ export default function BundleQuickBuy({ tiers = [], productHandle, anchorId, si
           <div
             className={[
               "bundleTierBtn__inner",
-              isEight ? "pt-[22px] pb-4.5 pl-4" : "pt-3.5 pb-3 pl-3.5",
+              isEight ? "pt-[22px] pb-4 pl-4" : "pt-4 pb-3.5 pl-4",
               isEight ? "bg-white/[0.035] rounded-2xl" : "",
             ].join(" ")}
           >
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start justify-between gap-4">
               <div className="space-y-1">
-                <div className="flex items-center gap-2 whitespace-nowrap">
-                  <div
-                    className={[
-                      "text-white font-extrabold leading-none whitespace-nowrap",
-                      isEight ? "text-xl" : "text-lg",
-                    ].join(" ")}
-                  >
-                    {tier.quantity} bags
-                  </div>
+                <div className="text-white font-extrabold leading-none whitespace-nowrap text-lg">
+                  {tier.quantity} bags
                 </div>
                 <div className="text-xs text-white/70">
                   {tier.quantity === 5
-                    ? "Starter bundle"
+                    ? "Most popular"
                     : tier.quantity === 8
-                    ? "Most choose this"
-                    : "Stock up case"}
+                    ? "Best value"
+                    : tier.quantity === 12
+                    ? "Lowest per-bag"
+                    : tier.quantity < 5
+                    ? "Standard price"
+                    : "Bundle savings"}
                 </div>
-                {isEight ? (
-                  <div className="text-[11px] text-white/70 font-semibold uppercase tracking-[0.12em]">
-                    Best overall value
-                  </div>
-                ) : null}
                 {savingsValue && (isEight || isTwelve) ? (
                   <div
                     className={[
@@ -261,6 +254,7 @@ export default function BundleQuickBuy({ tiers = [], productHandle, anchorId, si
                       "bg-[rgba(212,167,75,0.14)] border border-[rgba(212,167,75,0.35)] text-[var(--gold)]",
                       isEight ? "shadow-[0_10px_28px_rgba(212,167,75,0.25)]" : "shadow-[0_6px_18px_rgba(212,167,75,0.18)]",
                     ].join(" ")}
+                    title="Savings vs the 5-bag baseline"
                   >
                     <span aria-hidden="true">★</span>
                     <span className="leading-none font-extrabold">
@@ -275,17 +269,19 @@ export default function BundleQuickBuy({ tiers = [], productHandle, anchorId, si
               </div>
               <div className="relative text-right">
                 {isEight ? (
-                  <span className="pointer-events-none absolute -inset-3 rounded-[18px] bg-[radial-gradient(circle_at_65%_20%,rgba(212,167,75,0.28),transparent_58%)] opacity-95" />
+                  <span className="pointer-events-none absolute -inset-3 rounded-[18px] bg-[radial-gradient(circle_at_65%_20%,rgba(212,167,75,0.26),transparent_58%)] opacity-95" />
                 ) : null}
-                <div className="relative text-white text-xl font-extrabold leading-none drop-shadow-[0_6px_18px_rgba(0,0,0,0.35)]">
+                <div className="relative text-white text-xl font-extrabold leading-none drop-shadow-[0_6px_18px_rgba(0,0,0,0.35)] transition-all duration-300">
                   {displayTotal || "—"}
                 </div>
                 {displayPerBag ? (
-                  <div className="relative mt-1 text-[11px] text-white/65">{displayPerBag}</div>
+                  <div className="relative mt-1 text-[11px] text-white/65 transition-all duration-300">
+                    {displayPerBag}
+                  </div>
                 ) : null}
               </div>
             </div>
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <div className="mt-3 flex flex-wrap items-center gap-1.5">
               {pills.slice(0, 2).map((p) => (
                 <span
                   key={p}
@@ -327,10 +323,10 @@ export default function BundleQuickBuy({ tiers = [], productHandle, anchorId, si
     <section
       id={anchorId}
       aria-label="Bundle pricing"
-      className="relative max-w-3xl mx-auto rounded-3xl border border-white/10 bg-white/[0.06] shadow-[0_30px_90px_rgba(0,0,0,0.35)] backdrop-blur-xl p-4 sm:p-5 pb-20 sm:pb-12 overflow-hidden"
+      className="relative max-w-3xl mx-auto rounded-3xl border border-white/10 bg-white/[0.06] shadow-[0_30px_90px_rgba(0,0,0,0.35)] backdrop-blur-xl p-4 sm:p-5 pb-16 sm:pb-12 overflow-hidden"
     >
-      <div className="pointer-events-none absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_10%_16%,rgba(255,255,255,0.22),transparent_36%),radial-gradient(circle_at_86%_8%,rgba(10,60,138,0.3),transparent_44%),linear-gradient(135deg,rgba(214,64,58,0.28),rgba(212,167,75,0.18),rgba(12,20,38,0.38)),repeating-linear-gradient(135deg,rgba(255,255,255,0.07)_0,rgba(255,255,255,0.07)_8px,transparent_8px,transparent_16px)]" />
-      <div className="relative mb-3 h-[2px] rounded-full bg-gradient-to-r from-[#d6403a]/70 via-white/50 to-[#0a3c8a]/65 opacity-85 shadow-[0_0_18px_rgba(255,255,255,0.12)]" />
+      <div className="pointer-events-none absolute inset-0 opacity-12 bg-[radial-gradient(circle_at_10%_16%,rgba(255,255,255,0.22),transparent_36%),radial-gradient(circle_at_86%_8%,rgba(10,60,138,0.3),transparent_44%),linear-gradient(135deg,rgba(214,64,58,0.18),rgba(12,20,38,0.38)),repeating-linear-gradient(135deg,rgba(255,255,255,0.07)_0,rgba(255,255,255,0.07)_8px,transparent_8px,transparent_16px)]" />
+      <div className="relative mb-3 h-[2px] rounded-full bg-gradient-to-r from-[#d6403a]/70 via-white/60 to-[#0a3c8a]/65 opacity-85 shadow-[0_0_18px_rgba(255,255,255,0.12)]" />
       <div className="relative text-[10px] font-semibold tracking-[0.26em] text-white/75 uppercase flex items-center gap-2">
         <span aria-hidden="true">🇺🇸</span>
         <span>American-made bundle pricing</span>
@@ -341,13 +337,23 @@ export default function BundleQuickBuy({ tiers = [], productHandle, anchorId, si
       <p className="relative mt-1.5 text-sm text-white/70 max-w-[52ch]">
         {FREE_SHIPPING_PHRASE}. 8 bags is the sweet spot.
       </p>
+      <div className="relative mt-2 text-xs text-white/75 font-semibold">
+        ★★★★★ Rated by verified buyers
+        <span className="ml-2 text-white/45" title="Ratings pulled from verified buyers only">
+          ⓘ
+        </span>
+      </div>
 
-      <div className="mt-2.5 flex flex-col gap-1.25 sm:gap-2">
-        {featured.map((tier) => renderRow(tier))}
+      <div className="relative mt-3">
+        <div className="pointer-events-none absolute left-0 top-0 h-full w-10 bg-[linear-gradient(90deg,rgba(12,20,38,0.9),transparent)]" />
+        <div className="pointer-events-none absolute right-0 top-0 h-full w-10 bg-[linear-gradient(270deg,rgba(12,20,38,0.9),transparent)]" />
+        <div className="flex snap-x snap-mandatory gap-2.5 overflow-x-auto pb-2 pr-4">
+          {featured.map((tier) => renderRow(tier))}
+        </div>
       </div>
 
       <div
-        className="mt-3 sm:mt-3.5 rounded-2xl border border-white/12 bg-white/[0.07] p-3 sm:p-4 sticky bottom-3 md:static backdrop-blur-sm"
+        className="mt-4 sm:mt-4 rounded-2xl border border-white/12 bg-white/[0.07] p-3 sm:p-4 sticky bottom-3 md:static backdrop-blur-sm"
         ref={ctaRef}
       >
         {selectedTier ? (
@@ -359,6 +365,11 @@ export default function BundleQuickBuy({ tiers = [], productHandle, anchorId, si
               <span className="text-[15px] font-extrabold text-white">{selectedTier.quantity} bags</span>
             </div>
             <div className="text-right text-xs text-white/60">
+              <div className="text-[12px] font-semibold text-white/80 transition-all duration-300">
+                {selectedTier.totalPrice && Number.isFinite(selectedTier.totalPrice)
+                  ? money(selectedTier.totalPrice, "USD")
+                  : "—"}
+              </div>
               {selectedTier.perBagPrice && Number.isFinite(selectedTier.perBagPrice)
                 ? `~${money(selectedTier.perBagPrice, "USD")} / bag`
                 : ""}

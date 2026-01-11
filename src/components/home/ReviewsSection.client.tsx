@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Image from "next/image";
 
 export type ReviewSource = "legacy" | "shopify";
 
@@ -61,10 +62,15 @@ function initials(name: string) {
     .join("");
 }
 
-function Stars({ rating }: { rating: number }) {
+function Stars({ rating, size = "sm" }: { rating: number; size?: "sm" | "md" }) {
   const full = Math.round(rating);
   return (
-    <div className="flex items-center gap-1 text-amber-300">
+    <div
+      className={clsx(
+        "flex items-center gap-1 text-amber-300",
+        size === "md" ? "text-base" : "text-sm"
+      )}
+    >
       {Array.from({ length: 5 }).map((_, i) => (
         <span key={i} className="text-sm">
           {i < full ? "★" : "☆"}
@@ -143,7 +149,7 @@ function CardShell({
       role={role}
       tabIndex={tabIndex}
       className={clsx(
-        "relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.06] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-xl",
+        "relative overflow-hidden rounded-3xl border border-white/15 bg-white/[0.09] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-xl",
         clickable ? "cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400/60" : "",
         className
       )}
@@ -248,6 +254,7 @@ export default function ReviewsSectionClient({ reviews }: Props) {
     [verified, hero]
   );
   const mentions = React.useMemo(() => computeMentions(verified), [verified]);
+  const ugcImages = ["/brand/hero.jpg", "/home-patriotic-product.jpg", "/america-250.jpg"];
 
   const [modalOpen, setModalOpen] = React.useState(false);
   const [filter, setFilter] = React.useState<ReviewSource | "all">("all");
@@ -407,11 +414,12 @@ export default function ReviewsSectionClient({ reviews }: Props) {
       <StarFieldOverlay />
       <div className="relative z-10 space-y-6">
         <div className="space-y-3">
-          <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/70">
+          <div className="flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-[0.2em] text-white/75">
+            <Stars rating={avg || 5} size="md" />
             <span>
               {count > 0
-                ? `★★★★★ Rated ${avg.toFixed(1)} by verified buyers (${count} reviews)`
-                : "★★★★★ Verified reviews coming in"}
+                ? `Rated ${avg.toFixed(1)} by verified buyers (${count} reviews)`
+                : "Verified reviews coming in"}
             </span>
           </div>
           <div className="space-y-1">
@@ -454,7 +462,7 @@ export default function ReviewsSectionClient({ reviews }: Props) {
                     {initials(hero.authorName)}
                   </div>
                   <div className="flex-1 space-y-2">
-                    <Stars rating={hero.rating} />
+                    <Stars rating={hero.rating} size="md" />
                     <div className="flex flex-wrap items-center gap-2">
                       <VerifiedBadge source={hero.source} />
                       <span className="text-xs text-white/60">
@@ -536,6 +544,28 @@ export default function ReviewsSectionClient({ reviews }: Props) {
                 </div>
               </div>
             ) : null}
+
+            <div className="space-y-2">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/60">
+                Customer moments
+              </div>
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {ugcImages.map((src, idx) => (
+                  <div
+                    key={`${src}-${idx}`}
+                    className="relative h-28 w-28 shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-white/5 shadow-[0_12px_28px_rgba(0,0,0,0.28)]"
+                  >
+                    <Image
+                      src={src}
+                      alt="USA Gummies customer moment"
+                      fill
+                      className="object-cover"
+                      sizes="112px"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         ) : (
           <div className="text-sm text-white/70">

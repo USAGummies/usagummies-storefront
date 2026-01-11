@@ -13,21 +13,53 @@ const POLICIES = [
     href: "/policies/shipping",
     title: "Shipping Policy",
     desc: "Processing times, delivery expectations, and tracking. Free shipping on 5+ bags.",
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-5 w-5 text-[#DBAA79]" aria-hidden="true">
+        <path
+          fill="currentColor"
+          d="M4 6h10v4h6v8H4V6zm2 2v8h12v-4h-4V8H6zm1 8a2 2 0 1 0 4 0H7zm8 0a2 2 0 1 0 4 0h-4z"
+        />
+      </svg>
+    ),
   },
   {
     href: "/policies/returns",
     title: "Returns & Refunds",
     desc: "Food-safety rules, damaged/incorrect orders, and refund timing.",
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-5 w-5 text-[#DBAA79]" aria-hidden="true">
+        <path
+          fill="currentColor"
+          d="M12 4a8 8 0 1 1-7.4 5h2.2A6 6 0 1 0 12 6V3l4 3-4 3V6z"
+        />
+      </svg>
+    ),
   },
   {
     href: "/policies/privacy",
     title: "Privacy Policy",
     desc: "What we collect, how it’s used, and how Shopify checkout protects payments.",
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-5 w-5 text-[#DBAA79]" aria-hidden="true">
+        <path
+          fill="currentColor"
+          d="M12 3 4 6v6c0 5 3.4 8.6 8 9 4.6-.4 8-4 8-9V6l-8-3zm0 4a3 3 0 0 1 3 3c0 1.7-1.3 3-3 3s-3-1.3-3-3a3 3 0 0 1 3-3zm0 10a6 6 0 0 1-4.7-2.3c.7-1.4 2.2-2.3 4.7-2.3s4 .9 4.7 2.3A6 6 0 0 1 12 17z"
+        />
+      </svg>
+    ),
   },
   {
     href: "/policies/terms",
     title: "Terms of Service",
     desc: "General terms for using the site and purchasing through Shopify checkout.",
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-5 w-5 text-[#DBAA79]" aria-hidden="true">
+        <path
+          fill="currentColor"
+          d="M6 3h9l5 5v13H6V3zm8 1.5V9h4.5L14 4.5zM8 12h8v2H8v-2zm0 4h8v2H8v-2z"
+        />
+      </svg>
+    ),
   },
 ];
 
@@ -66,7 +98,8 @@ export default function PoliciesIndexPage() {
               >
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <div className="text-sm font-semibold text-white">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                      {p.icon}
                       {p.title}
                     </div>
                     <div className="mt-2 text-sm text-white/70">{p.desc}</div>
