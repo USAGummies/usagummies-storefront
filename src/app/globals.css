@@ -294,6 +294,15 @@ a:hover {
   will-change: transform;
   animation: heroDrift 18s ease-in-out infinite;
 }
+.hero-crossfade{
+  position: absolute;
+  inset: 0;
+}
+.hero-crossfade__img{
+  opacity: 0;
+  animation: heroCrossfade 18s ease-in-out infinite;
+  animation-fill-mode: both;
+}
 .hero-badge-fade{
   animation: fadeIn var(--dur-3) var(--ease-out) both;
 }
@@ -308,6 +317,14 @@ a:hover {
   .hero-media__img{
     animation-duration: 22s;
   }
+}
+
+@keyframes heroCrossfade{
+  0%{ opacity: 0; }
+  6%{ opacity: 1; }
+  30%{ opacity: 1; }
+  40%{ opacity: 0; }
+  100%{ opacity: 0; }
 }
 
 .hero-fade{

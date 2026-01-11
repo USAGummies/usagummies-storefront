@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import Image from "next/image";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 
@@ -36,7 +35,6 @@ export default function AboutPage() {
             </Pill>
             <Pill>No artificial dyes</Pill>
             <Pill>Made in USA</Pill>
-            <Pill>{FREE_SHIPPING_PHRASE}</Pill>
           </div>
 
           <h1 className="mt-5 text-4xl font-semibold tracking-tight">
@@ -114,15 +112,14 @@ export default function AboutPage() {
 
           <div className="mt-8 grid gap-8 md:grid-cols-2 md:items-center">
             <div>
-              <h2 className="text-2xl font-semibold">Why bundles?</h2>
+              <h2 className="text-2xl font-semibold">Crafted in America</h2>
               <p className="mt-3 text-white/75">
-                Bundles aren’t a gimmick — they’re how real customers buy candy.
-                Stock the pantry. Bring it to a party. Load up for road trips.
+                USA Gummies are made in the United States with clean ingredients and
+                real fruit-forward flavor. No artificial dyes. No weird aftertaste.
               </p>
               <p className="mt-3 text-white/75">
-                That’s why we built bundle pricing directly into the product pages,
-                and why <span className="text-white font-semibold">{FREE_SHIPPING_PHRASE}</span>.
-                Simple, clear, and built to be shared.
+                We keep the process simple: quality ingredients, consistent texture,
+                and a bag that’s ready for everyday snacking or gifting.
               </p>
 
               <div className="mt-6 flex flex-wrap gap-3">

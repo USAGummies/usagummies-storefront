@@ -568,10 +568,6 @@ export default function PurchaseBox({
           </div>
         </div>
 
-        <div className="pbx__tip">
-          <strong>Note:</strong> Bundles add multiples of the single-bag item. Inventory is tracked on the single-bag SKU.
-        </div>
-
         <div className="pbx__mobileSticky" aria-live="polite">
           <div className="pbx__stickyLeft">
             <div className="pbx__stickyLabel">{selectedOption?.label || `${selectedQty} bags`}</div>
@@ -844,7 +840,6 @@ export default function PurchaseBox({
           flex-wrap:wrap;
         }
 
-        .pbx__tip{ margin-top:10px; font-size:13px; opacity:.78; line-height:1.5; }
 
         .pbx__mobileSticky{
           display:none;

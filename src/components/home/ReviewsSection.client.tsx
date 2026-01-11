@@ -493,7 +493,12 @@ export default function ReviewsSectionClient({ reviews }: Props) {
             {supporting.length ? (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <div className={swipeHintClass(!hasSwiped && supporting.length > 1)}>
+                  <div
+                    className={clsx(
+                      swipeHintClass(!hasSwiped && supporting.length > 1),
+                      "sm:hidden"
+                    )}
+                  >
                     Swipe →
                   </div>
                 </div>
