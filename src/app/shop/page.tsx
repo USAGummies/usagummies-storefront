@@ -1,6 +1,7 @@
 // src/app/shop/page.tsx (FULL REPLACE)
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import { ShopToolbar } from "@/components/shop/ShopToolbar";
 import { ShopProductCard } from "@/components/shop/ShopProductCard";
 import { getProductsPage, type SortValue } from "@/lib/shopify/products";
@@ -237,16 +238,43 @@ export default async function ShopPage(props: {
           </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {[
-              { title: "Patriotic party pack", note: "Limited seasonal drops" },
-              { title: "Gift-ready bundle", note: "Easy host gifts" },
-              { title: "USA Gummies merch", note: "Hats, stickers & more" },
+              {
+                title: "Patriotic party pack",
+                note: "Limited seasonal drops",
+                img: "/home-patriotic-product.jpg",
+                cta: "Coming soon",
+              },
+              {
+                title: "Gift-ready bundle",
+                note: "Easy host gifts",
+                img: "/brand/hero.jpg",
+                cta: "Join the waitlist",
+              },
+              {
+                title: "USA Gummies merch",
+                note: "Hats, stickers & more",
+                img: "/america-250.jpg",
+                cta: "Coming soon",
+              },
             ].map((item) => (
               <div
                 key={item.title}
                 className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[0_12px_28px_rgba(0,0,0,0.18)]"
               >
+                <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-[var(--border)] bg-[rgba(255,255,255,0.04)]">
+                  <Image
+                    src={item.img}
+                    alt={item.title}
+                    fill
+                    sizes="(max-width: 768px) 90vw, 320px"
+                    className="object-cover"
+                  />
+                </div>
                 <div className="text-sm font-black text-[var(--text)]">{item.title}</div>
                 <div className="mt-1 text-xs font-semibold text-[var(--muted)]">{item.note}</div>
+                <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface-strong)] px-3 py-1 text-[11px] font-bold text-[var(--text)]">
+                  {item.cta}
+                </div>
               </div>
             ))}
           </div>

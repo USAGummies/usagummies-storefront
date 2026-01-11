@@ -86,7 +86,7 @@ export function ShopProductCard({
               </div>
             )}
 
-            <div className="absolute inset-0 flex items-end justify-center p-3 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+            <div className="absolute inset-0 flex items-end justify-center p-3 opacity-100 transition-opacity duration-200 md:opacity-0 md:group-hover:opacity-100">
               <button
                 type="button"
                 onClick={(e) => {

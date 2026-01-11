@@ -378,13 +378,38 @@ export default async function ProductPage(props: {
           <div className="pdp-sectionTitle">You may also like</div>
           <div className="pdp-crosssellGrid">
             {[
-              { title: "Patriotic party pack", note: "Limited seasonal drops" },
-              { title: "Gift-ready bundle", note: "Perfect for hosts" },
-              { title: "Merch coming soon", note: "Hats, stickers & more" },
+              {
+                title: "Patriotic party pack",
+                note: "Limited seasonal drops",
+                img: "/home-patriotic-product.jpg",
+                cta: "Coming soon",
+              },
+              {
+                title: "Gift-ready bundle",
+                note: "Perfect for hosts",
+                img: "/brand/hero.jpg",
+                cta: "Join the waitlist",
+              },
+              {
+                title: "USA Gummies merch",
+                note: "Hats, stickers & more",
+                img: "/america-250.jpg",
+                cta: "Coming soon",
+              },
             ].map((item) => (
               <div key={item.title} className="glass-card pdp-crosssellCard">
+                <div className="pdp-crosssellMedia">
+                  <Image
+                    src={item.img}
+                    alt={item.title}
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 90vw, 280px"
+                  />
+                </div>
                 <div className="pdp-crosssellTitle">{item.title}</div>
                 <div className="pdp-crosssellNote">{item.note}</div>
+                <div className="pdp-crosssellCta">{item.cta}</div>
               </div>
             ))}
           </div>
@@ -549,6 +574,15 @@ export default async function ProductPage(props: {
             border: 1px solid var(--border);
             background: var(--surface);
           }
+          .pdp-crosssellMedia{
+            position: relative;
+            aspect-ratio: 4 / 3;
+            border-radius: 14px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            background: rgba(255,255,255,0.04);
+            margin-bottom: 10px;
+          }
           .pdp-crosssellTitle{
             font-weight: 900;
             margin-bottom: 6px;
@@ -556,6 +590,19 @@ export default async function ProductPage(props: {
           .pdp-crosssellNote{
             font-size: 13px;
             color: var(--muted);
+          }
+          .pdp-crosssellCta{
+            margin-top: 10px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: var(--surface-strong);
+            padding: 6px 10px;
+            font-size: 11px;
+            font-weight: 900;
+            color: var(--text);
           }
 
           .pdp-mini-proof{

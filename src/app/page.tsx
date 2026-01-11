@@ -56,11 +56,7 @@ export default async function HomePage() {
     product?.description?.toString?.() ||
     "All natural flavors. Free from artificial dyes. Built in America. Shipped fast.";
 
-  const heroImgs = [
-    "/brand/hero.jpg",
-    "/home-patriotic-product.jpg",
-    "/america-250.jpg",
-  ];
+  const heroMediaSrc = "/hero-loop.gif";
   let bundleVariants: Awaited<ReturnType<typeof getBundleVariants>> | null = null;
   try {
     bundleVariants = await getBundleVariants();
@@ -179,22 +175,15 @@ export default async function HomePage() {
               </div>
               <div className="lg:hidden">
                 <div className="usa-hero__frame h-full min-h-[130px] sm:min-h-[180px] rounded-2xl border border-gold-soft">
-                  <div className="hero-crossfade">
-                    {heroImgs.map((src, idx) => (
-                      <Image
-                        key={src}
-                        src={src}
-                        alt={idx === 0 ? "USA Gummies hero" : ""}
-                        aria-hidden={idx !== 0}
-                        fill
-                        priority={idx === 0}
-                        unoptimized
-                        sizes="(max-width: 640px) 90vw, (max-width: 1024px) 60vw, 560px"
-                        className="object-cover hero-media__img hero-crossfade__img"
-                        style={{ animationDelay: `${idx * 6}s` }}
-                      />
-                    ))}
-                  </div>
+                  <Image
+                    src={heroMediaSrc}
+                    alt="USA Gummies hero"
+                    fill
+                    priority
+                    unoptimized
+                    sizes="(max-width: 640px) 90vw, (max-width: 1024px) 60vw, 560px"
+                    className="object-cover hero-media__img"
+                  />
                   <div className="hero-fade" />
                 </div>
                 {/* hide link on mobile to avoid overlap */}
@@ -220,22 +209,15 @@ export default async function HomePage() {
             <div className="flex flex-col gap-3 lg:gap-5">
               <div className="relative hidden lg:block">
                 <div className="usa-hero__frame h-full min-h-[230px] lg:min-h-[360px] rounded-2xl border border-gold-soft">
-                  <div className="hero-crossfade">
-                    {heroImgs.map((src, idx) => (
-                      <Image
-                        key={src}
-                        src={src}
-                        alt={idx === 0 ? "USA Gummies hero" : ""}
-                        aria-hidden={idx !== 0}
-                        fill
-                        priority={idx === 0}
-                        unoptimized
-                        sizes="(max-width: 640px) 90vw, (max-width: 1024px) 60vw, 560px"
-                        className="object-cover hero-media__img hero-crossfade__img"
-                        style={{ animationDelay: `${idx * 6}s` }}
-                      />
-                    ))}
-                  </div>
+                  <Image
+                    src={heroMediaSrc}
+                    alt="USA Gummies hero"
+                    fill
+                    priority
+                    unoptimized
+                    sizes="(max-width: 640px) 90vw, (max-width: 1024px) 60vw, 560px"
+                    className="object-cover hero-media__img"
+                  />
                   <div className="hero-fade" />
                 </div>
               </div>
@@ -312,10 +294,13 @@ export default async function HomePage() {
           <div className="text-xs font-semibold uppercase tracking-[0.2em] text-white/60">
             Get updates
           </div>
-          <h3 className="text-2xl font-black text-white">Get early access & bundle-only drops</h3>
+          <h3 className="text-2xl font-black text-white">Unlock early access + bundle-only drops</h3>
           <p className="text-sm text-white/70">
-            Be first in line for limited flavors and restock alerts.
+            First dibs on limited flavors, restocks, and member-only bundle alerts.
           </p>
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-semibold text-white/80 w-fit">
+            VIP early access • limited-batch alerts
+          </div>
           <form className="flex flex-wrap gap-3 items-center">
             <input
               type="email"

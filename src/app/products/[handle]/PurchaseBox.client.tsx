@@ -426,8 +426,11 @@ export default function PurchaseBox({
           <div className="pbx__bagLabel">How many bags?</div>
         </div>
 
-        <div className="pbx__grid">
-          {bundleOptionsWithBadges.map((o) => {
+        <div className="pbx__sliderWrap">
+          <div className="pbx__edge pbx__edge--left" aria-hidden="true" />
+          <div className="pbx__edge pbx__edge--right" aria-hidden="true" />
+          <div className="pbx__grid bundle-slider">
+            {bundleOptionsWithBadges.map((o) => {
             const active = selectedQty === o.qty;
             const accent = Boolean((o as any).accent);
             const showSavings = o.savingsAmount > 0;
@@ -500,6 +503,7 @@ export default function PurchaseBox({
               </button>
             );
           })}
+          </div>
         </div>
 
         {/* Decision row */}
@@ -654,27 +658,36 @@ export default function PurchaseBox({
           color: var(--muted);
         }
 
+        .pbx__sliderWrap{
+          position: relative;
+        }
+        .pbx__edge{
+          position: absolute;
+          top: 0;
+          bottom: 0;
+          width: 28px;
+          pointer-events: none;
+          z-index: 2;
+        }
+        .pbx__edge--left{
+          left: 0;
+          background: linear-gradient(90deg, rgba(12,20,38,0.95), rgba(12,20,38,0));
+        }
+        .pbx__edge--right{
+          right: 0;
+          background: linear-gradient(270deg, rgba(12,20,38,0.95), rgba(12,20,38,0));
+        }
         .pbx__grid{
           margin-top:12px;
-          display:grid;
-          gap:8px;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
+          display:flex;
+          overflow-x:auto;
+          gap:10px;
+          scroll-snap-type: x mandatory;
+          padding: 0 6px 8px;
           scrollbar-width: none;
         }
         .pbx__grid::-webkit-scrollbar{ display:none; }
         @media (max-width: 640px){
-          .pbx__grid{
-            display:flex;
-            overflow-x:auto;
-            gap:10px;
-            scroll-snap-type: x mandatory;
-            padding-bottom: 8px;
-          }
-          .pbx__tile{
-            min-width: 240px;
-            flex: 0 0 auto;
-            scroll-snap-align: start;
-          }
           .pbx__right{ display:none; }
           .pbx__cardMini{ display:none; }
           .pbx__tileTop{ flex-direction: column; align-items:flex-start; }
@@ -684,6 +697,9 @@ export default function PurchaseBox({
 
         .pbx__tile{
           width:100%;
+          min-width: 240px;
+          flex: 0 0 auto;
+          scroll-snap-align: start;
           text-align:left;
           border-radius:18px;
           border:1px solid var(--border);
@@ -691,6 +707,9 @@ export default function PurchaseBox({
           padding:12px;
           cursor:pointer;
           transition: transform var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out), border-color var(--dur-2) var(--ease-out), background var(--dur-2) var(--ease-out);
+        }
+        @media (min-width: 768px){
+          .pbx__tile{ min-width: 280px; }
         }
         .pbx__tile:hover{
           transform: translateY(-2px);
