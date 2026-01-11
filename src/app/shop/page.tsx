@@ -230,6 +230,28 @@ export default async function ShopPage(props: {
           ))}
         </div>
 
+        <section className="mt-8 glass-card px-5 py-6 sm:px-6 sm:py-7">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-xl font-black text-[var(--text)]">You may also like</h2>
+            <span className="text-sm font-semibold text-[var(--muted)]">More Americana drops coming soon</span>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {[
+              { title: "Patriotic party pack", note: "Limited seasonal drops" },
+              { title: "Gift-ready bundle", note: "Easy host gifts" },
+              { title: "USA Gummies merch", note: "Hats, stickers & more" },
+            ].map((item) => (
+              <div
+                key={item.title}
+                className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[0_12px_28px_rgba(0,0,0,0.18)]"
+              >
+                <div className="text-sm font-black text-[var(--text)]">{item.title}</div>
+                <div className="mt-1 text-xs font-semibold text-[var(--muted)]">{item.note}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+
         <div className="mt-8 flex gap-3 flex-wrap">
           {results.pageInfo.hasPreviousPage && results.pageInfo.startCursor ? (
             <Link

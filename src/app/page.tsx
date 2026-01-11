@@ -253,13 +253,13 @@ export default async function HomePage() {
       </section>
 
       <section className="border-t border-gold-soft bg-transparent">
-        <div className="mx-auto max-w-6xl px-4 py-5 lg:py-8">
+        <div className="mx-auto max-w-6xl px-4 py-5 lg:py-8 reveal-up">
           <ReviewsSection />
         </div>
       </section>
 
       <section className="border-t border-gold-soft bg-[rgba(255,255,255,0.02)]">
-        <div className="mx-auto max-w-6xl px-4 py-5 lg:py-8 space-y-4">
+        <div className="mx-auto max-w-6xl px-4 py-5 lg:py-8 space-y-4 reveal-up">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-2xl font-black text-[var(--text)]">Why USA Gummies</h2>
             <div className="text-sm font-semibold text-[var(--muted)]">
@@ -284,7 +284,7 @@ export default async function HomePage() {
       </section>
 
       <section className="border-t border-gold-soft bg-transparent">
-        <div className="mx-auto max-w-6xl px-4 py-5 lg:py-8 space-y-3">
+        <div className="mx-auto max-w-6xl px-4 py-5 lg:py-8 space-y-3 reveal-up">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">
@@ -308,13 +308,13 @@ export default async function HomePage() {
       </section>
 
       <section className="border-t border-gold-soft bg-[rgba(255,255,255,0.02)]">
-        <div className="mx-auto max-w-6xl px-4 py-5 lg:py-8 space-y-3">
+        <div className="mx-auto max-w-6xl px-4 py-5 lg:py-8 space-y-3 reveal-up">
           <div className="text-xs font-semibold uppercase tracking-[0.2em] text-white/60">
             Get updates
           </div>
-          <h3 className="text-2xl font-black text-white">Get exclusive deals & new flavor alerts</h3>
+          <h3 className="text-2xl font-black text-white">Get early access & bundle-only drops</h3>
           <p className="text-sm text-white/70">
-            Be the first to know when bundles restock.
+            Be first in line for limited flavors and restock alerts.
           </p>
           <form className="flex flex-wrap gap-3 items-center">
             <input

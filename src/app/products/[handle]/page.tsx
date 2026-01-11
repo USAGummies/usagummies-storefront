@@ -1,6 +1,7 @@
 // src/app/products/[handle]/page.tsx (FULL REPLACE)
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import { JsonLd } from "@/components/JsonLd";
 import { ProductGallery } from "@/components/product/ProductGallery.client";
 import PurchaseBox from "./PurchaseBox.client";
@@ -187,6 +188,7 @@ export default async function ProductPage(props: {
     : "";
 
   const images = (product.images?.edges ?? []).map((e: any) => e.node);
+  const macroShots = images.length ? images.slice(0, 4) : [];
 
   const purchaseProduct = {
     title: product.title,
@@ -270,9 +272,62 @@ export default async function ProductPage(props: {
               images={images}
             />
 
+            {macroShots.length ? (
+              <div className="pdp-section pdp-macro">
+                <div className="pdp-sectionTitle">Gummy close-ups</div>
+                <div className="pdp-macroGrid">
+                  {macroShots.map((img: any, idx: number) => (
+                    <div key={img?.url || idx} className="pdp-macroCard">
+                      {img?.url ? (
+                        <Image
+                          src={img.url}
+                          alt={img.altText || "USA Gummies close-up"}
+                          fill
+                          className="object-cover"
+                          sizes="(max-width: 768px) 50vw, 200px"
+                        />
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
             {/* On mobile, we want trust immediately after gallery */}
             <div className="pdp-mobile-only pdp-section">
               <ProductTrustStack />
+            </div>
+
+            <div className="pdp-section pdp-accordions">
+              <div className="pdp-sectionTitle">Details & transparency</div>
+              <details className="pdp-accordion" open>
+                <summary>Description</summary>
+                <div className="pdp-accordionBody">
+                  {product.description || "Premium gummy bears made in the USA with clean ingredients."}
+                </div>
+              </details>
+              <details className="pdp-accordion">
+                <summary>Ingredients</summary>
+                <div className="pdp-accordionBody">
+                  All-natural flavors with no artificial dyes. See the bag for full ingredient details.
+                </div>
+              </details>
+              <details className="pdp-accordion">
+                <summary>Nutrition</summary>
+                <div className="pdp-accordionBody">
+                  Nutrition facts are listed on the package. Scan the bag for full panel details.
+                </div>
+              </details>
+              <details className="pdp-accordion">
+                <summary>FAQ</summary>
+                <div className="pdp-accordionBody">
+                  <ul>
+                    <li>Made in the USA with clean ingredients.</li>
+                    <li>{`Free shipping on 5+ bags.`}</li>
+                    <li>Bundle discounts scale automatically as you add bags.</li>
+                  </ul>
+                </div>
+              </details>
             </div>
 
             <div className="pdp-section">
@@ -318,6 +373,22 @@ export default async function ProductPage(props: {
             </div>
           </aside>
         </div>
+
+        <section className="pdp-section pdp-crosssell">
+          <div className="pdp-sectionTitle">You may also like</div>
+          <div className="pdp-crosssellGrid">
+            {[
+              { title: "Patriotic party pack", note: "Limited seasonal drops" },
+              { title: "Gift-ready bundle", note: "Perfect for hosts" },
+              { title: "Merch coming soon", note: "Hats, stickers & more" },
+            ].map((item) => (
+              <div key={item.title} className="glass-card pdp-crosssellCard">
+                <div className="pdp-crosssellTitle">{item.title}</div>
+                <div className="pdp-crosssellNote">{item.note}</div>
+              </div>
+            ))}
+          </div>
+        </section>
 
         <style>{`
           .pdp-root{
@@ -419,6 +490,74 @@ export default async function ProductPage(props: {
             margin-top: 14px;
           }
 
+          .pdp-sectionTitle{
+            font-weight: 950;
+            font-size: 16px;
+            margin-bottom: 8px;
+          }
+
+          .pdp-macroGrid{
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+          }
+          .pdp-macroCard{
+            position: relative;
+            aspect-ratio: 1 / 1;
+            border-radius: 14px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            background: rgba(255,255,255,0.04);
+            box-shadow: 0 16px 36px rgba(0,0,0,0.18);
+          }
+
+          .pdp-accordions{
+            display: grid;
+            gap: 10px;
+          }
+          .pdp-accordion{
+            border-radius: 14px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            padding: 10px 12px;
+          }
+          .pdp-accordion summary{
+            cursor: pointer;
+            font-weight: 800;
+            color: var(--text);
+            list-style: none;
+          }
+          .pdp-accordion summary::-webkit-details-marker{ display:none; }
+          .pdp-accordionBody{
+            margin-top: 6px;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.6;
+          }
+          .pdp-accordionBody ul{
+            padding-left: 18px;
+            margin: 6px 0 0;
+          }
+
+          .pdp-crosssellGrid{
+            display: grid;
+            gap: 10px;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+          }
+          .pdp-crosssellCard{
+            padding: 14px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+          }
+          .pdp-crosssellTitle{
+            font-weight: 900;
+            margin-bottom: 6px;
+          }
+          .pdp-crosssellNote{
+            font-size: 13px;
+            color: var(--muted);
+          }
+
           .pdp-mini-proof{
             margin-top: 12px;
           }
@@ -457,6 +596,7 @@ export default async function ProductPage(props: {
             .pdp-mobile-only{ display: block; }
             .pdp-section{ margin-top: 12px; }
             .pdp-title{ font-size: 30px; }
+            .pdp-macroGrid{ grid-template-columns: repeat(2, minmax(0,1fr)); }
           }
         `}</style>
       </div>

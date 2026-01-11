@@ -254,7 +254,13 @@ export default function ReviewsSectionClient({ reviews }: Props) {
     [verified, hero]
   );
   const mentions = React.useMemo(() => computeMentions(verified), [verified]);
-  const ugcImages = ["/brand/hero.jpg", "/home-patriotic-product.jpg", "/america-250.jpg"];
+  const ugcImages = [
+    "/brand/hero.jpg",
+    "/home-patriotic-product.jpg",
+    "/america-250.jpg",
+    "/hero.jpg",
+    "/logo.jpg",
+  ];
 
   const [modalOpen, setModalOpen] = React.useState(false);
   const [filter, setFilter] = React.useState<ReviewSource | "all">("all");
@@ -502,34 +508,38 @@ export default function ReviewsSectionClient({ reviews }: Props) {
                     Swipe →
                   </div>
                 </div>
-                <div
-                  ref={carouselRef}
-                  className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2"
-                >
-                  {supporting.map((r, i) => (
-                    <CardShell
-                      key={`${r.id}-${i}`}
-                      className="min-w-[260px] snap-start shrink-0 p-4"
-                      onClick={openModal}
-                      onKeyDown={keyActivate(openModal)}
-                      role="button"
-                      tabIndex={0}
-                    >
-                      <div className="space-y-2">
-                        <Stars rating={r.rating} />
-                        <div className="flex items-center gap-2 text-xs text-white/60">
-                          <VerifiedBadge source={r.source} />
-                          <span>{formatDate(r.dateISO)}</span>
+                <div className="relative">
+                  <div className="pointer-events-none absolute left-0 top-0 z-10 h-full w-10 bg-[linear-gradient(90deg,rgba(12,20,38,0.85),transparent)]" />
+                  <div className="pointer-events-none absolute right-0 top-0 z-10 h-full w-10 bg-[linear-gradient(270deg,rgba(12,20,38,0.85),transparent)]" />
+                  <div
+                    ref={carouselRef}
+                    className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2"
+                  >
+                    {supporting.map((r, i) => (
+                      <CardShell
+                        key={`${r.id}-${i}`}
+                        className="min-w-[260px] snap-start shrink-0 p-4"
+                        onClick={openModal}
+                        onKeyDown={keyActivate(openModal)}
+                        role="button"
+                        tabIndex={0}
+                      >
+                        <div className="space-y-2">
+                          <Stars rating={r.rating} />
+                          <div className="flex items-center gap-2 text-xs text-white/60">
+                            <VerifiedBadge source={r.source} />
+                            <span>{formatDate(r.dateISO)}</span>
+                          </div>
+                          <div className="text-base font-bold text-white leading-tight">
+                            {r.title || r.body.slice(0, 42) + "..."}
+                          </div>
+                          <p className="text-sm text-white/75 line-clamp-4">
+                            {r.body}
+                          </p>
                         </div>
-                        <div className="text-base font-bold text-white leading-tight">
-                          {r.title || r.body.slice(0, 42) + "..."}
-                        </div>
-                        <p className="text-sm text-white/75 line-clamp-4">
-                          {r.body}
-                        </p>
-                      </div>
-                    </CardShell>
-                  ))}
+                      </CardShell>
+                    ))}
+                  </div>
                 </div>
                 <div className="flex justify-center gap-1">
                   {supporting.length > 1

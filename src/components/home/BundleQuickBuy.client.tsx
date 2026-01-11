@@ -347,7 +347,7 @@ export default function BundleQuickBuy({ tiers = [], productHandle, anchorId, si
       <div className="relative mt-3">
         <div className="pointer-events-none absolute left-0 top-0 h-full w-10 bg-[linear-gradient(90deg,rgba(12,20,38,0.9),transparent)]" />
         <div className="pointer-events-none absolute right-0 top-0 h-full w-10 bg-[linear-gradient(270deg,rgba(12,20,38,0.9),transparent)]" />
-        <div className="flex snap-x snap-mandatory gap-2.5 overflow-x-auto pb-2 pr-4">
+        <div className="flex snap-x snap-mandatory gap-2.5 overflow-x-auto pb-2 pr-4 bundle-slider">
           {featured.map((tier) => renderRow(tier))}
         </div>
       </div>
@@ -365,14 +365,22 @@ export default function BundleQuickBuy({ tiers = [], productHandle, anchorId, si
               <span className="text-[15px] font-extrabold text-white">{selectedTier.quantity} bags</span>
             </div>
             <div className="text-right text-xs text-white/60">
-              <div className="text-[12px] font-semibold text-white/80 transition-all duration-300">
+              <div
+                key={`${selectedTier.quantity}-${selectedTier.totalPrice}`}
+                className="text-[12px] font-semibold text-white/80 transition-all duration-300 price-pop"
+              >
                 {selectedTier.totalPrice && Number.isFinite(selectedTier.totalPrice)
                   ? money(selectedTier.totalPrice, "USD")
                   : "—"}
               </div>
-              {selectedTier.perBagPrice && Number.isFinite(selectedTier.perBagPrice)
-                ? `~${money(selectedTier.perBagPrice, "USD")} / bag`
-                : ""}
+              {selectedTier.perBagPrice && Number.isFinite(selectedTier.perBagPrice) ? (
+                <div
+                  key={`${selectedTier.quantity}-${selectedTier.perBagPrice}`}
+                  className="price-pop"
+                >
+                  {`~${money(selectedTier.perBagPrice, "USD")} / bag`}
+                </div>
+              ) : null}
             </div>
           </div>
         ) : null}
