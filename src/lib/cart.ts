@@ -41,6 +41,16 @@ function getShopifyToken() {
   );
 }
 
+export function getCartConfigStatus() {
+  const { endpoint, source } = getShopifyEndpoint();
+  const token = getShopifyToken();
+  return {
+    endpoint: Boolean(endpoint),
+    token: Boolean(token),
+    source,
+  };
+}
+
 async function shopify<T>(query: string, variables?: Record<string, any>): Promise<T | null> {
   const { endpoint } = getShopifyEndpoint();
   const token = getShopifyToken();

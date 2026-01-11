@@ -7,6 +7,7 @@ import {
   replaceCartWithVariant,
   getCart,
   getCartById,
+  getCartConfigStatus,
 } from "@/lib/cart";
 import { normalizeSingleBagVariant } from "@/lib/bundles/atomic";
 
@@ -34,6 +35,17 @@ export async function POST(req: Request) {
   }
 
   const action = body.action ?? "buy";
+  const config = getCartConfigStatus();
+  if (!config.endpoint || !config.token) {
+    return json(
+      {
+        ok: false,
+        error:
+          "Shopify Storefront API is not configured. Set SHOPIFY_STOREFRONT_API_ENDPOINT and SHOPIFY_STOREFRONT_API_TOKEN in Vercel.",
+      },
+      500
+    );
+  }
 
   try {
     if (action === "get") {
