@@ -37,6 +37,18 @@ function money(amount?: number | null, currency = "USD") {
   }).format(n);
 }
 
+function storeCartId(cartId?: string | null) {
+  if (!cartId || typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem("cartId", cartId);
+  } catch {
+    // ignore
+  }
+  if (typeof document !== "undefined") {
+    document.cookie = `cartId=${cartId}; path=/; samesite=lax`;
+  }
+}
+
 const FEATURED_QTYS: TierKey[] = ["1", "2", "3", "4", "5", "8", "12"];
 
 export default function BundleQuickBuy({ tiers = [], productHandle, anchorId, singleBagVariantId, availableForSale = true }: Props) {
@@ -112,6 +124,7 @@ export default function BundleQuickBuy({ tiers = [], productHandle, anchorId, si
       if (!res.ok || json?.ok === false) {
         throw new Error(json?.error || "Could not add to cart.");
       }
+      if (json?.cart?.id) storeCartId(json.cart.id);
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("cart:updated"));
       }
@@ -298,13 +311,13 @@ export default function BundleQuickBuy({ tiers = [], productHandle, anchorId, si
           Bundle pricing
         </div>
         <div className="mt-2 text-sm">
-          Live bundle pricing is unavailable right now. View the product page to continue.
+          Bundle pricing is temporarily unavailable right now. Please try again or view product details.
         </div>
         <Link
           href={productHandle ? `/products/${productHandle}?focus=bundles` : "/shop"}
           className="mt-3 inline-flex items-center justify-center rounded-full bg-[#d6403a] px-5 py-3 text-sm font-bold text-white shadow-[0_10px_30px_rgba(214,64,58,0.35)] hover:brightness-110 active:brightness-95"
         >
-          View product
+          View product details
         </Link>
       </section>
     );

@@ -5,6 +5,27 @@ import { GlassPanel } from "@/components/ui/Glass";
 import { CartView } from "@/components/ui/CartView";
 import { cn } from "@/lib/cn";
 
+function getStoredCartId() {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem("cartId");
+  } catch {
+    return null;
+  }
+}
+
+function storeCartId(cartId?: string | null) {
+  if (!cartId || typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem("cartId", cartId);
+  } catch {
+    // ignore
+  }
+  if (typeof document !== "undefined") {
+    document.cookie = `cartId=${cartId}; path=/; samesite=lax`;
+  }
+}
+
 export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [mounted, setMounted] = useState(false);
   const [cart, setCart] = useState<any>(null);
@@ -15,27 +36,37 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
 
   useEffect(() => {
     if (!open) return;
+    const cartId = getStoredCartId();
     fetch("/api/cart", {
       method: "POST",
       cache: "no-store",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "get" }),
+      body: JSON.stringify({ action: "get", cartId: cartId || undefined }),
     })
       .then((r) => r.json())
-      .then((data) => setCart(data.cart ?? null))
+      .then((data) => {
+        const nextCart = data.cart ?? null;
+        if (nextCart?.id) storeCartId(nextCart.id);
+        setCart(nextCart);
+      })
       .catch(() => {});
   }, [open]);
 
   useEffect(() => {
     function refresh() {
+      const cartId = getStoredCartId();
       fetch("/api/cart", {
         method: "POST",
         cache: "no-store",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "get" }),
+        body: JSON.stringify({ action: "get", cartId: cartId || undefined }),
       })
         .then((r) => r.json())
-        .then((data) => setCart(data.cart ?? null))
+        .then((data) => {
+          const nextCart = data.cart ?? null;
+          if (nextCart?.id) storeCartId(nextCart.id);
+          setCart(nextCart);
+        })
         .catch(() => {});
     }
     window.addEventListener("cart:updated", refresh);

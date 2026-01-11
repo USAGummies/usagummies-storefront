@@ -15,6 +15,7 @@ type Body = {
   variantId?: string;
   quantity?: number;
   lineId?: string;
+  cartId?: string;
 };
 
 function json(data: any, status = 200) {
@@ -36,7 +37,9 @@ export async function POST(req: Request) {
 
   try {
     if (action === "get") {
-      const cart = await getCart();
+      const cartId = String(body.cartId ?? "");
+      const cart =
+        cartId ? (await getCartById(cartId)) ?? (await getCart()) : await getCart();
       return json({ ok: true, cart });
     }
 

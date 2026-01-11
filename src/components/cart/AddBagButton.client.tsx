@@ -44,6 +44,11 @@ export default function AddBagButton({
             throw new Error("AddBagButton: missing onAdd or lineId");
           }
 
+          const cartId =
+            typeof window !== "undefined" ? window.localStorage.getItem("cartId") : null;
+          if (cartId && typeof document !== "undefined") {
+            document.cookie = `cartId=${cartId}; path=/; samesite=lax`;
+          }
           const res = await fetch("/api/cart", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -51,12 +56,21 @@ export default function AddBagButton({
               action: "update",
               lineId,
               quantity: (currentQty || 1) + 1,
+              cartId: cartId || undefined,
             }),
           });
 
           const json = await res.json().catch(() => ({}));
           if (!res.ok || json?.ok === false) {
             throw new Error(json?.error || "Could not update cart.");
+          }
+          if (json?.cart?.id && typeof window !== "undefined") {
+            try {
+              window.localStorage.setItem("cartId", json.cart.id);
+              document.cookie = `cartId=${json.cart.id}; path=/; samesite=lax`;
+            } catch {
+              // ignore
+            }
           }
 
           onAdded?.();

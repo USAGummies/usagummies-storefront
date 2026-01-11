@@ -64,13 +64,25 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
   const [localCart, setLocalCart] = useState(cart);
   const refreshCart = useMemo(
     () => () => {
+      const cartId =
+        typeof window !== "undefined" ? window.localStorage.getItem("cartId") : null;
       fetch("/api/cart", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "get" }),
+        body: JSON.stringify({ action: "get", cartId: cartId || undefined }),
       })
         .then((r) => r.json())
-        .then((data) => setLocalCart(data.cart ?? null))
+        .then((data) => {
+          const nextCart = data.cart ?? null;
+          if (nextCart?.id && typeof window !== "undefined") {
+            try {
+              window.localStorage.setItem("cartId", nextCart.id);
+            } catch {
+              // ignore
+            }
+          }
+          setLocalCart(nextCart);
+        })
         .catch(() => {});
     },
     []

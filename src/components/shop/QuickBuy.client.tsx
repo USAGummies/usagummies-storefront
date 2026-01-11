@@ -5,6 +5,18 @@ import { SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
 
 type AnyProduct = any;
 
+function storeCartId(cartId?: string | null) {
+  if (!cartId || typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem("cartId", cartId);
+  } catch {
+    // ignore
+  }
+  if (typeof document !== "undefined") {
+    document.cookie = `cartId=${cartId}; path=/; samesite=lax`;
+  }
+}
+
 function getVariants(product: AnyProduct): AnyProduct[] {
   return (
     product?.variants?.nodes ||
@@ -72,6 +84,7 @@ export default function QuickBuy({
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || json?.ok === false) throw new Error(json?.error || "Add failed");
+      if (json?.cart?.id) storeCartId(json.cart.id);
       window.dispatchEvent(new Event("cart:updated"));
     } catch (e: any) {
       setError(e?.message || "Could not add");

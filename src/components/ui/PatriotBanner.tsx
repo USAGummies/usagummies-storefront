@@ -22,7 +22,7 @@ export function PatriotBanner() {
             <div className="big-callout">
               Premium gummy bears.
               <br />
-              Loud flavor.
+              Bold flavor.
               <br />
               Patriotic backbone.
             </div>

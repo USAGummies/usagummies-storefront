@@ -12,6 +12,20 @@ function cx(...a: Array<string | false | null | undefined>) {
   return a.filter(Boolean).join(" ");
 }
 
+function getStoredCartId() {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem("cartId");
+  } catch {
+    return null;
+  }
+}
+
+function setCartCookie(cartId?: string | null) {
+  if (!cartId || typeof document === "undefined") return;
+  document.cookie = `cartId=${cartId}; path=/; samesite=lax`;
+}
+
 const navLinks = [
   { href: "/shop", label: "Shop" },
   { href: "/about", label: "About" },
@@ -27,13 +41,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   async function refreshCartCount() {
     try {
+      const stored = getStoredCartId();
+      if (stored) setCartCookie(stored);
       const res = await fetch("/api/cart", {
         method: "POST",
         cache: "no-store",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "get" }),
+        body: JSON.stringify({ action: "get", cartId: stored || undefined }),
       });
       const data = await res.json();
+      if (data?.cart?.id) setCartCookie(data.cart.id);
       const qty = Number(data?.cart?.totalQuantity || 0);
       setCartCount((prev) => {
         if (qty !== prev) {
@@ -52,6 +69,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [pathname]);
 
   useEffect(() => {
+    const stored = getStoredCartId();
+    if (stored) setCartCookie(stored);
     refreshCartCount();
   }, []);
 

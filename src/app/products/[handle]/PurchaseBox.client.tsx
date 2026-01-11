@@ -11,6 +11,18 @@ function cx(...a: Array<string | false | null | undefined>) {
   return a.filter(Boolean).join(" ");
 }
 
+function storeCartId(cartId?: string | null) {
+  if (!cartId || typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem("cartId", cartId);
+  } catch {
+    // ignore
+  }
+  if (typeof document !== "undefined") {
+    document.cookie = `cartId=${cartId}; path=/; samesite=lax`;
+  }
+}
+
 type MoneyLike =
   | { amount: string; currencyCode?: string }
   | { amount: string; currencyCode: string }
@@ -322,10 +334,11 @@ export default function PurchaseBox({
         }),
       });
 
-      if (!res.ok) {
-        const txt = await res.text().catch(() => "");
-        throw new Error(txt || "Cart request failed");
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json?.ok === false) {
+        throw new Error(json?.error || "Cart request failed");
       }
+      if (json?.cart?.id) storeCartId(json.cart.id);
 
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("cart:updated"));
