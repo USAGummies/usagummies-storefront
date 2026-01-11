@@ -4,8 +4,10 @@ import Link from "next/link";
 import Image from "next/image";
 import { ShopToolbar } from "@/components/shop/ShopToolbar";
 import { ShopProductCard } from "@/components/shop/ShopProductCard";
+import BundleQuickBuy from "@/components/home/BundleQuickBuy.client";
 import { getProductsPage, type SortValue } from "@/lib/shopify/products";
 import { getProductByHandle, money } from "@/lib/storefront";
+import { getBundleVariants } from "@/lib/bundles/getBundleVariants";
 import { pricingForQty, FREE_SHIP_QTY, FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 
 const PAGE_SIZE = 18;
@@ -146,43 +148,64 @@ export default async function ShopPage(props: {
         return current.perBag < best.perBag ? current : best;
       }, null) || bundles[bundles.length - 1];
 
+  let bundleVariants: Awaited<ReturnType<typeof getBundleVariants>> | null = null;
+  try {
+    bundleVariants = await getBundleVariants();
+  } catch {
+    bundleVariants = null;
+  }
+
+  const quickBuyTiers = (bundleVariants?.variants || []).filter((t) =>
+    [1, 2, 3, 4, 5, 8, 12].includes(t.quantity)
+  );
+
   return (
     <main className="bg-[var(--bg)] py-8 sm:py-12 text-[var(--text)]">
-      <div className="container mx-auto max-w-6xl px-4 space-y-8 sm:space-y-10">
-        <div className="glass-card px-5 py-6 sm:px-8 sm:py-8">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-baseline sm:justify-between">
-            <div>
-              <h1 className="text-3xl font-black text-[var(--text)] sm:text-4xl">Shop USA Gummies</h1>
-              <p className="mt-1 text-sm font-semibold text-[var(--muted)]">
-                Made in the USA • All Natural • Dye-Free • {FREE_SHIPPING_PHRASE}
-              </p>
+      <div className="container mx-auto max-w-6xl px-4 space-y-10 sm:space-y-12">
+        <section className="glass-card px-5 py-6 sm:px-8 sm:py-8 relative overflow-hidden">
+          <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
+            <div className="space-y-4">
+              <div className="kicker">Shop USA Gummies</div>
+              <div>
+                <h1 className="text-3xl font-black text-[var(--text)] sm:text-4xl">Shop USA Gummies</h1>
+                <p className="mt-2 text-sm font-semibold text-[var(--muted)]">
+                  Made in the USA • All Natural • Dye-Free • {FREE_SHIPPING_PHRASE}
+                </p>
+              </div>
+              <div className="badge-row">
+                <span className="badge">🇺🇸 Made in USA</span>
+                <span className="badge">🌿 All Natural</span>
+                <span className="badge">✅ Dye-Free</span>
+                <span className="badge badge--red">Bundle &amp; save</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Link href="/products/all-american-gummy-bears-7-5-oz-single-bag?focus=bundles" className="btn btn-red">
+                  Build a bundle
+                </Link>
+                <Link href="#shop-catalog" className="btn btn-outline">
+                  Shop flavors
+                </Link>
+              </div>
             </div>
-            <Link href="/products/all-american-gummy-bears-7-5-oz-single-bag?focus=bundles" className="btn btn-navy">
-              Build a bundle
-            </Link>
-          </div>
 
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <span className="badge">🇺🇸 Made in USA</span>
-            <span className="badge">🌿 All Natural</span>
-            <span className="badge">✅ Dye-Free</span>
-            <span className="badge badge--red">Bundle &amp; save</span>
-            <span className="text-sm font-semibold text-[var(--muted)]">
-              {FREE_SHIPPING_PHRASE}
-            </span>
+            <div className="rounded-3xl border border-[rgba(255,255,255,0.12)] bg-[var(--navy)] p-4 shadow-[0_30px_70px_rgba(7,12,20,0.45)]">
+              <BundleQuickBuy
+                anchorId="shop-bundle-pricing"
+                productHandle={primaryHandle}
+                tiers={quickBuyTiers}
+                singleBagVariantId={bundleVariants?.singleBagVariantId}
+                availableForSale={bundleVariants?.availableForSale}
+              />
+            </div>
           </div>
+        </section>
 
-          <div className="mt-6">
-            <ShopToolbar />
-          </div>
-        </div>
-
-        <section aria-label="Bundles" className="space-y-4">
+        <section aria-label="Bundle ladder" className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="text-xl font-black text-[var(--text)]">Pick your bundle</div>
+            <div className="text-xl font-black text-[var(--text)]">Bundle savings ladder</div>
             <div className="text-sm font-semibold text-[var(--muted)]">Most popular: 5 bags · Best value: 8+ bags</div>
           </div>
-          <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 sm:grid sm:grid-cols-2 sm:gap-5 sm:overflow-visible lg:grid-cols-3 xl:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {bundles.map((b: any) => {
               const isPopular = mostPopular && b.qty === mostPopular.qty;
               const isBest = bestValue && b.qty === bestValue.qty;
@@ -192,7 +215,7 @@ export default async function ShopPage(props: {
               return (
                 <article
                   key={b.id}
-                  className="glass-card w-full max-w-[340px] min-w-[260px] snap-start rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
+                  className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[0_18px_38px_rgba(15,27,45,0.12)] transition hover:-translate-y-1 hover:shadow-[0_24px_50px_rgba(15,27,45,0.16)]"
                 >
                   <div className="flex items-center justify-between">
                     <div className="text-base font-black text-[var(--text)]">{b.title || `${b.qty} Bags`}</div>
@@ -205,17 +228,17 @@ export default async function ShopPage(props: {
                       ) : null}
                     </div>
                   </div>
-                  <div className="mt-2 text-xl font-black text-[var(--text)]">{totalText}</div>
+                  <div className="mt-2 text-2xl font-black text-[var(--text)]">{totalText}</div>
                   <div className="text-sm font-semibold text-[var(--muted)]">~ {perBagText} per bag</div>
                   {b.qty >= FREE_SHIP_QTY ? (
-                    <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-[rgba(205,53,50,0.4)] bg-[rgba(205,53,50,0.12)] px-3 py-1 text-[11px] font-bold text-[var(--red)]">
+                    <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-[rgba(199,54,44,0.3)] bg-[rgba(199,54,44,0.12)] px-3 py-1 text-[11px] font-bold text-[var(--red)]">
                       {FREE_SHIPPING_PHRASE}
                     </div>
                   ) : (
                     <div className="mt-2 text-xs font-semibold text-[var(--muted)]">{FREE_SHIPPING_PHRASE}</div>
                   )}
                   <div className="mt-4 grid gap-2">
-                    <Link href={href} className="btn btn-red justify-center">
+                    <Link href={href} className="btn btn-navy justify-center">
                       Build bundle
                     </Link>
                   </div>
@@ -225,11 +248,27 @@ export default async function ShopPage(props: {
           </div>
         </section>
 
-        <div className="mt-4 grid gap-5 sm:gap-6 md:gap-7 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 justify-items-center">
-          {results.nodes.map((p) => (
-            <ShopProductCard key={p.id} product={p} hasBundle={hasBundleVariants(p)} />
-          ))}
-        </div>
+        <section id="shop-catalog" aria-label="Shop catalog" className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="kicker">Shop by flavor</div>
+              <h2 className="text-2xl font-black text-[var(--text)]">Shop the catalog</h2>
+              <p className="text-sm text-[var(--muted)]">
+                Browse best sellers, then jump into bundle pricing for the fastest checkout.
+              </p>
+            </div>
+          </div>
+
+          <div className="glass-card px-5 py-6 sm:px-6 sm:py-7">
+            <ShopToolbar />
+          </div>
+
+          <div className="mt-4 grid gap-5 sm:gap-6 md:gap-7 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 justify-items-center">
+            {results.nodes.map((p) => (
+              <ShopProductCard key={p.id} product={p} hasBundle={hasBundleVariants(p)} />
+            ))}
+          </div>
+        </section>
 
         <section className="mt-8 glass-card px-5 py-6 sm:px-6 sm:py-7">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -259,9 +298,9 @@ export default async function ShopPage(props: {
             ].map((item) => (
               <div
                 key={item.title}
-                className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[0_12px_28px_rgba(0,0,0,0.18)]"
+                className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[0_12px_28px_rgba(15,27,45,0.12)]"
               >
-                <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-[var(--border)] bg-[rgba(255,255,255,0.04)]">
+                <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface-strong)]">
                   <Image
                     src={item.img}
                     alt={item.title}

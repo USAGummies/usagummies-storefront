@@ -1,7 +1,20 @@
 // src/app/layout.tsx
 import "./globals.css";
 import type { Metadata } from "next";
+import { Fraunces, Manrope } from "next/font/google";
 import { AppShell } from "@/components/layout/AppShell.client";
+
+const display = Fraunces({
+  subsets: ["latin"],
+  variable: "--font-display",
+  weight: ["400", "500", "600", "700", "800", "900"],
+});
+
+const sans = Manrope({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  weight: ["400", "500", "600", "700", "800"],
+});
 
 export const metadata: Metadata = {
   title: "USA Gummies",
@@ -16,13 +29,14 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      style={{ backgroundColor: "var(--bg, #0c1426)" }}
+      className={`${display.variable} ${sans.variable}`}
+      style={{ backgroundColor: "var(--bg, #f8f5ef)" }}
     >
       <body
-        className="min-h-screen bg-[var(--bg,#0c1426)] text-[var(--text,#f2f6ff)]"
+        className="min-h-screen bg-[var(--bg,#f8f5ef)] text-[var(--text,#1c2430)]"
         style={{
-          backgroundColor: "var(--bg, #0c1426)",
-          color: "var(--text, #f2f6ff)",
+          backgroundColor: "var(--bg, #f8f5ef)",
+          color: "var(--text, #1c2430)",
         }}
       >
         <AppShell>{children}</AppShell>

@@ -595,7 +595,8 @@ export default function PurchaseBox({
         .pbx__banner{
           border-radius: 18px;
           border: 1px solid var(--border);
-          background: var(--surface-strong);
+          background: linear-gradient(180deg, #ffffff 0%, #f8f4ed 100%);
+          box-shadow: 0 18px 40px rgba(15,27,45,0.12);
           overflow:hidden;
         }
         .pbx__bannerInner{ padding: 16px; }
@@ -627,10 +628,11 @@ export default function PurchaseBox({
           border:1px solid var(--border);
           background: var(--surface-strong);
           padding:14px;
+          box-shadow: 0 18px 40px rgba(15,27,45,0.12);
         }
         .pbx__glow{
-          outline: 2px solid rgba(21,36,65,0.35);
-          box-shadow: 0 0 0 6px rgba(21,36,65,0.12), 0 18px 55px rgba(21,36,65,0.16);
+          outline: 2px solid rgba(13,28,51,0.3);
+          box-shadow: 0 0 0 6px rgba(13,28,51,0.1), 0 18px 55px rgba(13,28,51,0.16);
         }
         .pbx__cardHeader{
           display:flex; gap:10px; align-items:flex-start; justify-content:space-between; flex-wrap:wrap;
@@ -671,11 +673,11 @@ export default function PurchaseBox({
         }
         .pbx__edge--left{
           left: 0;
-          background: linear-gradient(90deg, rgba(12,20,38,0.95), rgba(12,20,38,0));
+          background: linear-gradient(90deg, rgba(248,245,239,0.98), rgba(248,245,239,0));
         }
         .pbx__edge--right{
           right: 0;
-          background: linear-gradient(270deg, rgba(12,20,38,0.95), rgba(12,20,38,0));
+          background: linear-gradient(270deg, rgba(248,245,239,0.98), rgba(248,245,239,0));
         }
         .pbx__grid{
           margin-top:12px;
@@ -713,28 +715,28 @@ export default function PurchaseBox({
         }
         .pbx__tile:hover{
           transform: translateY(-2px);
-          box-shadow: 0 16px 34px rgba(21,36,65,0.14);
-          border-color: rgba(21,36,65,0.18);
+          box-shadow: 0 16px 34px rgba(15,27,45,0.14);
+          border-color: rgba(13,28,51,0.18);
         }
         .pbx__tile:focus-visible{
-          outline: 3px solid rgba(21,36,65,0.35);
+          outline: 3px solid rgba(13,28,51,0.3);
           outline-offset: 2px;
         }
-        .pbx__tile--accent{ border-color: rgba(205,53,50,0.30); }
+        .pbx__tile--accent{ border-color: rgba(199,54,44,0.32); }
         .pbx__tile--active{
-          border-color: rgba(21,36,65,0.34);
-          box-shadow: 0 18px 38px rgba(21,36,65,0.16);
-          background: linear-gradient(140deg, rgba(21,36,65,0.18), rgba(21,36,65,0.08));
+          border-color: rgba(13,28,51,0.34);
+          box-shadow: 0 18px 38px rgba(13,28,51,0.16);
+          background: linear-gradient(140deg, rgba(13,28,51,0.12), rgba(13,28,51,0.04));
           transform: translateY(-2px) scale(1.01);
         }
         .pbx__tile--activeAccent{
-          border-color: rgba(205,53,50,0.38);
-          box-shadow: 0 18px 44px rgba(205,53,50,0.12);
+          border-color: rgba(199,54,44,0.42);
+          box-shadow: 0 18px 44px rgba(199,54,44,0.14);
           animation: pbxPulse 3s ease-in-out infinite;
         }
         .pbx__tile--glow{
-          box-shadow: 0 22px 58px rgba(219,170,121,0.18), 0 0 0 1px rgba(219,170,121,0.24), 0 0 0 8px rgba(219,170,121,0.04);
-          background: rgba(219,170,121,0.06);
+          box-shadow: 0 22px 58px rgba(199,160,98,0.18), 0 0 0 1px rgba(199,160,98,0.28), 0 0 0 8px rgba(199,160,98,0.04);
+          background: rgba(199,160,98,0.08);
         }
 
         .pbx__tileTop{ display:flex; gap:10px; align-items:flex-start; justify-content:space-between; }
@@ -746,29 +748,29 @@ export default function PurchaseBox({
           border:1px solid var(--border);
           display:inline-flex; align-items:center; justify-content:center;
           font-size:12px; font-weight:900; color: transparent;
-          background: rgba(255,255,255,0.08);
+          background: var(--surface-strong);
         }
         .pbx__check--active{
           color: white;
-          background: linear-gradient(145deg, rgba(21,36,65,0.98), rgba(21,36,65,0.86));
-          border-color: rgba(21,36,65,0.4);
-          box-shadow: 0 8px 18px rgba(21,36,65,0.24);
+          background: linear-gradient(145deg, rgba(13,28,51,0.98), rgba(13,28,51,0.86));
+          border-color: rgba(13,28,51,0.4);
+          box-shadow: 0 8px 18px rgba(13,28,51,0.24);
         }
         .pbx__pill{
           border-radius:999px; padding:6px 10px;
-          border:1px solid var(--red);
-          background: var(--red);
-          font-weight:950; font-size:11px; color: var(--white);
+          border:1px solid rgba(199,54,44,0.35);
+          background: rgba(199,54,44,0.12);
+          font-weight:950; font-size:11px; color: var(--red);
         }
         .pbx__pill--gold{
-          border-color: rgba(219,170,121,0.55);
-          background: rgba(219,170,121,0.2);
+          border-color: rgba(199,160,98,0.55);
+          background: rgba(199,160,98,0.2);
           color: #7a531f;
         }
         .pbx__pill--navy{
-          border-color: rgba(219,170,121,0.45);
-          background: rgba(255,255,255,0.08);
-          color: var(--text);
+          border-color: rgba(13,28,51,0.18);
+          background: var(--surface-strong);
+          color: var(--navy);
         }
         .pbx__tileSub{ margin-top:6px; font-size:12px; color: var(--muted); }
         .pbx__tileSub--accent{ color: var(--red); font-weight:900; }
@@ -835,13 +837,19 @@ export default function PurchaseBox({
           padding:12px 18px;
           font-weight:950;
           cursor:pointer;
-          transition: transform .08s ease, opacity .18s ease;
+          transition: transform .08s ease, opacity .18s ease, filter .18s ease;
           white-space:nowrap;
           background: var(--navy);
           color: white;
         }
+        .pbx__cta--primary{
+          background: linear-gradient(180deg, #c7362c 0%, #b02c26 100%);
+        }
+        .pbx__cta--primary:hover{
+          filter: brightness(1.05);
+        }
         .pbx__cta:disabled{ opacity:.65; cursor:not-allowed; }
-        .pbx__cta:active{ transform: translateY(1px); background: #0f1d36; }
+        .pbx__cta:active{ transform: translateY(1px); }
         .pbx__ctaNote{
           margin-top:6px;
           font-size:12px;
@@ -850,7 +858,7 @@ export default function PurchaseBox({
         .pbx__ctaMicro{
           margin-top:4px;
           font-size:11px;
-          color: rgba(255,255,255,0.7);
+          color: var(--muted);
         }
         .pbx__trustInline{
           margin-top:8px;
@@ -867,7 +875,7 @@ export default function PurchaseBox({
         .pbx__stickyLabel{ font-weight:900; }
         .pbx__stickySub{ font-size:12px; opacity:0.82; margin-top:2px; }
         .pbx__stickyBtn{
-          background: var(--red);
+          background: linear-gradient(180deg, #c7362c 0%, #b02c26 100%);
           color: white;
           border:none;
           border-radius:999px;

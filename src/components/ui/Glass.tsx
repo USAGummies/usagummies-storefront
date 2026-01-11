@@ -8,7 +8,7 @@ type GlassProps = {
 };
 
 const base =
-  "backdrop-blur-md bg-[var(--surface)] border border-[var(--border)] shadow-[0_18px_48px_rgba(0,0,0,0.28)]";
+  "bg-[var(--surface)] border border-[var(--border)] shadow-[0_24px_60px_rgba(15,27,45,0.22)]";
 
 export function GlassPanel({ children, className, as: Tag = "div" }: GlassProps) {
   return <Tag className={[base, "rounded-3xl", className || ""].join(" ")}>{children}</Tag>;

@@ -58,11 +58,11 @@ export function ProductGallery({
           priority={active === 0}
         />
         {/* Subtle gold edge glow */}
-        <div className="pointer-events-none absolute inset-0 ring-1 ring-white/10 shadow-[0_0_80px_rgba(212,175,55,0.08)]" />
+        <div className="pointer-events-none absolute inset-0 ring-1 ring-[var(--border)] shadow-[0_0_60px_rgba(199,160,98,0.16)]" />
       </div>
 
       {imgs.length > 1 ? (
-        <div className="flex gap-2 overflow-x-auto border-t border-white/10 bg-black/20 p-3">
+        <div className="flex gap-2 overflow-x-auto border-t border-[var(--border)] bg-[var(--surface-strong)] p-3">
           {imgs.map((im, idx) => (
             <button
               key={im.url}
@@ -71,8 +71,8 @@ export function ProductGallery({
               className={cn(
                 "relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border bg-[var(--surface)]",
                 idx === active
-                  ? "border-[#d4af37]/40 ring-1 ring-[#d4af37]/25"
-                  : "border-white/10 hover:border-white/20"
+                  ? "border-[rgba(199,160,98,0.6)] ring-1 ring-[rgba(199,160,98,0.3)]"
+                  : "border-[var(--border)] hover:border-[rgba(13,28,51,0.2)]"
               )}
               aria-label={`View image ${idx + 1}`}
             >

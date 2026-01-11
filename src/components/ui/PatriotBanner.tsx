@@ -51,7 +51,7 @@ export function PatriotBanner() {
             </div>
 
             <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
-              <Link className="btn btn-primary" href="/shop">
+              <Link className="btn btn-red" href="/shop">
                 Build a Bundle 🇺🇸
               </Link>
               <Link className="btn btn-navy" href="/shop">

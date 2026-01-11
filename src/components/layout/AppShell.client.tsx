@@ -38,6 +38,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [cartCount, setCartCount] = useState<number>(0);
   const [badgePop, setBadgePop] = useState(false);
   const pathname = usePathname();
+  const bundleCtaHref =
+    "/products/all-american-gummy-bears-7-5-oz-single-bag?focus=bundles";
 
   async function refreshCartCount() {
     try {
@@ -84,9 +86,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[var(--bg,#0c1426)] text-[var(--text)]">
-      {/* Header is the only light surface */}
-      <header className="sticky top-0 z-40 bg-white text-[var(--rebel)] border-b border-[var(--red)] shadow-[0_10px_28px_rgba(0,0,0,0.12)]">
+    <div className="min-h-screen bg-[var(--bg,#f8f5ef)] text-[var(--text)]">
+      <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-white/92 text-[var(--text)] backdrop-blur-md shadow-[0_10px_24px_rgba(15,27,45,0.08)]">
         <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between gap-3">
           <Link href="/" className="flex items-center gap-3 pressable focus-ring">
             <div className="relative h-9 w-32">
@@ -100,12 +101,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 priority
               />
             </div>
-            <span className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--rebel)]">
+            <span className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--navy)]">
               🇺🇸 American-made
             </span>
           </Link>
 
-          <nav className="hidden md:flex items-center gap-4 text-sm font-semibold text-[var(--rebel)]">
+          <nav className="hidden md:flex items-center gap-4 text-sm font-semibold text-[var(--text)]">
             {navLinks.map((link) => {
               const active = pathname === link.href;
               return (
@@ -113,7 +114,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   key={link.href}
                   href={link.href}
                   className={cx(
-                    "underline-slide pressable px-2 py-1 rounded-lg transition-colors duration-150 text-[var(--rebel)] hover:text-[var(--red)]",
+                    "underline-slide pressable px-2 py-1 rounded-lg transition-colors duration-150 text-[var(--text)] hover:text-[var(--red)]",
                     active && "text-[var(--red)]"
                   )}
                 >
@@ -124,10 +125,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </nav>
 
           <div className="flex items-center gap-2">
+            <Link
+              href={bundleCtaHref}
+              className="hidden md:inline-flex btn btn-red"
+            >
+              Build a bundle
+            </Link>
             <button
               type="button"
               onClick={() => setDrawerOpen(true)}
-              className="pressable focus-ring inline-flex items-center gap-2 rounded-full bg-[rgba(21,36,65,0.06)] border border-[rgba(0,0,0,0.12)] px-4 py-2 text-sm font-black text-[var(--rebel)]"
+              className="pressable focus-ring inline-flex items-center gap-2 rounded-full bg-[var(--surface-strong)] border border-[var(--border)] px-4 py-2 text-sm font-black text-[var(--text)]"
             >
               <span>Cart</span>
               <span
@@ -143,7 +150,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <button
               type="button"
               onClick={() => setMobileOpen((s) => !s)}
-              className="md:hidden pressable focus-ring inline-flex h-10 w-10 items-center justify-center rounded-full border border-[rgba(0,0,0,0.12)] text-[var(--rebel)] bg-white"
+              className="md:hidden pressable focus-ring inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border)] text-[var(--text)] bg-white"
               aria-label="Toggle navigation"
             >
               ☰
@@ -152,8 +159,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
 
         {mobileOpen ? (
-          <div className="md:hidden border-t border-[rgba(0,0,0,0.08)] bg-white/96 backdrop-blur-md">
-          <div className="mx-auto max-w-6xl px-4 py-3 flex flex-col gap-2 text-[var(--rebel)]">
+          <div className="md:hidden border-t border-[var(--border)] bg-white/96 backdrop-blur-md">
+            <div className="mx-auto max-w-6xl px-4 py-3 flex flex-col gap-2 text-[var(--text)]">
               {navLinks.map((link) => {
                 const active = pathname === link.href;
                 return (
@@ -169,10 +176,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   </Link>
                 );
               })}
+              <Link
+                href={bundleCtaHref}
+                className="pressable focus-ring inline-flex items-center justify-center rounded-full bg-[var(--red)] px-4 py-2 text-sm font-black text-white"
+              >
+                Build a bundle
+              </Link>
               <button
                 type="button"
                 onClick={() => setDrawerOpen(true)}
-                className="pressable focus-ring inline-flex items-center justify-center rounded-full bg-[var(--red)] px-4 py-2 text-sm font-black text-white"
+                className="pressable focus-ring inline-flex items-center justify-center rounded-full bg-[var(--navy)] px-4 py-2 text-sm font-black text-white"
               >
                 View cart
               </button>
@@ -185,11 +198,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <main className="pb-16 text-[var(--text)]">{children}</main>
 
-      <footer className="border-top border-[var(--border)] bg-[rgba(12,20,38,0.92)] backdrop-blur-md text-white">
+      <footer className="border-t border-[var(--border)] bg-white/85 backdrop-blur-md text-[var(--text)]">
         <div className="mx-auto max-w-6xl px-4 py-8 text-sm text-[var(--muted)] space-y-6">
           <div className="grid gap-4 md:grid-cols-[1.1fr_auto] md:items-start">
             <div className="space-y-2">
-              <div className="text-lg font-black text-white">USA Gummies</div>
+              <div className="text-lg font-black text-[var(--text)]">USA Gummies</div>
               <ul className="space-y-1 text-[var(--muted)]">
                 <li>🇺🇸 American-made • Bold flavor</li>
                 <li>✅ Dye-free • All natural</li>

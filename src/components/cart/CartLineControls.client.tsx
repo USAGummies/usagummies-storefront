@@ -17,28 +17,28 @@ export function CartLineControls({
   const [pending, startTransition] = useTransition();
 
   function submitUpdate(nextQty: number) {
-  if (pending) return;
-  startTransition(async () => {
-    const fd = new FormData();
-    fd.set("lineId", lineId);
-    fd.set("quantity", String(Math.max(0, nextQty)));
-    await updateLine(fd);
-    window.dispatchEvent(new Event("cart:updated"));
-    onChange?.();
-  });
-}
+    if (pending) return;
+    startTransition(async () => {
+      const fd = new FormData();
+      fd.set("lineId", lineId);
+      fd.set("quantity", String(Math.max(0, nextQty)));
+      await updateLine(fd);
+      window.dispatchEvent(new Event("cart:updated"));
+      onChange?.();
+    });
+  }
 
 
   function submitRemove() {
-  if (pending) return;
-  startTransition(async () => {
-    const fd = new FormData();
-    fd.set("lineId", lineId);
-    await removeLine(fd);
-    window.dispatchEvent(new Event("cart:updated"));
-    onChange?.();
-  });
-}
+    if (pending) return;
+    startTransition(async () => {
+      const fd = new FormData();
+      fd.set("lineId", lineId);
+      await removeLine(fd);
+      window.dispatchEvent(new Event("cart:updated"));
+      onChange?.();
+    });
+  }
 
   
   return (
@@ -58,7 +58,7 @@ export function CartLineControls({
           −
         </button>
 
-        <div className="min-w-[44px] px-3 flex items-center justify-center font-black text-white" aria-label="Quantity">
+        <div className="min-w-[44px] px-3 flex items-center justify-center font-black text-[var(--text)]" aria-label="Quantity">
           {quantity}
         </div>
 

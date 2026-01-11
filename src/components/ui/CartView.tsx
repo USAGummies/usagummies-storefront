@@ -124,7 +124,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
   return (
     <div className="px-4 py-4 flex flex-col gap-4 text-[var(--text)]">
       <div className="glass-bar">
-        <div className="text-sm font-black text-white">
+        <div className="text-sm font-black text-[var(--text)]">
           {FREE_SHIPPING_PHRASE}
         </div>
         <div className="mt-1 text-xs text-[var(--muted)]">
@@ -194,7 +194,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                   ) : null}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="font-black text-white leading-tight">{title}</div>
+                  <div className="font-black text-[var(--text)] leading-tight">{title}</div>
                   {variant ? (
                     <div className="text-xs text-[var(--muted)] mt-1">{variant}</div>
                   ) : null}
@@ -202,7 +202,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                     <CartLineControls lineId={l.id} quantity={l.quantity} onChange={refreshCart} />
                   </div>
                 </div>
-                <div className="text-right text-sm font-black text-white">
+                <div className="text-right text-sm font-black text-[var(--text)]">
                   {lineTotal}
                 </div>
               </div>
@@ -214,7 +214,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
       <div className="glass-card p-4 flex flex-col gap-2">
         <div className="flex items-center justify-between text-sm text-[var(--muted)]">
           <span>Subtotal</span>
-          <span className="font-black text-white">{subtotal}</span>
+          <span className="font-black text-[var(--text)]">{subtotal}</span>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {localCart?.checkoutUrl ? (
@@ -233,8 +233,8 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
       </div>
 
       <div className="glass-card p-4">
-        <div className="kicker text-[var(--muted)]">Pro tip</div>
-        <div className="mt-1 text-sm text-white">
+        <div className="kicker">Pro tip</div>
+        <div className="mt-1 text-sm text-[var(--text)]">
           {totalBags >= 8
             ? "You’re at the best per-bag price. Checkout to lock it in."
             : "Pro tip: 8+ bags gives you the best per-bag price."}

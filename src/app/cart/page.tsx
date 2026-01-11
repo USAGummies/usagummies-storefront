@@ -24,7 +24,7 @@ export default async function CartPage() {
               Home
             </Link>
             <span>›</span>
-            <span className="font-black text-white">Cart</span>
+            <span className="font-black text-[var(--text)]">Cart</span>
           </div>
 
           <div className="flex gap-2">

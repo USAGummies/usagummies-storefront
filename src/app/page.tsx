@@ -110,20 +110,20 @@ export default async function HomePage() {
   return (
     <main
       className="bg-[var(--bg)] text-[var(--text)] min-h-screen pb-16 lg:pb-0"
-      style={{ backgroundColor: "var(--bg, #0c1426)", color: "var(--text, #f2f6ff)" }}
+      style={{ backgroundColor: "var(--bg, #f8f5ef)", color: "var(--text, #1c2430)" }}
     >
       <section
-        className="relative overflow-hidden border-b border-gold-soft hero-parallax"
+        className="relative overflow-hidden border-b border-white/10 bg-[var(--navy)] text-white hero-parallax"
         style={{
           backgroundImage:
-            "linear-gradient(135deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.04) 40%, rgba(255,255,255,0.02) 100%), radial-gradient(circle at 10% 20%, rgba(255,255,255,0.05), rgba(255,255,255,0) 35%), radial-gradient(circle at 80% 0%, rgba(255,255,255,0.05), rgba(255,255,255,0) 30%)",
+            "linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.08) 40%, rgba(255,255,255,0.02) 100%), radial-gradient(circle at 10% 20%, rgba(199,160,98,0.22), rgba(255,255,255,0) 38%), radial-gradient(circle at 80% 0%, rgba(255,255,255,0.08), rgba(255,255,255,0) 30%)",
         }}
       >
         <div className="absolute inset-0 pointer-events-none" aria-hidden="true" />
         <div className="relative mx-auto max-w-6xl px-4 py-3 sm:py-5 lg:py-9">
           <div className="grid gap-4 lg:gap-9 lg:grid-cols-2 lg:items-stretch">
             <div className="flex flex-col gap-2.5">
-              <div className="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--muted)]">
+              <div className="text-xs font-semibold uppercase tracking-[0.28em] text-white/70">
                 American-made gummies
               </div>
               <div className="space-y-1.5">
@@ -133,24 +133,24 @@ export default async function HomePage() {
                 <div className="text-[13px] font-semibold uppercase tracking-[0.22em] text-[var(--gold)]">
                   Fan-favorite
                 </div>
-                <p className="text-sm text-[var(--muted)] sm:text-base max-w-prose">
+                <p className="text-sm text-white/75 sm:text-base max-w-prose">
                   All-natural flavors. No artificial dyes. Build a bundle to save more —{" "}
                   {FREE_SHIPPING_PHRASE}.
                 </p>
                 {/* Mobile pills: exactly two, never wrap */}
                 <div className="flex md:hidden flex-nowrap items-center gap-2 overflow-hidden text-[11px] font-semibold text-white/75 hero-badge-fade">
-                  <span className="badge px-2 py-1 opacity-80">🇺🇸 Made in USA</span>
-                  <span className="badge px-2 py-1 opacity-80">✅ Dye-free</span>
+                  <span className="badge badge--inverse px-2 py-1 opacity-90">🇺🇸 Made in USA</span>
+                  <span className="badge badge--inverse px-2 py-1 opacity-90">✅ Dye-free</span>
                 </div>
                 {/* Desktop/tablet pills: three pills */}
                 <div className="hidden md:flex flex-nowrap items-center gap-2 overflow-hidden text-xs font-semibold text-white/80 hero-badge-fade">
-                  <span className="badge px-3 py-1.5">🇺🇸 Made in USA</span>
-                  <span className="badge px-3 py-1.5">✅ Dye-free</span>
-                  <span className="badge px-3 py-1.5">🚚 Ships fast</span>
+                  <span className="badge badge--inverse px-3 py-1.5">🇺🇸 Made in USA</span>
+                  <span className="badge badge--inverse px-3 py-1.5">✅ Dye-free</span>
+                  <span className="badge badge--inverse px-3 py-1.5">🚚 Ships fast</span>
                 </div>
-                <div className="flex flex-wrap items-center gap-1 text-sm font-semibold text-[var(--muted)]">
+                <div className="flex flex-wrap items-center gap-1 text-sm font-semibold text-white/70">
                   <span>Bundle & save</span>
-                  <span className="text-[var(--muted)]">•</span>
+                  <span className="text-white/60">•</span>
                   <span>8+ bags is the sweet spot</span>
                 </div>
               </div>
@@ -234,13 +234,13 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="border-t border-gold-soft bg-transparent">
-        <div className="mx-auto max-w-6xl px-4 py-5 lg:py-8 reveal-up">
+      <section className="border-t border-white/10 bg-[var(--navy)] text-white">
+        <div className="mx-auto max-w-6xl px-4 py-7 lg:py-10 reveal-up">
           <ReviewsSection />
         </div>
       </section>
 
-      <section className="border-t border-gold-soft bg-[rgba(255,255,255,0.02)]">
+      <section className="border-t border-[var(--border)] bg-[var(--surface-strong)]">
         <div className="mx-auto max-w-6xl px-4 py-5 lg:py-8 space-y-4 reveal-up">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-2xl font-black text-[var(--text)]">Why USA Gummies</h2>
@@ -252,11 +252,11 @@ export default async function HomePage() {
             {whyCards.map((card) => (
               <div
                 key={card.title}
-                className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[0_14px_32px_rgba(0,0,0,0.22)] transition-transform duration-200 hover:-translate-y-1"
+                className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[0_14px_32px_rgba(15,27,45,0.12)] transition-transform duration-200 hover:-translate-y-1"
               >
                 <div className="flex items-center gap-3">
                   <div className="icon-float">{card.icon}</div>
-                  <div className="text-lg font-black text-white">{card.title}</div>
+                  <div className="text-lg font-black text-[var(--text)]">{card.title}</div>
                 </div>
                 <p className="mt-3 text-sm text-[var(--muted)]">{card.copy}</p>
               </div>
@@ -265,7 +265,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="border-t border-gold-soft bg-transparent">
+      <section className="border-t border-[var(--border)] bg-[var(--surface)]">
         <div className="mx-auto max-w-6xl px-4 py-5 lg:py-8 space-y-3 reveal-up">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -289,16 +289,16 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="border-t border-gold-soft bg-[rgba(255,255,255,0.02)]">
+      <section className="border-t border-[var(--border)] bg-[var(--surface-strong)]">
         <div className="mx-auto max-w-6xl px-4 py-5 lg:py-8 space-y-3 reveal-up">
-          <div className="text-xs font-semibold uppercase tracking-[0.2em] text-white/60">
+          <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
             Get updates
           </div>
-          <h3 className="text-2xl font-black text-white">Unlock early access + bundle-only drops</h3>
-          <p className="text-sm text-white/70">
+          <h3 className="text-2xl font-black text-[var(--text)]">Unlock early access + bundle-only drops</h3>
+          <p className="text-sm text-[var(--muted)]">
             First dibs on limited flavors, restocks, and member-only bundle alerts.
           </p>
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-semibold text-white/80 w-fit">
+          <div className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1 text-[11px] font-semibold text-[var(--text)] w-fit">
             VIP early access • limited-batch alerts
           </div>
           <form className="flex flex-wrap gap-3 items-center">

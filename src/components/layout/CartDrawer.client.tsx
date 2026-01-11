@@ -113,11 +113,11 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
         >
           <GlassPanel className="h-full rounded-none border-l border-[var(--border)]">
             <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
-              <div className="text-lg font-black text-white">Your cart</div>
+              <div className="text-lg font-black text-[var(--text)]">Your cart</div>
               <button
                 type="button"
                 onClick={onClose}
-                className="pressable rounded-full border border-[var(--border)] px-3 py-1 text-sm text-white focus-ring"
+                className="pressable rounded-full border border-[var(--border)] px-3 py-1 text-sm text-[var(--text)] focus-ring"
               >
                 Close
               </button>

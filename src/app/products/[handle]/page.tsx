@@ -418,6 +418,7 @@ export default async function ProductPage(props: {
         <style>{`
           .pdp-root{
             padding: 18px 0 80px;
+            color: var(--text);
           }
 
           .pdp-container{
@@ -427,7 +428,7 @@ export default async function ProductPage(props: {
           }
 
           .pdp-breadcrumb{
-            opacity: 0.82;
+            color: var(--muted);
             font-size: 13px;
             display: flex;
             gap: 8px;
@@ -468,7 +469,7 @@ export default async function ProductPage(props: {
           .pdp-titlecard{
             padding: 20px;
             border: 1px solid var(--border);
-            background: var(--surface-strong);
+            background: var(--surface);
           }
 
           .pdp-kicker{
@@ -482,7 +483,7 @@ export default async function ProductPage(props: {
             letter-spacing:0.08em;
             text-transform:uppercase;
             color: var(--muted);
-            background: rgba(255,255,255,0.06);
+            background: var(--surface-strong);
           }
 
           .pdp-title{
@@ -492,13 +493,14 @@ export default async function ProductPage(props: {
             line-height: 1.08;
             margin: 8px 0 0;
             letter-spacing: -0.015em;
+            color: var(--text);
           }
 
           .pdp-price{
             margin-top: 10px;
             font-weight: 950;
             font-size: 18px;
-            opacity: 0.9;
+            color: var(--navy);
           }
 
           .pdp-desc{
@@ -532,8 +534,8 @@ export default async function ProductPage(props: {
             border-radius: 14px;
             overflow: hidden;
             border: 1px solid var(--border);
-            background: rgba(255,255,255,0.04);
-            box-shadow: 0 16px 36px rgba(0,0,0,0.18);
+            background: var(--surface-strong);
+            box-shadow: 0 16px 36px rgba(15,27,45,0.12);
           }
 
           .pdp-accordions{
@@ -543,7 +545,7 @@ export default async function ProductPage(props: {
           .pdp-accordion{
             border-radius: 14px;
             border: 1px solid var(--border);
-            background: var(--surface);
+            background: var(--surface-strong);
             padding: 10px 12px;
           }
           .pdp-accordion summary{
@@ -573,6 +575,7 @@ export default async function ProductPage(props: {
             padding: 14px;
             border: 1px solid var(--border);
             background: var(--surface);
+            box-shadow: 0 14px 30px rgba(15,27,45,0.1);
           }
           .pdp-crosssellMedia{
             position: relative;
@@ -580,7 +583,7 @@ export default async function ProductPage(props: {
             border-radius: 14px;
             overflow: hidden;
             border: 1px solid var(--border);
-            background: rgba(255,255,255,0.04);
+            background: var(--surface-strong);
             margin-bottom: 10px;
           }
           .pdp-crosssellTitle{

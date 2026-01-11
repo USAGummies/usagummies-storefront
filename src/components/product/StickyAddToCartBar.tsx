@@ -146,7 +146,7 @@ export function StickyAddToCartBar({
             <button
               type="button"
               onClick={handleClick}
-              className="btn btn-primary"
+              className="btn btn-red"
               style={{
                 borderRadius: 999,
                 padding: "12px 14px",

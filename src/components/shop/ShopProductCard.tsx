@@ -69,9 +69,9 @@ export function ShopProductCard({
               open();
             }
           }}
-          className="group flex h-full w-full max-w-[340px] flex-col rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-[14px] shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-xl glass-card focus:outline-none focus:ring-2 focus:ring-[var(--gold)]"
+          className="group flex h-full w-full max-w-[340px] flex-col rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[0_18px_40px_rgba(15,27,45,0.12)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_24px_50px_rgba(15,27,45,0.16)] focus:outline-none focus:ring-2 focus:ring-[var(--gold)]"
         >
-          <div className="relative aspect-square overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06),0_14px_28px_rgba(0,0,0,0.18)]">
+          <div className="relative aspect-square overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.2),0_12px_24px_rgba(15,27,45,0.12)]">
             {img?.url ? (
               <Image
                 src={img.url}
@@ -93,19 +93,19 @@ export function ShopProductCard({
                   e.stopPropagation();
                   open();
                 }}
-                className="rounded-full border border-white/30 bg-[rgba(12,20,38,0.72)] px-4 py-2 text-xs font-semibold text-white shadow-[0_10px_24px_rgba(0,0,0,0.3)] backdrop-blur-md"
+                className="rounded-full border border-[var(--border)] bg-white/90 px-4 py-2 text-xs font-semibold text-[var(--navy)] shadow-[0_10px_24px_rgba(15,27,45,0.18)] backdrop-blur-md"
               >
                 Quick view
               </button>
             </div>
 
             {hasBundle ? (
-              <div className="absolute left-2 top-2 rounded-full border border-[rgba(205,53,50,0.35)] bg-[rgba(205,53,50,0.12)] px-3 py-1 text-[11px] font-bold text-[var(--red)]">
+              <div className="absolute left-2 top-2 rounded-full border border-[rgba(199,54,44,0.35)] bg-[rgba(199,54,44,0.12)] px-3 py-1 text-[11px] font-bold text-[var(--red)]">
                 Bundle deals inside
               </div>
             ) : null}
 
-            <div className="absolute bottom-2 right-2 rounded-full border border-white/15 bg-[rgba(12,20,38,0.72)] px-3 py-1 text-[11px] font-semibold text-white backdrop-blur-md">
+            <div className="absolute bottom-2 right-2 rounded-full border border-[var(--border)] bg-white/90 px-3 py-1 text-[11px] font-semibold text-[var(--navy)] backdrop-blur-md">
               {FREE_SHIPPING_PHRASE}
             </div>
           </div>
@@ -131,7 +131,7 @@ export function ShopProductCard({
               ) : (
                 <span>See pricing</span>
               )}
-              <span className="text-xs font-semibold text-white/70 underline underline-offset-4">
+              <span className="text-xs font-semibold text-[var(--navy)] underline underline-offset-4">
                 Quick view
               </span>
             </div>
@@ -148,7 +148,7 @@ export function ShopProductCard({
           <div className="mt-3 grid gap-2">
             <Link
               href={bundleHref}
-              className="btn btn-red justify-center min-h-[44px]"
+              className="btn btn-navy justify-center min-h-[44px]"
               onClick={(e) => e.stopPropagation()}
             >
               Build bundle
