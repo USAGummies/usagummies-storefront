@@ -6,7 +6,7 @@ import { getProductByHandle } from "@/lib/storefront";
 import BundleQuickBuy from "@/components/home/BundleQuickBuy.client";
 import ReviewsSection from "@/components/home/ReviewsSection";
 import { getBundleVariants } from "@/lib/bundles/getBundleVariants";
-import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
+import { FREE_SHIPPING_PHRASE, pricingForQty } from "@/lib/bundles/pricing";
 import HeroCTAWatcher from "@/components/home/HeroCTAWatcher";
 
 export const metadata: Metadata = {
@@ -51,12 +51,24 @@ export default async function HomePage() {
     product?.title?.toString?.() ||
     "All American Gummy Bears – 7.5 oz bag";
 
-  const description =
-    detailedProduct?.description?.toString?.() ||
-    product?.description?.toString?.() ||
-    "All natural flavors. Free from artificial dyes. Built in America. Shipped fast.";
-
   const heroMediaSrc = "/hero-loop.gif";
+  const starterPricing = pricingForQty(1);
+  const bestValuePricing = pricingForQty(8);
+  const starterPerBag = formatMoney(starterPricing.perBag);
+  const bestValuePerBag = formatMoney(bestValuePricing.perBag);
+  const bestValueSavingsPct =
+    starterPricing.perBag > 0
+      ? Math.max(
+          0,
+          Math.round(
+            ((starterPricing.perBag - bestValuePricing.perBag) / starterPricing.perBag) * 100
+          )
+        )
+      : 0;
+  const bestValueLine =
+    bestValueSavingsPct > 0
+      ? `~${bestValuePerBag} / bag • save ${bestValueSavingsPct}%`
+      : `~${bestValuePerBag} / bag`;
   let bundleVariants: Awaited<ReturnType<typeof getBundleVariants>> | null = null;
   try {
     bundleVariants = await getBundleVariants();
@@ -120,105 +132,112 @@ export default async function HomePage() {
         }}
       >
         <div className="absolute inset-0 pointer-events-none" aria-hidden="true" />
-        <div className="relative mx-auto max-w-6xl px-4 py-3 sm:py-5 lg:py-9">
-          <div className="grid gap-4 lg:gap-9 lg:grid-cols-2 lg:items-stretch">
-            <div className="flex flex-col gap-2.5">
-              <div className="text-xs font-semibold uppercase tracking-[0.28em] text-white/70">
-                American-made gummies
+        <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[rgba(199,160,98,0.3)] blur-3xl" aria-hidden="true" />
+        <div className="absolute -left-20 bottom-0 h-72 w-72 rounded-full bg-white/10 blur-3xl" aria-hidden="true" />
+        <div className="relative mx-auto max-w-6xl px-4 py-10 sm:py-12 lg:py-16">
+          <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
+            <div className="space-y-5">
+              <div className="flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-[0.28em] text-white/70">
+                <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">American-made gummies</span>
+                <span className="text-[var(--gold)]">Fan-favorite</span>
               </div>
-              <div className="space-y-1.5">
+
+              <div className="space-y-2">
                 <h1 className="text-3xl font-black leading-tight text-white sm:text-4xl lg:text-5xl">
                   Dye-Free Gummy Bears — Made in the USA.
                 </h1>
-                <div className="text-[13px] font-semibold uppercase tracking-[0.22em] text-[var(--gold)]">
-                  Fan-favorite
-                </div>
-                <p className="text-sm text-white/75 sm:text-base max-w-prose">
+                <p className="text-sm text-white/80 sm:text-base max-w-prose">
                   All-natural flavors. No artificial dyes. Build a bundle to save more —{" "}
                   {FREE_SHIPPING_PHRASE}.
                 </p>
-                {/* Mobile pills: exactly two, never wrap */}
-                <div className="flex md:hidden flex-nowrap items-center gap-2 overflow-hidden text-[11px] font-semibold text-white/75 hero-badge-fade">
-                  <span className="badge badge--inverse px-2 py-1 opacity-90">🇺🇸 Made in USA</span>
-                  <span className="badge badge--inverse px-2 py-1 opacity-90">✅ Dye-free</span>
-                </div>
-                {/* Desktop/tablet pills: three pills */}
-                <div className="hidden md:flex flex-nowrap items-center gap-2 overflow-hidden text-xs font-semibold text-white/80 hero-badge-fade">
-                  <span className="badge badge--inverse px-3 py-1.5">🇺🇸 Made in USA</span>
-                  <span className="badge badge--inverse px-3 py-1.5">✅ Dye-free</span>
-                  <span className="badge badge--inverse px-3 py-1.5">🚚 Ships fast</span>
-                </div>
-                <div className="flex flex-wrap items-center gap-1 text-sm font-semibold text-white/70">
-                  <span>Bundle & save</span>
-                  <span className="text-white/60">•</span>
-                  <span>8+ bags is the sweet spot</span>
+                <div className="text-sm font-semibold text-white/75">
+                  Bundle &amp; save • 8+ bags is the sweet spot
                 </div>
               </div>
-              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                <div className="text-sm text-amber-200 font-semibold">
-                  ★★★★★ Verified buyer rating
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-2xl border border-white/15 bg-white/10 p-3">
+                  <div className="text-[10px] uppercase tracking-[0.24em] text-white/60">Best value</div>
+                  <div className="mt-1 text-lg font-black text-white">8 bags</div>
+                  <div className="text-xs text-white/70">{bestValueLine}</div>
                 </div>
+                <div className="rounded-2xl border border-white/15 bg-white/10 p-3">
+                  <div className="text-[10px] uppercase tracking-[0.24em] text-white/60">Free shipping</div>
+                  <div className="mt-1 text-lg font-black text-white">5+ bags</div>
+                  <div className="text-xs text-white/70">{FREE_SHIPPING_PHRASE}</div>
+                </div>
+                <div className="rounded-2xl border border-white/15 bg-white/10 p-3">
+                  <div className="text-[10px] uppercase tracking-[0.24em] text-white/60">Made in USA</div>
+                  <div className="mt-1 text-lg font-black text-white">Dye-free</div>
+                  <div className="text-xs text-white/70">All natural flavors</div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
                 <div id="hero-primary-cta" className="w-full sm:w-auto">
                   <a href="#bundle-pricing" className="btn btn-red w-full sm:w-auto">
                     Build my bundle
                   </a>
                 </div>
-                <div className="text-xs text-white/70">{FREE_SHIPPING_PHRASE}</div>
-                <div className="flex flex-wrap items-center gap-2 text-xs text-white/75">
-                  <span className="rounded-full border border-white/15 bg-white/5 px-3 py-1">
-                    100% Satisfaction Guarantee
-                  </span>
-                  <span className="rounded-full border border-white/15 bg-white/5 px-3 py-1">
-                    50,000+ bags shipped nationwide
-                  </span>
-                </div>
-              </div>
-              <div className="lg:hidden">
-                <div className="usa-hero__frame h-full min-h-[130px] sm:min-h-[180px] rounded-2xl border border-gold-soft">
-                  <Image
-                    src={heroMediaSrc}
-                    alt="USA Gummies hero"
-                    fill
-                    priority
-                    unoptimized
-                    sizes="(max-width: 640px) 90vw, (max-width: 1024px) 60vw, 560px"
-                    className="object-cover hero-media__img"
-                  />
-                  <div className="hero-fade" />
-                </div>
-                {/* hide link on mobile to avoid overlap */}
-                <div className="mt-2">
-                  <Link
-                    href="/products/all-american-gummy-bears-7-5-oz-single-bag"
-                    className="hidden lg:inline-flex text-xs sm:text-sm text-white/65 underline underline-offset-4 hover:text-white focus-ring w-fit"
-                  >
-                    See ingredients & single bag →
-                  </Link>
-                </div>
-              </div>
-              <div className="hidden lg:block">
-                <Link
-                  href="/products/all-american-gummy-bears-7-5-oz-single-bag"
-                  className="text-xs sm:text-sm text-white/65 underline underline-offset-4 hover:text-white focus-ring w-fit inline-flex"
-                >
-                  See ingredients & single bag →
+                <Link href="/shop" className="btn btn-outline-white w-full sm:w-auto">
+                  Shop flavors
                 </Link>
+                <span className="text-xs text-white/70">{FREE_SHIPPING_PHRASE}</span>
               </div>
+
+              <div className="rounded-2xl border border-white/15 bg-white/5 px-4 py-3 flex flex-wrap items-center gap-4">
+                <span className="text-sm font-semibold text-white">★★★★★ Verified buyer reviews</span>
+                <span className="text-xs text-white/70">Real customers. Real bundles.</span>
+              </div>
+
+              <Link
+                href={`/products/${handle}`}
+                className="text-xs sm:text-sm text-white/70 underline underline-offset-4 hover:text-white focus-ring w-fit inline-flex"
+              >
+                See ingredients & single bag →
+              </Link>
             </div>
 
-            <div className="flex flex-col gap-3 lg:gap-5">
-              <div className="relative hidden lg:block">
-                <div className="usa-hero__frame h-full min-h-[230px] lg:min-h-[360px] rounded-2xl border border-gold-soft">
-                  <Image
-                    src={heroMediaSrc}
-                    alt="USA Gummies hero"
-                    fill
-                    priority
-                    unoptimized
-                    sizes="(max-width: 640px) 90vw, (max-width: 1024px) 60vw, 560px"
-                    className="object-cover hero-media__img"
-                  />
-                  <div className="hero-fade" />
+            <div className="space-y-4">
+              <div className="relative">
+                <div className="absolute -top-6 right-6 h-20 w-20 rounded-full bg-[rgba(199,160,98,0.35)] blur-2xl" aria-hidden="true" />
+                <div className="relative rounded-3xl border border-white/20 bg-white/95 p-3 text-[var(--navy)] shadow-[0_30px_70px_rgba(7,12,20,0.35)]">
+                  <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-white/60 bg-white">
+                    <Image
+                      src={heroMediaSrc}
+                      alt="USA Gummies hero"
+                      fill
+                      priority
+                      unoptimized
+                      sizes="(max-width: 640px) 90vw, (max-width: 1024px) 60vw, 520px"
+                      className="object-cover"
+                    />
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 via-black/0 to-transparent p-3">
+                      <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-white/80">
+                        Best seller
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-3 space-y-1">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
+                      Best seller
+                    </div>
+                    <div className="text-lg font-black text-[var(--navy)]">
+                      {title}
+                    </div>
+                    <div className="text-sm text-[var(--muted)]">
+                      From {starterPerBag} / bag • {FREE_SHIPPING_PHRASE}
+                    </div>
+                    {bestValueSavingsPct > 0 ? (
+                      <div className="mt-2 inline-flex items-center rounded-full bg-[var(--navy)]/10 px-3 py-1 text-[11px] font-semibold text-[var(--navy)]">
+                        Save {bestValueSavingsPct}% with 8-bag bundles
+                      </div>
+                    ) : null}
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <span className="badge badge--navy">Made in USA</span>
+                      <span className="badge badge--navy">Dye-free</span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
