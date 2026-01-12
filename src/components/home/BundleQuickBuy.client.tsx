@@ -184,6 +184,7 @@ export default function BundleQuickBuy({
       const isEight = tier.quantity === 8;
       const isTwelve = tier.quantity === 12;
       const canSelect = !unavailable;
+      const showFreeShipping = tier.quantity >= 5;
       const label =
         isEight ? "Best value" : isFive ? "Most popular" : isTwelve ? "Best price" : "";
       return (
@@ -204,6 +205,8 @@ export default function BundleQuickBuy({
             unavailable ? "opacity-60 cursor-not-allowed" : "",
           ].join(" ")}
         >
+          <span className="pointer-events-none absolute inset-0 rounded-2xl border border-white/10" />
+          <span className="pointer-events-none absolute inset-0 rounded-2xl bg-[linear-gradient(180deg,rgba(255,255,255,0.08),transparent_55%)]" />
           {isEight ? (
             <span className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#c7362c] via-[#c7a062] to-[#c7362c] opacity-90" />
           ) : null}
@@ -221,6 +224,11 @@ export default function BundleQuickBuy({
           <div className="text-[11px] text-white/60">
             {displayPerBag || "Standard price"}
           </div>
+          {showFreeShipping ? (
+            <div className="mt-2 inline-flex items-center rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/80">
+              Free shipping
+            </div>
+          ) : null}
         </button>
       );
     }
