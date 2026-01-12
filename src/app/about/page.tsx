@@ -5,10 +5,40 @@ import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { AMAZON_LISTING_URL } from "@/lib/amazon";
 import { FREE_SHIPPING_PHRASE, pricingForQty } from "@/lib/bundles/pricing";
 
+const LISTING_TITLE =
+  "USA Gummies – All American Gummy Bears, 7.5 oz, Made in USA, No Artificial Dyes, All Natural Flavors";
+
+const LISTING_BULLETS = [
+  {
+    title: "MADE IN THE USA",
+    body:
+      "Proudly sourced, manufactured, and packed entirely in America. Supporting local jobs while delivering a better-quality gummy you can trust.",
+  },
+  {
+    title: "NO ARTIFICIAL DYES OR SYNTHETIC COLORS",
+    body:
+      "Colored naturally using real fruit and vegetable extracts. No fake brightness, no artificial dyes.",
+  },
+  {
+    title: "CLASSIC GUMMY BEAR FLAVOR — DONE RIGHT",
+    body:
+      "All the chewy, fruity flavor you expect from a gummy bear, just without artificial ingredients or harsh aftertaste.",
+  },
+  {
+    title: "PERFECT FOR EVERYDAY SNACKING",
+    body:
+      "Great for lunchboxes, desk drawers, road trips, care packages, and guilt-free sweet cravings.",
+  },
+  {
+    title: "7.5 OZ BAG WITH 5 FRUIT FLAVORS",
+    body:
+      "Cherry, Watermelon, Orange, Green Apple, and Lemon. Clearly labeled, honestly made, and easy to share.",
+  },
+];
+
 export const metadata: Metadata = {
-  title: "About USA Gummies | All Natural, Dye-Free, Made in the USA",
-  description:
-    "USA Gummies makes premium gummy bears with all natural flavors, no artificial dyes, and U.S. manufacturing. Bundle pricing saves per bag and 5+ bags ship free. Also available on Amazon.",
+  title: LISTING_TITLE,
+  description: LISTING_TITLE,
 };
 
 function formatMoney(amount: string | number, currency = "USD") {
@@ -78,21 +108,21 @@ export default function AboutPage() {
                   <span className="text-[var(--gold)]">No artificial dyes</span>
                 </div>
 
-                <h1 className="text-4xl font-black leading-[1.05] tracking-tight text-white sm:text-5xl">
-                  Built for people who read labels.
+                <h1 className="text-3xl font-black leading-[1.12] tracking-tight text-white sm:text-4xl lg:text-5xl">
+                  {LISTING_TITLE}
                 </h1>
 
                 <p className="text-sm text-white/80 sm:text-base max-w-prose">
-                  USA Gummies exists for a simple reason: candy should taste incredible
-                  without looking like a science experiment. We make gummy bears with
-                  all natural flavors, no artificial dyes or synthetic colors, and proud
-                  U.S. manufacturing. Classic gummy bear flavor - done right.
+                  {LISTING_BULLETS[0].body}
+                </p>
+                <p className="text-sm text-white/80 sm:text-base max-w-prose">
+                  {LISTING_BULLETS[1].body}
                 </p>
 
                 <div className="flex flex-wrap gap-2">
-                  <Pill>All natural flavors</Pill>
-                  <Pill>Classic gummy bear flavor</Pill>
-                  <Pill>Made in USA</Pill>
+                  <Pill>Made in the USA</Pill>
+                  <Pill>No artificial dyes or synthetic colors</Pill>
+                  <Pill>7.5 oz bag with 5 fruit flavors</Pill>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
@@ -116,7 +146,7 @@ export default function AboutPage() {
                   <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-white/60 bg-white">
                     <Image
                       src="/brand/hero.jpg"
-                      alt="USA Gummies bag"
+                      alt={LISTING_TITLE}
                       fill
                       sizes="(max-width: 768px) 90vw, 460px"
                       className="object-cover"
@@ -124,15 +154,12 @@ export default function AboutPage() {
                   </div>
                   <div className="mt-2 space-y-1">
                     <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
-                      Best seller
-                    </div>
-                    <div className="text-lg font-black text-[var(--navy)]">
-                      USA Gummies - All American Gummy Bears
+                      {LISTING_BULLETS[4].title}
                     </div>
                     <div className="text-sm text-[var(--muted)]">
-                      From {starterPerBag} per bag
+                      {LISTING_BULLETS[4].body}
                     </div>
-                    <div className="flex flex-wrap gap-2 pt-1">
+                    <div className="flex flex-wrap gap-2 pt-2">
                       <span className="badge badge--navy">Made in USA</span>
                       <span className="badge badge--navy">No artificial dyes</span>
                     </div>
@@ -141,25 +168,18 @@ export default function AboutPage() {
               </div>
             </div>
 
-            <div className="mt-6 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div className="text-sm font-semibold text-white">No artificial dyes</div>
-                <div className="mt-1 text-sm text-white/70">
-                  Cleaner ingredients and a clean finish, made for people who care what goes in.
+            <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {LISTING_BULLETS.map((bullet) => (
+                <div
+                  key={bullet.title}
+                  className="rounded-2xl border border-white/10 bg-white/5 p-4"
+                >
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-white/60">
+                    {bullet.title}
+                  </div>
+                  <div className="mt-2 text-sm text-white/75">{bullet.body}</div>
                 </div>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div className="text-sm font-semibold text-white">All natural flavors</div>
-                <div className="mt-1 text-sm text-white/70">
-                  Great taste without the fake, neon vibe. Simple, premium, shareable.
-                </div>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div className="text-sm font-semibold text-white">Made in the USA</div>
-                <div className="mt-1 text-sm text-white/70">
-                  Proudly sourced, manufactured, and packed entirely in America.
-                </div>
-              </div>
+              ))}
             </div>
           </div>
 
@@ -205,10 +225,7 @@ export default function AboutPage() {
               <h2 className="mt-2 text-2xl font-black text-white">
                 Find USA Gummies on Amazon.
               </h2>
-              <p className="mt-2 text-sm text-white/75">
-                Prefer Amazon checkout? We also sell on Amazon for 1-3 bag orders. Same
-                product, same ingredients, same American-made quality.
-              </p>
+              <p className="mt-2 text-sm text-white/75">{LISTING_TITLE}.</p>
               <div className="mt-4 flex flex-wrap gap-3">
                 <a
                   href={AMAZON_LISTING_URL}
@@ -221,84 +238,6 @@ export default function AboutPage() {
                 <Link href="/shop" className="btn btn-red">
                   Shop bundles
                 </Link>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-6 metal-panel rounded-[32px] border border-white/12 p-5 sm:p-6">
-            <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
-              <div className="space-y-3">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/60">
-                  Founder-led, quality-first
-                </div>
-                <h2 className="text-2xl font-black text-white">American-made candy, done right.</h2>
-                <p className="text-white/75">
-                  USA Gummies started with a simple goal: make gummy bears that taste
-                  incredible and feel good to share without artificial dyes. We keep
-                  production close, ingredients clean, and quality consistent.
-                </p>
-                <div className="flex flex-wrap gap-2 text-xs text-white/70">
-                  <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
-                    Made in America
-                  </span>
-                  <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
-                    Small-batch care
-                  </span>
-                  <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
-                    Clean ingredients
-                  </span>
-                </div>
-              </div>
-
-              <div className="rounded-3xl border border-white/20 bg-white/95 p-2 text-[var(--navy)] shadow-[0_22px_60px_rgba(7,12,20,0.35)]">
-                <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-white/60 bg-white">
-                  <Image
-                    src="/home-patriotic-product.jpg"
-                    alt="USA Gummies made in the USA"
-                    fill
-                    sizes="(max-width: 768px) 90vw, 420px"
-                    className="object-cover"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6 grid gap-4 md:grid-cols-2 md:items-center">
-              <div>
-                <h3 className="text-xl font-black text-white">Crafted in America</h3>
-                <p className="mt-2 text-white/75">
-                  USA Gummies are made in the United States with clean ingredients and real,
-                  fruit-forward flavor. No artificial dyes and no weird aftertaste.
-                </p>
-                <p className="mt-2 text-white/75">
-                  We keep the process simple: quality ingredients, consistent texture, and a bag
-                  that is ready for everyday snacking or gifting.
-                </p>
-                <div className="mt-4 flex flex-wrap gap-3">
-                  <Link href="/shop" className="btn btn-red">
-                    Shop bundles
-                  </Link>
-                  <Link href="/contact" className="btn btn-outline-white">
-                    Contact
-                  </Link>
-                </div>
-              </div>
-
-              <div className="rounded-3xl border border-white/20 bg-white/95 p-2 text-[var(--navy)] shadow-[0_22px_60px_rgba(7,12,20,0.35)]">
-                <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-white/60 bg-white">
-                  <Image
-                    src="/brand/hero.jpg"
-                    alt="USA Gummies - all natural flavors, no artificial dyes"
-                    fill
-                    sizes="(max-width: 768px) 90vw, 420px"
-                    className="object-cover"
-                  />
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Pill>All natural flavors</Pill>
-                  <Pill>No artificial dyes</Pill>
-                  <Pill>Made in USA</Pill>
-                </div>
               </div>
             </div>
           </div>
