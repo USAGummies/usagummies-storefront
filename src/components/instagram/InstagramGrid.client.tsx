@@ -82,25 +82,6 @@ export function InstagramGrid({
     <section className="glass p-6">
       <div className="flex items-end justify-between gap-4">
         <div>
-          <div className="flex items-center gap-3">
-            <span
-              className="inline-flex h-5 w-8 items-center justify-center rounded-md border border-white/25 bg-white/10"
-              aria-hidden="true"
-              style={{
-                backgroundImage:
-                  "radial-gradient(rgba(255,255,255,0.9) 1px, transparent 2px)",
-                backgroundSize: "9px 9px",
-              }}
-            />
-            <span
-              className="h-1 w-16 rounded-full border border-white/20"
-              aria-hidden="true"
-              style={{
-                backgroundImage:
-                  "repeating-linear-gradient(90deg, rgba(214,64,58,0.95) 0 10px, rgba(255,255,255,0.95) 10px 20px)",
-              }}
-            />
-          </div>
           <div className="text-xs text-white/60">Follow the road trip</div>
           <h2 className="mt-1 text-2xl font-black">
             @<span className="text-white">{username}</span>

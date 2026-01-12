@@ -26,29 +26,6 @@ function formatMoney(amount: string | number, currency = "USD") {
   }).format(n);
 }
 
-function FlagAccent({ className = "" }: { className?: string }) {
-  return (
-    <div className={`flex items-center gap-3 ${className}`}>
-      <span
-        className="inline-flex h-6 w-9 items-center justify-center rounded-md border border-[rgba(13,28,51,0.2)] bg-[rgba(13,28,51,0.95)] shadow-[0_8px_18px_rgba(13,28,51,0.2)]"
-        aria-hidden="true"
-        style={{
-          backgroundImage: "radial-gradient(rgba(255,255,255,0.9) 1px, transparent 2px)",
-          backgroundSize: "10px 10px",
-        }}
-      />
-      <span
-        className="h-1.5 w-24 rounded-full border border-[rgba(13,28,51,0.12)]"
-        aria-hidden="true"
-        style={{
-          backgroundImage:
-            "repeating-linear-gradient(90deg, rgba(199,54,44,0.95) 0 12px, rgba(255,255,255,0.95) 12px 24px)",
-        }}
-      />
-    </div>
-  );
-}
-
 export default async function HomePage() {
   let productsPage: Awaited<ReturnType<typeof getProductsPage>> | null = null;
   try {
@@ -174,18 +151,8 @@ export default async function HomePage() {
           aria-hidden="true"
           style={{
             backgroundImage:
-              "radial-gradient(rgba(255,255,255,0.18) 1px, transparent 1px), radial-gradient(rgba(255,255,255,0.08) 1px, transparent 1px)",
-            backgroundSize: "120px 120px, 220px 220px",
-            backgroundPosition: "0 0, 30px 40px",
-            opacity: 0.35,
-          }}
-        />
-        <div
-          className="absolute left-6 top-8 hidden h-20 w-32 rounded-2xl border border-white/25 bg-[rgba(13,28,51,0.75)] shadow-[0_18px_40px_rgba(0,0,0,0.35)] sm:block"
-          aria-hidden="true"
-          style={{
-            backgroundImage: "radial-gradient(rgba(255,255,255,0.9) 1px, transparent 2px)",
-            backgroundSize: "14px 14px",
+              "radial-gradient(circle at 20% 20%, rgba(255,255,255,0.08), transparent 45%), radial-gradient(circle at 80% 0%, rgba(255,255,255,0.06), transparent 40%)",
+            opacity: 0.4,
           }}
         />
         <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[rgba(199,54,44,0.28)] blur-3xl" aria-hidden="true" />
@@ -202,14 +169,6 @@ export default async function HomePage() {
                 <h1 className="text-3xl font-black leading-[1.02] tracking-tight text-white sm:text-5xl lg:text-6xl">
                   Dye-Free Gummy Bears — Made in the USA.
                 </h1>
-                <div
-                  className="h-2 w-28 rounded-full border border-white/60 shadow-[0_10px_24px_rgba(0,0,0,0.35)]"
-                  aria-hidden="true"
-                  style={{
-                    backgroundImage:
-                      "repeating-linear-gradient(90deg, rgba(199,54,44,1) 0 12px, rgba(255,255,255,0.95) 12px 24px)",
-                  }}
-                />
                 <p className="text-sm text-white/80 sm:text-base max-w-prose">
                   All-natural flavors. No artificial dyes. Build a bundle to save more —{" "}
                   {FREE_SHIPPING_PHRASE}.
@@ -249,28 +208,9 @@ export default async function HomePage() {
                 <span className="text-xs text-white/70">{FREE_SHIPPING_PHRASE}</span>
               </div>
 
-              <div className="relative overflow-hidden rounded-2xl border border-white/15 bg-white/5 px-4 py-3">
-                <div
-                  className="absolute inset-0 opacity-35"
-                  aria-hidden="true"
-                  style={{
-                    backgroundImage:
-                      "repeating-linear-gradient(90deg, rgba(199,54,44,0.55) 0 18px, rgba(255,255,255,0.35) 18px 36px)",
-                  }}
-                />
-                <div className="relative flex flex-wrap items-center gap-4">
-                  <span
-                    className="hidden sm:inline-flex h-6 w-9 items-center justify-center rounded-md border border-white/30 bg-[rgba(13,28,51,0.65)] shadow-[0_8px_18px_rgba(0,0,0,0.3)]"
-                    aria-hidden="true"
-                    style={{
-                      backgroundImage:
-                        "radial-gradient(rgba(255,255,255,0.9) 1px, transparent 2px)",
-                      backgroundSize: "10px 10px",
-                    }}
-                  />
-                  <span className="text-sm font-semibold text-white">★★★★★ Verified buyer reviews</span>
-                  <span className="text-xs text-white/70">Real customers. Real bundles.</span>
-                </div>
+              <div className="rounded-2xl border border-white/15 bg-white/5 px-4 py-3 flex flex-wrap items-center gap-4">
+                <span className="text-sm font-semibold text-white">★★★★★ Verified buyer reviews</span>
+                <span className="text-xs text-white/70">Real customers. Real bundles.</span>
               </div>
 
               <Link
@@ -282,14 +222,6 @@ export default async function HomePage() {
             </div>
 
             <div className="relative space-y-4">
-              <div
-                className="pointer-events-none absolute -right-6 top-6 hidden h-[86%] w-28 rounded-[32px] border border-white/20 opacity-55 shadow-[0_20px_40px_rgba(0,0,0,0.25)] lg:block"
-                aria-hidden="true"
-                style={{
-                  backgroundImage:
-                    "repeating-linear-gradient(180deg, rgba(199,54,44,0.9) 0 16px, rgba(255,255,255,0.85) 16px 32px)",
-                }}
-              />
               <div className="relative">
                 <div className="absolute -top-6 right-6 h-20 w-20 rounded-full bg-[rgba(199,54,44,0.25)] blur-2xl" aria-hidden="true" />
                 <div className="relative rounded-3xl border border-white/20 bg-white/95 p-3 text-[var(--navy)] shadow-[0_30px_70px_rgba(7,12,20,0.35)]">
@@ -351,19 +283,8 @@ export default async function HomePage() {
           aria-hidden="true"
           style={{
             backgroundImage:
-              "radial-gradient(rgba(255,255,255,0.12) 1px, transparent 1px), radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px)",
-            backgroundSize: "140px 140px, 240px 240px",
-            backgroundPosition: "20px 30px, 70px 90px",
-            opacity: 0.28,
-          }}
-        />
-        <div
-          className="pointer-events-none absolute inset-x-0 bottom-0 h-4"
-          aria-hidden="true"
-          style={{
-            backgroundImage:
-              "repeating-linear-gradient(90deg, rgba(199,54,44,0.95) 0 16px, rgba(255,255,255,0.9) 16px 32px)",
-            boxShadow: "0 -1px 0 rgba(13,28,51,0.55)",
+              "radial-gradient(circle at 18% 10%, rgba(255,255,255,0.08), transparent 45%), radial-gradient(circle at 90% 0%, rgba(255,255,255,0.05), transparent 38%)",
+            opacity: 0.3,
           }}
         />
         <div className="relative mx-auto max-w-6xl px-4 py-7 lg:py-10 reveal-up">
@@ -374,18 +295,9 @@ export default async function HomePage() {
       <section className="bg-[var(--bg)]">
         <div className="mx-auto max-w-6xl px-4 py-6 lg:py-10 reveal-up">
           <div className="relative overflow-hidden rounded-[32px] border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[0_20px_54px_rgba(15,27,45,0.12)] sm:p-8">
-            <div
-              className="pointer-events-none absolute inset-x-0 top-0 h-1.5"
-              aria-hidden="true"
-              style={{
-                backgroundImage:
-                  "repeating-linear-gradient(90deg, rgba(199,54,44,0.9) 0 14px, rgba(255,255,255,0.95) 14px 28px)",
-              }}
-            />
             <div className="relative space-y-6">
               <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
                 <div className="space-y-4">
-                  <FlagAccent />
                   <div className="space-y-2">
                     <h2 className="text-3xl font-black text-[var(--text)] sm:text-4xl">
                       Why USA Gummies matters.
@@ -462,14 +374,6 @@ export default async function HomePage() {
                     key={card.title}
                     className="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-4 shadow-[0_14px_32px_rgba(15,27,45,0.12)] transition-transform duration-200 hover:-translate-y-1"
                   >
-                    <div
-                      className="pointer-events-none absolute inset-x-0 top-0 h-1.5"
-                      aria-hidden="true"
-                      style={{
-                        backgroundImage:
-                          "repeating-linear-gradient(90deg, rgba(199,54,44,0.85) 0 12px, rgba(255,255,255,0.95) 12px 24px)",
-                      }}
-                    />
                     <div className="flex items-center gap-3">
                       <div className="icon-float flex h-10 w-10 items-center justify-center rounded-full bg-[rgba(13,28,51,0.06)]">
                         {card.icon}
@@ -494,16 +398,7 @@ export default async function HomePage() {
       <section className="bg-[var(--bg)]">
         <div className="mx-auto max-w-6xl px-4 py-5 lg:py-8 reveal-up">
           <div className="relative overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[0_18px_48px_rgba(15,27,45,0.12)]">
-            <div
-              className="pointer-events-none absolute inset-x-0 top-0 h-1.5"
-              aria-hidden="true"
-              style={{
-                backgroundImage:
-                  "repeating-linear-gradient(90deg, rgba(199,54,44,0.9) 0 14px, rgba(255,255,255,0.95) 14px 28px)",
-              }}
-            />
             <div className="relative space-y-3">
-              <FlagAccent />
               <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
                 Get updates
               </div>

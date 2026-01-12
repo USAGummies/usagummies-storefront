@@ -93,37 +93,6 @@ function VerifiedBadge({ source }: { source: ReviewSource }) {
   );
 }
 
-function StarFieldOverlay() {
-  return (
-    <div
-      className="pointer-events-none absolute inset-0 opacity-[0.12]"
-      style={{
-        backgroundImage:
-          "radial-gradient(circle, rgba(255,255,255,0.26) 1px, transparent 1px)",
-        backgroundSize: "20px 20px",
-        backgroundPosition: "4px 8px",
-        maskImage: "radial-gradient(circle at 18% 12%, black 0%, transparent 62%)",
-        WebkitMaskImage:
-          "radial-gradient(circle at 18% 12%, black 0%, transparent 62%)",
-      }}
-    />
-  );
-}
-
-function CardTopEdge() {
-  return (
-    <div className="pointer-events-none absolute left-0 right-0 top-0 h-1 overflow-hidden">
-      <div
-        className="h-full w-full opacity-[0.7]"
-        style={{
-          backgroundImage:
-            "repeating-linear-gradient(90deg, rgba(214,64,58,0.95) 0 14px, rgba(255,255,255,0.95) 14px 28px)",
-        }}
-      />
-    </div>
-  );
-}
-
 function CardShell({
   children,
   className,
@@ -156,7 +125,6 @@ function CardShell({
         className
       )}
     >
-      <CardTopEdge />
       <div
         className="pointer-events-none absolute inset-0"
         style={{
@@ -176,29 +144,6 @@ function CardShell({
         />
       ) : null}
       <div className="relative z-10">{children}</div>
-    </div>
-  );
-}
-
-function FlagAccent({ className }: { className?: string }) {
-  return (
-    <div className={clsx("flex items-center gap-3", className)}>
-      <span
-        className="inline-flex h-6 w-9 items-center justify-center rounded-md border border-white/25 bg-white/10"
-        aria-hidden="true"
-        style={{
-          backgroundImage: "radial-gradient(rgba(255,255,255,0.9) 1px, transparent 2px)",
-          backgroundSize: "10px 10px",
-        }}
-      />
-      <span
-        className="h-1.5 w-24 rounded-full border border-white/20"
-        aria-hidden="true"
-        style={{
-          backgroundImage:
-            "repeating-linear-gradient(90deg, rgba(214,64,58,0.95) 0 12px, rgba(255,255,255,0.95) 12px 24px)",
-        }}
-      />
     </div>
   );
 }
@@ -482,12 +427,8 @@ export default function ReviewsSectionClient({ reviews }: Props) {
     <section className="relative mx-auto max-w-6xl px-4 py-12 sm:py-14">
       <div className="relative overflow-hidden rounded-[34px] border border-white/10 bg-white/[0.05] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.45)] backdrop-blur-2xl sm:p-8">
         <div
-          className="pointer-events-none absolute inset-x-0 top-0 h-1.5"
+          className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/15"
           aria-hidden="true"
-          style={{
-            backgroundImage:
-              "repeating-linear-gradient(90deg, rgba(214,64,58,0.9) 0 14px, rgba(255,255,255,0.95) 14px 28px)",
-          }}
         />
         <div
           className="pointer-events-none absolute inset-0"
@@ -499,10 +440,8 @@ export default function ReviewsSectionClient({ reviews }: Props) {
             ].join(","),
           }}
         />
-        <StarFieldOverlay />
         <div className="relative z-10 space-y-6">
           <div className="space-y-4">
-            <FlagAccent />
             <div className="flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-[0.2em] text-white/75">
               <Stars rating={avg || 5} size="md" />
               <span>
