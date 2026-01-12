@@ -9,11 +9,12 @@ import { InstagramGrid } from "@/components/instagram/InstagramGrid.client";
 import { getBundleVariants } from "@/lib/bundles/getBundleVariants";
 import { FREE_SHIPPING_PHRASE, pricingForQty } from "@/lib/bundles/pricing";
 import HeroCTAWatcher from "@/components/home/HeroCTAWatcher";
+import { AMAZON_LISTING_URL } from "@/lib/amazon";
 
 export const metadata: Metadata = {
-  title: "USA Gummies | American-Made Clean Gummies",
+  title: "USA Gummies | All American Gummy Bears",
   description:
-    "Premium American-made gummy bears with clean ingredients and no dyes. Free shipping on 5+ bags.",
+    "USA Gummies - All American Gummy Bears, made in the USA with no artificial dyes or synthetic colors and all natural flavors.",
 };
 
 function formatMoney(amount: string | number, currency = "USD") {
@@ -50,7 +51,7 @@ export default async function HomePage() {
   const title =
     detailedProduct?.title?.toString?.() ||
     product?.title?.toString?.() ||
-    "All American Gummy Bears – 7.5 oz bag";
+    "All American Gummy Bears - 7.5 oz bag";
 
   const heroMediaSrc = "/hero-loop.gif";
   const starterPricing = pricingForQty(1);
@@ -78,13 +79,13 @@ export default async function HomePage() {
   }
 
   const homepageTiers = (bundleVariants?.variants || []).filter((t) =>
-    [1, 2, 3, 4, 5, 8, 12].includes(t.quantity)
+    [5, 8, 12].includes(t.quantity)
   );
 
   const whyCards = [
     {
-      title: "American-made craft",
-      copy: "Built in the USA with clean ingredients and tight quality control.",
+      title: "Made in the USA",
+      copy: "Proudly sourced, manufactured, and packed entirely in America.",
       icon: (
         <svg viewBox="0 0 24 24" className="h-6 w-6 text-[var(--gold)]" aria-hidden="true">
           <path
@@ -95,8 +96,8 @@ export default async function HomePage() {
       ),
     },
     {
-      title: "Clean, dye-free",
-      copy: "All-natural flavors with no artificial dyes or neon aftertaste.",
+      title: "No artificial dyes",
+      copy: "Colored naturally using real fruit and vegetable extracts.",
       icon: (
         <svg viewBox="0 0 24 24" className="h-6 w-6 text-[var(--gold)]" aria-hidden="true">
           <path
@@ -107,8 +108,8 @@ export default async function HomePage() {
       ),
     },
     {
-      title: "Bundle value",
-      copy: `Save more as you add bags. ${FREE_SHIPPING_PHRASE}.`,
+      title: "Classic gummy bear flavor",
+      copy: "Chewy, fruity flavor without artificial ingredients or harsh aftertaste.",
       icon: (
         <svg viewBox="0 0 24 24" className="h-6 w-6 text-[var(--gold)]" aria-hidden="true">
           <path
@@ -122,21 +123,21 @@ export default async function HomePage() {
   const checkoutSteps = [
     {
       title: "Pick your bundle",
-      copy: `${FREE_SHIPPING_PHRASE}. 8 bags is the sweet spot.`,
+      copy: `Choose 5, 8, or 12 bags. ${FREE_SHIPPING_PHRASE}.`,
     },
     {
-      title: "Choose your flavors",
-      copy: "Mix and match your favorites for a bundle that feels custom.",
+      title: "Classic gummy bear flavor — done right",
+      copy: "All natural flavors. No artificial dyes or synthetic colors.",
     },
     {
-      title: "Checkout fast",
-      copy: "Add once, ship fast, and stock up without the chaos.",
+      title: "Made in the USA",
+      copy: "Proudly sourced, manufactured, and packed entirely in America.",
     },
   ];
 
   return (
     <main
-      className="relative overflow-hidden bg-[var(--navy)] text-white min-h-screen pb-16 lg:pb-0"
+      className="relative overflow-hidden bg-[var(--navy)] text-white min-h-screen pb-16 lg:pb-0 home-metal"
       style={{ backgroundColor: "var(--navy, #0d1c33)", color: "#ffffff" }}
     >
       <section
@@ -161,18 +162,24 @@ export default async function HomePage() {
           <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
             <div className="space-y-5">
               <div className="flex flex-wrap items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.32em] text-white/70 sm:text-xs">
-                <span className="rounded-full border border-white/20 bg-white/5 px-3 py-1">American-made gummies</span>
-                <span className="text-[var(--gold)]">Fan-favorite</span>
+                <span className="rounded-full border border-white/20 bg-white/5 px-3 py-1">Made in the USA</span>
+                <span className="text-[var(--gold)]">No artificial dyes</span>
               </div>
 
               <div className="space-y-2">
                 <h1 className="text-4xl font-black leading-[1.02] tracking-tight text-white sm:text-5xl lg:text-6xl">
-                  Dye-Free Gummy Bears — Made in the USA.
+                  USA Gummies — All American Gummy Bears.
                 </h1>
+                <div className="font-script text-[var(--gold)] text-2xl sm:text-3xl">
+                  Made in the U.S.A.
+                </div>
                 <p className="text-sm text-white/80 sm:text-base max-w-prose">
-                  All-natural flavors. No artificial dyes. Build a bundle to save more —{" "}
-                  {FREE_SHIPPING_PHRASE}.
+                  No artificial dyes or synthetic colors. All natural flavors. Classic gummy bear
+                  flavor — done right.
                 </p>
+                <div className="text-xs text-white/65">
+                  7.5 oz bag with 5 fruit flavors: cherry, watermelon, orange, green apple, lemon.
+                </div>
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
@@ -181,13 +188,15 @@ export default async function HomePage() {
                     Build my bundle
                   </a>
                 </div>
-                <span className="text-xs text-white/70">{FREE_SHIPPING_PHRASE}</span>
-                <Link
-                  href="/shop"
-                  className="text-xs font-semibold text-white/80 underline underline-offset-4 hover:text-white focus-ring"
+                <a
+                  href={AMAZON_LISTING_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-outline-white w-full sm:w-auto"
                 >
-                  Shop flavors
-                </Link>
+                  Buy 1-3 bags on Amazon
+                </a>
+                <span className="text-xs text-white/70">{FREE_SHIPPING_PHRASE}</span>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-3">
@@ -205,7 +214,7 @@ export default async function HomePage() {
                 ))}
               </div>
 
-              <div className="rounded-3xl border border-white/12 bg-white/5 p-4">
+              <div className="metal-panel rounded-3xl border border-white/12 p-4">
                 <div className="grid gap-3 sm:grid-cols-3">
                   <div className="space-y-1">
                     <div className="text-[10px] uppercase tracking-[0.24em] text-white/60">Best value</div>
@@ -218,33 +227,35 @@ export default async function HomePage() {
                     <div className="text-[11px] text-white/70">{FREE_SHIPPING_PHRASE}</div>
                   </div>
                   <div className="space-y-1 sm:border-l sm:border-white/10 sm:pl-4">
-                    <div className="text-[10px] uppercase tracking-[0.24em] text-white/60">Made in USA</div>
-                    <div className="text-base font-black text-white">Dye-free</div>
-                    <div className="text-[11px] text-white/70">All natural flavors</div>
+                    <div className="text-[10px] uppercase tracking-[0.24em] text-white/60">No artificial dyes</div>
+                    <div className="text-base font-black text-white">All natural flavors</div>
+                    <div className="text-[11px] text-white/70">Colored with fruit + vegetable extracts</div>
                   </div>
                 </div>
               </div>
 
               <div className="flex flex-wrap items-center gap-3 text-xs text-white/70">
                 <span className="font-semibold text-white">★★★★★ Verified buyer reviews</span>
-                <span>Real customers. Real bundles.</span>
-                <Link
-                  href={`/products/${handle}`}
+                <span>Also available on Amazon</span>
+                <a
+                  href={AMAZON_LISTING_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="text-xs text-white/70 underline underline-offset-4 hover:text-white focus-ring"
                 >
-                  Ingredients &amp; single bag
-                </Link>
+                  View Amazon listing →
+                </a>
               </div>
             </div>
 
             <div className="relative">
-              <div className="rounded-[36px] border border-[rgba(199,54,44,0.35)] bg-[rgba(255,255,255,0.04)] p-3 shadow-[0_28px_80px_rgba(7,12,20,0.5)]">
+              <div className="metal-panel rounded-[36px] border border-[rgba(199,54,44,0.35)] p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-[0.3em] text-white/60">
                   <span>Build your bundle</span>
-                  <span className="text-[var(--gold)]">Best seller</span>
+                  <span className="text-[var(--gold)]">5 • 8 • 12 bags</span>
                 </div>
                 <div className="mt-3 space-y-3">
-                  <div className="rounded-[28px] border border-white/10 bg-white/5 p-2">
+                  <div className="bundle-home rounded-[28px] border border-white/10 bg-white/5 p-2">
                     <BundleQuickBuy
                       anchorId="bundle-pricing"
                       productHandle={handle}
@@ -291,7 +302,7 @@ export default async function HomePage() {
                         ) : null}
                         <div className="flex flex-wrap gap-2 pt-1">
                           <span className="badge badge--navy">Made in USA</span>
-                          <span className="badge badge--navy">Dye-free</span>
+                          <span className="badge badge--navy">No artificial dyes</span>
                         </div>
                       </div>
                     </div>
@@ -320,7 +331,7 @@ export default async function HomePage() {
 
       <section className="bg-[var(--navy)]">
         <div className="mx-auto max-w-6xl px-4 py-8 lg:py-10 reveal-up">
-          <div className="relative overflow-hidden rounded-[36px] border border-[rgba(199,54,44,0.25)] bg-[rgba(255,255,255,0.04)] p-5 shadow-[0_26px_70px_rgba(7,12,20,0.45)] sm:p-6">
+          <div className="metal-panel relative overflow-hidden rounded-[36px] border border-[rgba(199,54,44,0.25)] p-5 sm:p-6">
             <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
               <div className="space-y-4">
                 <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-white/60">
@@ -330,20 +341,30 @@ export default async function HomePage() {
                   Why USA Gummies matters.
                 </h2>
                 <p className="text-sm text-white/75 sm:text-base">
-                  We’re building the clean, American-made gummy bear you can feel proud to
-                  share. No artificial dyes. No gimmicks. Just bold flavor, crafted in the USA,
-                  with bundle pricing that rewards the big move.
+                  Proudly sourced, manufactured, and packed entirely in America. No artificial
+                  dyes or synthetic colors. Classic gummy bear flavor — done right.
+                </p>
+                <p className="text-xs text-white/65">
+                  7.5 oz bag with 5 fruit flavors: cherry, watermelon, orange, green apple, lemon.
                 </p>
                 <div className="flex flex-wrap items-center gap-3">
                   <a href="#bundle-pricing" className="btn btn-red">
                     Build my bundle
                   </a>
-                  <Link href="/shop" className="btn btn-outline-white">
-                    Shop flavors
+                  <a
+                    href={AMAZON_LISTING_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn-outline-white"
+                  >
+                    Buy 1-3 bags on Amazon
+                  </a>
+                  <Link
+                    href={`/products/${handle}`}
+                    className="text-xs font-semibold text-white/70 underline underline-offset-4 hover:text-white focus-ring"
+                  >
+                    View product details →
                   </Link>
-                  <span className="text-xs font-semibold text-white/70">
-                    {FREE_SHIPPING_PHRASE}
-                  </span>
                 </div>
               </div>
 
@@ -365,14 +386,14 @@ export default async function HomePage() {
                   </div>
                   <div className="mt-2 space-y-2">
                     <div className="text-base font-black text-[var(--navy)]">
-                      Clean ingredients. Bold flavor. Built for bundles.
+                      Classic gummy bear flavor — done right.
                     </div>
                     <div className="text-xs text-[var(--muted)]">
-                      American-made gummies with clean ingredients and honest bundle savings.
+                      All the chewy, fruity flavor you expect, without artificial dyes or harsh aftertaste.
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <span className="badge badge--navy">Dye-free</span>
-                      <span className="badge badge--navy">All natural flavors</span>
+                      <span className="badge badge--navy">Made in USA</span>
+                      <span className="badge badge--navy">No artificial dyes</span>
                       <span className="badge badge--navy">{FREE_SHIPPING_PHRASE}</span>
                     </div>
                   </div>
@@ -404,14 +425,14 @@ export default async function HomePage() {
         <div className="mx-auto max-w-6xl px-4 py-8 lg:py-10 reveal-up">
           <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
             <InstagramGrid username="usagummies" limit={8} />
-            <div className="relative overflow-hidden rounded-[32px] border border-[rgba(199,54,44,0.3)] bg-[rgba(255,255,255,0.04)] p-5 shadow-[0_22px_60px_rgba(7,12,20,0.45)] text-white">
+            <div className="metal-panel relative overflow-hidden rounded-[32px] border border-[rgba(199,54,44,0.3)] p-5 text-white">
               <div className="space-y-3">
                 <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-white/60">
                   Get updates
                 </div>
                 <h3 className="text-2xl font-black text-white">Unlock early access + bundle-only drops</h3>
                 <p className="text-sm text-white/70">
-                  First dibs on limited flavors, restocks, and member-only bundle alerts.
+                  First dibs on limited drops, restocks, and member-only bundle alerts.
                 </p>
                 <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-semibold text-white/80 w-fit">
                   VIP early access • limited-batch alerts
@@ -437,6 +458,25 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      <div className="sticky-cta-bar fixed bottom-4 left-1/2 z-40 hidden w-[min(94vw,680px)] -translate-x-1/2 translate-y-4 opacity-0 transition-all duration-300">
+        <div className="metal-panel flex flex-wrap items-center justify-between gap-3 rounded-full border border-white/15 px-3 py-2 backdrop-blur-md">
+          <div className="hidden text-[10px] font-semibold uppercase tracking-[0.3em] text-white/70 sm:block">
+            Bundle &amp; save
+          </div>
+          <a href="#bundle-pricing" className="btn btn-red w-full sm:w-auto">
+            Build my bundle
+          </a>
+          <a
+            href={AMAZON_LISTING_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs font-semibold text-white/80 underline underline-offset-4 hover:text-white"
+          >
+            Buy 1-3 bags on Amazon →
+          </a>
+        </div>
+      </div>
 
       <HeroCTAWatcher />
     </main>

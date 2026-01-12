@@ -9,6 +9,7 @@ import AddBagButton from "@/components/cart/AddBagButton.client";
 import { PatriotRibbon } from "@/components/ui/PatriotRibbon";
 import { cn } from "@/lib/cn";
 import { pricingForQty, FREE_SHIP_QTY, FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
+import { AMAZON_LISTING_URL } from "@/lib/amazon";
 
 type MoneyV2 = { amount: string; currencyCode: string };
 
@@ -231,6 +232,23 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
           </Link>
         </div>
       </div>
+
+      {totalBags > 0 && totalBags <= 3 ? (
+        <div className="glass-card p-4">
+          <div className="kicker">Also on Amazon</div>
+          <div className="mt-1 text-sm text-[var(--text)]">
+            Prefer 1-3 bags? Buy from our official Amazon listing for full product details.
+          </div>
+          <a
+            href={AMAZON_LISTING_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-2 inline-flex items-center gap-2 text-sm font-semibold text-[var(--navy)] underline underline-offset-4 hover:text-[var(--text)]"
+          >
+            View Amazon listing →
+          </a>
+        </div>
+      ) : null}
 
       <div className="glass-card p-4">
         <div className="kicker">Pro tip</div>

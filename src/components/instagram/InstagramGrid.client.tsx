@@ -79,17 +79,17 @@ export function InstagramGrid({
   const usingFallback = items.length === 0;
 
   return (
-    <section className="rounded-[32px] border border-[rgba(199,54,44,0.3)] bg-[rgba(255,255,255,0.04)] p-5 shadow-[0_22px_60px_rgba(7,12,20,0.45)] text-white sm:p-6">
+    <section className="metal-panel rounded-[32px] border border-[rgba(199,54,44,0.3)] p-5 text-white sm:p-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-white/60">
-            Follow the road trip
+            Made in the USA
           </div>
           <h2 className="mt-1 text-2xl font-black text-white">
             @{username}
           </h2>
           <div className="mt-2 text-sm text-white/70">
-            Real America. Real gummies. No influencer nonsense.
+            No artificial dyes or synthetic colors. Classic gummy bear flavor — done right.
           </div>
         </div>
         <Link

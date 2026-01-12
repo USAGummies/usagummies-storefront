@@ -25,6 +25,11 @@
   --pill: rgba(13, 28, 51, 0.06);
   --pill-border: rgba(13, 28, 51, 0.18);
   --pill-strong: rgba(199, 54, 44, 0.12);
+  --metal-dark: #0b1428;
+  --metal-ink: #0f1b36;
+  --metal-sheen: rgba(255, 255, 255, 0.08);
+  --metal-warm: rgba(199, 160, 98, 0.18);
+  --metal-red: rgba(199, 54, 44, 0.18);
   color-scheme: light;
   --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
   --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
@@ -59,6 +64,33 @@ h3,
 .font-display {
   font-family: var(--font-display, var(--font-sans, system-ui, -apple-system, sans-serif));
   letter-spacing: -0.02em;
+}
+.font-script{
+  font-family: var(--font-script, cursive);
+  letter-spacing: 0;
+}
+
+.home-metal{
+  background-color: var(--metal-dark);
+  background-image:
+    radial-gradient(circle at 12% 12%, rgba(255,255,255,0.08), transparent 40%),
+    radial-gradient(circle at 85% 0%, rgba(199,160,98,0.18), transparent 38%),
+    linear-gradient(180deg, #0c152b 0%, #0a1327 55%, #081022 100%),
+    repeating-linear-gradient(120deg, rgba(255,255,255,0.025) 0 1px, rgba(0,0,0,0.03) 1px 2px);
+}
+
+.metal-panel{
+  background-color: rgba(255,255,255,0.03);
+  background-image:
+    linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02) 45%, rgba(199,160,98,0.12) 100%),
+    repeating-linear-gradient(120deg, rgba(255,255,255,0.035) 0 2px, rgba(0,0,0,0.03) 2px 4px);
+  box-shadow: 0 24px 70px rgba(7, 12, 20, 0.45);
+}
+.metal-panel--light{
+  background-color: rgba(255,255,255,0.08);
+  background-image:
+    linear-gradient(135deg, rgba(255,255,255,0.35), rgba(255,255,255,0.12) 45%, rgba(199,160,98,0.2) 100%),
+    repeating-linear-gradient(120deg, rgba(255,255,255,0.05) 0 2px, rgba(0,0,0,0.03) 2px 4px);
 }
 
 a {
@@ -378,6 +410,26 @@ a:hover {
 .bundle-slider{
   -webkit-mask-image: linear-gradient(90deg, transparent 0%, black 8%, black 92%, transparent 100%);
   mask-image: linear-gradient(90deg, transparent 0%, black 8%, black 92%, transparent 100%);
+}
+.bundle-home .bundle-slider{
+  overflow-x: visible;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-right: 0;
+  -webkit-mask-image: none;
+  mask-image: none;
+  scroll-snap-type: none;
+}
+.bundle-home{
+  overflow-x: hidden;
+}
+.bundle-home .bundle-slider > *{
+  min-width: 0;
+  flex: 1 1 160px;
+  scroll-snap-align: none;
+}
+.bundle-home a[href*="focus=bundles"]{
+  display: none;
 }
 
 .reveal-up{

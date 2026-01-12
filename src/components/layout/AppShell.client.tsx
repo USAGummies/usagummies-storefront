@@ -102,7 +102,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               />
             </div>
             <span className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--navy)]">
-              🇺🇸 American-made
+              🇺🇸 Made in the USA
             </span>
           </Link>
 
@@ -204,8 +204,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div className="space-y-2">
               <div className="text-lg font-black text-[var(--text)]">USA Gummies</div>
               <ul className="space-y-1 text-[var(--muted)]">
-                <li>🇺🇸 American-made • Bold flavor</li>
-                <li>✅ Dye-free • All natural</li>
+                <li>🇺🇸 Made in the USA • Classic gummy bear flavor</li>
+                <li>✅ No artificial dyes • All natural flavors</li>
                 <li>🚚 Ships fast • Bundle &amp; save</li>
               </ul>
             </div>

@@ -26,9 +26,9 @@ type Props = {
 type Mention = { key: string; label: string; keywords: string[]; count: number };
 
 const MENTION_PRESETS: Mention[] = [
-  { key: "flavor", label: "Bold flavor", keywords: ["flavor", "taste"], count: 0 },
+  { key: "flavor", label: "Classic gummy bear flavor", keywords: ["flavor", "taste"], count: 0 },
   { key: "aftertaste", label: "No weird aftertaste", keywords: ["aftertaste"], count: 0 },
-  { key: "dye", label: "Dye-free", keywords: ["dye", "artificial"], count: 0 },
+  { key: "dye", label: "No artificial dyes", keywords: ["dye", "artificial"], count: 0 },
   { key: "texture", label: "Great texture", keywords: ["texture", "chew", "chewy"], count: 0 },
   { key: "usa", label: "Made in USA", keywords: ["usa", "american"], count: 0 },
   { key: "gift", label: "Giftable", keywords: ["gift"], count: 0 },
@@ -37,7 +37,7 @@ const MENTION_PRESETS: Mention[] = [
 const CTA_LINK =
   "/products/all-american-gummy-bears-7-5-oz-single-bag?focus=bundles&bundle=5";
 
-const MAX_SUPPORTING = 8;
+const MAX_SUPPORTING = 6;
 
 function clsx(...a: Array<string | false | null | undefined>) {
   return a.filter(Boolean).join(" ");
@@ -189,13 +189,6 @@ function computeMentions(reviews: Review[]) {
   return top.length ? top : merged.slice(0, 6);
 }
 
-function swipeHintClass(show: boolean) {
-  return clsx(
-    "text-xs font-semibold text-white/70 transition-opacity duration-200",
-    show ? "opacity-100" : "opacity-0"
-  );
-}
-
 export default function ReviewsSectionClient({ reviews }: Props) {
   // Deduping: composite key, prefer shopify over legacy
   const deduped = React.useMemo(() => {
@@ -236,10 +229,6 @@ export default function ReviewsSectionClient({ reviews }: Props) {
   const [sort, setSort] = React.useState<"newest" | "helpful">("newest");
   const [query, setQuery] = React.useState("");
   const [expanded, setExpanded] = React.useState<Record<string, boolean>>({});
-  const [hasSwiped, setHasSwiped] = React.useState(false);
-  const carouselRef = React.useRef<HTMLDivElement | null>(null);
-  const [carouselIndex, setCarouselIndex] = React.useState(0);
-
   const modalRef = React.useRef<HTMLDivElement | null>(null);
   const closeBtnRef = React.useRef<HTMLButtonElement | null>(null);
   const triggerRef = React.useRef<HTMLButtonElement | null>(null);
@@ -254,35 +243,6 @@ export default function ReviewsSectionClient({ reviews }: Props) {
       };
     }
   }, [modalOpen]);
-
-  // Throttled carousel index via rAF
-  React.useEffect(() => {
-    const el = carouselRef.current;
-    if (!el) return;
-    let frame = 0;
-    const handler = () => {
-      if (frame) return;
-      frame = requestAnimationFrame(() => {
-        frame = 0;
-        setHasSwiped(true);
-        const children = Array.from(el.children);
-        const scrollLeft = el.scrollLeft;
-        const widths = children.map((c) => (c as HTMLElement).offsetWidth + 12);
-        let acc = 0;
-        let idx = 0;
-        for (let i = 0; i < widths.length; i++) {
-          if (scrollLeft + 16 >= acc) idx = i;
-          acc += widths[i];
-        }
-        setCarouselIndex(idx);
-      });
-    };
-    el.addEventListener("scroll", handler, { passive: true });
-    return () => {
-      if (frame) cancelAnimationFrame(frame);
-      el.removeEventListener("scroll", handler);
-    };
-  }, []);
 
   const filteredList = React.useMemo(() => {
     let list = [...verified];
@@ -356,17 +316,6 @@ export default function ReviewsSectionClient({ reviews }: Props) {
     if (e.target === e.currentTarget) closeModal();
   };
 
-  const scrollToCard = (index: number) => {
-    const el = carouselRef.current;
-    if (!el) return;
-    const child = el.children[index] as HTMLElement | undefined;
-    if (child) {
-      child.scrollIntoView({ behavior: "smooth", inline: "start" });
-      setCarouselIndex(index);
-      setHasSwiped(true);
-    }
-  };
-
   const keyActivate = (action?: () => void) => (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
@@ -424,7 +373,7 @@ export default function ReviewsSectionClient({ reviews }: Props) {
 
   return (
     <section className="relative">
-      <div className="relative overflow-hidden rounded-[36px] border border-[rgba(199,54,44,0.3)] bg-[rgba(255,255,255,0.04)] p-5 shadow-[0_26px_80px_rgba(7,12,20,0.5)] sm:p-6">
+      <div className="metal-panel relative overflow-hidden rounded-[36px] border border-[rgba(199,54,44,0.3)] p-5 sm:p-6">
         <div
           className="pointer-events-none absolute inset-x-6 top-0 h-px bg-[rgba(199,54,44,0.6)]"
           aria-hidden="true"
@@ -455,11 +404,10 @@ export default function ReviewsSectionClient({ reviews }: Props) {
             <div className="space-y-3">
               <div className="space-y-1">
                 <h2 className="text-2xl font-black text-white sm:text-3xl">
-                  Clean ingredients. Real reviews.
+                  Made in the USA. Real reviews.
                 </h2>
                 <p className="text-sm text-white/70 sm:text-base">
-                  Made in the USA. No artificial dyes. Loved for bold flavor and
-                  soft texture.
+                  No artificial dyes or synthetic colors. Classic gummy bear flavor — done right.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -481,68 +429,33 @@ export default function ReviewsSectionClient({ reviews }: Props) {
           </div>
 
           {hero ? (
-            <div className="space-y-2">
+            <div className="space-y-3">
               {supporting.length ? (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div
-                      className={clsx(
-                        swipeHintClass(!hasSwiped && supporting.length > 1),
-                        "sm:hidden"
-                      )}
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {supporting.map((r, i) => (
+                    <CardShell
+                      key={`${r.id}-${i}`}
+                      className="p-4 border-white/12 bg-white/[0.06]"
+                      onClick={openModal}
+                      onKeyDown={keyActivate(openModal)}
+                      role="button"
+                      tabIndex={0}
                     >
-                      Swipe →
-                    </div>
-                  </div>
-                  <div className="relative">
-                    <div className="pointer-events-none absolute left-0 top-0 z-10 h-full w-10 bg-[linear-gradient(90deg,rgba(12,20,38,0.85),transparent)]" />
-                    <div className="pointer-events-none absolute right-0 top-0 z-10 h-full w-10 bg-[linear-gradient(270deg,rgba(12,20,38,0.85),transparent)]" />
-                    <div
-                      ref={carouselRef}
-                      className="flex snap-x snap-mandatory gap-2 overflow-x-auto pb-2"
-                    >
-                      {supporting.map((r, i) => (
-                        <CardShell
-                          key={`${r.id}-${i}`}
-                          className="min-w-[220px] snap-start shrink-0 p-4 border-white/12 bg-white/[0.06]"
-                          onClick={openModal}
-                          onKeyDown={keyActivate(openModal)}
-                          role="button"
-                          tabIndex={0}
-                        >
-                          <div className="space-y-2">
-                            <Stars rating={r.rating} />
-                            <div className="flex items-center gap-2 text-xs text-white/60">
-                              <VerifiedBadge source={r.source} />
-                              <span>{formatDate(r.dateISO)}</span>
-                            </div>
-                            <div className="text-base font-bold text-white leading-tight">
-                              {r.title || r.body.slice(0, 42) + "..."}
-                            </div>
-                            <p className="text-sm text-white/75 line-clamp-4">
-                              {r.body}
-                            </p>
-                          </div>
-                        </CardShell>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex justify-center gap-1">
-                    {supporting.length > 1
-                      ? supporting.map((_, i) => (
-                          <button
-                            key={i}
-                            type="button"
-                            onClick={() => scrollToCard(i)}
-                            className={clsx(
-                              "h-2 w-2 rounded-full",
-                              i === carouselIndex ? "bg-white" : "bg-white/30"
-                            )}
-                            aria-label={`Go to review ${i + 1}`}
-                          />
-                        ))
-                      : null}
-                  </div>
+                      <div className="space-y-2">
+                        <Stars rating={r.rating} />
+                        <div className="flex items-center gap-2 text-xs text-white/60">
+                          <VerifiedBadge source={r.source} />
+                          <span>{formatDate(r.dateISO)}</span>
+                        </div>
+                        <div className="text-base font-bold text-white leading-tight">
+                          {r.title || r.body.slice(0, 42) + "..."}
+                        </div>
+                        <p className="text-sm text-white/75 line-clamp-4">
+                          {r.body}
+                        </p>
+                      </div>
+                    </CardShell>
+                  ))}
                 </div>
               ) : null}
 
@@ -550,18 +463,18 @@ export default function ReviewsSectionClient({ reviews }: Props) {
                 <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/60">
                   Customer moments
                 </div>
-                <div className="flex gap-2 overflow-x-auto pb-1">
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
                   {ugcImages.map((src, idx) => (
                     <div
                       key={`${src}-${idx}`}
-                      className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-white/5 shadow-[0_12px_28px_rgba(0,0,0,0.28)]"
+                      className="relative aspect-square w-full overflow-hidden rounded-2xl border border-white/10 bg-white/5 shadow-[0_12px_28px_rgba(0,0,0,0.28)]"
                     >
                       <Image
                         src={src}
                         alt="USA Gummies customer moment"
                         fill
                         className="object-cover"
-                        sizes="80px"
+                        sizes="(max-width: 640px) 30vw, 96px"
                       />
                     </div>
                   ))}
