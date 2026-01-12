@@ -249,13 +249,16 @@ export default async function HomePage() {
             </div>
 
             <div className="relative">
-              <div className="metal-panel rounded-[36px] border border-[rgba(199,54,44,0.35)] p-3">
+              <div className="metal-panel rounded-[36px] border border-[rgba(199,54,44,0.45)] p-3 ring-1 ring-white/20 shadow-[0_32px_90px_rgba(7,12,20,0.6)]">
                 <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-[0.3em] text-white/60">
                   <span>Build your bundle</span>
                   <span className="text-[var(--gold)]">5 • 8 • 12 bags</span>
                 </div>
+                <div className="mt-1 text-xs text-white/70">
+                  Tap a bundle size to lock your price.
+                </div>
                 <div className="mt-3 space-y-3">
-                  <div className="bundle-home rounded-[28px] border border-white/10 bg-white/5 p-2">
+                  <div className="bundle-home metal-panel--light rounded-[28px] border border-white/25 p-2 shadow-[0_18px_48px_rgba(7,12,20,0.45)]">
                     <BundleQuickBuy
                       anchorId="bundle-pricing"
                       productHandle={handle}
