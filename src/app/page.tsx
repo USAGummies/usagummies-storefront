@@ -142,6 +142,20 @@ export default async function HomePage() {
       ),
     },
   ];
+  const storySteps = [
+    {
+      title: "Pick your bundle",
+      copy: `${FREE_SHIPPING_PHRASE}. 8 bags is the sweet spot.`,
+    },
+    {
+      title: "Choose your flavors",
+      copy: "Mix and match your favorites for a bundle that feels custom.",
+    },
+    {
+      title: "Checkout fast",
+      copy: "Add once, ship fast, and stock up without the chaos.",
+    },
+  ];
 
   return (
     <main
@@ -358,8 +372,8 @@ export default async function HomePage() {
       </section>
 
       <section className="bg-[var(--bg)]">
-        <div className="mx-auto max-w-6xl px-4 py-5 lg:py-8 reveal-up">
-          <div className="relative overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[0_18px_48px_rgba(15,27,45,0.12)]">
+        <div className="mx-auto max-w-6xl px-4 py-6 lg:py-10 reveal-up">
+          <div className="relative overflow-hidden rounded-[32px] border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[0_20px_54px_rgba(15,27,45,0.12)] sm:p-8">
             <div
               className="pointer-events-none absolute inset-x-0 top-0 h-1.5"
               aria-hidden="true"
@@ -368,16 +382,80 @@ export default async function HomePage() {
                   "repeating-linear-gradient(90deg, rgba(199,54,44,0.9) 0 14px, rgba(255,255,255,0.95) 14px 28px)",
               }}
             />
-            <div className="relative space-y-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="space-y-2">
+            <div className="relative space-y-6">
+              <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
+                <div className="space-y-4">
                   <FlagAccent />
-                  <h2 className="text-2xl font-black text-[var(--text)]">Why USA Gummies</h2>
+                  <div className="space-y-2">
+                    <h2 className="text-3xl font-black text-[var(--text)] sm:text-4xl">
+                      Why USA Gummies matters.
+                    </h2>
+                    <p className="text-base text-[var(--muted)] sm:text-lg">
+                      We’re building the clean, American-made gummy bear you can feel proud to
+                      share. No artificial dyes. No gimmicks. Just bold flavor, crafted in the USA,
+                      with bundle pricing that rewards the big move.
+                    </p>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    {storySteps.map((step, idx) => (
+                      <div
+                        key={step.title}
+                        className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-3 shadow-[0_12px_30px_rgba(15,27,45,0.08)]"
+                      >
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">
+                          Step {idx + 1}
+                        </div>
+                        <div className="mt-1 text-sm font-black text-[var(--text)]">{step.title}</div>
+                        <div className="mt-1 text-xs text-[var(--muted)]">{step.copy}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <a href="#bundle-pricing" className="btn btn-red">
+                      Build my bundle
+                    </a>
+                    <Link href="/shop" className="btn btn-navy">
+                      Shop flavors
+                    </Link>
+                    <span className="text-xs font-semibold text-[var(--muted)]">
+                      {FREE_SHIPPING_PHRASE}
+                    </span>
+                  </div>
                 </div>
-                <div className="text-sm font-semibold text-[var(--muted)]">
-                  American-made, clean, and built for bundles.
+
+                <div className="space-y-3">
+                  <div className="relative overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface-strong)] p-4 shadow-[0_18px_44px_rgba(15,27,45,0.16)]">
+                    <div className="relative aspect-[4/5] overflow-hidden rounded-2xl border border-white/60 bg-white">
+                      <Image
+                        src="/home-patriotic-product.jpg"
+                        alt="USA Gummies patriotic bundle"
+                        fill
+                        sizes="(max-width: 640px) 90vw, (max-width: 1024px) 40vw, 420px"
+                        className="object-cover"
+                      />
+                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/55 via-black/0 to-transparent p-3">
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-white/80">
+                          Made in USA
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-3 space-y-2">
+                      <div className="text-base font-black text-[var(--text)]">
+                        Clean ingredients. Bold flavor. Built for bundles.
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <span className="badge badge--navy">Dye-free</span>
+                        <span className="badge badge--navy">All natural flavors</span>
+                        <span className="badge badge--navy">{FREE_SHIPPING_PHRASE}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-3 text-sm font-semibold text-[var(--text)]">
+                    American-made gummies with clean ingredients and honest bundle savings.
+                  </div>
                 </div>
               </div>
+
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {whyCards.map((card) => (
                   <div
