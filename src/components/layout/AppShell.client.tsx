@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CartDrawer } from "@/components/layout/CartDrawer.client";
 import { usePathname } from "next/navigation";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
@@ -30,16 +30,17 @@ const navLinks = [
   { href: "/shop", label: "Shop" },
   { href: "/about", label: "About" },
   { href: "/contact", label: "Contact" },
+  { href: "/policies", label: "Policies" },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [cartCount, setCartCount] = useState<number>(0);
   const [badgePop, setBadgePop] = useState(false);
   const pathname = usePathname();
-  const bundleCtaHref =
-    "/products/all-american-gummy-bears-7-5-oz-single-bag?focus=bundles";
+  const menuRef = useRef<HTMLDivElement | null>(null);
 
   async function refreshCartCount() {
     try {
@@ -68,6 +69,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     setMobileOpen(false);
+    setMenuOpen(false);
   }, [pathname]);
 
   useEffect(() => {
@@ -84,6 +86,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     window.addEventListener("cart:updated", handleCartUpdated);
     return () => window.removeEventListener("cart:updated", handleCartUpdated);
   }, []);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    function handleClick(event: MouseEvent) {
+      if (!menuRef.current || !event.target) return;
+      if (!menuRef.current.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    function handleKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setMenuOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [menuOpen]);
 
   return (
     <div className="min-h-screen bg-[var(--bg,#f8f5ef)] text-[var(--text)]">
@@ -106,31 +127,47 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </span>
           </Link>
 
-          <nav className="hidden md:flex items-center gap-4 text-sm font-semibold text-[var(--text)]">
-            {navLinks.map((link) => {
-              const active = pathname === link.href;
-              return (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className={cx(
-                    "underline-slide pressable px-2 py-1 rounded-lg transition-colors duration-150 text-[var(--text)] hover:text-[var(--red)]",
-                    active && "text-[var(--red)]"
-                  )}
-                >
-                  {link.label}
-                </Link>
-              );
-            })}
-          </nav>
-
           <div className="flex items-center gap-2">
-            <Link
-              href={bundleCtaHref}
-              className="hidden md:inline-flex btn btn-red"
-            >
-              Build a bundle
-            </Link>
+            <div ref={menuRef} className="relative hidden md:block">
+              <button
+                type="button"
+                onClick={() => setMenuOpen((s) => !s)}
+                className="pressable focus-ring inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-white px-4 py-2 text-sm font-black text-[var(--navy)]"
+                aria-haspopup="menu"
+                aria-expanded={menuOpen}
+                aria-controls="header-menu"
+              >
+                Menu
+                <span aria-hidden="true">▾</span>
+              </button>
+              {menuOpen ? (
+                <div
+                  id="header-menu"
+                  role="menu"
+                  className="absolute right-0 top-full mt-2 min-w-[200px] rounded-2xl border border-[var(--border)] bg-white/95 p-2 text-sm text-[var(--text)] shadow-[0_18px_48px_rgba(15,27,45,0.16)] backdrop-blur-md"
+                >
+                  {navLinks.map((link) => {
+                    const active = pathname === link.href;
+                    return (
+                      <Link
+                        key={link.href}
+                        href={link.href}
+                        role="menuitem"
+                        className={cx(
+                          "pressable block rounded-xl px-3 py-2 font-semibold transition-colors",
+                          active
+                            ? "bg-[var(--navy)] text-white"
+                            : "text-[var(--text)] hover:bg-[var(--navy)]/10"
+                        )}
+                        onClick={() => setMenuOpen(false)}
+                      >
+                        {link.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
             <button
               type="button"
               onClick={() => setDrawerOpen(true)}
@@ -161,11 +198,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {mobileOpen ? (
           <div className="md:hidden border-t border-[var(--border)] bg-white/96 backdrop-blur-md">
             <div className="mx-auto max-w-6xl px-4 py-3 flex flex-col gap-2 text-[var(--text)]">
-              {navLinks.map((link) => {
-                const active = pathname === link.href;
-                return (
-                  <Link
-                    key={link.href}
+            {navLinks.map((link) => {
+              const active = pathname === link.href;
+              return (
+                <Link
+                  key={link.href}
                     href={link.href}
                     className={cx(
                       "pressable px-2 py-2 rounded-lg",
@@ -176,12 +213,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   </Link>
                 );
               })}
-              <Link
-                href={bundleCtaHref}
-                className="pressable focus-ring inline-flex items-center justify-center rounded-full bg-[var(--red)] px-4 py-2 text-sm font-black text-white"
-              >
-                Build a bundle
-              </Link>
               <button
                 type="button"
                 onClick={() => setDrawerOpen(true)}
