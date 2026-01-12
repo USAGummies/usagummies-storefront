@@ -160,7 +160,7 @@ export default async function HomePage() {
         <div className="absolute -left-20 bottom-0 h-72 w-72 rounded-full bg-white/10 blur-3xl" aria-hidden="true" />
         <div className="relative mx-auto max-w-6xl px-4 py-8 sm:py-10 lg:py-12">
           <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
-            <div className="space-y-5">
+            <div className="order-2 space-y-5 lg:order-1">
               <div className="flex items-center gap-3">
                 <div className="relative h-16 w-16 overflow-hidden rounded-2xl border border-white/25 bg-white/95 p-1 shadow-[0_16px_36px_rgba(7,12,20,0.35)]">
                   <Image
@@ -197,7 +197,7 @@ export default async function HomePage() {
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
-                <div id="hero-primary-cta" className="w-full sm:w-auto">
+                <div className="w-full sm:w-auto">
                   <a href="#bundle-pricing" className="btn btn-red w-full sm:w-auto">
                     Build my bundle
                   </a>
@@ -287,7 +287,7 @@ export default async function HomePage() {
               </div>
             </div>
 
-            <div className="relative">
+            <div className="relative order-1 lg:order-2">
               <div className="metal-panel rounded-[36px] border border-[rgba(199,54,44,0.45)] p-3 ring-1 ring-white/20 shadow-[0_32px_90px_rgba(7,12,20,0.6)]">
                 <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-[0.3em] text-white/60">
                   <span>Build your bundle</span>
@@ -297,7 +297,10 @@ export default async function HomePage() {
                   Tap a bundle size to lock your price.
                 </div>
                 <div className="mt-3 space-y-3">
-                  <div className="bundle-home metal-panel rounded-[28px] border border-[rgba(199,160,98,0.4)] p-2 shadow-[0_22px_60px_rgba(7,12,20,0.6)]">
+                  <div
+                    id="hero-primary-cta"
+                    className="bundle-home metal-panel rounded-[28px] border border-[rgba(199,160,98,0.4)] p-2 shadow-[0_22px_60px_rgba(7,12,20,0.6)]"
+                  >
                     <BundleQuickBuy
                       anchorId="bundle-pricing"
                       productHandle={handle}
