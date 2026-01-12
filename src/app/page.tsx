@@ -287,7 +287,49 @@ export default async function HomePage() {
               </div>
             </div>
 
-            <div className="relative order-1 lg:order-2">
+            <div className="relative order-1 flex flex-col gap-4 lg:order-2 lg:gap-5 lg:flex-col-reverse">
+              <div className="relative">
+                <div className="absolute -top-6 right-6 h-20 w-20 rounded-full bg-[rgba(199,54,44,0.25)] blur-2xl" aria-hidden="true" />
+                <div className="relative rounded-3xl border border-white/20 bg-white/95 p-2 text-[var(--navy)] shadow-[0_30px_70px_rgba(7,12,20,0.35)]">
+                  <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-white/60 bg-white">
+                    <Image
+                      src={heroMediaSrc}
+                      alt="USA Gummies hero"
+                      fill
+                      priority
+                      unoptimized
+                      sizes="(max-width: 640px) 90vw, (max-width: 1024px) 60vw, 520px"
+                      className="object-cover"
+                    />
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 via-black/0 to-transparent p-3">
+                      <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-white/80">
+                        Best seller
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-2 space-y-1">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
+                      Best seller
+                    </div>
+                    <div className="text-lg font-black text-[var(--navy)]">
+                      {title}
+                    </div>
+                    <div className="text-sm text-[var(--muted)]">
+                      From {starterPerBag} / bag • {FREE_SHIPPING_PHRASE}
+                    </div>
+                    {bestValueSavingsPct > 0 ? (
+                      <div className="mt-1 inline-flex items-center rounded-full bg-[var(--navy)]/10 px-3 py-1 text-[11px] font-semibold text-[var(--navy)]">
+                        Save {bestValueSavingsPct}% with 8-bag bundles
+                      </div>
+                    ) : null}
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <span className="badge badge--navy">Made in USA</span>
+                      <span className="badge badge--navy">No artificial dyes</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className="metal-panel rounded-[36px] border border-[rgba(199,54,44,0.45)] p-3 ring-1 ring-white/20 shadow-[0_32px_90px_rgba(7,12,20,0.6)]">
                 <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-[0.3em] text-white/60">
                   <span>Build your bundle</span>
@@ -296,7 +338,7 @@ export default async function HomePage() {
                 <div className="mt-1 text-xs text-white/70">
                   Tap a bundle size to lock your price.
                 </div>
-                <div className="mt-3 space-y-3">
+                <div className="mt-3">
                   <div
                     id="hero-primary-cta"
                     className="bundle-home metal-panel rounded-[28px] border border-[rgba(199,160,98,0.4)] p-2 shadow-[0_22px_60px_rgba(7,12,20,0.6)]"
@@ -309,48 +351,6 @@ export default async function HomePage() {
                       availableForSale={bundleVariants?.availableForSale}
                       variant="compact"
                     />
-                  </div>
-
-                  <div className="relative">
-                    <div className="absolute -top-6 right-6 h-20 w-20 rounded-full bg-[rgba(199,54,44,0.25)] blur-2xl" aria-hidden="true" />
-                    <div className="relative rounded-3xl border border-white/20 bg-white/95 p-2 text-[var(--navy)] shadow-[0_30px_70px_rgba(7,12,20,0.35)]">
-                      <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-white/60 bg-white">
-                        <Image
-                          src={heroMediaSrc}
-                          alt="USA Gummies hero"
-                          fill
-                          priority
-                          unoptimized
-                          sizes="(max-width: 640px) 90vw, (max-width: 1024px) 60vw, 520px"
-                          className="object-cover"
-                        />
-                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 via-black/0 to-transparent p-3">
-                          <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-white/80">
-                            Best seller
-                          </div>
-                        </div>
-                      </div>
-                      <div className="mt-2 space-y-1">
-                        <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
-                          Best seller
-                        </div>
-                        <div className="text-lg font-black text-[var(--navy)]">
-                          {title}
-                        </div>
-                        <div className="text-sm text-[var(--muted)]">
-                          From {starterPerBag} / bag • {FREE_SHIPPING_PHRASE}
-                        </div>
-                        {bestValueSavingsPct > 0 ? (
-                          <div className="mt-1 inline-flex items-center rounded-full bg-[var(--navy)]/10 px-3 py-1 text-[11px] font-semibold text-[var(--navy)]">
-                            Save {bestValueSavingsPct}% with 8-bag bundles
-                          </div>
-                        ) : null}
-                        <div className="flex flex-wrap gap-2 pt-1">
-                          <span className="badge badge--navy">Made in USA</span>
-                          <span className="badge badge--navy">No artificial dyes</span>
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 </div>
               </div>
