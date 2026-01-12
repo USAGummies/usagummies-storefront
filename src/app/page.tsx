@@ -25,6 +25,29 @@ function formatMoney(amount: string | number, currency = "USD") {
   }).format(n);
 }
 
+function FlagAccent({ className = "" }: { className?: string }) {
+  return (
+    <div className={`flex items-center gap-3 ${className}`}>
+      <span
+        className="inline-flex h-6 w-9 items-center justify-center rounded-md border border-[rgba(13,28,51,0.2)] bg-[rgba(13,28,51,0.95)] shadow-[0_8px_18px_rgba(13,28,51,0.2)]"
+        aria-hidden="true"
+        style={{
+          backgroundImage: "radial-gradient(rgba(255,255,255,0.9) 1px, transparent 2px)",
+          backgroundSize: "10px 10px",
+        }}
+      />
+      <span
+        className="h-1.5 w-24 rounded-full border border-[rgba(13,28,51,0.12)]"
+        aria-hidden="true"
+        style={{
+          backgroundImage:
+            "repeating-linear-gradient(90deg, rgba(199,54,44,0.95) 0 12px, rgba(255,255,255,0.95) 12px 24px)",
+        }}
+      />
+    </div>
+  );
+}
+
 export default async function HomePage() {
   let productsPage: Awaited<ReturnType<typeof getProductsPage>> | null = null;
   try {
@@ -121,18 +144,36 @@ export default async function HomePage() {
 
   return (
     <main
-      className="bg-[var(--bg)] text-[var(--text)] min-h-screen pb-16 lg:pb-0"
+      className="relative overflow-hidden bg-[var(--bg)] text-[var(--text)] min-h-screen pb-16 lg:pb-0"
       style={{ backgroundColor: "var(--bg, #f8f5ef)", color: "var(--text, #1c2430)" }}
     >
       <section
-        className="relative overflow-hidden border-b border-white/10 bg-[var(--navy)] text-white hero-parallax"
+        className="relative overflow-hidden bg-[var(--navy)] text-white hero-parallax"
         style={{
           backgroundImage:
-            "linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.08) 40%, rgba(255,255,255,0.02) 100%), radial-gradient(circle at 10% 20%, rgba(199,160,98,0.22), rgba(255,255,255,0) 38%), radial-gradient(circle at 80% 0%, rgba(255,255,255,0.08), rgba(255,255,255,0) 30%)",
+            "linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 45%, rgba(255,255,255,0) 100%), radial-gradient(circle at 12% 18%, rgba(199,54,44,0.22), rgba(255,255,255,0) 38%), radial-gradient(circle at 85% 0%, rgba(255,255,255,0.08), rgba(255,255,255,0) 30%)",
         }}
       >
-        <div className="absolute inset-0 pointer-events-none" aria-hidden="true" />
-        <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[rgba(199,160,98,0.3)] blur-3xl" aria-hidden="true" />
+        <div
+          className="absolute inset-0 pointer-events-none"
+          aria-hidden="true"
+          style={{
+            backgroundImage:
+              "radial-gradient(rgba(255,255,255,0.18) 1px, transparent 1px), radial-gradient(rgba(255,255,255,0.08) 1px, transparent 1px)",
+            backgroundSize: "120px 120px, 220px 220px",
+            backgroundPosition: "0 0, 30px 40px",
+            opacity: 0.35,
+          }}
+        />
+        <div
+          className="absolute left-6 top-8 hidden h-20 w-32 rounded-2xl border border-white/25 bg-[rgba(13,28,51,0.75)] shadow-[0_18px_40px_rgba(0,0,0,0.35)] sm:block"
+          aria-hidden="true"
+          style={{
+            backgroundImage: "radial-gradient(rgba(255,255,255,0.9) 1px, transparent 2px)",
+            backgroundSize: "14px 14px",
+          }}
+        />
+        <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[rgba(199,54,44,0.28)] blur-3xl" aria-hidden="true" />
         <div className="absolute -left-20 bottom-0 h-72 w-72 rounded-full bg-white/10 blur-3xl" aria-hidden="true" />
         <div className="relative mx-auto max-w-6xl px-4 py-10 sm:py-12 lg:py-16">
           <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
@@ -143,9 +184,17 @@ export default async function HomePage() {
               </div>
 
               <div className="space-y-2">
-                <h1 className="text-3xl font-black leading-tight text-white sm:text-4xl lg:text-5xl">
+                <h1 className="text-3xl font-black leading-[1.02] tracking-tight text-white sm:text-5xl lg:text-6xl">
                   Dye-Free Gummy Bears — Made in the USA.
                 </h1>
+                <div
+                  className="h-2 w-28 rounded-full border border-white/60 shadow-[0_10px_24px_rgba(0,0,0,0.35)]"
+                  aria-hidden="true"
+                  style={{
+                    backgroundImage:
+                      "repeating-linear-gradient(90deg, rgba(199,54,44,1) 0 12px, rgba(255,255,255,0.95) 12px 24px)",
+                  }}
+                />
                 <p className="text-sm text-white/80 sm:text-base max-w-prose">
                   All-natural flavors. No artificial dyes. Build a bundle to save more —{" "}
                   {FREE_SHIPPING_PHRASE}.
@@ -185,9 +234,28 @@ export default async function HomePage() {
                 <span className="text-xs text-white/70">{FREE_SHIPPING_PHRASE}</span>
               </div>
 
-              <div className="rounded-2xl border border-white/15 bg-white/5 px-4 py-3 flex flex-wrap items-center gap-4">
-                <span className="text-sm font-semibold text-white">★★★★★ Verified buyer reviews</span>
-                <span className="text-xs text-white/70">Real customers. Real bundles.</span>
+              <div className="relative overflow-hidden rounded-2xl border border-white/15 bg-white/5 px-4 py-3">
+                <div
+                  className="absolute inset-0 opacity-35"
+                  aria-hidden="true"
+                  style={{
+                    backgroundImage:
+                      "repeating-linear-gradient(90deg, rgba(199,54,44,0.55) 0 18px, rgba(255,255,255,0.35) 18px 36px)",
+                  }}
+                />
+                <div className="relative flex flex-wrap items-center gap-4">
+                  <span
+                    className="hidden sm:inline-flex h-6 w-9 items-center justify-center rounded-md border border-white/30 bg-[rgba(13,28,51,0.65)] shadow-[0_8px_18px_rgba(0,0,0,0.3)]"
+                    aria-hidden="true"
+                    style={{
+                      backgroundImage:
+                        "radial-gradient(rgba(255,255,255,0.9) 1px, transparent 2px)",
+                      backgroundSize: "10px 10px",
+                    }}
+                  />
+                  <span className="text-sm font-semibold text-white">★★★★★ Verified buyer reviews</span>
+                  <span className="text-xs text-white/70">Real customers. Real bundles.</span>
+                </div>
               </div>
 
               <Link
@@ -198,9 +266,17 @@ export default async function HomePage() {
               </Link>
             </div>
 
-            <div className="space-y-4">
+            <div className="relative space-y-4">
+              <div
+                className="pointer-events-none absolute -right-6 top-6 hidden h-[86%] w-28 rounded-[32px] border border-white/20 opacity-55 shadow-[0_20px_40px_rgba(0,0,0,0.25)] lg:block"
+                aria-hidden="true"
+                style={{
+                  backgroundImage:
+                    "repeating-linear-gradient(180deg, rgba(199,54,44,0.9) 0 16px, rgba(255,255,255,0.85) 16px 32px)",
+                }}
+              />
               <div className="relative">
-                <div className="absolute -top-6 right-6 h-20 w-20 rounded-full bg-[rgba(199,160,98,0.35)] blur-2xl" aria-hidden="true" />
+                <div className="absolute -top-6 right-6 h-20 w-20 rounded-full bg-[rgba(199,54,44,0.25)] blur-2xl" aria-hidden="true" />
                 <div className="relative rounded-3xl border border-white/20 bg-white/95 p-3 text-[var(--navy)] shadow-[0_30px_70px_rgba(7,12,20,0.35)]">
                   <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-white/60 bg-white">
                     <Image
@@ -254,16 +330,39 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="border-t border-white/10 bg-[var(--navy)] text-white">
-        <div className="mx-auto max-w-6xl px-4 py-7 lg:py-10 reveal-up">
+      <section className="relative overflow-hidden bg-[var(--navy)] text-white">
+        <div
+          className="absolute inset-0 pointer-events-none"
+          aria-hidden="true"
+          style={{
+            backgroundImage:
+              "radial-gradient(rgba(255,255,255,0.12) 1px, transparent 1px), radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px)",
+            backgroundSize: "140px 140px, 240px 240px",
+            backgroundPosition: "20px 30px, 70px 90px",
+            opacity: 0.28,
+          }}
+        />
+        <div
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-4"
+          aria-hidden="true"
+          style={{
+            backgroundImage:
+              "repeating-linear-gradient(90deg, rgba(199,54,44,0.95) 0 16px, rgba(255,255,255,0.9) 16px 32px)",
+            boxShadow: "0 -1px 0 rgba(13,28,51,0.55)",
+          }}
+        />
+        <div className="relative mx-auto max-w-6xl px-4 py-7 lg:py-10 reveal-up">
           <ReviewsSection />
         </div>
       </section>
 
-      <section className="border-t border-[var(--border)] bg-[var(--surface-strong)]">
+      <section className="bg-[var(--bg)]">
         <div className="mx-auto max-w-6xl px-4 py-5 lg:py-8 space-y-4 reveal-up">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-2xl font-black text-[var(--text)]">Why USA Gummies</h2>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="space-y-2">
+              <FlagAccent />
+              <h2 className="text-2xl font-black text-[var(--text)]">Why USA Gummies</h2>
+            </div>
             <div className="text-sm font-semibold text-[var(--muted)]">
               American-made, clean, and built for bundles.
             </div>
@@ -272,10 +371,20 @@ export default async function HomePage() {
             {whyCards.map((card) => (
               <div
                 key={card.title}
-                className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[0_14px_32px_rgba(15,27,45,0.12)] transition-transform duration-200 hover:-translate-y-1"
+                className="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[0_14px_32px_rgba(15,27,45,0.12)] transition-transform duration-200 hover:-translate-y-1"
               >
+                <div
+                  className="pointer-events-none absolute inset-x-0 top-0 h-1.5"
+                  aria-hidden="true"
+                  style={{
+                    backgroundImage:
+                      "repeating-linear-gradient(90deg, rgba(199,54,44,0.85) 0 12px, rgba(255,255,255,0.95) 12px 24px)",
+                  }}
+                />
                 <div className="flex items-center gap-3">
-                  <div className="icon-float">{card.icon}</div>
+                  <div className="icon-float flex h-10 w-10 items-center justify-center rounded-full bg-[rgba(13,28,51,0.06)]">
+                    {card.icon}
+                  </div>
                   <div className="text-lg font-black text-[var(--text)]">{card.title}</div>
                 </div>
                 <p className="mt-3 text-sm text-[var(--muted)]">{card.copy}</p>
@@ -285,55 +394,79 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="border-t border-[var(--border)] bg-[var(--surface)]">
-        <div className="mx-auto max-w-6xl px-4 py-5 lg:py-8 space-y-3 reveal-up">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">
-                Join the movement
+      <section className="bg-[var(--bg)]">
+        <div className="mx-auto max-w-6xl px-4 py-5 lg:py-8 reveal-up">
+          <div className="relative overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[0_18px_48px_rgba(15,27,45,0.12)]">
+            <div
+              className="pointer-events-none absolute inset-x-0 top-0 h-1.5"
+              aria-hidden="true"
+              style={{
+                backgroundImage:
+                  "repeating-linear-gradient(90deg, rgba(199,54,44,0.9) 0 14px, rgba(255,255,255,0.95) 14px 28px)",
+              }}
+            />
+            <div className="relative flex flex-wrap items-center justify-between gap-4">
+              <div className="space-y-2">
+                <FlagAccent />
+                <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">
+                  Join the movement
+                </div>
+                <h3 className="text-xl font-black text-[var(--text)]">
+                  Follow @usagummies for new flavors & customer stories
+                </h3>
+                <p className="text-sm text-[var(--muted)]">
+                  Real customers. Real bundles. Built in America.
+                </p>
               </div>
-              <h3 className="mt-1 text-xl font-black text-[var(--text)]">
-                Follow @usagummies for new flavors & customer stories
-              </h3>
-              <p className="mt-1 text-sm text-[var(--muted)]">
-                Real customers. Real bundles. Built in America.
-              </p>
+              <Link
+                href="https://www.instagram.com/usagummies"
+                className="btn btn-navy"
+              >
+                Follow @usagummies
+              </Link>
             </div>
-            <Link
-              href="https://www.instagram.com/usagummies"
-              className="btn btn-navy"
-            >
-              Follow @usagummies
-            </Link>
           </div>
         </div>
       </section>
 
-      <section className="border-t border-[var(--border)] bg-[var(--surface-strong)]">
-        <div className="mx-auto max-w-6xl px-4 py-5 lg:py-8 space-y-3 reveal-up">
-          <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
-            Get updates
-          </div>
-          <h3 className="text-2xl font-black text-[var(--text)]">Unlock early access + bundle-only drops</h3>
-          <p className="text-sm text-[var(--muted)]">
-            First dibs on limited flavors, restocks, and member-only bundle alerts.
-          </p>
-          <div className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1 text-[11px] font-semibold text-[var(--text)] w-fit">
-            VIP early access • limited-batch alerts
-          </div>
-          <form className="flex flex-wrap gap-3 items-center">
-            <input
-              type="email"
-              name="email"
-              placeholder="Enter your email"
-              className="usa-input flex-1 min-w-[240px]"
-              aria-label="Enter your email for updates"
-              required
+      <section className="bg-[var(--bg)]">
+        <div className="mx-auto max-w-6xl px-4 py-5 lg:py-8 reveal-up">
+          <div className="relative overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[0_18px_48px_rgba(15,27,45,0.12)]">
+            <div
+              className="pointer-events-none absolute inset-x-0 top-0 h-1.5"
+              aria-hidden="true"
+              style={{
+                backgroundImage:
+                  "repeating-linear-gradient(90deg, rgba(199,54,44,0.9) 0 14px, rgba(255,255,255,0.95) 14px 28px)",
+              }}
             />
-            <button type="submit" className="btn btn-red pressable px-5 py-3 font-black w-full sm:w-auto">
-              Sign me up
-            </button>
-          </form>
+            <div className="relative space-y-3">
+              <FlagAccent />
+              <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
+                Get updates
+              </div>
+              <h3 className="text-2xl font-black text-[var(--text)]">Unlock early access + bundle-only drops</h3>
+              <p className="text-sm text-[var(--muted)]">
+                First dibs on limited flavors, restocks, and member-only bundle alerts.
+              </p>
+              <div className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1 text-[11px] font-semibold text-[var(--text)] w-fit">
+                VIP early access • limited-batch alerts
+              </div>
+              <form className="flex flex-wrap gap-3 items-center">
+                <input
+                  type="email"
+                  name="email"
+                  placeholder="Enter your email"
+                  className="usa-input flex-1 min-w-[240px]"
+                  aria-label="Enter your email for updates"
+                  required
+                />
+                <button type="submit" className="btn btn-red pressable px-5 py-3 font-black w-full sm:w-auto">
+                  Sign me up
+                </button>
+              </form>
+            </div>
+          </div>
         </div>
       </section>
 
