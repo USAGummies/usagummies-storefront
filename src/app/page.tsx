@@ -136,8 +136,8 @@ export default async function HomePage() {
 
   return (
     <main
-      className="relative overflow-hidden bg-[var(--bg)] text-[var(--text)] min-h-screen pb-16 lg:pb-0"
-      style={{ backgroundColor: "var(--bg, #f8f5ef)", color: "var(--text, #1c2430)" }}
+      className="relative overflow-hidden bg-[var(--navy)] text-white min-h-screen pb-16 lg:pb-0"
+      style={{ backgroundColor: "var(--navy, #0d1c33)", color: "#ffffff" }}
     >
       <section
         className="relative overflow-hidden bg-[var(--navy)] text-white hero-parallax"
@@ -264,14 +264,16 @@ export default async function HomePage() {
                 </div>
               </div>
 
-              <BundleQuickBuy
-                anchorId="bundle-pricing"
-                productHandle={handle}
-                tiers={homepageTiers}
-                singleBagVariantId={bundleVariants?.singleBagVariantId}
-                availableForSale={bundleVariants?.availableForSale}
-                variant="compact"
-              />
+              <div className="rounded-[28px] border border-[rgba(199,54,44,0.25)] bg-[rgba(255,255,255,0.03)] p-1 shadow-[0_24px_60px_rgba(7,12,20,0.45)]">
+                <BundleQuickBuy
+                  anchorId="bundle-pricing"
+                  productHandle={handle}
+                  tiers={homepageTiers}
+                  singleBagVariantId={bundleVariants?.singleBagVariantId}
+                  availableForSale={bundleVariants?.availableForSale}
+                  variant="compact"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -292,9 +294,9 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="bg-[var(--bg)]">
+      <section className="bg-[var(--navy)]">
         <div className="mx-auto max-w-6xl px-4 py-6 lg:py-10 reveal-up">
-          <div className="relative overflow-hidden rounded-[32px] bg-[var(--surface-strong)] p-6 shadow-[0_18px_44px_rgba(15,27,45,0.1)] sm:p-8">
+          <div className="relative overflow-hidden rounded-[32px] border border-[rgba(199,54,44,0.24)] bg-[var(--surface-strong)] p-6 shadow-[0_22px_60px_rgba(7,12,20,0.45)] sm:p-8">
             <div className="relative space-y-6">
               <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
                 <div className="space-y-4">
@@ -389,15 +391,15 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="bg-[var(--bg)]">
+      <section className="bg-[var(--navy)]">
         <div className="mx-auto max-w-6xl px-4 py-6 lg:py-10 reveal-up">
           <InstagramGrid username="usagummies" limit={12} />
         </div>
       </section>
 
-      <section className="bg-[var(--bg)]">
+      <section className="bg-[var(--navy)]">
         <div className="mx-auto max-w-6xl px-4 py-6 lg:py-10 reveal-up">
-          <div className="relative overflow-hidden rounded-3xl bg-[var(--surface-strong)] p-6 shadow-[0_16px_40px_rgba(15,27,45,0.1)]">
+          <div className="relative overflow-hidden rounded-3xl border border-[rgba(199,54,44,0.22)] bg-[var(--surface-strong)] p-6 shadow-[0_20px_54px_rgba(7,12,20,0.4)]">
             <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
               <div className="space-y-3">
                 <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">

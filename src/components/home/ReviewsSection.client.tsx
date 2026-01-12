@@ -425,7 +425,7 @@ export default function ReviewsSectionClient({ reviews }: Props) {
 
   return (
     <section className="relative mx-auto max-w-6xl px-4 py-12 sm:py-14">
-      <div className="relative overflow-hidden rounded-[34px] border border-white/10 bg-white/[0.05] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.45)] backdrop-blur-2xl sm:p-8">
+      <div className="relative overflow-hidden rounded-[34px] border border-[rgba(199,54,44,0.25)] bg-white/[0.05] p-6 shadow-[0_32px_96px_rgba(7,12,20,0.55)] backdrop-blur-2xl sm:p-8">
         <div
           className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/15"
           aria-hidden="true"

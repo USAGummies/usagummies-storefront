@@ -79,7 +79,7 @@ export function InstagramGrid({
   const usingFallback = items.length === 0;
 
   return (
-    <section className="rounded-[32px] bg-[var(--surface-strong)] p-6 shadow-[0_18px_44px_rgba(15,27,45,0.1)]">
+    <section className="rounded-[32px] border border-[rgba(199,54,44,0.22)] bg-[var(--surface-strong)] p-6 shadow-[0_22px_60px_rgba(7,12,20,0.4)]">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
