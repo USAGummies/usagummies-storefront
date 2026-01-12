@@ -161,6 +161,20 @@ export default async function HomePage() {
         <div className="relative mx-auto max-w-6xl px-4 py-8 sm:py-10 lg:py-12">
           <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
             <div className="space-y-5">
+              <div className="flex items-center gap-3">
+                <div className="relative h-16 w-16 overflow-hidden rounded-2xl border border-white/25 bg-white/95 p-1 shadow-[0_16px_36px_rgba(7,12,20,0.35)]">
+                  <Image
+                    src="/home-patriotic-product.jpg"
+                    alt="USA Gummies bag"
+                    fill
+                    sizes="64px"
+                    className="rounded-xl object-cover"
+                  />
+                </div>
+                <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-white/60">
+                  Best seller
+                </div>
+              </div>
               <div className="flex flex-wrap items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.32em] text-white/70 sm:text-xs">
                 <span className="rounded-full border border-white/20 bg-white/5 px-3 py-1">Made in the USA</span>
                 <span className="text-[var(--gold)]">No artificial dyes</span>
