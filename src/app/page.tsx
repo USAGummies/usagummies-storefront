@@ -294,7 +294,7 @@ export default async function HomePage() {
 
       <section className="bg-[var(--bg)]">
         <div className="mx-auto max-w-6xl px-4 py-6 lg:py-10 reveal-up">
-          <div className="relative overflow-hidden rounded-[32px] border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[0_20px_54px_rgba(15,27,45,0.12)] sm:p-8">
+          <div className="relative overflow-hidden rounded-[32px] bg-[var(--surface-strong)] p-6 shadow-[0_18px_44px_rgba(15,27,45,0.1)] sm:p-8">
             <div className="relative space-y-6">
               <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
                 <div className="space-y-4">
@@ -312,7 +312,7 @@ export default async function HomePage() {
                     {storySteps.map((step, idx) => (
                       <div
                         key={step.title}
-                        className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-3 shadow-[0_12px_30px_rgba(15,27,45,0.08)]"
+                        className="rounded-2xl border border-[rgba(13,28,51,0.12)] bg-[var(--surface)] p-4 shadow-[0_10px_24px_rgba(15,27,45,0.08)]"
                       >
                         <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">
                           Step {idx + 1}
@@ -336,11 +336,11 @@ export default async function HomePage() {
                 </div>
 
                 <div className="space-y-3">
-                  <div className="relative overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface-strong)] p-4 shadow-[0_18px_44px_rgba(15,27,45,0.16)]">
+                  <div className="relative overflow-hidden rounded-3xl border border-[rgba(13,28,51,0.12)] bg-[var(--surface)] p-4 shadow-[0_18px_44px_rgba(15,27,45,0.14)]">
                     <div className="relative aspect-[4/5] overflow-hidden rounded-2xl border border-white/60 bg-white">
                       <Image
                         src="/home-patriotic-product.jpg"
-                        alt="USA Gummies patriotic bundle"
+                        alt="USA Gummies bundle"
                         fill
                         sizes="(max-width: 640px) 90vw, (max-width: 1024px) 40vw, 420px"
                         className="object-cover"
@@ -362,7 +362,7 @@ export default async function HomePage() {
                       </div>
                     </div>
                   </div>
-                  <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-3 text-sm font-semibold text-[var(--text)]">
+                  <div className="rounded-2xl border border-[rgba(13,28,51,0.12)] bg-[var(--surface)] px-4 py-3 text-sm font-semibold text-[var(--text)]">
                     American-made gummies with clean ingredients and honest bundle savings.
                   </div>
                 </div>
@@ -372,10 +372,10 @@ export default async function HomePage() {
                 {whyCards.map((card) => (
                   <div
                     key={card.title}
-                    className="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-4 shadow-[0_14px_32px_rgba(15,27,45,0.12)] transition-transform duration-200 hover:-translate-y-1"
+                    className="relative overflow-hidden rounded-2xl border border-[rgba(13,28,51,0.12)] bg-[var(--surface)] p-4 shadow-[0_12px_28px_rgba(15,27,45,0.1)] transition-transform duration-200 hover:-translate-y-1"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="icon-float flex h-10 w-10 items-center justify-center rounded-full bg-[rgba(13,28,51,0.06)]">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[rgba(13,28,51,0.06)]">
                         {card.icon}
                       </div>
                       <div className="text-lg font-black text-[var(--text)]">{card.title}</div>
@@ -390,31 +390,33 @@ export default async function HomePage() {
       </section>
 
       <section className="bg-[var(--bg)]">
-        <div className="mx-auto max-w-6xl px-4 py-5 lg:py-8 reveal-up">
+        <div className="mx-auto max-w-6xl px-4 py-6 lg:py-10 reveal-up">
           <InstagramGrid username="usagummies" limit={12} />
         </div>
       </section>
 
       <section className="bg-[var(--bg)]">
-        <div className="mx-auto max-w-6xl px-4 py-5 lg:py-8 reveal-up">
-          <div className="relative overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[0_18px_48px_rgba(15,27,45,0.12)]">
-            <div className="relative space-y-3">
-              <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
-                Get updates
+        <div className="mx-auto max-w-6xl px-4 py-6 lg:py-10 reveal-up">
+          <div className="relative overflow-hidden rounded-3xl bg-[var(--surface-strong)] p-6 shadow-[0_16px_40px_rgba(15,27,45,0.1)]">
+            <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+              <div className="space-y-3">
+                <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
+                  Get updates
+                </div>
+                <h3 className="text-2xl font-black text-[var(--text)]">Unlock early access + bundle-only drops</h3>
+                <p className="text-sm text-[var(--muted)]">
+                  First dibs on limited flavors, restocks, and member-only bundle alerts.
+                </p>
+                <div className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1 text-[11px] font-semibold text-[var(--text)] w-fit">
+                  VIP early access • limited-batch alerts
+                </div>
               </div>
-              <h3 className="text-2xl font-black text-[var(--text)]">Unlock early access + bundle-only drops</h3>
-              <p className="text-sm text-[var(--muted)]">
-                First dibs on limited flavors, restocks, and member-only bundle alerts.
-              </p>
-              <div className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1 text-[11px] font-semibold text-[var(--text)] w-fit">
-                VIP early access • limited-batch alerts
-              </div>
-              <form className="flex flex-wrap gap-3 items-center">
+              <form className="flex flex-wrap gap-3 items-center rounded-2xl border border-[rgba(13,28,51,0.12)] bg-[var(--surface)] p-4">
                 <input
                   type="email"
                   name="email"
                   placeholder="Enter your email"
-                  className="usa-input flex-1 min-w-[240px]"
+                  className="usa-input flex-1 min-w-[220px]"
                   aria-label="Enter your email for updates"
                   required
                 />

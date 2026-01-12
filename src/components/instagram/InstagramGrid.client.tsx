@@ -79,14 +79,16 @@ export function InstagramGrid({
   const usingFallback = items.length === 0;
 
   return (
-    <section className="glass p-6">
-      <div className="flex items-end justify-between gap-4">
+    <section className="rounded-[32px] bg-[var(--surface-strong)] p-6 shadow-[0_18px_44px_rgba(15,27,45,0.1)]">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <div className="text-xs text-white/60">Follow the road trip</div>
-          <h2 className="mt-1 text-2xl font-black">
-            @<span className="text-white">{username}</span>
+          <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
+            Follow the road trip
+          </div>
+          <h2 className="mt-1 text-2xl font-black text-[var(--text)]">
+            @{username}
           </h2>
-          <div className="mt-2 text-sm text-white/70">
+          <div className="mt-2 text-sm text-[var(--muted)]">
             Real America. Real gummies. No influencer nonsense.
           </div>
         </div>
@@ -94,14 +96,14 @@ export function InstagramGrid({
           href={`https://www.instagram.com/${username}/`}
           target="_blank"
           rel="noopener noreferrer"
-          className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10"
+          className="btn btn-outline"
         >
           Follow →
         </Link>
       </div>
 
       {err ? (
-        <div className="mt-4 text-xs text-white/50">
+        <div className="mt-4 text-xs text-[var(--muted)]">
           Showing a preview while the live feed refreshes.
         </div>
       ) : null}
@@ -118,8 +120,8 @@ export function InstagramGrid({
                 target="_blank"
                 rel="noopener noreferrer"
                 className={cn(
-                  "group relative aspect-square overflow-hidden rounded-2xl border border-white/10 bg-black/30",
-                  "hover:border-[#d4af37]/25 hover:shadow-[0_0_0_1px_rgba(212,175,55,0.25),0_0_60px_rgba(212,175,55,0.08)]",
+                  "group relative aspect-square overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]",
+                  "hover:border-[rgba(13,28,51,0.2)] hover:shadow-[0_18px_42px_rgba(15,27,45,0.16)]",
                   "transition"
                 )}
               >
@@ -130,9 +132,9 @@ export function InstagramGrid({
                   sizes="(max-width: 1024px) 50vw, 16vw"
                   className="object-cover opacity-95 group-hover:opacity-100 group-hover:scale-[1.02] transition"
                 />
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition" />
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/50 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition" />
                 {it.media_type === "VIDEO" ? (
-                  <div className="absolute right-2 top-2 rounded-full border border-white/15 bg-black/40 px-2 py-0.5 text-[10px] text-white/80">
+                  <div className="absolute right-2 top-2 rounded-full border border-white/15 bg-[rgba(13,28,51,0.85)] px-2 py-0.5 text-[10px] text-white/90">
                     VIDEO
                   </div>
                 ) : null}
@@ -141,12 +143,12 @@ export function InstagramGrid({
           })}
         </div>
       ) : (
-        <div className="mt-6 rounded-2xl border border-white/10 bg-black/30 p-4 text-sm text-white/70">
+        <div className="mt-6 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 text-sm text-[var(--muted)]">
           Follow @usagummies for the latest drops, customer photos, and bundle moments.
         </div>
       )}
 
-      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 text-xs text-white/50">
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 text-xs text-[var(--muted)]">
         <div>
           {feed?.source === "live" ? "Live Instagram feed" : "Instagram preview"}
         </div>
