@@ -39,7 +39,6 @@ const CTA_LINK =
 
 const MAX_SUPPORTING = 8;
 
-
 function clsx(...a: Array<string | false | null | undefined>) {
   return a.filter(Boolean).join(" ");
 }
@@ -377,16 +376,16 @@ export default function ReviewsSectionClient({ reviews }: Props) {
 
   const heroCard = hero ? (
     <CardShell
-      className="p-6 border-white/20 bg-white/[0.12]"
+      className="p-5 border-white/20 bg-white/[0.12]"
       onClick={openModal}
       onKeyDown={keyActivate(openModal)}
       role="button"
       tabIndex={0}
       accent
     >
-      <div className="space-y-3">
+      <div className="space-y-2">
         <div className="flex items-start gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 text-base font-bold text-white">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-base font-bold text-white">
             {initials(hero.authorName)}
           </div>
           <div className="flex-1 space-y-2">
@@ -400,7 +399,7 @@ export default function ReviewsSectionClient({ reviews }: Props) {
             <div className="text-lg font-extrabold text-white leading-tight">
               {hero.title || hero.body.slice(0, 64) + "..."}
             </div>
-            <p className="text-sm text-white/75 line-clamp-6">
+            <p className="text-sm text-white/75 line-clamp-5">
               {hero.body}
             </p>
             <button
@@ -418,14 +417,14 @@ export default function ReviewsSectionClient({ reviews }: Props) {
       </div>
     </CardShell>
   ) : (
-    <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-6 text-sm text-white/70">
+    <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 text-sm text-white/70">
       Verified reviews coming soon.
     </div>
   );
 
   return (
-    <section className="relative mx-auto max-w-6xl px-4 py-12 sm:py-14">
-      <div className="relative overflow-hidden rounded-[34px] border border-[rgba(199,54,44,0.25)] bg-white/[0.05] p-6 shadow-[0_32px_96px_rgba(7,12,20,0.55)] backdrop-blur-2xl sm:p-8">
+    <section className="relative">
+      <div className="relative overflow-hidden rounded-[34px] border border-[rgba(199,54,44,0.25)] bg-white/[0.05] p-4 shadow-[0_32px_96px_rgba(7,12,20,0.55)] backdrop-blur-2xl sm:p-5">
         <div
           className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/15"
           aria-hidden="true"
@@ -440,8 +439,8 @@ export default function ReviewsSectionClient({ reviews }: Props) {
             ].join(","),
           }}
         />
-        <div className="relative z-10 space-y-6">
-          <div className="space-y-4">
+        <div className="relative z-10 space-y-4">
+          <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-[0.2em] text-white/75">
               <Stars rating={avg || 5} size="md" />
               <span>
@@ -452,8 +451,8 @@ export default function ReviewsSectionClient({ reviews }: Props) {
             </div>
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
-            <div className="space-y-4">
+          <div className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
+            <div className="space-y-3">
               <div className="space-y-1">
                 <h2 className="text-2xl font-black text-white sm:text-3xl">
                   Clean ingredients. Real reviews.
@@ -467,7 +466,7 @@ export default function ReviewsSectionClient({ reviews }: Props) {
                 {mentions.map((chip) => (
                   <span
                     key={chip.key}
-                    className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-white/80 shadow-[0_10px_30px_rgba(0,0,0,0.25)]"
+                    className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs font-semibold text-white/80 shadow-[0_10px_30px_rgba(0,0,0,0.25)]"
                   >
                     {chip.label}
                   </span>
@@ -482,9 +481,9 @@ export default function ReviewsSectionClient({ reviews }: Props) {
           </div>
 
           {hero ? (
-            <div className="space-y-4">
+            <div className="space-y-2">
               {supporting.length ? (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <div
                       className={clsx(
@@ -500,12 +499,12 @@ export default function ReviewsSectionClient({ reviews }: Props) {
                     <div className="pointer-events-none absolute right-0 top-0 z-10 h-full w-10 bg-[linear-gradient(270deg,rgba(12,20,38,0.85),transparent)]" />
                     <div
                       ref={carouselRef}
-                      className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2"
+                      className="flex snap-x snap-mandatory gap-2 overflow-x-auto pb-2"
                     >
                       {supporting.map((r, i) => (
                         <CardShell
                           key={`${r.id}-${i}`}
-                          className="min-w-[260px] snap-start shrink-0 p-4 border-white/12 bg-white/[0.06]"
+                          className="min-w-[220px] snap-start shrink-0 p-4 border-white/12 bg-white/[0.06]"
                           onClick={openModal}
                           onKeyDown={keyActivate(openModal)}
                           role="button"
@@ -555,14 +554,14 @@ export default function ReviewsSectionClient({ reviews }: Props) {
                   {ugcImages.map((src, idx) => (
                     <div
                       key={`${src}-${idx}`}
-                      className="relative h-28 w-28 shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-white/5 shadow-[0_12px_28px_rgba(0,0,0,0.28)]"
+                      className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-white/5 shadow-[0_12px_28px_rgba(0,0,0,0.28)]"
                     >
                       <Image
                         src={src}
                         alt="USA Gummies customer moment"
                         fill
                         className="object-cover"
-                        sizes="112px"
+                        sizes="80px"
                       />
                     </div>
                   ))}
@@ -571,8 +570,8 @@ export default function ReviewsSectionClient({ reviews }: Props) {
             </div>
           ) : null}
 
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-3">
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
               <a href={CTA_LINK} className="btn btn-red min-h-[44px]">
                 Build my bundle →
               </a>
