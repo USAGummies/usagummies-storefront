@@ -246,6 +246,31 @@ export default async function HomePage() {
                   View Amazon listing →
                 </a>
               </div>
+
+              <div className="metal-panel rounded-3xl border border-white/12 p-4">
+                <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.3em] text-white/60">
+                  <span>Inside every bag</span>
+                  <span className="text-[11px] tracking-[0.2em] text-white/50">7.5 oz</span>
+                </div>
+                <div className="mt-2 grid gap-2 text-sm text-white/80">
+                  <div className="flex items-start gap-2">
+                    <span className="mt-1.5 h-2 w-2 rounded-full bg-[var(--gold)]" />
+                    <span>All natural flavors. No artificial dyes or synthetic colors.</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="mt-1.5 h-2 w-2 rounded-full bg-[rgba(199,54,44,0.8)]" />
+                    <span>Classic gummy bear flavor — done right.</span>
+                  </div>
+                  <div className="flex items-start gap-2 text-white/70">
+                    <span className="mt-1.5 h-2 w-2 rounded-full bg-white/50" />
+                    <span>5 fruit flavors: cherry, watermelon, orange, green apple, lemon.</span>
+                  </div>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <span className="badge badge--navy">Made in USA</span>
+                  <span className="badge badge--navy">No artificial dyes</span>
+                </div>
+              </div>
             </div>
 
             <div className="relative">
