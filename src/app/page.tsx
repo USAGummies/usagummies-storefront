@@ -17,6 +17,27 @@ export const metadata: Metadata = {
     "USA Gummies - All American Gummy Bears, made in the USA with no artificial dyes or synthetic colors and all natural flavors.",
 };
 
+type GummyBearProps = {
+  className?: string;
+  color: string;
+};
+
+function GummyBearIcon({ className, color }: GummyBearProps) {
+  return (
+    <svg
+      viewBox="0 0 64 86"
+      className={className}
+      style={{ color }}
+      aria-hidden="true"
+    >
+      <path
+        fill="currentColor"
+        d="M32 6c-5.8 0-10.5 4.7-10.5 10.5 0 3.8 2 7.1 5 9-5.3 1.2-9.3 6-9.3 11.8 0 7 5.4 12.7 12 12.7h1.1v18.2c0 5 4.1 9 9.1 9s9.1-4 9.1-9V50h1.1c6.6 0 12-5.7 12-12.7 0-5.8-4-10.6-9.3-11.8 3-1.9 5-5.2 5-9C42.5 10.7 37.8 6 32 6zm-8.6 11.8a3.6 3.6 0 1 1 0 7.2 3.6 3.6 0 0 1 0-7.2zm17.2 0a3.6 3.6 0 1 1 0 7.2 3.6 3.6 0 0 1 0-7.2z"
+      />
+    </svg>
+  );
+}
+
 function formatMoney(amount: string | number, currency = "USD") {
   const n = typeof amount === "string" ? Number(amount) : amount;
   if (!Number.isFinite(n)) return `$${amount}`;
@@ -158,6 +179,32 @@ export default async function HomePage() {
         />
         <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[rgba(199,54,44,0.28)] blur-3xl" aria-hidden="true" />
         <div className="absolute -left-20 bottom-0 h-72 w-72 rounded-full bg-white/10 blur-3xl" aria-hidden="true" />
+        <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+          <GummyBearIcon
+            className="absolute left-6 top-6 h-7 w-7 rotate-6 opacity-80 drop-shadow-[0_6px_16px_rgba(0,0,0,0.35)]"
+            color="#8f1f1f"
+          />
+          <GummyBearIcon
+            className="absolute left-16 top-36 hidden h-6 w-6 -rotate-6 opacity-70 sm:block"
+            color="#f4c64a"
+          />
+          <GummyBearIcon
+            className="absolute left-10 bottom-14 hidden h-8 w-8 rotate-12 opacity-75 sm:block"
+            color="#4ba45d"
+          />
+          <GummyBearIcon
+            className="absolute right-10 top-12 h-8 w-8 -rotate-6 opacity-75 drop-shadow-[0_6px_18px_rgba(0,0,0,0.4)]"
+            color="#f08b2d"
+          />
+          <GummyBearIcon
+            className="absolute right-28 top-48 hidden h-7 w-7 rotate-3 opacity-70 sm:block"
+            color="#d65a55"
+          />
+          <GummyBearIcon
+            className="absolute right-20 bottom-10 hidden h-6 w-6 -rotate-12 opacity-70 sm:block"
+            color="#8f1f1f"
+          />
+        </div>
         <div className="relative mx-auto max-w-6xl px-4 py-8 sm:py-10 lg:py-12">
           <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
             <div className="space-y-5">
@@ -252,13 +299,13 @@ export default async function HomePage() {
               <div className="metal-panel rounded-[36px] border border-[rgba(199,54,44,0.45)] p-3 ring-1 ring-white/20 shadow-[0_32px_90px_rgba(7,12,20,0.6)]">
                 <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-[0.3em] text-white/60">
                   <span>Build your bundle</span>
-                  <span className="text-[var(--gold)]">5 • 8 • 12 bags</span>
+                  <span className="text-[var(--gold)]">5 / 8 / 12 bags</span>
                 </div>
                 <div className="mt-1 text-xs text-white/70">
                   Tap a bundle size to lock your price.
                 </div>
                 <div className="mt-3 space-y-3">
-                  <div className="bundle-home metal-panel--light rounded-[28px] border border-white/25 p-2 shadow-[0_18px_48px_rgba(7,12,20,0.45)]">
+                  <div className="bundle-home metal-panel rounded-[28px] border border-[rgba(199,160,98,0.4)] p-2 shadow-[0_22px_60px_rgba(7,12,20,0.6)]">
                     <BundleQuickBuy
                       anchorId="bundle-pricing"
                       productHandle={handle}
