@@ -117,9 +117,9 @@ function CardShell({
       role={role}
       tabIndex={tabIndex}
       className={clsx(
-        "relative overflow-hidden rounded-3xl border border-white/15 bg-white/[0.08] p-4 shadow-[0_24px_70px_rgba(0,0,0,0.35)] backdrop-blur-2xl transition",
+        "relative overflow-hidden rounded-3xl border border-white/12 bg-white/[0.06] p-4 shadow-[0_20px_60px_rgba(5,10,20,0.4)] transition",
         clickable
-          ? "cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-300/40 hover:-translate-y-0.5 hover:shadow-[0_32px_80px_rgba(0,0,0,0.42)]"
+          ? "cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-300/40 hover:-translate-y-0.5 hover:shadow-[0_28px_72px_rgba(5,10,20,0.5)]"
           : "",
         className
       )}
@@ -376,7 +376,7 @@ export default function ReviewsSectionClient({ reviews }: Props) {
 
   const heroCard = hero ? (
     <CardShell
-      className="p-5 border-white/20 bg-white/[0.12]"
+      className="p-5 border-white/15 bg-white/[0.08]"
       onClick={openModal}
       onKeyDown={keyActivate(openModal)}
       role="button"
@@ -417,24 +417,24 @@ export default function ReviewsSectionClient({ reviews }: Props) {
       </div>
     </CardShell>
   ) : (
-    <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 text-sm text-white/70">
+    <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 text-sm text-white/70">
       Verified reviews coming soon.
     </div>
   );
 
   return (
     <section className="relative">
-      <div className="relative overflow-hidden rounded-[34px] border border-[rgba(199,54,44,0.25)] bg-white/[0.05] p-4 shadow-[0_32px_96px_rgba(7,12,20,0.55)] backdrop-blur-2xl sm:p-5">
+      <div className="relative overflow-hidden rounded-[36px] border border-[rgba(199,54,44,0.3)] bg-[rgba(255,255,255,0.04)] p-5 shadow-[0_26px_80px_rgba(7,12,20,0.5)] sm:p-6">
         <div
-          className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/15"
+          className="pointer-events-none absolute inset-x-6 top-0 h-px bg-[rgba(199,54,44,0.6)]"
           aria-hidden="true"
         />
         <div
           className="pointer-events-none absolute inset-0"
           style={{
             backgroundImage: [
-              "radial-gradient(circle at 10% 0%, rgba(214,64,58,0.08), transparent 38%)",
-              "radial-gradient(circle at 88% 10%, rgba(255,255,255,0.06), transparent 42%)",
+              "radial-gradient(circle at 12% 0%, rgba(255,255,255,0.05), transparent 44%)",
+              "radial-gradient(circle at 88% 10%, rgba(199,54,44,0.1), transparent 46%)",
               "linear-gradient(180deg, rgba(11,20,38,0.0), rgba(11,20,38,0.4))",
             ].join(","),
           }}
@@ -466,7 +466,7 @@ export default function ReviewsSectionClient({ reviews }: Props) {
                 {mentions.map((chip) => (
                   <span
                     key={chip.key}
-                    className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs font-semibold text-white/80 shadow-[0_10px_30px_rgba(0,0,0,0.25)]"
+                    className="rounded-full border border-white/15 bg-white/10 px-2 py-1 text-xs font-semibold text-white/80 shadow-[0_10px_30px_rgba(0,0,0,0.25)]"
                   >
                     {chip.label}
                   </span>
@@ -578,7 +578,7 @@ export default function ReviewsSectionClient({ reviews }: Props) {
               <button
                 type="button"
                 onClick={openModal}
-                className="btn btn-outline min-h-[44px]"
+                className="btn btn-outline-white min-h-[44px]"
                 ref={triggerRef}
               >
                 See all verified reviews

@@ -79,16 +79,16 @@ export function InstagramGrid({
   const usingFallback = items.length === 0;
 
   return (
-    <section className="rounded-[32px] border border-[rgba(199,54,44,0.22)] bg-[var(--surface-strong)] p-6 shadow-[0_22px_60px_rgba(7,12,20,0.4)]">
+    <section className="rounded-[32px] border border-[rgba(199,54,44,0.3)] bg-[rgba(255,255,255,0.04)] p-5 shadow-[0_22px_60px_rgba(7,12,20,0.45)] text-white sm:p-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-white/60">
             Follow the road trip
           </div>
-          <h2 className="mt-1 text-2xl font-black text-[var(--text)]">
+          <h2 className="mt-1 text-2xl font-black text-white">
             @{username}
           </h2>
-          <div className="mt-2 text-sm text-[var(--muted)]">
+          <div className="mt-2 text-sm text-white/70">
             Real America. Real gummies. No influencer nonsense.
           </div>
         </div>
@@ -96,14 +96,14 @@ export function InstagramGrid({
           href={`https://www.instagram.com/${username}/`}
           target="_blank"
           rel="noopener noreferrer"
-          className="btn btn-outline"
+          className="btn btn-outline-white"
         >
           Follow →
         </Link>
       </div>
 
       {err ? (
-        <div className="mt-4 text-xs text-[var(--muted)]">
+        <div className="mt-4 text-xs text-white/60">
           Showing a preview while the live feed refreshes.
         </div>
       ) : null}
@@ -120,8 +120,8 @@ export function InstagramGrid({
                 target="_blank"
                 rel="noopener noreferrer"
                 className={cn(
-                  "group relative aspect-square overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]",
-                  "hover:border-[rgba(13,28,51,0.2)] hover:shadow-[0_18px_42px_rgba(15,27,45,0.16)]",
+                  "group relative aspect-square overflow-hidden rounded-2xl border border-white/10 bg-white/5",
+                  "hover:border-white/30 hover:shadow-[0_18px_42px_rgba(5,10,20,0.45)]",
                   "transition"
                 )}
               >
@@ -143,12 +143,12 @@ export function InstagramGrid({
           })}
         </div>
       ) : (
-        <div className="mt-6 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 text-sm text-[var(--muted)]">
+        <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/70">
           Follow @usagummies for the latest drops, customer photos, and bundle moments.
         </div>
       )}
 
-      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 text-xs text-[var(--muted)]">
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 text-xs text-white/60">
         <div>
           {feed?.source === "live" ? "Live Instagram feed" : "Instagram preview"}
         </div>
