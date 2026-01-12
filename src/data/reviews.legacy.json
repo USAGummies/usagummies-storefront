@@ -1,57 +1,51 @@
 [
   {
-    "id": "legacy-1",
-    "source": "legacy",
+    "id": "legacy-2026-01-05-rene-g",
     "rating": 5,
-    "title": "Best clean gummies",
-    "body": "Finally a gummy that’s dye-free and tastes amazing. Buying bundles from now on.",
-    "authorName": "Morgan T",
-    "dateISO": "2023-11-05",
-    "productLabel": "All American Gummy Bear Bundles",
-    "verified": true
+    "body": "Gummies arrived in time for Christmas. Nice stocking stuffers for my kids! The gummies are fresh and very good! Definitely will order more!!!",
+    "authorName": "Rene G",
+    "dateISO": "2026-01-05"
   },
   {
-    "id": "legacy-2",
-    "source": "legacy",
+    "id": "legacy-2025-12-08-michael-d",
     "rating": 5,
-    "title": "Soft texture, great flavor",
-    "body": "The texture is perfect and the flavor is bold without being fake.",
-    "authorName": "Dana K",
-    "dateISO": "2023-12-01",
-    "productLabel": "All American Gummy Bear Bundles",
-    "verified": true
+    "body": "Absolutely delicious soft gummy bears made in America packaged in a unique bag displaying American pride in American products and American workers! What more could you want!?Support a small business right here in America by giving these gummies a try , You will not be disappointed!!😃🇺🇸",
+    "authorName": "MICHAEL D",
+    "dateISO": "2025-12-08"
   },
   {
-    "id": "legacy-3",
-    "source": "legacy",
+    "id": "legacy-2025-12-01-tommie-o",
     "rating": 5,
-    "title": "Repeat buyer",
-    "body": "Fast shipping and my whole family loves them. Clean label matters to us.",
-    "authorName": "Paul R",
-    "dateISO": "2024-01-18",
-    "productLabel": "All American Gummy Bears – 7.5 oz",
-    "verified": true
+    "body": "THEY ARE OUTSTANDING , I WILL ORDER MORE IN THE FUTURE",
+    "authorName": "Tommie O",
+    "dateISO": "2025-12-01"
   },
   {
-    "id": "legacy-4",
-    "source": "legacy",
+    "id": "legacy-2025-11-11-ryan-m",
     "rating": 5,
-    "title": "Flavor is on point",
-    "body": "Great balance of sweetness and texture. American-made pride.",
-    "authorName": "Samantha L",
-    "dateISO": "2024-02-10",
-    "productLabel": "All American Gummy Bear Bundles",
-    "verified": true
+    "body": "Super fast and easy",
+    "authorName": "Ryan M",
+    "dateISO": "2025-11-11"
   },
   {
-    "id": "legacy-5",
-    "source": "legacy",
+    "id": "legacy-2025-11-10-beau-m",
     "rating": 5,
-    "title": "Perfect gift",
-    "body": "Gave these as a gift and immediately ordered more for myself. Free ship on bundles is great.",
-    "authorName": "Chris B",
-    "dateISO": "2024-02-28",
-    "productLabel": "All American Gummy Bear Bundles",
-    "verified": true
+    "body": "Quick order fulfillment and shipping, with a great tasting, soft, and fresh gummy bears. I’ll order again.",
+    "authorName": "Beau M",
+    "dateISO": "2025-11-10"
+  },
+  {
+    "id": "legacy-2025-11-04-craig-b",
+    "rating": 5,
+    "body": "Love them gummies, will be ordering regularly.",
+    "authorName": "Craig B",
+    "dateISO": "2025-11-04"
+  },
+  {
+    "id": "legacy-2025-11-01-niki-l",
+    "rating": 5,
+    "body": "Just tried USA Gummies and they are amazing! The flavor and texture is next level and addicting. I will definitely get them again!",
+    "authorName": "Niki L",
+    "dateISO": "2025-11-01"
   }
 ]

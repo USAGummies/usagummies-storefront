@@ -287,7 +287,7 @@ export default async function HomePage() {
               </div>
             </div>
 
-            <div className="relative order-1 flex flex-col gap-4 lg:order-2 lg:gap-5 lg:flex-col-reverse">
+            <div className="relative order-1 flex flex-col gap-4 lg:order-2 lg:gap-5 lg:flex-col">
               <div className="relative">
                 <div className="absolute -top-6 right-6 h-20 w-20 rounded-full bg-[rgba(199,54,44,0.25)] blur-2xl" aria-hidden="true" />
                 <div className="relative rounded-3xl border border-white/20 bg-white/95 p-2 text-[var(--navy)] shadow-[0_30px_70px_rgba(7,12,20,0.35)]">
