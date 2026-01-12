@@ -5,6 +5,7 @@ import { getProductsPage } from "@/lib/shopify/products";
 import { getProductByHandle } from "@/lib/storefront";
 import BundleQuickBuy from "@/components/home/BundleQuickBuy.client";
 import ReviewsSection from "@/components/home/ReviewsSection";
+import { InstagramGrid } from "@/components/instagram/InstagramGrid.client";
 import { getBundleVariants } from "@/lib/bundles/getBundleVariants";
 import { FREE_SHIPPING_PHRASE, pricingForQty } from "@/lib/bundles/pricing";
 import HeroCTAWatcher from "@/components/home/HeroCTAWatcher";
@@ -357,46 +358,8 @@ export default async function HomePage() {
       </section>
 
       <section className="bg-[var(--bg)]">
-        <div className="mx-auto max-w-6xl px-4 py-5 lg:py-8 space-y-4 reveal-up">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="space-y-2">
-              <FlagAccent />
-              <h2 className="text-2xl font-black text-[var(--text)]">Why USA Gummies</h2>
-            </div>
-            <div className="text-sm font-semibold text-[var(--muted)]">
-              American-made, clean, and built for bundles.
-            </div>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {whyCards.map((card) => (
-              <div
-                key={card.title}
-                className="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[0_14px_32px_rgba(15,27,45,0.12)] transition-transform duration-200 hover:-translate-y-1"
-              >
-                <div
-                  className="pointer-events-none absolute inset-x-0 top-0 h-1.5"
-                  aria-hidden="true"
-                  style={{
-                    backgroundImage:
-                      "repeating-linear-gradient(90deg, rgba(199,54,44,0.85) 0 12px, rgba(255,255,255,0.95) 12px 24px)",
-                  }}
-                />
-                <div className="flex items-center gap-3">
-                  <div className="icon-float flex h-10 w-10 items-center justify-center rounded-full bg-[rgba(13,28,51,0.06)]">
-                    {card.icon}
-                  </div>
-                  <div className="text-lg font-black text-[var(--text)]">{card.title}</div>
-                </div>
-                <p className="mt-3 text-sm text-[var(--muted)]">{card.copy}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="bg-[var(--bg)]">
         <div className="mx-auto max-w-6xl px-4 py-5 lg:py-8 reveal-up">
-          <div className="relative overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[0_18px_48px_rgba(15,27,45,0.12)]">
+          <div className="relative overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[0_18px_48px_rgba(15,27,45,0.12)]">
             <div
               className="pointer-events-none absolute inset-x-0 top-0 h-1.5"
               aria-hidden="true"
@@ -405,27 +368,48 @@ export default async function HomePage() {
                   "repeating-linear-gradient(90deg, rgba(199,54,44,0.9) 0 14px, rgba(255,255,255,0.95) 14px 28px)",
               }}
             />
-            <div className="relative flex flex-wrap items-center justify-between gap-4">
-              <div className="space-y-2">
-                <FlagAccent />
-                <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">
-                  Join the movement
+            <div className="relative space-y-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="space-y-2">
+                  <FlagAccent />
+                  <h2 className="text-2xl font-black text-[var(--text)]">Why USA Gummies</h2>
                 </div>
-                <h3 className="text-xl font-black text-[var(--text)]">
-                  Follow @usagummies for new flavors & customer stories
-                </h3>
-                <p className="text-sm text-[var(--muted)]">
-                  Real customers. Real bundles. Built in America.
-                </p>
+                <div className="text-sm font-semibold text-[var(--muted)]">
+                  American-made, clean, and built for bundles.
+                </div>
               </div>
-              <Link
-                href="https://www.instagram.com/usagummies"
-                className="btn btn-navy"
-              >
-                Follow @usagummies
-              </Link>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {whyCards.map((card) => (
+                  <div
+                    key={card.title}
+                    className="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-4 shadow-[0_14px_32px_rgba(15,27,45,0.12)] transition-transform duration-200 hover:-translate-y-1"
+                  >
+                    <div
+                      className="pointer-events-none absolute inset-x-0 top-0 h-1.5"
+                      aria-hidden="true"
+                      style={{
+                        backgroundImage:
+                          "repeating-linear-gradient(90deg, rgba(199,54,44,0.85) 0 12px, rgba(255,255,255,0.95) 12px 24px)",
+                      }}
+                    />
+                    <div className="flex items-center gap-3">
+                      <div className="icon-float flex h-10 w-10 items-center justify-center rounded-full bg-[rgba(13,28,51,0.06)]">
+                        {card.icon}
+                      </div>
+                      <div className="text-lg font-black text-[var(--text)]">{card.title}</div>
+                    </div>
+                    <p className="mt-3 text-sm text-[var(--muted)]">{card.copy}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      <section className="bg-[var(--bg)]">
+        <div className="mx-auto max-w-6xl px-4 py-5 lg:py-8 reveal-up">
+          <InstagramGrid username="usagummies" limit={12} />
         </div>
       </section>
 

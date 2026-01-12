@@ -40,7 +40,6 @@ const CTA_LINK =
 const MAX_SUPPORTING = 8;
 
 const RED = "#D6403A";
-const BLUE = "#2563EB";
 
 function clsx(...a: Array<string | false | null | undefined>) {
   return a.filter(Boolean).join(" ");
@@ -83,7 +82,7 @@ function Stars({ rating, size = "sm" }: { rating: number; size?: "sm" | "md" }) 
 function VerifiedBadge({ source }: { source: ReviewSource }) {
   if (source === "shopify") {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-blue-300/35 bg-blue-500/10 px-3 py-1 text-xs font-semibold text-blue-100">
+      <span className="inline-flex items-center gap-1 rounded-full border border-white/25 bg-white/10 px-3 py-1 text-xs font-semibold text-white/85">
         Shopify • Verified buyer
       </span>
     );
@@ -115,11 +114,13 @@ function StarFieldOverlay() {
 function CardTopEdge() {
   return (
     <div className="pointer-events-none absolute left-0 right-0 top-0 h-[5px] overflow-hidden">
-      <div className="flex h-full w-full opacity-[0.85]">
-        <div style={{ width: "33.33%", backgroundColor: RED }} />
-        <div style={{ width: "33.33%", backgroundColor: "rgba(255,255,255,0.95)" }} />
-        <div style={{ width: "33.33%", backgroundColor: BLUE }} />
-      </div>
+      <div
+        className="h-full w-full opacity-[0.85]"
+        style={{
+          backgroundImage:
+            "repeating-linear-gradient(90deg, rgba(214,64,58,0.95) 0 14px, rgba(255,255,255,0.95) 14px 28px)",
+        }}
+      />
     </div>
   );
 }
@@ -150,7 +151,7 @@ function CardShell({
       tabIndex={tabIndex}
       className={clsx(
         "relative overflow-hidden rounded-3xl border border-white/15 bg-white/[0.09] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-xl",
-        clickable ? "cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400/60" : "",
+        clickable ? "cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-300/40" : "",
         className
       )}
     >
@@ -160,7 +161,7 @@ function CardShell({
         style={{
           backgroundImage: [
             "radial-gradient(circle at 12% 10%, rgba(214,64,58,0.10), transparent 44%)",
-            "radial-gradient(circle at 88% 10%, rgba(37,99,235,0.10), transparent 46%)",
+            "radial-gradient(circle at 88% 10%, rgba(13,28,51,0.16), transparent 46%)",
           ].join(","),
         }}
       />
@@ -420,6 +421,25 @@ export default function ReviewsSectionClient({ reviews }: Props) {
       <StarFieldOverlay />
       <div className="relative z-10 space-y-6">
         <div className="space-y-3">
+          <div className="flex items-center gap-3">
+            <span
+              className="inline-flex h-6 w-9 items-center justify-center rounded-md border border-white/25 bg-white/10"
+              aria-hidden="true"
+              style={{
+                backgroundImage:
+                  "radial-gradient(rgba(255,255,255,0.9) 1px, transparent 2px)",
+                backgroundSize: "10px 10px",
+              }}
+            />
+            <span
+              className="h-1.5 w-24 rounded-full border border-white/20"
+              aria-hidden="true"
+              style={{
+                backgroundImage:
+                  "repeating-linear-gradient(90deg, rgba(214,64,58,0.95) 0 12px, rgba(255,255,255,0.95) 12px 24px)",
+              }}
+            />
+          </div>
           <div className="flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-[0.2em] text-white/75">
             <Stars rating={avg || 5} size="md" />
             <span>
