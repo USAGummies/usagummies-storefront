@@ -1,10 +1,25 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
-import { money } from "@/lib/storefront";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import QuickView from "@/components/shop/QuickView.client";
 
 type ProductCardData = any;
+
+function formatMoney(amount: string | number, currency = "USD") {
+  const n = typeof amount === "string" ? Number(amount) : amount;
+  if (!Number.isFinite(n)) return `${amount}`;
+  try {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency,
+      maximumFractionDigits: n % 1 === 0 ? 0 : 2,
+    }).format(n);
+  } catch {
+    return `${amount} ${currency}`;
+  }
+}
 
 function formatPrice(product: ProductCardData) {
   const variants =
@@ -19,13 +34,13 @@ function formatPrice(product: ProductCardData) {
     product?.priceRange?.minVariantPrice?.amount;
 
   if (typeof price === "string") return price;
-  if (price?.amount && price?.currencyCode) return money(price.amount, price.currencyCode);
+  if (price?.amount && price?.currencyCode) return formatMoney(price.amount, price.currencyCode);
 
   if (
     product?.priceRange?.minVariantPrice?.amount &&
     product?.priceRange?.minVariantPrice?.currencyCode
   ) {
-    return money(
+    return formatMoney(
       product.priceRange.minVariantPrice.amount,
       product.priceRange.minVariantPrice.currencyCode
     );
