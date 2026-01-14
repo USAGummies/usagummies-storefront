@@ -14,7 +14,7 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { BundleTier } from "@/lib/bundles/getBundleVariants";
-import { BASE_PRICE, FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
+import { BASE_PRICE, FREE_SHIPPING_PHRASE, MIN_PER_BAG } from "@/lib/bundles/pricing";
 import { trackEvent } from "@/lib/analytics";
 import { fireCartToast } from "@/lib/cartFeedback";
 
@@ -110,6 +110,7 @@ export default function BundleQuickBuy({
 
   const selectedTier =
     featured.find((t) => String(t.quantity) === selected) || featured[0] || null;
+  const perBagCapText = money(MIN_PER_BAG, "USD");
 
   function scrollToCTA() {
     if (!ctaRef.current) return;
@@ -520,6 +521,7 @@ export default function BundleQuickBuy({
           <li>Discounts start at 4 bags</li>
           <li>Free shipping at 5+ bags</li>
           <li>Most customers choose 8 bags</li>
+          <li>Per-bag price caps at {perBagCapText} after 12+ bags</li>
         </ul>
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] text-white/70">

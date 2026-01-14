@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { pricingForQty, BASE_PRICE, FREE_SHIP_QTY, FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
+import { pricingForQty, BASE_PRICE, FREE_SHIP_QTY, FREE_SHIPPING_PHRASE, MIN_PER_BAG } from "@/lib/bundles/pricing";
 import { SINGLE_BAG_SKU, SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
 import { fireCartToast } from "@/lib/cartFeedback";
 
@@ -174,6 +174,7 @@ export default function PurchaseBox({
     "USD";
 
   const availableTiers = useMemo(() => ladder, [ladder]);
+  const perBagCapText = money(MIN_PER_BAG, baselineCurrency);
 
   const bundleOptions = useMemo<BundleOption[]>(() => {
     if (!singleVariant?.id) return [];
@@ -364,6 +365,7 @@ export default function PurchaseBox({
                 <li>Discounts start at 4 bags</li>
                 <li>Free shipping at 5+ bags</li>
                 <li>Most customers choose 8 bags</li>
+                <li>Per-bag price caps at {perBagCapText} after 12+ bags</li>
               </ul>
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-2 text-[10px] text-white/70">

@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CartLineControls } from "@/components/cart/CartLineControls.client";
 import AddBagButton from "@/components/cart/AddBagButton.client";
 import { cn } from "@/lib/cn";
-import { pricingForQty, BASE_PRICE, FREE_SHIP_QTY, FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
+import { pricingForQty, BASE_PRICE, FREE_SHIP_QTY, FREE_SHIPPING_PHRASE, MIN_PER_BAG } from "@/lib/bundles/pricing";
 import { isSingleBagVariant, SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
 import { trackEvent } from "@/lib/analytics";
 import { ReviewHighlights } from "@/components/reviews/ReviewHighlights";
@@ -367,6 +367,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                   <li>Discounts start at 4 bags</li>
                   <li>Free shipping at 5+ bags</li>
                   <li>Most customers choose 8 bags</li>
+                  <li>Per-bag price caps at {formatNumber(MIN_PER_BAG, summaryCurrency)} after 12+ bags</li>
                 </ul>
               </div>
 
