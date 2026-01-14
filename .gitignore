@@ -46,6 +46,8 @@ node_modules/n.next/n.vercel
 shopify-app/
 shopify/
 usagummies-storefront/
+!src/lib/shopify/
+!src/lib/shopify/**
 
 node_modules/
 .env*
