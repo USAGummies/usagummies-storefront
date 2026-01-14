@@ -60,7 +60,7 @@ export default async function HomePage() {
   const whyImageSrc = whyImage?.url || "/home-patriotic-product.jpg";
   const whyImageAlt = whyImage?.altText || "USA Gummies in hand";
 
-  const heroMediaSrc = "/hero-loop.gif";
+  const heroMediaSrc = "/brand/hero.jpg";
   const starterPricing = pricingForQty(1);
   const bestValuePricing = pricingForQty(8);
   const starterPerBag = formatMoney(starterPricing.perBag);
