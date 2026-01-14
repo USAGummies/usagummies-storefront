@@ -5,7 +5,6 @@ import { getProductsPage } from "@/lib/shopify/products";
 import { getProductByHandle } from "@/lib/storefront";
 import BundleQuickBuy from "@/components/home/BundleQuickBuy.client";
 import ReviewsSection from "@/components/home/ReviewsSection";
-import { InstagramGrid } from "@/components/instagram/InstagramGrid.client";
 import { getBundleVariants } from "@/lib/bundles/getBundleVariants";
 import { FREE_SHIPPING_PHRASE, pricingForQty } from "@/lib/bundles/pricing";
 import HeroCTAWatcher from "@/components/home/HeroCTAWatcher";
@@ -28,6 +27,78 @@ function formatMoney(amount: string | number, currency = "USD") {
     maximumFractionDigits: 2,
   }).format(n);
 }
+
+const SOCIAL_LINKS = [
+  {
+    name: "Instagram",
+    href: "https://www.instagram.com/usagummies/",
+    label: "@usagummies",
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+        <rect
+          x="3"
+          y="3"
+          width="18"
+          height="18"
+          rx="5"
+          ry="5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+        />
+        <circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" strokeWidth="1.6" />
+        <circle cx="17.2" cy="6.8" r="1.2" fill="currentColor" />
+      </svg>
+    ),
+  },
+  {
+    name: "Facebook",
+    href: "https://www.facebook.com/profile.php?id=61581802793282#",
+    label: "USA Gummies",
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+        <path
+          fill="currentColor"
+          d="M13.5 8.5h3V6h-3c-2.5 0-4.5 2-4.5 4.5V13H7v3h2v5h3v-5h3l1-3h-4v-2.5c0-0.6 0.4-1 1-1z"
+        />
+      </svg>
+    ),
+  },
+  {
+    name: "TikTok",
+    href: "https://www.tiktok.com/@usa.gummies?lang=en",
+    label: "@usa.gummies",
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+        <path
+          fill="currentColor"
+          d="M15.5 4c.4 1.6 1.7 3 3.5 3.4v3c-1.5 0-2.9-.5-4-1.3v6.1c0 3.1-2.6 5.8-5.8 5.8S3.5 19 3.5 15.9c0-3.1 2.5-5.5 5.6-5.5.5 0 1 .1 1.5.2v3.3c-.5-.2-1-.4-1.6-.4-1.3 0-2.4 1.1-2.4 2.4 0 1.4 1.1 2.5 2.5 2.5 1.4 0 2.4-1.1 2.4-2.5V4h4z"
+        />
+      </svg>
+    ),
+  },
+  {
+    name: "YouTube",
+    href: "https://www.youtube.com/@USAGummies",
+    label: "USA Gummies",
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+        <rect
+          x="3"
+          y="6"
+          width="18"
+          height="12"
+          rx="3"
+          ry="3"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+        />
+        <polygon points="10,9 16,12 10,15" fill="currentColor" />
+      </svg>
+    ),
+  },
+];
 
 export default async function HomePage() {
   let productsPage: Awaited<ReturnType<typeof getProductsPage>> | null = null;
@@ -479,7 +550,56 @@ export default async function HomePage() {
       <section className="bg-[var(--navy)]">
         <div className="mx-auto max-w-6xl px-4 py-8 lg:py-10 reveal-up">
           <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-            <InstagramGrid username="usagummies" limit={8} />
+            <div className="metal-panel rounded-[32px] border border-[rgba(199,54,44,0.3)] p-5 text-white sm:p-6">
+              <div className="flex flex-wrap items-end justify-between gap-4">
+                <div>
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-white/60">
+                    Follow the revolution
+                  </div>
+                  <h2 className="mt-1 text-2xl font-black text-white">
+                    Follow along with USA Gummies
+                  </h2>
+                  <div className="mt-2 text-sm text-white/70">
+                    Behind-the-scenes drops, customer moments, and all the latest updates.
+                  </div>
+                </div>
+                <Link
+                  href="https://www.instagram.com/usagummies/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-outline-white"
+                >
+                  Follow →
+                </Link>
+              </div>
+
+              <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-2">
+                {SOCIAL_LINKS.map((social) => (
+                  <a
+                    key={social.name}
+                    href={social.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3 transition hover:border-white/30 hover:bg-white/10"
+                    aria-label={`Follow USA Gummies on ${social.name}`}
+                  >
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white/90">
+                      {social.icon}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold text-white">
+                        {social.name}
+                      </span>
+                      <span className="block text-[11px] text-white/60">{social.label}</span>
+                    </span>
+                  </a>
+                ))}
+              </div>
+
+              <div className="mt-4 text-xs text-white/60">
+                Tap any channel to follow and stay in the loop.
+              </div>
+            </div>
             <div className="metal-panel relative overflow-hidden rounded-[32px] border border-[rgba(199,54,44,0.3)] p-5 text-white">
               <div className="space-y-3">
                 <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-white/60">
