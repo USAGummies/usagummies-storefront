@@ -50,10 +50,22 @@ export async function shopifyRequest<T>({
       signal: controller.signal,
     });
 
-    const json = (await res.json().catch(() => null)) as ShopifyResponse<T> | null;
+    const raw = await res.text();
+    let json: ShopifyResponse<T> | null = null;
+    if (raw) {
+      try {
+        json = JSON.parse(raw) as ShopifyResponse<T>;
+      } catch {
+        json = null;
+      }
+    }
     if (!res.ok || !json || json.errors?.length) {
+      const errorMessages = json?.errors?.map((err) => err?.message).filter(Boolean).join("; ");
+      const status = res.status ? `HTTP ${res.status}${res.statusText ? ` ${res.statusText}` : ""}` : "";
+      const preview = raw ? raw.replace(/\s+/g, " ").slice(0, 200) : "";
       const message =
-        json?.errors?.map((err) => err?.message).filter(Boolean).join("; ") || "request failed";
+        errorMessages ||
+        (status && preview ? `${status}: ${preview}` : status || preview || "request failed");
       if (process.env.NODE_ENV !== "production") {
         console.warn(`[${warnPrefix}] ${message}`);
       }
