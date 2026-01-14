@@ -256,9 +256,17 @@ export default function QuickView({ product, detailHref, bundleHref, children }:
                     disabled={adding}
                     className="btn btn-red mt-3 w-full"
                   >
-                    {adding
-                      ? "Adding…"
-                      : `Add ${selectedQty}-bag bundle — ${money(total)} →`}
+                    {adding ? (
+                      <span className="inline-flex items-center gap-2">
+                        <span
+                          aria-hidden="true"
+                          className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent opacity-60"
+                        />
+                        Adding…
+                      </span>
+                    ) : (
+                      `Add ${selectedQty}-bag bundle — ${money(total)} →`
+                    )}
                   </button>
                   <div className="mt-2 text-[11px] text-[var(--muted)]">Free shipping • Secure checkout</div>
                 </div>

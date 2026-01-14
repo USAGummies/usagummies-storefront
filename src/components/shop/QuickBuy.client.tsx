@@ -106,7 +106,17 @@ export default function QuickBuy({
           "disabled:cursor-not-allowed disabled:opacity-60",
         ].join(" ")}
       >
-        {pending ? "Adding…" : "Quick add"}
+        {pending ? (
+          <span className="inline-flex items-center gap-2">
+            <span
+              aria-hidden="true"
+              className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent opacity-60"
+            />
+            Adding…
+          </span>
+        ) : (
+          "Quick add"
+        )}
       </button>
       {error ? <span className="text-[11px] text-red-200">{error}</span> : null}
     </div>

@@ -500,7 +500,17 @@ export default function PurchaseBox({
               onClick={addToCart}
               className={cx("pbx__cta", "pbx__cta--primary")}
             >
-              {adding ? "Adding…" : "Add to Cart"}
+              {adding ? (
+                <span className="inline-flex items-center gap-2">
+                  <span
+                    aria-hidden="true"
+                    className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent opacity-60"
+                  />
+                  Adding…
+                </span>
+              ) : (
+                "Add to Cart"
+              )}
             </button>
             <div className="pbx__ctaNote" aria-live="polite">
               {selectedQty >= 5
@@ -523,7 +533,17 @@ export default function PurchaseBox({
             disabled={adding}
             className="pbx__stickyBtn"
           >
-            {adding ? "Adding…" : "Add bundle"}
+            {adding ? (
+              <span className="inline-flex items-center gap-2">
+                <span
+                  aria-hidden="true"
+                  className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent opacity-60"
+                />
+                Adding…
+              </span>
+            ) : (
+              "Add bundle"
+            )}
           </button>
         </div>
       </div>

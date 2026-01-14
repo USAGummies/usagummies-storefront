@@ -565,12 +565,20 @@ export default function BundleQuickBuy({
             disabled={adding || ctaDisabled}
           >
             <span className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.14),transparent_50%)] opacity-95" />
-            <span className="relative">
-              {adding
-                ? "Adding…"
-                : selectedTier && selectedTier.totalPrice
-                ? `Add ${selectedTier.quantity}-bag bundle — ${money(selectedTier.totalPrice, "USD")} →`
-                : "Add bundle to cart →"}
+            <span className="relative inline-flex items-center gap-2">
+              {adding ? (
+                <>
+                  <span
+                    aria-hidden="true"
+                    className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent opacity-60"
+                  />
+                  Adding…
+                </>
+              ) : selectedTier && selectedTier.totalPrice ? (
+                `Add ${selectedTier.quantity}-bag bundle — ${money(selectedTier.totalPrice, "USD")} →`
+              ) : (
+                "Add bundle to cart →"
+              )}
             </span>
           </button>
           <div className={isCompact ? "text-xs text-white/70" : "text-xs text-white/75"}>
