@@ -222,11 +222,21 @@ type CartLinesUpdateResult = {
   };
 };
 
-async function createCartId(): Promise<string | null> {
-  const data = await shopify<CartCreateResult>(CART_CREATE);
-  const cart = data?.cartCreate?.cart;
-  const errs = data?.cartCreate?.userErrors;
-  if (errs?.length || !cart?.id) return null;
+async function createCartId(): Promise<string> {
+  const result = await shopifyResult<CartCreateResult>(CART_CREATE);
+  if (!result.ok) {
+    throw new Error(result.error || "Cart create failed.");
+  }
+
+  const cart = result.data?.cartCreate?.cart;
+  const errs = result.data?.cartCreate?.userErrors;
+  if (errs?.length) {
+    const message = errs.map((err) => err.message).filter(Boolean).join("; ");
+    throw new Error(message || "Cart create failed.");
+  }
+  if (!cart?.id) {
+    throw new Error("Cart create failed.");
+  }
 
   const jar = await cookies();
   jar.set(CART_COOKIE, cart.id, { path: "/", httpOnly: true, sameSite: "lax" });
@@ -234,11 +244,20 @@ async function createCartId(): Promise<string | null> {
   return cart.id;
 }
 
-async function getOrCreateCartId(): Promise<string | null> {
+async function getOrCreateCartId({
+  throwOnError = false,
+}: {
+  throwOnError?: boolean;
+} = {}): Promise<string | null> {
   const jar = await cookies();
   const existing = jar.get(CART_COOKIE)?.value;
   if (existing) return existing;
-  return createCartId();
+  try {
+    return await createCartId();
+  } catch (err) {
+    if (throwOnError) throw err;
+    return null;
+  }
 }
 
 async function getCartById(cartId: string) {
@@ -262,7 +281,7 @@ export async function addToCart(variantId: string, quantity: number) {
   if (!safeVariantId) {
     throw new Error("Only the single-bag variant can be added to cart.");
   }
-  const cartId = await getOrCreateCartId();
+  const cartId = await getOrCreateCartId({ throwOnError: true });
   if (!cartId) {
     throw new Error("Cart unavailable.");
   }
