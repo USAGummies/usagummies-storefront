@@ -111,7 +111,7 @@ export default async function ShopPage() {
     primaryProduct?.priceRange?.minVariantPrice?.currencyCode ||
     "USD";
 
-  const featuredQuantities = [5, 8, 10];
+  const featuredQuantities = [5, 8, 12];
   const bestValuePerBagText = money(pricingForQty(8).perBag.toFixed(2), currency);
 
   let bundleVariants: Awaited<ReturnType<typeof getBundleVariants>> | null = null;

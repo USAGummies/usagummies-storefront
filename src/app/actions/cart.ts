@@ -28,8 +28,12 @@ export async function addToCart(formData: FormData) {
   const safeVariantId = normalizeSingleBagVariant(variantId);
   const quantity = Math.max(1, Number(formData.get("quantity") ?? 1) || 1);
   if (!safeVariantId) throw new Error("Invalid merchandiseId (variant id).");
-  await addLine(safeVariantId, quantity);
-  return { ok: true };
+  try {
+    await addLine(safeVariantId, quantity);
+    return { ok: true };
+  } catch (err: any) {
+    return { ok: false, error: err?.message || "Cart add failed." };
+  }
 }
 
 export async function buyNow(formData: FormData) {

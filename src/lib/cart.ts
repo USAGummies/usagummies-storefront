@@ -66,6 +66,21 @@ async function shopify<T>(query: string, variables?: Record<string, any>): Promi
   return result.ok ? result.data : null;
 }
 
+async function shopifyResult<T>(query: string, variables?: Record<string, any>) {
+  const { endpoint } = getShopifyEndpoint();
+  const token = getShopifyToken();
+  if (!endpoint || !token) {
+    return { ok: false, data: null, error: "missing config" } as const;
+  }
+  return shopifyRequest<T>({
+    endpoint,
+    token,
+    body: { query, variables },
+    cache: "no-store",
+    warnPrefix: "Shopify cart",
+  });
+}
+
 const CART_CREATE = /* GraphQL */ `
   mutation CartCreate {
     cartCreate {
@@ -248,23 +263,31 @@ export async function addToCart(variantId: string, quantity: number) {
     throw new Error("Only the single-bag variant can be added to cart.");
   }
   const cartId = await getOrCreateCartId();
-  if (!cartId) return null;
+  if (!cartId) {
+    throw new Error("Cart unavailable.");
+  }
 
-  const data = await shopify<CartLinesAddResult>(CART_LINES_ADD, {
+  const result = await shopifyResult<CartLinesAddResult>(CART_LINES_ADD, {
     cartId,
     lines: [{ merchandiseId: safeVariantId, quantity }],
   });
+  if (!result.ok) {
+    throw new Error(result.error || "Cart add failed.");
+  }
 
-  const errs = data?.cartLinesAdd?.userErrors;
-  if (errs?.length) return null;
+  const errs = result.data?.cartLinesAdd?.userErrors;
+  if (errs?.length) {
+    const message = errs.map((err) => err.message).filter(Boolean).join("; ");
+    throw new Error(message || "Cart add failed.");
+  }
 
-  const cart = data?.cartLinesAdd?.cart;
+  const cart = result.data?.cartLinesAdd?.cart;
   if (cart?.id) {
     const jar = await cookies();
     jar.set(CART_COOKIE, cart.id, { path: "/", httpOnly: true, sameSite: "lax" });
     return cart.id;
   }
-  return null;
+  throw new Error("Cart unavailable.");
 }
 
 export async function buyNow(variantId: string, quantity: number) {
@@ -276,15 +299,16 @@ export async function buyNow(variantId: string, quantity: number) {
   const cartId = await getOrCreateCartId();
   if (!cartId) return null;
 
-  const data = await shopify<CartLinesAddResult>(CART_LINES_ADD, {
+  const result = await shopifyResult<CartLinesAddResult>(CART_LINES_ADD, {
     cartId,
     lines: [{ merchandiseId: safeVariantId, quantity }],
   });
+  if (!result.ok) return null;
 
-  const errs = data?.cartLinesAdd?.userErrors;
+  const errs = result.data?.cartLinesAdd?.userErrors;
   if (errs?.length) return null;
 
-  const cart = data?.cartLinesAdd?.cart;
+  const cart = result.data?.cartLinesAdd?.cart;
   if (!cart?.checkoutUrl) return null;
   return cart.checkoutUrl;
 }

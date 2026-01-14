@@ -52,7 +52,12 @@ export async function shopifyRequest<T>({
 
     const json = (await res.json().catch(() => null)) as ShopifyResponse<T> | null;
     if (!res.ok || !json || json.errors?.length) {
-      return { ok: false, data: null, error: "request failed" };
+      const message =
+        json?.errors?.map((err) => err?.message).filter(Boolean).join("; ") || "request failed";
+      if (process.env.NODE_ENV !== "production") {
+        console.warn(`[${warnPrefix}] ${message}`);
+      }
+      return { ok: false, data: null, error: message };
     }
 
     return { ok: true, data: json.data ?? null };
