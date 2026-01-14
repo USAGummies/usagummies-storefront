@@ -16,10 +16,10 @@ export async function sendContactEmail(formData: FormData) {
   const port = Number(process.env.SMTP_PORT || "465");
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
-  const to = process.env.CONTACT_TO_EMAIL;
+  const to = process.env.CONTACT_TO_EMAIL || "Ben@usagummies.com";
 
-  if (!host || !user || !pass || !to) {
-    throw new Error("Email environment variables are not configured.");
+  if (!host || !user || !pass) {
+    throw new Error("Email transport is not configured.");
   }
 
   const transporter = nodemailer.createTransport({
