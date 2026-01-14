@@ -17,7 +17,6 @@ import { ReviewHighlights } from "@/components/reviews/ReviewHighlights";
 type MoneyV2 = { amount: string; currencyCode: string };
 
 const FEATURED_BUNDLE_QTYS = [5, 8, 12];
-const EXTRA_BUNDLE_QTYS = [1, 2, 3, 4, 6, 7, 9, 10, 11];
 
 function storeCartId(cartId?: string | null) {
   if (!cartId || typeof window === "undefined") return;
@@ -383,38 +382,15 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                   );
                 })}
               </div>
-
-              <div className="mt-3 flex flex-wrap gap-2">
-                {EXTRA_BUNDLE_QTYS.map((qty) => {
-                  const pricing = pricingForQty(qty);
-                  const totalText = formatNumber(pricing.total, summaryCurrency);
-                  const isActive = totalBags === qty;
-                  const freeShip = qty >= FREE_SHIP_QTY;
-                  return (
-                    <button
-                      key={qty}
-                      type="button"
-                      aria-pressed={isActive}
-                      onClick={() => setBundleQty(qty)}
-                      disabled={bundlePending}
-                      className={cn(
-                        "flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition",
-                        "bg-[rgba(255,255,255,0.04)]",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(199,160,98,0.45)]",
-                        isActive
-                          ? "border-[rgba(199,160,98,0.7)] text-white"
-                          : "border-white/10 text-white/75 hover:border-white/35 hover:text-white",
-                        bundlePending && !isActive && "opacity-70 cursor-not-allowed"
-                      )}
-                    >
-                      <span>{qty} bags</span>
-                      <span className="text-[10px] text-white/55">{totalText}</span>
-                      {freeShip ? (
-                        <span className="text-[10px] text-white/55">Free ship</span>
-                      ) : null}
-                    </button>
-                  );
-                })}
+              <div className="mt-3 text-xs text-white/65">
+                <a
+                  href={AMAZON_LISTING_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline underline-offset-4 hover:text-white"
+                >
+                  Need fewer bags? Buy on Amazon →
+                </a>
               </div>
 
               {bundleError ? (

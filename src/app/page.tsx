@@ -279,14 +279,6 @@ export default async function HomePage() {
                     Build my bundle
                   </a>
                 </div>
-                <a
-                  href={AMAZON_LISTING_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn btn-outline-white w-full sm:w-auto"
-                >
-                  Buy 1-3 bags on Amazon
-                </a>
                 <span className="text-xs text-white/70">{FREE_SHIPPING_PHRASE}</span>
               </div>
 
@@ -327,15 +319,6 @@ export default async function HomePage() {
 
               <div className="flex flex-wrap items-center gap-3 text-xs text-white/70">
                 <span className="font-semibold text-white">★★★★★ Verified buyer reviews</span>
-                <span>Also available on Amazon</span>
-                <a
-                  href={AMAZON_LISTING_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-white/70 underline underline-offset-4 hover:text-white focus-ring"
-                >
-                  View Amazon listing →
-                </a>
               </div>
 
               <div className="metal-panel rounded-3xl border border-white/12 p-4">
@@ -429,6 +412,16 @@ export default async function HomePage() {
                       variant="compact"
                     />
                   </div>
+                </div>
+                <div className="mt-3 text-xs text-white/65">
+                  <a
+                    href={AMAZON_LISTING_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline underline-offset-4 hover:text-white"
+                  >
+                    Prefer 1–3 bags? Buy on Amazon →
+                  </a>
                 </div>
               </div>
             </div>
