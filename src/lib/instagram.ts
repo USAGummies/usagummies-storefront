@@ -35,53 +35,59 @@ export async function fetchInstagramFeed(opts?: { limit?: number }): Promise<Ins
     };
   }
 
-  // Instagram Graph API endpoint:
-  // https://graph.instagram.com/{user-id}/media?fields=id,caption,media_type,media_url,permalink,thumbnail_url,timestamp&access_token=...
-  const url = new URL(`https://graph.instagram.com/${encodeURIComponent(userId)}/media`);
-  url.searchParams.set(
-    "fields",
-    "id,caption,media_type,media_url,permalink,thumbnail_url,timestamp"
-  );
-  url.searchParams.set("limit", String(limit));
-  url.searchParams.set("access_token", accessToken);
+  const fields = "id,caption,media_type,media_url,permalink,thumbnail_url,timestamp";
+  const endpoints = [
+    "https://graph.instagram.com", // Basic Display
+    "https://graph.facebook.com/v19.0", // Instagram Graph API (business/creator)
+  ];
 
+  for (const base of endpoints) {
+    try {
+      const url = new URL(`${base}/${encodeURIComponent(userId)}/media`);
+      url.searchParams.set("fields", fields);
+      url.searchParams.set("limit", String(limit));
+      url.searchParams.set("access_token", accessToken);
 
-  try {
-    const res = await fetch(url.toString(), {
-      // cache on the server / edge; the route will add Cache-Control too.
-      next: { revalidate: 60 * 15 }, // 15 minutes
-    });
+      const res = await fetch(url.toString(), {
+        // cache on the server / edge; the route will add Cache-Control too.
+        next: { revalidate: 60 * 15 }, // 15 minutes
+      });
 
-    if (!res.ok) {
-      throw new Error("non-200");
+      if (!res.ok) {
+        continue;
+      }
+
+      const json: any = await res.json();
+      const items: InstagramMediaItem[] = Array.isArray(json?.data)
+        ? json.data
+            .filter(Boolean)
+            .map((x: any) => ({
+              id: String(x?.id ?? ""),
+              caption: x?.caption ?? null,
+              media_type: x?.media_type,
+              media_url: x?.media_url,
+              permalink: x?.permalink ?? null,
+              thumbnail_url: x?.thumbnail_url ?? null,
+              timestamp: x?.timestamp ?? null,
+            }))
+            .filter((x: any) => x.id && x.media_type && x.media_url)
+        : [];
+
+      if (items.length) {
+        return {
+          source: "live",
+          fetchedAt: new Date().toISOString(),
+          items,
+        };
+      }
+    } catch {
+      // try the next endpoint
     }
-
-    const json: any = await res.json();
-    const items: InstagramMediaItem[] = Array.isArray(json?.data)
-      ? json.data
-          .filter(Boolean)
-          .map((x: any) => ({
-            id: String(x?.id ?? ""),
-            caption: x?.caption ?? null,
-            media_type: x?.media_type,
-            media_url: x?.media_url,
-            permalink: x?.permalink ?? null,
-            thumbnail_url: x?.thumbnail_url ?? null,
-            timestamp: x?.timestamp ?? null,
-          }))
-          .filter((x: any) => x.id && x.media_type && x.media_url)
-      : [];
-
-    return {
-      source: "live",
-      fetchedAt: new Date().toISOString(),
-      items,
-    };
-  } catch {
-    return {
-      source: "fallback",
-      fetchedAt: new Date().toISOString(),
-      items: [],
-    };
   }
+
+  return {
+    source: "fallback",
+    fetchedAt: new Date().toISOString(),
+    items: [],
+  };
 }
