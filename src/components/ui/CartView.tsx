@@ -356,6 +356,11 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                   <span className="font-semibold text-white">
                     {totalBags} bag{totalBags === 1 ? "" : "s"}
                   </span>
+                  {totalBags === 8 ? (
+                    <span className="ml-2 text-[11px] text-[var(--gold)]/90">
+                      Great choice — our most popular bundle.
+                    </span>
+                  ) : null}
                 </div>
               </div>
 

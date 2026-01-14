@@ -274,7 +274,7 @@ export default async function HomePage() {
                   Made in USA. No artificial dyes. All natural flavors.
                 </div>
                 <p className="text-sm text-white/80 sm:text-base max-w-prose">
-                  Classic gummy bear flavor with a clean, chewy finish and five fruit flavors.
+                  Classic gummy bear flavor with a soft, chewy finish and five fruit flavors.
                 </p>
                 <div className="text-xs text-white/65">
                   7.5 oz bag with 5 fruit flavors: cherry, watermelon, orange, green apple, lemon.

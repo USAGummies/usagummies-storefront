@@ -17,6 +17,8 @@ import type { BundleTier } from "@/lib/bundles/getBundleVariants";
 import { BASE_PRICE, FREE_SHIPPING_PHRASE, MIN_PER_BAG } from "@/lib/bundles/pricing";
 import { trackEvent } from "@/lib/analytics";
 import { fireCartToast } from "@/lib/cartFeedback";
+import { AMAZON_LISTING_URL } from "@/lib/amazon";
+import { REVIEW_HIGHLIGHTS } from "@/data/reviewHighlights";
 
 type TierKey = "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10" | "11" | "12";
 
@@ -111,6 +113,13 @@ export default function BundleQuickBuy({
   const selectedTier =
     featured.find((t) => String(t.quantity) === selected) || featured[0] || null;
   const perBagCapText = money(MIN_PER_BAG, "USD");
+  const showAmazonLink = !!selectedTier && selectedTier.quantity <= 3;
+  const reviewSnippets = REVIEW_HIGHLIGHTS.slice(0, 2);
+
+  function starLine(rating: number) {
+    const full = Math.max(0, Math.min(5, Math.round(rating)));
+    return "★".repeat(full).padEnd(5, "☆");
+  }
 
   function scrollToCTA() {
     if (!ctaRef.current) return;
@@ -657,6 +666,28 @@ export default function BundleQuickBuy({
           <div className={isCompact ? "text-xs text-white/70" : "text-xs text-white/75"}>
             Love it or your money back • Ships within 24 hours • Secure checkout
           </div>
+          {reviewSnippets.length ? (
+            <div className="grid gap-1 text-[11px] text-white/70">
+              {reviewSnippets.map((review) => (
+                <div key={review.id} className="inline-flex items-center gap-2">
+                  <span className="text-[var(--gold)]">{starLine(review.rating)}</span>
+                  <span className="truncate">"{review.body}" — {review.author}</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+          {showAmazonLink ? (
+            <div className="text-xs text-white/65">
+              <a
+                href={AMAZON_LISTING_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline underline-offset-4 hover:text-white"
+              >
+                Just want 1–3 bags? Amazon is best for small orders →
+              </a>
+            </div>
+          ) : null}
           {error ? (
             <div className={isCompact ? "text-xs font-semibold text-red-200" : "text-xs font-semibold text-red-200"}>{error}</div>
           ) : null}
