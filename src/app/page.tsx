@@ -297,7 +297,7 @@ export default async function HomePage() {
               <div className="relative">
                 <div className="absolute -top-6 right-6 h-20 w-20 rounded-full bg-[rgba(199,54,44,0.25)] blur-2xl" aria-hidden="true" />
                 <div className="relative rounded-3xl border border-white/20 bg-white/95 p-2 text-[var(--navy)] shadow-[0_30px_70px_rgba(7,12,20,0.35)]">
-                  <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-white/60 bg-white">
+                  <div className="relative aspect-[3/4] overflow-hidden rounded-2xl border border-white/60 bg-white">
                     <Image
                       src={heroMediaSrc}
                       alt="USA Gummies hero"
@@ -305,7 +305,7 @@ export default async function HomePage() {
                       priority
                       unoptimized
                       sizes="(max-width: 640px) 90vw, (max-width: 1024px) 60vw, 520px"
-                      className="object-cover"
+                      className="object-contain"
                     />
                     <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 via-black/0 to-transparent p-3">
                       <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-white/80">
