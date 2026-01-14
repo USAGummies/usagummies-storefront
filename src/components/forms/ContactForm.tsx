@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { sendContactEmail } from "@/lib/email/sendContactEmail";
 
@@ -70,7 +71,11 @@ export default function ContactForm({
       ) : null}
 
       <p className="text-xs text-white/50">
-        We’ll reply to the email you provide. Your message is sent securely.
+        We’ll reply to the email you provide. By submitting, you agree to our{" "}
+        <Link href="/policies/privacy" className="underline underline-offset-4 hover:text-white">
+          Privacy Policy
+        </Link>
+        .
       </p>
     </form>
   );

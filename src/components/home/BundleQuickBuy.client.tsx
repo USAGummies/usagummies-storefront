@@ -52,6 +52,15 @@ function storeCartId(cartId?: string | null) {
   }
 }
 
+function getStoredCartId() {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem("cartId");
+  } catch {
+    return null;
+  }
+}
+
 const FEATURED_QTYS: TierKey[] = ["1", "2", "3", "4", "5", "8", "12"];
 const FEATURED_QTYS_COMPACT: TierKey[] = ["5", "8", "12"];
 
@@ -69,6 +78,7 @@ export default function BundleQuickBuy({
   const [selected, setSelected] = React.useState<TierKey>("8");
   const [adding, setAdding] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [success, setSuccess] = React.useState(false);
   const isCompact = variant === "compact";
 
   const featured = React.useMemo(() => {
@@ -120,6 +130,7 @@ export default function BundleQuickBuy({
       anchorId: anchorId || null,
     });
     setSelected(String(qty) as TierKey);
+    setSuccess(false);
     if (typeof window !== "undefined" && window.innerWidth < 768) {
       window.requestAnimationFrame(scrollToCTA);
     }
@@ -128,27 +139,39 @@ export default function BundleQuickBuy({
   const hasPrice = Number.isFinite(selectedTier?.totalPrice ?? NaN);
   const ctaDisabled = !singleBagVariantId || !hasPrice || availableForSale === false;
 
+  React.useEffect(() => {
+    if (!success) return;
+    const t = window.setTimeout(() => setSuccess(false), 2200);
+    return () => window.clearTimeout(t);
+  }, [success]);
+
   async function addToCart() {
-    if (!singleBagVariantId || ctaDisabled) {
+    const qty = selectedTier?.quantity ?? 0;
+    if (!singleBagVariantId || ctaDisabled || !qty) {
       setError(availableForSale === false ? "Out of stock" : "Select a bundle to continue.");
       return;
     }
     trackEvent("bundle_add_to_cart", {
-      qty: selectedTier?.quantity,
+      qty,
       variant,
       anchorId: anchorId || null,
     });
     setAdding(true);
     setError(null);
+    setSuccess(false);
     try {
+      const storedCartId = getStoredCartId();
+      if (storedCartId && typeof document !== "undefined") {
+        document.cookie = `cartId=${storedCartId}; path=/; samesite=lax`;
+      }
       const res = await fetch("/api/cart", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: "add",
+          action: "replace",
           variantId: singleBagVariantId,
           merchandiseId: singleBagVariantId,
-          quantity: selectedTier.quantity,
+          quantity: qty,
         }),
       });
       const json = await res.json().catch(() => ({}));
@@ -159,6 +182,7 @@ export default function BundleQuickBuy({
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("cart:updated"));
       }
+      setSuccess(true);
       router.refresh();
       if (typeof window !== "undefined") {
         const prefersReduced =
@@ -555,6 +579,11 @@ export default function BundleQuickBuy({
           </div>
           {error ? (
             <div className={isCompact ? "text-xs font-semibold text-red-200" : "text-xs font-semibold text-red-200"}>{error}</div>
+          ) : null}
+          {success && !error ? (
+            <div className={isCompact ? "text-xs font-semibold text-[var(--gold)]" : "text-xs font-semibold text-[var(--gold)]"}>
+              Added to cart.
+            </div>
           ) : null}
           {ctaDisabled && availableForSale === false && !error ? (
             <div className={isCompact ? "text-xs text-white/50" : "text-xs text-white/60"}>Out of stock.</div>

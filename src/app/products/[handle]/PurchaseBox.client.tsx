@@ -22,6 +22,15 @@ function storeCartId(cartId?: string | null) {
   }
 }
 
+function getStoredCartId() {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem("cartId");
+  } catch {
+    return null;
+  }
+}
+
 type MoneyLike =
   | { amount: string; currencyCode?: string }
   | { amount: string; currencyCode: string }
@@ -330,11 +339,15 @@ export default function PurchaseBox({
 
     setAdding(true);
     try {
+      const storedCartId = getStoredCartId();
+      if (storedCartId && typeof document !== "undefined") {
+        document.cookie = `cartId=${storedCartId}; path=/; samesite=lax`;
+      }
       const res = await fetch("/api/cart", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: "add",
+          action: "replace",
           variantId: selectedVariant.id,
           quantity: Math.max(1, selectedQty),
         }),

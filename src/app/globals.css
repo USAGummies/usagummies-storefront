@@ -135,12 +135,14 @@ a:hover {
 .focus-ring:focus-visible{
   outline: 2px solid var(--gold);
   outline-offset: 2px;
+  box-shadow: 0 0 0 3px rgba(199, 160, 98, 0.35);
 }
 button:focus-visible:not(.btn):not(.focus-ring),
 a:focus-visible:not(.btn):not(.focus-ring),
 [role="button"]:focus-visible:not(.btn):not(.focus-ring){
   outline: 2px solid var(--gold);
   outline-offset: 2px;
+  box-shadow: 0 0 0 3px rgba(199, 160, 98, 0.35);
 }
 .fade-in{
   animation: fadeIn var(--dur-2) var(--ease-out) both;
@@ -209,6 +211,7 @@ a:focus-visible:not(.btn):not(.focus-ring),
 .btn:focus-visible{
   outline: 2px solid var(--gold);
   outline-offset: 2px;
+  box-shadow: 0 0 0 3px rgba(199, 160, 98, 0.35);
 }
 .btn-red {
   border-color: rgba(199, 54, 44, 0.3);
@@ -770,4 +773,13 @@ main.text-white{
   border: 1px solid rgba(255,255,255,0.12);
   background: rgba(13, 28, 51, 0.6);
   box-shadow: 0 18px 40px rgba(7, 12, 20, 0.32);
+}
+
+@media (prefers-contrast: more) {
+  .text-white\/50,
+  .text-white\/60,
+  .text-white\/65,
+  .text-white\/70 {
+    color: rgba(255, 255, 255, 0.88);
+  }
 }

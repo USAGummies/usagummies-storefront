@@ -42,6 +42,15 @@ function storeCartId(cartId?: string | null) {
   }
 }
 
+function getStoredCartId() {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem("cartId");
+  } catch {
+    return null;
+  }
+}
+
 export default function QuickView({ product, detailHref, bundleHref, children }: QuickViewProps) {
   const [open, setOpen] = useState(false);
   const [selectedQty, setSelectedQty] = useState(8);
@@ -82,11 +91,15 @@ export default function QuickView({ product, detailHref, bundleHref, children }:
     setError(null);
     setAdding(true);
     try {
+      const storedCartId = getStoredCartId();
+      if (storedCartId && typeof document !== "undefined") {
+        document.cookie = `cartId=${storedCartId}; path=/; samesite=lax`;
+      }
       const res = await fetch("/api/cart", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: "add",
+          action: "replace",
           variantId: SINGLE_BAG_VARIANT_ID,
           merchandiseId: SINGLE_BAG_VARIANT_ID,
           quantity: selectedQty,
