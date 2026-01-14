@@ -166,9 +166,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         href={link.href}
                         role="menuitem"
                         className={cx(
-                          "pressable block rounded-xl px-3 py-2 font-semibold transition-colors",
+                          "pressable block rounded-xl border border-transparent px-3 py-2 font-semibold transition-colors",
                           active
-                            ? "bg-[var(--navy)] text-white"
+                            ? "bg-[var(--navy)]/12 text-[var(--navy)] border-[var(--navy)]/25"
                             : "text-[var(--text)] hover:bg-[var(--navy)]/10"
                         )}
                         onClick={() => setMenuOpen(false)}

@@ -439,6 +439,11 @@ export default function PurchaseBox({
                     <div className="pbx__tiny">Price</div>
                     <div className="pbx__tileTotal">{money(o.totalPrice, o.currencyCode)}</div>
                     <div className="pbx__tilePer">Per bag: {money(o.perBag, o.currencyCode)}</div>
+                    {o.savingsAmount > 0 ? (
+                      <div className="pbx__tileSave">
+                        Save {money(o.savingsAmount, o.currencyCode)}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               </button>
@@ -702,6 +707,7 @@ export default function PurchaseBox({
         .pbx__tileRight{ text-align:right; min-width:100px; color: var(--text); }
         .pbx__tileTotal{ font-weight:950; font-size:15px; color: var(--text); }
         .pbx__tilePer{ margin-top:4px; font-size:12px; color: var(--muted); }
+        .pbx__tileSave{ margin-top:6px; font-size:11px; font-weight:800; color: var(--gold); }
 
         .pbx__summary{
           margin-top:10px;

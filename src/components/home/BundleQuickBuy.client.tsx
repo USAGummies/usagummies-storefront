@@ -14,7 +14,7 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { BundleTier } from "@/lib/bundles/getBundleVariants";
-import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
+import { BASE_PRICE, FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import { trackEvent } from "@/lib/analytics";
 
 type TierKey = "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10" | "11" | "12";
@@ -199,14 +199,9 @@ export default function BundleQuickBuy({
     }
   }
 
-  const tier5 = featured.find((t) => t.quantity === 5);
-  const baselinePerBag =
-    tier5 && Number.isFinite(tier5.totalPrice ?? NaN) ? (tier5.totalPrice as number) / 5 : null;
-
   function savingsFor(tier: BundleTier) {
-    if (!baselinePerBag || !Number.isFinite(tier.totalPrice ?? NaN)) return null;
-    const baselineTotal = baselinePerBag * tier.quantity;
-    const s = baselineTotal - (tier.totalPrice as number);
+    if (!Number.isFinite(tier.totalPrice ?? NaN)) return null;
+    const s = BASE_PRICE * tier.quantity - (tier.totalPrice as number);
     return s > 0 ? s : 0;
   }
 
@@ -221,6 +216,9 @@ export default function BundleQuickBuy({
         ? `~${money(tier.perBagPrice, "USD")} / bag`
         : null;
     const unavailable = availableForSale === false || !displayTotal;
+    const savings = savingsFor(tier);
+    const savingsValue =
+      savings && Number.isFinite(savings) && savings > 0 ? savings : null;
 
     if (isCompact) {
       const isFive = tier.quantity === 5;
@@ -267,6 +265,11 @@ export default function BundleQuickBuy({
           <div className="text-[11px] text-white/60">
             {displayPerBag || "Standard price"}
           </div>
+          {savingsValue ? (
+            <div className="text-[11px] font-semibold text-[var(--gold)]">
+              Save {money(savingsValue, "USD")}
+            </div>
+          ) : null}
           {showFreeShipping ? (
             <div className="mt-2 inline-flex items-center rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/80">
               Free shipping
@@ -281,7 +284,7 @@ export default function BundleQuickBuy({
     const isTwelve = tier.quantity === 12;
     const isSmall = tier.quantity < 5;
 
-    const savings = !isFive ? savingsFor(tier) : null;
+    const savings = savingsFor(tier);
     const savingsValue =
       savings && Number.isFinite(savings) && savings > 0 ? savings : null;
 
@@ -356,7 +359,7 @@ export default function BundleQuickBuy({
                     ? "Standard price"
                     : "Bundle savings"}
                 </div>
-                {savingsValue && (isEight || isTwelve) ? (
+                {savingsValue ? (
                   <div
                     className={[
                       "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold",
