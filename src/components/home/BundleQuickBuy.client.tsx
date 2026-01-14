@@ -480,7 +480,7 @@ export default function BundleQuickBuy({
       aria-label="Bundle pricing"
       className={[
         "relative mx-auto rounded-3xl border p-4 sm:p-5 overflow-hidden",
-        isCompact ? "max-w-2xl" : "max-w-3xl",
+        isCompact ? "w-full" : "max-w-3xl",
         isCompact
           ? "border-white/15 bg-[rgba(10,16,30,0.92)] text-white shadow-[0_24px_60px_rgba(7,12,20,0.45)]"
           : "border-white/10 bg-white/[0.06] shadow-[0_30px_90px_rgba(0,0,0,0.35)] backdrop-blur-xl pb-16 sm:pb-12",
@@ -684,7 +684,7 @@ export default function BundleQuickBuy({
                 rel="noopener noreferrer"
                 className="underline underline-offset-4 hover:text-white"
               >
-                Just want 1–3 bags? Amazon is best for small orders →
+                Prefer a 1–3 bag refill? Buy on Amazon →
               </a>
             </div>
           ) : null}

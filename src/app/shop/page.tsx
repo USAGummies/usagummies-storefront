@@ -1,5 +1,6 @@
 // src/app/shop/page.tsx (FULL REPLACE)
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import BundleQuickBuy from "@/components/home/BundleQuickBuy.client";
 import { ProductGallery } from "@/components/product/ProductGallery.client";
@@ -243,7 +244,35 @@ export default async function ShopPage() {
               </div>
             </div>
 
-            <div className="relative">
+            <div className="relative space-y-4">
+              <div className="relative overflow-hidden rounded-3xl border border-white/20 bg-white/95 p-2 text-[var(--navy)] shadow-[0_22px_60px_rgba(7,12,20,0.35)]">
+                <div className="relative aspect-[3/2] overflow-hidden rounded-2xl border border-white/60 bg-white">
+                  <Image
+                    src="/america-250.jpg"
+                    alt="USA Gummies patriotic artwork"
+                    fill
+                    sizes="(max-width: 640px) 92vw, (max-width: 1024px) 44vw, 520px"
+                    className="object-cover"
+                  />
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/55 via-black/0 to-transparent p-3">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-white/80">
+                      Made in USA
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-2 space-y-1">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
+                    All American
+                  </div>
+                  <div className="text-lg font-black text-[var(--navy)]">
+                    Proudly made in the USA.
+                  </div>
+                  <div className="text-xs text-[var(--muted)]">
+                    All natural flavors. No artificial dyes.
+                  </div>
+                </div>
+              </div>
+
               <div className="metal-panel rounded-[36px] border border-[rgba(199,54,44,0.45)] p-3 ring-1 ring-white/20 shadow-[0_32px_90px_rgba(7,12,20,0.6)]">
                 <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-[0.3em] text-white/60">
                   <span>Build your bundle</span>
