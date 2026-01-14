@@ -46,8 +46,8 @@ export function PatriotBanner({ showRibbon = true }: { showRibbon?: boolean }) {
               Bundle & Save
             </div>
             <div className="muted" style={{ marginTop: 8, fontSize: 14 }}>
-              The cart shows the best value automatically. Add more bags and
-              watch shipping unlock.
+              The cart highlights the most popular bundle. Add more bags and
+              unlock free shipping.
             </div>
 
             <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>

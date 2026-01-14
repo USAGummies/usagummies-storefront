@@ -148,8 +148,8 @@ export default function PurchaseBox({
               : FREE_SHIPPING_PHRASE;
 
       if (qty === 8) {
-        label = "Best Value (8 bags)";
-        sub = "Recommended";
+        label = "Most Popular (8 bags)";
+        sub = "Best balance of value + convenience";
       }
 
       if (qty === 10) {
@@ -203,45 +203,10 @@ export default function PurchaseBox({
   }, [availableTiers, singleVariant, baselineCurrency]);
 
   const bundleOptionsWithBadges = useMemo<BundleOption[]>(() => {
-    const opts = bundleOptions.map((o) => ({ ...o, badges: [...o.badges] }));
-
-    let mostTaken = false;
-    let bestTaken = false;
+    const opts = bundleOptions.map((o) => ({ ...o, badges: [] as BundleBadge[] }));
 
     for (const o of opts) {
-      const hasMost = o.badges.includes("most_popular");
-      const hasBest = o.badges.includes("best_deal");
-
-      o.badges = [
-        ...(hasMost && !mostTaken ? ((mostTaken = true), ["most_popular"] as const) : []),
-        ...(hasBest && !bestTaken ? ((bestTaken = true), ["best_deal"] as const) : []),
-      ];
-    }
-
-    // Ensure 5-bag shows as Most Popular when available
-    const fiveTier = opts.find((o) => o.qty === 5);
-    if (fiveTier && !fiveTier.badges.includes("most_popular") && !mostTaken) {
-      fiveTier.badges.push("most_popular");
-      mostTaken = true;
-    }
-
-    if (!mostTaken && opts.length) {
-      const sortedByQty = [...opts].sort((a, b) => a.qty - b.qty);
-      const median = sortedByQty[Math.floor(sortedByQty.length / 2)];
-      if (median && !median.badges.includes("most_popular")) {
-        median.badges.push("most_popular");
-        mostTaken = true;
-      }
-    }
-
-    if (!bestTaken) {
-      const best = [...opts]
-        .filter((o) => (o.savingsPct ?? 0) > 0)
-        .sort((a, b) => (b.savingsPct ?? 0) - (a.savingsPct ?? 0) || b.qty - a.qty)[0];
-      if (best && !best.badges.includes("best_deal")) {
-        best.badges.push("best_deal");
-        bestTaken = true;
-      }
+      if (o.qty === 8) o.badges.push("most_popular");
     }
 
     return opts;
@@ -261,8 +226,7 @@ export default function PurchaseBox({
 
     return base.map((o) => {
       const badges = [...o.badges];
-      if (o.qty === 5 && !badges.includes("most_popular")) badges.push("most_popular");
-      if (o.qty === 8 && !badges.includes("best_deal")) badges.push("best_deal");
+      if (o.qty === 8 && !badges.includes("most_popular")) badges.push("most_popular");
       return { ...o, badges };
     });
   }, [bundleOptionsWithBadges]);
@@ -388,7 +352,46 @@ export default function PurchaseBox({
               Bundle pricing follows the USA Gummies ladder.
             </div>
             <div className="pbx__guidance">
-              Most customers pick 5, 8, or 12 bags. {FREE_SHIPPING_PHRASE}
+              Most customers choose 8 bags. {FREE_SHIPPING_PHRASE}
+            </div>
+            <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/70">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-white/60">
+                How pricing works
+              </div>
+              <ul className="mt-1.5 space-y-1">
+                <li>Discounts start at 4 bags</li>
+                <li>Free shipping at 5+ bags</li>
+                <li>Most customers choose 8 bags</li>
+              </ul>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-[10px] text-white/70">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1">
+                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" aria-hidden="true">
+                  <path
+                    fill="currentColor"
+                    d="M12 2 19 5v6c0 5-3.5 9.4-7 11-3.5-1.6-7-6-7-11V5l7-3z"
+                  />
+                </svg>
+                Love it or your money back
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1">
+                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" aria-hidden="true">
+                  <path
+                    fill="currentColor"
+                    d="M3 6h10v7H3V6zm10 2h4l3 3v2h-7V8zm-8 9a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm11 0a2 2 0 1 0 .001 4A2 2 0 0 0 16 17z"
+                  />
+                </svg>
+                Ships in 1-2 business days
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1">
+                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" aria-hidden="true">
+                  <path
+                    fill="currentColor"
+                    d="M6 10V8a6 6 0 1 1 12 0v2h1v12H5V10h1zm2 0h8V8a4 4 0 1 0-8 0v2z"
+                  />
+                </svg>
+                Secure checkout
+              </span>
             </div>
           </div>
         </div>
@@ -514,7 +517,7 @@ export default function PurchaseBox({
               )}
             </button>
             <div className="pbx__ctaNote" aria-live="polite">
-              {FREE_SHIPPING_PHRASE} • Ships within 24 hours • 30-day money-back guarantee
+              Love it or your money back • Ships in 1-2 business days • Secure checkout
             </div>
           </div>
         </div>
@@ -523,7 +526,7 @@ export default function PurchaseBox({
           <div className="pbx__stickyLeft">
             <div className="pbx__stickyLabel">{selectedOption?.label || `${selectedQty} bags`}</div>
             <div className="pbx__stickySub">
-              {FREE_SHIPPING_PHRASE} • Ships within 24 hours
+              Love it or your money back • Ships in 1-2 business days • Secure checkout
             </div>
           </div>
           <button

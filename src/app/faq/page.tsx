@@ -2,20 +2,19 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { AmericanDreamCallout } from "@/components/story/AmericanDreamCallout";
-import { AMAZON_LISTING_URL } from "@/lib/amazon";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 
 export const metadata: Metadata = {
   title: "FAQ | USA Gummies",
   description:
-    "USA Gummies FAQ. Answers about All American gummy bears, ingredients, flavor notes, bundles, shipping, and Amazon availability.",
+    "USA Gummies FAQ. Answers about All American gummy bears, ingredients, flavor notes, bundles, shipping, and pricing.",
 };
 
 const FAQS = [
   {
     question: "Are USA Gummies gluten-free?",
     answer:
-      "We do not make a gluten-free claim. Please review the ingredient panel on the bag or the Amazon listing for the most current allergen details. If you have sensitivities, contact us before ordering.",
+      "We do not make a gluten-free claim. Please review the ingredient panel on the bag for the most current allergen details. If you have sensitivities, contact us before ordering.",
   },
   {
     question: "Do your gummy bears contain artificial dyes or synthetic colors?",
@@ -40,17 +39,12 @@ const FAQS = [
   {
     question: "Can I buy a single bag?",
     answer:
-      "Yes. You can order 1-3 bags on our site at standard price, or shop those quantities on Amazon. Bundles on our site are designed to save you more per bag.",
+      "Yes. You can order 1-3 bags on our site at standard price, or bundle up for savings on 4+ bags.",
   },
   {
     question: "How does bundle pricing work?",
     answer:
       `Bundle pricing lowers the per-bag cost as you add more bags. Most customers choose 5, 8, or 12 bags, and ${FREE_SHIPPING_PHRASE.toLowerCase()}.`,
-  },
-  {
-    question: "Are these the same gummy bears sold on Amazon?",
-    answer:
-      "Yes. USA Gummies on this site and on Amazon are the same All American gummy bears. The difference is bundle savings here and single-bag convenience on Amazon.",
   },
 ];
 
@@ -104,14 +98,6 @@ export default function FaqPage() {
                 <Link href="/shop" className="btn btn-red">
                   Shop bundles
                 </Link>
-                <a
-                  href={AMAZON_LISTING_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn btn-outline-white"
-                >
-                  Buy 1-3 bags on Amazon
-                </a>
                 <span className="text-xs text-white/70">{FREE_SHIPPING_PHRASE}</span>
               </div>
             </div>

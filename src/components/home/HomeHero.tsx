@@ -31,7 +31,7 @@ export function HomeHero() {
 
               <p className="sub" style={{ marginTop: 12 }}>
                 Premium gummies built in the USA — bold flavor, clean finish, and
-                a cart that nudges the best value automatically.
+                a cart that highlights the most popular bundle.
               </p>
 
               <div
@@ -62,7 +62,7 @@ export function HomeHero() {
             <div className="hero-right">
               <div className="hero-flag" aria-hidden="true" />
               <div className="card" style={{ padding: 16, position: "relative" }}>
-                <div className="h-eyebrow">Best value play</div>
+                <div className="h-eyebrow">Most popular pick</div>
                 <div style={{ fontWeight: 950, fontSize: 22, marginTop: 8 }}>
                   Stack bags. Save more.
                 </div>

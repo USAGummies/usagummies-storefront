@@ -8,9 +8,7 @@ import { CartLineControls } from "@/components/cart/CartLineControls.client";
 import AddBagButton from "@/components/cart/AddBagButton.client";
 import { cn } from "@/lib/cn";
 import { pricingForQty, BASE_PRICE, FREE_SHIP_QTY, FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
-import { AMAZON_LISTING_URL } from "@/lib/amazon";
 import { isSingleBagVariant, SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
-import { AMAZON_REVIEWS } from "@/data/amazonReviews";
 import { trackEvent } from "@/lib/analytics";
 import { ReviewHighlights } from "@/components/reviews/ReviewHighlights";
 
@@ -83,9 +81,9 @@ function getBagsPerUnit(merchandise: any): number {
 }
 
 function bundleLabel(qty: number) {
-  if (qty === 5) return "Most popular";
-  if (qty === 8) return "Best value";
-  if (qty === 12) return "Max value";
+  if (qty === 5) return "Free shipping";
+  if (qty === 8) return "Most popular";
+  if (qty === 12) return "Bulk savings";
   return "";
 }
 
@@ -127,7 +125,6 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
     const qty = Number(l?.quantity) || 0;
     return sum + bagsPerUnit * qty;
   }, 0);
-  const remaining = Math.max(0, FREE_SHIP_QTY - totalBags);
   const primaryLine =
     lines.find((l: any) => isSingleBagVariant(l?.merchandise?.id)) || lines[0] || null;
   const canUpdateLine = Boolean(primaryLine?.id && isSingleBagVariant(primaryLine?.merchandise?.id));
@@ -152,27 +149,65 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
   const pct = clampPct(Math.round((totalBags / FREE_SHIP_QTY) * 100));
   const unlocked = totalBags >= FREE_SHIP_QTY;
 
-  const amazonRatingText = `${AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars from verified Amazon buyers`;
-  const amazonSupportText =
-    totalBags > 0 && totalBags <= 3
-      ? "Prefer 1-3 bags? Buy from our official Amazon listing for full product details."
-      : "USA Gummies is available on Amazon with verified product details and reviews.";
+  let cartNudge = "";
+  let cartNudgeDetail = "";
+  let nudgeActionQty: number | null = null;
+  let nudgeActionLabel = "";
+  if (totalBags > 0 && totalBags < 4) {
+    const needed = 4 - totalBags;
+    cartNudge = `Add ${needed} more bag${needed === 1 ? "" : "s"} to start saving.`;
+    nudgeActionQty = 4;
+    nudgeActionLabel = `Add ${needed} bag${needed === 1 ? "" : "s"} to start saving`;
+    const pricingAtFour = pricingForQty(4);
+    const savingsAtFour = Math.max(0, BASE_PRICE * 4 - pricingAtFour.total);
+    if (savingsAtFour > 0) {
+      cartNudgeDetail = `Savings start at ${formatNumber(savingsAtFour, summaryCurrency)} off standard pricing.`;
+    }
+  } else if (totalBags === 4) {
+    cartNudge = "Add 1 more bag to get free shipping.";
+    nudgeActionQty = 5;
+    nudgeActionLabel = "Add 1 bag for free shipping";
+  } else if (totalBags >= 5 && totalBags < 8) {
+    cartNudge = "Most customers choose 8 bags for better value.";
+    nudgeActionQty = 8;
+    nudgeActionLabel = "Upgrade to 8 bags";
+    const pricingAtEight = pricingForQty(8);
+    const savingsAtEight = Math.max(0, BASE_PRICE * 8 - pricingAtEight.total);
+    const savingsAtCurrent = Math.max(0, BASE_PRICE * totalBags - (bundlePricing?.total || 0));
+    const extraSavings = Math.max(0, savingsAtEight - savingsAtCurrent);
+    if (extraSavings > 0) {
+      cartNudgeDetail = `Save ${formatNumber(extraSavings, summaryCurrency)} more at 8 bags.`;
+    }
+  } else if (totalBags === 8) {
+    cartNudge = "Great choice — our most popular bundle.";
+    if (bundleSavingsText) {
+      cartNudgeDetail = `You're saving ${bundleSavingsText}.`;
+    }
+  } else if (totalBags > 8) {
+    cartNudge = "Bulk savings locked in.";
+    if (bundleSavingsText) {
+      cartNudgeDetail = `You're saving ${bundleSavingsText}.`;
+    }
+  }
+  const cartNudgeSecondary =
+    cartNudgeDetail ||
+    (unlocked ? "Free shipping unlocked." : "Free shipping unlocks at 5 bags.");
 
   let upgradeTarget: number | null = null;
-  let upgradeTitle = "Best value locked";
-  let upgradeDetail = "You're at our best per-bag pricing.";
+  let upgradeTitle = "Bundle locked";
+  let upgradeDetail = "You're locked in at bundle pricing.";
   if (totalBags < 5) {
     upgradeTarget = 5;
     upgradeTitle = "Unlock free shipping";
     upgradeDetail = "Move to 5 bags and ship free.";
   } else if (totalBags < 8) {
     upgradeTarget = 8;
-    upgradeTitle = "Best value bundle";
-    upgradeDetail = "8 bags is the best per-bag price.";
+    upgradeTitle = "Most popular bundle";
+    upgradeDetail = "Best balance of value + convenience.";
   } else if (totalBags < 12) {
     upgradeTarget = 12;
-    upgradeTitle = "Max value bundle";
-    upgradeDetail = "12 bags locks in the lowest price per bag.";
+    upgradeTitle = "Bulk savings option";
+    upgradeDetail = "Stock up for the lowest per-bag price.";
   }
   const upgradePricing = upgradeTarget ? pricingForQty(upgradeTarget) : null;
   const upgradeTotalText =
@@ -267,12 +302,10 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
           <div className="flex flex-col gap-4">
             <div className="metal-panel rounded-3xl border border-[rgba(199,160,98,0.35)] p-4">
               <div className="text-sm font-black text-white">
-                {FREE_SHIPPING_PHRASE}
+                {cartNudge || FREE_SHIPPING_PHRASE}
               </div>
               <div className="mt-1 text-xs text-white/70">
-                {unlocked
-                  ? "Unlocked."
-                  : `Add ${remaining} more bag${remaining === 1 ? "" : "s"} to unlock ${FREE_SHIPPING_PHRASE}.`}
+                {cartNudgeSecondary}
               </div>
               <div
                 className={cn(
@@ -288,13 +321,13 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                   style={{ width: `${pct}%` }}
                 />
               </div>
-              {!unlocked && primaryLine?.id ? (
+              {nudgeActionQty ? (
                 <div className="mt-3 flex gap-2 flex-wrap">
                   <AddBagButton
-                    label="Add 1 bag to unlock"
+                    label={nudgeActionLabel || "Add bags"}
                     pendingLabel="Updating..."
                     disabled={bundlePending}
-                    onAdd={() => setBundleQty(totalBags + 1)}
+                    onAdd={() => setBundleQty(nudgeActionQty as number)}
                   />
                   <Link
                     href="/shop#product-bundles"
@@ -313,8 +346,10 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                   <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/60">
                     Pick your bundle
                   </div>
-                  <div className="text-lg font-black text-white">Upgrade & save more per bag</div>
-                  <div className="text-xs text-white/65">Every 5+ bag bundle ships free.</div>
+                  <div className="text-lg font-black text-white">Choose your bundle</div>
+                  <div className="text-xs text-white/65">
+                    Discounts start at 4 bags. Free shipping at 5+ bags. Most customers choose 8.
+                  </div>
                 </div>
                 <div className="text-xs text-white/60">
                   Current bundle:{" "}
@@ -322,6 +357,17 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                     {totalBags} bag{totalBags === 1 ? "" : "s"}
                   </span>
                 </div>
+              </div>
+
+              <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/70">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-white/60">
+                  How pricing works
+                </div>
+                <ul className="mt-1.5 space-y-1">
+                  <li>Discounts start at 4 bags</li>
+                  <li>Free shipping at 5+ bags</li>
+                  <li>Most customers choose 8 bags</li>
+                </ul>
               </div>
 
               <div className="mt-4 grid gap-3 sm:grid-cols-3">
@@ -347,9 +393,11 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                         "relative rounded-2xl border px-3 py-3 text-left transition overflow-hidden",
                         "bg-[linear-gradient(180deg,rgba(10,16,30,0.96),rgba(8,12,24,0.92))] text-white",
                         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(199,160,98,0.45)]",
+                        "transition-transform",
                         isActive
                           ? "border-[rgba(199,160,98,0.7)] shadow-[0_18px_46px_rgba(7,12,20,0.6)] ring-1 ring-[rgba(199,160,98,0.45)]"
                           : "border-white/15 hover:border-[rgba(199,160,98,0.4)] hover:shadow-[0_14px_36px_rgba(7,12,20,0.5)]",
+                        isBest && "scale-[1.03] sm:scale-[1.04] z-10",
                         bundlePending && !isActive && "opacity-70 cursor-not-allowed"
                       )}
                     >
@@ -368,6 +416,11 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                       </div>
                       <div className="mt-1 text-base font-black text-white">{totalText}</div>
                       <div className="text-[11px] text-white/60">~{perBagText} / bag</div>
+                      {isBest ? (
+                        <div className="text-[11px] text-[var(--gold)]/90">
+                          Best balance of value + convenience
+                        </div>
+                      ) : null}
                       {savingsText ? (
                         <div className="mt-1 text-[11px] font-semibold text-[var(--gold)]">
                           Save {savingsText}
@@ -382,17 +435,6 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                   );
                 })}
               </div>
-              <div className="mt-3 text-xs text-white/65">
-                <a
-                  href={AMAZON_LISTING_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline underline-offset-4 hover:text-white"
-                >
-                  Need fewer bags? Buy on Amazon →
-                </a>
-              </div>
-
               {bundleError ? (
                 <div className="mt-3 text-xs text-[var(--red)]">{bundleError}</div>
               ) : null}
@@ -550,27 +592,11 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                 Trust & shipping
               </div>
               <div className="mt-2 grid gap-2 text-xs text-white/70 sm:grid-cols-2">
+                <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1">Love it or your money back</div>
+                <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1">Ships in 1-2 business days</div>
                 <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1">Secure checkout</div>
-                <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1">Made in the USA</div>
-                <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1">No artificial dyes</div>
                 <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1">Free shipping on 5+ bags</div>
               </div>
-            </div>
-
-            <div className="metal-panel rounded-2xl border border-white/12 p-4">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/60">
-                Also on Amazon
-              </div>
-              <div className="mt-1 text-sm text-white">{amazonSupportText}</div>
-              <div className="mt-2 text-xs text-white/65">{amazonRatingText}</div>
-              <a
-                href={AMAZON_LISTING_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-2 inline-flex items-center gap-2 text-sm font-semibold text-[var(--gold)] underline underline-offset-4 hover:text-white"
-              >
-                View Amazon listing →
-              </a>
             </div>
 
             <ReviewHighlights variant="dark" limit={2} />

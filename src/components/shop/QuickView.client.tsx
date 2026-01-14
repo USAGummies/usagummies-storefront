@@ -216,12 +216,12 @@ export default function QuickView({ product, detailHref, bundleHref, children }:
                             </div>
                             {qty === 8 ? (
                               <div className="mt-1 inline-flex rounded-full border border-[rgba(199,160,98,0.6)] bg-[rgba(199,160,98,0.18)] px-2 py-0.5 text-[10px] font-semibold text-[var(--gold)]">
-                                Best value
+                                Most popular
                               </div>
                             ) : null}
                             {qty === 5 ? (
                               <div className="mt-1 inline-flex rounded-full border border-[var(--border)] bg-[var(--surface-strong)] px-2 py-0.5 text-[10px] font-semibold text-[var(--text)]">
-                                Most popular
+                                Free shipping
                               </div>
                             ) : null}
                           </button>

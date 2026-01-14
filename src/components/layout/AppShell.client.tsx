@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { CartDrawer } from "@/components/layout/CartDrawer.client";
 import { usePathname } from "next/navigation";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
+import { AMAZON_LISTING_URL } from "@/lib/amazon";
 import { applyExperimentFromUrl, trackEvent } from "@/lib/analytics";
 import { LeadCapture } from "@/components/marketing/LeadCapture.client";
 import { SubscriptionUnlock } from "@/components/marketing/SubscriptionUnlock.client";
@@ -301,6 +302,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Link href="/shipping" className="link-underline">
                 Shipping
               </Link>
+            </div>
+            <div className="text-xs text-[var(--muted)]">
+              <div className="font-semibold text-[var(--text)]">Other places to buy</div>
+              <a
+                href={AMAZON_LISTING_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="link-underline"
+              >
+                Amazon
+              </a>
             </div>
           </div>
         </div>

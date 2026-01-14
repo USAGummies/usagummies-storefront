@@ -6,9 +6,8 @@ import { getProductByHandle } from "@/lib/storefront";
 import BundleQuickBuy from "@/components/home/BundleQuickBuy.client";
 import ReviewsSection from "@/components/home/ReviewsSection";
 import { getBundleVariants } from "@/lib/bundles/getBundleVariants";
-import { FREE_SHIPPING_PHRASE, pricingForQty } from "@/lib/bundles/pricing";
+import { BASE_PRICE, FREE_SHIPPING_PHRASE, pricingForQty } from "@/lib/bundles/pricing";
 import HeroCTAWatcher from "@/components/home/HeroCTAWatcher";
-import { AMAZON_LISTING_URL } from "@/lib/amazon";
 import { AmericanDreamCallout } from "@/components/story/AmericanDreamCallout";
 
 export const metadata: Metadata = {
@@ -145,7 +144,7 @@ export default async function HomePage() {
           )
         )
       : 0;
-  const bestValueLine =
+  const mostPopularLine =
     bestValueSavingsPct > 0
       ? `~${bestValuePerBag} / bag • save ${bestValueSavingsPct}%`
       : `~${bestValuePerBag} / bag`;
@@ -158,6 +157,13 @@ export default async function HomePage() {
 
   const heroBundleQuantities = [1, 2, 3, 4, 5, 8, 12];
   const heroBundleLabel = "1-3 / 4 / 5 / 8 / 12 bags";
+  const maxBundleSavings = Math.max(
+    ...heroBundleQuantities.map((qty) => {
+      const pricing = pricingForQty(qty);
+      return Math.max(0, BASE_PRICE * qty - pricing.total);
+    })
+  );
+  const maxBundleSavingsText = formatMoney(maxBundleSavings);
   const homepageTiers = (bundleVariants?.variants || []).filter((t) =>
     heroBundleQuantities.includes(t.quantity)
   );
@@ -238,8 +244,8 @@ export default async function HomePage() {
         />
         <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[rgba(199,54,44,0.28)] blur-3xl" aria-hidden="true" />
         <div className="absolute -left-20 bottom-0 h-72 w-72 rounded-full bg-white/10 blur-3xl" aria-hidden="true" />
-        <div className="relative mx-auto max-w-6xl px-4 py-8 sm:py-10 lg:py-12">
-          <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
+        <div className="relative mx-auto max-w-6xl px-4 py-6 sm:py-8 lg:py-12">
+          <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
             <div className="order-2 space-y-5 lg:order-1">
               <div className="flex items-center gap-3">
                 <div className="relative h-16 w-16 overflow-hidden rounded-2xl border border-white/25 bg-white/95 p-1 shadow-[0_16px_36px_rgba(7,12,20,0.35)]">
@@ -278,12 +284,12 @@ export default async function HomePage() {
               <div className="flex flex-wrap items-center gap-3">
                 <div className="w-full sm:w-auto">
                   <a href="#bundle-pricing" className="btn btn-red w-full sm:w-auto">
-                    Build my bundle
+                    Build your bundle &amp; save up to {maxBundleSavingsText}
                   </a>
                 </div>
               </div>
               <div className="text-xs text-white/70">
-                {FREE_SHIPPING_PHRASE} • Ships within 24 hours • 30-day money-back guarantee
+                Love it or your money back • Ships in 1-2 business days • Secure checkout
               </div>
 
               <div className="grid gap-3 sm:grid-cols-3">
@@ -304,9 +310,12 @@ export default async function HomePage() {
               <div className="metal-panel rounded-3xl border border-white/12 p-4">
                 <div className="grid gap-3 sm:grid-cols-3">
                   <div className="space-y-1">
-                    <div className="text-[10px] uppercase tracking-[0.24em] text-white/60">Best value</div>
-                    <div className="text-base font-black text-white">8 bags</div>
-                    <div className="text-[11px] text-white/70">{bestValueLine}</div>
+                      <div className="text-[10px] uppercase tracking-[0.24em] text-white/60">Most popular</div>
+                      <div className="text-base font-black text-white">8 bags</div>
+                    <div className="text-[11px] text-white/70">{mostPopularLine}</div>
+                    <div className="text-[11px] text-[var(--gold)]/90">
+                      Best balance of value + convenience
+                    </div>
                   </div>
                   <div className="space-y-1 sm:border-l sm:border-white/10 sm:pl-4">
                     <div className="text-[10px] uppercase tracking-[0.24em] text-white/60">Free shipping</div>
@@ -362,7 +371,7 @@ export default async function HomePage() {
               <div className="relative">
                 <div className="absolute -top-6 right-6 h-20 w-20 rounded-full bg-[rgba(199,54,44,0.25)] blur-2xl" aria-hidden="true" />
                 <div className="relative rounded-3xl border border-white/20 bg-white/95 p-2 text-[var(--navy)] shadow-[0_30px_70px_rgba(7,12,20,0.35)]">
-                  <div className="relative aspect-[3/4] overflow-hidden rounded-2xl border border-white/60 bg-white">
+                  <div className="relative aspect-[4/5] sm:aspect-[3/4] overflow-hidden rounded-2xl border border-white/60 bg-white">
                     <Image
                       src={heroMediaSrc}
                       alt="USA Gummies hero"
@@ -390,7 +399,7 @@ export default async function HomePage() {
                     </div>
                     {bestValueSavingsPct > 0 ? (
                       <div className="mt-1 inline-flex items-center rounded-full bg-[var(--navy)]/10 px-3 py-1 text-[11px] font-semibold text-[var(--navy)]">
-                        Save {bestValueSavingsPct}% with 8-bag bundles
+                        Most popular savings: save {bestValueSavingsPct}%
                       </div>
                     ) : null}
                     <div className="flex flex-wrap gap-2 pt-1">
@@ -423,16 +432,6 @@ export default async function HomePage() {
                       variant="compact"
                     />
                   </div>
-                </div>
-                <div className="mt-3 text-xs text-white/65">
-                  <a
-                    href={AMAZON_LISTING_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="underline underline-offset-4 hover:text-white"
-                  >
-                    Prefer 1-3 bags? Buy on Amazon →
-                  </a>
                 </div>
               </div>
             </div>
@@ -484,17 +483,6 @@ export default async function HomePage() {
                   >
                     View product details →
                   </Link>
-                </div>
-                <div className="text-xs text-white/70">
-                  Prefer 1-3 bags?{" "}
-                  <a
-                    href={AMAZON_LISTING_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-semibold text-white underline underline-offset-4 hover:text-[var(--gold)]"
-                  >
-                    Buy on Amazon
-                  </a>
                 </div>
               </div>
 
@@ -645,14 +633,6 @@ export default async function HomePage() {
           </div>
           <a href="#bundle-pricing" className="btn btn-red w-full sm:w-auto">
             Build my bundle
-          </a>
-          <a
-            href={AMAZON_LISTING_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs font-semibold text-white/80 underline underline-offset-4 hover:text-white"
-          >
-            Buy 1-3 bags on Amazon →
           </a>
         </div>
       </div>

@@ -3,7 +3,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { AmericanDreamCallout } from "@/components/story/AmericanDreamCallout";
-import { AMAZON_LISTING_URL } from "@/lib/amazon";
 import { FREE_SHIPPING_PHRASE, pricingForQty } from "@/lib/bundles/pricing";
 
 const LISTING_TITLE =
@@ -130,14 +129,6 @@ export default function AboutPage() {
                   <Link href="/shop" className="btn btn-red">
                     Shop bundles
                   </Link>
-                  <a
-                    href={AMAZON_LISTING_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn btn-outline-white"
-                  >
-                    Buy 1-3 bags on Amazon
-                  </a>
                   <span className="text-xs text-white/65">{FREE_SHIPPING_PHRASE}</span>
                 </div>
               </div>
@@ -208,10 +199,13 @@ export default function AboutPage() {
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
                   <div className="text-[10px] uppercase tracking-[0.24em] text-white/60">
-                    Best value
+                    Most popular
                   </div>
                   <div className="text-base font-black text-white">{bestValuePerBag} per bag</div>
                   <div className="text-[11px] text-white/65">8-bag bundle</div>
+                  <div className="text-[11px] text-[var(--gold)]/90">
+                    Best balance of value + convenience
+                  </div>
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
                   <div className="text-[10px] uppercase tracking-[0.24em] text-white/60">
@@ -223,28 +217,6 @@ export default function AboutPage() {
               </div>
             </div>
 
-            <div className="metal-panel rounded-[32px] border border-white/12 p-5 sm:p-6">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-white/60">
-                Also on Amazon
-              </div>
-              <h2 className="mt-2 text-2xl font-black text-white">
-                Find USA Gummies on Amazon.
-              </h2>
-              <p className="mt-2 text-sm text-white/75">{LISTING_TITLE}.</p>
-              <div className="mt-4 flex flex-wrap gap-3">
-                <a
-                  href={AMAZON_LISTING_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn btn-outline-white"
-                >
-                  View Amazon listing
-                </a>
-                <Link href="/shop" className="btn btn-red">
-                  Shop bundles
-                </Link>
-              </div>
-            </div>
           </div>
         </div>
       </section>

@@ -3,7 +3,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { AmericanDreamCallout } from "@/components/story/AmericanDreamCallout";
-import { AMAZON_LISTING_URL } from "@/lib/amazon";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 
 export const metadata: Metadata = {
@@ -33,7 +32,7 @@ const BENEFITS = [
   {
     title: "Bundle-first savings",
     body:
-      "Lower per-bag pricing as you bundle All American gummy bears, with the best value on larger bundles.",
+      "Lower per-bag pricing as you bundle All American gummy bears, with the best balance of value + convenience at 8 bags.",
   },
   {
     title: "Subscription eligibility",
@@ -91,14 +90,6 @@ export default function JoinTheRevolutionPage() {
                   <Link href="/shop" className="btn btn-red">
                     Shop bundles
                   </Link>
-                  <a
-                    href={AMAZON_LISTING_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn btn-outline-white"
-                  >
-                    Buy 1-3 bags on Amazon
-                  </a>
                   <span className="text-xs text-white/70">{FREE_SHIPPING_PHRASE}</span>
                 </div>
               </div>

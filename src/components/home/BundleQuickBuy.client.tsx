@@ -230,11 +230,11 @@ export default function BundleQuickBuy({
       const showFreeShipping = tier.quantity >= 5;
       const label =
         isEight
-          ? "Best value"
+          ? "Most popular"
           : isFive
-            ? "Most popular"
+            ? "Free shipping"
             : isTwelve
-              ? "Best price"
+              ? "Bulk savings"
               : isFour
                 ? "Starter savings"
                 : isOne
@@ -300,7 +300,7 @@ export default function BundleQuickBuy({
     if (isFive) {
       pills.push(FREE_SHIPPING_PHRASE);
     } else if (isEight) {
-      pills.push("Most popular • Best value");
+      pills.push("Most popular");
       pills.push(FREE_SHIPPING_PHRASE);
     } else if (isTwelve) {
       pills.push("Best price per bag");
@@ -329,12 +329,12 @@ export default function BundleQuickBuy({
         onClick={() => handleSelect(tier.quantity, canSelect)}
         className={[
           "bundleTierBtn",
-          "min-w-[220px] sm:min-w-[240px] snap-start",
+          "min-w-[220px] sm:min-w-[240px] snap-start transition-transform",
           cardTone,
           isActive
             ? "bundleTierBtn--active ring-1 ring-[rgba(212,167,75,0.8)] shadow-[0_18px_46px_rgba(0,0,0,0.32)]"
             : "bundleTierBtn--highlight",
-          isEight ? "bundleTierBtn--primary" : "",
+          isEight ? "bundleTierBtn--primary scale-[1.03] sm:scale-[1.04] z-10" : "",
           cardBorder,
           unavailable ? "opacity-60 cursor-not-allowed" : "",
         ].join(" ")}
@@ -344,7 +344,7 @@ export default function BundleQuickBuy({
             <>
               <span className="absolute left-0 top-3 bottom-3 w-[4px] rounded-full bg-gradient-to-b from-[#d6403a] via-[var(--gold, #d4a74b)] to-[#0a3c8a] opacity-90" />
               <span className="absolute -top-2 left-3 inline-flex items-center rounded-b-xl rounded-tr-xl bg-[linear-gradient(135deg,rgba(212,167,75,0.96),rgba(214,64,58,0.82))] px-2.5 py-0.5 text-[10px] font-semibold tracking-[0.24em] text-[#0c1426] uppercase shadow-[0_8px_18px_rgba(0,0,0,0.3)]">
-                Recommended
+                Most popular
               </span>
             </>
           ) : null}
@@ -362,9 +362,9 @@ export default function BundleQuickBuy({
                 </div>
                 <div className="text-xs text-white/70">
                   {tier.quantity === 5
-                    ? "Most popular"
+                    ? "Free shipping"
                     : tier.quantity === 8
-                    ? "Best value"
+                    ? "Most popular"
                     : tier.quantity === 12
                     ? "Lowest per-bag"
                     : tier.quantity === 4
@@ -405,6 +405,11 @@ export default function BundleQuickBuy({
                 {displayPerBag ? (
                   <div className="relative mt-1 text-[11px] text-white/65 transition-all duration-300">
                     {displayPerBag}
+                  </div>
+                ) : null}
+                {isEight ? (
+                  <div className="relative mt-1 text-[10px] font-semibold text-[var(--gold)]/90">
+                    Best balance of value + convenience
                   </div>
                 ) : null}
               </div>
@@ -498,8 +503,52 @@ export default function BundleQuickBuy({
           isCompact ? "text-white/65" : "text-white/70",
         ].join(" ")}
       >
-        {FREE_SHIPPING_PHRASE}. 8 bags is the sweet spot.
+        {FREE_SHIPPING_PHRASE}. Most customers choose 8 bags.
       </p>
+      <div
+        className={[
+          "relative mt-3 rounded-2xl border px-3 py-2 text-xs",
+          isCompact ? "border-white/12 bg-white/5 text-white/70" : "border-white/10 bg-white/5 text-white/75",
+        ].join(" ")}
+      >
+        <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-white/60">
+          How pricing works
+        </div>
+        <ul className="mt-1.5 space-y-1">
+          <li>Discounts start at 4 bags</li>
+          <li>Free shipping at 5+ bags</li>
+          <li>Most customers choose 8 bags</li>
+        </ul>
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] text-white/70">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1">
+          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" aria-hidden="true">
+            <path
+              fill="currentColor"
+              d="M12 2 19 5v6c0 5-3.5 9.4-7 11-3.5-1.6-7-6-7-11V5l7-3z"
+            />
+          </svg>
+          Love it or your money back
+        </span>
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1">
+          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" aria-hidden="true">
+            <path
+              fill="currentColor"
+              d="M3 6h10v7H3V6zm10 2h4l3 3v2h-7V8zm-8 9a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm11 0a2 2 0 1 0 .001 4A2 2 0 0 0 16 17z"
+            />
+          </svg>
+          Ships in 1-2 business days
+        </span>
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1">
+          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" aria-hidden="true">
+            <path
+              fill="currentColor"
+              d="M6 10V8a6 6 0 1 1 12 0v2h1v12H5V10h1zm2 0h8V8a4 4 0 1 0-8 0v2z"
+            />
+          </svg>
+          Secure checkout
+        </span>
+      </div>
       {isCompact ? null : (
         <div className="relative mt-2 text-xs text-white/75 font-semibold">
           ★★★★★ Rated by verified buyers
@@ -548,7 +597,7 @@ export default function BundleQuickBuy({
             ].join(" ")}
           >
             <div className={isCompact ? "text-sm font-semibold text-white/80" : "text-sm font-semibold text-white/90"}>
-              {selectedTier.quantity === 8 ? "Your best value bundle:" : "Your bundle:"}{" "}
+              {selectedTier.quantity === 8 ? "Your most popular bundle:" : "Your bundle:"}{" "}
               <span className={isCompact ? "font-extrabold text-white" : "font-extrabold text-white"}>
                 {selectedTier.quantity} bags
               </span>
@@ -602,7 +651,7 @@ export default function BundleQuickBuy({
             </span>
           </button>
           <div className={isCompact ? "text-xs text-white/70" : "text-xs text-white/75"}>
-            {FREE_SHIPPING_PHRASE} • Ships within 24 hours • 30-day money-back guarantee
+            Love it or your money back • Ships in 1-2 business days • Secure checkout
           </div>
           {error ? (
             <div className={isCompact ? "text-xs font-semibold text-red-200" : "text-xs font-semibold text-red-200"}>{error}</div>

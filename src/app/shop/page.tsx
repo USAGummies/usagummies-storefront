@@ -9,8 +9,7 @@ import { StickyAddToCartBar } from "@/components/product/StickyAddToCartBar";
 import { getProductsPage } from "@/lib/shopify/products";
 import { getProductByHandle, money } from "@/lib/storefront";
 import { getBundleVariants } from "@/lib/bundles/getBundleVariants";
-import { pricingForQty, FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
-import { AMAZON_LISTING_URL } from "@/lib/amazon";
+import { BASE_PRICE, pricingForQty, FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 
 const PAGE_SIZE = 1;
 function resolveSiteUrl() {
@@ -115,6 +114,13 @@ export default async function ShopPage() {
   const featuredQuantities = [1, 2, 3, 4, 5, 8, 12];
   const featuredDisplay = "1-3 / 4 / 5 / 8 / 12";
   const bestValuePerBagText = money(pricingForQty(8).perBag.toFixed(2), currency);
+  const maxBundleSavings = Math.max(
+    ...featuredQuantities.map((qty) => {
+      const pricing = pricingForQty(qty);
+      return Math.max(0, BASE_PRICE * qty - pricing.total);
+    })
+  );
+  const maxBundleSavingsText = money(maxBundleSavings.toFixed(2), currency);
 
   let bundleVariants: Awaited<ReturnType<typeof getBundleVariants>> | null = null;
   try {
@@ -206,25 +212,22 @@ export default async function ShopPage() {
 
               <div className="flex flex-wrap items-center gap-3">
                 <a href="#bundle-pricing" className="btn btn-red">
-                  Build my bundle
+                  Build your bundle &amp; save up to {maxBundleSavingsText}
                 </a>
-                <a
-                  href={AMAZON_LISTING_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn btn-outline-white"
-                >
-                  Buy 1-3 bags on Amazon
-                </a>
-                <span className="text-xs text-white/70">{FREE_SHIPPING_PHRASE}</span>
+                <span className="text-xs text-white/70">
+                  Love it or your money back • Ships in 1-2 business days • Secure checkout
+                </span>
               </div>
 
               <div className="metal-panel rounded-3xl border border-white/12 p-4">
                 <div className="grid gap-3 sm:grid-cols-3">
                   <div className="space-y-1">
-                    <div className="text-[10px] uppercase tracking-[0.24em] text-white/60">Best value</div>
+                    <div className="text-[10px] uppercase tracking-[0.24em] text-white/60">Most popular</div>
                     <div className="text-base font-black text-white">8 bags</div>
                     <div className="text-[11px] text-white/70">~ {bestValuePerBagText} / bag</div>
+                    <div className="text-[11px] text-[var(--gold)]/90">
+                      Best balance of value + convenience
+                    </div>
                   </div>
                   <div className="space-y-1 sm:border-l sm:border-white/10 sm:pl-4">
                     <div className="text-[10px] uppercase tracking-[0.24em] text-white/60">Free shipping</div>
@@ -306,17 +309,9 @@ export default async function ShopPage() {
                 <a href="#product-bundles" className="btn btn-red">
                   Build my bundle
                 </a>
-                <a
-                  href={AMAZON_LISTING_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn btn-outline-white"
-                >
-                  Buy 1-3 bags on Amazon
-                </a>
               </div>
               <div className="text-xs text-white/70">
-                {FREE_SHIPPING_PHRASE} • Ships within 24 hours • 30-day money-back guarantee
+                Love it or your money back • Ships in 1-2 business days • Secure checkout
               </div>
 
               <AmericanDreamCallout variant="compact" className="mt-4" />

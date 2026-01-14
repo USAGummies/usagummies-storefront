@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
-import { AMAZON_LISTING_URL } from "@/lib/amazon";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 
 export const metadata: Metadata = {
@@ -91,14 +90,6 @@ export default function IngredientsPage() {
                   <Link href="/shop" className="btn btn-red">
                     Shop bundles
                   </Link>
-                  <a
-                    href={AMAZON_LISTING_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn btn-outline-white"
-                  >
-                    Buy 1-3 bags on Amazon
-                  </a>
                   <span className="text-xs text-white/70">{FREE_SHIPPING_PHRASE}</span>
                 </div>
               </div>
@@ -161,20 +152,15 @@ export default function IngredientsPage() {
             <h2 className="mt-2 text-2xl font-black text-white">Check the label for full details.</h2>
             <p className="mt-2 text-sm text-white/75">
               For full ingredient and allergen details, please review the ingredient panel on the bag
-              or the Amazon listing before you order.
+              before you order.
             </p>
             <div className="mt-3 flex flex-wrap gap-3">
               <Link href="/faq" className="btn btn-outline-white">
                 Read FAQ
               </Link>
-              <a
-                href={AMAZON_LISTING_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn btn-red"
-              >
-                View Amazon listing
-              </a>
+              <Link href="/shop" className="btn btn-red">
+                Shop bundles
+              </Link>
             </div>
           </div>
         </div>
