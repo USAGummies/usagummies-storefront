@@ -156,8 +156,10 @@ export default async function HomePage() {
     bundleVariants = null;
   }
 
+  const heroBundleQuantities = [1, 2, 3, 4, 5, 8, 12];
+  const heroBundleLabel = "1-3 / 4 / 5 / 8 / 12 bags";
   const homepageTiers = (bundleVariants?.variants || []).filter((t) =>
-    [1, 4, 5, 8, 12].includes(t.quantity)
+    heroBundleQuantities.includes(t.quantity)
   );
 
   const whyCards = [
@@ -201,7 +203,7 @@ export default async function HomePage() {
   const checkoutSteps = [
     {
       title: "Pick your bundle",
-      copy: `Start with a 1-bag trial or unlock first savings at 4 bags. ${FREE_SHIPPING_PHRASE}.`,
+      copy: `Start with 1-3 bags at standard price or unlock first savings at 4 bags. ${FREE_SHIPPING_PHRASE}.`,
     },
     {
       title: "Classic gummy bear flavor — done right",
@@ -402,7 +404,7 @@ export default async function HomePage() {
               <div className="metal-panel rounded-[36px] border border-[rgba(199,54,44,0.45)] p-3 ring-1 ring-white/20 shadow-[0_32px_90px_rgba(7,12,20,0.6)]">
                 <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-[0.3em] text-white/60">
                   <span>Build your bundle</span>
-                  <span className="text-[var(--gold)]">1 / 4 / 5 / 8 / 12 bags</span>
+                  <span className="text-[var(--gold)]">{heroBundleLabel}</span>
                 </div>
                 <div className="mt-1 text-xs text-white/70">
                   Tap a bundle size to lock your price.
@@ -429,7 +431,7 @@ export default async function HomePage() {
                     rel="noopener noreferrer"
                     className="underline underline-offset-4 hover:text-white"
                   >
-                    Prefer 1–3 bags? Buy on Amazon →
+                    Prefer 1-3 bags? Buy on Amazon →
                   </a>
                 </div>
               </div>

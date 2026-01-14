@@ -71,6 +71,8 @@ type BundleOption = {
   currencyCode?: string;
 };
 
+const VISIBLE_QUANTITIES = [1, 2, 3, 4, 5, 8, 12];
+
 function money(amount?: number, currencyCode = "USD") {
   const n = Number(amount);
   if (!Number.isFinite(n)) return "—";
@@ -131,11 +133,10 @@ export default function PurchaseBox({
   const router = useRouter();
 
   const variants = (product?.variants?.nodes || []) as VariantNode[];
-  // Canonical ladder. Expose the full 1-12 bag pricing options for reference.
+  // Canonical ladder. Expose 1-3 bags plus core bundle sizes on-site.
   const ladder = useMemo(() => {
-    return Array.from({ length: 12 }, (_, idx) => {
-      const qty = idx + 1;
-      const accent = [4, 5, 8, 10, 12].includes(qty);
+    return VISIBLE_QUANTITIES.map((qty) => {
+      const accent = [4, 5, 8, 12].includes(qty);
       let label = `${qty} Bag${qty === 1 ? "" : "s"}`;
       let sub =
         qty === 1
@@ -246,7 +247,7 @@ export default function PurchaseBox({
     return opts;
   }, [bundleOptions]);
 
-  const featuredQuantities = [1, 4, 5, 8, 12];
+  const featuredQuantities = [4, 5, 8, 12];
 
   const featuredOptions = useMemo<BundleOption[]>(() => {
     if (!bundleOptionsWithBadges.length) return [];

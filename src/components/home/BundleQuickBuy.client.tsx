@@ -62,7 +62,7 @@ function getStoredCartId() {
 }
 
 const FEATURED_QTYS: TierKey[] = ["1", "2", "3", "4", "5", "8", "12"];
-const FEATURED_QTYS_COMPACT: TierKey[] = ["1", "4", "5", "8", "12"];
+const FEATURED_QTYS_COMPACT: TierKey[] = ["1", "2", "3", "4", "5", "8", "12"];
 
 export default function BundleQuickBuy({
   tiers = [],

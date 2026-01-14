@@ -112,7 +112,8 @@ export default async function ShopPage() {
     primaryProduct?.priceRange?.minVariantPrice?.currencyCode ||
     "USD";
 
-  const featuredQuantities = [1, 4, 5, 8, 12];
+  const featuredQuantities = [1, 2, 3, 4, 5, 8, 12];
+  const featuredDisplay = "1-3 / 4 / 5 / 8 / 12";
   const bestValuePerBagText = money(pricingForQty(8).perBag.toFixed(2), currency);
 
   let bundleVariants: Awaited<ReturnType<typeof getBundleVariants>> | null = null;
@@ -243,7 +244,7 @@ export default async function ShopPage() {
               <div className="metal-panel rounded-[36px] border border-[rgba(199,54,44,0.45)] p-3 ring-1 ring-white/20 shadow-[0_32px_90px_rgba(7,12,20,0.6)]">
                 <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-[0.3em] text-white/60">
                   <span>Build your bundle</span>
-                  <span className="text-[var(--gold)]">{featuredQuantities.join(" / ")} bags</span>
+                  <span className="text-[var(--gold)]">{featuredDisplay} bags</span>
                 </div>
                 <div className="mt-1 text-xs text-white/70">
                   Tap a bundle size to lock your price.

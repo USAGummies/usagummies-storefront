@@ -40,7 +40,7 @@ const FAQS = [
   {
     question: "Can I buy a single bag?",
     answer:
-      "Yes. We direct 1-3 bag orders to Amazon. Bundles on our site are designed to save you more per bag.",
+      "Yes. You can order 1-3 bags on our site at standard price, or shop those quantities on Amazon. Bundles on our site are designed to save you more per bag.",
   },
   {
     question: "How does bundle pricing work?",

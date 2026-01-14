@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Disallow: /cart
+Disallow: /checkout
+Disallow: /api/
+Disallow: /admin
+Disallow: /account
+Disallow: /orders
+Disallow: /search
+Sitemap: https://www.usagummies.com/sitemap.xml
+Host: https://www.usagummies.com
