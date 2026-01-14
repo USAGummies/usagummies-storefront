@@ -93,11 +93,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     function handleCartUpdated() {
       refreshCartCount();
-      setDrawerOpen(true);
+      if (pathname !== "/cart") {
+        setDrawerOpen(true);
+      }
     }
     window.addEventListener("cart:updated", handleCartUpdated);
     return () => window.removeEventListener("cart:updated", handleCartUpdated);
-  }, []);
+  }, [pathname]);
 
   useEffect(() => {
     if (!menuOpen) return;
