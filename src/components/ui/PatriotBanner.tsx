@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { PatriotRibbon } from "@/components/ui/PatriotRibbon";
 
-export function PatriotBanner() {
+export function PatriotBanner({ showRibbon = true }: { showRibbon?: boolean }) {
   return (
     <section className="patriot-banner">
       <div className="patriot-banner__content" style={{ padding: 18 }}>
@@ -36,11 +36,11 @@ export function PatriotBanner() {
               <span className="badge">🇺🇸 Made in USA</span>
               <span className="badge">🚚 Ships fast</span>
               <span className="badge">✅ Dye-free</span>
-              <span className="badge">⭐ 4.8 rating</span>
+              <span className="badge">⭐ 4.8 stars from verified Amazon buyers</span>
             </div>
           </div>
 
-          <div className="card" style={{ padding: 14 }}>
+          <div className="metal-panel rounded-2xl border border-white/12" style={{ padding: 14 }}>
             <div className="kicker">Today’s move</div>
             <div style={{ fontWeight: 950, fontSize: 18, marginTop: 8 }}>
               Bundle & Save
@@ -51,7 +51,7 @@ export function PatriotBanner() {
             </div>
 
             <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
-              <Link className="btn btn-red" href="/shop">
+              <Link className="btn btn-red" href="/shop#bundle-pricing">
                 Build a Bundle 🇺🇸
               </Link>
               <Link className="btn btn-navy" href="/shop">
@@ -61,9 +61,11 @@ export function PatriotBanner() {
           </div>
         </div>
 
-        <div style={{ marginTop: 14 }}>
-          <PatriotRibbon />
-        </div>
+        {showRibbon ? (
+          <div style={{ marginTop: 14 }}>
+            <PatriotRibbon />
+          </div>
+        ) : null}
       </div>
 
       <style>{`

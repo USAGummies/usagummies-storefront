@@ -61,18 +61,17 @@ export function ShopProductCard({
   const img = product?.featuredImage;
   const priceText = formatPrice(product);
 
-  const basePath = `/products/${product.handle}`;
-
-  const href = campaign
-    ? `${basePath}?campaign=${encodeURIComponent(campaign)}`
-    : basePath;
+  const basePath = "/shop";
+  const detailHref = campaign
+    ? `${basePath}?campaign=${encodeURIComponent(campaign)}#product-details`
+    : `${basePath}#product-details`;
 
   const bundleHref = campaign
-    ? `${basePath}?focus=bundles&campaign=${encodeURIComponent(campaign)}`
-    : `${basePath}?focus=bundles`;
+    ? `${basePath}?campaign=${encodeURIComponent(campaign)}#product-bundles`
+    : `${basePath}#product-bundles`;
 
   return (
-    <QuickView product={product} href={href}>
+    <QuickView product={product} detailHref={detailHref} bundleHref={bundleHref}>
       {(open) => (
         <div
           role="button"

@@ -2,10 +2,6 @@
 
 import { useEffect, useState } from "react";
 
-function cx(...a: Array<string | false | null | undefined>) {
-  return a.filter(Boolean).join(" ");
-}
-
 type Selected = {
   label?: string;
   total?: string;

@@ -30,8 +30,8 @@ export default function ReturnsPolicyPage() {
         <section className="glass p-7">
           <h1 className="text-3xl font-semibold tracking-tight">Returns & Refunds</h1>
           <p className="mt-3 text-white/75">
-            We’re customer-first — and we also follow food-safety best practices.
-            If something arrives wrong or damaged, we’ll make it right.
+            This returns and refund policy is customer-first while following food-safety best
+            practices. If something arrives wrong or damaged, we will make it right.
           </p>
 
           <div className="mt-8 space-y-6 text-white/80">

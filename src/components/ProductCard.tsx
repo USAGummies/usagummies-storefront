@@ -28,7 +28,7 @@ export function ProductCard({ product }: { product: Product }) {
         ${variant.price.amount}
       </p>
 
-      <Link href={`/products/${product.handle}`}>
+      <Link href="/shop#product-details">
         <button
           style={{
             padding: "0.75rem 1.25rem",

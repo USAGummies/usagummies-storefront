@@ -15,8 +15,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { BundleTier } from "@/lib/bundles/getBundleVariants";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
+import { trackEvent } from "@/lib/analytics";
 
-type TierKey = "1" | "2" | "3" | "4" | "5" | "8" | "12";
+type TierKey = "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10" | "11" | "12";
 
 type Props = {
   tiers?: BundleTier[] | null;
@@ -25,6 +26,7 @@ type Props = {
   singleBagVariantId?: string | null;
   availableForSale?: boolean;
   variant?: "default" | "compact";
+  featuredQuantities?: number[];
 };
 
 function money(amount?: number | null, currency = "USD") {
@@ -55,10 +57,11 @@ const FEATURED_QTYS_COMPACT: TierKey[] = ["5", "8", "12"];
 
 export default function BundleQuickBuy({
   tiers = [],
-  productHandle,
+  productHandle: _productHandle,
   anchorId,
   singleBagVariantId,
   availableForSale = true,
+  featuredQuantities,
   variant = "default",
 }: Props) {
   const router = useRouter();
@@ -69,14 +72,20 @@ export default function BundleQuickBuy({
   const isCompact = variant === "compact";
 
   const featured = React.useMemo(() => {
+    const defaultKeys = isCompact ? FEATURED_QTYS_COMPACT : FEATURED_QTYS;
+    const allowedKeys = (featuredQuantities?.length
+      ? featuredQuantities.map((q) => String(q))
+      : defaultKeys) as TierKey[];
+    const allowedSet = new Set(allowedKeys);
+
     const allowed = (tiers || []).filter((t) => {
       if (!t) return false;
       const key = String(t.quantity) as TierKey;
-      return (isCompact ? FEATURED_QTYS_COMPACT : FEATURED_QTYS).includes(key);
+      return allowedSet.has(key);
     });
     allowed.sort((a, b) => a.quantity - b.quantity);
     return allowed;
-  }, [tiers, isCompact]);
+  }, [tiers, isCompact, featuredQuantities]);
 
   React.useEffect(() => {
     const preferred =
@@ -105,6 +114,11 @@ export default function BundleQuickBuy({
 
   function handleSelect(qty: number, canSelect = true) {
     if (!canSelect) return;
+    trackEvent("bundle_select", {
+      qty,
+      variant,
+      anchorId: anchorId || null,
+    });
     setSelected(String(qty) as TierKey);
     if (typeof window !== "undefined" && window.innerWidth < 768) {
       window.requestAnimationFrame(scrollToCTA);
@@ -119,6 +133,11 @@ export default function BundleQuickBuy({
       setError(availableForSale === false ? "Out of stock" : "Select a bundle to continue.");
       return;
     }
+    trackEvent("bundle_add_to_cart", {
+      qty: selectedTier?.quantity,
+      variant,
+      anchorId: anchorId || null,
+    });
     setAdding(true);
     setError(null);
     try {
@@ -386,7 +405,7 @@ export default function BundleQuickBuy({
           Bundle pricing is temporarily unavailable right now. Please try again or view product details.
         </div>
         <Link
-          href={productHandle ? `/products/${productHandle}?focus=bundles` : "/shop"}
+          href="/shop#product-details"
           className="mt-3 inline-flex items-center justify-center rounded-full bg-[#d6403a] px-5 py-3 text-sm font-bold text-white shadow-[0_10px_30px_rgba(214,64,58,0.35)] hover:brightness-110 active:brightness-95"
         >
           View product details
@@ -545,11 +564,7 @@ export default function BundleQuickBuy({
 
       <div className={isCompact ? "mt-3 flex items-center gap-3 text-xs text-white/60" : "mt-3 flex items-center gap-3 text-xs text-white/70"}>
         <Link
-          href={
-            productHandle
-              ? `/products/${productHandle}?focus=bundles`
-              : "/shop"
-          }
+          href="/shop#product-bundles"
           className={isCompact ? "inline-flex items-center gap-2 font-semibold text-white/80 underline underline-offset-4 hover:text-white" : "inline-flex items-center gap-2 font-semibold text-white underline underline-offset-4 hover:text-white/90"}
         >
           Explore more bundle sizes →

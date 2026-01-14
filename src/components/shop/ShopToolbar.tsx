@@ -102,7 +102,6 @@ export function ShopToolbar() {
     return () => {
       if (debounceRef.current) window.clearTimeout(debounceRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [input, q, queryString]); // include q/queryString to avoid stale updates
 
   // Submit immediately on Enter (no waiting for debounce)

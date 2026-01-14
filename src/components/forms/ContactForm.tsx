@@ -20,7 +20,7 @@ export default function ContactForm({
       formData.set("context", context);
       await sendContactEmail(formData);
       setStatus("sent");
-    } catch (e) {
+    } catch {
       setStatus("error");
     }
   }

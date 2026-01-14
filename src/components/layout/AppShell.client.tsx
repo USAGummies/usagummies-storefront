@@ -7,6 +7,9 @@ import { useEffect, useRef, useState } from "react";
 import { CartDrawer } from "@/components/layout/CartDrawer.client";
 import { usePathname } from "next/navigation";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
+import { applyExperimentFromUrl, trackEvent } from "@/lib/analytics";
+import { LeadCapture } from "@/components/marketing/LeadCapture.client";
+import { SubscriptionUnlock } from "@/components/marketing/SubscriptionUnlock.client";
 
 function cx(...a: Array<string | false | null | undefined>) {
   return a.filter(Boolean).join(" ");
@@ -29,6 +32,7 @@ function setCartCookie(cartId?: string | null) {
 const navLinks = [
   { href: "/shop", label: "Shop" },
   { href: "/about", label: "About" },
+  { href: "/join-the-revolution", label: "Join the Revolution" },
   { href: "/contact", label: "Contact" },
   { href: "/policies", label: "Policies" },
 ];
@@ -73,9 +77,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [pathname]);
 
   useEffect(() => {
+    trackEvent("page_view", { path: pathname });
+  }, [pathname]);
+
+  useEffect(() => {
     const stored = getStoredCartId();
     if (stored) setCartCookie(stored);
     refreshCartCount();
+  }, []);
+
+  useEffect(() => {
+    applyExperimentFromUrl();
   }, []);
 
   useEffect(() => {
@@ -231,6 +243,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <footer className="border-t border-[var(--border)] bg-white/85 backdrop-blur-md text-[var(--text)]">
         <div className="mx-auto max-w-6xl px-4 py-8 text-sm text-[var(--muted)] space-y-6">
+          <div className="grid gap-4 md:grid-cols-2">
+            <LeadCapture
+              source="footer"
+              intent="newsletter"
+              title="Join the revolution"
+              subtitle="Early drops, bundle alerts, and patriotic releases."
+              ctaLabel="Join the list"
+              variant="light"
+              showSms
+            />
+            <SubscriptionUnlock source="footer" variant="light" />
+          </div>
+
           <div className="grid gap-4 md:grid-cols-[1.1fr_auto] md:items-start">
             <div className="space-y-2">
               <div className="text-lg font-black text-[var(--text)]">USA Gummies</div>
@@ -252,6 +277,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </Link>
               <Link href="/about" className="link-underline">
                 About
+              </Link>
+              <Link href="/join-the-revolution" className="link-underline">
+                Join the Revolution
+              </Link>
+              <Link href="/faq" className="link-underline">
+                FAQ
+              </Link>
+              <Link href="/ingredients" className="link-underline">
+                Ingredients
+              </Link>
+              <Link href="/made-in-usa" className="link-underline">
+                Made in USA
               </Link>
               <Link href="/contact" className="link-underline">
                 Contact

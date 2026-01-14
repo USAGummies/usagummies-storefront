@@ -10,11 +10,13 @@ import { getBundleVariants } from "@/lib/bundles/getBundleVariants";
 import { FREE_SHIPPING_PHRASE, pricingForQty } from "@/lib/bundles/pricing";
 import HeroCTAWatcher from "@/components/home/HeroCTAWatcher";
 import { AMAZON_LISTING_URL } from "@/lib/amazon";
+import { AmericanDreamCallout } from "@/components/story/AmericanDreamCallout";
 
 export const metadata: Metadata = {
-  title: "USA Gummies | All American Gummy Bears",
+  title:
+    "USA Gummies - All American Gummy Bears, 7.5 oz, Made in USA, No Artificial Dyes, All Natural Flavors",
   description:
-    "USA Gummies - All American Gummy Bears, made in the USA with no artificial dyes or synthetic colors and all natural flavors.",
+    "USA Gummies - All American Gummy Bears, 7.5 oz, Made in USA, No Artificial Dyes, All Natural Flavors.",
 };
 
 function formatMoney(amount: string | number, currency = "USD") {
@@ -52,6 +54,11 @@ export default async function HomePage() {
     detailedProduct?.title?.toString?.() ||
     product?.title?.toString?.() ||
     "All American Gummy Bears - 7.5 oz bag";
+  const productImages =
+    (detailedProduct?.images?.edges || []).map((e: any) => e?.node) || [];
+  const whyImage = productImages[1] || productImages[0] || null;
+  const whyImageSrc = whyImage?.url || "/home-patriotic-product.jpg";
+  const whyImageAlt = whyImage?.altText || "USA Gummies in hand";
 
   const heroMediaSrc = "/hero-loop.gif";
   const starterPricing = pricingForQty(1);
@@ -182,14 +189,13 @@ export default async function HomePage() {
 
               <div className="space-y-2">
                 <h1 className="text-4xl font-black leading-[1.02] tracking-tight text-white sm:text-5xl lg:text-6xl">
-                  USA Gummies — All American Gummy Bears.
+                  USA Gummies - All American Gummy Bears, 7.5 oz.
                 </h1>
                 <div className="font-script text-[var(--gold)] text-2xl sm:text-3xl">
-                  Made in the U.S.A.
+                  Made in USA. No artificial dyes. All natural flavors.
                 </div>
                 <p className="text-sm text-white/80 sm:text-base max-w-prose">
-                  No artificial dyes or synthetic colors. All natural flavors. Classic gummy bear
-                  flavor — done right.
+                  Classic gummy bear flavor with a clean, chewy finish and five fruit flavors.
                 </p>
                 <div className="text-xs text-white/65">
                   7.5 oz bag with 5 fruit flavors: cherry, watermelon, orange, green apple, lemon.
@@ -392,24 +398,28 @@ export default async function HomePage() {
                 <p className="text-xs text-white/65">
                   7.5 oz bag with 5 fruit flavors: cherry, watermelon, orange, green apple, lemon.
                 </p>
+                <AmericanDreamCallout variant="compact" className="mt-4" />
                 <div className="flex flex-wrap items-center gap-3">
                   <a href="#bundle-pricing" className="btn btn-red">
                     Build my bundle
                   </a>
-                  <a
-                    href={AMAZON_LISTING_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn btn-outline-white"
-                  >
-                    Buy 1-3 bags on Amazon
-                  </a>
                   <Link
-                    href={`/products/${handle}`}
+                    href="/shop#product-details"
                     className="text-xs font-semibold text-white/70 underline underline-offset-4 hover:text-white focus-ring"
                   >
                     View product details →
                   </Link>
+                </div>
+                <div className="text-xs text-white/70">
+                  Prefer 1-3 bags?{" "}
+                  <a
+                    href={AMAZON_LISTING_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-semibold text-white underline underline-offset-4 hover:text-[var(--gold)]"
+                  >
+                    Buy on Amazon
+                  </a>
                 </div>
               </div>
 
@@ -417,8 +427,8 @@ export default async function HomePage() {
                 <div className="relative overflow-hidden rounded-3xl border border-white/20 bg-white/95 p-2 text-[var(--navy)] shadow-[0_22px_60px_rgba(7,12,20,0.35)]">
                   <div className="relative aspect-[4/5] overflow-hidden rounded-2xl border border-white/60 bg-white">
                     <Image
-                      src="/home-patriotic-product.jpg"
-                      alt="USA Gummies bundle"
+                      src={whyImageSrc}
+                      alt={whyImageAlt}
                       fill
                       sizes="(max-width: 640px) 90vw, (max-width: 1024px) 40vw, 420px"
                       className="object-cover"

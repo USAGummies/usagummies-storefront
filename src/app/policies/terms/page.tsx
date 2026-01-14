@@ -30,8 +30,8 @@ export default function TermsPage() {
         <section className="glass p-7">
           <h1 className="text-3xl font-semibold tracking-tight">Terms of Service</h1>
           <p className="mt-3 text-white/75">
-            These terms apply to purchases made through USA Gummies. Checkout is processed securely
-            through Shopify.
+            These terms of service apply to purchases made through USA Gummies. Checkout is processed
+            securely through Shopify.
           </p>
 
           <div className="mt-8 space-y-6 text-white/80">

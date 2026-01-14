@@ -1,17 +1,17 @@
 // src/app/shop/page.tsx (FULL REPLACE)
 import type { Metadata } from "next";
-import Link from "next/link";
-import Image from "next/image";
-import { ShopToolbar } from "@/components/shop/ShopToolbar";
-import { ShopProductCard } from "@/components/shop/ShopProductCard";
 import BundleQuickBuy from "@/components/home/BundleQuickBuy.client";
-import { getProductsPage, type SortValue } from "@/lib/shopify/products";
+import { ProductGallery } from "@/components/product/ProductGallery.client";
+import PurchaseBox from "@/app/products/[handle]/PurchaseBox.client";
+import { AmericanDreamCallout } from "@/components/story/AmericanDreamCallout";
+import { StickyAddToCartBar } from "@/components/product/StickyAddToCartBar";
+import { getProductsPage } from "@/lib/shopify/products";
 import { getProductByHandle, money } from "@/lib/storefront";
 import { getBundleVariants } from "@/lib/bundles/getBundleVariants";
-import { pricingForQty, FREE_SHIP_QTY, FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
+import { pricingForQty, FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import { AMAZON_LISTING_URL } from "@/lib/amazon";
 
-const PAGE_SIZE = 18;
+const PAGE_SIZE = 1;
 function resolveSiteUrl() {
   const fromEnv = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "");
   if (fromEnv) return fromEnv;
@@ -22,36 +22,35 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-
-function coerceSort(v?: string): SortValue {
-  switch ((v ?? "").toLowerCase()) {
-    case "best-selling":
-    case "best":
-      return "best-selling";
-    case "newest":
-      return "newest";
-    case "price-asc":
-      return "price-asc";
-    case "price-desc":
-      return "price-desc";
-    case "featured":
-    default:
-      return "best-selling";
-  }
-}
-
-function hasBundleVariants(product: any) {
-  const variants =
-    product?.variants?.nodes ||
-    product?.variants?.edges?.map((e: any) => e.node) ||
-    [];
-  return variants.some((v: any) => {
-    const t = (v?.title || "").toLowerCase();
-    const match = t.match(/(\d+)\s*(bag|bags)/);
-    if (match && Number(match[1]) > 1) return true;
-    return false;
-  });
-}
+const LISTING_TITLE =
+  "USA Gummies – All American Gummy Bears, 7.5 oz, Made in USA, No Artificial Dyes, All Natural Flavors";
+const LISTING_BULLETS = [
+  {
+    title: "MADE IN THE USA",
+    body:
+      "Proudly sourced, manufactured, and packed entirely in America. Supporting local jobs while delivering a better-quality gummy you can trust.",
+  },
+  {
+    title: "NO ARTIFICIAL DYES OR SYNTHETIC COLORS",
+    body:
+      "Colored naturally using real fruit and vegetable extracts. No fake brightness, no artificial dyes.",
+  },
+  {
+    title: "CLASSIC GUMMY BEAR FLAVOR — DONE RIGHT",
+    body:
+      "All the chewy, fruity flavor you expect from a gummy bear, just without artificial ingredients or harsh aftertaste.",
+  },
+  {
+    title: "PERFECT FOR EVERYDAY SNACKING",
+    body:
+      "Great for lunchboxes, desk drawers, road trips, care packages, and guilt-free sweet cravings.",
+  },
+  {
+    title: "7.5 OZ BAG WITH 5 FRUIT FLAVORS",
+    body:
+      "Cherry, Watermelon, Orange, Green Apple, and Lemon. Clearly labeled, honestly made, and easy to share.",
+  },
+];
 
 export async function generateMetadata(): Promise<Metadata> {
   const title = "Shop USA Gummies | Bundle & Save on American-Made Gummies";
@@ -76,28 +75,12 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default async function ShopPage(props: {
-  searchParams: Promise<{
-    sort?: string;
-    q?: string;
-    after?: string;
-    before?: string;
-  }>;
-}) {
-  const sp = await props.searchParams;
-  const sort = coerceSort(sp.sort);
-  const q = (sp.q ?? "").trim() || undefined;
-  const after = sp.after || undefined;
-  const before = sp.before || undefined;
-
+export default async function ShopPage() {
   let results: Awaited<ReturnType<typeof getProductsPage>>;
   try {
     results = await getProductsPage({
       pageSize: PAGE_SIZE,
-      sort,
-      q,
-      after,
-      before,
+      sort: "best-selling",
     });
   } catch {
     results = {
@@ -128,20 +111,7 @@ export default async function ShopPage(props: {
     primaryProduct?.priceRange?.minVariantPrice?.currencyCode ||
     "USD";
 
-  const focusQuantities = [5, 8, 12];
-  const bundles = focusQuantities.map((qty) => {
-    const pricing = pricingForQty(qty);
-    return {
-      qty,
-      total: pricing.total,
-      perBag: pricing.perBag,
-      id: `ladder-${qty}`,
-      title: `${qty} Bag${qty > 1 ? "s" : ""}`,
-    };
-  });
-
-  const mostPopular = bundles.find((b: any) => b.qty === 5) || bundles[0];
-  const bestValue = bundles.find((b: any) => b.qty === 8) || bundles[bundles.length - 1];
+  const featuredQuantities = [5, 8, 10];
   const bestValuePerBagText = money(pricingForQty(8).perBag.toFixed(2), currency);
 
   let bundleVariants: Awaited<ReturnType<typeof getBundleVariants>> | null = null;
@@ -151,9 +121,25 @@ export default async function ShopPage(props: {
     bundleVariants = null;
   }
 
-  const quickBuyTiers = (bundleVariants?.variants || []).filter((t) =>
-    focusQuantities.includes(t.quantity)
-  );
+  const quickBuyTiers = bundleVariants?.variants || [];
+
+  const productTitle = LISTING_TITLE;
+  const productFeatured = detailedProduct?.featuredImage || primaryProduct?.featuredImage || null;
+  const productImages = (detailedProduct?.images?.edges || []).map((e: any) => e.node);
+  const productVariants = (detailedProduct?.variants?.edges || []).map((e: any) => e.node);
+  const purchaseProduct = detailedProduct
+    ? {
+        title: detailedProduct.title,
+        handle: detailedProduct.handle,
+        description: detailedProduct.description,
+        variants: { nodes: productVariants },
+        priceRange: detailedProduct.priceRange,
+      }
+    : null;
+
+  const stickyImage =
+    productFeatured?.url || productImages?.[0]?.url || "/home-patriotic-product.jpg";
+  const stickyAlt = productFeatured?.altText || "USA Gummies bag";
 
   return (
     <main className="relative overflow-hidden bg-[var(--navy)] text-white min-h-screen home-metal pb-16">
@@ -189,8 +175,7 @@ export default async function ShopPage(props: {
                   Shop USA Gummies
                 </h1>
                 <p className="text-sm text-white/80 sm:text-base max-w-prose">
-                  USA Gummies – All American Gummy Bears, 7.5 oz, Made in USA, No Artificial Dyes,
-                  All Natural Flavors.
+                  {LISTING_TITLE}.
                 </p>
               </div>
 
@@ -198,26 +183,24 @@ export default async function ShopPage(props: {
                 <div className="flex items-start gap-2">
                   <span className="mt-1.5 h-2 w-2 rounded-full bg-[var(--gold)]" />
                   <span>
-                    MADE IN THE USA – Proudly sourced, manufactured, and packed entirely in America.
+                    {LISTING_BULLETS[0].title} – {LISTING_BULLETS[0].body}
                   </span>
                 </div>
                 <div className="flex items-start gap-2">
                   <span className="mt-1.5 h-2 w-2 rounded-full bg-[rgba(199,54,44,0.8)]" />
                   <span>
-                    NO ARTIFICIAL DYES OR SYNTHETIC COLORS – Colored naturally using real fruit and vegetable extracts.
+                    {LISTING_BULLETS[1].title} – {LISTING_BULLETS[1].body}
                   </span>
                 </div>
                 <div className="flex items-start gap-2 text-white/70">
                   <span className="mt-1.5 h-2 w-2 rounded-full bg-white/50" />
                   <span>
-                    CLASSIC GUMMY BEAR FLAVOR — DONE RIGHT – All the chewy, fruity flavor you expect, without artificial ingredients or harsh aftertaste.
+                    {LISTING_BULLETS[2].title} – {LISTING_BULLETS[2].body}
                   </span>
                 </div>
               </div>
 
-              <div className="text-xs text-white/65">
-                7.5 oz bag with 5 fruit flavors: Cherry, Watermelon, Orange, Green Apple, and Lemon.
-              </div>
+              <div className="text-xs text-white/65">{LISTING_BULLETS[4].body}</div>
 
               <div className="flex flex-wrap items-center gap-3">
                 <a href="#bundle-pricing" className="btn btn-red">
@@ -259,7 +242,7 @@ export default async function ShopPage(props: {
               <div className="metal-panel rounded-[36px] border border-[rgba(199,54,44,0.45)] p-3 ring-1 ring-white/20 shadow-[0_32px_90px_rgba(7,12,20,0.6)]">
                 <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-[0.3em] text-white/60">
                   <span>Build your bundle</span>
-                  <span className="text-[var(--gold)]">5 / 8 / 12 bags</span>
+                  <span className="text-[var(--gold)]">{featuredQuantities.join(" / ")} bags</span>
                 </div>
                 <div className="mt-1 text-xs text-white/70">
                   Tap a bundle size to lock your price.
@@ -267,6 +250,7 @@ export default async function ShopPage(props: {
                 <div className="mt-3 space-y-3">
                   <div
                     id="bundle-pricing"
+                    data-purchase-section="true"
                     className="bundle-home metal-panel rounded-[28px] border border-[rgba(199,160,98,0.4)] p-2 shadow-[0_22px_60px_rgba(7,12,20,0.6)]"
                   >
                     <BundleQuickBuy
@@ -275,201 +259,99 @@ export default async function ShopPage(props: {
                       tiers={quickBuyTiers}
                       singleBagVariantId={bundleVariants?.singleBagVariantId}
                       availableForSale={bundleVariants?.availableForSale}
+                      featuredQuantities={featuredQuantities}
                       variant="compact"
                     />
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
-                  <div className="relative">
-                    <div className="absolute -top-6 right-6 h-20 w-20 rounded-full bg-[rgba(199,54,44,0.25)] blur-2xl" aria-hidden="true" />
-                    <div className="relative rounded-3xl border border-white/20 bg-white/95 p-2 text-[var(--navy)] shadow-[0_30px_70px_rgba(7,12,20,0.35)]">
-                      <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-white/60 bg-white">
-                        <Image
-                          src="/home-patriotic-product.jpg"
-                          alt="USA Gummies bundle"
-                          fill
-                          sizes="(max-width: 640px) 90vw, (max-width: 1024px) 60vw, 520px"
-                          className="object-cover"
-                        />
-                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 via-black/0 to-transparent p-3">
-                          <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-white/80">
-                            Best seller
-                          </div>
-                        </div>
-                      </div>
-                      <div className="mt-2 space-y-1">
-                        <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
-                          Best seller
-                        </div>
-                        <div className="text-lg font-black text-[var(--navy)]">
-                          USA Gummies - All American Gummy Bears
-                        </div>
-                        <div className="text-sm text-[var(--muted)]">
-                          7.5 oz bag with 5 fruit flavors
-                        </div>
-                        <div className="flex flex-wrap gap-2 pt-1">
-                          <span className="badge badge--navy">Made in USA</span>
-                          <span className="badge badge--navy">No artificial dyes</span>
-                        </div>
-                      </div>
-                    </div>
+      <section id="product-details" aria-label="Product details" className="bg-[var(--navy)] scroll-mt-24">
+        <div className="mx-auto max-w-6xl px-4 py-8 lg:py-10">
+          <div className="metal-panel rounded-[36px] border border-[rgba(199,54,44,0.25)] p-5 sm:p-6">
+            <div className="space-y-4">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-white/60">
+                Product details
+              </div>
+              <h2 className="text-2xl font-black text-white sm:text-3xl">
+                {productTitle}
+              </h2>
+              <div className="grid gap-2 text-sm text-white/75">
+                {LISTING_BULLETS.map((bullet, idx) => (
+                  <div
+                    key={bullet.title}
+                    className={["flex items-start gap-2", idx > 2 ? "text-white/65" : ""].join(" ")}
+                  >
+                    <span className="mt-1.5 h-2 w-2 rounded-full bg-[var(--gold)]" />
+                    <span>
+                      {bullet.title} – {bullet.body}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <a href="#product-bundles" className="btn btn-red">
+                  Build my bundle
+                </a>
+                <a
+                  href={AMAZON_LISTING_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-outline-white"
+                >
+                  Buy 1-3 bags on Amazon
+                </a>
+                <span className="text-xs text-white/70">{FREE_SHIPPING_PHRASE}</span>
+              </div>
+
+              <AmericanDreamCallout variant="compact" className="mt-4" />
+            </div>
+
+            <div className="mt-6 grid gap-6 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
+              <div className="space-y-4">
+                <ProductGallery
+                  title={productTitle}
+                  featured={productFeatured}
+                  images={productImages}
+                />
+                <div className="rounded-3xl border border-white/15 bg-white/5 p-4 text-white/75">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-white/60">
+                    Bundle pricing
+                  </div>
+                  <div className="mt-2 text-sm">
+                    Bundle pricing lowers the per-bag cost as you add bags. {FREE_SHIPPING_PHRASE}.
                   </div>
                 </div>
               </div>
+
+              <div
+                id="product-bundles"
+                className="scroll-mt-24 rounded-3xl border border-[rgba(199,160,98,0.35)] metal-panel p-3 shadow-[0_26px_70px_rgba(7,12,20,0.45)]"
+              >
+                {purchaseProduct ? (
+                  <PurchaseBox product={purchaseProduct as any} />
+                ) : (
+                  <div className="p-4 text-sm text-[var(--muted)]">
+                    Product details are loading. Please refresh to view bundle pricing.
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      <section aria-label="Bundle sizes" className="bg-[var(--navy)]">
-        <div className="mx-auto max-w-6xl px-4 py-8 lg:py-10">
-          <div className="metal-panel rounded-[36px] border border-[rgba(199,54,44,0.25)] p-5 sm:p-6">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-white/60">
-                  Bundle sizes
-                </div>
-                <h2 className="mt-2 text-2xl font-black text-white">
-                  Pick your bundle size.
-                </h2>
-                <p className="mt-2 text-sm text-white/70">
-                  Bundle pricing lowers the per-bag cost. {FREE_SHIPPING_PHRASE}.
-                </p>
-              </div>
-              <a
-                href={AMAZON_LISTING_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn btn-outline-white"
-              >
-                Buy 1-3 bags on Amazon
-              </a>
-            </div>
-
-            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {bundles.map((b: any) => {
-                const isPopular = mostPopular && b.qty === mostPopular.qty;
-                const isBest = bestValue && b.qty === bestValue.qty;
-                const href = `/products/${primaryHandle}?focus=bundles&qty=${b.qty}`;
-                const perBagText = money(b.perBag.toFixed(2), currency);
-                const totalText = money(b.total.toFixed(2), currency);
-                return (
-                  <article
-                    key={b.id}
-                    className="rounded-3xl border border-white/10 bg-white/5 p-4 shadow-[0_18px_42px_rgba(7,12,20,0.35)] transition hover:-translate-y-1 hover:shadow-[0_26px_60px_rgba(7,12,20,0.45)]"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="text-base font-black text-white">{b.title || `${b.qty} Bags`}</div>
-                      <div className="flex gap-2">
-                        {isPopular ? (
-                          <span className="badge badge--inverse text-[11px] font-bold">Most Popular</span>
-                        ) : null}
-                        {isBest ? (
-                          <span className="badge badge--inverse text-[11px] font-bold">Best Value</span>
-                        ) : null}
-                      </div>
-                    </div>
-                    <div className="mt-2 text-2xl font-black text-white">{totalText}</div>
-                    <div className="text-sm font-semibold text-white/70">~ {perBagText} per bag</div>
-                    {b.qty >= FREE_SHIP_QTY ? (
-                      <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-[rgba(199,54,44,0.35)] bg-[rgba(199,54,44,0.18)] px-3 py-1 text-[11px] font-bold text-white/90">
-                        {FREE_SHIPPING_PHRASE}
-                      </div>
-                    ) : (
-                      <div className="mt-2 text-xs font-semibold text-white/60">{FREE_SHIPPING_PHRASE}</div>
-                    )}
-                    <div className="mt-4 grid gap-2">
-                      <Link href={href} className="btn btn-red justify-center">
-                        Build bundle
-                      </Link>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section id="shop-catalog" aria-label="Shop catalog" className="bg-[var(--navy)]">
-        <div className="mx-auto max-w-6xl px-4 py-8 lg:py-10">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-white/60">
-                Shop catalog
-              </div>
-              <h2 className="text-2xl font-black text-white">Shop the catalog</h2>
-              <p className="text-sm text-white/70">
-                Great for lunchboxes, desk drawers, road trips, care packages, and guilt-free sweet cravings.
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-4 metal-panel rounded-[32px] border border-white/12 p-5 sm:p-6">
-            <ShopToolbar />
-          </div>
-
-          <div className="mt-5 grid gap-5 sm:gap-6 md:gap-7 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 justify-items-center">
-            {results.nodes.map((p) => (
-              <ShopProductCard key={p.id} product={p} hasBundle={hasBundleVariants(p)} />
-            ))}
-          </div>
-
-          <div className="mt-6 metal-panel rounded-[32px] border border-white/12 p-5 sm:p-6">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-white/60">
-                  Also on Amazon
-                </div>
-                <div className="mt-2 text-lg font-black text-white">
-                  USA Gummies – All American Gummy Bears, 7.5 oz, Made in USA, No Artificial Dyes, All Natural Flavors.
-                </div>
-              </div>
-              <a
-                href={AMAZON_LISTING_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn btn-outline-white"
-              >
-                View Amazon listing
-              </a>
-            </div>
-          </div>
-
-          <div className="mt-6 flex gap-3 flex-wrap">
-            {results.pageInfo.hasPreviousPage && results.pageInfo.startCursor ? (
-              <Link
-                className="btn btn-outline-white"
-                href={{
-                  pathname: "/shop",
-                  query: {
-                    sort,
-                    ...(q ? { q } : {}),
-                    before: results.pageInfo.startCursor,
-                  },
-                }}
-              >
-                ← Prev
-              </Link>
-            ) : null}
-
-            {results.pageInfo.hasNextPage && results.pageInfo.endCursor ? (
-              <Link
-                className="btn btn-red"
-                href={{
-                  pathname: "/shop",
-                  query: {
-                    sort,
-                    ...(q ? { q } : {}),
-                    after: results.pageInfo.endCursor,
-                  },
-                }}
-              >
-                Next →
-              </Link>
-            ) : null}
-          </div>
-        </div>
-      </section>
+      <StickyAddToCartBar
+        title="USA Gummies bundle"
+        priceText={`${bestValuePerBagText} / bag`}
+        imageUrl={stickyImage}
+        imageAlt={stickyAlt}
+        purchaseSelector="#bundle-pricing"
+      />
     </main>
   );
 }

@@ -9,9 +9,6 @@ export default function HeroCTAWatcher() {
     const sticky = document.querySelector<HTMLElement>(".sticky-cta-bar");
     if (!target || !sticky) return;
 
-    const prefersReduced =
-      window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {

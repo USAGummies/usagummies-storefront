@@ -4,7 +4,6 @@ import { getCart } from "@/lib/cart";
 import { CartView } from "@/components/ui/CartView";
 import { ReviewsSummary } from "@/components/reviews/ReviewsSummary";
 import { PatriotBanner } from "@/components/ui/PatriotBanner";
-import { PatriotRibbon } from "@/components/ui/PatriotRibbon";
 
 export default async function CartPage() {
   let cart: any = null;
@@ -15,20 +14,20 @@ export default async function CartPage() {
   }
 
   return (
-    <main className="pb-16">
-      <div className="container mx-auto px-4">
+    <main className="relative overflow-hidden bg-[var(--navy)] text-white min-h-screen home-metal pb-16">
+      <div className="mx-auto max-w-6xl px-4 pt-6">
         {/* Top nav */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-4 text-[var(--muted)] text-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-white/70">
           <div className="flex items-center gap-2">
-            <Link href="/" className="link-underline">
+            <Link href="/" className="link-underline text-white/80 hover:text-white">
               Home
             </Link>
             <span>›</span>
-            <span className="font-black text-[var(--text)]">Cart</span>
+            <span className="font-black text-white">Cart</span>
           </div>
 
           <div className="flex gap-2">
-            <Link className="btn" href="/shop">
+            <Link className="btn btn-outline-white" href="/shop#bundle-pricing">
               Keep shopping →
             </Link>
           </div>
@@ -36,10 +35,7 @@ export default async function CartPage() {
 
         {/* Hero + mission */}
         <div className="mt-4">
-          <PatriotBanner />
-          <div className="mt-3">
-            <PatriotRibbon />
-          </div>
+          <PatriotBanner showRibbon={false} />
         </div>
 
         <div className="mt-6">

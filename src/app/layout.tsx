@@ -8,18 +8,21 @@ const display = Oswald({
   subsets: ["latin"],
   variable: "--font-display",
   weight: ["400", "500", "600", "700"],
+  display: "swap",
 });
 
 const sans = Space_Grotesk({
   subsets: ["latin"],
   variable: "--font-sans",
   weight: ["400", "500", "600", "700"],
+  display: "swap",
 });
 
 const script = Yellowtail({
   subsets: ["latin"],
   variable: "--font-script",
   weight: ["400"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {

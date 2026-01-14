@@ -25,7 +25,6 @@ export async function shopifyRequest<T>({
   if (SKIP_SHOPIFY_FETCH) {
     if (!warnedSkip && process.env.NODE_ENV !== "production") {
       warnedSkip = true;
-      // eslint-disable-next-line no-console
       console.warn(`[${warnPrefix}] Shopify fetch skipped (SKIP_SHOPIFY_FETCH=1)`);
     }
     return { ok: false, skipped: true, data: null, error: "skipped" };

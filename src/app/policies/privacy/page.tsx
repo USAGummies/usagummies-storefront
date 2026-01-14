@@ -30,8 +30,8 @@ export default function PrivacyPolicyPage() {
         <section className="glass p-7">
           <h1 className="text-3xl font-semibold tracking-tight">Privacy Policy</h1>
           <p className="mt-3 text-white/75">
-            We keep privacy simple: we only use information needed to process your order
-            and improve your experience. Payments are handled securely through Shopify checkout.
+            This privacy policy keeps things simple: we only use information needed to process your
+            order and improve your experience. Payments are handled securely through Shopify checkout.
           </p>
 
           <div className="mt-8 space-y-6 text-white/80">

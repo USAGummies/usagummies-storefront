@@ -30,8 +30,8 @@ export default function ShippingPolicyPage() {
         <section className="glass p-7">
           <h1 className="text-3xl font-semibold tracking-tight">Shipping Policy</h1>
           <p className="mt-3 text-white/75">
-            We keep shipping simple and predictable. Bundle pricing is clear on every product page,
-            and tracking. Free shipping on 5+ bags.
+            This shipping policy keeps delivery simple and predictable. Bundle pricing is clear on
+            every product page, plus tracking and shipping updates. Free shipping on 5+ bags.
           </p>
 
           <div className="mt-8 space-y-6 text-white/80">

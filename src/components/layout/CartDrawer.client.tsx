@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { GlassPanel } from "@/components/ui/Glass";
 import { CartView } from "@/components/ui/CartView";
 import { cn } from "@/lib/cn";
 
@@ -111,13 +110,13 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
           )}
           aria-hidden={!open}
         >
-          <GlassPanel className="h-full rounded-none border-l border-[var(--border)]">
-            <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
-              <div className="text-lg font-black text-[var(--text)]">Your cart</div>
+          <div className="h-full rounded-none border-l border-white/12 bg-[var(--navy)] text-white home-metal">
+            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+              <div className="text-lg font-black text-white">Your cart</div>
               <button
                 type="button"
                 onClick={onClose}
-                className="pressable rounded-full border border-[var(--border)] px-3 py-1 text-sm text-[var(--text)] focus-ring"
+                className="pressable rounded-full border border-white/15 px-3 py-1 text-sm text-white/80 hover:text-white focus-ring"
               >
                 Close
               </button>
@@ -125,7 +124,7 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
             <div className="h-[calc(100%-64px)] overflow-y-auto">
               <CartView cart={cart} onClose={onClose} />
             </div>
-          </GlassPanel>
+          </div>
         </div>
       </div>
     </>

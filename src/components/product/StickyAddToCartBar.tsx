@@ -3,8 +3,8 @@
 
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
-import { PatriotRibbon } from "@/components/ui/PatriotRibbon";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
+import { trackEvent } from "@/lib/analytics";
 
 type Props = {
   title: string;
@@ -58,6 +58,7 @@ export function StickyAddToCartBar({
   }, [purchaseSelector]);
 
   function handleClick() {
+    trackEvent("sticky_bundle_click", { source: "shop" });
     const hiddenSubmit = document.getElementById(
       addToCartSubmitId
     ) as HTMLButtonElement | null;
@@ -75,29 +76,11 @@ export function StickyAddToCartBar({
   if (!show) return null;
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-50">
-      {/* Ribbon */}
-      <div style={{ margin: "0 10px 8px" }}>
-        <PatriotRibbon />
-      </div>
-
+    <div className="fixed inset-x-0 bottom-0 z-50 sm:hidden">
       <div className="mx-auto w-full max-w-6xl px-3 pb-3">
-        <div
-          className="patriot-banner"
-          style={{
-            borderRadius: 18,
-          }}
-        >
-          <div
-            className="patriot-banner__content"
-            style={{
-              padding: 12,
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-            }}
-          >
-            <div className="relative h-11 w-11 overflow-hidden rounded-xl border border-black/10 bg-white/60">
+        <div className="metal-panel rounded-2xl border border-white/15 text-white">
+          <div className="flex items-center gap-3 px-3 py-3">
+            <div className="relative h-11 w-11 overflow-hidden rounded-xl border border-white/10 bg-white/10">
               {imageUrl ? (
                 <Image
                   src={imageUrl}
@@ -110,61 +93,29 @@ export function StickyAddToCartBar({
             </div>
 
             <div className="min-w-0 flex-1">
-              <div
-                style={{
-                  fontWeight: 950,
-                  fontSize: 13,
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                }}
-              >
-                {title}
+              <div className="text-sm font-black text-white truncate">{title}</div>
+              <div className="text-xs text-white/70">
+                <span className="font-semibold text-white">{priceText}</span>{" "}
+                <span className="text-white/40">-</span>{" "}
+                <span>Bundle &amp; save - {FREE_SHIPPING_PHRASE}</span>
               </div>
-
-              <div style={{ fontSize: 12, opacity: 0.82, lineHeight: 1.25 }}>
-                <span style={{ fontWeight: 900 }}>{priceText}</span>{" "}
-                <span style={{ opacity: 0.55 }}>•</span>{" "}
-                <span style={{ opacity: 0.85 }}>
-                  Bundle &amp; save — {FREE_SHIPPING_PHRASE}
-                </span>
-              </div>
-
-              <div style={{ marginTop: 6, display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <span className="badge" style={{ padding: "7px 10px" }}>
-                  🇺🇸 Made in USA
-                </span>
-                <span className="badge" style={{ padding: "7px 10px" }}>
-                  ✅ Dye-free
-                </span>
-                <span className="badge" style={{ padding: "7px 10px" }}>
-                  🚚 Ships fast
-                </span>
+              <div className="mt-2 flex flex-wrap gap-2 text-[10px] uppercase tracking-[0.18em] text-white/60">
+                <span className="rounded-full border border-white/15 bg-white/5 px-2 py-1">Made in USA</span>
+                <span className="rounded-full border border-white/15 bg-white/5 px-2 py-1">No artificial dyes</span>
               </div>
             </div>
 
             <button
               type="button"
               onClick={handleClick}
-              className="btn btn-red"
-              style={{
-                borderRadius: 999,
-                padding: "12px 14px",
-                whiteSpace: "nowrap",
-                fontWeight: 950,
-              }}
+              className="btn btn-red pressable"
+              style={{ whiteSpace: "nowrap" }}
             >
-              Add bundle →
+              Build bundle
             </button>
           </div>
         </div>
       </div>
-
-      <style>{`
-        @media (max-width: 420px){
-          .badge{ display: none; }
-        }
-      `}</style>
     </div>
   );
 }

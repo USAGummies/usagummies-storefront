@@ -85,8 +85,8 @@ export default function PoliciesIndexPage() {
         <section className="glass p-7">
           <h1 className="text-3xl font-semibold tracking-tight">Policies</h1>
           <p className="mt-3 text-white/75">
-            Clear, customer-first policies — built to keep checkout simple and expectations
-            transparent.
+            Clear, customer-first policies covering shipping, refund, privacy, and terms of service
+            so checkout stays simple and expectations stay transparent.
           </p>
 
           <div className="mt-7 grid gap-3 sm:grid-cols-2">

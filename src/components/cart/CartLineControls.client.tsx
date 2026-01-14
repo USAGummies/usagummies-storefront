@@ -42,23 +42,25 @@ export function CartLineControls({
 
   
   return (
-    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-      <div className="flex overflow-hidden rounded-full border border-[var(--border)] bg-[var(--surface)]">
+    <div className="flex flex-wrap items-center gap-2">
+      <div className="flex overflow-hidden rounded-full border border-white/15 bg-white/5">
         <button
           type="button"
           onClick={() => submitUpdate(quantity - 1)}
           disabled={pending || quantity <= 1}
           className={cn(
-            "btn btn-navy pressable focus-ring",
-            "rounded-none px-3",
+            "pressable focus-ring px-3 py-2 text-white/80 hover:bg-white/10 hover:text-white",
             (pending || quantity <= 1) && "opacity-60 pointer-events-none"
           )}
           aria-label="Decrease quantity"
         >
-          −
+          -
         </button>
 
-        <div className="min-w-[44px] px-3 flex items-center justify-center font-black text-[var(--text)]" aria-label="Quantity">
+        <div
+          className="min-w-[44px] px-3 flex items-center justify-center font-black text-white"
+          aria-label="Quantity"
+        >
           {quantity}
         </div>
 
@@ -67,8 +69,7 @@ export function CartLineControls({
           onClick={() => submitUpdate(quantity + 1)}
           disabled={pending}
           className={cn(
-            "btn btn-navy pressable focus-ring",
-            "rounded-none px-3",
+            "pressable focus-ring px-3 py-2 text-white/80 hover:bg-white/10 hover:text-white",
             pending && "opacity-60 pointer-events-none"
           )}
           aria-label="Increase quantity"
@@ -82,16 +83,14 @@ export function CartLineControls({
         onClick={submitRemove}
         disabled={pending}
         className={cn(
-          "btn pressable focus-ring rounded-full px-3 py-2",
+          "pressable focus-ring rounded-full border border-white/15 px-3 py-2 text-xs font-semibold text-white/80 hover:border-white/40 hover:text-white",
           pending && "opacity-60 pointer-events-none"
         )}
       >
         Remove
       </button>
 
-      {pending ? (
-        <span style={{ fontSize: 12, opacity: 0.75 }}>Updating…</span>
-      ) : null}
+      {pending ? <span className="text-xs text-white/60">Updating...</span> : null}
     </div>
   );
 }

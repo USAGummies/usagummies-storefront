@@ -2,14 +2,16 @@
 import Link from "next/link";
 import Image from "next/image";
 import { Reveal } from "@/components/ui/Reveal";
+import { LeadCapture } from "@/components/marketing/LeadCapture.client";
+import { SubscriptionUnlock } from "@/components/marketing/SubscriptionUnlock.client";
 
 const igImages = ["/home-patriotic-product.jpg", "/brand/hero.jpg", "/hero.jpg"];
 
 export default function ThankYouPage() {
   return (
-    <main className="pb-16">
+    <main className="relative overflow-hidden bg-[var(--navy)] text-white min-h-screen home-metal pb-16">
       <div className="mx-auto max-w-6xl px-4 pt-10">
-        <Reveal className="glass-card p-6 space-y-3">
+        <Reveal className="metal-panel rounded-3xl border border-white/12 p-6 space-y-3 text-white">
           <div className="text-xs font-semibold tracking-[0.22em] text-[var(--muted)] uppercase">
             USA Gummies
           </div>
@@ -22,7 +24,7 @@ export default function ThankYouPage() {
         </Reveal>
 
         <div className="mt-6 grid gap-4 md:grid-cols-2">
-          <Reveal className="glass-card p-5 space-y-3">
+          <Reveal className="metal-panel rounded-2xl border border-white/12 p-5 space-y-3 text-white">
             <div className="text-lg font-black text-white">America 250 perks</div>
             <ul className="list-disc list-inside text-sm text-[var(--muted)] space-y-1">
               <li>Early drops</li>
@@ -37,7 +39,7 @@ export default function ThankYouPage() {
             </Link>
           </Reveal>
 
-          <Reveal className="glass-card p-5 space-y-3">
+          <Reveal className="metal-panel rounded-2xl border border-white/12 p-5 space-y-3 text-white">
             <div className="text-lg font-black text-white">Follow @usagummies</div>
             <div className="grid grid-cols-3 gap-2">
               {igImages.map((src) => (
@@ -56,40 +58,38 @@ export default function ThankYouPage() {
         </div>
 
         <div className="mt-6 grid gap-4 md:grid-cols-2">
-          <Reveal className="glass-card p-5 space-y-3">
-            <div className="text-lg font-black text-white">Stay in the circle</div>
-            <div className="text-sm text-[var(--muted)]">No spam. Only bold flavor news.</div>
-            <form className="flex flex-wrap gap-2">
-              <input type="hidden" name="source" value="thank-you" />
-              <input
-                type="email"
-                name="email"
-                placeholder="Your email"
-                className="usa-input flex-1 min-w-[220px]"
-                aria-label="Email"
-                required
-              />
-              <button type="submit" className="btn btn-navy pressable px-4 py-2">
-                Get first access
-              </button>
-            </form>
+          <Reveal>
+            <LeadCapture
+              source="thank-you"
+              intent="newsletter"
+              title="Stay in the circle"
+              subtitle="No spam. Only bold flavor news."
+              ctaLabel="Get first access"
+              variant="dark"
+              showSms
+            />
           </Reveal>
+          <Reveal>
+            <SubscriptionUnlock source="thank-you" variant="dark" unlockOnMount />
+          </Reveal>
+        </div>
 
-          <Reveal className="glass-card p-5 space-y-3">
+        <div className="mt-6">
+          <Reveal className="metal-panel rounded-2xl border border-white/12 p-5 space-y-3 text-white">
             <div className="text-lg font-black text-white">Build your next bundle</div>
-            <div className="text-sm text-[var(--muted)]">
+            <div className="text-sm text-white/70">
               Free shipping on 5+ bags. Most customers go bigger on the next run.
             </div>
             <div className="flex flex-wrap gap-2">
               <Link href="/shop" className="btn btn-red pressable">
                 Shop best sellers
               </Link>
-              <Link href="/contact" className="btn pressable">
+              <Link href="/contact" className="btn btn-outline-white pressable">
                 Order support
               </Link>
             </div>
-            <div className="text-xs text-[var(--muted)]">
-              Ships fast. If you need help, we’ve got you.
+            <div className="text-xs text-white/60">
+              Ships fast. If you need help, we have you covered.
             </div>
           </Reveal>
         </div>

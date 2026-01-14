@@ -51,7 +51,7 @@ export function HomeHero() {
                 </Link>
                 <span className="chip">✅ Dye-free</span>
                 <span className="chip">🚚 Ships fast</span>
-                <span className="chip">⭐ 4.8 rating</span>
+                <span className="chip">⭐ 4.8 stars from verified Amazon buyers</span>
               </div>
 
               <div style={{ marginTop: 16 }}>
@@ -77,7 +77,7 @@ export function HomeHero() {
                   </Link>
                   <Link
                     className="btn"
-                    href="/products/all-american-gummy-bears-7-5-oz-single-bag"
+                    href="/shop#product-details"
                   >
                     View Product
                   </Link>

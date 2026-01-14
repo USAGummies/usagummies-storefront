@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import Image from "next/image";
 
 export type ReviewSource = "legacy" | "shopify";
 
@@ -34,8 +33,7 @@ const MENTION_PRESETS: Mention[] = [
   { key: "gift", label: "Giftable", keywords: ["gift"], count: 0 },
 ];
 
-const CTA_LINK =
-  "/products/all-american-gummy-bears-7-5-oz-single-bag?focus=bundles&bundle=5";
+const CTA_LINK = "/shop#product-bundles";
 
 const MAX_SUPPORTING = 6;
 
@@ -216,14 +214,6 @@ export default function ReviewsSectionClient({ reviews }: Props) {
     [verified, hero]
   );
   const mentions = React.useMemo(() => computeMentions(verified), [verified]);
-  const ugcImages = [
-    "/brand/hero.jpg",
-    "/home-patriotic-product.jpg",
-    "/america-250.jpg",
-    "/hero.jpg",
-    "/logo.jpg",
-  ];
-
   const [modalOpen, setModalOpen] = React.useState(false);
   const [filter, setFilter] = React.useState<ReviewSource | "all">("all");
   const [sort, setSort] = React.useState<"newest" | "helpful">("newest");
@@ -459,27 +449,6 @@ export default function ReviewsSectionClient({ reviews }: Props) {
                 </div>
               ) : null}
 
-              <div className="space-y-2">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/60">
-                  Customer moments
-                </div>
-                <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
-                  {ugcImages.map((src, idx) => (
-                    <div
-                      key={`${src}-${idx}`}
-                      className="relative aspect-square w-full overflow-hidden rounded-2xl border border-white/10 bg-white/5 shadow-[0_12px_28px_rgba(0,0,0,0.28)]"
-                    >
-                      <Image
-                        src={src}
-                        alt="USA Gummies customer moment"
-                        fill
-                        className="object-cover"
-                        sizes="(max-width: 640px) 30vw, 96px"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
             </div>
           ) : null}
 

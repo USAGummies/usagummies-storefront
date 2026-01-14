@@ -10,7 +10,8 @@ const QUICK_QTYS = [1, 2, 3, 4, 5, 8, 12];
 
 type QuickViewProps = {
   product: any;
-  href: string;
+  detailHref: string;
+  bundleHref: string;
   children?: (open: () => void) => React.ReactNode;
 };
 
@@ -41,7 +42,7 @@ function storeCartId(cartId?: string | null) {
   }
 }
 
-export default function QuickView({ product, href, children }: QuickViewProps) {
+export default function QuickView({ product, detailHref, bundleHref, children }: QuickViewProps) {
   const [open, setOpen] = useState(false);
   const [selectedQty, setSelectedQty] = useState(8);
   const [adding, setAdding] = useState(false);
@@ -250,10 +251,10 @@ export default function QuickView({ product, href, children }: QuickViewProps) {
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  <Link href={href} className="btn btn-outline">
+                  <Link href={detailHref} className="btn btn-outline">
                     View full details
                   </Link>
-                  <Link href={`${href}?focus=bundles`} className="btn btn-navy">
+                  <Link href={bundleHref} className="btn btn-navy">
                     Jump to bundles
                   </Link>
                 </div>

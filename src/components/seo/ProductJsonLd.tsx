@@ -1,5 +1,3 @@
-type Money = { amount: string; currencyCode: string };
-
 type ProductJsonLdProps = {
   name: string;
   description?: string | null;
@@ -52,7 +50,6 @@ export function ProductJsonLd({
   return (
     <script
       type="application/ld+json"
-      // eslint-disable-next-line react/no-danger
       dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
     />
   );

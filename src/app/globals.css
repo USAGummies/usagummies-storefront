@@ -136,6 +136,12 @@ a:hover {
   outline: 2px solid var(--gold);
   outline-offset: 2px;
 }
+button:focus-visible:not(.btn):not(.focus-ring),
+a:focus-visible:not(.btn):not(.focus-ring),
+[role="button"]:focus-visible:not(.btn):not(.focus-ring){
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
 .fade-in{
   animation: fadeIn var(--dur-2) var(--ease-out) both;
 }
@@ -428,7 +434,7 @@ a:hover {
   flex: 1 1 160px;
   scroll-snap-align: none;
 }
-.bundle-home a[href*="focus=bundles"]{
+.bundle-home a[href*="product-bundles"]{
   display: none;
 }
 
@@ -702,20 +708,27 @@ a:hover {
   position: relative;
   overflow: hidden;
   border-radius: 24px;
-  border: 1px solid var(--border);
+  border: 1px solid rgba(199,160,98,0.35);
   background:
-    linear-gradient(135deg, rgba(13, 28, 51, 0.06), rgba(199, 160, 98, 0.12)),
-    linear-gradient(180deg, #ffffff 0%, #f8f4ed 100%);
-  box-shadow: var(--shadow);
+    linear-gradient(135deg, rgba(12,18,32,0.96), rgba(9,13,26,0.98)),
+    repeating-linear-gradient(120deg, rgba(255,255,255,0.03) 0 2px, rgba(0,0,0,0.03) 2px 4px);
+  box-shadow: 0 28px 70px rgba(7, 12, 20, 0.45);
+  color: #ffffff;
+  --text: #f8f5ef;
+  --muted: rgba(255,255,255,0.7);
+  --border: rgba(255,255,255,0.16);
+  --surface: rgba(255,255,255,0.06);
+  --surface-strong: rgba(255,255,255,0.1);
+  --shadow: 0 18px 40px rgba(7, 12, 20, 0.4);
 }
 .patriot-banner::after{
   content:"";
   position:absolute;
   inset:0;
   background:
-    radial-gradient(circle at 18% 18%, rgba(199, 160, 98, 0.16), transparent 45%),
-    radial-gradient(circle at 88% 10%, rgba(13, 28, 51, 0.08), transparent 42%);
-  opacity: 0.7;
+    radial-gradient(circle at 18% 18%, rgba(199,160,98,0.2), transparent 45%),
+    radial-gradient(circle at 82% 8%, rgba(199,54,44,0.25), transparent 40%);
+  opacity: 0.8;
   pointer-events:none;
 }
 .patriot-banner__content{

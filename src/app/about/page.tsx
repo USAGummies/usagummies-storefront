@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
+import { AmericanDreamCallout } from "@/components/story/AmericanDreamCallout";
 import { AMAZON_LISTING_URL } from "@/lib/amazon";
 import { FREE_SHIPPING_PHRASE, pricingForQty } from "@/lib/bundles/pricing";
 
@@ -181,6 +182,10 @@ export default function AboutPage() {
                 </div>
               ))}
             </div>
+          </div>
+
+          <div className="mt-6">
+            <AmericanDreamCallout ctaHref="/shop" ctaLabel="Shop bundles" />
           </div>
 
           <div className="mt-6 grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
