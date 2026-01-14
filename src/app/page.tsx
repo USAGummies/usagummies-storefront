@@ -157,7 +157,7 @@ export default async function HomePage() {
   }
 
   const homepageTiers = (bundleVariants?.variants || []).filter((t) =>
-    [5, 8, 12].includes(t.quantity)
+    [1, 4, 5, 8, 12].includes(t.quantity)
   );
 
   const whyCards = [
@@ -201,7 +201,7 @@ export default async function HomePage() {
   const checkoutSteps = [
     {
       title: "Pick your bundle",
-      copy: `Choose 5, 8, or 12 bags. ${FREE_SHIPPING_PHRASE}.`,
+      copy: `Start with a 1-bag trial or unlock first savings at 4 bags. ${FREE_SHIPPING_PHRASE}.`,
     },
     {
       title: "Classic gummy bear flavor — done right",
@@ -279,7 +279,9 @@ export default async function HomePage() {
                     Build my bundle
                   </a>
                 </div>
-                <span className="text-xs text-white/70">{FREE_SHIPPING_PHRASE}</span>
+              </div>
+              <div className="text-xs text-white/70">
+                {FREE_SHIPPING_PHRASE} • Ships within 24 hours • 30-day money-back guarantee
               </div>
 
               <div className="grid gap-3 sm:grid-cols-3">
@@ -344,6 +346,13 @@ export default async function HomePage() {
                   <span className="badge badge--navy">Made in USA</span>
                   <span className="badge badge--navy">No artificial dyes</span>
                 </div>
+                <div className="mt-3 text-xs text-white/70">
+                  Ingredients &amp; allergen info: see the ingredient panel on the bag or{" "}
+                  <Link href="/ingredients" className="underline underline-offset-4 hover:text-white">
+                    ingredients
+                  </Link>
+                  .
+                </div>
               </div>
             </div>
 
@@ -393,7 +402,7 @@ export default async function HomePage() {
               <div className="metal-panel rounded-[36px] border border-[rgba(199,54,44,0.45)] p-3 ring-1 ring-white/20 shadow-[0_32px_90px_rgba(7,12,20,0.6)]">
                 <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-[0.3em] text-white/60">
                   <span>Build your bundle</span>
-                  <span className="text-[var(--gold)]">5 / 8 / 12 bags</span>
+                  <span className="text-[var(--gold)]">1 / 4 / 5 / 8 / 12 bags</span>
                 </div>
                 <div className="mt-1 text-xs text-white/70">
                   Tap a bundle size to lock your price.

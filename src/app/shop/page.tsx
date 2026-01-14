@@ -1,5 +1,6 @@
 // src/app/shop/page.tsx (FULL REPLACE)
 import type { Metadata } from "next";
+import Link from "next/link";
 import BundleQuickBuy from "@/components/home/BundleQuickBuy.client";
 import { ProductGallery } from "@/components/product/ProductGallery.client";
 import PurchaseBox from "@/app/products/[handle]/PurchaseBox.client";
@@ -111,7 +112,7 @@ export default async function ShopPage() {
     primaryProduct?.priceRange?.minVariantPrice?.currencyCode ||
     "USD";
 
-  const featuredQuantities = [5, 8, 12];
+  const featuredQuantities = [1, 4, 5, 8, 12];
   const bestValuePerBagText = money(pricingForQty(8).perBag.toFixed(2), currency);
 
   let bundleVariants: Awaited<ReturnType<typeof getBundleVariants>> | null = null;
@@ -293,6 +294,13 @@ export default async function ShopPage() {
                   </div>
                 ))}
               </div>
+              <div className="text-xs text-white/70">
+                Ingredients &amp; allergen info: see the ingredient panel on the bag or{" "}
+                <Link href="/ingredients" className="underline underline-offset-4 hover:text-white">
+                  ingredients
+                </Link>
+                .
+              </div>
               <div className="flex flex-wrap items-center gap-3">
                 <a href="#product-bundles" className="btn btn-red">
                   Build my bundle
@@ -305,7 +313,9 @@ export default async function ShopPage() {
                 >
                   Buy 1-3 bags on Amazon
                 </a>
-                <span className="text-xs text-white/70">{FREE_SHIPPING_PHRASE}</span>
+              </div>
+              <div className="text-xs text-white/70">
+                {FREE_SHIPPING_PHRASE} • Ships within 24 hours • 30-day money-back guarantee
               </div>
 
               <AmericanDreamCallout variant="compact" className="mt-4" />

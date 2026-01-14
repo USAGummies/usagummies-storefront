@@ -62,7 +62,7 @@ function getStoredCartId() {
 }
 
 const FEATURED_QTYS: TierKey[] = ["1", "2", "3", "4", "5", "8", "12"];
-const FEATURED_QTYS_COMPACT: TierKey[] = ["5", "8", "12"];
+const FEATURED_QTYS_COMPACT: TierKey[] = ["1", "4", "5", "8", "12"];
 
 export default function BundleQuickBuy({
   tiers = [],
@@ -221,13 +221,25 @@ export default function BundleQuickBuy({
       savings && Number.isFinite(savings) && savings > 0 ? savings : null;
 
     if (isCompact) {
+      const isOne = tier.quantity === 1;
+      const isFour = tier.quantity === 4;
       const isFive = tier.quantity === 5;
       const isEight = tier.quantity === 8;
       const isTwelve = tier.quantity === 12;
       const canSelect = !unavailable;
       const showFreeShipping = tier.quantity >= 5;
       const label =
-        isEight ? "Best value" : isFive ? "Most popular" : isTwelve ? "Best price" : "";
+        isEight
+          ? "Best value"
+          : isFive
+            ? "Most popular"
+            : isTwelve
+              ? "Best price"
+              : isFour
+                ? "Starter savings"
+                : isOne
+                  ? "Trial size"
+                  : "";
       return (
         <button
           key={tier.quantity}
@@ -293,6 +305,10 @@ export default function BundleQuickBuy({
     } else if (isTwelve) {
       pills.push("Best price per bag");
       pills.push(FREE_SHIPPING_PHRASE);
+    } else if (tier.quantity === 4) {
+      pills.push("Starter savings");
+    } else if (tier.quantity === 1) {
+      pills.push("Trial size");
     } else if (isSmall) {
       pills.push("Standard price");
     }
@@ -351,6 +367,10 @@ export default function BundleQuickBuy({
                     ? "Best value"
                     : tier.quantity === 12
                     ? "Lowest per-bag"
+                    : tier.quantity === 4
+                    ? "Starter savings"
+                    : tier.quantity === 1
+                    ? "Trial size"
                     : tier.quantity < 5
                     ? "Standard price"
                     : "Bundle savings"}
@@ -582,7 +602,7 @@ export default function BundleQuickBuy({
             </span>
           </button>
           <div className={isCompact ? "text-xs text-white/70" : "text-xs text-white/75"}>
-            {FREE_SHIPPING_PHRASE} • Secure checkout
+            {FREE_SHIPPING_PHRASE} • Ships within 24 hours • 30-day money-back guarantee
           </div>
           {error ? (
             <div className={isCompact ? "text-xs font-semibold text-red-200" : "text-xs font-semibold text-red-200"}>{error}</div>

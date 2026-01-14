@@ -30,8 +30,9 @@ export default function ShippingPolicyPage() {
         <section className="glass p-7">
           <h1 className="text-3xl font-semibold tracking-tight">Shipping Policy</h1>
           <p className="mt-3 text-white/75">
-            This shipping policy keeps delivery simple and predictable. Bundle pricing is clear on
-            every product page, plus tracking and shipping updates. Free shipping on 5+ bags.
+            This shipping policy keeps delivery simple and predictable. Orders ship within 24 hours,
+            with tracking sent fast. Bundle pricing is clear on every product page, plus shipping
+            updates. Free shipping on 5+ bags.
           </p>
 
           <div className="mt-8 space-y-6 text-white/80">
@@ -46,8 +47,9 @@ export default function ShippingPolicyPage() {
             <div className="glass-soft p-5">
               <h2 className="text-lg font-semibold text-white">Processing time</h2>
               <p className="mt-2 text-sm text-white/75">
-                Orders are typically processed within <strong className="text-white">1–2 business days</strong>.
-                During high-volume periods, processing may take slightly longer.
+                Orders ship within <strong className="text-white">24 hours</strong>.
+                If an order is placed after the daily carrier pickup time or on weekends/holidays,
+                it ships the next business day.
               </p>
             </div>
 
@@ -62,7 +64,7 @@ export default function ShippingPolicyPage() {
             <div className="glass-soft p-5">
               <h2 className="text-lg font-semibold text-white">Tracking</h2>
               <p className="mt-2 text-sm text-white/75">
-                Once your order ships, you’ll receive tracking details via email.
+                Tracking details are sent within 24 hours of your order.
               </p>
             </div>
 

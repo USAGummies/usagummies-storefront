@@ -36,6 +36,15 @@ export default function ReturnsPolicyPage() {
 
           <div className="mt-8 space-y-6 text-white/80">
             <div className="glass-soft p-5">
+              <h2 className="text-lg font-semibold text-white">30-day money-back guarantee</h2>
+              <p className="mt-2 text-sm text-white/75">
+                We offer a 30-day money-back guarantee from delivery. If you are not satisfied,
+                contact us and we’ll make it right with a refund or replacement, subject to
+                food-safety guidelines.
+              </p>
+            </div>
+
+            <div className="glass-soft p-5">
               <h2 className="text-lg font-semibold text-white">Food item policy</h2>
               <p className="mt-2 text-sm text-white/75">
                 Because our products are food items, we generally cannot accept returns of opened items.

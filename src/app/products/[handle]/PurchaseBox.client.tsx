@@ -246,7 +246,7 @@ export default function PurchaseBox({
     return opts;
   }, [bundleOptions]);
 
-  const featuredQuantities = [5, 8, 12];
+  const featuredQuantities = [1, 4, 5, 8, 12];
 
   const featuredOptions = useMemo<BundleOption[]>(() => {
     if (!bundleOptionsWithBadges.length) return [];
@@ -513,9 +513,7 @@ export default function PurchaseBox({
               )}
             </button>
             <div className="pbx__ctaNote" aria-live="polite">
-              {selectedQty >= 5
-                ? FREE_SHIPPING_PHRASE
-                : FREE_SHIPPING_PHRASE}
+              {FREE_SHIPPING_PHRASE} • Ships within 24 hours • 30-day money-back guarantee
             </div>
           </div>
         </div>
@@ -524,7 +522,7 @@ export default function PurchaseBox({
           <div className="pbx__stickyLeft">
             <div className="pbx__stickyLabel">{selectedOption?.label || `${selectedQty} bags`}</div>
             <div className="pbx__stickySub">
-              {selectedQty >= 5 ? FREE_SHIPPING_PHRASE : FREE_SHIPPING_PHRASE}
+              {FREE_SHIPPING_PHRASE} • Ships within 24 hours
             </div>
           </div>
           <button
