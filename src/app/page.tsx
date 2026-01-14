@@ -289,7 +289,7 @@ export default async function HomePage() {
                 </div>
               </div>
               <div className="text-xs text-white/70">
-                Love it or your money back • Ships in 1-2 business days • Secure checkout
+                Love it or your money back • Ships within 24 hours • Secure checkout
               </div>
 
               <div className="grid gap-3 sm:grid-cols-3">

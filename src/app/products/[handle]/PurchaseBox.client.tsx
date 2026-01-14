@@ -381,7 +381,7 @@ export default function PurchaseBox({
                     d="M3 6h10v7H3V6zm10 2h4l3 3v2h-7V8zm-8 9a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm11 0a2 2 0 1 0 .001 4A2 2 0 0 0 16 17z"
                   />
                 </svg>
-                Ships in 1-2 business days
+                Ships within 24 hours
               </span>
               <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1">
                 <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" aria-hidden="true">
@@ -517,7 +517,7 @@ export default function PurchaseBox({
               )}
             </button>
             <div className="pbx__ctaNote" aria-live="polite">
-              Love it or your money back • Ships in 1-2 business days • Secure checkout
+              Love it or your money back • Ships within 24 hours • Secure checkout
             </div>
           </div>
         </div>
@@ -526,7 +526,7 @@ export default function PurchaseBox({
           <div className="pbx__stickyLeft">
             <div className="pbx__stickyLabel">{selectedOption?.label || `${selectedQty} bags`}</div>
             <div className="pbx__stickySub">
-              Love it or your money back • Ships in 1-2 business days • Secure checkout
+              Love it or your money back • Ships within 24 hours • Secure checkout
             </div>
           </div>
           <button

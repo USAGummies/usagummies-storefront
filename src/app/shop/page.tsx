@@ -215,7 +215,7 @@ export default async function ShopPage() {
                   Build your bundle &amp; save up to {maxBundleSavingsText}
                 </a>
                 <span className="text-xs text-white/70">
-                  Love it or your money back • Ships in 1-2 business days • Secure checkout
+                  Love it or your money back • Ships within 24 hours • Secure checkout
                 </span>
               </div>
 
@@ -311,7 +311,7 @@ export default async function ShopPage() {
                 </a>
               </div>
               <div className="text-xs text-white/70">
-                Love it or your money back • Ships in 1-2 business days • Secure checkout
+                Love it or your money back • Ships within 24 hours • Secure checkout
               </div>
 
               <AmericanDreamCallout variant="compact" className="mt-4" />

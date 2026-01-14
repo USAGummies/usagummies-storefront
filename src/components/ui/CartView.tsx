@@ -593,7 +593,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
               </div>
               <div className="mt-2 grid gap-2 text-xs text-white/70 sm:grid-cols-2">
                 <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1">Love it or your money back</div>
-                <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1">Ships in 1-2 business days</div>
+                <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1">Ships within 24 hours</div>
                 <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1">Secure checkout</div>
                 <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1">Free shipping on 5+ bags</div>
               </div>
