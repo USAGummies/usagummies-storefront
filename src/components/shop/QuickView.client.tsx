@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { pricingForQty, FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import { SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
+import { fireCartToast } from "@/lib/cartFeedback";
 
 const QUICK_QTYS = [1, 2, 3, 4, 5, 8, 12];
 
@@ -113,6 +114,7 @@ export default function QuickView({ product, detailHref, bundleHref, children }:
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("cart:updated"));
       }
+      fireCartToast(selectedQty);
       setOpen(false);
     } catch (e: any) {
       setError(e?.message || "Could not add to cart.");

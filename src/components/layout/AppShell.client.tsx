@@ -11,6 +11,7 @@ import { AMAZON_LISTING_URL } from "@/lib/amazon";
 import { applyExperimentFromUrl, trackEvent } from "@/lib/analytics";
 import { LeadCapture } from "@/components/marketing/LeadCapture.client";
 import { SubscriptionUnlock } from "@/components/marketing/SubscriptionUnlock.client";
+import { getCartToastMessage } from "@/lib/cartFeedback";
 
 function cx(...a: Array<string | false | null | undefined>) {
   return a.filter(Boolean).join(" ");
@@ -44,8 +45,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [cartCount, setCartCount] = useState<number>(0);
   const [badgePop, setBadgePop] = useState(false);
+  const [cartToast, setCartToast] = useState<string | null>(null);
   const pathname = usePathname();
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const toastTimerRef = useRef<number | null>(null);
 
   async function refreshCartCount() {
     try {
@@ -103,6 +106,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [pathname]);
 
   useEffect(() => {
+    function handleToast(event: Event) {
+      const detail = (event as CustomEvent<{ qty?: number }>).detail;
+      const qty = Number(detail?.qty ?? 0);
+      setCartToast(getCartToastMessage(qty));
+      if (toastTimerRef.current) {
+        window.clearTimeout(toastTimerRef.current);
+      }
+      toastTimerRef.current = window.setTimeout(() => {
+        setCartToast(null);
+      }, 2600);
+    }
+    window.addEventListener("cart:toast", handleToast);
+    return () => {
+      window.removeEventListener("cart:toast", handleToast);
+      if (toastTimerRef.current) {
+        window.clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     if (!menuOpen) return;
     function handleClick(event: MouseEvent) {
       if (!menuRef.current || !event.target) return;
@@ -123,6 +147,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-[var(--bg,#f8f5ef)] text-[var(--text)]">
+      {cartToast ? (
+        <div className="fixed right-4 top-20 z-50 max-w-[320px]">
+          <div className="metal-panel rounded-2xl border border-white/20 bg-[rgba(12,20,38,0.95)] px-4 py-3 text-white shadow-[0_22px_50px_rgba(7,12,20,0.45)]">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-white/60">
+              Added to cart
+            </div>
+            <div className="mt-1 text-sm font-semibold text-white">{cartToast}</div>
+          </div>
+        </div>
+      ) : null}
       <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-white/92 text-[var(--text)] backdrop-blur-md shadow-[0_10px_24px_rgba(15,27,45,0.08)]">
         <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between gap-3">
           <Link href="/" className="flex items-center gap-3 pressable focus-ring">

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
+import { fireCartToast } from "@/lib/cartFeedback";
 
 type AnyProduct = any;
 
@@ -86,6 +87,7 @@ export default function QuickBuy({
       if (!res.ok || json?.ok === false) throw new Error(json?.error || "Add failed");
       if (json?.cart?.id) storeCartId(json.cart.id);
       window.dispatchEvent(new Event("cart:updated"));
+      fireCartToast(1);
     } catch (e: any) {
       setError(e?.message || "Could not add");
     } finally {

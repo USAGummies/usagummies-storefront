@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { pricingForQty, BASE_PRICE, FREE_SHIP_QTY, FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import { SINGLE_BAG_SKU, SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
+import { fireCartToast } from "@/lib/cartFeedback";
 
 function cx(...a: Array<string | false | null | undefined>) {
   return a.filter(Boolean).join(" ");
@@ -327,6 +328,7 @@ export default function PurchaseBox({
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("cart:updated"));
       }
+      fireCartToast(optionQty);
       router.push("/cart");
       router.refresh();
     } catch {

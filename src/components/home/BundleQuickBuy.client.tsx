@@ -16,6 +16,7 @@ import { useRouter } from "next/navigation";
 import type { BundleTier } from "@/lib/bundles/getBundleVariants";
 import { BASE_PRICE, FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import { trackEvent } from "@/lib/analytics";
+import { fireCartToast } from "@/lib/cartFeedback";
 
 type TierKey = "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10" | "11" | "12";
 
@@ -182,6 +183,7 @@ export default function BundleQuickBuy({
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("cart:updated"));
       }
+      fireCartToast(qty);
       setSuccess(true);
       router.refresh();
       if (typeof window !== "undefined") {

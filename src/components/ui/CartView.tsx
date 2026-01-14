@@ -525,7 +525,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                     className="btn btn-red w-full justify-center pressable"
                     onClick={handleCheckoutClick}
                   >
-                    Checkout →
+                    Secure checkout →
                   </a>
                 ) : null}
                 <Link
@@ -536,6 +536,11 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                   {secondaryCta.label}
                 </Link>
               </div>
+              {totalBags > 0 && totalBags < 8 ? (
+                <div className="text-xs text-white/60">
+                  Most customers check out with 8 bags.
+                </div>
+              ) : null}
             </div>
 
             <div className="metal-panel rounded-2xl border border-white/12 p-4">
@@ -582,7 +587,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                 </div>
               ) : (
                 <div className="mt-3 text-xs text-white/60">
-                  Checkout to lock in your current pricing.
+                  Secure checkout to lock in your current pricing.
                 </div>
               )}
             </div>
@@ -636,7 +641,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                     className="btn btn-red pressable"
                     onClick={handleCheckoutClick}
                   >
-                    Checkout →
+                    Secure checkout →
                   </a>
                 ) : null}
               </div>
