@@ -284,10 +284,6 @@ export default function BundleQuickBuy({
     const isTwelve = tier.quantity === 12;
     const isSmall = tier.quantity < 5;
 
-    const savings = savingsFor(tier);
-    const savingsValue =
-      savings && Number.isFinite(savings) && savings > 0 ? savings : null;
-
     const pills: string[] = [];
     if (isFive) {
       pills.push(FREE_SHIPPING_PHRASE);
