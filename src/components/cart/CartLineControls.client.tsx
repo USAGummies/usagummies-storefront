@@ -59,10 +59,14 @@ export function CartLineControls({
   
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <div className="flex overflow-hidden rounded-full border border-white/15 bg-white/5">
+      <div className="flex items-center gap-1 overflow-hidden rounded-full border border-white/15 bg-white/5 px-1">
         <button
           type="button"
-          onClick={() => submitUpdate(quantity - 1)}
+          onClick={() => {
+            const next = Math.max(1, quantity - 1);
+            setManualQty(String(next));
+            submitUpdate(next);
+          }}
           disabled={pending || quantity <= 1}
           className={cn(
             "pressable focus-ring px-3 py-2 text-white/80 hover:bg-white/10 hover:text-white",
@@ -73,29 +77,6 @@ export function CartLineControls({
           -
         </button>
 
-        <div
-          className="min-w-[44px] px-3 flex items-center justify-center font-black text-white"
-          aria-label="Quantity"
-        >
-          {quantity}
-        </div>
-
-        <button
-          type="button"
-          onClick={() => submitUpdate(quantity + 1)}
-          disabled={pending}
-          className={cn(
-            "pressable focus-ring px-3 py-2 text-white/80 hover:bg-white/10 hover:text-white",
-            pending && "opacity-60 pointer-events-none"
-          )}
-          aria-label="Increase quantity"
-        >
-          +
-        </button>
-      </div>
-
-      <div className="flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-2 text-xs text-white/70">
-        <label className="text-[10px] uppercase tracking-[0.2em] text-white/50">Qty</label>
         <input
           type="number"
           inputMode="numeric"
@@ -109,19 +90,25 @@ export function CartLineControls({
               commitManualQty();
             }
           }}
-          className="w-16 rounded-lg border border-white/10 bg-white/10 px-2 py-1 text-center text-xs font-semibold text-white focus:outline-none focus:ring-2 focus:ring-[var(--gold)]"
-          aria-label="Set quantity"
+          className="w-16 rounded-full border border-white/10 bg-white/10 px-2 py-1 text-center text-xs font-semibold text-white focus:outline-none focus:ring-2 focus:ring-[var(--gold)]"
+          aria-label="Quantity"
         />
+
         <button
           type="button"
-          onClick={commitManualQty}
+          onClick={() => {
+            const next = Math.max(1, quantity + 1);
+            setManualQty(String(next));
+            submitUpdate(next);
+          }}
           disabled={pending}
           className={cn(
-            "rounded-full border border-white/15 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/80 hover:border-white/40 hover:text-white",
+            "pressable focus-ring px-3 py-2 text-white/80 hover:bg-white/10 hover:text-white",
             pending && "opacity-60 pointer-events-none"
           )}
+          aria-label="Increase quantity"
         >
-          Set
+          +
         </button>
       </div>
 
