@@ -34,7 +34,11 @@ function normalizeLegacy(): Review[] {
     .filter((r) => r.rating > 0 && r.dateISO);
 }
 
-export default async function ReviewsSection() {
+export default async function ReviewsSection({
+  showAmericanaAccent = false,
+}: {
+  showAmericanaAccent?: boolean;
+}) {
   const legacy = normalizeLegacy();
   let shopify: Review[] = [];
   try {
@@ -51,5 +55,10 @@ export default async function ReviewsSection() {
       return bDate - aDate;
     });
 
-  return <ReviewsSectionClient reviews={reviews} />;
+  return (
+    <ReviewsSectionClient
+      reviews={reviews}
+      showAmericanaAccent={showAmericanaAccent}
+    />
+  );
 }

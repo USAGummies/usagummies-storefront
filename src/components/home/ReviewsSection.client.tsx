@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { BrandTouch } from "@/components/home/BrandTouch";
 
 export type ReviewSource = "legacy" | "shopify";
 
@@ -20,22 +21,8 @@ export type Review = {
 
 type Props = {
   reviews: Review[];
+  showAmericanaAccent?: boolean;
 };
-
-type Mention = { key: string; label: string; keywords: string[]; count: number };
-
-const MENTION_PRESETS: Mention[] = [
-  { key: "flavor", label: "Classic gummy bear flavor", keywords: ["flavor", "taste"], count: 0 },
-  { key: "aftertaste", label: "No weird aftertaste", keywords: ["aftertaste"], count: 0 },
-  { key: "dye", label: "No artificial dyes", keywords: ["dye", "artificial"], count: 0 },
-  { key: "texture", label: "Great texture", keywords: ["texture", "chew", "chewy"], count: 0 },
-  { key: "usa", label: "Made in USA", keywords: ["usa", "american"], count: 0 },
-  { key: "gift", label: "Giftable", keywords: ["gift"], count: 0 },
-];
-
-const CTA_LINK = "/shop#product-bundles";
-
-const MAX_SUPPORTING = 6;
 
 function clsx(...a: Array<string | false | null | undefined>) {
   return a.filter(Boolean).join(" ");
@@ -62,7 +49,7 @@ function Stars({ rating, size = "sm" }: { rating: number; size?: "sm" | "md" }) 
   return (
     <div
       className={clsx(
-        "flex items-center gap-1 text-amber-300",
+        "flex items-center gap-1 text-[var(--candy-yellow)]",
         size === "md" ? "text-base" : "text-sm"
       )}
     >
@@ -78,13 +65,13 @@ function Stars({ rating, size = "sm" }: { rating: number; size?: "sm" | "md" }) 
 function VerifiedBadge({ source }: { source: ReviewSource }) {
   if (source === "shopify") {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-white/25 bg-white/10 px-3 py-1 text-xs font-semibold text-white/85">
+      <span className="inline-flex items-center gap-1 rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-3 py-1 text-xs font-semibold text-[var(--text)]">
         Shopify • Verified buyer
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-white/25 bg-white/10 px-3 py-1 text-xs font-semibold text-white/80">
+    <span className="inline-flex items-center gap-1 rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-3 py-1 text-xs font-semibold text-[var(--text)]">
       Verified buyer (prior store)
     </span>
   );
@@ -115,9 +102,9 @@ function CardShell({
       role={role}
       tabIndex={tabIndex}
       className={clsx(
-        "relative overflow-hidden rounded-3xl border border-white/12 bg-white/[0.06] p-4 shadow-[0_20px_60px_rgba(5,10,20,0.4)] transition",
+        "relative overflow-hidden rounded-3xl border border-[rgba(15,27,45,0.12)] bg-white p-4 shadow-[0_18px_40px_rgba(15,27,45,0.12)] transition",
         clickable
-          ? "cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-300/40 hover:-translate-y-0.5 hover:shadow-[0_28px_72px_rgba(5,10,20,0.5)]"
+          ? "cursor-pointer focus:outline-none focus:ring-2 focus:ring-[rgba(239,59,59,0.25)] hover:-translate-y-0.5 hover:shadow-[0_22px_50px_rgba(15,27,45,0.16)]"
           : "",
         className
       )}
@@ -126,8 +113,8 @@ function CardShell({
         className="pointer-events-none absolute inset-0"
         style={{
           backgroundImage: [
-            "radial-gradient(circle at 12% 10%, rgba(214,64,58,0.10), transparent 44%)",
-            "radial-gradient(circle at 88% 10%, rgba(13,28,51,0.16), transparent 46%)",
+            "radial-gradient(circle at 12% 10%, rgba(239,59,59,0.08), transparent 44%)",
+            "radial-gradient(circle at 88% 10%, rgba(255,199,44,0.12), transparent 46%)",
           ].join(","),
         }}
       />
@@ -153,41 +140,7 @@ function getStats(reviews: Review[]) {
   return { avg: Number.isFinite(avg) ? avg : 0, count: list.length };
 }
 
-function pickHero(reviews: Review[]) {
-  if (!reviews.length) return null;
-  const featured = reviews.find((r) => r.featured && r.verified);
-  if (featured) return featured;
-  return [...reviews].sort((a, b) => {
-    const rate = b.rating - a.rating;
-    if (rate !== 0) return rate;
-    const bDate = b.dateISO ? Date.parse(b.dateISO) : 0;
-    const aDate = a.dateISO ? Date.parse(a.dateISO) : 0;
-    return bDate - aDate;
-  })[0];
-}
-
-function computeMentions(reviews: Review[]) {
-  const merged = MENTION_PRESETS.map((m) => ({ ...m, count: 0 }));
-  const text = reviews
-    .map((r) => `${r.title || ""} ${r.body}`)
-    .join(" ")
-    .toLowerCase();
-  merged.forEach((m) => {
-    let c = 0;
-    m.keywords.forEach((kw) => {
-      const matches = text.match(new RegExp(`\\b${kw}\\b`, "g"));
-      c += matches ? matches.length : 0;
-    });
-    m.count = c;
-  });
-  const top = merged
-    .filter((m) => m.count > 0)
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 6);
-  return top.length ? top : merged.slice(0, 6);
-}
-
-export default function ReviewsSectionClient({ reviews }: Props) {
+export default function ReviewsSectionClient({ reviews, showAmericanaAccent = false }: Props) {
   // Deduping: composite key, prefer shopify over legacy
   const deduped = React.useMemo(() => {
     const keyFor = (r: Review) =>
@@ -208,12 +161,6 @@ export default function ReviewsSectionClient({ reviews }: Props) {
     [deduped]
   );
   const { avg, count } = getStats(verified);
-  const hero = pickHero(verified);
-  const supporting = React.useMemo(
-    () => verified.filter((r) => r.id !== hero?.id).slice(0, MAX_SUPPORTING),
-    [verified, hero]
-  );
-  const mentions = React.useMemo(() => computeMentions(verified), [verified]);
   const [modalOpen, setModalOpen] = React.useState(false);
   const [filter, setFilter] = React.useState<ReviewSource | "all">("all");
   const [sort, setSort] = React.useState<"newest" | "helpful">("newest");
@@ -313,159 +260,58 @@ export default function ReviewsSectionClient({ reviews }: Props) {
     }
   };
 
-  const heroCard = hero ? (
-    <CardShell
-      className="p-5 border-white/15 bg-white/[0.08]"
-      onClick={openModal}
-      onKeyDown={keyActivate(openModal)}
-      role="button"
-      tabIndex={0}
-      accent
-    >
-      <div className="space-y-2">
-        <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-base font-bold text-white">
-            {initials(hero.authorName)}
-          </div>
-          <div className="flex-1 space-y-2">
-            <Stars rating={hero.rating} size="md" />
-            <div className="flex flex-wrap items-center gap-2">
-              <VerifiedBadge source={hero.source} />
-              <span className="text-xs text-white/60">
-                {formatDate(hero.dateISO)}
-              </span>
-            </div>
-            <div className="text-lg font-extrabold text-white leading-tight">
-              {hero.title || hero.body.slice(0, 64) + "..."}
-            </div>
-            <p className="text-sm text-white/75 line-clamp-5">
-              {hero.body}
-            </p>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                openModal();
-              }}
-              className="text-xs font-semibold text-amber-300 underline underline-offset-4 hover:text-amber-200"
-            >
-              Read full review
-            </button>
-          </div>
-        </div>
-      </div>
-    </CardShell>
-  ) : (
-    <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 text-sm text-white/70">
-      Verified reviews coming soon.
-    </div>
-  );
-
   return (
     <section className="relative">
-      <div className="metal-panel relative overflow-hidden rounded-[36px] border border-[rgba(199,54,44,0.3)] p-5 sm:p-6">
+      <div className="candy-panel relative overflow-hidden rounded-[36px] p-5 sm:p-6">
+        {showAmericanaAccent ? (
+          <BrandTouch
+            id="rushmore"
+            zone="REVIEWS"
+            className="absolute -left-24 top-4 hidden w-[240px] opacity-[0.14] md:block lg:w-[260px]"
+          />
+        ) : null}
         <div
-          className="pointer-events-none absolute inset-x-6 top-0 h-px bg-[rgba(199,54,44,0.6)]"
+          className="pointer-events-none absolute inset-x-6 top-0 h-px bg-[rgba(239,59,59,0.45)]"
           aria-hidden="true"
         />
         <div
           className="pointer-events-none absolute inset-0"
           style={{
             backgroundImage: [
-              "radial-gradient(circle at 12% 0%, rgba(255,255,255,0.05), transparent 44%)",
-              "radial-gradient(circle at 88% 10%, rgba(199,54,44,0.1), transparent 46%)",
-              "linear-gradient(180deg, rgba(11,20,38,0.0), rgba(11,20,38,0.4))",
+              "radial-gradient(circle at 12% 0%, rgba(255,77,79,0.08), transparent 44%)",
+              "radial-gradient(circle at 88% 10%, rgba(255,199,44,0.12), transparent 46%)",
+              "linear-gradient(180deg, rgba(255,255,255,0.0), rgba(255,255,255,0.6))",
             ].join(","),
           }}
         />
         <div className="relative z-10 space-y-4">
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-[0.2em] text-white/75">
-              <Stars rating={avg || 5} size="md" />
-              <span>
-                {count > 0
-                  ? `Rated ${avg.toFixed(1)} by verified buyers (${count} reviews)`
-                  : "Verified reviews coming in"}
-              </span>
-            </div>
+          <div className="flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
+            <Stars rating={avg || 5} size="md" />
+            <span>
+              {count > 0
+                ? `Rated ${avg.toFixed(1)} by verified buyers (${count} reviews)`
+                : "Verified reviews coming in"}
+            </span>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
-            <div className="space-y-3">
-              <div className="space-y-1">
-                <h2 className="text-2xl font-black text-white sm:text-3xl">
-                  Made in the USA. Real reviews.
-                </h2>
-                <p className="text-sm text-white/70 sm:text-base">
-                  No artificial dyes or synthetic colors. Classic gummy bear flavor — done right.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {mentions.map((chip) => (
-                  <span
-                    key={chip.key}
-                    className="rounded-full border border-white/15 bg-white/10 px-2 py-1 text-xs font-semibold text-white/80 shadow-[0_10px_30px_rgba(0,0,0,0.25)]"
-                  >
-                    {chip.label}
-                  </span>
-                ))}
-              </div>
-              <div className="text-xs text-white/60">
-                Verified orders only. No edits.
-              </div>
-            </div>
-
-            {heroCard}
+          <div className="space-y-2">
+            <h2 className="text-2xl font-black text-[var(--text)] sm:text-3xl">
+              Made in the USA. Real reviews.
+            </h2>
+            <p className="text-sm text-[var(--muted)] sm:text-base">
+              Verified buyer feedback, always unedited.
+            </p>
           </div>
 
-          {hero ? (
-            <div className="space-y-3">
-              {supporting.length ? (
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {supporting.map((r, i) => (
-                    <CardShell
-                      key={`${r.id}-${i}`}
-                      className="p-4 border-white/12 bg-white/[0.06]"
-                      onClick={openModal}
-                      onKeyDown={keyActivate(openModal)}
-                      role="button"
-                      tabIndex={0}
-                    >
-                      <div className="space-y-2">
-                        <Stars rating={r.rating} />
-                        <div className="flex items-center gap-2 text-xs text-white/60">
-                          <VerifiedBadge source={r.source} />
-                          <span>{formatDate(r.dateISO)}</span>
-                        </div>
-                        <div className="text-base font-bold text-white leading-tight">
-                          {r.title || r.body.slice(0, 42) + "..."}
-                        </div>
-                        <p className="text-sm text-white/75 line-clamp-4">
-                          {r.body}
-                        </p>
-                      </div>
-                    </CardShell>
-                  ))}
-                </div>
-              ) : null}
-
-            </div>
-          ) : null}
-
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <a href={CTA_LINK} className="btn btn-red min-h-[44px]">
-                Build my bundle →
-              </a>
-              <button
-                type="button"
-                onClick={openModal}
-                className="btn btn-outline-white min-h-[44px]"
-                ref={triggerRef}
-              >
-                See all verified reviews
-              </button>
-            </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={openModal}
+              className="btn btn-outline min-h-[44px]"
+              ref={triggerRef}
+            >
+              See all verified reviews
+            </button>
           </div>
         </div>
       </div>
@@ -477,17 +323,17 @@ export default function ReviewsSectionClient({ reviews }: Props) {
         >
           <div
             ref={modalRef}
-            className="mx-auto w-full max-w-3xl rounded-t-3xl bg-[#0c1426] p-5 shadow-2xl sm:rounded-3xl sm:p-6"
+            className="mx-auto w-full max-w-3xl rounded-t-3xl border border-[rgba(15,27,45,0.12)] bg-white p-5 shadow-2xl sm:rounded-3xl sm:p-6"
             role="dialog"
             aria-modal="true"
             aria-labelledby="reviews-modal-title"
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div id="reviews-modal-title" className="text-sm font-semibold text-white/85">
+                <div id="reviews-modal-title" className="text-sm font-semibold text-[var(--text)]">
                   Verified reviews
                 </div>
-                <div className="text-xs text-white/60">
+                <div className="text-xs text-[var(--muted)]">
                   Filter, sort, search, expand.
                 </div>
               </div>
@@ -495,7 +341,7 @@ export default function ReviewsSectionClient({ reviews }: Props) {
                 type="button"
                 onClick={closeModal}
                 ref={closeBtnRef}
-                className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white hover:bg-white/15"
+                className="rounded-full bg-[var(--surface-strong)] px-3 py-1 text-xs font-semibold text-[var(--text)] hover:bg-[var(--surface)]"
               >
                 Close
               </button>
@@ -503,13 +349,13 @@ export default function ReviewsSectionClient({ reviews }: Props) {
 
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
               <div className="space-y-2">
-                <label className="text-xs text-white/60">Source</label>
+                <label className="text-xs text-[var(--muted)]">Source</label>
                 <select
                   value={filter}
                   onChange={(e) =>
                     setFilter(e.target.value as ReviewSource | "all")
                   }
-                  className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white"
+                  className="w-full rounded-xl border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-3 py-2 text-sm text-[var(--text)]"
                 >
                   <option value="all">All sources</option>
                   <option value="shopify">Shopify</option>
@@ -517,32 +363,32 @@ export default function ReviewsSectionClient({ reviews }: Props) {
                 </select>
               </div>
               <div className="space-y-2">
-                <label className="text-xs text-white/60">Sort</label>
+                <label className="text-xs text-[var(--muted)]">Sort</label>
                 <select
                   value={sort}
                   onChange={(e) =>
                     setSort(e.target.value as "newest" | "helpful")
                   }
-                  className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white"
+                  className="w-full rounded-xl border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-3 py-2 text-sm text-[var(--text)]"
                 >
                   <option value="newest">Newest</option>
                   <option value="helpful">Most helpful</option>
                 </select>
               </div>
               <div className="space-y-2 sm:col-span-1">
-                <label className="text-xs text-white/60">Search</label>
+                <label className="text-xs text-[var(--muted)]">Search</label>
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search review text"
-                  className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/40"
+                  className="w-full rounded-xl border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-3 py-2 text-sm text-[var(--text)] placeholder:text-[var(--muted)]"
                 />
               </div>
             </div>
 
             <div className="mt-4 max-h-[60vh] space-y-3 overflow-y-auto pr-1">
               {filteredList.length === 0 ? (
-                <div className="text-sm text-white/70">
+                <div className="text-sm text-[var(--muted)]">
                   No verified reviews match those filters yet.
                 </div>
               ) : (
@@ -553,7 +399,7 @@ export default function ReviewsSectionClient({ reviews }: Props) {
                   return (
                     <CardShell key={r.id} className="p-4">
                       <div className="flex items-start gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-sm font-bold text-white">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--surface-strong)] text-sm font-bold text-[var(--text)]">
                           {initials(r.authorName)}
                         </div>
                         <div className="flex-1 space-y-2">
@@ -561,13 +407,13 @@ export default function ReviewsSectionClient({ reviews }: Props) {
                             <Stars rating={r.rating} />
                             <VerifiedBadge source={r.source} />
                             {dateLabel ? (
-                              <span className="text-xs text-white/60">{dateLabel}</span>
+                              <span className="text-xs text-[var(--muted)]">{dateLabel}</span>
                             ) : null}
                           </div>
-                          <div className="text-base font-bold text-white">
+                          <div className="text-base font-bold text-[var(--text)]">
                             {r.title || r.body.slice(0, 48) + "..."}
                           </div>
-                          <p className="text-sm text-white/75">
+                          <p className="text-sm text-[var(--muted)]">
                             {showBody ? r.body : r.body.slice(0, 320) + "..."}
                           </p>
                           {r.body.length > 320 ? (
@@ -579,7 +425,7 @@ export default function ReviewsSectionClient({ reviews }: Props) {
                                   [r.id]: !prev[r.id],
                                 }))
                               }
-                              className="text-xs font-semibold text-amber-300 underline underline-offset-4"
+                              className="text-xs font-semibold text-[var(--candy-red)] underline underline-offset-4"
                             >
                               {isExpanded ? "Show less" : "Read full review"}
                             </button>
