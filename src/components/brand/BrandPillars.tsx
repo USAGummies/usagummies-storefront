@@ -8,17 +8,17 @@ export default function BrandPillars({ size = "md" }: { size?: "sm" | "md" }) {
   return (
     <div className="flex flex-wrap gap-2">
       <span
-        className={`inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 ${pill}`}
+        className={`inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface-strong)] text-[var(--text)] ${pill}`}
       >
         🇺🇸 <span className="font-semibold">Made in America</span>
       </span>
       <span
-        className={`inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 ${pill}`}
+        className={`inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface-strong)] text-[var(--text)] ${pill}`}
       >
         🌱 <span className="font-semibold">All Natural</span>
       </span>
       <span
-        className={`inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 ${pill}`}
+        className={`inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface-strong)] text-[var(--text)] ${pill}`}
       >
         🚫 <span className="font-semibold">Artificial Dye Free</span>
       </span>

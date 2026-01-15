@@ -162,7 +162,7 @@ export function ShopProductCard({
           <div className="mt-3 grid gap-2">
             <Link
               href={bundleHref}
-              className="btn btn-navy justify-center min-h-[44px]"
+              className="btn btn-candy justify-center min-h-[44px]"
               onClick={(e) => e.stopPropagation()}
             >
               Build bundle

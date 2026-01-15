@@ -68,7 +68,7 @@ function formatMoney(amount: string, currencyCode: string) {
   }).format(n);
 }
 
-export function MemberPortal({ source, variant = "dark" }: MemberPortalProps) {
+export function MemberPortal({ source, variant = "light" }: MemberPortalProps) {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [status, setStatus] = useState<"idle" | "loading" | "error" | "ready">("idle");
   const [message, setMessage] = useState<string | null>(null);
@@ -253,7 +253,7 @@ export function MemberPortal({ source, variant = "dark" }: MemberPortalProps) {
             type="submit"
             className={cn(
               "btn pressable",
-              isDark ? "btn-outline-white" : "btn-navy",
+              isDark ? "btn-outline-white" : "btn-candy",
               status === "loading" && "opacity-70 pointer-events-none"
             )}
           >
@@ -319,28 +319,59 @@ export function MemberPortal({ source, variant = "dark" }: MemberPortalProps) {
       </div>
 
       <div className="mt-4 grid gap-3">
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-          <div className="text-xs font-semibold text-white">Subscription access</div>
-          <div className="mt-1 text-xs text-white/70">
+        <div
+          className={cn(
+            "rounded-2xl border p-3",
+            isDark ? "border-white/10 bg-white/5" : "border-[var(--border)] bg-[var(--surface-strong)]"
+          )}
+        >
+          <div className={cn("text-xs font-semibold", isDark ? "text-white" : "text-[var(--text)]")}>
+            Subscription access
+          </div>
+          <div className={cn("mt-1 text-xs", isDark ? "text-white/70" : "text-[var(--muted)]")}>
             {eligible
               ? "Eligible now. Subscription activation will be emailed to you."
               : "Eligible after your first purchase. Build a bundle to unlock access."}
           </div>
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-          <div className="text-xs font-semibold text-white">Order history</div>
+        <div
+          className={cn(
+            "rounded-2xl border p-3",
+            isDark ? "border-white/10 bg-white/5" : "border-[var(--border)] bg-[var(--surface-strong)]"
+          )}
+        >
+          <div className={cn("text-xs font-semibold", isDark ? "text-white" : "text-[var(--text)]")}>
+            Order history
+          </div>
           {customer.orders.length === 0 ? (
-            <div className="mt-2 text-xs text-white/70">No orders found yet.</div>
+            <div className={cn("mt-2 text-xs", isDark ? "text-white/70" : "text-[var(--muted)]")}>
+              No orders found yet.
+            </div>
           ) : (
             <div className="mt-2 space-y-3">
               {customer.orders.map((order) => (
-                <div key={order.id} className="rounded-xl border border-white/10 bg-white/5 p-3">
+                <div
+                  key={order.id}
+                  className={cn(
+                    "rounded-xl border p-3",
+                    isDark ? "border-white/10 bg-white/5" : "border-[var(--border)] bg-white"
+                  )}
+                >
                   <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                    <div className="font-semibold text-white">Order #{order.orderNumber}</div>
-                    <div className="text-white/60">{formatDate(order.processedAt)}</div>
+                    <div className={cn("font-semibold", isDark ? "text-white" : "text-[var(--text)]")}>
+                      Order #{order.orderNumber}
+                    </div>
+                    <div className={cn(isDark ? "text-white/60" : "text-[var(--muted)]")}>
+                      {formatDate(order.processedAt)}
+                    </div>
                   </div>
-                  <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-white/65">
+                  <div
+                    className={cn(
+                      "mt-1 flex flex-wrap gap-2 text-[11px]",
+                      isDark ? "text-white/65" : "text-[var(--muted)]"
+                    )}
+                  >
                     <span>
                       {STATUS_LABELS[order.financialStatus] || order.financialStatus}
                     </span>
@@ -358,7 +389,7 @@ export function MemberPortal({ source, variant = "dark" }: MemberPortalProps) {
                       </span>
                     ) : null}
                   </div>
-                  <div className="mt-2 space-y-1 text-xs text-white/70">
+                  <div className={cn("mt-2 space-y-1 text-xs", isDark ? "text-white/70" : "text-[var(--muted)]")}>
                     {order.lineItems.map((item) => (
                       <div key={`${order.id}-${item.title}`} className="flex justify-between gap-2">
                         <span>{item.title}</span>

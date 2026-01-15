@@ -78,9 +78,9 @@ export function StickyAddToCartBar({
   return (
     <div className="fixed inset-x-0 bottom-0 z-50 sm:hidden">
       <div className="mx-auto w-full max-w-6xl px-3 pb-3">
-        <div className="metal-panel rounded-2xl border border-white/15 text-white">
+        <div className="candy-panel rounded-2xl">
           <div className="flex items-center gap-3 px-3 py-3">
-            <div className="relative h-11 w-11 overflow-hidden rounded-xl border border-white/10 bg-white/10">
+            <div className="relative h-11 w-11 overflow-hidden rounded-xl border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)]">
               {imageUrl ? (
                 <Image
                   src={imageUrl}
@@ -93,25 +93,25 @@ export function StickyAddToCartBar({
             </div>
 
             <div className="min-w-0 flex-1">
-              <div className="text-sm font-black text-white truncate">{title}</div>
-              <div className="text-xs text-white/70">
-                <span className="font-semibold text-white">{priceText}</span>{" "}
-                <span className="text-white/40">-</span>{" "}
+              <div className="text-sm font-black text-[var(--text)] truncate">{title}</div>
+              <div className="text-xs text-[var(--muted)]">
+                <span className="font-semibold text-[var(--text)]">{priceText}</span>{" "}
+                <span className="text-[var(--muted)]">-</span>{" "}
                 <span>Bundle &amp; save - {FREE_SHIPPING_PHRASE}</span>
               </div>
-              <div className="mt-2 flex flex-wrap gap-2 text-[10px] uppercase tracking-[0.18em] text-white/60">
-                <span className="rounded-full border border-white/15 bg-white/5 px-2 py-1">Made in USA</span>
-                <span className="rounded-full border border-white/15 bg-white/5 px-2 py-1">No artificial dyes</span>
+              <div className="mt-2 flex flex-wrap gap-2 text-[10px] uppercase tracking-[0.18em] text-[var(--muted)]">
+                <span className="rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-2 py-1">Made in USA</span>
+                <span className="rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-2 py-1">No artificial dyes</span>
               </div>
             </div>
 
             <button
               type="button"
               onClick={handleClick}
-              className="btn btn-red pressable"
+              className="btn btn-candy pressable"
               style={{ whiteSpace: "nowrap" }}
             >
-              Build bundle
+              Build my bundle
             </button>
           </div>
         </div>

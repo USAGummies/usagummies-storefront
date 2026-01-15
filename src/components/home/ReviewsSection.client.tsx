@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import { BrandTouch } from "@/components/home/BrandTouch";
 
 export type ReviewSource = "legacy" | "shopify";
 
@@ -21,7 +20,6 @@ export type Review = {
 
 type Props = {
   reviews: Review[];
-  showAmericanaAccent?: boolean;
 };
 
 function clsx(...a: Array<string | false | null | undefined>) {
@@ -46,6 +44,7 @@ function initials(name: string) {
 
 function Stars({ rating, size = "sm" }: { rating: number; size?: "sm" | "md" }) {
   const full = Math.round(rating);
+  const starClass = size === "md" ? "text-base" : "text-sm";
   return (
     <div
       className={clsx(
@@ -54,7 +53,7 @@ function Stars({ rating, size = "sm" }: { rating: number; size?: "sm" | "md" }) 
       )}
     >
       {Array.from({ length: 5 }).map((_, i) => (
-        <span key={i} className="text-sm">
+        <span key={i} className={starClass}>
           {i < full ? "★" : "☆"}
         </span>
       ))}
@@ -140,7 +139,7 @@ function getStats(reviews: Review[]) {
   return { avg: Number.isFinite(avg) ? avg : 0, count: list.length };
 }
 
-export default function ReviewsSectionClient({ reviews, showAmericanaAccent = false }: Props) {
+export default function ReviewsSectionClient({ reviews }: Props) {
   // Deduping: composite key, prefer shopify over legacy
   const deduped = React.useMemo(() => {
     const keyFor = (r: Review) =>
@@ -253,39 +252,25 @@ export default function ReviewsSectionClient({ reviews, showAmericanaAccent = fa
     if (e.target === e.currentTarget) closeModal();
   };
 
-  const keyActivate = (action?: () => void) => (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      action?.();
-    }
-  };
-
   return (
     <section className="relative">
-      <div className="candy-panel relative overflow-hidden rounded-[36px] p-5 sm:p-6">
-        {showAmericanaAccent ? (
-          <BrandTouch
-            id="rushmore"
-            zone="REVIEWS"
-            className="absolute -left-24 top-4 hidden w-[240px] opacity-[0.14] md:block lg:w-[260px]"
-          />
-        ) : null}
+      <div className="candy-panel relative overflow-hidden rounded-[32px] p-4 sm:p-5">
         <div
-          className="pointer-events-none absolute inset-x-6 top-0 h-px bg-[rgba(239,59,59,0.45)]"
+          className="pointer-events-none absolute inset-x-6 top-0 h-px bg-[rgba(239,59,59,0.32)]"
           aria-hidden="true"
         />
         <div
           className="pointer-events-none absolute inset-0"
           style={{
             backgroundImage: [
-              "radial-gradient(circle at 12% 0%, rgba(255,77,79,0.08), transparent 44%)",
-              "radial-gradient(circle at 88% 10%, rgba(255,199,44,0.12), transparent 46%)",
-              "linear-gradient(180deg, rgba(255,255,255,0.0), rgba(255,255,255,0.6))",
+              "radial-gradient(circle at 12% 0%, rgba(255,77,79,0.06), transparent 46%)",
+              "radial-gradient(circle at 88% 10%, rgba(255,199,44,0.08), transparent 48%)",
+              "linear-gradient(180deg, rgba(255,255,255,0.0), rgba(255,255,255,0.5))",
             ].join(","),
           }}
         />
-        <div className="relative z-10 space-y-4">
-          <div className="flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
+        <div className="relative z-10 space-y-3">
+          <div className="flex flex-wrap items-center gap-2 text-sm font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
             <Stars rating={avg || 5} size="md" />
             <span>
               {count > 0
@@ -294,20 +279,20 @@ export default function ReviewsSectionClient({ reviews, showAmericanaAccent = fa
             </span>
           </div>
 
-          <div className="space-y-2">
-            <h2 className="text-2xl font-black text-[var(--text)] sm:text-3xl">
-              Made in the USA. Real reviews.
-            </h2>
+          <div className="space-y-1.5">
             <p className="text-sm text-[var(--muted)] sm:text-base">
               Verified buyer feedback, always unedited.
             </p>
+            <h2 className="text-xl font-bold text-[var(--text)] sm:text-2xl">
+              Made in the USA. Real reviews.
+            </h2>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={openModal}
-              className="btn btn-outline min-h-[44px]"
+              className="btn btn-outline min-h-[40px] text-xs"
               ref={triggerRef}
             >
               See all verified reviews

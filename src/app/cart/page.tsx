@@ -14,20 +14,20 @@ export default async function CartPage() {
   }
 
   return (
-    <main className="relative overflow-hidden bg-[var(--navy)] text-white min-h-screen home-metal pb-16">
+    <main className="relative overflow-hidden bg-[#fffdf8] text-[var(--text)] min-h-screen pb-16">
       <div className="mx-auto max-w-6xl px-4 pt-6">
         {/* Top nav */}
-        <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-white/70">
+        <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-[var(--muted)]">
           <div className="flex items-center gap-2">
-            <Link href="/" className="link-underline text-white/80 hover:text-white">
+            <Link href="/" className="link-underline text-[var(--muted)] hover:text-[var(--text)]">
               Home
             </Link>
             <span>›</span>
-            <span className="font-black text-white">Cart</span>
+            <span className="font-black text-[var(--text)]">Cart</span>
           </div>
 
           <div className="flex gap-2">
-            <Link className="btn btn-outline-white" href="/shop#bundle-pricing">
+            <Link className="btn btn-outline" href="/shop#bundle-pricing">
               Keep shopping →
             </Link>
           </div>

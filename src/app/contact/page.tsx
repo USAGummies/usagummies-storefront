@@ -10,26 +10,26 @@ export const metadata: Metadata = {
 
 export default function ContactPage() {
   return (
-    <main className="min-h-screen text-white">
+    <main className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
       <div className="mx-auto max-w-4xl px-4 py-12">
         <div className="mb-6 flex items-center justify-between gap-3">
           <Link
             href="/"
-            className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-sm text-white/80 hover:bg-white/5 hover:text-white"
+            className="rounded-full border border-[var(--border)] bg-white px-3 py-1 text-sm text-[var(--text)] hover:bg-[var(--surface-strong)]"
           >
             ← Home
           </Link>
           <Link
             href="/shop"
-            className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-sm text-white/80 hover:bg-white/5 hover:text-white"
+            className="rounded-full border border-[var(--border)] bg-white px-3 py-1 text-sm text-[var(--text)] hover:bg-[var(--surface-strong)]"
           >
             Shop →
           </Link>
         </div>
 
-        <section className="glass p-7">
+        <section className="candy-panel p-7">
           <h1 className="text-3xl font-semibold tracking-tight">Contact</h1>
-          <p className="mt-3 text-white/75">
+          <p className="mt-3 text-[var(--muted)]">
             Customer support or business inquiries — send a message below.
             We respond within one business day.
           </p>
@@ -52,9 +52,9 @@ export default function ContactPage() {
             ].map((item) => (
               <div
                 key={item.title}
-                className="glass-soft rounded-2xl border border-white/10 p-4 text-sm text-white/75"
+                className="card-solid rounded-2xl border border-[var(--border)] p-4 text-sm text-[var(--muted)]"
               >
-                <div className="text-sm font-semibold text-white">{item.title}</div>
+                <div className="text-sm font-semibold text-[var(--text)]">{item.title}</div>
                 <div className="mt-2">
                   {item.copy}{" "}
                   {item.link ? (
@@ -67,9 +67,9 @@ export default function ContactPage() {
             ))}
           </div>
 
-          <div className="mt-6 glass-soft p-5 text-sm text-white/75">
-            <div className="font-semibold text-white">What can we help with?</div>
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-white/75">
+          <div className="mt-6 card-solid p-5 text-sm text-[var(--muted)]">
+            <div className="font-semibold text-[var(--text)]">What can we help with?</div>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-[var(--muted)]">
               <li>Order questions</li>
               <li>Shipping & delivery</li>
               <li>Damaged or incorrect items</li>

@@ -65,26 +65,26 @@ const POLICIES = [
 
 export default function PoliciesIndexPage() {
   return (
-    <main className="min-h-screen text-white">
+    <main className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
       <div className="mx-auto max-w-4xl px-4 py-12">
         <div className="mb-6 flex items-center justify-between gap-3">
           <Link
             href="/"
-            className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-sm text-white/80 hover:bg-white/5 hover:text-white"
+            className="rounded-full border border-[var(--border)] bg-white px-3 py-1 text-sm text-[var(--text)] hover:bg-[var(--surface-strong)]"
           >
             ← Home
           </Link>
           <Link
             href="/shop"
-            className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-sm text-white/80 hover:bg-white/5 hover:text-white"
+            className="rounded-full border border-[var(--border)] bg-white px-3 py-1 text-sm text-[var(--text)] hover:bg-[var(--surface-strong)]"
           >
             Shop →
           </Link>
         </div>
 
-        <section className="glass p-7">
+        <section className="candy-panel p-7">
           <h1 className="text-3xl font-semibold tracking-tight">Policies</h1>
-          <p className="mt-3 text-white/75">
+          <p className="mt-3 text-[var(--muted)]">
             Clear, customer-first policies covering shipping, refund, privacy, and terms of service
             so checkout stays simple and expectations stay transparent.
           </p>
@@ -94,15 +94,15 @@ export default function PoliciesIndexPage() {
               <Link
                 key={p.href}
                 href={p.href}
-                className="group rounded-3xl border border-white/10 bg-white/5 p-5 transition hover:border-white/15 hover:bg-white/10"
+                className="group rounded-3xl border border-[var(--border)] bg-[var(--surface-strong)] p-5 transition hover:border-[rgba(15,27,45,0.2)] hover:bg-white"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
                       {p.icon}
                       {p.title}
                     </div>
-                    <div className="mt-2 text-sm text-white/70">{p.desc}</div>
+                    <div className="mt-2 text-sm text-[var(--muted)]">{p.desc}</div>
                   </div>
                   <div className="shrink-0 text-sm text-[#DBAA79] opacity-80 group-hover:opacity-100">
                     View →
@@ -112,9 +112,9 @@ export default function PoliciesIndexPage() {
             ))}
           </div>
 
-          <div className="mt-10 border-t border-white/10 pt-8">
+          <div className="mt-10 border-t border-[var(--border)] pt-8">
             <h2 className="text-xl font-semibold">Need help?</h2>
-            <p className="mt-2 text-white/70">
+            <p className="mt-2 text-[var(--muted)]">
               Send a message below. We respond within one business day.
             </p>
 

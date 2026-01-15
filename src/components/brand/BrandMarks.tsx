@@ -11,9 +11,9 @@ export function PillarBar({
   return (
     <div
       className={[
-        "inline-flex items-center gap-3 rounded-full border border-white/10 bg-black/25",
+        "inline-flex items-center gap-3 rounded-full border border-[var(--border)] bg-[var(--surface-strong)]",
         small ? "px-3 py-1 text-[11px]" : "px-4 py-1.5 text-xs",
-        "font-semibold uppercase tracking-wide text-white/90",
+        "font-semibold uppercase tracking-wide text-[var(--text)]",
         className,
       ].join(" ")}
       aria-label="USA Gummies brand pillars"
@@ -34,13 +34,13 @@ export function PillarBar({
 export function StarDivider({ className = "" }: { className?: string }) {
   return (
     <div className={["flex items-center justify-center gap-4", className].join(" ")}>
-      <div className="h-px w-20 bg-white/10" />
+      <div className="h-px w-20 bg-[var(--border)]" />
       <div className="flex items-center gap-2 text-amber-400" aria-hidden>
         <span>★</span>
         <span>★</span>
         <span>★</span>
       </div>
-      <div className="h-px w-20 bg-white/10" />
+      <div className="h-px w-20 bg-[var(--border)]" />
     </div>
   );
 }

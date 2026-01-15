@@ -53,7 +53,7 @@ function formatMoney(amount: string | number, currency = "USD") {
 
 function Pill({ children }: { children: React.ReactNode }) {
   return (
-    <span className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-semibold text-white/80">
+    <span className="candy-pill">
       {children}
     </span>
   );
@@ -79,15 +79,15 @@ export default function AboutPage() {
       : "Bundle pricing lowers the per-bag cost as you add more bags.";
 
   return (
-    <main className="relative overflow-hidden bg-[var(--navy)] text-white min-h-screen home-metal">
+    <main className="relative overflow-hidden bg-[var(--bg)] text-[var(--text)] min-h-screen home-candy">
       <section className="relative overflow-hidden">
         <div
           className="absolute inset-0 pointer-events-none"
           aria-hidden="true"
           style={{
             backgroundImage:
-              "radial-gradient(circle at 12% 18%, rgba(199,54,44,0.2), transparent 45%), radial-gradient(circle at 85% 5%, rgba(255,255,255,0.08), transparent 35%)",
-            opacity: 0.6,
+              "radial-gradient(circle at 12% 18%, rgba(255,77,79,0.14), transparent 48%), radial-gradient(circle at 85% 5%, rgba(255,199,44,0.14), transparent 38%)",
+            opacity: 0.5,
           }}
         />
         <div className="relative mx-auto max-w-6xl px-4 py-10">
@@ -98,24 +98,24 @@ export default function AboutPage() {
             ]}
           />
 
-          <div className="metal-panel rounded-[36px] border border-[rgba(199,54,44,0.35)] p-6 sm:p-8 shadow-[0_32px_90px_rgba(7,12,20,0.55)]">
+          <div className="candy-panel rounded-[36px] border border-[var(--border)] p-6 sm:p-8">
             <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
               <div className="space-y-4">
-                <div className="flex flex-wrap items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.32em] text-white/70 sm:text-xs">
-                  <span className="rounded-full border border-white/20 bg-white/5 px-3 py-1">
+                <div className="flex flex-wrap items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.32em] text-[var(--muted)] sm:text-xs">
+                  <span className="rounded-full border border-[var(--border)] bg-[var(--surface-strong)] px-3 py-1 text-[var(--text)]">
                     Made in the USA
                   </span>
-                  <span className="text-[var(--gold)]">No artificial dyes</span>
+                  <span className="text-[var(--red)]">No artificial dyes</span>
                 </div>
 
-                <h1 className="text-3xl font-black leading-[1.12] tracking-tight text-white sm:text-4xl lg:text-5xl">
+                <h1 className="text-3xl font-black leading-[1.12] tracking-tight text-[var(--text)] sm:text-4xl lg:text-5xl">
                   {LISTING_TITLE}
                 </h1>
 
-                <p className="text-sm text-white/80 sm:text-base max-w-prose">
+                <p className="text-sm text-[var(--muted)] sm:text-base max-w-prose">
                   {LISTING_BULLETS[0].body}
                 </p>
-                <p className="text-sm text-white/80 sm:text-base max-w-prose">
+                <p className="text-sm text-[var(--muted)] sm:text-base max-w-prose">
                   {LISTING_BULLETS[1].body}
                 </p>
 
@@ -126,16 +126,16 @@ export default function AboutPage() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
-                  <Link href="/shop" className="btn btn-red">
+                  <Link href="/shop" className="btn btn-candy">
                     Shop bundles
                   </Link>
-                  <span className="text-xs text-white/65">{FREE_SHIPPING_PHRASE}</span>
+                  <span className="text-xs text-[var(--muted)]">{FREE_SHIPPING_PHRASE}</span>
                 </div>
               </div>
 
               <div className="relative">
-                <div className="relative rounded-3xl border border-white/20 bg-white/95 p-2 text-[var(--navy)] shadow-[0_26px_70px_rgba(7,12,20,0.35)]">
-                  <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-white/60 bg-white">
+                <div className="relative rounded-3xl border border-[var(--border)] bg-white p-2 text-[var(--text)] shadow-[0_20px_48px_rgba(15,27,45,0.12)]">
+                  <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-[var(--border)] bg-white">
                     <Image
                       src="/brand/hero.jpg"
                       alt={LISTING_TITLE}
@@ -164,55 +164,55 @@ export default function AboutPage() {
               {LISTING_BULLETS.map((bullet) => (
                 <div
                   key={bullet.title}
-                  className="rounded-2xl border border-white/10 bg-white/5 p-4"
+                  className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-4"
                 >
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-white/60">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
                     {bullet.title}
                   </div>
-                  <div className="mt-2 text-sm text-white/75">{bullet.body}</div>
+                  <div className="mt-2 text-sm text-[var(--muted)]">{bullet.body}</div>
                 </div>
               ))}
             </div>
           </div>
 
           <div className="mt-6">
-            <AmericanDreamCallout ctaHref="/shop" ctaLabel="Shop bundles" />
+            <AmericanDreamCallout ctaHref="/shop" ctaLabel="Shop bundles" tone="light" />
           </div>
 
           <div className="mt-6 grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
-            <div className="metal-panel rounded-[32px] border border-white/12 p-5 sm:p-6">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-white/60">
+            <div className="candy-panel rounded-[32px] border border-[var(--border)] p-5 sm:p-6">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
                 Bundle savings
               </div>
-              <h2 className="mt-2 text-2xl font-black text-white">
+              <h2 className="mt-2 text-2xl font-black text-[var(--text)]">
                 Bundle pricing saves you money.
               </h2>
-              <p className="mt-2 text-sm text-white/75">{bundleSavingsLine}</p>
-              <div className="mt-3 text-sm text-white/70">{FREE_SHIPPING_PHRASE}.</div>
+              <p className="mt-2 text-sm text-[var(--muted)]">{bundleSavingsLine}</p>
+              <div className="mt-3 text-sm text-[var(--muted)]">{FREE_SHIPPING_PHRASE}.</div>
 
               <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                  <div className="text-[10px] uppercase tracking-[0.24em] text-white/60">
+                <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-3">
+                  <div className="text-[10px] uppercase tracking-[0.24em] text-[var(--muted)]">
                     Single bag
                   </div>
-                  <div className="text-base font-black text-white">{starterPerBag} per bag</div>
+                  <div className="text-base font-black text-[var(--text)]">{starterPerBag} per bag</div>
                 </div>
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                  <div className="text-[10px] uppercase tracking-[0.24em] text-white/60">
+                <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-3">
+                  <div className="text-[10px] uppercase tracking-[0.24em] text-[var(--muted)]">
                     Most popular
                   </div>
-                  <div className="text-base font-black text-white">{bestValuePerBag} per bag</div>
-                  <div className="text-[11px] text-white/65">8-bag bundle</div>
-                  <div className="text-[11px] text-[var(--gold)]/90">
+                  <div className="text-base font-black text-[var(--text)]">{bestValuePerBag} per bag</div>
+                  <div className="text-[11px] text-[var(--muted)]">8-bag bundle</div>
+                  <div className="text-[11px] text-[var(--red)]">
                     Best balance of value + convenience
                   </div>
                 </div>
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                  <div className="text-[10px] uppercase tracking-[0.24em] text-white/60">
+                <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-3">
+                  <div className="text-[10px] uppercase tracking-[0.24em] text-[var(--muted)]">
                     Free shipping
                   </div>
-                  <div className="text-base font-black text-white">5+ bags</div>
-                  <div className="text-[11px] text-white/65">Orders ship free</div>
+                  <div className="text-base font-black text-[var(--text)]">5+ bags</div>
+                  <div className="text-[11px] text-[var(--muted)]">Orders ship free</div>
                 </div>
               </div>
             </div>

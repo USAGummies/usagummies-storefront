@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CartLineControls } from "@/components/cart/CartLineControls.client";
 import AddBagButton from "@/components/cart/AddBagButton.client";
 import { cn } from "@/lib/cn";
-import { pricingForQty, BASE_PRICE, FREE_SHIP_QTY, FREE_SHIPPING_PHRASE, MIN_PER_BAG } from "@/lib/bundles/pricing";
+import { pricingForQty, BASE_PRICE, FREE_SHIP_QTY, MIN_PER_BAG } from "@/lib/bundles/pricing";
 import { isSingleBagVariant, SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
 import { trackEvent } from "@/lib/analytics";
 import { ReviewHighlights } from "@/components/reviews/ReviewHighlights";
@@ -149,76 +149,34 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
   const pct = clampPct(Math.round((totalBags / FREE_SHIP_QTY) * 100));
   const unlocked = totalBags >= FREE_SHIP_QTY;
 
-  let cartNudge = "";
-  let cartNudgeDetail = "";
-  let nudgeActionQty: number | null = null;
-  let nudgeActionLabel = "";
-  if (totalBags > 0 && totalBags < 4) {
-    const needed = 4 - totalBags;
-    cartNudge = `Add ${needed} more bag${needed === 1 ? "" : "s"} to start saving.`;
-    nudgeActionQty = 4;
-    nudgeActionLabel = `Add ${needed} bag${needed === 1 ? "" : "s"} to start saving`;
-    const pricingAtFour = pricingForQty(4);
-    const savingsAtFour = Math.max(0, BASE_PRICE * 4 - pricingAtFour.total);
-    if (savingsAtFour > 0) {
-      cartNudgeDetail = `Savings start at ${formatNumber(savingsAtFour, summaryCurrency)} off standard pricing.`;
-    }
+  const savingsGap = Math.max(0, 4 - totalBags);
+  let cartHeadline = "";
+  if (totalBags === 0) {
+    cartHeadline = "Add bags to unlock bundle savings.";
+  } else if (totalBags < 4) {
+    cartHeadline = `You're ${savingsGap} bag${savingsGap === 1 ? "" : "s"} away from bundle savings.`;
   } else if (totalBags === 4) {
-    cartNudge = "Add 1 more bag to get free shipping.";
-    nudgeActionQty = 5;
-    nudgeActionLabel = "Add 1 bag for free shipping";
+    cartHeadline = "Bundle savings unlocked.";
   } else if (totalBags >= 5 && totalBags < 8) {
-    cartNudge = "Most customers choose 8 bags for better value.";
-    nudgeActionQty = 8;
-    nudgeActionLabel = "Upgrade to 8 bags";
-    const pricingAtEight = pricingForQty(8);
-    const savingsAtEight = Math.max(0, BASE_PRICE * 8 - pricingAtEight.total);
-    const savingsAtCurrent = Math.max(0, BASE_PRICE * totalBags - (bundlePricing?.total || 0));
-    const extraSavings = Math.max(0, savingsAtEight - savingsAtCurrent);
-    if (extraSavings > 0) {
-      cartNudgeDetail = `Save ${formatNumber(extraSavings, summaryCurrency)} more at 8 bags.`;
-    }
+    cartHeadline = "Free shipping unlocked.";
   } else if (totalBags === 8) {
-    cartNudge = "Great choice — our most popular bundle.";
-    if (bundleSavingsText) {
-      cartNudgeDetail = `You're saving ${bundleSavingsText}.`;
-    }
-  } else if (totalBags > 8) {
-    cartNudge = "Bulk savings locked in.";
-    if (bundleSavingsText) {
-      cartNudgeDetail = `You're saving ${bundleSavingsText}.`;
-    }
+    cartHeadline = "Great choice — our most popular bundle.";
+  } else if (totalBags > 8 && totalBags < 12) {
+    cartHeadline = "Bulk savings locked in.";
+  } else {
+    cartHeadline = "Best price per bag unlocked.";
   }
-  const cartNudgeSecondary =
-    cartNudgeDetail ||
-    (unlocked ? "Free shipping unlocked." : "Free shipping unlocks at 5 bags.");
+  const cartSubline = "Free shipping at 5+ bags.";
 
-  let upgradeTarget: number | null = null;
-  let upgradeTitle = "Bundle locked";
-  let upgradeDetail = "You're locked in at bundle pricing.";
-  if (totalBags < 5) {
-    upgradeTarget = 5;
-    upgradeTitle = "Unlock free shipping";
-    upgradeDetail = "Move to 5 bags and ship free.";
-  } else if (totalBags < 8) {
-    upgradeTarget = 8;
-    upgradeTitle = "Most popular bundle";
-    upgradeDetail = "Best balance of value + convenience.";
-  } else if (totalBags < 12) {
-    upgradeTarget = 12;
-    upgradeTitle = "Bulk savings option";
-    upgradeDetail = "Stock up for the lowest per-bag price.";
-  }
-  const upgradePricing = upgradeTarget ? pricingForQty(upgradeTarget) : null;
-  const upgradeTotalText =
-    upgradeTarget && upgradePricing ? formatNumber(upgradePricing.total, summaryCurrency) : "";
-  const upgradePerBagText =
-    upgradeTarget && upgradePricing ? formatNumber(upgradePricing.perBag, summaryCurrency) : "";
-  const upgradeSavings =
-    upgradeTarget && upgradePricing
-      ? Math.max(0, BASE_PRICE * upgradeTarget - upgradePricing.total)
-      : 0;
-  const upgradeSavingsText = upgradeSavings > 0 ? formatNumber(upgradeSavings, summaryCurrency) : "";
+  const savingsTarget = totalBags > 0 && totalBags < 4 ? 4 : totalBags === 4 ? 5 : null;
+  const savingsButtonLabel =
+    totalBags > 0 && totalBags < 4
+      ? `Add ${savingsGap} bag${savingsGap === 1 ? "" : "s"} to start saving`
+      : totalBags === 4
+        ? "Add 1 bag to unlock free shipping"
+        : "";
+  const showUpgradeToEight = totalBags > 0 && totalBags < 8;
+  const showActionButtons = Boolean(savingsTarget || showUpgradeToEight);
 
   useEffect(() => {
     if (unlocked) {
@@ -275,6 +233,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
 
   const hasLines = lines.length > 0;
   const cartContext = onClose ? "drawer" : "cart";
+  const isDrawer = Boolean(onClose);
   const secondaryCta = onClose
     ? { href: "/cart", label: "View cart" }
     : { href: "/shop#bundle-pricing", label: "Keep shopping" };
@@ -291,7 +250,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
   }
 
   return (
-    <div className={cn("px-4 py-4 text-white", showStickyCheckout && "pb-24")}>
+    <div className={cn("px-4 py-4 text-[var(--text)]", showStickyCheckout && "pb-24")}>
       {hasLines ? (
         <div
           className={cn(
@@ -301,15 +260,11 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
         >
           <div className="flex flex-col gap-4">
             <div className="metal-panel rounded-3xl border border-[rgba(199,160,98,0.35)] p-4">
-              <div className="text-sm font-black text-white">
-                {cartNudge || FREE_SHIPPING_PHRASE}
-              </div>
-              <div className="mt-1 text-xs text-white/70">
-                {cartNudgeSecondary}
-              </div>
+              <div className="text-sm font-black text-[var(--text)]">{cartHeadline}</div>
+              <div className="mt-1 text-xs text-[var(--muted)]">{cartSubline}</div>
               <div
                 className={cn(
-                  "mt-3 h-2 w-full overflow-hidden rounded-full border border-white/15 bg-white/10",
+                  "mt-3 h-2 w-full overflow-hidden rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)]",
                   justUnlocked && "ring-2 ring-[var(--red)]"
                 )}
               >
@@ -321,59 +276,70 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                   style={{ width: `${pct}%` }}
                 />
               </div>
-              {nudgeActionQty ? (
-                <div className="mt-3 flex gap-2 flex-wrap">
-                  <AddBagButton
-                    label={nudgeActionLabel || "Add bags"}
-                    pendingLabel="Updating..."
-                    disabled={bundlePending}
-                    onAdd={() => setBundleQty(nudgeActionQty as number)}
-                  />
-                  <Link
-                    href="/shop#product-bundles"
-                    className="btn btn-outline-white pressable"
-                    onClick={onClose}
-                  >
-                    Browse bundles
-                  </Link>
-                </div>
-              ) : null}
-            </div>
-
-            <div className="metal-panel rounded-[32px] border border-[rgba(199,160,98,0.35)] p-4 sm:p-5">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/60">
-                    Pick your bundle
+              {showActionButtons ? (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2 flex-1">
+                    {savingsTarget ? (
+                      <AddBagButton
+                        label={savingsButtonLabel}
+                        pendingLabel="Updating..."
+                        disabled={bundlePending}
+                        onAdd={() => setBundleQty(savingsTarget as number)}
+                      />
+                    ) : null}
+                    {showUpgradeToEight ? (
+                      <AddBagButton
+                        label="Upgrade to 8 bags (Most popular)"
+                        pendingLabel="Updating..."
+                        disabled={bundlePending}
+                        onAdd={() => setBundleQty(8)}
+                      />
+                    ) : null}
                   </div>
-                  <div className="text-lg font-black text-white">Choose your bundle</div>
-                  <div className="text-xs text-white/65">
-                    Discounts start at 4 bags. Free shipping at 5+ bags. Most customers choose 8.
-                  </div>
-                </div>
-                <div className="text-xs text-white/60">
-                  Current bundle:{" "}
-                  <span className="font-semibold text-white">
-                    {totalBags} bag{totalBags === 1 ? "" : "s"}
-                  </span>
-                  {totalBags === 8 ? (
-                    <span className="ml-2 text-[11px] text-[var(--gold)]/90">
-                      Great choice — our most popular bundle.
-                    </span>
+                  {isDrawer ? (
+                    <div className="relative h-28 w-24 shrink-0 self-center mr-8">
+                      <Image
+                        src="/website%20assets/StatueofLiberty.png"
+                        alt=""
+                        fill
+                        sizes="96px"
+                        className="object-contain"
+                        aria-hidden="true"
+                      />
+                    </div>
                   ) : null}
                 </div>
-              </div>
-
-              <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/70">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-white/60">
-                  How pricing works
-                </div>
-                <ul className="mt-1.5 space-y-1">
+              ) : null}
+              <details className="mt-3 text-xs text-[var(--muted)]">
+                <summary className="cursor-pointer font-semibold text-[var(--text)]">
+                  See bundle pricing rules
+                </summary>
+                <ul className="mt-2 space-y-1">
                   <li>Discounts start at 4 bags</li>
                   <li>Free shipping at 5+ bags</li>
                   <li>Most customers choose 8 bags</li>
                   <li>Per-bag price caps at {formatNumber(MIN_PER_BAG, summaryCurrency)} after 12+ bags</li>
                 </ul>
+              </details>
+            </div>
+
+            <div className="candy-panel rounded-[32px] p-4 sm:p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
+                    Choose your bundle
+                  </div>
+                  <div className="text-lg font-black text-[var(--text)]">Bundle &amp; save</div>
+                  <div className="text-xs text-[var(--muted)]">
+                    Add more bags to lower your price per bag.
+                  </div>
+                </div>
+                <div className="text-xs text-[var(--muted)]">
+                  Current bundle:{" "}
+                  <span className="font-semibold text-[var(--text)]">
+                    {totalBags} bag{totalBags === 1 ? "" : "s"}
+                  </span>
+                </div>
               </div>
 
               <div className="mt-4 grid gap-3 sm:grid-cols-3">
@@ -397,44 +363,41 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                       disabled={bundlePending}
                       className={cn(
                         "relative rounded-2xl border px-3 py-3 text-left transition overflow-hidden",
-                        "bg-[linear-gradient(180deg,rgba(10,16,30,0.96),rgba(8,12,24,0.92))] text-white",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(199,160,98,0.45)]",
+                        "bg-white text-[var(--text)]",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(239,59,59,0.35)]",
                         "transition-transform",
                         isActive
-                          ? "border-[rgba(199,160,98,0.7)] shadow-[0_18px_46px_rgba(7,12,20,0.6)] ring-1 ring-[rgba(199,160,98,0.45)]"
-                          : "border-white/15 hover:border-[rgba(199,160,98,0.4)] hover:shadow-[0_14px_36px_rgba(7,12,20,0.5)]",
-                        isBest && "scale-[1.03] sm:scale-[1.04] z-10",
+                          ? "border-[var(--candy-red)] bg-[rgba(239,59,59,0.08)] shadow-[0_14px_32px_rgba(239,59,59,0.16)] ring-2 ring-[rgba(239,59,59,0.2)]"
+                          : "border-[rgba(15,27,45,0.12)] hover:border-[rgba(239,59,59,0.3)] hover:shadow-[0_12px_28px_rgba(15,27,45,0.12)]",
+                        isBest &&
+                          "scale-[1.04] sm:scale-[1.06] z-10 border-[rgba(239,59,59,0.35)] bg-[rgba(239,59,59,0.04)]",
                         bundlePending && !isActive && "opacity-70 cursor-not-allowed"
                       )}
                     >
-                      <span className="pointer-events-none absolute inset-0 rounded-2xl border border-white/10" />
-                      <span className="pointer-events-none absolute inset-0 rounded-2xl bg-[linear-gradient(180deg,rgba(255,255,255,0.08),transparent_55%)]" />
                       {isBest ? (
-                        <span className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#c7362c] via-[#c7a062] to-[#c7362c] opacity-90" />
+                        <span className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#ff4b4b] via-[#f8d44f] to-[#ff4b4b] opacity-90" />
                       ) : null}
                       <div className="flex items-center justify-between gap-2">
-                        <div className="text-sm font-black text-white">{qty} bags</div>
+                        <div className="text-sm font-black text-[var(--text)]">{qty} bags</div>
                         {label ? (
-                          <span className="rounded-full border border-white/20 bg-[rgba(199,54,44,0.22)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-white/90">
+                          <span className="rounded-full border border-[rgba(239,59,59,0.25)] bg-[rgba(239,59,59,0.12)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--candy-red)]">
                             {label}
                           </span>
                         ) : null}
                       </div>
-                      <div className="mt-1 text-base font-black text-white">{totalText}</div>
-                      <div className="text-[11px] text-white/60">~{perBagText} / bag</div>
+                      <div className="mt-2 text-xl font-black text-[var(--text)]">{totalText}</div>
+                      <div className="text-[11px] text-[var(--muted)]">~{perBagText} / bag</div>
+                      <div className="mt-2 flex items-center justify-between gap-2 text-[11px]">
+                        <span className="font-semibold text-[var(--candy-red)]">
+                          {savingsText ? `Save ${savingsText} vs single bags` : "Standard price"}
+                        </span>
+                        {freeShip ? (
+                          <span className="text-[var(--muted)]">Free shipping</span>
+                        ) : null}
+                      </div>
                       {isBest ? (
-                        <div className="text-[11px] text-[var(--gold)]/90">
-                          Best balance of value + convenience
-                        </div>
-                      ) : null}
-                      {savingsText ? (
-                        <div className="mt-1 text-[11px] font-semibold text-[var(--gold)]">
-                          Save {savingsText}
-                        </div>
-                      ) : null}
-                      {freeShip ? (
-                        <div className="mt-2 inline-flex items-center rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/80">
-                          Free shipping
+                        <div className="mt-2 text-[11px] font-semibold text-[var(--muted)]">
+                          Most customers check out with 8.
                         </div>
                       ) : null}
                     </button>
@@ -445,185 +408,218 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                 <div className="mt-3 text-xs text-[var(--red)]">{bundleError}</div>
               ) : null}
               {bundlePending ? (
-                <div className="mt-2 text-xs text-white/60">Updating bundle...</div>
+                <div className="mt-2 text-xs text-[var(--muted)]">Updating bundle...</div>
               ) : null}
             </div>
 
-            <div className="flex flex-col gap-3">
-              {lines.length === 0 ? (
-                <div className="metal-panel rounded-2xl border border-white/12 p-4 text-sm text-white/70">
-                  Your cart is empty.
-                </div>
-              ) : (
-                lines.map((l: any) => {
-                  const title = l?.merchandise?.product?.title || "Item";
-                  const variant = l?.merchandise?.title || "";
-                  const img =
-                    l?.merchandise?.image?.url ||
-                    l?.merchandise?.product?.featuredImage?.url ||
-                    null;
-                  const lineQty = Number(l?.quantity) || 0;
-                  const bagsPerUnit = getBagsPerUnit(l?.merchandise);
-                  const lineBags = bagsPerUnit * lineQty;
-                  const lineCurrency = l?.cost?.totalAmount?.currencyCode || "USD";
-                  const linePricing = lineBags > 0 ? pricingForQty(lineBags) : null;
-                  const lineTotal = linePricing
-                    ? formatMoney({ amount: linePricing.total.toFixed(2), currencyCode: lineCurrency })
-                    : l.cost?.totalAmount
-                      ? formatMoney(l.cost.totalAmount as MoneyV2)
-                      : "";
-                  const bundleLabel = `${lineBags} bag${lineBags === 1 ? "" : "s"}`;
-                  const linePerBagText =
-                    linePricing && linePricing.perBag
-                      ? formatMoney({ amount: linePricing.perBag.toFixed(2), currencyCode: lineCurrency })
-                      : "";
-                  return (
-                    <div key={l.id} className="metal-panel rounded-2xl border border-white/10 p-4 flex gap-3 hover-lift">
-                      <div
-                        className="relative h-14 w-14 rounded-xl overflow-hidden border border-white/10 bg-white/5"
-                        aria-hidden="true"
-                      >
-                        {img ? (
-                          <Image src={img} alt={title} fill className="object-cover" />
-                        ) : null}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-black text-white leading-tight">{title}</div>
-                        {variant ? (
-                          <div className="text-xs text-white/60 mt-1">{variant}</div>
-                        ) : null}
-                        <div className="text-xs text-white/60 mt-1">
-                          Bundle: {bundleLabel}
-                          {linePerBagText ? ` • ${linePerBagText} / bag` : ""}
+            {isDrawer ? (
+              <div className="flex flex-col gap-3">
+                {lines.length === 0 ? (
+                  <div className="metal-panel rounded-2xl border border-[rgba(15,27,45,0.12)] p-4 text-sm text-[var(--muted)]">
+                    Your cart is empty.
+                  </div>
+                ) : (
+                  lines.map((l: any) => {
+                    const title = l?.merchandise?.product?.title || "Item";
+                    const variant = l?.merchandise?.title || "";
+                    const img =
+                      l?.merchandise?.image?.url ||
+                      l?.merchandise?.product?.featuredImage?.url ||
+                      null;
+                    const lineQty = Number(l?.quantity) || 0;
+                    const bagsPerUnit = getBagsPerUnit(l?.merchandise);
+                    const lineBags = bagsPerUnit * lineQty;
+                    const lineCurrency = l?.cost?.totalAmount?.currencyCode || "USD";
+                    const linePricing = lineBags > 0 ? pricingForQty(lineBags) : null;
+                    const lineTotal = linePricing
+                      ? formatMoney({ amount: linePricing.total.toFixed(2), currencyCode: lineCurrency })
+                      : l.cost?.totalAmount
+                        ? formatMoney(l.cost.totalAmount as MoneyV2)
+                        : "";
+                    const bundleLabel = `${lineBags} bag${lineBags === 1 ? "" : "s"}`;
+                    const linePerBagText =
+                      linePricing && linePricing.perBag
+                        ? formatMoney({ amount: linePricing.perBag.toFixed(2), currencyCode: lineCurrency })
+                        : "";
+                    return (
+                      <div key={l.id} className="metal-panel rounded-2xl border border-[rgba(15,27,45,0.12)] p-4 flex gap-3 hover-lift">
+                        <div
+                          className="relative h-14 w-14 rounded-xl overflow-hidden border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)]"
+                          aria-hidden="true"
+                        >
+                          {img ? (
+                            <Image src={img} alt={title} fill className="object-cover" />
+                          ) : null}
                         </div>
-                        <div className="mt-2">
-                          <CartLineControls lineId={l.id} quantity={l.quantity} onChange={refreshCart} />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-black text-[var(--text)] leading-tight">{title}</div>
+                          {variant ? (
+                            <div className="text-xs text-[var(--muted)] mt-1">{variant}</div>
+                          ) : null}
+                          <div className="text-xs text-[var(--muted)] mt-1">
+                            Bundle: {bundleLabel}
+                            {linePerBagText ? ` • ${linePerBagText} / bag` : ""}
+                          </div>
+                          <div className="mt-2">
+                            <CartLineControls lineId={l.id} quantity={l.quantity} onChange={refreshCart} />
+                          </div>
+                          <div className="mt-2 text-[10px] text-[var(--muted)]">
+                            Bundles apply automatically at 4+ bags.
+                          </div>
                         </div>
+                        <div className="text-right text-sm font-black text-[var(--text)]">{lineTotal}</div>
                       </div>
-                      <div className="text-right text-sm font-black text-white">{lineTotal}</div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
+                    );
+                  })
+                )}
+              </div>
+            ) : null}
           </div>
 
-          <div className="flex flex-col gap-4">
+          <div
+            className={cn(
+              "flex flex-col gap-4",
+              !isDrawer && "lg:sticky lg:top-24 lg:self-start"
+            )}
+          >
+            {!isDrawer ? (
+              <div className="metal-panel rounded-2xl border border-[rgba(15,27,45,0.12)] p-4">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
+                  Your bundle
+                </div>
+                <div className="mt-3 flex flex-col gap-3">
+                  {lines.length === 0 ? (
+                    <div className="text-sm text-[var(--muted)]">Your cart is empty.</div>
+                  ) : (
+                    lines.map((l: any) => {
+                      const title = l?.merchandise?.product?.title || "Item";
+                      const variant = l?.merchandise?.title || "";
+                      const img =
+                        l?.merchandise?.image?.url ||
+                        l?.merchandise?.product?.featuredImage?.url ||
+                        null;
+                      const lineQty = Number(l?.quantity) || 0;
+                      const bagsPerUnit = getBagsPerUnit(l?.merchandise);
+                      const lineBags = bagsPerUnit * lineQty;
+                      const lineCurrency = l?.cost?.totalAmount?.currencyCode || "USD";
+                      const linePricing = lineBags > 0 ? pricingForQty(lineBags) : null;
+                      const lineTotal = linePricing
+                        ? formatMoney({ amount: linePricing.total.toFixed(2), currencyCode: lineCurrency })
+                        : l.cost?.totalAmount
+                          ? formatMoney(l.cost.totalAmount as MoneyV2)
+                          : "";
+                      const bundleLabel = `${lineBags} bag${lineBags === 1 ? "" : "s"}`;
+                      const linePerBagText =
+                        linePricing && linePricing.perBag
+                          ? formatMoney({ amount: linePricing.perBag.toFixed(2), currencyCode: lineCurrency })
+                          : "";
+                      return (
+                        <div key={l.id} className="rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-3 flex gap-3">
+                          <div
+                            className="relative h-14 w-14 rounded-xl overflow-hidden border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)]"
+                            aria-hidden="true"
+                          >
+                            {img ? (
+                              <Image src={img} alt={title} fill className="object-cover" />
+                            ) : null}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-black text-[var(--text)] leading-tight">{title}</div>
+                            {variant ? (
+                              <div className="text-xs text-[var(--muted)] mt-1">{variant}</div>
+                            ) : null}
+                            <div className="text-xs text-[var(--muted)] mt-1">
+                              Bundle: {bundleLabel}
+                              {linePerBagText ? ` • ${linePerBagText} / bag` : ""}
+                            </div>
+                            <div className="mt-2">
+                              <CartLineControls lineId={l.id} quantity={l.quantity} onChange={refreshCart} />
+                            </div>
+                            <div className="mt-2 text-[10px] text-[var(--muted)]">
+                              Bundles apply automatically at 4+ bags.
+                            </div>
+                          </div>
+                          <div className="text-right text-sm font-black text-[var(--text)]">{lineTotal}</div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            ) : null}
+
             <div className="metal-panel rounded-2xl border border-[rgba(199,160,98,0.35)] p-4 flex flex-col gap-2">
-              <div className="flex items-center justify-between text-sm text-white/70">
+              <div className="flex items-center justify-between text-sm text-[var(--muted)]">
                 <span>Subtotal</span>
-                <span className="font-black text-white">{subtotal}</span>
+                <span className="font-black text-[var(--text)]">{subtotal}</span>
               </div>
               {bundlePricing ? (
-                <div className="text-xs text-white/60">
+                <div className="text-xs text-[var(--muted)]">
                   Bundle pricing: {totalBags} bags • {bundlePerBagText} / bag
                 </div>
               ) : null}
               {bundleSavings > 0 ? (
-                <div className="text-xs text-white/60">
-                  You save {bundleSavingsText} vs single-bag pricing.
+                <div className="text-xs text-[var(--muted)]">
+                  Save {bundleSavingsText} vs single bags.
                 </div>
               ) : null}
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="mt-2">
                 {localCart?.checkoutUrl ? (
                   <a
                     href={localCart.checkoutUrl}
-                    className="btn btn-red w-full justify-center pressable"
+                    className="btn btn-candy w-full justify-center pressable"
                     onClick={handleCheckoutClick}
                   >
-                    Secure checkout →
+                    <span className="inline-flex items-center gap-2">
+                      <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+                        <path
+                          fill="currentColor"
+                          d="M6 10V8a6 6 0 1 1 12 0v2h1v12H5V10h1zm2 0h8V8a4 4 0 1 0-8 0v2z"
+                        />
+                      </svg>
+                      Secure checkout
+                    </span>
                   </a>
                 ) : null}
+                <div className="mt-2 text-xs text-[var(--muted)]">
+                  Ships in 24 hours 🇺🇸
+                </div>
                 <Link
                   href={secondaryCta.href}
-                  className="btn btn-outline-white w-full justify-center pressable"
+                  className="mt-2 inline-flex text-xs font-semibold text-[var(--muted)] underline underline-offset-4 hover:text-[var(--text)]"
                   onClick={onClose}
                 >
                   {secondaryCta.label}
                 </Link>
               </div>
-              {totalBags > 0 && totalBags < 8 ? (
-                <div className="text-xs text-white/60">
-                  Most customers check out with 8 bags.
-                </div>
-              ) : null}
-            </div>
-
-            <div className="metal-panel rounded-2xl border border-white/12 p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/60">
-                    Bundle upgrade
-                  </div>
-                  <div className="mt-1 text-sm font-semibold text-white">{upgradeTitle}</div>
-                  <div className="text-xs text-white/60">{upgradeDetail}</div>
-                </div>
-                {upgradeTarget ? (
-                  <div className="text-right text-xs text-white/65">
-                    <div className="font-semibold text-white">{upgradeTotalText}</div>
-                    <div>~{upgradePerBagText} / bag</div>
-                  </div>
-                ) : null}
-              </div>
-              {upgradeTarget ? (
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      trackEvent("cart_upgrade_click", {
-                        targetQty: upgradeTarget,
-                        currentQty: totalBags,
-                        context: cartContext,
-                      });
-                      setBundleQty(upgradeTarget as number);
-                    }}
-                    disabled={bundlePending}
-                    className={cn(
-                      "btn btn-outline-white pressable",
-                      bundlePending && "opacity-70 pointer-events-none"
-                    )}
-                  >
-                    Upgrade to {upgradeTarget} bags
-                  </button>
-                  {upgradeSavingsText ? (
-                    <span className="text-xs text-[var(--gold)]">
-                      Save {upgradeSavingsText}
-                    </span>
-                  ) : null}
-                </div>
-              ) : (
-                <div className="mt-3 text-xs text-white/60">
-                  Secure checkout to lock in your current pricing.
-                </div>
-              )}
-            </div>
-
-            <div className="metal-panel rounded-2xl border border-white/12 p-4">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/60">
-                Trust & shipping
-              </div>
-              <div className="mt-2 grid gap-2 text-xs text-white/70 sm:grid-cols-2">
-                <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1">Love it or your money back</div>
-                <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1">Ships within 24 hours</div>
-                <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1">Secure checkout</div>
-                <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1">Free shipping on 5+ bags</div>
+              <div className="mt-3 grid gap-1 text-xs text-[var(--muted)]">
+                <div>Love it or your money back</div>
+                <div>Ships within 24 hours</div>
+                <div>Made in the USA</div>
               </div>
             </div>
 
-            <ReviewHighlights variant="dark" limit={2} />
+            <details className="rounded-2xl border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] p-4">
+              <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
+                See verified reviews
+              </summary>
+              <div className="mt-3">
+                <ReviewHighlights variant="light" limit={2} />
+              </div>
+            </details>
 
           </div>
         </div>
       ) : (
         <div className="flex flex-col gap-4">
-          <div className="metal-panel rounded-[28px] border border-white/12 p-4">
-            <div className="text-sm font-semibold text-white">Your cart is empty.</div>
-            <div className="mt-2 text-xs text-white/70">
+          <div className="metal-panel rounded-[28px] border border-[rgba(15,27,45,0.12)] p-4">
+            <div className="text-sm font-semibold text-[var(--text)]">Your cart is empty.</div>
+            <div className="mt-2 text-xs text-[var(--muted)]">
               Pick a bundle to get started and unlock free shipping at 5 bags.
             </div>
             <Link
               href="/shop#bundle-pricing"
-              className="btn btn-red mt-4 w-full justify-center"
+              className="btn btn-candy mt-4 w-full justify-center"
               onClick={onClose}
             >
               Build my bundle
@@ -635,19 +631,19 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
       {showStickyCheckout ? (
         <div className="fixed inset-x-0 bottom-0 z-40 sm:hidden">
           <div className="mx-auto max-w-6xl px-4 pb-4">
-            <div className="metal-panel rounded-2xl border border-white/12 px-4 py-3 text-white shadow-[0_18px_40px_rgba(7,12,20,0.45)]">
+            <div className="metal-panel rounded-2xl border border-[rgba(15,27,45,0.12)] px-4 py-3 text-[var(--text)] shadow-[0_16px_36px_rgba(15,27,45,0.18)]">
               <div className="flex items-center justify-between gap-3">
-                <div className="text-xs text-white/60">
+                <div className="text-xs text-[var(--muted)]">
                   Subtotal
-                  <div className="text-sm font-black text-white">{subtotal}</div>
+                  <div className="text-sm font-black text-[var(--text)]">{subtotal}</div>
                 </div>
                 {localCart?.checkoutUrl ? (
                   <a
                     href={localCart.checkoutUrl}
-                    className="btn btn-red pressable"
+                    className="btn btn-candy pressable"
                     onClick={handleCheckoutClick}
                   >
-                    Secure checkout →
+                    Secure checkout
                   </a>
                 ) : null}
               </div>

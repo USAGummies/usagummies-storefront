@@ -1,0 +1,96 @@
+.scene {
+  position: relative;
+  overflow: hidden;
+}
+
+.sceneBg {
+  position: absolute;
+  inset: 0;
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: var(--scene-pos, center);
+  background-image: var(--scene-bg, none);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.sceneOverlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.sceneContent {
+  position: relative;
+  z-index: 2;
+}
+
+.sceneHero {
+  --scene-pos: center 68%;
+  min-height: clamp(420px, 65vh, 700px);
+}
+
+.sceneHero .sceneOverlay {
+  background: linear-gradient(0deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0) 60%);
+}
+
+.scenePricing {
+  --scene-pos: center;
+}
+
+.scenePricing .sceneOverlay {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.sceneBundle {
+  background: #fffdf8;
+}
+
+.sceneBundle .sceneBg,
+.sceneBundle .sceneOverlay {
+  display: none;
+}
+
+.sceneReviews {
+  --scene-pos: center bottom;
+}
+
+.sceneReviews .sceneOverlay {
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.sceneEmail {
+  --scene-pos: center;
+}
+
+.sceneEmail .sceneOverlay {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.sceneFooter {
+  --scene-pos: center;
+}
+
+.sceneFooter .sceneOverlay {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+@media (max-width: 640px) {
+  .sceneHero {
+    --scene-pos: center 72%;
+    min-height: clamp(360px, 58vh, 520px);
+  }
+  .sceneHero .sceneOverlay {
+    background: linear-gradient(0deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0) 70%);
+  }
+  .sceneReviews .sceneOverlay {
+    background: rgba(255, 255, 255, 0.72);
+  }
+  .sceneEmail .sceneOverlay {
+    background: rgba(255, 255, 255, 0.3);
+  }
+  .sceneFooter .sceneOverlay {
+    background: rgba(255, 255, 255, 0.35);
+  }
+}

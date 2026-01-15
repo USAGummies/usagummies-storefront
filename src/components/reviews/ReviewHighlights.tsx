@@ -11,7 +11,7 @@ function stars(rating: number) {
   return "*".repeat(full).padEnd(5, "-");
 }
 
-export function ReviewHighlights({ variant = "dark", limit = 2 }: Props) {
+export function ReviewHighlights({ variant = "light", limit = 2 }: Props) {
   const list = REVIEW_HIGHLIGHTS.slice(0, Math.max(1, limit));
   const isDark = variant === "dark";
 

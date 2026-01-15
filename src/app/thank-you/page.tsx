@@ -9,13 +9,13 @@ const igImages = ["/home-patriotic-product.jpg", "/brand/hero.jpg", "/hero.jpg"]
 
 export default function ThankYouPage() {
   return (
-    <main className="relative overflow-hidden bg-[var(--navy)] text-white min-h-screen home-metal pb-16">
+    <main className="relative overflow-hidden bg-[var(--bg)] text-[var(--text)] min-h-screen home-candy pb-16">
       <div className="mx-auto max-w-6xl px-4 pt-10">
-        <Reveal className="metal-panel rounded-3xl border border-white/12 p-6 space-y-3 text-white">
+        <Reveal className="candy-panel rounded-3xl border border-[var(--border)] p-6 space-y-3 text-[var(--text)]">
           <div className="text-xs font-semibold tracking-[0.22em] text-[var(--muted)] uppercase">
             USA Gummies
           </div>
-          <h1 className="text-3xl font-black text-white leading-tight">
+          <h1 className="text-3xl font-black text-[var(--text)] leading-tight">
             You’re officially part of the movement 🇺🇸
           </h1>
           <div className="text-sm font-semibold text-[var(--muted)]">
@@ -24,8 +24,8 @@ export default function ThankYouPage() {
         </Reveal>
 
         <div className="mt-6 grid gap-4 md:grid-cols-2">
-          <Reveal className="metal-panel rounded-2xl border border-white/12 p-5 space-y-3 text-white">
-            <div className="text-lg font-black text-white">America 250 perks</div>
+          <Reveal className="candy-panel rounded-2xl border border-[var(--border)] p-5 space-y-3 text-[var(--text)]">
+            <div className="text-lg font-black text-[var(--text)]">America 250 perks</div>
             <ul className="list-disc list-inside text-sm text-[var(--muted)] space-y-1">
               <li>Early drops</li>
               <li>Bundle deals</li>
@@ -33,14 +33,14 @@ export default function ThankYouPage() {
             </ul>
             <Link
               href="/america-250"
-              className="btn btn-red pressable inline-flex w-fit"
+              className="btn btn-candy pressable inline-flex w-fit"
             >
               Claim America 250 perks
             </Link>
           </Reveal>
 
-          <Reveal className="metal-panel rounded-2xl border border-white/12 p-5 space-y-3 text-white">
-            <div className="text-lg font-black text-white">Follow @usagummies</div>
+          <Reveal className="candy-panel rounded-2xl border border-[var(--border)] p-5 space-y-3 text-[var(--text)]">
+            <div className="text-lg font-black text-[var(--text)]">Follow @usagummies</div>
             <div className="grid grid-cols-3 gap-2">
               {igImages.map((src) => (
                 <div key={src} className="relative aspect-square overflow-hidden rounded-xl border border-[var(--border)]">
@@ -50,7 +50,7 @@ export default function ThankYouPage() {
             </div>
             <Link
               href="https://www.instagram.com/usagummies"
-              className="btn btn-navy pressable inline-flex w-fit"
+              className="btn btn-outline pressable inline-flex w-fit"
             >
               Follow @usagummies
             </Link>
@@ -65,30 +65,29 @@ export default function ThankYouPage() {
               title="Stay in the circle"
               subtitle="No spam. Only bold flavor news."
               ctaLabel="Get first access"
-              variant="dark"
               showSms
             />
           </Reveal>
           <Reveal>
-            <SubscriptionUnlock source="thank-you" variant="dark" unlockOnMount />
+            <SubscriptionUnlock source="thank-you" unlockOnMount />
           </Reveal>
         </div>
 
         <div className="mt-6">
-          <Reveal className="metal-panel rounded-2xl border border-white/12 p-5 space-y-3 text-white">
-            <div className="text-lg font-black text-white">Build your next bundle</div>
-            <div className="text-sm text-white/70">
+          <Reveal className="candy-panel rounded-2xl border border-[var(--border)] p-5 space-y-3 text-[var(--text)]">
+            <div className="text-lg font-black text-[var(--text)]">Build your next bundle</div>
+            <div className="text-sm text-[var(--muted)]">
               Free shipping on 5+ bags. Most customers go bigger on the next run.
             </div>
             <div className="flex flex-wrap gap-2">
-              <Link href="/shop" className="btn btn-red pressable">
+              <Link href="/shop" className="btn btn-candy pressable">
                 Shop best sellers
               </Link>
-              <Link href="/contact" className="btn btn-outline-white pressable">
+              <Link href="/contact" className="btn btn-outline pressable">
                 Order support
               </Link>
             </div>
-            <div className="text-xs text-white/60">
+            <div className="text-xs text-[var(--muted)]">
               Ships fast. If you need help, we have you covered.
             </div>
           </Reveal>

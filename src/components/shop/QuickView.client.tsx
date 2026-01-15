@@ -256,7 +256,7 @@ export default function QuickView({ product, detailHref, bundleHref, children }:
                     type="button"
                     onClick={addToCart}
                     disabled={adding}
-                    className="btn btn-red mt-3 w-full"
+                    className="btn btn-candy mt-3 w-full"
                   >
                     {adding ? (
                       <span className="inline-flex items-center gap-2">
@@ -277,7 +277,7 @@ export default function QuickView({ product, detailHref, bundleHref, children }:
                   <Link href={detailHref} className="btn btn-outline">
                     View full details
                   </Link>
-                  <Link href={bundleHref} className="btn btn-navy">
+                  <Link href={bundleHref} className="btn btn-outline">
                     Jump to bundles
                   </Link>
                 </div>

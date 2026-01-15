@@ -13,6 +13,7 @@ type LeadCaptureProps = {
   ctaLabel?: string;
   successMessage?: string;
   variant?: "light" | "dark";
+  emphasis?: "default" | "quiet";
   showSms?: boolean;
 };
 
@@ -24,12 +25,15 @@ export function LeadCapture({
   ctaLabel = "Join the list",
   successMessage = "Thanks for joining. We will only send the good stuff.",
   variant = "light",
+  emphasis = "default",
   showSms = true,
 }: LeadCaptureProps) {
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
+  const [showSmsField, setShowSmsField] = useState(false);
 
   const isDark = variant === "dark";
+  const isQuiet = emphasis === "quiet";
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -61,6 +65,7 @@ export function LeadCapture({
         throw new Error(json?.error || "Could not submit.");
       }
       setStatus("success");
+      setShowSmsField(false);
       form.reset();
     } catch (err: any) {
       setStatus("error");
@@ -71,20 +76,32 @@ export function LeadCapture({
   return (
     <div
       className={cn(
-        "rounded-2xl p-4",
+        "rounded-2xl",
+        isQuiet ? "p-3 shadow-none hover:shadow-none hover:translate-y-0" : "p-4",
         isDark
           ? "metal-panel border border-white/12 text-white"
-          : "card-solid border border-[var(--border)] text-[var(--text)]"
+          : "card-solid border border-[var(--border)] text-[var(--text)]",
+        isQuiet && !isDark ? "bg-[var(--surface-strong)]" : ""
       )}
     >
-      <div className={cn("text-sm font-black", isDark ? "text-white" : "text-[var(--text)]")}>
+      <div
+        className={cn(
+          isQuiet ? "text-[13px] font-black" : "text-sm font-black",
+          isDark ? "text-white" : "text-[var(--text)]"
+        )}
+      >
         {title}
       </div>
-      <div className={cn("mt-1 text-xs", isDark ? "text-white/65" : "text-[var(--muted)]")}>
+      <div
+        className={cn(
+          isQuiet ? "mt-1 text-[11px]" : "mt-1 text-xs",
+          isDark ? "text-white/65" : "text-[var(--muted)]"
+        )}
+      >
         {subtitle}
       </div>
 
-      <form onSubmit={handleSubmit} className="mt-3 flex flex-wrap gap-2">
+      <form onSubmit={handleSubmit} className={cn(isQuiet ? "mt-2 flex flex-wrap gap-2" : "mt-3 flex flex-wrap gap-2")}>
         <input type="hidden" name="source" value={source} />
         <input type="hidden" name="intent" value={intent} />
         <input
@@ -99,7 +116,7 @@ export function LeadCapture({
           )}
           aria-label="Email"
         />
-        {showSms ? (
+        {showSms && showSmsField ? (
           <input
             type="tel"
             name="phone"
@@ -117,13 +134,25 @@ export function LeadCapture({
           type="submit"
           className={cn(
             "btn pressable",
-            isDark ? "btn-outline-white" : "btn-navy",
+            isDark ? "btn-outline-white" : isQuiet ? "btn-outline" : "btn-candy",
             status === "loading" && "opacity-70 pointer-events-none"
           )}
         >
           {status === "loading" ? "Sending..." : ctaLabel}
         </button>
       </form>
+      {showSms && !showSmsField ? (
+        <button
+          type="button"
+          onClick={() => setShowSmsField(true)}
+          className={cn(
+            "mt-2 text-[10px] font-semibold uppercase tracking-[0.2em] underline underline-offset-4",
+            isDark ? "text-white/70 hover:text-white" : "text-[var(--muted)] hover:text-[var(--text)]"
+          )}
+        >
+          Add SMS alerts (optional)
+        </button>
+      ) : null}
 
       {status === "success" ? (
         <div className={cn("mt-2 text-xs", isDark ? "text-white/70" : "text-[var(--muted)]")}>
@@ -133,9 +162,8 @@ export function LeadCapture({
       {status === "error" && error ? (
         <div className="mt-2 text-xs text-[var(--red)]">{error}</div>
       ) : null}
-      {showSms ? (
-        <div className={cn("mt-2 text-[10px]", isDark ? "text-white/50" : "text-[var(--muted)]")}
-        >
+      {showSms && showSmsField ? (
+        <div className={cn("mt-2 text-[10px]", isDark ? "text-white/50" : "text-[var(--muted)]")}>
           SMS is optional. Standard message rates may apply.
         </div>
       ) : null}

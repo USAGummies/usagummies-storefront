@@ -79,16 +79,16 @@ export function InstagramGrid({
   const usingFallback = items.length === 0;
 
   return (
-    <section className="metal-panel rounded-[32px] border border-[rgba(199,54,44,0.3)] p-5 text-white sm:p-6">
+    <section className="candy-panel rounded-[32px] border border-[var(--border)] p-5 text-[var(--text)] sm:p-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-white/60">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
             Made in the USA
           </div>
-          <h2 className="mt-1 text-2xl font-black text-white">
+          <h2 className="mt-1 text-2xl font-black text-[var(--text)]">
             @{username}
           </h2>
-          <div className="mt-2 text-sm text-white/70">
+          <div className="mt-2 text-sm text-[var(--muted)]">
             No artificial dyes or synthetic colors. Classic gummy bear flavor — done right.
           </div>
         </div>
@@ -96,14 +96,14 @@ export function InstagramGrid({
           href={`https://www.instagram.com/${username}/`}
           target="_blank"
           rel="noopener noreferrer"
-          className="btn btn-outline-white"
+          className="btn btn-outline"
         >
           Follow →
         </Link>
       </div>
 
       {err ? (
-        <div className="mt-4 text-xs text-white/60">
+        <div className="mt-4 text-xs text-[var(--muted)]">
           Showing a preview while the live feed refreshes.
         </div>
       ) : null}
@@ -120,8 +120,8 @@ export function InstagramGrid({
                 target="_blank"
                 rel="noopener noreferrer"
                 className={cn(
-                  "group relative aspect-square overflow-hidden rounded-2xl border border-white/10 bg-white/5",
-                  "hover:border-white/30 hover:shadow-[0_18px_42px_rgba(5,10,20,0.45)]",
+                  "group relative aspect-square overflow-hidden rounded-2xl border border-[var(--border)] bg-white",
+                  "hover:border-[rgba(15,27,45,0.2)] hover:shadow-[0_18px_42px_rgba(15,27,45,0.12)]",
                   "transition"
                 )}
               >
@@ -132,9 +132,9 @@ export function InstagramGrid({
                   sizes="(max-width: 1024px) 50vw, 16vw"
                   className="object-cover opacity-95 group-hover:opacity-100 group-hover:scale-[1.02] transition"
                 />
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/50 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition" />
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/35 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition" />
                 {it.media_type === "VIDEO" ? (
-                  <div className="absolute right-2 top-2 rounded-full border border-white/15 bg-[rgba(13,28,51,0.85)] px-2 py-0.5 text-[10px] text-white/90">
+                  <div className="absolute right-2 top-2 rounded-full border border-[var(--border)] bg-white/90 px-2 py-0.5 text-[10px] text-[var(--text)]">
                     VIDEO
                   </div>
                 ) : null}
@@ -143,12 +143,12 @@ export function InstagramGrid({
           })}
         </div>
       ) : (
-        <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/70">
+        <div className="mt-6 rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-4 text-sm text-[var(--muted)]">
           Follow @usagummies for the latest drops, customer photos, and bundle moments.
         </div>
       )}
 
-      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 text-xs text-white/60">
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 text-xs text-[var(--muted)]">
         <div>
           {feed?.source === "live" ? "Live Instagram feed" : "Instagram preview"}
         </div>

@@ -53,15 +53,15 @@ const BENEFITS = [
 
 export default function JoinTheRevolutionPage() {
   return (
-    <main className="relative overflow-hidden bg-[var(--navy)] text-white min-h-screen home-metal">
+    <main className="relative overflow-hidden bg-[var(--bg)] text-[var(--text)] min-h-screen home-candy">
       <section className="relative overflow-hidden">
         <div
           className="absolute inset-0 pointer-events-none"
           aria-hidden="true"
           style={{
             backgroundImage:
-              "radial-gradient(circle at 12% 18%, rgba(199,54,44,0.2), transparent 45%), radial-gradient(circle at 85% 5%, rgba(255,255,255,0.08), transparent 35%)",
-            opacity: 0.6,
+              "radial-gradient(circle at 12% 18%, rgba(255,77,79,0.14), transparent 48%), radial-gradient(circle at 85% 5%, rgba(255,199,44,0.14), transparent 38%)",
+            opacity: 0.5,
           }}
         />
         <div className="relative mx-auto max-w-6xl px-4 py-10">
@@ -72,31 +72,31 @@ export default function JoinTheRevolutionPage() {
             ]}
           />
 
-          <div className="metal-panel rounded-[36px] border border-white/12 p-6 sm:p-8 shadow-[0_32px_90px_rgba(7,12,20,0.55)]">
+          <div className="candy-panel rounded-[36px] border border-[var(--border)] p-6 sm:p-8">
             <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
               <div className="space-y-4">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.32em] text-white/60">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.32em] text-[var(--muted)]">
                   Loyalty access
                 </div>
-                <h1 className="text-3xl font-black leading-[1.1] tracking-tight text-white sm:text-4xl lg:text-5xl">
+                <h1 className="text-3xl font-black leading-[1.1] tracking-tight text-[var(--text)] sm:text-4xl lg:text-5xl">
                   Join the Revolution
                 </h1>
-                <p className="text-sm text-white/80 sm:text-base max-w-prose">
+                <p className="text-sm text-[var(--muted)] sm:text-base max-w-prose">
                   Purchasing these gummies is a vote in the America you believe in. The American Dream
                   is something to always strive for and try to achieve. Join the Revolution by choosing
                   USA Gummies and unlock member benefits after your first order.
                 </p>
                 <div className="flex flex-wrap items-center gap-3">
-                  <Link href="/shop" className="btn btn-red">
+                  <Link href="/shop" className="btn btn-candy">
                     Shop bundles
                   </Link>
-                  <span className="text-xs text-white/70">{FREE_SHIPPING_PHRASE}</span>
+                  <span className="text-xs text-[var(--muted)]">{FREE_SHIPPING_PHRASE}</span>
                 </div>
               </div>
 
               <div className="relative">
-                <div className="relative rounded-3xl border border-white/20 bg-white/95 p-2 text-[var(--navy)] shadow-[0_26px_70px_rgba(7,12,20,0.35)]">
-                  <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-white/60 bg-white">
+                <div className="relative rounded-3xl border border-[var(--border)] bg-white p-2 text-[var(--text)] shadow-[0_20px_48px_rgba(15,27,45,0.12)]">
+                  <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-[var(--border)] bg-white">
                     <Image
                       src="/brand/hero.jpg"
                       alt="USA Gummies All American gummy bears"
@@ -123,25 +123,25 @@ export default function JoinTheRevolutionPage() {
 
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
               {STEPS.map((step) => (
-                <div key={step.title} className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-white/60">
+                <div key={step.title} className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-4">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
                     {step.title}
                   </div>
-                  <div className="mt-2 text-sm text-white/75">{step.body}</div>
+                  <div className="mt-2 text-sm text-[var(--muted)]">{step.body}</div>
                 </div>
               ))}
             </div>
           </div>
 
           <div className="mt-6 grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
-            <div className="metal-panel rounded-[32px] border border-white/12 p-5 sm:p-6">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-white/60">
+            <div className="candy-panel rounded-[32px] border border-[var(--border)] p-5 sm:p-6">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
                 Member benefits
               </div>
-              <h2 className="mt-2 text-2xl font-black text-white">
+              <h2 className="mt-2 text-2xl font-black text-[var(--text)]">
                 Benefits that make joining worth it.
               </h2>
-              <p className="mt-2 text-sm text-white/75">
+              <p className="mt-2 text-sm text-[var(--muted)]">
                 USA Gummies members get priority access and premium perks that reward loyal buyers of
                 our All American gummy bears.
               </p>
@@ -149,60 +149,60 @@ export default function JoinTheRevolutionPage() {
                 {BENEFITS.map((benefit) => (
                   <div
                     key={benefit.title}
-                    className="rounded-2xl border border-white/10 bg-white/5 p-4"
+                    className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-4"
                   >
-                    <div className="text-sm font-semibold text-white">{benefit.title}</div>
-                    <div className="mt-2 text-sm text-white/75">{benefit.body}</div>
+                    <div className="text-sm font-semibold text-[var(--text)]">{benefit.title}</div>
+                    <div className="mt-2 text-sm text-[var(--muted)]">{benefit.body}</div>
                   </div>
                 ))}
               </div>
             </div>
 
             <div className="space-y-4">
-              <div className="metal-panel rounded-[32px] border border-white/12 p-5 sm:p-6">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-white/60">
+              <div className="candy-panel rounded-[32px] border border-[var(--border)] p-5 sm:p-6">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
                   Member portal
                 </div>
-                <h2 className="mt-2 text-2xl font-black text-white">
+                <h2 className="mt-2 text-2xl font-black text-[var(--text)]">
                   Member access launches after purchase.
                 </h2>
-                <p className="mt-2 text-sm text-white/75">
+                <p className="mt-2 text-sm text-[var(--muted)]">
                   Place your first order and you are in. We will email your sign-in link as soon as the
                   Revolution portal is live.
                 </p>
-                <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <div className="text-xs font-semibold text-white">What members get</div>
-                  <ul className="mt-2 space-y-1 text-xs text-white/70">
+                <div className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-4">
+                  <div className="text-xs font-semibold text-[var(--text)]">What members get</div>
+                  <ul className="mt-2 space-y-1 text-xs text-[var(--muted)]">
                     <li>Order history tied to your checkout email</li>
                     <li>Subscription eligibility after your first order</li>
                     <li>Early drops and premium bundle alerts</li>
                   </ul>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-3">
-                  <Link href="/shop" className="btn btn-red">
+                  <Link href="/shop" className="btn btn-candy">
                     Build a bundle
                   </Link>
-                  <Link href="/faq" className="btn btn-outline-white">
+                  <Link href="/faq" className="btn btn-outline">
                     Read the FAQ
                   </Link>
                 </div>
               </div>
-              <div className="metal-panel rounded-[32px] border border-white/12 p-5 sm:p-6">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-white/60">
+              <div className="candy-panel rounded-[32px] border border-[var(--border)] p-5 sm:p-6">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
                   How you qualify
                 </div>
-                <h2 className="mt-2 text-2xl font-black text-white">
+                <h2 className="mt-2 text-2xl font-black text-[var(--text)]">
                   Membership unlocks after purchase.
                 </h2>
-                <p className="mt-2 text-sm text-white/75">
+                <p className="mt-2 text-sm text-[var(--muted)]">
                   Place your first order for USA Gummies and you are in. Subscriptions are reserved
                   for members who have already purchased.
                 </p>
                 <div className="mt-3 flex flex-wrap gap-3">
-                  <Link href="/shop" className="btn btn-red">
+                  <Link href="/shop" className="btn btn-candy">
                     Build a bundle
                   </Link>
-                  <Link href="/faq" className="btn btn-outline-white">
+                  <Link href="/faq" className="btn btn-outline">
                     Read the FAQ
                   </Link>
                 </div>
@@ -216,6 +216,7 @@ export default function JoinTheRevolutionPage() {
               ctaHref="/shop"
               ctaLabel="Shop bundles"
               showJoinButton={false}
+              tone="light"
             />
           </div>
         </div>

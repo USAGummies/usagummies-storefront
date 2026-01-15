@@ -40,7 +40,7 @@ export function PatriotBanner({ showRibbon = true }: { showRibbon?: boolean }) {
             </div>
           </div>
 
-          <div className="metal-panel rounded-2xl border border-white/12" style={{ padding: 14 }}>
+          <div className="candy-panel rounded-2xl" style={{ padding: 14 }}>
             <div className="kicker">Today’s move</div>
             <div style={{ fontWeight: 950, fontSize: 18, marginTop: 8 }}>
               Bundle & Save
@@ -51,10 +51,10 @@ export function PatriotBanner({ showRibbon = true }: { showRibbon?: boolean }) {
             </div>
 
             <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
-              <Link className="btn btn-red" href="/shop#bundle-pricing">
+              <Link className="btn btn-candy" href="/shop#bundle-pricing">
                 Build a Bundle 🇺🇸
               </Link>
-              <Link className="btn btn-navy" href="/shop">
+              <Link className="btn btn-outline" href="/shop">
                 Shop All
               </Link>
             </div>

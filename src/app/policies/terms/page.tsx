@@ -10,73 +10,73 @@ export const metadata: Metadata = {
 
 export default function TermsPage() {
   return (
-    <main className="min-h-screen text-white">
+    <main className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
       <div className="mx-auto max-w-4xl px-4 py-12">
         <div className="mb-6 flex items-center justify-between gap-3">
           <Link
             href="/policies"
-            className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-sm text-white/80 hover:bg-white/5 hover:text-white"
+            className="rounded-full border border-[var(--border)] bg-white px-3 py-1 text-sm text-[var(--text)] hover:bg-[var(--surface-strong)]"
           >
             ← Policies
           </Link>
           <Link
             href="/shop"
-            className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-sm text-white/80 hover:bg-white/5 hover:text-white"
+            className="rounded-full border border-[var(--border)] bg-white px-3 py-1 text-sm text-[var(--text)] hover:bg-[var(--surface-strong)]"
           >
             Shop →
           </Link>
         </div>
 
-        <section className="glass p-7">
+        <section className="candy-panel p-7">
           <h1 className="text-3xl font-semibold tracking-tight">Terms of Service</h1>
-          <p className="mt-3 text-white/75">
+          <p className="mt-3 text-[var(--muted)]">
             These terms of service apply to purchases made through USA Gummies. Checkout is processed
             securely through Shopify.
           </p>
 
-          <div className="mt-8 space-y-6 text-white/80">
-            <div className="glass-soft p-5">
-              <h2 className="text-lg font-semibold text-white">Orders</h2>
-              <p className="mt-2 text-sm text-white/75">
+          <div className="mt-8 space-y-6 text-[var(--muted)]">
+            <div className="card-solid p-5">
+              <h2 className="text-lg font-semibold text-[var(--text)]">Orders</h2>
+              <p className="mt-2 text-sm text-[var(--muted)]">
                 By placing an order, you agree that the information you provide is accurate and that
                 you are authorized to use the selected payment method.
               </p>
             </div>
 
-            <div className="glass-soft p-5">
-              <h2 className="text-lg font-semibold text-white">Pricing</h2>
-              <p className="mt-2 text-sm text-white/75">
+            <div className="card-solid p-5">
+              <h2 className="text-lg font-semibold text-[var(--text)]">Pricing</h2>
+              <p className="mt-2 text-sm text-[var(--muted)]">
                 Prices are shown in your cart at checkout. Bundle pricing and shipping eligibility
                 (including Free shipping on 5+ bags) are displayed clearly before you purchase.
               </p>
             </div>
 
-            <div className="glass-soft p-5">
-              <h2 className="text-lg font-semibold text-white">Checkout & payments</h2>
-              <p className="mt-2 text-sm text-white/75">
-                Checkout is powered by <strong className="text-white">Shopify</strong>.
+            <div className="card-solid p-5">
+              <h2 className="text-lg font-semibold text-[var(--text)]">Checkout & payments</h2>
+              <p className="mt-2 text-sm text-[var(--muted)]">
+                Checkout is powered by <strong className="text-[var(--text)]">Shopify</strong>.
                 Payment details are processed securely by Shopify and related providers.
               </p>
             </div>
 
-            <div className="glass-soft p-5">
-              <h2 className="text-lg font-semibold text-white">Site use</h2>
-              <p className="mt-2 text-sm text-white/75">
+            <div className="card-solid p-5">
+              <h2 className="text-lg font-semibold text-[var(--text)]">Site use</h2>
+              <p className="mt-2 text-sm text-[var(--muted)]">
                 You agree not to misuse the site, attempt unauthorized access, or disrupt site operations.
               </p>
             </div>
 
-            <div className="glass-soft p-5">
-              <h2 className="text-lg font-semibold text-white">Changes</h2>
-              <p className="mt-2 text-sm text-white/75">
+            <div className="card-solid p-5">
+              <h2 className="text-lg font-semibold text-[var(--text)]">Changes</h2>
+              <p className="mt-2 text-sm text-[var(--muted)]">
                 We may update these terms from time to time. The latest version will always be posted on this page.
               </p>
             </div>
           </div>
 
-          <div className="mt-10 border-t border-white/10 pt-8">
+          <div className="mt-10 border-t border-[var(--border)] pt-8">
             <h2 className="text-xl font-semibold">Contact us</h2>
-            <p className="mt-2 text-white/70">
+            <p className="mt-2 text-[var(--muted)]">
               Terms question? Send a message and we’ll respond within one business day.
             </p>
 

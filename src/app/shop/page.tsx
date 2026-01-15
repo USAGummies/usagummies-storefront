@@ -2,15 +2,13 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import BundleQuickBuy from "@/components/home/BundleQuickBuy.client";
 import { ProductGallery } from "@/components/product/ProductGallery.client";
 import PurchaseBox from "@/app/products/[handle]/PurchaseBox.client";
 import { AmericanDreamCallout } from "@/components/story/AmericanDreamCallout";
 import { StickyAddToCartBar } from "@/components/product/StickyAddToCartBar";
 import { getProductsPage } from "@/lib/shopify/products";
 import { getProductByHandle, money } from "@/lib/storefront";
-import { getBundleVariants } from "@/lib/bundles/getBundleVariants";
-import { BASE_PRICE, pricingForQty, FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
+import { pricingForQty, FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 
 const PAGE_SIZE = 1;
 function resolveSiteUrl() {
@@ -25,32 +23,16 @@ function resolveSiteUrl() {
 const SITE_URL = resolveSiteUrl();
 const LISTING_TITLE =
   "USA Gummies – All American Gummy Bears, 7.5 oz, Made in USA, No Artificial Dyes, All Natural Flavors";
-const LISTING_BULLETS = [
-  {
-    title: "MADE IN THE USA",
-    body:
-      "Proudly sourced, manufactured, and packed entirely in America. Supporting local jobs while delivering a better-quality gummy you can trust.",
-  },
-  {
-    title: "NO ARTIFICIAL DYES OR SYNTHETIC COLORS",
-    body:
-      "Colored naturally using real fruit and vegetable extracts. No fake brightness, no artificial dyes.",
-  },
-  {
-    title: "CLASSIC GUMMY BEAR FLAVOR — DONE RIGHT",
-    body:
-      "All the chewy, fruity flavor you expect from a gummy bear, just without artificial ingredients or harsh aftertaste.",
-  },
-  {
-    title: "PERFECT FOR EVERYDAY SNACKING",
-    body:
-      "Great for lunchboxes, desk drawers, road trips, care packages, and guilt-free sweet cravings.",
-  },
-  {
-    title: "7.5 OZ BAG WITH 5 FRUIT FLAVORS",
-    body:
-      "Cherry, Watermelon, Orange, Green Apple, and Lemon. Clearly labeled, honestly made, and easy to share.",
-  },
+const DETAIL_BULLETS = [
+  "Made in the USA and packed in FDA-compliant facilities.",
+  "Colored naturally with fruit + vegetable extracts. No artificial dyes.",
+  "Soft, chewy classic gummy bear flavor.",
+  "7.5 oz bag with five fruit flavors: Cherry, Watermelon, Orange, Green Apple, Lemon.",
+];
+const HERO_BULLETS = [
+  "Made in the USA. Produced and packed in FDA-compliant facilities.",
+  "No artificial dyes. Colored naturally with fruit + vegetable extracts.",
+  "5 fruit flavors: Cherry, Watermelon, Orange, Green Apple, Lemon.",
 ];
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -96,7 +78,6 @@ export default async function ShopPage() {
   }
 
   const primaryProduct = results.nodes?.[0] ?? null;
-  const primaryHandle = primaryProduct?.handle || "all-american-gummy-bears-7-5-oz-single-bag";
   let detailedProduct: any = null;
   try {
     if (primaryProduct?.handle) {
@@ -112,26 +93,7 @@ export default async function ShopPage() {
     primaryProduct?.priceRange?.minVariantPrice?.currencyCode ||
     "USD";
 
-  const featuredQuantities = [1, 2, 3, 4, 5, 8, 12];
-  const featuredDisplay = "1-3 / 4 / 5 / 8 / 12";
   const bestValuePerBagText = money(pricingForQty(8).perBag.toFixed(2), currency);
-  const maxBundleSavings = Math.max(
-    ...featuredQuantities.map((qty) => {
-      const pricing = pricingForQty(qty);
-      return Math.max(0, BASE_PRICE * qty - pricing.total);
-    })
-  );
-  const maxBundleSavingsText = money(maxBundleSavings.toFixed(2), currency);
-
-  let bundleVariants: Awaited<ReturnType<typeof getBundleVariants>> | null = null;
-  try {
-    bundleVariants = await getBundleVariants();
-  } catch {
-    bundleVariants = null;
-  }
-
-  const quickBuyTiers = bundleVariants?.variants || [];
-
   const productTitle = LISTING_TITLE;
   const productFeatured = detailedProduct?.featuredImage || primaryProduct?.featuredImage || null;
   const productImages = (detailedProduct?.images?.edges || []).map((e: any) => e.node);
@@ -149,103 +111,175 @@ export default async function ShopPage() {
   const stickyImage =
     productFeatured?.url || productImages?.[0]?.url || "/home-patriotic-product.jpg";
   const stickyAlt = productFeatured?.altText || "USA Gummies bag";
+  const lowBundlePrice = pricingForQty(1).total;
+  const highBundlePrice = pricingForQty(12).total;
+
+  const productJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: LISTING_TITLE,
+    description:
+      "All-American gummy bears made in the USA with all natural flavors and no artificial dyes.",
+    image: productFeatured?.url ? [productFeatured.url] : undefined,
+    brand: {
+      "@type": "Brand",
+      name: "USA Gummies",
+    },
+    offers: {
+      "@type": "AggregateOffer",
+      url: `${SITE_URL}/shop`,
+      priceCurrency: currency,
+      lowPrice: Number.isFinite(lowBundlePrice) ? lowBundlePrice.toFixed(2) : undefined,
+      highPrice: Number.isFinite(highBundlePrice) ? highBundlePrice.toFixed(2) : undefined,
+      offerCount: 4,
+      availability: "https://schema.org/InStock",
+      shippingDetails: {
+        "@type": "OfferShippingDetails",
+        shippingDestination: {
+          "@type": "DefinedRegion",
+          addressCountry: "US",
+        },
+        deliveryTime: {
+          "@type": "ShippingDeliveryTime",
+          handlingTime: {
+            "@type": "QuantitativeValue",
+            minValue: 0,
+            maxValue: 1,
+            unitCode: "d",
+          },
+        },
+      },
+    },
+  };
+
+  const faqJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: [
+      {
+        "@type": "Question",
+        name: "Where are USA Gummies made?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "USA Gummies are sourced, made, and packed in the USA.",
+        },
+      },
+      {
+        "@type": "Question",
+        name: "Do your gummy bears contain artificial dyes?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "No. USA Gummies are colored naturally with fruit and vegetable extracts.",
+        },
+      },
+      {
+        "@type": "Question",
+        name: "How fast do orders ship?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "Orders are packed and shipped within 24 hours, with tracking provided once your label is created.",
+        },
+      },
+      {
+        "@type": "Question",
+        name: "What allergens should I know about?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "Please review the ingredient panel on the bag for the most current allergen details. Contact us if you have sensitivities before ordering.",
+        },
+      },
+    ],
+  };
 
   return (
-    <main className="relative overflow-hidden bg-[var(--navy)] text-white min-h-screen home-metal pb-16">
-      <section
-        className="relative overflow-hidden bg-[var(--navy)] text-white hero-parallax"
-        style={{
-          backgroundImage:
-            "linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 45%, rgba(255,255,255,0) 100%), radial-gradient(circle at 12% 18%, rgba(199,54,44,0.22), rgba(255,255,255,0) 38%), radial-gradient(circle at 85% 0%, rgba(255,255,255,0.08), rgba(255,255,255,0) 30%)",
-        }}
-      >
-        <div
-          className="absolute inset-0 pointer-events-none"
-          aria-hidden="true"
-          style={{
-            backgroundImage:
-              "radial-gradient(circle at 20% 20%, rgba(255,255,255,0.08), transparent 45%), radial-gradient(circle at 80% 0%, rgba(255,255,255,0.06), transparent 40%)",
-            opacity: 0.4,
-          }}
-        />
-        <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[rgba(199,54,44,0.28)] blur-3xl" aria-hidden="true" />
-        <div className="absolute -left-20 bottom-0 h-72 w-72 rounded-full bg-white/10 blur-3xl" aria-hidden="true" />
+    <main className="relative overflow-hidden bg-[#fffdf8] text-[var(--text)] min-h-screen pb-16">
+      <section className="relative overflow-hidden bg-[#fffdf8]">
 
         <div className="relative mx-auto max-w-6xl px-4 py-10 lg:py-12">
           <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
             <div className="space-y-5">
-              <div className="flex flex-wrap items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.32em] text-white/70 sm:text-xs">
-                <span className="rounded-full border border-white/20 bg-white/5 px-3 py-1">Made in the USA</span>
-                <span className="text-[var(--gold)]">No artificial dyes</span>
+              <div className="flex flex-wrap items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.32em] text-[var(--muted)] sm:text-xs">
+                <span className="rounded-full border border-[rgba(15,27,45,0.12)] bg-white px-3 py-1 text-[var(--navy)]">Made in the USA</span>
+                <span className="text-[var(--candy-red)]">No artificial dyes</span>
               </div>
 
               <div className="space-y-2">
-                <h1 className="text-4xl font-black leading-[1.05] tracking-tight text-white sm:text-5xl">
-                  Shop USA Gummies
+                <h1 className="text-4xl font-black leading-[1.05] tracking-tight text-[var(--navy)] sm:text-5xl">
+                  All-American Gummy Bears
                 </h1>
-                <p className="text-sm text-white/80 sm:text-base max-w-prose">
-                  {LISTING_TITLE}.
+                <p className="text-sm text-[var(--muted)] sm:text-base max-w-prose">
+                  Made in the USA. Colored naturally. Classic flavor done right.
                 </p>
               </div>
 
-              <div className="grid gap-2 text-sm text-white/75">
-                <div className="flex items-start gap-2">
-                  <span className="mt-1.5 h-2 w-2 rounded-full bg-[var(--gold)]" />
-                  <span>
-                    {LISTING_BULLETS[0].title} – {LISTING_BULLETS[0].body}
-                  </span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="mt-1.5 h-2 w-2 rounded-full bg-[rgba(199,54,44,0.8)]" />
-                  <span>
-                    {LISTING_BULLETS[1].title} – {LISTING_BULLETS[1].body}
-                  </span>
-                </div>
-                <div className="flex items-start gap-2 text-white/70">
-                  <span className="mt-1.5 h-2 w-2 rounded-full bg-white/50" />
-                  <span>
-                    {LISTING_BULLETS[2].title} – {LISTING_BULLETS[2].body}
-                  </span>
-                </div>
+              <div className="grid gap-2 text-sm text-[var(--muted)]">
+                {HERO_BULLETS.map((line, idx) => (
+                  <div key={line} className="flex items-start gap-2">
+                    <span
+                      className={[
+                        "mt-1.5 h-2 w-2 rounded-full",
+                        idx === 0
+                          ? "bg-[var(--candy-red)]"
+                          : idx === 1
+                            ? "bg-[var(--candy-orange)]"
+                            : "bg-[var(--candy-green)]",
+                      ].join(" ")}
+                    />
+                    <span>{line}</span>
+                  </div>
+                ))}
               </div>
 
-              <div className="text-xs text-white/65">{LISTING_BULLETS[4].body}</div>
+              <div className="text-xs text-[var(--muted)]">
+                Most customers save more when they build a bundle.
+              </div>
 
               <div className="flex flex-wrap items-center gap-3">
-                <a href="#bundle-pricing" className="btn btn-red">
-                  Build your bundle &amp; save up to {maxBundleSavingsText}
+                <a href="#bundle-pricing" className="btn btn-candy">
+                  Build my bundle
                 </a>
-                <span className="text-xs text-white/70">
-                  Love it or your money back • Ships within 24 hours • Secure checkout
+                <span className="text-xs text-[var(--muted)]">
+                  Love it or your money back - Ships within 24 hours - Limited daily production
                 </span>
               </div>
 
-              <div className="metal-panel rounded-3xl border border-white/12 p-4">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--muted)]">
+                <Link href="/ingredients" className="underline underline-offset-4 text-[var(--text)]">
+                  Ingredients
+                </Link>
+                <span className="text-[var(--muted)]">|</span>
+                <Link href="/policies/shipping" className="underline underline-offset-4 text-[var(--text)]">
+                  Shipping
+                </Link>
+                <span className="text-[var(--muted)]">|</span>
+                <Link href="/faq" className="underline underline-offset-4 text-[var(--text)]">
+                  FAQ
+                </Link>
+              </div>
+
+              <div className="candy-panel rounded-3xl p-4">
                 <div className="grid gap-3 sm:grid-cols-3">
                   <div className="space-y-1">
-                    <div className="text-[10px] uppercase tracking-[0.24em] text-white/60">Most popular</div>
-                    <div className="text-base font-black text-white">8 bags</div>
-                    <div className="text-[11px] text-white/70">~ {bestValuePerBagText} / bag</div>
-                    <div className="text-[11px] text-[var(--gold)]/90">
-                      Best balance of value + convenience
-                    </div>
+                    <div className="text-[10px] uppercase tracking-[0.24em] text-[var(--muted)]">Bundle savings</div>
+                    <div className="text-base font-black text-[var(--text)]">4+ bags</div>
+                    <div className="text-[11px] text-[var(--muted)]">Lower price per bag as you add more.</div>
                   </div>
-                  <div className="space-y-1 sm:border-l sm:border-white/10 sm:pl-4">
-                    <div className="text-[10px] uppercase tracking-[0.24em] text-white/60">Free shipping</div>
-                    <div className="text-base font-black text-white">5+ bags</div>
-                    <div className="text-[11px] text-white/70">{FREE_SHIPPING_PHRASE}</div>
+                  <div className="space-y-1 sm:border-l sm:border-[rgba(15,27,45,0.12)] sm:pl-4">
+                    <div className="text-[10px] uppercase tracking-[0.24em] text-[var(--muted)]">Free shipping</div>
+                    <div className="text-base font-black text-[var(--text)]">5+ bags</div>
+                    <div className="text-[11px] text-[var(--muted)]">{FREE_SHIPPING_PHRASE}</div>
                   </div>
-                  <div className="space-y-1 sm:border-l sm:border-white/10 sm:pl-4">
-                    <div className="text-[10px] uppercase tracking-[0.24em] text-white/60">No artificial dyes</div>
-                    <div className="text-base font-black text-white">All natural flavors</div>
-                    <div className="text-[11px] text-white/70">Colored with fruit + vegetable extracts</div>
+                  <div className="space-y-1 sm:border-l sm:border-[rgba(15,27,45,0.12)] sm:pl-4">
+                    <div className="text-[10px] uppercase tracking-[0.24em] text-[var(--muted)]">Five fruit flavors</div>
+                    <div className="text-base font-black text-[var(--text)]">Classic gummy mix</div>
+                    <div className="text-[11px] text-[var(--muted)]">Cherry, lemon, orange, green apple, watermelon.</div>
                   </div>
                 </div>
               </div>
             </div>
 
             <div className="relative space-y-4">
-              <div className="relative overflow-hidden rounded-3xl border border-white/20 bg-white/95 p-2 text-[var(--navy)] shadow-[0_22px_60px_rgba(7,12,20,0.35)]">
+              <div className="candy-panel relative overflow-hidden rounded-3xl p-2 text-[var(--text)]">
                 <div className="relative aspect-[3/2] overflow-hidden rounded-2xl border border-white/60 bg-white">
                   <Image
                     src="/america-250.jpg"
@@ -260,11 +294,11 @@ export default async function ShopPage() {
                     </div>
                   </div>
                 </div>
-                <div className="mt-2 space-y-1">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
+                <div className="mt-3 space-y-1">
+                  <div className="text-[8px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
                     All American
                   </div>
-                  <div className="text-lg font-black text-[var(--navy)]">
+                  <div className="text-sm font-semibold text-[var(--text)]">
                     Proudly made in the USA.
                   </div>
                   <div className="text-xs text-[var(--muted)]">
@@ -273,109 +307,78 @@ export default async function ShopPage() {
                 </div>
               </div>
 
-              <div className="metal-panel rounded-[36px] border border-[rgba(199,54,44,0.45)] p-3 ring-1 ring-white/20 shadow-[0_32px_90px_rgba(7,12,20,0.6)]">
-                <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-[0.3em] text-white/60">
-                  <span>Build your bundle</span>
-                  <span className="text-[var(--gold)]">{featuredDisplay} bags</span>
-                </div>
-                <div className="mt-1 text-xs text-white/70">
-                  Tap a bundle size to lock your price.
-                </div>
-                <div className="mt-3 space-y-3">
-                  <div
-                    id="bundle-pricing"
-                    data-purchase-section="true"
-                    className="bundle-home metal-panel rounded-[28px] border border-[rgba(199,160,98,0.4)] p-2 shadow-[0_22px_60px_rgba(7,12,20,0.6)]"
-                  >
-                    <BundleQuickBuy
-                      anchorId="bundle-pricing"
-                      productHandle={primaryHandle}
-                      tiers={quickBuyTiers}
-                      singleBagVariantId={bundleVariants?.singleBagVariantId}
-                      availableForSale={bundleVariants?.availableForSale}
-                      featuredQuantities={featuredQuantities}
-                      variant="compact"
-                    />
-                  </div>
-                </div>
+              <div className="relative aspect-[3/2] overflow-hidden">
+                <Image
+                  src="/website%20assets/IwaJima.png"
+                  alt="Iwo Jima memorial illustration"
+                  fill
+                  sizes="(max-width: 640px) 92vw, (max-width: 1024px) 44vw, 520px"
+                  className="object-contain"
+                />
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      <section id="product-details" aria-label="Product details" className="bg-[var(--navy)] scroll-mt-24">
+      <section id="bundle-pricing" aria-label="Bundle pricing" className="bg-[#fffdf8] scroll-mt-24">
+        <div className="mx-auto max-w-6xl px-4 pb-8 lg:pb-10">
+          <div className="rounded-3xl border border-[rgba(15,27,45,0.12)] bg-white p-3 shadow-[0_18px_44px_rgba(15,27,45,0.12)]">
+            {purchaseProduct ? (
+              <PurchaseBox product={purchaseProduct as any} />
+            ) : (
+              <div className="p-4 text-sm text-[var(--muted)]">
+                Product details are loading. Please refresh to view bundle pricing.
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section id="product-details" aria-label="Product details" className="bg-[#fffdf8] scroll-mt-24">
         <div className="mx-auto max-w-6xl px-4 py-8 lg:py-10">
-          <div className="metal-panel rounded-[36px] border border-[rgba(199,54,44,0.25)] p-5 sm:p-6">
-            <div className="space-y-4">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-white/60">
-                Product details
-              </div>
-              <h2 className="text-2xl font-black text-white sm:text-3xl">
-                {productTitle}
-              </h2>
-              <div className="grid gap-2 text-sm text-white/75">
-                {LISTING_BULLETS.map((bullet, idx) => (
-                  <div
-                    key={bullet.title}
-                    className={["flex items-start gap-2", idx > 2 ? "text-white/65" : ""].join(" ")}
-                  >
-                    <span className="mt-1.5 h-2 w-2 rounded-full bg-[var(--gold)]" />
-                    <span>
-                      {bullet.title} – {bullet.body}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              <div className="text-xs text-white/70">
-                Ingredients &amp; allergen info: see the ingredient panel on the bag or{" "}
-                <Link href="/ingredients" className="underline underline-offset-4 hover:text-white">
-                  ingredients
-                </Link>
-                .
-              </div>
-              <div className="flex flex-wrap items-center gap-3">
-                <a href="#product-bundles" className="btn btn-red">
-                  Build my bundle
-                </a>
-              </div>
-              <div className="text-xs text-white/70">
-                Love it or your money back • Ships within 24 hours • Secure checkout
+          <div className="candy-panel rounded-[36px] p-5 sm:p-6">
+            <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
+              <div className="space-y-4">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+                  Product details
+                </div>
+                <h2 className="text-2xl font-black text-[var(--text)] sm:text-3xl">
+                  {productTitle}
+                </h2>
+                <div className="grid gap-2 text-sm text-[var(--muted)]">
+                  {DETAIL_BULLETS.map((bullet) => (
+                    <div key={bullet} className="flex items-start gap-2">
+                      <span className="mt-1.5 h-2 w-2 rounded-full bg-[var(--gold)]" />
+                      <span>{bullet}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-sm text-[var(--muted)]">
+                  Every bag supports American manufacturing and American jobs.
+                </div>
+                <div className="text-sm text-[var(--muted)]">
+                  Unlike imported gummies, USA Gummies are made and packed entirely in America.
+                </div>
+                <div className="text-xs text-[var(--muted)]">
+                  Ingredients &amp; allergen info: see the ingredient panel on the bag or{" "}
+                  <Link href="/ingredients" className="underline underline-offset-4 text-[var(--text)]">
+                    ingredients
+                  </Link>
+                  .
+                </div>
               </div>
 
-              <AmericanDreamCallout variant="compact" className="mt-4" />
-            </div>
-
-            <div className="mt-6 grid gap-6 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
               <div className="space-y-4">
                 <ProductGallery
                   title={productTitle}
                   featured={productFeatured}
                   images={productImages}
                 />
-                <div className="rounded-3xl border border-white/15 bg-white/5 p-4 text-white/75">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-white/60">
-                    Bundle pricing
-                  </div>
-                  <div className="mt-2 text-sm">
-                    Bundle pricing lowers the per-bag cost as you add bags. {FREE_SHIPPING_PHRASE}.
-                  </div>
-                </div>
-              </div>
-
-              <div
-                id="product-bundles"
-                className="scroll-mt-24 rounded-3xl border border-[rgba(199,160,98,0.35)] metal-panel p-3 shadow-[0_26px_70px_rgba(7,12,20,0.45)]"
-              >
-                {purchaseProduct ? (
-                  <PurchaseBox product={purchaseProduct as any} />
-                ) : (
-                  <div className="p-4 text-sm text-[var(--muted)]">
-                    Product details are loading. Please refresh to view bundle pricing.
-                  </div>
-                )}
               </div>
             </div>
+
+            <AmericanDreamCallout variant="compact" tone="light" className="mt-6" showJoinButton={false} />
           </div>
         </div>
       </section>
@@ -386,6 +389,15 @@ export default async function ShopPage() {
         imageUrl={stickyImage}
         imageAlt={stickyAlt}
         purchaseSelector="#bundle-pricing"
+      />
+
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
       />
     </main>
   );

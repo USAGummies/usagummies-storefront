@@ -122,7 +122,7 @@ export function ShopToolbar() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         {/* Search */}
         <div className="w-full sm:max-w-md">
-          <label className="block text-sm font-semibold text-white/80">
+          <label className="block text-sm font-semibold text-[var(--text)]">
             Search
           </label>
 
@@ -135,7 +135,7 @@ export function ShopToolbar() {
                 if (e.key === "Escape") setInput("");
               }}
               placeholder="Search gummies…"
-              className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-base text-white placeholder:text-white/50 outline-none focus:border-[rgba(199,160,98,0.6)] focus:ring-2 focus:ring-[rgba(199,160,98,0.25)]"
+              className="w-full rounded-xl border border-[var(--border)] bg-white px-4 py-2 text-base text-[var(--text)] placeholder:text-[var(--muted)] outline-none focus:border-[rgba(239,59,59,0.4)] focus:ring-2 focus:ring-[rgba(239,59,59,0.18)]"
               inputMode="search"
               aria-label="Search products"
             />
@@ -144,7 +144,7 @@ export function ShopToolbar() {
               <button
                 type="button"
                 onClick={() => setInput("")}
-                className="shrink-0 rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white/80 hover:bg-white/15"
+                className="shrink-0 rounded-xl border border-[var(--border)] bg-[var(--surface-strong)] px-3 py-2 text-sm font-semibold text-[var(--text)] hover:bg-white"
                 aria-label="Clear search input"
               >
                 Clear
@@ -152,20 +152,20 @@ export function ShopToolbar() {
             ) : null}
           </div>
 
-          <p className="mt-1 text-xs text-white/60">
+          <p className="mt-1 text-xs text-[var(--muted)]">
             Tip: try "bundle" or "USA Gummies". Press Enter to submit instantly.
           </p>
         </div>
 
         {/* Sort */}
         <div className="w-full sm:w-64">
-          <label className="block text-sm font-semibold text-white/80">
+          <label className="block text-sm font-semibold text-[var(--text)]">
             Sort
           </label>
           <select
             value={sort}
             onChange={(e) => setParam("sort", e.target.value)}
-            className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-base text-white outline-none focus:border-[rgba(199,160,98,0.6)] focus:ring-2 focus:ring-[rgba(199,160,98,0.25)]"
+            className="mt-1 w-full rounded-xl border border-[var(--border)] bg-white px-4 py-2 text-base text-[var(--text)] outline-none focus:border-[rgba(239,59,59,0.4)] focus:ring-2 focus:ring-[rgba(239,59,59,0.18)]"
             aria-label="Sort products"
           >
             {SORT_OPTIONS.map((o) => (
@@ -175,29 +175,29 @@ export function ShopToolbar() {
             ))}
           </select>
 
-          {isPending && <p className="mt-1 text-xs text-white/60">Updating…</p>}
+          {isPending && <p className="mt-1 text-xs text-[var(--muted)]">Updating…</p>}
         </div>
       </div>
 
       {/* Active filter chips */}
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm text-white/60">Active:</span>
+        <span className="text-sm text-[var(--muted)]">Active:</span>
 
         {hasQuery ? (
           <button
             type="button"
             onClick={() => setParam("q", null)}
-            className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-sm text-white hover:bg-white/15"
+            className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface-strong)] px-3 py-1 text-sm text-[var(--text)] hover:bg-white"
             aria-label="Remove search filter"
             title="Remove search filter"
           >
-            <span className="text-white/60">Search:</span>
+            <span className="text-[var(--muted)]">Search:</span>
             <span className="font-semibold">“{q}”</span>
-            <span className="text-white/60">✕</span>
+            <span className="text-[var(--muted)]">✕</span>
           </button>
         ) : (
-          <span className="inline-flex items-center rounded-full border border-white/15 bg-white/5 px-3 py-1 text-sm text-white/60">
-            Search: <span className="ml-1 text-white/50">none</span>
+          <span className="inline-flex items-center rounded-full border border-[var(--border)] bg-[var(--surface-strong)] px-3 py-1 text-sm text-[var(--muted)]">
+            Search: <span className="ml-1 text-[var(--muted)]">none</span>
           </span>
         )}
 
@@ -205,17 +205,17 @@ export function ShopToolbar() {
           <button
             type="button"
             onClick={() => setParam("sort", null)}
-            className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-sm text-white hover:bg-white/15"
+            className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface-strong)] px-3 py-1 text-sm text-[var(--text)] hover:bg-white"
             aria-label="Reset sort"
             title="Reset sort"
           >
-            <span className="text-white/60">Sort:</span>
+            <span className="text-[var(--muted)]">Sort:</span>
             <span className="font-semibold">{sortLabel(sort)}</span>
-            <span className="text-white/60">✕</span>
+            <span className="text-[var(--muted)]">✕</span>
           </button>
         ) : (
-          <span className="inline-flex items-center rounded-full border border-white/15 bg-white/5 px-3 py-1 text-sm text-white/60">
-            Sort: <span className="ml-1 text-white/50">default</span>
+          <span className="inline-flex items-center rounded-full border border-[var(--border)] bg-[var(--surface-strong)] px-3 py-1 text-sm text-[var(--muted)]">
+            Sort: <span className="ml-1 text-[var(--muted)]">default</span>
           </span>
         )}
 
@@ -223,7 +223,7 @@ export function ShopToolbar() {
           <button
             type="button"
             onClick={clearAll}
-            className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-sm font-semibold text-white hover:bg-white/15"
+            className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface-strong)] px-3 py-1 text-sm font-semibold text-[var(--text)] hover:bg-white"
           >
             Clear all
           </button>

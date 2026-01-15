@@ -88,7 +88,7 @@ export default function AddBagButton({
       type="button"
       onClick={addOne}
       disabled={Boolean(disabled) || pending}
-      className="btn btn-outline-white pressable focus-ring"
+      className="btn btn-outline pressable focus-ring"
       style={{ opacity: pending ? 0.6 : 1, minWidth: 120 }}
     >
       {pending ? pendingLabel : label || "Add 1 bag"}

@@ -33,14 +33,14 @@ export default function ContactForm({
           name="name"
           required
           placeholder="Your name"
-          className="w-full rounded-xl border border-white/15 bg-black/20 px-4 py-3 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-[#DBAA79]/50"
+          className="w-full rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[rgba(239,59,59,0.18)]"
         />
         <input
           name="email"
           type="email"
           required
           placeholder="Your email"
-          className="w-full rounded-xl border border-white/15 bg-black/20 px-4 py-3 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-[#DBAA79]/50"
+          className="w-full rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[rgba(239,59,59,0.18)]"
         />
       </div>
 
@@ -49,13 +49,13 @@ export default function ContactForm({
         required
         rows={compact ? 4 : 5}
         placeholder="How can we help?"
-        className="w-full rounded-xl border border-white/15 bg-black/20 px-4 py-3 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-[#DBAA79]/50"
+        className="w-full rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[rgba(239,59,59,0.18)]"
       />
 
       <button
         type="submit"
         disabled={status === "sending" || status === "sent"}
-        className="inline-flex w-full items-center justify-center rounded-2xl bg-white px-6 py-3 text-sm font-semibold text-black transition hover:bg-white/90 disabled:opacity-70"
+        className="btn btn-candy inline-flex w-full items-center justify-center rounded-2xl px-6 py-3 text-sm font-semibold disabled:opacity-70"
       >
         {status === "sending"
           ? "Sending…"
@@ -70,9 +70,9 @@ export default function ContactForm({
         </p>
       ) : null}
 
-      <p className="text-xs text-white/50">
+      <p className="text-xs text-[var(--muted)]">
         We’ll reply to the email you provide. By submitting, you agree to our{" "}
-        <Link href="/policies/privacy" className="underline underline-offset-4 hover:text-white">
+        <Link href="/policies/privacy" className="underline underline-offset-4 hover:text-[var(--text)]">
           Privacy Policy
         </Link>
         .

@@ -33,14 +33,14 @@ export default function ShopError({
         <div className="mt-6 flex gap-3">
           <button
             onClick={() => reset()}
-            className="rounded-xl bg-neutral-900 px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+            className="btn btn-candy rounded-xl px-4 py-2 text-sm font-semibold"
           >
             Retry
           </button>
 
           <Link
             href="/"
-            className="rounded-xl border border-neutral-200 bg-white px-4 py-2 text-sm font-semibold text-neutral-900 hover:bg-neutral-50"
+            className="btn btn-outline rounded-xl px-4 py-2 text-sm font-semibold"
           >
             Go home
           </Link>

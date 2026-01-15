@@ -63,15 +63,15 @@ const faqJsonLd = {
 
 export default function FaqPage() {
   return (
-    <main className="relative overflow-hidden bg-[var(--navy)] text-white min-h-screen home-metal">
+    <main className="relative overflow-hidden bg-[var(--bg)] text-[var(--text)] min-h-screen home-candy">
       <section className="relative overflow-hidden">
         <div
           className="absolute inset-0 pointer-events-none"
           aria-hidden="true"
           style={{
             backgroundImage:
-              "radial-gradient(circle at 12% 18%, rgba(199,54,44,0.2), transparent 45%), radial-gradient(circle at 85% 5%, rgba(255,255,255,0.08), transparent 35%)",
-            opacity: 0.6,
+              "radial-gradient(circle at 12% 18%, rgba(255,77,79,0.14), transparent 48%), radial-gradient(circle at 85% 5%, rgba(255,199,44,0.14), transparent 38%)",
+            opacity: 0.5,
           }}
         />
         <div className="relative mx-auto max-w-6xl px-4 py-10">
@@ -82,23 +82,23 @@ export default function FaqPage() {
             ]}
           />
 
-          <div className="metal-panel rounded-[36px] border border-white/12 p-6 sm:p-8 shadow-[0_32px_90px_rgba(7,12,20,0.55)]">
+          <div className="candy-panel rounded-[36px] border border-[var(--border)] p-6 sm:p-8">
             <div className="space-y-4">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.32em] text-white/60">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.32em] text-[var(--muted)]">
                 FAQ
               </div>
-              <h1 className="text-3xl font-black leading-[1.1] tracking-tight text-white sm:text-4xl lg:text-5xl">
+              <h1 className="text-3xl font-black leading-[1.1] tracking-tight text-[var(--text)] sm:text-4xl lg:text-5xl">
                 USA Gummies FAQ
               </h1>
-              <p className="text-sm text-white/80 sm:text-base max-w-prose">
+              <p className="text-sm text-[var(--muted)] sm:text-base max-w-prose">
                 Quick answers about our All American gummy bears, ingredients, flavor notes, bundles,
                 and where to buy.
               </p>
               <div className="flex flex-wrap items-center gap-3">
-                <Link href="/shop" className="btn btn-red">
+                <Link href="/shop" className="btn btn-candy">
                   Shop bundles
                 </Link>
-                <span className="text-xs text-white/70">{FREE_SHIPPING_PHRASE}</span>
+                <span className="text-xs text-[var(--muted)]">{FREE_SHIPPING_PHRASE}</span>
               </div>
             </div>
 
@@ -106,33 +106,33 @@ export default function FaqPage() {
               {FAQS.map((item) => (
                 <div
                   key={item.question}
-                  className="rounded-2xl border border-white/10 bg-white/5 p-4"
+                  className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-4"
                 >
-                  <div className="text-sm font-semibold text-white">{item.question}</div>
-                  <div className="mt-2 text-sm text-white/75">{item.answer}</div>
+                  <div className="text-sm font-semibold text-[var(--text)]">{item.question}</div>
+                  <div className="mt-2 text-sm text-[var(--muted)]">{item.answer}</div>
                 </div>
               ))}
             </div>
           </div>
 
           <div className="mt-6">
-            <AmericanDreamCallout variant="compact" ctaHref="/shop" ctaLabel="Shop bundles" />
+            <AmericanDreamCallout variant="compact" ctaHref="/shop" ctaLabel="Shop bundles" tone="light" />
           </div>
 
-          <div className="mt-6 metal-panel rounded-[32px] border border-white/12 p-5 sm:p-6">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-white/60">
+          <div className="mt-6 candy-panel rounded-[32px] border border-[var(--border)] p-5 sm:p-6">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
               Still have questions?
             </div>
-            <h2 className="mt-2 text-2xl font-black text-white">We are here to help.</h2>
-            <p className="mt-2 text-sm text-white/75">
+            <h2 className="mt-2 text-2xl font-black text-[var(--text)]">We are here to help.</h2>
+            <p className="mt-2 text-sm text-[var(--muted)]">
               Need ingredient details or order help? Send a note and we will respond within one
               business day.
             </p>
             <div className="mt-3 flex flex-wrap gap-3">
-              <Link href="/contact" className="btn btn-outline-white">
+              <Link href="/contact" className="btn btn-outline">
                 Contact support
               </Link>
-              <Link href="/about" className="btn btn-red">
+              <Link href="/about" className="btn btn-candy">
                 Learn our story
               </Link>
             </div>

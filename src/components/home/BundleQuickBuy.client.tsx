@@ -12,6 +12,7 @@
  */
 import * as React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import type { BundleTier } from "@/lib/bundles/getBundleVariants";
 import { BASE_PRICE, FREE_SHIPPING_PHRASE, MIN_PER_BAG } from "@/lib/bundles/pricing";
@@ -30,6 +31,13 @@ type Props = {
   availableForSale?: boolean;
   variant?: "default" | "compact";
   featuredQuantities?: number[];
+  tone?: "dark" | "light";
+  showHowItWorks?: boolean;
+  summaryCopy?: string;
+  showTrainAccent?: boolean;
+  showOtherQuantitiesLink?: boolean;
+  otherQuantitiesLabel?: string;
+  otherQuantities?: number[];
 };
 
 function money(amount?: number | null, currency = "USD") {
@@ -75,6 +83,13 @@ export default function BundleQuickBuy({
   availableForSale = true,
   featuredQuantities,
   variant = "default",
+  tone = "dark",
+  showHowItWorks = true,
+  summaryCopy,
+  showTrainAccent = false,
+  showOtherQuantitiesLink = false,
+  otherQuantitiesLabel = "Need fewer bags?",
+  otherQuantities,
 }: Props) {
   const router = useRouter();
   const ctaRef = React.useRef<HTMLDivElement | null>(null);
@@ -82,39 +97,71 @@ export default function BundleQuickBuy({
   const [adding, setAdding] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState(false);
+  const [showOtherQuantities, setShowOtherQuantities] = React.useState(false);
   const isCompact = variant === "compact";
+  const isLight = tone === "light";
 
-  const featured = React.useMemo(() => {
+  const allTiers = React.useMemo(() => {
+    const allowed = (tiers || []).filter((t) => {
+      if (!t) return false;
+      return Number.isFinite(t.quantity);
+    });
+    allowed.sort((a, b) => a.quantity - b.quantity);
+    return allowed;
+  }, [tiers]);
+
+  const primaryTiers = React.useMemo(() => {
     const defaultKeys = isCompact ? FEATURED_QTYS_COMPACT : FEATURED_QTYS;
     const allowedKeys = (featuredQuantities?.length
       ? featuredQuantities.map((q) => String(q))
       : defaultKeys) as TierKey[];
     const allowedSet = new Set(allowedKeys);
 
-    const allowed = (tiers || []).filter((t) => {
-      if (!t) return false;
+    return allTiers.filter((t) => {
       const key = String(t.quantity) as TierKey;
       return allowedSet.has(key);
     });
-    allowed.sort((a, b) => a.quantity - b.quantity);
-    return allowed;
-  }, [tiers, isCompact, featuredQuantities]);
+  }, [allTiers, isCompact, featuredQuantities]);
+
+  const expandedTiers = React.useMemo(() => {
+    if (!showOtherQuantitiesLink || !showOtherQuantities) {
+      return primaryTiers;
+    }
+    if (!otherQuantities?.length) {
+      return allTiers;
+    }
+    const otherSet = new Set(otherQuantities.map((q) => String(q)));
+    const combined = [...primaryTiers];
+    allTiers.forEach((tier) => {
+      const key = String(tier.quantity);
+      if (otherSet.has(key) && !combined.some((t) => t.quantity === tier.quantity)) {
+        combined.push(tier);
+      }
+    });
+    combined.sort((a, b) => a.quantity - b.quantity);
+    return combined;
+  }, [allTiers, primaryTiers, showOtherQuantities, showOtherQuantitiesLink, otherQuantities]);
 
   React.useEffect(() => {
+    const pool = expandedTiers;
+    if (!pool.length) return;
+    const selectedInPool = pool.some((t) => String(t.quantity) === selected);
     const preferred =
-      featured.find((t) => t.quantity === 8) ||
-      featured.find((t) => t.quantity === 5) ||
-      featured[0];
-    if (preferred) {
+      pool.find((t) => t.quantity === 8) ||
+      pool.find((t) => t.quantity === 5) ||
+      pool[0];
+    if (!selectedInPool && preferred) {
       setSelected(String(preferred.quantity) as TierKey);
     }
-  }, [featured]);
+  }, [expandedTiers, selected]);
 
   const selectedTier =
-    featured.find((t) => String(t.quantity) === selected) || featured[0] || null;
+    expandedTiers.find((t) => String(t.quantity) === selected) || expandedTiers[0] || null;
   const perBagCapText = money(MIN_PER_BAG, "USD");
   const showAmazonLink = !!selectedTier && selectedTier.quantity <= 3;
   const reviewSnippets = REVIEW_HIGHLIGHTS.slice(0, 2);
+  const summaryLine =
+    summaryCopy === undefined ? `${FREE_SHIPPING_PHRASE}. Most customers choose 8 bags.` : summaryCopy;
 
   function starLine(rating: number) {
     const full = Math.max(0, Math.min(5, Math.round(rating)));
@@ -149,6 +196,41 @@ export default function BundleQuickBuy({
 
   const hasPrice = Number.isFinite(selectedTier?.totalPrice ?? NaN);
   const ctaDisabled = !singleBagVariantId || !hasPrice || availableForSale === false;
+
+  const selectableTiers = React.useMemo(
+    () =>
+      expandedTiers.filter((tier) => {
+        if (availableForSale === false) return false;
+        return Number.isFinite(tier.totalPrice ?? NaN) && tier.totalPrice !== null;
+      }),
+    [expandedTiers, availableForSale]
+  );
+
+  function handleRadioKeyDown(
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    quantity: number
+  ) {
+    const keys = ["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp", "Home", "End"];
+    if (!keys.includes(event.key)) return;
+    event.preventDefault();
+    if (!selectableTiers.length) return;
+    const currentIndex = selectableTiers.findIndex((tier) => tier.quantity === quantity);
+    if (currentIndex === -1) return;
+    let nextIndex = currentIndex;
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+      nextIndex = Math.min(currentIndex + 1, selectableTiers.length - 1);
+    } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+      nextIndex = Math.max(currentIndex - 1, 0);
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = selectableTiers.length - 1;
+    }
+    const nextTier = selectableTiers[nextIndex];
+    if (nextTier) {
+      handleSelect(nextTier.quantity, true);
+    }
+  }
 
   React.useEffect(() => {
     if (!success) return;
@@ -252,53 +334,84 @@ export default function BundleQuickBuy({
                 : isOne
                   ? "Trial size"
                   : "";
+      const hasLabel = Boolean(label);
       return (
         <button
           key={tier.quantity}
           type="button"
-          aria-pressed={isActive}
+          role="radio"
+          aria-checked={isActive}
+          aria-pressed={undefined}
+          tabIndex={isActive ? 0 : -1}
           disabled={!canSelect}
           onClick={() => handleSelect(tier.quantity, canSelect)}
+          onKeyDown={(event) => handleRadioKeyDown(event, tier.quantity)}
           className={[
-            "relative min-w-[170px] sm:min-w-[190px] snap-start rounded-2xl border px-3 py-2 text-left transition overflow-hidden",
-            "bg-[linear-gradient(180deg,rgba(10,16,30,0.96),rgba(8,12,24,0.92))] text-white",
+            "relative w-full snap-start border-2 px-4 py-4 text-left transition-[border-color,background-color,box-shadow,transform] duration-150 ease-out",
+            "rounded-[12px] min-h-[190px] sm:min-h-[200px] w-full sm:max-w-[280px] sm:justify-self-center",
+            isLight
+              ? "bg-white text-[var(--text)] border-[rgba(15,27,45,0.14)] shadow-[0_10px_22px_rgba(15,27,45,0.08)]"
+              : "bg-[linear-gradient(180deg,rgba(10,16,30,0.96),rgba(8,12,24,0.92))] text-white border-white/15 shadow-[0_12px_24px_rgba(7,12,20,0.45)]",
             isActive
-              ? "border-[rgba(199,160,98,0.7)] shadow-[0_18px_46px_rgba(7,12,20,0.6)] ring-1 ring-[rgba(199,160,98,0.45)]"
-              : "border-white/15 hover:border-[rgba(199,160,98,0.4)] hover:shadow-[0_14px_36px_rgba(7,12,20,0.5)]",
-            isEight ? "ring-1 ring-[rgba(199,160,98,0.45)]" : "",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(199,160,98,0.45)]",
-            unavailable ? "opacity-60 cursor-not-allowed" : "",
+              ? isLight
+                ? "border-[var(--candy-red)] bg-[rgba(239,59,59,0.1)] shadow-[0_18px_38px_rgba(239,59,59,0.2)] ring-2 ring-[rgba(239,59,59,0.2)]"
+                : "border-[rgba(199,160,98,0.7)] bg-white/[0.08] shadow-[0_18px_38px_rgba(7,12,20,0.6)] ring-2 ring-[rgba(199,160,98,0.28)]"
+              : isLight
+                ? "hover:border-[rgba(239,59,59,0.3)] hover:bg-[rgba(239,59,59,0.04)]"
+                : "hover:border-[rgba(199,160,98,0.4)] hover:bg-white/[0.04]",
+            isEight ? "scale-[1.03] sm:scale-[1.04] z-10 sm:max-w-[300px]" : "",
+            isLight
+              ? "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(239,59,59,0.35)]"
+              : "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(199,160,98,0.45)]",
+            unavailable ? "opacity-60 cursor-not-allowed" : "active:scale-[0.98]",
           ].join(" ")}
         >
-          <span className="pointer-events-none absolute inset-0 rounded-2xl border border-white/10" />
-          <span className="pointer-events-none absolute inset-0 rounded-2xl bg-[linear-gradient(180deg,rgba(255,255,255,0.08),transparent_55%)]" />
-          {isEight ? (
-            <span className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#c7362c] via-[#c7a062] to-[#c7362c] opacity-90" />
-          ) : null}
           <div className="flex items-center justify-between gap-2">
-            <div className="text-sm font-black text-white">{tier.quantity} bags</div>
+            <div className={isLight ? "text-[17px] font-semibold text-[var(--text)]" : "text-[17px] font-semibold text-white"}>
+              {tier.quantity} bags
+            </div>
             {label ? (
-              <span className="rounded-full border border-white/20 bg-[rgba(199,54,44,0.22)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-white/90">
+              <span
+                className={[
+                  "rounded-full px-2 py-1 text-[12px] font-medium",
+                  isLight
+                    ? "border border-[rgba(239,59,59,0.25)] bg-[rgba(239,59,59,0.12)] text-[var(--candy-red)]"
+                    : "border border-white/20 bg-[rgba(199,54,44,0.22)] text-white/90",
+                ].join(" ")}
+              >
                 {label}
               </span>
-            ) : null}
+            ) : (
+              <span
+                className={[
+                  "rounded-full px-2 py-1 text-[12px] font-medium invisible",
+                  isLight
+                    ? "border border-[rgba(239,59,59,0.25)] bg-[rgba(239,59,59,0.12)] text-[var(--candy-red)]"
+                    : "border border-white/20 bg-[rgba(199,54,44,0.22)] text-white/90",
+                ].join(" ")}
+              >
+                {hasLabel ? label : "Label"}
+              </span>
+            )}
           </div>
-          <div className="mt-1 text-base font-black text-white">
-            {displayTotal || "—"}
-          </div>
-          <div className="text-[11px] text-white/60">
-            {displayPerBag || "Standard price"}
-          </div>
-          {savingsValue ? (
-            <div className="text-[11px] font-semibold text-[var(--gold)]">
-              Save {money(savingsValue, "USD")}
+
+          <div className="mt-1.5 flex items-baseline justify-between gap-2 sm:flex-col sm:items-start sm:gap-1.5">
+            <div className={isLight ? "text-[32px] font-bold leading-[1.05] text-[var(--text)]" : "text-[32px] font-bold leading-[1.05] text-white"}>
+              {displayTotal || "—"}
             </div>
-          ) : null}
-          {showFreeShipping ? (
-            <div className="mt-2 inline-flex items-center rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/80">
-              Free shipping
+            <div className={isLight ? "text-[12px] font-medium text-[var(--muted)]" : "text-[12px] font-medium text-white/65"}>
+              {displayPerBag || "Standard price"}
             </div>
-          ) : null}
+          </div>
+
+          <div className="mt-1.5 flex items-center justify-between text-[11px] font-medium">
+            <div className={isLight ? "text-[var(--candy-red)]" : "text-[var(--gold)]"}>
+              {savingsValue ? `Save ${money(savingsValue, "USD")}` : <span className="invisible">Save</span>}
+            </div>
+            <div className={isLight ? "text-[var(--muted)]" : "text-white/60"}>
+              {showFreeShipping ? "Free shipping" : <span className="invisible">Free shipping</span>}
+            </div>
+          </div>
         </button>
       );
     }
@@ -341,12 +454,14 @@ export default function BundleQuickBuy({
         onClick={() => handleSelect(tier.quantity, canSelect)}
         className={[
           "bundleTierBtn",
-          "min-w-[220px] sm:min-w-[240px] snap-start transition-transform",
+          "min-w-[220px] w-[220px] sm:min-w-[240px] sm:w-[240px] min-h-[210px] sm:min-h-[220px] snap-start transition-transform",
           cardTone,
           isActive
             ? "bundleTierBtn--active ring-1 ring-[rgba(212,167,75,0.8)] shadow-[0_18px_46px_rgba(0,0,0,0.32)]"
             : "bundleTierBtn--highlight",
-          isEight ? "bundleTierBtn--primary scale-[1.03] sm:scale-[1.04] z-10" : "",
+          isEight
+            ? "bundleTierBtn--primary scale-[1.03] sm:scale-[1.04] z-10 min-w-[240px] w-[240px] sm:min-w-[260px] sm:w-[260px]"
+            : "",
           cardBorder,
           unavailable ? "opacity-60 cursor-not-allowed" : "",
         ].join(" ")}
@@ -442,7 +557,7 @@ export default function BundleQuickBuy({
     );
   }
 
-  if (!featured.length) {
+  if (!expandedTiers.length) {
     return (
       <section
         id={anchorId}
@@ -482,8 +597,12 @@ export default function BundleQuickBuy({
         "relative mx-auto rounded-3xl border p-4 sm:p-5 overflow-hidden",
         isCompact ? "w-full" : "max-w-3xl",
         isCompact
-          ? "border-white/15 bg-[rgba(10,16,30,0.92)] text-white shadow-[0_24px_60px_rgba(7,12,20,0.45)]"
-          : "border-white/10 bg-white/[0.06] shadow-[0_30px_90px_rgba(0,0,0,0.35)] backdrop-blur-xl pb-16 sm:pb-12",
+          ? isLight
+            ? "border-[rgba(15,27,45,0.12)] bg-white text-[var(--text)] shadow-[0_20px_44px_rgba(15,27,45,0.12)]"
+            : "border-white/15 bg-[rgba(10,16,30,0.92)] text-white shadow-[0_24px_60px_rgba(7,12,20,0.45)]"
+          : isLight
+            ? "border-[rgba(15,27,45,0.12)] bg-white text-[var(--text)] shadow-[0_30px_90px_rgba(15,27,45,0.12)] pb-16 sm:pb-12"
+            : "border-white/10 bg-white/[0.06] shadow-[0_30px_90px_rgba(0,0,0,0.35)] backdrop-blur-xl pb-16 sm:pb-12",
       ].join(" ")}
     >
       {isCompact ? null : (
@@ -495,46 +614,111 @@ export default function BundleQuickBuy({
       <div
         className={[
           "relative text-[10px] font-semibold tracking-[0.26em] uppercase flex items-center gap-2",
-          isCompact ? "text-white/70" : "text-white/75",
+          isCompact ? (isLight ? "text-[var(--muted)]" : "text-white/70") : isLight ? "text-[var(--muted)]" : "text-white/75",
         ].join(" ")}
       >
         <span aria-hidden="true">🇺🇸</span>
         <span>American-made bundle pricing</span>
       </div>
-      <div
-        className={[
-          "relative mt-1 font-extrabold",
-          isCompact ? "text-2xl text-white" : "text-2xl text-white",
-        ].join(" ")}
-      >
-        Pick your bundle
-      </div>
-      <p
-        className={[
-          "relative mt-1.5 text-sm max-w-[52ch]",
-          isCompact ? "text-white/65" : "text-white/70",
-        ].join(" ")}
-      >
-        {FREE_SHIPPING_PHRASE}. Most customers choose 8 bags.
-      </p>
-      <div
-        className={[
-          "relative mt-3 rounded-2xl border px-3 py-2 text-xs",
-          isCompact ? "border-white/12 bg-white/5 text-white/70" : "border-white/10 bg-white/5 text-white/75",
-        ].join(" ")}
-      >
-        <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-white/60">
-          How pricing works
+      <div className="relative mt-1 flex flex-col gap-3 sm:flex-row sm:items-start">
+        <div className="min-w-0 space-y-1.5">
+          <div
+            className={[
+              "font-extrabold",
+              isCompact ? (isLight ? "text-2xl text-[var(--text)]" : "text-2xl text-white") : isLight ? "text-2xl text-[var(--text)]" : "text-2xl text-white",
+            ].join(" ")}
+          >
+            Pick your bundle
+          </div>
+          <div
+            className={[
+              "text-xs font-semibold",
+              isCompact ? (isLight ? "text-[var(--muted)]" : "text-white/70") : isLight ? "text-[var(--muted)]" : "text-white/75",
+            ].join(" ")}
+          >
+            Build your bundle and watch your per‑bag price drop.
+          </div>
+      {summaryLine ? (
+        <p
+          className={[
+            "text-sm max-w-[52ch]",
+            isCompact ? (isLight ? "text-[var(--muted)]" : "text-white/65") : isLight ? "text-[var(--muted)]" : "text-white/70",
+          ].join(" ")}
+        >
+          {summaryLine}
+        </p>
+      ) : null}
+          <div
+            className={[
+              "flex flex-wrap items-center gap-2 text-[10.5px] font-semibold",
+              isLight ? "text-[var(--text)]" : "text-white/80",
+            ].join(" ")}
+          >
+            <span
+              className={[
+                "inline-flex items-center rounded-full px-2.5 py-1",
+                isLight
+                  ? "border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)]"
+                  : "border border-white/10 bg-white/5",
+              ].join(" ")}
+            >
+              Save at 4+ bags
+            </span>
+            <span
+              className={[
+                "inline-flex items-center rounded-full px-2.5 py-1",
+                isLight
+                  ? "border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)]"
+                  : "border border-white/10 bg-white/5",
+              ].join(" ")}
+            >
+              Free shipping at 5+ bags
+            </span>
+          </div>
         </div>
-        <ul className="mt-1.5 space-y-1">
-          <li>Discounts start at 4 bags</li>
-          <li>Free shipping at 5+ bags</li>
-          <li>Most customers choose 8 bags</li>
-          <li>Per-bag price caps at {perBagCapText} after 12+ bags</li>
-        </ul>
+        {showTrainAccent ? (
+          <Image
+            src="/website%20assets/B17Bomber.png"
+            alt=""
+            aria-hidden="true"
+            width={1405}
+            height={954}
+            sizes="(max-width: 640px) 110vw, 860px"
+            className="h-[190px] w-auto shrink-0 object-contain sm:ml-auto sm:h-[218px] lg:h-[236px]"
+          />
+        ) : null}
       </div>
-      <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] text-white/70">
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1">
+      {showHowItWorks ? (
+        <div
+          className={[
+            "relative mt-3 rounded-2xl border px-3 py-2 text-xs",
+            isCompact
+              ? isLight
+                ? "border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] text-[var(--muted)]"
+                : "border-white/12 bg-white/5 text-white/70"
+              : isLight
+                ? "border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] text-[var(--muted)]"
+                : "border-white/10 bg-white/5 text-white/75",
+          ].join(" ")}
+        >
+          <div
+            className={[
+              "text-[10px] font-semibold uppercase tracking-[0.24em]",
+              isLight ? "text-[var(--muted)]" : "text-white/60",
+            ].join(" ")}
+          >
+            How pricing works
+          </div>
+          <ul className="mt-1.5 space-y-1">
+            <li>Discounts start at 4 bags</li>
+            <li>Free shipping at 5+ bags</li>
+            <li>Most customers choose 8 bags</li>
+            <li>Per-bag price caps at {perBagCapText} after 12+ bags</li>
+          </ul>
+        </div>
+      ) : null}
+      <div className={isLight ? "mt-2 flex flex-wrap items-center gap-2 text-[10px] text-[var(--muted)]" : "mt-2 flex flex-wrap items-center gap-2 text-[10px] text-white/70"}>
+        <span className={isLight ? "inline-flex items-center gap-1.5 rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-2.5 py-1" : "inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1"}>
           <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" aria-hidden="true">
             <path
               fill="currentColor"
@@ -543,7 +727,7 @@ export default function BundleQuickBuy({
           </svg>
           Love it or your money back
         </span>
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1">
+        <span className={isLight ? "inline-flex items-center gap-1.5 rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-2.5 py-1" : "inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1"}>
           <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" aria-hidden="true">
             <path
               fill="currentColor"
@@ -552,7 +736,7 @@ export default function BundleQuickBuy({
           </svg>
           Ships within 24 hours
         </span>
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1">
+        <span className={isLight ? "inline-flex items-center gap-1.5 rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-2.5 py-1" : "inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1"}>
           <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" aria-hidden="true">
             <path
               fill="currentColor"
@@ -572,7 +756,15 @@ export default function BundleQuickBuy({
       )}
 
       <div className="relative mt-3">
-        {isCompact ? null : (
+        {isCompact ? (
+          <div
+            className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 sm:gap-4"
+            role="radiogroup"
+            aria-label="Bundle size"
+          >
+            {expandedTiers.map((tier) => renderRow(tier))}
+          </div>
+        ) : (
           <>
             <div
               className={[
@@ -586,62 +778,120 @@ export default function BundleQuickBuy({
                 "bg-[linear-gradient(270deg,rgba(12,20,38,0.9),transparent)]",
               ].join(" ")}
             />
+            <div className="flex snap-x snap-mandatory gap-2.5 overflow-x-auto pb-2 pr-4 bundle-slider">
+              {expandedTiers.map((tier) => renderRow(tier))}
+            </div>
           </>
         )}
-        <div className="flex snap-x snap-mandatory gap-2.5 overflow-x-auto pb-2 pr-4 bundle-slider">
-          {featured.map((tier) => renderRow(tier))}
-        </div>
       </div>
+      {showOtherQuantitiesLink && !showOtherQuantities ? (
+        <button
+          type="button"
+          onClick={() => setShowOtherQuantities(true)}
+          className={[
+            "mt-2 text-[11px] font-medium underline underline-offset-2 decoration-transparent hover:decoration-current",
+            isLight ? "text-[var(--muted)]/80 hover:text-[var(--text)]" : "text-white/60 hover:text-white",
+          ].join(" ")}
+        >
+          {otherQuantitiesLabel}
+        </button>
+      ) : null}
 
       <div
         className={[
-          "mt-4 rounded-2xl border p-3 sm:p-4",
+          "mt-5 rounded-2xl border p-3 sm:p-3.5",
           isCompact
-            ? "border-white/15 bg-[rgba(12,18,32,0.92)]"
-            : "border-white/12 bg-white/[0.07] sticky bottom-3 md:static backdrop-blur-sm",
+            ? isLight
+              ? "border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)]"
+              : "border-white/15 bg-[rgba(12,18,32,0.92)]"
+            : isLight
+              ? "border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] sticky bottom-3 md:static backdrop-blur-sm"
+              : "border-white/12 bg-white/[0.07] sticky bottom-3 md:static backdrop-blur-sm",
         ].join(" ")}
         ref={ctaRef}
       >
         {selectedTier ? (
-          <div
-            className={[
-              "flex items-center justify-between gap-3",
-              isCompact ? "" : "border-b border-white/12 pb-2 mb-2",
-            ].join(" ")}
-          >
-            <div className={isCompact ? "text-sm font-semibold text-white/80" : "text-sm font-semibold text-white/90"}>
-              {selectedTier.quantity === 8 ? "Your most popular bundle:" : "Your bundle:"}{" "}
-              <span className={isCompact ? "font-extrabold text-white" : "font-extrabold text-white"}>
-                {selectedTier.quantity} bags
-              </span>
-            </div>
-            <div className={isCompact ? "text-right text-sm font-bold text-white" : "text-right text-xs text-white/60"}>
+          isCompact ? (
+            <div className="space-y-1">
+              <div className={isLight ? "text-[14px] font-medium text-[var(--muted)]" : "text-[14px] font-medium text-white/80"}>
+                Your selected bundle: {selectedTier.quantity} bags
+              </div>
               <div
                 key={`${selectedTier.quantity}-${selectedTier.totalPrice}`}
-                className={isCompact ? "text-base font-extrabold" : "text-[12px] font-semibold text-white/80 transition-all duration-300 price-pop"}
+                className={isLight ? "text-[24px] font-bold text-[var(--text)]" : "text-[24px] font-bold text-white"}
               >
                 {selectedTier.totalPrice && Number.isFinite(selectedTier.totalPrice)
                   ? money(selectedTier.totalPrice, "USD")
                   : "—"}
               </div>
-              {isCompact ? null : selectedTier.perBagPrice && Number.isFinite(selectedTier.perBagPrice) ? (
-                <div
-                  key={`${selectedTier.quantity}-${selectedTier.perBagPrice}`}
-                  className="price-pop"
-                >
-                  {`~${money(selectedTier.perBagPrice, "USD")} / bag`}
-                </div>
-              ) : null}
             </div>
-          </div>
+          ) : (
+            <div
+              className={[
+                "flex items-center justify-between gap-3",
+                "border-b border-white/12 pb-2 mb-2",
+              ].join(" ")}
+            >
+              <div
+                className={
+                  isLight
+                    ? "text-sm font-semibold text-[var(--text)]"
+                    : "text-sm font-semibold text-white/90"
+                }
+              >
+                Your bundle:{" "}
+                <span
+                  className={
+                    isLight
+                      ? "font-extrabold text-[var(--text)]"
+                      : "font-extrabold text-white"
+                  }
+                >
+                  {selectedTier.quantity} bags
+                </span>
+              </div>
+              <div
+                className={
+                  isLight
+                    ? "text-right text-xs text-[var(--muted)]"
+                    : "text-right text-xs text-white/60"
+                }
+              >
+                <div
+                  key={`${selectedTier.quantity}-${selectedTier.totalPrice}`}
+                  className={
+                    isLight
+                      ? "text-[12px] font-semibold text-[var(--muted)] transition-all duration-300 price-pop"
+                      : "text-[12px] font-semibold text-white/80 transition-all duration-300 price-pop"
+                  }
+                >
+                  {selectedTier.totalPrice && Number.isFinite(selectedTier.totalPrice)
+                    ? money(selectedTier.totalPrice, "USD")
+                    : "—"}
+                </div>
+                {selectedTier.perBagPrice && Number.isFinite(selectedTier.perBagPrice) ? (
+                  <div
+                    key={`${selectedTier.quantity}-${selectedTier.perBagPrice}`}
+                    className="price-pop"
+                  >
+                    {`~${money(selectedTier.perBagPrice, "USD")} / bag`}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          )
         ) : null}
 
-        <div className="mt-2.5 flex flex-col gap-2">
+        <div className="mt-3 flex flex-col gap-2">
           <button
             type="button"
             className={[
-              "w-full inline-flex items-center justify-center rounded-full px-4 sm:px-5 py-3 text-[14px] sm:text-[15px] font-bold whitespace-nowrap shadow-[0_14px_36px_rgba(214,64,58,0.28)] hover:brightness-110 active:brightness-95 disabled:opacity-60 disabled:cursor-not-allowed leading-tight relative overflow-hidden",
-              isCompact ? "bg-[var(--red)] text-white" : "bg-[#d6403a] text-white",
+              "w-full inline-flex items-center justify-center rounded-[12px] h-[54px] px-4 sm:px-5 text-[16px] sm:text-[17px] font-semibold whitespace-nowrap shadow-[0_14px_36px_rgba(214,64,58,0.28)] hover:brightness-110 active:brightness-95 disabled:opacity-60 disabled:cursor-not-allowed leading-tight relative overflow-hidden",
+              isLight
+                ? "bg-[var(--candy-red)] text-white shadow-[0_16px_36px_rgba(239,59,59,0.32)]"
+                : isCompact
+                  ? "bg-[var(--red)] text-white"
+                  : "bg-[#d6403a] text-white",
             ].join(" ")}
             onClick={addToCart}
             disabled={adding || ctaDisabled}
@@ -663,49 +913,83 @@ export default function BundleQuickBuy({
               )}
             </span>
           </button>
-          <div className={isCompact ? "text-xs text-white/70" : "text-xs text-white/75"}>
+          <div
+            className={
+              isLight
+                ? "text-xs text-[var(--muted)]"
+                : isCompact
+                  ? "text-xs text-white/70"
+                  : "text-xs text-white/75"
+            }
+          >
             Love it or your money back • Ships within 24 hours • Secure checkout
           </div>
           {reviewSnippets.length ? (
-            <div className="grid gap-1 text-[11px] text-white/70">
+            <div className={isLight ? "grid gap-1 text-[11px] text-[var(--muted)]" : "grid gap-1 text-[11px] text-white/70"}>
               {reviewSnippets.map((review) => (
                 <div key={review.id} className="inline-flex items-center gap-2">
-                  <span className="text-[var(--gold)]">{starLine(review.rating)}</span>
+                  <span className={isLight ? "text-[var(--candy-yellow)]" : "text-[var(--gold)]"}>
+                    {starLine(review.rating)}
+                  </span>
                   <span className="truncate">"{review.body}" — {review.author}</span>
                 </div>
               ))}
             </div>
           ) : null}
           {showAmazonLink ? (
-            <div className="text-xs text-white/65">
+            <div className={isLight ? "text-xs text-[var(--muted)]" : "text-xs text-white/65"}>
               <a
                 href={AMAZON_LISTING_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="underline underline-offset-4 hover:text-white"
+                className={isLight ? "underline underline-offset-4 hover:text-[var(--text)]" : "underline underline-offset-4 hover:text-white"}
               >
                 Prefer a 1–3 bag refill? Buy on Amazon →
               </a>
             </div>
           ) : null}
           {error ? (
-            <div className={isCompact ? "text-xs font-semibold text-red-200" : "text-xs font-semibold text-red-200"}>{error}</div>
+            <div
+              className={
+                isLight
+                  ? "text-xs font-semibold text-red-500"
+                  : isCompact
+                    ? "text-xs font-semibold text-red-200"
+                    : "text-xs font-semibold text-red-200"
+              }
+            >
+              {error}
+            </div>
           ) : null}
           {success && !error ? (
-            <div className={isCompact ? "text-xs font-semibold text-[var(--gold)]" : "text-xs font-semibold text-[var(--gold)]"}>
+            <div
+              className={
+                isLight
+                  ? "text-xs font-semibold text-[var(--candy-green)]"
+                  : isCompact
+                    ? "text-xs font-semibold text-[var(--gold)]"
+                    : "text-xs font-semibold text-[var(--gold)]"
+              }
+            >
               Added to cart.
             </div>
           ) : null}
           {ctaDisabled && availableForSale === false && !error ? (
-            <div className={isCompact ? "text-xs text-white/50" : "text-xs text-white/60"}>Out of stock.</div>
+            <div className={isLight ? "text-xs text-[var(--muted)]" : isCompact ? "text-xs text-white/50" : "text-xs text-white/60"}>Out of stock.</div>
           ) : null}
         </div>
       </div>
 
-      <div className={isCompact ? "mt-3 flex items-center gap-3 text-xs text-white/60" : "mt-3 flex items-center gap-3 text-xs text-white/70"}>
+      <div className={isLight ? "mt-3 flex items-center gap-3 text-xs text-[var(--muted)]" : isCompact ? "mt-3 flex items-center gap-3 text-xs text-white/60" : "mt-3 flex items-center gap-3 text-xs text-white/70"}>
         <Link
           href="/shop#product-bundles"
-          className={isCompact ? "inline-flex items-center gap-2 font-semibold text-white/80 underline underline-offset-4 hover:text-white" : "inline-flex items-center gap-2 font-semibold text-white underline underline-offset-4 hover:text-white/90"}
+          className={
+            isLight
+              ? "inline-flex items-center gap-2 font-semibold text-[var(--text)] underline underline-offset-4 hover:text-[var(--text)]"
+              : isCompact
+                ? "inline-flex items-center gap-2 font-semibold text-white/80 underline underline-offset-4 hover:text-white"
+                : "inline-flex items-center gap-2 font-semibold text-white underline underline-offset-4 hover:text-white/90"
+          }
         >
           Explore more bundle sizes →
         </Link>

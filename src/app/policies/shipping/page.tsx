@@ -10,76 +10,76 @@ export const metadata: Metadata = {
 
 export default function ShippingPolicyPage() {
   return (
-    <main className="min-h-screen text-white">
+    <main className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
       <div className="mx-auto max-w-4xl px-4 py-12">
         <div className="mb-6 flex items-center justify-between gap-3">
           <Link
             href="/policies"
-            className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-sm text-white/80 hover:bg-white/5 hover:text-white"
+            className="rounded-full border border-[var(--border)] bg-white px-3 py-1 text-sm text-[var(--text)] hover:bg-[var(--surface-strong)]"
           >
             ← Policies
           </Link>
           <Link
             href="/shop"
-            className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-sm text-white/80 hover:bg-white/5 hover:text-white"
+            className="rounded-full border border-[var(--border)] bg-white px-3 py-1 text-sm text-[var(--text)] hover:bg-[var(--surface-strong)]"
           >
             Shop →
           </Link>
         </div>
 
-        <section className="glass p-7">
+        <section className="candy-panel p-7">
           <h1 className="text-3xl font-semibold tracking-tight">Shipping Policy</h1>
-          <p className="mt-3 text-white/75">
+          <p className="mt-3 text-[var(--muted)]">
             This shipping policy keeps delivery simple and predictable. Orders ship within 24 hours,
             with tracking sent fast. Bundle pricing is clear on every product page, plus shipping
             updates. Free shipping on 5+ bags.
           </p>
 
-          <div className="mt-8 space-y-6 text-white/80">
-            <div className="glass-soft p-5">
-              <h2 className="text-lg font-semibold text-white">Free shipping</h2>
-              <p className="mt-2 text-sm text-white/75">
+          <div className="mt-8 space-y-6 text-[var(--muted)]">
+            <div className="card-solid p-5">
+              <h2 className="text-lg font-semibold text-[var(--text)]">Free shipping</h2>
+              <p className="mt-2 text-sm text-[var(--muted)]">
                 Free shipping on 5+ bags.
                 The product page and cart will reflect this automatically.
               </p>
             </div>
 
-            <div className="glass-soft p-5">
-              <h2 className="text-lg font-semibold text-white">Processing time</h2>
-              <p className="mt-2 text-sm text-white/75">
-                Orders ship within <strong className="text-white">24 hours</strong>.
+            <div className="card-solid p-5">
+              <h2 className="text-lg font-semibold text-[var(--text)]">Processing time</h2>
+              <p className="mt-2 text-sm text-[var(--muted)]">
+                Orders ship within <strong className="text-[var(--text)]">24 hours</strong>.
                 If an order is placed after the daily carrier pickup time or on weekends/holidays,
                 it ships the next business day. We prep and label orders within 24 hours.
               </p>
             </div>
 
-            <div className="glass-soft p-5">
-              <h2 className="text-lg font-semibold text-white">Delivery time</h2>
-              <p className="mt-2 text-sm text-white/75">
+            <div className="card-solid p-5">
+              <h2 className="text-lg font-semibold text-[var(--text)]">Delivery time</h2>
+              <p className="mt-2 text-sm text-[var(--muted)]">
                 Delivery speed depends on the carrier and destination. Most customers receive orders
-                within <strong className="text-white">2–7 business days</strong> after shipment.
+                within <strong className="text-[var(--text)]">2–7 business days</strong> after shipment.
               </p>
             </div>
 
-            <div className="glass-soft p-5">
-              <h2 className="text-lg font-semibold text-white">Tracking</h2>
-              <p className="mt-2 text-sm text-white/75">
+            <div className="card-solid p-5">
+              <h2 className="text-lg font-semibold text-[var(--text)]">Tracking</h2>
+              <p className="mt-2 text-sm text-[var(--muted)]">
                 Tracking details are sent within 24 hours of your order.
               </p>
             </div>
 
-            <div className="glass-soft p-5">
-              <h2 className="text-lg font-semibold text-white">Shipping issues</h2>
-              <p className="mt-2 text-sm text-white/75">
+            <div className="card-solid p-5">
+              <h2 className="text-lg font-semibold text-[var(--text)]">Shipping issues</h2>
+              <p className="mt-2 text-sm text-[var(--muted)]">
                 If your package is delayed, missing, or arrives damaged, contact us using the form below.
                 We’ll make it right.
               </p>
             </div>
           </div>
 
-          <div className="mt-10 border-t border-white/10 pt-8">
+          <div className="mt-10 border-t border-[var(--border)] pt-8">
             <h2 className="text-xl font-semibold">Contact us</h2>
-            <p className="mt-2 text-white/70">
+            <p className="mt-2 text-[var(--muted)]">
               Shipping question? Send a message and we’ll respond within one business day.
             </p>
 

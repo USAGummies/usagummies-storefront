@@ -10,75 +10,75 @@ export const metadata: Metadata = {
 
 export default function PrivacyPolicyPage() {
   return (
-    <main className="min-h-screen text-white">
+    <main className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
       <div className="mx-auto max-w-4xl px-4 py-12">
         <div className="mb-6 flex items-center justify-between gap-3">
           <Link
             href="/policies"
-            className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-sm text-white/80 hover:bg-white/5 hover:text-white"
+            className="rounded-full border border-[var(--border)] bg-white px-3 py-1 text-sm text-[var(--text)] hover:bg-[var(--surface-strong)]"
           >
             ← Policies
           </Link>
           <Link
             href="/shop"
-            className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-sm text-white/80 hover:bg-white/5 hover:text-white"
+            className="rounded-full border border-[var(--border)] bg-white px-3 py-1 text-sm text-[var(--text)] hover:bg-[var(--surface-strong)]"
           >
             Shop →
           </Link>
         </div>
 
-        <section className="glass p-7">
+        <section className="candy-panel p-7">
           <h1 className="text-3xl font-semibold tracking-tight">Privacy Policy</h1>
-          <p className="mt-3 text-white/75">
+          <p className="mt-3 text-[var(--muted)]">
             This privacy policy keeps things simple: we only use information needed to process your
             order and improve your experience. Payments are handled securely through Shopify checkout.
           </p>
 
-          <div className="mt-8 space-y-6 text-white/80">
-            <div className="glass-soft p-5">
-              <h2 className="text-lg font-semibold text-white">What we collect</h2>
-              <p className="mt-2 text-sm text-white/75">
+          <div className="mt-8 space-y-6 text-[var(--muted)]">
+            <div className="card-solid p-5">
+              <h2 className="text-lg font-semibold text-[var(--text)]">What we collect</h2>
+              <p className="mt-2 text-sm text-[var(--muted)]">
                 When you place an order, we collect information required to fulfill it, such as
                 your name, shipping address, email, and order details.
               </p>
             </div>
 
-            <div className="glass-soft p-5">
-              <h2 className="text-lg font-semibold text-white">How we use it</h2>
-              <p className="mt-2 text-sm text-white/75">
+            <div className="card-solid p-5">
+              <h2 className="text-lg font-semibold text-[var(--text)]">How we use it</h2>
+              <p className="mt-2 text-sm text-[var(--muted)]">
                 We use your information to process orders, provide updates, respond to support requests,
                 and improve the site experience.
               </p>
             </div>
 
-            <div className="glass-soft p-5">
-              <h2 className="text-lg font-semibold text-white">Payments</h2>
-              <p className="mt-2 text-sm text-white/75">
+            <div className="card-solid p-5">
+              <h2 className="text-lg font-semibold text-[var(--text)]">Payments</h2>
+              <p className="mt-2 text-sm text-[var(--muted)]">
                 Payment information is processed securely through{" "}
-                <strong className="text-white">Shopify checkout</strong>.
+                <strong className="text-[var(--text)]">Shopify checkout</strong>.
                 We do not store your full payment card details on our servers.
               </p>
             </div>
 
-            <div className="glass-soft p-5">
-              <h2 className="text-lg font-semibold text-white">Cookies</h2>
-              <p className="mt-2 text-sm text-white/75">
+            <div className="card-solid p-5">
+              <h2 className="text-lg font-semibold text-[var(--text)]">Cookies</h2>
+              <p className="mt-2 text-sm text-[var(--muted)]">
                 We may use cookies and similar technologies to support site functionality
                 and understand how visitors use the site.
               </p>
             </div>
 
-            <div className="glass-soft p-5">
-              <h2 className="text-lg font-semibold text-white">Contact</h2>
-              <p className="mt-2 text-sm text-white/75">
+            <div className="card-solid p-5">
+              <h2 className="text-lg font-semibold text-[var(--text)]">Contact</h2>
+              <p className="mt-2 text-sm text-[var(--muted)]">
                 If you have privacy questions, contact us using the form below.
               </p>
             </div>
           </div>
 
-          <div className="mt-10 border-t border-white/10 pt-8">
+          <div className="mt-10 border-t border-[var(--border)] pt-8">
             <h2 className="text-xl font-semibold">Contact us</h2>
-            <p className="mt-2 text-white/70">
+            <p className="mt-2 text-[var(--muted)]">
               Privacy question? Send a message and we’ll respond within one business day.
             </p>
 

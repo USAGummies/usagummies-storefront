@@ -149,11 +149,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-[var(--bg,#f8f5ef)] text-[var(--text)]">
       {cartToast ? (
         <div className="fixed right-4 top-20 z-50 max-w-[320px]">
-          <div className="metal-panel rounded-2xl border border-white/20 bg-[rgba(12,20,38,0.95)] px-4 py-3 text-white shadow-[0_22px_50px_rgba(7,12,20,0.45)]">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-white/60">
+          <div className="candy-panel rounded-2xl border border-[var(--border)] px-4 py-3 text-[var(--text)] shadow-[0_18px_42px_rgba(15,27,45,0.14)]">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
               Added to cart
             </div>
-            <div className="mt-1 text-sm font-semibold text-white">{cartToast}</div>
+            <div className="mt-1 text-sm font-semibold text-[var(--text)]">{cartToast}</div>
           </div>
         </div>
       ) : null}
@@ -288,6 +288,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               subtitle="Early drops, bundle alerts, and patriotic releases."
               ctaLabel="Join the list"
               variant="light"
+              emphasis="quiet"
               showSms
             />
             <SubscriptionUnlock source="footer" variant="light" />

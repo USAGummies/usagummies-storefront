@@ -20,12 +20,12 @@ export default function Error({
         Try refreshing. If it keeps happening, the dev overlay was failing to load the required error components.
       </p>
       <button
-        className="mt-6 rounded-full bg-white/10 px-4 py-2 text-sm font-medium hover:bg-white/15"
+        className="btn btn-outline mt-6 rounded-full px-4 py-2 text-sm font-medium"
         onClick={() => reset()}
       >
         Try again
       </button>
-      <pre className="mt-6 whitespace-pre-wrap rounded-lg bg-black/30 p-4 text-xs">
+      <pre className="mt-6 whitespace-pre-wrap rounded-lg border border-[var(--border)] bg-[var(--surface-strong)] p-4 text-xs">
         {String(error?.message || error)}
       </pre>
     </div>
