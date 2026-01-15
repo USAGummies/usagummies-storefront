@@ -148,6 +148,10 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
 
   const pct = clampPct(Math.round((totalBags / FREE_SHIP_QTY) * 100));
   const unlocked = totalBags >= FREE_SHIP_QTY;
+  const freeShipGap = Math.max(0, FREE_SHIP_QTY - totalBags);
+  const freeShipLine = unlocked
+    ? "Free shipping unlocked."
+    : `Add ${freeShipGap} more bag${freeShipGap === 1 ? "" : "s"} for free shipping.`;
 
   const savingsGap = Math.max(0, 4 - totalBags);
   let cartHeadline = "";
@@ -177,6 +181,10 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
         : "";
   const showUpgradeToEight = totalBags > 0 && totalBags < 8;
   const showActionButtons = Boolean(savingsTarget || showUpgradeToEight);
+  const upgradeToEightLabel = `Add 8-bag bundle - ${formatNumber(
+    pricingForQty(8).total,
+    summaryCurrency
+  )}`;
 
   useEffect(() => {
     if (unlocked) {
@@ -276,6 +284,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                   style={{ width: `${pct}%` }}
                 />
               </div>
+              <div className="mt-2 text-xs text-[var(--muted)]">{freeShipLine}</div>
               {showActionButtons ? (
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <div className="flex flex-wrap items-center gap-2 flex-1">
@@ -289,7 +298,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                     ) : null}
                     {showUpgradeToEight ? (
                       <AddBagButton
-                        label="Upgrade to 8 bags (Most popular)"
+                        label={upgradeToEightLabel}
                         pendingLabel="Updating..."
                         disabled={bundlePending}
                         onAdd={() => setBundleQty(8)}
@@ -577,7 +586,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                           d="M6 10V8a6 6 0 1 1 12 0v2h1v12H5V10h1zm2 0h8V8a4 4 0 1 0-8 0v2z"
                         />
                       </svg>
-                      Secure checkout
+                      Secure checkout - Ships in 24 hours
                     </span>
                   </a>
                 ) : null}
@@ -643,7 +652,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                     className="btn btn-candy pressable"
                     onClick={handleCheckoutClick}
                   >
-                    Secure checkout
+                    Secure checkout - Ships in 24 hours
                   </a>
                 ) : null}
               </div>

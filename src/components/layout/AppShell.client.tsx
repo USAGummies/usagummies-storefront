@@ -31,6 +31,69 @@ function setCartCookie(cartId?: string | null) {
   document.cookie = `cartId=${cartId}; path=/; samesite=lax`;
 }
 
+function formatMoney(amount: string | number | null | undefined, currency = "USD") {
+  const raw = typeof amount === "string" ? Number(amount) : Number(amount ?? 0);
+  if (!Number.isFinite(raw)) return "$0.00";
+  try {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency,
+      maximumFractionDigits: 2,
+    }).format(raw);
+  } catch {
+    return `$${raw.toFixed(2)}`;
+  }
+}
+
+function parseBagsFromTitle(title?: string): number | undefined {
+  const t = (title || "").toLowerCase();
+  if (t.includes("single")) return 1;
+  const m = t.match(/(\d+)\s*(?:bag|bags)\b/);
+  if (m?.[1]) {
+    const n = Number(m[1]);
+    if (Number.isFinite(n)) return n;
+  }
+  const fallback = t.match(/(\d+)/);
+  if (fallback?.[1]) {
+    const n = Number(fallback[1]);
+    if (Number.isFinite(n)) return n;
+  }
+  return undefined;
+}
+
+function getBagsPerUnit(merchandise: any): number {
+  const meta =
+    merchandise?.bundleQty?.value ??
+    merchandise?.bundleBags?.value ??
+    merchandise?.metafield?.value;
+  const metaNum = Number(meta);
+  if (Number.isFinite(metaNum) && metaNum > 0) return metaNum;
+  const parsed = parseBagsFromTitle(merchandise?.title);
+  if (parsed && parsed > 0) return parsed;
+  return 1;
+}
+
+function summarizeCart(cart: any) {
+  const lines =
+    cart?.lines?.nodes ??
+    cart?.lines?.edges?.map((e: any) => e?.node) ??
+    [];
+  if (!lines.length) {
+    return { totalBags: 0, summary: null as string | null };
+  }
+  const totalBags = lines.reduce((sum: number, l: any) => {
+    const bagsPerUnit = getBagsPerUnit(l?.merchandise);
+    const qty = Number(l?.quantity) || 0;
+    return sum + bagsPerUnit * qty;
+  }, 0);
+  const amount = cart?.cost?.subtotalAmount?.amount;
+  const currency = cart?.cost?.subtotalAmount?.currencyCode || "USD";
+  const totalText = formatMoney(amount, currency);
+  const summary =
+    totalBags > 0 ? `${totalBags}-Bag Bundle - ${totalText}` : null;
+  return { totalBags, summary };
+}
+
 const navLinks = [
   { href: "/shop", label: "Shop" },
   { href: "/about", label: "About" },
@@ -44,6 +107,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [cartCount, setCartCount] = useState<number>(0);
+  const [cartSummary, setCartSummary] = useState<string | null>(null);
   const [badgePop, setBadgePop] = useState(false);
   const [cartToast, setCartToast] = useState<string | null>(null);
   const pathname = usePathname();
@@ -62,7 +126,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       });
       const data = await res.json();
       if (data?.cart?.id) setCartCookie(data.cart.id);
-      const qty = Number(data?.cart?.totalQuantity || 0);
+      const summary = summarizeCart(data?.cart ?? null);
+      const qty = Number(summary.totalBags || 0);
       setCartCount((prev) => {
         if (qty !== prev) {
           setBadgePop(true);
@@ -70,6 +135,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         }
         return qty;
       });
+      setCartSummary(summary.summary);
     } catch {
       // ignore
     }
@@ -222,11 +288,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               onClick={() => setDrawerOpen(true)}
               className="pressable focus-ring inline-flex items-center gap-2 rounded-full bg-[var(--surface-strong)] border border-[var(--border)] px-4 py-2 text-sm font-black text-[var(--text)]"
             >
-              <span>Cart</span>
+              <span className="flex flex-col items-start leading-tight">
+                <span>Cart</span>
+                {cartSummary ? (
+                  <span className="hidden md:block text-[10px] font-semibold text-[var(--muted)]">
+                    {cartSummary}
+                  </span>
+                ) : null}
+              </span>
               <span
                 className={cx(
                   "inline-flex h-6 min-w-[24px] items-center justify-center rounded-full bg-[var(--red)] text-white text-xs font-black px-1 transition-transform",
-                  badgePop && "badge-pop"
+                  badgePop && "badge-pop",
+                  cartSummary && "md:hidden"
                 )}
               >
                 {cartCount > 99 ? "99+" : cartCount}
