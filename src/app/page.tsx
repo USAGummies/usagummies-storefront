@@ -658,7 +658,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <div className="sticky-cta-bar home-product-stage fixed bottom-4 left-1/2 z-40 hidden w-[min(94vw,680px)] -translate-x-1/2 translate-y-4 opacity-0 transition-all duration-300">
+      <div className="sticky-cta-bar fixed bottom-4 left-1/2 z-40 hidden w-[min(94vw,680px)] -translate-x-1/2 translate-y-4 bg-transparent opacity-0 transition-all duration-300">
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-full border border-[rgba(15,27,45,0.12)] bg-white/85 px-3 py-2 shadow-[0_14px_30px_rgba(15,27,45,0.12)] backdrop-blur-md">
           <div className="hidden text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)] sm:block">
             Bundle &amp; save
