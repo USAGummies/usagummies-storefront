@@ -94,7 +94,8 @@ export default function BundleQuickBuy({
   const router = useRouter();
   const ctaRef = React.useRef<HTMLDivElement | null>(null);
   const [selected, setSelected] = React.useState<TierKey>("8");
-  const [adding, setAdding] = React.useState(false);
+  const [addingQty, setAddingQty] = React.useState<number | null>(null);
+  const [lastAddedQty, setLastAddedQty] = React.useState<number | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState(false);
   const [showOtherQuantities, setShowOtherQuantities] = React.useState(false);
@@ -162,6 +163,10 @@ export default function BundleQuickBuy({
   const reviewSnippets = REVIEW_HIGHLIGHTS.slice(0, 2);
   const summaryLine =
     summaryCopy === undefined ? `${FREE_SHIPPING_PHRASE}. Most customers choose 8 bags.` : summaryCopy;
+  const hasAdded = lastAddedQty !== null;
+  const selectedAdded = Boolean(
+    selectedTier && lastAddedQty !== null && selectedTier.quantity === lastAddedQty
+  );
 
   function starLine(rating: number) {
     const full = Math.max(0, Math.min(5, Math.round(rating)));
@@ -194,8 +199,14 @@ export default function BundleQuickBuy({
     }
   }
 
-  const hasPrice = Number.isFinite(selectedTier?.totalPrice ?? NaN);
-  const ctaDisabled = !singleBagVariantId || !hasPrice || availableForSale === false;
+  function isTierPurchasable(tier?: BundleTier | null) {
+    if (!tier) return false;
+    if (availableForSale === false) return false;
+    return Number.isFinite(tier.totalPrice ?? NaN) && tier.totalPrice !== null;
+  }
+
+  const ctaDisabled = !singleBagVariantId || !isTierPurchasable(selectedTier);
+  const isAdding = addingQty !== null;
 
   const selectableTiers = React.useMemo(
     () =>
@@ -207,9 +218,15 @@ export default function BundleQuickBuy({
   );
 
   function handleRadioKeyDown(
-    event: React.KeyboardEvent<HTMLButtonElement>,
-    quantity: number
+    event: React.KeyboardEvent<HTMLElement>,
+    quantity: number,
+    canSelect: boolean
   ) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      if (canSelect) handleSelect(quantity, canSelect);
+      return;
+    }
     const keys = ["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp", "Home", "End"];
     if (!keys.includes(event.key)) return;
     event.preventDefault();
@@ -238,18 +255,23 @@ export default function BundleQuickBuy({
     return () => window.clearTimeout(t);
   }, [success]);
 
-  async function addToCart() {
-    const qty = selectedTier?.quantity ?? 0;
-    if (!singleBagVariantId || ctaDisabled || !qty) {
+  async function addToCart(targetQty?: number, source: "cta" | "tile" = "cta") {
+    const qty = Math.max(1, Number(targetQty ?? selectedTier?.quantity ?? 0) || 0);
+    const targetTier = expandedTiers.find((tier) => tier.quantity === qty) || selectedTier;
+    if (!singleBagVariantId || !isTierPurchasable(targetTier) || !qty) {
       setError(availableForSale === false ? "Out of stock" : "Select a bundle to continue.");
       return;
+    }
+    if (expandedTiers.some((tier) => tier.quantity === qty)) {
+      setSelected(String(qty) as TierKey);
     }
     trackEvent("bundle_add_to_cart", {
       qty,
       variant,
       anchorId: anchorId || null,
+      source,
     });
-    setAdding(true);
+    setAddingQty(qty);
     setError(null);
     setSuccess(false);
     try {
@@ -276,6 +298,7 @@ export default function BundleQuickBuy({
         window.dispatchEvent(new Event("cart:updated"));
       }
       fireCartToast(qty);
+      setLastAddedQty(qty);
       setSuccess(true);
       router.refresh();
       if (typeof window !== "undefined") {
@@ -289,7 +312,7 @@ export default function BundleQuickBuy({
     } catch (e: any) {
       setError(e?.message || "Could not add to cart.");
     } finally {
-      setAdding(false);
+      setAddingQty(null);
     }
   }
 
@@ -321,6 +344,15 @@ export default function BundleQuickBuy({
       const isEight = tier.quantity === 8;
       const isTwelve = tier.quantity === 12;
       const canSelect = !unavailable;
+      const isAdded = lastAddedQty === tier.quantity;
+      const isAddingThis = addingQty === tier.quantity;
+      const tileCtaLabel = isAddingThis
+        ? "Adding..."
+        : hasAdded
+          ? isAdded
+            ? "In your cart"
+            : "Upgrade my cart for more savings"
+          : "Add to cart";
       const showFreeShipping = tier.quantity >= 5;
       const label =
         isEight
@@ -336,16 +368,14 @@ export default function BundleQuickBuy({
                   : "";
       const hasLabel = Boolean(label);
       return (
-        <button
+        <div
           key={tier.quantity}
-          type="button"
           role="radio"
           aria-checked={isActive}
-          aria-pressed={undefined}
-          tabIndex={isActive ? 0 : -1}
-          disabled={!canSelect}
+          aria-disabled={!canSelect}
+          tabIndex={isActive && canSelect ? 0 : -1}
           onClick={() => handleSelect(tier.quantity, canSelect)}
-          onKeyDown={(event) => handleRadioKeyDown(event, tier.quantity)}
+          onKeyDown={(event) => handleRadioKeyDown(event, tier.quantity, canSelect)}
           className={[
             "relative w-full snap-start border-2 px-4 py-4 text-left transition-[border-color,background-color,box-shadow,transform] duration-150 ease-out",
             "rounded-[12px] min-h-[190px] sm:min-h-[200px] w-full sm:max-w-[280px] sm:justify-self-center",
@@ -412,7 +442,34 @@ export default function BundleQuickBuy({
               {showFreeShipping ? "Free shipping" : <span className="invisible">Free shipping</span>}
             </div>
           </div>
-        </button>
+          <button
+            type="button"
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              addToCart(tier.quantity, "tile");
+            }}
+            disabled={unavailable || isAdding}
+            className={[
+              "mt-2 inline-flex w-full items-center justify-center rounded-full border px-3 py-1 text-[10.5px] font-semibold tracking-tight transition",
+              isLight
+                ? "border-[rgba(15,27,45,0.16)] bg-white text-[var(--text)] hover:border-[rgba(15,27,45,0.28)] hover:bg-[rgba(239,59,59,0.08)]"
+                : "border-white/20 bg-white/10 text-white/90 hover:border-white/40 hover:bg-white/15",
+              isAdded
+                ? isLight
+                  ? "border-[rgba(34,197,94,0.55)] bg-[rgba(34,197,94,0.12)] text-[var(--candy-green)]"
+                  : "border-[rgba(125,210,150,0.55)] bg-[rgba(125,210,150,0.2)] text-white"
+                : hasAdded
+                  ? isLight
+                    ? "border-[rgba(239,59,59,0.35)] bg-[rgba(239,59,59,0.08)] text-[var(--candy-red)]"
+                    : "border-[rgba(199,160,98,0.5)] bg-[rgba(199,160,98,0.18)] text-white"
+                  : "",
+              (unavailable || isAdding) ? "opacity-60 cursor-not-allowed" : "",
+            ].join(" ")}
+          >
+            {tileCtaLabel}
+          </button>
+        </div>
       );
     }
 
@@ -444,14 +501,25 @@ export default function BundleQuickBuy({
       : "border-[rgba(212,167,75,0.16)]";
 
     const canSelect = !unavailable;
+    const isAdded = lastAddedQty === tier.quantity;
+    const isAddingThis = addingQty === tier.quantity;
+    const tileCtaLabel = isAddingThis
+      ? "Adding..."
+      : hasAdded
+        ? isAdded
+          ? "In your cart"
+          : "Upgrade my cart for more savings"
+        : "Add to cart";
 
     return (
-      <button
+      <div
         key={tier.quantity}
-        type="button"
-        aria-pressed={isActive}
-        disabled={!canSelect}
+        role="radio"
+        aria-checked={isActive}
+        aria-disabled={!canSelect}
+        tabIndex={isActive && canSelect ? 0 : -1}
         onClick={() => handleSelect(tier.quantity, canSelect)}
+        onKeyDown={(event) => handleRadioKeyDown(event, tier.quantity, canSelect)}
         className={[
           "bundleTierBtn",
           "min-w-[220px] w-[220px] sm:min-w-[240px] sm:w-[240px] min-h-[210px] sm:min-h-[220px] snap-start transition-transform",
@@ -551,9 +619,26 @@ export default function BundleQuickBuy({
                 </span>
               ))}
             </div>
+            <div className="mt-3 flex">
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  addToCart(tier.quantity, "tile");
+                }}
+                disabled={unavailable || isAdding}
+                className={[
+                  "bundleTierBtn__cta",
+                  isAdded ? "bundleTierBtn__cta--added" : hasAdded ? "bundleTierBtn__cta--upgrade" : "",
+                ].join(" ")}
+              >
+                {tileCtaLabel}
+              </button>
+            </div>
           </div>
         </div>
-      </button>
+      </div>
     );
   }
 
@@ -814,7 +899,7 @@ export default function BundleQuickBuy({
           isCompact ? (
             <div className="space-y-1">
               <div className={isLight ? "text-[14px] font-medium text-[var(--muted)]" : "text-[14px] font-medium text-white/80"}>
-                Your selected bundle: {selectedTier.quantity} bags
+                {selectedAdded ? "In your cart" : "Your selected bundle"}: {selectedTier.quantity} bags
               </div>
               <div
                 key={`${selectedTier.quantity}-${selectedTier.totalPrice}`}
@@ -839,7 +924,7 @@ export default function BundleQuickBuy({
                     : "text-sm font-semibold text-white/90"
                 }
               >
-                Your bundle:{" "}
+                {selectedAdded ? "In your cart" : "Your bundle"}:{" "}
                 <span
                   className={
                     isLight
@@ -893,12 +978,12 @@ export default function BundleQuickBuy({
                   ? "bg-[var(--red)] text-white"
                   : "bg-[#d6403a] text-white",
             ].join(" ")}
-            onClick={addToCart}
-            disabled={adding || ctaDisabled}
+            onClick={() => addToCart()}
+            disabled={isAdding || ctaDisabled}
           >
             <span className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.14),transparent_50%)] opacity-95" />
             <span className="relative inline-flex items-center gap-2">
-              {adding ? (
+              {isAdding ? (
                 <>
                   <span
                     aria-hidden="true"
@@ -907,7 +992,11 @@ export default function BundleQuickBuy({
                   Adding…
                 </>
               ) : selectedTier && selectedTier.totalPrice ? (
-                `Add ${selectedTier.quantity}-bag bundle — ${money(selectedTier.totalPrice, "USD")} →`
+                selectedAdded
+                  ? `In your cart — ${money(selectedTier.totalPrice, "USD")}`
+                  : hasAdded
+                    ? `Upgrade to ${selectedTier.quantity} bags — ${money(selectedTier.totalPrice, "USD")} →`
+                    : `Add ${selectedTier.quantity}-bag bundle — ${money(selectedTier.totalPrice, "USD")} →`
               ) : (
                 "Add bundle to cart →"
               )}
@@ -971,7 +1060,7 @@ export default function BundleQuickBuy({
                     : "text-xs font-semibold text-[var(--gold)]"
               }
             >
-              Added to cart.
+              {lastAddedQty ? `Added ${lastAddedQty}-bag bundle to cart.` : "Added to cart."}
             </div>
           ) : null}
           {ctaDisabled && availableForSale === false && !error ? (

@@ -218,7 +218,8 @@ export default function PurchaseBox({
   }, [bundleOptions]);
 
   const [selectedQty, setSelectedQty] = useState<number>(defaultQty);
-  const [adding, setAdding] = useState(false);
+  const [addingQty, setAddingQty] = useState<number | null>(null);
+  const [lastAddedQty, setLastAddedQty] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showMore, setShowMore] = useState(false);
 
@@ -254,6 +255,16 @@ export default function PurchaseBox({
     (selectedVariant?.priceV2 as any)?.currencyCode ||
     baselineCurrency;
   const selectedPriceText = money(selectedPrice, selectedCurrency);
+  const hasAdded = lastAddedQty !== null;
+  const selectedAdded = hasAdded && lastAddedQty === optionQty;
+  const isAdding = addingQty !== null;
+  const ctaLabel = isAdding
+    ? "Adding..."
+    : selectedAdded
+      ? `In your cart - ${selectedPriceText}`
+      : hasAdded
+        ? `Upgrade to ${formatQtyLabel(optionQty)} - ${selectedPriceText} ->`
+        : `Add ${optionQty}-bag bundle - ${selectedPriceText} ->`;
 
   const hasExtraSelected = extraOptions.some((o) => o.qty === selectedQty);
   const showExtras = showMore || hasExtraSelected;
@@ -273,11 +284,17 @@ export default function PurchaseBox({
     return map;
   }, [radioOptions]);
 
-  const radioRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const radioRefs = useRef<Array<HTMLElement | null>>([]);
 
   function handleRadioKey(index: number) {
-    return (event: KeyboardEvent<HTMLButtonElement>) => {
+    return (event: KeyboardEvent<HTMLElement>) => {
       if (!radioOptions.length) return;
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        const qty = radioOptions[index]?.qty;
+        if (qty) setSelectedQty(qty);
+        return;
+      }
       if (["ArrowRight", "ArrowDown"].includes(event.key)) {
         event.preventDefault();
         const nextIndex = (index + 1) % radioOptions.length;
@@ -299,8 +316,9 @@ export default function PurchaseBox({
     };
   }
 
-  async function addToCart() {
+  async function addToCart(targetQty?: number) {
     setError(null);
+    const qty = Math.max(1, Number(targetQty ?? selectedQty) || 1);
 
     if (!selectedVariant?.id) {
       setError("No purchasable variant found for this product.");
@@ -312,7 +330,11 @@ export default function PurchaseBox({
       return;
     }
 
-    setAdding(true);
+    if (bundleOptions.some((o) => o.qty === qty)) {
+      setSelectedQty(qty);
+    }
+
+    setAddingQty(qty);
     try {
       const storedCartId = getStoredCartId();
       if (storedCartId && typeof document !== "undefined") {
@@ -324,7 +346,7 @@ export default function PurchaseBox({
         body: JSON.stringify({
           action: "replace",
           variantId: selectedVariant.id,
-          quantity: Math.max(1, selectedQty),
+          quantity: qty,
         }),
       });
 
@@ -337,14 +359,14 @@ export default function PurchaseBox({
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("cart:updated"));
       }
-      fireCartToast(optionQty);
+      fireCartToast(qty);
+      setLastAddedQty(qty);
       router.push("/cart");
       router.refresh();
     } catch {
       setError("Couldn't add to cart. Please try again.");
-      setAdding(false);
     } finally {
-      setAdding(false);
+      setAddingQty(null);
     }
   }
 
@@ -377,11 +399,19 @@ export default function PurchaseBox({
               const badge = badgeForQty(o.qty);
               const index = radioIndexByQty.get(o.qty) ?? 0;
               const popular = o.qty === 8;
+              const isAdded = lastAddedQty === o.qty;
+              const isAddingThis = addingQty === o.qty;
+              const tileCtaLabel = isAddingThis
+                ? "Adding..."
+                : hasAdded
+                  ? isAdded
+                    ? "In your cart"
+                    : "Upgrade my cart for more savings"
+                  : "Add to cart";
 
               return (
-                <button
+                <div
                   key={`${o.qty}-${o.variant.id}`}
-                  type="button"
                   onClick={() => setSelectedQty(o.qty)}
                   onKeyDown={handleRadioKey(index)}
                   ref={(el) => {
@@ -414,7 +444,23 @@ export default function PurchaseBox({
                     )}
                     {o.freeShipping ? <span className="pbx__tileShip">Free shipping</span> : null}
                   </div>
-                </button>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      addToCart(o.qty);
+                    }}
+                    disabled={isAdding}
+                    className={cx(
+                      "pbx__tileCta",
+                      isAdded && "pbx__tileCta--added",
+                      hasAdded && !isAdded && "pbx__tileCta--upgrade"
+                    )}
+                  >
+                    {tileCtaLabel}
+                  </button>
+                </div>
               );
             })}
             </div>
@@ -463,18 +509,28 @@ export default function PurchaseBox({
 
         <div className="pbx__summary" aria-live="polite" role="status">
           <div className="pbx__summaryMeta">
-            <div className="pbx__summaryLabel">Your selected bundle: {formatQtyLabel(optionQty)}</div>
+            <div className="pbx__summaryLabel">
+              {selectedAdded ? "In your cart" : "Your selected bundle"}: {formatQtyLabel(optionQty)}
+            </div>
             <div className="pbx__summaryPrice">{selectedPriceText}</div>
+            {hasAdded && !selectedAdded ? (
+              <div className="pbx__summaryStatus pbx__summaryStatus--muted">
+                In your cart: {formatQtyLabel(lastAddedQty ?? 0)}
+              </div>
+            ) : null}
+            {selectedAdded ? (
+              <div className="pbx__summaryStatus pbx__summaryStatus--success">Added to cart.</div>
+            ) : null}
             {error ? <div className="pbx__error">{error}</div> : null}
           </div>
 
           <button
             type="button"
-            disabled={adding}
-            onClick={addToCart}
+            disabled={isAdding}
+            onClick={() => addToCart()}
             className={cx("pbx__cta", "pbx__cta--primary")}
           >
-            {adding ? (
+            {isAdding ? (
               <span className="inline-flex items-center gap-2">
                 <span
                   aria-hidden="true"
@@ -483,7 +539,7 @@ export default function PurchaseBox({
                 Adding...
               </span>
             ) : (
-              `Build my bundle - ${selectedPriceText} ->`
+              ctaLabel
             )}
           </button>
           <div className="pbx__ctaNote" aria-live="polite">
@@ -609,6 +665,38 @@ export default function PurchaseBox({
         .pbx__tileSave{ font-weight:700; color: var(--red); }
         .pbx__tileSave--muted{ color: var(--muted); }
         .pbx__tileShip{ color: var(--muted); font-weight:600; }
+        .pbx__tileCta{
+          margin-top:10px;
+          align-self:flex-start;
+          display:inline-flex;
+          align-items:center;
+          justify-content:center;
+          gap:6px;
+          border-radius:999px;
+          border:1px solid rgba(13,28,51,0.16);
+          background: rgba(13,28,51,0.06);
+          padding:6px 12px;
+          font-size:11px;
+          font-weight:800;
+          color: var(--text);
+          transition: transform .08s ease, border-color .14s ease, background .14s ease, opacity .14s ease;
+        }
+        .pbx__tileCta:hover{
+          border-color: rgba(239,59,59,0.3);
+          background: rgba(239,59,59,0.08);
+        }
+        .pbx__tileCta:active{ transform: translateY(1px); }
+        .pbx__tileCta:disabled{ opacity: 0.6; cursor: not-allowed; }
+        .pbx__tileCta--added{
+          border-color: rgba(34,197,94,0.35);
+          background: rgba(34,197,94,0.12);
+          color: rgba(21,128,61,0.95);
+        }
+        .pbx__tileCta--upgrade{
+          border-color: rgba(239,59,59,0.35);
+          background: rgba(239,59,59,0.1);
+          color: var(--red);
+        }
 
         .pbx__more{ margin-top:10px; }
         .pbx__moreLink{
@@ -675,6 +763,14 @@ export default function PurchaseBox({
         .pbx__summaryMeta{ min-width:0; }
         .pbx__summaryLabel{ font-size:14px; font-weight:600; color: var(--muted); }
         .pbx__summaryPrice{ font-weight:900; font-size:24px; color: var(--text); margin-top:4px; }
+        .pbx__summaryStatus{
+          margin-top:6px;
+          font-size:12px;
+          font-weight:700;
+          color: var(--text);
+        }
+        .pbx__summaryStatus--muted{ color: var(--muted); }
+        .pbx__summaryStatus--success{ color: rgba(21,128,61,0.95); }
         .pbx__error{
           margin-top:8px;
           font-size:13px;

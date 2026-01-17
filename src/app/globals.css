@@ -727,7 +727,44 @@ a:focus-visible:not(.btn):not(.focus-ring),
 /* Ensure NOTHING inside the card steals clicks */
 .bundleTierBtn * { pointer-events: none; }
 .bundleTierBtn { pointer-events: auto; }
-.bundleTierBtn__inner { pointer-events: none; }
+.bundleTierBtn__inner { pointer-events: auto; }
+.bundleTierBtn .bundleTierBtn__cta,
+.bundleTierBtn .bundleTierBtn__cta * { pointer-events: auto; }
+
+.bundleTierBtn__cta{
+  pointer-events: auto;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.28);
+  background: rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.92);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  transition: transform 120ms ease, border-color 120ms ease, background 120ms ease, opacity 120ms ease;
+}
+.bundleTierBtn__cta:hover{
+  transform: translateY(-1px);
+  border-color: rgba(255,255,255,0.4);
+  background: rgba(255,255,255,0.16);
+}
+.bundleTierBtn__cta:disabled{
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+.bundleTierBtn__cta--added{
+  border-color: rgba(95,220,145,0.45);
+  background: rgba(95,220,145,0.2);
+}
+.bundleTierBtn__cta--upgrade{
+  border-color: rgba(212,167,75,0.55);
+  background: rgba(212,167,75,0.2);
+}
 
 /* Patriotic surfaces + typography helpers */
 .kicker{
