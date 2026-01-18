@@ -4,10 +4,38 @@ import Image from "next/image";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 
+function resolveSiteUrl() {
+  const fromEnv = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || null;
+  if (fromEnv) return fromEnv.replace(/\/$/, "");
+  const vercel = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL.replace(/\/$/, "")}` : null;
+  if (vercel) return vercel;
+  if (process.env.NODE_ENV !== "production") return "http://localhost:3000";
+  return "https://www.usagummies.com";
+}
+
+const SITE_URL = resolveSiteUrl();
+const PAGE_TITLE = "Ingredients & Flavor Notes | USA Gummies";
+const PAGE_DESCRIPTION =
+  "Ingredients and flavor notes for USA Gummies. All American gummy bears with all natural flavors and no artificial dyes or synthetic colors.";
+const OG_IMAGE = "/opengraph-image";
+
 export const metadata: Metadata = {
-  title: "Ingredients & Flavor Notes | USA Gummies",
-  description:
-    "Ingredients and flavor notes for USA Gummies. All American gummy bears with all natural flavors and no artificial dyes or synthetic colors.",
+  title: PAGE_TITLE,
+  description: PAGE_DESCRIPTION,
+  alternates: { canonical: `${SITE_URL}/ingredients` },
+  openGraph: {
+    title: PAGE_TITLE,
+    description: PAGE_DESCRIPTION,
+    url: `${SITE_URL}/ingredients`,
+    type: "website",
+    images: [{ url: OG_IMAGE }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: PAGE_TITLE,
+    description: PAGE_DESCRIPTION,
+    images: [OG_IMAGE],
+  },
 };
 
 const FLAVORS = [

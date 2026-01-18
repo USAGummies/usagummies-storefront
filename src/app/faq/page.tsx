@@ -5,10 +5,38 @@ import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { AmericanDreamCallout } from "@/components/story/AmericanDreamCallout";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 
+function resolveSiteUrl() {
+  const fromEnv = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || null;
+  if (fromEnv) return fromEnv.replace(/\/$/, "");
+  const vercel = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL.replace(/\/$/, "")}` : null;
+  if (vercel) return vercel;
+  if (process.env.NODE_ENV !== "production") return "http://localhost:3000";
+  return "https://www.usagummies.com";
+}
+
+const SITE_URL = resolveSiteUrl();
+const PAGE_TITLE = "FAQ | USA Gummies";
+const PAGE_DESCRIPTION =
+  "USA Gummies FAQ. Answers about All American gummy bears, ingredients, flavor notes, bundles, shipping, and pricing.";
+const OG_IMAGE = "/opengraph-image";
+
 export const metadata: Metadata = {
-  title: "FAQ | USA Gummies",
-  description:
-    "USA Gummies FAQ. Answers about All American gummy bears, ingredients, flavor notes, bundles, shipping, and pricing.",
+  title: PAGE_TITLE,
+  description: PAGE_DESCRIPTION,
+  alternates: { canonical: `${SITE_URL}/faq` },
+  openGraph: {
+    title: PAGE_TITLE,
+    description: PAGE_DESCRIPTION,
+    url: `${SITE_URL}/faq`,
+    type: "website",
+    images: [{ url: OG_IMAGE }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: PAGE_TITLE,
+    description: PAGE_DESCRIPTION,
+    images: [OG_IMAGE],
+  },
 };
 
 type FaqItem = {
