@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
+import { AmazonOneBagNote } from "@/components/ui/AmazonOneBagNote";
 import QuickView from "@/components/shop/QuickView.client";
 
 type ProductCardData = any;
@@ -167,6 +168,7 @@ export function ShopProductCard({
             >
               Build bundle
             </Link>
+            <AmazonOneBagNote className="text-[11px] text-[var(--muted)]" />
           </div>
         </div>
       )}

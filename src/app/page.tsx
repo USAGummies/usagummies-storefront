@@ -8,6 +8,7 @@ import ReviewsSection from "@/components/home/ReviewsSection";
 import { getBundleVariants } from "@/lib/bundles/getBundleVariants";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import HeroCTAWatcher from "@/components/home/HeroCTAWatcher";
+import { AmazonOneBagNote } from "@/components/ui/AmazonOneBagNote";
 import styles from "./homepage-scenes.module.css";
 
 export const metadata: Metadata = {
@@ -247,6 +248,7 @@ export default async function HomePage() {
                       <span className="text-[15px] sm:text-[16px] font-semibold">Build my bundle</span>
                     </a>
                     <div className="text-xs font-semibold text-[var(--muted)]">Love it or your money back</div>
+                    <AmazonOneBagNote />
                     <span aria-hidden="true" className="h-4 w-px bg-[rgba(15,27,45,0.16)]" />
                   </div>
                 </div>
@@ -483,6 +485,9 @@ export default async function HomePage() {
                       View product details →
                     </Link>
                   </div>
+                  <div className="mt-2">
+                    <AmazonOneBagNote />
+                  </div>
                 </div>
 
                 <div className="space-y-3 lg:pt-2">
@@ -666,6 +671,9 @@ export default async function HomePage() {
           <a href="#bundle-pricing" className="btn btn-candy w-full sm:w-auto">
             Build my bundle
           </a>
+        </div>
+        <div className="mt-2 text-center">
+          <AmazonOneBagNote className="text-[11px] text-[var(--muted)]" />
         </div>
       </div>
 

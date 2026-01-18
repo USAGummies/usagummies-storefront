@@ -6,6 +6,7 @@ import Link from "next/link";
 import { pricingForQty, FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import { SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
 import { fireCartToast } from "@/lib/cartFeedback";
+import { AmazonOneBagNote } from "@/components/ui/AmazonOneBagNote";
 
 const QUICK_QTYS = [1, 2, 3, 4, 5, 8, 12];
 
@@ -271,6 +272,7 @@ export default function QuickView({ product, detailHref, bundleHref, children }:
                     )}
                   </button>
                   <div className="mt-2 text-[11px] text-[var(--muted)]">Free shipping • Secure checkout</div>
+                  <AmazonOneBagNote className="mt-2 text-[11px] text-[var(--muted)]" />
                 </div>
 
                 <div className="flex flex-wrap gap-2">

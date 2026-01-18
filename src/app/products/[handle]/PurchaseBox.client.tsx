@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { pricingForQty, BASE_PRICE, FREE_SHIP_QTY } from "@/lib/bundles/pricing";
 import { SINGLE_BAG_SKU, SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
 import { fireCartToast } from "@/lib/cartFeedback";
+import { AmazonOneBagNote } from "@/components/ui/AmazonOneBagNote";
 
 function cx(...a: Array<string | false | null | undefined>) {
   return a.filter(Boolean).join(" ");
@@ -545,6 +546,7 @@ export default function PurchaseBox({
           <div className="pbx__ctaNote" aria-live="polite">
             Love it or your money back - Ships within 24 hours - Limited daily production
           </div>
+          <AmazonOneBagNote className="pbx__amazonNote" />
         </div>
       </div>
 
@@ -799,6 +801,10 @@ export default function PurchaseBox({
           grid-column: 1 / -1;
           font-size:12px;
           color: var(--muted);
+        }
+        .pbx__amazonNote{
+          margin-top:6px;
+          font-size:12px;
         }
 
         @media (max-width: 640px){

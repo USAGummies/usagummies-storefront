@@ -18,8 +18,8 @@ import type { BundleTier } from "@/lib/bundles/getBundleVariants";
 import { BASE_PRICE, FREE_SHIPPING_PHRASE, MIN_PER_BAG } from "@/lib/bundles/pricing";
 import { trackEvent } from "@/lib/analytics";
 import { fireCartToast } from "@/lib/cartFeedback";
-import { AMAZON_LISTING_URL } from "@/lib/amazon";
 import { REVIEW_HIGHLIGHTS } from "@/data/reviewHighlights";
+import { AmazonOneBagNote } from "@/components/ui/AmazonOneBagNote";
 
 type TierKey = "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10" | "11" | "12";
 
@@ -159,7 +159,6 @@ export default function BundleQuickBuy({
   const selectedTier =
     expandedTiers.find((t) => String(t.quantity) === selected) || expandedTiers[0] || null;
   const perBagCapText = money(MIN_PER_BAG, "USD");
-  const showAmazonLink = !!selectedTier && selectedTier.quantity <= 3;
   const reviewSnippets = REVIEW_HIGHLIGHTS.slice(0, 2);
   const summaryLine =
     summaryCopy === undefined ? `${FREE_SHIPPING_PHRASE}. Most customers choose 8 bags.` : summaryCopy;
@@ -1025,18 +1024,14 @@ export default function BundleQuickBuy({
               ))}
             </div>
           ) : null}
-          {showAmazonLink ? (
-            <div className={isLight ? "text-xs text-[var(--muted)]" : "text-xs text-white/65"}>
-              <a
-                href={AMAZON_LISTING_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={isLight ? "underline underline-offset-4 hover:text-[var(--text)]" : "underline underline-offset-4 hover:text-white"}
-              >
-                Prefer a 1–3 bag refill? Buy on Amazon →
-              </a>
-            </div>
-          ) : null}
+          <AmazonOneBagNote
+            className={isLight ? "text-xs text-[var(--muted)]" : "text-xs text-white/65"}
+            linkClassName={
+              isLight
+                ? "underline underline-offset-4 text-[var(--text)] hover:text-[var(--navy)]"
+                : "underline underline-offset-4 text-white hover:text-white"
+            }
+          />
           {error ? (
             <div
               className={

@@ -1,6 +1,7 @@
 // src/components/ui/PatriotBanner.tsx
 import Link from "next/link";
 import { PatriotRibbon } from "@/components/ui/PatriotRibbon";
+import { AmazonOneBagNote } from "@/components/ui/AmazonOneBagNote";
 
 export function PatriotBanner({ showRibbon = true }: { showRibbon?: boolean }) {
   return (
@@ -57,6 +58,9 @@ export function PatriotBanner({ showRibbon = true }: { showRibbon?: boolean }) {
               <Link className="btn btn-outline" href="/shop">
                 Shop All
               </Link>
+            </div>
+            <div style={{ marginTop: 8 }}>
+              <AmazonOneBagNote className="text-[11px]" linkClassName="text-[var(--text)]" />
             </div>
           </div>
         </div>

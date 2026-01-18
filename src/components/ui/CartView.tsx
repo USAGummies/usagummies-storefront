@@ -11,6 +11,7 @@ import { pricingForQty, BASE_PRICE, FREE_SHIP_QTY, MIN_PER_BAG } from "@/lib/bun
 import { isSingleBagVariant, SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
 import { trackEvent } from "@/lib/analytics";
 import { ReviewHighlights } from "@/components/reviews/ReviewHighlights";
+import { AmazonOneBagNote } from "@/components/ui/AmazonOneBagNote";
 
 type MoneyV2 = { amount: string; currencyCode: string };
 
@@ -633,6 +634,9 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
             >
               Build my bundle
             </Link>
+            <div className="mt-2">
+              <AmazonOneBagNote className="text-[11px] text-[var(--muted)]" />
+            </div>
           </div>
         </div>
       )}
