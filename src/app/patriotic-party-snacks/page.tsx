@@ -3,10 +3,23 @@ import type { Metadata } from "next";
 import { AmericanDreamCallout } from "@/components/story/AmericanDreamCallout";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 
+function resolveSiteUrl() {
+  const fromEnv = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || null;
+  if (fromEnv) return fromEnv.replace(/\/$/, "");
+  const vercel = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL.replace(/\/$/, "")}` : null;
+  if (vercel) return vercel;
+  if (process.env.NODE_ENV !== "production") return "http://localhost:3000";
+  return "https://www.usagummies.com";
+}
+
+const SITE_URL = resolveSiteUrl();
+const PAGE_TITLE = "Patriotic Party Snacks | USA Gummies Bundles";
+const PAGE_DESCRIPTION =
+  "Patriotic party snacks and gummy bundles for July 4th and USA-themed events. Bundle and save with USA Gummies.";
+
 export const metadata: Metadata = {
-  title: "Patriotic Party Snacks | USA Gummies Bundles",
-  description:
-    "Patriotic party snacks and gummy bundles for July 4th and USA-themed events. Bundle and save with USA Gummies.",
+  title: PAGE_TITLE,
+  description: PAGE_DESCRIPTION,
 };
 
 const PARTY_TIPS = [
@@ -20,6 +33,29 @@ const RELATED_GUIDES = [
   { href: "/bulk-gummy-bears", label: "Bulk gummy bears" },
   { href: "/bundle-guides", label: "All bundle guides" },
 ];
+
+const articleJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Article",
+  headline: "Patriotic party snacks and gummy bundles",
+  description: PAGE_DESCRIPTION,
+  mainEntityOfPage: {
+    "@type": "WebPage",
+    "@id": `${SITE_URL}/patriotic-party-snacks`,
+  },
+  author: {
+    "@type": "Organization",
+    name: "USA Gummies",
+  },
+  publisher: {
+    "@type": "Organization",
+    name: "USA Gummies",
+    logo: {
+      "@type": "ImageObject",
+      url: `${SITE_URL}/brand/logo.png`,
+    },
+  },
+};
 
 export default function PatrioticPartySnacksPage() {
   return (
@@ -83,6 +119,11 @@ export default function PatrioticPartySnacksPage() {
 
         <AmericanDreamCallout variant="compact" tone="light" className="mt-6" showJoinButton={false} />
       </section>
+
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }}
+      />
     </main>
   );
 }

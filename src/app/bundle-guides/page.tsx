@@ -3,6 +3,17 @@ import type { Metadata } from "next";
 import { AmericanDreamCallout } from "@/components/story/AmericanDreamCallout";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 
+function resolveSiteUrl() {
+  const fromEnv = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || null;
+  if (fromEnv) return fromEnv.replace(/\/$/, "");
+  const vercel = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL.replace(/\/$/, "")}` : null;
+  if (vercel) return vercel;
+  if (process.env.NODE_ENV !== "production") return "http://localhost:3000";
+  return "https://www.usagummies.com";
+}
+
+const SITE_URL = resolveSiteUrl();
+
 export const metadata: Metadata = {
   title: "USA Gummies Bundle Guides | Gift, Party, and Bulk Bundles",
   description:
@@ -26,6 +37,17 @@ const GUIDES = [
     description: "Crowd-ready bundles for teams, clients, and events.",
   },
 ];
+
+const itemListJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "ItemList",
+  itemListElement: GUIDES.map((guide, index) => ({
+    "@type": "ListItem",
+    position: index + 1,
+    name: guide.title,
+    url: `${SITE_URL}${guide.href}`,
+  })),
+};
 
 export default function BundleGuidesPage() {
   return (
@@ -81,6 +103,11 @@ export default function BundleGuidesPage() {
 
         <AmericanDreamCallout variant="compact" tone="light" className="mt-6" showJoinButton={false} />
       </section>
+
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListJsonLd) }}
+      />
     </main>
   );
 }
