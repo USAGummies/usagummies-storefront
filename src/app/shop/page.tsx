@@ -258,6 +258,20 @@ export default async function ShopPage() {
                   FAQ
                 </Link>
               </div>
+              <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--muted)]">
+                <span className="font-semibold text-[var(--text)]">Bundle guides:</span>
+                <Link href="/gummy-gift-bundles" className="underline underline-offset-4 text-[var(--text)]">
+                  Gift bundles
+                </Link>
+                <span className="text-[var(--muted)]">|</span>
+                <Link href="/patriotic-party-snacks" className="underline underline-offset-4 text-[var(--text)]">
+                  Party snacks
+                </Link>
+                <span className="text-[var(--muted)]">|</span>
+                <Link href="/bulk-gummy-bears" className="underline underline-offset-4 text-[var(--text)]">
+                  Bulk gummy bears
+                </Link>
+              </div>
 
               <div className="candy-panel rounded-3xl p-4">
                 <div className="grid gap-3 sm:grid-cols-3">

@@ -402,6 +402,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Link href="/made-in-usa" className="link-underline">
                 Made in USA
               </Link>
+              <Link href="/bundle-guides" className="link-underline">
+                Bundle guides
+              </Link>
+              <Link href="/gummy-gift-bundles" className="link-underline">
+                Gift bundles
+              </Link>
+              <Link href="/patriotic-party-snacks" className="link-underline">
+                Party snacks
+              </Link>
+              <Link href="/bulk-gummy-bears" className="link-underline">
+                Bulk gummy bears
+              </Link>
               <Link href="/contact" className="link-underline">
                 Contact
               </Link>

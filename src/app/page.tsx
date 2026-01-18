@@ -249,6 +249,18 @@ export default async function HomePage() {
                     </a>
                     <div className="text-xs font-semibold text-[var(--muted)]">Love it or your money back</div>
                     <AmazonOneBagNote />
+                    <div className="flex flex-wrap gap-2 text-[11px] text-[var(--muted)]">
+                      <span className="font-semibold text-[var(--text)]">Bundle guides:</span>
+                      <Link href="/gummy-gift-bundles" className="underline underline-offset-4">
+                        Gift bundles
+                      </Link>
+                      <Link href="/patriotic-party-snacks" className="underline underline-offset-4">
+                        Party snacks
+                      </Link>
+                      <Link href="/bulk-gummy-bears" className="underline underline-offset-4">
+                        Bulk gummy bears
+                      </Link>
+                    </div>
                   </div>
                 </div>
               </div>
