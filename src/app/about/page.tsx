@@ -51,6 +51,30 @@ const LISTING_BULLETS = [
   },
 ];
 
+const articleJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Article",
+  headline: PAGE_TITLE,
+  description: PAGE_DESCRIPTION,
+  mainEntityOfPage: {
+    "@type": "WebPage",
+    "@id": `${SITE_URL}/about`,
+  },
+  author: {
+    "@type": "Organization",
+    name: "USA Gummies",
+  },
+  publisher: {
+    "@type": "Organization",
+    name: "USA Gummies",
+    logo: {
+      "@type": "ImageObject",
+      url: `${SITE_URL}/brand/logo.png`,
+    },
+  },
+  image: [`${SITE_URL}/brand/hero.jpg`],
+};
+
 export const metadata: Metadata = {
   title: PAGE_TITLE,
   description: PAGE_DESCRIPTION,
@@ -249,6 +273,11 @@ export default function AboutPage() {
           </div>
         </div>
       </section>
+
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }}
+      />
     </main>
   );
 }

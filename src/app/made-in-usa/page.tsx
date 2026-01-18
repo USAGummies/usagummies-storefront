@@ -57,6 +57,30 @@ const VALUES = [
   },
 ];
 
+const articleJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Article",
+  headline: "Made in USA gummies",
+  description: PAGE_DESCRIPTION,
+  mainEntityOfPage: {
+    "@type": "WebPage",
+    "@id": `${SITE_URL}/made-in-usa`,
+  },
+  author: {
+    "@type": "Organization",
+    name: "USA Gummies",
+  },
+  publisher: {
+    "@type": "Organization",
+    name: "USA Gummies",
+    logo: {
+      "@type": "ImageObject",
+      url: `${SITE_URL}/brand/logo.png`,
+    },
+  },
+  image: [`${SITE_URL}/brand/hero.jpg`],
+};
+
 export default function MadeInUsaPage() {
   return (
     <main className="relative overflow-hidden bg-[var(--bg)] text-[var(--text)] min-h-screen home-candy">
@@ -165,6 +189,11 @@ export default function MadeInUsaPage() {
           </div>
         </div>
       </section>
+
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }}
+      />
     </main>
   );
 }
