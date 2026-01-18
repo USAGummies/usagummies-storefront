@@ -249,7 +249,6 @@ export default async function HomePage() {
                     </a>
                     <div className="text-xs font-semibold text-[var(--muted)]">Love it or your money back</div>
                     <AmazonOneBagNote />
-                    <span aria-hidden="true" className="h-4 w-px bg-[rgba(15,27,45,0.16)]" />
                   </div>
                 </div>
               </div>
