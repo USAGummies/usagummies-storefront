@@ -390,6 +390,61 @@ export default async function ShopPage() {
         </div>
       </section>
 
+      <section aria-label="Bundle guides" className="bg-[#fffdf8]">
+        <div className="mx-auto max-w-6xl px-4 pb-8 lg:pb-10">
+          <div className="candy-panel rounded-[32px] p-5 sm:p-6">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="space-y-2">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+                  Bundle guides
+                </div>
+                <h2 className="text-2xl font-black text-[var(--text)]">
+                  Need help picking a bundle?
+                </h2>
+                <p className="text-sm text-[var(--muted)] max-w-prose">
+                  Match the right bundle size for gifts, parties, and bulk orders.
+                </p>
+              </div>
+              <Link href="/bundle-guides" className="btn btn-outline">
+                View all guides
+              </Link>
+            </div>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-3">
+              {[
+                {
+                  href: "/gummy-gift-bundles",
+                  title: "Gift bundles",
+                  copy: "Build thoughtful gifts for birthdays and care packages.",
+                },
+                {
+                  href: "/patriotic-party-snacks",
+                  title: "Party snacks",
+                  copy: "Plan July 4th tables and patriotic celebrations.",
+                },
+                {
+                  href: "/bulk-gummy-bears",
+                  title: "Bulk gummy bears",
+                  copy: "Order for teams, events, and corporate gifting.",
+                },
+              ].map((guide) => (
+                <Link
+                  key={guide.href}
+                  href={guide.href}
+                  className="rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-4 text-sm text-[var(--text)] transition hover:border-[rgba(15,27,45,0.22)] hover:shadow-[0_14px_28px_rgba(15,27,45,0.12)]"
+                >
+                  <div className="text-sm font-semibold">{guide.title}</div>
+                  <div className="mt-2 text-xs text-[var(--muted)]">{guide.copy}</div>
+                  <div className="mt-3 text-xs font-semibold text-[var(--navy)]">
+                    Read guide {"->"}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section id="product-details" aria-label="Product details" className="bg-[#fffdf8] scroll-mt-24">
         <div className="mx-auto max-w-6xl px-4 py-8 lg:py-10">
           <div className="candy-panel rounded-[36px] p-5 sm:p-6">
