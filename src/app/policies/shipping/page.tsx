@@ -2,10 +2,38 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import ContactForm from "@/components/forms/ContactForm";
 
+function resolveSiteUrl() {
+  const fromEnv = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || null;
+  if (fromEnv) return fromEnv.replace(/\/$/, "");
+  const vercel = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL.replace(/\/$/, "")}` : null;
+  if (vercel) return vercel;
+  if (process.env.NODE_ENV !== "production") return "http://localhost:3000";
+  return "https://www.usagummies.com";
+}
+
+const SITE_URL = resolveSiteUrl();
+const PAGE_TITLE = "Shipping Policy | USA Gummies";
+const PAGE_DESCRIPTION =
+  "USA Gummies shipping policy including processing times, delivery expectations, and tracking. Free shipping on 5+ bags.";
+const OG_IMAGE = "/opengraph-image";
+
 export const metadata: Metadata = {
-  title: "Shipping Policy | USA Gummies",
-  description:
-    "USA Gummies shipping policy including processing times, delivery expectations, and tracking. Free shipping on 5+ bags.",
+  title: PAGE_TITLE,
+  description: PAGE_DESCRIPTION,
+  alternates: { canonical: `${SITE_URL}/policies/shipping` },
+  openGraph: {
+    title: PAGE_TITLE,
+    description: PAGE_DESCRIPTION,
+    url: `${SITE_URL}/policies/shipping`,
+    type: "website",
+    images: [{ url: OG_IMAGE }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: PAGE_TITLE,
+    description: PAGE_DESCRIPTION,
+    images: [OG_IMAGE],
+  },
 };
 
 export default function ShippingPolicyPage() {
