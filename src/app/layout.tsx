@@ -17,6 +17,9 @@ function resolveSiteUrl() {
   return "https://www.usagummies.com";
 }
 
+const SITE_URL = resolveSiteUrl();
+const DEFAULT_DESCRIPTION = "Premium American-made gummy bears.";
+
 const display = Oswald({
   subsets: ["latin"],
   variable: "--font-display",
@@ -39,9 +42,26 @@ const script = Yellowtail({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(resolveSiteUrl()),
-  title: "USA Gummies",
-  description: "Premium American-made gummy bears.",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "USA Gummies",
+    template: "%s | USA Gummies",
+  },
+  description: DEFAULT_DESCRIPTION,
+  openGraph: {
+    title: "USA Gummies",
+    description: DEFAULT_DESCRIPTION,
+    url: SITE_URL,
+    siteName: "USA Gummies",
+    type: "website",
+    images: [{ url: "/opengraph-image" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "USA Gummies",
+    description: DEFAULT_DESCRIPTION,
+    images: ["/opengraph-image"],
+  },
 };
 
 export default function RootLayout({
@@ -49,7 +69,7 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const siteUrl = resolveSiteUrl();
+  const siteUrl = SITE_URL;
   const orgJsonLd = {
     "@context": "https://schema.org",
     "@type": "Organization",

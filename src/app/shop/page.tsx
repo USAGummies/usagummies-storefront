@@ -24,6 +24,7 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
+const OG_IMAGE = "/opengraph-image";
 const LISTING_TITLE =
   "USA Gummies – All American Gummy Bears, 7.5 oz, Made in USA, No Artificial Dyes, All Natural Flavors";
 const DETAIL_BULLETS = [
@@ -52,11 +53,13 @@ export async function generateMetadata(): Promise<Metadata> {
       title,
       description,
       url: canonical,
+      images: [{ url: OG_IMAGE }],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
+      images: [OG_IMAGE],
     },
   };
 }

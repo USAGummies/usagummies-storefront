@@ -11,6 +11,7 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
+const OG_IMAGE = "/opengraph-image";
 const SHOP_TITLE = "Shop USA Gummies | Bundle & Save on American-Made Gummies";
 const SHOP_DESCRIPTION =
   "Explore USA Gummies bundles and best sellers. Made in the USA, all natural, dye-free. Free shipping on 5+ bags.";
@@ -25,11 +26,13 @@ export async function generateMetadata(): Promise<Metadata> {
       title: SHOP_TITLE,
       description: SHOP_DESCRIPTION,
       url: canonical,
+      images: [{ url: OG_IMAGE }],
     },
     twitter: {
       card: "summary_large_image",
       title: SHOP_TITLE,
       description: SHOP_DESCRIPTION,
+      images: [OG_IMAGE],
     },
   };
 }
