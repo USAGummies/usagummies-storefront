@@ -13,11 +13,27 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
+const PAGE_TITLE = "USA Gummies Bundle Guides | Gift, Party, and Bulk Bundles";
+const PAGE_DESCRIPTION =
+  "Explore USA Gummies bundle guides for gifts, parties, and bulk orders. Find the right bundle size and build your bundle.";
 
 export const metadata: Metadata = {
-  title: "USA Gummies Bundle Guides | Gift, Party, and Bulk Bundles",
-  description:
-    "Explore USA Gummies bundle guides for gifts, parties, and bulk orders. Find the right bundle size and build your bundle.",
+  title: PAGE_TITLE,
+  description: PAGE_DESCRIPTION,
+  alternates: { canonical: `${SITE_URL}/bundle-guides` },
+  openGraph: {
+    title: PAGE_TITLE,
+    description: PAGE_DESCRIPTION,
+    url: `${SITE_URL}/bundle-guides`,
+    type: "website",
+    images: [{ url: "/opengraph-image" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: PAGE_TITLE,
+    description: PAGE_DESCRIPTION,
+    images: ["/opengraph-image"],
+  },
 };
 
 const GUIDES = [

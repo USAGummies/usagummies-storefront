@@ -20,6 +20,20 @@ const PAGE_DESCRIPTION =
 export const metadata: Metadata = {
   title: PAGE_TITLE,
   description: PAGE_DESCRIPTION,
+  alternates: { canonical: `${SITE_URL}/gummy-gift-bundles` },
+  openGraph: {
+    title: PAGE_TITLE,
+    description: PAGE_DESCRIPTION,
+    url: `${SITE_URL}/gummy-gift-bundles`,
+    type: "article",
+    images: [{ url: "/opengraph-image" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: PAGE_TITLE,
+    description: PAGE_DESCRIPTION,
+    images: ["/opengraph-image"],
+  },
 };
 
 const BUNDLE_IDEAS = [

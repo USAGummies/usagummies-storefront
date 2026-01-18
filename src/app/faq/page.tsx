@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { AmericanDreamCallout } from "@/components/story/AmericanDreamCallout";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
@@ -10,7 +11,13 @@ export const metadata: Metadata = {
     "USA Gummies FAQ. Answers about All American gummy bears, ingredients, flavor notes, bundles, shipping, and pricing.",
 };
 
-const FAQS = [
+type FaqItem = {
+  question: string;
+  answer: string;
+  answerNode?: ReactNode;
+};
+
+const FAQS: FaqItem[] = [
   {
     question: "Are USA Gummies gluten-free?",
     answer:
@@ -45,6 +52,31 @@ const FAQS = [
     question: "How does bundle pricing work?",
     answer:
       `Bundle pricing lowers the per-bag cost as you add more bags. Most customers choose 5, 8, or 12 bags, and ${FREE_SHIPPING_PHRASE.toLowerCase()}.`,
+  },
+  {
+    question: "Which bundle should I choose?",
+    answer:
+      "Use our bundle guides to match the right size for gifts, parties, or bulk orders.",
+    answerNode: (
+      <>
+        Use our bundle guides to match the right size for{" "}
+        <Link href="/gummy-gift-bundles" className="link-underline font-semibold text-[var(--navy)]">
+          gifts
+        </Link>
+        ,{" "}
+        <Link
+          href="/patriotic-party-snacks"
+          className="link-underline font-semibold text-[var(--navy)]"
+        >
+          patriotic parties
+        </Link>
+        , or{" "}
+        <Link href="/bulk-gummy-bears" className="link-underline font-semibold text-[var(--navy)]">
+          bulk orders
+        </Link>
+        .
+      </>
+    ),
   },
 ];
 
@@ -109,7 +141,9 @@ export default function FaqPage() {
                   className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-4"
                 >
                   <div className="text-sm font-semibold text-[var(--text)]">{item.question}</div>
-                  <div className="mt-2 text-sm text-[var(--muted)]">{item.answer}</div>
+                  <div className="mt-2 text-sm text-[var(--muted)]">
+                    {item.answerNode ?? item.answer}
+                  </div>
                 </div>
               ))}
             </div>

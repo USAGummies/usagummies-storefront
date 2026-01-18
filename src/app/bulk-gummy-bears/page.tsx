@@ -20,6 +20,20 @@ const PAGE_DESCRIPTION =
 export const metadata: Metadata = {
   title: PAGE_TITLE,
   description: PAGE_DESCRIPTION,
+  alternates: { canonical: `${SITE_URL}/bulk-gummy-bears` },
+  openGraph: {
+    title: PAGE_TITLE,
+    description: PAGE_DESCRIPTION,
+    url: `${SITE_URL}/bulk-gummy-bears`,
+    type: "article",
+    images: [{ url: "/opengraph-image" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: PAGE_TITLE,
+    description: PAGE_DESCRIPTION,
+    images: ["/opengraph-image"],
+  },
 };
 
 const BULK_BENEFITS = [
