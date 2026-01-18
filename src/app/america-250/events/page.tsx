@@ -1,11 +1,51 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+function resolveSiteUrl() {
+  const fromEnv = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || null;
+  if (fromEnv) return fromEnv.replace(/\/$/, "");
+  const vercel = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL.replace(/\/$/, "")}` : null;
+  if (vercel) return vercel;
+  if (process.env.NODE_ENV !== "production") return "http://localhost:3000";
+  return "https://www.usagummies.com";
+}
+
+const SITE_URL = resolveSiteUrl();
+const PAGE_TITLE = "America 250 Events";
+const PAGE_DESCRIPTION =
+  "America 250 events — simple event-focused page for SEO and campaign landing use.";
+const PAGE_URL = `${SITE_URL}/america-250/events`;
+const OG_IMAGE = `${SITE_URL}/opengraph-image`;
+
 export const metadata: Metadata = {
-  title: "America 250 Events",
-  description:
-    "America 250 events — simple event-focused page for SEO and campaign landing use.",
-  alternates: { canonical: "/america-250/events" },
+  title: PAGE_TITLE,
+  description: PAGE_DESCRIPTION,
+  alternates: { canonical: PAGE_URL },
+};
+
+const blogPostingJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  headline: PAGE_TITLE,
+  description: PAGE_DESCRIPTION,
+  url: PAGE_URL,
+  mainEntityOfPage: {
+    "@type": "WebPage",
+    "@id": PAGE_URL,
+  },
+  author: {
+    "@type": "Organization",
+    name: "USA Gummies",
+  },
+  publisher: {
+    "@type": "Organization",
+    name: "USA Gummies",
+    logo: {
+      "@type": "ImageObject",
+      url: `${SITE_URL}/brand/logo.png`,
+    },
+  },
+  image: [OG_IMAGE],
 };
 
 export default function America250EventsPage() {
@@ -32,6 +72,11 @@ export default function America250EventsPage() {
           </p>
         </div>
       </div>
+
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(blogPostingJsonLd) }}
+      />
     </main>
   );
 }
