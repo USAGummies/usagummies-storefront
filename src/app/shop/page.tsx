@@ -341,7 +341,7 @@ export default async function ShopPage() {
         <div className="mx-auto max-w-6xl px-4 py-8 lg:py-10">
           <div className="candy-panel rounded-[36px] p-5 sm:p-6">
             <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
-              <div className="space-y-4">
+              <div className="min-w-0 space-y-4">
                 <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
                   Product details
                 </div>
@@ -371,7 +371,7 @@ export default async function ShopPage() {
                 </div>
               </div>
 
-              <div className="space-y-4">
+              <div className="min-w-0 space-y-4">
                 <ProductGallery
                   title={productTitle}
                   featured={productFeatured}
