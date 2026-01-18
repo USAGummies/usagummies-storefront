@@ -458,7 +458,13 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                           aria-hidden="true"
                         >
                           {img ? (
-                            <Image src={img} alt={title} fill className="object-cover" />
+                            <Image
+                              src={img}
+                              alt={title}
+                              fill
+                              sizes="56px"
+                              className="object-cover"
+                            />
                           ) : null}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -530,7 +536,13 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                             aria-hidden="true"
                           >
                             {img ? (
-                              <Image src={img} alt={title} fill className="object-cover" />
+                              <Image
+                                src={img}
+                                alt={title}
+                                fill
+                                sizes="56px"
+                                className="object-cover"
+                              />
                             ) : null}
                           </div>
                           <div className="flex-1 min-w-0">

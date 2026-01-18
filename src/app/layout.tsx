@@ -3,6 +3,19 @@ import "./globals.css";
 import type { Metadata } from "next";
 import { Oswald, Space_Grotesk, Yellowtail } from "next/font/google";
 import { AppShell } from "@/components/layout/AppShell.client";
+import { AMAZON_LISTING_URL } from "@/lib/amazon";
+
+function resolveSiteUrl() {
+  const fromEnv =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.SITE_URL ||
+    null;
+  if (fromEnv) return fromEnv.replace(/\/$/, "");
+  const vercel = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL.replace(/\/$/, "")}` : null;
+  if (vercel) return vercel;
+  if (process.env.NODE_ENV !== "production") return "http://localhost:3000";
+  return "https://www.usagummies.com";
+}
 
 const display = Oswald({
   subsets: ["latin"],
@@ -26,6 +39,7 @@ const script = Yellowtail({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(resolveSiteUrl()),
   title: "USA Gummies",
   description: "Premium American-made gummy bears.",
 };
@@ -35,6 +49,33 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const siteUrl = resolveSiteUrl();
+  const orgJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "@id": `${siteUrl}#organization`,
+    name: "USA Gummies",
+    url: siteUrl,
+    logo: `${siteUrl}/brand/logo.png`,
+    sameAs: [
+      "https://www.instagram.com/usagummies/",
+      AMAZON_LISTING_URL,
+    ],
+  };
+  const webSiteJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "@id": `${siteUrl}#website`,
+    name: "USA Gummies",
+    url: siteUrl,
+    publisher: { "@id": `${siteUrl}#organization` },
+    potentialAction: {
+      "@type": "SearchAction",
+      target: `${siteUrl}/shop?q={search_term_string}`,
+      "query-input": "required name=search_term_string",
+    },
+  };
+
   return (
     <html
       lang="en"
@@ -48,6 +89,14 @@ export default function RootLayout({
           color: "var(--text, #1c2430)",
         }}
       >
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(webSiteJsonLd) }}
+        />
         <AppShell>{children}</AppShell>
       </body>
     </html>

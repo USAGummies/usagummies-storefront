@@ -5,9 +5,15 @@ type Crumb = {
 };
 
 function siteUrl() {
-  return process.env.NODE_ENV === "production"
-    ? "https://www.usagummies.com"
-    : "http://localhost:3000";
+  const fromEnv =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.SITE_URL ||
+    null;
+  if (fromEnv) return fromEnv.replace(/\/$/, "");
+  const vercel = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL.replace(/\/$/, "")}` : null;
+  if (vercel) return vercel;
+  if (process.env.NODE_ENV !== "production") return "http://localhost:3000";
+  return "https://www.usagummies.com";
 }
 
 function absolute(href: string) {

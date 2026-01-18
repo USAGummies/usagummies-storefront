@@ -7,9 +7,11 @@ import PurchaseBox from "@/app/products/[handle]/PurchaseBox.client";
 import { AmericanDreamCallout } from "@/components/story/AmericanDreamCallout";
 import { StickyAddToCartBar } from "@/components/product/StickyAddToCartBar";
 import { AmazonOneBagNote } from "@/components/ui/AmazonOneBagNote";
+import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { getProductsPage } from "@/lib/shopify/products";
 import { getProductByHandle, money } from "@/lib/storefront";
 import { pricingForQty, FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
+import { REVIEW_HIGHLIGHTS } from "@/data/reviewHighlights";
 
 const PAGE_SIZE = 1;
 function resolveSiteUrl() {
@@ -114,6 +116,26 @@ export default async function ShopPage() {
   const stickyAlt = productFeatured?.altText || "USA Gummies bag";
   const lowBundlePrice = pricingForQty(1).total;
   const highBundlePrice = pricingForQty(12).total;
+  const reviewItems = REVIEW_HIGHLIGHTS.map((review) => ({
+    "@type": "Review",
+    name: "USA Gummies review",
+    reviewBody: review.body,
+    author: {
+      "@type": "Person",
+      name: review.author,
+    },
+    reviewRating: {
+      "@type": "Rating",
+      ratingValue: review.rating,
+      bestRating: 5,
+      worstRating: 1,
+    },
+  }));
+  const avgRating =
+    REVIEW_HIGHLIGHTS.length > 0
+      ? REVIEW_HIGHLIGHTS.reduce((sum, review) => sum + review.rating, 0) /
+        REVIEW_HIGHLIGHTS.length
+      : null;
 
   const productJsonLd = {
     "@context": "https://schema.org",
@@ -126,6 +148,14 @@ export default async function ShopPage() {
       "@type": "Brand",
       name: "USA Gummies",
     },
+    review: reviewItems.length ? reviewItems : undefined,
+    aggregateRating: avgRating
+      ? {
+          "@type": "AggregateRating",
+          ratingValue: Number(avgRating.toFixed(1)),
+          reviewCount: REVIEW_HIGHLIGHTS.length,
+        }
+      : undefined,
     offers: {
       "@type": "AggregateOffer",
       url: `${SITE_URL}/shop`,
@@ -194,6 +224,12 @@ export default async function ShopPage() {
 
   return (
     <main className="relative overflow-hidden bg-[#fffdf8] text-[var(--text)] min-h-screen pb-16">
+      <BreadcrumbJsonLd
+        items={[
+          { name: "Home", href: "/" },
+          { name: "Shop", href: "/shop" },
+        ]}
+      />
       <section className="relative overflow-hidden bg-[#fffdf8]">
 
         <div className="relative mx-auto max-w-6xl px-4 py-10 lg:py-12">

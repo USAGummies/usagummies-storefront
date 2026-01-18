@@ -165,6 +165,7 @@ export default function QuickView({ product, detailHref, bundleHref, children }:
                     src={img.url}
                     alt={img.altText || product?.title || "USA Gummies"}
                     fill
+                    sizes="(max-width: 640px) 90vw, 360px"
                     className="object-contain"
                   />
                 ) : (

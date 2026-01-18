@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { AmericanDreamCallout } from "@/components/story/AmericanDreamCallout";
+import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 
 export const metadata: Metadata = {
   title: "Patriotic Party Snacks | USA Gummies Bundles",
@@ -24,6 +25,13 @@ export default function PatrioticPartySnacksPage() {
   return (
     <main className="relative overflow-hidden bg-[#fffdf8] text-[var(--text)] min-h-screen pb-16">
       <section className="mx-auto max-w-6xl px-4 py-8 lg:py-10">
+        <BreadcrumbJsonLd
+          items={[
+            { name: "Home", href: "/" },
+            { name: "Bundle guides", href: "/bundle-guides" },
+            { name: "Patriotic party snacks", href: "/patriotic-party-snacks" },
+          ]}
+        />
         <div className="candy-panel rounded-[36px] p-5 sm:p-6">
           <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
             Party snacks

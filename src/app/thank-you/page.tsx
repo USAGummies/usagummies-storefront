@@ -44,7 +44,13 @@ export default function ThankYouPage() {
             <div className="grid grid-cols-3 gap-2">
               {igImages.map((src) => (
                 <div key={src} className="relative aspect-square overflow-hidden rounded-xl border border-[var(--border)]">
-                  <Image src={src} alt="USA Gummies social" fill className="object-cover" />
+                  <Image
+                    src={src}
+                    alt="USA Gummies social"
+                    fill
+                    sizes="(max-width: 768px) 28vw, 120px"
+                    className="object-cover"
+                  />
                 </div>
               ))}
             </div>
