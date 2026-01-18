@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 
 function resolveSiteUrl() {
   const fromEnv = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || null;
@@ -52,6 +53,14 @@ export default function America250GiftsPage() {
   return (
     <main className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
       <div className="mx-auto max-w-4xl px-4 py-14">
+        <BreadcrumbJsonLd
+          items={[
+            { name: "Home", href: "/" },
+            { name: "America 250", href: "/america-250" },
+            { name: "Gifts", href: "/america-250/gifts" },
+          ]}
+        />
+
         <div className="mb-6 flex items-center justify-between">
           <Link href="/america-250" className="text-sm text-[var(--muted)] hover:text-[var(--text)]">
             ← Back to America 250
