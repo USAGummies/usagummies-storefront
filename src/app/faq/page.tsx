@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { AmericanDreamCallout } from "@/components/story/AmericanDreamCallout";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
+import { BRAND_STORY_SHORT } from "@/data/brandStory";
 
 function resolveSiteUrl() {
   const fromEnv = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || null;
@@ -60,6 +61,20 @@ const FAQS: FaqItem[] = [
     question: "Where are USA Gummies made?",
     answer:
       "Our All American gummy bears are sourced, made, and packed right here in the USA.",
+  },
+  {
+    question: "What is the USA Gummies story?",
+    answer: BRAND_STORY_SHORT.join(" "),
+    answerNode: (
+      <div className="space-y-2">
+        {BRAND_STORY_SHORT.map((paragraph) => (
+          <p key={paragraph}>{paragraph}</p>
+        ))}
+        <Link href="/about" className="link-underline font-semibold text-[var(--navy)]">
+          Read the full story
+        </Link>
+      </div>
+    ),
   },
   {
     question: "What flavors are in the bag?",

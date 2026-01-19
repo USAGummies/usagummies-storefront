@@ -9,6 +9,7 @@ import { getBundleVariants } from "@/lib/bundles/getBundleVariants";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import HeroCTAWatcher from "@/components/home/HeroCTAWatcher";
 import { AmazonOneBagNote } from "@/components/ui/AmazonOneBagNote";
+import { BRAND_STORY_HEADLINE, BRAND_STORY_PARAGRAPHS } from "@/data/brandStory";
 import styles from "./homepage-scenes.module.css";
 
 function resolveSiteUrl() {
@@ -687,6 +688,32 @@ export default async function HomePage() {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-[#fffdf8]" data-zone="STORY">
+        <div className="mx-auto max-w-6xl px-4 py-10">
+          <div className="candy-panel rounded-[36px] border border-[var(--border)] p-6 sm:p-8">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+              Our story
+            </div>
+            <h2 className="mt-2 text-2xl font-black text-[var(--text)] sm:text-3xl">
+              {BRAND_STORY_HEADLINE}
+            </h2>
+            <div className="mt-4 space-y-3 text-sm text-[var(--muted)]">
+              {BRAND_STORY_PARAGRAPHS.map((paragraph) => (
+                <p key={paragraph}>{paragraph}</p>
+              ))}
+            </div>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <Link href="/about" className="btn btn-outline">
+                Read our story
+              </Link>
+              <Link href="/shop" className="btn btn-candy">
+                Shop bundles
+              </Link>
             </div>
           </div>
         </div>

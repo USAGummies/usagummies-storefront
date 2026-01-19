@@ -12,6 +12,7 @@ import { getProductsPage } from "@/lib/shopify/products";
 import { getProductByHandle, money } from "@/lib/storefront";
 import { pricingForQty, FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import { REVIEW_HIGHLIGHTS } from "@/data/reviewHighlights";
+import { BRAND_STORY_HEADLINE, BRAND_STORY_MEDIUM } from "@/data/brandStory";
 
 const PAGE_SIZE = 1;
 function resolveSiteUrl() {
@@ -440,6 +441,32 @@ export default async function ShopPage() {
                   </div>
                 </Link>
               ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section aria-label="Our story" className="bg-[#fffdf8]">
+        <div className="mx-auto max-w-6xl px-4 pb-8 lg:pb-10">
+          <div className="candy-panel rounded-[32px] p-5 sm:p-6">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+              Our story
+            </div>
+            <h2 className="mt-2 text-2xl font-black text-[var(--text)]">
+              {BRAND_STORY_HEADLINE}
+            </h2>
+            <div className="mt-3 space-y-3 text-sm text-[var(--muted)]">
+              {BRAND_STORY_MEDIUM.map((paragraph) => (
+                <p key={paragraph}>{paragraph}</p>
+              ))}
+            </div>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <Link href="/about" className="btn btn-outline">
+                Read our story
+              </Link>
+              <Link href="/shop#bundle-pricing" className="btn btn-candy">
+                Build my bundle
+              </Link>
             </div>
           </div>
         </div>

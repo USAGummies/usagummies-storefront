@@ -4,6 +4,7 @@ import Image from "next/image";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { AmericanDreamCallout } from "@/components/story/AmericanDreamCallout";
 import { FREE_SHIPPING_PHRASE, pricingForQty } from "@/lib/bundles/pricing";
+import { BRAND_STORY_HEADLINE, BRAND_STORY_PARAGRAPHS } from "@/data/brandStory";
 
 function resolveSiteUrl() {
   const fromEnv = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || null;
@@ -224,6 +225,20 @@ export default function AboutPage() {
                   </div>
                   <div className="mt-2 text-sm text-[var(--muted)]">{bullet.body}</div>
                 </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-6 candy-panel rounded-[32px] border border-[var(--border)] p-5 sm:p-6">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+              Our story
+            </div>
+            <h2 className="mt-2 text-2xl font-black text-[var(--text)]">
+              {BRAND_STORY_HEADLINE}
+            </h2>
+            <div className="mt-4 space-y-3 text-sm text-[var(--muted)]">
+              {BRAND_STORY_PARAGRAPHS.map((paragraph) => (
+                <p key={paragraph}>{paragraph}</p>
               ))}
             </div>
           </div>

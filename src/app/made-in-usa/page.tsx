@@ -4,6 +4,7 @@ import Image from "next/image";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { AmericanDreamCallout } from "@/components/story/AmericanDreamCallout";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
+import { BRAND_STORY_HEADLINE, BRAND_STORY_MEDIUM } from "@/data/brandStory";
 
 function resolveSiteUrl() {
   const fromEnv = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || null;
@@ -160,6 +161,28 @@ export default function MadeInUsaPage() {
                   <div className="mt-2 text-sm text-[var(--muted)]">{value.body}</div>
                 </div>
               ))}
+            </div>
+          </div>
+
+          <div className="mt-6 candy-panel rounded-[32px] border border-[var(--border)] p-5 sm:p-6">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+              Our story
+            </div>
+            <h2 className="mt-2 text-2xl font-black text-[var(--text)]">
+              {BRAND_STORY_HEADLINE}
+            </h2>
+            <div className="mt-3 space-y-3 text-sm text-[var(--muted)]">
+              {BRAND_STORY_MEDIUM.map((paragraph) => (
+                <p key={paragraph}>{paragraph}</p>
+              ))}
+            </div>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <Link href="/about" className="btn btn-outline">
+                Read our story
+              </Link>
+              <Link href="/shop" className="btn btn-candy">
+                Shop bundles
+              </Link>
             </div>
           </div>
 

@@ -12,6 +12,7 @@ import { applyExperimentFromUrl, trackEvent } from "@/lib/analytics";
 import { LeadCapture } from "@/components/marketing/LeadCapture.client";
 import { SubscriptionUnlock } from "@/components/marketing/SubscriptionUnlock.client";
 import { getCartToastMessage } from "@/lib/cartFeedback";
+import { BRAND_STORY_HEADLINE, BRAND_STORY_SHORT } from "@/data/brandStory";
 
 function cx(...a: Array<string | false | null | undefined>) {
   return a.filter(Boolean).join(" ");
@@ -94,12 +95,38 @@ function summarizeCart(cart: any) {
   return { totalBags, summary };
 }
 
-const navLinks = [
-  { href: "/shop", label: "Shop" },
-  { href: "/about", label: "About" },
-  { href: "/join-the-revolution", label: "Join the Revolution" },
-  { href: "/contact", label: "Contact" },
-  { href: "/policies", label: "Policies" },
+const navSections = [
+  {
+    title: "Shop",
+    links: [
+      { href: "/shop", label: "Shop bundles" },
+      { href: "/bundle-guides", label: "Bundle guides" },
+      { href: "/gummy-gift-bundles", label: "Gift bundles" },
+      { href: "/patriotic-party-snacks", label: "Party snacks" },
+      { href: "/bulk-gummy-bears", label: "Bulk gummy bears" },
+    ],
+  },
+  {
+    title: "Brand",
+    links: [
+      { href: "/about", label: "About" },
+      { href: "/made-in-usa", label: "Made in USA" },
+      { href: "/ingredients", label: "Ingredients" },
+      { href: "/faq", label: "FAQ" },
+      { href: "/join-the-revolution", label: "Join the Revolution" },
+    ],
+  },
+  {
+    title: "Support",
+    links: [
+      { href: "/contact", label: "Contact" },
+      { href: "/policies", label: "Policies" },
+      { href: "/policies/shipping", label: "Shipping" },
+      { href: "/policies/returns", label: "Returns" },
+      { href: "/policies/privacy", label: "Privacy" },
+      { href: "/policies/terms", label: "Terms" },
+    ],
+  },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -259,27 +286,38 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <div
                   id="header-menu"
                   role="menu"
-                  className="absolute right-0 top-full mt-2 min-w-[200px] rounded-2xl border border-[var(--border)] bg-white/95 p-2 text-sm text-[var(--text)] shadow-[0_18px_48px_rgba(15,27,45,0.16)] backdrop-blur-md"
+                  className="absolute right-0 top-full mt-2 w-[320px] sm:w-[420px] rounded-2xl border border-[var(--border)] bg-white/95 p-3 text-sm text-[var(--text)] shadow-[0_18px_48px_rgba(15,27,45,0.16)] backdrop-blur-md"
                 >
-                  {navLinks.map((link) => {
-                    const active = pathname === link.href;
-                    return (
-                      <Link
-                        key={link.href}
-                        href={link.href}
-                        role="menuitem"
-                        className={cx(
-                          "pressable block rounded-xl border border-transparent px-3 py-2 font-semibold transition-colors",
-                          active
-                            ? "bg-[var(--navy)]/12 text-[var(--navy)] border-[var(--navy)]/25"
-                            : "text-[var(--text)] hover:bg-[var(--navy)]/10"
-                        )}
-                        onClick={() => setMenuOpen(false)}
-                      >
-                        {link.label}
-                      </Link>
-                    );
-                  })}
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {navSections.map((section) => (
+                      <div key={section.title}>
+                        <div className="px-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
+                          {section.title}
+                        </div>
+                        <div className="mt-2 grid gap-1">
+                          {section.links.map((link) => {
+                            const active = pathname === link.href;
+                            return (
+                              <Link
+                                key={link.href}
+                                href={link.href}
+                                role="menuitem"
+                                className={cx(
+                                  "pressable block rounded-xl border border-transparent px-3 py-2 font-semibold transition-colors",
+                                  active
+                                    ? "bg-[var(--navy)]/12 text-[var(--navy)] border-[var(--navy)]/25"
+                                    : "text-[var(--text)] hover:bg-[var(--navy)]/10"
+                                )}
+                                onClick={() => setMenuOpen(false)}
+                              >
+                                {link.label}
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ) : null}
             </div>
@@ -320,22 +358,34 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         {mobileOpen ? (
           <div className="md:hidden border-t border-[var(--border)] bg-white/96 backdrop-blur-md">
-            <div className="mx-auto max-w-6xl px-4 py-3 flex flex-col gap-2 text-[var(--text)]">
-            {navLinks.map((link) => {
-              const active = pathname === link.href;
-              return (
-                <Link
-                  key={link.href}
-                    href={link.href}
-                    className={cx(
-                      "pressable px-2 py-2 rounded-lg",
-                      active && "text-[var(--red)] font-black"
-                    )}
-                  >
-                    {link.label}
-                  </Link>
-                );
-              })}
+            <div className="mx-auto max-w-6xl px-4 py-3 flex flex-col gap-3 text-[var(--text)]">
+              {navSections.map((section) => (
+                <div
+                  key={section.title}
+                  className="rounded-2xl border border-[var(--border)] bg-white/90 p-3"
+                >
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
+                    {section.title}
+                  </div>
+                  <div className="mt-2 grid gap-1">
+                    {section.links.map((link) => {
+                      const active = pathname === link.href;
+                      return (
+                        <Link
+                          key={link.href}
+                          href={link.href}
+                          className={cx(
+                            "pressable px-2 py-2 rounded-lg",
+                            active && "text-[var(--red)] font-black"
+                          )}
+                        >
+                          {link.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
               <button
                 type="button"
                 onClick={() => setDrawerOpen(true)}
@@ -377,9 +427,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <li>🚚 Ships fast • Bundle &amp; save</li>
               </ul>
             </div>
-            <div className="text-xs text-[var(--muted)]">
-              Secure checkout • {FREE_SHIPPING_PHRASE} • Easy returns
+              <div className="text-xs text-[var(--muted)]">
+                Secure checkout • {FREE_SHIPPING_PHRASE} • Easy returns
+              </div>
+          </div>
+
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-4 text-sm text-[var(--muted)]">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
+              Our story
             </div>
+            <div className="mt-2 text-sm font-semibold text-[var(--text)]">
+              {BRAND_STORY_HEADLINE}
+            </div>
+            <div className="mt-3 space-y-2 text-xs text-[var(--muted)]">
+              {BRAND_STORY_SHORT.map((paragraph) => (
+                <p key={paragraph}>{paragraph}</p>
+              ))}
+            </div>
+            <Link href="/about" className="mt-3 inline-flex text-xs font-semibold text-[var(--navy)] link-underline">
+              Read our story
+            </Link>
           </div>
 
           <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
@@ -420,7 +487,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Link href="/policies" className="link-underline">
                 Policies
               </Link>
-              <Link href="/shipping" className="link-underline">
+              <Link href="/policies/shipping" className="link-underline">
                 Shipping
               </Link>
             </div>
