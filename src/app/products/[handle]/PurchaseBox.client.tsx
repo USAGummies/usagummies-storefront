@@ -3,7 +3,6 @@
 
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { pricingForQty, BASE_PRICE, FREE_SHIP_QTY } from "@/lib/bundles/pricing";
 import { SINGLE_BAG_SKU, SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
 import { fireCartToast } from "@/lib/cartFeedback";
@@ -159,7 +158,6 @@ export default function PurchaseBox({
   product: Product;
   focus?: string;
 }) {
-  const router = useRouter();
   const { bagCount } = useCartBagCount();
   const currentBags = Math.max(0, Number(bagCount) || 0);
   const currentPricing = currentBags > 0 ? pricingForQty(currentBags) : null;
@@ -427,8 +425,6 @@ export default function PurchaseBox({
       }
       fireCartToast(qty);
       setLastAddedQty(qty);
-      router.push("/cart");
-      router.refresh();
     } catch {
       setError("Couldn't add to cart. Please try again.");
     } finally {

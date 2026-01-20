@@ -227,6 +227,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setMobileOpen(false);
     setMenuOpen(false);
+    setDrawerOpen(false);
   }, [pathname]);
 
   useEffect(() => {

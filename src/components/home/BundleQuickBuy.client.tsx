@@ -13,7 +13,6 @@
 import * as React from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 import type { BundleTier } from "@/lib/bundles/getBundleVariants";
 import { BASE_PRICE, FREE_SHIPPING_PHRASE, MIN_PER_BAG, pricingForQty } from "@/lib/bundles/pricing";
 import { trackEvent } from "@/lib/analytics";
@@ -101,7 +100,6 @@ export default function BundleQuickBuy({
   otherQuantitiesLabel = "Need fewer bags?",
   otherQuantities,
 }: Props) {
-  const router = useRouter();
   const { bagCount } = useCartBagCount();
   const currentBags = Math.max(0, Number(bagCount) || 0);
   const currentPricing = currentBags > 0 ? pricingForQty(currentBags) : null;
@@ -339,15 +337,6 @@ export default function BundleQuickBuy({
       fireCartToast(qty);
       setLastAddedQty(qty);
       setSuccess(true);
-      router.refresh();
-      if (typeof window !== "undefined") {
-        const prefersReduced =
-          window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        if (!prefersReduced) {
-          window.scrollTo({ top: 0, behavior: "smooth" });
-        }
-      }
-      router.push("/cart");
     } catch (e: any) {
       setError(e?.message || "Could not add to cart.");
     } finally {
