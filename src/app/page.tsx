@@ -418,22 +418,13 @@ export default async function HomePage() {
             <div className="mt-2">
               <div
                 id="hero-primary-cta"
-                className="bundle-home bundle-hero-stage buy-module relative overflow-hidden rounded-[32px] border border-[rgba(15,27,45,0.12)] bg-white shadow-[0_24px_60px_rgba(15,27,45,0.12)]"
+                className="bundle-home bundle-hero-stage buy-module relative rounded-[32px] border border-[rgba(15,27,45,0.12)] bg-white shadow-[0_24px_60px_rgba(15,27,45,0.12)]"
               >
                 <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_10%,rgba(199,160,98,0.18),transparent_45%),radial-gradient(circle_at_85%_0%,rgba(13,28,51,0.08),transparent_48%)]" />
                 <div className="buy-module__inner">
                   <div className="buy-module__zone buy-module__zone--product">
-                    <div className="buy-module__zoneHeader">
-                      <div className="buy-module__step">
-                        <span className="buy-module__stepBadge">Step 1</span>
-                        <span className="buy-module__stepLabel">Product</span>
-                      </div>
-                    </div>
                     <div className="buy-module__top">
                       <div className="buy-module__details order-2 min-w-0 space-y-3 lg:order-1">
-                        <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-                          Product details
-                        </div>
                         <div className="text-xl font-black text-[var(--text)] sm:text-2xl">
                           Classic gummy bears, made in the USA.
                         </div>
@@ -444,6 +435,12 @@ export default async function HomePage() {
                               <span>{bullet}</span>
                             </div>
                           ))}
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <span className="candy-pill">Made in USA</span>
+                          <span className="candy-pill">No artificial dyes</span>
+                          <span className="candy-pill">Ships in 24 hours</span>
+                          <span className="candy-pill">{FREE_SHIPPING_PHRASE}</span>
                         </div>
                         <div className="text-xs text-[var(--muted)]">
                           Ingredients &amp; allergen info:{" "}
@@ -457,7 +454,7 @@ export default async function HomePage() {
                       <div className="buy-module__image order-1 min-w-0 space-y-3 lg:order-2">
                         <div className="relative">
                           <div className="media-frame">
-                            <div className="relative aspect-[4/5] w-full bg-[var(--surface)]">
+                            <div className="relative aspect-[4/5] w-full bg-transparent">
                               <Image
                                 src="/Hero-pack.jpeg"
                                 alt="USA Gummies bag"
@@ -472,22 +469,7 @@ export default async function HomePage() {
                       </div>
                     </div>
                   </div>
-
-                  <div className="buy-module__trust">
-                    <span className="candy-pill">Made in USA</span>
-                    <span className="candy-pill">No artificial dyes</span>
-                    <span className="candy-pill">Ships in 24 hours</span>
-                    <span className="candy-pill">{FREE_SHIPPING_PHRASE}</span>
-                  </div>
-
-                  <div className="buy-module__divider" />
                   <div className="buy-module__bundle buy-module__zone buy-module__zone--bundle min-w-0">
-                    <div className="buy-module__zoneHeader">
-                      <div className="buy-module__step buy-module__step--bundle">
-                        <span className="buy-module__stepBadge">Step 2</span>
-                        <span className="buy-module__stepLabel">Pick your bundle</span>
-                      </div>
-                    </div>
                     <BundleQuickBuy
                       anchorId="bundle-pricing"
                       productHandle={handle}
@@ -497,7 +479,7 @@ export default async function HomePage() {
                       variant="compact"
                       tone="light"
                       surface="flat"
-                      layout="integrated"
+                      layout="fusion"
                       showHowItWorks={false}
                       summaryCopy=""
                       showTrainAccent

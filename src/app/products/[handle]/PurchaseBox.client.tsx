@@ -161,7 +161,7 @@ export default function PurchaseBox({
   product: Product;
   focus?: string;
   surface?: "card" | "flat";
-  layout?: "classic" | "integrated";
+  layout?: "classic" | "integrated" | "fusion";
 }) {
   const { bagCount } = useCartBagCount();
   const currentBags = Math.max(0, Number(bagCount) || 0);
@@ -187,6 +187,7 @@ export default function PurchaseBox({
     : "Mystery extra unlocks at 12 bags.";
   const isFlat = surface === "flat";
   const isIntegrated = layout === "integrated";
+  const isFusion = layout === "fusion";
 
   const variants = (product?.variants?.nodes || []) as VariantNode[];
   // Canonical ladder. Expose 1-3 bags plus core bundle sizes on-site.
@@ -447,7 +448,12 @@ export default function PurchaseBox({
   return (
     <section
       data-purchase-section="true"
-      className={cx("pbx pbx--metal", isFlat && "pbx--flat", isIntegrated && "pbx--integrated")}
+      className={cx(
+        "pbx pbx--metal",
+        isFlat && "pbx--flat",
+        isIntegrated && "pbx--integrated",
+        isFusion && "pbx--fusion"
+      )}
     >
       {/* Savings ladder */}
       <div
@@ -455,53 +461,53 @@ export default function PurchaseBox({
         className={cx("pbx__card", focusGlow && "pbx__glow")}
         aria-label="Bag count selection"
       >
-        <div className="pbx__cardHeader">
-          <div>
-            <div className="pbx__cardTitle pbx__cardTitle--gummy">
-              <HeroPackIcon size={20} className="pbx__packIcon" />
-              <span>Lock in your savings</span>
-              <GummyIconRow size={14} className="pbx__gummyRow" />
-            </div>
-            <div className="pbx__cardHint">
-              {cardHint}
-            </div>
-          </div>
-        </div>
-
         <div className="pbx__grid">
           <div className="pbx__guide">
+            <div className="pbx__cardHeader">
+              <div>
+                <div className="pbx__cardTitle pbx__cardTitle--gummy">
+                  <HeroPackIcon size={20} className="pbx__packIcon" />
+                  <span>Lock in your savings</span>
+                  <GummyIconRow size={14} className="pbx__gummyRow" />
+                </div>
+                <div className="pbx__cardHint">
+                  {cardHint}
+                </div>
+              </div>
+            </div>
+
             <div className="pbx__ladder">
               <div className="pbx__ladderTitle">Savings ladder</div>
               <div className="pbx__ladderGrid">
                 {SAVINGS_LADDER.map((milestone) => {
                   const isNext = !bestPriceReached && milestone.qty === nextMilestone.qty;
-              const isBest = bestPriceReached && milestone.qty === topMilestone.qty;
-              const isReached = currentBags >= milestone.qty;
-              const isPopularComplete =
-                milestone.qty === MISSION_TARGET_QTY && currentBags >= milestone.qty;
-              return (
-                <div
-                  key={milestone.qty}
-                  className={cx(
-                    "pbx__ladderItem",
-                    (isNext || isBest) && "pbx__ladderItem--next",
-                    isReached && !(isNext || isBest) && "pbx__ladderItem--reached"
-                  )}
-                >
-                  <div className="pbx__ladderLabel">{milestone.label}</div>
-                  <div className="pbx__ladderCaption">{milestone.caption}</div>
-                  {isNext ? (
-                    <div className="pbx__ladderNext">Next up</div>
-                  ) : isBest ? (
-                    <div className="pbx__ladderNext">Best price applied</div>
-                  ) : isPopularComplete ? (
-                    <div className="pbx__ladderNext">Most popular mission complete</div>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-          <div className="pbx__ladderProof">{MISSION_SOCIAL_PROOF}</div>
+                  const isBest = bestPriceReached && milestone.qty === topMilestone.qty;
+                  const isReached = currentBags >= milestone.qty;
+                  const isPopularComplete =
+                    milestone.qty === MISSION_TARGET_QTY && currentBags >= milestone.qty;
+                  return (
+                    <div
+                      key={milestone.qty}
+                      className={cx(
+                        "pbx__ladderItem",
+                        (isNext || isBest) && "pbx__ladderItem--next",
+                        isReached && !(isNext || isBest) && "pbx__ladderItem--reached"
+                      )}
+                    >
+                      <div className="pbx__ladderLabel">{milestone.label}</div>
+                      <div className="pbx__ladderCaption">{milestone.caption}</div>
+                      {isNext ? (
+                        <div className="pbx__ladderNext">Next up</div>
+                      ) : isBest ? (
+                        <div className="pbx__ladderNext">Best price applied</div>
+                      ) : isPopularComplete ? (
+                        <div className="pbx__ladderNext">Most popular mission complete</div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="pbx__ladderProof">{MISSION_SOCIAL_PROOF}</div>
             </div>
 
             <div className="pbx__mission">
@@ -589,253 +595,227 @@ export default function PurchaseBox({
               </div>
             </div>
 
-        <div className="pbx__complete">
-          <div className="pbx__completeTitle">Complete your savings</div>
-          {completeTargets.length ? (
-            <div className="pbx__completeGrid">
-              {completeTargets.map((target) => (
-                <button
-                  key={target.target}
-                  type="button"
-                  onClick={() => addToCart(target.addQty)}
-                  disabled={addingQty !== null}
-                  className="pbx__completeBtn"
-                >
-                  <span className="pbx__completeLabel">
-                    Lock in savings now: {target.addQty} bag{target.addQty === 1 ? "" : "s"} (total {target.target})
-                  </span>
-                  <span className="pbx__completePrice">
-                    {target.addTotalText ? `+${target.addTotalText}` : ""}
-                  </span>
-                </button>
-              ))}
+            <div className="pbx__freeShip">
+              Free shipping at 5+ bags (based on your total)
             </div>
-          ) : (
-            <div className="pbx__completeBadge">Best price unlocked.</div>
-          )}
-        </div>
 
-        <div className="pbx__freeShip">
-          Free shipping at 5+ bags (based on your total)
-        </div>
-
-        <div className="pbx__pricingNote">
-          <div className="pbx__pricingLine">
-            How pricing works: selections add bags, never replace your cart.
-          </div>
-          <details className="pbx__pricingDetails">
-            <summary className="pbx__pricingSummary">Learn more</summary>
-            <div className="pbx__pricingBody">
-              Savings start at 4 bags, free shipping unlocks at 5 bags, and the best per-bag price
-              shows up at 12 bags.{" "}
-              <Link href="/faq" className="pbx__pricingLink">
-                Read the FAQ
-              </Link>
-              .
+            <div className="pbx__pricingNote">
+              <div className="pbx__pricingLine">
+                How pricing works: selections add bags, never replace your cart.
+              </div>
+              <details className="pbx__pricingDetails">
+                <summary className="pbx__pricingSummary">Learn more</summary>
+                <div className="pbx__pricingBody">
+                  Savings start at 4 bags, free shipping unlocks at 5 bags, and the best per-bag price
+                  shows up at 12 bags.{" "}
+                  <Link href="/faq" className="pbx__pricingLink">
+                    Read the FAQ
+                  </Link>
+                  .
+                </div>
+              </details>
             </div>
-          </details>
-        </div>
           </div>
 
           <div className="pbx__select">
             <div className="pbx__options">
-          <div className="pbx__optionGroup" role="radiogroup" aria-label="Bag counts">
-            <div className="pbx__featured">
-            {featuredOptions.map((o) => {
-              const active = selectedQty === o.qty;
-              const badge = badgeForTotal(o.nextBags ?? o.qty);
-              const index = radioIndexByQty.get(o.qty) ?? 0;
-              const popular = (o.nextBags ?? o.qty) === 8;
-              const isAdded = lastAddedQty === o.qty;
-              const isAddingThis = addingQty === o.qty;
-              const tileCtaLabel = isAddingThis
-                ? "Locking in..."
-                : isAdded
-                  ? "Savings locked"
-                  : hasAdded
-                    ? "Lock in more savings"
-                    : "Lock in savings now";
+              <div className="pbx__optionGroup" role="radiogroup" aria-label="Bag counts">
+                <div className="pbx__featured">
+                  {featuredOptions.map((o) => {
+                    const active = selectedQty === o.qty;
+                    const badge = badgeForTotal(o.nextBags ?? o.qty);
+                    const index = radioIndexByQty.get(o.qty) ?? 0;
+                    const popular = (o.nextBags ?? o.qty) === 8;
+                    const isAdded = lastAddedQty === o.qty;
+                    const isAddingThis = addingQty === o.qty;
+                    const tileCtaLabel = isAddingThis
+                      ? "Locking in..."
+                      : isAdded
+                        ? "Savings locked"
+                        : hasAdded
+                          ? "Lock in more savings"
+                          : "Lock in savings now";
 
-              return (
-                <div
-                  key={`${o.qty}-${o.variant.id}`}
-                  onClick={() => setSelectedQty(o.qty)}
-                  onKeyDown={handleRadioKey(index)}
-                  ref={(el) => {
-                    radioRefs.current[index] = el;
-                  }}
-                  className={cx("pbx__tile", popular && "pbx__tile--popular", active && "pbx__tile--active")}
-                  role="radio"
-                  aria-checked={active}
-                  tabIndex={active ? 0 : -1}
-                >
-                  <div className="pbx__tileHeader">
-                    <span className="pbx__tileQty">{formatAddLabel(o.qty)}</span>
-                    {badge ? (
-                      <span className={cx("pbx__badge", popular && "pbx__badge--popular")}>
-                        {badge}
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="text-[11px] text-[var(--muted)]">
-                    New total: {o.nextBags ?? currentBags + o.qty} bags
-                  </div>
+                    return (
+                      <div
+                        key={`${o.qty}-${o.variant.id}`}
+                        onClick={() => setSelectedQty(o.qty)}
+                        onKeyDown={handleRadioKey(index)}
+                        ref={(el) => {
+                          radioRefs.current[index] = el;
+                        }}
+                        className={cx("pbx__tile", popular && "pbx__tile--popular", active && "pbx__tile--active")}
+                        role="radio"
+                        aria-checked={active}
+                        tabIndex={active ? 0 : -1}
+                      >
+                        <div className="pbx__tileHeader">
+                          <span className="pbx__tileQty">{formatAddLabel(o.qty)}</span>
+                          {badge ? (
+                            <span className={cx("pbx__badge", popular && "pbx__badge--popular")}>
+                              {badge}
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="text-[11px] text-[var(--muted)]">
+                          New total: {o.nextBags ?? currentBags + o.qty} bags
+                        </div>
 
-                  <div className="pbx__tilePriceRow">
-                    <div className="pbx__tilePrice">+{money(o.totalPrice, o.currencyCode)}</div>
-                    <div className="pbx__tilePer">
-                      Total after add: {money(o.nextTotal, o.currencyCode)} - ~{money(o.perBag, o.currencyCode)} / bag
-                    </div>
-                  </div>
+                        <div className="pbx__tilePriceRow">
+                          <div className="pbx__tilePrice">+{money(o.totalPrice, o.currencyCode)}</div>
+                          <div className="pbx__tilePer">
+                            Total after add: {money(o.nextTotal, o.currencyCode)} - ~{money(o.perBag, o.currencyCode)} / bag
+                          </div>
+                        </div>
 
-                  <div className="pbx__tileMeta">
-                    {o.savingsAmount > 0 ? (
-                      <span className="pbx__tileSave">Save {money(o.savingsAmount, o.currencyCode)} total</span>
-                    ) : (
-                      <span className="pbx__tileSave pbx__tileSave--muted">Standard price</span>
-                    )}
-                    {o.freeShipping ? <span className="pbx__tileShip">Free shipping</span> : null}
+                        <div className="pbx__tileMeta">
+                          {o.savingsAmount > 0 ? (
+                            <span className="pbx__tileSave">Save {money(o.savingsAmount, o.currencyCode)} total</span>
+                          ) : (
+                            <span className="pbx__tileSave pbx__tileSave--muted">Standard price</span>
+                          )}
+                          {o.freeShipping ? <span className="pbx__tileShip">Free shipping</span> : null}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            addToCart(o.qty);
+                          }}
+                          disabled={isAdding}
+                          className={cx(
+                            "pbx__tileCta",
+                            isAdded && "pbx__tileCta--added",
+                            hasAdded && !isAdded && "pbx__tileCta--upgrade"
+                          )}
+                        >
+                          {tileCtaLabel}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+                {showExtras ? (
+                  <div className="pbx__miniRow">
+                    {extraOptions.map((o) => {
+                      const active = selectedQty === o.qty;
+                      const label = formatAddLabel(o.qty);
+                      const index = radioIndexByQty.get(o.qty) ?? 0;
+
+                      return (
+                        <button
+                          key={`mini-${o.qty}-${o.variant.id}`}
+                          type="button"
+                          onClick={() => setSelectedQty(o.qty)}
+                          onKeyDown={handleRadioKey(index)}
+                          ref={(el) => {
+                            radioRefs.current[index] = el;
+                          }}
+                          className={cx("pbx__miniBtn", active && "pbx__miniBtn--active")}
+                          role="radio"
+                          aria-checked={active}
+                          tabIndex={active ? 0 : -1}
+                        >
+                          <span className="pbx__miniQty">{label}</span>
+                          <span className="pbx__miniPrice">+{money(o.totalPrice, o.currencyCode)}</span>
+                        </button>
+                      );
+                    })}
                   </div>
+                ) : null}
+              </div>
+              {extraOptions.length ? (
+                <div className="pbx__more">
                   <button
                     type="button"
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      addToCart(o.qty);
-                    }}
-                    disabled={isAdding}
-                    className={cx(
-                      "pbx__tileCta",
-                      isAdded && "pbx__tileCta--added",
-                      hasAdded && !isAdded && "pbx__tileCta--upgrade"
-                    )}
+                    className="pbx__moreLink"
+                    onClick={() => setShowMore((prev) => !prev)}
+                    disabled={hasExtraSelected}
                   >
-                    {tileCtaLabel}
+                    {toggleExtrasLabel}
                   </button>
                 </div>
-              );
-            })}
+              ) : null}
             </div>
-            {showExtras ? (
-              <div className="pbx__miniRow">
-                {extraOptions.map((o) => {
-                  const active = selectedQty === o.qty;
-                  const label = formatAddLabel(o.qty);
-                  const index = radioIndexByQty.get(o.qty) ?? 0;
 
-                  return (
+            <div className="pbx__complete">
+              <div className="pbx__completeTitle">Complete your savings</div>
+              {completeTargets.length ? (
+                <div className="pbx__completeGrid">
+                  {completeTargets.map((target) => (
                     <button
-                      key={`mini-${o.qty}-${o.variant.id}`}
+                      key={target.target}
                       type="button"
-                      onClick={() => setSelectedQty(o.qty)}
-                      onKeyDown={handleRadioKey(index)}
-                      ref={(el) => {
-                        radioRefs.current[index] = el;
-                      }}
-                      className={cx("pbx__miniBtn", active && "pbx__miniBtn--active")}
-                      role="radio"
-                      aria-checked={active}
-                      tabIndex={active ? 0 : -1}
+                      onClick={() => addToCart(target.addQty)}
+                      disabled={addingQty !== null}
+                      className="pbx__completeBtn"
                     >
-                      <span className="pbx__miniQty">{label}</span>
-                      <span className="pbx__miniPrice">+{money(o.totalPrice, o.currencyCode)}</span>
+                      <span className="pbx__completeLabel">
+                        Lock in savings now: {target.addQty} bag{target.addQty === 1 ? "" : "s"} (total {target.target})
+                      </span>
+                      <span className="pbx__completePrice">
+                        {target.addTotalText ? `+${target.addTotalText}` : ""}
+                      </span>
                     </button>
-                  );
-                })}
+                  ))}
+                </div>
+              ) : (
+                <div className="pbx__completeBadge">Best price unlocked.</div>
+              )}
+            </div>
+
+            <div className="pbx__summary" aria-live="polite" role="status">
+              <div className="pbx__summaryMeta">
+                <div className="pbx__summaryLabel">
+                  {selectedAdded ? "Savings locked" : "Lock in savings now"} {formatQtyLabel(optionQty)}
+                </div>
+                <div className="pbx__summaryPrice">+{selectedPriceText}</div>
+                {currentBags > 0 ? (
+                  <div className="pbx__summaryStatus pbx__summaryStatus--muted">
+                    New total: {selectedNextBags} bags - {selectedNextTotalText}
+                  </div>
+                ) : null}
+                {selectedAdded ? (
+                  <div className="pbx__summaryStatus pbx__summaryStatus--success">Bags added to cart.</div>
+                ) : null}
+                {error ? <div className="pbx__error">{error}</div> : null}
               </div>
-            ) : null}
-          </div>
-          {extraOptions.length ? (
-            <div className="pbx__more">
+
               <button
                 type="button"
-                className="pbx__moreLink"
-                onClick={() => setShowMore((prev) => !prev)}
-                disabled={hasExtraSelected}
+                disabled={isAdding}
+                onClick={() => addToCart()}
+                className={cx("pbx__cta", "pbx__cta--primary")}
               >
-                {toggleExtrasLabel}
+                {isAdding ? (
+                  <span className="inline-flex items-center gap-2">
+                    <span
+                      aria-hidden="true"
+                      className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent opacity-60"
+                    />
+                    Locking in...
+                  </span>
+                ) : (
+                  ctaLabel
+                )}
               </button>
-            </div>
-          ) : null}
-        </div>
-
-        <div className="pbx__summary" aria-live="polite" role="status">
-          <div className="pbx__summaryMeta">
-            <div className="pbx__summaryLabel">
-              {selectedAdded ? "Savings locked" : "Lock in savings now"} {formatQtyLabel(optionQty)}
-            </div>
-            <div className="pbx__summaryPrice">+{selectedPriceText}</div>
-            {currentBags > 0 ? (
-              <div className="pbx__summaryStatus pbx__summaryStatus--muted">
-                New total: {selectedNextBags} bags - {selectedNextTotalText}
+              <div className="pbx__ctaNote" aria-live="polite">
+                Love it or your money back - Ships within 24 hours - Limited daily production
               </div>
-            ) : null}
-            {selectedAdded ? (
-              <div className="pbx__summaryStatus pbx__summaryStatus--success">Bags added to cart.</div>
-            ) : null}
-            {error ? <div className="pbx__error">{error}</div> : null}
-          </div>
-
-          <button
-            type="button"
-            disabled={isAdding}
-            onClick={() => addToCart()}
-            className={cx("pbx__cta", "pbx__cta--primary")}
-          >
-            {isAdding ? (
-              <span className="inline-flex items-center gap-2">
-                <span
-                  aria-hidden="true"
-                  className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent opacity-60"
-                />
-                Locking in...
-              </span>
-            ) : (
-              ctaLabel
-            )}
-          </button>
-          <div className="pbx__ctaNote" aria-live="polite">
-            Love it or your money back - Ships within 24 hours - Limited daily production
-          </div>
-          <AmazonOneBagNote className="pbx__amazonNote" />
-          <div className="pbx__trust">
-            <div className="pbx__trustRating">
-              ⭐ {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars from verified Amazon buyers
-            </div>
-            <div className="pbx__trustBadges">
-              <span>Made in the USA</span>
-              <span>No artificial dyes</span>
-              <span>Money-back guarantee</span>
+              <AmazonOneBagNote className="pbx__amazonNote" />
+              <div className="pbx__trust">
+                <div className="pbx__trustRating">
+                  ⭐ {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars from verified Amazon buyers
+                </div>
+                <div className="pbx__trustBadges">
+                  <span>Made in the USA</span>
+                  <span>No artificial dyes</span>
+                  <span>Money-back guarantee</span>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-          </div>
-        </div>
-
-        <div className="pbx__complete">
-          <div className="pbx__completeTitle">Complete your savings</div>
-          {completeTargets.length ? (
-            <div className="pbx__completeGrid">
-              {completeTargets.map((target) => (
-                <button
-                  key={target.target}
-                  type="button"
-                  onClick={() => addToCart(target.addQty)}
-                  disabled={addingQty !== null}
-                  className="pbx__completeBtn"
-                >
-                  <span className="pbx__completeLabel">
-                    Lock in savings now: {target.addQty} bag{target.addQty === 1 ? "" : "s"} (total {target.target})
-                  </span>
-                  <span className="pbx__completePrice">
-                    {target.addTotalText ? `+${target.addTotalText}` : ""}
-                  </span>
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="pbx__completeBadge">Best price unlocked.</div>
-          )}
         </div>
       </div>
 
@@ -855,10 +835,30 @@ export default function PurchaseBox({
         .pbx--integrated .pbx__cardHeader{
           margin-bottom: 6px;
         }
+        .pbx--fusion .pbx__cardTitle{
+          font-size: 13px;
+          letter-spacing: 0.22em;
+          text-transform: uppercase;
+        }
+        .pbx--fusion .pbx__cardTitle--gummy{
+          gap: 6px;
+        }
+        .pbx--fusion .pbx__packIcon{
+          width: 16px;
+          height: 16px;
+        }
+        .pbx--fusion .pbx__gummyRow{
+          transform: scale(0.9);
+          transform-origin: left center;
+        }
+        .pbx--fusion .pbx__cardHint{
+          font-size: 12px;
+          color: var(--muted);
+        }
         .pbx__grid{
-          margin-top: 12px;
+          margin-top: 0;
           display: grid;
-          gap: 16px;
+          gap: 14px;
         }
         .pbx__guide,
         .pbx__select{

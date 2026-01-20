@@ -41,7 +41,7 @@ type Props = {
   otherQuantitiesLabel?: string;
   otherQuantities?: number[];
   surface?: "card" | "flat";
-  layout?: "classic" | "integrated";
+  layout?: "classic" | "integrated" | "fusion";
 };
 
 function money(amount?: number | null, currency = "USD") {
@@ -138,6 +138,7 @@ export default function BundleQuickBuy({
   const isLight = tone === "light";
   const isFlat = surface === "flat";
   const isIntegrated = layout === "integrated";
+  const isFusion = layout === "fusion";
 
   const allTiers = React.useMemo(() => {
     const allowed = (tiers || []).filter((t) => {
@@ -420,7 +421,9 @@ export default function BundleQuickBuy({
           className={[
             "relative w-full snap-start border-2 px-4 py-4 text-left transition-[border-color,background-color,box-shadow,transform] duration-150 ease-out",
           "rounded-[12px] min-h-[190px] sm:min-h-[200px] w-full",
-          isIntegrated ? "sm:max-w-none sm:justify-self-stretch" : "sm:max-w-[280px] sm:justify-self-center",
+          isIntegrated || isFusion
+            ? "sm:max-w-none sm:justify-self-stretch"
+            : "sm:max-w-[280px] sm:justify-self-center",
             isLight
               ? "bg-white text-[var(--text)] border-[rgba(15,27,45,0.14)] shadow-[0_10px_22px_rgba(15,27,45,0.08)]"
               : "bg-[linear-gradient(180deg,rgba(10,16,30,0.96),rgba(8,12,24,0.92))] text-white border-white/15 shadow-[0_12px_24px_rgba(7,12,20,0.45)]",
@@ -957,6 +960,213 @@ export default function BundleQuickBuy({
         >
           View product details
         </Link>
+      </section>
+    );
+  }
+
+  if (isFusion) {
+    return (
+      <section id={anchorId} aria-label="Savings pricing" className="bundle-fusion">
+        {showTrainAccent ? (
+          <Image
+            src="/website%20assets/B17Bomber.png"
+            alt=""
+            aria-hidden="true"
+            width={1405}
+            height={954}
+            sizes="(max-width: 640px) 80vw, 640px"
+            className="bundle-fusion__accent"
+          />
+        ) : null}
+
+        <div className="bundle-fusion__grid">
+          <div className="bundle-fusion__guide">
+            <div className="bundle-fusion__intro">
+              <div className="bundle-fusion__eyebrow">Bundle &amp; save</div>
+              <div className="bundle-fusion__title">Choose your bag count</div>
+              <div className="bundle-fusion__sub">
+                Add more bags and watch your per-bag price drop. Savings apply to your total bag count.
+              </div>
+              {summaryLine ? (
+                <div className="bundle-fusion__summary">{summaryLine}</div>
+              ) : null}
+            </div>
+
+            <div className="bundle-fusion__rail">
+              {SAVINGS_LADDER.map((milestone) => {
+                const isNext = !bestPriceReached && milestone.qty === nextMilestone.qty;
+                const isBest = bestPriceReached && milestone.qty === topMilestone.qty;
+                const isReached = currentBags >= milestone.qty;
+                const isActive = isNext || isBest;
+                return (
+                  <div
+                    key={milestone.qty}
+                    className={[
+                      "bundle-fusion__milestone",
+                      isActive ? "bundle-fusion__milestone--active" : "",
+                      isReached && !isActive ? "bundle-fusion__milestone--reached" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                  >
+                    <span className="bundle-fusion__milestoneDot" aria-hidden="true" />
+                    <div className="bundle-fusion__milestoneLabel">{milestone.label}</div>
+                    <div className="bundle-fusion__milestoneCaption">{milestone.caption}</div>
+                    {isActive ? (
+                      <div className="bundle-fusion__milestoneNote">
+                        {isBest ? "Best price applied" : "Next up"}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="bundle-fusion__railProof">{MISSION_SOCIAL_PROOF}</div>
+
+            <div className="bundle-fusion__mission">
+              <div className="bundle-fusion__missionHeader">
+                <span>Mission to savings</span>
+                <span>
+                  Progress: {missionProgressCount}/{topMilestone.qty} bags
+                </span>
+              </div>
+              <div className="bundle-fusion__missionCopy">
+                Hit 8 bags to unlock the crowd-favorite price.
+              </div>
+              <div className="mission-bar" aria-hidden="true">
+                <div className="mission-bar__fill" style={{ width: `${missionProgressPct}%` }} />
+                {SAVINGS_LADDER.map((milestone) => {
+                  const left = (milestone.qty / topMilestone.qty) * 100;
+                  const reached = currentBags >= milestone.qty;
+                  const isNext = !bestPriceReached && milestone.qty === nextMilestone.qty;
+                  return (
+                    <span
+                      key={milestone.qty}
+                      className={[
+                        "mission-bar__tick",
+                        reached ? "mission-bar__tick--reached" : "",
+                        isNext ? "mission-bar__tick--next" : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                      style={{ left: `${left}%` }}
+                    />
+                  );
+                })}
+              </div>
+              <div className="bundle-fusion__missionBadges">
+                {[
+                  { qty: 4, label: "Savings unlocked" },
+                  { qty: 5, label: "Free shipping unlocked" },
+                  { qty: 8, label: "Crowd favorite unlocked" },
+                  {
+                    qty: 12,
+                    label: bestPriceReached ? "Mystery extra revealed" : "Mystery extra unlocks",
+                  },
+                ].map((badge) => {
+                  const unlocked = currentBags >= badge.qty;
+                  return (
+                    <span
+                      key={badge.qty}
+                      className={[
+                        "bundle-fusion__missionBadge",
+                        unlocked ? "bundle-fusion__missionBadge--active" : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                    >
+                      {badge.label}
+                    </span>
+                  );
+                })}
+              </div>
+              <div className="bundle-fusion__missionActions">
+                {missionRemaining > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => addToCart(missionRemaining, "mission")}
+                    disabled={addingQty !== null || !singleBagVariantId}
+                    className="btn btn-candy pressable"
+                  >
+                    {addingQty ? "Locking in..." : missionCtaLabel}
+                  </button>
+                ) : (
+                  <span className="bundle-fusion__missionDone">{missionCtaLabel}</span>
+                )}
+              </div>
+              <div className="bundle-fusion__missionNote">{mysteryBonusLine}</div>
+            </div>
+
+            {showHowItWorks ? (
+              <div className="bundle-fusion__how">
+                <div className="text-[11px] font-semibold">
+                  How pricing works: selections add bags, never replace your cart.
+                </div>
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-[11px] font-semibold text-[var(--text)]">
+                    Learn more
+                  </summary>
+                  <div className="mt-1 text-[11px] text-[var(--muted)]">
+                    Savings start at 4 bags, free shipping unlocks at 5 bags, and per-bag pricing caps at {perBagCapText} after 12+ bags.{" "}
+                    <Link href="/faq" className="underline underline-offset-2">
+                      Read the FAQ
+                    </Link>
+                    .
+                  </div>
+                </details>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="bundle-fusion__select">
+            <div className="bundle-fusion__selectHeader">Pick your bundle</div>
+            {isCompact ? (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4" role="radiogroup" aria-label="Bag count">
+                {expandedTiers.map((tier) => renderRow(tier))}
+              </div>
+            ) : (
+              <div className="relative">
+                <div
+                  className={[
+                    "pointer-events-none absolute left-0 top-0 h-full w-10",
+                    "bg-[linear-gradient(90deg,rgba(12,20,38,0.12),transparent)]",
+                  ].join(" ")}
+                />
+                <div
+                  className={[
+                    "pointer-events-none absolute right-0 top-0 h-full w-10",
+                    "bg-[linear-gradient(270deg,rgba(12,20,38,0.12),transparent)]",
+                  ].join(" ")}
+                />
+                <div className="flex snap-x snap-mandatory gap-2.5 overflow-x-auto pb-2 pr-4 bundle-slider">
+                  {expandedTiers.map((tier) => renderRow(tier))}
+                </div>
+              </div>
+            )}
+
+            {showOtherQuantitiesLink && !showOtherQuantities ? (
+              <button
+                type="button"
+                onClick={() => setShowOtherQuantities(true)}
+                className="bundle-fusion__more"
+              >
+                {otherQuantitiesLabel}
+              </button>
+            ) : null}
+
+            <div
+              className={[
+                "bundle-fusion__cta",
+                !isCompact ? "bundle-fusion__cta--sticky" : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              ref={ctaRef}
+            >
+              {ctaContent}
+            </div>
+          </div>
+        </div>
       </section>
     );
   }
