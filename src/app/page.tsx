@@ -420,24 +420,14 @@ export default async function HomePage() {
                 id="hero-primary-cta"
                 className="bundle-home relative overflow-hidden rounded-[36px] border border-[rgba(15,27,45,0.12)] bg-white shadow-[0_24px_60px_rgba(15,27,45,0.12)]"
               >
-                <div className="grid gap-0 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
-                  <div className="order-2 min-w-0 space-y-3 p-5 sm:p-6 lg:order-1">
+                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_10%,rgba(199,160,98,0.18),transparent_45%),radial-gradient(circle_at_85%_0%,rgba(13,28,51,0.08),transparent_48%)]" />
+                <div className="relative grid gap-0 lg:grid-cols-[0.9fr_0.95fr_1.15fr] lg:items-start">
+                  <div className="order-3 min-w-0 space-y-3 p-5 sm:p-6 lg:order-1">
                     <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
                       Product details
                     </div>
                     <div className="text-xl font-black text-[var(--text)] sm:text-2xl">
                       Classic gummy bears, made in the USA.
-                    </div>
-                    <div className="media-frame">
-                      <div className="relative aspect-[4/5] w-full bg-[var(--surface)]">
-                        <Image
-                          src="/Hero-pack.jpeg"
-                          alt="USA Gummies bag"
-                          fill
-                          sizes="(max-width: 640px) 90vw, (max-width: 1024px) 45vw, 520px"
-                          className="object-contain drop-shadow-[0_18px_40px_rgba(13,28,51,0.18)]"
-                        />
-                      </div>
                     </div>
                     <div className="grid gap-2 text-sm text-[var(--muted)]">
                       {DETAIL_BULLETS.slice(0, 3).map((bullet) => (
@@ -446,6 +436,11 @@ export default async function HomePage() {
                           <span>{bullet}</span>
                         </div>
                       ))}
+                    </div>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <span className="badge badge--navy">Made in USA</span>
+                      <span className="badge">No artificial dyes</span>
+                      <span className="badge">{FREE_SHIPPING_PHRASE}</span>
                     </div>
                     <div className="text-xs text-[var(--muted)]">
                       Ingredients &amp; allergen info:{" "}
@@ -456,7 +451,29 @@ export default async function HomePage() {
                     </div>
                   </div>
 
-                  <div className="order-1 min-w-0 border-b border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] p-4 sm:p-5 lg:order-2 lg:border-b-0 lg:border-l">
+                  <div className="order-1 min-w-0 border-b border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] p-5 sm:p-6 lg:order-2 lg:border-b-0 lg:border-x">
+                    <div className="relative">
+                      <div className="media-frame">
+                        <div className="relative aspect-[4/5] w-full bg-[var(--surface)]">
+                          <Image
+                            src="/Hero-pack.jpeg"
+                            alt="USA Gummies bag"
+                            fill
+                            sizes="(max-width: 640px) 90vw, (max-width: 1024px) 45vw, 520px"
+                            className="object-contain drop-shadow-[0_18px_40px_rgba(13,28,51,0.18)]"
+                          />
+                        </div>
+                      </div>
+                      <span className="usa-stamp usa-stamp--small absolute left-4 top-4">Made in USA</span>
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-[var(--muted)]">
+                      <span className="candy-pill">All natural flavors</span>
+                      <span className="candy-pill">Dye-free</span>
+                      <span className="candy-pill">Ships in 24 hours</span>
+                    </div>
+                  </div>
+
+                  <div className="order-2 min-w-0 p-4 sm:p-5 lg:order-3">
                     <BundleQuickBuy
                       anchorId="bundle-pricing"
                       productHandle={handle}
