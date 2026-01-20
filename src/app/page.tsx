@@ -423,11 +423,11 @@ export default async function HomePage() {
                 <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_10%,rgba(199,160,98,0.18),transparent_45%),radial-gradient(circle_at_85%_0%,rgba(13,28,51,0.08),transparent_48%)]" />
                 <div className="buy-module__inner">
                   <div className="buy-module__layout">
-                    <div className="buy-module__details min-w-0 space-y-3">
+                    <div className="buy-module__details min-w-0">
                       <div className="text-xl font-black text-[var(--text)] sm:text-2xl">
                         Classic gummy bears, made in the USA.
                       </div>
-                      <div className="grid gap-2 text-sm text-[var(--muted)]">
+                      <div className="grid gap-1.5 text-sm text-[var(--muted)]">
                         {DETAIL_BULLETS.slice(0, 3).map((bullet) => (
                           <div key={bullet} className="flex items-start gap-2">
                             <span className="mt-1.5 h-2 w-2 rounded-full bg-[var(--gold)]" />
@@ -470,20 +470,22 @@ export default async function HomePage() {
                       />
                     </div>
 
-                    <div className="buy-module__image min-w-0 space-y-3">
-                      <div className="relative">
-                        <div className="media-frame">
-                          <div className="relative aspect-[4/5] w-full bg-transparent">
-                            <Image
-                              src="/Hero-pack.jpeg"
-                              alt="USA Gummies bag"
-                              fill
-                              sizes="(max-width: 640px) 90vw, (max-width: 1024px) 45vw, 520px"
-                              className="object-contain drop-shadow-[0_18px_40px_rgba(13,28,51,0.18)]"
-                            />
+                    <div className="buy-module__image min-w-0">
+                      <div className="buy-module__imagePanel">
+                        <div className="relative">
+                          <div className="media-frame">
+                            <div className="relative aspect-[4/5] w-full bg-transparent">
+                              <Image
+                                src="/Hero-pack.jpeg"
+                                alt="USA Gummies bag"
+                                fill
+                                sizes="(max-width: 640px) 90vw, (max-width: 1024px) 45vw, 520px"
+                                className="object-contain drop-shadow-[0_18px_40px_rgba(13,28,51,0.18)]"
+                              />
+                            </div>
                           </div>
+                          <span className="usa-stamp usa-stamp--small absolute left-4 top-4">Made in USA</span>
                         </div>
-                        <span className="usa-stamp usa-stamp--small absolute left-4 top-4">Made in USA</span>
                       </div>
                     </div>
                   </div>

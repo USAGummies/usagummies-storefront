@@ -379,12 +379,12 @@ export default async function ShopPage() {
               <div className="buy-module__layout">
                 <div
                   id="product-details"
-                  className="buy-module__details min-w-0 space-y-4 scroll-mt-24"
+                  className="buy-module__details min-w-0 scroll-mt-24"
                 >
                   <h2 className="text-2xl font-black text-[var(--text)] sm:text-3xl">
                     {productTitle}
                   </h2>
-                  <div className="grid gap-2 text-sm text-[var(--muted)]">
+                  <div className="grid gap-1.5 text-sm text-[var(--muted)]">
                     {DETAIL_BULLETS.map((bullet) => (
                       <div key={bullet} className="flex items-start gap-2">
                         <span className="mt-1.5 h-2 w-2 rounded-full bg-[var(--gold)]" />
@@ -425,14 +425,16 @@ export default async function ShopPage() {
                   )}
                 </div>
 
-                <div className="buy-module__image min-w-0 space-y-3">
-                  <div className="relative">
-                    <ProductGallery
-                      title={productTitle}
-                      featured={productFeatured}
-                      images={productImages}
-                    />
-                    <span className="usa-stamp usa-stamp--small absolute left-4 top-4">Made in USA</span>
+                <div className="buy-module__image min-w-0">
+                  <div className="buy-module__imagePanel">
+                    <div className="relative">
+                      <ProductGallery
+                        title={productTitle}
+                        featured={productFeatured}
+                        images={productImages}
+                      />
+                      <span className="usa-stamp usa-stamp--small absolute left-4 top-4">Made in USA</span>
+                    </div>
                   </div>
                 </div>
               </div>
