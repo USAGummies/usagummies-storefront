@@ -1260,7 +1260,7 @@ export default function BundleQuickBuy({
                   <span className={isLight ? "text-[var(--candy-yellow)]" : "text-[var(--gold)]"}>
                     {starLine(review.rating)}
                   </span>
-                  <span className="truncate">"{review.body}" — {review.author}</span>
+                  <span className="truncate">&quot;{review.body}&quot; — {review.author}</span>
                 </div>
               ))}
             </div>

@@ -110,8 +110,8 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
           )}
           aria-hidden={!open}
         >
-          <div className="h-full rounded-none border-l border-[var(--border)] bg-white text-[var(--text)]">
-            <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
+          <div className="h-full rounded-none border-l border-[var(--border)] bg-[var(--surface)] text-[var(--text)] sm:rounded-l-[var(--radius-xl)] sm:shadow-[var(--shadow-card)]">
+            <div className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--surface-strong)] px-4 py-3">
               <div className="text-lg font-black text-[var(--text)]">Your cart</div>
               <button
                 type="button"

@@ -41,7 +41,7 @@ export function ReviewHighlights({ variant = "light", limit = 2 }: Props) {
               {stars(review.rating)}
             </div>
             <div className={cn("mt-1 text-sm", isDark ? "text-white/80" : "text-[var(--muted)]")}>
-              "{review.body}"
+              &quot;{review.body}&quot;
             </div>
             <div
               className={cn(
