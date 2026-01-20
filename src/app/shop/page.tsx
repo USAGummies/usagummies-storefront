@@ -375,8 +375,8 @@ export default async function ShopPage() {
       <section id="bundle-pricing" aria-label="Savings pricing" className="bg-[#fffdf8] scroll-mt-24">
         <div className="mx-auto max-w-6xl px-4 pb-8 lg:pb-10">
           <div className="candy-panel overflow-hidden rounded-[36px] p-0">
-            <div className="grid gap-0 lg:grid-cols-[0.9fr_1fr_1.1fr] lg:items-start">
-              <div id="product-details" className="order-3 min-w-0 space-y-4 scroll-mt-24 p-5 sm:p-6 lg:order-1">
+            <div className="grid gap-0 lg:grid-cols-[1fr_1fr] lg:items-start">
+              <div id="product-details" className="order-2 min-w-0 space-y-4 scroll-mt-24 p-5 sm:p-6 lg:order-1">
                 <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
                   Product details
                 </div>
@@ -411,7 +411,7 @@ export default async function ShopPage() {
                 </div>
               </div>
 
-              <div className="order-1 min-w-0 border-b border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] p-5 sm:p-6 lg:order-2 lg:border-b-0 lg:border-x">
+              <div className="order-1 min-w-0 border-b border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] p-5 sm:p-6 lg:order-2 lg:border-b-0 lg:border-l">
                 <div className="relative">
                   <ProductGallery
                     title={productTitle}
@@ -426,16 +426,16 @@ export default async function ShopPage() {
                   <span className="candy-pill">Ships in 24 hours</span>
                 </div>
               </div>
+            </div>
 
-              <div className="order-2 min-w-0 p-4 sm:p-5 lg:order-3">
-                {purchaseProduct ? (
-                  <PurchaseBox product={purchaseProduct as any} />
-                ) : (
-                  <div className="p-4 text-sm text-[var(--muted)]">
-                    Product details are loading. Please refresh to view savings pricing.
-                  </div>
-                )}
-              </div>
+            <div className="border-t border-[rgba(15,27,45,0.12)] bg-white p-4 sm:p-5 lg:p-6">
+              {purchaseProduct ? (
+                <PurchaseBox product={purchaseProduct as any} />
+              ) : (
+                <div className="p-4 text-sm text-[var(--muted)]">
+                  Product details are loading. Please refresh to view savings pricing.
+                </div>
+              )}
             </div>
 
             <div className="border-t border-[rgba(15,27,45,0.12)] p-4 sm:p-5">
