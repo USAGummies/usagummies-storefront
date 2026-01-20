@@ -831,12 +831,8 @@ a:focus-visible:not(.btn):not(.focus-ring),
 .bundle-fusion__grid{
   display: grid;
   gap: 16px;
-}
-@media (min-width: 1024px){
-  .bundle-fusion__grid{
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    align-items: start;
-  }
+  grid-template-columns: 1fr;
+  align-items: start;
 }
 .bundle-fusion__guide,
 .bundle-fusion__select{
@@ -950,6 +946,12 @@ a:focus-visible:not(.btn):not(.focus-ring),
   flex-wrap: wrap;
   gap: 8px;
 }
+.bundle-fusion__missionActions .btn{
+  height: 36px;
+  padding: 0 12px;
+  font-size: 11px;
+  font-weight: 700;
+}
 .bundle-fusion__missionDone{
   font-size: 10px;
   font-weight: 700;
@@ -973,6 +975,146 @@ a:focus-visible:not(.btn):not(.focus-ring),
   letter-spacing: 0.24em;
   text-transform: uppercase;
   color: var(--muted);
+}
+.bundle-fusion__list{
+  display: grid;
+  gap: 0;
+  border-top: 1px solid rgba(15,27,45,0.12);
+  border-bottom: 1px solid rgba(15,27,45,0.12);
+}
+.bundle-fusion__row{
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 0;
+  transition: background 0.16s ease, border-color 0.16s ease;
+}
+.bundle-fusion__row + .bundle-fusion__row{
+  border-top: 1px solid rgba(15,27,45,0.08);
+}
+.bundle-fusion__row--active{
+  background: rgba(239,59,59,0.05);
+  border-left: 3px solid var(--candy-red);
+  padding-left: 12px;
+}
+.bundle-fusion__row--popular{
+  background: rgba(239,59,59,0.03);
+}
+.bundle-fusion__row--disabled{
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.bundle-fusion__rowInfo{
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.bundle-fusion__rowHeader{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.bundle-fusion__rowQty{
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text);
+}
+.bundle-fusion__rowBadge{
+  border: 1px solid rgba(15,27,45,0.12);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.bundle-fusion__rowBadge--accent{
+  border-color: rgba(239,59,59,0.35);
+  background: rgba(239,59,59,0.08);
+  color: var(--candy-red);
+}
+.bundle-fusion__rowBadge--ghost{
+  visibility: hidden;
+}
+.bundle-fusion__rowPrice{
+  display: grid;
+  gap: 2px;
+}
+.bundle-fusion__rowAdd{
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--text);
+}
+.bundle-fusion__rowTotal{
+  font-size: 12px;
+  color: var(--muted);
+}
+.bundle-fusion__rowMeta{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 11px;
+}
+.bundle-fusion__rowSave{
+  font-weight: 700;
+  color: var(--candy-red);
+}
+.bundle-fusion__rowSave--muted{
+  color: var(--muted);
+}
+.bundle-fusion__rowShip{
+  font-weight: 600;
+  color: var(--muted);
+}
+.bundle-fusion__rowCta{
+  border: 1px solid rgba(15,27,45,0.16);
+  background: #ffffff;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  transition: border-color 0.16s ease, background 0.16s ease, color 0.16s ease;
+}
+.bundle-fusion__rowCta:hover{
+  border-color: rgba(239,59,59,0.35);
+  background: rgba(239,59,59,0.08);
+}
+.bundle-fusion__rowCta:active{
+  transform: translateY(1px);
+}
+.bundle-fusion__rowCta--active{
+  border-color: rgba(239,59,59,0.45);
+  background: rgba(239,59,59,0.12);
+  color: var(--candy-red);
+}
+.bundle-fusion__rowCta--added{
+  border-color: rgba(34,197,94,0.4);
+  background: rgba(34,197,94,0.12);
+  color: rgba(21,128,61,0.95);
+}
+.bundle-fusion__rowCta--upgrade{
+  border-color: rgba(239,59,59,0.35);
+  background: rgba(239,59,59,0.1);
+  color: var(--candy-red);
+}
+.bundle-fusion__rowCta:disabled{
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+@media (max-width: 640px){
+  .bundle-fusion__row{
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+  .bundle-fusion__rowCta{
+    width: 100%;
+    justify-self: start;
+  }
 }
 .bundle-fusion__cta{
   border-top: 1px solid rgba(15,27,45,0.12);
@@ -1019,7 +1161,7 @@ a:focus-visible:not(.btn):not(.focus-ring),
 }
 .buy-module__layout{
   display: grid;
-  gap: 16px;
+  gap: 12px;
   grid-template-areas:
     "details"
     "bundle"

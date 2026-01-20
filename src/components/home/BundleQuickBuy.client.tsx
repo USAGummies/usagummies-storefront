@@ -409,6 +409,92 @@ export default function BundleQuickBuy({
                   ? "Trial size"
                   : "";
       const hasLabel = Boolean(label);
+
+      if (isFusion) {
+        return (
+          <div
+            key={tier.quantity}
+            role="radio"
+            aria-checked={isActive}
+            aria-disabled={!canSelect}
+            tabIndex={isActive && canSelect ? 0 : -1}
+            onClick={() => handleSelect(tier.quantity, canSelect)}
+            onKeyDown={(event) => handleRadioKeyDown(event, tier.quantity, canSelect)}
+            className={[
+              "bundle-fusion__row",
+              isActive ? "bundle-fusion__row--active" : "",
+              isEight ? "bundle-fusion__row--popular" : "",
+              unavailable ? "bundle-fusion__row--disabled" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            <div className="bundle-fusion__rowInfo">
+              <div className="bundle-fusion__rowHeader">
+                <div className="bundle-fusion__rowQty">+{tier.quantity} bags</div>
+                {label ? (
+                  <span
+                    className={[
+                      "bundle-fusion__rowBadge",
+                      isEight ? "bundle-fusion__rowBadge--accent" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                  >
+                    {label}
+                  </span>
+                ) : (
+                  <span className="bundle-fusion__rowBadge bundle-fusion__rowBadge--ghost">
+                    {hasLabel ? label : "Label"}
+                  </span>
+                )}
+              </div>
+              <div className="bundle-fusion__rowPrice">
+                <div className="bundle-fusion__rowAdd">
+                  {displayAdd ? `+${displayAdd}` : "—"}
+                </div>
+                <div className="bundle-fusion__rowTotal">
+                  {displayTotal ? `New total: ${displayTotal}` : "Standard price"}
+                  {displayPerBag ? ` • ${displayPerBag}` : ""}
+                </div>
+              </div>
+              <div className="bundle-fusion__rowMeta">
+                {savingsValue ? (
+                  <span className="bundle-fusion__rowSave">
+                    Save {money(savingsValue, "USD")} total
+                  </span>
+                ) : (
+                  <span className="bundle-fusion__rowSave bundle-fusion__rowSave--muted">
+                    Standard price
+                  </span>
+                )}
+                {showFreeShipping ? (
+                  <span className="bundle-fusion__rowShip">Free shipping</span>
+                ) : null}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                addToCart(tier.quantity, "tile");
+              }}
+              disabled={unavailable || isAdding}
+              className={[
+                "bundle-fusion__rowCta",
+                isActive ? "bundle-fusion__rowCta--active" : "",
+                isAdded ? "bundle-fusion__rowCta--added" : hasAdded ? "bundle-fusion__rowCta--upgrade" : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+            >
+              {tileCtaLabel}
+            </button>
+          </div>
+        );
+      }
+
       return (
         <div
           key={tier.quantity}
@@ -1119,9 +1205,8 @@ export default function BundleQuickBuy({
           </div>
 
           <div className="bundle-fusion__select">
-            <div className="bundle-fusion__selectHeader">Pick your bundle</div>
             {isCompact ? (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4" role="radiogroup" aria-label="Bag count">
+              <div className="bundle-fusion__list" role="radiogroup" aria-label="Bag count">
                 {expandedTiers.map((tier) => renderRow(tier))}
               </div>
             ) : (
