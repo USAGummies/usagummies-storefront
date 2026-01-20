@@ -985,7 +985,7 @@ export default function BundleQuickBuy({
                 </div>
                 {Number.isFinite(selectedTierState?.nextTotal ?? NaN) ? (
                   <div
-                    key={`${selectedTier.quantity}-${selectedTierState.nextTotal}`}
+                    key={`${selectedTier.quantity}-${selectedTierState?.nextTotal ?? "na"}`}
                     className="price-pop"
                   >
                     {`Total after add: ${money(selectedTierState?.nextTotal, "USD")}`}
@@ -993,7 +993,7 @@ export default function BundleQuickBuy({
                 ) : null}
                 {Number.isFinite(selectedTierState?.perBag ?? NaN) ? (
                   <div
-                    key={`${selectedTier.quantity}-${selectedTierState.perBag}`}
+                    key={`${selectedTier.quantity}-${selectedTierState?.perBag ?? "na"}`}
                     className="price-pop"
                   >
                     {`~${money(selectedTierState?.perBag, "USD")} / bag`}
@@ -1113,7 +1113,7 @@ export default function BundleQuickBuy({
                 : "inline-flex items-center gap-2 font-semibold text-white underline underline-offset-4 hover:text-white/90"
           }
         >
-          Explore more bag sizes ->
+          Explore more bag sizes
         </Link>
       </div>
     </section>
