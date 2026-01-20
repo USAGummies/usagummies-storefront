@@ -81,6 +81,8 @@ const SAVINGS_LADDER = [
   { qty: 8, label: "Most popular", caption: "8 bags" },
   { qty: 12, label: "Best price", caption: "12 bags" },
 ];
+const MISSION_TARGET_QTY = 8;
+const MISSION_SOCIAL_PROOF = "87% of shoppers end at 8 bags.";
 
 export default function BundleQuickBuy({
   tiers = [],
@@ -108,6 +110,19 @@ export default function BundleQuickBuy({
   const nextMilestone = bestPriceReached
     ? topMilestone
     : SAVINGS_LADDER.find((milestone) => currentBags < milestone.qty) || topMilestone;
+  const missionRemaining = Math.max(0, MISSION_TARGET_QTY - currentBags);
+  const missionProgressCount = Math.min(currentBags, topMilestone.qty);
+  const missionProgressPct = Math.min(
+    100,
+    Math.round((missionProgressCount / topMilestone.qty) * 100)
+  );
+  const missionCtaLabel =
+    missionRemaining > 0
+      ? `Complete the mission: add ${missionRemaining} bag${missionRemaining === 1 ? "" : "s"}`
+      : "Most popular mission complete";
+  const mysteryBonusLine = bestPriceReached
+    ? "Mystery extra revealed: Patriot Pride sticker (while supplies last)."
+    : "Mystery extra unlocks at 12 bags.";
   const ctaRef = React.useRef<HTMLDivElement | null>(null);
   const [selected, setSelected] = React.useState<TierKey>("8");
   const [addingQty, setAddingQty] = React.useState<number | null>(null);
@@ -275,7 +290,10 @@ export default function BundleQuickBuy({
     return () => window.clearTimeout(t);
   }, [success]);
 
-  async function addToCart(targetQty?: number, source: "cta" | "tile" = "cta") {
+  async function addToCart(
+    targetQty?: number,
+    source: "cta" | "tile" | "mission" = "cta"
+  ) {
     const qty = Math.max(1, Number(targetQty ?? selectedTier?.quantity ?? 0) || 0);
     const targetTier = expandedTiers.find((tier) => tier.quantity === qty) || selectedTier;
     if (!singleBagVariantId || !isTierPurchasable(targetTier) || !qty) {
@@ -772,6 +790,8 @@ export default function BundleQuickBuy({
               const isNext = !bestPriceReached && milestone.qty === nextMilestone.qty;
               const isBest = bestPriceReached && milestone.qty === topMilestone.qty;
               const isReached = currentBags >= milestone.qty;
+              const isPopularComplete =
+                milestone.qty === MISSION_TARGET_QTY && currentBags >= milestone.qty;
               return (
                 <div
                   key={milestone.qty}
@@ -812,6 +832,15 @@ export default function BundleQuickBuy({
                     >
                       Best price applied
                     </div>
+                  ) : isPopularComplete ? (
+                    <div
+                      className={[
+                        "text-[10px] font-semibold",
+                        isLight ? "text-[var(--candy-red)]" : "text-[var(--gold)]",
+                      ].join(" ")}
+                    >
+                      Most popular mission complete
+                    </div>
                   ) : null}
                 </div>
               );
@@ -823,7 +852,100 @@ export default function BundleQuickBuy({
               isLight ? "text-[var(--muted)]" : "text-white/70",
             ].join(" ")}
           >
-            Most customers check out with 8 bags.
+            {MISSION_SOCIAL_PROOF}
+          </div>
+          <div
+            className={[
+              "mt-3 rounded-2xl border px-3 py-3 text-xs",
+              isLight
+                ? "border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] text-[var(--muted)]"
+                : "border-white/12 bg-white/5 text-white/70",
+            ].join(" ")}
+          >
+            <div className="text-[10px] font-semibold uppercase tracking-[0.24em]">
+              Mission to savings
+            </div>
+            <div
+              className={[
+                "mt-1 flex flex-wrap items-center justify-between gap-2 text-[11px] font-semibold",
+                isLight ? "text-[var(--text)]" : "text-white/85",
+              ].join(" ")}
+            >
+              <span>Hit 8 bags to unlock the crowd-favorite price.</span>
+              <span>
+                Progress: {missionProgressCount}/{topMilestone.qty} bags
+              </span>
+            </div>
+            <div className="mt-2 mission-bar" aria-hidden="true">
+              <div className="mission-bar__fill" style={{ width: `${missionProgressPct}%` }} />
+              {SAVINGS_LADDER.map((milestone) => {
+                const left = (milestone.qty / topMilestone.qty) * 100;
+                const reached = currentBags >= milestone.qty;
+                const isNext = !bestPriceReached && milestone.qty === nextMilestone.qty;
+                return (
+                  <span
+                    key={milestone.qty}
+                    className={[
+                      "mission-bar__tick",
+                      reached ? "mission-bar__tick--reached" : "",
+                      isNext ? "mission-bar__tick--next" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                    style={{ left: `${left}%` }}
+                  />
+                );
+              })}
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-semibold">
+              {[
+                { qty: 4, label: "Savings unlocked" },
+                { qty: 5, label: "Free shipping unlocked" },
+                { qty: 8, label: "Crowd favorite unlocked" },
+                {
+                  qty: 12,
+                  label: bestPriceReached ? "Mystery extra revealed" : "Mystery extra unlocks",
+                },
+              ].map((badge) => {
+                const unlocked = currentBags >= badge.qty;
+                return (
+                  <span
+                    key={badge.qty}
+                    className={[
+                      "inline-flex items-center rounded-full border px-2 py-1",
+                      unlocked
+                        ? isLight
+                          ? "border-[rgba(239,59,59,0.35)] bg-[rgba(239,59,59,0.12)] text-[var(--candy-red)]"
+                          : "border-[rgba(248,212,79,0.5)] bg-[rgba(248,212,79,0.12)] text-[var(--gold)]"
+                        : isLight
+                          ? "border-[rgba(15,27,45,0.12)] bg-white text-[var(--muted)]"
+                          : "border-white/10 bg-white/5 text-white/60",
+                    ].join(" ")}
+                  >
+                    {badge.label}
+                  </span>
+                );
+              })}
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {missionRemaining > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => addToCart(missionRemaining, "mission")}
+                  disabled={addingQty !== null || !singleBagVariantId}
+                  className="btn btn-candy pressable"
+                >
+                  {addingQty ? "Adding..." : missionCtaLabel}
+                </button>
+              ) : (
+                <span className="inline-flex rounded-full border border-[rgba(239,59,59,0.35)] bg-[rgba(239,59,59,0.12)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--candy-red)]">
+                  {missionCtaLabel}
+                </span>
+              )}
+            </div>
+            <div className="mt-2 text-[11px] font-semibold">
+              {mysteryBonusLine}
+            </div>
           </div>
         </div>
         {showTrainAccent ? (

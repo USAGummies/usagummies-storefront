@@ -81,6 +81,8 @@ const SAVINGS_LADDER = [
   { qty: 8, label: "Most popular", caption: "8 bags" },
   { qty: 12, label: "Best price", caption: "12 bags" },
 ];
+const MISSION_TARGET_QTY = 8;
+const MISSION_SOCIAL_PROOF = "87% of shoppers end at 8 bags.";
 
 function money(amount?: number, currencyCode = "USD") {
   const n = Number(amount);
@@ -165,6 +167,19 @@ export default function PurchaseBox({
   const nextMilestone = bestPriceReached
     ? topMilestone
     : SAVINGS_LADDER.find((milestone) => currentBags < milestone.qty) || topMilestone;
+  const missionRemaining = Math.max(0, MISSION_TARGET_QTY - currentBags);
+  const missionProgressCount = Math.min(currentBags, topMilestone.qty);
+  const missionProgressPct = Math.min(
+    100,
+    Math.round((missionProgressCount / topMilestone.qty) * 100)
+  );
+  const missionCtaLabel =
+    missionRemaining > 0
+      ? `Complete the mission: add ${missionRemaining} bag${missionRemaining === 1 ? "" : "s"}`
+      : "Most popular mission complete";
+  const mysteryBonusLine = bestPriceReached
+    ? "Mystery extra revealed: Patriot Pride sticker (while supplies last)."
+    : "Mystery extra unlocks at 12 bags.";
 
   const variants = (product?.variants?.nodes || []) as VariantNode[];
   // Canonical ladder. Expose 1-3 bags plus core bundle sizes on-site.
@@ -437,6 +452,8 @@ export default function PurchaseBox({
               const isNext = !bestPriceReached && milestone.qty === nextMilestone.qty;
               const isBest = bestPriceReached && milestone.qty === topMilestone.qty;
               const isReached = currentBags >= milestone.qty;
+              const isPopularComplete =
+                milestone.qty === MISSION_TARGET_QTY && currentBags >= milestone.qty;
               return (
                 <div
                   key={milestone.qty}
@@ -452,12 +469,99 @@ export default function PurchaseBox({
                     <div className="pbx__ladderNext">Next up</div>
                   ) : isBest ? (
                     <div className="pbx__ladderNext">Best price applied</div>
+                  ) : isPopularComplete ? (
+                    <div className="pbx__ladderNext">Most popular mission complete</div>
                   ) : null}
                 </div>
               );
             })}
           </div>
-          <div className="pbx__ladderProof">Most customers check out with 8 bags.</div>
+          <div className="pbx__ladderProof">{MISSION_SOCIAL_PROOF}</div>
+        </div>
+
+        <div className="pbx__mission">
+          <div className="pbx__missionHeader">
+            <div className="pbx__missionTitle">Mission to savings</div>
+            <div className="pbx__missionProgress">
+              Progress: {missionProgressCount}/{topMilestone.qty} bags
+            </div>
+          </div>
+          <div className="pbx__missionCopy">
+            Hit 8 bags to unlock the crowd-favorite price.
+          </div>
+          <div className="pbx__missionBar">
+            <div className="mission-bar" aria-hidden="true">
+              <div className="mission-bar__fill" style={{ width: `${missionProgressPct}%` }} />
+              {SAVINGS_LADDER.map((milestone) => {
+                const left = (milestone.qty / topMilestone.qty) * 100;
+                const reached = currentBags >= milestone.qty;
+                const isNext = !bestPriceReached && milestone.qty === nextMilestone.qty;
+                return (
+                  <span
+                    key={milestone.qty}
+                    className={cx(
+                      "mission-bar__tick",
+                      reached && "mission-bar__tick--reached",
+                      isNext && "mission-bar__tick--next"
+                    )}
+                    style={{ left: `${left}%` }}
+                  />
+                );
+              })}
+            </div>
+          </div>
+          <div className="pbx__missionActions">
+            {missionRemaining > 0 ? (
+              <button
+                type="button"
+                onClick={() => addToCart(missionRemaining)}
+                disabled={addingQty !== null}
+                className="btn btn-candy pressable pbx__missionCta"
+              >
+                {addingQty ? "Adding..." : missionCtaLabel}
+              </button>
+            ) : (
+              <span className="pbx__missionBadge">{missionCtaLabel}</span>
+            )}
+          </div>
+          <div className="pbx__missionList">
+            <div className="pbx__missionListTitle">Finish your bag count</div>
+            {[
+              { qty: 4, label: "Savings pricing unlocked" },
+              { qty: 5, label: "Free shipping unlocked" },
+              { qty: 8, label: "Crowd-favorite price unlocked" },
+              {
+                qty: 12,
+                label: bestPriceReached
+                  ? "Patriot Pride sticker revealed"
+                  : "Mystery extra unlocks",
+              },
+            ].map((item) => {
+              const done = currentBags >= item.qty;
+              return (
+                <div
+                  key={item.qty}
+                  className={cx("pbx__missionItem", done && "pbx__missionItem--done")}
+                >
+                  <span className="pbx__missionDot" aria-hidden="true">
+                    {done ? (
+                      <svg viewBox="0 0 24 24" className="pbx__missionCheck" aria-hidden="true">
+                        <path
+                          fill="currentColor"
+                          d="M9.2 16.2 5.5 12.5l1.4-1.4 2.3 2.3 7.2-7.2 1.4 1.4z"
+                        />
+                      </svg>
+                    ) : null}
+                  </span>
+                  <span>
+                    {item.label}
+                    {item.qty === 12 ? " (12 bags)" : ` (${item.qty}+ bags)`}
+                  </span>
+                </div>
+              );
+            })}
+            <div className="pbx__missionBonus">{mysteryBonusLine}</div>
+          </div>
         </div>
 
         <div className="pbx__freeShip">
@@ -726,6 +830,111 @@ export default function PurchaseBox({
         .pbx__ladderProof{
           font-size:11px;
           font-weight:600;
+          color: var(--muted);
+        }
+        .pbx__mission{
+          margin-top:10px;
+          border:1px solid var(--border);
+          background: var(--surface);
+          border-radius:12px;
+          padding:10px;
+        }
+        .pbx__missionHeader{
+          display:flex;
+          align-items:center;
+          justify-content:space-between;
+          gap:8px;
+          flex-wrap:wrap;
+        }
+        .pbx__missionTitle{
+          font-size:10px;
+          font-weight:700;
+          letter-spacing:0.22em;
+          text-transform:uppercase;
+          color: var(--muted);
+        }
+        .pbx__missionProgress{
+          font-size:11px;
+          font-weight:700;
+          color: var(--text);
+        }
+        .pbx__missionCopy{
+          margin-top:4px;
+          font-size:12px;
+          font-weight:600;
+          color: var(--muted);
+        }
+        .pbx__missionBar{ margin-top:8px; }
+        .pbx__missionActions{
+          margin-top:10px;
+          display:flex;
+          flex-wrap:wrap;
+          gap:8px;
+        }
+        .pbx__missionCta{
+          font-size:12px;
+          padding:8px 14px;
+        }
+        .pbx__missionBadge{
+          display:inline-flex;
+          align-items:center;
+          justify-content:center;
+          border-radius:999px;
+          border:1px solid rgba(239,59,59,0.4);
+          background: rgba(239,59,59,0.12);
+          color: var(--red);
+          font-size:10px;
+          font-weight:700;
+          letter-spacing:0.08em;
+          text-transform:uppercase;
+          padding:6px 10px;
+        }
+        .pbx__missionList{
+          margin-top:10px;
+          display:grid;
+          gap:6px;
+        }
+        .pbx__missionListTitle{
+          font-size:10px;
+          font-weight:700;
+          letter-spacing:0.22em;
+          text-transform:uppercase;
+          color: var(--muted);
+        }
+        .pbx__missionItem{
+          display:flex;
+          align-items:center;
+          gap:8px;
+          font-size:12px;
+          font-weight:600;
+          color: var(--muted);
+        }
+        .pbx__missionItem--done{
+          color: var(--text);
+        }
+        .pbx__missionDot{
+          width:16px;
+          height:16px;
+          border-radius:999px;
+          border:1px solid rgba(15,27,45,0.2);
+          background: #ffffff;
+          display:inline-flex;
+          align-items:center;
+          justify-content:center;
+          color: var(--muted);
+        }
+        .pbx__missionItem--done .pbx__missionDot{
+          border-color: rgba(239,59,59,0.5);
+          background: rgba(239,59,59,0.16);
+          color: var(--red);
+        }
+        .pbx__missionCheck{
+          width:12px;
+          height:12px;
+        }
+        .pbx__missionBonus{
+          margin-top:4px;
+          font-size:11px;
           color: var(--muted);
         }
         .pbx__pricingNote{

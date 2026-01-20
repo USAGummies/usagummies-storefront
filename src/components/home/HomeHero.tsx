@@ -68,7 +68,7 @@ export function HomeHero() {
                 </div>
                 <div style={{ opacity: 0.8, lineHeight: 1.6, marginTop: 8 }}>
                   Savings pricing and free shipping unlock automatically as you add bags.
-                  Most customers check out with 8 bags.
+                  87% of shoppers end at 8 bags.
                 </div>
 
                 <div style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap" }}>
