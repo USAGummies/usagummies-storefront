@@ -116,7 +116,7 @@ export function StickyAddToCartBar({
               className="btn btn-candy pressable"
               style={{ whiteSpace: "nowrap" }}
             >
-              Choose bag count
+              Lock in savings now
             </button>
           </div>
           <div className="px-3 pb-3">

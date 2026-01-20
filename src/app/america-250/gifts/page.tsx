@@ -79,7 +79,7 @@ export default function America250GiftsPage() {
             Back to America 250
           </Link>
           <Link href="/shop" className="text-sm text-[var(--muted)] hover:text-[var(--text)]">
-            Shop & save
+            Shop now and save
           </Link>
         </div>
 

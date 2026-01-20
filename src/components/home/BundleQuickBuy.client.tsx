@@ -117,8 +117,8 @@ export default function BundleQuickBuy({
   );
   const missionCtaLabel =
     missionRemaining > 0
-      ? `Complete the mission: add ${missionRemaining} bag${missionRemaining === 1 ? "" : "s"} (total ${MISSION_TARGET_QTY})`
-      : "Most popular mission complete";
+      ? `Lock in savings now: add ${missionRemaining} bag${missionRemaining === 1 ? "" : "s"} (total ${MISSION_TARGET_QTY})`
+      : `Savings locked at ${MISSION_TARGET_QTY} bags`;
   const mysteryBonusLine = bestPriceReached
     ? "Mystery extra revealed: Patriot Pride sticker (while supplies last)."
     : "Mystery extra unlocks at 12 bags.";
@@ -383,10 +383,10 @@ export default function BundleQuickBuy({
         ? ` (total ${nextBags})`
         : "";
       const tileCtaLabel = isAddingThis
-        ? "Adding..."
+        ? "Locking in..."
         : isAdded
-          ? `Added${totalLabel}`
-          : `Add ${tier.quantity} bags${totalLabel}`;
+          ? `Savings locked${totalLabel}`
+          : `Lock in savings now${totalLabel}`;
       const showFreeShipping = nextBags >= 5;
       const label =
         isEight
@@ -557,10 +557,10 @@ export default function BundleQuickBuy({
       ? ` (total ${nextBags})`
       : "";
     const tileCtaLabel = isAddingThis
-      ? "Adding..."
+      ? "Locking in..."
       : isAdded
-        ? `Added${totalLabel}`
-        : `Add ${tier.quantity} bags${totalLabel}`;
+        ? `Savings locked${totalLabel}`
+        : `Lock in savings now${totalLabel}`;
 
     return (
       <div
@@ -927,7 +927,7 @@ export default function BundleQuickBuy({
                   disabled={addingQty !== null || !singleBagVariantId}
                   className="btn btn-candy pressable"
                 >
-                  {addingQty ? "Adding..." : missionCtaLabel}
+                  {addingQty ? "Locking in..." : missionCtaLabel}
                 </button>
               ) : (
                 <span className="inline-flex rounded-full border border-[rgba(239,59,59,0.35)] bg-[rgba(239,59,59,0.12)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--candy-red)]">
@@ -1084,7 +1084,7 @@ export default function BundleQuickBuy({
           isCompact ? (
             <div className="space-y-1">
               <div className={isLight ? "text-[14px] font-medium text-[var(--muted)]" : "text-[14px] font-medium text-white/80"}>
-                {selectedAdded ? "Added" : "Add"} +{selectedTier.quantity} bags
+                {selectedAdded ? "Savings locked" : "Lock in savings now"} +{selectedTier.quantity} bags
               </div>
               <div
                 key={`${selectedTier.quantity}-${selectedTierState?.addTotal}`}
@@ -1114,7 +1114,7 @@ export default function BundleQuickBuy({
                     : "text-sm font-semibold text-white/90"
                 }
               >
-                {selectedAdded ? "Added" : "Add"} +{selectedTier.quantity} bags
+                {selectedAdded ? "Savings locked" : "Lock in savings now"} +{selectedTier.quantity} bags
                 <span
                   className={
                     isLight
@@ -1187,16 +1187,16 @@ export default function BundleQuickBuy({
                     aria-hidden="true"
                     className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent opacity-60"
                   />
-                  Adding...
+                  Locking in...
                 </>
               ) : Number.isFinite(selectedTierState?.addTotal ?? NaN) ? (
                 selectedAdded && Number.isFinite(selectedTierState?.nextBags ?? NaN)
-                  ? `Added ${selectedTier?.quantity} bags (total ${selectedTierState?.nextBags})`
+                  ? `Savings locked: ${selectedTier?.quantity} bags (total ${selectedTierState?.nextBags})`
                   : Number.isFinite(selectedTierState?.nextBags ?? NaN)
-                    ? `Add ${selectedTier?.quantity} bags (total ${selectedTierState?.nextBags})`
-                    : `Add ${selectedTier?.quantity} bags`
+                    ? `Lock in savings now: ${selectedTier?.quantity} bags (total ${selectedTierState?.nextBags})`
+                    : `Lock in savings now: ${selectedTier?.quantity} bags`
               ) : (
-                "Add bags ->"
+                "Lock in savings now"
               )}
             </span>
           </button>

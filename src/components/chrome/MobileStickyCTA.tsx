@@ -6,7 +6,7 @@ export function MobileStickyCTA() {
     <div className="mobile-sticky-cta" role="region" aria-label="Quick actions">
       <div className="container" style={{ display: "flex", gap: 10 }}>
         <Link className="btn btn-primary" href="/shop" style={{ flex: 1 }}>
-          Shop Now 🇺🇸
+          Shop now and save
         </Link>
         <Link className="btn btn-navy" href="/cart">
           Cart

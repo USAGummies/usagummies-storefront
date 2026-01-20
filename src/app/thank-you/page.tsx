@@ -87,7 +87,7 @@ export default function ThankYouPage() {
             </div>
             <div className="flex flex-wrap gap-2">
               <Link href="/shop" className="btn btn-candy pressable">
-                Shop best sellers
+                Shop now and save
               </Link>
               <Link href="/contact" className="btn btn-outline pressable">
                 Order support

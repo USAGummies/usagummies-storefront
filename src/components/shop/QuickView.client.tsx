@@ -85,8 +85,8 @@ export default function QuickView({ product, detailHref, bundleHref, children }:
   );
   const missionCtaLabel =
     missionRemaining > 0
-      ? `Complete the mission: add ${missionRemaining} bag${missionRemaining === 1 ? "" : "s"} (total ${MISSION_TARGET_QTY})`
-      : "Most popular mission complete";
+      ? `Lock in savings now: add ${missionRemaining} bag${missionRemaining === 1 ? "" : "s"} (total ${MISSION_TARGET_QTY})`
+      : `Savings locked at ${MISSION_TARGET_QTY} bags`;
   const mysteryBonusLine = bestPriceReached
     ? "Mystery extra revealed: Patriot Pride sticker (while supplies last)."
     : "Mystery extra unlocks at 12 bags.";
@@ -350,7 +350,7 @@ export default function QuickView({ product, detailHref, bundleHref, children }:
                           disabled={adding}
                           className="btn btn-candy pressable w-full sm:w-auto"
                         >
-                          {adding ? "Adding..." : missionCtaLabel}
+                          {adding ? "Locking in..." : missionCtaLabel}
                         </button>
                       ) : (
                         <span className="inline-flex rounded-full border border-[rgba(239,59,59,0.35)] bg-[rgba(239,59,59,0.12)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--candy-red)]">
@@ -417,10 +417,10 @@ export default function QuickView({ product, detailHref, bundleHref, children }:
                           aria-hidden="true"
                           className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent opacity-60"
                         />
-                        Adding...
+                        Locking in...
                       </span>
                     ) : (
-                      `Add ${selectedQty} bags (total ${nextBags})`
+                      `Lock in savings now: ${selectedQty} bags (total ${nextBags})`
                     )}
                   </button>
                   <div className="mt-2 text-[11px] text-[var(--muted)]">

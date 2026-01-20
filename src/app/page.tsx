@@ -274,7 +274,7 @@ export default async function HomePage() {
                       className="btn btn-candy w-full sm:w-auto"
                       style={{ padding: "14px 22px", boxShadow: "0 16px 34px rgba(239, 59, 59, 0.34)" }}
                     >
-                      <span className="text-[15px] sm:text-[16px] font-semibold">Choose bag count</span>
+                      <span className="text-[15px] sm:text-[16px] font-semibold">Shop now and save</span>
                     </a>
                     <div className="text-xs font-semibold text-[var(--muted)]">Love it or your money back</div>
                     <AmazonOneBagNote />
@@ -516,7 +516,7 @@ export default async function HomePage() {
                   </div>
                   <div className="flex flex-wrap items-center gap-3 pt-1">
                     <a href="#bundle-pricing" className="btn btn-candy">
-                      Choose bag count
+                      Shop now and save
                     </a>
                     <Link
                       href="/shop#product-details"
@@ -712,7 +712,7 @@ export default async function HomePage() {
                 Read our story
               </Link>
               <Link href="/shop" className="btn btn-candy">
-                Shop savings
+                Shop now and save
               </Link>
             </div>
           </div>
@@ -735,7 +735,7 @@ export default async function HomePage() {
             Save more with more bags
           </div>
           <a href="#bundle-pricing" className="btn btn-candy w-full sm:w-auto">
-            Choose bag count
+            Shop now and save
           </a>
         </div>
         <div className="mt-2 text-center">

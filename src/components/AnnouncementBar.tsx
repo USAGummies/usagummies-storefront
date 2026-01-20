@@ -48,7 +48,7 @@ export function AnnouncementBar() {
               "rounded-full border border-[var(--border)] bg-[var(--surface-strong)] px-3 py-1 text-[11px] font-semibold text-[var(--text)] hover:bg-white"
             )}
           >
-            Shop
+            Shop now and save
           </Link>
         </div>
       </div>

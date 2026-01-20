@@ -274,7 +274,7 @@ export function MemberPortal({ source, variant = "light" }: MemberPortalProps) {
             Send reset link
           </button>
           <Link href="/shop" className="link-underline">
-            Shop & save
+            Shop now and save
           </Link>
         </div>
 

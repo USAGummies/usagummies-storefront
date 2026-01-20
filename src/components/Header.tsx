@@ -15,7 +15,7 @@ export function Header() {
         USA Gummies
       </Link>
       <nav>
-        <Link href="/shop">Shop</Link>
+        <Link href="/shop">Shop now and save</Link>
       </nav>
     </header>
   );

@@ -277,7 +277,7 @@ export default async function ShopPage() {
 
               <div className="flex flex-wrap items-center gap-3">
                 <a href="#bundle-pricing" className="btn btn-candy">
-                  Choose bag count
+                  Lock in savings now
                 </a>
                 <span className="text-xs text-[var(--muted)]">
                   Love it or your money back - Ships within 24 hours - Limited daily production
@@ -465,7 +465,7 @@ export default async function ShopPage() {
                 Read our story
               </Link>
               <Link href="/shop#bundle-pricing" className="btn btn-candy">
-                Choose bag count
+                Lock in savings now
               </Link>
             </div>
           </div>

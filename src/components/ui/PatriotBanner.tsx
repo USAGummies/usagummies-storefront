@@ -53,10 +53,10 @@ export function PatriotBanner({ showRibbon = true }: { showRibbon?: boolean }) {
 
             <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
               <Link className="btn btn-candy" href="/shop#bundle-pricing">
-                Choose bag count 🇺🇸
+                Shop now and save
               </Link>
               <Link className="btn btn-outline" href="/shop">
-                Shop All
+                Shop now and save
               </Link>
             </div>
             <div style={{ marginTop: 8 }}>

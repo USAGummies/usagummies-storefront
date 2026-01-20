@@ -44,10 +44,10 @@ export function HomeHero() {
                 }}
               >
                 <Link className="btn btn-primary" href="/shop#bundle-pricing">
-                  Choose bag count
+                  Shop now and save
                 </Link>
                 <Link className="btn btn-navy" href="/shop">
-                  Shop all
+                  Shop now and save
                 </Link>
                 <span className="chip">✅ Dye-free</span>
                 <span className="chip">🚚 Ships fast</span>
@@ -73,7 +73,7 @@ export function HomeHero() {
 
                 <div style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap" }}>
                   <Link className="btn btn-primary" href="/shop#bundle-pricing">
-                    See bag counts
+                    Shop now and save
                   </Link>
                   <Link className="btn" href="/shop#product-details">
                     View product details

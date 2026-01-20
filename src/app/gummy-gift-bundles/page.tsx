@@ -126,7 +126,7 @@ export default function GummyGiftBundlesPage() {
 
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <Link href="/shop#bundle-pricing" className="btn btn-candy">
-              Choose my bag count
+              Shop now and save
             </Link>
             <Link href="/ingredients" className="btn btn-outline">
               Ingredients

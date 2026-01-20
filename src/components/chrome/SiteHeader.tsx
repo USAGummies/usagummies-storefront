@@ -42,7 +42,7 @@ export function SiteHeader() {
 
             <div style={{ marginLeft: "auto", display: "flex", gap: 10 }}>
               <Link className="btn" href="/shop">
-                Shop
+                Shop now and save
               </Link>
               <Link className="btn btn-navy" href="/cart">
                 Cart

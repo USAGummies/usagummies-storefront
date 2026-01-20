@@ -166,7 +166,7 @@ export function ShopProductCard({
               className="btn btn-candy justify-center min-h-[44px]"
               onClick={(e) => e.stopPropagation()}
             >
-              Choose bag count
+              Lock in savings now
             </Link>
             <AmazonOneBagNote className="text-[11px] text-[var(--muted)]" />
           </div>

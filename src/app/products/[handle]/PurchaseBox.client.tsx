@@ -175,8 +175,8 @@ export default function PurchaseBox({
   );
   const missionCtaLabel =
     missionRemaining > 0
-      ? `Complete the mission: add ${missionRemaining} bag${missionRemaining === 1 ? "" : "s"} (total ${MISSION_TARGET_QTY})`
-      : "Most popular mission complete";
+      ? `Lock in savings now: add ${missionRemaining} bag${missionRemaining === 1 ? "" : "s"} (total ${MISSION_TARGET_QTY})`
+      : `Savings locked at ${MISSION_TARGET_QTY} bags`;
   const mysteryBonusLine = bestPriceReached
     ? "Mystery extra revealed: Patriot Pride sticker (while supplies last)."
     : "Mystery extra unlocks at 12 bags.";
@@ -325,10 +325,10 @@ export default function PurchaseBox({
   const selectedAdded = hasAdded && lastAddedQty === optionQty;
   const isAdding = addingQty !== null;
   const ctaLabel = isAdding
-    ? "Adding..."
+    ? "Locking in..."
     : selectedAdded
-      ? `Added ${formatQtyLabel(optionQty)} (total ${selectedNextBags})`
-      : `Add ${formatQtyLabel(optionQty)} (total ${selectedNextBags})`;
+      ? `Savings locked: ${formatQtyLabel(optionQty)} (total ${selectedNextBags})`
+      : `Lock in savings now: ${formatQtyLabel(optionQty)} (total ${selectedNextBags})`;
 
   const hasExtraSelected = extraOptions.some((o) => o.qty === selectedQty);
   const showExtras = showMore || hasExtraSelected;
@@ -527,7 +527,7 @@ export default function PurchaseBox({
                 disabled={addingQty !== null}
                 className="btn btn-candy pressable pbx__missionCta"
               >
-                {addingQty ? "Adding..." : missionCtaLabel}
+                {addingQty ? "Locking in..." : missionCtaLabel}
               </button>
             ) : (
               <span className="pbx__missionBadge">{missionCtaLabel}</span>
@@ -586,7 +586,7 @@ export default function PurchaseBox({
                   className="pbx__completeBtn"
                 >
                   <span className="pbx__completeLabel">
-                    Add {target.addQty} bag{target.addQty === 1 ? "" : "s"} (total {target.target})
+                    Lock in savings now: {target.addQty} bag{target.addQty === 1 ? "" : "s"} (total {target.target})
                   </span>
                   <span className="pbx__completePrice">
                     {target.addTotalText ? `+${target.addTotalText}` : ""}
@@ -631,12 +631,12 @@ export default function PurchaseBox({
               const isAdded = lastAddedQty === o.qty;
               const isAddingThis = addingQty === o.qty;
               const tileCtaLabel = isAddingThis
-                ? "Adding..."
+                ? "Locking in..."
                 : isAdded
-                  ? "Added"
+                  ? "Savings locked"
                   : hasAdded
-                    ? `Add ${formatQtyLabel(o.qty)} more`
-                    : `Add ${formatQtyLabel(o.qty)}`;
+                    ? "Lock in more savings"
+                    : "Lock in savings now";
 
               return (
                 <div
@@ -744,7 +744,7 @@ export default function PurchaseBox({
         <div className="pbx__summary" aria-live="polite" role="status">
           <div className="pbx__summaryMeta">
             <div className="pbx__summaryLabel">
-              {selectedAdded ? "Added" : "Add"} {formatQtyLabel(optionQty)}
+              {selectedAdded ? "Savings locked" : "Lock in savings now"} {formatQtyLabel(optionQty)}
             </div>
             <div className="pbx__summaryPrice">+{selectedPriceText}</div>
             {currentBags > 0 ? (
@@ -770,7 +770,7 @@ export default function PurchaseBox({
                   aria-hidden="true"
                   className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent opacity-60"
                 />
-                Adding...
+                Locking in...
               </span>
             ) : (
               ctaLabel

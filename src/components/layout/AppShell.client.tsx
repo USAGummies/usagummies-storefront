@@ -100,7 +100,7 @@ const navSections = [
   {
     title: "Shop",
     links: [
-      { href: "/shop", label: "Shop & save" },
+      { href: "/shop", label: "Shop now and save" },
       { href: "/bundle-guides", label: "Bag count guides" },
       { href: "/gummy-gift-bundles", label: "Gift bag options" },
       { href: "/patriotic-party-snacks", label: "Party snacks" },

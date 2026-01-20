@@ -110,7 +110,7 @@ export default function BundleGuidesPage() {
 
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <Link href="/shop#bundle-pricing" className="btn btn-candy">
-              Choose my bag count
+              Shop now and save
             </Link>
             <Link href="/faq" className="btn btn-outline">
               Bag count FAQ
