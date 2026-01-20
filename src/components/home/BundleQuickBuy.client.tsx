@@ -787,20 +787,39 @@ export default function BundleQuickBuy({
     <>
       {selectedTier ? (
         isCompact ? (
-          <div className="space-y-1">
+          <div
+            className={[
+              "space-y-1",
+              isFusion ? "bundle-fusion__ctaSummary" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          >
             <div className={isLight ? "text-[14px] font-medium text-[var(--muted)]" : "text-[14px] font-medium text-white/80"}>
               {selectedAdded ? "Savings locked" : "Lock in savings now"} +{selectedTier.quantity} bags
             </div>
             <div
               key={`${selectedTier.quantity}-${selectedTierState?.addTotal}`}
-              className={isLight ? "text-[24px] font-bold text-[var(--text)]" : "text-[24px] font-bold text-white"}
+              className={[
+                isLight ? "text-[24px] font-bold text-[var(--text)]" : "text-[24px] font-bold text-white",
+                isFusion ? "bundle-fusion__ctaPrice" : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
             >
               {Number.isFinite(selectedTierState?.addTotal ?? NaN)
                 ? `+${money(selectedTierState?.addTotal, "USD")}`
                 : "—"}
             </div>
             {Number.isFinite(selectedTierState?.nextTotal ?? NaN) ? (
-              <div className={isLight ? "text-[12px] text-[var(--muted)]" : "text-[12px] text-white/70"}>
+              <div
+                className={[
+                  isLight ? "text-[12px] text-[var(--muted)]" : "text-[12px] text-white/70",
+                  isFusion ? "bundle-fusion__ctaTotal" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+              >
                 New total: {selectedTierState?.nextBags} bags - {money(selectedTierState?.nextTotal, "USD")}
               </div>
             ) : null}
@@ -874,7 +893,14 @@ export default function BundleQuickBuy({
         )
       ) : null}
 
-      <div className="mt-3 flex flex-col gap-2">
+      <div
+        className={[
+          "mt-3 flex flex-col gap-2",
+          isFusion ? "bundle-fusion__ctaStack" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+      >
         <button
           type="button"
           className={[
@@ -910,26 +936,32 @@ export default function BundleQuickBuy({
           </span>
         </button>
         <div
-          className={
+          className={[
             isLight
               ? "text-xs text-[var(--muted)]"
               : isCompact
                 ? "text-xs text-white/70"
-                : "text-xs text-white/75"
-          }
+                : "text-xs text-white/75",
+            isFusion ? "bundle-fusion__ctaNote" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
         >
           Love it or your money back • Ships within 24 hours • Secure checkout
         </div>
         <div
-          className={
+          className={[
             isFlat
               ? isLight
                 ? "mt-2 text-[11px] text-[var(--muted)]"
                 : "mt-2 text-[11px] text-white/70"
               : isLight
                 ? "mt-2 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white px-3 py-2 text-[11px] text-[var(--muted)]"
-                : "mt-2 rounded-2xl border border-white/12 bg-white/5 px-3 py-2 text-[11px] text-white/70"
-          }
+                : "mt-2 rounded-2xl border border-white/12 bg-white/5 px-3 py-2 text-[11px] text-white/70",
+            isFusion ? "bundle-fusion__ctaProof" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
         >
           <div className={isLight ? "font-semibold text-[var(--text)]" : "font-semibold text-white/90"}>
             ⭐ {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars from verified Amazon buyers
