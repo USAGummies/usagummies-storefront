@@ -11,7 +11,8 @@ import { AMAZON_LISTING_URL } from "@/lib/amazon";
 import { applyExperimentFromUrl, trackEvent } from "@/lib/analytics";
 import { LeadCapture } from "@/components/marketing/LeadCapture.client";
 import { SubscriptionUnlock } from "@/components/marketing/SubscriptionUnlock.client";
-import { getCartToastMessage } from "@/lib/cartFeedback";
+import { getCartToastMessage, readLastAdd } from "@/lib/cartFeedback";
+import { SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
 import { BRAND_STORY_HEADLINE, BRAND_STORY_SHORT } from "@/data/brandStory";
 
 function cx(...a: Array<string | false | null | undefined>) {
@@ -137,6 +138,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [cartSummary, setCartSummary] = useState<string | null>(null);
   const [badgePop, setBadgePop] = useState(false);
   const [cartToast, setCartToast] = useState<string | null>(null);
+  const [undoInfo, setUndoInfo] = useState<{ qty: number; at: number } | null>(null);
+  const [undoPending, setUndoPending] = useState(false);
   const pathname = usePathname();
   const menuRef = useRef<HTMLDivElement | null>(null);
   const toastTimerRef = useRef<number | null>(null);
@@ -165,6 +168,59 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       setCartSummary(summary.summary);
     } catch {
       // ignore
+    }
+  }
+
+  async function handleUndo() {
+    if (!undoInfo || undoPending) return;
+    setUndoPending(true);
+    try {
+      const stored = getStoredCartId();
+      const res = await fetch("/api/cart", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "get", cartId: stored || undefined }),
+      });
+      const data = await res.json();
+      const lines =
+        data?.cart?.lines?.nodes ??
+        data?.cart?.lines?.edges?.map((e: any) => e?.node) ??
+        [];
+      const line = lines.find((l: any) => l?.merchandise?.id === SINGLE_BAG_VARIANT_ID);
+      if (!line) throw new Error("Nothing to undo.");
+      const currentQty = Number(line?.quantity ?? 0);
+      const nextQty = Math.max(0, currentQty - undoInfo.qty);
+      if (nextQty === currentQty) {
+        throw new Error("Undo unavailable.");
+      }
+      const updateRes = await fetch("/api/cart", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "update",
+          lineId: line.id,
+          quantity: nextQty,
+          cartId: stored || undefined,
+        }),
+      });
+      const updateJson = await updateRes.json().catch(() => ({}));
+      if (!updateRes.ok || updateJson?.ok === false) {
+        throw new Error(updateJson?.error || "Undo failed.");
+      }
+      if (updateJson?.cart?.id) setCartCookie(updateJson.cart.id);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("cart:updated"));
+      }
+      setCartToast("Undo applied.");
+      setUndoInfo(null);
+      if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = window.setTimeout(() => {
+        setCartToast(null);
+      }, 2200);
+    } catch {
+      setCartToast("Could not undo.");
+    } finally {
+      setUndoPending(false);
     }
   }
 
@@ -203,12 +259,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       const detail = (event as CustomEvent<{ qty?: number }>).detail;
       const qty = Number(detail?.qty ?? 0);
       setCartToast(getCartToastMessage(qty));
+      const lastAdd = readLastAdd();
+      const canUndo =
+        lastAdd &&
+        Number.isFinite(lastAdd.qty) &&
+        lastAdd.qty > 0 &&
+        Date.now() - lastAdd.at < 20000;
+      setUndoInfo(canUndo ? { qty: lastAdd.qty, at: lastAdd.at } : null);
       if (toastTimerRef.current) {
         window.clearTimeout(toastTimerRef.current);
       }
+      const duration = canUndo ? 6000 : 2600;
       toastTimerRef.current = window.setTimeout(() => {
         setCartToast(null);
-      }, 2600);
+        setUndoInfo(null);
+      }, duration);
     }
     window.addEventListener("cart:toast", handleToast);
     return () => {
@@ -247,6 +312,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               Added to cart
             </div>
             <div className="mt-1 text-sm font-semibold text-[var(--text)]">{cartToast}</div>
+            {undoInfo ? (
+              <button
+                type="button"
+                onClick={handleUndo}
+                disabled={undoPending}
+                className="mt-2 inline-flex items-center gap-1 rounded-full border border-[var(--border)] px-3 py-1 text-[11px] font-semibold text-[var(--text)] hover:border-[rgba(15,27,45,0.3)]"
+              >
+                {undoPending ? "Undoing..." : "Undo"}
+              </button>
+            ) : null}
           </div>
         </div>
       ) : null}

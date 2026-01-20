@@ -56,6 +56,7 @@ export function ProductGallery({
           sizes="(max-width: 1024px) 100vw, 50vw"
           className="object-contain"
           priority={active === 0}
+          fetchPriority={active === 0 ? "high" : "auto"}
         />
         {/* Subtle gold edge glow */}
         <div className="pointer-events-none absolute inset-0 ring-1 ring-[var(--border)] shadow-[0_0_60px_rgba(199,160,98,0.16)]" />

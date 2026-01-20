@@ -21,6 +21,7 @@ import { fireCartToast } from "@/lib/cartFeedback";
 import { useCartBagCount } from "@/hooks/useCartBagCount";
 import { REVIEW_HIGHLIGHTS } from "@/data/reviewHighlights";
 import { AmazonOneBagNote } from "@/components/ui/AmazonOneBagNote";
+import { AMAZON_REVIEWS } from "@/data/amazonReviews";
 
 type TierKey = "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10" | "11" | "12";
 
@@ -118,7 +119,7 @@ export default function BundleQuickBuy({
   );
   const missionCtaLabel =
     missionRemaining > 0
-      ? `Complete the mission: add ${missionRemaining} bag${missionRemaining === 1 ? "" : "s"}`
+      ? `Complete the mission: add ${missionRemaining} bag${missionRemaining === 1 ? "" : "s"} (total ${MISSION_TARGET_QTY})`
       : "Most popular mission complete";
   const mysteryBonusLine = bestPriceReached
     ? "Mystery extra revealed: Patriot Pride sticker (while supplies last)."
@@ -1198,11 +1199,11 @@ export default function BundleQuickBuy({
                   Adding...
                 </>
               ) : Number.isFinite(selectedTierState?.addTotal ?? NaN) ? (
-                selectedAdded
-                  ? `Added +${selectedTier?.quantity} bags`
-                  : hasAdded
-                    ? `Add ${selectedTier?.quantity} more bags - ${money(selectedTierState?.addTotal, "USD")} ->`
-                    : `Add ${selectedTier?.quantity} bags - ${money(selectedTierState?.addTotal, "USD")} ->`
+                selectedAdded && Number.isFinite(selectedTierState?.nextBags ?? NaN)
+                  ? `Added ${selectedTier?.quantity} bags (total ${selectedTierState?.nextBags})`
+                  : Number.isFinite(selectedTierState?.nextBags ?? NaN)
+                    ? `Add ${selectedTier?.quantity} bags (total ${selectedTierState?.nextBags})`
+                    : `Add ${selectedTier?.quantity} bags`
               ) : (
                 "Add bags ->"
               )}
@@ -1218,6 +1219,37 @@ export default function BundleQuickBuy({
             }
           >
             Love it or your money back • Ships within 24 hours • Secure checkout
+          </div>
+          <div
+            className={
+              isLight
+                ? "mt-2 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white px-3 py-2 text-[11px] text-[var(--muted)]"
+                : "mt-2 rounded-2xl border border-white/12 bg-white/5 px-3 py-2 text-[11px] text-white/70"
+            }
+          >
+            <div className={isLight ? "font-semibold text-[var(--text)]" : "font-semibold text-white/90"}>
+              ⭐ {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars from verified Amazon buyers
+            </div>
+            <div className="mt-1 flex flex-wrap gap-2 text-[10px] font-semibold uppercase tracking-[0.12em]">
+              <span
+                className={
+                  isLight
+                    ? "rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-2 py-1"
+                    : "rounded-full border border-white/10 bg-white/5 px-2 py-1"
+                }
+              >
+                Made in the USA
+              </span>
+              <span
+                className={
+                  isLight
+                    ? "rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-2 py-1"
+                    : "rounded-full border border-white/10 bg-white/5 px-2 py-1"
+                }
+              >
+                No artificial dyes
+              </span>
+            </div>
           </div>
           {reviewSnippets.length ? (
             <div className={isLight ? "grid gap-1 text-[11px] text-[var(--muted)]" : "grid gap-1 text-[11px] text-white/70"}>

@@ -9,6 +9,7 @@ import { SINGLE_BAG_SKU, SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
 import { fireCartToast } from "@/lib/cartFeedback";
 import { useCartBagCount } from "@/hooks/useCartBagCount";
 import { AmazonOneBagNote } from "@/components/ui/AmazonOneBagNote";
+import { AMAZON_REVIEWS } from "@/data/amazonReviews";
 
 function cx(...a: Array<string | false | null | undefined>) {
   return a.filter(Boolean).join(" ");
@@ -83,6 +84,7 @@ const SAVINGS_LADDER = [
 ];
 const MISSION_TARGET_QTY = 8;
 const MISSION_SOCIAL_PROOF = "87% of shoppers end at 8 bags.";
+const COMPLETE_TARGETS = [5, 8, 12];
 
 function money(amount?: number, currencyCode = "USD") {
   const n = Number(amount);
@@ -175,7 +177,7 @@ export default function PurchaseBox({
   );
   const missionCtaLabel =
     missionRemaining > 0
-      ? `Complete the mission: add ${missionRemaining} bag${missionRemaining === 1 ? "" : "s"}`
+      ? `Complete the mission: add ${missionRemaining} bag${missionRemaining === 1 ? "" : "s"} (total ${MISSION_TARGET_QTY})`
       : "Most popular mission complete";
   const mysteryBonusLine = bestPriceReached
     ? "Mystery extra revealed: Patriot Pride sticker (while supplies last)."
@@ -306,6 +308,19 @@ export default function PurchaseBox({
     (selectedVariant?.price as any)?.currencyCode ||
     (selectedVariant?.priceV2 as any)?.currencyCode ||
     baselineCurrency;
+  const completeTargets = useMemo(() => {
+    if (currentBags >= COMPLETE_TARGETS[COMPLETE_TARGETS.length - 1]) return [];
+    return COMPLETE_TARGETS.filter((target) => target > currentBags).map((target) => {
+      const addQty = Math.max(1, target - currentBags);
+      const targetPricing = pricingForQty(target);
+      const addTotal = Math.max(0, targetPricing.total - currentTotal);
+      return {
+        target,
+        addQty,
+        addTotalText: money(addTotal, selectedCurrency),
+      };
+    });
+  }, [currentBags, currentTotal, selectedCurrency]);
   const selectedPriceText = money(selectedAddTotal, selectedCurrency);
   const selectedNextTotalText = money(selectedNextTotal, selectedCurrency);
   const hasAdded = lastAddedQty !== null;
@@ -314,10 +329,8 @@ export default function PurchaseBox({
   const ctaLabel = isAdding
     ? "Adding..."
     : selectedAdded
-      ? `Added ${formatQtyLabel(optionQty)}`
-      : hasAdded
-        ? `Add ${formatQtyLabel(optionQty)} more - ${selectedPriceText} ->`
-        : `Add ${formatQtyLabel(optionQty)} - ${selectedPriceText} ->`;
+      ? `Added ${formatQtyLabel(optionQty)} (total ${selectedNextBags})`
+      : `Add ${formatQtyLabel(optionQty)} (total ${selectedNextBags})`;
 
   const hasExtraSelected = extraOptions.some((o) => o.qty === selectedQty);
   const showExtras = showMore || hasExtraSelected;
@@ -564,6 +577,32 @@ export default function PurchaseBox({
           </div>
         </div>
 
+        <div className="pbx__complete">
+          <div className="pbx__completeTitle">Complete your savings</div>
+          {completeTargets.length ? (
+            <div className="pbx__completeGrid">
+              {completeTargets.map((target) => (
+                <button
+                  key={target.target}
+                  type="button"
+                  onClick={() => addToCart(target.addQty)}
+                  disabled={addingQty !== null}
+                  className="pbx__completeBtn"
+                >
+                  <span className="pbx__completeLabel">
+                    Add {target.addQty} bag{target.addQty === 1 ? "" : "s"} (total {target.target})
+                  </span>
+                  <span className="pbx__completePrice">
+                    {target.addTotalText ? `+${target.addTotalText}` : ""}
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="pbx__completeBadge">Best price unlocked.</div>
+          )}
+        </div>
+
         <div className="pbx__freeShip">
           Free shipping at 5+ bags (based on your total)
         </div>
@@ -745,6 +784,16 @@ export default function PurchaseBox({
             Love it or your money back - Ships within 24 hours - Limited daily production
           </div>
           <AmazonOneBagNote className="pbx__amazonNote" />
+          <div className="pbx__trust">
+            <div className="pbx__trustRating">
+              ⭐ {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars from verified Amazon buyers
+            </div>
+            <div className="pbx__trustBadges">
+              <span>Made in the USA</span>
+              <span>No artificial dyes</span>
+              <span>Money-back guarantee</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -936,6 +985,76 @@ export default function PurchaseBox({
           margin-top:4px;
           font-size:11px;
           color: var(--muted);
+        }
+        .pbx__complete{
+          margin-top:10px;
+          border:1px solid var(--border);
+          background: var(--surface);
+          border-radius:12px;
+          padding:10px;
+        }
+        .pbx__completeTitle{
+          font-size:10px;
+          font-weight:700;
+          letter-spacing:0.22em;
+          text-transform:uppercase;
+          color: var(--muted);
+        }
+        .pbx__completeGrid{
+          margin-top:8px;
+          display:grid;
+          grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+          gap:8px;
+        }
+        .pbx__completeBtn{
+          border-radius:12px;
+          border:1px solid rgba(15,27,45,0.12);
+          background: var(--surface-strong);
+          padding:8px 10px;
+          text-align:left;
+          font-size:12px;
+          font-weight:700;
+          color: var(--text);
+          display:flex;
+          align-items:center;
+          justify-content:space-between;
+          gap:10px;
+          transition: transform .12s ease, border-color .12s ease, box-shadow .12s ease;
+        }
+        .pbx__completeBtn:hover{
+          transform: translateY(-1px);
+          border-color: rgba(239,59,59,0.35);
+          box-shadow: 0 10px 22px rgba(239,59,59,0.12);
+        }
+        .pbx__completeBtn:disabled{
+          opacity:0.6;
+          cursor:not-allowed;
+          transform:none;
+          box-shadow:none;
+        }
+        .pbx__completeLabel{
+          font-size:12px;
+          font-weight:700;
+          color: var(--text);
+        }
+        .pbx__completePrice{
+          font-size:11px;
+          font-weight:600;
+          color: var(--muted);
+          white-space:nowrap;
+        }
+        .pbx__completeBadge{
+          margin-top:8px;
+          display:inline-flex;
+          align-items:center;
+          gap:6px;
+          border-radius:999px;
+          border:1px solid rgba(239,59,59,0.4);
+          background: rgba(239,59,59,0.12);
+          color: var(--red);
+          font-size:11px;
+          font-weight:700;
+          padding:6px 10px;
         }
         .pbx__pricingNote{
           margin-top:10px;
@@ -1178,6 +1297,33 @@ export default function PurchaseBox({
         .pbx__amazonNote{
           margin-top:6px;
           font-size:12px;
+        }
+        .pbx__trust{
+          margin-top:10px;
+          display:grid;
+          gap:6px;
+          font-size:11px;
+          color: var(--muted);
+        }
+        .pbx__trustRating{
+          font-weight:700;
+          color: var(--text);
+        }
+        .pbx__trustBadges{
+          display:flex;
+          flex-wrap:wrap;
+          gap:6px;
+          font-size:10px;
+          font-weight:700;
+          text-transform:uppercase;
+          letter-spacing:0.12em;
+          color: var(--muted);
+        }
+        .pbx__trustBadges span{
+          border:1px solid rgba(15,27,45,0.12);
+          border-radius:999px;
+          padding:4px 8px;
+          background: var(--surface);
         }
 
         @media (max-width: 640px){

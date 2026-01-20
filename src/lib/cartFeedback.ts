@@ -3,6 +3,15 @@ export type CartToastDetail = {
 };
 
 import { MIN_PER_BAG } from "@/lib/bundles/pricing";
+import { SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
+
+const LAST_ADD_KEY = "cart:lastAdd";
+
+export type LastAddInfo = {
+  qty: number;
+  at: number;
+  variantId: string;
+};
 
 function formatMoney(amount: number) {
   try {
@@ -34,5 +43,32 @@ export function getCartToastMessage(qty: number) {
 
 export function fireCartToast(qty: number) {
   if (typeof window === "undefined") return;
+  if (Number.isFinite(qty) && qty > 0) {
+    try {
+      const payload: LastAddInfo = {
+        qty,
+        at: Date.now(),
+        variantId: SINGLE_BAG_VARIANT_ID,
+      };
+      window.localStorage.setItem(LAST_ADD_KEY, JSON.stringify(payload));
+    } catch {
+      // ignore storage failures
+    }
+  }
   window.dispatchEvent(new CustomEvent<CartToastDetail>("cart:toast", { detail: { qty } }));
+}
+
+export function readLastAdd(): LastAddInfo | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(LAST_ADD_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as LastAddInfo;
+    if (!parsed || !Number.isFinite(parsed.qty) || !Number.isFinite(parsed.at)) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
 }

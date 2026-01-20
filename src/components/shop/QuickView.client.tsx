@@ -8,6 +8,7 @@ import { SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
 import { fireCartToast } from "@/lib/cartFeedback";
 import { useCartBagCount } from "@/hooks/useCartBagCount";
 import { AmazonOneBagNote } from "@/components/ui/AmazonOneBagNote";
+import { AMAZON_REVIEWS } from "@/data/amazonReviews";
 
 const QUICK_QTYS = [1, 2, 3, 4, 5, 8, 12];
 const SAVINGS_LADDER = [
@@ -84,7 +85,7 @@ export default function QuickView({ product, detailHref, bundleHref, children }:
   );
   const missionCtaLabel =
     missionRemaining > 0
-      ? `Complete the mission: add ${missionRemaining} bag${missionRemaining === 1 ? "" : "s"}`
+      ? `Complete the mission: add ${missionRemaining} bag${missionRemaining === 1 ? "" : "s"} (total ${MISSION_TARGET_QTY})`
       : "Most popular mission complete";
   const mysteryBonusLine = bestPriceReached
     ? "Mystery extra revealed: Patriot Pride sticker (while supplies last)."
@@ -419,11 +420,26 @@ export default function QuickView({ product, detailHref, bundleHref, children }:
                         Adding...
                       </span>
                     ) : (
-                      `Add ${selectedQty} bags - ${money(addTotal)} ->`
+                      `Add ${selectedQty} bags (total ${nextBags})`
                     )}
                   </button>
-                  <div className="mt-2 text-[11px] text-[var(--muted)]">Free shipping • Secure checkout</div>
+                  <div className="mt-2 text-[11px] text-[var(--muted)]">
+                    Free shipping • Secure checkout
+                  </div>
                   <AmazonOneBagNote className="mt-2 text-[11px] text-[var(--muted)]" />
+                  <div className="mt-2 rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-2 text-[11px] text-[var(--muted)]">
+                    <div className="font-semibold text-[var(--text)]">
+                      ⭐ {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars from verified Amazon buyers
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-2 text-[10px] font-semibold uppercase tracking-[0.12em]">
+                      <span className="rounded-full border border-[var(--border)] bg-white px-2 py-1">
+                        Made in the USA
+                      </span>
+                      <span className="rounded-full border border-[var(--border)] bg-white px-2 py-1">
+                        No artificial dyes
+                      </span>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="flex flex-wrap gap-2">
