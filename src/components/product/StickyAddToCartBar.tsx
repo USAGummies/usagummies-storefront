@@ -70,7 +70,11 @@ export function StickyAddToCartBar({
 
     const purchaseEl = document.querySelector(purchaseSelector);
     if (purchaseEl) {
-      purchaseEl.scrollIntoView({ behavior: "smooth", block: "start" });
+      const prefersReduced =
+        typeof window !== "undefined" &&
+        window.matchMedia &&
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      purchaseEl.scrollIntoView({ behavior: prefersReduced ? "auto" : "smooth", block: "start" });
     }
   }
 

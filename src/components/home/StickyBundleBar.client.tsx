@@ -61,7 +61,13 @@ export function StickyBundleBar({ selected }: { selected?: Selected }) {
                 type="button"
                 onClick={() => {
                   const el = document.getElementById(targetId);
-                  if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+                  if (el) {
+                    const prefersReduced =
+                      typeof window !== "undefined" &&
+                      window.matchMedia &&
+                      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+                    el.scrollIntoView({ behavior: prefersReduced ? "auto" : "smooth", block: "start" });
+                  }
                 }}
                 className="text-xs font-semibold text-[var(--red)] underline underline-offset-4"
               >

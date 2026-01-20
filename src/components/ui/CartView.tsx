@@ -132,9 +132,11 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
     const qty = Number(l?.quantity) || 0;
     return sum + bagsPerUnit * qty;
   }, 0);
-  const nextMilestone =
-    SAVINGS_LADDER.find((milestone) => totalBags < milestone.qty) ||
-    SAVINGS_LADDER[SAVINGS_LADDER.length - 1];
+  const topMilestone = SAVINGS_LADDER[SAVINGS_LADDER.length - 1];
+  const bestPriceReached = totalBags >= topMilestone.qty;
+  const nextMilestone = bestPriceReached
+    ? topMilestone
+    : SAVINGS_LADDER.find((milestone) => totalBags < milestone.qty) || topMilestone;
   const bundlePricing = totalBags > 0 ? pricingForQty(totalBags) : null;
   const summaryCurrency = localCart?.cost?.subtotalAmount?.currencyCode || "USD";
   const bundlePerBagText =
@@ -163,7 +165,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
         nextTierAddTotalText ? ` - +${nextTierAddTotalText}` : ""
       }`
     : "";
-  const bestPriceApplied = totalBags >= 12;
+  const bestPriceApplied = bestPriceReached;
 
   const pct = clampPct(Math.round((totalBags / FREE_SHIP_QTY) * 100));
   const unlocked = totalBags >= FREE_SHIP_QTY;
@@ -379,7 +381,8 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
 
               <div className="mt-3 grid gap-2 sm:grid-cols-4">
                 {SAVINGS_LADDER.map((milestone) => {
-                  const isNext = milestone.qty === nextMilestone.qty;
+                  const isNext = !bestPriceReached && milestone.qty === nextMilestone.qty;
+                  const isBest = bestPriceReached && milestone.qty === topMilestone.qty;
                   const isReached = totalBags >= milestone.qty;
                   return (
                     <div
@@ -387,8 +390,8 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                       className={cn(
                         "rounded-2xl border px-2.5 py-2 text-[11px] font-semibold",
                         "border-[rgba(15,27,45,0.12)] bg-white text-[var(--text)]",
-                        isNext && "border-[rgba(239,59,59,0.45)] bg-[rgba(239,59,59,0.08)]",
-                        isReached && !isNext && "opacity-90"
+                        (isNext || isBest) && "border-[rgba(239,59,59,0.45)] bg-[rgba(239,59,59,0.08)]",
+                        isReached && !(isNext || isBest) && "opacity-90"
                       )}
                     >
                       <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--muted)]">
@@ -397,6 +400,10 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                       <div>{milestone.caption}</div>
                       {isNext ? (
                         <div className="text-[10px] font-semibold text-[var(--candy-red)]">Next up</div>
+                      ) : isBest ? (
+                        <div className="text-[10px] font-semibold text-[var(--candy-red)]">
+                          Best price applied
+                        </div>
                       ) : null}
                     </div>
                   );

@@ -649,6 +649,14 @@ a:focus-visible:not(.btn):not(.focus-ring),
   overflow: hidden;
 }
 
+.bundleTierBtn:focus-visible{
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
+  box-shadow:
+    0 18px 48px rgba(8, 14, 22, 0.36),
+    0 0 0 3px rgba(199, 160, 98, 0.35);
+}
+
 .bundleTierBtn__inner{
   position: relative;
   z-index: 2;

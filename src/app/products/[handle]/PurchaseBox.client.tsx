@@ -160,9 +160,11 @@ export default function PurchaseBox({
   const currentBags = Math.max(0, Number(bagCount) || 0);
   const currentPricing = currentBags > 0 ? pricingForQty(currentBags) : null;
   const currentTotal = currentPricing?.total ?? 0;
-  const nextMilestone =
-    SAVINGS_LADDER.find((milestone) => currentBags < milestone.qty) ||
-    SAVINGS_LADDER[SAVINGS_LADDER.length - 1];
+  const topMilestone = SAVINGS_LADDER[SAVINGS_LADDER.length - 1];
+  const bestPriceReached = currentBags >= topMilestone.qty;
+  const nextMilestone = bestPriceReached
+    ? topMilestone
+    : SAVINGS_LADDER.find((milestone) => currentBags < milestone.qty) || topMilestone;
 
   const variants = (product?.variants?.nodes || []) as VariantNode[];
   // Canonical ladder. Expose 1-3 bags plus core bundle sizes on-site.
@@ -264,7 +266,14 @@ export default function PurchaseBox({
   useEffect(() => {
     if (focus === "bundles") {
       setTimeout(() => {
-        bundlesRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        const prefersReduced =
+          typeof window !== "undefined" &&
+          window.matchMedia &&
+          window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        bundlesRef.current?.scrollIntoView({
+          behavior: prefersReduced ? "auto" : "smooth",
+          block: "start",
+        });
         setFocusGlow(true);
         setTimeout(() => setFocusGlow(false), 1400);
       }, 120);
@@ -425,20 +434,25 @@ export default function PurchaseBox({
           <div className="pbx__ladderTitle">Savings ladder</div>
           <div className="pbx__ladderGrid">
             {SAVINGS_LADDER.map((milestone) => {
-              const isNext = milestone.qty === nextMilestone.qty;
+              const isNext = !bestPriceReached && milestone.qty === nextMilestone.qty;
+              const isBest = bestPriceReached && milestone.qty === topMilestone.qty;
               const isReached = currentBags >= milestone.qty;
               return (
                 <div
                   key={milestone.qty}
                   className={cx(
                     "pbx__ladderItem",
-                    isNext && "pbx__ladderItem--next",
-                    isReached && !isNext && "pbx__ladderItem--reached"
+                    (isNext || isBest) && "pbx__ladderItem--next",
+                    isReached && !(isNext || isBest) && "pbx__ladderItem--reached"
                   )}
                 >
                   <div className="pbx__ladderLabel">{milestone.label}</div>
                   <div className="pbx__ladderCaption">{milestone.caption}</div>
-                  {isNext ? <div className="pbx__ladderNext">Next up</div> : null}
+                  {isNext ? (
+                    <div className="pbx__ladderNext">Next up</div>
+                  ) : isBest ? (
+                    <div className="pbx__ladderNext">Best price applied</div>
+                  ) : null}
                 </div>
               );
             })}

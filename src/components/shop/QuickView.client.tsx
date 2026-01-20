@@ -69,9 +69,11 @@ export default function QuickView({ product, detailHref, bundleHref, children }:
   const currentBags = Math.max(0, Number(bagCount) || 0);
   const currentPricing = currentBags > 0 ? pricingForQty(currentBags) : null;
   const currentTotal = currentPricing?.total ?? 0;
-  const nextMilestone =
-    SAVINGS_LADDER.find((milestone) => currentBags < milestone.qty) ||
-    SAVINGS_LADDER[SAVINGS_LADDER.length - 1];
+  const topMilestone = SAVINGS_LADDER[SAVINGS_LADDER.length - 1];
+  const bestPriceReached = currentBags >= topMilestone.qty;
+  const nextMilestone = bestPriceReached
+    ? topMilestone
+    : SAVINGS_LADDER.find((milestone) => currentBags < milestone.qty) || topMilestone;
   const closeBtnRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
@@ -255,7 +257,8 @@ export default function QuickView({ product, detailHref, bundleHref, children }:
                   </div>
                   <div className="mt-2 grid gap-2 sm:grid-cols-4">
                     {SAVINGS_LADDER.map((milestone) => {
-                      const isNext = milestone.qty === nextMilestone.qty;
+                      const isNext = !bestPriceReached && milestone.qty === nextMilestone.qty;
+                      const isBest = bestPriceReached && milestone.qty === topMilestone.qty;
                       const isReached = currentBags >= milestone.qty;
                       return (
                         <div
@@ -263,8 +266,8 @@ export default function QuickView({ product, detailHref, bundleHref, children }:
                           className={[
                             "rounded-2xl border px-2.5 py-2 text-[11px] font-semibold",
                             "border-[var(--border)] bg-[var(--surface-strong)] text-[var(--text)]",
-                            isNext ? "border-[rgba(239,59,59,0.45)] bg-[rgba(239,59,59,0.08)]" : "",
-                            isReached && !isNext ? "opacity-90" : "",
+                            isNext || isBest ? "border-[rgba(239,59,59,0.45)] bg-[rgba(239,59,59,0.08)]" : "",
+                            isReached && !(isNext || isBest) ? "opacity-90" : "",
                           ].join(" ")}
                         >
                           <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--muted)]">
@@ -273,6 +276,10 @@ export default function QuickView({ product, detailHref, bundleHref, children }:
                           <div>{milestone.caption}</div>
                           {isNext ? (
                             <div className="text-[10px] font-semibold text-[var(--candy-red)]">Next up</div>
+                          ) : isBest ? (
+                            <div className="text-[10px] font-semibold text-[var(--candy-red)]">
+                              Best price applied
+                            </div>
                           ) : null}
                         </div>
                       );

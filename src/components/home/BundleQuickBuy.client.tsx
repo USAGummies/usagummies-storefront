@@ -103,9 +103,11 @@ export default function BundleQuickBuy({
   const currentBags = Math.max(0, Number(bagCount) || 0);
   const currentPricing = currentBags > 0 ? pricingForQty(currentBags) : null;
   const currentTotal = currentPricing?.total ?? 0;
-  const nextMilestone =
-    SAVINGS_LADDER.find((milestone) => currentBags < milestone.qty) ||
-    SAVINGS_LADDER[SAVINGS_LADDER.length - 1];
+  const topMilestone = SAVINGS_LADDER[SAVINGS_LADDER.length - 1];
+  const bestPriceReached = currentBags >= topMilestone.qty;
+  const nextMilestone = bestPriceReached
+    ? topMilestone
+    : SAVINGS_LADDER.find((milestone) => currentBags < milestone.qty) || topMilestone;
   const ctaRef = React.useRef<HTMLDivElement | null>(null);
   const [selected, setSelected] = React.useState<TierKey>("8");
   const [addingQty, setAddingQty] = React.useState<number | null>(null);
@@ -767,7 +769,8 @@ export default function BundleQuickBuy({
       ) : null}
           <div className="mt-2 grid gap-2 sm:grid-cols-4">
             {SAVINGS_LADDER.map((milestone) => {
-              const isNext = milestone.qty === nextMilestone.qty;
+              const isNext = !bestPriceReached && milestone.qty === nextMilestone.qty;
+              const isBest = bestPriceReached && milestone.qty === topMilestone.qty;
               const isReached = currentBags >= milestone.qty;
               return (
                 <div
@@ -777,12 +780,12 @@ export default function BundleQuickBuy({
                     isLight
                       ? "border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] text-[var(--text)]"
                       : "border-white/10 bg-white/5 text-white/85",
-                    isNext
+                    isNext || isBest
                       ? isLight
                         ? "border-[rgba(239,59,59,0.45)] bg-[rgba(239,59,59,0.08)]"
                         : "border-[rgba(248,212,79,0.5)] bg-[rgba(248,212,79,0.08)]"
                       : "",
-                    isReached && !isNext && (isLight ? "opacity-90" : "opacity-80"),
+                    isReached && !(isNext || isBest) && (isLight ? "opacity-90" : "opacity-80"),
                   ].join(" ")}
                 >
                   <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--muted)]">
@@ -799,6 +802,15 @@ export default function BundleQuickBuy({
                       ].join(" ")}
                     >
                       Next up
+                    </div>
+                  ) : isBest ? (
+                    <div
+                      className={[
+                        "text-[10px] font-semibold",
+                        isLight ? "text-[var(--candy-red)]" : "text-[var(--gold)]",
+                      ].join(" ")}
+                    >
+                      Best price applied
                     </div>
                   ) : null}
                 </div>
