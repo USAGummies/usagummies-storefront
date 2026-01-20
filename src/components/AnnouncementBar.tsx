@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useMemo } from "react";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
+import { GummyIcon, HeroPackIcon } from "@/components/ui/GummyIcon";
 
 function cx(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
@@ -34,7 +35,9 @@ export function AnnouncementBar() {
     <div className="sticky top-0 z-[60] border-b border-[var(--border)] bg-white/92 backdrop-blur supports-[backdrop-filter]:bg-white/70">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-2 text-xs text-[var(--text)]">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="hidden sm:inline-block rounded-full border border-[var(--border)] bg-[var(--surface-strong)] px-2 py-0.5 text-[11px] text-[var(--text)]">
+          <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface-strong)] px-2 py-0.5 text-[11px] text-[var(--text)]">
+            <HeroPackIcon size={14} className="icon-float" />
+            <GummyIcon variant="red" size={14} />
             USA Gummies
           </span>
           <span className="truncate">{left}</span>

@@ -9,6 +9,7 @@ import { fireCartToast } from "@/lib/cartFeedback";
 import { useCartBagCount } from "@/hooks/useCartBagCount";
 import { AmazonOneBagNote } from "@/components/ui/AmazonOneBagNote";
 import { AMAZON_REVIEWS } from "@/data/amazonReviews";
+import { GummyIconRow, HeroPackIcon } from "@/components/ui/GummyIcon";
 
 const QUICK_QTYS = [1, 2, 3, 4, 5, 8, 12];
 const SAVINGS_LADDER = [
@@ -218,8 +219,10 @@ export default function QuickView({ product, detailHref, bundleHref, children }:
                 </p>
 
                 <div className="space-y-2">
-                  <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
-                    Pick your bag count
+                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
+                    <HeroPackIcon size={14} className="opacity-85" />
+                    <span>Lock in your savings</span>
+                    <GummyIconRow size={12} className="opacity-80" />
                   </div>
                   <div className="relative">
                     <div className="pointer-events-none absolute left-0 top-0 h-full w-8 bg-gradient-to-r from-[var(--surface)] to-transparent" />

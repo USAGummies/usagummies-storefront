@@ -93,7 +93,7 @@ export default function PatrioticPartySnacksPage() {
           </h1>
           <p className="mt-2 text-sm text-[var(--muted)] sm:text-base max-w-prose">
             Hosting a July 4th party or an America-themed event? USA Gummies bags make easy
-            shareable snacks. Choose a bag count for crowd-ready gummy bears.
+            shareable snacks. Shop now and save for crowd-ready gummy bears.
           </p>
 
           <div className="mt-6 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-4">

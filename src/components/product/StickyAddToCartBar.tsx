@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import { trackEvent } from "@/lib/analytics";
 import { AmazonOneBagNote } from "@/components/ui/AmazonOneBagNote";
+import { GummyIcon } from "@/components/ui/GummyIcon";
 
 type Props = {
   title: string;
@@ -116,7 +117,10 @@ export function StickyAddToCartBar({
               className="btn btn-candy pressable"
               style={{ whiteSpace: "nowrap" }}
             >
-              Lock in savings now
+              <span className="inline-flex items-center gap-2">
+                <GummyIcon variant="red" size={14} />
+                Lock in savings now
+              </span>
             </button>
           </div>
           <div className="px-3 pb-3">

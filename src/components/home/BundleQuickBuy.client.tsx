@@ -17,6 +17,7 @@ import type { BundleTier } from "@/lib/bundles/getBundleVariants";
 import { BASE_PRICE, FREE_SHIPPING_PHRASE, MIN_PER_BAG, pricingForQty } from "@/lib/bundles/pricing";
 import { trackEvent } from "@/lib/analytics";
 import { fireCartToast } from "@/lib/cartFeedback";
+import { GummyIconRow } from "@/components/ui/GummyIcon";
 import { useCartBagCount } from "@/hooks/useCartBagCount";
 import { REVIEW_HIGHLIGHTS } from "@/data/reviewHighlights";
 import { AmazonOneBagNote } from "@/components/ui/AmazonOneBagNote";
@@ -753,11 +754,12 @@ export default function BundleQuickBuy({
         <div className="min-w-0 space-y-1.5">
           <div
             className={[
-              "font-extrabold",
+              "font-extrabold flex items-center gap-2 flex-wrap",
               isCompact ? (isLight ? "text-2xl text-[var(--text)]" : "text-2xl text-white") : isLight ? "text-2xl text-[var(--text)]" : "text-2xl text-white",
             ].join(" ")}
           >
-            Pick your bag count
+            <span>Lock in your savings</span>
+            <GummyIconRow size={14} className={isLight ? "opacity-80" : "opacity-90"} />
           </div>
           <div
             className={[

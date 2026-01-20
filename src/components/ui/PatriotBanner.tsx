@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { PatriotRibbon } from "@/components/ui/PatriotRibbon";
 import { AmazonOneBagNote } from "@/components/ui/AmazonOneBagNote";
+import { GummyIconRow, HeroPackIcon } from "@/components/ui/GummyIcon";
 
 export function PatriotBanner({ showRibbon = true }: { showRibbon?: boolean }) {
   return (
@@ -42,13 +43,19 @@ export function PatriotBanner({ showRibbon = true }: { showRibbon?: boolean }) {
           </div>
 
           <div className="candy-panel rounded-2xl" style={{ padding: 14 }}>
-            <div className="kicker">Today’s move</div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div className="kicker">Today’s move</div>
+              <HeroPackIcon size={28} className="icon-float" />
+            </div>
             <div style={{ fontWeight: 950, fontSize: 18, marginTop: 8 }}>
               Save more with more bags
             </div>
             <div className="muted" style={{ marginTop: 8, fontSize: 14 }}>
               The cart highlights the most popular size. Add more bags and
               unlock free shipping.
+            </div>
+            <div style={{ marginTop: 10 }}>
+              <GummyIconRow size={14} className="opacity-80" />
             </div>
 
             <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>

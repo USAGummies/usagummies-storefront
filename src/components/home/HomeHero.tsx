@@ -1,13 +1,18 @@
 // src/components/home/HomeHero.tsx (FULL REPLACE)
 import Link from "next/link";
 import { PatriotBanner } from "@/components/ui/PatriotBanner";
+import { GummyIconRow, HeroPackIcon } from "@/components/ui/GummyIcon";
 import { PatriotRibbon } from "@/components/ui/PatriotRibbon";
 
 export function HomeHero() {
   return (
     <section style={{ padding: "26px 0 10px" }}>
       <div className="container">
-        <div className="card-solid" style={{ padding: 22, overflow: "hidden" }}>
+        <div
+          className="card-solid patriot-sheen"
+          style={{ padding: 22, overflow: "hidden", position: "relative" }}
+        >
+          <span className="usa-stamp usa-stamp--corner">Made in USA</span>
           <div className="h-eyebrow">
             American-made gummy bears • Fast shipping • Save more per bag
           </div>
@@ -53,6 +58,10 @@ export function HomeHero() {
                 <span className="chip">🚚 Ships fast</span>
                 <span className="chip">⭐ 4.8 stars from verified Amazon buyers</span>
               </div>
+              <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8 }}>
+                <HeroPackIcon size={26} className="icon-float" />
+                <GummyIconRow size={16} className="opacity-80" />
+              </div>
 
               <div style={{ marginTop: 16 }}>
                 <PatriotRibbon />
@@ -62,6 +71,7 @@ export function HomeHero() {
             <div className="hero-right">
               <div className="hero-flag" aria-hidden="true" />
               <div className="card" style={{ padding: 16, position: "relative" }}>
+                <HeroPackIcon size={54} className="hero-pack-stamp icon-float" />
                 <div className="h-eyebrow">Most popular pick</div>
                 <div style={{ fontWeight: 950, fontSize: 22, marginTop: 8 }}>
                   Stack bags. Save more.
@@ -79,6 +89,9 @@ export function HomeHero() {
                     View product details
                   </Link>
                 </div>
+                <div style={{ marginTop: 10 }}>
+                  <GummyIconRow size={14} className="opacity-70" />
+                </div>
               </div>
             </div>
           </div>
@@ -94,6 +107,13 @@ export function HomeHero() {
         .hero-right{
           position: relative;
           min-height: 260px;
+        }
+        .hero-pack-stamp{
+          position: absolute;
+          top: -18px;
+          right: -8px;
+          opacity: 0.9;
+          filter: drop-shadow(0 12px 18px rgba(13, 28, 51, 0.2));
         }
         .hero-flag{
           position:absolute;

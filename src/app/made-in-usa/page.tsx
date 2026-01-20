@@ -187,7 +187,7 @@ export default function MadeInUsaPage() {
           </div>
 
           <div className="mt-6">
-            <AmericanDreamCallout variant="compact" ctaHref="/shop" ctaLabel="Choose a bag count" tone="light" />
+            <AmericanDreamCallout variant="compact" ctaHref="/shop" ctaLabel="Shop now and save" tone="light" />
           </div>
 
           <div className="mt-6 candy-panel rounded-[32px] border border-[var(--border)] p-5 sm:p-6">

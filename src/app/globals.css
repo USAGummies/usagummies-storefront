@@ -43,6 +43,18 @@
     rgba(255, 255, 255, 0.35) 75%,
     rgba(255, 255, 255, 0) 100%
   );
+  --star-pattern: url("/brand/pattern-stars.svg");
+  --stripe-sheen: repeating-linear-gradient(
+    125deg,
+    rgba(199, 54, 44, 0.18) 0px,
+    rgba(199, 54, 44, 0.18) 12px,
+    rgba(255, 255, 255, 0) 12px,
+    rgba(255, 255, 255, 0) 24px,
+    rgba(13, 28, 51, 0.16) 24px,
+    rgba(13, 28, 51, 0.16) 36px,
+    rgba(255, 255, 255, 0) 36px,
+    rgba(255, 255, 255, 0) 48px
+  );
   --shadow: var(--shadow-card);
   --primary: var(--navy);
   --primary-text: var(--white);
@@ -123,6 +135,46 @@ p{ line-height: 1.65; }
 .brand-touch{
   pointer-events: none;
   user-select: none;
+}
+.patriot-sheen{
+  background-image:
+    var(--paper-grain),
+    var(--foil-sheen),
+    var(--star-pattern),
+    var(--stripe-sheen);
+  background-size: auto, auto, 160px 160px, auto;
+  background-repeat: repeat;
+  background-position: center;
+}
+.usa-stamp{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  user-select: none;
+  border-radius: 999px;
+  border: 2px dashed rgba(199, 54, 44, 0.5);
+  padding: 8px 12px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--red);
+  background:
+    radial-gradient(circle at 30% 30%, rgba(255,255,255,0.85), rgba(255,255,255,0.1)),
+    var(--paper-grain);
+  box-shadow: 0 10px 22px rgba(15, 27, 45, 0.16);
+}
+.usa-stamp--small{
+  padding: 6px 10px;
+  font-size: 8px;
+  border-width: 1.5px;
+}
+.usa-stamp--corner{
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  transform: rotate(6deg);
 }
 
 .metal-panel{
@@ -967,7 +1019,11 @@ a:focus-visible:not(.btn):not(.focus-ring),
   inset:0;
   background:
     radial-gradient(circle at 18% 18%, rgba(239,59,59,0.12), transparent 45%),
-    radial-gradient(circle at 82% 8%, rgba(248,212,79,0.18), transparent 40%);
+    radial-gradient(circle at 82% 8%, rgba(248,212,79,0.18), transparent 40%),
+    var(--star-pattern),
+    var(--stripe-sheen);
+  background-size: auto, auto, 180px 180px, auto;
+  background-repeat: no-repeat, no-repeat, repeat, repeat;
   opacity: 0.45;
   pointer-events:none;
 }

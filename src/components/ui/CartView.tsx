@@ -13,6 +13,7 @@ import { trackEvent } from "@/lib/analytics";
 import { ReviewHighlights } from "@/components/reviews/ReviewHighlights";
 import { AmazonOneBagNote } from "@/components/ui/AmazonOneBagNote";
 import { AMAZON_REVIEWS } from "@/data/amazonReviews";
+import { GummyIconRow, HeroPackIcon } from "@/components/ui/GummyIcon";
 
 type MoneyV2 = { amount: string; currencyCode: string };
 
@@ -475,8 +476,14 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
           >
             <div className="rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white/92 p-3 shadow-[0_12px_30px_rgba(15,27,45,0.08)] backdrop-blur-md">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
-                  In your cart
+                <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
+                  <HeroPackIcon size={16} className="opacity-90" />
+                  <GummyIconRow
+                    size={12}
+                    variants={["red", "yellow", "green"]}
+                    className="opacity-80"
+                  />
+                  <span>In your cart</span>
                 </div>
                 <div className="text-[11px] font-semibold text-[var(--text)]">
                   {totalBags} bag{totalBags === 1 ? "" : "s"} • {cartPeekSubtotal}
@@ -535,7 +542,8 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
             )}
           >
           <div className="flex flex-col gap-4">
-            <div className="metal-panel rounded-3xl border border-[rgba(199,160,98,0.35)] p-4">
+            <div className="metal-panel patriot-sheen relative rounded-3xl border border-[rgba(199,160,98,0.35)] p-4">
+              <span className="usa-stamp usa-stamp--corner">Made in USA</span>
               {dealToast ? (
                 <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[rgba(239,59,59,0.35)] bg-[rgba(239,59,59,0.12)] px-3 py-1 text-[11px] font-semibold text-[var(--candy-red)] shadow-[0_12px_30px_rgba(239,59,59,0.18)]">
                   <span className="h-2 w-2 rounded-full bg-[var(--candy-red)] animate-pbxPulse" />
@@ -688,8 +696,9 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
             <div className="candy-panel rounded-[32px] p-4 sm:p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
-                    Choose your bag count
+                  <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
+                    <span>Lock in your savings</span>
+                    <GummyIconRow size={12} className="opacity-80" />
                   </div>
                   <div className="text-lg font-black text-[var(--text)]">Save more with more bags</div>
                   <div className="text-xs text-[var(--muted)]">

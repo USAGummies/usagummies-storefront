@@ -9,6 +9,7 @@ import { fireCartToast } from "@/lib/cartFeedback";
 import { useCartBagCount } from "@/hooks/useCartBagCount";
 import { AmazonOneBagNote } from "@/components/ui/AmazonOneBagNote";
 import { AMAZON_REVIEWS } from "@/data/amazonReviews";
+import { GummyIconRow, HeroPackIcon } from "@/components/ui/GummyIcon";
 
 function cx(...a: Array<string | false | null | undefined>) {
   return a.filter(Boolean).join(" ");
@@ -447,7 +448,11 @@ export default function PurchaseBox({
       >
         <div className="pbx__cardHeader">
           <div>
-            <div className="pbx__cardTitle">Pick your bag count</div>
+            <div className="pbx__cardTitle pbx__cardTitle--gummy">
+              <HeroPackIcon size={20} className="pbx__packIcon" />
+              <span>Lock in your savings</span>
+              <GummyIconRow size={14} className="pbx__gummyRow" />
+            </div>
             <div className="pbx__cardHint">
               {cardHint}
             </div>
@@ -818,6 +823,9 @@ export default function PurchaseBox({
           display:flex; gap:10px; align-items:flex-start; justify-content:space-between; flex-wrap:wrap;
         }
         .pbx__cardTitle{ font-weight:950; font-size:16px; color: var(--text); }
+        .pbx__cardTitle--gummy{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+        .pbx__packIcon{ opacity:0.92; filter: drop-shadow(0 8px 14px rgba(13,28,51,0.18)); }
+        .pbx__gummyRow{ opacity:0.85; }
         .pbx__cardHint{ font-size:13px; color: var(--muted); }
         .pbx__freeShip{
           margin-top:10px;

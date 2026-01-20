@@ -180,7 +180,7 @@ export default function JoinTheRevolutionPage() {
                 </div>
                 <div className="mt-3 flex flex-wrap gap-3">
                   <Link href="/shop" className="btn btn-candy">
-                    Choose a bag count
+                    Shop now and save
                   </Link>
                   <Link href="/faq" className="btn btn-outline">
                     Read the FAQ
@@ -200,7 +200,7 @@ export default function JoinTheRevolutionPage() {
                 </p>
                 <div className="mt-3 flex flex-wrap gap-3">
                   <Link href="/shop" className="btn btn-candy">
-                    Choose a bag count
+                    Shop now and save
                   </Link>
                   <Link href="/faq" className="btn btn-outline">
                     Read the FAQ

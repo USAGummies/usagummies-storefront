@@ -5,6 +5,7 @@ import Image from "next/image";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import { AmazonOneBagNote } from "@/components/ui/AmazonOneBagNote";
 import QuickView from "@/components/shop/QuickView.client";
+import { GummyIcon, HeroPackIcon } from "@/components/ui/GummyIcon";
 
 type ProductCardData = any;
 
@@ -115,10 +116,15 @@ export function ShopProductCard({
             </div>
 
             {hasBundle ? (
-              <div className="absolute left-2 top-2 rounded-full border border-[rgba(199,54,44,0.35)] bg-[rgba(199,54,44,0.12)] px-3 py-1 text-[11px] font-bold text-[var(--red)]">
+              <div className="absolute left-2 top-2 flex items-center gap-1.5 rounded-full border border-[rgba(199,54,44,0.35)] bg-[rgba(199,54,44,0.12)] px-3 py-1 text-[11px] font-bold text-[var(--red)]">
+                <GummyIcon variant="red" size={14} />
                 Savings inside
               </div>
             ) : null}
+
+            <div className="absolute right-2 top-2 flex items-center justify-center rounded-full border border-[var(--border)] bg-white/90 p-1.5 backdrop-blur-md">
+              <HeroPackIcon size={18} className="icon-float" />
+            </div>
 
             <div className="absolute bottom-2 right-2 rounded-full border border-[var(--border)] bg-white/90 px-3 py-1 text-[11px] font-semibold text-[var(--navy)] backdrop-blur-md">
               {FREE_SHIPPING_PHRASE}
