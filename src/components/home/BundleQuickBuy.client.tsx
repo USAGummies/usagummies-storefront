@@ -41,6 +41,7 @@ type Props = {
   otherQuantitiesLabel?: string;
   otherQuantities?: number[];
   surface?: "card" | "flat";
+  layout?: "classic" | "integrated";
 };
 
 function money(amount?: number | null, currency = "USD") {
@@ -102,6 +103,7 @@ export default function BundleQuickBuy({
   otherQuantitiesLabel = "Need fewer bags?",
   otherQuantities,
   surface = "card",
+  layout = "classic",
 }: Props) {
   const { bagCount } = useCartBagCount();
   const currentBags = Math.max(0, Number(bagCount) || 0);
@@ -135,6 +137,7 @@ export default function BundleQuickBuy({
   const isCompact = variant === "compact";
   const isLight = tone === "light";
   const isFlat = surface === "flat";
+  const isIntegrated = layout === "integrated";
 
   const allTiers = React.useMemo(() => {
     const allowed = (tiers || []).filter((t) => {
@@ -416,7 +419,8 @@ export default function BundleQuickBuy({
           onKeyDown={(event) => handleRadioKeyDown(event, tier.quantity, canSelect)}
           className={[
             "relative w-full snap-start border-2 px-4 py-4 text-left transition-[border-color,background-color,box-shadow,transform] duration-150 ease-out",
-            "rounded-[12px] min-h-[190px] sm:min-h-[200px] w-full sm:max-w-[280px] sm:justify-self-center",
+          "rounded-[12px] min-h-[190px] sm:min-h-[200px] w-full",
+          isIntegrated ? "sm:max-w-none sm:justify-self-stretch" : "sm:max-w-[280px] sm:justify-self-center",
             isLight
               ? "bg-white text-[var(--text)] border-[rgba(15,27,45,0.14)] shadow-[0_10px_22px_rgba(15,27,45,0.08)]"
               : "bg-[linear-gradient(180deg,rgba(10,16,30,0.96),rgba(8,12,24,0.92))] text-white border-white/15 shadow-[0_12px_24px_rgba(7,12,20,0.45)]",
@@ -690,6 +694,237 @@ export default function BundleQuickBuy({
     );
   }
 
+  const ctaContent = (
+    <>
+      {selectedTier ? (
+        isCompact ? (
+          <div className="space-y-1">
+            <div className={isLight ? "text-[14px] font-medium text-[var(--muted)]" : "text-[14px] font-medium text-white/80"}>
+              {selectedAdded ? "Savings locked" : "Lock in savings now"} +{selectedTier.quantity} bags
+            </div>
+            <div
+              key={`${selectedTier.quantity}-${selectedTierState?.addTotal}`}
+              className={isLight ? "text-[24px] font-bold text-[var(--text)]" : "text-[24px] font-bold text-white"}
+            >
+              {Number.isFinite(selectedTierState?.addTotal ?? NaN)
+                ? `+${money(selectedTierState?.addTotal, "USD")}`
+                : "—"}
+            </div>
+            {Number.isFinite(selectedTierState?.nextTotal ?? NaN) ? (
+              <div className={isLight ? "text-[12px] text-[var(--muted)]" : "text-[12px] text-white/70"}>
+                New total: {selectedTierState?.nextBags} bags - {money(selectedTierState?.nextTotal, "USD")}
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <div
+            className={[
+              "flex items-center justify-between gap-3",
+              isFlat
+                ? isLight
+                  ? "border-b border-[rgba(15,27,45,0.12)] pb-2 mb-2"
+                  : "border-b border-white/12 pb-2 mb-2"
+                : "border-b border-white/12 pb-2 mb-2",
+            ].join(" ")}
+          >
+            <div
+              className={
+                isLight
+                  ? "text-sm font-semibold text-[var(--text)]"
+                  : "text-sm font-semibold text-white/90"
+              }
+            >
+              {selectedAdded ? "Savings locked" : "Lock in savings now"} +{selectedTier.quantity} bags
+              <span
+                className={
+                  isLight
+                    ? "font-extrabold text-[var(--text)]"
+                    : "font-extrabold text-white"
+                }
+              >
+                {selectedTierState ? ` (new total: ${selectedTierState.nextBags} bags)` : ""}
+              </span>
+            </div>
+            <div
+              className={
+                isLight
+                  ? "text-right text-xs text-[var(--muted)]"
+                  : "text-right text-xs text-white/60"
+              }
+            >
+              <div
+                key={`${selectedTier.quantity}-${selectedTierState?.addTotal}`}
+                className={
+                  isLight
+                    ? "text-[12px] font-semibold text-[var(--muted)] transition-all duration-300 price-pop"
+                    : "text-[12px] font-semibold text-white/80 transition-all duration-300 price-pop"
+                }
+              >
+                {Number.isFinite(selectedTierState?.addTotal ?? NaN)
+                  ? `+${money(selectedTierState?.addTotal, "USD")}`
+                  : "—"}
+              </div>
+              {Number.isFinite(selectedTierState?.nextTotal ?? NaN) ? (
+                <div
+                  key={`${selectedTier.quantity}-${selectedTierState?.nextTotal ?? "na"}`}
+                  className="price-pop"
+                >
+                  {`Total after add: ${money(selectedTierState?.nextTotal, "USD")}`}
+                </div>
+              ) : null}
+              {Number.isFinite(selectedTierState?.perBag ?? NaN) ? (
+                <div
+                  key={`${selectedTier.quantity}-${selectedTierState?.perBag ?? "na"}`}
+                  className="price-pop"
+                >
+                  {`~${money(selectedTierState?.perBag, "USD")} / bag`}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        )
+      ) : null}
+
+      <div className="mt-3 flex flex-col gap-2">
+        <button
+          type="button"
+          className={[
+            "w-full inline-flex items-center justify-center rounded-[12px] h-[54px] px-4 sm:px-5 text-[16px] sm:text-[17px] font-semibold whitespace-nowrap shadow-[0_14px_36px_rgba(214,64,58,0.28)] hover:brightness-110 active:brightness-95 disabled:opacity-60 disabled:cursor-not-allowed leading-tight relative overflow-hidden",
+            isLight
+              ? "bg-[var(--candy-red)] text-white shadow-[0_16px_36px_rgba(239,59,59,0.32)]"
+              : isCompact
+                ? "bg-[var(--red)] text-white"
+                : "bg-[#d6403a] text-white",
+          ].join(" ")}
+          onClick={() => addToCart()}
+          disabled={isAdding || ctaDisabled}
+        >
+          <span className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.14),transparent_50%)] opacity-95" />
+          <span className="relative inline-flex items-center gap-2">
+            {isAdding ? (
+              <>
+                <span
+                  aria-hidden="true"
+                  className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent opacity-60"
+                />
+                Locking in...
+              </>
+            ) : Number.isFinite(selectedTierState?.addTotal ?? NaN) ? (
+              selectedAdded && Number.isFinite(selectedTierState?.nextBags ?? NaN)
+                ? `Savings locked: ${selectedTier?.quantity} bags (total ${selectedTierState?.nextBags})`
+                : Number.isFinite(selectedTierState?.nextBags ?? NaN)
+                  ? `Lock in savings now: ${selectedTier?.quantity} bags (total ${selectedTierState?.nextBags})`
+                  : `Lock in savings now: ${selectedTier?.quantity} bags`
+            ) : (
+              "Lock in savings now"
+            )}
+          </span>
+        </button>
+        <div
+          className={
+            isLight
+              ? "text-xs text-[var(--muted)]"
+              : isCompact
+                ? "text-xs text-white/70"
+                : "text-xs text-white/75"
+          }
+        >
+          Love it or your money back • Ships within 24 hours • Secure checkout
+        </div>
+        <div
+          className={
+            isFlat
+              ? isLight
+                ? "mt-2 text-[11px] text-[var(--muted)]"
+                : "mt-2 text-[11px] text-white/70"
+              : isLight
+                ? "mt-2 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white px-3 py-2 text-[11px] text-[var(--muted)]"
+                : "mt-2 rounded-2xl border border-white/12 bg-white/5 px-3 py-2 text-[11px] text-white/70"
+          }
+        >
+          <div className={isLight ? "font-semibold text-[var(--text)]" : "font-semibold text-white/90"}>
+            ⭐ {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars from verified Amazon buyers
+          </div>
+          <div className="mt-1 flex flex-wrap gap-2 text-[10px] font-semibold uppercase tracking-[0.12em]">
+            <span
+              className={
+                isFlat
+                  ? "px-0 py-0"
+                  : isLight
+                    ? "rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-2 py-1"
+                    : "rounded-full border border-white/10 bg-white/5 px-2 py-1"
+              }
+            >
+              Made in the USA
+            </span>
+            <span
+              className={
+                isFlat
+                  ? "px-0 py-0"
+                  : isLight
+                    ? "rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-2 py-1"
+                    : "rounded-full border border-white/10 bg-white/5 px-2 py-1"
+              }
+            >
+              No artificial dyes
+            </span>
+          </div>
+        </div>
+        {reviewSnippets.length ? (
+          <div className={isLight ? "grid gap-1 text-[11px] text-[var(--muted)]" : "grid gap-1 text-[11px] text-white/70"}>
+            {reviewSnippets.map((review) => (
+              <div key={review.id} className="inline-flex items-center gap-2">
+                <span className={isLight ? "text-[var(--candy-yellow)]" : "text-[var(--gold)]"}>
+                  {starLine(review.rating)}
+                </span>
+                <span className="truncate">&quot;{review.body}&quot; — {review.author}</span>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        <AmazonOneBagNote
+          className={isLight ? "text-xs text-[var(--muted)]" : "text-xs text-white/65"}
+          linkClassName={
+            isLight
+              ? "underline underline-offset-4 text-[var(--text)] hover:text-[var(--navy)]"
+              : "underline underline-offset-4 text-white hover:text-white"
+          }
+        />
+        {error ? (
+          <div
+            className={
+              isLight
+                ? "text-xs font-semibold text-red-500"
+                : isCompact
+                  ? "text-xs font-semibold text-red-200"
+                  : "text-xs font-semibold text-red-200"
+            }
+          >
+            {error}
+          </div>
+        ) : null}
+        {success && !error ? (
+          <div
+            className={
+              isLight
+                ? "text-xs font-semibold text-[var(--candy-green)]"
+                : isCompact
+                  ? "text-xs font-semibold text-[var(--gold)]"
+                  : "text-xs font-semibold text-[var(--gold)]"
+            }
+          >
+            {lastAddedQty ? `Added ${lastAddedQty} bags to cart.` : "Added to cart."}
+          </div>
+        ) : null}
+        {ctaDisabled && availableForSale === false && !error ? (
+          <div className={isLight ? "text-xs text-[var(--muted)]" : isCompact ? "text-xs text-white/50" : "text-xs text-white/60"}>
+            Out of stock.
+          </div>
+        ) : null}
+      </div>
+    </>
+  );
+
   if (!expandedTiers.length) {
     return (
       <section
@@ -722,6 +957,221 @@ export default function BundleQuickBuy({
         >
           View product details
         </Link>
+      </section>
+    );
+  }
+
+  if (isIntegrated) {
+    return (
+      <section
+        id={anchorId}
+        aria-label="Savings pricing"
+        className="bundle-integrated relative"
+      >
+        {showTrainAccent ? (
+          <Image
+            src="/website%20assets/B17Bomber.png"
+            alt=""
+            aria-hidden="true"
+            width={1405}
+            height={954}
+            sizes="(max-width: 640px) 90vw, 620px"
+            className="bundle-integrated__accent"
+          />
+        ) : null}
+
+        <div className="bundle-integrated__header">
+          <div className="bundle-integrated__eyebrow">Bundle &amp; save</div>
+          <div className="bundle-integrated__title">Lock in your savings</div>
+          <div className="bundle-integrated__sub">
+            Add more bags and watch your per-bag price drop. Savings apply to your total bag count.
+          </div>
+          {summaryLine ? (
+            <div className="bundle-integrated__summary">
+              {summaryLine}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="bundle-integrated__grid">
+          <div className="bundle-integrated__guide">
+            <div className="bundle-integrated__ladder">
+              <div className="bundle-integrated__ladderRow">
+                {SAVINGS_LADDER.map((milestone) => {
+                  const isNext = !bestPriceReached && milestone.qty === nextMilestone.qty;
+                  const isBest = bestPriceReached && milestone.qty === topMilestone.qty;
+                  const isReached = currentBags >= milestone.qty;
+                  const isActive = isNext || isBest;
+                  return (
+                    <div
+                      key={milestone.qty}
+                      className={[
+                        "bundle-integrated__ladderItem",
+                        isActive ? "bundle-integrated__ladderItem--active" : "",
+                        isReached && !isActive ? "bundle-integrated__ladderItem--reached" : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                    >
+                      <span className="bundle-integrated__ladderDot" aria-hidden="true" />
+                      <div className="bundle-integrated__ladderLabel">{milestone.label}</div>
+                      <div className="bundle-integrated__ladderCaption">{milestone.caption}</div>
+                      {isActive ? (
+                        <div className="bundle-integrated__ladderNote">
+                          {isBest ? "Best price applied" : "Next up"}
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="bundle-integrated__ladderProof">{MISSION_SOCIAL_PROOF}</div>
+            </div>
+
+            <div className="bundle-integrated__mission">
+              <div className="bundle-integrated__missionHeader">
+                <span>Mission to savings</span>
+                <span>Progress: {missionProgressCount}/{topMilestone.qty} bags</span>
+              </div>
+              <div className="bundle-integrated__missionCopy">
+                Hit 8 bags to unlock the crowd-favorite price.
+              </div>
+              <div className="mission-bar" aria-hidden="true">
+                <div className="mission-bar__fill" style={{ width: `${missionProgressPct}%` }} />
+                {SAVINGS_LADDER.map((milestone) => {
+                  const left = (milestone.qty / topMilestone.qty) * 100;
+                  const reached = currentBags >= milestone.qty;
+                  const isNext = !bestPriceReached && milestone.qty === nextMilestone.qty;
+                  return (
+                    <span
+                      key={milestone.qty}
+                      className={[
+                        "mission-bar__tick",
+                        reached ? "mission-bar__tick--reached" : "",
+                        isNext ? "mission-bar__tick--next" : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                      style={{ left: `${left}%` }}
+                    />
+                  );
+                })}
+              </div>
+              <div className="bundle-integrated__missionBadges">
+                {[
+                  { qty: 4, label: "Savings unlocked" },
+                  { qty: 5, label: "Free shipping unlocked" },
+                  { qty: 8, label: "Crowd favorite unlocked" },
+                  {
+                    qty: 12,
+                    label: bestPriceReached ? "Mystery extra revealed" : "Mystery extra unlocks",
+                  },
+                ].map((badge) => {
+                  const unlocked = currentBags >= badge.qty;
+                  return (
+                    <span
+                      key={badge.qty}
+                      className={[
+                        "bundle-integrated__missionBadge",
+                        unlocked ? "bundle-integrated__missionBadge--active" : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                    >
+                      {badge.label}
+                    </span>
+                  );
+                })}
+              </div>
+              <div className="bundle-integrated__missionActions">
+                {missionRemaining > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => addToCart(missionRemaining, "mission")}
+                    disabled={addingQty !== null || !singleBagVariantId}
+                    className="btn btn-candy pressable"
+                  >
+                    {addingQty ? "Locking in..." : missionCtaLabel}
+                  </button>
+                ) : (
+                  <span className="bundle-integrated__missionDone">
+                    {missionCtaLabel}
+                  </span>
+                )}
+              </div>
+              <div className="bundle-integrated__missionNote">{mysteryBonusLine}</div>
+            </div>
+
+            {showHowItWorks ? (
+              <div className="bundle-integrated__how">
+                <div className="text-[11px] font-semibold">
+                  How pricing works: selections add bags, never replace your cart.
+                </div>
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-[11px] font-semibold text-[var(--text)]">
+                    Learn more
+                  </summary>
+                  <div className="mt-1 text-[11px] text-[var(--muted)]">
+                    Savings start at 4 bags, free shipping unlocks at 5 bags, and per-bag pricing caps at {perBagCapText} after 12+ bags.{" "}
+                    <Link href="/faq" className="underline underline-offset-2">
+                      Read the FAQ
+                    </Link>
+                    .
+                  </div>
+                </details>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="bundle-integrated__select">
+            <div className="bundle-integrated__selectHeader">Choose your bag count</div>
+            {isCompact ? (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-2 sm:gap-4" role="radiogroup" aria-label="Bag count">
+                {expandedTiers.map((tier) => renderRow(tier))}
+              </div>
+            ) : (
+              <>
+                <div
+                  className={[
+                    "pointer-events-none absolute left-0 top-0 h-full w-10",
+                    "bg-[linear-gradient(90deg,rgba(12,20,38,0.12),transparent)]",
+                  ].join(" ")}
+                />
+                <div
+                  className={[
+                    "pointer-events-none absolute right-0 top-0 h-full w-10",
+                    "bg-[linear-gradient(270deg,rgba(12,20,38,0.12),transparent)]",
+                  ].join(" ")}
+                />
+                <div className="flex snap-x snap-mandatory gap-2.5 overflow-x-auto pb-2 pr-4 bundle-slider">
+                  {expandedTiers.map((tier) => renderRow(tier))}
+                </div>
+              </>
+            )}
+
+            {showOtherQuantitiesLink && !showOtherQuantities ? (
+              <button
+                type="button"
+                onClick={() => setShowOtherQuantities(true)}
+                className="bundle-integrated__more"
+              >
+                {otherQuantitiesLabel}
+              </button>
+            ) : null}
+
+            <div
+              className={[
+                "bundle-integrated__cta",
+                !isCompact ? "bundle-integrated__cta--sticky" : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              ref={ctaRef}
+            >
+              {ctaContent}
+            </div>
+          </div>
+        </div>
       </section>
     );
   }
@@ -1159,230 +1609,7 @@ export default function BundleQuickBuy({
         ].join(" ")}
         ref={ctaRef}
       >
-        {selectedTier ? (
-          isCompact ? (
-            <div className="space-y-1">
-              <div className={isLight ? "text-[14px] font-medium text-[var(--muted)]" : "text-[14px] font-medium text-white/80"}>
-                {selectedAdded ? "Savings locked" : "Lock in savings now"} +{selectedTier.quantity} bags
-              </div>
-              <div
-                key={`${selectedTier.quantity}-${selectedTierState?.addTotal}`}
-                className={isLight ? "text-[24px] font-bold text-[var(--text)]" : "text-[24px] font-bold text-white"}
-              >
-                {Number.isFinite(selectedTierState?.addTotal ?? NaN)
-                  ? `+${money(selectedTierState?.addTotal, "USD")}`
-                  : "—"}
-              </div>
-              {Number.isFinite(selectedTierState?.nextTotal ?? NaN) ? (
-                <div className={isLight ? "text-[12px] text-[var(--muted)]" : "text-[12px] text-white/70"}>
-                  New total: {selectedTierState?.nextBags} bags - {money(selectedTierState?.nextTotal, "USD")}
-                </div>
-              ) : null}
-            </div>
-          ) : (
-            <div
-              className={[
-                "flex items-center justify-between gap-3",
-                isFlat
-                  ? isLight
-                    ? "border-b border-[rgba(15,27,45,0.12)] pb-2 mb-2"
-                    : "border-b border-white/12 pb-2 mb-2"
-                  : "border-b border-white/12 pb-2 mb-2",
-              ].join(" ")}
-            >
-              <div
-                className={
-                  isLight
-                    ? "text-sm font-semibold text-[var(--text)]"
-                    : "text-sm font-semibold text-white/90"
-                }
-              >
-                {selectedAdded ? "Savings locked" : "Lock in savings now"} +{selectedTier.quantity} bags
-                <span
-                  className={
-                    isLight
-                      ? "font-extrabold text-[var(--text)]"
-                      : "font-extrabold text-white"
-                  }
-                >
-                  {selectedTierState ? ` (new total: ${selectedTierState.nextBags} bags)` : ""}
-                </span>
-              </div>
-              <div
-                className={
-                  isLight
-                    ? "text-right text-xs text-[var(--muted)]"
-                    : "text-right text-xs text-white/60"
-                }
-              >
-                <div
-                  key={`${selectedTier.quantity}-${selectedTierState?.addTotal}`}
-                  className={
-                    isLight
-                      ? "text-[12px] font-semibold text-[var(--muted)] transition-all duration-300 price-pop"
-                      : "text-[12px] font-semibold text-white/80 transition-all duration-300 price-pop"
-                  }
-                >
-                  {Number.isFinite(selectedTierState?.addTotal ?? NaN)
-                    ? `+${money(selectedTierState?.addTotal, "USD")}`
-                    : "—"}
-                </div>
-                {Number.isFinite(selectedTierState?.nextTotal ?? NaN) ? (
-                  <div
-                    key={`${selectedTier.quantity}-${selectedTierState?.nextTotal ?? "na"}`}
-                    className="price-pop"
-                  >
-                    {`Total after add: ${money(selectedTierState?.nextTotal, "USD")}`}
-                  </div>
-                ) : null}
-                {Number.isFinite(selectedTierState?.perBag ?? NaN) ? (
-                  <div
-                    key={`${selectedTier.quantity}-${selectedTierState?.perBag ?? "na"}`}
-                    className="price-pop"
-                  >
-                    {`~${money(selectedTierState?.perBag, "USD")} / bag`}
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          )
-        ) : null}
-
-        <div className="mt-3 flex flex-col gap-2">
-          <button
-            type="button"
-            className={[
-              "w-full inline-flex items-center justify-center rounded-[12px] h-[54px] px-4 sm:px-5 text-[16px] sm:text-[17px] font-semibold whitespace-nowrap shadow-[0_14px_36px_rgba(214,64,58,0.28)] hover:brightness-110 active:brightness-95 disabled:opacity-60 disabled:cursor-not-allowed leading-tight relative overflow-hidden",
-              isLight
-                ? "bg-[var(--candy-red)] text-white shadow-[0_16px_36px_rgba(239,59,59,0.32)]"
-                : isCompact
-                  ? "bg-[var(--red)] text-white"
-                  : "bg-[#d6403a] text-white",
-            ].join(" ")}
-            onClick={() => addToCart()}
-            disabled={isAdding || ctaDisabled}
-          >
-            <span className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.14),transparent_50%)] opacity-95" />
-            <span className="relative inline-flex items-center gap-2">
-              {isAdding ? (
-                <>
-                  <span
-                    aria-hidden="true"
-                    className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent opacity-60"
-                  />
-                  Locking in...
-                </>
-              ) : Number.isFinite(selectedTierState?.addTotal ?? NaN) ? (
-                selectedAdded && Number.isFinite(selectedTierState?.nextBags ?? NaN)
-                  ? `Savings locked: ${selectedTier?.quantity} bags (total ${selectedTierState?.nextBags})`
-                  : Number.isFinite(selectedTierState?.nextBags ?? NaN)
-                    ? `Lock in savings now: ${selectedTier?.quantity} bags (total ${selectedTierState?.nextBags})`
-                    : `Lock in savings now: ${selectedTier?.quantity} bags`
-              ) : (
-                "Lock in savings now"
-              )}
-            </span>
-          </button>
-          <div
-            className={
-              isLight
-                ? "text-xs text-[var(--muted)]"
-                : isCompact
-                  ? "text-xs text-white/70"
-                  : "text-xs text-white/75"
-            }
-          >
-            Love it or your money back • Ships within 24 hours • Secure checkout
-          </div>
-          <div
-            className={
-              isFlat
-                ? isLight
-                  ? "mt-2 text-[11px] text-[var(--muted)]"
-                  : "mt-2 text-[11px] text-white/70"
-                : isLight
-                  ? "mt-2 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white px-3 py-2 text-[11px] text-[var(--muted)]"
-                  : "mt-2 rounded-2xl border border-white/12 bg-white/5 px-3 py-2 text-[11px] text-white/70"
-            }
-          >
-            <div className={isLight ? "font-semibold text-[var(--text)]" : "font-semibold text-white/90"}>
-              ⭐ {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars from verified Amazon buyers
-            </div>
-            <div className="mt-1 flex flex-wrap gap-2 text-[10px] font-semibold uppercase tracking-[0.12em]">
-              <span
-                className={
-                  isFlat
-                    ? "px-0 py-0"
-                    : isLight
-                      ? "rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-2 py-1"
-                      : "rounded-full border border-white/10 bg-white/5 px-2 py-1"
-                }
-              >
-                Made in the USA
-              </span>
-              <span
-                className={
-                  isFlat
-                    ? "px-0 py-0"
-                    : isLight
-                      ? "rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-2 py-1"
-                      : "rounded-full border border-white/10 bg-white/5 px-2 py-1"
-                }
-              >
-                No artificial dyes
-              </span>
-            </div>
-          </div>
-          {reviewSnippets.length ? (
-            <div className={isLight ? "grid gap-1 text-[11px] text-[var(--muted)]" : "grid gap-1 text-[11px] text-white/70"}>
-              {reviewSnippets.map((review) => (
-                <div key={review.id} className="inline-flex items-center gap-2">
-                  <span className={isLight ? "text-[var(--candy-yellow)]" : "text-[var(--gold)]"}>
-                    {starLine(review.rating)}
-                  </span>
-                  <span className="truncate">&quot;{review.body}&quot; — {review.author}</span>
-                </div>
-              ))}
-            </div>
-          ) : null}
-          <AmazonOneBagNote
-            className={isLight ? "text-xs text-[var(--muted)]" : "text-xs text-white/65"}
-            linkClassName={
-              isLight
-                ? "underline underline-offset-4 text-[var(--text)] hover:text-[var(--navy)]"
-                : "underline underline-offset-4 text-white hover:text-white"
-            }
-          />
-          {error ? (
-            <div
-              className={
-                isLight
-                  ? "text-xs font-semibold text-red-500"
-                  : isCompact
-                    ? "text-xs font-semibold text-red-200"
-                    : "text-xs font-semibold text-red-200"
-              }
-            >
-              {error}
-            </div>
-          ) : null}
-          {success && !error ? (
-            <div
-              className={
-                isLight
-                  ? "text-xs font-semibold text-[var(--candy-green)]"
-                  : isCompact
-                    ? "text-xs font-semibold text-[var(--gold)]"
-                    : "text-xs font-semibold text-[var(--gold)]"
-              }
-            >
-              {lastAddedQty ? `Added ${lastAddedQty} bags to cart.` : "Added to cart."}
-            </div>
-          ) : null}
-          {ctaDisabled && availableForSale === false && !error ? (
-            <div className={isLight ? "text-xs text-[var(--muted)]" : isCompact ? "text-xs text-white/50" : "text-xs text-white/60"}>Out of stock.</div>
-          ) : null}
-        </div>
+        {ctaContent}
       </div>
 
       <div className={isLight ? "mt-3 flex items-center gap-3 text-xs text-[var(--muted)]" : isCompact ? "mt-3 flex items-center gap-3 text-xs text-white/60" : "mt-3 flex items-center gap-3 text-xs text-white/70"}>

@@ -497,6 +497,7 @@ export default async function HomePage() {
                       variant="compact"
                       tone="light"
                       surface="flat"
+                      layout="integrated"
                       showHowItWorks={false}
                       summaryCopy=""
                       showTrainAccent

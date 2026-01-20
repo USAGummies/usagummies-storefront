@@ -156,10 +156,12 @@ export default function PurchaseBox({
   product,
   focus,
   surface = "card",
+  layout = "classic",
 }: {
   product: Product;
   focus?: string;
   surface?: "card" | "flat";
+  layout?: "classic" | "integrated";
 }) {
   const { bagCount } = useCartBagCount();
   const currentBags = Math.max(0, Number(bagCount) || 0);
@@ -184,6 +186,7 @@ export default function PurchaseBox({
     ? "Mystery extra revealed: Patriot Pride sticker (while supplies last)."
     : "Mystery extra unlocks at 12 bags.";
   const isFlat = surface === "flat";
+  const isIntegrated = layout === "integrated";
 
   const variants = (product?.variants?.nodes || []) as VariantNode[];
   // Canonical ladder. Expose 1-3 bags plus core bundle sizes on-site.
@@ -442,7 +445,10 @@ export default function PurchaseBox({
       : "Selecting a size adds that many bags to your cart. More bags = lower price per bag.";
 
   return (
-    <section data-purchase-section="true" className={cx("pbx pbx--metal", isFlat && "pbx--flat")}>
+    <section
+      data-purchase-section="true"
+      className={cx("pbx pbx--metal", isFlat && "pbx--flat", isIntegrated && "pbx--integrated")}
+    >
       {/* Savings ladder */}
       <div
         ref={bundlesRef}
@@ -462,11 +468,13 @@ export default function PurchaseBox({
           </div>
         </div>
 
-        <div className="pbx__ladder">
-          <div className="pbx__ladderTitle">Savings ladder</div>
-          <div className="pbx__ladderGrid">
-            {SAVINGS_LADDER.map((milestone) => {
-              const isNext = !bestPriceReached && milestone.qty === nextMilestone.qty;
+        <div className="pbx__grid">
+          <div className="pbx__guide">
+            <div className="pbx__ladder">
+              <div className="pbx__ladderTitle">Savings ladder</div>
+              <div className="pbx__ladderGrid">
+                {SAVINGS_LADDER.map((milestone) => {
+                  const isNext = !bestPriceReached && milestone.qty === nextMilestone.qty;
               const isBest = bestPriceReached && milestone.qty === topMilestone.qty;
               const isReached = currentBags >= milestone.qty;
               const isPopularComplete =
@@ -494,92 +502,92 @@ export default function PurchaseBox({
             })}
           </div>
           <div className="pbx__ladderProof">{MISSION_SOCIAL_PROOF}</div>
-        </div>
+            </div>
 
-        <div className="pbx__mission">
-          <div className="pbx__missionHeader">
-            <div className="pbx__missionTitle">Mission to savings</div>
-            <div className="pbx__missionProgress">
-              Progress: {missionProgressCount}/{topMilestone.qty} bags
-            </div>
-          </div>
-          <div className="pbx__missionCopy">
-            Hit 8 bags to unlock the crowd-favorite price.
-          </div>
-          <div className="pbx__missionBar">
-            <div className="mission-bar" aria-hidden="true">
-              <div className="mission-bar__fill" style={{ width: `${missionProgressPct}%` }} />
-              {SAVINGS_LADDER.map((milestone) => {
-                const left = (milestone.qty / topMilestone.qty) * 100;
-                const reached = currentBags >= milestone.qty;
-                const isNext = !bestPriceReached && milestone.qty === nextMilestone.qty;
-                return (
-                  <span
-                    key={milestone.qty}
-                    className={cx(
-                      "mission-bar__tick",
-                      reached && "mission-bar__tick--reached",
-                      isNext && "mission-bar__tick--next"
-                    )}
-                    style={{ left: `${left}%` }}
-                  />
-                );
-              })}
-            </div>
-          </div>
-          <div className="pbx__missionActions">
-            {missionRemaining > 0 ? (
-              <button
-                type="button"
-                onClick={() => addToCart(missionRemaining)}
-                disabled={addingQty !== null}
-                className="btn btn-candy pressable pbx__missionCta"
-              >
-                {addingQty ? "Locking in..." : missionCtaLabel}
-              </button>
-            ) : (
-              <span className="pbx__missionBadge">{missionCtaLabel}</span>
-            )}
-          </div>
-          <div className="pbx__missionList">
-            <div className="pbx__missionListTitle">Finish your bag count</div>
-            {[
-              { qty: 4, label: "Savings pricing unlocked" },
-              { qty: 5, label: "Free shipping unlocked" },
-              { qty: 8, label: "Crowd-favorite price unlocked" },
-              {
-                qty: 12,
-                label: bestPriceReached
-                  ? "Patriot Pride sticker revealed"
-                  : "Mystery extra unlocks",
-              },
-            ].map((item) => {
-              const done = currentBags >= item.qty;
-              return (
-                <div
-                  key={item.qty}
-                  className={cx("pbx__missionItem", done && "pbx__missionItem--done")}
-                >
-                  <span className="pbx__missionDot" aria-hidden="true">
-                    {done ? (
-                      <svg viewBox="0 0 24 24" className="pbx__missionCheck" aria-hidden="true">
-                        <path
-                          fill="currentColor"
-                          d="M9.2 16.2 5.5 12.5l1.4-1.4 2.3 2.3 7.2-7.2 1.4 1.4z"
-                        />
-                      </svg>
-                    ) : null}
-                  </span>
-                  <span>
-                    {item.label}
-                    {item.qty === 12 ? " (12 bags)" : ` (${item.qty}+ bags)`}
-                  </span>
+            <div className="pbx__mission">
+              <div className="pbx__missionHeader">
+                <div className="pbx__missionTitle">Mission to savings</div>
+                <div className="pbx__missionProgress">
+                  Progress: {missionProgressCount}/{topMilestone.qty} bags
                 </div>
-              );
-            })}
-            <div className="pbx__missionBonus">{mysteryBonusLine}</div>
-          </div>
-        </div>
+              </div>
+              <div className="pbx__missionCopy">
+                Hit 8 bags to unlock the crowd-favorite price.
+              </div>
+              <div className="pbx__missionBar">
+                <div className="mission-bar" aria-hidden="true">
+                  <div className="mission-bar__fill" style={{ width: `${missionProgressPct}%` }} />
+                  {SAVINGS_LADDER.map((milestone) => {
+                    const left = (milestone.qty / topMilestone.qty) * 100;
+                    const reached = currentBags >= milestone.qty;
+                    const isNext = !bestPriceReached && milestone.qty === nextMilestone.qty;
+                    return (
+                      <span
+                        key={milestone.qty}
+                        className={cx(
+                          "mission-bar__tick",
+                          reached && "mission-bar__tick--reached",
+                          isNext && "mission-bar__tick--next"
+                        )}
+                        style={{ left: `${left}%` }}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="pbx__missionActions">
+                {missionRemaining > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => addToCart(missionRemaining)}
+                    disabled={addingQty !== null}
+                    className="btn btn-candy pressable pbx__missionCta"
+                  >
+                    {addingQty ? "Locking in..." : missionCtaLabel}
+                  </button>
+                ) : (
+                  <span className="pbx__missionBadge">{missionCtaLabel}</span>
+                )}
+              </div>
+              <div className="pbx__missionList">
+                <div className="pbx__missionListTitle">Finish your bag count</div>
+                {[
+                  { qty: 4, label: "Savings pricing unlocked" },
+                  { qty: 5, label: "Free shipping unlocked" },
+                  { qty: 8, label: "Crowd-favorite price unlocked" },
+                  {
+                    qty: 12,
+                    label: bestPriceReached
+                      ? "Patriot Pride sticker revealed"
+                      : "Mystery extra unlocks",
+                  },
+                ].map((item) => {
+                  const done = currentBags >= item.qty;
+                  return (
+                    <div
+                      key={item.qty}
+                      className={cx("pbx__missionItem", done && "pbx__missionItem--done")}
+                    >
+                      <span className="pbx__missionDot" aria-hidden="true">
+                        {done ? (
+                          <svg viewBox="0 0 24 24" className="pbx__missionCheck" aria-hidden="true">
+                            <path
+                              fill="currentColor"
+                              d="M9.2 16.2 5.5 12.5l1.4-1.4 2.3 2.3 7.2-7.2 1.4 1.4z"
+                            />
+                          </svg>
+                        ) : null}
+                      </span>
+                      <span>
+                        {item.label}
+                        {item.qty === 12 ? " (12 bags)" : ` (${item.qty}+ bags)`}
+                      </span>
+                    </div>
+                  );
+                })}
+                <div className="pbx__missionBonus">{mysteryBonusLine}</div>
+              </div>
+            </div>
 
         <div className="pbx__complete">
           <div className="pbx__completeTitle">Complete your savings</div>
@@ -627,8 +635,10 @@ export default function PurchaseBox({
             </div>
           </details>
         </div>
+          </div>
 
-        <div className="pbx__options">
+          <div className="pbx__select">
+            <div className="pbx__options">
           <div className="pbx__optionGroup" role="radiogroup" aria-label="Bag counts">
             <div className="pbx__featured">
             {featuredOptions.map((o) => {
@@ -799,6 +809,34 @@ export default function PurchaseBox({
             </div>
           </div>
         </div>
+          </div>
+        </div>
+
+        <div className="pbx__complete">
+          <div className="pbx__completeTitle">Complete your savings</div>
+          {completeTargets.length ? (
+            <div className="pbx__completeGrid">
+              {completeTargets.map((target) => (
+                <button
+                  key={target.target}
+                  type="button"
+                  onClick={() => addToCart(target.addQty)}
+                  disabled={addingQty !== null}
+                  className="pbx__completeBtn"
+                >
+                  <span className="pbx__completeLabel">
+                    Lock in savings now: {target.addQty} bag{target.addQty === 1 ? "" : "s"} (total {target.target})
+                  </span>
+                  <span className="pbx__completePrice">
+                    {target.addTotalText ? `+${target.addTotalText}` : ""}
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="pbx__completeBadge">Best price unlocked.</div>
+          )}
+        </div>
       </div>
 
       <style>{`
@@ -813,6 +851,25 @@ export default function PurchaseBox({
         .pbx--flat{
           --surface: transparent;
           --surface-strong: transparent;
+        }
+        .pbx--integrated .pbx__cardHeader{
+          margin-bottom: 6px;
+        }
+        .pbx__grid{
+          margin-top: 12px;
+          display: grid;
+          gap: 16px;
+        }
+        .pbx__guide,
+        .pbx__select{
+          display: grid;
+          gap: 12px;
+        }
+        @media (min-width: 1024px){
+          .pbx__grid{
+            grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr);
+            align-items: start;
+          }
         }
         .pbx--flat .pbx__card{
           margin-top:0;

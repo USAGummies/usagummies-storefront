@@ -449,7 +449,7 @@ export default async function ShopPage() {
                   </div>
                 </div>
                 {purchaseProduct ? (
-                  <PurchaseBox product={purchaseProduct as any} surface="flat" />
+                  <PurchaseBox product={purchaseProduct as any} surface="flat" layout="integrated" />
                 ) : (
                   <div className="p-4 text-sm text-[var(--muted)]">
                     Product details are loading. Please refresh to view savings pricing.
