@@ -21,7 +21,7 @@ export function LeadCapture({
   source,
   intent = "newsletter",
   title = "Join the revolution",
-  subtitle = "Early drops, bundle alerts, and patriotic releases.",
+  subtitle = "Early drops, savings alerts, and patriotic releases.",
   ctaLabel = "Join the list",
   successMessage = "Thanks for joining. We will only send the good stuff.",
   variant = "light",

@@ -24,11 +24,11 @@ Simple, direct, high-trust.
 - Flavors: cherry, watermelon, orange, green apple, lemon
 - Made in the USA with no artificial dyes
 
-## Bundle pricing ladder
+## Bag-count pricing ladder
 - Base price: $5.99 per bag (1-3 bags, standard price)
 - Savings start at 4 bags
 - Free shipping at 5+ bags
-- Most popular bundle: 8 bags
+- Most popular bag count: 8 bags
 - Best per-bag price: 12 bags ($4.25 per bag, $51.00 total)
 - Per-bag price caps after 12+ bags
 
@@ -43,8 +43,8 @@ Simple, direct, high-trust.
 ## Canonical URLs
 - Home: /
 - Shop: /shop
-- Bundle guides: /bundle-guides
-- Gift bundles: /gummy-gift-bundles
+- Bag count guides: /bundle-guides
+- Gift bag options: /gummy-gift-bundles
 - Party snacks: /patriotic-party-snacks
 - Bulk gummy bears: /bulk-gummy-bears
 - About: /about
@@ -55,7 +55,7 @@ Simple, direct, high-trust.
 - Policies: /policies
 
 ## Conversion model
-- Bundles are the primary value driver.
+- Bag-count savings are the primary value driver.
 - Free shipping on 5+ bags.
 - Shopify checkout only for completed purchases.
 
@@ -63,7 +63,7 @@ Simple, direct, high-trust.
 - Premium taste and quality positioning
 - Fast shipping
 - Secure Shopify checkout
-- Bundle savings and stocking-up value
+- Bag-count savings and stocking-up value
 - Made in the USA, all natural flavors, no artificial dyes
 
 ## Structured data notes

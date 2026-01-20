@@ -41,9 +41,9 @@ const HERO_BULLETS = [
 ];
 
 export async function generateMetadata(): Promise<Metadata> {
-  const title = "Shop USA Gummies | Bundle & Save on American-Made Gummies";
+  const title = "Shop USA Gummies | Buy More, Save More on American-Made Gummies";
   const description =
-    "Explore USA Gummies bundles and best sellers. Made in the USA, all natural, dye-free. Free shipping on 5+ bags.";
+    "Explore USA Gummies savings and best sellers. Made in the USA, all natural, dye-free. Free shipping on 5+ bags.";
   const canonical = `${SITE_URL}/shop`;
 
   return {
@@ -272,12 +272,12 @@ export default async function ShopPage() {
               </div>
 
               <div className="text-xs text-[var(--muted)]">
-                Most customers save more when they build a bundle.
+                Most customers save more when they add more bags.
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
                 <a href="#bundle-pricing" className="btn btn-candy">
-                  Build my bundle
+                  Choose bag count
                 </a>
                 <span className="text-xs text-[var(--muted)]">
                   Love it or your money back - Ships within 24 hours - Limited daily production
@@ -299,9 +299,9 @@ export default async function ShopPage() {
                 </Link>
               </div>
               <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--muted)]">
-                <span className="font-semibold text-[var(--text)]">Bundle guides:</span>
+                <span className="font-semibold text-[var(--text)]">Bag count guides:</span>
                 <Link href="/gummy-gift-bundles" className="underline underline-offset-4 text-[var(--text)]">
-                  Gift bundles
+                  Gift bag options
                 </Link>
                 <span className="text-[var(--muted)]">|</span>
                 <Link href="/patriotic-party-snacks" className="underline underline-offset-4 text-[var(--text)]">
@@ -316,7 +316,7 @@ export default async function ShopPage() {
               <div className="candy-panel rounded-3xl p-4">
                 <div className="grid gap-3 sm:grid-cols-3">
                   <div className="space-y-1">
-                    <div className="text-[10px] uppercase tracking-[0.24em] text-[var(--muted)]">Bundle savings</div>
+                    <div className="text-[10px] uppercase tracking-[0.24em] text-[var(--muted)]">Savings tiers</div>
                     <div className="text-base font-black text-[var(--text)]">4+ bags</div>
                     <div className="text-[11px] text-[var(--muted)]">Lower price per bag as you add more.</div>
                   </div>
@@ -377,33 +377,33 @@ export default async function ShopPage() {
         </div>
       </section>
 
-      <section id="bundle-pricing" aria-label="Bundle pricing" className="bg-[#fffdf8] scroll-mt-24">
+      <section id="bundle-pricing" aria-label="Savings pricing" className="bg-[#fffdf8] scroll-mt-24">
         <div className="mx-auto max-w-6xl px-4 pb-8 lg:pb-10">
           <div className="rounded-3xl border border-[rgba(15,27,45,0.12)] bg-white p-3 shadow-[0_18px_44px_rgba(15,27,45,0.12)]">
             {purchaseProduct ? (
               <PurchaseBox product={purchaseProduct as any} />
             ) : (
               <div className="p-4 text-sm text-[var(--muted)]">
-                Product details are loading. Please refresh to view bundle pricing.
+                Product details are loading. Please refresh to view savings pricing.
               </div>
             )}
           </div>
         </div>
       </section>
 
-      <section aria-label="Bundle guides" className="bg-[#fffdf8]">
+      <section aria-label="Bag count guides" className="bg-[#fffdf8]">
         <div className="mx-auto max-w-6xl px-4 pb-8 lg:pb-10">
           <div className="candy-panel rounded-[32px] p-5 sm:p-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="space-y-2">
                 <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-                  Bundle guides
+                  Bag count guides
                 </div>
                 <h2 className="text-2xl font-black text-[var(--text)]">
-                  Need help picking a bundle?
+                  Need help picking a bag count?
                 </h2>
                 <p className="text-sm text-[var(--muted)] max-w-prose">
-                  Match the right bundle size for gifts, parties, and bulk orders.
+                  Match the right bag count for gifts, parties, and bulk orders.
                 </p>
               </div>
               <Link href="/bundle-guides" className="btn btn-outline">
@@ -415,7 +415,7 @@ export default async function ShopPage() {
               {[
                 {
                   href: "/gummy-gift-bundles",
-                  title: "Gift bundles",
+                  title: "Gift bag options",
                   copy: "Build thoughtful gifts for birthdays and care packages.",
                 },
                 {
@@ -465,7 +465,7 @@ export default async function ShopPage() {
                 Read our story
               </Link>
               <Link href="/shop#bundle-pricing" className="btn btn-candy">
-                Build my bundle
+                Choose bag count
               </Link>
             </div>
           </div>
@@ -521,7 +521,7 @@ export default async function ShopPage() {
       </section>
 
       <StickyAddToCartBar
-        title="USA Gummies bundle"
+        title="USA Gummies"
         priceText={`${bestValuePerBagText} / bag`}
         imageUrl={stickyImage}
         imageAlt={stickyAlt}

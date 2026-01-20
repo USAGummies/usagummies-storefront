@@ -235,6 +235,10 @@ a:focus-visible:not(.btn):not(.focus-ring),
 .btn:active {
   transform: translateY(1px) scale(0.99);
 }
+.btn-compact {
+  padding: 8px 14px;
+  font-size: 12px;
+}
 .btn-primary,
 .btn-navy {
   border-color: rgba(13, 28, 51, 0.4);

@@ -28,7 +28,7 @@ export default function ThankYouPage() {
             <div className="text-lg font-black text-[var(--text)]">America 250 perks</div>
             <ul className="list-disc list-inside text-sm text-[var(--muted)] space-y-1">
               <li>Early drops</li>
-              <li>Bundle deals</li>
+              <li>Savings deals</li>
               <li>First access to new runs</li>
             </ul>
             <Link
@@ -81,7 +81,7 @@ export default function ThankYouPage() {
 
         <div className="mt-6">
           <Reveal className="candy-panel rounded-2xl border border-[var(--border)] p-5 space-y-3 text-[var(--text)]">
-            <div className="text-lg font-black text-[var(--text)]">Build your next bundle</div>
+            <div className="text-lg font-black text-[var(--text)]">Choose your next bag count</div>
             <div className="text-sm text-[var(--muted)]">
               Free shipping on 5+ bags. Most customers go bigger on the next run.
             </div>

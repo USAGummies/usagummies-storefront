@@ -13,9 +13,9 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "USA Gummies Bundle Guides | Gift, Party, and Bulk Bundles";
+const PAGE_TITLE = "USA Gummies Bag Count Guides | Gifts, Parties, and Bulk Orders";
 const PAGE_DESCRIPTION =
-  "Explore USA Gummies bundle guides for gifts, parties, and bulk orders. Find the right bundle size and build your bundle.";
+  "Explore USA Gummies bag count guides for gifts, parties, and bulk orders. Find the right bag count and save more per bag.";
 
 export const metadata: Metadata = {
   title: PAGE_TITLE,
@@ -39,18 +39,18 @@ export const metadata: Metadata = {
 const GUIDES = [
   {
     href: "/gummy-gift-bundles",
-    title: "Gummy gift bundles",
-    description: "Gift-ready bundles for birthdays, thank yous, and care packages.",
+    title: "Gummy gift bag options",
+    description: "Gift-ready bag counts for birthdays, thank yous, and care packages.",
   },
   {
     href: "/patriotic-party-snacks",
     title: "Patriotic party snacks",
-    description: "Bundle picks for July 4th and USA-themed events.",
+    description: "Bag-count picks for July 4th and USA-themed events.",
   },
   {
     href: "/bulk-gummy-bears",
     title: "Bulk gummy bears",
-    description: "Crowd-ready bundles for teams, clients, and events.",
+    description: "Crowd-ready bag counts for teams, clients, and events.",
   },
 ];
 
@@ -72,18 +72,18 @@ export default function BundleGuidesPage() {
         <BreadcrumbJsonLd
           items={[
             { name: "Home", href: "/" },
-            { name: "Bundle guides", href: "/bundle-guides" },
+            { name: "Bag count guides", href: "/bundle-guides" },
           ]}
         />
         <div className="candy-panel rounded-[36px] p-5 sm:p-6">
           <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-            Bundle guides
+            Bag count guides
           </div>
           <h1 className="mt-2 text-3xl font-black text-[var(--text)] sm:text-4xl">
-            Find the right USA Gummies bundle
+            Find the right USA Gummies bag count
           </h1>
           <p className="mt-2 text-sm text-[var(--muted)] sm:text-base max-w-prose">
-            Use these guides to match bundle size to the moment. Build a gift bundle, plan party
+            Use these guides to match bag count to the moment. Choose a gift bag count, plan party
             snacks, or order bulk gummy bears for teams and events.
           </p>
 
@@ -105,10 +105,10 @@ export default function BundleGuidesPage() {
 
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <Link href="/shop#bundle-pricing" className="btn btn-candy">
-              Build my bundle
+              Choose my bag count
             </Link>
             <Link href="/faq" className="btn btn-outline">
-              Bundle FAQ
+              Bag count FAQ
             </Link>
           </div>
 

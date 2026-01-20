@@ -12,9 +12,9 @@ function resolveSiteUrl() {
 
 const SITE_URL = resolveSiteUrl();
 const OG_IMAGE = "/opengraph-image";
-const SHOP_TITLE = "Shop USA Gummies | Bundle & Save on American-Made Gummies";
+const SHOP_TITLE = "Shop USA Gummies | Buy More, Save More on American-Made Gummies";
 const SHOP_DESCRIPTION =
-  "Explore USA Gummies bundles and best sellers. Made in the USA, all natural, dye-free. Free shipping on 5+ bags.";
+  "Explore USA Gummies bag count savings and best sellers. Made in the USA, all natural, dye-free. Free shipping on 5+ bags.";
 
 export async function generateMetadata(): Promise<Metadata> {
   const canonical = `${SITE_URL}/shop`;

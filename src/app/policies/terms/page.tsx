@@ -45,13 +45,13 @@ export default function TermsPage() {
             href="/policies"
             className="rounded-full border border-[var(--border)] bg-white px-3 py-1 text-sm text-[var(--text)] hover:bg-[var(--surface-strong)]"
           >
-            ← Policies
+            Policies
           </Link>
           <Link
             href="/shop"
             className="rounded-full border border-[var(--border)] bg-white px-3 py-1 text-sm text-[var(--text)] hover:bg-[var(--surface-strong)]"
           >
-            Shop →
+            Shop & save
           </Link>
         </div>
 
@@ -74,7 +74,7 @@ export default function TermsPage() {
             <div className="card-solid p-5">
               <h2 className="text-lg font-semibold text-[var(--text)]">Pricing</h2>
               <p className="mt-2 text-sm text-[var(--muted)]">
-                Prices are shown in your cart at checkout. Bundle pricing and shipping eligibility
+                Prices are shown in your cart at checkout. Savings pricing and shipping eligibility
                 (including Free shipping on 5+ bags) are displayed clearly before you purchase.
               </p>
             </div>

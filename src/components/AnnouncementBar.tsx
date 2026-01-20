@@ -18,7 +18,7 @@ export function AnnouncementBar() {
   const { left, right, href } = useMemo(() => {
     if (isAmerica250) {
       return {
-        left: "America 250 limited bundles",
+        left: "America 250 limited drops",
         right: FREE_SHIPPING_PHRASE,
         href: "/shop?campaign=america250",
       };
@@ -48,7 +48,7 @@ export function AnnouncementBar() {
               "rounded-full border border-[var(--border)] bg-[var(--surface-strong)] px-3 py-1 text-[11px] font-semibold text-[var(--text)] hover:bg-white"
             )}
           >
-            Shop →
+            Shop
           </Link>
         </div>
       </div>

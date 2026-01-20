@@ -14,7 +14,7 @@ function resolveSiteUrl() {
 const SITE_URL = resolveSiteUrl();
 const PAGE_TITLE = "America 250 Gifts";
 const PAGE_DESCRIPTION =
-  "America 250 gifts — patriotic gummy bundles built for hosting, gifting, and sharing.";
+  "America 250 gifts — patriotic gummy bag options for hosting, gifting, and sharing.";
 const PAGE_URL = `${SITE_URL}/america-250/gifts`;
 const OG_IMAGE = `${SITE_URL}/opengraph-image`;
 
@@ -76,16 +76,16 @@ export default function America250GiftsPage() {
 
         <div className="mb-6 flex items-center justify-between">
           <Link href="/america-250" className="text-sm text-[var(--muted)] hover:text-[var(--text)]">
-            ← Back to America 250
+            Back to America 250
           </Link>
           <Link href="/shop" className="text-sm text-[var(--muted)] hover:text-[var(--text)]">
-            Shop →
+            Shop & save
           </Link>
         </div>
 
         <h1 className="text-4xl font-semibold tracking-tight">America 250 gifts</h1>
         <p className="mt-4 text-[var(--muted)]">
-          Simple, gift-ready bundles with an Americana feel — built to show up looking premium.
+          Simple, gift-ready bag options with an Americana feel and built to show up looking premium.
         </p>
 
         <div className="mt-8 rounded-3xl border border-[var(--border)] bg-[var(--surface-strong)] p-6">

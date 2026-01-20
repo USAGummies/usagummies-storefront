@@ -85,7 +85,7 @@ export function ShopToolbar() {
     pushParams(next);
   }
 
-  // Debounce search → update URL after pause
+  // Debounce search -> update URL after pause
   const debounceRef = useRef<number | null>(null);
   useEffect(() => {
     const normalized = normalizeQuery(input);
@@ -153,7 +153,7 @@ export function ShopToolbar() {
           </div>
 
           <p className="mt-1 text-xs text-[var(--muted)]">
-            Tip: try "bundle" or "USA Gummies". Press Enter to submit instantly.
+            Tip: try "5 bags" or "USA Gummies". Press Enter to submit instantly.
           </p>
         </div>
 

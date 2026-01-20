@@ -49,19 +49,19 @@ export function America250Blocks({ productTitle }: Props) {
             href="/america-250/gifts"
             className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-3 text-sm font-semibold text-[var(--text)] hover:bg-white"
           >
-            America 250 Gifts →
+            America 250 gifts
           </Link>
           <Link
             href="/america-250/celebrations"
             className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-3 text-sm font-semibold text-[var(--text)] hover:bg-white"
           >
-            Celebrations →
+            Celebrations
           </Link>
           <Link
             href="/america-250/events"
             className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-3 text-sm font-semibold text-[var(--text)] hover:bg-white"
           >
-            Events →
+            Events
           </Link>
         </div>
       </div>

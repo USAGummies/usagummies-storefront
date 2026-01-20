@@ -76,7 +76,7 @@ export default function America250EventsPage() {
 
         <div className="mb-6">
           <Link href="/america-250" className="text-sm text-[var(--muted)] hover:text-[var(--text)]">
-            ← Back to America 250
+            Back to America 250
           </Link>
         </div>
 

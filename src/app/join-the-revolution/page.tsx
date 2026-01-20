@@ -8,13 +8,13 @@ import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 export const metadata: Metadata = {
   title: "Join the Revolution | USA Gummies",
   description:
-    "Join the Revolution by purchasing USA Gummies. Unlock member eligibility, bundle benefits, and subscription access after your first order.",
+    "Join the Revolution by purchasing USA Gummies. Unlock member eligibility, savings benefits, and subscription access after your first order.",
 };
 
 const STEPS = [
   {
     title: "1. Buy USA Gummies",
-    body: `Choose a 5, 8, or 12 bag bundle. ${FREE_SHIPPING_PHRASE}.`,
+    body: `Choose 5, 8, or 12 bags. ${FREE_SHIPPING_PHRASE}.`,
   },
   {
     title: "2. Join the Revolution",
@@ -30,9 +30,9 @@ const STEPS = [
 
 const BENEFITS = [
   {
-    title: "Bundle-first savings",
+    title: "Bag-count savings",
     body:
-      "Lower per-bag pricing as you bundle All American gummy bears, with the best balance of value + convenience at 8 bags.",
+      "Lower per-bag pricing as you add more bags, with the best balance of value + convenience at 8 bags.",
   },
   {
     title: "Subscription eligibility",
@@ -88,7 +88,7 @@ export default function JoinTheRevolutionPage() {
                 </p>
                 <div className="flex flex-wrap items-center gap-3">
                   <Link href="/shop" className="btn btn-candy">
-                    Shop bundles
+                    Shop & save
                   </Link>
                   <span className="text-xs text-[var(--muted)]">{FREE_SHIPPING_PHRASE}</span>
                 </div>
@@ -175,12 +175,12 @@ export default function JoinTheRevolutionPage() {
                   <ul className="mt-2 space-y-1 text-xs text-[var(--muted)]">
                     <li>Order history tied to your checkout email</li>
                     <li>Subscription eligibility after your first order</li>
-                    <li>Early drops and premium bundle alerts</li>
+                    <li>Early drops and premium savings alerts</li>
                   </ul>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-3">
                   <Link href="/shop" className="btn btn-candy">
-                    Build a bundle
+                    Choose a bag count
                   </Link>
                   <Link href="/faq" className="btn btn-outline">
                     Read the FAQ
@@ -200,7 +200,7 @@ export default function JoinTheRevolutionPage() {
                 </p>
                 <div className="mt-3 flex flex-wrap gap-3">
                   <Link href="/shop" className="btn btn-candy">
-                    Build a bundle
+                    Choose a bag count
                   </Link>
                   <Link href="/faq" className="btn btn-outline">
                     Read the FAQ
@@ -214,7 +214,7 @@ export default function JoinTheRevolutionPage() {
             <AmericanDreamCallout
               variant="compact"
               ctaHref="/shop"
-              ctaLabel="Shop bundles"
+              ctaLabel="Shop & save"
               showJoinButton={false}
               tone="light"
             />

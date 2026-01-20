@@ -129,8 +129,8 @@ export default function AboutPage() {
       : 0;
   const bundleSavingsLine =
     bestValueSavingsPct > 0
-      ? `Bundle pricing lowers the per-bag cost from ${starterPerBag} to ${bestValuePerBag} when you choose 8 bags (${bestValueSavingsPct}% less per bag).`
-      : "Bundle pricing lowers the per-bag cost as you add more bags.";
+      ? `Savings pricing lowers the per-bag cost from ${starterPerBag} to ${bestValuePerBag} when you choose 8 bags (${bestValueSavingsPct}% less per bag).`
+      : "Savings pricing lowers the per-bag cost as you add more bags.";
 
   return (
     <main className="relative overflow-hidden bg-[var(--bg)] text-[var(--text)] min-h-screen home-candy">
@@ -181,7 +181,7 @@ export default function AboutPage() {
 
                 <div className="flex flex-wrap items-center gap-3">
                   <Link href="/shop" className="btn btn-candy">
-                    Shop bundles
+                    Shop & save
                   </Link>
                   <span className="text-xs text-[var(--muted)]">{FREE_SHIPPING_PHRASE}</span>
                 </div>
@@ -244,16 +244,16 @@ export default function AboutPage() {
           </div>
 
           <div className="mt-6">
-            <AmericanDreamCallout ctaHref="/shop" ctaLabel="Shop bundles" tone="light" />
+            <AmericanDreamCallout ctaHref="/shop" ctaLabel="Shop & save" tone="light" />
           </div>
 
           <div className="mt-6 grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
             <div className="candy-panel rounded-[32px] border border-[var(--border)] p-5 sm:p-6">
               <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-                Bundle savings
+                Savings by bag count
               </div>
               <h2 className="mt-2 text-2xl font-black text-[var(--text)]">
-                Bundle pricing saves you money.
+                Bag-count pricing saves you money.
               </h2>
               <p className="mt-2 text-sm text-[var(--muted)]">{bundleSavingsLine}</p>
               <div className="mt-3 text-sm text-[var(--muted)]">{FREE_SHIPPING_PHRASE}.</div>
@@ -270,7 +270,7 @@ export default function AboutPage() {
                     Most popular
                   </div>
                   <div className="text-base font-black text-[var(--text)]">{bestValuePerBag} per bag</div>
-                  <div className="text-[11px] text-[var(--muted)]">8-bag bundle</div>
+                  <div className="text-[11px] text-[var(--muted)]">8-bag total</div>
                   <div className="text-[11px] text-[var(--red)]">
                     Best balance of value + convenience
                   </div>

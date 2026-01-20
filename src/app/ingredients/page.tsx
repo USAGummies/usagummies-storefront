@@ -184,7 +184,7 @@ export default function IngredientsPage() {
                 </p>
                 <div className="flex flex-wrap items-center gap-3">
                   <Link href="/shop" className="btn btn-candy">
-                    Shop bundles
+                    Shop & save
                   </Link>
                   <span className="text-xs text-[var(--muted)]">{FREE_SHIPPING_PHRASE}</span>
                 </div>
@@ -320,7 +320,7 @@ export default function IngredientsPage() {
                 Read FAQ
               </Link>
               <Link href="/shop" className="btn btn-candy">
-                Shop bundles
+                Shop & save
               </Link>
             </div>
           </div>

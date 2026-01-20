@@ -24,7 +24,7 @@ function normalizeLegacy(): Review[] {
       body: r.body || "",
       authorName: r.authorName || "Customer",
       dateISO: r.dateISO || "",
-      productLabel: r.productLabel || "All American Gummy Bear Bundles",
+      productLabel: r.productLabel || "All American Gummy Bears",
       verified: true,
       helpfulCount:
         Number.isFinite(Number(r.helpfulCount)) && r.helpfulCount !== undefined

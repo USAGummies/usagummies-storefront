@@ -91,7 +91,7 @@ function summarizeCart(cart: any) {
   const currency = cart?.cost?.subtotalAmount?.currencyCode || "USD";
   const totalText = formatMoney(amount, currency);
   const summary =
-    totalBags > 0 ? `${totalBags}-Bag Bundle - ${totalText}` : null;
+    totalBags > 0 ? `${totalBags} bags - ${totalText}` : null;
   return { totalBags, summary };
 }
 
@@ -99,9 +99,9 @@ const navSections = [
   {
     title: "Shop",
     links: [
-      { href: "/shop", label: "Shop bundles" },
-      { href: "/bundle-guides", label: "Bundle guides" },
-      { href: "/gummy-gift-bundles", label: "Gift bundles" },
+      { href: "/shop", label: "Shop & save" },
+      { href: "/bundle-guides", label: "Bag count guides" },
+      { href: "/gummy-gift-bundles", label: "Gift bag options" },
       { href: "/patriotic-party-snacks", label: "Party snacks" },
       { href: "/bulk-gummy-bears", label: "Bulk gummy bears" },
     ],
@@ -409,7 +409,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               source="footer"
               intent="newsletter"
               title="Join the revolution"
-              subtitle="Early drops, bundle alerts, and patriotic releases."
+              subtitle="Early drops, savings alerts, and patriotic releases."
               ctaLabel="Join the list"
               variant="light"
               emphasis="quiet"
@@ -424,7 +424,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <ul className="space-y-1 text-[var(--muted)]">
                 <li>🇺🇸 Made in the USA • Classic gummy bear flavor</li>
                 <li>✅ No artificial dyes • All natural flavors</li>
-                <li>🚚 Ships fast • Bundle &amp; save</li>
+                <li>🚚 Ships fast • Save more with more bags</li>
               </ul>
             </div>
               <div className="text-xs text-[var(--muted)]">
@@ -470,10 +470,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 Made in USA
               </Link>
               <Link href="/bundle-guides" className="link-underline">
-                Bundle guides
+                Bag count guides
               </Link>
               <Link href="/gummy-gift-bundles" className="link-underline">
-                Gift bundles
+                Gift bag options
               </Link>
               <Link href="/patriotic-party-snacks" className="link-underline">
                 Party snacks

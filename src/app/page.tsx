@@ -266,7 +266,7 @@ export default async function HomePage() {
                 </div>
                 <div className="pt-1 space-y-2">
                   <div className="text-xs font-semibold text-[var(--muted)]">
-                    Save more per bag when you build a bundle (4+ bags).
+                    Save more per bag when you add 4+ bags.
                   </div>
                   <div className="flex flex-col gap-1.5">
                     <a
@@ -274,14 +274,14 @@ export default async function HomePage() {
                       className="btn btn-candy w-full sm:w-auto"
                       style={{ padding: "14px 22px", boxShadow: "0 16px 34px rgba(239, 59, 59, 0.34)" }}
                     >
-                      <span className="text-[15px] sm:text-[16px] font-semibold">Build my bundle</span>
+                      <span className="text-[15px] sm:text-[16px] font-semibold">Choose bag count</span>
                     </a>
                     <div className="text-xs font-semibold text-[var(--muted)]">Love it or your money back</div>
                     <AmazonOneBagNote />
                     <div className="flex flex-wrap gap-2 text-[11px] text-[var(--muted)]">
-                      <span className="font-semibold text-[var(--text)]">Bundle guides:</span>
+                      <span className="font-semibold text-[var(--text)]">Bag count guides:</span>
                       <Link href="/gummy-gift-bundles" className="underline underline-offset-4">
-                        Gift bundles
+                        Gift bag options
                       </Link>
                       <Link href="/patriotic-party-snacks" className="underline underline-offset-4">
                         Party snacks
@@ -516,13 +516,13 @@ export default async function HomePage() {
                   </div>
                   <div className="flex flex-wrap items-center gap-3 pt-1">
                     <a href="#bundle-pricing" className="btn btn-candy">
-                      Build my bundle
+                      Choose bag count
                     </a>
                     <Link
                       href="/shop#product-details"
                       className="text-xs font-semibold text-[var(--muted)] underline underline-offset-4 hover:text-[var(--text)] focus-ring"
                     >
-                      View product details →
+                      View product details
                     </Link>
                   </div>
                   <div className="mt-2">
@@ -627,7 +627,7 @@ export default async function HomePage() {
                     rel="noopener noreferrer"
                     className="btn btn-outline"
                   >
-                    Follow →
+                    Follow
                   </Link>
                 </div>
 
@@ -663,9 +663,9 @@ export default async function HomePage() {
                   <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
                     Get updates
                   </div>
-                  <h3 className="text-xl font-black text-[var(--text)] sm:text-2xl">Unlock early access + bundle-only drops</h3>
+                  <h3 className="text-xl font-black text-[var(--text)] sm:text-2xl">Unlock early access + member-only drops</h3>
                   <p className="text-sm text-[var(--muted)]">
-                    First dibs on limited drops, restocks, and member-only bundle alerts.
+                    First dibs on limited drops, restocks, and member-only savings alerts.
                   </p>
                   <div className="inline-flex items-center gap-2 rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-3 py-1 text-[11px] font-semibold text-[var(--text)] w-fit">
                     VIP early access • limited-batch alerts
@@ -684,7 +684,7 @@ export default async function HomePage() {
                     </button>
                   </form>
                   <div className="text-[11px] text-[var(--muted)]">
-                    No spam. Just drops, restocks, and bundle alerts.
+                    No spam. Just drops, restocks, and savings alerts.
                   </div>
                 </div>
               </div>
@@ -712,7 +712,7 @@ export default async function HomePage() {
                 Read our story
               </Link>
               <Link href="/shop" className="btn btn-candy">
-                Shop bundles
+                Shop savings
               </Link>
             </div>
           </div>
@@ -732,10 +732,10 @@ export default async function HomePage() {
       <div className="sticky-cta-bar fixed bottom-4 left-1/2 z-40 hidden w-[min(94vw,680px)] -translate-x-1/2 translate-y-4 bg-transparent opacity-0 transition-all duration-300">
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-full border border-[rgba(15,27,45,0.12)] bg-white/85 px-3 py-2 shadow-[0_14px_30px_rgba(15,27,45,0.12)] backdrop-blur-md">
           <div className="hidden text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)] sm:block">
-            Bundle &amp; save
+            Save more with more bags
           </div>
           <a href="#bundle-pricing" className="btn btn-candy w-full sm:w-auto">
-            Build my bundle
+            Choose bag count
           </a>
         </div>
         <div className="mt-2 text-center">

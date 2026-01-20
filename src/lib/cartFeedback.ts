@@ -22,7 +22,7 @@ export function getCartToastMessage(qty: number) {
     return `${qty} bags added — per-bag price capped at ${formatMoney(MIN_PER_BAG)}.`;
   }
   if (qty === 12) return "12 bags added — best price per bag.";
-  if (qty === 8) return "8 bags added — great choice. This is our most popular bundle.";
+  if (qty === 8) return "8 bags added — great choice. This is our most popular size.";
   if (qty >= 5) return "Added to cart. Want better value? Most customers choose 8 bags.";
   if (qty === 4) return "4 bags added. Add 1 more bag for free shipping.";
   if (qty >= 1 && qty <= 3) {

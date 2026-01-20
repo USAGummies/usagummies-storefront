@@ -80,7 +80,7 @@ export async function fetchVerifiedReviews(): Promise<Review[]> {
         body,
         authorName: getField(node, "authorName") || "Customer",
         dateISO,
-        productLabel: getField(node, "productLabel") || "All American Gummy Bear Bundles",
+        productLabel: getField(node, "productLabel") || "All American Gummy Bears",
         verified: true,
         helpfulCount: helpfulCountRaw && Number.isFinite(Number(helpfulCountRaw))
           ? Number(helpfulCountRaw)

@@ -13,9 +13,9 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "Gummy Gift Bundles | USA Gummies";
+const PAGE_TITLE = "Gummy Gift Bag Options | USA Gummies";
 const PAGE_DESCRIPTION =
-  "Gift-ready gummy bundles made in the USA. Use 4, 5, 8, or 12 bag bundles for birthdays, thank you gifts, and care packages.";
+  "Gift-ready gummy bag options made in the USA. Choose 4, 5, 8, or 12 bags for birthdays, thank you gifts, and care packages.";
 
 export const metadata: Metadata = {
   title: PAGE_TITLE,
@@ -39,32 +39,32 @@ export const metadata: Metadata = {
 const BUNDLE_IDEAS = [
   {
     title: "Starter gift",
-    detail: "4 bag bundle for small thank you gifts and care packages.",
+    detail: "4 bags for small thank you gifts and care packages.",
   },
   {
     title: "Free shipping pick",
-    detail: "5 bag bundle to unlock free shipping and easy gifting.",
+    detail: "5 bags to unlock free shipping and easy gifting.",
   },
   {
     title: "Most popular gift",
-    detail: "8 bag bundle for office gifting, family packs, and parties.",
+    detail: "8 bags for office gifting, family packs, and parties.",
   },
   {
     title: "Bulk gifting",
-    detail: "12 bag bundle for teams, clients, and large events.",
+    detail: "12 bags for teams, clients, and large events.",
   },
 ];
 
 const RELATED_GUIDES = [
   { href: "/patriotic-party-snacks", label: "Patriotic party snacks" },
   { href: "/bulk-gummy-bears", label: "Bulk gummy bears" },
-  { href: "/bundle-guides", label: "All bundle guides" },
+  { href: "/bundle-guides", label: "All bag count guides" },
 ];
 
 const articleJsonLd = {
   "@context": "https://schema.org",
   "@type": "Article",
-  headline: "Gummy gift bundles made in the USA",
+  headline: "Gummy gift bag options made in the USA",
   description: PAGE_DESCRIPTION,
   mainEntityOfPage: {
     "@type": "WebPage",
@@ -91,20 +91,20 @@ export default function GummyGiftBundlesPage() {
         <BreadcrumbJsonLd
           items={[
             { name: "Home", href: "/" },
-            { name: "Bundle guides", href: "/bundle-guides" },
-            { name: "Gummy gift bundles", href: "/gummy-gift-bundles" },
+            { name: "Bag count guides", href: "/bundle-guides" },
+            { name: "Gummy gift bag options", href: "/gummy-gift-bundles" },
           ]}
         />
         <div className="candy-panel rounded-[36px] p-5 sm:p-6">
           <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-            Gift bundles
+            Gift bag options
           </div>
           <h1 className="mt-2 text-3xl font-black text-[var(--text)] sm:text-4xl">
-            Gummy gift bundles made in the USA
+            Gummy gift bag options made in the USA
           </h1>
           <p className="mt-2 text-sm text-[var(--muted)] sm:text-base max-w-prose">
-            USA Gummies bundles make easy gifts for birthdays, thank yous, and care packages. Pick
-            the bundle size that matches your list and ship fast.
+            USA Gummies bags make easy gifts for birthdays, thank yous, and care packages. Pick the
+            bag count that matches your list and ship fast.
           </p>
 
           <div className="mt-6 grid gap-3 sm:grid-cols-2">
@@ -121,18 +121,18 @@ export default function GummyGiftBundlesPage() {
 
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <Link href="/shop#bundle-pricing" className="btn btn-candy">
-              Build my bundle
+              Choose my bag count
             </Link>
             <Link href="/ingredients" className="btn btn-outline">
               Ingredients
             </Link>
             <Link href="/faq" className="btn btn-outline">
-              Bundle FAQ
+              Bag count FAQ
             </Link>
           </div>
 
           <div className="mt-4 text-xs text-[var(--muted)]">
-            Free shipping at 5+ bags. Bundles save more per bag.
+            Free shipping at 5+ bags. Savings grow as you add bags.
           </div>
         </div>
 

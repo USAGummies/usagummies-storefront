@@ -13,9 +13,9 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "Bulk Gummy Bears | USA Gummies Bundles";
+const PAGE_TITLE = "Bulk Gummy Bears | USA Gummies Bag Counts";
 const PAGE_DESCRIPTION =
-  "Bulk gummy bears for events, teams, and gifting. Bundle USA Gummies for fast shipping and better per bag value.";
+  "Bulk gummy bears for events, teams, and gifting. Add more bags for better per bag value and fast shipping.";
 
 export const metadata: Metadata = {
   title: PAGE_TITLE,
@@ -39,11 +39,11 @@ export const metadata: Metadata = {
 const BULK_BENEFITS = [
   {
     title: "Event ready",
-    detail: "12 bag bundles work well for large teams and company events.",
+    detail: "12 bags work well for large teams and company events.",
   },
   {
     title: "Popular value",
-    detail: "8 bag bundles balance value and convenience for bulk gifting.",
+    detail: "8 bags balance value and convenience for bulk gifting.",
   },
   {
     title: "Free shipping",
@@ -52,9 +52,9 @@ const BULK_BENEFITS = [
 ];
 
 const RELATED_GUIDES = [
-  { href: "/gummy-gift-bundles", label: "Gummy gift bundles" },
+  { href: "/gummy-gift-bundles", label: "Gummy gift bag options" },
   { href: "/patriotic-party-snacks", label: "Patriotic party snacks" },
-  { href: "/bundle-guides", label: "All bundle guides" },
+  { href: "/bundle-guides", label: "All bag count guides" },
 ];
 
 const articleJsonLd = {
@@ -87,20 +87,20 @@ export default function BulkGummyBearsPage() {
         <BreadcrumbJsonLd
           items={[
             { name: "Home", href: "/" },
-            { name: "Bundle guides", href: "/bundle-guides" },
+            { name: "Bag count guides", href: "/bundle-guides" },
             { name: "Bulk gummy bears", href: "/bulk-gummy-bears" },
           ]}
         />
         <div className="candy-panel rounded-[36px] p-5 sm:p-6">
           <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-            Bulk bundles
+            Bulk bag counts
           </div>
           <h1 className="mt-2 text-3xl font-black text-[var(--text)] sm:text-4xl">
             Bulk gummy bears for events and gifting
           </h1>
           <p className="mt-2 text-sm text-[var(--muted)] sm:text-base max-w-prose">
-            Stock up with USA Gummies bundles for teams, clients, and large gatherings. Bundle and
-            save with fast shipping and made in the USA quality.
+            Stock up with USA Gummies for teams, clients, and large gatherings. Add more bags to
+            save per bag with fast shipping and made in the USA quality.
           </p>
 
           <div className="mt-6 grid gap-3 sm:grid-cols-3">
@@ -117,13 +117,13 @@ export default function BulkGummyBearsPage() {
 
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <Link href="/shop#bundle-pricing" className="btn btn-candy">
-              Build my bundle
+              Choose my bag count
             </Link>
             <Link href="/contact" className="btn btn-outline">
               Contact for large orders
             </Link>
             <Link href="/faq" className="btn btn-outline">
-              Bundle FAQ
+              Bag count FAQ
             </Link>
           </div>
         </div>

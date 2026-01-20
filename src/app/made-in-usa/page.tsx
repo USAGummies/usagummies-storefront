@@ -119,7 +119,7 @@ export default function MadeInUsaPage() {
                 </p>
                 <div className="flex flex-wrap items-center gap-3">
                   <Link href="/shop" className="btn btn-candy">
-                    Shop bundles
+                    Shop & save
                   </Link>
                   <span className="text-xs text-[var(--muted)]">{FREE_SHIPPING_PHRASE}</span>
                 </div>
@@ -181,13 +181,13 @@ export default function MadeInUsaPage() {
                 Read our story
               </Link>
               <Link href="/shop" className="btn btn-candy">
-                Shop bundles
+                Shop & save
               </Link>
             </div>
           </div>
 
           <div className="mt-6">
-            <AmericanDreamCallout variant="compact" ctaHref="/shop" ctaLabel="Build a bundle" tone="light" />
+            <AmericanDreamCallout variant="compact" ctaHref="/shop" ctaLabel="Choose a bag count" tone="light" />
           </div>
 
           <div className="mt-6 candy-panel rounded-[32px] border border-[var(--border)] p-5 sm:p-6">

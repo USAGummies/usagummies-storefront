@@ -98,7 +98,7 @@ export function InstagramGrid({
           rel="noopener noreferrer"
           className="btn btn-outline"
         >
-          Follow →
+          Follow
         </Link>
       </div>
 
@@ -144,7 +144,7 @@ export function InstagramGrid({
         </div>
       ) : (
         <div className="mt-6 rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-4 text-sm text-[var(--muted)]">
-          Follow @usagummies for the latest drops, customer photos, and bundle moments.
+          Follow @usagummies for the latest drops, customer photos, and stock-up moments.
         </div>
       )}
 

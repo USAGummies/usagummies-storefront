@@ -13,9 +13,9 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "Patriotic Party Snacks | USA Gummies Bundles";
+const PAGE_TITLE = "Patriotic Party Snacks | USA Gummies Bag Options";
 const PAGE_DESCRIPTION =
-  "Patriotic party snacks and gummy bundles for July 4th and USA-themed events. Bundle and save with USA Gummies.";
+  "Patriotic party snacks and gummy bag options for July 4th and USA-themed events. Add more bags to save more.";
 
 export const metadata: Metadata = {
   title: PAGE_TITLE,
@@ -37,21 +37,21 @@ export const metadata: Metadata = {
 };
 
 const PARTY_TIPS = [
-  "8 bag bundles are the most popular for backyard parties.",
-  "12 bag bundles are best for large groups and team events.",
+  "8 bags are the most popular for backyard parties.",
+  "12 bags are best for large groups and team events.",
   "5+ bags unlock free shipping for party planning.",
 ];
 
 const RELATED_GUIDES = [
-  { href: "/gummy-gift-bundles", label: "Gummy gift bundles" },
+  { href: "/gummy-gift-bundles", label: "Gummy gift bag options" },
   { href: "/bulk-gummy-bears", label: "Bulk gummy bears" },
-  { href: "/bundle-guides", label: "All bundle guides" },
+  { href: "/bundle-guides", label: "All bag count guides" },
 ];
 
 const articleJsonLd = {
   "@context": "https://schema.org",
   "@type": "Article",
-  headline: "Patriotic party snacks and gummy bundles",
+  headline: "Patriotic party snacks and gummy bag options",
   description: PAGE_DESCRIPTION,
   mainEntityOfPage: {
     "@type": "WebPage",
@@ -78,7 +78,7 @@ export default function PatrioticPartySnacksPage() {
         <BreadcrumbJsonLd
           items={[
             { name: "Home", href: "/" },
-            { name: "Bundle guides", href: "/bundle-guides" },
+            { name: "Bag count guides", href: "/bundle-guides" },
             { name: "Patriotic party snacks", href: "/patriotic-party-snacks" },
           ]}
         />
@@ -87,11 +87,11 @@ export default function PatrioticPartySnacksPage() {
             Party snacks
           </div>
           <h1 className="mt-2 text-3xl font-black text-[var(--text)] sm:text-4xl">
-            Patriotic party snacks and gummy bundles
+            Patriotic party snacks and gummy bag options
           </h1>
           <p className="mt-2 text-sm text-[var(--muted)] sm:text-base max-w-prose">
-            Hosting a July 4th party or an America-themed event? USA Gummies bundles make easy
-            shareable snacks. Build a bundle for crowd-ready gummy bears.
+            Hosting a July 4th party or an America-themed event? USA Gummies bags make easy
+            shareable snacks. Choose a bag count for crowd-ready gummy bears.
           </p>
 
           <div className="mt-6 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-4">
@@ -108,13 +108,13 @@ export default function PatrioticPartySnacksPage() {
 
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <Link href="/shop#bundle-pricing" className="btn btn-candy">
-              Build my bundle
+              Choose my bag count
             </Link>
             <Link href="/made-in-usa" className="btn btn-outline">
               Made in USA
             </Link>
             <Link href="/faq" className="btn btn-outline">
-              Bundle FAQ
+              Bag count FAQ
             </Link>
           </div>
         </div>

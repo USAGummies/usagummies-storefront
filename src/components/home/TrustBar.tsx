@@ -4,7 +4,7 @@ export function TrustBar() {
     { t: "American-Made", d: "Built with pride. No fluff." },
     { t: "Fast Shipping", d: "Quick fulfillment & tracking." },
     { t: "Secure Checkout", d: "Shopify checkout protection." },
-    { t: "Bundle & Save", d: "Bigger cart = better deal." },
+    { t: "Buy More, Save More", d: "Bigger cart = better deal." },
   ];
 
   return (

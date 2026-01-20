@@ -83,7 +83,7 @@ export default function OpenGraphImage() {
                 lineHeight: 1.25,
               }}
             >
-              All American gummy bears. Bundle and save.
+              All American gummy bears. Buy more, save more.
             </div>
             <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
               <div

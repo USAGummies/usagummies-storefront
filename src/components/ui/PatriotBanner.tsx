@@ -29,8 +29,8 @@ export function PatriotBanner({ showRibbon = true }: { showRibbon?: boolean }) {
             </div>
 
             <div className="muted" style={{ marginTop: 10 }}>
-              All natural flavors. No artificial dyes. Fast shipping. Bundle
-              pricing that pushes AOV without pushing cringe.
+              All natural flavors. No artificial dyes. Fast shipping. Savings
+              pricing that rewards bigger orders without confusion.
             </div>
 
             <div className="badge-row">
@@ -44,16 +44,16 @@ export function PatriotBanner({ showRibbon = true }: { showRibbon?: boolean }) {
           <div className="candy-panel rounded-2xl" style={{ padding: 14 }}>
             <div className="kicker">Today’s move</div>
             <div style={{ fontWeight: 950, fontSize: 18, marginTop: 8 }}>
-              Bundle & Save
+              Save more with more bags
             </div>
             <div className="muted" style={{ marginTop: 8, fontSize: 14 }}>
-              The cart highlights the most popular bundle. Add more bags and
+              The cart highlights the most popular size. Add more bags and
               unlock free shipping.
             </div>
 
             <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
               <Link className="btn btn-candy" href="/shop#bundle-pricing">
-                Build a Bundle 🇺🇸
+                Choose bag count 🇺🇸
               </Link>
               <Link className="btn btn-outline" href="/shop">
                 Shop All

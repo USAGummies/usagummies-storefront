@@ -45,13 +45,13 @@ export default function ReturnsPolicyPage() {
             href="/policies"
             className="rounded-full border border-[var(--border)] bg-white px-3 py-1 text-sm text-[var(--text)] hover:bg-[var(--surface-strong)]"
           >
-            ← Policies
+            Policies
           </Link>
           <Link
             href="/shop"
             className="rounded-full border border-[var(--border)] bg-white px-3 py-1 text-sm text-[var(--text)] hover:bg-[var(--surface-strong)]"
           >
-            Shop →
+            Shop & save
           </Link>
         </div>
 

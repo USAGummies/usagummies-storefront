@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { pricingForQty, BASE_PRICE, FREE_SHIP_QTY } from "@/lib/bundles/pricing";
 import { SINGLE_BAG_SKU, SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
 import { fireCartToast } from "@/lib/cartFeedback";
+import { useCartBagCount } from "@/hooks/useCartBagCount";
 import { AmazonOneBagNote } from "@/components/ui/AmazonOneBagNote";
 
 function cx(...a: Array<string | false | null | undefined>) {
@@ -63,6 +64,8 @@ type BundleOption = {
   accent?: boolean;
   variant: VariantNode;
   totalPrice?: number;
+  nextTotal?: number;
+  nextBags?: number;
   perBag?: number;
   freeShipping: boolean;
   savingsAmount: number;
@@ -91,7 +94,11 @@ function formatQtyLabel(qty: number) {
   return `${qty} bag${qty === 1 ? "" : "s"}`;
 }
 
-function badgeForQty(qty: number) {
+function formatAddLabel(qty: number) {
+  return `+${formatQtyLabel(qty)}`;
+}
+
+function badgeForTotal(qty: number) {
   if (qty === 4) return "Starter savings";
   if (qty === 5) return "Free shipping";
   if (qty === 8) return "Most popular";
@@ -142,6 +149,10 @@ export default function PurchaseBox({
   focus?: string;
 }) {
   const router = useRouter();
+  const { bagCount } = useCartBagCount();
+  const currentBags = Math.max(0, Number(bagCount) || 0);
+  const currentPricing = currentBags > 0 ? pricingForQty(currentBags) : null;
+  const currentTotal = currentPricing?.total ?? 0;
 
   const variants = (product?.variants?.nodes || []) as VariantNode[];
   // Canonical ladder. Expose 1-3 bags plus core bundle sizes on-site.
@@ -166,28 +177,32 @@ export default function PurchaseBox({
     if (!singleVariant?.id) return [];
 
     return availableTiers.map((t) => {
-      const pricing = pricingForQty(t.qty);
-      const totalPrice = Number.isFinite(pricing.total) ? pricing.total : undefined;
+      const nextBags = currentBags + t.qty;
+      const pricing = pricingForQty(nextBags);
+      const nextTotal = Number.isFinite(pricing.total) ? pricing.total : undefined;
+      const addTotal = Math.max(0, (nextTotal ?? 0) - currentTotal);
       const perBag = Number.isFinite(pricing.perBag) ? pricing.perBag : undefined;
-      const savingsAmount = Math.max(0, BASE_PRICE * t.qty - (totalPrice ?? 0));
+      const savingsAmount = Math.max(0, BASE_PRICE * nextBags - (nextTotal ?? 0));
       const savingsPct =
-        totalPrice && savingsAmount > 0
-          ? (savingsAmount / (BASE_PRICE * t.qty)) * 100
+        nextTotal && savingsAmount > 0
+          ? (savingsAmount / (BASE_PRICE * nextBags)) * 100
           : undefined;
 
       return {
         ...t,
         variant: singleVariant,
-        totalPrice,
+        totalPrice: addTotal,
+        nextTotal,
+        nextBags,
         perBag,
-        freeShipping: t.qty >= FREE_SHIP_QTY,
+        freeShipping: nextBags >= FREE_SHIP_QTY,
         savingsAmount,
         savingsPct,
         currencyCode: baselineCurrency,
         accent: t.accent,
       };
     });
-  }, [availableTiers, singleVariant, baselineCurrency]);
+  }, [availableTiers, singleVariant, baselineCurrency, currentBags, currentTotal]);
 
   const featuredQuantities = [4, 5, 8, 12];
 
@@ -249,23 +264,26 @@ export default function PurchaseBox({
   const selectedOption = bundleOptions.find((o) => o.qty === selectedQty) ?? bundleOptions[0];
 
   const selectedVariant = selectedOption?.variant ?? pickSingleVariant(variants);
-  const selectedPrice = selectedOption?.totalPrice;
   const optionQty = selectedOption?.qty ?? selectedQty ?? 1;
+  const selectedAddTotal = selectedOption?.totalPrice ?? 0;
+  const selectedNextTotal = selectedOption?.nextTotal ?? 0;
+  const selectedNextBags = selectedOption?.nextBags ?? currentBags + optionQty;
   const selectedCurrency =
     (selectedVariant?.price as any)?.currencyCode ||
     (selectedVariant?.priceV2 as any)?.currencyCode ||
     baselineCurrency;
-  const selectedPriceText = money(selectedPrice, selectedCurrency);
+  const selectedPriceText = money(selectedAddTotal, selectedCurrency);
+  const selectedNextTotalText = money(selectedNextTotal, selectedCurrency);
   const hasAdded = lastAddedQty !== null;
   const selectedAdded = hasAdded && lastAddedQty === optionQty;
   const isAdding = addingQty !== null;
   const ctaLabel = isAdding
     ? "Adding..."
     : selectedAdded
-      ? `In your cart - ${selectedPriceText}`
+      ? `Added ${formatQtyLabel(optionQty)}`
       : hasAdded
-        ? `Upgrade to ${formatQtyLabel(optionQty)} - ${selectedPriceText} ->`
-        : `Add ${optionQty}-bag bundle - ${selectedPriceText} ->`;
+        ? `Add ${formatQtyLabel(optionQty)} more - ${selectedPriceText} ->`
+        : `Add ${formatQtyLabel(optionQty)} - ${selectedPriceText} ->`;
 
   const hasExtraSelected = extraOptions.some((o) => o.qty === selectedQty);
   const showExtras = showMore || hasExtraSelected;
@@ -345,7 +363,7 @@ export default function PurchaseBox({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: "replace",
+          action: "add",
           variantId: selectedVariant.id,
           quantity: qty,
         }),
@@ -371,44 +389,49 @@ export default function PurchaseBox({
     }
   }
 
+  const cardHint =
+    currentBags > 0
+      ? `In your cart: ${currentBags} bags. Selecting a size adds that many bags.`
+      : "Selecting a size adds that many bags to your cart. More bags = lower price per bag.";
+
   return (
     <section data-purchase-section="true" className="pbx pbx--metal">
-      {/* Bundle ladder */}
+      {/* Savings ladder */}
       <div
         ref={bundlesRef}
         className={cx("pbx__card", focusGlow && "pbx__glow")}
-        aria-label="Bundle selection"
+        aria-label="Bag count selection"
       >
         <div className="pbx__cardHeader">
           <div>
-            <div className="pbx__cardTitle">Pick your bundle</div>
+            <div className="pbx__cardTitle">Pick your bag count</div>
             <div className="pbx__cardHint">
-              Add more bags, lower price per bag, free shipping at 5+.
+              {cardHint}
             </div>
           </div>
         </div>
 
         <div className="pbx__freeShip">
-          Free shipping on 5+ bags - most customers qualify
+          Free shipping at 5+ bags (based on your total)
         </div>
 
         <div className="pbx__options">
-          <div className="pbx__optionGroup" role="radiogroup" aria-label="Bundle sizes">
+          <div className="pbx__optionGroup" role="radiogroup" aria-label="Bag counts">
             <div className="pbx__featured">
             {featuredOptions.map((o) => {
               const active = selectedQty === o.qty;
-              const badge = badgeForQty(o.qty);
+              const badge = badgeForTotal(o.nextBags ?? o.qty);
               const index = radioIndexByQty.get(o.qty) ?? 0;
-              const popular = o.qty === 8;
+              const popular = (o.nextBags ?? o.qty) === 8;
               const isAdded = lastAddedQty === o.qty;
               const isAddingThis = addingQty === o.qty;
               const tileCtaLabel = isAddingThis
                 ? "Adding..."
-                : hasAdded
-                  ? isAdded
-                    ? "In your cart"
-                    : "Upgrade my cart for more savings"
-                  : "Add to cart";
+                : isAdded
+                  ? "Added"
+                  : hasAdded
+                    ? `Add ${formatQtyLabel(o.qty)} more`
+                    : `Add ${formatQtyLabel(o.qty)}`;
 
               return (
                 <div
@@ -424,22 +447,27 @@ export default function PurchaseBox({
                   tabIndex={active ? 0 : -1}
                 >
                   <div className="pbx__tileHeader">
-                    <span className="pbx__tileQty">{formatQtyLabel(o.qty)}</span>
+                    <span className="pbx__tileQty">{formatAddLabel(o.qty)}</span>
                     {badge ? (
                       <span className={cx("pbx__badge", popular && "pbx__badge--popular")}>
                         {badge}
                       </span>
                     ) : null}
                   </div>
+                  <div className="text-[11px] text-[var(--muted)]">
+                    New total: {o.nextBags ?? currentBags + o.qty} bags
+                  </div>
 
                   <div className="pbx__tilePriceRow">
-                    <div className="pbx__tilePrice">{money(o.totalPrice, o.currencyCode)}</div>
-                    <div className="pbx__tilePer">~{money(o.perBag, o.currencyCode)} / bag</div>
+                    <div className="pbx__tilePrice">+{money(o.totalPrice, o.currencyCode)}</div>
+                    <div className="pbx__tilePer">
+                      Total after add: {money(o.nextTotal, o.currencyCode)} - ~{money(o.perBag, o.currencyCode)} / bag
+                    </div>
                   </div>
 
                   <div className="pbx__tileMeta">
                     {o.savingsAmount > 0 ? (
-                      <span className="pbx__tileSave">Save {money(o.savingsAmount, o.currencyCode)}</span>
+                      <span className="pbx__tileSave">Save {money(o.savingsAmount, o.currencyCode)} total</span>
                     ) : (
                       <span className="pbx__tileSave pbx__tileSave--muted">Standard price</span>
                     )}
@@ -469,7 +497,7 @@ export default function PurchaseBox({
               <div className="pbx__miniRow">
                 {extraOptions.map((o) => {
                   const active = selectedQty === o.qty;
-                  const label = formatQtyLabel(o.qty);
+                  const label = formatAddLabel(o.qty);
                   const index = radioIndexByQty.get(o.qty) ?? 0;
 
                   return (
@@ -487,7 +515,7 @@ export default function PurchaseBox({
                       tabIndex={active ? 0 : -1}
                     >
                       <span className="pbx__miniQty">{label}</span>
-                      <span className="pbx__miniPrice">{money(o.totalPrice, o.currencyCode)}</span>
+                      <span className="pbx__miniPrice">+{money(o.totalPrice, o.currencyCode)}</span>
                     </button>
                   );
                 })}
@@ -511,16 +539,16 @@ export default function PurchaseBox({
         <div className="pbx__summary" aria-live="polite" role="status">
           <div className="pbx__summaryMeta">
             <div className="pbx__summaryLabel">
-              {selectedAdded ? "In your cart" : "Your selected bundle"}: {formatQtyLabel(optionQty)}
+              {selectedAdded ? "Added" : "Add"} {formatQtyLabel(optionQty)}
             </div>
-            <div className="pbx__summaryPrice">{selectedPriceText}</div>
-            {hasAdded && !selectedAdded ? (
+            <div className="pbx__summaryPrice">+{selectedPriceText}</div>
+            {currentBags > 0 ? (
               <div className="pbx__summaryStatus pbx__summaryStatus--muted">
-                In your cart: {formatQtyLabel(lastAddedQty ?? 0)}
+                New total: {selectedNextBags} bags - {selectedNextTotalText}
               </div>
             ) : null}
             {selectedAdded ? (
-              <div className="pbx__summaryStatus pbx__summaryStatus--success">Added to cart.</div>
+              <div className="pbx__summaryStatus pbx__summaryStatus--success">Bags added to cart.</div>
             ) : null}
             {error ? <div className="pbx__error">{error}</div> : null}
           </div>

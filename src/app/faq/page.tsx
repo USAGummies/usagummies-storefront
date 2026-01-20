@@ -18,7 +18,7 @@ function resolveSiteUrl() {
 const SITE_URL = resolveSiteUrl();
 const PAGE_TITLE = "FAQ | USA Gummies";
 const PAGE_DESCRIPTION =
-  "USA Gummies FAQ. Answers about All American gummy bears, ingredients, flavor notes, bundles, shipping, and pricing.";
+  "USA Gummies FAQ. Answers about All American gummy bears, ingredients, flavor notes, bag count savings, shipping, and pricing.";
 const OG_IMAGE = "/opengraph-image";
 
 export const metadata: Metadata = {
@@ -89,20 +89,20 @@ const FAQS: FaqItem[] = [
   {
     question: "Can I buy a single bag?",
     answer:
-      "Yes. You can order 1-3 bags on our site at standard price, or bundle up for savings on 4+ bags.",
+      "Yes. You can order 1-3 bags on our site at standard price, or save more per bag on 4+ bags.",
   },
   {
-    question: "How does bundle pricing work?",
+    question: "How do bag count savings work?",
     answer:
-      `Bundle pricing lowers the per-bag cost as you add more bags. Most customers choose 5, 8, or 12 bags, and ${FREE_SHIPPING_PHRASE.toLowerCase()}.`,
+      `Savings pricing lowers the per-bag cost as you add more bags. Most customers choose 5, 8, or 12 bags, and ${FREE_SHIPPING_PHRASE.toLowerCase()}.`,
   },
   {
-    question: "Which bundle should I choose?",
+    question: "Which bag count should I choose?",
     answer:
-      "Use our bundle guides to match the right size for gifts, parties, or bulk orders.",
+      "Use our bag count guides to match the right size for gifts, parties, or bulk orders.",
     answerNode: (
       <>
-        Use our bundle guides to match the right size for{" "}
+        Use our bag count guides to match the right size for{" "}
         <Link href="/gummy-gift-bundles" className="link-underline font-semibold text-[var(--navy)]">
           gifts
         </Link>
@@ -166,12 +166,12 @@ export default function FaqPage() {
                 USA Gummies FAQ
               </h1>
               <p className="text-sm text-[var(--muted)] sm:text-base max-w-prose">
-                Quick answers about our All American gummy bears, ingredients, flavor notes, bundles,
-                and where to buy.
+                Quick answers about our All American gummy bears, ingredients, flavor notes, bag count
+                savings, and where to buy.
               </p>
               <div className="flex flex-wrap items-center gap-3">
                 <Link href="/shop" className="btn btn-candy">
-                  Shop bundles
+                  Shop & save
                 </Link>
                 <span className="text-xs text-[var(--muted)]">{FREE_SHIPPING_PHRASE}</span>
               </div>
@@ -193,7 +193,7 @@ export default function FaqPage() {
           </div>
 
           <div className="mt-6">
-            <AmericanDreamCallout variant="compact" ctaHref="/shop" ctaLabel="Shop bundles" tone="light" />
+            <AmericanDreamCallout variant="compact" ctaHref="/shop" ctaLabel="Shop & save" tone="light" />
           </div>
 
           <div className="mt-6 candy-panel rounded-[32px] border border-[var(--border)] p-5 sm:p-6">

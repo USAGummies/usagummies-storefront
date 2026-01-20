@@ -45,13 +45,13 @@ export default function ShippingPolicyPage() {
             href="/policies"
             className="rounded-full border border-[var(--border)] bg-white px-3 py-1 text-sm text-[var(--text)] hover:bg-[var(--surface-strong)]"
           >
-            ← Policies
+            Policies
           </Link>
           <Link
             href="/shop"
             className="rounded-full border border-[var(--border)] bg-white px-3 py-1 text-sm text-[var(--text)] hover:bg-[var(--surface-strong)]"
           >
-            Shop →
+            Shop & save
           </Link>
         </div>
 
@@ -59,7 +59,7 @@ export default function ShippingPolicyPage() {
           <h1 className="text-3xl font-semibold tracking-tight">Shipping Policy</h1>
           <p className="mt-3 text-[var(--muted)]">
             This shipping policy keeps delivery simple and predictable. Orders ship within 24 hours,
-            with tracking sent fast. Bundle pricing is clear on every product page, plus shipping
+            with tracking sent fast. Savings pricing is clear on every product page, plus shipping
             updates. Free shipping on 5+ bags.
           </p>
 

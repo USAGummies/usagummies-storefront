@@ -98,7 +98,7 @@ export function StickyAddToCartBar({
               <div className="text-xs text-[var(--muted)]">
                 <span className="font-semibold text-[var(--text)]">{priceText}</span>{" "}
                 <span className="text-[var(--muted)]">-</span>{" "}
-                <span>Bundle &amp; save - {FREE_SHIPPING_PHRASE}</span>
+                <span>Save more with more bags - {FREE_SHIPPING_PHRASE}</span>
               </div>
               <div className="mt-2 flex flex-wrap gap-2 text-[10px] uppercase tracking-[0.18em] text-[var(--muted)]">
                 <span className="rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-2 py-1">Made in USA</span>
@@ -112,7 +112,7 @@ export function StickyAddToCartBar({
               className="btn btn-candy pressable"
               style={{ whiteSpace: "nowrap" }}
             >
-              Build my bundle
+              Choose bag count
             </button>
           </div>
           <div className="px-3 pb-3">

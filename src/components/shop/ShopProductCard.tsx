@@ -116,7 +116,7 @@ export function ShopProductCard({
 
             {hasBundle ? (
               <div className="absolute left-2 top-2 rounded-full border border-[rgba(199,54,44,0.35)] bg-[rgba(199,54,44,0.12)] px-3 py-1 text-[11px] font-bold text-[var(--red)]">
-                Bundle deals inside
+                Savings inside
               </div>
             ) : null}
 
@@ -166,7 +166,7 @@ export function ShopProductCard({
               className="btn btn-candy justify-center min-h-[44px]"
               onClick={(e) => e.stopPropagation()}
             >
-              Build bundle
+              Choose bag count
             </Link>
             <AmazonOneBagNote className="text-[11px] text-[var(--muted)]" />
           </div>

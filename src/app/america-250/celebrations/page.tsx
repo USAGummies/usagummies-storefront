@@ -14,7 +14,7 @@ function resolveSiteUrl() {
 const SITE_URL = resolveSiteUrl();
 const PAGE_TITLE = "America 250 Celebrations";
 const PAGE_DESCRIPTION =
-  "America 250 celebrations — party ideas and patriotic bundle snacks built for sharing.";
+  "America 250 celebrations — party ideas and patriotic snack bags built for sharing.";
 const PAGE_URL = `${SITE_URL}/america-250/celebrations`;
 const OG_IMAGE = `${SITE_URL}/opengraph-image`;
 
@@ -76,14 +76,14 @@ export default function America250CelebrationsPage() {
 
         <div className="mb-6">
           <Link href="/america-250" className="text-sm text-[var(--muted)] hover:text-[var(--text)]">
-            ← Back to America 250
+            Back to America 250
           </Link>
         </div>
 
         <h1 className="text-4xl font-semibold tracking-tight">America 250 celebrations</h1>
         <p className="mt-4 text-[var(--muted)]">
           Built for parades, cookouts, road trips, and community events. Same premium gummies — just
-          bundled and positioned for the moment.
+          curated and positioned for the moment.
         </p>
 
         <div className="mt-8 rounded-3xl border border-[var(--border)] bg-[var(--surface-strong)] p-6">

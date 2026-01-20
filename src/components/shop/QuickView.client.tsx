@@ -6,6 +6,7 @@ import Link from "next/link";
 import { pricingForQty, FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import { SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
 import { fireCartToast } from "@/lib/cartFeedback";
+import { useCartBagCount } from "@/hooks/useCartBagCount";
 import { AmazonOneBagNote } from "@/components/ui/AmazonOneBagNote";
 
 const QUICK_QTYS = [1, 2, 3, 4, 5, 8, 12];
@@ -58,6 +59,10 @@ export default function QuickView({ product, detailHref, bundleHref, children }:
   const [selectedQty, setSelectedQty] = useState(8);
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { bagCount } = useCartBagCount();
+  const currentBags = Math.max(0, Number(bagCount) || 0);
+  const currentPricing = currentBags > 0 ? pricingForQty(currentBags) : null;
+  const currentTotal = currentPricing?.total ?? 0;
   const closeBtnRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
@@ -84,10 +89,11 @@ export default function QuickView({ product, detailHref, bundleHref, children }:
 
   const img = product?.featuredImage;
   const description = product?.description || "";
-  const pricing = pricingForQty(selectedQty);
-  const total = pricing.total;
-  const perBag = pricing.perBag;
-  const freeShip = selectedQty >= 5;
+  const nextBags = currentBags + selectedQty;
+  const nextPricing = pricingForQty(nextBags);
+  const addTotal = Math.max(0, nextPricing.total - currentTotal);
+  const perBag = nextPricing.perBag;
+  const freeShip = nextBags >= 5;
 
   async function addToCart() {
     setError(null);
@@ -101,7 +107,7 @@ export default function QuickView({ product, detailHref, bundleHref, children }:
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: "replace",
+          action: "add",
           variantId: SINGLE_BAG_VARIANT_ID,
           merchandiseId: SINGLE_BAG_VARIANT_ID,
           quantity: selectedQty,
@@ -185,18 +191,21 @@ export default function QuickView({ product, detailHref, bundleHref, children }:
 
                 <div className="space-y-2">
                   <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
-                    Pick a bundle
+                    Pick your bag count
                   </div>
                   <div className="relative">
                     <div className="pointer-events-none absolute left-0 top-0 h-full w-8 bg-gradient-to-r from-[var(--surface)] to-transparent" />
                     <div className="pointer-events-none absolute right-0 top-0 h-full w-8 bg-gradient-to-l from-[var(--surface)] to-transparent" />
                     <div className="bundle-slider flex snap-x snap-mandatory gap-2 overflow-x-auto pb-2">
                       {QUICK_QTYS.map((qty) => {
-                        const tierPricing = pricingForQty(qty);
+                        const nextTotalBags = currentBags + qty;
+                        const tierPricing = pricingForQty(nextTotalBags);
                         const totalPrice = money(tierPricing.total);
+                        const addPrice = money(Math.max(0, tierPricing.total - currentTotal));
                         const perBagPrice = money(tierPricing.perBag);
                         const isActive = qty === selectedQty;
-                        const highlight = qty === 8;
+                        const highlight = nextTotalBags === 8;
+                        const qualifiesShip = nextTotalBags >= 5;
                         return (
                           <button
                             key={qty}
@@ -212,18 +221,20 @@ export default function QuickView({ product, detailHref, bundleHref, children }:
                             ].join(" ")}
                             aria-pressed={isActive}
                           >
-                            <div className="text-sm font-black text-[var(--text)]">{qty} bags</div>
-                            <div className="mt-1 text-[var(--muted)]">{totalPrice}</div>
-                            <div className="text-[11px] text-[var(--muted)]">~{perBagPrice} / bag</div>
-                            <div className="mt-1 text-[10px] text-[var(--muted)]">
-                              {qty >= 5 ? FREE_SHIPPING_PHRASE : "Standard price"}
+                            <div className="text-sm font-black text-[var(--text)]">+{qty} bags</div>
+                            <div className="mt-1 text-[var(--muted)]">+{addPrice}</div>
+                            <div className="text-[11px] text-[var(--muted)]">
+                              New total: {totalPrice} - ~{perBagPrice} / bag
                             </div>
-                            {qty === 8 ? (
+                            <div className="mt-1 text-[10px] text-[var(--muted)]">
+                              {qualifiesShip ? FREE_SHIPPING_PHRASE : "Standard price"}
+                            </div>
+                            {nextTotalBags === 8 ? (
                               <div className="mt-1 inline-flex rounded-full border border-[rgba(199,160,98,0.6)] bg-[rgba(199,160,98,0.18)] px-2 py-0.5 text-[10px] font-semibold text-[var(--gold)]">
                                 Most popular
                               </div>
                             ) : null}
-                            {qty === 5 ? (
+                            {nextTotalBags === 5 ? (
                               <div className="mt-1 inline-flex rounded-full border border-[var(--border)] bg-[var(--surface-strong)] px-2 py-0.5 text-[10px] font-semibold text-[var(--text)]">
                                 Free shipping
                               </div>
@@ -238,12 +249,18 @@ export default function QuickView({ product, detailHref, bundleHref, children }:
                 <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-3">
                   <div className="flex items-center justify-between gap-3">
                     <div className="text-sm font-semibold text-[var(--text)]">
-                      Selected: {selectedQty} bags
+                      Adding +{selectedQty} bags
+                      <div className="text-xs text-[var(--muted)]">
+                        New total: {nextBags} bags
+                      </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-xs text-[var(--muted)]">Total</div>
+                      <div className="text-xs text-[var(--muted)]">Add today</div>
                       <div className="text-lg font-black text-[var(--text)] price-pop">
-                        {money(total)}
+                        +{money(addTotal)}
+                      </div>
+                      <div className="text-xs text-[var(--muted)]">
+                        Total after add: {money(nextPricing.total)}
                       </div>
                       <div className="text-xs text-[var(--muted)]">~{money(perBag)} / bag</div>
                     </div>
@@ -266,10 +283,10 @@ export default function QuickView({ product, detailHref, bundleHref, children }:
                           aria-hidden="true"
                           className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent opacity-60"
                         />
-                        Adding…
+                        Adding...
                       </span>
                     ) : (
-                      `Add ${selectedQty}-bag bundle — ${money(total)} →`
+                      `Add ${selectedQty} bags - ${money(addTotal)} ->`
                     )}
                   </button>
                   <div className="mt-2 text-[11px] text-[var(--muted)]">Free shipping • Secure checkout</div>
@@ -281,7 +298,7 @@ export default function QuickView({ product, detailHref, bundleHref, children }:
                     View full details
                   </Link>
                   <Link href={bundleHref} className="btn btn-outline">
-                    Jump to bundles
+                    Jump to bag pricing
                   </Link>
                 </div>
               </div>

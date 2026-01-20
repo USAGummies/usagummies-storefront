@@ -294,7 +294,7 @@ export async function getProductsPage(params: {
 
 /**
  * Cart add-ons helper (AOV lever)
- * Priority: bundle → case → pack → gift → sampler, then fallback to best-selling.
+ * Priority: bundle -> case -> pack -> gift -> sampler, then fallback to best-selling.
  * Excludes anything already in cart.
  */
 export async function getSuggestedCartAddOns(params: {

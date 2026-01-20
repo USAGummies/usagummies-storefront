@@ -100,13 +100,13 @@ export default function PoliciesIndexPage() {
             href="/"
             className="rounded-full border border-[var(--border)] bg-white px-3 py-1 text-sm text-[var(--text)] hover:bg-[var(--surface-strong)]"
           >
-            ← Home
+            Home
           </Link>
           <Link
             href="/shop"
             className="rounded-full border border-[var(--border)] bg-white px-3 py-1 text-sm text-[var(--text)] hover:bg-[var(--surface-strong)]"
           >
-            Shop →
+            Shop & save
           </Link>
         </div>
 
@@ -133,7 +133,7 @@ export default function PoliciesIndexPage() {
                     <div className="mt-2 text-sm text-[var(--muted)]">{p.desc}</div>
                   </div>
                   <div className="shrink-0 text-sm text-[#DBAA79] opacity-80 group-hover:opacity-100">
-                    View →
+                    View policy
                   </div>
                 </div>
               </Link>

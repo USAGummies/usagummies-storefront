@@ -15,9 +15,10 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import type { BundleTier } from "@/lib/bundles/getBundleVariants";
-import { BASE_PRICE, FREE_SHIPPING_PHRASE, MIN_PER_BAG } from "@/lib/bundles/pricing";
+import { BASE_PRICE, FREE_SHIPPING_PHRASE, MIN_PER_BAG, pricingForQty } from "@/lib/bundles/pricing";
 import { trackEvent } from "@/lib/analytics";
 import { fireCartToast } from "@/lib/cartFeedback";
+import { useCartBagCount } from "@/hooks/useCartBagCount";
 import { REVIEW_HIGHLIGHTS } from "@/data/reviewHighlights";
 import { AmazonOneBagNote } from "@/components/ui/AmazonOneBagNote";
 
@@ -92,6 +93,10 @@ export default function BundleQuickBuy({
   otherQuantities,
 }: Props) {
   const router = useRouter();
+  const { bagCount } = useCartBagCount();
+  const currentBags = Math.max(0, Number(bagCount) || 0);
+  const currentPricing = currentBags > 0 ? pricingForQty(currentBags) : null;
+  const currentTotal = currentPricing?.total ?? 0;
   const ctaRef = React.useRef<HTMLDivElement | null>(null);
   const [selected, setSelected] = React.useState<TierKey>("8");
   const [addingQty, setAddingQty] = React.useState<number | null>(null);
@@ -158,10 +163,15 @@ export default function BundleQuickBuy({
 
   const selectedTier =
     expandedTiers.find((t) => String(t.quantity) === selected) || expandedTiers[0] || null;
+  const selectedTierState = selectedTier ? resolveTier(selectedTier) : null;
   const perBagCapText = money(MIN_PER_BAG, "USD");
   const reviewSnippets = REVIEW_HIGHLIGHTS.slice(0, 2);
   const summaryLine =
-    summaryCopy === undefined ? `${FREE_SHIPPING_PHRASE}. Most customers choose 8 bags.` : summaryCopy;
+    summaryCopy === undefined
+      ? currentBags > 0
+        ? `In your cart: ${currentBags} bags. Add more to save. ${FREE_SHIPPING_PHRASE}.`
+        : `${FREE_SHIPPING_PHRASE}. Most customers choose 8 bags.`
+      : summaryCopy;
   const hasAdded = lastAddedQty !== null;
   const selectedAdded = Boolean(
     selectedTier && lastAddedQty !== null && selectedTier.quantity === lastAddedQty
@@ -258,7 +268,7 @@ export default function BundleQuickBuy({
     const qty = Math.max(1, Number(targetQty ?? selectedTier?.quantity ?? 0) || 0);
     const targetTier = expandedTiers.find((tier) => tier.quantity === qty) || selectedTier;
     if (!singleBagVariantId || !isTierPurchasable(targetTier) || !qty) {
-      setError(availableForSale === false ? "Out of stock" : "Select a bundle to continue.");
+      setError(availableForSale === false ? "Out of stock" : "Select a bag count to continue.");
       return;
     }
     if (expandedTiers.some((tier) => tier.quantity === qty)) {
@@ -282,7 +292,7 @@ export default function BundleQuickBuy({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: "replace",
+          action: "add",
           variantId: singleBagVariantId,
           merchandiseId: singleBagVariantId,
           quantity: qty,
@@ -315,44 +325,49 @@ export default function BundleQuickBuy({
     }
   }
 
-  function savingsFor(tier: BundleTier) {
-    if (!Number.isFinite(tier.totalPrice ?? NaN)) return null;
-    const s = BASE_PRICE * tier.quantity - (tier.totalPrice as number);
-    return s > 0 ? s : 0;
+  function resolveTier(tier: BundleTier) {
+    const nextBags = currentBags + tier.quantity;
+    const pricing = pricingForQty(nextBags);
+    const nextTotal = Number.isFinite(pricing.total) ? pricing.total : null;
+    const addTotal = Math.max(0, (nextTotal ?? 0) - currentTotal);
+    const perBag = Number.isFinite(pricing.perBag) ? pricing.perBag : null;
+    const savings = nextTotal ? Math.max(0, BASE_PRICE * nextBags - nextTotal) : null;
+    return { nextBags, nextTotal, addTotal, perBag, savings };
   }
 
   function renderRow(tier: BundleTier) {
     const isActive = String(tier.quantity) === selected;
-    const displayTotal =
-      Number.isFinite(tier.totalPrice ?? NaN) && tier.totalPrice !== null
-        ? money(tier.totalPrice, "USD")
-        : null;
+    const tierState = resolveTier(tier);
+    const displayTotal = tierState.nextTotal ? money(tierState.nextTotal, "USD") : null;
+    const displayAdd = tierState.nextTotal ? money(tierState.addTotal, "USD") : null;
     const displayPerBag =
-      tier.perBagPrice && Number.isFinite(tier.perBagPrice)
-        ? `~${money(tier.perBagPrice, "USD")} / bag`
+      tierState.perBag && Number.isFinite(tierState.perBag)
+        ? `~${money(tierState.perBag, "USD")} / bag`
         : null;
     const unavailable = availableForSale === false || !displayTotal;
-    const savings = savingsFor(tier);
     const savingsValue =
-      savings && Number.isFinite(savings) && savings > 0 ? savings : null;
+      tierState.savings && Number.isFinite(tierState.savings) && tierState.savings > 0
+        ? tierState.savings
+        : null;
 
     if (isCompact) {
-      const isOne = tier.quantity === 1;
-      const isFour = tier.quantity === 4;
-      const isFive = tier.quantity === 5;
-      const isEight = tier.quantity === 8;
-      const isTwelve = tier.quantity === 12;
+      const nextBags = tierState.nextBags;
+      const isOne = nextBags === 1;
+      const isFour = nextBags === 4;
+      const isFive = nextBags === 5;
+      const isEight = nextBags === 8;
+      const isTwelve = nextBags === 12;
       const canSelect = !unavailable;
       const isAdded = lastAddedQty === tier.quantity;
       const isAddingThis = addingQty === tier.quantity;
       const tileCtaLabel = isAddingThis
         ? "Adding..."
-        : hasAdded
-          ? isAdded
-            ? "In your cart"
-            : "Upgrade my cart for more savings"
-          : "Add to cart";
-      const showFreeShipping = tier.quantity >= 5;
+        : isAdded
+          ? "Added"
+          : hasAdded
+            ? `Add ${tier.quantity} more bags`
+            : `Add ${tier.quantity} bags`;
+      const showFreeShipping = nextBags >= 5;
       const label =
         isEight
           ? "Most popular"
@@ -397,7 +412,7 @@ export default function BundleQuickBuy({
         >
           <div className="flex items-center justify-between gap-2">
             <div className={isLight ? "text-[17px] font-semibold text-[var(--text)]" : "text-[17px] font-semibold text-white"}>
-              {tier.quantity} bags
+              +{tier.quantity} bags
             </div>
             {label ? (
               <span
@@ -426,16 +441,17 @@ export default function BundleQuickBuy({
 
           <div className="mt-1.5 flex items-baseline justify-between gap-2 sm:flex-col sm:items-start sm:gap-1.5">
             <div className={isLight ? "text-[32px] font-bold leading-[1.05] text-[var(--text)]" : "text-[32px] font-bold leading-[1.05] text-white"}>
-              {displayTotal || "—"}
+              {displayAdd ? `+${displayAdd}` : "—"}
             </div>
             <div className={isLight ? "text-[12px] font-medium text-[var(--muted)]" : "text-[12px] font-medium text-white/65"}>
-              {displayPerBag || "Standard price"}
+              {displayTotal ? `New total: ${displayTotal}` : "Standard price"}
+              {displayPerBag ? ` - ${displayPerBag}` : ""}
             </div>
           </div>
 
           <div className="mt-1.5 flex items-center justify-between text-[11px] font-medium">
             <div className={isLight ? "text-[var(--candy-red)]" : "text-[var(--gold)]"}>
-              {savingsValue ? `Save ${money(savingsValue, "USD")}` : <span className="invisible">Save</span>}
+              {savingsValue ? `Save ${money(savingsValue, "USD")} total` : <span className="invisible">Save</span>}
             </div>
             <div className={isLight ? "text-[var(--muted)]" : "text-white/60"}>
               {showFreeShipping ? "Free shipping" : <span className="invisible">Free shipping</span>}
@@ -472,10 +488,25 @@ export default function BundleQuickBuy({
       );
     }
 
-    const isFive = tier.quantity === 5;
-    const isEight = tier.quantity === 8;
-    const isTwelve = tier.quantity === 12;
-    const isSmall = tier.quantity < 5;
+    const nextBags = tierState.nextBags;
+    const isFive = nextBags === 5;
+    const isEight = nextBags === 8;
+    const isTwelve = nextBags === 12;
+    const isSmall = nextBags < 5;
+
+    const label = isEight
+      ? "Most popular"
+      : isFive
+        ? "Free shipping"
+        : isTwelve
+          ? "Lowest per-bag"
+          : nextBags === 4
+            ? "Starter savings"
+            : nextBags === 1
+              ? "Trial size"
+              : isSmall
+                ? "Standard price"
+                : "Savings";
 
     const pills: string[] = [];
     if (isFive) {
@@ -486,9 +517,9 @@ export default function BundleQuickBuy({
     } else if (isTwelve) {
       pills.push("Best price per bag");
       pills.push(FREE_SHIPPING_PHRASE);
-    } else if (tier.quantity === 4) {
+    } else if (nextBags === 4) {
       pills.push("Starter savings");
-    } else if (tier.quantity === 1) {
+    } else if (nextBags === 1) {
       pills.push("Trial size");
     } else if (isSmall) {
       pills.push("Standard price");
@@ -504,11 +535,11 @@ export default function BundleQuickBuy({
     const isAddingThis = addingQty === tier.quantity;
     const tileCtaLabel = isAddingThis
       ? "Adding..."
-      : hasAdded
-        ? isAdded
-          ? "In your cart"
-          : "Upgrade my cart for more savings"
-        : "Add to cart";
+      : isAdded
+        ? "Added"
+        : hasAdded
+          ? `Add ${tier.quantity} more bags`
+          : `Add ${tier.quantity} bags`;
 
     return (
       <div
@@ -552,22 +583,10 @@ export default function BundleQuickBuy({
             <div className="flex items-start justify-between gap-4">
               <div className="space-y-1">
                 <div className="text-white font-extrabold leading-none whitespace-nowrap text-lg">
-                  {tier.quantity} bags
+                  +{tier.quantity} bags
                 </div>
                 <div className="text-xs text-white/70">
-                  {tier.quantity === 5
-                    ? "Free shipping"
-                    : tier.quantity === 8
-                    ? "Most popular"
-                    : tier.quantity === 12
-                    ? "Lowest per-bag"
-                    : tier.quantity === 4
-                    ? "Starter savings"
-                    : tier.quantity === 1
-                    ? "Trial size"
-                    : tier.quantity < 5
-                    ? "Standard price"
-                    : "Bundle savings"}
+                  New total: {nextBags} bags - {label}
                 </div>
                 {savingsValue ? (
                   <div
@@ -580,9 +599,9 @@ export default function BundleQuickBuy({
                   >
                     <span aria-hidden="true">★</span>
                     <span className="leading-none font-extrabold">
-                      Save {money(savingsValue, "USD")}
+                      Save {money(savingsValue, "USD")} total
                     </span>
-                    <span className="text-[10px] text-white/65 whitespace-nowrap">(vs 5-bag)</span>
+                    <span className="text-[10px] text-white/65 whitespace-nowrap">(vs single bags)</span>
                   </div>
                 ) : null}
                 {unavailable ? (
@@ -594,8 +613,13 @@ export default function BundleQuickBuy({
                   <span className="pointer-events-none absolute -inset-3 rounded-[18px] bg-[radial-gradient(circle_at_65%_20%,rgba(212,167,75,0.26),transparent_58%)] opacity-95" />
                 ) : null}
                 <div className="relative text-white text-xl font-extrabold leading-none drop-shadow-[0_6px_18px_rgba(0,0,0,0.35)] transition-all duration-300">
-                  {displayTotal || "—"}
+                  {displayAdd ? `+${displayAdd}` : "—"}
                 </div>
+                {displayTotal ? (
+                  <div className="relative mt-1 text-[11px] text-white/65 transition-all duration-300">
+                    Total after add: {displayTotal}
+                  </div>
+                ) : null}
                 {displayPerBag ? (
                   <div className="relative mt-1 text-[11px] text-white/65 transition-all duration-300">
                     {displayPerBag}
@@ -658,10 +682,10 @@ export default function BundleQuickBuy({
             isCompact ? "text-[var(--muted)]" : "text-white/60",
           ].join(" ")}
         >
-          Bundle pricing
+          Savings pricing
         </div>
         <div className="mt-2 text-sm">
-          Bundle pricing is temporarily unavailable right now. Please try again or view product details.
+          Savings pricing is temporarily unavailable right now. Please try again or view product details.
         </div>
         <Link
           href="/shop#product-details"
@@ -676,7 +700,7 @@ export default function BundleQuickBuy({
   return (
     <section
       id={anchorId}
-      aria-label="Bundle pricing"
+      aria-label="Savings pricing"
       className={[
         "relative mx-auto rounded-3xl border p-4 sm:p-5 overflow-hidden",
         isCompact ? "w-full" : "max-w-3xl",
@@ -702,7 +726,7 @@ export default function BundleQuickBuy({
         ].join(" ")}
       >
         <span aria-hidden="true">🇺🇸</span>
-        <span>American-made bundle pricing</span>
+        <span>American-made savings pricing</span>
       </div>
       <div className="relative mt-1 flex flex-col gap-3 sm:flex-row sm:items-start">
         <div className="min-w-0 space-y-1.5">
@@ -712,7 +736,7 @@ export default function BundleQuickBuy({
               isCompact ? (isLight ? "text-2xl text-[var(--text)]" : "text-2xl text-white") : isLight ? "text-2xl text-[var(--text)]" : "text-2xl text-white",
             ].join(" ")}
           >
-            Pick your bundle
+            Pick your bag count
           </div>
           <div
             className={[
@@ -720,7 +744,7 @@ export default function BundleQuickBuy({
               isCompact ? (isLight ? "text-[var(--muted)]" : "text-white/70") : isLight ? "text-[var(--muted)]" : "text-white/75",
             ].join(" ")}
           >
-            Build your bundle and watch your per‑bag price drop.
+            Add more bags and watch your per-bag price drop. Savings apply to your total bag count.
           </div>
       {summaryLine ? (
         <p
@@ -794,6 +818,7 @@ export default function BundleQuickBuy({
             How pricing works
           </div>
           <ul className="mt-1.5 space-y-1">
+            <li>Pricing is based on total bags in your cart</li>
             <li>Discounts start at 4 bags</li>
             <li>Free shipping at 5+ bags</li>
             <li>Most customers choose 8 bags</li>
@@ -844,7 +869,7 @@ export default function BundleQuickBuy({
           <div
             className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 sm:gap-4"
             role="radiogroup"
-            aria-label="Bundle size"
+            aria-label="Bag count"
           >
             {expandedTiers.map((tier) => renderRow(tier))}
           </div>
@@ -898,16 +923,21 @@ export default function BundleQuickBuy({
           isCompact ? (
             <div className="space-y-1">
               <div className={isLight ? "text-[14px] font-medium text-[var(--muted)]" : "text-[14px] font-medium text-white/80"}>
-                {selectedAdded ? "In your cart" : "Your selected bundle"}: {selectedTier.quantity} bags
+                {selectedAdded ? "Added" : "Add"} +{selectedTier.quantity} bags
               </div>
               <div
-                key={`${selectedTier.quantity}-${selectedTier.totalPrice}`}
+                key={`${selectedTier.quantity}-${selectedTierState?.addTotal}`}
                 className={isLight ? "text-[24px] font-bold text-[var(--text)]" : "text-[24px] font-bold text-white"}
               >
-                {selectedTier.totalPrice && Number.isFinite(selectedTier.totalPrice)
-                  ? money(selectedTier.totalPrice, "USD")
+                {Number.isFinite(selectedTierState?.addTotal ?? NaN)
+                  ? `+${money(selectedTierState?.addTotal, "USD")}`
                   : "—"}
               </div>
+              {Number.isFinite(selectedTierState?.nextTotal ?? NaN) ? (
+                <div className={isLight ? "text-[12px] text-[var(--muted)]" : "text-[12px] text-white/70"}>
+                  New total: {selectedTierState?.nextBags} bags - {money(selectedTierState?.nextTotal, "USD")}
+                </div>
+              ) : null}
             </div>
           ) : (
             <div
@@ -923,7 +953,7 @@ export default function BundleQuickBuy({
                     : "text-sm font-semibold text-white/90"
                 }
               >
-                {selectedAdded ? "In your cart" : "Your bundle"}:{" "}
+                {selectedAdded ? "Added" : "Add"} +{selectedTier.quantity} bags
                 <span
                   className={
                     isLight
@@ -931,7 +961,7 @@ export default function BundleQuickBuy({
                       : "font-extrabold text-white"
                   }
                 >
-                  {selectedTier.quantity} bags
+                  {selectedTierState ? ` (new total: ${selectedTierState.nextBags} bags)` : ""}
                 </span>
               </div>
               <div
@@ -942,23 +972,31 @@ export default function BundleQuickBuy({
                 }
               >
                 <div
-                  key={`${selectedTier.quantity}-${selectedTier.totalPrice}`}
+                  key={`${selectedTier.quantity}-${selectedTierState?.addTotal}`}
                   className={
                     isLight
                       ? "text-[12px] font-semibold text-[var(--muted)] transition-all duration-300 price-pop"
                       : "text-[12px] font-semibold text-white/80 transition-all duration-300 price-pop"
                   }
                 >
-                  {selectedTier.totalPrice && Number.isFinite(selectedTier.totalPrice)
-                    ? money(selectedTier.totalPrice, "USD")
+                  {Number.isFinite(selectedTierState?.addTotal ?? NaN)
+                    ? `+${money(selectedTierState?.addTotal, "USD")}`
                     : "—"}
                 </div>
-                {selectedTier.perBagPrice && Number.isFinite(selectedTier.perBagPrice) ? (
+                {Number.isFinite(selectedTierState?.nextTotal ?? NaN) ? (
                   <div
-                    key={`${selectedTier.quantity}-${selectedTier.perBagPrice}`}
+                    key={`${selectedTier.quantity}-${selectedTierState.nextTotal}`}
                     className="price-pop"
                   >
-                    {`~${money(selectedTier.perBagPrice, "USD")} / bag`}
+                    {`Total after add: ${money(selectedTierState?.nextTotal, "USD")}`}
+                  </div>
+                ) : null}
+                {Number.isFinite(selectedTierState?.perBag ?? NaN) ? (
+                  <div
+                    key={`${selectedTier.quantity}-${selectedTierState.perBag}`}
+                    className="price-pop"
+                  >
+                    {`~${money(selectedTierState?.perBag, "USD")} / bag`}
                   </div>
                 ) : null}
               </div>
@@ -988,16 +1026,16 @@ export default function BundleQuickBuy({
                     aria-hidden="true"
                     className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent opacity-60"
                   />
-                  Adding…
+                  Adding...
                 </>
-              ) : selectedTier && selectedTier.totalPrice ? (
+              ) : Number.isFinite(selectedTierState?.addTotal ?? NaN) ? (
                 selectedAdded
-                  ? `In your cart — ${money(selectedTier.totalPrice, "USD")}`
+                  ? `Added +${selectedTier?.quantity} bags`
                   : hasAdded
-                    ? `Upgrade to ${selectedTier.quantity} bags — ${money(selectedTier.totalPrice, "USD")} →`
-                    : `Add ${selectedTier.quantity}-bag bundle — ${money(selectedTier.totalPrice, "USD")} →`
+                    ? `Add ${selectedTier?.quantity} more bags - ${money(selectedTierState?.addTotal, "USD")} ->`
+                    : `Add ${selectedTier?.quantity} bags - ${money(selectedTierState?.addTotal, "USD")} ->`
               ) : (
-                "Add bundle to cart →"
+                "Add bags ->"
               )}
             </span>
           </button>
@@ -1055,7 +1093,7 @@ export default function BundleQuickBuy({
                     : "text-xs font-semibold text-[var(--gold)]"
               }
             >
-              {lastAddedQty ? `Added ${lastAddedQty}-bag bundle to cart.` : "Added to cart."}
+              {lastAddedQty ? `Added ${lastAddedQty} bags to cart.` : "Added to cart."}
             </div>
           ) : null}
           {ctaDisabled && availableForSale === false && !error ? (
@@ -1075,7 +1113,7 @@ export default function BundleQuickBuy({
                 : "inline-flex items-center gap-2 font-semibold text-white underline underline-offset-4 hover:text-white/90"
           }
         >
-          Explore more bundle sizes →
+          Explore more bag sizes ->
         </Link>
       </div>
     </section>

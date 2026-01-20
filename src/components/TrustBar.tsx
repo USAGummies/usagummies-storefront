@@ -12,7 +12,7 @@ export function TrustBar({
               Built for conversion. Backed by trust.
             </h2>
             <p className="mt-1 text-sm text-[var(--muted)]">
-              Fast shipping, secure Shopify checkout, and bundle value that rewards stocking up.
+              Fast shipping, secure Shopify checkout, and bag savings that reward stocking up.
             </p>
           </div>
 

@@ -14,7 +14,7 @@ function resolveSiteUrl() {
 const SITE_URL = resolveSiteUrl();
 const PAGE_TITLE = "America 250";
 const PAGE_DESCRIPTION =
-  "America 250 hub — patriotic gummy gifts and bundle drops built for celebrating America’s 250th.";
+  "America 250 hub — patriotic gummy gifts and limited drops built for celebrating America’s 250th.";
 const PAGE_URL = `${SITE_URL}/america-250`;
 const OG_IMAGE = `${SITE_URL}/opengraph-image`;
 
@@ -75,10 +75,10 @@ export default function America250HubPage() {
 
         <div className="mb-6 flex items-center justify-between">
           <Link href="/shop" className="text-sm text-[var(--muted)] hover:text-[var(--text)]">
-            ← Back to shop
+            Back to shop
           </Link>
           <Link href="/cart" className="text-sm text-[var(--muted)] hover:text-[var(--text)]">
-            View cart →
+            View cart
           </Link>
         </div>
 
@@ -91,7 +91,7 @@ export default function America250HubPage() {
         <h1 className="mt-4 text-4xl font-semibold tracking-tight">America 250</h1>
         <p className="mt-4 text-[var(--muted)]">
           A focused hub for gifts, celebrations, and events tied to America’s 250th — with
-          limited-run gummy bundles built for sharing.
+          limited-run gummy drops built for sharing.
         </p>
 
         <div className="mt-10 grid gap-4 md:grid-cols-3">
@@ -101,7 +101,7 @@ export default function America250HubPage() {
           >
             <div className="text-lg font-semibold">Gifts</div>
             <div className="mt-2 text-sm text-[var(--muted)]">
-              Patriotic gummy gift ideas and bundle picks.
+              Patriotic gummy gift ideas and bag options.
             </div>
           </Link>
 
@@ -111,7 +111,7 @@ export default function America250HubPage() {
           >
             <div className="text-lg font-semibold">Celebrations</div>
             <div className="mt-2 text-sm text-[var(--muted)]">
-              Party ideas, parade snacks, and shareable bundles.
+              Party ideas, parade snacks, and shareable bag options.
             </div>
           </Link>
 
@@ -127,7 +127,7 @@ export default function America250HubPage() {
         </div>
 
         <div className="mt-10 candy-panel rounded-3xl border border-[var(--border)] p-6">
-          <div className="text-sm font-semibold text-[var(--text)]">Want the America 250 bundle view?</div>
+          <div className="text-sm font-semibold text-[var(--text)]">Want the America 250 savings view?</div>
           <p className="mt-2 text-sm text-[var(--muted)]">
             Add <span className="font-semibold text-[var(--text)]">?campaign=america250</span> to any product page.
           </p>
@@ -135,7 +135,7 @@ export default function America250HubPage() {
             href="/shop"
             className="btn btn-candy mt-4 inline-flex items-center justify-center rounded-2xl px-5 py-3 text-sm font-semibold"
           >
-            Shop bundles
+            Shop & save
           </Link>
         </div>
       </div>

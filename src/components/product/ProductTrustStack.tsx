@@ -14,7 +14,7 @@ export function ProductTrustStack() {
       </div>
 
       <div style={{ marginTop: 10 }} className="muted">
-        Bundle pricing is built into every product page. Add more bags to unlock
+        Savings pricing is built into every product page. Add more bags to unlock
         better value and {FREE_SHIPPING_PHRASE}.
       </div>
 

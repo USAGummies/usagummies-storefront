@@ -9,7 +9,7 @@ export function HomeHero() {
       <div className="container">
         <div className="card-solid" style={{ padding: 22, overflow: "hidden" }}>
           <div className="h-eyebrow">
-            🇺🇸 American-made gummy bears • Fast shipping • Bundle-first pricing
+            American-made gummy bears • Fast shipping • Save more per bag
           </div>
 
           <div
@@ -30,8 +30,8 @@ export function HomeHero() {
               </div>
 
               <p className="sub" style={{ marginTop: 12 }}>
-                Premium gummies built in the USA — bold flavor, clean finish, and
-                a cart that highlights the most popular bundle.
+                Premium gummies built in the USA, bold flavor, clean finish, and
+                a cart that highlights your best price.
               </p>
 
               <div
@@ -43,11 +43,11 @@ export function HomeHero() {
                   alignItems: "center",
                 }}
               >
-                <Link className="btn btn-primary" href="/shop">
-                  Shop Now 🇺🇸
+                <Link className="btn btn-primary" href="/shop#bundle-pricing">
+                  Choose bag count
                 </Link>
                 <Link className="btn btn-navy" href="/shop">
-                  Build a Bundle
+                  Shop all
                 </Link>
                 <span className="chip">✅ Dye-free</span>
                 <span className="chip">🚚 Ships fast</span>
@@ -67,19 +67,16 @@ export function HomeHero() {
                   Stack bags. Save more.
                 </div>
                 <div style={{ opacity: 0.8, lineHeight: 1.6, marginTop: 8 }}>
-                  Bundle pricing + free shipping thresholds built in. Clean logic.
-                  Higher AOV. No friction.
+                  Savings pricing and free shipping unlock automatically as you add bags.
+                  Most customers check out with 8 bags.
                 </div>
 
                 <div style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  <Link className="btn btn-primary" href="/shop">
-                    Start Bundle
+                  <Link className="btn btn-primary" href="/shop#bundle-pricing">
+                    See bag counts
                   </Link>
-                  <Link
-                    className="btn"
-                    href="/shop#product-details"
-                  >
-                    View Product
+                  <Link className="btn" href="/shop#product-details">
+                    View product details
                   </Link>
                 </div>
               </div>
