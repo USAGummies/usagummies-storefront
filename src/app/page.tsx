@@ -10,6 +10,7 @@ import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import HeroCTAWatcher from "@/components/home/HeroCTAWatcher";
 import { AmazonOneBagNote } from "@/components/ui/AmazonOneBagNote";
 import { BRAND_STORY_HEADLINE, BRAND_STORY_PARAGRAPHS } from "@/data/brandStory";
+import { DETAIL_BULLETS } from "@/data/productDetails";
 import styles from "./homepage-scenes.module.css";
 
 function resolveSiteUrl() {
@@ -417,23 +418,62 @@ export default async function HomePage() {
             <div className="mt-2">
               <div
                 id="hero-primary-cta"
-                className="bundle-home candy-panel relative rounded-[32px] p-2"
+                className="bundle-home candy-panel relative rounded-[32px] p-3 sm:p-4"
               >
-                <BundleQuickBuy
-                  anchorId="bundle-pricing"
-                  productHandle={handle}
-                  tiers={homepageTiers}
-                  singleBagVariantId={bundleVariants?.singleBagVariantId}
-                  availableForSale={bundleVariants?.availableForSale}
-                  variant="compact"
-                  tone="light"
-                  showHowItWorks={false}
-                  summaryCopy=""
-                  showTrainAccent
-                  featuredQuantities={[4, 5, 8, 12]}
-                  showOtherQuantitiesLink
-                  otherQuantities={[1, 2, 3]}
-                />
+                <div className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
+                  <div className="order-2 min-w-0 space-y-3 lg:order-1">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+                      Product details
+                    </div>
+                    <div className="text-xl font-black text-[var(--text)] sm:text-2xl">
+                      Classic gummy bears, made in the USA.
+                    </div>
+                    <div className="media-frame">
+                      <div className="relative aspect-[4/5] w-full bg-[var(--surface)]">
+                        <Image
+                          src="/Hero-pack.jpeg"
+                          alt="USA Gummies bag"
+                          fill
+                          sizes="(max-width: 640px) 90vw, (max-width: 1024px) 45vw, 520px"
+                          className="object-contain drop-shadow-[0_18px_40px_rgba(13,28,51,0.18)]"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid gap-2 text-sm text-[var(--muted)]">
+                      {DETAIL_BULLETS.slice(0, 3).map((bullet) => (
+                        <div key={bullet} className="flex items-start gap-2">
+                          <span className="mt-1.5 h-2 w-2 rounded-full bg-[var(--gold)]" />
+                          <span>{bullet}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="text-xs text-[var(--muted)]">
+                      Ingredients &amp; allergen info:{" "}
+                      <Link href="/ingredients" className="underline underline-offset-4 text-[var(--text)]">
+                        ingredients
+                      </Link>
+                      .
+                    </div>
+                  </div>
+
+                  <div className="order-1 min-w-0 lg:order-2">
+                    <BundleQuickBuy
+                      anchorId="bundle-pricing"
+                      productHandle={handle}
+                      tiers={homepageTiers}
+                      singleBagVariantId={bundleVariants?.singleBagVariantId}
+                      availableForSale={bundleVariants?.availableForSale}
+                      variant="compact"
+                      tone="light"
+                      showHowItWorks={false}
+                      summaryCopy=""
+                      showTrainAccent
+                      featuredQuantities={[4, 5, 8, 12]}
+                      showOtherQuantitiesLink
+                      otherQuantities={[1, 2, 3]}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </div>

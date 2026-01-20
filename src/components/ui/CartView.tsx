@@ -175,6 +175,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
   const [stampBurstQty, setStampBurstQty] = useState<number | null>(null);
   const [dealToast, setDealToast] = useState<string | null>(null);
   const dealToastTimerRef = useRef<number | null>(null);
+  const cartItemsRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     setLocalCart(cart);
   }, [cart]);
@@ -447,6 +448,10 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
     onClose?.();
   }
 
+  function handleEditItemsClick() {
+    cartItemsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   if (isDrawer && localCart === null) {
     return (
       <div className="px-4 py-6">
@@ -532,6 +537,107 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                   </div>
                 ) : null}
               </div>
+              {isDrawer ? (
+                <div className="mt-3 border-t border-[rgba(15,27,45,0.12)] pt-3">
+                  <div className="grid gap-2 text-[11px] text-[var(--muted)]">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="flex items-center justify-between rounded-full border border-[rgba(15,27,45,0.12)] bg-white px-2 py-1">
+                        <span>Items</span>
+                        <span className="font-black text-[var(--text)]">{subtotal}</span>
+                      </div>
+                      <div className="flex items-center justify-between rounded-full border border-[rgba(15,27,45,0.12)] bg-white px-2 py-1">
+                        <span>Shipping</span>
+                        <span className="font-semibold text-[var(--text)]">{shippingSummary}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between text-[12px] font-semibold text-[var(--text)]">
+                      <span>Estimated total</span>
+                      <span className="text-base font-black">{estimatedTotal}</span>
+                    </div>
+                    <div className="text-[10px] text-[var(--muted)]">{shippingHint}</div>
+                    {bundleSavings > 0 ? (
+                      <div className="text-[10px] font-semibold text-[var(--candy-red)]">
+                        You saved {bundleSavingsText} today vs single bags.
+                      </div>
+                    ) : null}
+                  </div>
+
+                  {localCart?.checkoutUrl ? (
+                    <>
+                      <div className="mt-3 grid grid-cols-3 gap-2">
+                        {[
+                          {
+                            label: "Shop Pay",
+                            short: "SP",
+                            iconClass: "bg-[var(--navy)] text-white",
+                          },
+                          {
+                            label: "Apple Pay",
+                            short: "AP",
+                            iconClass: "bg-[#111111] text-white",
+                          },
+                          {
+                            label: "Google Pay",
+                            short: "GP",
+                            iconClass: "border border-[var(--border)] bg-white text-[var(--text)]",
+                          },
+                        ].map((method) => (
+                          <a
+                            key={method.label}
+                            href={localCart.checkoutUrl}
+                            onClick={handleCheckoutClick}
+                            aria-label={`${method.label} checkout`}
+                            className="flex flex-col items-center justify-center gap-1 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-2 py-2 text-[9px] font-semibold text-[var(--text)]"
+                          >
+                            <span
+                              className={`flex h-9 w-9 items-center justify-center rounded-full text-[11px] font-black ${method.iconClass}`}
+                            >
+                              {method.short}
+                            </span>
+                            <span className="text-[9px] text-[var(--muted)]">{method.label}</span>
+                          </a>
+                        ))}
+                      </div>
+
+                      <a
+                        href={localCart.checkoutUrl}
+                        className="btn btn-candy mt-3 w-full justify-center pressable"
+                        onClick={handleCheckoutClick}
+                      >
+                        <span className="inline-flex items-center gap-2">
+                          <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+                            <path
+                              fill="currentColor"
+                              d="M6 10V8a6 6 0 1 1 12 0v2h1v12H5V10h1zm2 0h8V8a4 4 0 1 0-8 0v2z"
+                            />
+                          </svg>
+                          Secure checkout
+                        </span>
+                      </a>
+                    </>
+                  ) : null}
+
+                  <div className="mt-2 flex items-center justify-between text-[10px] font-semibold text-[var(--muted)]">
+                    <button
+                      type="button"
+                      onClick={handleEditItemsClick}
+                      className="underline underline-offset-4 hover:text-[var(--text)]"
+                    >
+                      Edit items
+                    </button>
+                    <Link
+                      href={secondaryCta.href}
+                      className="underline underline-offset-4 hover:text-[var(--text)]"
+                      onClick={onClose}
+                    >
+                      {secondaryCta.label}
+                    </Link>
+                  </div>
+                  <div className="mt-1 text-[10px] text-[var(--muted)]">
+                    Ships in 24 hours • Easy returns
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
 
@@ -986,7 +1092,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
             </div>
 
             {isDrawer ? (
-              <div className="flex flex-col gap-3">
+              <div ref={cartItemsRef} className="flex flex-col gap-3">
                 {lines.length === 0 ? (
                   <div className="metal-panel rounded-2xl border border-[rgba(15,27,45,0.12)] p-4 text-sm text-[var(--muted)]">
                     Your cart is empty.
@@ -1130,7 +1236,8 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
               </div>
             ) : null}
 
-            <div className="metal-panel rounded-2xl border border-[rgba(199,160,98,0.35)] p-4 flex flex-col gap-2">
+            {!isDrawer ? (
+              <div className="metal-panel rounded-2xl border border-[rgba(199,160,98,0.35)] p-4 flex flex-col gap-2">
               <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
                 Order summary
               </div>
@@ -1252,7 +1359,8 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                   {secondaryCta.label}
                 </Link>
               </div>
-            </div>
+              </div>
+            ) : null}
 
             <details className="rounded-2xl border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] p-4">
               <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">

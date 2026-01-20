@@ -13,6 +13,7 @@ import { getProductByHandle, money } from "@/lib/storefront";
 import { pricingForQty, FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import { REVIEW_HIGHLIGHTS } from "@/data/reviewHighlights";
 import { BRAND_STORY_HEADLINE, BRAND_STORY_MEDIUM } from "@/data/brandStory";
+import { DETAIL_BULLETS } from "@/data/productDetails";
 
 const PAGE_SIZE = 1;
 function resolveSiteUrl() {
@@ -28,12 +29,6 @@ const SITE_URL = resolveSiteUrl();
 const OG_IMAGE = "/opengraph-image";
 const LISTING_TITLE =
   "USA Gummies – All American Gummy Bears, 7.5 oz, Made in USA, No Artificial Dyes, All Natural Flavors";
-const DETAIL_BULLETS = [
-  "Made in the USA and packed in FDA-compliant facilities.",
-  "Colored naturally with fruit + vegetable extracts. No artificial dyes.",
-  "Soft, chewy classic gummy bear flavor.",
-  "7.5 oz bag with five fruit flavors: Cherry, Watermelon, Orange, Green Apple, Lemon.",
-];
 const HERO_BULLETS = [
   "Made in the USA. Produced and packed in FDA-compliant facilities.",
   "No artificial dyes. Colored naturally with fruit + vegetable extracts.",
@@ -379,14 +374,62 @@ export default async function ShopPage() {
 
       <section id="bundle-pricing" aria-label="Savings pricing" className="bg-[#fffdf8] scroll-mt-24">
         <div className="mx-auto max-w-6xl px-4 pb-8 lg:pb-10">
-          <div className="rounded-3xl border border-[rgba(15,27,45,0.12)] bg-white p-3 shadow-[0_18px_44px_rgba(15,27,45,0.12)]">
-            {purchaseProduct ? (
-              <PurchaseBox product={purchaseProduct as any} />
-            ) : (
-              <div className="p-4 text-sm text-[var(--muted)]">
-                Product details are loading. Please refresh to view savings pricing.
+          <div className="candy-panel rounded-[36px] p-5 sm:p-6">
+            <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
+              <div id="product-details" className="min-w-0 space-y-4 scroll-mt-24">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+                  Product details
+                </div>
+                <h2 className="text-2xl font-black text-[var(--text)] sm:text-3xl">
+                  {productTitle}
+                </h2>
+                <ProductGallery
+                  title={productTitle}
+                  featured={productFeatured}
+                  images={productImages}
+                />
+                <div className="grid gap-2 text-sm text-[var(--muted)]">
+                  {DETAIL_BULLETS.map((bullet) => (
+                    <div key={bullet} className="flex items-start gap-2">
+                      <span className="mt-1.5 h-2 w-2 rounded-full bg-[var(--gold)]" />
+                      <span>{bullet}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-sm text-[var(--muted)]">
+                  Every bag supports American manufacturing and American jobs.
+                </div>
+                <div className="text-sm text-[var(--muted)]">
+                  Unlike imported gummies, USA Gummies are made and packed entirely in America.
+                </div>
+                <div className="text-xs text-[var(--muted)]">
+                  Ingredients &amp; allergen info: see the ingredient panel on the bag or{" "}
+                  <Link href="/ingredients" className="underline underline-offset-4 text-[var(--text)]">
+                    ingredients
+                  </Link>
+                  .
+                </div>
               </div>
-            )}
+
+              <div className="min-w-0">
+                <div className="rounded-3xl border border-[rgba(15,27,45,0.12)] bg-white p-3 shadow-[0_18px_44px_rgba(15,27,45,0.12)]">
+                  {purchaseProduct ? (
+                    <PurchaseBox product={purchaseProduct as any} />
+                  ) : (
+                    <div className="p-4 text-sm text-[var(--muted)]">
+                      Product details are loading. Please refresh to view savings pricing.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <AmericanDreamCallout
+              variant="compact"
+              tone="light"
+              className="mt-6"
+              showJoinButton={false}
+            />
           </div>
         </div>
       </section>
@@ -468,54 +511,6 @@ export default async function ShopPage() {
                 Lock in savings now
               </Link>
             </div>
-          </div>
-        </div>
-      </section>
-
-      <section id="product-details" aria-label="Product details" className="bg-[#fffdf8] scroll-mt-24">
-        <div className="mx-auto max-w-6xl px-4 py-8 lg:py-10">
-          <div className="candy-panel rounded-[36px] p-5 sm:p-6">
-            <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
-              <div className="min-w-0 space-y-4">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-                  Product details
-                </div>
-                <h2 className="text-2xl font-black text-[var(--text)] sm:text-3xl">
-                  {productTitle}
-                </h2>
-                <div className="grid gap-2 text-sm text-[var(--muted)]">
-                  {DETAIL_BULLETS.map((bullet) => (
-                    <div key={bullet} className="flex items-start gap-2">
-                      <span className="mt-1.5 h-2 w-2 rounded-full bg-[var(--gold)]" />
-                      <span>{bullet}</span>
-                    </div>
-                  ))}
-                </div>
-                <div className="text-sm text-[var(--muted)]">
-                  Every bag supports American manufacturing and American jobs.
-                </div>
-                <div className="text-sm text-[var(--muted)]">
-                  Unlike imported gummies, USA Gummies are made and packed entirely in America.
-                </div>
-                <div className="text-xs text-[var(--muted)]">
-                  Ingredients &amp; allergen info: see the ingredient panel on the bag or{" "}
-                  <Link href="/ingredients" className="underline underline-offset-4 text-[var(--text)]">
-                    ingredients
-                  </Link>
-                  .
-                </div>
-              </div>
-
-              <div className="min-w-0 space-y-4">
-                <ProductGallery
-                  title={productTitle}
-                  featured={productFeatured}
-                  images={productImages}
-                />
-              </div>
-            </div>
-
-            <AmericanDreamCallout variant="compact" tone="light" className="mt-6" showJoinButton={false} />
           </div>
         </div>
       </section>
