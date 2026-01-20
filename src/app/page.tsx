@@ -418,65 +418,76 @@ export default async function HomePage() {
             <div className="mt-2">
               <div
                 id="hero-primary-cta"
-                className="bundle-home bundle-hero-stage buy-module relative overflow-hidden rounded-[36px] border border-[rgba(15,27,45,0.12)] bg-white shadow-[0_24px_60px_rgba(15,27,45,0.12)]"
+                className="bundle-home bundle-hero-stage buy-module relative overflow-hidden rounded-[32px] border border-[rgba(15,27,45,0.12)] bg-white shadow-[0_24px_60px_rgba(15,27,45,0.12)]"
               >
                 <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_10%,rgba(199,160,98,0.18),transparent_45%),radial-gradient(circle_at_85%_0%,rgba(13,28,51,0.08),transparent_48%)]" />
                 <div className="buy-module__inner">
-                  <div className="buy-module__top">
-                    <div className="buy-module__details order-2 min-w-0 space-y-3 lg:order-1">
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-                        Product details
+                  <div className="buy-module__zone buy-module__zone--product">
+                    <div className="buy-module__zoneHeader">
+                      <div className="buy-module__step">
+                        <span className="buy-module__stepBadge">Step 1</span>
+                        <span className="buy-module__stepLabel">Product</span>
                       </div>
-                    <div className="text-xl font-black text-[var(--text)] sm:text-2xl">
-                      Classic gummy bears, made in the USA.
                     </div>
-                    <div className="grid gap-2 text-sm text-[var(--muted)]">
-                      {DETAIL_BULLETS.slice(0, 3).map((bullet) => (
-                        <div key={bullet} className="flex items-start gap-2">
-                          <span className="mt-1.5 h-2 w-2 rounded-full bg-[var(--gold)]" />
-                          <span>{bullet}</span>
+                    <div className="buy-module__top">
+                      <div className="buy-module__details order-2 min-w-0 space-y-3 lg:order-1">
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+                          Product details
                         </div>
-                      ))}
-                    </div>
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      <span className="badge badge--navy">Made in USA</span>
-                      <span className="badge">No artificial dyes</span>
-                      <span className="badge">{FREE_SHIPPING_PHRASE}</span>
-                    </div>
-                      <div className="text-xs text-[var(--muted)]">
-                        Ingredients &amp; allergen info:{" "}
-                        <Link href="/ingredients" className="underline underline-offset-4 text-[var(--text)]">
-                          ingredients
-                        </Link>
-                        .
+                        <div className="text-xl font-black text-[var(--text)] sm:text-2xl">
+                          Classic gummy bears, made in the USA.
+                        </div>
+                        <div className="grid gap-2 text-sm text-[var(--muted)]">
+                          {DETAIL_BULLETS.slice(0, 3).map((bullet) => (
+                            <div key={bullet} className="flex items-start gap-2">
+                              <span className="mt-1.5 h-2 w-2 rounded-full bg-[var(--gold)]" />
+                              <span>{bullet}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="text-xs text-[var(--muted)]">
+                          Ingredients &amp; allergen info:{" "}
+                          <Link href="/ingredients" className="underline underline-offset-4 text-[var(--text)]">
+                            ingredients
+                          </Link>
+                          .
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="buy-module__image order-1 min-w-0 space-y-3 lg:order-2">
-                      <div className="relative">
-                        <div className="media-frame">
-                          <div className="relative aspect-[4/5] w-full bg-[var(--surface)]">
-                            <Image
-                              src="/Hero-pack.jpeg"
-                              alt="USA Gummies bag"
-                              fill
-                              sizes="(max-width: 640px) 90vw, (max-width: 1024px) 45vw, 520px"
-                              className="object-contain drop-shadow-[0_18px_40px_rgba(13,28,51,0.18)]"
-                            />
+                      <div className="buy-module__image order-1 min-w-0 space-y-3 lg:order-2">
+                        <div className="relative">
+                          <div className="media-frame">
+                            <div className="relative aspect-[4/5] w-full bg-[var(--surface)]">
+                              <Image
+                                src="/Hero-pack.jpeg"
+                                alt="USA Gummies bag"
+                                fill
+                                sizes="(max-width: 640px) 90vw, (max-width: 1024px) 45vw, 520px"
+                                className="object-contain drop-shadow-[0_18px_40px_rgba(13,28,51,0.18)]"
+                              />
+                            </div>
                           </div>
+                          <span className="usa-stamp usa-stamp--small absolute left-4 top-4">Made in USA</span>
                         </div>
-                        <span className="usa-stamp usa-stamp--small absolute left-4 top-4">Made in USA</span>
-                      </div>
-                      <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-[var(--muted)]">
-                        <span className="candy-pill">All natural flavors</span>
-                        <span className="candy-pill">Dye-free</span>
-                        <span className="candy-pill">Ships in 24 hours</span>
                       </div>
                     </div>
                   </div>
 
+                  <div className="buy-module__trust">
+                    <span className="candy-pill">Made in USA</span>
+                    <span className="candy-pill">No artificial dyes</span>
+                    <span className="candy-pill">Ships in 24 hours</span>
+                    <span className="candy-pill">{FREE_SHIPPING_PHRASE}</span>
+                  </div>
+
                   <div className="buy-module__divider" />
-                  <div className="buy-module__bundle min-w-0">
+                  <div className="buy-module__bundle buy-module__zone buy-module__zone--bundle min-w-0">
+                    <div className="buy-module__zoneHeader">
+                      <div className="buy-module__step buy-module__step--bundle">
+                        <span className="buy-module__stepBadge">Step 2</span>
+                        <span className="buy-module__stepLabel">Pick your bundle</span>
+                      </div>
+                    </div>
                     <BundleQuickBuy
                       anchorId="bundle-pricing"
                       productHandle={handle}
@@ -790,7 +801,7 @@ export default async function HomePage() {
       </section>
 
       <div className="sticky-cta-bar fixed bottom-4 left-1/2 z-40 hidden w-[min(94vw,680px)] -translate-x-1/2 translate-y-4 bg-transparent opacity-0 transition-all duration-300">
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-full border border-[rgba(15,27,45,0.12)] bg-white/85 px-3 py-2 shadow-[0_14px_30px_rgba(15,27,45,0.12)] backdrop-blur-md">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[22px] border border-[rgba(15,27,45,0.12)] bg-white/90 px-4 py-3 shadow-[0_18px_44px_rgba(15,27,45,0.12)] backdrop-blur-md">
           <div className="hidden text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)] sm:block">
             Save more with more bags
           </div>

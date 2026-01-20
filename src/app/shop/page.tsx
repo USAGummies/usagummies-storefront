@@ -374,63 +374,80 @@ export default async function ShopPage() {
 
       <section id="bundle-pricing" aria-label="Savings pricing" className="bg-[#fffdf8] scroll-mt-24">
         <div className="mx-auto max-w-6xl px-4 pb-8 lg:pb-10">
-          <div className="candy-panel bundle-hero-stage buy-module overflow-hidden rounded-[36px] p-0">
+          <div className="bundle-hero-stage buy-module relative overflow-hidden rounded-[32px] border border-[rgba(15,27,45,0.12)] bg-white shadow-[0_24px_60px_rgba(15,27,45,0.12)]">
             <div className="buy-module__inner">
-              <div className="buy-module__top">
-                <div id="product-details" className="buy-module__details order-2 min-w-0 space-y-4 scroll-mt-24 lg:order-1">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-                    Product details
-                  </div>
-                  <h2 className="text-2xl font-black text-[var(--text)] sm:text-3xl">
-                    {productTitle}
-                  </h2>
-                  <div className="grid gap-2 text-sm text-[var(--muted)]">
-                    {DETAIL_BULLETS.map((bullet) => (
-                      <div key={bullet} className="flex items-start gap-2">
-                        <span className="mt-1.5 h-2 w-2 rounded-full bg-[var(--gold)]" />
-                        <span>{bullet}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex flex-wrap gap-2 pt-1">
-                    <span className="badge badge--navy">Made in USA</span>
-                    <span className="badge">No artificial dyes</span>
-                    <span className="badge">{FREE_SHIPPING_PHRASE}</span>
-                  </div>
-                  <div className="text-sm text-[var(--muted)]">
-                    Every bag supports American manufacturing and American jobs.
-                  </div>
-                  <div className="text-sm text-[var(--muted)]">
-                    Unlike imported gummies, USA Gummies are made and packed entirely in America.
-                  </div>
-                  <div className="text-xs text-[var(--muted)]">
-                    Ingredients &amp; allergen info: see the ingredient panel on the bag or{" "}
-                    <Link href="/ingredients" className="underline underline-offset-4 text-[var(--text)]">
-                      ingredients
-                    </Link>
-                    .
+              <div className="buy-module__zone buy-module__zone--product">
+                <div className="buy-module__zoneHeader">
+                  <div className="buy-module__step">
+                    <span className="buy-module__stepBadge">Step 1</span>
+                    <span className="buy-module__stepLabel">Product</span>
                   </div>
                 </div>
-
-                <div className="buy-module__image order-1 min-w-0 space-y-3 lg:order-2">
-                  <div className="relative">
-                    <ProductGallery
-                      title={productTitle}
-                      featured={productFeatured}
-                      images={productImages}
-                    />
-                    <span className="usa-stamp usa-stamp--small absolute left-4 top-4">Made in USA</span>
+                <div className="buy-module__top">
+                  <div
+                    id="product-details"
+                    className="buy-module__details order-2 min-w-0 space-y-4 scroll-mt-24 lg:order-1"
+                  >
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+                      Product details
+                    </div>
+                    <h2 className="text-2xl font-black text-[var(--text)] sm:text-3xl">
+                      {productTitle}
+                    </h2>
+                    <div className="grid gap-2 text-sm text-[var(--muted)]">
+                      {DETAIL_BULLETS.map((bullet) => (
+                        <div key={bullet} className="flex items-start gap-2">
+                          <span className="mt-1.5 h-2 w-2 rounded-full bg-[var(--gold)]" />
+                          <span>{bullet}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="text-sm text-[var(--muted)]">
+                      Every bag supports American manufacturing and American jobs.
+                    </div>
+                    <div className="text-sm text-[var(--muted)]">
+                      Unlike imported gummies, USA Gummies are made and packed entirely in America.
+                    </div>
+                    <div className="text-xs text-[var(--muted)]">
+                      Ingredients &amp; allergen info: see the ingredient panel on the bag or{" "}
+                      <Link
+                        href="/ingredients"
+                        className="underline underline-offset-4 text-[var(--text)]"
+                      >
+                        ingredients
+                      </Link>
+                      .
+                    </div>
                   </div>
-                  <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-[var(--muted)]">
-                    <span className="candy-pill">All natural flavors</span>
-                    <span className="candy-pill">Dye-free</span>
-                    <span className="candy-pill">Ships in 24 hours</span>
+
+                  <div className="buy-module__image order-1 min-w-0 space-y-3 lg:order-2">
+                    <div className="relative">
+                      <ProductGallery
+                        title={productTitle}
+                        featured={productFeatured}
+                        images={productImages}
+                      />
+                      <span className="usa-stamp usa-stamp--small absolute left-4 top-4">Made in USA</span>
+                    </div>
                   </div>
                 </div>
               </div>
 
+              <div className="buy-module__trust">
+                <span className="candy-pill">Made in USA</span>
+                <span className="candy-pill">No artificial dyes</span>
+                <span className="candy-pill">Ships in 24 hours</span>
+                <span className="candy-pill">{FREE_SHIPPING_PHRASE}</span>
+              </div>
+
               <div className="buy-module__divider" />
-              <div className="buy-module__bundle min-w-0">
+              <div className="buy-module__bundle buy-module__zone buy-module__zone--bundle min-w-0">
+                <div className="buy-module__zoneHeader">
+                  <div className="buy-module__step buy-module__step--bundle">
+                    <span className="buy-module__stepBadge">Step 2</span>
+                    <span className="buy-module__stepLabel">Pick your bundle</span>
+                  </div>
+                </div>
                 {purchaseProduct ? (
                   <PurchaseBox product={purchaseProduct as any} />
                 ) : (
