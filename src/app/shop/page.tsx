@@ -375,7 +375,7 @@ export default async function ShopPage() {
       <section id="bundle-pricing" aria-label="Savings pricing" className="bg-[#fffdf8] scroll-mt-24">
         <div className="mx-auto max-w-6xl px-4 pb-8 lg:pb-10">
           <div className="candy-panel bundle-hero-stage overflow-hidden rounded-[36px] p-0">
-            <div className="relative grid gap-5 p-5 sm:p-6">
+            <div className="relative grid gap-6 p-5 sm:p-6">
               <div className="grid gap-6 lg:grid-cols-[1fr_1fr] lg:items-start">
                 <div id="product-details" className="order-2 min-w-0 space-y-4 scroll-mt-24 lg:order-1">
                   <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
@@ -429,8 +429,7 @@ export default async function ShopPage() {
                 </div>
               </div>
 
-              <div className="h-px w-full bg-gradient-to-r from-transparent via-[rgba(15,27,45,0.16)] to-transparent" />
-              <div className="min-w-0">
+              <div className="min-w-0 pt-1">
                 {purchaseProduct ? (
                   <PurchaseBox product={purchaseProduct as any} />
                 ) : (
@@ -440,13 +439,14 @@ export default async function ShopPage() {
                 )}
               </div>
 
-              <div className="h-px w-full bg-gradient-to-r from-transparent via-[rgba(15,27,45,0.16)] to-transparent" />
-              <AmericanDreamCallout
-                variant="compact"
-                tone="light"
-                className="mt-1"
-                showJoinButton={false}
-              />
+              <div className="pt-2">
+                <AmericanDreamCallout
+                  variant="compact"
+                  tone="light"
+                  className="mt-1"
+                  showJoinButton={false}
+                />
+              </div>
             </div>
           </div>
         </div>

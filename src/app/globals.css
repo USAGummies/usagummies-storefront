@@ -577,6 +577,8 @@ a:focus-visible:not(.btn):not(.focus-ring),
   background: transparent !important;
   box-shadow: none !important;
   padding: 0 !important;
+  border-radius: 0 !important;
+  overflow: visible !important;
 }
 .bundle-hero-stage .media-frame{
   border: none;
@@ -588,6 +590,12 @@ a:focus-visible:not(.btn):not(.focus-ring),
 }
 .bundle-hero-stage .media-thumb{
   box-shadow: none;
+}
+.bundle-hero-stage .pbx__card{
+  margin-top: 0;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 .bundle-home .bundle-slider > *{
   min-width: 0;
