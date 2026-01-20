@@ -496,6 +496,7 @@ export default async function HomePage() {
                       availableForSale={bundleVariants?.availableForSale}
                       variant="compact"
                       tone="light"
+                      surface="flat"
                       showHowItWorks={false}
                       summaryCopy=""
                       showTrainAccent

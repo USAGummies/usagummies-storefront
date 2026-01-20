@@ -155,9 +155,11 @@ function pickSingleVariant(variants: VariantNode[]) {
 export default function PurchaseBox({
   product,
   focus,
+  surface = "card",
 }: {
   product: Product;
   focus?: string;
+  surface?: "card" | "flat";
 }) {
   const { bagCount } = useCartBagCount();
   const currentBags = Math.max(0, Number(bagCount) || 0);
@@ -181,6 +183,7 @@ export default function PurchaseBox({
   const mysteryBonusLine = bestPriceReached
     ? "Mystery extra revealed: Patriot Pride sticker (while supplies last)."
     : "Mystery extra unlocks at 12 bags.";
+  const isFlat = surface === "flat";
 
   const variants = (product?.variants?.nodes || []) as VariantNode[];
   // Canonical ladder. Expose 1-3 bags plus core bundle sizes on-site.
@@ -439,7 +442,7 @@ export default function PurchaseBox({
       : "Selecting a size adds that many bags to your cart. More bags = lower price per bag.";
 
   return (
-    <section data-purchase-section="true" className="pbx pbx--metal">
+    <section data-purchase-section="true" className={cx("pbx pbx--metal", isFlat && "pbx--flat")}>
       {/* Savings ladder */}
       <div
         ref={bundlesRef}
@@ -806,6 +809,53 @@ export default function PurchaseBox({
           --text: #1c2430;
           --muted: #5f5b56;
           --border: rgba(15,27,45,0.12);
+        }
+        .pbx--flat{
+          --surface: transparent;
+          --surface-strong: transparent;
+        }
+        .pbx--flat .pbx__card{
+          margin-top:0;
+          border:0;
+          background: transparent;
+          box-shadow:none;
+          padding:0;
+          border-radius:0;
+        }
+        .pbx--flat .pbx__ladderItem,
+        .pbx--flat .pbx__mission,
+        .pbx--flat .pbx__complete,
+        .pbx--flat .pbx__pricingNote,
+        .pbx--flat .pbx__summary{
+          border:0;
+          background: transparent;
+          box-shadow:none;
+          border-radius:0;
+        }
+        .pbx--flat .pbx__ladderItem{ padding:4px 0; }
+        .pbx--flat .pbx__mission{ padding:4px 0; }
+        .pbx--flat .pbx__complete{ padding:4px 0; }
+        .pbx--flat .pbx__pricingNote{ padding:6px 0; }
+        .pbx--flat .pbx__summary{ padding:6px 0; margin-top:12px; }
+        .pbx--flat .pbx__missionBadge{
+          border:0;
+          background: transparent;
+          padding:0;
+        }
+        .pbx--flat .pbx__completeBtn{
+          border:0;
+          background: transparent;
+          box-shadow:none;
+          padding:4px 0;
+          border-radius:0;
+        }
+        .pbx--flat .pbx__completeBtn:hover{
+          border-color: transparent;
+          box-shadow:none;
+        }
+        .pbx--flat .pbx__ladderItem--next{
+          border-color: transparent;
+          background: transparent;
         }
         .pbx__card{
           margin-top:14px;

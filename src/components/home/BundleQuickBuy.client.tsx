@@ -40,6 +40,7 @@ type Props = {
   showOtherQuantitiesLink?: boolean;
   otherQuantitiesLabel?: string;
   otherQuantities?: number[];
+  surface?: "card" | "flat";
 };
 
 function money(amount?: number | null, currency = "USD") {
@@ -100,6 +101,7 @@ export default function BundleQuickBuy({
   showOtherQuantitiesLink = false,
   otherQuantitiesLabel = "Need fewer bags?",
   otherQuantities,
+  surface = "card",
 }: Props) {
   const { bagCount } = useCartBagCount();
   const currentBags = Math.max(0, Number(bagCount) || 0);
@@ -132,6 +134,7 @@ export default function BundleQuickBuy({
   const [showOtherQuantities, setShowOtherQuantities] = React.useState(false);
   const isCompact = variant === "compact";
   const isLight = tone === "light";
+  const isFlat = surface === "flat";
 
   const allTiers = React.useMemo(() => {
     const allowed = (tiers || []).filter((t) => {
@@ -692,16 +695,20 @@ export default function BundleQuickBuy({
       <section
         id={anchorId}
         className={[
-          "rounded-3xl border p-4 sm:p-5",
+          isFlat ? "border-0 bg-transparent p-0" : "rounded-3xl border p-4 sm:p-5",
           isCompact
-            ? "border-[var(--border)] bg-[var(--surface)] text-[var(--muted)]"
-            : "border-white/10 bg-white/[0.06] text-white/70",
+            ? isLight
+              ? "text-[var(--muted)]"
+              : "text-white/70"
+            : isLight
+              ? "text-[var(--muted)]"
+              : "text-white/70",
         ].join(" ")}
       >
         <div
           className={[
             "text-[11px] tracking-[0.2em] font-semibold uppercase",
-            isCompact ? "text-[var(--muted)]" : "text-white/60",
+            isCompact ? (isLight ? "text-[var(--muted)]" : "text-white/60") : isLight ? "text-[var(--muted)]" : "text-white/60",
           ].join(" ")}
         >
           Savings pricing
@@ -724,21 +731,26 @@ export default function BundleQuickBuy({
       id={anchorId}
       aria-label="Savings pricing"
       className={[
-        "relative mx-auto rounded-3xl border p-4 sm:p-5 overflow-hidden",
-        isCompact ? "w-full" : "max-w-3xl",
-        isCompact
+        "relative overflow-hidden",
+        isFlat ? "w-full" : "mx-auto rounded-3xl border p-4 sm:p-5",
+        isCompact ? "w-full" : isFlat ? "w-full" : "max-w-3xl",
+        isFlat
           ? isLight
-            ? "border-[rgba(15,27,45,0.12)] bg-white text-[var(--text)] shadow-[0_20px_44px_rgba(15,27,45,0.12)]"
-            : "border-white/15 bg-[rgba(10,16,30,0.92)] text-white shadow-[0_24px_60px_rgba(7,12,20,0.45)]"
-          : isLight
-            ? "border-[rgba(15,27,45,0.12)] bg-white text-[var(--text)] shadow-[0_30px_90px_rgba(15,27,45,0.12)] pb-16 sm:pb-12"
-            : "border-white/10 bg-white/[0.06] shadow-[0_30px_90px_rgba(0,0,0,0.35)] backdrop-blur-xl pb-16 sm:pb-12",
+            ? "bg-transparent text-[var(--text)]"
+            : "bg-transparent text-white"
+          : isCompact
+            ? isLight
+              ? "border-[rgba(15,27,45,0.12)] bg-white text-[var(--text)] shadow-[0_20px_44px_rgba(15,27,45,0.12)]"
+              : "border-white/15 bg-[rgba(10,16,30,0.92)] text-white shadow-[0_24px_60px_rgba(7,12,20,0.45)]"
+            : isLight
+              ? "border-[rgba(15,27,45,0.12)] bg-white text-[var(--text)] shadow-[0_30px_90px_rgba(15,27,45,0.12)] pb-16 sm:pb-12"
+              : "border-white/10 bg-white/[0.06] shadow-[0_30px_90px_rgba(0,0,0,0.35)] backdrop-blur-xl pb-16 sm:pb-12",
       ].join(" ")}
     >
-      {isCompact ? null : (
+      {isCompact || isFlat ? null : (
         <div className="pointer-events-none absolute inset-0 opacity-12 bg-[radial-gradient(circle_at_10%_16%,rgba(255,255,255,0.22),transparent_36%),radial-gradient(circle_at_86%_8%,rgba(10,60,138,0.3),transparent_44%),linear-gradient(135deg,rgba(214,64,58,0.18),rgba(12,20,38,0.38)),repeating-linear-gradient(135deg,rgba(255,255,255,0.07)_0,rgba(255,255,255,0.07)_8px,transparent_8px,transparent_16px)]" />
       )}
-      {isCompact ? null : (
+      {isCompact || isFlat ? null : (
         <div className="relative mb-3 h-[2px] rounded-full bg-gradient-to-r from-[#d6403a]/70 via-white/60 to-[#0a3c8a]/65 opacity-85 shadow-[0_0_18px_rgba(255,255,255,0.12)]" />
       )}
       <div
@@ -790,11 +802,15 @@ export default function BundleQuickBuy({
                 <div
                   key={milestone.qty}
                   className={[
-                    "rounded-2xl border px-2.5 py-2 text-[11px] font-semibold",
-                    isLight
-                      ? "border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] text-[var(--text)]"
-                      : "border-white/10 bg-white/5 text-white/85",
-                    isNext || isBest
+                    isFlat ? "px-0 py-1 text-[11px] font-semibold" : "rounded-2xl border px-2.5 py-2 text-[11px] font-semibold",
+                    isFlat
+                      ? isLight
+                        ? "text-[var(--text)]"
+                        : "text-white/85"
+                      : isLight
+                        ? "border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] text-[var(--text)]"
+                        : "border-white/10 bg-white/5 text-white/85",
+                    !isFlat && (isNext || isBest)
                       ? isLight
                         ? "border-[rgba(239,59,59,0.45)] bg-[rgba(239,59,59,0.08)]"
                         : "border-[rgba(248,212,79,0.5)] bg-[rgba(248,212,79,0.08)]"
@@ -850,10 +866,14 @@ export default function BundleQuickBuy({
           </div>
           <div
             className={[
-              "mt-3 rounded-2xl border px-3 py-3 text-xs",
-              isLight
-                ? "border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] text-[var(--muted)]"
-                : "border-white/12 bg-white/5 text-white/70",
+              isFlat ? "mt-3 pt-1 text-xs" : "mt-3 rounded-2xl border px-3 py-3 text-xs",
+              isFlat
+                ? isLight
+                  ? "text-[var(--muted)]"
+                  : "text-white/70"
+                : isLight
+                  ? "border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] text-[var(--muted)]"
+                  : "border-white/12 bg-white/5 text-white/70",
             ].join(" ")}
           >
             <div className="text-[10px] font-semibold uppercase tracking-[0.24em]">
@@ -906,14 +926,22 @@ export default function BundleQuickBuy({
                   <span
                     key={badge.qty}
                     className={[
-                      "inline-flex items-center rounded-full border px-2 py-1",
-                      unlocked
-                        ? isLight
-                          ? "border-[rgba(239,59,59,0.35)] bg-[rgba(239,59,59,0.12)] text-[var(--candy-red)]"
-                          : "border-[rgba(248,212,79,0.5)] bg-[rgba(248,212,79,0.12)] text-[var(--gold)]"
-                        : isLight
-                          ? "border-[rgba(15,27,45,0.12)] bg-white text-[var(--muted)]"
-                          : "border-white/10 bg-white/5 text-white/60",
+                      isFlat ? "inline-flex items-center px-2 py-1" : "inline-flex items-center rounded-full border px-2 py-1",
+                      isFlat
+                        ? unlocked
+                          ? isLight
+                            ? "text-[var(--candy-red)]"
+                            : "text-[var(--gold)]"
+                          : isLight
+                            ? "text-[var(--muted)]"
+                            : "text-white/60"
+                        : unlocked
+                          ? isLight
+                            ? "border-[rgba(239,59,59,0.35)] bg-[rgba(239,59,59,0.12)] text-[var(--candy-red)]"
+                            : "border-[rgba(248,212,79,0.5)] bg-[rgba(248,212,79,0.12)] text-[var(--gold)]"
+                          : isLight
+                            ? "border-[rgba(15,27,45,0.12)] bg-white text-[var(--muted)]"
+                            : "border-white/10 bg-white/5 text-white/60",
                     ].join(" ")}
                   >
                     {badge.label}
@@ -932,7 +960,13 @@ export default function BundleQuickBuy({
                   {addingQty ? "Locking in..." : missionCtaLabel}
                 </button>
               ) : (
-                <span className="inline-flex rounded-full border border-[rgba(239,59,59,0.35)] bg-[rgba(239,59,59,0.12)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--candy-red)]">
+                <span
+                  className={
+                    isFlat
+                      ? "inline-flex text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--candy-red)]"
+                      : "inline-flex rounded-full border border-[rgba(239,59,59,0.35)] bg-[rgba(239,59,59,0.12)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--candy-red)]"
+                  }
+                >
                   {missionCtaLabel}
                 </span>
               )}
@@ -957,14 +991,18 @@ export default function BundleQuickBuy({
       {showHowItWorks ? (
         <div
           className={[
-            "relative mt-3 rounded-2xl border px-3 py-2 text-xs",
-            isCompact
+            isFlat ? "relative mt-3 text-xs" : "relative mt-3 rounded-2xl border px-3 py-2 text-xs",
+            isFlat
               ? isLight
-                ? "border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] text-[var(--muted)]"
-                : "border-white/12 bg-white/5 text-white/70"
-              : isLight
-                ? "border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] text-[var(--muted)]"
-                : "border-white/10 bg-white/5 text-white/75",
+                ? "text-[var(--muted)]"
+                : "text-white/75"
+              : isCompact
+                ? isLight
+                  ? "border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] text-[var(--muted)]"
+                  : "border-white/12 bg-white/5 text-white/70"
+                : isLight
+                  ? "border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] text-[var(--muted)]"
+                  : "border-white/10 bg-white/5 text-white/75",
           ].join(" ")}
         >
           <div className="text-[11px] font-semibold">
@@ -989,8 +1027,26 @@ export default function BundleQuickBuy({
           </details>
         </div>
       ) : null}
-      <div className={isLight ? "mt-2 flex flex-wrap items-center gap-2 text-[10px] text-[var(--muted)]" : "mt-2 flex flex-wrap items-center gap-2 text-[10px] text-white/70"}>
-        <span className={isLight ? "inline-flex items-center gap-1.5 rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-2.5 py-1" : "inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1"}>
+      <div
+        className={
+          isFlat
+            ? isLight
+              ? "mt-2 flex flex-wrap items-center gap-3 text-[10px] text-[var(--muted)]"
+              : "mt-2 flex flex-wrap items-center gap-3 text-[10px] text-white/70"
+            : isLight
+              ? "mt-2 flex flex-wrap items-center gap-2 text-[10px] text-[var(--muted)]"
+              : "mt-2 flex flex-wrap items-center gap-2 text-[10px] text-white/70"
+        }
+      >
+        <span
+          className={
+            isFlat
+              ? "inline-flex items-center gap-1.5"
+              : isLight
+                ? "inline-flex items-center gap-1.5 rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-2.5 py-1"
+                : "inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1"
+          }
+        >
           <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" aria-hidden="true">
             <path
               fill="currentColor"
@@ -999,7 +1055,15 @@ export default function BundleQuickBuy({
           </svg>
           Love it or your money back
         </span>
-        <span className={isLight ? "inline-flex items-center gap-1.5 rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-2.5 py-1" : "inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1"}>
+        <span
+          className={
+            isFlat
+              ? "inline-flex items-center gap-1.5"
+              : isLight
+                ? "inline-flex items-center gap-1.5 rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-2.5 py-1"
+                : "inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1"
+          }
+        >
           <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" aria-hidden="true">
             <path
               fill="currentColor"
@@ -1008,7 +1072,15 @@ export default function BundleQuickBuy({
           </svg>
           Ships within 24 hours
         </span>
-        <span className={isLight ? "inline-flex items-center gap-1.5 rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-2.5 py-1" : "inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1"}>
+        <span
+          className={
+            isFlat
+              ? "inline-flex items-center gap-1.5"
+              : isLight
+                ? "inline-flex items-center gap-1.5 rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-2.5 py-1"
+                : "inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1"
+          }
+        >
           <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" aria-hidden="true">
             <path
               fill="currentColor"
@@ -1071,14 +1143,19 @@ export default function BundleQuickBuy({
 
       <div
         className={[
-          "mt-5 rounded-2xl border p-3 sm:p-3.5",
-          isCompact
+          isFlat ? "mt-5 pt-4 border-t border-[rgba(15,27,45,0.12)]" : "mt-5 rounded-2xl border p-3 sm:p-3.5",
+          isFlat
             ? isLight
-              ? "border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)]"
-              : "border-white/15 bg-[rgba(12,18,32,0.92)]"
-            : isLight
-              ? "border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] sticky bottom-3 md:static backdrop-blur-sm"
-              : "border-white/12 bg-white/[0.07] sticky bottom-3 md:static backdrop-blur-sm",
+              ? "bg-transparent"
+              : "border-white/12 bg-transparent"
+            : isCompact
+              ? isLight
+                ? "border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)]"
+                : "border-white/15 bg-[rgba(12,18,32,0.92)]"
+              : isLight
+                ? "border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] sticky bottom-3 md:static backdrop-blur-sm"
+                : "border-white/12 bg-white/[0.07] sticky bottom-3 md:static backdrop-blur-sm",
+          !isCompact && (isFlat ? "sticky bottom-3 md:static" : ""),
         ].join(" ")}
         ref={ctaRef}
       >
@@ -1106,7 +1183,11 @@ export default function BundleQuickBuy({
             <div
               className={[
                 "flex items-center justify-between gap-3",
-                "border-b border-white/12 pb-2 mb-2",
+                isFlat
+                  ? isLight
+                    ? "border-b border-[rgba(15,27,45,0.12)] pb-2 mb-2"
+                    : "border-b border-white/12 pb-2 mb-2"
+                  : "border-b border-white/12 pb-2 mb-2",
               ].join(" ")}
             >
               <div
@@ -1215,9 +1296,13 @@ export default function BundleQuickBuy({
           </div>
           <div
             className={
-              isLight
-                ? "mt-2 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white px-3 py-2 text-[11px] text-[var(--muted)]"
-                : "mt-2 rounded-2xl border border-white/12 bg-white/5 px-3 py-2 text-[11px] text-white/70"
+              isFlat
+                ? isLight
+                  ? "mt-2 text-[11px] text-[var(--muted)]"
+                  : "mt-2 text-[11px] text-white/70"
+                : isLight
+                  ? "mt-2 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white px-3 py-2 text-[11px] text-[var(--muted)]"
+                  : "mt-2 rounded-2xl border border-white/12 bg-white/5 px-3 py-2 text-[11px] text-white/70"
             }
           >
             <div className={isLight ? "font-semibold text-[var(--text)]" : "font-semibold text-white/90"}>
@@ -1226,18 +1311,22 @@ export default function BundleQuickBuy({
             <div className="mt-1 flex flex-wrap gap-2 text-[10px] font-semibold uppercase tracking-[0.12em]">
               <span
                 className={
-                  isLight
-                    ? "rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-2 py-1"
-                    : "rounded-full border border-white/10 bg-white/5 px-2 py-1"
+                  isFlat
+                    ? "px-0 py-0"
+                    : isLight
+                      ? "rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-2 py-1"
+                      : "rounded-full border border-white/10 bg-white/5 px-2 py-1"
                 }
               >
                 Made in the USA
               </span>
               <span
                 className={
-                  isLight
-                    ? "rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-2 py-1"
-                    : "rounded-full border border-white/10 bg-white/5 px-2 py-1"
+                  isFlat
+                    ? "px-0 py-0"
+                    : isLight
+                      ? "rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-2 py-1"
+                      : "rounded-full border border-white/10 bg-white/5 px-2 py-1"
                 }
               >
                 No artificial dyes

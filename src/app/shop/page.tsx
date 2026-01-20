@@ -449,7 +449,7 @@ export default async function ShopPage() {
                   </div>
                 </div>
                 {purchaseProduct ? (
-                  <PurchaseBox product={purchaseProduct as any} />
+                  <PurchaseBox product={purchaseProduct as any} surface="flat" />
                 ) : (
                   <div className="p-4 text-sm text-[var(--muted)]">
                     Product details are loading. Please refresh to view savings pricing.
@@ -457,15 +457,14 @@ export default async function ShopPage() {
                 )}
               </div>
 
-              <div className="buy-module__footer">
-                <AmericanDreamCallout
-                  variant="compact"
-                  tone="light"
-                  className="mt-1"
-                  showJoinButton={false}
-                />
-              </div>
             </div>
+          </div>
+          <div className="mt-5">
+            <AmericanDreamCallout
+              variant="compact"
+              tone="light"
+              showJoinButton={false}
+            />
           </div>
         </div>
       </section>
