@@ -418,10 +418,10 @@ export default async function HomePage() {
             <div className="mt-2">
               <div
                 id="hero-primary-cta"
-                className="bundle-home candy-panel relative rounded-[32px] p-3 sm:p-4"
+                className="bundle-home relative overflow-hidden rounded-[36px] border border-[rgba(15,27,45,0.12)] bg-white shadow-[0_24px_60px_rgba(15,27,45,0.12)]"
               >
-                <div className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
-                  <div className="order-2 min-w-0 space-y-3 lg:order-1">
+                <div className="grid gap-0 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
+                  <div className="order-2 min-w-0 space-y-3 p-5 sm:p-6 lg:order-1">
                     <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
                       Product details
                     </div>
@@ -456,7 +456,7 @@ export default async function HomePage() {
                     </div>
                   </div>
 
-                  <div className="order-1 min-w-0 lg:order-2">
+                  <div className="order-1 min-w-0 border-b border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] p-4 sm:p-5 lg:order-2 lg:border-b-0 lg:border-l">
                     <BundleQuickBuy
                       anchorId="bundle-pricing"
                       productHandle={handle}

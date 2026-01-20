@@ -374,9 +374,9 @@ export default async function ShopPage() {
 
       <section id="bundle-pricing" aria-label="Savings pricing" className="bg-[#fffdf8] scroll-mt-24">
         <div className="mx-auto max-w-6xl px-4 pb-8 lg:pb-10">
-          <div className="candy-panel rounded-[36px] p-5 sm:p-6">
-            <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
-              <div id="product-details" className="min-w-0 space-y-4 scroll-mt-24">
+          <div className="candy-panel overflow-hidden rounded-[36px] p-0">
+            <div className="grid gap-0 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
+              <div id="product-details" className="min-w-0 space-y-4 scroll-mt-24 p-5 sm:p-6">
                 <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
                   Product details
                 </div>
@@ -411,25 +411,25 @@ export default async function ShopPage() {
                 </div>
               </div>
 
-              <div className="min-w-0">
-                <div className="rounded-3xl border border-[rgba(15,27,45,0.12)] bg-white p-3 shadow-[0_18px_44px_rgba(15,27,45,0.12)]">
-                  {purchaseProduct ? (
-                    <PurchaseBox product={purchaseProduct as any} />
-                  ) : (
-                    <div className="p-4 text-sm text-[var(--muted)]">
-                      Product details are loading. Please refresh to view savings pricing.
-                    </div>
-                  )}
-                </div>
+              <div className="min-w-0 border-t border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] p-4 sm:p-5 lg:border-t-0 lg:border-l">
+                {purchaseProduct ? (
+                  <PurchaseBox product={purchaseProduct as any} />
+                ) : (
+                  <div className="p-4 text-sm text-[var(--muted)]">
+                    Product details are loading. Please refresh to view savings pricing.
+                  </div>
+                )}
               </div>
             </div>
 
-            <AmericanDreamCallout
-              variant="compact"
-              tone="light"
-              className="mt-6"
-              showJoinButton={false}
-            />
+            <div className="border-t border-[rgba(15,27,45,0.12)] p-4 sm:p-5">
+              <AmericanDreamCallout
+                variant="compact"
+                tone="light"
+                className="mt-2"
+                showJoinButton={false}
+              />
+            </div>
           </div>
         </div>
       </section>
