@@ -390,13 +390,14 @@ export default function BundleQuickBuy({
       const canSelect = !unavailable;
       const isAdded = lastAddedQty === tier.quantity;
       const isAddingThis = addingQty === tier.quantity;
+      const totalLabel = Number.isFinite(nextBags ?? NaN)
+        ? ` (total ${nextBags})`
+        : "";
       const tileCtaLabel = isAddingThis
         ? "Adding..."
         : isAdded
-          ? "Added"
-          : hasAdded
-            ? `Add ${tier.quantity} more bags`
-            : `Add ${tier.quantity} bags`;
+          ? `Added${totalLabel}`
+          : `Add ${tier.quantity} bags${totalLabel}`;
       const showFreeShipping = nextBags >= 5;
       const label =
         isEight
@@ -563,13 +564,14 @@ export default function BundleQuickBuy({
     const canSelect = !unavailable;
     const isAdded = lastAddedQty === tier.quantity;
     const isAddingThis = addingQty === tier.quantity;
+    const totalLabel = Number.isFinite(nextBags ?? NaN)
+      ? ` (total ${nextBags})`
+      : "";
     const tileCtaLabel = isAddingThis
       ? "Adding..."
       : isAdded
-        ? "Added"
-        : hasAdded
-          ? `Add ${tier.quantity} more bags`
-          : `Add ${tier.quantity} bags`;
+        ? `Added${totalLabel}`
+        : `Add ${tier.quantity} bags${totalLabel}`;
 
     return (
       <div

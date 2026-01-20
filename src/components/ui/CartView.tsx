@@ -126,6 +126,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
     },
     []
   );
+  const isDrawer = Boolean(onClose);
 
   const lines =
     (localCart?.lines as any)?.nodes ??
@@ -201,6 +202,9 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
   const freeShipLine = unlocked
     ? "Free shipping unlocked."
     : `Add ${freeShipGap} more bag${freeShipGap === 1 ? "" : "s"} for free shipping.`;
+  const shippingSummary = unlocked ? "Free" : "Calculated at checkout";
+  const shippingHint = unlocked ? "Free shipping unlocked" : `Free at ${FREE_SHIP_QTY}+ bags`;
+  const estimatedTotal = subtotal;
 
   const savingsGap = Math.max(0, 4 - totalBags);
   let cartHeadline = "";
@@ -316,7 +320,6 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
   const hasLines = lines.length > 0;
   const showNextTierCta = Boolean(hasLines && nextTierAddQty && nextTierAddQty > 0);
   const cartContext = onClose ? "drawer" : "cart";
-  const isDrawer = Boolean(onClose);
   const secondaryCta = onClose
     ? { href: "/cart", label: "View cart" }
     : { href: "/shop#bundle-pricing", label: "Keep shopping" };
@@ -330,6 +333,23 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
       subtotal: bundlePricing?.total ?? fallbackSubtotal,
     });
     onClose?.();
+  }
+
+  if (isDrawer && localCart === null) {
+    return (
+      <div className="px-4 py-6">
+        <div className="skeleton h-4 w-32" />
+        <div className="mt-4 grid gap-3">
+          <div className="skeleton skeleton-block h-20 w-full" />
+          <div className="skeleton skeleton-block h-32 w-full" />
+          <div className="skeleton skeleton-block h-24 w-full" />
+        </div>
+        <div className="mt-4 grid gap-2">
+          <div className="skeleton h-4 w-28" />
+          <div className="skeleton h-4 w-40" />
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -824,10 +844,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                           : "";
                       return (
                         <div key={l.id} className="rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-3 flex gap-3">
-                          <div
-                            className="relative h-14 w-14 rounded-xl overflow-hidden border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)]"
-                            aria-hidden="true"
-                          >
+                          <div className="media-thumb relative h-14 w-14" aria-hidden="true">
                             {img ? (
                               <Image
                                 src={img}
@@ -864,9 +881,21 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
             ) : null}
 
             <div className="metal-panel rounded-2xl border border-[rgba(199,160,98,0.35)] p-4 flex flex-col gap-2">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
+                Order summary
+              </div>
               <div className="flex items-center justify-between text-sm text-[var(--muted)]">
-                <span>Subtotal</span>
+                <span>Items</span>
                 <span className="font-black text-[var(--text)]">{subtotal}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm text-[var(--muted)]">
+                <span>Shipping</span>
+                <span className="font-semibold text-[var(--text)]">{shippingSummary}</span>
+              </div>
+              <div className="text-[10px] text-[var(--muted)]">{shippingHint}</div>
+              <div className="flex items-center justify-between text-base text-[var(--text)]">
+                <span className="font-semibold">Estimated total</span>
+                <span className="font-black">{estimatedTotal}</span>
               </div>
               {bundlePricing ? (
                 <div className="text-xs text-[var(--muted)]">

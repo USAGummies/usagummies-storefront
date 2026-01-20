@@ -22,7 +22,28 @@
   --text: #1c2430;
   --muted: #5f5b56;
   --border: rgba(16, 24, 40, 0.12);
-  --shadow: 0 24px 70px rgba(15, 27, 45, 0.12);
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --shadow-soft: 0 12px 30px rgba(15, 27, 45, 0.08);
+  --shadow-card: 0 22px 52px rgba(15, 27, 45, 0.12);
+  --shadow-hero: 0 28px 64px rgba(13, 28, 51, 0.2);
+  --paper-grain: repeating-linear-gradient(
+    135deg,
+    rgba(15, 27, 45, 0.015) 0,
+    rgba(15, 27, 45, 0.015) 1px,
+    transparent 1px,
+    transparent 6px
+  );
+  --foil-sheen: linear-gradient(
+    120deg,
+    rgba(255, 255, 255, 0.7) 0%,
+    rgba(255, 255, 255, 0) 45%,
+    rgba(255, 255, 255, 0.35) 75%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  --shadow: var(--shadow-card);
   --primary: var(--navy);
   --primary-text: var(--white);
   --accent: var(--red);
@@ -54,6 +75,7 @@ body {
   margin: 0;
   background-color: var(--bg, #f8f5ef);
   background-image:
+    var(--paper-grain),
     radial-gradient(circle at 12% 8%, rgba(199, 160, 98, 0.12), transparent 40%),
     radial-gradient(circle at 90% 0%, rgba(13, 28, 51, 0.08), transparent 45%),
     linear-gradient(180deg, #fbf9f5 0%, #f4efe6 100%);
@@ -61,6 +83,9 @@ body {
   color: var(--text, #1c2430);
   font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
   letter-spacing: -0.01em;
+  line-height: 1.6;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
 }
 
 h1,
@@ -70,6 +95,10 @@ h3,
   font-family: var(--font-display, var(--font-sans, system-ui, -apple-system, sans-serif));
   letter-spacing: -0.02em;
 }
+h1{ line-height: 1.05; font-weight: 800; }
+h2{ line-height: 1.12; font-weight: 800; }
+h3{ line-height: 1.18; font-weight: 700; }
+p{ line-height: 1.65; }
 .font-script{
   font-family: var(--font-script, cursive);
   letter-spacing: 0;
@@ -98,14 +127,18 @@ h3,
 
 .metal-panel{
   background-color: var(--surface);
-  background-image: none;
+  background-image:
+    var(--paper-grain),
+    var(--foil-sheen),
+    linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,255,255,1));
   border: 1px solid rgba(15, 27, 45, 0.12);
-  box-shadow: 0 18px 44px rgba(15, 27, 45, 0.12);
+  box-shadow: var(--shadow-card);
 }
 .candy-panel{
   background: #ffffff;
   border: 1px solid rgba(15, 27, 45, 0.12);
-  box-shadow: 0 16px 40px rgba(15, 27, 45, 0.12);
+  box-shadow: var(--shadow-card);
+  background-image: var(--paper-grain), var(--foil-sheen);
 }
 .candy-pill{
   display: inline-flex;
@@ -520,7 +553,7 @@ a:focus-visible:not(.btn):not(.focus-ring),
 }
 
 .card, .card-solid{
-  border-radius: 18px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border);
   background: var(--surface);
   box-shadow: var(--shadow);
@@ -535,18 +568,55 @@ a:focus-visible:not(.btn):not(.focus-ring),
   border-color: rgba(13, 28, 51, 0.2);
 }
 .glass-card{
-  border-radius: 22px;
+  border-radius: var(--radius-xl);
   background: var(--surface);
   border: 1px solid var(--border);
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-card);
 }
 .glass-bar{
-  border-radius: 18px;
+  border-radius: var(--radius-lg);
   background: var(--surface-strong);
   border: 1px solid var(--border);
-  box-shadow: 0 14px 30px rgba(15, 27, 45, 0.1);
+  box-shadow: var(--shadow-soft);
   padding: 14px;
 }
+.media-frame{
+  position: relative;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid rgba(15, 27, 45, 0.12);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+.media-frame::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  background:
+    radial-gradient(120% 90% at 0% 0%, rgba(255,255,255,0.4), transparent 60%),
+    var(--foil-sheen);
+  opacity: 0.45;
+}
+.media-thumb{
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid rgba(15, 27, 45, 0.12);
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+.skeleton{
+  background: linear-gradient(
+    90deg,
+    rgba(15,27,45,0.06) 0%,
+    rgba(15,27,45,0.12) 45%,
+    rgba(15,27,45,0.06) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+  border-radius: 999px;
+}
+.skeleton-block{ border-radius: var(--radius-lg); }
 
 @keyframes fadeIn{
   from{ opacity:0; }
@@ -585,6 +655,10 @@ a:focus-visible:not(.btn):not(.focus-ring),
 }
 .icon-float{
   animation: iconFloat 6s ease-in-out infinite;
+}
+@keyframes shimmer{
+  0%{ background-position: 200% 0; }
+  100%{ background-position: -200% 0; }
 }
 
 @media (prefers-reduced-motion: reduce){

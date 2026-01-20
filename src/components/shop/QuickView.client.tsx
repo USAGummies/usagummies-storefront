@@ -193,14 +193,14 @@ export default function QuickView({ product, detailHref, bundleHref, children }:
             </div>
 
             <div className="mt-4 grid gap-4 sm:grid-cols-[1fr_1.2fr]">
-              <div className="relative aspect-square overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)]">
+              <div className="media-frame aspect-square">
                 {img?.url ? (
                   <Image
                     src={img.url}
                     alt={img.altText || product?.title || "USA Gummies"}
                     fill
                     sizes="(max-width: 640px) 90vw, 360px"
-                    className="object-contain"
+                    className="object-contain drop-shadow-[0_18px_40px_rgba(13,28,51,0.14)]"
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-xs text-[var(--muted)]">
