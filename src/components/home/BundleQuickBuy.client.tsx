@@ -75,6 +75,12 @@ function getStoredCartId() {
 
 const FEATURED_QTYS: TierKey[] = ["1", "2", "3", "4", "5", "8", "12"];
 const FEATURED_QTYS_COMPACT: TierKey[] = ["1", "2", "3", "4", "5", "8", "12"];
+const SAVINGS_LADDER = [
+  { qty: 4, label: "Savings start", caption: "4+ bags" },
+  { qty: 5, label: "Free shipping", caption: "5+ bags" },
+  { qty: 8, label: "Most popular", caption: "8 bags" },
+  { qty: 12, label: "Best price", caption: "12 bags" },
+];
 
 export default function BundleQuickBuy({
   tiers = [],
@@ -97,6 +103,9 @@ export default function BundleQuickBuy({
   const currentBags = Math.max(0, Number(bagCount) || 0);
   const currentPricing = currentBags > 0 ? pricingForQty(currentBags) : null;
   const currentTotal = currentPricing?.total ?? 0;
+  const nextMilestone =
+    SAVINGS_LADDER.find((milestone) => currentBags < milestone.qty) ||
+    SAVINGS_LADDER[SAVINGS_LADDER.length - 1];
   const ctaRef = React.useRef<HTMLDivElement | null>(null);
   const [selected, setSelected] = React.useState<TierKey>("8");
   const [addingQty, setAddingQty] = React.useState<number | null>(null);
@@ -756,32 +765,53 @@ export default function BundleQuickBuy({
           {summaryLine}
         </p>
       ) : null}
+          <div className="mt-2 grid gap-2 sm:grid-cols-4">
+            {SAVINGS_LADDER.map((milestone) => {
+              const isNext = milestone.qty === nextMilestone.qty;
+              const isReached = currentBags >= milestone.qty;
+              return (
+                <div
+                  key={milestone.qty}
+                  className={[
+                    "rounded-2xl border px-2.5 py-2 text-[11px] font-semibold",
+                    isLight
+                      ? "border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] text-[var(--text)]"
+                      : "border-white/10 bg-white/5 text-white/85",
+                    isNext
+                      ? isLight
+                        ? "border-[rgba(239,59,59,0.45)] bg-[rgba(239,59,59,0.08)]"
+                        : "border-[rgba(248,212,79,0.5)] bg-[rgba(248,212,79,0.08)]"
+                      : "",
+                    isReached && !isNext && (isLight ? "opacity-90" : "opacity-80"),
+                  ].join(" ")}
+                >
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--muted)]">
+                    {milestone.label}
+                  </div>
+                  <div className={isLight ? "text-[var(--text)]" : "text-white"}>
+                    {milestone.caption}
+                  </div>
+                  {isNext ? (
+                    <div
+                      className={[
+                        "text-[10px] font-semibold",
+                        isLight ? "text-[var(--candy-red)]" : "text-[var(--gold)]",
+                      ].join(" ")}
+                    >
+                      Next up
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
           <div
             className={[
-              "flex flex-wrap items-center gap-2 text-[10.5px] font-semibold",
-              isLight ? "text-[var(--text)]" : "text-white/80",
+              "mt-2 text-[11px] font-semibold",
+              isLight ? "text-[var(--muted)]" : "text-white/70",
             ].join(" ")}
           >
-            <span
-              className={[
-                "inline-flex items-center rounded-full px-2.5 py-1",
-                isLight
-                  ? "border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)]"
-                  : "border border-white/10 bg-white/5",
-              ].join(" ")}
-            >
-              Save at 4+ bags
-            </span>
-            <span
-              className={[
-                "inline-flex items-center rounded-full px-2.5 py-1",
-                isLight
-                  ? "border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)]"
-                  : "border border-white/10 bg-white/5",
-              ].join(" ")}
-            >
-              Free shipping at 5+ bags
-            </span>
+            Most customers check out with 8 bags.
           </div>
         </div>
         {showTrainAccent ? (
@@ -809,21 +839,26 @@ export default function BundleQuickBuy({
                 : "border-white/10 bg-white/5 text-white/75",
           ].join(" ")}
         >
-          <div
-            className={[
-              "text-[10px] font-semibold uppercase tracking-[0.24em]",
-              isLight ? "text-[var(--muted)]" : "text-white/60",
-            ].join(" ")}
-          >
-            How pricing works
+          <div className="text-[11px] font-semibold">
+            How pricing works: selections add bags, never replace your cart.
           </div>
-          <ul className="mt-1.5 space-y-1">
-            <li>Pricing is based on total bags in your cart</li>
-            <li>Discounts start at 4 bags</li>
-            <li>Free shipping at 5+ bags</li>
-            <li>Most customers choose 8 bags</li>
-            <li>Per-bag price caps at {perBagCapText} after 12+ bags</li>
-          </ul>
+          <details className="mt-2">
+            <summary
+              className={[
+                "cursor-pointer text-[11px] font-semibold",
+                isLight ? "text-[var(--text)]" : "text-white/90",
+              ].join(" ")}
+            >
+              Learn more
+            </summary>
+            <div className="mt-1 text-[11px]">
+              Savings start at 4 bags, free shipping unlocks at 5 bags, and per-bag pricing caps at {perBagCapText} after 12+ bags.{" "}
+              <Link href="/faq" className="underline underline-offset-2">
+                Read the FAQ
+              </Link>
+              .
+            </div>
+          </details>
         </div>
       ) : null}
       <div className={isLight ? "mt-2 flex flex-wrap items-center gap-2 text-[10px] text-[var(--muted)]" : "mt-2 flex flex-wrap items-center gap-2 text-[10px] text-white/70"}>

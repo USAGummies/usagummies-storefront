@@ -303,7 +303,6 @@ export default async function HomePage() {
                     alt="USA Gummies bag"
                     fill
                     priority
-                    unoptimized
                     sizes="(max-width: 640px) 92vw, (max-width: 1024px) 55vw, 640px"
                     className="object-contain drop-shadow-[0_26px_40px_rgba(13,28,51,0.28)] z-10"
                   />

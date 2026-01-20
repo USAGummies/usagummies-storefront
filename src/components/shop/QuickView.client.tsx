@@ -10,6 +10,12 @@ import { useCartBagCount } from "@/hooks/useCartBagCount";
 import { AmazonOneBagNote } from "@/components/ui/AmazonOneBagNote";
 
 const QUICK_QTYS = [1, 2, 3, 4, 5, 8, 12];
+const SAVINGS_LADDER = [
+  { qty: 4, label: "Savings start", caption: "4+ bags" },
+  { qty: 5, label: "Free shipping", caption: "5+ bags" },
+  { qty: 8, label: "Most popular", caption: "8 bags" },
+  { qty: 12, label: "Best price", caption: "12 bags" },
+];
 
 type QuickViewProps = {
   product: any;
@@ -63,6 +69,9 @@ export default function QuickView({ product, detailHref, bundleHref, children }:
   const currentBags = Math.max(0, Number(bagCount) || 0);
   const currentPricing = currentBags > 0 ? pricingForQty(currentBags) : null;
   const currentTotal = currentPricing?.total ?? 0;
+  const nextMilestone =
+    SAVINGS_LADDER.find((milestone) => currentBags < milestone.qty) ||
+    SAVINGS_LADDER[SAVINGS_LADDER.length - 1];
   const closeBtnRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
@@ -243,6 +252,50 @@ export default function QuickView({ product, detailHref, bundleHref, children }:
                         );
                       })}
                     </div>
+                  </div>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-4">
+                    {SAVINGS_LADDER.map((milestone) => {
+                      const isNext = milestone.qty === nextMilestone.qty;
+                      const isReached = currentBags >= milestone.qty;
+                      return (
+                        <div
+                          key={milestone.qty}
+                          className={[
+                            "rounded-2xl border px-2.5 py-2 text-[11px] font-semibold",
+                            "border-[var(--border)] bg-[var(--surface-strong)] text-[var(--text)]",
+                            isNext ? "border-[rgba(239,59,59,0.45)] bg-[rgba(239,59,59,0.08)]" : "",
+                            isReached && !isNext ? "opacity-90" : "",
+                          ].join(" ")}
+                        >
+                          <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--muted)]">
+                            {milestone.label}
+                          </div>
+                          <div>{milestone.caption}</div>
+                          {isNext ? (
+                            <div className="text-[10px] font-semibold text-[var(--candy-red)]">Next up</div>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="mt-2 text-[11px] font-semibold text-[var(--muted)]">
+                    Most customers check out with 8 bags.
+                  </div>
+                  <div className="mt-2 rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-3 text-[11px] text-[var(--muted)]">
+                    <div className="font-semibold text-[var(--text)]">
+                      How pricing works: selections add bags, never replace your cart.
+                    </div>
+                    <details className="mt-2">
+                      <summary className="cursor-pointer font-semibold text-[var(--text)]">Learn more</summary>
+                      <div className="mt-1 text-[11px]">
+                        Savings start at 4 bags, free shipping unlocks at 5 bags, and the best per-bag
+                        price shows up at 12 bags.{" "}
+                        <Link href="/faq" className="underline underline-offset-2">
+                          Read the FAQ
+                        </Link>
+                        .
+                      </div>
+                    </details>
                   </div>
                 </div>
 

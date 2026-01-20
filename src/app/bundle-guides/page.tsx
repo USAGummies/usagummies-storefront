@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { AmericanDreamCallout } from "@/components/story/AmericanDreamCallout";
+import { OccasionBagPicker } from "@/components/guides/OccasionBagPicker.client";
+import { OCCASION_BAG_OPTIONS } from "@/data/occasionBagOptions";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 
 function resolveSiteUrl() {
@@ -86,6 +88,9 @@ export default function BundleGuidesPage() {
             Use these guides to match bag count to the moment. Choose a gift bag count, plan party
             snacks, or order bulk gummy bears for teams and events.
           </p>
+          <div className="mt-5">
+            <OccasionBagPicker options={OCCASION_BAG_OPTIONS} defaultKey="gift" />
+          </div>
 
           <div className="mt-6 grid gap-4 md:grid-cols-3">
             {GUIDES.map((guide) => (

@@ -16,6 +16,12 @@ import { AmazonOneBagNote } from "@/components/ui/AmazonOneBagNote";
 type MoneyV2 = { amount: string; currencyCode: string };
 
 const FEATURED_BUNDLE_QTYS = [5, 8, 12];
+const SAVINGS_LADDER = [
+  { qty: 4, label: "Savings start", caption: "4+ bags" },
+  { qty: 5, label: "Free shipping", caption: "5+ bags" },
+  { qty: 8, label: "Most popular", caption: "8 bags" },
+  { qty: 12, label: "Best price", caption: "12 bags" },
+];
 
 function storeCartId(cartId?: string | null) {
   if (!cartId || typeof window === "undefined") return;
@@ -126,6 +132,9 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
     const qty = Number(l?.quantity) || 0;
     return sum + bagsPerUnit * qty;
   }, 0);
+  const nextMilestone =
+    SAVINGS_LADDER.find((milestone) => totalBags < milestone.qty) ||
+    SAVINGS_LADDER[SAVINGS_LADDER.length - 1];
   const bundlePricing = totalBags > 0 ? pricingForQty(totalBags) : null;
   const summaryCurrency = localCart?.cost?.subtotalAmount?.currencyCode || "USD";
   const bundlePerBagText =
@@ -143,6 +152,18 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
       ? formatMoney(localCart.cost.subtotalAmount as MoneyV2)
       : "";
   const currentTotal = bundlePricing?.total ?? baseTotal;
+  const nextTierAddQty = totalBags < nextMilestone.qty ? nextMilestone.qty - totalBags : null;
+  const nextTierPricing = nextTierAddQty ? pricingForQty(totalBags + nextTierAddQty) : null;
+  const nextTierAddTotal =
+    nextTierAddQty && nextTierPricing ? Math.max(0, nextTierPricing.total - currentTotal) : null;
+  const nextTierAddTotalText =
+    nextTierAddTotal !== null ? formatNumber(nextTierAddTotal, summaryCurrency) : "";
+  const nextTierCtaLabel = nextTierAddQty
+    ? `Add ${nextTierAddQty} bag${nextTierAddQty === 1 ? "" : "s"} to reach ${nextMilestone.qty} bags${
+        nextTierAddTotalText ? ` - +${nextTierAddTotalText}` : ""
+      }`
+    : "";
+  const bestPriceApplied = totalBags >= 12;
 
   const pct = clampPct(Math.round((totalBags / FREE_SHIP_QTY) * 100));
   const unlocked = totalBags >= FREE_SHIP_QTY;
@@ -244,6 +265,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
   }
 
   const hasLines = lines.length > 0;
+  const showNextTierCta = Boolean(hasLines && nextTierAddQty && nextTierAddQty > 0);
   const cartContext = onClose ? "drawer" : "cart";
   const isDrawer = Boolean(onClose);
   const secondaryCta = onClose
@@ -353,6 +375,51 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                     {totalBags} bag{totalBags === 1 ? "" : "s"}
                   </span>
                 </div>
+              </div>
+
+              <div className="mt-3 grid gap-2 sm:grid-cols-4">
+                {SAVINGS_LADDER.map((milestone) => {
+                  const isNext = milestone.qty === nextMilestone.qty;
+                  const isReached = totalBags >= milestone.qty;
+                  return (
+                    <div
+                      key={milestone.qty}
+                      className={cn(
+                        "rounded-2xl border px-2.5 py-2 text-[11px] font-semibold",
+                        "border-[rgba(15,27,45,0.12)] bg-white text-[var(--text)]",
+                        isNext && "border-[rgba(239,59,59,0.45)] bg-[rgba(239,59,59,0.08)]",
+                        isReached && !isNext && "opacity-90"
+                      )}
+                    >
+                      <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--muted)]">
+                        {milestone.label}
+                      </div>
+                      <div>{milestone.caption}</div>
+                      {isNext ? (
+                        <div className="text-[10px] font-semibold text-[var(--candy-red)]">Next up</div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-2 text-[11px] font-semibold text-[var(--muted)]">
+                Most customers check out with 8 bags.
+              </div>
+              <div className="mt-2 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-3 text-[11px] text-[var(--muted)]">
+                <div className="font-semibold text-[var(--text)]">
+                  How pricing works: selections add bags, never replace your cart.
+                </div>
+                <details className="mt-2">
+                  <summary className="cursor-pointer font-semibold text-[var(--text)]">Learn more</summary>
+                  <div className="mt-1 text-[11px]">
+                    Savings start at 4 bags, free shipping unlocks at 5 bags, and the best per-bag price
+                    shows up at 12 bags.{" "}
+                    <Link href="/faq" className="underline underline-offset-2">
+                      Read the FAQ
+                    </Link>
+                    .
+                  </div>
+                </details>
               </div>
 
               <div className="mt-4 grid gap-3 sm:grid-cols-3">
@@ -591,10 +658,25 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                   Price per bag at {totalBags} bags • {bundlePerBagText} / bag
                 </div>
               ) : null}
+              {bestPriceApplied ? (
+                <div className="inline-flex w-fit rounded-full border border-[rgba(239,59,59,0.25)] bg-[rgba(239,59,59,0.12)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--candy-red)]">
+                  Best price applied
+                </div>
+              ) : null}
               {bundleSavings > 0 ? (
                 <div className="text-xs text-[var(--muted)]">
-                  Save {bundleSavingsText} vs single bags.
+                  You saved {bundleSavingsText} today vs single bags.
                 </div>
+              ) : null}
+              {showNextTierCta ? (
+                <button
+                  type="button"
+                  onClick={() => addBags(nextTierAddQty ?? 0)}
+                  disabled={bundlePending}
+                  className="btn btn-outline pressable w-full justify-center"
+                >
+                  {bundlePending ? "Adding..." : nextTierCtaLabel}
+                </button>
               ) : null}
               <div className="mt-2">
                 {localCart?.checkoutUrl ? (

@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { AmericanDreamCallout } from "@/components/story/AmericanDreamCallout";
+import { OccasionBagPicker } from "@/components/guides/OccasionBagPicker.client";
+import { OCCASION_BAG_OPTIONS } from "@/data/occasionBagOptions";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 
 function resolveSiteUrl() {
@@ -117,6 +119,9 @@ export default function GummyGiftBundlesPage() {
                 <div className="mt-2 text-xs text-[var(--muted)]">{idea.detail}</div>
               </div>
             ))}
+          </div>
+          <div className="mt-6">
+            <OccasionBagPicker options={OCCASION_BAG_OPTIONS} defaultKey="gift" />
           </div>
 
           <div className="mt-6 flex flex-wrap items-center gap-3">

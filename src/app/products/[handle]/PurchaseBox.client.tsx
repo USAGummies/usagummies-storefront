@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { pricingForQty, BASE_PRICE, FREE_SHIP_QTY } from "@/lib/bundles/pricing";
 import { SINGLE_BAG_SKU, SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
@@ -74,6 +75,12 @@ type BundleOption = {
 };
 
 const VISIBLE_QUANTITIES = [1, 2, 3, 4, 5, 8, 12];
+const SAVINGS_LADDER = [
+  { qty: 4, label: "Savings start", caption: "4+ bags" },
+  { qty: 5, label: "Free shipping", caption: "5+ bags" },
+  { qty: 8, label: "Most popular", caption: "8 bags" },
+  { qty: 12, label: "Best price", caption: "12 bags" },
+];
 
 function money(amount?: number, currencyCode = "USD") {
   const n = Number(amount);
@@ -153,6 +160,9 @@ export default function PurchaseBox({
   const currentBags = Math.max(0, Number(bagCount) || 0);
   const currentPricing = currentBags > 0 ? pricingForQty(currentBags) : null;
   const currentTotal = currentPricing?.total ?? 0;
+  const nextMilestone =
+    SAVINGS_LADDER.find((milestone) => currentBags < milestone.qty) ||
+    SAVINGS_LADDER[SAVINGS_LADDER.length - 1];
 
   const variants = (product?.variants?.nodes || []) as VariantNode[];
   // Canonical ladder. Expose 1-3 bags plus core bundle sizes on-site.
@@ -411,8 +421,50 @@ export default function PurchaseBox({
           </div>
         </div>
 
+        <div className="pbx__ladder">
+          <div className="pbx__ladderTitle">Savings ladder</div>
+          <div className="pbx__ladderGrid">
+            {SAVINGS_LADDER.map((milestone) => {
+              const isNext = milestone.qty === nextMilestone.qty;
+              const isReached = currentBags >= milestone.qty;
+              return (
+                <div
+                  key={milestone.qty}
+                  className={cx(
+                    "pbx__ladderItem",
+                    isNext && "pbx__ladderItem--next",
+                    isReached && !isNext && "pbx__ladderItem--reached"
+                  )}
+                >
+                  <div className="pbx__ladderLabel">{milestone.label}</div>
+                  <div className="pbx__ladderCaption">{milestone.caption}</div>
+                  {isNext ? <div className="pbx__ladderNext">Next up</div> : null}
+                </div>
+              );
+            })}
+          </div>
+          <div className="pbx__ladderProof">Most customers check out with 8 bags.</div>
+        </div>
+
         <div className="pbx__freeShip">
           Free shipping at 5+ bags (based on your total)
+        </div>
+
+        <div className="pbx__pricingNote">
+          <div className="pbx__pricingLine">
+            How pricing works: selections add bags, never replace your cart.
+          </div>
+          <details className="pbx__pricingDetails">
+            <summary className="pbx__pricingSummary">Learn more</summary>
+            <div className="pbx__pricingBody">
+              Savings start at 4 bags, free shipping unlocks at 5 bags, and the best per-bag price
+              shows up at 12 bags.{" "}
+              <Link href="/faq" className="pbx__pricingLink">
+                Read the FAQ
+              </Link>
+              .
+            </div>
+          </details>
         </div>
 
         <div className="pbx__options">
@@ -608,6 +660,76 @@ export default function PurchaseBox({
           margin-top:10px;
           font-size:12px;
           font-weight:700;
+          color: var(--text);
+        }
+        .pbx__ladder{
+          margin-top:10px;
+          display:grid;
+          gap:8px;
+        }
+        .pbx__ladderTitle{
+          font-size:10px;
+          font-weight:700;
+          letter-spacing:0.22em;
+          text-transform:uppercase;
+          color: var(--muted);
+        }
+        .pbx__ladderGrid{
+          display:grid;
+          grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+          gap:8px;
+        }
+        .pbx__ladderItem{
+          border:1px solid var(--border);
+          background: var(--surface);
+          border-radius:12px;
+          padding:8px;
+        }
+        .pbx__ladderItem--next{
+          border-color: rgba(239,59,59,0.45);
+          background: rgba(239,59,59,0.08);
+        }
+        .pbx__ladderItem--reached{
+          opacity:0.9;
+        }
+        .pbx__ladderLabel{
+          font-size:10px;
+          text-transform:uppercase;
+          letter-spacing:0.18em;
+          color: var(--muted);
+        }
+        .pbx__ladderCaption{
+          font-size:12px;
+          font-weight:700;
+          color: var(--text);
+        }
+        .pbx__ladderNext{
+          margin-top:2px;
+          font-size:10px;
+          font-weight:700;
+          color: var(--red);
+        }
+        .pbx__ladderProof{
+          font-size:11px;
+          font-weight:600;
+          color: var(--muted);
+        }
+        .pbx__pricingNote{
+          margin-top:10px;
+          border:1px solid var(--border);
+          background: var(--surface);
+          border-radius:12px;
+          padding:10px;
+          font-size:12px;
+          color: var(--muted);
+        }
+        .pbx__pricingLine{ font-weight:700; color: var(--text); }
+        .pbx__pricingDetails{ margin-top:6px; }
+        .pbx__pricingSummary{ cursor:pointer; font-weight:700; color: var(--text); }
+        .pbx__pricingBody{ margin-top:4px; }
+        .pbx__pricingLink{
+          text-decoration: underline;
+          text-underline-offset: 3px;
           color: var(--text);
         }
 

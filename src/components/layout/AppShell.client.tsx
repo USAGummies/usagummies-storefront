@@ -259,7 +259,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 alt="USA Gummies"
                 fill
                 sizes="128px"
-                unoptimized
                 className="object-contain"
                 priority
               />
