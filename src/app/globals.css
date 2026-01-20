@@ -572,6 +572,33 @@ a:focus-visible:not(.btn):not(.focus-ring),
     var(--paper-grain),
     linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(255,253,248,0.98) 60%, rgba(255,255,255,0.96) 100%);
 }
+.buy-module__inner{
+  position: relative;
+  display: grid;
+  gap: 28px;
+  padding: clamp(20px, 3vw, 28px);
+}
+.buy-module__top{
+  display: grid;
+  gap: 28px;
+}
+.buy-module__divider{
+  height: 1px;
+  width: 100%;
+  background: linear-gradient(90deg, transparent, rgba(15,27,45,0.18), transparent);
+}
+.buy-module__bundle{
+  display: block;
+}
+.buy-module__footer{
+  padding-top: 6px;
+}
+@media (min-width: 1024px){
+  .buy-module__top{
+    grid-template-columns: 1.05fr 0.95fr;
+    align-items: start;
+  }
+}
 .bundle-hero-stage section[aria-label="Savings pricing"]{
   border: none !important;
   background: transparent !important;
@@ -579,6 +606,7 @@ a:focus-visible:not(.btn):not(.focus-ring),
   padding: 0 !important;
   border-radius: 0 !important;
   overflow: visible !important;
+  margin: 0 !important;
 }
 .bundle-hero-stage .media-frame{
   border: none;

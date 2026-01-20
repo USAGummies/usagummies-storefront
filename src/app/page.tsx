@@ -418,12 +418,12 @@ export default async function HomePage() {
             <div className="mt-2">
               <div
                 id="hero-primary-cta"
-                className="bundle-home bundle-hero-stage relative overflow-hidden rounded-[36px] border border-[rgba(15,27,45,0.12)] bg-white shadow-[0_24px_60px_rgba(15,27,45,0.12)]"
+                className="bundle-home bundle-hero-stage buy-module relative overflow-hidden rounded-[36px] border border-[rgba(15,27,45,0.12)] bg-white shadow-[0_24px_60px_rgba(15,27,45,0.12)]"
               >
                 <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_10%,rgba(199,160,98,0.18),transparent_45%),radial-gradient(circle_at_85%_0%,rgba(13,28,51,0.08),transparent_48%)]" />
-                <div className="relative grid gap-6 p-5 sm:p-6">
-                  <div className="grid gap-6 lg:grid-cols-[1fr_1fr] lg:items-start">
-                    <div className="order-2 min-w-0 space-y-3 lg:order-1">
+                <div className="buy-module__inner">
+                  <div className="buy-module__top">
+                    <div className="buy-module__details order-2 min-w-0 space-y-3 lg:order-1">
                       <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
                         Product details
                       </div>
@@ -452,7 +452,7 @@ export default async function HomePage() {
                       </div>
                     </div>
 
-                    <div className="order-1 min-w-0 space-y-3 lg:order-2">
+                    <div className="buy-module__image order-1 min-w-0 space-y-3 lg:order-2">
                       <div className="relative">
                         <div className="media-frame">
                           <div className="relative aspect-[4/5] w-full bg-[var(--surface)]">
@@ -475,7 +475,8 @@ export default async function HomePage() {
                     </div>
                   </div>
 
-                  <div className="min-w-0 pt-1">
+                  <div className="buy-module__divider" />
+                  <div className="buy-module__bundle min-w-0">
                     <BundleQuickBuy
                       anchorId="bundle-pricing"
                       productHandle={handle}
