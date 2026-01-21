@@ -442,7 +442,8 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
   function handleCheckoutClick(event?: MouseEvent<HTMLAnchorElement>) {
     const safeCheckoutUrl = getSafeCheckoutUrl(
       localCart?.checkoutUrl,
-      `cart_${cartContext}`
+      `cart_${cartContext}`,
+      typeof window !== "undefined" ? window.location.host : undefined
     );
     if (!safeCheckoutUrl) {
       event?.preventDefault();

@@ -2,6 +2,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import {
   addToCart as addLine,
   buyNow as buyNowInternal,
@@ -46,7 +47,8 @@ export async function buyNow(formData: FormData) {
   if (!checkoutUrl) {
     redirect("/cart");
   }
-  const safeCheckoutUrl = getSafeCheckoutUrl(checkoutUrl, "buy_now_action");
+  const host = headers().get("host");
+  const safeCheckoutUrl = getSafeCheckoutUrl(checkoutUrl, "buy_now_action", host);
   if (!safeCheckoutUrl) {
     return { ok: false, error: "Invalid checkout URL." };
   }
@@ -83,7 +85,8 @@ export async function replaceWithVariant(formData: FormData) {
 export async function goToCheckout() {
   const cart = await getCartInternal();
   if (!cart || !cart.checkoutUrl) redirect("/");
-  const safeCheckoutUrl = getSafeCheckoutUrl(cart.checkoutUrl, "go_to_checkout");
+  const host = headers().get("host");
+  const safeCheckoutUrl = getSafeCheckoutUrl(cart.checkoutUrl, "go_to_checkout", host);
   if (!safeCheckoutUrl) {
     return { ok: false, error: "Invalid checkout URL." };
   }

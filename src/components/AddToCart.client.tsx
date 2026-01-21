@@ -21,7 +21,11 @@ export default function AddToCart({ variantId }: { variantId: string }) {
       });
       return;
     }
-    const safeCheckoutUrl = getSafeCheckoutUrl(data.checkoutUrl, "buy_now_button");
+    const safeCheckoutUrl = getSafeCheckoutUrl(
+      data.checkoutUrl,
+      "buy_now_button",
+      typeof window !== "undefined" ? window.location.host : undefined
+    );
     if (!safeCheckoutUrl) return;
     window.location.href = safeCheckoutUrl;
   }
