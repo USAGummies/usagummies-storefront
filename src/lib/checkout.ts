@@ -1,4 +1,6 @@
 const BLOCKED_CHECKOUT_PREFIXES = ["/cart/", "/checkout"];
+const DEFAULT_CHECKOUT_HOST = "usa-gummies.myshopify.com";
+const LEGACY_PRIMARY_HOSTS = new Set(["www.usagummies.com", "usagummies.com"]);
 
 function sanitizeHost(value?: string | null) {
   if (!value) return null;
@@ -55,12 +57,17 @@ export function normalizeCheckoutUrl(checkoutUrl: string | null | undefined) {
 
   const overrideHost = getCheckoutDomainOverride();
   if (trimmed.startsWith("/")) {
-    return overrideHost ? `https://${overrideHost}${trimmed}` : trimmed;
+    const host = overrideHost || DEFAULT_CHECKOUT_HOST;
+    return host ? `https://${host}${trimmed}` : trimmed;
   }
 
   try {
     const parsed = new URL(trimmed);
-    if (overrideHost) parsed.host = overrideHost;
+    if (overrideHost) {
+      parsed.host = overrideHost;
+    } else if (LEGACY_PRIMARY_HOSTS.has(parsed.host.toLowerCase())) {
+      parsed.host = DEFAULT_CHECKOUT_HOST;
+    }
     return parsed.toString();
   } catch {
     return trimmed;
