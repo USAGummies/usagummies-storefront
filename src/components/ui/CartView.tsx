@@ -10,7 +10,7 @@ import { cn } from "@/lib/cn";
 import { pricingForQty, BASE_PRICE, FREE_SHIP_QTY, MIN_PER_BAG } from "@/lib/bundles/pricing";
 import { SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
 import { trackEvent } from "@/lib/analytics";
-import { getSafeCheckoutUrl } from "@/lib/checkout";
+import { getSafeCheckoutUrl, normalizeCheckoutUrl } from "@/lib/checkout";
 import { ReviewHighlights } from "@/components/reviews/ReviewHighlights";
 import { AmazonOneBagNote } from "@/components/ui/AmazonOneBagNote";
 import { AMAZON_REVIEWS } from "@/data/amazonReviews";
@@ -438,6 +438,10 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
     ? { href: "/cart", label: "View cart" }
     : { href: "/shop#bundle-pricing", label: "Shop now and save" };
   const showStickyCheckout = !onClose && hasLines && Boolean(localCart?.checkoutUrl);
+  const checkoutHref = useMemo(
+    () => normalizeCheckoutUrl(localCart?.checkoutUrl) ?? localCart?.checkoutUrl,
+    [localCart?.checkoutUrl]
+  );
 
   function handleCheckoutClick(event?: MouseEvent<HTMLAnchorElement>) {
     const safeCheckoutUrl = getSafeCheckoutUrl(
@@ -448,6 +452,10 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
     if (!safeCheckoutUrl) {
       event?.preventDefault();
       return;
+    }
+    if (event?.currentTarget?.href && event.currentTarget.href !== safeCheckoutUrl) {
+      event.preventDefault();
+      window.location.href = safeCheckoutUrl;
     }
     const fallbackSubtotal = Number(localCart?.cost?.subtotalAmount?.amount || 0);
     trackEvent("checkout_click", {
@@ -594,7 +602,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                         ].map((method) => (
                           <a
                             key={method.label}
-                            href={localCart.checkoutUrl}
+                            href={checkoutHref ?? localCart.checkoutUrl}
                             onClick={handleCheckoutClick}
                             aria-label={`${method.label} checkout`}
                             className="flex flex-col items-center justify-center gap-1 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-2 py-2 text-[9px] font-semibold text-[var(--text)]"
@@ -610,7 +618,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                       </div>
 
                       <a
-                        href={localCart.checkoutUrl}
+                        href={checkoutHref ?? localCart.checkoutUrl}
                         className="btn btn-candy mt-3 w-full justify-center pressable"
                         onClick={handleCheckoutClick}
                       >
@@ -1297,21 +1305,21 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                     </div>
                     <div className="mt-2 grid grid-cols-3 gap-2">
                       <a
-                        href={localCart.checkoutUrl}
+                        href={checkoutHref ?? localCart.checkoutUrl}
                         onClick={handleCheckoutClick}
                         className="rounded-full bg-[var(--navy)] px-2 py-2 text-center text-[11px] font-semibold text-white"
                       >
                         Shop Pay
                       </a>
                       <a
-                        href={localCart.checkoutUrl}
+                        href={checkoutHref ?? localCart.checkoutUrl}
                         onClick={handleCheckoutClick}
                         className="rounded-full bg-[#111111] px-2 py-2 text-center text-[11px] font-semibold text-white"
                       >
                         Apple Pay
                       </a>
                       <a
-                        href={localCart.checkoutUrl}
+                        href={checkoutHref ?? localCart.checkoutUrl}
                         onClick={handleCheckoutClick}
                         className="rounded-full border border-[var(--border)] bg-white px-2 py-2 text-center text-[11px] font-semibold text-[var(--text)]"
                       >
@@ -1325,7 +1333,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                 ) : null}
                 {localCart?.checkoutUrl ? (
                   <a
-                    href={localCart.checkoutUrl}
+                    href={checkoutHref ?? localCart.checkoutUrl}
                     className="btn btn-candy w-full justify-center pressable"
                     onClick={handleCheckoutClick}
                   >
@@ -1416,7 +1424,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
           >
             {localCart?.checkoutUrl ? (
               <a
-                href={localCart.checkoutUrl}
+                href={checkoutHref ?? localCart.checkoutUrl}
                 className="btn btn-candy btn-compact pressable pointer-events-auto shadow-[0_10px_22px_rgba(15,27,45,0.14)] min-h-[44px]"
                 onClick={handleCheckoutClick}
               >
