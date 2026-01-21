@@ -47,7 +47,7 @@ export async function buyNow(formData: FormData) {
   if (!checkoutUrl) {
     redirect("/cart");
   }
-  const host = headers().get("host");
+  const host = (await headers()).get("host");
   const safeCheckoutUrl = getSafeCheckoutUrl(checkoutUrl, "buy_now_action", host);
   if (!safeCheckoutUrl) {
     return { ok: false, error: "Invalid checkout URL." };
@@ -85,7 +85,7 @@ export async function replaceWithVariant(formData: FormData) {
 export async function goToCheckout() {
   const cart = await getCartInternal();
   if (!cart || !cart.checkoutUrl) redirect("/");
-  const host = headers().get("host");
+  const host = (await headers()).get("host");
   const safeCheckoutUrl = getSafeCheckoutUrl(cart.checkoutUrl, "go_to_checkout", host);
   if (!safeCheckoutUrl) {
     return { ok: false, error: "Invalid checkout URL." };
