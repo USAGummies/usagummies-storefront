@@ -374,7 +374,7 @@ export default async function ShopPage() {
 
       <section id="bundle-pricing" aria-label="Savings pricing" className="bg-[#fffdf8] scroll-mt-24">
         <div className="mx-auto max-w-6xl px-4 pb-8 lg:pb-10">
-          <div className="bundle-hero-stage buy-module relative rounded-[32px] border border-[rgba(15,27,45,0.12)] bg-white shadow-[0_24px_60px_rgba(15,27,45,0.12)]">
+          <div className="bundle-home bundle-home--premium bundle-hero-stage buy-module relative rounded-[36px] border border-[rgba(15,27,45,0.12)] bg-white shadow-[0_30px_80px_rgba(15,27,45,0.14)]">
             <div className="buy-module__inner">
               <div className="buy-module__layout">
                 <div
@@ -417,7 +417,7 @@ export default async function ShopPage() {
 
                 <div className="buy-module__bundle min-w-0">
                   {purchaseProduct ? (
-                    <PurchaseBox product={purchaseProduct as any} surface="flat" layout="fusion" />
+                    <PurchaseBox product={purchaseProduct as any} surface="flat" layout="integrated" />
                   ) : (
                     <div className="p-4 text-sm text-[var(--muted)]">
                       Product details are loading. Please refresh to view savings pricing.

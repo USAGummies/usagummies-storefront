@@ -416,9 +416,9 @@ export default async function HomePage() {
         <div className={styles.sceneContent}>
           <div className="mx-auto max-w-6xl px-4 pb-5 sm:pb-6 lg:pb-8">
             <div className="mt-2">
-              <div
+                <div
                 id="hero-primary-cta"
-                className="bundle-home bundle-hero-stage buy-module relative rounded-[32px] border border-[rgba(15,27,45,0.12)] bg-white shadow-[0_24px_60px_rgba(15,27,45,0.12)]"
+                className="bundle-home bundle-home--premium bundle-hero-stage buy-module relative rounded-[36px] border border-[rgba(15,27,45,0.12)] bg-white shadow-[0_30px_80px_rgba(15,27,45,0.14)]"
               >
                 <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_10%,rgba(199,160,98,0.18),transparent_45%),radial-gradient(circle_at_85%_0%,rgba(13,28,51,0.08),transparent_48%)]" />
                 <div className="buy-module__inner">
@@ -460,7 +460,7 @@ export default async function HomePage() {
                         variant="compact"
                         tone="light"
                         surface="flat"
-                        layout="fusion"
+                        layout="integrated"
                         showHowItWorks={false}
                         summaryCopy=""
                         showTrainAccent

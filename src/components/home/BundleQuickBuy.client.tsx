@@ -503,6 +503,89 @@ export default function BundleQuickBuy({
         );
       }
 
+      if (isIntegrated) {
+        return (
+          <div
+            key={tier.quantity}
+            role="radio"
+            aria-checked={isActive}
+            aria-disabled={!canSelect}
+            tabIndex={isActive && canSelect ? 0 : -1}
+            onClick={() => handleSelect(tier.quantity, canSelect)}
+            onKeyDown={(event) => handleRadioKeyDown(event, tier.quantity, canSelect)}
+            className={[
+              "bundle-integrated__card",
+              isActive ? "bundle-integrated__card--active" : "",
+              isEight ? "bundle-integrated__card--popular" : "",
+              unavailable ? "bundle-integrated__card--disabled" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            <div className="bundle-integrated__cardHeader">
+              <div className="bundle-integrated__cardQty">+{tier.quantity} bags</div>
+              {label ? (
+                <span
+                  className={[
+                    "bundle-integrated__cardBadge",
+                    isEight ? "bundle-integrated__cardBadge--accent" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                >
+                  {label}
+                </span>
+              ) : (
+                <span className="bundle-integrated__cardBadge bundle-integrated__cardBadge--ghost">
+                  {hasLabel ? label : "Label"}
+                </span>
+              )}
+            </div>
+            <div className="bundle-integrated__cardPrice">
+              <div className="bundle-integrated__cardAdd">
+                {displayAdd ? `+${displayAdd}` : "—"}
+              </div>
+              <div className="bundle-integrated__cardTotal">
+                {displayTotal ? `New total: ${displayTotal}` : "Standard price"}
+                {displayPerBag ? ` • ${displayPerBag}` : ""}
+              </div>
+            </div>
+            <div className="bundle-integrated__cardMeta">
+              {savingsValue ? (
+                <span className="bundle-integrated__cardSave">
+                  Save {money(savingsValue, "USD")} total
+                </span>
+              ) : (
+                <span className="bundle-integrated__cardSave bundle-integrated__cardSave--muted">
+                  Standard price
+                </span>
+              )}
+              {showFreeShipping ? (
+                <span className="bundle-integrated__cardShip">Free shipping</span>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                addToCart(tier.quantity, "tile");
+              }}
+              disabled={unavailable || isAdding}
+              className={[
+                "bundle-integrated__cardCta",
+                isActive ? "bundle-integrated__cardCta--active" : "",
+                isAdded ? "bundle-integrated__cardCta--added" : hasAdded ? "bundle-integrated__cardCta--upgrade" : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+            >
+              {rowCtaLabel}
+            </button>
+          </div>
+        );
+      }
+
       return (
         <div
           key={tier.quantity}
@@ -1453,7 +1536,11 @@ export default function BundleQuickBuy({
           <div className="bundle-integrated__select">
             <div className="bundle-integrated__selectHeader">Choose your bag count</div>
             {isCompact ? (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-2 sm:gap-4" role="radiogroup" aria-label="Bag count">
+              <div
+                className="bundle-integrated__cards"
+                role="radiogroup"
+                aria-label="Bag count"
+              >
                 {expandedTiers.map((tier) => renderRow(tier))}
               </div>
             ) : (
