@@ -13,22 +13,38 @@ function sanitizeHost(value?: string | null) {
 }
 
 function getCheckoutDomainOverride() {
-  const explicit =
-    sanitizeHost(process.env.NEXT_PUBLIC_SHOPIFY_CHECKOUT_DOMAIN) ||
-    sanitizeHost(process.env.SHOPIFY_CHECKOUT_DOMAIN);
-  if (explicit) return explicit;
+  const isServer = typeof window === "undefined";
+  const env = process.env;
 
-  const endpoint =
-    sanitizeHost(process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_API_ENDPOINT) ||
-    sanitizeHost(process.env.SHOPIFY_STOREFRONT_API_ENDPOINT);
-  if (endpoint) return endpoint;
+  if (isServer) {
+    const explicit =
+      sanitizeHost(env.SHOPIFY_CHECKOUT_DOMAIN) ||
+      sanitizeHost(env.NEXT_PUBLIC_SHOPIFY_CHECKOUT_DOMAIN);
+    if (explicit) return explicit;
 
-  const storeDomain =
-    sanitizeHost(process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN) ||
-    sanitizeHost(process.env.SHOPIFY_STORE_DOMAIN) ||
-    sanitizeHost(process.env.NEXT_PUBLIC_SHOPIFY_DOMAIN) ||
-    sanitizeHost(process.env.SHOPIFY_DOMAIN);
-  if (storeDomain && storeDomain.endsWith(".myshopify.com")) return storeDomain;
+    const endpoint =
+      sanitizeHost(env.SHOPIFY_STOREFRONT_API_ENDPOINT) ||
+      sanitizeHost(env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_API_ENDPOINT);
+    if (endpoint) return endpoint;
+
+    const storeDomain =
+      sanitizeHost(env.SHOPIFY_STORE_DOMAIN) ||
+      sanitizeHost(env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN) ||
+      sanitizeHost(env.SHOPIFY_DOMAIN) ||
+      sanitizeHost(env.NEXT_PUBLIC_SHOPIFY_DOMAIN);
+    if (storeDomain && storeDomain.endsWith(".myshopify.com")) return storeDomain;
+  } else {
+    const explicit = sanitizeHost(env.NEXT_PUBLIC_SHOPIFY_CHECKOUT_DOMAIN);
+    if (explicit) return explicit;
+
+    const endpoint = sanitizeHost(env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_API_ENDPOINT);
+    if (endpoint) return endpoint;
+
+    const storeDomain =
+      sanitizeHost(env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN) ||
+      sanitizeHost(env.NEXT_PUBLIC_SHOPIFY_DOMAIN);
+    if (storeDomain && storeDomain.endsWith(".myshopify.com")) return storeDomain;
+  }
 
   return null;
 }
