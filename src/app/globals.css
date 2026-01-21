@@ -843,6 +843,10 @@ a:focus-visible:not(.btn):not(.focus-ring),
   gap: 10px;
   position: relative;
   z-index: 1;
+  max-width: 720px;
+}
+.bundle-fusion__guide{
+  max-width: 680px;
 }
 .bundle-fusion__rail{
   display: grid;
@@ -850,6 +854,7 @@ a:focus-visible:not(.btn):not(.focus-ring),
   gap: 8px;
   position: relative;
   padding-top: 4px;
+  max-width: 640px;
 }
 .bundle-fusion__rail::before{
   content: "";
@@ -911,6 +916,7 @@ a:focus-visible:not(.btn):not(.focus-ring),
   display: grid;
   gap: 6px;
   padding-top: 2px;
+  max-width: 640px;
 }
 .bundle-fusion__missionHeader{
   display: flex;
@@ -924,7 +930,7 @@ a:focus-visible:not(.btn):not(.focus-ring),
   color: var(--muted);
 }
 .bundle-fusion__missionCopy{
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   color: var(--muted);
 }
@@ -932,7 +938,7 @@ a:focus-visible:not(.btn):not(.focus-ring),
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 600;
 }
 .bundle-fusion__missionBadge{
@@ -965,7 +971,7 @@ a:focus-visible:not(.btn):not(.focus-ring),
   color: var(--candy-red);
 }
 .bundle-fusion__missionNote{
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 600;
   color: var(--muted);
 }
@@ -973,6 +979,7 @@ a:focus-visible:not(.btn):not(.focus-ring),
   border-top: 1px solid rgba(15,27,45,0.12);
   padding-top: 8px;
   color: var(--muted);
+  max-width: 640px;
 }
 .bundle-fusion__selectHeader{
   font-size: 11px;
@@ -981,34 +988,47 @@ a:focus-visible:not(.btn):not(.focus-ring),
   text-transform: uppercase;
   color: var(--muted);
 }
+.bundle-fusion__panel{
+  display: grid;
+  gap: 10px;
+  border: 1px solid rgba(15,27,45,0.08);
+  border-radius: 20px;
+  padding: 12px 14px;
+  background: rgba(255,255,255,0.82);
+  box-shadow: 0 14px 30px rgba(15,27,45,0.06);
+  overflow: hidden;
+}
 .bundle-fusion__list{
   display: grid;
   gap: 0;
-  border: 1px solid rgba(15,27,45,0.08);
-  border-radius: 16px;
-  padding: 2px 10px;
-  background: rgba(255,255,255,0.72);
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+}
+.bundle-fusion__list--slider{
+  padding: 2px 0 0;
 }
 .bundle-fusion__row{
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
-  padding: 10px 0;
+  padding: 8px 0;
   transition: background 0.16s ease, border-color 0.16s ease;
 }
 .bundle-fusion__row + .bundle-fusion__row{
   border-top: 1px solid rgba(15,27,45,0.06);
 }
 .bundle-fusion__row--active{
-  background: linear-gradient(90deg, rgba(239,59,59,0.08), rgba(239,59,59,0.02));
+  background: rgba(239,59,59,0.04);
   border-left: 2px solid var(--candy-red);
-  padding-left: 10px;
-  border-radius: 12px;
-  box-shadow: inset 0 0 0 1px rgba(239,59,59,0.18);
+  padding-left: 8px;
+  border-radius: 10px;
+  box-shadow: none;
 }
 .bundle-fusion__row--popular{
-  background: rgba(239,59,59,0.03);
+  background: rgba(239,59,59,0.02);
 }
 .bundle-fusion__row--disabled{
   opacity: 0.6;
@@ -1026,17 +1046,17 @@ a:focus-visible:not(.btn):not(.focus-ring),
   flex-wrap: wrap;
 }
 .bundle-fusion__rowQty{
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 800;
   color: var(--text);
 }
 .bundle-fusion__rowBadge{
   border: 1px solid rgba(15,27,45,0.12);
   border-radius: 999px;
-  padding: 2px 6px;
-  font-size: 8px;
+  padding: 2px 5px;
+  font-size: 7px;
   font-weight: 700;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--muted);
 }
@@ -1053,19 +1073,19 @@ a:focus-visible:not(.btn):not(.focus-ring),
   gap: 2px;
 }
 .bundle-fusion__rowAdd{
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 900;
   color: var(--text);
 }
 .bundle-fusion__rowTotal{
-  font-size: 11px;
+  font-size: 10px;
   color: var(--muted);
 }
 .bundle-fusion__rowMeta{
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  font-size: 10px;
+  gap: 8px;
+  font-size: 9px;
 }
 .bundle-fusion__rowSave{
   font-weight: 700;
@@ -1080,10 +1100,10 @@ a:focus-visible:not(.btn):not(.focus-ring),
 }
 .bundle-fusion__rowCta{
   border: 1px solid rgba(15,27,45,0.16);
-  background: #ffffff;
+  background: rgba(15,27,45,0.04);
   border-radius: 999px;
-  padding: 6px 10px;
-  font-size: 10px;
+  padding: 5px 8px;
+  font-size: 9px;
   font-weight: 700;
   color: var(--text);
   white-space: nowrap;
@@ -1118,6 +1138,9 @@ a:focus-visible:not(.btn):not(.focus-ring),
   cursor: not-allowed;
 }
 @media (max-width: 640px){
+  .bundle-fusion__panel{
+    padding: 10px 12px;
+  }
   .bundle-fusion__row{
     grid-template-columns: 1fr;
     align-items: start;
@@ -1128,65 +1151,70 @@ a:focus-visible:not(.btn):not(.focus-ring),
   }
 }
 .bundle-fusion__cta{
+  border-top: 1px solid rgba(15,27,45,0.08);
   padding-top: 10px;
-  padding-bottom: 4px;
-  background: rgba(255,255,255,0.7);
-  border-radius: 16px;
-  border: 1px solid rgba(15,27,45,0.08);
-  padding-left: 12px;
-  padding-right: 12px;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
+  background: transparent;
+  border-radius: 0;
+  border-left: 0;
+  border-right: 0;
+  border-bottom: 0;
+  padding-left: 0;
+  padding-right: 0;
+  box-shadow: none;
 }
 .bundle-fusion__cta--sticky{
   position: sticky;
   bottom: 12px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(255,255,255,0.9));
+  background: #ffffff;
   border-radius: 18px;
-  padding: 12px;
+  padding: 12px 14px;
   box-shadow: 0 18px 36px rgba(15,27,45,0.08);
+  border: 1px solid rgba(15,27,45,0.08);
   backdrop-filter: blur(8px);
 }
 .bundle-fusion__cta button{
-  height: 44px;
-  font-size: 13px;
+  height: 40px;
+  font-size: 12px;
   border-radius: 12px;
-  box-shadow: 0 12px 26px rgba(214,64,58,0.2);
+  box-shadow: 0 10px 22px rgba(214,64,58,0.2);
 }
 .bundle-fusion__ctaSummary > * + *{
   margin-top: 2px;
 }
 .bundle-fusion__ctaPrice{
-  font-size: 20px;
+  font-size: 18px;
   letter-spacing: -0.01em;
 }
 .bundle-fusion__ctaTotal{
-  font-size: 11px;
+  font-size: 10px;
 }
 .bundle-fusion__ctaStack{
-  margin-top: 8px;
-  gap: 6px;
+  margin-top: 6px;
+  gap: 4px;
 }
 .bundle-fusion__ctaNote{
-  font-size: 11px;
+  font-size: 10px;
   line-height: 1.4;
 }
 .bundle-fusion__ctaProof{
   margin-top: 6px;
   padding: 8px 10px;
-  border-radius: 14px;
-  background: rgba(255,255,255,0.65);
-  border: 1px solid rgba(15,27,45,0.08);
+  border-radius: 12px;
+  background: rgba(15,27,45,0.03);
+  border: 1px solid rgba(15,27,45,0.06);
 }
 .bundle-fusion__more{
-  align-self: center;
-  font-size: 10px;
+  align-self: start;
+  justify-self: start;
+  font-size: 9px;
   font-weight: 700;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--muted);
   text-decoration: none;
-  border-bottom: 1px solid rgba(15,27,45,0.18);
-  padding-bottom: 2px;
+  border-bottom: 1px solid rgba(15,27,45,0.14);
+  padding-bottom: 1px;
+  margin-top: 2px;
 }
 .buy-module{
   position: relative;
@@ -1226,6 +1254,8 @@ a:focus-visible:not(.btn):not(.focus-ring),
   z-index: 2;
   display: grid;
   gap: 10px;
+  max-width: 720px;
+  justify-self: start;
 }
 .buy-module__bundle{
   grid-area: bundle;
@@ -1234,12 +1264,17 @@ a:focus-visible:not(.btn):not(.focus-ring),
   gap: 12px;
   position: relative;
   z-index: 2;
+  max-width: 720px;
+  justify-self: start;
 }
 .buy-module__image{
   grid-area: image;
   min-width: 0;
   position: relative;
   z-index: 1;
+  width: 100%;
+  max-width: 420px;
+  justify-self: end;
 }
 .buy-module__imagePanel{
   position: relative;
@@ -1320,16 +1355,12 @@ a:focus-visible:not(.btn):not(.focus-ring),
 }
 @media (min-width: 1024px){
   .buy-module__layout{
-    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 420px);
     grid-template-areas:
       "details image"
       "bundle image";
     align-items: start;
-    column-gap: 28px;
-  }
-  .buy-module__details,
-  .buy-module__bundle{
-    padding-right: 6px;
+    column-gap: 36px;
   }
 }
 .bundle-hero-stage .media-frame{
@@ -1693,6 +1724,14 @@ a:focus-visible:not(.btn):not(.focus-ring),
   background: rgba(13, 28, 51, 0.08);
   border: 1px solid rgba(15, 27, 45, 0.12);
   overflow: hidden;
+}
+.bundle-fusion .mission-bar{
+  height: 8px;
+  max-width: 520px;
+}
+.bundle-fusion .mission-bar__tick{
+  width: 10px;
+  height: 10px;
 }
 .mission-bar__fill{
   height: 100%;

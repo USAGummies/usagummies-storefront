@@ -395,6 +395,14 @@ export default function BundleQuickBuy({
         : isAdded
           ? `Savings locked${totalLabel}`
           : `Lock in savings now${totalLabel}`;
+      const fusionCtaLabel = isAddingThis
+        ? "Adding..."
+        : isAdded
+          ? "Added"
+          : hasAdded
+            ? "Add more"
+            : "Add bags";
+      const rowCtaLabel = isFusion ? fusionCtaLabel : tileCtaLabel;
       const showFreeShipping = nextBags >= 5;
       const label =
         isEight
@@ -489,7 +497,7 @@ export default function BundleQuickBuy({
                 .filter(Boolean)
                 .join(" ")}
             >
-              {tileCtaLabel}
+              {rowCtaLabel}
             </button>
           </div>
         );
@@ -991,7 +999,7 @@ export default function BundleQuickBuy({
             </span>
           </div>
         </div>
-        {reviewSnippets.length ? (
+        {!isFusion && reviewSnippets.length ? (
           <div className={isLight ? "grid gap-1 text-[11px] text-[var(--muted)]" : "grid gap-1 text-[11px] text-white/70"}>
             {reviewSnippets.map((review) => (
               <div key={review.id} className="inline-flex items-center gap-2">
@@ -1085,18 +1093,6 @@ export default function BundleQuickBuy({
   if (isFusion) {
     return (
       <section id={anchorId} aria-label="Savings pricing" className="bundle-fusion">
-        {showTrainAccent ? (
-          <Image
-            src="/website%20assets/B17Bomber.png"
-            alt=""
-            aria-hidden="true"
-            width={1405}
-            height={954}
-            sizes="(max-width: 640px) 80vw, 640px"
-            className="bundle-fusion__accent"
-          />
-        ) : null}
-
         <div className="bundle-fusion__grid">
           <div className="bundle-fusion__guide">
             <div className="bundle-fusion__intro">
@@ -1237,50 +1233,54 @@ export default function BundleQuickBuy({
           </div>
 
           <div className="bundle-fusion__select">
-            {isCompact ? (
-              <div className="bundle-fusion__list" role="radiogroup" aria-label="Bag count">
-                {expandedTiers.map((tier) => renderRow(tier))}
-              </div>
-            ) : (
-              <div className="relative">
-                <div
-                  className={[
-                    "pointer-events-none absolute left-0 top-0 h-full w-10",
-                    "bg-[linear-gradient(90deg,rgba(12,20,38,0.12),transparent)]",
-                  ].join(" ")}
-                />
-                <div
-                  className={[
-                    "pointer-events-none absolute right-0 top-0 h-full w-10",
-                    "bg-[linear-gradient(270deg,rgba(12,20,38,0.12),transparent)]",
-                  ].join(" ")}
-                />
-                <div className="flex snap-x snap-mandatory gap-2.5 overflow-x-auto pb-2 pr-4 bundle-slider">
+            <div className="bundle-fusion__panel">
+              {isCompact ? (
+                <div className="bundle-fusion__list" role="radiogroup" aria-label="Bag count">
                   {expandedTiers.map((tier) => renderRow(tier))}
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className="bundle-fusion__list bundle-fusion__list--slider">
+                  <div className="relative">
+                    <div
+                      className={[
+                        "pointer-events-none absolute left-0 top-0 h-full w-10",
+                        "bg-[linear-gradient(90deg,rgba(12,20,38,0.12),transparent)]",
+                      ].join(" ")}
+                    />
+                    <div
+                      className={[
+                        "pointer-events-none absolute right-0 top-0 h-full w-10",
+                        "bg-[linear-gradient(270deg,rgba(12,20,38,0.12),transparent)]",
+                      ].join(" ")}
+                    />
+                    <div className="flex snap-x snap-mandatory gap-2.5 overflow-x-auto pb-2 pr-4 bundle-slider">
+                      {expandedTiers.map((tier) => renderRow(tier))}
+                    </div>
+                  </div>
+                </div>
+              )}
 
-            {showOtherQuantitiesLink && !showOtherQuantities ? (
-              <button
-                type="button"
-                onClick={() => setShowOtherQuantities(true)}
-                className="bundle-fusion__more"
+              {showOtherQuantitiesLink && !showOtherQuantities ? (
+                <button
+                  type="button"
+                  onClick={() => setShowOtherQuantities(true)}
+                  className="bundle-fusion__more"
+                >
+                  {otherQuantitiesLabel}
+                </button>
+              ) : null}
+
+              <div
+                className={[
+                  "bundle-fusion__cta",
+                  !isCompact ? "bundle-fusion__cta--sticky" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                ref={ctaRef}
               >
-                {otherQuantitiesLabel}
-              </button>
-            ) : null}
-
-            <div
-              className={[
-                "bundle-fusion__cta",
-                !isCompact ? "bundle-fusion__cta--sticky" : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-              ref={ctaRef}
-            >
-              {ctaContent}
+                {ctaContent}
+              </div>
             </div>
           </div>
         </div>
