@@ -14,35 +14,34 @@ function sanitizeHost(value?: string | null) {
 
 function getCheckoutDomainOverride() {
   const isServer = typeof window === "undefined";
-  const env = process.env;
 
   if (isServer) {
     const explicit =
-      sanitizeHost(env.SHOPIFY_CHECKOUT_DOMAIN) ||
-      sanitizeHost(env.NEXT_PUBLIC_SHOPIFY_CHECKOUT_DOMAIN);
+      sanitizeHost(process.env.SHOPIFY_CHECKOUT_DOMAIN) ||
+      sanitizeHost(process.env.NEXT_PUBLIC_SHOPIFY_CHECKOUT_DOMAIN);
     if (explicit) return explicit;
 
     const endpoint =
-      sanitizeHost(env.SHOPIFY_STOREFRONT_API_ENDPOINT) ||
-      sanitizeHost(env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_API_ENDPOINT);
+      sanitizeHost(process.env.SHOPIFY_STOREFRONT_API_ENDPOINT) ||
+      sanitizeHost(process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_API_ENDPOINT);
     if (endpoint) return endpoint;
 
     const storeDomain =
-      sanitizeHost(env.SHOPIFY_STORE_DOMAIN) ||
-      sanitizeHost(env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN) ||
-      sanitizeHost(env.SHOPIFY_DOMAIN) ||
-      sanitizeHost(env.NEXT_PUBLIC_SHOPIFY_DOMAIN);
+      sanitizeHost(process.env.SHOPIFY_STORE_DOMAIN) ||
+      sanitizeHost(process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN) ||
+      sanitizeHost(process.env.SHOPIFY_DOMAIN) ||
+      sanitizeHost(process.env.NEXT_PUBLIC_SHOPIFY_DOMAIN);
     if (storeDomain && storeDomain.endsWith(".myshopify.com")) return storeDomain;
   } else {
-    const explicit = sanitizeHost(env.NEXT_PUBLIC_SHOPIFY_CHECKOUT_DOMAIN);
+    const explicit = sanitizeHost(process.env.NEXT_PUBLIC_SHOPIFY_CHECKOUT_DOMAIN);
     if (explicit) return explicit;
 
-    const endpoint = sanitizeHost(env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_API_ENDPOINT);
+    const endpoint = sanitizeHost(process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_API_ENDPOINT);
     if (endpoint) return endpoint;
 
     const storeDomain =
-      sanitizeHost(env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN) ||
-      sanitizeHost(env.NEXT_PUBLIC_SHOPIFY_DOMAIN);
+      sanitizeHost(process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN) ||
+      sanitizeHost(process.env.NEXT_PUBLIC_SHOPIFY_DOMAIN);
     if (storeDomain && storeDomain.endsWith(".myshopify.com")) return storeDomain;
   }
 
