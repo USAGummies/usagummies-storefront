@@ -70,14 +70,19 @@ export function getSafeCheckoutUrl(
 
   try {
     const parsed = new URL(normalized);
-    if (BLOCKED_CHECKOUT_PREFIXES.some((prefix) => parsed.pathname.startsWith(prefix))) {
-      console.error("[checkout] Blocked invalid checkout URL", {
+    const isSameHost =
+      currentHost && parsed.host.toLowerCase() === currentHost.toLowerCase();
+    if (
+      isSameHost &&
+      BLOCKED_CHECKOUT_PREFIXES.some((prefix) => parsed.pathname.startsWith(prefix))
+    ) {
+      console.error("[checkout] Blocked same-origin checkout URL", {
         context,
         checkoutUrl: normalized,
       });
       return null;
     }
-    if (currentHost && parsed.host.toLowerCase() === currentHost.toLowerCase()) {
+    if (isSameHost) {
       console.error("[checkout] Blocked same-origin checkout URL", {
         context,
         checkoutUrl: normalized,
