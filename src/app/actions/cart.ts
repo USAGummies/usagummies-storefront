@@ -10,6 +10,7 @@ import {
   getCart as getCartInternal,
 } from "@/lib/cart";
 import { normalizeSingleBagVariant } from "@/lib/bundles/atomic";
+import { getSafeCheckoutUrl } from "@/lib/checkout";
 
 /**
  * Server actions wrapper layer.
@@ -42,7 +43,14 @@ export async function buyNow(formData: FormData) {
   const quantity = Math.max(1, Number(formData.get("quantity") ?? 1) || 1);
   if (!safeVariantId) throw new Error("Invalid merchandiseId (variant id).");
   const checkoutUrl = await buyNowInternal(safeVariantId, quantity);
-  redirect(checkoutUrl || "/cart");
+  if (!checkoutUrl) {
+    redirect("/cart");
+  }
+  const safeCheckoutUrl = getSafeCheckoutUrl(checkoutUrl, "buy_now_action");
+  if (!safeCheckoutUrl) {
+    return { ok: false, error: "Invalid checkout URL." };
+  }
+  redirect(safeCheckoutUrl);
 }
 
 export async function updateLine(formData: FormData) {
@@ -75,5 +83,9 @@ export async function replaceWithVariant(formData: FormData) {
 export async function goToCheckout() {
   const cart = await getCartInternal();
   if (!cart || !cart.checkoutUrl) redirect("/");
-  redirect(cart.checkoutUrl);
+  const safeCheckoutUrl = getSafeCheckoutUrl(cart.checkoutUrl, "go_to_checkout");
+  if (!safeCheckoutUrl) {
+    return { ok: false, error: "Invalid checkout URL." };
+  }
+  redirect(safeCheckoutUrl);
 }

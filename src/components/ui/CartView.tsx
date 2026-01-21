@@ -3,13 +3,14 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { CartLineControls } from "@/components/cart/CartLineControls.client";
 import AddBagButton from "@/components/cart/AddBagButton.client";
 import { cn } from "@/lib/cn";
 import { pricingForQty, BASE_PRICE, FREE_SHIP_QTY, MIN_PER_BAG } from "@/lib/bundles/pricing";
 import { SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
 import { trackEvent } from "@/lib/analytics";
+import { getSafeCheckoutUrl } from "@/lib/checkout";
 import { ReviewHighlights } from "@/components/reviews/ReviewHighlights";
 import { AmazonOneBagNote } from "@/components/ui/AmazonOneBagNote";
 import { AMAZON_REVIEWS } from "@/data/amazonReviews";
@@ -438,7 +439,15 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
     : { href: "/shop#bundle-pricing", label: "Shop now and save" };
   const showStickyCheckout = !onClose && hasLines && Boolean(localCart?.checkoutUrl);
 
-  function handleCheckoutClick() {
+  function handleCheckoutClick(event?: MouseEvent<HTMLAnchorElement>) {
+    const safeCheckoutUrl = getSafeCheckoutUrl(
+      localCart?.checkoutUrl,
+      `cart_${cartContext}`
+    );
+    if (!safeCheckoutUrl) {
+      event?.preventDefault();
+      return;
+    }
     const fallbackSubtotal = Number(localCart?.cost?.subtotalAmount?.amount || 0);
     trackEvent("checkout_click", {
       context: cartContext,
@@ -1288,18 +1297,21 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                     <div className="mt-2 grid grid-cols-3 gap-2">
                       <a
                         href={localCart.checkoutUrl}
+                        onClick={handleCheckoutClick}
                         className="rounded-full bg-[var(--navy)] px-2 py-2 text-center text-[11px] font-semibold text-white"
                       >
                         Shop Pay
                       </a>
                       <a
                         href={localCart.checkoutUrl}
+                        onClick={handleCheckoutClick}
                         className="rounded-full bg-[#111111] px-2 py-2 text-center text-[11px] font-semibold text-white"
                       >
                         Apple Pay
                       </a>
                       <a
                         href={localCart.checkoutUrl}
+                        onClick={handleCheckoutClick}
                         className="rounded-full border border-[var(--border)] bg-white px-2 py-2 text-center text-[11px] font-semibold text-[var(--text)]"
                       >
                         Google Pay

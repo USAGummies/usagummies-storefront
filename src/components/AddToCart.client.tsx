@@ -1,6 +1,7 @@
 "use client";
 
 import { normalizeSingleBagVariant, SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
+import { getSafeCheckoutUrl } from "@/lib/checkout";
 
 export default function AddToCart({ variantId }: { variantId: string }) {
   const targetVariantId = normalizeSingleBagVariant(variantId) || SINGLE_BAG_VARIANT_ID;
@@ -12,8 +13,17 @@ export default function AddToCart({ variantId }: { variantId: string }) {
       body: JSON.stringify({ variantId: targetVariantId }),
     });
 
-    const data = await res.json();
-    window.location.href = data.checkoutUrl;
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data?.ok === false || !data?.checkoutUrl) {
+      console.error("[checkout] Buy now failed.", {
+        status: res.status,
+        error: data?.error,
+      });
+      return;
+    }
+    const safeCheckoutUrl = getSafeCheckoutUrl(data.checkoutUrl, "buy_now_button");
+    if (!safeCheckoutUrl) return;
+    window.location.href = safeCheckoutUrl;
   }
 
   return (
