@@ -2,6 +2,7 @@
 import { cookies } from "next/headers";
 import { shopifyRequest } from "./shopify/fetch";
 import { normalizeSingleBagVariant } from "@/lib/bundles/atomic";
+import { normalizeCheckoutUrl } from "@/lib/checkout";
 
 const CART_COOKIE = "cartId";
 const DEFAULT_STOREFRONT_API_VERSION = "2024-07";
@@ -263,7 +264,10 @@ async function getOrCreateCartId({
 async function getCartById(cartId: string) {
   if (!cartId) return null;
   const data = await shopify<CartGetResult>(CART_GET, { cartId });
-  return data?.cart ?? null;
+  const cart = data?.cart ?? null;
+  if (!cart?.checkoutUrl) return cart;
+  const normalized = normalizeCheckoutUrl(cart.checkoutUrl);
+  return normalized ? { ...cart, checkoutUrl: normalized } : cart;
 }
 
 export async function getCart() {
@@ -329,7 +333,8 @@ export async function buyNow(variantId: string, quantity: number) {
 
   const cart = result.data?.cartLinesAdd?.cart;
   if (!cart?.checkoutUrl) return null;
-  return cart.checkoutUrl;
+  const normalized = normalizeCheckoutUrl(cart.checkoutUrl);
+  return normalized ?? cart.checkoutUrl;
 }
 
 export async function updateLineQuantity(lineId: string, quantity: number) {
