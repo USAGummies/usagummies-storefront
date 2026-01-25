@@ -412,7 +412,13 @@ export default function BundleQuickBuy({
           .join(" ")}
       >
         <span>+{tier.quantity} bags</span>
-        {displayAdd ? <span className={isLight ? "text-[var(--muted)]" : "text-white/70"}>+{displayAdd}</span> : null}
+        {displayAdd ? (
+          <span
+            className={isLight ? "text-[10px] font-medium text-[var(--muted)]" : "text-[10px] font-medium text-white/60"}
+          >
+            +{displayAdd}
+          </span>
+        ) : null}
       </button>
     );
   }

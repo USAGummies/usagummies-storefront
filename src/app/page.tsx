@@ -8,7 +8,6 @@ import ReviewsSection from "@/components/home/ReviewsSection";
 import { getBundleVariants } from "@/lib/bundles/getBundleVariants";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import HeroCTAWatcher from "@/components/home/HeroCTAWatcher";
-import { AmazonOneBagNote } from "@/components/ui/AmazonOneBagNote";
 import { BRAND_STORY_HEADLINE, BRAND_STORY_PARAGRAPHS } from "@/data/brandStory";
 import { DETAIL_BULLETS } from "@/data/productDetails";
 import styles from "./homepage-scenes.module.css";
@@ -278,7 +277,6 @@ export default async function HomePage() {
                       <span className="text-[15px] sm:text-[16px] font-semibold">Shop now and save</span>
                     </a>
                     <div className="text-xs font-semibold text-[var(--muted)]">Love it or your money back</div>
-                    <AmazonOneBagNote />
                     <div className="flex flex-wrap gap-2 text-[11px] text-[var(--muted)]">
                       <span className="font-semibold text-[var(--text)]">Bag count guides:</span>
                       <Link href="/gummy-gift-bundles" className="underline underline-offset-4">
@@ -480,16 +478,16 @@ export default async function HomePage() {
                       surface="flat"
                       layout="classic"
                       showHowItWorks={false}
-                      summaryCopy="Best value bundles: 8 bags (most popular) or 12 bags (best price)."
+                      summaryCopy=""
                       showTrainAccent={false}
                       showAccent={true}
                       showEducation={false}
                       ctaVariant="simple"
                       primaryCtaLabel="Shop & save"
-                      featuredQuantities={[8, 12]}
+                      featuredQuantities={[5, 8, 12]}
                       showOtherQuantitiesLink={true}
                       otherQuantitiesLabel="Other sizes"
-                      otherQuantities={[1, 2, 3, 4, 5]}
+                      otherQuantities={[1, 2, 3, 4]}
                     />
                   </div>
                 </div>
@@ -583,9 +581,6 @@ export default async function HomePage() {
                     >
                       View product details
                     </Link>
-                  </div>
-                  <div className="mt-2">
-                    <AmazonOneBagNote />
                   </div>
                 </div>
 
@@ -796,9 +791,6 @@ export default async function HomePage() {
           <a href="#bundle-pricing" className="btn btn-candy w-full sm:w-auto">
             Shop now and save
           </a>
-        </div>
-        <div className="mt-2 text-center">
-          <AmazonOneBagNote className="text-[11px] text-[var(--muted)]" />
         </div>
       </div>
 

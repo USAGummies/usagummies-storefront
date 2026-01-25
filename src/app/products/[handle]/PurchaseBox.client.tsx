@@ -1126,9 +1126,10 @@ export default function PurchaseBox({
         }
         .pbx__miniQty{ font-weight:900; }
         .pbx__miniPrice{
-          font-size:11px;
-          font-weight:700;
+          font-size:10px;
+          font-weight:600;
           color: var(--muted);
+          opacity: 0.75;
         }
 
         .pbx__summary{

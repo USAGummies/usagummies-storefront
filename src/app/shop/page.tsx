@@ -6,7 +6,6 @@ import { ProductGallery } from "@/components/product/ProductGallery.client";
 import PurchaseBox from "@/app/products/[handle]/PurchaseBox.client";
 import { AmericanDreamCallout } from "@/components/story/AmericanDreamCallout";
 import { StickyAddToCartBar } from "@/components/product/StickyAddToCartBar";
-import { AmazonOneBagNote } from "@/components/ui/AmazonOneBagNote";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { getProductsPage } from "@/lib/shopify/products";
 import { getProductByHandle, money } from "@/lib/storefront";
@@ -278,7 +277,6 @@ export default async function ShopPage() {
                   Love it or your money back - Ships within 24 hours - Limited daily production
                 </span>
               </div>
-              <AmazonOneBagNote />
 
               <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--muted)]">
                 <Link href="/ingredients" className="underline underline-offset-4 text-[var(--text)]">

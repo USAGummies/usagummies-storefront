@@ -5,7 +5,6 @@ import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import { trackEvent } from "@/lib/analytics";
-import { AmazonOneBagNote } from "@/components/ui/AmazonOneBagNote";
 import { GummyIcon } from "@/components/ui/GummyIcon";
 
 type Props = {
@@ -122,12 +121,6 @@ export function StickyAddToCartBar({
                 Lock in savings now
               </span>
             </button>
-          </div>
-          <div className="px-3 pb-3">
-            <AmazonOneBagNote
-              className="text-[10px] text-[var(--muted)]"
-              linkClassName="underline underline-offset-4 text-[var(--text)]"
-            />
           </div>
         </div>
       </div>
