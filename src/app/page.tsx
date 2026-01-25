@@ -480,10 +480,16 @@ export default async function HomePage() {
                       surface="flat"
                       layout="classic"
                       showHowItWorks={false}
-                      summaryCopy=""
+                      summaryCopy="Best value bundles: 8 bags (most popular) or 12 bags (best price)."
                       showTrainAccent={false}
-                      featuredQuantities={[1, 2, 3, 4, 5, 8, 12]}
-                      showOtherQuantitiesLink={false}
+                      showAccent={true}
+                      showEducation={false}
+                      ctaVariant="simple"
+                      primaryCtaLabel="Shop & save"
+                      featuredQuantities={[8, 12]}
+                      showOtherQuantitiesLink={true}
+                      otherQuantitiesLabel="Other sizes"
+                      otherQuantities={[1, 2, 3, 4, 5]}
                     />
                   </div>
                 </div>

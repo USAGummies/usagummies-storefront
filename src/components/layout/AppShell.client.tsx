@@ -308,7 +308,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-[var(--bg,#f8f5ef)] text-[var(--text)]">
       {cartToast ? (
         <div className="fixed right-4 top-20 z-50 max-w-[320px]">
-          <div className="candy-panel rounded-2xl border border-[var(--border)] px-4 py-3 text-[var(--text)] shadow-[0_18px_42px_rgba(15,27,45,0.14)]">
+          <div className="relative candy-panel rounded-2xl border border-[var(--border)] px-4 py-3 text-[var(--text)] shadow-[0_18px_42px_rgba(15,27,45,0.14)]">
+            <div className="pointer-events-none absolute -right-6 -top-4 h-20 w-20 opacity-12">
+              <Image
+                src="/website%20assets/StatueofLiberty.png"
+                alt=""
+                aria-hidden="true"
+                fill
+                sizes="80px"
+                className="object-contain"
+              />
+            </div>
             <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
               Added to cart
             </div>

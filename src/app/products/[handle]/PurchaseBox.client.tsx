@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import Link from "next/link";
+import Image from "next/image";
 import { pricingForQty, BASE_PRICE, FREE_SHIP_QTY } from "@/lib/bundles/pricing";
 import { SINGLE_BAG_SKU, SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
 import { fireCartToast } from "@/lib/cartFeedback";
@@ -76,15 +76,6 @@ type BundleOption = {
 };
 
 const VISIBLE_QUANTITIES = [1, 2, 3, 4, 5, 8, 12];
-const SAVINGS_LADDER = [
-  { qty: 4, label: "Savings start", caption: "4+ bags" },
-  { qty: 5, label: "Free shipping", caption: "5+ bags" },
-  { qty: 8, label: "Most popular", caption: "8 bags" },
-  { qty: 12, label: "Best price", caption: "12 bags" },
-];
-const MISSION_TARGET_QTY = 8;
-const MISSION_SOCIAL_PROOF = "87% of shoppers end at 8 bags.";
-const COMPLETE_TARGETS = [5, 8, 12];
 
 function money(amount?: number, currencyCode = "USD") {
   const n = Number(amount);
@@ -167,24 +158,6 @@ export default function PurchaseBox({
   const currentBags = Math.max(0, Number(bagCount) || 0);
   const currentPricing = currentBags > 0 ? pricingForQty(currentBags) : null;
   const currentTotal = currentPricing?.total ?? 0;
-  const topMilestone = SAVINGS_LADDER[SAVINGS_LADDER.length - 1];
-  const bestPriceReached = currentBags >= topMilestone.qty;
-  const nextMilestone = bestPriceReached
-    ? topMilestone
-    : SAVINGS_LADDER.find((milestone) => currentBags < milestone.qty) || topMilestone;
-  const missionRemaining = Math.max(0, MISSION_TARGET_QTY - currentBags);
-  const missionProgressCount = Math.min(currentBags, topMilestone.qty);
-  const missionProgressPct = Math.min(
-    100,
-    Math.round((missionProgressCount / topMilestone.qty) * 100)
-  );
-  const missionCtaLabel =
-    missionRemaining > 0
-      ? `Lock in savings now: add ${missionRemaining} bag${missionRemaining === 1 ? "" : "s"} (total ${MISSION_TARGET_QTY})`
-      : `Savings locked at ${MISSION_TARGET_QTY} bags`;
-  const mysteryBonusLine = bestPriceReached
-    ? "Mystery extra revealed: Patriot Pride sticker (while supplies last)."
-    : "Mystery extra unlocks at 12 bags.";
   const isFlat = surface === "flat";
   const isIntegrated = layout === "integrated";
   const isFusion = layout === "fusion";
@@ -239,7 +212,7 @@ export default function PurchaseBox({
     });
   }, [availableTiers, singleVariant, baselineCurrency, currentBags, currentTotal]);
 
-  const featuredQuantities = [8, 12];
+  const featuredQuantities = [8, 12, 5];
 
   const featuredOptions = useMemo<BundleOption[]>(() => {
     if (!bundleOptions.length) return [];
@@ -314,37 +287,24 @@ export default function PurchaseBox({
     (selectedVariant?.price as any)?.currencyCode ||
     (selectedVariant?.priceV2 as any)?.currencyCode ||
     baselineCurrency;
-  const completeTargets = useMemo(() => {
-    if (currentBags >= COMPLETE_TARGETS[COMPLETE_TARGETS.length - 1]) return [];
-    return COMPLETE_TARGETS.filter((target) => target > currentBags).map((target) => {
-      const addQty = Math.max(1, target - currentBags);
-      const targetPricing = pricingForQty(target);
-      const addTotal = Math.max(0, targetPricing.total - currentTotal);
-      return {
-        target,
-        addQty,
-        addTotalText: money(addTotal, selectedCurrency),
-      };
-    });
-  }, [currentBags, currentTotal, selectedCurrency]);
   const selectedPriceText = money(selectedAddTotal, selectedCurrency);
   const selectedNextTotalText = money(selectedNextTotal, selectedCurrency);
   const hasAdded = lastAddedQty !== null;
   const selectedAdded = hasAdded && lastAddedQty === optionQty;
   const isAdding = addingQty !== null;
   const ctaLabel = isAdding
-    ? "Locking in..."
+    ? "Adding..."
     : selectedAdded
-      ? `Savings locked: ${formatQtyLabel(optionQty)} (total ${selectedNextBags})`
-      : `Lock in savings now: ${formatQtyLabel(optionQty)} (total ${selectedNextBags})`;
+      ? "Added to cart"
+      : `Add ${formatQtyLabel(optionQty)} to cart`;
 
   const hasExtraSelected = extraOptions.some((o) => o.qty === selectedQty);
   const showExtras = showMore || hasExtraSelected;
   const toggleExtrasLabel = hasExtraSelected
-    ? "Smaller quantities selected"
+    ? "Other sizes selected"
     : showExtras
-      ? "Hide smaller quantities"
-      : "Need fewer bags?";
+      ? "Hide other sizes"
+      : "Other sizes (1-4)";
 
   const radioOptions = useMemo(() => {
     return showExtras ? [...featuredOptions, ...extraOptions] : featuredOptions;
@@ -444,10 +404,10 @@ export default function PurchaseBox({
     selectedNextBags >= 12
       ? "Best price selected."
       : selectedNextBags >= 8
-        ? "Most popular price selected."
+        ? "Most popular bundle selected."
         : selectedNextBags >= 5
-          ? "Free shipping eligible."
-          : "Value size selected.";
+          ? "Free shipping bundle selected."
+          : "Small order selected.";
   const cardHint = curatedStatus;
 
   return (
@@ -480,150 +440,8 @@ export default function PurchaseBox({
                 </div>
               </div>
             </div>
-
-            <div className="pbx__ladder">
-              <div className="pbx__ladderTitle">Savings ladder</div>
-              <div className="pbx__ladderGrid">
-                {SAVINGS_LADDER.map((milestone) => {
-                  const isNext = !bestPriceReached && milestone.qty === nextMilestone.qty;
-                  const isBest = bestPriceReached && milestone.qty === topMilestone.qty;
-                  const isReached = currentBags >= milestone.qty;
-                  const isPopularComplete =
-                    milestone.qty === MISSION_TARGET_QTY && currentBags >= milestone.qty;
-                  return (
-                    <div
-                      key={milestone.qty}
-                      className={cx(
-                        "pbx__ladderItem",
-                        (isNext || isBest) && "pbx__ladderItem--next",
-                        isReached && !(isNext || isBest) && "pbx__ladderItem--reached"
-                      )}
-                    >
-                      <div className="pbx__ladderLabel">{milestone.label}</div>
-                      <div className="pbx__ladderCaption">{milestone.caption}</div>
-                      {isNext ? (
-                        <div className="pbx__ladderNext">Next up</div>
-                      ) : isBest ? (
-                        <div className="pbx__ladderNext">Best price applied</div>
-                      ) : isPopularComplete ? (
-                        <div className="pbx__ladderNext">Most popular mission complete</div>
-                      ) : null}
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="pbx__ladderProof">{MISSION_SOCIAL_PROOF}</div>
-            </div>
-
-            <div className="pbx__mission">
-              <div className="pbx__missionHeader">
-                <div className="pbx__missionTitle">Mission to savings</div>
-                <div className="pbx__missionProgress">
-                  Progress: {missionProgressCount}/{topMilestone.qty} bags
-                </div>
-              </div>
-              <div className="pbx__missionCopy">
-                Hit 8 bags to unlock the crowd-favorite price.
-              </div>
-              <div className="pbx__missionBar">
-                <div className="mission-bar" aria-hidden="true">
-                  <div className="mission-bar__fill" style={{ width: `${missionProgressPct}%` }} />
-                  {SAVINGS_LADDER.map((milestone) => {
-                    const left = (milestone.qty / topMilestone.qty) * 100;
-                    const reached = currentBags >= milestone.qty;
-                    const isNext = !bestPriceReached && milestone.qty === nextMilestone.qty;
-                    return (
-                      <span
-                        key={milestone.qty}
-                        className={cx(
-                          "mission-bar__tick",
-                          reached && "mission-bar__tick--reached",
-                          isNext && "mission-bar__tick--next"
-                        )}
-                        style={{ left: `${left}%` }}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-              <div className="pbx__missionStatus">
-                {bestPriceReached
-                  ? "Best price applied."
-                  : `Progress: ${missionProgressCount}/${topMilestone.qty} bags`}
-              </div>
-              <div className="pbx__missionActions">
-                {missionRemaining > 0 ? (
-                  <button
-                    type="button"
-                    onClick={() => addToCart(missionRemaining)}
-                    disabled={addingQty !== null}
-                    className="btn btn-candy pressable pbx__missionCta"
-                  >
-                    {addingQty ? "Locking in..." : missionCtaLabel}
-                  </button>
-                ) : (
-                  <span className="pbx__missionBadge">{missionCtaLabel}</span>
-                )}
-              </div>
-              <div className="pbx__missionList">
-                <div className="pbx__missionListTitle">Finish your bag count</div>
-                {[
-                  { qty: 4, label: "Savings pricing unlocked" },
-                  { qty: 5, label: "Free shipping unlocked" },
-                  { qty: 8, label: "Crowd-favorite price unlocked" },
-                  {
-                    qty: 12,
-                    label: bestPriceReached
-                      ? "Patriot Pride sticker revealed"
-                      : "Mystery extra unlocks",
-                  },
-                ].map((item) => {
-                  const done = currentBags >= item.qty;
-                  return (
-                    <div
-                      key={item.qty}
-                      className={cx("pbx__missionItem", done && "pbx__missionItem--done")}
-                    >
-                      <span className="pbx__missionDot" aria-hidden="true">
-                        {done ? (
-                          <svg viewBox="0 0 24 24" className="pbx__missionCheck" aria-hidden="true">
-                            <path
-                              fill="currentColor"
-                              d="M9.2 16.2 5.5 12.5l1.4-1.4 2.3 2.3 7.2-7.2 1.4 1.4z"
-                            />
-                          </svg>
-                        ) : null}
-                      </span>
-                      <span>
-                        {item.label}
-                        {item.qty === 12 ? " (12 bags)" : ` (${item.qty}+ bags)`}
-                      </span>
-                    </div>
-                  );
-                })}
-                <div className="pbx__missionBonus">{mysteryBonusLine}</div>
-              </div>
-            </div>
-
-            <div className="pbx__freeShip">
-              Free shipping at 5+ bags (based on your total)
-            </div>
-
-            <div className="pbx__pricingNote">
-              <div className="pbx__pricingLine">
-                How pricing works: selections add bags, never replace your cart.
-              </div>
-              <details className="pbx__pricingDetails">
-                <summary className="pbx__pricingSummary">Learn more</summary>
-                <div className="pbx__pricingBody">
-                  Savings start at 4 bags, free shipping unlocks at 5 bags, and the best per-bag price
-                  shows up at 12 bags.{" "}
-                  <Link href="/faq" className="pbx__pricingLink">
-                    Read the FAQ
-                  </Link>
-                  .
-                </div>
-              </details>
+            <div className="pbx__curatedLine">
+              Best value bundles: 5, 8, and 12 bags.
             </div>
           </div>
 
@@ -636,15 +454,6 @@ export default function PurchaseBox({
                     const badge = badgeForTotal(o.nextBags ?? o.qty);
                     const index = radioIndexByQty.get(o.qty) ?? 0;
                     const popular = (o.nextBags ?? o.qty) === 8;
-                    const isAdded = lastAddedQty === o.qty;
-                    const isAddingThis = addingQty === o.qty;
-                    const tileCtaLabel = isAddingThis
-                      ? "Locking in..."
-                      : isAdded
-                        ? "Savings locked"
-                        : hasAdded
-                          ? "Lock in more savings"
-                          : "Lock in savings now";
 
                     return (
                       <div
@@ -678,31 +487,6 @@ export default function PurchaseBox({
                             Total after add: {money(o.nextTotal, o.currencyCode)} - ~{money(o.perBag, o.currencyCode)} / bag
                           </div>
                         </div>
-
-                        <div className="pbx__tileMeta">
-                          {o.savingsAmount > 0 ? (
-                            <span className="pbx__tileSave">Save {money(o.savingsAmount, o.currencyCode)} total</span>
-                          ) : (
-                            <span className="pbx__tileSave pbx__tileSave--muted">Standard price</span>
-                          )}
-                          {o.freeShipping ? <span className="pbx__tileShip">Free shipping</span> : null}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            addToCart(o.qty);
-                          }}
-                          disabled={isAdding}
-                          className={cx(
-                            "pbx__tileCta",
-                            isAdded && "pbx__tileCta--added",
-                            hasAdded && !isAdded && "pbx__tileCta--upgrade"
-                          )}
-                        >
-                          {tileCtaLabel}
-                        </button>
                       </div>
                     );
                   })}
@@ -750,36 +534,19 @@ export default function PurchaseBox({
               ) : null}
             </div>
 
-            <div className="pbx__complete">
-              <div className="pbx__completeTitle">Complete your savings</div>
-              {completeTargets.length ? (
-                <div className="pbx__completeGrid">
-                  {completeTargets.map((target) => (
-                    <button
-                      key={target.target}
-                      type="button"
-                      onClick={() => addToCart(target.addQty)}
-                      disabled={addingQty !== null}
-                      className="pbx__completeBtn"
-                    >
-                      <span className="pbx__completeLabel">
-                        Lock in savings now: {target.addQty} bag{target.addQty === 1 ? "" : "s"} (total {target.target})
-                      </span>
-                      <span className="pbx__completePrice">
-                        {target.addTotalText ? `+${target.addTotalText}` : ""}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="pbx__completeBadge">Best price unlocked.</div>
-              )}
-            </div>
-
             <div className="pbx__summary" aria-live="polite" role="status">
+              <Image
+                src="/website%20assets/Jeep.png"
+                alt=""
+                aria-hidden="true"
+                width={900}
+                height={600}
+                sizes="140px"
+                className="pbx__summaryAccent"
+              />
               <div className="pbx__summaryMeta">
                 <div className="pbx__summaryLabel">
-                  {selectedAdded ? "Savings locked" : "Lock in savings now"} {formatQtyLabel(optionQty)}
+                  {selectedAdded ? "Added to cart" : "Selected bundle"}: {formatQtyLabel(optionQty)}
                 </div>
                 <div className="pbx__summaryPrice">+{selectedPriceText}</div>
                 {currentBags > 0 ? (
@@ -945,6 +712,12 @@ export default function PurchaseBox({
         .pbx__packIcon{ opacity:0.92; filter: drop-shadow(0 8px 14px rgba(13,28,51,0.18)); }
         .pbx__gummyRow{ opacity:0.85; }
         .pbx__cardHint{ font-size:13px; color: var(--muted); }
+        .pbx__curatedLine{
+          margin-top: 6px;
+          font-size: 12px;
+          font-weight: 600;
+          color: var(--muted);
+        }
         .pbx__freeShip{
           margin-top:10px;
           font-size:12px;
@@ -1368,6 +1141,15 @@ export default function PurchaseBox({
           gap:12px;
           position: relative;
         }
+        .pbx__summaryAccent{
+          position: absolute;
+          right: -12px;
+          top: -10px;
+          width: 140px;
+          height: auto;
+          opacity: 0.16;
+          pointer-events: none;
+        }
         @media (min-width: 768px){
           .pbx__summary{
             grid-template-columns: 1fr auto;
@@ -1458,6 +1240,11 @@ export default function PurchaseBox({
           .pbx__tilePrice{ font-size:26px; }
           .pbx__summary{ padding:12px; }
           .pbx__cta{ width:100%; justify-content:center; }
+          .pbx__summaryAccent{
+            width: 110px;
+            right: -6px;
+            top: -6px;
+          }
           .pbx__miniRow{
             flex-wrap:nowrap;
             overflow-x:auto;
@@ -1516,11 +1303,17 @@ export default function PurchaseBox({
           box-shadow: none;
         }
         .pbx__featured{
-          grid-template-columns: 1fr;
-          gap: 12px;
+          grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+          gap: 10px;
+          align-items: stretch;
+        }
+        @media (max-width: 768px){
+          .pbx__featured{
+            grid-template-columns: 1fr;
+          }
         }
         .pbx__tile{
-          min-height: 150px;
+          min-height: 140px;
           padding: 14px;
           box-shadow: none;
         }
@@ -1535,12 +1328,17 @@ export default function PurchaseBox({
           background: rgba(239,59,59,0.08);
           box-shadow: 0 16px 40px rgba(239,59,59,0.18);
           transform: translateY(-2px);
+          grid-row: span 2;
         }
         .pbx__tile[data-qty="8"] .pbx__tileMeta{
           display: flex;
         }
         .pbx__tile[data-qty="8"] .pbx__tilePrice{
           font-size: 34px;
+        }
+        .pbx__tile[data-qty="5"]{
+          border-color: rgba(15,27,45,0.16);
+          background: rgba(15,27,45,0.02);
         }
         .pbx__tile[data-qty="12"]{
           border-color: rgba(199,160,98,0.35);
@@ -1552,10 +1350,20 @@ export default function PurchaseBox({
           color: var(--gold);
         }
         .pbx__badge{
-          display: none;
+          display: inline-flex;
+          font-size: 10px;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
         }
         .pbx__tile[data-qty="8"] .pbx__badge{
-          display: inline-flex;
+          border-color: rgba(239,59,59,0.45);
+          background: rgba(239,59,59,0.12);
+          color: var(--red);
+        }
+        .pbx__tile[data-qty="5"] .pbx__badge{
+          border-color: rgba(15,27,45,0.18);
+          background: rgba(15,27,45,0.06);
+          color: var(--muted);
         }
         .pbx__summary{
           margin-top: 14px;

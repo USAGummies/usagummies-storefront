@@ -509,7 +509,17 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
       <div className="px-4 py-4 text-[var(--text)]">
         {hasLines ? (
           <>
-            <div className="rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-3 shadow-[0_10px_24px_rgba(15,27,45,0.08)]">
+            <div className="relative rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-3 shadow-[0_10px_24px_rgba(15,27,45,0.08)]">
+              <div className="pointer-events-none absolute -right-4 -bottom-4 h-24 w-24 opacity-15">
+                <Image
+                  src="/website%20assets/Truck.png"
+                  alt=""
+                  aria-hidden="true"
+                  fill
+                  sizes="96px"
+                  className="object-contain"
+                />
+              </div>
               <div className="flex items-center justify-between gap-2">
                 <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
                   Order summary

@@ -589,6 +589,24 @@ a:focus-visible:not(.btn):not(.focus-ring),
   filter: saturate(0.35);
   pointer-events: none;
 }
+.bundle-quickbuy__accent{
+  position: absolute;
+  right: -26px;
+  top: -18px;
+  width: min(220px, 40vw);
+  height: auto;
+  opacity: 0.18;
+  filter: saturate(0.4);
+  pointer-events: none;
+}
+@media (max-width: 640px){
+  .bundle-quickbuy__accent{
+    right: -10px;
+    top: -8px;
+    width: min(160px, 48vw);
+    opacity: 0.16;
+  }
+}
 .bundle-integrated__header{
   display: grid;
   gap: 6px;
@@ -1912,7 +1930,7 @@ a:focus-visible:not(.btn):not(.focus-ring),
 }
 @media (min-width: 640px){
   .atomic-buy__bundle [data-bundle-root] [role="radiogroup"]{
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: 1fr;
   }
   .atomic-buy__bundle [data-bundle-root] [role="radio"]{
     min-height: 130px;

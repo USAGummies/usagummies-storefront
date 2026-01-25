@@ -37,6 +37,11 @@ type Props = {
   showHowItWorks?: boolean;
   summaryCopy?: string;
   showTrainAccent?: boolean;
+  showAccent?: boolean;
+  accentSrc?: string;
+  showEducation?: boolean;
+  ctaVariant?: "detailed" | "simple";
+  primaryCtaLabel?: string;
   showOtherQuantitiesLink?: boolean;
   otherQuantitiesLabel?: string;
   otherQuantities?: number[];
@@ -99,6 +104,11 @@ export default function BundleQuickBuy({
   showHowItWorks = true,
   summaryCopy,
   showTrainAccent = false,
+  showAccent = false,
+  accentSrc = "/website%20assets/Train-02.png",
+  showEducation = true,
+  ctaVariant = "detailed",
+  primaryCtaLabel = "Shop & save",
   showOtherQuantitiesLink = false,
   otherQuantitiesLabel = "Need fewer bags?",
   otherQuantities,
@@ -162,27 +172,40 @@ export default function BundleQuickBuy({
     });
   }, [allTiers, isCompact, featuredQuantities]);
 
-  const expandedTiers = React.useMemo(() => {
-    if (!showOtherQuantitiesLink || !showOtherQuantities) {
-      return primaryTiers;
-    }
-    if (!otherQuantities?.length) {
-      return allTiers;
-    }
-    const otherSet = new Set(otherQuantities.map((q) => String(q)));
-    const combined = [...primaryTiers];
-    allTiers.forEach((tier) => {
-      const key = String(tier.quantity);
-      if (otherSet.has(key) && !combined.some((t) => t.quantity === tier.quantity)) {
-        combined.push(tier);
-      }
+  const secondaryTiers = React.useMemo(() => {
+    if (!showOtherQuantitiesLink) return [];
+    const primarySet = new Set(primaryTiers.map((t) => String(t.quantity)));
+    const otherSet = otherQuantities?.length
+      ? new Set(otherQuantities.map((q) => String(q)))
+      : null;
+    const pool = otherSet
+      ? allTiers.filter((tier) => otherSet.has(String(tier.quantity)))
+      : allTiers.filter((tier) => !primarySet.has(String(tier.quantity)));
+    return pool.filter((tier) => !primarySet.has(String(tier.quantity)));
+  }, [allTiers, primaryTiers, showOtherQuantitiesLink, otherQuantities]);
+
+  const selectableTiers = React.useMemo(() => {
+    const combined = [...primaryTiers, ...secondaryTiers];
+    const seen = new Set<number>();
+    return combined.filter((tier) => {
+      if (seen.has(tier.quantity)) return false;
+      seen.add(tier.quantity);
+      return true;
     });
-    combined.sort((a, b) => a.quantity - b.quantity);
-    return combined;
-  }, [allTiers, primaryTiers, showOtherQuantities, showOtherQuantitiesLink, otherQuantities]);
+  }, [primaryTiers, secondaryTiers]);
+
+  const hasSecondarySelected = secondaryTiers.some(
+    (tier) => String(tier.quantity) === selected
+  );
+  const showSecondaryTiers = showOtherQuantities || hasSecondarySelected;
+  const secondaryToggleLabel = hasSecondarySelected
+    ? "Other sizes selected"
+    : showSecondaryTiers
+      ? "Hide other sizes"
+      : otherQuantitiesLabel;
 
   React.useEffect(() => {
-    const pool = expandedTiers;
+    const pool = selectableTiers;
     if (!pool.length) return;
     const selectedInPool = pool.some((t) => String(t.quantity) === selected);
     const preferred =
@@ -192,19 +215,21 @@ export default function BundleQuickBuy({
     if (!selectedInPool && preferred) {
       setSelected(String(preferred.quantity) as TierKey);
     }
-  }, [expandedTiers, selected]);
+  }, [selectableTiers, selected]);
 
   const selectedTier =
-    expandedTiers.find((t) => String(t.quantity) === selected) || expandedTiers[0] || null;
+    selectableTiers.find((t) => String(t.quantity) === selected) || selectableTiers[0] || null;
   const selectedTierState = selectedTier ? resolveTier(selectedTier) : null;
   const perBagCapText = money(MIN_PER_BAG, "USD");
   const reviewSnippets = REVIEW_HIGHLIGHTS.slice(0, 2);
   const summaryLine =
-    summaryCopy === undefined
-      ? currentBags > 0
-        ? `In your cart: ${currentBags} bags. Add more to save. ${FREE_SHIPPING_PHRASE}.`
-        : `${FREE_SHIPPING_PHRASE}. Most customers choose 8 bags.`
-      : summaryCopy;
+    summaryCopy !== undefined
+      ? summaryCopy
+      : showEducation
+        ? currentBags > 0
+          ? `In your cart: ${currentBags} bags. Add more to save. ${FREE_SHIPPING_PHRASE}.`
+          : `${FREE_SHIPPING_PHRASE}. Most customers choose 8 bags.`
+        : "";
   const hasAdded = lastAddedQty !== null;
   const selectedAdded = Boolean(
     selectedTier && lastAddedQty !== null && selectedTier.quantity === lastAddedQty
@@ -250,13 +275,13 @@ export default function BundleQuickBuy({
   const ctaDisabled = !singleBagVariantId || !isTierPurchasable(selectedTier);
   const isAdding = addingQty !== null;
 
-  const selectableTiers = React.useMemo(
+  const selectableTiersForKeys = React.useMemo(
     () =>
-      expandedTiers.filter((tier) => {
+      selectableTiers.filter((tier) => {
         if (availableForSale === false) return false;
         return Number.isFinite(tier.totalPrice ?? NaN) && tier.totalPrice !== null;
       }),
-    [expandedTiers, availableForSale]
+    [selectableTiers, availableForSale]
   );
 
   function handleRadioKeyDown(
@@ -272,20 +297,20 @@ export default function BundleQuickBuy({
     const keys = ["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp", "Home", "End"];
     if (!keys.includes(event.key)) return;
     event.preventDefault();
-    if (!selectableTiers.length) return;
-    const currentIndex = selectableTiers.findIndex((tier) => tier.quantity === quantity);
+    if (!selectableTiersForKeys.length) return;
+    const currentIndex = selectableTiersForKeys.findIndex((tier) => tier.quantity === quantity);
     if (currentIndex === -1) return;
     let nextIndex = currentIndex;
     if (event.key === "ArrowRight" || event.key === "ArrowDown") {
-      nextIndex = Math.min(currentIndex + 1, selectableTiers.length - 1);
+      nextIndex = Math.min(currentIndex + 1, selectableTiersForKeys.length - 1);
     } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
       nextIndex = Math.max(currentIndex - 1, 0);
     } else if (event.key === "Home") {
       nextIndex = 0;
     } else if (event.key === "End") {
-      nextIndex = selectableTiers.length - 1;
+      nextIndex = selectableTiersForKeys.length - 1;
     }
-    const nextTier = selectableTiers[nextIndex];
+    const nextTier = selectableTiersForKeys[nextIndex];
     if (nextTier) {
       handleSelect(nextTier.quantity, true);
     }
@@ -302,12 +327,12 @@ export default function BundleQuickBuy({
     source: "cta" | "tile" | "mission" = "cta"
   ) {
     const qty = Math.max(1, Number(targetQty ?? selectedTier?.quantity ?? 0) || 0);
-    const targetTier = expandedTiers.find((tier) => tier.quantity === qty) || selectedTier;
+    const targetTier = selectableTiers.find((tier) => tier.quantity === qty) || selectedTier;
     if (!singleBagVariantId || !isTierPurchasable(targetTier) || !qty) {
       setError(availableForSale === false ? "Out of stock" : "Select a bag count to continue.");
       return;
     }
-    if (expandedTiers.some((tier) => tier.quantity === qty)) {
+    if (selectableTiers.some((tier) => tier.quantity === qty)) {
       setSelected(String(qty) as TierKey);
     }
     trackEvent("bundle_add_to_cart", {
@@ -360,6 +385,36 @@ export default function BundleQuickBuy({
     const perBag = Number.isFinite(pricing.perBag) ? pricing.perBag : null;
     const savings = nextTotal ? Math.max(0, BASE_PRICE * nextBags - nextTotal) : null;
     return { nextBags, nextTotal, addTotal, perBag, savings };
+  }
+
+  function renderSecondaryPill(tier: BundleTier) {
+    const isActive = String(tier.quantity) === selected;
+    const tierState = resolveTier(tier);
+    const displayAdd = Number.isFinite(tierState.addTotal ?? NaN)
+      ? money(tierState.addTotal, "USD")
+      : null;
+    return (
+      <button
+        key={`secondary-${tier.quantity}`}
+        type="button"
+        role="radio"
+        aria-checked={isActive}
+        tabIndex={isActive ? 0 : -1}
+        onClick={() => handleSelect(tier.quantity, true)}
+        className={[
+          "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-semibold transition",
+          isLight
+            ? "border-[rgba(15,27,45,0.12)] bg-white text-[var(--text)] hover:border-[rgba(15,27,45,0.28)]"
+            : "border-white/15 bg-white/5 text-white/85 hover:border-white/40",
+          isActive ? (isLight ? "border-[rgba(239,59,59,0.45)] bg-[rgba(239,59,59,0.08)] text-[var(--red)]" : "border-[rgba(248,212,79,0.55)] bg-white/10 text-white") : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+      >
+        <span>+{tier.quantity} bags</span>
+        {displayAdd ? <span className={isLight ? "text-[var(--muted)]" : "text-white/70"}>+{displayAdd}</span> : null}
+      </button>
+    );
   }
 
   function renderRow(tier: BundleTier) {
@@ -890,34 +945,76 @@ export default function BundleQuickBuy({
               .filter(Boolean)
               .join(" ")}
           >
-            <div className={isLight ? "text-[14px] font-medium text-[var(--muted)]" : "text-[14px] font-medium text-white/80"}>
-              {selectedAdded ? "Savings locked" : "Lock in savings now"} +{selectedTier.quantity} bags
-            </div>
-            <div
-              key={`${selectedTier.quantity}-${selectedTierState?.addTotal}`}
-              className={[
-                isLight ? "text-[24px] font-bold text-[var(--text)]" : "text-[24px] font-bold text-white",
-                isFusion ? "bundle-fusion__ctaPrice" : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-            >
-              {Number.isFinite(selectedTierState?.addTotal ?? NaN)
-                ? `+${money(selectedTierState?.addTotal, "USD")}`
-                : "—"}
-            </div>
-            {Number.isFinite(selectedTierState?.nextTotal ?? NaN) ? (
-              <div
-                className={[
-                  isLight ? "text-[12px] text-[var(--muted)]" : "text-[12px] text-white/70",
-                  isFusion ? "bundle-fusion__ctaTotal" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-              >
-                New total: {selectedTierState?.nextBags} bags - {money(selectedTierState?.nextTotal, "USD")}
-              </div>
-            ) : null}
+            {ctaVariant === "simple" ? (
+              <>
+                <div className={isLight ? "text-[12px] font-semibold text-[var(--muted)]" : "text-[12px] font-semibold text-white/75"}>
+                  {selectedTier.quantity === 8
+                    ? "Most popular"
+                    : selectedTier.quantity === 12
+                      ? "Best price"
+                      : selectedTier.quantity === 5
+                        ? "Free shipping"
+                        : "Other size"}{" "}
+                  - {selectedTier.quantity} bags selected
+                </div>
+                <div
+                  key={`${selectedTier.quantity}-${selectedTierState?.addTotal}`}
+                  className={[
+                    isLight ? "text-[22px] font-bold text-[var(--text)]" : "text-[22px] font-bold text-white",
+                    isFusion ? "bundle-fusion__ctaPrice" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                >
+                  {Number.isFinite(selectedTierState?.addTotal ?? NaN)
+                    ? `+${money(selectedTierState?.addTotal, "USD")}`
+                    : "—"}
+                </div>
+                {Number.isFinite(selectedTierState?.nextTotal ?? NaN) ? (
+                  <div
+                    className={[
+                      isLight ? "text-[11px] text-[var(--muted)]" : "text-[11px] text-white/70",
+                      isFusion ? "bundle-fusion__ctaTotal" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                  >
+                    New total: {selectedTierState?.nextBags} bags - {money(selectedTierState?.nextTotal, "USD")}
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <div className={isLight ? "text-[14px] font-medium text-[var(--muted)]" : "text-[14px] font-medium text-white/80"}>
+                  {selectedAdded ? "Savings locked" : "Lock in savings now"} +{selectedTier.quantity} bags
+                </div>
+                <div
+                  key={`${selectedTier.quantity}-${selectedTierState?.addTotal}`}
+                  className={[
+                    isLight ? "text-[24px] font-bold text-[var(--text)]" : "text-[24px] font-bold text-white",
+                    isFusion ? "bundle-fusion__ctaPrice" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                >
+                  {Number.isFinite(selectedTierState?.addTotal ?? NaN)
+                    ? `+${money(selectedTierState?.addTotal, "USD")}`
+                    : "—"}
+                </div>
+                {Number.isFinite(selectedTierState?.nextTotal ?? NaN) ? (
+                  <div
+                    className={[
+                      isLight ? "text-[12px] text-[var(--muted)]" : "text-[12px] text-white/70",
+                      isFusion ? "bundle-fusion__ctaTotal" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                  >
+                    New total: {selectedTierState?.nextBags} bags - {money(selectedTierState?.nextTotal, "USD")}
+                  </div>
+                ) : null}
+              </>
+            )}
           </div>
         ) : (
           <div
@@ -1021,6 +1118,8 @@ export default function BundleQuickBuy({
                 />
                 Locking in...
               </>
+            ) : ctaVariant === "simple" ? (
+              selectedAdded ? "Added to cart" : primaryCtaLabel
             ) : Number.isFinite(selectedTierState?.addTotal ?? NaN) ? (
               selectedAdded && Number.isFinite(selectedTierState?.nextBags ?? NaN)
                 ? `Savings locked: ${selectedTier?.quantity} bags (total ${selectedTierState?.nextBags})`
@@ -1150,7 +1249,7 @@ export default function BundleQuickBuy({
     </>
   );
 
-  if (!expandedTiers.length) {
+  if (!selectableTiers.length) {
     return (
       <section
         id={anchorId}
@@ -1203,129 +1302,133 @@ export default function BundleQuickBuy({
               ) : null}
             </div>
 
-            <div className="bundle-fusion__rail">
-              {SAVINGS_LADDER.map((milestone) => {
-                const isNext = !bestPriceReached && milestone.qty === nextMilestone.qty;
-                const isBest = bestPriceReached && milestone.qty === topMilestone.qty;
-                const isReached = currentBags >= milestone.qty;
-                const isActive = isNext || isBest;
-                return (
-                  <div
-                    key={milestone.qty}
-                    className={[
-                      "bundle-fusion__milestone",
-                      isActive ? "bundle-fusion__milestone--active" : "",
-                      isReached && !isActive ? "bundle-fusion__milestone--reached" : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                  >
-                    <span className="bundle-fusion__milestoneDot" aria-hidden="true" />
-                    <div className="bundle-fusion__milestoneLabel">{milestone.label}</div>
-                    <div className="bundle-fusion__milestoneCaption">{milestone.caption}</div>
-                    {isActive ? (
-                      <div className="bundle-fusion__milestoneNote">
-                        {isBest ? "Best price applied" : "Next up"}
+            {showEducation ? (
+              <>
+                <div className="bundle-fusion__rail">
+                  {SAVINGS_LADDER.map((milestone) => {
+                    const isNext = !bestPriceReached && milestone.qty === nextMilestone.qty;
+                    const isBest = bestPriceReached && milestone.qty === topMilestone.qty;
+                    const isReached = currentBags >= milestone.qty;
+                    const isActive = isNext || isBest;
+                    return (
+                      <div
+                        key={milestone.qty}
+                        className={[
+                          "bundle-fusion__milestone",
+                          isActive ? "bundle-fusion__milestone--active" : "",
+                          isReached && !isActive ? "bundle-fusion__milestone--reached" : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                      >
+                        <span className="bundle-fusion__milestoneDot" aria-hidden="true" />
+                        <div className="bundle-fusion__milestoneLabel">{milestone.label}</div>
+                        <div className="bundle-fusion__milestoneCaption">{milestone.caption}</div>
+                        {isActive ? (
+                          <div className="bundle-fusion__milestoneNote">
+                            {isBest ? "Best price applied" : "Next up"}
+                          </div>
+                        ) : null}
                       </div>
-                    ) : null}
-                  </div>
-                );
-              })}
-            </div>
-            <div className="bundle-fusion__railProof">{MISSION_SOCIAL_PROOF}</div>
-
-            <div className="bundle-fusion__mission">
-              <div className="bundle-fusion__missionHeader">
-                <span>Mission to savings</span>
-                <span>
-                  Progress: {missionProgressCount}/{topMilestone.qty} bags
-                </span>
-              </div>
-              <div className="bundle-fusion__missionCopy">
-                Hit 8 bags to unlock the crowd-favorite price.
-              </div>
-              <div className="mission-bar" aria-hidden="true">
-                <div className="mission-bar__fill" style={{ width: `${missionProgressPct}%` }} />
-                {SAVINGS_LADDER.map((milestone) => {
-                  const left = (milestone.qty / topMilestone.qty) * 100;
-                  const reached = currentBags >= milestone.qty;
-                  const isNext = !bestPriceReached && milestone.qty === nextMilestone.qty;
-                  return (
-                    <span
-                      key={milestone.qty}
-                      className={[
-                        "mission-bar__tick",
-                        reached ? "mission-bar__tick--reached" : "",
-                        isNext ? "mission-bar__tick--next" : "",
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                      style={{ left: `${left}%` }}
-                    />
-                  );
-                })}
-              </div>
-              <div className="bundle-fusion__missionBadges">
-                {[
-                  { qty: 4, label: "Savings unlocked" },
-                  { qty: 5, label: "Free shipping unlocked" },
-                  { qty: 8, label: "Crowd favorite unlocked" },
-                  {
-                    qty: 12,
-                    label: bestPriceReached ? "Mystery extra revealed" : "Mystery extra unlocks",
-                  },
-                ].map((badge) => {
-                  const unlocked = currentBags >= badge.qty;
-                  return (
-                    <span
-                      key={badge.qty}
-                      className={[
-                        "bundle-fusion__missionBadge",
-                        unlocked ? "bundle-fusion__missionBadge--active" : "",
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                    >
-                      {badge.label}
-                    </span>
-                  );
-                })}
-              </div>
-              <div className="bundle-fusion__missionActions">
-                {missionRemaining > 0 ? (
-                  <button
-                    type="button"
-                    onClick={() => addToCart(missionRemaining, "mission")}
-                    disabled={addingQty !== null || !singleBagVariantId}
-                    className="btn btn-candy pressable"
-                  >
-                    {addingQty ? "Locking in..." : missionCtaLabel}
-                  </button>
-                ) : (
-                  <span className="bundle-fusion__missionDone">{missionCtaLabel}</span>
-                )}
-              </div>
-              <div className="bundle-fusion__missionNote">{mysteryBonusLine}</div>
-            </div>
-
-            {showHowItWorks ? (
-              <div className="bundle-fusion__how">
-                <div className="text-[11px] font-semibold">
-                  How pricing works: selections add bags, never replace your cart.
+                    );
+                  })}
                 </div>
-                <details className="mt-2">
-                  <summary className="cursor-pointer text-[11px] font-semibold text-[var(--text)]">
-                    Learn more
-                  </summary>
-                  <div className="mt-1 text-[11px] text-[var(--muted)]">
-                    Savings start at 4 bags, free shipping unlocks at 5 bags, and per-bag pricing caps at {perBagCapText} after 12+ bags.{" "}
-                    <Link href="/faq" className="underline underline-offset-2">
-                      Read the FAQ
-                    </Link>
-                    .
+                <div className="bundle-fusion__railProof">{MISSION_SOCIAL_PROOF}</div>
+
+                <div className="bundle-fusion__mission">
+                  <div className="bundle-fusion__missionHeader">
+                    <span>Mission to savings</span>
+                    <span>
+                      Progress: {missionProgressCount}/{topMilestone.qty} bags
+                    </span>
                   </div>
-                </details>
-              </div>
+                  <div className="bundle-fusion__missionCopy">
+                    Hit 8 bags to unlock the crowd-favorite price.
+                  </div>
+                  <div className="mission-bar" aria-hidden="true">
+                    <div className="mission-bar__fill" style={{ width: `${missionProgressPct}%` }} />
+                    {SAVINGS_LADDER.map((milestone) => {
+                      const left = (milestone.qty / topMilestone.qty) * 100;
+                      const reached = currentBags >= milestone.qty;
+                      const isNext = !bestPriceReached && milestone.qty === nextMilestone.qty;
+                      return (
+                        <span
+                          key={milestone.qty}
+                          className={[
+                            "mission-bar__tick",
+                            reached ? "mission-bar__tick--reached" : "",
+                            isNext ? "mission-bar__tick--next" : "",
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                          style={{ left: `${left}%` }}
+                        />
+                      );
+                    })}
+                  </div>
+                  <div className="bundle-fusion__missionBadges">
+                    {[
+                      { qty: 4, label: "Savings unlocked" },
+                      { qty: 5, label: "Free shipping unlocked" },
+                      { qty: 8, label: "Crowd favorite unlocked" },
+                      {
+                        qty: 12,
+                        label: bestPriceReached ? "Mystery extra revealed" : "Mystery extra unlocks",
+                      },
+                    ].map((badge) => {
+                      const unlocked = currentBags >= badge.qty;
+                      return (
+                        <span
+                          key={badge.qty}
+                          className={[
+                            "bundle-fusion__missionBadge",
+                            unlocked ? "bundle-fusion__missionBadge--active" : "",
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                        >
+                          {badge.label}
+                        </span>
+                      );
+                    })}
+                  </div>
+                  <div className="bundle-fusion__missionActions">
+                    {missionRemaining > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => addToCart(missionRemaining, "mission")}
+                        disabled={addingQty !== null || !singleBagVariantId}
+                        className="btn btn-candy pressable"
+                      >
+                        {addingQty ? "Locking in..." : missionCtaLabel}
+                      </button>
+                    ) : (
+                      <span className="bundle-fusion__missionDone">{missionCtaLabel}</span>
+                    )}
+                  </div>
+                  <div className="bundle-fusion__missionNote">{mysteryBonusLine}</div>
+                </div>
+
+                {showHowItWorks ? (
+                  <div className="bundle-fusion__how">
+                    <div className="text-[11px] font-semibold">
+                      How pricing works: selections add bags, never replace your cart.
+                    </div>
+                    <details className="mt-2">
+                      <summary className="cursor-pointer text-[11px] font-semibold text-[var(--text)]">
+                        Learn more
+                      </summary>
+                      <div className="mt-1 text-[11px] text-[var(--muted)]">
+                        Savings start at 4 bags, free shipping unlocks at 5 bags, and per-bag pricing caps at {perBagCapText} after 12+ bags.{" "}
+                        <Link href="/faq" className="underline underline-offset-2">
+                          Read the FAQ
+                        </Link>
+                        .
+                      </div>
+                    </details>
+                  </div>
+                ) : null}
+              </>
             ) : null}
           </div>
 
@@ -1333,7 +1436,7 @@ export default function BundleQuickBuy({
             <div className="bundle-fusion__panel">
               {isCompact ? (
                 <div className="bundle-fusion__list" role="radiogroup" aria-label="Bag count">
-                  {expandedTiers.map((tier) => renderRow(tier))}
+                  {primaryTiers.map((tier) => renderRow(tier))}
                 </div>
               ) : (
                 <div className="bundle-fusion__list bundle-fusion__list--slider">
@@ -1351,20 +1454,31 @@ export default function BundleQuickBuy({
                       ].join(" ")}
                     />
                     <div className="flex snap-x snap-mandatory gap-2.5 overflow-x-auto pb-2 pr-4 bundle-slider">
-                      {expandedTiers.map((tier) => renderRow(tier))}
+                      {primaryTiers.map((tier) => renderRow(tier))}
                     </div>
                   </div>
                 </div>
               )}
 
-              {showOtherQuantitiesLink && !showOtherQuantities ? (
-                <button
-                  type="button"
-                  onClick={() => setShowOtherQuantities(true)}
-                  className="bundle-fusion__more"
-                >
-                  {otherQuantitiesLabel}
-                </button>
+              {showOtherQuantitiesLink && secondaryTiers.length ? (
+                <div className="mt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowOtherQuantities((prev) => !prev)}
+                    className="bundle-fusion__more"
+                  >
+                    {secondaryToggleLabel}
+                  </button>
+                  {showSecondaryTiers ? (
+                    <div
+                      className="mt-2 flex flex-wrap gap-2"
+                      role="radiogroup"
+                      aria-label="Other bag sizes"
+                    >
+                      {secondaryTiers.map((tier) => renderSecondaryPill(tier))}
+                    </div>
+                  ) : null}
+                </div>
               ) : null}
 
               <div
@@ -1420,131 +1534,135 @@ export default function BundleQuickBuy({
 
         <div className="bundle-integrated__grid">
           <div className="bundle-integrated__guide">
-            <div className="bundle-integrated__ladder">
-              <div className="bundle-integrated__ladderRow">
-                {SAVINGS_LADDER.map((milestone) => {
-                  const isNext = !bestPriceReached && milestone.qty === nextMilestone.qty;
-                  const isBest = bestPriceReached && milestone.qty === topMilestone.qty;
-                  const isReached = currentBags >= milestone.qty;
-                  const isActive = isNext || isBest;
-                  return (
-                    <div
-                      key={milestone.qty}
-                      className={[
-                        "bundle-integrated__ladderItem",
-                        isActive ? "bundle-integrated__ladderItem--active" : "",
-                        isReached && !isActive ? "bundle-integrated__ladderItem--reached" : "",
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                    >
-                      <span className="bundle-integrated__ladderDot" aria-hidden="true" />
-                      <div className="bundle-integrated__ladderLabel">{milestone.label}</div>
-                      <div className="bundle-integrated__ladderCaption">{milestone.caption}</div>
-                      {isActive ? (
-                        <div className="bundle-integrated__ladderNote">
-                          {isBest ? "Best price applied" : "Next up"}
+            {showEducation ? (
+              <>
+                <div className="bundle-integrated__ladder">
+                  <div className="bundle-integrated__ladderRow">
+                    {SAVINGS_LADDER.map((milestone) => {
+                      const isNext = !bestPriceReached && milestone.qty === nextMilestone.qty;
+                      const isBest = bestPriceReached && milestone.qty === topMilestone.qty;
+                      const isReached = currentBags >= milestone.qty;
+                      const isActive = isNext || isBest;
+                      return (
+                        <div
+                          key={milestone.qty}
+                          className={[
+                            "bundle-integrated__ladderItem",
+                            isActive ? "bundle-integrated__ladderItem--active" : "",
+                            isReached && !isActive ? "bundle-integrated__ladderItem--reached" : "",
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                        >
+                          <span className="bundle-integrated__ladderDot" aria-hidden="true" />
+                          <div className="bundle-integrated__ladderLabel">{milestone.label}</div>
+                          <div className="bundle-integrated__ladderCaption">{milestone.caption}</div>
+                          {isActive ? (
+                            <div className="bundle-integrated__ladderNote">
+                              {isBest ? "Best price applied" : "Next up"}
+                            </div>
+                          ) : null}
                         </div>
-                      ) : null}
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="bundle-integrated__ladderProof">{MISSION_SOCIAL_PROOF}</div>
-            </div>
-
-            <div className="bundle-integrated__mission">
-              <div className="bundle-integrated__missionHeader">
-                <span>Mission to savings</span>
-                <span>Progress: {missionProgressCount}/{topMilestone.qty} bags</span>
-              </div>
-              <div className="bundle-integrated__missionCopy">
-                Hit 8 bags to unlock the crowd-favorite price.
-              </div>
-              <div className="mission-bar" aria-hidden="true">
-                <div className="mission-bar__fill" style={{ width: `${missionProgressPct}%` }} />
-                {SAVINGS_LADDER.map((milestone) => {
-                  const left = (milestone.qty / topMilestone.qty) * 100;
-                  const reached = currentBags >= milestone.qty;
-                  const isNext = !bestPriceReached && milestone.qty === nextMilestone.qty;
-                  return (
-                    <span
-                      key={milestone.qty}
-                      className={[
-                        "mission-bar__tick",
-                        reached ? "mission-bar__tick--reached" : "",
-                        isNext ? "mission-bar__tick--next" : "",
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                      style={{ left: `${left}%` }}
-                    />
-                  );
-                })}
-              </div>
-              <div className="bundle-integrated__missionBadges">
-                {[
-                  { qty: 4, label: "Savings unlocked" },
-                  { qty: 5, label: "Free shipping unlocked" },
-                  { qty: 8, label: "Crowd favorite unlocked" },
-                  {
-                    qty: 12,
-                    label: bestPriceReached ? "Mystery extra revealed" : "Mystery extra unlocks",
-                  },
-                ].map((badge) => {
-                  const unlocked = currentBags >= badge.qty;
-                  return (
-                    <span
-                      key={badge.qty}
-                      className={[
-                        "bundle-integrated__missionBadge",
-                        unlocked ? "bundle-integrated__missionBadge--active" : "",
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                    >
-                      {badge.label}
-                    </span>
-                  );
-                })}
-              </div>
-              <div className="bundle-integrated__missionActions">
-                {missionRemaining > 0 ? (
-                  <button
-                    type="button"
-                    onClick={() => addToCart(missionRemaining, "mission")}
-                    disabled={addingQty !== null || !singleBagVariantId}
-                    className="btn btn-candy pressable"
-                  >
-                    {addingQty ? "Locking in..." : missionCtaLabel}
-                  </button>
-                ) : (
-                  <span className="bundle-integrated__missionDone">
-                    {missionCtaLabel}
-                  </span>
-                )}
-              </div>
-              <div className="bundle-integrated__missionNote">{mysteryBonusLine}</div>
-            </div>
-
-            {showHowItWorks ? (
-              <div className="bundle-integrated__how">
-                <div className="text-[11px] font-semibold">
-                  How pricing works: selections add bags, never replace your cart.
-                </div>
-                <details className="mt-2">
-                  <summary className="cursor-pointer text-[11px] font-semibold text-[var(--text)]">
-                    Learn more
-                  </summary>
-                  <div className="mt-1 text-[11px] text-[var(--muted)]">
-                    Savings start at 4 bags, free shipping unlocks at 5 bags, and per-bag pricing caps at {perBagCapText} after 12+ bags.{" "}
-                    <Link href="/faq" className="underline underline-offset-2">
-                      Read the FAQ
-                    </Link>
-                    .
+                      );
+                    })}
                   </div>
-                </details>
-              </div>
+                  <div className="bundle-integrated__ladderProof">{MISSION_SOCIAL_PROOF}</div>
+                </div>
+
+                <div className="bundle-integrated__mission">
+                  <div className="bundle-integrated__missionHeader">
+                    <span>Mission to savings</span>
+                    <span>Progress: {missionProgressCount}/{topMilestone.qty} bags</span>
+                  </div>
+                  <div className="bundle-integrated__missionCopy">
+                    Hit 8 bags to unlock the crowd-favorite price.
+                  </div>
+                  <div className="mission-bar" aria-hidden="true">
+                    <div className="mission-bar__fill" style={{ width: `${missionProgressPct}%` }} />
+                    {SAVINGS_LADDER.map((milestone) => {
+                      const left = (milestone.qty / topMilestone.qty) * 100;
+                      const reached = currentBags >= milestone.qty;
+                      const isNext = !bestPriceReached && milestone.qty === nextMilestone.qty;
+                      return (
+                        <span
+                          key={milestone.qty}
+                          className={[
+                            "mission-bar__tick",
+                            reached ? "mission-bar__tick--reached" : "",
+                            isNext ? "mission-bar__tick--next" : "",
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                          style={{ left: `${left}%` }}
+                        />
+                      );
+                    })}
+                  </div>
+                  <div className="bundle-integrated__missionBadges">
+                    {[
+                      { qty: 4, label: "Savings unlocked" },
+                      { qty: 5, label: "Free shipping unlocked" },
+                      { qty: 8, label: "Crowd favorite unlocked" },
+                      {
+                        qty: 12,
+                        label: bestPriceReached ? "Mystery extra revealed" : "Mystery extra unlocks",
+                      },
+                    ].map((badge) => {
+                      const unlocked = currentBags >= badge.qty;
+                      return (
+                        <span
+                          key={badge.qty}
+                          className={[
+                            "bundle-integrated__missionBadge",
+                            unlocked ? "bundle-integrated__missionBadge--active" : "",
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                        >
+                          {badge.label}
+                        </span>
+                      );
+                    })}
+                  </div>
+                  <div className="bundle-integrated__missionActions">
+                    {missionRemaining > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => addToCart(missionRemaining, "mission")}
+                        disabled={addingQty !== null || !singleBagVariantId}
+                        className="btn btn-candy pressable"
+                      >
+                        {addingQty ? "Locking in..." : missionCtaLabel}
+                      </button>
+                    ) : (
+                      <span className="bundle-integrated__missionDone">
+                        {missionCtaLabel}
+                      </span>
+                    )}
+                  </div>
+                  <div className="bundle-integrated__missionNote">{mysteryBonusLine}</div>
+                </div>
+
+                {showHowItWorks ? (
+                  <div className="bundle-integrated__how">
+                    <div className="text-[11px] font-semibold">
+                      How pricing works: selections add bags, never replace your cart.
+                    </div>
+                    <details className="mt-2">
+                      <summary className="cursor-pointer text-[11px] font-semibold text-[var(--text)]">
+                        Learn more
+                      </summary>
+                      <div className="mt-1 text-[11px] text-[var(--muted)]">
+                        Savings start at 4 bags, free shipping unlocks at 5 bags, and per-bag pricing caps at {perBagCapText} after 12+ bags.{" "}
+                        <Link href="/faq" className="underline underline-offset-2">
+                          Read the FAQ
+                        </Link>
+                        .
+                      </div>
+                    </details>
+                  </div>
+                ) : null}
+              </>
             ) : null}
           </div>
 
@@ -1556,7 +1674,7 @@ export default function BundleQuickBuy({
                 role="radiogroup"
                 aria-label="Bag count"
               >
-                {expandedTiers.map((tier) => renderRow(tier))}
+                {primaryTiers.map((tier) => renderRow(tier))}
               </div>
             ) : (
               <>
@@ -1573,19 +1691,30 @@ export default function BundleQuickBuy({
                   ].join(" ")}
                 />
                 <div className="flex snap-x snap-mandatory gap-2.5 overflow-x-auto pb-2 pr-4 bundle-slider">
-                  {expandedTiers.map((tier) => renderRow(tier))}
+                  {primaryTiers.map((tier) => renderRow(tier))}
                 </div>
               </>
             )}
 
-            {showOtherQuantitiesLink && !showOtherQuantities ? (
-              <button
-                type="button"
-                onClick={() => setShowOtherQuantities(true)}
-                className="bundle-integrated__more"
-              >
-                {otherQuantitiesLabel}
-              </button>
+            {showOtherQuantitiesLink && secondaryTiers.length ? (
+              <div className="mt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowOtherQuantities((prev) => !prev)}
+                  className="bundle-integrated__more"
+                >
+                  {secondaryToggleLabel}
+                </button>
+                {showSecondaryTiers ? (
+                  <div
+                    className="mt-2 flex flex-wrap gap-2"
+                    role="radiogroup"
+                    aria-label="Other bag sizes"
+                  >
+                    {secondaryTiers.map((tier) => renderSecondaryPill(tier))}
+                  </div>
+                ) : null}
+              </div>
             ) : null}
 
             <div
@@ -1627,6 +1756,17 @@ export default function BundleQuickBuy({
               : "border-white/10 bg-white/[0.06] shadow-[0_30px_90px_rgba(0,0,0,0.35)] backdrop-blur-xl pb-16 sm:pb-12",
       ].join(" ")}
     >
+      {showAccent ? (
+        <Image
+          src={accentSrc}
+          alt=""
+          aria-hidden="true"
+          width={1200}
+          height={800}
+          sizes="(max-width: 768px) 200px, 260px"
+          className="bundle-quickbuy__accent"
+        />
+      ) : null}
       {isCompact || isFlat ? null : (
         <div className="pointer-events-none absolute inset-0 opacity-12 bg-[radial-gradient(circle_at_10%_16%,rgba(255,255,255,0.22),transparent_36%),radial-gradient(circle_at_86%_8%,rgba(10,60,138,0.3),transparent_44%),linear-gradient(135deg,rgba(214,64,58,0.18),rgba(12,20,38,0.38)),repeating-linear-gradient(135deg,rgba(255,255,255,0.07)_0,rgba(255,255,255,0.07)_8px,transparent_8px,transparent_16px)]" />
       )}
@@ -1675,203 +1815,207 @@ export default function BundleQuickBuy({
           {summaryLine}
         </p>
       ) : null}
-          <div data-bundle-ladder className="mt-2 grid gap-2 sm:grid-cols-4">
-            {SAVINGS_LADDER.map((milestone) => {
-              const isNext = !bestPriceReached && milestone.qty === nextMilestone.qty;
-              const isBest = bestPriceReached && milestone.qty === topMilestone.qty;
-              const isReached = currentBags >= milestone.qty;
-              const isPopularComplete =
-                milestone.qty === MISSION_TARGET_QTY && currentBags >= milestone.qty;
-              return (
+          {showEducation ? (
+            <>
+              <div data-bundle-ladder className="mt-2 grid gap-2 sm:grid-cols-4">
+                {SAVINGS_LADDER.map((milestone) => {
+                  const isNext = !bestPriceReached && milestone.qty === nextMilestone.qty;
+                  const isBest = bestPriceReached && milestone.qty === topMilestone.qty;
+                  const isReached = currentBags >= milestone.qty;
+                  const isPopularComplete =
+                    milestone.qty === MISSION_TARGET_QTY && currentBags >= milestone.qty;
+                  return (
+                    <div
+                      key={milestone.qty}
+                      className={[
+                        isFlat ? "px-0 py-1 text-[11px] font-semibold" : "rounded-2xl border px-2.5 py-2 text-[11px] font-semibold",
+                        isFlat
+                          ? isLight
+                            ? "text-[var(--text)]"
+                            : "text-white/85"
+                          : isLight
+                            ? "border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] text-[var(--text)]"
+                            : "border-white/10 bg-white/5 text-white/85",
+                        !isFlat && (isNext || isBest)
+                          ? isLight
+                            ? "border-[rgba(239,59,59,0.45)] bg-[rgba(239,59,59,0.08)]"
+                            : "border-[rgba(248,212,79,0.5)] bg-[rgba(248,212,79,0.08)]"
+                          : "",
+                        isReached && !(isNext || isBest) && (isLight ? "opacity-90" : "opacity-80"),
+                      ].join(" ")}
+                    >
+                      <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--muted)]">
+                        {milestone.label}
+                      </div>
+                      <div className={isLight ? "text-[var(--text)]" : "text-white"}>
+                        {milestone.caption}
+                      </div>
+                      {isNext ? (
+                        <div
+                          className={[
+                            "text-[10px] font-semibold",
+                            isLight ? "text-[var(--candy-red)]" : "text-[var(--gold)]",
+                          ].join(" ")}
+                        >
+                          Next up
+                        </div>
+                      ) : isBest ? (
+                        <div
+                          className={[
+                            "text-[10px] font-semibold",
+                            isLight ? "text-[var(--candy-red)]" : "text-[var(--gold)]",
+                          ].join(" ")}
+                        >
+                          Best price applied
+                        </div>
+                      ) : isPopularComplete ? (
+                        <div
+                          className={[
+                            "text-[10px] font-semibold",
+                            isLight ? "text-[var(--candy-red)]" : "text-[var(--gold)]",
+                          ].join(" ")}
+                        >
+                          Most popular mission complete
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+              <div
+                data-bundle-proof
+                className={[
+                  "mt-2 text-[11px] font-semibold",
+                  isLight ? "text-[var(--muted)]" : "text-white/70",
+                ].join(" ")}
+              >
+                {MISSION_SOCIAL_PROOF}
+              </div>
+              <div
+                data-bundle-mission
+                className={[
+                  isFlat ? "mt-3 pt-1 text-xs" : "mt-3 rounded-2xl border px-3 py-3 text-xs",
+                  isFlat
+                    ? isLight
+                      ? "text-[var(--muted)]"
+                      : "text-white/70"
+                    : isLight
+                      ? "border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] text-[var(--muted)]"
+                      : "border-white/12 bg-white/5 text-white/70",
+                ].join(" ")}
+              >
+                <div className="text-[10px] font-semibold uppercase tracking-[0.24em]">
+                  Mission to savings
+                </div>
                 <div
-                  key={milestone.qty}
                   className={[
-                    isFlat ? "px-0 py-1 text-[11px] font-semibold" : "rounded-2xl border px-2.5 py-2 text-[11px] font-semibold",
-                    isFlat
-                      ? isLight
-                        ? "text-[var(--text)]"
-                        : "text-white/85"
-                      : isLight
-                        ? "border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] text-[var(--text)]"
-                        : "border-white/10 bg-white/5 text-white/85",
-                    !isFlat && (isNext || isBest)
-                      ? isLight
-                        ? "border-[rgba(239,59,59,0.45)] bg-[rgba(239,59,59,0.08)]"
-                        : "border-[rgba(248,212,79,0.5)] bg-[rgba(248,212,79,0.08)]"
-                      : "",
-                    isReached && !(isNext || isBest) && (isLight ? "opacity-90" : "opacity-80"),
+                    "mt-1 flex flex-wrap items-center justify-between gap-2 text-[11px] font-semibold",
+                    isLight ? "text-[var(--text)]" : "text-white/85",
                   ].join(" ")}
                 >
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--muted)]">
-                    {milestone.label}
-                  </div>
-                  <div className={isLight ? "text-[var(--text)]" : "text-white"}>
-                    {milestone.caption}
-                  </div>
-                  {isNext ? (
-                    <div
-                      className={[
-                        "text-[10px] font-semibold",
-                        isLight ? "text-[var(--candy-red)]" : "text-[var(--gold)]",
-                      ].join(" ")}
-                    >
-                      Next up
-                    </div>
-                  ) : isBest ? (
-                    <div
-                      className={[
-                        "text-[10px] font-semibold",
-                        isLight ? "text-[var(--candy-red)]" : "text-[var(--gold)]",
-                      ].join(" ")}
-                    >
-                      Best price applied
-                    </div>
-                  ) : isPopularComplete ? (
-                    <div
-                      className={[
-                        "text-[10px] font-semibold",
-                        isLight ? "text-[var(--candy-red)]" : "text-[var(--gold)]",
-                      ].join(" ")}
-                    >
-                      Most popular mission complete
-                    </div>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-          <div
-            data-bundle-proof
-            className={[
-              "mt-2 text-[11px] font-semibold",
-              isLight ? "text-[var(--muted)]" : "text-white/70",
-            ].join(" ")}
-          >
-            {MISSION_SOCIAL_PROOF}
-          </div>
-          <div
-            data-bundle-mission
-            className={[
-              isFlat ? "mt-3 pt-1 text-xs" : "mt-3 rounded-2xl border px-3 py-3 text-xs",
-              isFlat
-                ? isLight
-                  ? "text-[var(--muted)]"
-                  : "text-white/70"
-                : isLight
-                  ? "border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] text-[var(--muted)]"
-                  : "border-white/12 bg-white/5 text-white/70",
-            ].join(" ")}
-          >
-            <div className="text-[10px] font-semibold uppercase tracking-[0.24em]">
-              Mission to savings
-            </div>
-            <div
-              className={[
-                "mt-1 flex flex-wrap items-center justify-between gap-2 text-[11px] font-semibold",
-                isLight ? "text-[var(--text)]" : "text-white/85",
-              ].join(" ")}
-            >
-              <span>Hit 8 bags to unlock the crowd-favorite price.</span>
-              <span>
-                Progress: {missionProgressCount}/{topMilestone.qty} bags
-              </span>
-            </div>
-            <div className="mt-2 mission-bar" aria-hidden="true">
-              <div className="mission-bar__fill" style={{ width: `${missionProgressPct}%` }} />
-              {SAVINGS_LADDER.map((milestone) => {
-                const left = (milestone.qty / topMilestone.qty) * 100;
-                const reached = currentBags >= milestone.qty;
-                const isNext = !bestPriceReached && milestone.qty === nextMilestone.qty;
-                return (
-                  <span
-                    key={milestone.qty}
-                    className={[
-                      "mission-bar__tick",
-                      reached ? "mission-bar__tick--reached" : "",
-                      isNext ? "mission-bar__tick--next" : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                    style={{ left: `${left}%` }}
-                  />
-                );
-              })}
-            </div>
-            <div
-              data-bundle-mission-status
-              className={[
-                "mt-2 text-[11px] font-semibold",
-                isLight ? "text-[var(--text)]" : "text-white/85",
-              ].join(" ")}
-            >
-              {bestPriceReached
-                ? "Best price applied"
-                : `Progress: ${missionProgressCount}/${topMilestone.qty} bags`}
-            </div>
-            <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-semibold">
-              {[
-                { qty: 4, label: "Savings unlocked" },
-                { qty: 5, label: "Free shipping unlocked" },
-                { qty: 8, label: "Crowd favorite unlocked" },
-                {
-                  qty: 12,
-                  label: bestPriceReached ? "Mystery extra revealed" : "Mystery extra unlocks",
-                },
-              ].map((badge) => {
-                const unlocked = currentBags >= badge.qty;
-                return (
-                  <span
-                    key={badge.qty}
-                    className={[
-                      isFlat ? "inline-flex items-center px-2 py-1" : "inline-flex items-center rounded-full border px-2 py-1",
-                      isFlat
-                        ? unlocked
-                          ? isLight
-                            ? "text-[var(--candy-red)]"
-                            : "text-[var(--gold)]"
-                          : isLight
-                            ? "text-[var(--muted)]"
-                            : "text-white/60"
-                        : unlocked
-                          ? isLight
-                            ? "border-[rgba(239,59,59,0.35)] bg-[rgba(239,59,59,0.12)] text-[var(--candy-red)]"
-                            : "border-[rgba(248,212,79,0.5)] bg-[rgba(248,212,79,0.12)] text-[var(--gold)]"
-                          : isLight
-                            ? "border-[rgba(15,27,45,0.12)] bg-white text-[var(--muted)]"
-                            : "border-white/10 bg-white/5 text-white/60",
-                    ].join(" ")}
-                  >
-                    {badge.label}
+                  <span>Hit 8 bags to unlock the crowd-favorite price.</span>
+                  <span>
+                    Progress: {missionProgressCount}/{topMilestone.qty} bags
                   </span>
-                );
-              })}
-            </div>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              {missionRemaining > 0 ? (
-                <button
-                  type="button"
-                  onClick={() => addToCart(missionRemaining, "mission")}
-                  disabled={addingQty !== null || !singleBagVariantId}
-                  className="btn btn-candy pressable"
+                </div>
+                <div className="mt-2 mission-bar" aria-hidden="true">
+                  <div className="mission-bar__fill" style={{ width: `${missionProgressPct}%` }} />
+                  {SAVINGS_LADDER.map((milestone) => {
+                    const left = (milestone.qty / topMilestone.qty) * 100;
+                    const reached = currentBags >= milestone.qty;
+                    const isNext = !bestPriceReached && milestone.qty === nextMilestone.qty;
+                    return (
+                      <span
+                        key={milestone.qty}
+                        className={[
+                          "mission-bar__tick",
+                          reached ? "mission-bar__tick--reached" : "",
+                          isNext ? "mission-bar__tick--next" : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                        style={{ left: `${left}%` }}
+                      />
+                    );
+                  })}
+                </div>
+                <div
+                  data-bundle-mission-status
+                  className={[
+                    "mt-2 text-[11px] font-semibold",
+                    isLight ? "text-[var(--text)]" : "text-white/85",
+                  ].join(" ")}
                 >
-                  {addingQty ? "Locking in..." : missionCtaLabel}
-                </button>
-              ) : (
-                <span
-                  className={
-                    isFlat
-                      ? "inline-flex text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--candy-red)]"
-                      : "inline-flex rounded-full border border-[rgba(239,59,59,0.35)] bg-[rgba(239,59,59,0.12)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--candy-red)]"
-                  }
-                >
-                  {missionCtaLabel}
-                </span>
-              )}
-            </div>
-            <div className="mt-2 text-[11px] font-semibold">
-              {mysteryBonusLine}
-            </div>
-          </div>
+                  {bestPriceReached
+                    ? "Best price applied"
+                    : `Progress: ${missionProgressCount}/${topMilestone.qty} bags`}
+                </div>
+                <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-semibold">
+                  {[
+                    { qty: 4, label: "Savings unlocked" },
+                    { qty: 5, label: "Free shipping unlocked" },
+                    { qty: 8, label: "Crowd favorite unlocked" },
+                    {
+                      qty: 12,
+                      label: bestPriceReached ? "Mystery extra revealed" : "Mystery extra unlocks",
+                    },
+                  ].map((badge) => {
+                    const unlocked = currentBags >= badge.qty;
+                    return (
+                      <span
+                        key={badge.qty}
+                        className={[
+                          isFlat ? "inline-flex items-center px-2 py-1" : "inline-flex items-center rounded-full border px-2 py-1",
+                          isFlat
+                            ? unlocked
+                              ? isLight
+                                ? "text-[var(--candy-red)]"
+                                : "text-[var(--gold)]"
+                              : isLight
+                                ? "text-[var(--muted)]"
+                                : "text-white/60"
+                            : unlocked
+                              ? isLight
+                                ? "border-[rgba(239,59,59,0.35)] bg-[rgba(239,59,59,0.12)] text-[var(--candy-red)]"
+                                : "border-[rgba(248,212,79,0.5)] bg-[rgba(248,212,79,0.12)] text-[var(--gold)]"
+                              : isLight
+                                ? "border-[rgba(15,27,45,0.12)] bg-white text-[var(--muted)]"
+                                : "border-white/10 bg-white/5 text-white/60",
+                        ].join(" ")}
+                      >
+                        {badge.label}
+                      </span>
+                    );
+                  })}
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {missionRemaining > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => addToCart(missionRemaining, "mission")}
+                      disabled={addingQty !== null || !singleBagVariantId}
+                      className="btn btn-candy pressable"
+                    >
+                      {addingQty ? "Locking in..." : missionCtaLabel}
+                    </button>
+                  ) : (
+                    <span
+                      className={
+                        isFlat
+                          ? "inline-flex text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--candy-red)]"
+                          : "inline-flex rounded-full border border-[rgba(239,59,59,0.35)] bg-[rgba(239,59,59,0.12)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--candy-red)]"
+                      }
+                    >
+                      {missionCtaLabel}
+                    </span>
+                  )}
+                </div>
+                <div className="mt-2 text-[11px] font-semibold">
+                  {mysteryBonusLine}
+                </div>
+              </div>
+            </>
+          ) : null}
         </div>
         {showTrainAccent ? (
           <Image
@@ -1885,7 +2029,7 @@ export default function BundleQuickBuy({
           />
         ) : null}
       </div>
-      {showHowItWorks ? (
+      {showEducation && showHowItWorks ? (
         <div
           className={[
             isFlat ? "relative mt-3 text-xs" : "relative mt-3 rounded-2xl border px-3 py-2 text-xs",
@@ -2004,7 +2148,7 @@ export default function BundleQuickBuy({
             role="radiogroup"
             aria-label="Bag count"
           >
-            {expandedTiers.map((tier) => renderRow(tier))}
+            {primaryTiers.map((tier) => renderRow(tier))}
           </div>
         ) : (
           <>
@@ -2021,22 +2165,33 @@ export default function BundleQuickBuy({
               ].join(" ")}
             />
             <div className="flex snap-x snap-mandatory gap-2.5 overflow-x-auto pb-2 pr-4 bundle-slider">
-              {expandedTiers.map((tier) => renderRow(tier))}
+              {primaryTiers.map((tier) => renderRow(tier))}
             </div>
           </>
         )}
       </div>
-      {showOtherQuantitiesLink && !showOtherQuantities ? (
-        <button
-          type="button"
-          onClick={() => setShowOtherQuantities(true)}
-          className={[
-            "mt-2 text-[11px] font-medium underline underline-offset-2 decoration-transparent hover:decoration-current",
-            isLight ? "text-[var(--muted)]/80 hover:text-[var(--text)]" : "text-white/60 hover:text-white",
-          ].join(" ")}
-        >
-          {otherQuantitiesLabel}
-        </button>
+      {showOtherQuantitiesLink && secondaryTiers.length ? (
+        <div className="mt-2 flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={() => setShowOtherQuantities((prev) => !prev)}
+            className={[
+              "w-fit text-[11px] font-medium underline underline-offset-2 decoration-transparent hover:decoration-current",
+              isLight ? "text-[var(--muted)]/80 hover:text-[var(--text)]" : "text-white/60 hover:text-white",
+            ].join(" ")}
+          >
+            {secondaryToggleLabel}
+          </button>
+          {showSecondaryTiers ? (
+            <div
+              className="flex flex-wrap gap-2"
+              role="radiogroup"
+              aria-label="Other bag sizes"
+            >
+              {secondaryTiers.map((tier) => renderSecondaryPill(tier))}
+            </div>
+          ) : null}
+        </div>
       ) : null}
 
       <div

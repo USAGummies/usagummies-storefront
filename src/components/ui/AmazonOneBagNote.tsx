@@ -1,4 +1,5 @@
-import { AMAZON_LISTING_URL } from "@/lib/amazon";
+import Image from "next/image";
+import { AMAZON_LISTING_URL, AMAZON_LOGO_URL } from "@/lib/amazon";
 
 export function AmazonOneBagNote({
   className = "",
@@ -11,7 +12,7 @@ export function AmazonOneBagNote({
     .filter(Boolean)
     .join(" ");
   const linkClass = [
-    "underline underline-offset-4 text-[var(--text)] hover:text-[var(--navy)]",
+    "inline-flex items-center gap-2 underline underline-offset-4 text-[var(--text)] hover:text-[var(--navy)]",
     linkClassName,
   ]
     .filter(Boolean)
@@ -19,9 +20,16 @@ export function AmazonOneBagNote({
 
   return (
     <div className={baseClass}>
-      Want to try 1 bag?{" "}
+      Buying 1-4 bags?{" "}
       <a href={AMAZON_LISTING_URL} target="_blank" rel="noopener noreferrer" className={linkClass}>
-        Buy on Amazon
+        <Image
+          src={AMAZON_LOGO_URL}
+          alt="Amazon"
+          width={56}
+          height={16}
+          className="h-3.5 w-auto opacity-85"
+        />
+        <span>Buy on Amazon</span>
       </a>
       .
     </div>
