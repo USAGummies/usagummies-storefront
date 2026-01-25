@@ -419,42 +419,44 @@ export default async function HomePage() {
               <div id="hero-primary-cta" className="atomic-buy">
                 <div className="atomic-buy__glow" aria-hidden="true" />
                 <div className="atomic-buy__grid">
-                  <div className="atomic-buy__details">
-                    <div className="atomic-buy__kicker">USA Gummies</div>
-                    <div className="atomic-buy__title">Classic gummy bears, made in the USA.</div>
-                    <ul className="atomic-buy__bullets">
-                      {DETAIL_BULLETS.slice(0, 3).map((bullet) => (
-                        <li key={bullet} className="atomic-buy__bullet">
-                          <span className="atomic-buy__bulletDot" aria-hidden="true" />
-                          <span>{bullet}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    <div className="atomic-buy__chips">
-                      <span className="atomic-buy__chip">Made in USA</span>
-                      <span className="atomic-buy__chip">No artificial dyes</span>
-                      <span className="atomic-buy__chip">Ships in 24 hours</span>
-                      <span className="atomic-buy__chip">{FREE_SHIPPING_PHRASE}</span>
-                    </div>
-                    <div className="atomic-buy__ingredients">
-                      Ingredients &amp; allergen info:{" "}
-                      <Link href="/ingredients">ingredients</Link>.
-                    </div>
-                  </div>
-                  <div className="atomic-buy__media">
-                    <div className="atomic-buy__mediaFrame">
-                      <div className="relative aspect-[4/5] w-full">
-                        <Image
-                          src="/Hero-pack.jpeg"
-                          alt="USA Gummies bag"
-                          fill
-                          sizes="(max-width: 640px) 90vw, (max-width: 1024px) 45vw, 520px"
-                          className="object-contain drop-shadow-[0_24px_50px_rgba(13,28,51,0.2)]"
-                        />
+                  <div className="atomic-buy__product">
+                    <div className="atomic-buy__details">
+                      <div className="atomic-buy__kicker">USA Gummies</div>
+                      <div className="atomic-buy__title">Classic gummy bears, made in the USA.</div>
+                      <ul className="atomic-buy__bullets">
+                        {DETAIL_BULLETS.slice(0, 3).map((bullet) => (
+                          <li key={bullet} className="atomic-buy__bullet">
+                            <span className="atomic-buy__bulletDot" aria-hidden="true" />
+                            <span>{bullet}</span>
+                          </li>
+                        ))}
+                      </ul>
+                      <div className="atomic-buy__chips">
+                        <span className="atomic-buy__chip">Made in USA</span>
+                        <span className="atomic-buy__chip">No artificial dyes</span>
+                        <span className="atomic-buy__chip">Ships in 24 hours</span>
+                        <span className="atomic-buy__chip">{FREE_SHIPPING_PHRASE}</span>
                       </div>
-                      <span className="usa-stamp usa-stamp--small atomic-buy__stamp">
-                        Made in USA
-                      </span>
+                      <div className="atomic-buy__ingredients">
+                        Ingredients &amp; allergen info:{" "}
+                        <Link href="/ingredients">ingredients</Link>.
+                      </div>
+                    </div>
+                    <div className="atomic-buy__media">
+                      <div className="atomic-buy__mediaFrame">
+                        <div className="relative aspect-[4/5] w-full">
+                          <Image
+                            src="/Hero-pack.jpeg"
+                            alt="USA Gummies bag"
+                            fill
+                            sizes="(max-width: 640px) 90vw, (max-width: 1024px) 45vw, 520px"
+                            className="object-contain drop-shadow-[0_24px_50px_rgba(13,28,51,0.2)]"
+                          />
+                        </div>
+                        <span className="usa-stamp usa-stamp--small atomic-buy__stamp">
+                          Made in USA
+                        </span>
+                      </div>
                     </div>
                   </div>
                   <div className="atomic-buy__bundle">
@@ -470,10 +472,9 @@ export default async function HomePage() {
                       layout="classic"
                       showHowItWorks={false}
                       summaryCopy=""
-                      showTrainAccent
-                      featuredQuantities={[4, 5, 8, 12]}
-                      showOtherQuantitiesLink
-                      otherQuantities={[1, 2, 3]}
+                      showTrainAccent={false}
+                      featuredQuantities={[1, 2, 3, 4, 5, 8, 12]}
+                      showOtherQuantitiesLink={false}
                     />
                   </div>
                 </div>

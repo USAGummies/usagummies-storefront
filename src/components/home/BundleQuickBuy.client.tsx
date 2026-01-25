@@ -985,6 +985,7 @@ export default function BundleQuickBuy({
       ) : null}
 
       <div
+        data-bundle-cta-stack
         className={[
           "mt-3 flex flex-col gap-2",
           isFusion ? "bundle-fusion__ctaStack" : "",
@@ -993,6 +994,7 @@ export default function BundleQuickBuy({
           .join(" ")}
       >
         <button
+          data-primary-cta
           type="button"
           className={[
             "w-full inline-flex items-center justify-center rounded-[12px] h-[54px] px-4 sm:px-5 text-[16px] sm:text-[17px] font-semibold whitespace-nowrap shadow-[0_14px_36px_rgba(214,64,58,0.28)] hover:brightness-110 active:brightness-95 disabled:opacity-60 disabled:cursor-not-allowed leading-tight relative overflow-hidden",
@@ -1026,64 +1028,71 @@ export default function BundleQuickBuy({
             )}
           </span>
         </button>
-        <div
-          className={[
-            isLight
-              ? "text-xs text-[var(--muted)]"
-              : isCompact
-                ? "text-xs text-white/70"
-                : "text-xs text-white/75",
-            isFusion ? "bundle-fusion__ctaNote" : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
-        >
-          Love it or your money back • Ships within 24 hours • Secure checkout
-        </div>
-        <div
-          className={[
-            isFlat
-              ? isLight
-                ? "mt-2 text-[11px] text-[var(--muted)]"
-                : "mt-2 text-[11px] text-white/70"
-              : isLight
-                ? "mt-2 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white px-3 py-2 text-[11px] text-[var(--muted)]"
-                : "mt-2 rounded-2xl border border-white/12 bg-white/5 px-3 py-2 text-[11px] text-white/70",
-            isFusion ? "bundle-fusion__ctaProof" : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
-        >
-          <div className={isLight ? "font-semibold text-[var(--text)]" : "font-semibold text-white/90"}>
-            ⭐ {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars from verified Amazon buyers
+        <div data-bundle-cta-trust>
+          <div
+            data-bundle-cta-note
+            className={[
+              isLight
+                ? "text-xs text-[var(--muted)]"
+                : isCompact
+                  ? "text-xs text-white/70"
+                  : "text-xs text-white/75",
+              isFusion ? "bundle-fusion__ctaNote" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            Love it or your money back • Ships within 24 hours • Secure checkout
           </div>
-          <div className="mt-1 flex flex-wrap gap-2 text-[10px] font-semibold uppercase tracking-[0.12em]">
-            <span
-              className={
-                isFlat
-                  ? "px-0 py-0"
-                  : isLight
-                    ? "rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-2 py-1"
-                    : "rounded-full border border-white/10 bg-white/5 px-2 py-1"
-              }
-            >
-              Made in the USA
-            </span>
-            <span
-              className={
-                isFlat
-                  ? "px-0 py-0"
-                  : isLight
-                    ? "rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-2 py-1"
-                    : "rounded-full border border-white/10 bg-white/5 px-2 py-1"
-              }
-            >
-              No artificial dyes
-            </span>
+          <div
+            data-bundle-rating
+            className={[
+              isFlat
+                ? isLight
+                  ? "mt-2 text-[11px] text-[var(--muted)]"
+                  : "mt-2 text-[11px] text-white/70"
+                : isLight
+                  ? "mt-2 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white px-3 py-2 text-[11px] text-[var(--muted)]"
+                  : "mt-2 rounded-2xl border border-white/12 bg-white/5 px-3 py-2 text-[11px] text-white/70",
+              isFusion ? "bundle-fusion__ctaProof" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            <div className={isLight ? "font-semibold text-[var(--text)]" : "font-semibold text-white/90"}>
+              ⭐ {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars from verified Amazon buyers
+            </div>
+            <div className="mt-1 flex flex-wrap gap-2 text-[10px] font-semibold uppercase tracking-[0.12em]">
+              <span
+                className={
+                  isFlat
+                    ? "px-0 py-0"
+                    : isLight
+                      ? "rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-2 py-1"
+                      : "rounded-full border border-white/10 bg-white/5 px-2 py-1"
+                }
+              >
+                Made in the USA
+              </span>
+              <span
+                className={
+                  isFlat
+                    ? "px-0 py-0"
+                    : isLight
+                      ? "rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-2 py-1"
+                      : "rounded-full border border-white/10 bg-white/5 px-2 py-1"
+                }
+              >
+                No artificial dyes
+              </span>
+            </div>
           </div>
         </div>
         {!isFusion && reviewSnippets.length ? (
-          <div className={isLight ? "grid gap-1 text-[11px] text-[var(--muted)]" : "grid gap-1 text-[11px] text-white/70"}>
+          <div
+            data-bundle-reviews
+            className={isLight ? "grid gap-1 text-[11px] text-[var(--muted)]" : "grid gap-1 text-[11px] text-white/70"}
+          >
             {reviewSnippets.map((review) => (
               <div key={review.id} className="inline-flex items-center gap-2">
                 <span className={isLight ? "text-[var(--candy-yellow)]" : "text-[var(--gold)]"}>
@@ -1141,6 +1150,7 @@ export default function BundleQuickBuy({
     return (
       <section
         id={anchorId}
+        data-bundle-root
         className={[
           isFlat ? "border-0 bg-transparent p-0" : "rounded-3xl border p-4 sm:p-5",
           isCompact
@@ -1175,7 +1185,7 @@ export default function BundleQuickBuy({
 
   if (isFusion) {
     return (
-      <section id={anchorId} aria-label="Savings pricing" className="bundle-fusion">
+      <section id={anchorId} aria-label="Savings pricing" data-bundle-root className="bundle-fusion">
         <div className="bundle-fusion__grid">
           <div className="bundle-fusion__guide">
             <div className="bundle-fusion__intro">
@@ -1376,6 +1386,7 @@ export default function BundleQuickBuy({
       <section
         id={anchorId}
         aria-label="Savings pricing"
+        data-bundle-root
         className="bundle-integrated relative"
       >
         {showTrainAccent ? (
@@ -1594,6 +1605,7 @@ export default function BundleQuickBuy({
     <section
       id={anchorId}
       aria-label="Savings pricing"
+      data-bundle-root
       className={[
         "relative overflow-hidden",
         isFlat ? "w-full" : "mx-auto rounded-3xl border p-4 sm:p-5",
@@ -1892,6 +1904,7 @@ export default function BundleQuickBuy({
         </div>
       ) : null}
       <div
+        data-bundle-pretrust
         className={
           isFlat
             ? isLight
@@ -1963,7 +1976,7 @@ export default function BundleQuickBuy({
         </div>
       )}
 
-      <div className="relative mt-3">
+      <div data-bundle-grid className="relative mt-3">
         {isCompact ? (
           <div
             className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 sm:gap-4"
@@ -2006,6 +2019,7 @@ export default function BundleQuickBuy({
       ) : null}
 
       <div
+        data-bundle-cta
         className={[
           isFlat ? "mt-5 pt-4 border-t border-[rgba(15,27,45,0.12)]" : "mt-5 rounded-2xl border p-3 sm:p-3.5",
           isFlat
@@ -2026,7 +2040,10 @@ export default function BundleQuickBuy({
         {ctaContent}
       </div>
 
-      <div className={isLight ? "mt-3 flex items-center gap-3 text-xs text-[var(--muted)]" : isCompact ? "mt-3 flex items-center gap-3 text-xs text-white/60" : "mt-3 flex items-center gap-3 text-xs text-white/70"}>
+      <div
+        data-bundle-explore
+        className={isLight ? "mt-3 flex items-center gap-3 text-xs text-[var(--muted)]" : isCompact ? "mt-3 flex items-center gap-3 text-xs text-white/60" : "mt-3 flex items-center gap-3 text-xs text-white/70"}
+      >
         <Link
           href="/shop#product-bundles"
           className={
