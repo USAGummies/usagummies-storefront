@@ -1797,6 +1797,17 @@ export default function BundleQuickBuy({
                 );
               })}
             </div>
+            <div
+              data-bundle-mission-status
+              className={[
+                "mt-2 text-[11px] font-semibold",
+                isLight ? "text-[var(--text)]" : "text-white/85",
+              ].join(" ")}
+            >
+              {bestPriceReached
+                ? "Best price applied"
+                : `Progress: ${missionProgressCount}/${topMilestone.qty} bags`}
+            </div>
             <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-semibold">
               {[
                 { qty: 4, label: "Savings unlocked" },
