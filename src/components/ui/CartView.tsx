@@ -448,7 +448,17 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
       : totalBags > 0
         ? "Savings pending."
         : "";
-  const drawerUpsellLabel = nextTierAddQty ? nextTierCtaLabel : "";
+  const nextTierDescriptor =
+    nextMilestone.qty === 4
+      ? "savings pricing"
+      : nextMilestone.qty === 5
+        ? "free shipping"
+        : nextMilestone.qty === 8
+          ? "most popular price"
+          : "best price";
+  const drawerUpsellLabel = nextTierAddQty
+    ? `Add ${nextTierAddQty} bag${nextTierAddQty === 1 ? "" : "s"} for ${nextTierDescriptor}.`
+    : "";
 
   function handleCheckoutClick(event?: MouseEvent<HTMLAnchorElement>) {
     const safeCheckoutUrl = getSafeCheckoutUrl(
@@ -500,43 +510,70 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
         {hasLines ? (
           <>
             <div className="rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-3 shadow-[0_10px_24px_rgba(15,27,45,0.08)]">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
-                Order summary
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
+                  Order summary
+                </div>
+                <div className="text-[11px] font-semibold text-[var(--muted)]">
+                  {totalBags} bag{totalBags === 1 ? "" : "s"}
+                </div>
               </div>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                {cartPeekLines.map((l: any) => {
+              <div className="mt-2 divide-y divide-[rgba(15,27,45,0.08)]">
+                {lines.map((l: any) => {
                   const title = l?.merchandise?.product?.title || "Item";
+                  const img =
+                    l?.merchandise?.image?.url ||
+                    l?.merchandise?.product?.featuredImage?.url ||
+                    null;
                   const lineQty = Number(l?.quantity) || 0;
                   const bagsPerUnit = getBagsPerUnit(l?.merchandise);
                   const lineBags = bagsPerUnit * lineQty;
                   return (
-                    <div
-                      key={l.id}
-                      className="flex items-center gap-2 rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-2.5 py-1 text-[10px] font-semibold text-[var(--text)]"
-                    >
-                      <span className="truncate max-w-[120px]">{title}</span>
-                      <span className="text-[var(--muted)]">
-                        {lineBags} bag{lineBags === 1 ? "" : "s"}
-                      </span>
+                    <div key={l.id} className="py-2 first:pt-0 last:pb-0">
+                      <div className="flex items-start gap-3">
+                        <div className="relative h-12 w-12 overflow-hidden rounded-xl border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)]">
+                          {img ? (
+                            <Image
+                              src={img}
+                              alt={title}
+                              fill
+                              sizes="48px"
+                              className="object-cover"
+                            />
+                          ) : null}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-[13px] font-semibold text-[var(--text)]">
+                            {title}
+                          </div>
+                          <div className="text-[10px] text-[var(--muted)]">
+                            Bag count: {lineBags} bag{lineBags === 1 ? "" : "s"}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-2">
+                        <CartLineControls
+                          lineId={l.id}
+                          quantity={lineQty}
+                          onChange={refreshCart}
+                        />
+                      </div>
                     </div>
                   );
                 })}
-                {cartPeekExtra > 0 ? (
-                  <span className="text-[10px] font-semibold text-[var(--muted)]">
-                    +{cartPeekExtra} more
-                  </span>
-                ) : null}
               </div>
               <div className="mt-3 grid gap-2 text-[11px] text-[var(--muted)]">
-                <div className="flex items-center justify-between">
-                  <span>Bag count</span>
-                  <span className="font-semibold text-[var(--text)]">
-                    {totalBags} bag{totalBags === 1 ? "" : "s"}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Shipping</span>
-                  <span className="font-semibold text-[var(--text)]">{shippingSummary}</span>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex items-center justify-between rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-2 py-1">
+                    <span>Bag count</span>
+                    <span className="font-semibold text-[var(--text)]">
+                      {totalBags} bag{totalBags === 1 ? "" : "s"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-2 py-1">
+                    <span>Shipping</span>
+                    <span className="font-semibold text-[var(--text)]">{shippingSummary}</span>
+                  </div>
                 </div>
                 <div className="flex items-center justify-between text-[12px] font-semibold text-[var(--text)]">
                   <span>Total</span>
@@ -608,7 +645,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
             {showNextTierCta ? (
               <details className="mt-3 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-3 py-2 text-[11px] text-[var(--muted)]">
                 <summary className="cursor-pointer font-semibold text-[var(--text)]">
-                  Optional: boost your savings
+                  A better value is available
                 </summary>
                 <div className="mt-2">
                   <button
@@ -626,6 +663,14 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
             {bundleError ? (
               <div className="mt-2 text-xs text-[var(--red)]">{bundleError}</div>
             ) : null}
+
+            <div className="mt-3 flex items-center justify-center gap-2 text-[10px] font-semibold text-[var(--muted)]">
+              <span>Fast shipping</span>
+              <span className="h-1 w-1 rounded-full bg-[var(--muted)]" aria-hidden="true" />
+              <span>Easy returns</span>
+              <span className="h-1 w-1 rounded-full bg-[var(--muted)]" aria-hidden="true" />
+              <span>Secure checkout</span>
+            </div>
           </>
         ) : (
           <div className="rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-4 text-sm text-[var(--muted)]">
