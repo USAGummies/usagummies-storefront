@@ -1952,8 +1952,20 @@ a:focus-visible:not(.btn):not(.focus-ring),
   background: rgba(239,59,59,0.06);
   box-shadow: none;
 }
+.atomic-buy__bundle [data-bundle-root] [role="radio"][aria-checked="false"]{
+  border-color: rgba(15,27,45,0.08);
+  background: rgba(15,27,45,0.02);
+  box-shadow: none;
+  opacity: 0.78;
+}
 .atomic-buy__bundle .bundleTierBtn__cta{
   display: none;
+}
+.atomic-buy__bundle .bundleTierBtn__meta{
+  display: none;
+}
+.atomic-buy__bundle [role="radio"][aria-checked="true"] .bundleTierBtn__meta{
+  display: block;
 }
 .atomic-buy__bundle [data-bundle-cta]{
   margin-top: 8px;

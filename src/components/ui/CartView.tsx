@@ -52,6 +52,20 @@ const TRUST_ITEMS = [
     icon: "M12 5V2L7 7l5 5V9c3.3 0 6 2.7 6 6a6 6 0 0 1-6 6H6v-2h6a4 4 0 0 0 0-8z",
   },
 ];
+const EXPRESS_CHECKOUT_METHODS = [
+  {
+    label: "Shop Pay",
+    iconSrc: "/payments/shop-pay.svg",
+  },
+  {
+    label: "Apple Pay",
+    iconSrc: "/payments/apple-pay.svg",
+  },
+  {
+    label: "Google Pay",
+    iconSrc: "/payments/google-pay.svg",
+  },
+];
 
 function storeCartId(cartId?: string | null) {
   if (!cartId || typeof window === "undefined") return;
@@ -590,34 +604,24 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
             {localCart?.checkoutUrl ? (
               <div className="mt-3 grid gap-2">
                 <div className="grid grid-cols-3 gap-2">
-                  {[
-                    {
-                      label: "Shop Pay",
-                      short: "SP",
-                      iconClass: "bg-[var(--navy)] text-white",
-                    },
-                    {
-                      label: "Apple Pay",
-                      short: "AP",
-                      iconClass: "bg-[#111111] text-white",
-                    },
-                    {
-                      label: "Google Pay",
-                      short: "GP",
-                      iconClass: "border border-[var(--border)] bg-white text-[var(--text)]",
-                    },
-                  ].map((method) => (
+                  {EXPRESS_CHECKOUT_METHODS.map((method) => (
                     <a
                       key={method.label}
                       href={checkoutHref ?? localCart.checkoutUrl}
                       onClick={handleCheckoutClick}
                       aria-label={`${method.label} checkout`}
-                      className="flex flex-col items-center justify-center gap-1 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-2 py-2 text-[9px] font-semibold text-[var(--text)]"
+                      className="flex flex-col items-center justify-center gap-1 rounded-2xl border border-[rgba(15,27,45,0.1)] bg-white/80 px-2 py-2 text-[9px] font-semibold text-[var(--muted)]"
                     >
-                      <span
-                        className={`flex h-9 w-9 items-center justify-center rounded-full text-[11px] font-black ${method.iconClass}`}
-                      >
-                        {method.short}
+                      <span className="flex h-9 w-full items-center justify-center rounded-full border border-[rgba(15,27,45,0.08)] bg-white">
+                        <Image
+                          src={method.iconSrc}
+                          alt=""
+                          aria-hidden="true"
+                          width={72}
+                          height={20}
+                          sizes="72px"
+                          className="h-4 w-auto opacity-80"
+                        />
                       </span>
                       <span className="text-[9px] text-[var(--muted)]">{method.label}</span>
                     </a>
@@ -777,34 +781,24 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                   {localCart?.checkoutUrl ? (
                     <>
                       <div className="mt-3 grid grid-cols-3 gap-2">
-                        {[
-                          {
-                            label: "Shop Pay",
-                            short: "SP",
-                            iconClass: "bg-[var(--navy)] text-white",
-                          },
-                          {
-                            label: "Apple Pay",
-                            short: "AP",
-                            iconClass: "bg-[#111111] text-white",
-                          },
-                          {
-                            label: "Google Pay",
-                            short: "GP",
-                            iconClass: "border border-[var(--border)] bg-white text-[var(--text)]",
-                          },
-                        ].map((method) => (
+                        {EXPRESS_CHECKOUT_METHODS.map((method) => (
                           <a
                             key={method.label}
                             href={checkoutHref ?? localCart.checkoutUrl}
                             onClick={handleCheckoutClick}
                             aria-label={`${method.label} checkout`}
-                            className="flex flex-col items-center justify-center gap-1 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-2 py-2 text-[9px] font-semibold text-[var(--text)]"
+                            className="flex flex-col items-center justify-center gap-1 rounded-2xl border border-[rgba(15,27,45,0.1)] bg-white/80 px-2 py-2 text-[9px] font-semibold text-[var(--muted)]"
                           >
-                            <span
-                              className={`flex h-9 w-9 items-center justify-center rounded-full text-[11px] font-black ${method.iconClass}`}
-                            >
-                              {method.short}
+                            <span className="flex h-9 w-full items-center justify-center rounded-full border border-[rgba(15,27,45,0.08)] bg-white">
+                              <Image
+                                src={method.iconSrc}
+                                alt=""
+                                aria-hidden="true"
+                                width={72}
+                                height={20}
+                                sizes="72px"
+                                className="h-4 w-auto opacity-80"
+                              />
                             </span>
                             <span className="text-[9px] text-[var(--muted)]">{method.label}</span>
                           </a>

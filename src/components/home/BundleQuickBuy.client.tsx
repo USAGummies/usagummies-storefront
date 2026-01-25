@@ -387,39 +387,54 @@ export default function BundleQuickBuy({
     return { nextBags, nextTotal, addTotal, perBag, savings };
   }
 
-  function renderSecondaryPill(tier: BundleTier) {
+  function renderSecondaryOption(tier: BundleTier, index: number) {
     const isActive = String(tier.quantity) === selected;
+    const canSelect = isTierPurchasable(tier);
     const tierState = resolveTier(tier);
     const displayAdd = Number.isFinite(tierState.addTotal ?? NaN)
       ? money(tierState.addTotal, "USD")
       : null;
     return (
-      <button
-        key={`secondary-${tier.quantity}`}
-        type="button"
-        role="radio"
-        aria-checked={isActive}
-        tabIndex={isActive ? 0 : -1}
-        onClick={() => handleSelect(tier.quantity, true)}
-        className={[
-          "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-semibold transition",
-          isLight
-            ? "border-[rgba(15,27,45,0.12)] bg-white text-[var(--text)] hover:border-[rgba(15,27,45,0.28)]"
-            : "border-white/15 bg-white/5 text-white/85 hover:border-white/40",
-          isActive ? (isLight ? "border-[rgba(239,59,59,0.45)] bg-[rgba(239,59,59,0.08)] text-[var(--red)]" : "border-[rgba(248,212,79,0.55)] bg-white/10 text-white") : "",
-        ]
-          .filter(Boolean)
-          .join(" ")}
-      >
-        <span>+{tier.quantity} bags</span>
+      <span key={`secondary-${tier.quantity}`} className="inline-flex items-center gap-1 group">
+        {index > 0 ? (
+          <span className={isLight ? "text-[var(--muted)]" : "text-white/50"} aria-hidden="true">
+            ·
+          </span>
+        ) : null}
+        <button
+          type="button"
+          role="radio"
+          aria-checked={isActive}
+          aria-disabled={!canSelect}
+          tabIndex={isActive ? 0 : -1}
+          onClick={() => handleSelect(tier.quantity, canSelect)}
+          disabled={!canSelect}
+          className={[
+            "px-0 py-0 text-[11px] font-medium transition-colors",
+            isLight
+              ? isActive
+                ? "text-[var(--text)]"
+                : "text-[var(--muted)] hover:text-[var(--text)]"
+              : isActive
+                ? "text-white"
+                : "text-white/70 hover:text-white",
+            !canSelect ? "opacity-50 cursor-not-allowed" : "",
+          ].join(" ")}
+        >
+          {tier.quantity} bag{tier.quantity === 1 ? "" : "s"}
+        </button>
         {displayAdd ? (
           <span
-            className={isLight ? "text-[10px] font-medium text-[var(--muted)]" : "text-[10px] font-medium text-white/60"}
+            className={[
+              "text-[10px] font-medium transition-opacity",
+              isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+              isLight ? "text-[var(--muted)]" : "text-white/60",
+            ].join(" ")}
           >
             +{displayAdd}
           </span>
         ) : null}
-      </button>
+      </span>
     );
   }
 
@@ -437,6 +452,9 @@ export default function BundleQuickBuy({
       tierState.savings && Number.isFinite(tierState.savings) && tierState.savings > 0
         ? tierState.savings
         : null;
+    const showSavings = isActive && Boolean(savingsValue);
+    const showTotalLine = !showSavings;
+    const showPerBag = false;
 
     if (isCompact) {
       const nextBags = tierState.nextBags;
@@ -524,20 +542,16 @@ export default function BundleQuickBuy({
                   {displayAdd ? `+${displayAdd}` : "—"}
                 </div>
                 <div className="bundle-fusion__rowTotal">
-                  {displayTotal ? `New total: ${displayTotal}` : "Standard price"}
-                  {displayPerBag ? ` • ${displayPerBag}` : ""}
+                  {showTotalLine ? (displayTotal ? `New total: ${displayTotal}` : "Standard price") : null}
+                  {showTotalLine && showPerBag && displayPerBag ? ` • ${displayPerBag}` : ""}
                 </div>
               </div>
               <div className="bundle-fusion__rowMeta">
-                {savingsValue ? (
+                {showSavings ? (
                   <span className="bundle-fusion__rowSave">
                     Save {money(savingsValue, "USD")} total
                   </span>
-                ) : (
-                  <span className="bundle-fusion__rowSave bundle-fusion__rowSave--muted">
-                    Standard price
-                  </span>
-                )}
+                ) : null}
                 {showFreeShipping ? (
                   <span className="bundle-fusion__rowShip">Free shipping</span>
                 ) : null}
@@ -608,25 +622,21 @@ export default function BundleQuickBuy({
               <div className="bundle-integrated__cardAdd">
                 {displayAdd ? `+${displayAdd}` : "—"}
               </div>
-              <div className="bundle-integrated__cardTotal">
-                {displayTotal ? `New total: ${displayTotal}` : "Standard price"}
-                {displayPerBag ? ` • ${displayPerBag}` : ""}
-              </div>
+            <div className="bundle-integrated__cardTotal">
+              {showTotalLine ? (displayTotal ? `New total: ${displayTotal}` : "Standard price") : null}
+              {showTotalLine && showPerBag && displayPerBag ? ` • ${displayPerBag}` : ""}
             </div>
-            <div className="bundle-integrated__cardMeta">
-              {savingsValue ? (
-                <span className="bundle-integrated__cardSave">
-                  Save {money(savingsValue, "USD")} total
-                </span>
-              ) : (
-                <span className="bundle-integrated__cardSave bundle-integrated__cardSave--muted">
-                  Standard price
-                </span>
-              )}
-              {showFreeShipping ? (
-                <span className="bundle-integrated__cardShip">Free shipping</span>
-              ) : null}
-            </div>
+          </div>
+          <div className="bundle-integrated__cardMeta">
+            {showSavings ? (
+              <span className="bundle-integrated__cardSave">
+                Save {money(savingsValue, "USD")} total
+              </span>
+            ) : null}
+            {showFreeShipping ? (
+              <span className="bundle-integrated__cardShip">Free shipping</span>
+            ) : null}
+          </div>
             <button
               type="button"
               onClick={(event) => {
@@ -716,14 +726,14 @@ export default function BundleQuickBuy({
               {displayAdd ? `+${displayAdd}` : "—"}
             </div>
             <div className={isLight ? "text-[12px] font-medium text-[var(--muted)]" : "text-[12px] font-medium text-white/65"}>
-              {displayTotal ? `New total: ${displayTotal}` : "Standard price"}
-              {displayPerBag ? ` - ${displayPerBag}` : ""}
+              {showTotalLine ? (displayTotal ? `New total: ${displayTotal}` : "Standard price") : null}
+              {showTotalLine && showPerBag && displayPerBag ? ` - ${displayPerBag}` : ""}
             </div>
           </div>
 
           <div className="mt-1.5 flex items-center justify-between text-[11px] font-medium">
             <div className={isLight ? "text-[var(--candy-red)]" : "text-[var(--gold)]"}>
-              {savingsValue ? `Save ${money(savingsValue, "USD")} total` : <span className="invisible">Save</span>}
+              {showSavings ? `Save ${money(savingsValue, "USD")} total` : <span className="invisible">Save</span>}
             </div>
             <div className={isLight ? "text-[var(--muted)]" : "text-white/60"}>
               {showFreeShipping ? "Free shipping" : <span className="invisible">Free shipping</span>}
@@ -859,10 +869,10 @@ export default function BundleQuickBuy({
                 <div className="text-white font-extrabold leading-none whitespace-nowrap text-lg">
                   +{tier.quantity} bags
                 </div>
-                <div className="text-xs text-white/70">
+                <div className="bundleTierBtn__meta text-xs text-white/70">
                   New total: {nextBags} bags - {label}
                 </div>
-                {savingsValue ? (
+                {showSavings ? (
                   <div
                     className={[
                       "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold",
@@ -889,12 +899,12 @@ export default function BundleQuickBuy({
                 <div className="relative text-white text-xl font-extrabold leading-none drop-shadow-[0_6px_18px_rgba(0,0,0,0.35)] transition-all duration-300">
                   {displayAdd ? `+${displayAdd}` : "—"}
                 </div>
-                {displayTotal ? (
+                {showTotalLine && displayTotal ? (
                   <div className="relative mt-1 text-[11px] text-white/65 transition-all duration-300">
                     Total after add: {displayTotal}
                   </div>
                 ) : null}
-                {displayPerBag ? (
+                {showPerBag && displayPerBag ? (
                   <div className="relative mt-1 text-[11px] text-white/65 transition-all duration-300">
                     {displayPerBag}
                   </div>
@@ -1477,11 +1487,11 @@ export default function BundleQuickBuy({
                   </button>
                   {showSecondaryTiers ? (
                     <div
-                      className="mt-2 flex flex-wrap gap-2"
+                      className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px]"
                       role="radiogroup"
                       aria-label="Other bag sizes"
                     >
-                      {secondaryTiers.map((tier) => renderSecondaryPill(tier))}
+                      {secondaryTiers.map((tier, index) => renderSecondaryOption(tier, index))}
                     </div>
                   ) : null}
                 </div>
@@ -1713,11 +1723,11 @@ export default function BundleQuickBuy({
                 </button>
                 {showSecondaryTiers ? (
                   <div
-                    className="mt-2 flex flex-wrap gap-2"
+                    className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px]"
                     role="radiogroup"
                     aria-label="Other bag sizes"
                   >
-                    {secondaryTiers.map((tier) => renderSecondaryPill(tier))}
+                    {secondaryTiers.map((tier, index) => renderSecondaryOption(tier, index))}
                   </div>
                 ) : null}
               </div>
@@ -2190,11 +2200,11 @@ export default function BundleQuickBuy({
           </button>
           {showSecondaryTiers ? (
             <div
-              className="flex flex-wrap gap-2"
+              className="flex flex-wrap items-center gap-1.5 text-[11px]"
               role="radiogroup"
               aria-label="Other bag sizes"
             >
-              {secondaryTiers.map((tier) => renderSecondaryPill(tier))}
+              {secondaryTiers.map((tier, index) => renderSecondaryOption(tier, index))}
             </div>
           ) : null}
         </div>

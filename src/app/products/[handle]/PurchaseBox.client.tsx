@@ -463,7 +463,12 @@ export default function PurchaseBox({
                         ref={(el) => {
                           radioRefs.current[index] = el;
                         }}
-                        className={cx("pbx__tile", popular && "pbx__tile--popular", active && "pbx__tile--active")}
+                        className={cx(
+                          "pbx__tile",
+                          popular && "pbx__tile--popular",
+                          active && "pbx__tile--active",
+                          !active && "pbx__tile--muted"
+                        )}
                         data-qty={o.qty}
                         role="radio"
                         aria-checked={active}
@@ -483,9 +488,11 @@ export default function PurchaseBox({
 
                         <div className="pbx__tilePriceRow">
                           <div className="pbx__tilePrice">+{money(o.totalPrice, o.currencyCode)}</div>
-                          <div className="pbx__tilePer">
-                            Total after add: {money(o.nextTotal, o.currencyCode)} - ~{money(o.perBag, o.currencyCode)} / bag
-                          </div>
+                          {active && o.savingsAmount > 0 ? (
+                            <div className="pbx__tileSaveLine">
+                              Save {money(o.savingsAmount, o.currencyCode)} total
+                            </div>
+                          ) : null}
                         </div>
                       </div>
                     );
@@ -493,28 +500,37 @@ export default function PurchaseBox({
                 </div>
                 {showExtras ? (
                   <div className="pbx__miniRow">
-                    {extraOptions.map((o) => {
+                    {extraOptions.map((o, index) => {
                       const active = selectedQty === o.qty;
                       const label = formatAddLabel(o.qty);
-                      const index = radioIndexByQty.get(o.qty) ?? 0;
+                      const radioIndex = radioIndexByQty.get(o.qty) ?? 0;
 
                       return (
-                        <button
+                        <span
                           key={`mini-${o.qty}-${o.variant.id}`}
-                          type="button"
-                          onClick={() => setSelectedQty(o.qty)}
-                          onKeyDown={handleRadioKey(index)}
-                          ref={(el) => {
-                            radioRefs.current[index] = el;
-                          }}
-                          className={cx("pbx__miniBtn", active && "pbx__miniBtn--active")}
-                          role="radio"
-                          aria-checked={active}
-                          tabIndex={active ? 0 : -1}
+                          className={cx("pbx__miniOption", active && "pbx__miniOption--active")}
                         >
-                          <span className="pbx__miniQty">{label}</span>
+                          {index > 0 ? (
+                            <span className="pbx__miniSep" aria-hidden="true">
+                              ·
+                            </span>
+                          ) : null}
+                          <button
+                            type="button"
+                            onClick={() => setSelectedQty(o.qty)}
+                            onKeyDown={handleRadioKey(radioIndex)}
+                            ref={(el) => {
+                              radioRefs.current[radioIndex] = el;
+                            }}
+                            className="pbx__miniLink"
+                            role="radio"
+                            aria-checked={active}
+                            tabIndex={active ? 0 : -1}
+                          >
+                            <span className="pbx__miniQty">{label}</span>
+                          </button>
                           <span className="pbx__miniPrice">+{money(o.totalPrice, o.currencyCode)}</span>
-                        </button>
+                        </span>
                       );
                     })}
                   </div>
@@ -1013,6 +1029,11 @@ export default function PurchaseBox({
           background: rgba(239,59,59,0.07);
           box-shadow: 0 0 0 2px rgba(239,59,59,0.35), 0 18px 44px rgba(239,59,59,0.18);
         }
+        .pbx__tile--muted{
+          border-color: rgba(15,27,45,0.08);
+          background: rgba(15,27,45,0.015);
+          box-shadow: none;
+        }
 
         .pbx__tileHeader{
           display:flex;
@@ -1043,6 +1064,16 @@ export default function PurchaseBox({
         }
         .pbx__tilePrice{ font-weight:900; font-size:30px; line-height:1.1; color: var(--text); }
         .pbx__tilePer{ font-size:14px; font-weight:600; color: var(--muted); }
+        .pbx__tileSaveLine{ font-size:12px; font-weight:700; color: var(--red); }
+        .pbx__tile--muted .pbx__tilePrice,
+        .pbx__tile--muted .pbx__tileQty{
+          color: var(--muted);
+        }
+        .pbx__tile--muted .pbx__badge{
+          border-color: rgba(15,27,45,0.1);
+          background: rgba(15,27,45,0.04);
+          color: var(--muted);
+        }
         .pbx__tileMeta{
           margin-top:auto;
           display:flex;
@@ -1103,32 +1134,42 @@ export default function PurchaseBox({
           margin-top:10px;
           display:flex;
           flex-wrap:wrap;
-          gap:8px;
+          align-items:center;
+          gap:6px;
         }
-        .pbx__miniBtn{
-          border:1px solid var(--border);
-          border-radius:999px;
-          padding:6px 10px;
-          background: var(--surface);
+        .pbx__miniOption{
           display:inline-flex;
           align-items:center;
-          gap:8px;
-          font-size:12px;
-          font-weight:800;
+          gap:6px;
+        }
+        .pbx__miniSep{
+          color: var(--muted);
+          opacity: 0.65;
+        }
+        .pbx__miniLink{
+          background: none;
+          border: none;
+          padding: 0;
+          font-size: 12px;
+          font-weight: 700;
+          color: var(--muted);
+          cursor: pointer;
+          transition: color .14s ease;
+        }
+        .pbx__miniLink:hover{ color: var(--text); }
+        .pbx__miniOption--active .pbx__miniLink{
           color: var(--text);
-          transition: transform .08s ease, border-color .14s ease, background .14s ease;
         }
-        .pbx__miniBtn:hover{ transform: translateY(-1px); }
-        .pbx__miniBtn--active{
-          border-color: rgba(239,59,59,0.55);
-          background: rgba(239,59,59,0.08);
-          color: var(--red);
-        }
-        .pbx__miniQty{ font-weight:900; }
+        .pbx__miniQty{ font-weight:700; }
         .pbx__miniPrice{
           font-size:10px;
           font-weight:600;
           color: var(--muted);
+          opacity: 0;
+          transition: opacity .14s ease;
+        }
+        .pbx__miniOption:hover .pbx__miniPrice,
+        .pbx__miniOption--active .pbx__miniPrice{
           opacity: 0.75;
         }
 
@@ -1247,12 +1288,8 @@ export default function PurchaseBox({
             top: -6px;
           }
           .pbx__miniRow{
-            flex-wrap:nowrap;
-            overflow-x:auto;
-            padding-bottom:6px;
-            scrollbar-width:none;
+            gap:6px;
           }
-          .pbx__miniRow::-webkit-scrollbar{ display:none; }
         }
 
         @media (prefers-reduced-motion: reduce){
@@ -1364,6 +1401,16 @@ export default function PurchaseBox({
         .pbx__tile[data-qty="5"] .pbx__badge{
           border-color: rgba(15,27,45,0.18);
           background: rgba(15,27,45,0.06);
+          color: var(--muted);
+        }
+        .pbx__tile--muted{
+          border-color: rgba(15,27,45,0.08);
+          background: rgba(15,27,45,0.015);
+          box-shadow: none;
+        }
+        .pbx__tile--muted .pbx__badge{
+          border-color: rgba(15,27,45,0.1);
+          background: rgba(15,27,45,0.04);
           color: var(--muted);
         }
         .pbx__summary{
