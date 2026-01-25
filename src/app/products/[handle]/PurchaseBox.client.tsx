@@ -75,7 +75,7 @@ type BundleOption = {
   currencyCode?: string;
 };
 
-const VISIBLE_QUANTITIES = [1, 2, 3, 4, 5, 8, 12];
+const VISIBLE_QUANTITIES = [5, 8, 12];
 
 function money(amount?: number, currencyCode = "USD") {
   const n = Number(amount);
@@ -94,10 +94,6 @@ function money(amount?: number, currencyCode = "USD") {
 
 function formatQtyLabel(qty: number) {
   return `${qty} bag${qty === 1 ? "" : "s"}`;
-}
-
-function formatAddLabel(qty: number) {
-  return `+${formatQtyLabel(qty)}`;
 }
 
 function badgeForTotal(qty: number) {
@@ -225,14 +221,6 @@ export default function PurchaseBox({
     return ordered.length ? ordered : fallback;
   }, [bundleOptions]);
 
-  const extraOptions = useMemo<BundleOption[]>(() => {
-    if (!bundleOptions.length) return [];
-    const featuredIds = new Set(featuredOptions.map((o) => o.qty));
-    return bundleOptions
-      .filter((o) => !featuredIds.has(o.qty))
-      .sort((a, b) => a.qty - b.qty);
-  }, [bundleOptions, featuredOptions]);
-
   const defaultQty = useMemo(() => {
     const preferred = [8, 12, 5, 4];
     for (const qty of preferred) {
@@ -245,7 +233,6 @@ export default function PurchaseBox({
   const [addingQty, setAddingQty] = useState<number | null>(null);
   const [lastAddedQty, setLastAddedQty] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showMore, setShowMore] = useState(false);
 
   // Keep selection valid as data hydrates
   useEffect(() => {
@@ -280,15 +267,17 @@ export default function PurchaseBox({
 
   const selectedVariant = selectedOption?.variant ?? pickSingleVariant(variants);
   const optionQty = selectedOption?.qty ?? selectedQty ?? 1;
-  const selectedAddTotal = selectedOption?.totalPrice ?? 0;
   const selectedNextTotal = selectedOption?.nextTotal ?? 0;
   const selectedNextBags = selectedOption?.nextBags ?? currentBags + optionQty;
   const selectedCurrency =
     (selectedVariant?.price as any)?.currencyCode ||
     (selectedVariant?.priceV2 as any)?.currencyCode ||
     baselineCurrency;
-  const selectedPriceText = money(selectedAddTotal, selectedCurrency);
   const selectedNextTotalText = money(selectedNextTotal, selectedCurrency);
+  const selectedSavingsText =
+    selectedOption?.savingsAmount && selectedOption.savingsAmount > 0
+      ? money(selectedOption.savingsAmount, selectedCurrency)
+      : null;
   const hasAdded = lastAddedQty !== null;
   const selectedAdded = hasAdded && lastAddedQty === optionQty;
   const isAdding = addingQty !== null;
@@ -298,17 +287,9 @@ export default function PurchaseBox({
       ? "Added to cart"
       : `Add ${formatQtyLabel(optionQty)} to cart`;
 
-  const hasExtraSelected = extraOptions.some((o) => o.qty === selectedQty);
-  const showExtras = showMore || hasExtraSelected;
-  const toggleExtrasLabel = hasExtraSelected
-    ? "Other sizes selected"
-    : showExtras
-      ? "Hide other sizes"
-      : "Other sizes (1-4)";
-
   const radioOptions = useMemo(() => {
-    return showExtras ? [...featuredOptions, ...extraOptions] : featuredOptions;
-  }, [showExtras, featuredOptions, extraOptions]);
+    return featuredOptions;
+  }, [featuredOptions]);
 
   const radioIndexByQty = useMemo(() => {
     const map = new Map<number, number>();
@@ -448,106 +429,35 @@ export default function PurchaseBox({
           <div className="pbx__select">
             <div className="pbx__options">
               <div className="pbx__optionGroup" role="radiogroup" aria-label="Bag counts">
-                <div className="pbx__featured">
+                <div className="pbx__selector">
                   {featuredOptions.map((o) => {
                     const active = selectedQty === o.qty;
                     const badge = badgeForTotal(o.nextBags ?? o.qty);
                     const index = radioIndexByQty.get(o.qty) ?? 0;
-                    const popular = (o.nextBags ?? o.qty) === 8;
 
                     return (
-                      <div
+                      <button
                         key={`${o.qty}-${o.variant.id}`}
+                        type="button"
                         onClick={() => setSelectedQty(o.qty)}
                         onKeyDown={handleRadioKey(index)}
                         ref={(el) => {
                           radioRefs.current[index] = el;
                         }}
-                        className={cx(
-                          "pbx__tile",
-                          popular && "pbx__tile--popular",
-                          active && "pbx__tile--active",
-                          !active && "pbx__tile--muted"
-                        )}
+                        className={cx("pbx__selectorOption", active && "pbx__selectorOption--active")}
                         data-qty={o.qty}
                         role="radio"
                         aria-checked={active}
                         tabIndex={active ? 0 : -1}
                       >
-                        <div className="pbx__tileHeader">
-                          <span className="pbx__tileQty">{formatAddLabel(o.qty)}</span>
-                          {badge ? (
-                            <span className={cx("pbx__badge", popular && "pbx__badge--popular")}>
-                              {badge}
-                            </span>
-                          ) : null}
-                        </div>
-                        <div className="text-[11px] text-[var(--muted)]">
-                          New total: {o.nextBags ?? currentBags + o.qty} bags
-                        </div>
-
-                        <div className="pbx__tilePriceRow">
-                          <div className="pbx__tilePrice">+{money(o.totalPrice, o.currencyCode)}</div>
-                          {active && o.savingsAmount > 0 ? (
-                            <div className="pbx__tileSaveLine">
-                              Save {money(o.savingsAmount, o.currencyCode)} total
-                            </div>
-                          ) : null}
-                        </div>
-                      </div>
+                        <span className="pbx__selectorDot">{active ? "●" : "○"}</span>
+                        <span className="pbx__selectorQty">{formatQtyLabel(o.qty)}</span>
+                        {badge ? <span className="pbx__selectorMeta">— {badge}</span> : null}
+                      </button>
                     );
                   })}
                 </div>
-                {showExtras ? (
-                  <div className="pbx__miniRow">
-                    {extraOptions.map((o, index) => {
-                      const active = selectedQty === o.qty;
-                      const label = formatAddLabel(o.qty);
-                      const radioIndex = radioIndexByQty.get(o.qty) ?? 0;
-
-                      return (
-                        <span
-                          key={`mini-${o.qty}-${o.variant.id}`}
-                          className={cx("pbx__miniOption", active && "pbx__miniOption--active")}
-                        >
-                          {index > 0 ? (
-                            <span className="pbx__miniSep" aria-hidden="true">
-                              ·
-                            </span>
-                          ) : null}
-                          <button
-                            type="button"
-                            onClick={() => setSelectedQty(o.qty)}
-                            onKeyDown={handleRadioKey(radioIndex)}
-                            ref={(el) => {
-                              radioRefs.current[radioIndex] = el;
-                            }}
-                            className="pbx__miniLink"
-                            role="radio"
-                            aria-checked={active}
-                            tabIndex={active ? 0 : -1}
-                          >
-                            <span className="pbx__miniQty">{label}</span>
-                          </button>
-                          <span className="pbx__miniPrice">+{money(o.totalPrice, o.currencyCode)}</span>
-                        </span>
-                      );
-                    })}
-                  </div>
-                ) : null}
               </div>
-              {extraOptions.length ? (
-                <div className="pbx__more">
-                  <button
-                    type="button"
-                    className="pbx__moreLink"
-                    onClick={() => setShowMore((prev) => !prev)}
-                    disabled={hasExtraSelected}
-                  >
-                    {toggleExtrasLabel}
-                  </button>
-                </div>
-              ) : null}
             </div>
 
             <div className="pbx__summary" aria-live="polite" role="status">
@@ -564,10 +474,10 @@ export default function PurchaseBox({
                 <div className="pbx__summaryLabel">
                   {selectedAdded ? "Added to cart" : "Selected bundle"}: {formatQtyLabel(optionQty)}
                 </div>
-                <div className="pbx__summaryPrice">+{selectedPriceText}</div>
-                {currentBags > 0 ? (
-                  <div className="pbx__summaryStatus pbx__summaryStatus--muted">
-                    New total: {selectedNextBags} bags - {selectedNextTotalText}
+                <div className="pbx__summaryPrice">{selectedNextTotalText}</div>
+                {selectedSavingsText ? (
+                  <div className="pbx__summaryStatus pbx__summaryStatus--savings">
+                    Save {selectedSavingsText} total
                   </div>
                 ) : null}
                 {selectedAdded ? (
@@ -710,11 +620,11 @@ export default function PurchaseBox({
         }
         .pbx__card{
           margin-top:14px;
-          border-radius:18px;
-          border:1px solid var(--border);
-          background: var(--surface-strong);
-          padding:14px;
-          box-shadow: 0 18px 40px rgba(15,27,45,0.12);
+          border-radius:0;
+          border:0;
+          background: transparent;
+          padding:0;
+          box-shadow: none;
         }
         .pbx__glow{
           outline: 2px solid rgba(239,59,59,0.25);
@@ -993,6 +903,41 @@ export default function PurchaseBox({
           gap:14px;
           grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
         }
+        .pbx__selector{
+          display:flex;
+          flex-direction:column;
+          gap:8px;
+        }
+        .pbx__selectorOption{
+          background: none;
+          border: none;
+          padding: 0;
+          display:flex;
+          align-items:center;
+          gap:8px;
+          font-size:13px;
+          font-weight:600;
+          color: var(--muted);
+          cursor: pointer;
+          transition: color .14s ease;
+        }
+        .pbx__selectorOption:hover{ color: var(--text); }
+        .pbx__selectorOption--active{ color: var(--text); }
+        .pbx__selectorDot{
+          font-size: 12px;
+          line-height: 1;
+          color: currentColor;
+          opacity: 0.75;
+        }
+        .pbx__selectorOption--active .pbx__selectorDot{
+          opacity: 1;
+        }
+        .pbx__selectorQty{ font-weight:700; }
+        .pbx__selectorMeta{
+          font-size:11px;
+          font-weight:600;
+          color: var(--muted);
+        }
 
         .pbx__tile{
           width:100%;
@@ -1189,7 +1134,7 @@ export default function PurchaseBox({
           top: -10px;
           width: 140px;
           height: auto;
-          opacity: 0.16;
+          opacity: 0.08;
           pointer-events: none;
         }
         @media (min-width: 768px){
@@ -1210,6 +1155,7 @@ export default function PurchaseBox({
           color: var(--text);
         }
         .pbx__summaryStatus--muted{ color: var(--muted); }
+        .pbx__summaryStatus--savings{ color: var(--red); }
         .pbx__summaryStatus--success{ color: rgba(21,128,61,0.95); }
         .pbx__error{
           margin-top:8px;

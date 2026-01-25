@@ -646,6 +646,23 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
               </div>
             ) : null}
 
+            <div className="mt-3 relative overflow-hidden rounded-2xl border border-[rgba(15,27,45,0.08)] bg-white/80 px-3 py-3 text-[11px] text-[var(--muted)]">
+              <Image
+                src="/website%20assets/Train-02.png"
+                alt=""
+                aria-hidden="true"
+                width={640}
+                height={420}
+                sizes="120px"
+                className="pointer-events-none absolute -right-8 -top-8 w-28 opacity-10"
+              />
+              <div className="relative grid gap-1 text-[11px] font-semibold text-[var(--muted)]">
+                <span>Fast shipping</span>
+                <span>Easy returns</span>
+                <span>Secure checkout</span>
+              </div>
+            </div>
+
             {showNextTierCta ? (
               <details className="mt-3 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-3 py-2 text-[11px] text-[var(--muted)]">
                 <summary className="cursor-pointer font-semibold text-[var(--text)]">
@@ -667,14 +684,6 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
             {bundleError ? (
               <div className="mt-2 text-xs text-[var(--red)]">{bundleError}</div>
             ) : null}
-
-            <div className="mt-3 flex items-center justify-center gap-2 text-[10px] font-semibold text-[var(--muted)]">
-              <span>Fast shipping</span>
-              <span className="h-1 w-1 rounded-full bg-[var(--muted)]" aria-hidden="true" />
-              <span>Easy returns</span>
-              <span className="h-1 w-1 rounded-full bg-[var(--muted)]" aria-hidden="true" />
-              <span>Secure checkout</span>
-            </div>
           </>
         ) : (
           <div className="rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-4 text-sm text-[var(--muted)]">

@@ -1933,39 +1933,18 @@ a:focus-visible:not(.btn):not(.focus-ring),
     grid-template-columns: 1fr;
   }
   .atomic-buy__bundle [data-bundle-root] [role="radio"]{
-    min-height: 130px;
+    min-height: auto;
   }
 }
 .atomic-buy__bundle [data-bundle-root] [role="radio"]{
-  min-height: 120px;
-  padding: 10px 12px;
-  border-width: 1px;
+  min-height: auto;
+  padding: 0;
+  border-width: 0;
   box-shadow: none;
-  background: #ffffff;
-}
-.atomic-buy__bundle [data-bundle-root] [role="radio"][data-qty="8"]{
-  min-height: 150px;
-  padding: 12px 14px;
-}
-.atomic-buy__bundle [data-bundle-root] [role="radio"][aria-checked="true"]{
-  border-color: rgba(239,59,59,0.45);
-  background: rgba(239,59,59,0.06);
-  box-shadow: none;
-}
-.atomic-buy__bundle [data-bundle-root] [role="radio"][aria-checked="false"]{
-  border-color: rgba(15,27,45,0.08);
-  background: rgba(15,27,45,0.02);
-  box-shadow: none;
-  opacity: 0.78;
+  background: transparent;
 }
 .atomic-buy__bundle .bundleTierBtn__cta{
   display: none;
-}
-.atomic-buy__bundle .bundleTierBtn__meta{
-  display: none;
-}
-.atomic-buy__bundle [role="radio"][aria-checked="true"] .bundleTierBtn__meta{
-  display: block;
 }
 .atomic-buy__bundle [data-bundle-cta]{
   margin-top: 8px;
