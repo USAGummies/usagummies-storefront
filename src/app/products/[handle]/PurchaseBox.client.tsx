@@ -239,7 +239,7 @@ export default function PurchaseBox({
     });
   }, [availableTiers, singleVariant, baselineCurrency, currentBags, currentTotal]);
 
-  const featuredQuantities = [4, 5, 8, 12];
+  const featuredQuantities = [8, 12];
 
   const featuredOptions = useMemo<BundleOption[]>(() => {
     if (!bundleOptions.length) return [];
@@ -261,7 +261,7 @@ export default function PurchaseBox({
   }, [bundleOptions, featuredOptions]);
 
   const defaultQty = useMemo(() => {
-    const preferred = [8, 5, 4, 12];
+    const preferred = [8, 12, 5, 4];
     for (const qty of preferred) {
       if (bundleOptions.some((o) => o.qty === qty)) return qty;
     }
@@ -440,10 +440,15 @@ export default function PurchaseBox({
     }
   }
 
-  const cardHint =
-    currentBags > 0
-      ? `In your cart: ${currentBags} bags. Selecting a size adds that many bags.`
-      : "Selecting a size adds that many bags to your cart. More bags = lower price per bag.";
+  const curatedStatus =
+    selectedNextBags >= 12
+      ? "Best price selected."
+      : selectedNextBags >= 8
+        ? "Most popular price selected."
+        : selectedNextBags >= 5
+          ? "Free shipping eligible."
+          : "Value size selected.";
+  const cardHint = curatedStatus;
 
   return (
     <section
@@ -540,6 +545,11 @@ export default function PurchaseBox({
                     );
                   })}
                 </div>
+              </div>
+              <div className="pbx__missionStatus">
+                {bestPriceReached
+                  ? "Best price applied."
+                  : `Progress: ${missionProgressCount}/${topMilestone.qty} bags`}
               </div>
               <div className="pbx__missionActions">
                 {missionRemaining > 0 ? (
@@ -645,6 +655,7 @@ export default function PurchaseBox({
                           radioRefs.current[index] = el;
                         }}
                         className={cx("pbx__tile", popular && "pbx__tile--popular", active && "pbx__tile--active")}
+                        data-qty={o.qty}
                         role="radio"
                         aria-checked={active}
                         tabIndex={active ? 0 : -1}
@@ -1465,6 +1476,94 @@ export default function PurchaseBox({
             animation: none !important;
             transform: none !important;
           }
+        }
+
+        /* Premium curation overrides */
+        .pbx__ladder,
+        .pbx__freeShip,
+        .pbx__pricingNote,
+        .pbx__complete,
+        .pbx__missionHeader,
+        .pbx__missionCopy,
+        .pbx__missionActions,
+        .pbx__missionList{
+          display:none;
+        }
+        .pbx__mission{
+          margin-top: 8px;
+          padding: 8px 10px;
+          border-radius: 12px;
+          border-color: rgba(15,27,45,0.08);
+          background: rgba(15,27,45,0.03);
+        }
+        .pbx__missionBar{ margin-top: 0; }
+        .pbx__missionStatus{
+          margin-top: 6px;
+          font-size: 11px;
+          font-weight: 700;
+          color: var(--text);
+        }
+        .mission-bar{
+          height: 6px;
+          border-color: rgba(15,27,45,0.08);
+          background: rgba(15,27,45,0.06);
+        }
+        .mission-bar__fill{ opacity: 0.75; }
+        .mission-bar__tick{
+          width: 8px;
+          height: 8px;
+          border-width: 1px;
+          box-shadow: none;
+        }
+        .pbx__featured{
+          grid-template-columns: 1fr;
+          gap: 12px;
+        }
+        .pbx__tile{
+          min-height: 150px;
+          padding: 14px;
+          box-shadow: none;
+        }
+        .pbx__tileCta{
+          display: none;
+        }
+        .pbx__tileMeta{
+          display: none;
+        }
+        .pbx__tile[data-qty="8"]{
+          border-color: rgba(239,59,59,0.55);
+          background: rgba(239,59,59,0.08);
+          box-shadow: 0 16px 40px rgba(239,59,59,0.18);
+          transform: translateY(-2px);
+        }
+        .pbx__tile[data-qty="8"] .pbx__tileMeta{
+          display: flex;
+        }
+        .pbx__tile[data-qty="8"] .pbx__tilePrice{
+          font-size: 34px;
+        }
+        .pbx__tile[data-qty="12"]{
+          border-color: rgba(199,160,98,0.35);
+          background: rgba(199,160,98,0.06);
+        }
+        .pbx__tile[data-qty="12"] .pbx__badge{
+          border-color: rgba(199,160,98,0.4);
+          background: rgba(199,160,98,0.12);
+          color: var(--gold);
+        }
+        .pbx__badge{
+          display: none;
+        }
+        .pbx__tile[data-qty="8"] .pbx__badge{
+          display: inline-flex;
+        }
+        .pbx__summary{
+          margin-top: 14px;
+          padding: 12px;
+        }
+        .pbx__cta{
+          height: 50px;
+          font-size: 15px;
         }
       `}</style>
     </section>
