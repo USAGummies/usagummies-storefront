@@ -416,78 +416,65 @@ export default async function HomePage() {
         <div className={styles.sceneContent}>
           <div className="mx-auto max-w-6xl px-4 pb-5 sm:pb-6 lg:pb-8">
             <div className="mt-2">
-                <div
-                id="hero-primary-cta"
-                className="bundle-home bundle-home--premium bundle-hero-stage buy-module relative rounded-[36px] border border-[rgba(15,27,45,0.12)] bg-white shadow-[0_30px_80px_rgba(15,27,45,0.14)]"
-              >
-                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_10%,rgba(199,160,98,0.18),transparent_45%),radial-gradient(circle_at_85%_0%,rgba(13,28,51,0.08),transparent_48%)]" />
-                <div className="buy-module__inner">
-                  <div className="buy-module__layout">
-                    <div className="buy-module__details min-w-0">
-                      <div className="text-xl font-black text-[var(--text)] sm:text-2xl">
-                        Classic gummy bears, made in the USA.
-                      </div>
-                      <div className="grid gap-1.5 text-sm text-[var(--muted)]">
-                        {DETAIL_BULLETS.slice(0, 3).map((bullet) => (
-                          <div key={bullet} className="flex items-start gap-2">
-                            <span className="mt-1.5 h-2 w-2 rounded-full bg-[var(--gold)]" />
-                            <span>{bullet}</span>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <span className="candy-pill">Made in USA</span>
-                        <span className="candy-pill">No artificial dyes</span>
-                        <span className="candy-pill">Ships in 24 hours</span>
-                        <span className="candy-pill">{FREE_SHIPPING_PHRASE}</span>
-                      </div>
-                      <div className="text-xs text-[var(--muted)]">
-                        Ingredients &amp; allergen info:{" "}
-                        <Link href="/ingredients" className="underline underline-offset-4 text-[var(--text)]">
-                          ingredients
-                        </Link>
-                        .
-                      </div>
+              <div id="hero-primary-cta" className="atomic-buy">
+                <div className="atomic-buy__glow" aria-hidden="true" />
+                <div className="atomic-buy__grid">
+                  <div className="atomic-buy__details">
+                    <div className="atomic-buy__kicker">USA Gummies</div>
+                    <div className="atomic-buy__title">Classic gummy bears, made in the USA.</div>
+                    <ul className="atomic-buy__bullets">
+                      {DETAIL_BULLETS.slice(0, 3).map((bullet) => (
+                        <li key={bullet} className="atomic-buy__bullet">
+                          <span className="atomic-buy__bulletDot" aria-hidden="true" />
+                          <span>{bullet}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="atomic-buy__chips">
+                      <span className="atomic-buy__chip">Made in USA</span>
+                      <span className="atomic-buy__chip">No artificial dyes</span>
+                      <span className="atomic-buy__chip">Ships in 24 hours</span>
+                      <span className="atomic-buy__chip">{FREE_SHIPPING_PHRASE}</span>
                     </div>
-
-                    <div className="buy-module__bundle min-w-0">
-                      <BundleQuickBuy
-                        anchorId="bundle-pricing"
-                        productHandle={handle}
-                        tiers={homepageTiers}
-                        singleBagVariantId={bundleVariants?.singleBagVariantId}
-                        availableForSale={bundleVariants?.availableForSale}
-                        variant="compact"
-                        tone="light"
-                        surface="flat"
-                        layout="integrated"
-                        showHowItWorks={false}
-                        summaryCopy=""
-                        showTrainAccent
-                        featuredQuantities={[4, 5, 8, 12]}
-                        showOtherQuantitiesLink
-                        otherQuantities={[1, 2, 3]}
-                      />
+                    <div className="atomic-buy__ingredients">
+                      Ingredients &amp; allergen info:{" "}
+                      <Link href="/ingredients">ingredients</Link>.
                     </div>
-
-                    <div className="buy-module__image min-w-0">
-                      <div className="buy-module__imagePanel">
-                        <div className="relative">
-                          <div className="media-frame">
-                            <div className="relative aspect-[4/5] w-full bg-transparent">
-                              <Image
-                                src="/Hero-pack.jpeg"
-                                alt="USA Gummies bag"
-                                fill
-                                sizes="(max-width: 640px) 90vw, (max-width: 1024px) 45vw, 520px"
-                                className="object-contain drop-shadow-[0_18px_40px_rgba(13,28,51,0.18)]"
-                              />
-                            </div>
-                          </div>
-                          <span className="usa-stamp usa-stamp--small absolute left-4 top-4">Made in USA</span>
-                        </div>
+                  </div>
+                  <div className="atomic-buy__media">
+                    <div className="atomic-buy__mediaFrame">
+                      <div className="relative aspect-[4/5] w-full">
+                        <Image
+                          src="/Hero-pack.jpeg"
+                          alt="USA Gummies bag"
+                          fill
+                          sizes="(max-width: 640px) 90vw, (max-width: 1024px) 45vw, 520px"
+                          className="object-contain drop-shadow-[0_24px_50px_rgba(13,28,51,0.2)]"
+                        />
                       </div>
+                      <span className="usa-stamp usa-stamp--small atomic-buy__stamp">
+                        Made in USA
+                      </span>
                     </div>
+                  </div>
+                  <div className="atomic-buy__bundle">
+                    <BundleQuickBuy
+                      anchorId="bundle-pricing"
+                      productHandle={handle}
+                      tiers={homepageTiers}
+                      singleBagVariantId={bundleVariants?.singleBagVariantId}
+                      availableForSale={bundleVariants?.availableForSale}
+                      variant="compact"
+                      tone="light"
+                      surface="flat"
+                      layout="classic"
+                      showHowItWorks={false}
+                      summaryCopy=""
+                      showTrainAccent
+                      featuredQuantities={[4, 5, 8, 12]}
+                      showOtherQuantitiesLink
+                      otherQuantities={[1, 2, 3]}
+                    />
                   </div>
                 </div>
               </div>
