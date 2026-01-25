@@ -423,6 +423,7 @@ export default function BundleQuickBuy({
           <div
             key={tier.quantity}
             role="radio"
+            data-qty={tier.quantity}
             aria-checked={isActive}
             aria-disabled={!canSelect}
             tabIndex={isActive && canSelect ? 0 : -1}
@@ -508,6 +509,7 @@ export default function BundleQuickBuy({
           <div
             key={tier.quantity}
             role="radio"
+            data-qty={tier.quantity}
             aria-checked={isActive}
             aria-disabled={!canSelect}
             tabIndex={isActive && canSelect ? 0 : -1}
@@ -590,6 +592,7 @@ export default function BundleQuickBuy({
         <div
           key={tier.quantity}
           role="radio"
+          data-qty={tier.quantity}
           aria-checked={isActive}
           aria-disabled={!canSelect}
           tabIndex={isActive && canSelect ? 0 : -1}
@@ -750,14 +753,15 @@ export default function BundleQuickBuy({
         ? `Savings locked${totalLabel}`
         : `Lock in savings now${totalLabel}`;
 
-    return (
-      <div
-        key={tier.quantity}
-        role="radio"
-        aria-checked={isActive}
-        aria-disabled={!canSelect}
-        tabIndex={isActive && canSelect ? 0 : -1}
-        onClick={() => handleSelect(tier.quantity, canSelect)}
+      return (
+        <div
+          key={tier.quantity}
+          role="radio"
+          data-qty={tier.quantity}
+          aria-checked={isActive}
+          aria-disabled={!canSelect}
+          tabIndex={isActive && canSelect ? 0 : -1}
+          onClick={() => handleSelect(tier.quantity, canSelect)}
         onKeyDown={(event) => handleRadioKeyDown(event, tier.quantity, canSelect)}
         className={[
           "bundleTierBtn",
@@ -1630,6 +1634,7 @@ export default function BundleQuickBuy({
         <div className="relative mb-3 h-[2px] rounded-full bg-gradient-to-r from-[#d6403a]/70 via-white/60 to-[#0a3c8a]/65 opacity-85 shadow-[0_0_18px_rgba(255,255,255,0.12)]" />
       )}
       <div
+        data-bundle-kicker
         className={[
           "relative text-[10px] font-semibold tracking-[0.26em] uppercase flex items-center gap-2",
           isCompact ? (isLight ? "text-[var(--muted)]" : "text-white/70") : isLight ? "text-[var(--muted)]" : "text-white/75",
@@ -1638,9 +1643,10 @@ export default function BundleQuickBuy({
         <span aria-hidden="true">🇺🇸</span>
         <span>American-made savings pricing</span>
       </div>
-      <div className="relative mt-1 flex flex-col gap-3 sm:flex-row sm:items-start">
-        <div className="min-w-0 space-y-1.5">
+      <div data-bundle-header className="relative mt-1 flex flex-col gap-3 sm:flex-row sm:items-start">
+        <div data-bundle-header-body className="min-w-0 space-y-1.5">
           <div
+            data-bundle-title
             className={[
               "font-extrabold flex items-center gap-2 flex-wrap",
               isCompact ? (isLight ? "text-2xl text-[var(--text)]" : "text-2xl text-white") : isLight ? "text-2xl text-[var(--text)]" : "text-2xl text-white",
@@ -1650,6 +1656,7 @@ export default function BundleQuickBuy({
             <GummyIconRow size={14} className={isLight ? "opacity-80" : "opacity-90"} />
           </div>
           <div
+            data-bundle-sub
             className={[
               "text-xs font-semibold",
               isCompact ? (isLight ? "text-[var(--muted)]" : "text-white/70") : isLight ? "text-[var(--muted)]" : "text-white/75",
@@ -1659,6 +1666,7 @@ export default function BundleQuickBuy({
           </div>
       {summaryLine ? (
         <p
+          data-bundle-summary
           className={[
             "text-sm max-w-[52ch]",
             isCompact ? (isLight ? "text-[var(--muted)]" : "text-white/65") : isLight ? "text-[var(--muted)]" : "text-white/70",
@@ -1667,7 +1675,7 @@ export default function BundleQuickBuy({
           {summaryLine}
         </p>
       ) : null}
-          <div className="mt-2 grid gap-2 sm:grid-cols-4">
+          <div data-bundle-ladder className="mt-2 grid gap-2 sm:grid-cols-4">
             {SAVINGS_LADDER.map((milestone) => {
               const isNext = !bestPriceReached && milestone.qty === nextMilestone.qty;
               const isBest = bestPriceReached && milestone.qty === topMilestone.qty;
@@ -1733,6 +1741,7 @@ export default function BundleQuickBuy({
             })}
           </div>
           <div
+            data-bundle-proof
             className={[
               "mt-2 text-[11px] font-semibold",
               isLight ? "text-[var(--muted)]" : "text-white/70",
@@ -1741,6 +1750,7 @@ export default function BundleQuickBuy({
             {MISSION_SOCIAL_PROOF}
           </div>
           <div
+            data-bundle-mission
             className={[
               isFlat ? "mt-3 pt-1 text-xs" : "mt-3 rounded-2xl border px-3 py-3 text-xs",
               isFlat

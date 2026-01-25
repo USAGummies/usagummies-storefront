@@ -418,11 +418,20 @@ export default async function HomePage() {
             <div className="mt-2">
               <div id="hero-primary-cta" className="atomic-buy">
                 <div className="atomic-buy__glow" aria-hidden="true" />
+                <div className="atomic-buy__header">
+                  <div className="atomic-buy__headerMain">
+                    <div className="atomic-buy__kicker">USA Gummies</div>
+                    <div className="atomic-buy__headerTitle">
+                      Classic gummy bears, made in the USA.
+                    </div>
+                  </div>
+                  <div className="atomic-buy__headerSub">
+                    Add more bags and watch your per-bag price drop. Savings apply to your total bag count.
+                  </div>
+                </div>
                 <div className="atomic-buy__grid">
                   <div className="atomic-buy__product">
                     <div className="atomic-buy__details">
-                      <div className="atomic-buy__kicker">USA Gummies</div>
-                      <div className="atomic-buy__title">Classic gummy bears, made in the USA.</div>
                       <ul className="atomic-buy__bullets">
                         {DETAIL_BULLETS.slice(0, 3).map((bullet) => (
                           <li key={bullet} className="atomic-buy__bullet">

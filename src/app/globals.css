@@ -1640,11 +1640,39 @@ a:focus-visible:not(.btn):not(.focus-ring),
     linear-gradient(135deg, rgba(239,59,59,0.05), rgba(13,28,51,0.06), transparent 60%);
   opacity: 0.7;
 }
+.atomic-buy__header{
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px 18px;
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid rgba(15,27,45,0.12);
+}
+.atomic-buy__headerMain{
+  min-width: 0;
+}
+.atomic-buy__headerTitle{
+  font-size: clamp(22px, 2.4vw, 28px);
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+.atomic-buy__headerSub{
+  max-width: 40ch;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  text-align: right;
+}
 .atomic-buy__grid{
   position: relative;
   z-index: 1;
   display: grid;
-  gap: clamp(12px, 2vw, 18px);
+  gap: clamp(10px, 2vw, 16px);
   align-items: start;
 }
 .atomic-buy__product,
@@ -1684,12 +1712,6 @@ a:focus-visible:not(.btn):not(.focus-ring),
   letter-spacing: 0.32em;
   text-transform: uppercase;
   color: var(--muted);
-}
-.atomic-buy__title{
-  font-size: clamp(22px, 2.4vw, 28px);
-  font-weight: 900;
-  letter-spacing: -0.01em;
-  color: var(--text);
 }
 .atomic-buy__bullets{
   margin: 0;
@@ -1767,8 +1789,15 @@ a:focus-visible:not(.btn):not(.focus-ring),
   .atomic-buy{
     padding: 12px;
   }
-  .atomic-buy__title{
+  .atomic-buy__header{
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+  }
+  .atomic-buy__headerTitle{
     font-size: 22px;
+  }
+  .atomic-buy__headerSub{
+    text-align: left;
   }
   .atomic-buy__mediaFrame{
     padding: 10px;
@@ -1780,21 +1809,94 @@ a:focus-visible:not(.btn):not(.focus-ring),
   background: transparent;
   box-shadow: none;
 }
-.atomic-buy__bundle [data-bundle-root] > div:first-child{
-  margin-bottom: 4px;
-  letter-spacing: 0.22em;
+.atomic-buy__bundle [data-bundle-kicker],
+.atomic-buy__bundle [data-bundle-title],
+.atomic-buy__bundle [data-bundle-sub],
+.atomic-buy__bundle [data-bundle-summary]{
+  display: none;
 }
-.atomic-buy__bundle [data-bundle-root] > div:nth-child(2){
-  gap: 10px;
+.atomic-buy__bundle [data-bundle-header]{
+  margin-top: 0;
+  gap: 8px;
+}
+.atomic-buy__bundle [data-bundle-header-body]{
+  gap: 8px;
+}
+.atomic-buy__bundle [data-bundle-ladder]{
+  margin-top: 6px;
+  gap: 6px;
+}
+.atomic-buy__bundle [data-bundle-ladder] > div{
+  padding: 6px 8px;
+  border-radius: 12px;
+  font-size: 10px;
+}
+.atomic-buy__bundle [data-bundle-proof]{
+  margin-top: 6px;
+  font-size: 10px;
+}
+.atomic-buy__bundle [data-bundle-mission]{
+  margin-top: 8px;
+  padding: 8px 10px;
+}
+.atomic-buy__bundle [data-bundle-mission] .btn{
+  padding: 6px 10px;
+  font-size: 10px;
+  box-shadow: none;
+  border: 1px solid rgba(15,27,45,0.12);
+  background: rgba(15,27,45,0.04);
+  color: var(--text);
 }
 .atomic-buy__bundle [data-bundle-pretrust]{
   display: none;
 }
 .atomic-buy__bundle [data-bundle-grid]{
-  margin-top: 10px;
+  margin-top: 8px;
 }
 .atomic-buy__bundle [data-bundle-root] [role="radiogroup"]{
-  gap: 10px;
+  gap: 8px;
+  grid-template-columns: 1fr;
+  grid-auto-flow: dense;
+}
+.atomic-buy__bundle [data-bundle-root] [role="radiogroup"] [data-qty]{
+  order: 5;
+  opacity: 0.85;
+}
+.atomic-buy__bundle [data-bundle-root] [role="radiogroup"] [data-qty="8"]{
+  order: 1;
+  opacity: 1;
+  grid-column: 1 / -1;
+  border-color: rgba(239,59,59,0.5);
+  background: rgba(239,59,59,0.08);
+}
+.atomic-buy__bundle [data-bundle-root] [role="radiogroup"] [data-qty="12"]{
+  order: 2;
+  opacity: 0.98;
+  grid-column: 1 / -1;
+  border-color: rgba(199,160,98,0.45);
+  background: rgba(199,160,98,0.08);
+}
+.atomic-buy__bundle [data-bundle-root] [role="radiogroup"] [data-qty="5"]{
+  order: 3;
+  opacity: 0.9;
+}
+.atomic-buy__bundle [data-bundle-root] [role="radiogroup"] [data-qty="4"]{
+  order: 4;
+  opacity: 0.9;
+}
+.atomic-buy__bundle [data-bundle-root] [role="radiogroup"] [data-qty="1"],
+.atomic-buy__bundle [data-bundle-root] [role="radiogroup"] [data-qty="2"],
+.atomic-buy__bundle [data-bundle-root] [role="radiogroup"] [data-qty="3"]{
+  opacity: 0.75;
+  border-color: rgba(15,27,45,0.08);
+}
+@media (min-width: 640px){
+  .atomic-buy__bundle [data-bundle-root] [role="radiogroup"]{
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .atomic-buy__bundle [data-bundle-root] [role="radio"]{
+    min-height: 150px;
+  }
 }
 .atomic-buy__bundle [data-bundle-root] [role="radio"]{
   min-height: 150px;
@@ -1808,15 +1910,35 @@ a:focus-visible:not(.btn):not(.focus-ring),
   background: rgba(239,59,59,0.06);
   box-shadow: none;
 }
+.atomic-buy__bundle .bundleTierBtn__cta{
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font-size: 10px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  color: var(--muted);
+  box-shadow: none;
+  opacity: 0.65;
+}
+.atomic-buy__bundle .bundleTierBtn__cta--added{
+  color: rgba(21,128,61,0.9);
+  opacity: 0.85;
+}
+.atomic-buy__bundle .bundleTierBtn__cta--upgrade{
+  color: var(--candy-red);
+  opacity: 0.85;
+}
 .atomic-buy__bundle [data-bundle-cta]{
-  margin-top: 12px;
+  margin-top: 10px;
   padding-top: 0;
   border-top: 0;
   background: transparent;
+  position: static;
 }
 .atomic-buy__bundle [data-bundle-cta-stack]{
-  margin-top: 10px;
-  gap: 8px;
+  margin-top: 8px;
+  gap: 6px;
 }
 .atomic-buy__bundle [data-primary-cta]{
   height: 46px;
@@ -1827,7 +1949,7 @@ a:focus-visible:not(.btn):not(.focus-ring),
 .atomic-buy__bundle [data-bundle-cta-trust]{
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px 12px;
   align-items: center;
 }
 .atomic-buy__bundle [data-bundle-cta-note]{
@@ -1838,18 +1960,22 @@ a:focus-visible:not(.btn):not(.focus-ring),
   padding: 0;
   border: 0;
   background: transparent;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 .atomic-buy__bundle [data-bundle-rating] > div:first-child{
   font-size: 12px;
 }
 .atomic-buy__bundle [data-bundle-rating] .mt-1{
   margin-top: 4px;
-}
-.atomic-buy__bundle [data-bundle-reviews]{
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  font-size: 10px;
+  gap: 6px;
+}
+.atomic-buy__bundle [data-bundle-reviews]{
+  display: none;
 }
 .atomic-buy__bundle [data-bundle-reviews] > div{
   max-width: 100%;
