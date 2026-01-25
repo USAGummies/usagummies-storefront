@@ -442,6 +442,13 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
     () => normalizeCheckoutUrl(localCart?.checkoutUrl) ?? localCart?.checkoutUrl,
     [localCart?.checkoutUrl]
   );
+  const drawerSavingsLine =
+    bundleSavings > 0
+      ? `You saved ${bundleSavingsText} vs single bags.`
+      : totalBags > 0
+        ? "Savings pending."
+        : "";
+  const drawerUpsellLabel = nextTierAddQty ? nextTierCtaLabel : "";
 
   function handleCheckoutClick(event?: MouseEvent<HTMLAnchorElement>) {
     const safeCheckoutUrl = getSafeCheckoutUrl(
@@ -483,6 +490,148 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
           <div className="skeleton h-4 w-28" />
           <div className="skeleton h-4 w-40" />
         </div>
+      </div>
+    );
+  }
+
+  if (isDrawer) {
+    return (
+      <div className="px-4 py-4 text-[var(--text)]">
+        {hasLines ? (
+          <>
+            <div className="rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-3 shadow-[0_10px_24px_rgba(15,27,45,0.08)]">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
+                Order summary
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                {cartPeekLines.map((l: any) => {
+                  const title = l?.merchandise?.product?.title || "Item";
+                  const lineQty = Number(l?.quantity) || 0;
+                  const bagsPerUnit = getBagsPerUnit(l?.merchandise);
+                  const lineBags = bagsPerUnit * lineQty;
+                  return (
+                    <div
+                      key={l.id}
+                      className="flex items-center gap-2 rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-2.5 py-1 text-[10px] font-semibold text-[var(--text)]"
+                    >
+                      <span className="truncate max-w-[120px]">{title}</span>
+                      <span className="text-[var(--muted)]">
+                        {lineBags} bag{lineBags === 1 ? "" : "s"}
+                      </span>
+                    </div>
+                  );
+                })}
+                {cartPeekExtra > 0 ? (
+                  <span className="text-[10px] font-semibold text-[var(--muted)]">
+                    +{cartPeekExtra} more
+                  </span>
+                ) : null}
+              </div>
+              <div className="mt-3 grid gap-2 text-[11px] text-[var(--muted)]">
+                <div className="flex items-center justify-between">
+                  <span>Bag count</span>
+                  <span className="font-semibold text-[var(--text)]">
+                    {totalBags} bag{totalBags === 1 ? "" : "s"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Shipping</span>
+                  <span className="font-semibold text-[var(--text)]">{shippingSummary}</span>
+                </div>
+                <div className="flex items-center justify-between text-[12px] font-semibold text-[var(--text)]">
+                  <span>Total</span>
+                  <span className="text-base font-black">{estimatedTotal}</span>
+                </div>
+                {drawerSavingsLine ? (
+                  <div className="text-[10px] font-semibold text-[var(--candy-red)]">
+                    {drawerSavingsLine}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
+            {localCart?.checkoutUrl ? (
+              <div className="mt-3 grid gap-2">
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    {
+                      label: "Shop Pay",
+                      short: "SP",
+                      iconClass: "bg-[var(--navy)] text-white",
+                    },
+                    {
+                      label: "Apple Pay",
+                      short: "AP",
+                      iconClass: "bg-[#111111] text-white",
+                    },
+                    {
+                      label: "Google Pay",
+                      short: "GP",
+                      iconClass: "border border-[var(--border)] bg-white text-[var(--text)]",
+                    },
+                  ].map((method) => (
+                    <a
+                      key={method.label}
+                      href={checkoutHref ?? localCart.checkoutUrl}
+                      onClick={handleCheckoutClick}
+                      aria-label={`${method.label} checkout`}
+                      className="flex flex-col items-center justify-center gap-1 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-2 py-2 text-[9px] font-semibold text-[var(--text)]"
+                    >
+                      <span
+                        className={`flex h-9 w-9 items-center justify-center rounded-full text-[11px] font-black ${method.iconClass}`}
+                      >
+                        {method.short}
+                      </span>
+                      <span className="text-[9px] text-[var(--muted)]">{method.label}</span>
+                    </a>
+                  ))}
+                </div>
+
+                <a
+                  href={checkoutHref ?? localCart.checkoutUrl}
+                  className="btn btn-candy w-full justify-center pressable"
+                  onClick={handleCheckoutClick}
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+                      <path
+                        fill="currentColor"
+                        d="M6 10V8a6 6 0 1 1 12 0v2h1v12H5V10h1zm2 0h8V8a4 4 0 1 0-8 0v2z"
+                      />
+                    </svg>
+                    Secure checkout
+                  </span>
+                </a>
+              </div>
+            ) : null}
+
+            {showNextTierCta ? (
+              <details className="mt-3 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-3 py-2 text-[11px] text-[var(--muted)]">
+                <summary className="cursor-pointer font-semibold text-[var(--text)]">
+                  Optional: boost your savings
+                </summary>
+                <div className="mt-2">
+                  <button
+                    type="button"
+                    onClick={() => (nextTierAddQty ? addBags(nextTierAddQty) : null)}
+                    disabled={bundlePending}
+                    className="w-full rounded-full border border-[rgba(15,27,45,0.12)] bg-white px-3 py-2 text-[11px] font-semibold text-[var(--text)] transition hover:border-[rgba(239,59,59,0.35)]"
+                  >
+                    {bundlePending ? "Locking in..." : drawerUpsellLabel}
+                  </button>
+                </div>
+              </details>
+            ) : null}
+
+            {bundleError ? (
+              <div className="mt-2 text-xs text-[var(--red)]">{bundleError}</div>
+            ) : null}
+          </>
+        ) : (
+          <div className="rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-4 text-sm text-[var(--muted)]">
+            Your cart is empty.
+          </div>
+        )}
       </div>
     );
   }
