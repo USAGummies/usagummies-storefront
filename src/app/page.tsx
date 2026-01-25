@@ -485,9 +485,6 @@ export default async function HomePage() {
                       ctaVariant="simple"
                       primaryCtaLabel="Shop & save"
                       featuredQuantities={[5, 8, 12]}
-                      showOtherQuantitiesLink={true}
-                      otherQuantitiesLabel="Other sizes"
-                      otherQuantities={[1, 2, 3, 4]}
                     />
                   </div>
                 </div>
