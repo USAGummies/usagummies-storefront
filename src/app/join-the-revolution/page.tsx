@@ -88,7 +88,7 @@ export default function JoinTheRevolutionPage() {
                 </p>
                 <div className="flex flex-wrap items-center gap-3">
                   <Link href="/shop" className="btn btn-candy">
-                    Shop now and save
+                    Shop now
                   </Link>
                   <span className="text-xs text-[var(--muted)]">{FREE_SHIPPING_PHRASE}</span>
                 </div>
@@ -180,7 +180,7 @@ export default function JoinTheRevolutionPage() {
                 </div>
                 <div className="mt-3 flex flex-wrap gap-3">
                   <Link href="/shop" className="btn btn-candy">
-                    Shop now and save
+                    Shop now
                   </Link>
                   <Link href="/faq" className="btn btn-outline">
                     Read the FAQ
@@ -200,7 +200,7 @@ export default function JoinTheRevolutionPage() {
                 </p>
                 <div className="mt-3 flex flex-wrap gap-3">
                   <Link href="/shop" className="btn btn-candy">
-                    Shop now and save
+                    Shop now
                   </Link>
                   <Link href="/faq" className="btn btn-outline">
                     Read the FAQ
@@ -214,7 +214,7 @@ export default function JoinTheRevolutionPage() {
             <AmericanDreamCallout
               variant="compact"
               ctaHref="/shop"
-              ctaLabel="Shop now and save"
+              ctaLabel="Shop now"
               showJoinButton={false}
               tone="light"
             />

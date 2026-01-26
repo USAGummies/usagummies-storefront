@@ -135,7 +135,7 @@ export default function America250HubPage() {
             href="/shop"
             className="btn btn-candy mt-4 inline-flex items-center justify-center rounded-2xl px-5 py-3 text-sm font-semibold"
           >
-            Shop now and save
+            Shop now
           </Link>
         </div>
       </div>

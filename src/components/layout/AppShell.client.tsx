@@ -100,9 +100,9 @@ const navSections = [
   {
     title: "Shop",
     links: [
-      { href: "/shop", label: "Shop now and save" },
-      { href: "/bundle-guides", label: "Bag count guides" },
-      { href: "/gummy-gift-bundles", label: "Gift bag options" },
+      { href: "/shop", label: "Shop" },
+      { href: "/bundle-guides", label: "Bundle guides" },
+      { href: "/gummy-gift-bundles", label: "Gift bundles" },
       { href: "/patriotic-party-snacks", label: "Party snacks" },
       { href: "/bulk-gummy-bears", label: "Bulk gummy bears" },
     ],
@@ -350,7 +350,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               />
             </div>
             <span className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--navy)]">
-              🇺🇸 Made in the USA
+              Made in the USA
             </span>
           </Link>
 
@@ -507,9 +507,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div className="space-y-2">
               <div className="text-lg font-black text-[var(--text)]">USA Gummies</div>
               <ul className="space-y-1 text-[var(--muted)]">
-                <li>🇺🇸 Made in the USA • Classic gummy bear flavor</li>
-                <li>✅ No artificial dyes • All natural flavors</li>
-                <li>🚚 Ships fast • Save more with more bags</li>
+                <li>Made in the USA • Classic gummy bear flavor</li>
+                <li>All natural flavors • No artificial dyes</li>
+                <li>Ships fast • Save more on 5+ bags</li>
               </ul>
             </div>
               <div className="text-xs text-[var(--muted)]">

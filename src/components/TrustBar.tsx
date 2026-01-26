@@ -9,10 +9,10 @@ export function TrustBar({
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-[var(--text)]">
-              Built for conversion. Backed by trust.
+              American-made. Backed by trust.
             </h2>
             <p className="mt-1 text-sm text-[var(--muted)]">
-              Fast shipping, secure Shopify checkout, and bag savings that reward stocking up.
+              Fast shipping, secure checkout, all natural flavors, and no artificial dyes.
             </p>
           </div>
 

@@ -274,7 +274,7 @@ export function MemberPortal({ source, variant = "light" }: MemberPortalProps) {
             Send reset link
           </button>
           <Link href="/shop" className="link-underline">
-            Shop now and save
+            Shop now
           </Link>
         </div>
 
@@ -331,7 +331,7 @@ export function MemberPortal({ source, variant = "light" }: MemberPortalProps) {
           <div className={cn("mt-1 text-xs", isDark ? "text-white/70" : "text-[var(--muted)]")}>
             {eligible
               ? "Eligible now. Subscription activation will be emailed to you."
-              : "Eligible after your first purchase. Shop now and save to unlock access."}
+              : "Eligible after your first purchase. Shop now to unlock access."}
           </div>
         </div>
 

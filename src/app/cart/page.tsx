@@ -28,7 +28,7 @@ export default async function CartPage() {
 
           <div className="flex gap-2">
             <Link className="btn btn-outline" href="/shop#bundle-pricing">
-              Shop now and save
+              Shop now
             </Link>
           </div>
         </div>

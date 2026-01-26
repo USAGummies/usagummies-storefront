@@ -51,7 +51,7 @@ export default function ReturnsPolicyPage() {
             href="/shop"
             className="rounded-full border border-[var(--border)] bg-white px-3 py-1 text-sm text-[var(--text)] hover:bg-[var(--surface-strong)]"
           >
-            Shop now and save
+            Shop now
           </Link>
         </div>
 

@@ -26,7 +26,7 @@ export function AnnouncementBar() {
     }
     return {
       left: FREE_SHIPPING_PHRASE,
-      right: "Fast U.S. fulfillment • No subscriptions",
+      right: "Made in USA • No artificial dyes",
       href: "/shop",
     };
   }, [isAmerica250]);
@@ -51,7 +51,7 @@ export function AnnouncementBar() {
               "rounded-full border border-[var(--border)] bg-[var(--surface-strong)] px-3 py-1 text-[11px] font-semibold text-[var(--text)] hover:bg-white"
             )}
           >
-            Shop now and save
+            Shop now
           </Link>
         </div>
       </div>

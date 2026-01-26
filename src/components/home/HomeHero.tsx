@@ -14,7 +14,7 @@ export function HomeHero() {
         >
           <span className="usa-stamp usa-stamp--corner">Made in USA</span>
           <div className="h-eyebrow">
-            American-made gummy bears • Fast shipping • Save more per bag
+            All natural • Made in the USA • No artificial dyes
           </div>
 
           <div
@@ -35,8 +35,8 @@ export function HomeHero() {
               </div>
 
               <p className="sub" style={{ marginTop: 12 }}>
-                Premium gummies built in the USA, bold flavor, clean finish, and
-                a cart that highlights your best price.
+                Premium gummies made in the USA with bold flavor, a clean finish, and
+                pricing that rewards bigger orders.
               </p>
 
               <div
@@ -49,14 +49,11 @@ export function HomeHero() {
                 }}
               >
                 <Link className="btn btn-primary" href="/shop#bundle-pricing">
-                  Shop now and save
+                  Shop now
                 </Link>
-                <Link className="btn btn-navy" href="/shop">
-                  Shop now and save
-                </Link>
-                <span className="chip">✅ Dye-free</span>
-                <span className="chip">🚚 Ships fast</span>
-                <span className="chip">⭐ 4.8 stars from verified Amazon buyers</span>
+                <span className="chip">No artificial dyes</span>
+                <span className="chip">Ships fast</span>
+                <span className="chip">4.8 stars from verified Amazon buyers</span>
               </div>
               <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8 }}>
                 <HeroPackIcon size={26} className="icon-float" />
@@ -77,15 +74,12 @@ export function HomeHero() {
                   Stack bags. Save more.
                 </div>
                 <div style={{ opacity: 0.8, lineHeight: 1.6, marginTop: 8 }}>
-                  Savings pricing and free shipping unlock automatically as you add bags.
-                  87% of shoppers end at 8 bags.
+                  Free shipping and better pricing unlock as you add bags. 87% of shoppers
+                  end at 8 bags.
                 </div>
 
                 <div style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  <Link className="btn btn-primary" href="/shop#bundle-pricing">
-                    Shop now and save
-                  </Link>
-                  <Link className="btn" href="/shop#product-details">
+                  <Link className="btn btn-outline" href="/shop#product-details">
                     View product details
                   </Link>
                 </div>

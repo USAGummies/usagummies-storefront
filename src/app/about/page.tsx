@@ -181,7 +181,7 @@ export default function AboutPage() {
 
                 <div className="flex flex-wrap items-center gap-3">
                   <Link href="/shop" className="btn btn-candy">
-                    Shop now and save
+                    Shop now
                   </Link>
                   <span className="text-xs text-[var(--muted)]">{FREE_SHIPPING_PHRASE}</span>
                 </div>
@@ -244,7 +244,7 @@ export default function AboutPage() {
           </div>
 
           <div className="mt-6">
-            <AmericanDreamCallout ctaHref="/shop" ctaLabel="Shop now and save" tone="light" />
+            <AmericanDreamCallout ctaHref="/shop" ctaLabel="Shop now" tone="light" />
           </div>
 
           <div className="mt-6 grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">

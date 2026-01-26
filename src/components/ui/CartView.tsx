@@ -450,7 +450,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
   const cartContext = onClose ? "drawer" : "cart";
   const secondaryCta = onClose
     ? { href: "/cart", label: "View cart" }
-    : { href: "/shop#bundle-pricing", label: "Shop now and save" };
+    : { href: "/shop#bundle-pricing", label: "Shop now" };
   const showStickyCheckout = !onClose && hasLines && Boolean(localCart?.checkoutUrl);
   const checkoutHref = useMemo(
     () => normalizeCheckoutUrl(localCart?.checkoutUrl) ?? localCart?.checkoutUrl,
@@ -1613,7 +1613,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
               className="btn btn-candy mt-4 w-full justify-center"
               onClick={onClose}
             >
-              Shop now and save
+              Shop now
             </Link>
             <div className="mt-2">
               <AmazonOneBagNote className="text-[11px] text-[var(--muted)]" />
