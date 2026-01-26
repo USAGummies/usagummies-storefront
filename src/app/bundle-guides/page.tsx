@@ -1,6 +1,6 @@
 import Link from "next/link";
+import Image from "next/image";
 import type { Metadata } from "next";
-import { AmericanDreamCallout } from "@/components/story/AmericanDreamCallout";
 import { OccasionBagPicker } from "@/components/guides/OccasionBagPicker.client";
 import { OCCASION_BAG_OPTIONS } from "@/data/occasionBagOptions";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
@@ -81,16 +81,33 @@ export default function BundleGuidesPage() {
           ]}
         />
         <div className="candy-panel rounded-[36px] p-5 sm:p-6">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-            Bag count guides
+          <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+                Bag count guides
+              </div>
+              <h1 className="mt-2 text-3xl font-black text-[var(--text)] sm:text-4xl">
+                Find the right USA Gummies bag count
+              </h1>
+              <p className="mt-2 text-sm text-[var(--muted)] sm:text-base max-w-prose">
+                Use these guides to match bag count to the moment. Choose a gift bag count, plan party
+                snacks, or order bulk gummy bears for teams and events.
+              </p>
+            </div>
+            <div className="relative">
+              <div className="relative rounded-3xl border border-[var(--border)] bg-white p-2 shadow-[0_18px_44px_rgba(15,27,45,0.12)]">
+                <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-[var(--border)] bg-white">
+                  <Image
+                    src="/Hero-pack.jpeg"
+                    alt="USA Gummies bag"
+                    fill
+                    sizes="(max-width: 768px) 90vw, 420px"
+                    className="object-contain"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
-          <h1 className="mt-2 text-3xl font-black text-[var(--text)] sm:text-4xl">
-            Find the right USA Gummies bag count
-          </h1>
-          <p className="mt-2 text-sm text-[var(--muted)] sm:text-base max-w-prose">
-            Use these guides to match bag count to the moment. Choose a gift bag count, plan party
-            snacks, or order bulk gummy bears for teams and events.
-          </p>
           <div className="mt-5">
             <OccasionBagPicker options={OCCASION_BAG_OPTIONS} defaultKey="gift" />
           </div>
@@ -125,7 +142,6 @@ export default function BundleGuidesPage() {
           </div>
         </div>
 
-        <AmericanDreamCallout variant="compact" tone="light" className="mt-6" showJoinButton={false} />
       </section>
 
       <script

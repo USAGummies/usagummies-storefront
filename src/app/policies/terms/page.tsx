@@ -42,7 +42,7 @@ export const metadata: Metadata = {
 export default function TermsPage() {
   return (
     <main className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
-      <div className="mx-auto max-w-4xl px-4 py-12">
+      <div className="mx-auto max-w-4xl px-4 py-10">
         <div className="mb-6 flex items-center justify-between gap-3">
           <Link
             href="/policies"
@@ -65,8 +65,8 @@ export default function TermsPage() {
             securely through Shopify.
           </p>
 
-          <div className="mt-8 space-y-6 text-[var(--muted)]">
-            <div className="card-solid p-5">
+          <div className="mt-8 divide-y divide-[var(--border)] text-[var(--muted)]">
+            <div className="py-4">
               <h2 className="text-lg font-semibold text-[var(--text)]">Orders</h2>
               <p className="mt-2 text-sm text-[var(--muted)]">
                 By placing an order, you agree that the information you provide is accurate and that
@@ -74,7 +74,7 @@ export default function TermsPage() {
               </p>
             </div>
 
-            <div className="card-solid p-5">
+            <div className="py-4">
               <h2 className="text-lg font-semibold text-[var(--text)]">Pricing</h2>
               <p className="mt-2 text-sm text-[var(--muted)]">
                 Prices are shown in your cart at checkout. Savings pricing and shipping eligibility
@@ -82,7 +82,7 @@ export default function TermsPage() {
               </p>
             </div>
 
-            <div className="card-solid p-5">
+            <div className="py-4">
               <h2 className="text-lg font-semibold text-[var(--text)]">Checkout & payments</h2>
               <p className="mt-2 text-sm text-[var(--muted)]">
                 Checkout is powered by <strong className="text-[var(--text)]">Shopify</strong>.
@@ -90,14 +90,14 @@ export default function TermsPage() {
               </p>
             </div>
 
-            <div className="card-solid p-5">
+            <div className="py-4">
               <h2 className="text-lg font-semibold text-[var(--text)]">Site use</h2>
               <p className="mt-2 text-sm text-[var(--muted)]">
                 You agree not to misuse the site, attempt unauthorized access, or disrupt site operations.
               </p>
             </div>
 
-            <div className="card-solid p-5">
+            <div className="py-4">
               <h2 className="text-lg font-semibold text-[var(--text)]">Changes</h2>
               <p className="mt-2 text-sm text-[var(--muted)]">
                 We may update these terms from time to time. The latest version will always be posted on this page.

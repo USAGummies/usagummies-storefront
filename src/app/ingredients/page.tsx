@@ -219,6 +219,12 @@ export default function IngredientsPage() {
                   </Link>
                   <span className="text-xs text-[var(--muted)]">{FREE_SHIPPING_PHRASE}</span>
                 </div>
+                <div className="flex flex-wrap gap-2 text-[11px] font-semibold text-[var(--muted)]">
+                  <span className="candy-pill">Made in USA</span>
+                  <span className="candy-pill">No artificial dyes</span>
+                  <span className="candy-pill">All natural flavors</span>
+                  <span className="candy-pill">5 fruit flavors</span>
+                </div>
               </div>
 
               <div className="relative">
@@ -321,7 +327,7 @@ export default function IngredientsPage() {
               ))}
             </div>
 
-            <div className="mt-8 grid gap-3 sm:grid-cols-2">
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
               {FLAVORS.map((flavor) => (
                 <div
                   key={flavor.name}
@@ -340,15 +346,18 @@ export default function IngredientsPage() {
               <h2 className="mt-2 text-2xl font-black text-[var(--text)]">
                 Quick answers before you buy.
               </h2>
-              <div className="mt-4 grid gap-3">
+              <div className="mt-4 space-y-2">
                 {FAQS.map((item) => (
-                  <div
+                  <details
                     key={item.question}
-                    className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-4"
+                    className="group rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-3"
                   >
-                    <div className="text-sm font-semibold text-[var(--text)]">{item.question}</div>
+                    <summary className="flex cursor-pointer items-center justify-between gap-3 text-sm font-semibold text-[var(--text)]">
+                      <span>{item.question}</span>
+                      <span className="text-[var(--muted)] transition-transform group-open:rotate-45">+</span>
+                    </summary>
                     <div className="mt-2 text-sm text-[var(--muted)]">{item.answer}</div>
-                  </div>
+                  </details>
                 ))}
               </div>
             </div>

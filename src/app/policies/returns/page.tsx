@@ -42,7 +42,7 @@ export const metadata: Metadata = {
 export default function ReturnsPolicyPage() {
   return (
     <main className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
-      <div className="mx-auto max-w-4xl px-4 py-12">
+      <div className="mx-auto max-w-4xl px-4 py-10">
         <div className="mb-6 flex items-center justify-between gap-3">
           <Link
             href="/policies"
@@ -65,8 +65,8 @@ export default function ReturnsPolicyPage() {
             practices. If something arrives wrong or damaged, we will make it right.
           </p>
 
-          <div className="mt-8 space-y-6 text-[var(--muted)]">
-            <div className="card-solid p-5">
+          <div className="mt-8 divide-y divide-[var(--border)] text-[var(--muted)]">
+            <div className="py-4">
               <h2 className="text-lg font-semibold text-[var(--text)]">30-day money-back guarantee</h2>
               <p className="mt-2 text-sm text-[var(--muted)]">
                 We offer a 30-day money-back guarantee from delivery. If you are not satisfied,
@@ -75,7 +75,7 @@ export default function ReturnsPolicyPage() {
               </p>
             </div>
 
-            <div className="card-solid p-5">
+            <div className="py-4">
               <h2 className="text-lg font-semibold text-[var(--text)]">Food item policy</h2>
               <p className="mt-2 text-sm text-[var(--muted)]">
                 Because our products are food items, we generally cannot accept returns of opened items.
@@ -83,7 +83,7 @@ export default function ReturnsPolicyPage() {
               </p>
             </div>
 
-            <div className="card-solid p-5">
+            <div className="py-4">
               <h2 className="text-lg font-semibold text-[var(--text)]">Damaged or incorrect orders</h2>
               <p className="mt-2 text-sm text-[var(--muted)]">
                 If your order arrives damaged or incorrect, contact us within{" "}
@@ -92,7 +92,7 @@ export default function ReturnsPolicyPage() {
               </p>
             </div>
 
-            <div className="card-solid p-5">
+            <div className="py-4">
               <h2 className="text-lg font-semibold text-[var(--text)]">Refund timing</h2>
               <p className="mt-2 text-sm text-[var(--muted)]">
                 If a refund is approved, it will be issued to the original payment method.
@@ -100,7 +100,7 @@ export default function ReturnsPolicyPage() {
               </p>
             </div>
 
-            <div className="card-solid p-5">
+            <div className="py-4">
               <h2 className="text-lg font-semibold text-[var(--text)]">Order changes</h2>
               <p className="mt-2 text-sm text-[var(--muted)]">
                 If you need to update an address or correct an order detail, contact us as soon as possible.

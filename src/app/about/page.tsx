@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
-import { AmericanDreamCallout } from "@/components/story/AmericanDreamCallout";
 import { FREE_SHIPPING_PHRASE, pricingForQty } from "@/lib/bundles/pricing";
 import { BRAND_STORY_HEADLINE, BRAND_STORY_PARAGRAPHS } from "@/data/brandStory";
 
@@ -233,61 +232,58 @@ export default function AboutPage() {
           </div>
 
           <div className="mt-6 candy-panel rounded-[32px] border border-[var(--border)] p-5 sm:p-6">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-              Our story
-            </div>
-            <h2 className="mt-2 text-2xl font-black text-[var(--text)]">
-              {BRAND_STORY_HEADLINE}
-            </h2>
-            <div className="mt-4 space-y-3 text-sm text-[var(--muted)]">
-              {BRAND_STORY_PARAGRAPHS.map((paragraph) => (
-                <p key={paragraph}>{paragraph}</p>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-6">
-            <AmericanDreamCallout ctaHref="/shop" ctaLabel="Shop now" tone="light" />
-          </div>
-
-          <div className="mt-6 grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
-            <div className="candy-panel rounded-[32px] border border-[var(--border)] p-5 sm:p-6">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-                Savings by bag count
+            <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
+              <div>
+                <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+                  Our story
+                </div>
+                <h2 className="mt-2 text-2xl font-black text-[var(--text)]">
+                  {BRAND_STORY_HEADLINE}
+                </h2>
+                <div className="mt-4 space-y-3 text-sm text-[var(--muted)]">
+                  {BRAND_STORY_PARAGRAPHS.map((paragraph) => (
+                    <p key={paragraph}>{paragraph}</p>
+                  ))}
+                </div>
               </div>
-              <h2 className="mt-2 text-2xl font-black text-[var(--text)]">
-                Bag-count pricing saves you money.
-              </h2>
-              <p className="mt-2 text-sm text-[var(--muted)]">{bundleSavingsLine}</p>
-              <div className="mt-3 text-sm text-[var(--muted)]">{FREE_SHIPPING_PHRASE}.</div>
 
-              <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-3">
-                  <div className="text-[10px] uppercase tracking-[0.24em] text-[var(--muted)]">
-                    Single bag
-                  </div>
-                  <div className="text-base font-black text-[var(--text)]">{starterPerBag} per bag</div>
+              <div>
+                <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+                  Savings by bag count
                 </div>
-                <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-3">
-                  <div className="text-[10px] uppercase tracking-[0.24em] text-[var(--muted)]">
-                    Most popular
+                <h2 className="mt-2 text-2xl font-black text-[var(--text)]">
+                  Bag-count pricing saves you money.
+                </h2>
+                <p className="mt-2 text-sm text-[var(--muted)]">{bundleSavingsLine}</p>
+                <div className="mt-3 text-sm text-[var(--muted)]">{FREE_SHIPPING_PHRASE}.</div>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-3">
+                    <div className="text-[10px] uppercase tracking-[0.24em] text-[var(--muted)]">
+                      Single bag
+                    </div>
+                    <div className="text-base font-black text-[var(--text)]">{starterPerBag} per bag</div>
                   </div>
-                  <div className="text-base font-black text-[var(--text)]">{bestValuePerBag} per bag</div>
-                  <div className="text-[11px] text-[var(--muted)]">8-bag total</div>
-                  <div className="text-[11px] text-[var(--red)]">
-                    Best balance of value + convenience
+                  <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-3">
+                    <div className="text-[10px] uppercase tracking-[0.24em] text-[var(--muted)]">
+                      Most popular
+                    </div>
+                    <div className="text-base font-black text-[var(--text)]">{bestValuePerBag} per bag</div>
+                    <div className="text-[11px] text-[var(--muted)]">8-bag total</div>
+                    <div className="text-[11px] text-[var(--red)]">
+                      Best balance of value + convenience
+                    </div>
                   </div>
-                </div>
-                <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-3">
-                  <div className="text-[10px] uppercase tracking-[0.24em] text-[var(--muted)]">
-                    Free shipping
+                  <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-3">
+                    <div className="text-[10px] uppercase tracking-[0.24em] text-[var(--muted)]">
+                      Free shipping
+                    </div>
+                    <div className="text-base font-black text-[var(--text)]">5+ bags</div>
+                    <div className="text-[11px] text-[var(--muted)]">Orders ship free</div>
                   </div>
-                  <div className="text-base font-black text-[var(--text)]">5+ bags</div>
-                  <div className="text-[11px] text-[var(--muted)]">Orders ship free</div>
                 </div>
               </div>
             </div>
-
           </div>
         </div>
       </section>

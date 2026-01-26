@@ -42,7 +42,7 @@ export const metadata: Metadata = {
 export default function ShippingPolicyPage() {
   return (
     <main className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
-      <div className="mx-auto max-w-4xl px-4 py-12">
+      <div className="mx-auto max-w-4xl px-4 py-10">
         <div className="mb-6 flex items-center justify-between gap-3">
           <Link
             href="/policies"
@@ -66,8 +66,8 @@ export default function ShippingPolicyPage() {
             updates. Free shipping on 5+ bags.
           </p>
 
-          <div className="mt-8 space-y-6 text-[var(--muted)]">
-            <div className="card-solid p-5">
+          <div className="mt-8 divide-y divide-[var(--border)] text-[var(--muted)]">
+            <div className="py-4">
               <h2 className="text-lg font-semibold text-[var(--text)]">Free shipping</h2>
               <p className="mt-2 text-sm text-[var(--muted)]">
                 Free shipping on 5+ bags.
@@ -75,7 +75,7 @@ export default function ShippingPolicyPage() {
               </p>
             </div>
 
-            <div className="card-solid p-5">
+            <div className="py-4">
               <h2 className="text-lg font-semibold text-[var(--text)]">Processing time</h2>
               <p className="mt-2 text-sm text-[var(--muted)]">
                 Orders ship within <strong className="text-[var(--text)]">24 hours</strong>.
@@ -84,7 +84,7 @@ export default function ShippingPolicyPage() {
               </p>
             </div>
 
-            <div className="card-solid p-5">
+            <div className="py-4">
               <h2 className="text-lg font-semibold text-[var(--text)]">Delivery time</h2>
               <p className="mt-2 text-sm text-[var(--muted)]">
                 Delivery speed depends on the carrier and destination. Most customers receive orders
@@ -92,14 +92,14 @@ export default function ShippingPolicyPage() {
               </p>
             </div>
 
-            <div className="card-solid p-5">
+            <div className="py-4">
               <h2 className="text-lg font-semibold text-[var(--text)]">Tracking</h2>
               <p className="mt-2 text-sm text-[var(--muted)]">
                 Tracking details are sent within 24 hours of your order.
               </p>
             </div>
 
-            <div className="card-solid p-5">
+            <div className="py-4">
               <h2 className="text-lg font-semibold text-[var(--text)]">Shipping issues</h2>
               <p className="mt-2 text-sm text-[var(--muted)]">
                 If your package is delayed, missing, or arrives damaged, contact us using the form below.

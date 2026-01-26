@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
-import { AmericanDreamCallout } from "@/components/story/AmericanDreamCallout";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 
 export const metadata: Metadata = {
@@ -158,42 +157,33 @@ export default function JoinTheRevolutionPage() {
               </div>
             </div>
 
-            <div className="space-y-4">
-              <div className="candy-panel rounded-[32px] border border-[var(--border)] p-5 sm:p-6">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-                  Member portal
-                </div>
-                <h2 className="mt-2 text-2xl font-black text-[var(--text)]">
-                  Member access launches after purchase.
-                </h2>
-                <p className="mt-2 text-sm text-[var(--muted)]">
-                  Place your first order and you are in. We will email your sign-in link as soon as the
-                  Revolution portal is live.
-                </p>
-                <div className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-4">
-                  <div className="text-xs font-semibold text-[var(--text)]">What members get</div>
-                  <ul className="mt-2 space-y-1 text-xs text-[var(--muted)]">
-                    <li>Order history tied to your checkout email</li>
-                    <li>Subscription eligibility after your first order</li>
-                    <li>Early drops and premium savings alerts</li>
-                  </ul>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-3">
-                  <Link href="/shop" className="btn btn-candy">
-                    Shop now
-                  </Link>
-                  <Link href="/faq" className="btn btn-outline">
-                    Read the FAQ
-                  </Link>
-                </div>
+            <div className="candy-panel rounded-[32px] border border-[var(--border)] p-5 sm:p-6">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+                Member portal
               </div>
-              <div className="candy-panel rounded-[32px] border border-[var(--border)] p-5 sm:p-6">
+              <h2 className="mt-2 text-2xl font-black text-[var(--text)]">
+                Member access launches after purchase.
+              </h2>
+              <p className="mt-2 text-sm text-[var(--muted)]">
+                Place your first order and you are in. We will email your sign-in link as soon as the
+                Revolution portal is live.
+              </p>
+              <div className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-4">
+                <div className="text-xs font-semibold text-[var(--text)]">What members get</div>
+                <ul className="mt-2 space-y-1 text-xs text-[var(--muted)]">
+                  <li>Order history tied to your checkout email</li>
+                  <li>Subscription eligibility after your first order</li>
+                  <li>Early drops and premium savings alerts</li>
+                </ul>
+              </div>
+
+              <div className="mt-5 border-t border-[var(--border)] pt-5">
                 <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
                   How you qualify
                 </div>
-                <h2 className="mt-2 text-2xl font-black text-[var(--text)]">
+                <h3 className="mt-2 text-xl font-black text-[var(--text)]">
                   Membership unlocks after purchase.
-                </h2>
+                </h3>
                 <p className="mt-2 text-sm text-[var(--muted)]">
                   Place your first order for USA Gummies and you are in. Subscriptions are reserved
                   for members who have already purchased.
@@ -208,16 +198,6 @@ export default function JoinTheRevolutionPage() {
                 </div>
               </div>
             </div>
-          </div>
-
-          <div className="mt-6">
-            <AmericanDreamCallout
-              variant="compact"
-              ctaHref="/shop"
-              ctaLabel="Shop now"
-              showJoinButton={false}
-              tone="light"
-            />
           </div>
         </div>
       </section>

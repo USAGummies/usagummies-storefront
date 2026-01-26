@@ -1,6 +1,6 @@
 import Link from "next/link";
+import Image from "next/image";
 import type { Metadata } from "next";
-import { AmericanDreamCallout } from "@/components/story/AmericanDreamCallout";
 import { OccasionBagPicker } from "@/components/guides/OccasionBagPicker.client";
 import { OCCASION_BAG_OPTIONS } from "@/data/occasionBagOptions";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
@@ -88,16 +88,33 @@ export default function PatrioticPartySnacksPage() {
           ]}
         />
         <div className="candy-panel rounded-[36px] p-5 sm:p-6">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-            Party snacks
+          <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+                Party snacks
+              </div>
+              <h1 className="mt-2 text-3xl font-black text-[var(--text)] sm:text-4xl">
+                Patriotic party snacks and gummy bag options
+              </h1>
+              <p className="mt-2 text-sm text-[var(--muted)] sm:text-base max-w-prose">
+                Hosting a July 4th party or an America-themed event? USA Gummies bags make easy
+                shareable snacks. Shop now for crowd-ready gummy bears.
+              </p>
+            </div>
+            <div className="relative">
+              <div className="relative rounded-3xl border border-[var(--border)] bg-white p-2 shadow-[0_18px_44px_rgba(15,27,45,0.12)]">
+                <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-[var(--border)] bg-white">
+                  <Image
+                    src="/website%20assets/StatueofLiberty.png"
+                    alt="Statue of Liberty illustration"
+                    fill
+                    sizes="(max-width: 768px) 90vw, 420px"
+                    className="object-contain"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
-          <h1 className="mt-2 text-3xl font-black text-[var(--text)] sm:text-4xl">
-            Patriotic party snacks and gummy bag options
-          </h1>
-          <p className="mt-2 text-sm text-[var(--muted)] sm:text-base max-w-prose">
-            Hosting a July 4th party or an America-themed event? USA Gummies bags make easy
-            shareable snacks. Shop now for crowd-ready gummy bears.
-          </p>
 
           <div className="mt-6 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-4">
             <div className="text-sm font-black text-[var(--text)]">Party sizing tips</div>
@@ -138,8 +155,6 @@ export default function PatrioticPartySnacksPage() {
             </Link>
           ))}
         </div>
-
-        <AmericanDreamCallout variant="compact" tone="light" className="mt-6" showJoinButton={false} />
       </section>
 
       <script

@@ -1,6 +1,6 @@
 import Link from "next/link";
+import Image from "next/image";
 import type { Metadata } from "next";
-import { AmericanDreamCallout } from "@/components/story/AmericanDreamCallout";
 import { OccasionBagPicker } from "@/components/guides/OccasionBagPicker.client";
 import { OCCASION_BAG_OPTIONS } from "@/data/occasionBagOptions";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
@@ -101,16 +101,33 @@ export default function GummyGiftBundlesPage() {
           ]}
         />
         <div className="candy-panel rounded-[36px] p-5 sm:p-6">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-            Gift bag options
+          <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+                Gift bag options
+              </div>
+              <h1 className="mt-2 text-3xl font-black text-[var(--text)] sm:text-4xl">
+                Gummy gift bag options made in the USA
+              </h1>
+              <p className="mt-2 text-sm text-[var(--muted)] sm:text-base max-w-prose">
+                USA Gummies bags make easy gifts for birthdays, thank yous, and care packages. Pick the
+                bag count that matches your list and ship fast.
+              </p>
+            </div>
+            <div className="relative">
+              <div className="relative rounded-3xl border border-[var(--border)] bg-white p-2 shadow-[0_18px_44px_rgba(15,27,45,0.12)]">
+                <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-[var(--border)] bg-white">
+                  <Image
+                    src="/home-patriotic-product.jpg"
+                    alt="USA Gummies gift bags"
+                    fill
+                    sizes="(max-width: 768px) 90vw, 420px"
+                    className="object-cover"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
-          <h1 className="mt-2 text-3xl font-black text-[var(--text)] sm:text-4xl">
-            Gummy gift bag options made in the USA
-          </h1>
-          <p className="mt-2 text-sm text-[var(--muted)] sm:text-base max-w-prose">
-            USA Gummies bags make easy gifts for birthdays, thank yous, and care packages. Pick the
-            bag count that matches your list and ship fast.
-          </p>
 
           <div className="mt-6 grid gap-3 sm:grid-cols-2">
             {BUNDLE_IDEAS.map((idea) => (
@@ -155,8 +172,6 @@ export default function GummyGiftBundlesPage() {
             </Link>
           ))}
         </div>
-
-        <AmericanDreamCallout variant="compact" tone="light" className="mt-6" showJoinButton={false} />
       </section>
 
       <script

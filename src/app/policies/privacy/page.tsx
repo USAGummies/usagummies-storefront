@@ -42,7 +42,7 @@ export const metadata: Metadata = {
 export default function PrivacyPolicyPage() {
   return (
     <main className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
-      <div className="mx-auto max-w-4xl px-4 py-12">
+      <div className="mx-auto max-w-4xl px-4 py-10">
         <div className="mb-6 flex items-center justify-between gap-3">
           <Link
             href="/policies"
@@ -65,8 +65,8 @@ export default function PrivacyPolicyPage() {
             order and improve your experience. Payments are handled securely through Shopify checkout.
           </p>
 
-          <div className="mt-8 space-y-6 text-[var(--muted)]">
-            <div className="card-solid p-5">
+          <div className="mt-8 divide-y divide-[var(--border)] text-[var(--muted)]">
+            <div className="py-4">
               <h2 className="text-lg font-semibold text-[var(--text)]">What we collect</h2>
               <p className="mt-2 text-sm text-[var(--muted)]">
                 When you place an order, we collect information required to fulfill it, such as
@@ -74,7 +74,7 @@ export default function PrivacyPolicyPage() {
               </p>
             </div>
 
-            <div className="card-solid p-5">
+            <div className="py-4">
               <h2 className="text-lg font-semibold text-[var(--text)]">How we use it</h2>
               <p className="mt-2 text-sm text-[var(--muted)]">
                 We use your information to process orders, provide updates, respond to support requests,
@@ -82,7 +82,7 @@ export default function PrivacyPolicyPage() {
               </p>
             </div>
 
-            <div className="card-solid p-5">
+            <div className="py-4">
               <h2 className="text-lg font-semibold text-[var(--text)]">Payments</h2>
               <p className="mt-2 text-sm text-[var(--muted)]">
                 Payment information is processed securely through{" "}
@@ -91,7 +91,7 @@ export default function PrivacyPolicyPage() {
               </p>
             </div>
 
-            <div className="card-solid p-5">
+            <div className="py-4">
               <h2 className="text-lg font-semibold text-[var(--text)]">Cookies</h2>
               <p className="mt-2 text-sm text-[var(--muted)]">
                 We may use cookies and similar technologies to support site functionality
@@ -99,7 +99,7 @@ export default function PrivacyPolicyPage() {
               </p>
             </div>
 
-            <div className="card-solid p-5">
+            <div className="py-4">
               <h2 className="text-lg font-semibold text-[var(--text)]">Contact</h2>
               <p className="mt-2 text-sm text-[var(--muted)]">
                 If you have privacy questions, contact us using the form below.

@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
-import { AmericanDreamCallout } from "@/components/story/AmericanDreamCallout";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import { BRAND_STORY_HEADLINE, BRAND_STORY_MEDIUM } from "@/data/brandStory";
 
@@ -193,32 +192,28 @@ export default function MadeInUsaPage() {
                 </div>
               ))}
             </div>
-          </div>
 
-          <div className="mt-6 candy-panel rounded-[32px] border border-[var(--border)] p-5 sm:p-6">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-              Our story
+            <div className="mt-6 border-t border-[var(--border)] pt-5">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+                Our story
+              </div>
+              <h2 className="mt-2 text-2xl font-black text-[var(--text)]">
+                {BRAND_STORY_HEADLINE}
+              </h2>
+              <div className="mt-3 space-y-3 text-sm text-[var(--muted)]">
+                {BRAND_STORY_MEDIUM.map((paragraph) => (
+                  <p key={paragraph}>{paragraph}</p>
+                ))}
+              </div>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <Link href="/about" className="btn btn-outline">
+                  Read our story
+                </Link>
+                <Link href="/shop" className="btn btn-candy">
+                  Shop now
+                </Link>
+              </div>
             </div>
-            <h2 className="mt-2 text-2xl font-black text-[var(--text)]">
-              {BRAND_STORY_HEADLINE}
-            </h2>
-            <div className="mt-3 space-y-3 text-sm text-[var(--muted)]">
-              {BRAND_STORY_MEDIUM.map((paragraph) => (
-                <p key={paragraph}>{paragraph}</p>
-              ))}
-            </div>
-            <div className="mt-4 flex flex-wrap gap-3">
-              <Link href="/about" className="btn btn-outline">
-                Read our story
-              </Link>
-              <Link href="/shop" className="btn btn-candy">
-                Shop now
-              </Link>
-            </div>
-          </div>
-
-          <div className="mt-6">
-            <AmericanDreamCallout variant="compact" ctaHref="/shop" ctaLabel="Shop now" tone="light" />
           </div>
 
           <div className="mt-6 candy-panel rounded-[32px] border border-[var(--border)] p-5 sm:p-6">
@@ -228,15 +223,18 @@ export default function MadeInUsaPage() {
             <h2 className="mt-2 text-2xl font-black text-[var(--text)]">
               Quick answers before you buy.
             </h2>
-            <div className="mt-4 grid gap-3">
+            <div className="mt-4 space-y-2">
               {FAQS.map((item) => (
-                <div
+                <details
                   key={item.question}
-                  className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-4"
+                  className="group rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-3"
                 >
-                  <div className="text-sm font-semibold text-[var(--text)]">{item.question}</div>
+                  <summary className="flex cursor-pointer items-center justify-between gap-3 text-sm font-semibold text-[var(--text)]">
+                    <span>{item.question}</span>
+                    <span className="text-[var(--muted)] transition-transform group-open:rotate-45">+</span>
+                  </summary>
                   <div className="mt-2 text-sm text-[var(--muted)]">{item.answer}</div>
-                </div>
+                </details>
               ))}
             </div>
           </div>

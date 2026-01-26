@@ -42,7 +42,7 @@ export const metadata: Metadata = {
 export default function ContactPage() {
   return (
     <main className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
-      <div className="mx-auto max-w-4xl px-4 py-12">
+      <div className="mx-auto max-w-4xl px-4 py-10">
         <div className="mb-6 flex items-center justify-between gap-3">
           <Link
             href="/"
@@ -83,7 +83,7 @@ export default function ContactPage() {
             ].map((item) => (
               <div
                 key={item.title}
-                className="card-solid rounded-2xl border border-[var(--border)] p-4 text-sm text-[var(--muted)]"
+                className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-4 text-sm text-[var(--muted)]"
               >
                 <div className="text-sm font-semibold text-[var(--text)]">{item.title}</div>
                 <div className="mt-2">
@@ -98,7 +98,7 @@ export default function ContactPage() {
             ))}
           </div>
 
-          <div className="mt-6 card-solid p-5 text-sm text-[var(--muted)]">
+          <div className="mt-6 border-t border-[var(--border)] pt-5 text-sm text-[var(--muted)]">
             <div className="font-semibold text-[var(--text)]">What can we help with?</div>
             <ul className="mt-2 list-disc space-y-1 pl-5 text-[var(--muted)]">
               <li>Order questions</li>

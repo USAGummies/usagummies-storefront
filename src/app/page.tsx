@@ -231,7 +231,7 @@ export default async function HomePage() {
         data-zone="HERO"
         style={{ backgroundImage: "none" }}
       >
-        <div className="mx-auto max-w-6xl px-4 py-6 sm:py-8 lg:py-10">
+        <div className="mx-auto max-w-6xl px-4 py-5 sm:py-6 lg:py-8">
           <div className="relative grid gap-6 lg:grid-cols-[1fr_1fr] lg:items-center">
             <div className="order-2 relative lg:order-1">
               <div className="relative z-10 space-y-3">
@@ -342,7 +342,7 @@ export default async function HomePage() {
       </section>
 
       <section className="bg-[#fffdf8]" data-zone="VALUE" aria-label="Product value">
-        <div className="mx-auto max-w-6xl px-4 py-4 sm:py-5">
+        <div className="mx-auto max-w-6xl px-4 py-3 sm:py-4">
           <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
             <div className="rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-3">
               <div className="flex items-center gap-2">
@@ -397,7 +397,7 @@ export default async function HomePage() {
       </section>
 
       <section className="bg-[#fffdf8]" data-zone="FLAVORS">
-        <div className="mx-auto max-w-6xl px-4 py-4 sm:py-5">
+        <div className="mx-auto max-w-6xl px-4 py-3 sm:py-4">
           <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]/80">
             Inside every bag
           </div>

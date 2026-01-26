@@ -532,11 +532,43 @@ export default function BundleQuickBuy({
             )}
           </span>
         </button>
-        <div className={isLight ? "text-[11px] font-semibold text-[var(--muted)]" : "text-[11px] font-semibold text-white/70"}>
-          Ships within 24 hours • Easy returns • Secure checkout
-        </div>
       </div>
       <div data-rail-bottom className="mt-auto space-y-3">
+        <div
+          data-rail-trust
+          className={[
+            "grid gap-1.5 text-[11px] font-semibold",
+            isLight ? "text-[var(--muted)]" : "text-white/70",
+          ].join(" ")}
+        >
+          <div className="flex items-center gap-2">
+            <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M3 7h11l4 4v6h-2a3 3 0 0 1-6 0H8a3 3 0 0 1-6 0H1V9a2 2 0 0 1 2-2zm13 1.5V7H5v3h11v-1.5zM6.5 19a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zm9 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"
+              />
+            </svg>
+            <span>Ships within 24 hours</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M12 2a5 5 0 0 1 5 5v2h2v4h-2.1A6 6 0 1 1 7 9h5V7a3 3 0 0 0-3-3H6V2h6z"
+              />
+            </svg>
+            <span>Easy returns</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M6 10V8a6 6 0 1 1 12 0v2h1v12H5V10h1zm2 0h8V8a4 4 0 1 0-8 0v2z"
+              />
+            </svg>
+            <span>Secure checkout</span>
+          </div>
+        </div>
         <div className={isLight ? "text-xs text-[var(--muted)]" : "text-xs text-white/65"}>
           Buying 1-4 bags?{" "}
           <a

@@ -121,6 +121,7 @@ export default function Gummies101Page() {
                 <li>7.5 oz bag</li>
                 <li>Ships within 24 hours</li>
                 <li>{FREE_SHIPPING_PHRASE}</li>
+                <li>Bundles start at 5 bags</li>
               </ul>
             </div>
             <div className="rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-4">
@@ -161,15 +162,18 @@ export default function Gummies101Page() {
             <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
               Frequently asked
             </div>
-            <div className="grid gap-3">
+            <div className="space-y-2">
               {FAQS.map((item) => (
-                <div
+                <details
                   key={item.question}
-                  className="rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-4"
+                  className="group rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white px-4 py-3"
                 >
-                  <div className="text-sm font-semibold text-[var(--text)]">{item.question}</div>
+                  <summary className="flex cursor-pointer items-center justify-between gap-3 text-sm font-semibold text-[var(--text)]">
+                    <span>{item.question}</span>
+                    <span className="text-[var(--muted)] transition-transform group-open:rotate-45">+</span>
+                  </summary>
                   <div className="mt-2 text-sm text-[var(--muted)]">{item.answer}</div>
-                </div>
+                </details>
               ))}
             </div>
           </div>

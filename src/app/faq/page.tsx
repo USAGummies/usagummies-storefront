@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
-import { AmericanDreamCallout } from "@/components/story/AmericanDreamCallout";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import { BRAND_STORY_SHORT } from "@/data/brandStory";
 
@@ -180,41 +179,40 @@ export default function FaqPage() {
               </div>
             </div>
 
-            <div className="mt-8 grid gap-3 sm:grid-cols-2">
+            <div className="mt-6 space-y-2">
               {FAQS.map((item) => (
-                <div
+                <details
                   key={item.question}
-                  className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-4"
+                  className="group rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-3"
                 >
-                  <div className="text-sm font-semibold text-[var(--text)]">{item.question}</div>
+                  <summary className="flex cursor-pointer items-center justify-between gap-3 text-sm font-semibold text-[var(--text)]">
+                    <span>{item.question}</span>
+                    <span className="text-[var(--muted)] transition-transform group-open:rotate-45">+</span>
+                  </summary>
                   <div className="mt-2 text-sm text-[var(--muted)]">
                     {item.answerNode ?? item.answer}
                   </div>
-                </div>
+                </details>
               ))}
             </div>
-          </div>
 
-          <div className="mt-6">
-            <AmericanDreamCallout variant="compact" ctaHref="/shop" ctaLabel="Shop now" tone="light" />
-          </div>
-
-          <div className="mt-6 candy-panel rounded-[32px] border border-[var(--border)] p-5 sm:p-6">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-              Still have questions?
-            </div>
-            <h2 className="mt-2 text-2xl font-black text-[var(--text)]">We are here to help.</h2>
-            <p className="mt-2 text-sm text-[var(--muted)]">
-              Need ingredient details or order help? Send a note and we will respond within one
-              business day.
-            </p>
-            <div className="mt-3 flex flex-wrap gap-3">
-              <Link href="/contact" className="btn btn-outline">
-                Contact support
-              </Link>
-              <Link href="/about" className="btn btn-candy">
-                Learn our story
-              </Link>
+            <div className="mt-6 border-t border-[var(--border)] pt-5">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+                Still have questions?
+              </div>
+              <h2 className="mt-2 text-2xl font-black text-[var(--text)]">We are here to help.</h2>
+              <p className="mt-2 text-sm text-[var(--muted)]">
+                Need ingredient details or order help? Send a note and we will respond within one
+                business day.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-3">
+                <Link href="/contact" className="btn btn-outline">
+                  Contact support
+                </Link>
+                <Link href="/about" className="btn btn-candy">
+                  Learn our story
+                </Link>
+              </div>
             </div>
           </div>
         </div>
