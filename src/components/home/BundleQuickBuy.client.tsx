@@ -437,12 +437,13 @@ export default function BundleQuickBuy({
     <div
       role="radiogroup"
       aria-label="Bag count"
+      data-segmented-control
       className={[
-        "w-full rounded-full border px-1 py-1 flex items-center gap-1",
-        isLight ? "border-[rgba(15,27,45,0.12)] bg-white" : "border-white/12 bg-white/5",
+        "w-full flex items-stretch gap-0 rounded-[999px] border overflow-hidden",
+        isLight ? "border-[rgba(15,27,45,0.12)] bg-white/90" : "border-white/15 bg-white/5",
       ].join(" ")}
     >
-      {primaryTiers.map((tier) => {
+      {primaryTiers.map((tier, index) => {
         const isActive = String(tier.quantity) === selected;
         const label =
           tier.quantity === 8
@@ -459,20 +460,24 @@ export default function BundleQuickBuy({
             role="radio"
             aria-checked={isActive}
             aria-disabled={!isTierPurchasable(tier)}
+            data-segment
+            data-active={isActive ? "true" : "false"}
             onClick={() => handleSelect(tier.quantity, isTierPurchasable(tier))}
             onKeyDown={(event) => handleRadioKeyDown(event, tier.quantity, isTierPurchasable(tier))}
             className={[
-              "flex-1 rounded-full px-3 py-1.5 text-[12px] font-semibold transition",
+              "flex-1 px-3 py-2 text-[12px] font-semibold transition",
+              index > 0 ? "border-l border-[rgba(15,27,45,0.08)]" : "",
               isActive
                 ? isLight
-                  ? "bg-[rgba(239,59,59,0.12)] text-[var(--text)]"
-                  : "bg-white/15 text-white"
+                  ? "text-[var(--text)]"
+                  : "text-white"
                 : isLight
                   ? "text-[var(--muted)] hover:text-[var(--text)]"
                   : "text-white/70 hover:text-white",
             ].join(" ")}
           >
-            {tier.quantity} bags{label ? ` — ${label}` : ""}
+            <span className="block text-[12px] font-semibold">{tier.quantity} bags</span>
+            {label ? <span className="block text-[10px] font-semibold opacity-70">{label}</span> : null}
           </button>
         );
       })}
@@ -480,11 +485,16 @@ export default function BundleQuickBuy({
   );
 
   const compactRail = (
-    <div data-bundle-rail className="flex h-full flex-col gap-3">
+    <div data-bundle-rail className="grid h-full grid-rows-[auto_1fr_auto] gap-4">
       <div data-rail-top className="space-y-2">
         {selectorContent}
       </div>
-      <div data-rail-middle className="space-y-2">
+      <div data-rail-middle className="flex flex-col justify-center gap-2">
+        {selectedTier ? (
+          <div className={isLight ? "text-[11px] font-semibold tracking-[0.12em] uppercase text-[var(--muted)]" : "text-[11px] font-semibold tracking-[0.12em] uppercase text-white/70"}>
+            {selectedTier.quantity} bags{selectedLabel ? ` — ${selectedLabel}` : ""}
+          </div>
+        ) : null}
         {selectedTotal ? (
           <div className={isLight ? "text-[26px] font-bold text-[var(--text)]" : "text-[26px] font-bold text-white"}>
             Total {selectedTotal}
@@ -523,7 +533,7 @@ export default function BundleQuickBuy({
           </span>
         </button>
       </div>
-      <div data-rail-bottom className="mt-auto space-y-3">
+      <div data-rail-bottom className="space-y-3">
         <div className="grid gap-2 text-[12px] font-semibold text-[var(--muted)]">
           {[
             { label: "Ships within 24 hours", icon: "M3 7h11v5h4l3 4v3h-3a2 2 0 1 1-4 0H9a2 2 0 1 1-4 0H3V7zm13 5V9h3l2 3h-5z" },

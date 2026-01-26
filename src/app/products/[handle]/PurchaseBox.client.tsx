@@ -9,7 +9,6 @@ import { fireCartToast } from "@/lib/cartFeedback";
 import { useCartBagCount } from "@/hooks/useCartBagCount";
 import { AmazonOneBagNote } from "@/components/ui/AmazonOneBagNote";
 import { AMAZON_REVIEWS } from "@/data/amazonReviews";
-import { GummyIconRow, HeroPackIcon } from "@/components/ui/GummyIcon";
 
 function cx(...a: Array<string | false | null | undefined>) {
   return a.filter(Boolean).join(" ");
@@ -76,6 +75,20 @@ type BundleOption = {
 };
 
 const VISIBLE_QUANTITIES = [5, 8, 12];
+const TRUST_ITEMS = [
+  {
+    label: "Ships within 24 hours",
+    icon: "M3 7h11v5h4l3 4v3h-3a2 2 0 1 1-4 0H9a2 2 0 1 1-4 0H3V7zm13 5V9h3l2 3h-5z",
+  },
+  {
+    label: "Easy returns",
+    icon: "M12 5V2L7 7l5 5V9c3.3 0 6 2.7 6 6a6 6 0 0 1-6 6H6v-2h6a4 4 0 0 0 0-8z",
+  },
+  {
+    label: "Secure checkout",
+    icon: "M6 10V8a6 6 0 1 1 12 0v2h1v12H5V10h1zm2 0h8V8a4 4 0 1 0-8 0v2z",
+  },
+];
 
 function money(amount?: number, currencyCode = "USD") {
   const n = Number(amount);
@@ -100,7 +113,7 @@ function badgeForTotal(qty: number) {
   if (qty === 4) return "Starter savings";
   if (qty === 5) return "Free shipping";
   if (qty === 8) return "Most popular";
-  if (qty === 12) return "Bulk savings";
+  if (qty === 12) return "Best price";
   return "";
 }
 
@@ -278,6 +291,7 @@ export default function PurchaseBox({
     selectedOption?.savingsAmount && selectedOption.savingsAmount > 0
       ? money(selectedOption.savingsAmount, selectedCurrency)
       : null;
+  const selectedBadge = badgeForTotal(optionQty);
   const hasAdded = lastAddedQty !== null;
   const selectedAdded = hasAdded && lastAddedQty === optionQty;
   const isAdding = addingQty !== null;
@@ -386,9 +400,7 @@ export default function PurchaseBox({
       ? "Best price selected."
       : selectedNextBags >= 8
         ? "Most popular bundle selected."
-        : selectedNextBags >= 5
-          ? "Free shipping bundle selected."
-          : "Small order selected.";
+        : "Free shipping bundle selected.";
   const cardHint = curatedStatus;
 
   return (
@@ -408,59 +420,41 @@ export default function PurchaseBox({
         aria-label="Bag count selection"
       >
         <div className="pbx__grid">
-          <div className="pbx__guide">
-            <div className="pbx__cardHeader">
-              <div>
-                <div className="pbx__cardTitle pbx__cardTitle--gummy">
-                  <HeroPackIcon size={20} className="pbx__packIcon" />
-                  <span>Lock in your savings</span>
-                  <GummyIconRow size={14} className="pbx__gummyRow" />
-                </div>
-                <div className="pbx__cardHint">
-                  {cardHint}
-                </div>
+          <div className="pbx__panel" role="group" aria-label="Bundle selection">
+            <div className="pbx__panelTop">
+              <div className="pbx__panelTitle">Lock in your savings</div>
+              <div className="pbx__panelSub">Best value bundles: 5, 8, and 12 bags.</div>
+              <div className="pbx__segmented" role="radiogroup" aria-label="Bag counts">
+                {featuredOptions.map((o) => {
+                  const active = selectedQty === o.qty;
+                  const badge = badgeForTotal(o.nextBags ?? o.qty);
+                  const index = radioIndexByQty.get(o.qty) ?? 0;
+
+                  return (
+                    <button
+                      key={`${o.qty}-${o.variant.id}`}
+                      type="button"
+                      onClick={() => setSelectedQty(o.qty)}
+                      onKeyDown={handleRadioKey(index)}
+                      ref={(el) => {
+                        radioRefs.current[index] = el;
+                      }}
+                      className={cx("pbx__segment", active && "pbx__segment--active")}
+                      data-qty={o.qty}
+                      role="radio"
+                      aria-checked={active}
+                      tabIndex={active ? 0 : -1}
+                    >
+                      <span className="pbx__segmentQty">{formatQtyLabel(o.qty)}</span>
+                      {badge ? <span className="pbx__segmentMeta">{badge}</span> : null}
+                    </button>
+                  );
+                })}
               </div>
-            </div>
-            <div className="pbx__curatedLine">
-              Best value bundles: 5, 8, and 12 bags.
-            </div>
-          </div>
-
-          <div className="pbx__select">
-            <div className="pbx__options">
-              <div className="pbx__optionGroup" role="radiogroup" aria-label="Bag counts">
-                <div className="pbx__selector">
-                  {featuredOptions.map((o) => {
-                    const active = selectedQty === o.qty;
-                    const badge = badgeForTotal(o.nextBags ?? o.qty);
-                    const index = radioIndexByQty.get(o.qty) ?? 0;
-
-                    return (
-                      <button
-                        key={`${o.qty}-${o.variant.id}`}
-                        type="button"
-                        onClick={() => setSelectedQty(o.qty)}
-                        onKeyDown={handleRadioKey(index)}
-                        ref={(el) => {
-                          radioRefs.current[index] = el;
-                        }}
-                        className={cx("pbx__selectorOption", active && "pbx__selectorOption--active")}
-                        data-qty={o.qty}
-                        role="radio"
-                        aria-checked={active}
-                        tabIndex={active ? 0 : -1}
-                      >
-                        <span className="pbx__selectorDot">{active ? "●" : "○"}</span>
-                        <span className="pbx__selectorQty">{formatQtyLabel(o.qty)}</span>
-                        {badge ? <span className="pbx__selectorMeta">— {badge}</span> : null}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+              <div className="pbx__panelHint">{cardHint}</div>
             </div>
 
-            <div className="pbx__summary" aria-live="polite" role="status">
+            <div className="pbx__panelMid" aria-live="polite" role="status">
               <Image
                 src="/website%20assets/Jeep.png"
                 alt=""
@@ -468,23 +462,16 @@ export default function PurchaseBox({
                 width={900}
                 height={600}
                 sizes="140px"
-                className="pbx__summaryAccent"
+                className="pbx__panelAccent"
               />
-              <div className="pbx__summaryMeta">
-                <div className="pbx__summaryLabel">
-                  {selectedAdded ? "Added to cart" : "Selected bundle"}: {formatQtyLabel(optionQty)}
-                </div>
-                <div className="pbx__summaryPrice">{selectedNextTotalText}</div>
-                {selectedSavingsText ? (
-                  <div className="pbx__summaryStatus pbx__summaryStatus--savings">
-                    Save {selectedSavingsText} total
-                  </div>
-                ) : null}
-                {selectedAdded ? (
-                  <div className="pbx__summaryStatus pbx__summaryStatus--success">Bags added to cart.</div>
-                ) : null}
-                {error ? <div className="pbx__error">{error}</div> : null}
+              <div className="pbx__panelMeta">
+                <span>{formatQtyLabel(optionQty)}</span>
+                {selectedBadge ? <span className="pbx__panelBadge">{selectedBadge}</span> : null}
               </div>
+              <div className="pbx__panelTotal">Total {selectedNextTotalText}</div>
+              {selectedSavingsText ? (
+                <div className="pbx__panelSavings">Save {selectedSavingsText} total</div>
+              ) : null}
 
               <button
                 type="button"
@@ -504,19 +491,26 @@ export default function PurchaseBox({
                   ctaLabel
                 )}
               </button>
-              <div className="pbx__ctaNote" aria-live="polite">
-                Love it or your money back - Ships within 24 hours - Limited daily production
+              {selectedAdded ? (
+                <div className="pbx__panelStatus">Bags added to cart.</div>
+              ) : null}
+              {error ? <div className="pbx__error">{error}</div> : null}
+            </div>
+
+            <div className="pbx__panelBottom">
+              <div className="pbx__trustList">
+                {TRUST_ITEMS.map((item) => (
+                  <div key={item.label} className="pbx__trustItem">
+                    <svg viewBox="0 0 24 24" className="pbx__trustIcon" aria-hidden="true">
+                      <path fill="currentColor" d={item.icon} />
+                    </svg>
+                    <span>{item.label}</span>
+                  </div>
+                ))}
               </div>
               <AmazonOneBagNote className="pbx__amazonNote" />
-              <div className="pbx__trust">
-                <div className="pbx__trustRating">
-                  ⭐ {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars from verified Amazon buyers
-                </div>
-                <div className="pbx__trustBadges">
-                  <span>Made in the USA</span>
-                  <span>No artificial dyes</span>
-                  <span>Money-back guarantee</span>
-                </div>
+              <div className="pbx__trustRating">
+                ⭐ {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars from verified Amazon buyers
               </div>
             </div>
           </div>
@@ -563,16 +557,11 @@ export default function PurchaseBox({
           margin-top: 0;
           display: grid;
           gap: 14px;
-        }
-        .pbx__guide,
-        .pbx__select{
-          display: grid;
-          gap: 12px;
+          align-items: stretch;
         }
         @media (min-width: 1024px){
           .pbx__grid{
-            grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr);
-            align-items: start;
+            grid-template-columns: minmax(0, 1fr);
           }
         }
         .pbx--flat .pbx__card{
@@ -638,6 +627,141 @@ export default function PurchaseBox({
         .pbx__packIcon{ opacity:0.92; filter: drop-shadow(0 8px 14px rgba(13,28,51,0.18)); }
         .pbx__gummyRow{ opacity:0.85; }
         .pbx__cardHint{ font-size:13px; color: var(--muted); }
+        .pbx__panel{
+          border: 1px solid var(--border);
+          border-radius: 24px;
+          background: linear-gradient(180deg, #fffdf8 0%, #fff7ee 100%);
+          padding: 16px;
+          display: grid;
+          gap: 14px;
+          position: relative;
+          overflow: hidden;
+          min-height: 100%;
+          box-shadow:
+            inset 0 1px 0 rgba(255,255,255,0.7),
+            0 24px 60px rgba(15,27,45,0.08);
+        }
+        .pbx__panelTop{ display:grid; gap:8px; }
+        .pbx__panelTitle{
+          font-size: 13px;
+          font-weight: 800;
+          letter-spacing: 0.16em;
+          text-transform: uppercase;
+          color: var(--muted);
+        }
+        .pbx__panelSub{
+          font-size: 12px;
+          font-weight: 600;
+          color: var(--muted);
+        }
+        .pbx__panelHint{
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          color: var(--muted);
+        }
+        .pbx__segmented{
+          display:flex;
+          align-items:stretch;
+          border: 1px solid rgba(15,27,45,0.12);
+          border-radius: 999px;
+          overflow: hidden;
+          background: rgba(255,255,255,0.92);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.75);
+        }
+        .pbx__segment{
+          flex:1;
+          padding: 8px 10px;
+          text-align:center;
+          border: 0;
+          background: transparent;
+          color: var(--muted);
+          cursor: pointer;
+          transition: color .14s ease, background .14s ease;
+        }
+        .pbx__segment + .pbx__segment{
+          border-left: 1px solid rgba(15,27,45,0.08);
+        }
+        .pbx__segment--active{
+          color: var(--text);
+          background: rgba(239,59,59,0.12);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.8);
+        }
+        .pbx__segmentQty{ display:block; font-size:12px; font-weight:800; }
+        .pbx__segmentMeta{ display:block; font-size:10px; font-weight:700; opacity:0.7; }
+        .pbx__panelMid{
+          display:flex;
+          flex-direction:column;
+          gap:8px;
+          justify-content:center;
+        }
+        .pbx__panelAccent{
+          position:absolute;
+          right: -18px;
+          top: -10px;
+          width: 150px;
+          height: auto;
+          opacity: 0.08;
+          pointer-events: none;
+        }
+        .pbx__panelMeta{
+          display:flex;
+          align-items:center;
+          gap:8px;
+          font-size:12px;
+          font-weight:700;
+          color: var(--muted);
+        }
+        .pbx__panelBadge{
+          border-radius:999px;
+          border:1px solid rgba(239,59,59,0.35);
+          background: rgba(239,59,59,0.12);
+          padding:2px 8px;
+          font-size:10px;
+          font-weight:700;
+          letter-spacing:0.08em;
+          text-transform: uppercase;
+          color: var(--red);
+        }
+        .pbx__panelTotal{
+          font-weight: 900;
+          font-size: 28px;
+          color: var(--text);
+        }
+        .pbx__panelSavings{
+          font-size: 12px;
+          font-weight: 700;
+          color: var(--red);
+        }
+        .pbx__panelStatus{
+          font-size: 11px;
+          font-weight: 700;
+          color: rgba(21,128,61,0.95);
+        }
+        .pbx__panelBottom{
+          border-top: 1px solid rgba(15,27,45,0.08);
+          padding-top: 12px;
+          display:grid;
+          gap:8px;
+        }
+        .pbx__trustList{
+          display:grid;
+          gap:6px;
+          font-size:12px;
+          font-weight:600;
+          color: var(--muted);
+        }
+        .pbx__trustItem{
+          display:flex;
+          align-items:center;
+          gap:8px;
+        }
+        .pbx__trustIcon{
+          width:14px;
+          height:14px;
+          color: var(--text);
+        }
         .pbx__curatedLine{
           margin-top: 6px;
           font-size: 12px;
@@ -1227,6 +1351,11 @@ export default function PurchaseBox({
           }
           .pbx__tilePrice{ font-size:26px; }
           .pbx__summary{ padding:12px; }
+          .pbx__panel{ padding:14px; border-radius:20px; }
+          .pbx__panelTitle{ font-size:12px; letter-spacing:0.14em; }
+          .pbx__panelSub{ font-size:11px; }
+          .pbx__panelTotal{ font-size:24px; }
+          .pbx__segmentQty{ font-size:11px; }
           .pbx__cta{ width:100%; justify-content:center; }
           .pbx__summaryAccent{
             width: 110px;
