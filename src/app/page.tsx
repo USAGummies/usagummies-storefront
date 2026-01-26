@@ -274,9 +274,11 @@ export default async function HomePage() {
                       className="btn btn-candy w-full sm:w-auto"
                       style={{ padding: "14px 22px", boxShadow: "0 16px 34px rgba(239, 59, 59, 0.34)" }}
                     >
-                      <span className="text-[15px] sm:text-[16px] font-semibold">Shop now and save</span>
+                      <span className="text-[15px] sm:text-[16px] font-semibold">Shop now</span>
                     </a>
-                    <div className="text-xs font-semibold text-[var(--muted)]">Love it or your money back</div>
+                    <div className="text-xs font-semibold text-[var(--muted)]">
+                      {FREE_SHIPPING_PHRASE} • Love it or your money back
+                    </div>
                     <div className="flex flex-wrap gap-2 text-[11px] text-[var(--muted)]">
                       <span className="font-semibold text-[var(--text)]">Bag count guides:</span>
                       <Link href="/gummy-gift-bundles" className="underline underline-offset-4">
@@ -570,7 +572,7 @@ export default async function HomePage() {
                   </div>
                   <div className="flex flex-wrap items-center gap-3 pt-1">
                     <a href="#bundle-pricing" className="btn btn-candy">
-                      Shop now and save
+                      Shop now
                     </a>
                     <Link
                       href="/shop#product-details"
@@ -759,11 +761,14 @@ export default async function HomePage() {
               ))}
             </div>
             <div className="mt-4 flex flex-wrap gap-3">
-              <Link href="/about" className="btn btn-outline">
+              <Link
+                href="/about"
+                className="text-sm font-semibold text-[var(--muted)] underline underline-offset-4 hover:text-[var(--text)] focus-ring"
+              >
                 Read our story
               </Link>
               <Link href="/shop" className="btn btn-candy">
-                Shop now and save
+                Shop now
               </Link>
             </div>
           </div>
@@ -786,7 +791,7 @@ export default async function HomePage() {
             Save more with more bags
           </div>
           <a href="#bundle-pricing" className="btn btn-candy w-full sm:w-auto">
-            Shop now and save
+            Shop now
           </a>
         </div>
       </div>
