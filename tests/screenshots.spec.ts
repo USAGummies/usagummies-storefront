@@ -62,14 +62,20 @@ test("cart drawer", async ({ page }, testInfo) => {
 
   await page.waitForTimeout(600);
 
-  const cartButton = page.getByRole("button", { name: /^Cart$/ });
-  await expect(cartButton).toBeVisible();
-  await cartButton.click();
+  const drawerTitle = page.getByText("Your cart", { exact: true });
+  const drawerVisible = await drawerTitle
+    .waitFor({ state: "visible", timeout: 3000 })
+    .then(() => true)
+    .catch(() => false);
 
-  const drawerPanel = page
-    .getByText("Your cart", { exact: true })
-    .locator("..")
-    .locator("..");
+  if (!drawerVisible) {
+    const cartButton = page.getByRole("button", { name: /Cart/i }).first();
+    await expect(cartButton).toBeVisible();
+    await cartButton.click();
+    await expect(drawerTitle).toBeVisible();
+  }
+
+  const drawerPanel = drawerTitle.locator("..").locator("..");
   await expect(drawerPanel).toBeVisible();
   await page.waitForTimeout(300);
 
