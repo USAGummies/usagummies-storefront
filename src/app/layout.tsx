@@ -43,7 +43,7 @@ const script = Yellowtail({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(SITE_URL),
+  metadataBase: new URL("https://www.usagummies.com"),
   title: {
     default: "USA Gummies",
     template: "%s | USA Gummies",
