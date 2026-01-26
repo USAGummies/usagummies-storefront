@@ -316,6 +316,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     };
   }, [menuOpen]);
 
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const originalBody = document.body.style.overflow;
+    const originalHtml = document.documentElement.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = originalBody;
+      document.documentElement.style.overflow = originalHtml;
+    };
+  }, [mobileOpen]);
+
   return (
     <div className="min-h-screen bg-[var(--bg,#f8f5ef)] text-[var(--text)]">
       {cartToast ? (
@@ -454,7 +466,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
 
         {mobileOpen ? (
-          <div className="md:hidden border-t border-[var(--border)] bg-white/96 backdrop-blur-md">
+          <div className="md:hidden border-t border-[var(--border)] bg-white/96 backdrop-blur-md max-h-[calc(100vh-72px)] overflow-y-auto overscroll-contain">
             <div className="mx-auto max-w-6xl px-4 py-3 flex flex-col gap-3 text-[var(--text)]">
               {navSections.map((section) => (
                 <div

@@ -1985,13 +1985,17 @@ a:focus-visible:not(.btn):not(.focus-ring),
   gap: 8px;
 }
 .atomic-buy__chip{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 999px;
   border: 1px solid rgba(15,27,45,0.12);
   background: rgba(15,27,45,0.04);
-  padding: 6px 10px;
+  padding: 4px 9px;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.18em;
+  line-height: 1;
   text-transform: uppercase;
   color: var(--text);
 }

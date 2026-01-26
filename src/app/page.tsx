@@ -469,7 +469,7 @@ export default async function HomePage() {
                     <div className="atomic-buy__chips">
                       <span className="atomic-buy__chip">Made in USA</span>
                       <span className="atomic-buy__chip">No artificial dyes</span>
-                      <span className="atomic-buy__chip">Ships in 24 hours</span>
+                      <span className="atomic-buy__chip">All natural</span>
                       <span className="atomic-buy__chip">{FREE_SHIPPING_PHRASE}</span>
                     </div>
                     <div className="atomic-buy__ingredients">

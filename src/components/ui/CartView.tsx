@@ -647,15 +647,15 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                       aria-label={`${method.label} checkout`}
                       className="flex items-center justify-center rounded-xl border border-transparent bg-[var(--surface-strong)] px-2 py-2 text-[9px] font-semibold text-[var(--muted)] transition hover:border-[rgba(15,27,45,0.12)] hover:text-[var(--text)]"
                     >
-                      <span className="flex h-8 w-full items-center justify-center">
+                      <span className="flex h-9 w-full items-center justify-center">
                         <Image
                           src={method.iconSrc}
                           alt=""
                           aria-hidden="true"
-                          width={72}
-                          height={20}
-                          sizes="72px"
-                          className="h-5 w-auto opacity-80"
+                          width={96}
+                          height={28}
+                          sizes="96px"
+                          className="h-6 w-auto opacity-80"
                         />
                       </span>
                     </a>

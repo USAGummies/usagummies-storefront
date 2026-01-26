@@ -433,6 +433,7 @@ export default function BundleQuickBuy({
     selectedTierState?.savings && Number.isFinite(selectedTierState.savings) && selectedTierState.savings > 0
       ? money(selectedTierState.savings, "USD")
       : null;
+  const totalLabel = currentBags > 0 ? "New total" : "Total";
   const selectorContent = (
     <div
       role="radiogroup"
@@ -497,7 +498,7 @@ export default function BundleQuickBuy({
         ) : null}
         {selectedTotal ? (
           <div className={isLight ? "text-[26px] font-bold text-[var(--text)]" : "text-[26px] font-bold text-white"}>
-            Total {selectedTotal}
+            {totalLabel} {selectedTotal}
           </div>
         ) : null}
         {selectedSavings ? (
@@ -809,7 +810,7 @@ export default function BundleQuickBuy({
               key={`${selectedTier.quantity}-${selectedTierState?.nextTotal ?? "na"}`}
               className={isLight ? "text-[22px] font-bold text-[var(--text)]" : "text-[22px] font-bold text-white"}
             >
-              Total {selectedTotal}
+              {totalLabel} {selectedTotal}
             </div>
           ) : null}
           {selectedSavings ? (
