@@ -3,17 +3,18 @@ import { notFound } from "next/navigation";
 function resolveSiteUrl() {
   const preferred = "https://www.usagummies.com";
   const fromEnv = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || null;
+  const nodeEnv = (process.env.NODE_ENV as string | undefined) || "";
   if (fromEnv && fromEnv.includes("usagummies.com")) return fromEnv.replace(/\/$/, "");
-  if (process.env.NODE_ENV === "production") return preferred;
+  if (nodeEnv === "production") return preferred;
   const vercel = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL.replace(/\/$/, "")}` : null;
   if (vercel) return vercel;
   if (fromEnv) return fromEnv.replace(/\/$/, "");
-  if (process.env.NODE_ENV !== "production") return "http://localhost:3000";
-  return preferred;
+  return nodeEnv === "production" ? preferred : "http://localhost:3000";
 }
 
 export default function SeoDebugPage() {
-  if (process.env.NODE_ENV === "production") return notFound();
+  const nodeEnv = (process.env.NODE_ENV as string | undefined) || "";
+  if (nodeEnv === "production") return notFound();
 
   const siteUrl = resolveSiteUrl();
   const canonicalShop = `${siteUrl}/shop`;
@@ -25,7 +26,7 @@ export default function SeoDebugPage() {
       <h1 style={{ fontSize: "20px", fontWeight: 800, marginBottom: "16px" }}>SEO Debug (dev-only)</h1>
       <div style={{ display: "grid", gap: "10px" }}>
         <div>
-          <strong>NODE_ENV:</strong> {process.env.NODE_ENV}
+          <strong>NODE_ENV:</strong> {nodeEnv}
         </div>
         <div>
           <strong>Resolved site URL:</strong> {siteUrl}

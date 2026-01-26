@@ -8,12 +8,13 @@ import { BRAND_STORY_HEADLINE, BRAND_STORY_MEDIUM } from "@/data/brandStory";
 function resolveSiteUrl() {
   const preferred = "https://www.usagummies.com";
   const fromEnv = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || null;
+  const nodeEnv = (process.env.NODE_ENV as string | undefined) || "";
   if (fromEnv && fromEnv.includes("usagummies.com")) return fromEnv.replace(/\/$/, "");
-  if (process.env.NODE_ENV === "production") return preferred;
+  if (nodeEnv === "production") return preferred;
   const vercel = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL.replace(/\/$/, "")}` : null;
   if (vercel) return vercel;
   if (fromEnv) return fromEnv.replace(/\/$/, "");
-  if (process.env.NODE_ENV !== "production") return "http://localhost:3000";
+  if (nodeEnv !== "production") return "http://localhost:3000";
   return preferred;
 }
 
