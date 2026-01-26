@@ -1,4 +1,5 @@
 // src/app/thank-you/page.tsx
+import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { Reveal } from "@/components/ui/Reveal";
@@ -6,6 +7,12 @@ import { LeadCapture } from "@/components/marketing/LeadCapture.client";
 import { SubscriptionUnlock } from "@/components/marketing/SubscriptionUnlock.client";
 
 const igImages = ["/home-patriotic-product.jpg", "/brand/hero.jpg", "/hero.jpg"];
+
+export const metadata: Metadata = {
+  title: "Thank You | USA Gummies",
+  description: "Thanks for your USA Gummies order. You are officially part of the movement.",
+  robots: { index: false, follow: false },
+};
 
 export default function ThankYouPage() {
   return (

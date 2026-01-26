@@ -1,9 +1,16 @@
 // src/app/cart/page.tsx
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getCart } from "@/lib/cart";
 import { CartView } from "@/components/ui/CartView";
 import { ReviewsSummary } from "@/components/reviews/ReviewsSummary";
 import { PatriotBanner } from "@/components/ui/PatriotBanner";
+
+export const metadata: Metadata = {
+  title: "Cart | USA Gummies",
+  description: "Review your USA Gummies order and proceed to secure checkout.",
+  robots: { index: false, follow: false },
+};
 
 export default async function CartPage() {
   let cart: any = null;

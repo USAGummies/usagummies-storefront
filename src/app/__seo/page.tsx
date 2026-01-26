@@ -1,4 +1,10 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+
+export const metadata: Metadata = {
+  title: "SEO Debug | USA Gummies",
+  robots: { index: false, follow: false },
+};
 
 function resolveSiteUrl() {
   const preferred = "https://www.usagummies.com";

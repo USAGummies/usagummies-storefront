@@ -117,7 +117,7 @@ export default async function ShopPage() {
     productFeatured?.url || productImages?.[0]?.url || "/home-patriotic-product.jpg";
   const stickyAlt = productFeatured?.altText || "USA Gummies bag";
   const lowBundlePrice = pricingForQty(1).total;
-  const highBundlePrice = pricingForQty(12).total;
+  const featuredBundlePrice = pricingForQty(8).total;
   const reviewItems = REVIEW_HIGHLIGHTS.map((review) => ({
     "@type": "Review",
     name: "USA Gummies review",
@@ -159,12 +159,14 @@ export default async function ShopPage() {
         }
       : undefined,
     offers: {
-      "@type": "AggregateOffer",
+      "@type": "Offer",
       url: `${SITE_URL}/shop`,
       priceCurrency: currency,
-      lowPrice: Number.isFinite(lowBundlePrice) ? lowBundlePrice.toFixed(2) : undefined,
-      highPrice: Number.isFinite(highBundlePrice) ? highBundlePrice.toFixed(2) : undefined,
-      offerCount: 4,
+      ...(Number.isFinite(featuredBundlePrice)
+        ? { price: featuredBundlePrice.toFixed(2) }
+        : Number.isFinite(lowBundlePrice)
+          ? { price: lowBundlePrice.toFixed(2) }
+          : {}),
       availability: "https://schema.org/InStock",
       shippingDetails: {
         "@type": "OfferShippingDetails",

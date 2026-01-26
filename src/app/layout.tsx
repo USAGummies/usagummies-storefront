@@ -19,7 +19,7 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const DEFAULT_DESCRIPTION = "Premium American-made gummy bears.";
+const DEFAULT_DESCRIPTION = "All natural, American-made gummy bears with no artificial dyes.";
 
 const display = Oswald({
   subsets: ["latin"],
@@ -55,7 +55,7 @@ export const metadata: Metadata = {
     url: SITE_URL,
     siteName: "USA Gummies",
     type: "website",
-    images: [{ url: "/opengraph-image" }],
+    images: [{ url: "/opengraph-image", alt: "USA Gummies all natural gummy bears" }],
   },
   twitter: {
     card: "summary_large_image",
