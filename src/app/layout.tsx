@@ -1,9 +1,31 @@
 // src/app/layout.tsx
 import "./globals.css";
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Oswald, Space_Grotesk, Yellowtail } from "next/font/google";
 import { AppShell } from "@/components/layout/AppShell.client";
 import { AMAZON_LISTING_URL } from "@/lib/amazon";
+
+function GoogleAnalytics() {
+  return (
+    <>
+      <Script
+        src="https://www.googletagmanager.com/gtag/js?id=G-31X673PSVY"
+        strategy="afterInteractive"
+      />
+      <Script id="ga4-init" strategy="afterInteractive">
+        {`
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-31X673PSVY', {
+            send_page_view: true,
+          });
+        `}
+      </Script>
+    </>
+  );
+}
 
 function resolveSiteUrl() {
   const preferred = "https://www.usagummies.com";
@@ -110,6 +132,7 @@ export default function RootLayout({
           color: "var(--text, #1c2430)",
         }}
       >
+        <GoogleAnalytics />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }}
