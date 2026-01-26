@@ -483,7 +483,7 @@ export default async function HomePage() {
                       showAccent={true}
                       showEducation={false}
                       ctaVariant="simple"
-                      primaryCtaLabel="Shop & save"
+                      primaryCtaLabel="Add to Cart"
                       featuredQuantities={[5, 8, 12]}
                     />
                   </div>

@@ -75,21 +75,6 @@ type BundleOption = {
 };
 
 const VISIBLE_QUANTITIES = [5, 8, 12];
-const TRUST_ITEMS = [
-  {
-    label: "Ships within 24 hours",
-    icon: "M3 7h11v5h4l3 4v3h-3a2 2 0 1 1-4 0H9a2 2 0 1 1-4 0H3V7zm13 5V9h3l2 3h-5z",
-  },
-  {
-    label: "Easy returns",
-    icon: "M12 5V2L7 7l5 5V9c3.3 0 6 2.7 6 6a6 6 0 0 1-6 6H6v-2h6a4 4 0 0 0 0-8z",
-  },
-  {
-    label: "Secure checkout",
-    icon: "M6 10V8a6 6 0 1 1 12 0v2h1v12H5V10h1zm2 0h8V8a4 4 0 1 0-8 0v2z",
-  },
-];
-
 function money(amount?: number, currencyCode = "USD") {
   const n = Number(amount);
   if (!Number.isFinite(n)) return "--";
@@ -298,8 +283,8 @@ export default function PurchaseBox({
   const ctaLabel = isAdding
     ? "Adding..."
     : selectedAdded
-      ? "Added to cart"
-      : `Add ${formatQtyLabel(optionQty)} to cart`;
+      ? "Added to Cart"
+      : `Add ${formatQtyLabel(optionQty)} to Cart`;
 
   const radioOptions = useMemo(() => {
     return featuredOptions;
@@ -498,15 +483,8 @@ export default function PurchaseBox({
             </div>
 
             <div className="pbx__panelBottom">
-              <div className="pbx__trustList">
-                {TRUST_ITEMS.map((item) => (
-                  <div key={item.label} className="pbx__trustItem">
-                    <svg viewBox="0 0 24 24" className="pbx__trustIcon" aria-hidden="true">
-                      <path fill="currentColor" d={item.icon} />
-                    </svg>
-                    <span>{item.label}</span>
-                  </div>
-                ))}
+              <div className="pbx__trustLine">
+                Ships within 24 hours • Easy returns • Secure checkout
               </div>
               <AmazonOneBagNote className="pbx__amazonNote" />
               <div className="pbx__trustRating">
@@ -745,22 +723,10 @@ export default function PurchaseBox({
           display:grid;
           gap:8px;
         }
-        .pbx__trustList{
-          display:grid;
-          gap:6px;
+        .pbx__trustLine{
           font-size:12px;
           font-weight:600;
           color: var(--muted);
-        }
-        .pbx__trustItem{
-          display:flex;
-          align-items:center;
-          gap:8px;
-        }
-        .pbx__trustIcon{
-          width:14px;
-          height:14px;
-          color: var(--text);
         }
         .pbx__curatedLine{
           margin-top: 6px;

@@ -106,7 +106,7 @@ export default function BundleQuickBuy({
   accentSrc = "/website%20assets/Train-02.png",
   showEducation = true,
   ctaVariant = "detailed",
-  primaryCtaLabel = "Shop & save",
+  primaryCtaLabel = "Add to Cart",
   surface = "card",
   layout = "classic",
 }: Props) {
@@ -525,29 +525,18 @@ export default function BundleQuickBuy({
                   aria-hidden="true"
                   className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent opacity-60"
                 />
-                Locking in...
+                Adding...
               </>
             ) : (
-              selectedAdded ? "Added to cart" : primaryCtaLabel
+              selectedAdded ? "Added to Cart" : primaryCtaLabel
             )}
           </span>
         </button>
+        <div className={isLight ? "text-[11px] font-semibold text-[var(--muted)]" : "text-[11px] font-semibold text-white/70"}>
+          Ships within 24 hours • Easy returns • Secure checkout
+        </div>
       </div>
       <div data-rail-bottom className="mt-auto space-y-3">
-        <div className="grid gap-2 text-[12px] font-semibold text-[var(--muted)]">
-          {[
-            { label: "Ships within 24 hours", icon: "M3 7h11v5h4l3 4v3h-3a2 2 0 1 1-4 0H9a2 2 0 1 1-4 0H3V7zm13 5V9h3l2 3h-5z" },
-            { label: "Easy returns", icon: "M12 5V2L7 7l5 5V9c3.3 0 6 2.7 6 6a6 6 0 0 1-6 6H6v-2h6a4 4 0 0 0 0-8z" },
-            { label: "Secure checkout", icon: "M6 10V8a6 6 0 1 1 12 0v2h1v12H5V10h1zm2 0h8V8a4 4 0 1 0-8 0v2z" },
-          ].map((item) => (
-            <div key={item.label} className="flex items-center gap-2">
-              <svg viewBox="0 0 24 24" className="h-4 w-4 text-[var(--text)]" aria-hidden="true">
-                <path fill="currentColor" d={item.icon} />
-              </svg>
-              <span>{item.label}</span>
-            </div>
-          ))}
-        </div>
         <div className={isLight ? "text-xs text-[var(--muted)]" : "text-xs text-white/65"}>
           Buying 1-4 bags?{" "}
           <a
