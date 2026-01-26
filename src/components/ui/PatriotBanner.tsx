@@ -1,5 +1,6 @@
 // src/components/ui/PatriotBanner.tsx
 import Link from "next/link";
+import Image from "next/image";
 import { PatriotRibbon } from "@/components/ui/PatriotRibbon";
 import { AmazonOneBagNote } from "@/components/ui/AmazonOneBagNote";
 import { GummyIconRow, HeroPackIcon } from "@/components/ui/GummyIcon";
@@ -41,7 +42,16 @@ export function PatriotBanner({ showRibbon = true }: { showRibbon?: boolean }) {
             </div>
           </div>
 
-          <div className="candy-panel rounded-2xl" style={{ padding: 14 }}>
+          <div className="candy-panel rounded-2xl relative overflow-hidden" style={{ padding: 14 }}>
+            <Image
+              src="/website%20assets/B17Bomber.png"
+              alt=""
+              aria-hidden="true"
+              width={1200}
+              height={800}
+              sizes="(max-width: 980px) 1px, 220px"
+              className="pointer-events-none absolute -right-16 -top-8 w-48 opacity-12"
+            />
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div className="kicker">Today’s move</div>
               <HeroPackIcon size={28} className="icon-float" />

@@ -657,6 +657,9 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                 className="pointer-events-none absolute -right-8 -top-8 w-28 opacity-10"
               />
               <div className="relative grid gap-1 text-[11px] font-semibold text-[var(--muted)]">
+                <div className="flex items-center gap-2 opacity-70" aria-hidden="true">
+                  <GummyIconRow size={12} />
+                </div>
                 {[
                   "Ships within 24 hours",
                   "Easy returns",

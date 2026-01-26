@@ -485,7 +485,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <CartDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
 
-      <main className="pb-16 text-[var(--text)]">{children}</main>
+      <main className="relative overflow-hidden pb-16 text-[var(--text)]">
+        <Image
+          src="/website%20assets/B17Bomber.png"
+          alt=""
+          aria-hidden="true"
+          width={1405}
+          height={954}
+          sizes="(max-width: 1024px) 1px, 520px"
+          className="site-watermark site-watermark--bomber"
+        />
+        <Image
+          src="/website%20assets/StatueofLiberty.png"
+          alt=""
+          aria-hidden="true"
+          width={780}
+          height={1024}
+          sizes="(max-width: 1024px) 1px, 360px"
+          className="site-watermark site-watermark--liberty"
+        />
+        <div className="relative z-10">{children}</div>
+      </main>
 
       <footer className="border-t border-[var(--border)] bg-white/85 backdrop-blur-md text-[var(--text)]">
         <div className="mx-auto max-w-6xl px-4 py-8 text-sm text-[var(--muted)] space-y-6">

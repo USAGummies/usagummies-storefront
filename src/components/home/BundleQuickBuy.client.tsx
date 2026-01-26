@@ -1017,6 +1017,11 @@ export default function BundleQuickBuy({
             className="bundle-integrated__accent"
           />
         ) : null}
+        {showTrainAccent ? (
+          <div className="bundle-integrated__trail" aria-hidden="true">
+            <GummyIconRow size={14} className="opacity-90" />
+          </div>
+        ) : null}
 
         <div className="bundle-integrated__header">
           <div className="bundle-integrated__eyebrow">Bundle &amp; save</div>
@@ -1220,6 +1225,11 @@ export default function BundleQuickBuy({
           sizes="(max-width: 768px) 200px, 260px"
           className="bundle-quickbuy__accent"
         />
+      ) : null}
+      {showAccent ? (
+        <div className="bundle-quickbuy__trail" aria-hidden="true">
+          <GummyIconRow size={12} className="opacity-90" />
+        </div>
       ) : null}
       {isCompact || isFlat ? null : (
         <div className="pointer-events-none absolute inset-0 opacity-12 bg-[radial-gradient(circle_at_10%_16%,rgba(255,255,255,0.22),transparent_36%),radial-gradient(circle_at_86%_8%,rgba(10,60,138,0.3),transparent_44%),linear-gradient(135deg,rgba(214,64,58,0.18),rgba(12,20,38,0.38)),repeating-linear-gradient(135deg,rgba(255,255,255,0.07)_0,rgba(255,255,255,0.07)_8px,transparent_8px,transparent_16px)]" />

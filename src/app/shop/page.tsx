@@ -374,11 +374,11 @@ export default async function ShopPage() {
         <div className="mx-auto max-w-6xl px-4 pb-8 lg:pb-10">
           <div className="bundle-home bundle-home--premium bundle-hero-stage buy-module relative rounded-[36px] border border-[rgba(15,27,45,0.12)] bg-white shadow-[0_30px_80px_rgba(15,27,45,0.14)]">
             <div className="buy-module__inner">
-              <div className="buy-module__layout">
-                <div
-                  id="product-details"
-                  className="buy-module__details min-w-0 scroll-mt-24"
-                >
+            <div className="buy-module__layout">
+              <div
+                id="product-details"
+                className="buy-module__details min-w-0 scroll-mt-24"
+              >
                   <h2 className="text-2xl font-black text-[var(--text)] sm:text-3xl">
                     {productTitle}
                   </h2>
@@ -413,26 +413,28 @@ export default async function ShopPage() {
                   </div>
                 </div>
 
-                <div className="buy-module__bundle min-w-0">
-                  {purchaseProduct ? (
-                    <PurchaseBox product={purchaseProduct as any} surface="flat" layout="integrated" />
-                  ) : (
-                    <div className="p-4 text-sm text-[var(--muted)]">
-                      Product details are loading. Please refresh to view savings pricing.
+                <div className="buy-module__rail min-w-0">
+                  <div className="buy-module__image">
+                    <div className="buy-module__imagePanel">
+                      <div className="relative">
+                        <ProductGallery
+                          title={productTitle}
+                          featured={productFeatured}
+                          images={productImages}
+                        />
+                        <span className="usa-stamp usa-stamp--small absolute left-4 top-4">Made in USA</span>
+                      </div>
                     </div>
-                  )}
-                </div>
+                  </div>
 
-                <div className="buy-module__image min-w-0">
-                  <div className="buy-module__imagePanel">
-                    <div className="relative">
-                      <ProductGallery
-                        title={productTitle}
-                        featured={productFeatured}
-                        images={productImages}
-                      />
-                      <span className="usa-stamp usa-stamp--small absolute left-4 top-4">Made in USA</span>
-                    </div>
+                  <div className="buy-module__bundle">
+                    {purchaseProduct ? (
+                      <PurchaseBox product={purchaseProduct as any} surface="flat" layout="integrated" />
+                    ) : (
+                      <div className="p-4 text-sm text-[var(--muted)]">
+                        Product details are loading. Please refresh to view savings pricing.
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

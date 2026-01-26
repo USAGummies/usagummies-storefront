@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 
 type Variant = "full" | "compact";
 
@@ -55,6 +56,20 @@ export function AmericanDreamCallout({
         .filter(Boolean)
         .join(" ")}
     >
+      <Image
+        src="/website%20assets/StatueofLiberty.png"
+        alt=""
+        aria-hidden="true"
+        width={780}
+        height={1024}
+        sizes="(max-width: 768px) 1px, 220px"
+        className={[
+          "pointer-events-none absolute -right-8 -bottom-10 w-44 opacity-12",
+          isLight ? "mix-blend-multiply" : "opacity-15",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+      />
       <div
         className="absolute inset-0 pointer-events-none"
         aria-hidden="true"
