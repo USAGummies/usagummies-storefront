@@ -115,6 +115,7 @@ const navSections = [
       { href: "/made-in-usa", label: "Made in USA" },
       { href: "/ingredients", label: "Ingredients" },
       { href: "/faq", label: "FAQ" },
+      { href: "/gummies-101", label: "Gummies 101" },
       { href: "/join-the-revolution", label: "Join the Revolution" },
     ],
   },
@@ -146,6 +147,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isShop = pathname === "/shop";
   const isProduct = pathname?.startsWith("/products");
   const experienceVariant = isHome || isShop || isProduct ? "full" : "compact";
+  const showExperienceBand =
+    isHome ||
+    isShop ||
+    isProduct ||
+    pathname === "/join-the-revolution" ||
+    pathname === "/thank-you";
   const menuRef = useRef<HTMLDivElement | null>(null);
   const toastTimerRef = useRef<number | null>(null);
 
@@ -512,11 +519,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="relative z-10">{children}</div>
       </main>
 
-      <section className="bg-[#fffdf8]">
-        <div className="mx-auto max-w-6xl px-4 pb-10">
-          <ExperienceBand variant={experienceVariant} />
-        </div>
-      </section>
+      {showExperienceBand ? (
+        <section className="bg-[#fffdf8]">
+          <div className="mx-auto max-w-6xl px-4 pb-10">
+            <ExperienceBand variant={experienceVariant} />
+          </div>
+        </section>
+      ) : null}
 
       <footer className="border-t border-[var(--border)] bg-white/85 backdrop-blur-md text-[var(--text)]">
         <div className="mx-auto max-w-6xl px-4 py-8 text-sm text-[var(--muted)] space-y-6">
@@ -578,6 +587,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </Link>
               <Link href="/faq" className="link-underline">
                 FAQ
+              </Link>
+              <Link href="/gummies-101" className="link-underline">
+                Gummies 101
               </Link>
               <Link href="/ingredients" className="link-underline">
                 Ingredients

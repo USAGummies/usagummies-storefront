@@ -1,20 +1,24 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 
 function resolveSiteUrl() {
+  const preferred = "https://www.usagummies.com";
   const fromEnv = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || null;
-  if (fromEnv) return fromEnv.replace(/\/$/, "");
+  if (fromEnv && fromEnv.includes("usagummies.com")) return fromEnv.replace(/\/$/, "");
+  if (process.env.NODE_ENV === "production") return preferred;
   const vercel = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL.replace(/\/$/, "")}` : null;
   if (vercel) return vercel;
+  if (fromEnv) return fromEnv.replace(/\/$/, "");
   if (process.env.NODE_ENV !== "production") return "http://localhost:3000";
-  return "https://www.usagummies.com";
+  return preferred;
 }
 
 const SITE_URL = resolveSiteUrl();
 const PAGE_TITLE = "America 250";
 const PAGE_DESCRIPTION =
-  "America 250 hub — patriotic gummy gifts and limited drops built for celebrating America’s 250th.";
+  "America 250 hub - patriotic gummy gifts and limited drops built for celebrating America's 250th.";
 const PAGE_URL = `${SITE_URL}/america-250`;
 const OG_IMAGE = `${SITE_URL}/opengraph-image`;
 
@@ -90,7 +94,7 @@ export default function America250HubPage() {
 
         <h1 className="mt-4 text-4xl font-semibold tracking-tight">America 250</h1>
         <p className="mt-4 text-[var(--muted)]">
-          A focused hub for gifts, celebrations, and events tied to America’s 250th — with
+          A focused hub for gifts, celebrations, and events tied to America&apos;s 250th - with
           limited-run gummy drops built for sharing.
         </p>
 
@@ -127,16 +131,41 @@ export default function America250HubPage() {
         </div>
 
         <div className="mt-10 candy-panel rounded-3xl border border-[var(--border)] p-6">
-          <div className="text-sm font-semibold text-[var(--text)]">Want the America 250 savings view?</div>
-          <p className="mt-2 text-sm text-[var(--muted)]">
-            Add <span className="font-semibold text-[var(--text)]">?campaign=america250</span> to any product page.
-          </p>
-          <Link
-            href="/shop"
-            className="btn btn-candy mt-4 inline-flex items-center justify-center rounded-2xl px-5 py-3 text-sm font-semibold"
-          >
-            Shop now
-          </Link>
+          <div className="grid gap-4 md:grid-cols-[1.3fr_0.7fr] md:items-center">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
+                Featured bundle
+              </div>
+              <h2 className="mt-2 text-2xl font-black text-[var(--text)]">
+                America 250 gifting, ready to share.
+              </h2>
+              <p className="mt-2 text-sm text-[var(--muted)]">
+                Our most popular bag counts for patriotic gifts, community events, and celebration tables.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <Link href="/shop?campaign=america250#bundle-pricing" className="btn btn-candy">
+                  Shop America 250
+                </Link>
+                <Link href="/gummy-gift-bundles" className="btn btn-outline">
+                  Gift bundles
+                </Link>
+              </div>
+              <p className="mt-3 text-xs text-[var(--muted)]">
+                Add <span className="font-semibold text-[var(--text)]">?campaign=america250</span> to any product page.
+              </p>
+            </div>
+            <div className="relative">
+              <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-[var(--border)] bg-white p-3">
+                <Image
+                  src="/Hero-pack.jpeg"
+                  alt="USA Gummies bag"
+                  fill
+                  sizes="(max-width: 768px) 80vw, 240px"
+                  className="object-contain"
+                />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

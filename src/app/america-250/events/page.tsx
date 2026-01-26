@@ -1,20 +1,24 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 
 function resolveSiteUrl() {
+  const preferred = "https://www.usagummies.com";
   const fromEnv = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || null;
-  if (fromEnv) return fromEnv.replace(/\/$/, "");
+  if (fromEnv && fromEnv.includes("usagummies.com")) return fromEnv.replace(/\/$/, "");
+  if (process.env.NODE_ENV === "production") return preferred;
   const vercel = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL.replace(/\/$/, "")}` : null;
   if (vercel) return vercel;
+  if (fromEnv) return fromEnv.replace(/\/$/, "");
   if (process.env.NODE_ENV !== "production") return "http://localhost:3000";
-  return "https://www.usagummies.com";
+  return preferred;
 }
 
 const SITE_URL = resolveSiteUrl();
 const PAGE_TITLE = "America 250 Events";
 const PAGE_DESCRIPTION =
-  "America 250 events — simple event-focused page for SEO and campaign landing use.";
+  "America 250 events - simple event-focused page for SEO and campaign landing use.";
 const PAGE_URL = `${SITE_URL}/america-250/events`;
 const OG_IMAGE = `${SITE_URL}/opengraph-image`;
 
@@ -82,16 +86,44 @@ export default function America250EventsPage() {
 
         <h1 className="text-4xl font-semibold tracking-tight">America 250 events</h1>
         <p className="mt-4 text-[var(--muted)]">
-          This page exists for event-intent traffic and internal linking. You can expand it later
-          with specific city / date content.
+          A curated set of bundle sizes built for parades, community events, and patriotic gatherings.
         </p>
 
-        <div className="mt-8 rounded-3xl border border-[var(--border)] bg-[var(--surface-strong)] p-6">
-          <div className="text-sm font-semibold">Next upgrade (optional)</div>
-          <p className="mt-2 text-sm text-[var(--muted)]">
-            We can add a lightweight “events index” component and feed it from a simple JSON list
-            so it stays fast and doesn’t need a CMS.
-          </p>
+        <div className="mt-8 candy-panel rounded-3xl border border-[var(--border)] p-6">
+          <div className="grid gap-4 md:grid-cols-[1.1fr_0.9fr] md:items-center">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
+                Event essentials
+              </div>
+              <h2 className="mt-2 text-2xl font-black text-[var(--text)]">
+                Built for teams, tents, and town squares.
+              </h2>
+              <ul className="mt-3 grid gap-2 text-sm text-[var(--muted)]">
+                <li>• 8 bags: most popular for sharing tables</li>
+                <li>• 12 bags: best value for large groups</li>
+                <li>• Free shipping on 5+ bags</li>
+              </ul>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <Link href="/shop?campaign=america250#bundle-pricing" className="btn btn-candy">
+                  Shop event bundles
+                </Link>
+                <Link href="/bulk-gummy-bears" className="btn btn-outline">
+                  Bulk orders
+                </Link>
+              </div>
+            </div>
+            <div className="relative">
+              <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-[var(--border)] bg-white p-3">
+                <Image
+                  src="/website%20assets/Truck.png"
+                  alt="Patriotic event delivery"
+                  fill
+                  sizes="(max-width: 768px) 80vw, 240px"
+                  className="object-contain"
+                />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

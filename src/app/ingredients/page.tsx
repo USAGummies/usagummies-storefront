@@ -5,12 +5,15 @@ import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 
 function resolveSiteUrl() {
+  const preferred = "https://www.usagummies.com";
   const fromEnv = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || null;
-  if (fromEnv) return fromEnv.replace(/\/$/, "");
+  if (fromEnv && fromEnv.includes("usagummies.com")) return fromEnv.replace(/\/$/, "");
+  if (process.env.NODE_ENV === "production") return preferred;
   const vercel = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL.replace(/\/$/, "")}` : null;
   if (vercel) return vercel;
+  if (fromEnv) return fromEnv.replace(/\/$/, "");
   if (process.env.NODE_ENV !== "production") return "http://localhost:3000";
-  return "https://www.usagummies.com";
+  return preferred;
 }
 
 const SITE_URL = resolveSiteUrl();
@@ -122,6 +125,34 @@ const QUALITY_POINTS = [
       "Sourced, made, and packed right here in America with tight quality control at every step.",
   },
 ];
+
+const FAQS = [
+  {
+    question: "Do USA Gummies use artificial dyes?",
+    answer: "No. Colors come from fruit and vegetable extracts.",
+  },
+  {
+    question: "What flavors are in every bag?",
+    answer: "Cherry, watermelon, orange, green apple, and lemon.",
+  },
+  {
+    question: "Where can I review allergen details?",
+    answer: "Check the ingredient panel on the bag or visit the ingredients page.",
+  },
+];
+
+const faqJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: FAQS.map((item) => ({
+    "@type": "Question",
+    name: item.question,
+    acceptedAnswer: {
+      "@type": "Answer",
+      text: item.answer,
+    },
+  })),
+};
 
 const articleJsonLd = {
   "@context": "https://schema.org",
@@ -301,6 +332,26 @@ export default function IngredientsPage() {
                 </div>
               ))}
             </div>
+
+            <div className="mt-6 candy-panel rounded-[32px] border border-[var(--border)] p-5 sm:p-6">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+                Ingredients FAQs
+              </div>
+              <h2 className="mt-2 text-2xl font-black text-[var(--text)]">
+                Quick answers before you buy.
+              </h2>
+              <div className="mt-4 grid gap-3">
+                {FAQS.map((item) => (
+                  <div
+                    key={item.question}
+                    className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-4"
+                  >
+                    <div className="text-sm font-semibold text-[var(--text)]">{item.question}</div>
+                    <div className="mt-2 text-sm text-[var(--muted)]">{item.answer}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
 
           <div className="mt-6 candy-panel rounded-[32px] border border-[var(--border)] p-5 sm:p-6">
@@ -330,6 +381,10 @@ export default function IngredientsPage() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
       />
     </main>
   );

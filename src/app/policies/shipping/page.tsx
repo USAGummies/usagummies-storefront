@@ -3,12 +3,15 @@ import Link from "next/link";
 import ContactForm from "@/components/forms/ContactForm";
 
 function resolveSiteUrl() {
+  const preferred = "https://www.usagummies.com";
   const fromEnv = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || null;
-  if (fromEnv) return fromEnv.replace(/\/$/, "");
+  if (fromEnv && fromEnv.includes("usagummies.com")) return fromEnv.replace(/\/$/, "");
+  if (process.env.NODE_ENV === "production") return preferred;
   const vercel = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL.replace(/\/$/, "")}` : null;
   if (vercel) return vercel;
+  if (fromEnv) return fromEnv.replace(/\/$/, "");
   if (process.env.NODE_ENV !== "production") return "http://localhost:3000";
-  return "https://www.usagummies.com";
+  return preferred;
 }
 
 const SITE_URL = resolveSiteUrl();

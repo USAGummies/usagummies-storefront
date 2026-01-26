@@ -43,6 +43,7 @@ Simple, direct, high-trust.
 ## Canonical URLs
 - Home: /
 - Shop: /shop
+- Gummies 101 (facts + Q&A): /gummies-101
 - Bag count guides: /bundle-guides
 - Gift bag options: /gummy-gift-bundles
 - Party snacks: /patriotic-party-snacks
@@ -53,6 +54,7 @@ Simple, direct, high-trust.
 - Ingredients: /ingredients
 - Made in USA: /made-in-usa
 - Policies: /policies
+- America 250 hub: /america-250
 
 ## Conversion model
 - Bag-count savings are the primary value driver.

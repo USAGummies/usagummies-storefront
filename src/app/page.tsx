@@ -13,12 +13,15 @@ import { DETAIL_BULLETS } from "@/data/productDetails";
 import styles from "./homepage-scenes.module.css";
 
 function resolveSiteUrl() {
+  const preferred = "https://www.usagummies.com";
   const fromEnv = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || null;
-  if (fromEnv) return fromEnv.replace(/\/$/, "");
+  if (fromEnv && fromEnv.includes("usagummies.com")) return fromEnv.replace(/\/$/, "");
+  if (process.env.NODE_ENV === "production") return preferred;
   const vercel = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL.replace(/\/$/, "")}` : null;
   if (vercel) return vercel;
+  if (fromEnv) return fromEnv.replace(/\/$/, "");
   if (process.env.NODE_ENV !== "production") return "http://localhost:3000";
-  return "https://www.usagummies.com";
+  return preferred;
 }
 
 const SITE_URL = resolveSiteUrl();
@@ -158,6 +161,29 @@ export default async function HomePage() {
   const homepageTiers = (bundleVariants?.variants || []).filter((t) =>
     heroBundleQuantities.includes(t.quantity)
   );
+
+  const heroImage = productImages[0]?.url || `${SITE_URL}/brand/hero.jpg`;
+  const priceAmount = detailedProduct?.priceRange?.minVariantPrice?.amount || null;
+  const priceCurrency =
+    detailedProduct?.priceRange?.minVariantPrice?.currencyCode || "USD";
+  const productJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: detailedProduct?.title || PAGE_TITLE,
+    image: [heroImage],
+    description: detailedProduct?.description || PAGE_DESCRIPTION,
+    brand: { "@type": "Brand", name: "USA Gummies" },
+    offers: {
+      "@type": "Offer",
+      url: `${SITE_URL}/shop`,
+      priceCurrency,
+      ...(priceAmount ? { price: priceAmount } : {}),
+      availability:
+        bundleVariants?.availableForSale === false
+          ? "https://schema.org/OutOfStock"
+          : "https://schema.org/InStock",
+    },
+  };
 
   const whyCards = [
     {
@@ -793,6 +819,11 @@ export default async function HomePage() {
           </a>
         </div>
       </div>
+
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }}
+      />
 
       <HeroCTAWatcher />
     </main>

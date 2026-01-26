@@ -5,11 +5,13 @@ import type { MetadataRoute } from "next";
 export const revalidate = 3600; // 1 hour
 
 function siteUrl() {
-  const raw =
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    process.env.SITE_URL ||
-    "https://www.usagummies.com";
-  return raw.replace(/\/$/, "");
+  const preferred = "https://www.usagummies.com";
+  const raw = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || "";
+  if (raw && raw.includes("usagummies.com")) return raw.replace(/\/$/, "");
+  if (process.env.NODE_ENV === "production") return preferred;
+  if (raw) return raw.replace(/\/$/, "");
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL.replace(/\/$/, "")}`;
+  return preferred;
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
@@ -30,6 +32,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/gummy-gift-bundles`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
     { url: `${base}/patriotic-party-snacks`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
     { url: `${base}/bulk-gummy-bears`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
+    { url: `${base}/gummies-101`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
 
     // Policies hub + subpages
     { url: `${base}/policies`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
@@ -40,6 +43,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
     // Campaign / collection pages
     { url: `${base}/america-250`, lastModified: now, changeFrequency: "weekly", priority: 0.6 },
+    { url: `${base}/america-250/events`, lastModified: now, changeFrequency: "monthly", priority: 0.4 },
+    { url: `${base}/america-250/gifts`, lastModified: now, changeFrequency: "monthly", priority: 0.4 },
+    { url: `${base}/america-250/celebrations`, lastModified: now, changeFrequency: "monthly", priority: 0.4 },
   ];
 
   // Optional: add product URLs if Shopify is reachable.
