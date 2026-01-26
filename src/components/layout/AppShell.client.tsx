@@ -14,6 +14,7 @@ import { SubscriptionUnlock } from "@/components/marketing/SubscriptionUnlock.cl
 import { getCartToastMessage, readLastAdd } from "@/lib/cartFeedback";
 import { SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
 import { BRAND_STORY_HEADLINE, BRAND_STORY_SHORT } from "@/data/brandStory";
+import { ExperienceBand } from "@/components/brand/ExperienceBand";
 
 function cx(...a: Array<string | false | null | undefined>) {
   return a.filter(Boolean).join(" ");
@@ -141,6 +142,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [undoInfo, setUndoInfo] = useState<{ qty: number; at: number } | null>(null);
   const [undoPending, setUndoPending] = useState(false);
   const pathname = usePathname();
+  const isHome = pathname === "/";
+  const isShop = pathname === "/shop";
+  const isProduct = pathname?.startsWith("/products");
+  const experienceVariant = isHome || isShop || isProduct ? "full" : "compact";
   const menuRef = useRef<HTMLDivElement | null>(null);
   const toastTimerRef = useRef<number | null>(null);
 
@@ -506,6 +511,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         />
         <div className="relative z-10">{children}</div>
       </main>
+
+      <section className="bg-[#fffdf8]">
+        <div className="mx-auto max-w-6xl px-4 pb-10">
+          <ExperienceBand variant={experienceVariant} />
+        </div>
+      </section>
 
       <footer className="border-t border-[var(--border)] bg-white/85 backdrop-blur-md text-[var(--text)]">
         <div className="mx-auto max-w-6xl px-4 py-8 text-sm text-[var(--muted)] space-y-6">

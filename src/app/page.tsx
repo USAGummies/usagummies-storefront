@@ -480,7 +480,7 @@ export default async function HomePage() {
                       showHowItWorks={false}
                       summaryCopy=""
                       showTrainAccent={false}
-                      showAccent={true}
+                      showAccent={false}
                       showEducation={false}
                       ctaVariant="simple"
                       primaryCtaLabel="Add to Cart"

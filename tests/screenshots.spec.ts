@@ -29,6 +29,12 @@ async function captureSection(
   await target.screenshot({ path: screenshotPath(testInfo, name) });
 }
 
+async function captureFullPage(page: any, testInfo: any, route: string, name: string) {
+  await page.goto(route, { waitUntil: "networkidle" });
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: screenshotPath(testInfo, name), fullPage: true });
+}
+
 test.describe("purchase rail screenshots", () => {
   test("home purchase rail", async ({ page }, testInfo) => {
     await captureSection(page, testInfo, "/", "#bundle-pricing", "home-purchase-rail");
@@ -36,6 +42,16 @@ test.describe("purchase rail screenshots", () => {
 
   test("shop purchase rail", async ({ page }, testInfo) => {
     await captureSection(page, testInfo, "/shop", "#bundle-pricing", "shop-purchase-rail");
+  });
+});
+
+test.describe("full page screenshots", () => {
+  test("home full page", async ({ page }, testInfo) => {
+    await captureFullPage(page, testInfo, "/", "home-full");
+  });
+
+  test("shop full page", async ({ page }, testInfo) => {
+    await captureFullPage(page, testInfo, "/shop", "shop-full");
   });
 });
 
