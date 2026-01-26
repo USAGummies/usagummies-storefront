@@ -22,6 +22,7 @@ import { useCartBagCount } from "@/hooks/useCartBagCount";
 import { REVIEW_HIGHLIGHTS } from "@/data/reviewHighlights";
 import { AmazonOneBagNote } from "@/components/ui/AmazonOneBagNote";
 import { AMAZON_REVIEWS } from "@/data/amazonReviews";
+import { AMAZON_LISTING_URL, AMAZON_LOGO_URL } from "@/lib/amazon";
 
 type TierKey = "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10" | "11" | "12";
 
@@ -478,9 +479,289 @@ export default function BundleQuickBuy({
     </div>
   );
 
+  const compactRail = (
+    <div data-bundle-rail className="flex h-full flex-col gap-3">
+      <div data-rail-top className="space-y-2">
+        {selectorContent}
+      </div>
+      <div data-rail-middle className="space-y-2">
+        {selectedTotal ? (
+          <div className={isLight ? "text-[26px] font-bold text-[var(--text)]" : "text-[26px] font-bold text-white"}>
+            Total {selectedTotal}
+          </div>
+        ) : null}
+        {selectedSavings ? (
+          <div className={isLight ? "text-[12px] font-semibold text-[var(--candy-red)]" : "text-[12px] font-semibold text-[var(--gold)]"}>
+            Save {selectedSavings} total
+          </div>
+        ) : null}
+        <button
+          data-primary-cta
+          type="button"
+          className={[
+            "w-full inline-flex items-center justify-center rounded-[12px] h-[54px] px-4 sm:px-5 text-[16px] sm:text-[17px] font-semibold whitespace-nowrap shadow-[0_14px_36px_rgba(214,64,58,0.28)] hover:brightness-110 active:brightness-95 disabled:opacity-60 disabled:cursor-not-allowed leading-tight relative overflow-hidden",
+            isLight
+              ? "bg-[var(--candy-red)] text-white shadow-[0_16px_36px_rgba(239,59,59,0.32)]"
+              : "bg-[var(--red)] text-white",
+          ].join(" ")}
+          onClick={() => addToCart()}
+          disabled={isAdding || ctaDisabled}
+        >
+          <span className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.14),transparent_50%)] opacity-95" />
+          <span className="relative inline-flex items-center gap-2">
+            {isAdding ? (
+              <>
+                <span
+                  aria-hidden="true"
+                  className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent opacity-60"
+                />
+                Locking in...
+              </>
+            ) : (
+              selectedAdded ? "Added to cart" : primaryCtaLabel
+            )}
+          </span>
+        </button>
+      </div>
+      <div data-rail-bottom className="mt-auto space-y-3">
+        <div className="grid gap-2 text-[12px] font-semibold text-[var(--muted)]">
+          {[
+            { label: "Ships within 24 hours", icon: "M3 7h11v5h4l3 4v3h-3a2 2 0 1 1-4 0H9a2 2 0 1 1-4 0H3V7zm13 5V9h3l2 3h-5z" },
+            { label: "Easy returns", icon: "M12 5V2L7 7l5 5V9c3.3 0 6 2.7 6 6a6 6 0 0 1-6 6H6v-2h6a4 4 0 0 0 0-8z" },
+            { label: "Secure checkout", icon: "M6 10V8a6 6 0 1 1 12 0v2h1v12H5V10h1zm2 0h8V8a4 4 0 1 0-8 0v2z" },
+          ].map((item) => (
+            <div key={item.label} className="flex items-center gap-2">
+              <svg viewBox="0 0 24 24" className="h-4 w-4 text-[var(--text)]" aria-hidden="true">
+                <path fill="currentColor" d={item.icon} />
+              </svg>
+              <span>{item.label}</span>
+            </div>
+          ))}
+        </div>
+        <div className={isLight ? "text-xs text-[var(--muted)]" : "text-xs text-white/65"}>
+          Buying 1-4 bags?{" "}
+          <a
+            href={AMAZON_LISTING_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={
+              isLight
+                ? "inline-flex items-center gap-2 font-semibold text-[var(--text)] underline underline-offset-4 hover:text-[var(--navy)]"
+                : "inline-flex items-center gap-2 font-semibold text-white underline underline-offset-4 hover:text-white"
+            }
+          >
+            <Image
+              src={AMAZON_LOGO_URL}
+              alt="Amazon"
+              width={56}
+              height={16}
+              className="h-3.5 w-auto opacity-85"
+            />
+            <span>Available on Amazon</span>
+          </a>
+          .
+        </div>
+        <div className={isLight ? "text-[11px] font-semibold text-[var(--muted)]" : "text-[11px] font-semibold text-white/70"}>
+          ⭐ {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars from verified Amazon buyers
+        </div>
+        {error ? (
+          <div
+            className={
+              isLight
+                ? "text-xs font-semibold text-red-500"
+                : "text-xs font-semibold text-red-200"
+            }
+          >
+            {error}
+          </div>
+        ) : null}
+        {success && !error ? (
+          <div
+            className={
+              isLight
+                ? "text-xs font-semibold text-[var(--candy-green)]"
+                : "text-xs font-semibold text-[var(--gold)]"
+            }
+          >
+            {lastAddedQty ? `Added ${lastAddedQty} bags to cart.` : "Added to cart."}
+          </div>
+        ) : null}
+        {ctaDisabled && availableForSale === false && !error ? (
+          <div className={isLight ? "text-xs text-[var(--muted)]" : "text-xs text-white/60"}>
+            Out of stock.
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+
+  const defaultCtaStack = (
+    <div
+      data-bundle-cta-stack
+      className={[
+        "mt-3 flex flex-col gap-2",
+        isFusion ? "bundle-fusion__ctaStack" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      <button
+        data-primary-cta
+        type="button"
+        className={[
+          "w-full inline-flex items-center justify-center rounded-[12px] h-[54px] px-4 sm:px-5 text-[16px] sm:text-[17px] font-semibold whitespace-nowrap shadow-[0_14px_36px_rgba(214,64,58,0.28)] hover:brightness-110 active:brightness-95 disabled:opacity-60 disabled:cursor-not-allowed leading-tight relative overflow-hidden",
+          isLight
+            ? "bg-[var(--candy-red)] text-white shadow-[0_16px_36px_rgba(239,59,59,0.32)]"
+            : isCompact
+              ? "bg-[var(--red)] text-white"
+              : "bg-[#d6403a] text-white",
+        ].join(" ")}
+        onClick={() => addToCart()}
+        disabled={isAdding || ctaDisabled}
+      >
+        <span className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.14),transparent_50%)] opacity-95" />
+        <span className="relative inline-flex items-center gap-2">
+          {isAdding ? (
+            <>
+              <span
+                aria-hidden="true"
+                className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent opacity-60"
+              />
+              Locking in...
+            </>
+          ) : ctaVariant === "simple" ? (
+            selectedAdded ? "Added to cart" : primaryCtaLabel
+          ) : Number.isFinite(selectedTierState?.addTotal ?? NaN) ? (
+            selectedAdded && Number.isFinite(selectedTierState?.nextBags ?? NaN)
+              ? `Savings locked: ${selectedTier?.quantity} bags (total ${selectedTierState?.nextBags})`
+              : Number.isFinite(selectedTierState?.nextBags ?? NaN)
+                ? `Lock in savings now: ${selectedTier?.quantity} bags (total ${selectedTierState?.nextBags})`
+                : `Lock in savings now: ${selectedTier?.quantity} bags`
+          ) : (
+            "Lock in savings now"
+          )}
+        </span>
+      </button>
+      <AmazonOneBagNote
+        className={isLight ? "text-xs text-[var(--muted)]" : "text-xs text-white/65"}
+        linkClassName={
+          isLight
+            ? "underline underline-offset-4 text-[var(--text)] hover:text-[var(--navy)]"
+            : "underline underline-offset-4 text-white hover:text-white"
+        }
+      />
+      <div data-bundle-cta-trust>
+        <div
+          data-bundle-cta-note
+          className={[
+            isLight
+              ? "text-xs text-[var(--muted)]"
+              : isCompact
+                ? "text-xs text-white/70"
+                : "text-xs text-white/75",
+            isFusion ? "bundle-fusion__ctaNote" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+        >
+          Love it or your money back • Ships within 24 hours • Secure checkout
+        </div>
+        <div
+          data-bundle-rating
+          className={[
+            isFlat
+              ? isLight
+                ? "mt-2 text-[11px] text-[var(--muted)]"
+                : "mt-2 text-[11px] text-white/70"
+              : isLight
+                ? "mt-2 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white px-3 py-2 text-[11px] text-[var(--muted)]"
+                : "mt-2 rounded-2xl border border-white/12 bg-white/5 px-3 py-2 text-[11px] text-white/70",
+            isFusion ? "bundle-fusion__ctaProof" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+        >
+          <div className={isLight ? "font-semibold text-[var(--text)]" : "font-semibold text-white/90"}>
+            ⭐ {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars from verified Amazon buyers
+          </div>
+          <div className="mt-1 flex flex-wrap gap-2 text-[10px] font-semibold uppercase tracking-[0.12em]">
+            <span
+              className={
+                isFlat
+                  ? "px-0 py-0"
+                  : isLight
+                    ? "rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-2 py-1"
+                    : "rounded-full border border-white/10 bg-white/5 px-2 py-1"
+              }
+            >
+              Made in the USA
+            </span>
+            <span
+              className={
+                isFlat
+                  ? "px-0 py-0"
+                  : isLight
+                    ? "rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-2 py-1"
+                    : "rounded-full border border-white/10 bg-white/5 px-2 py-1"
+              }
+            >
+              No artificial dyes
+            </span>
+          </div>
+        </div>
+      </div>
+      {!isFusion && reviewSnippets.length ? (
+        <div
+          data-bundle-reviews
+          className={isLight ? "grid gap-1 text-[11px] text-[var(--muted)]" : "grid gap-1 text-[11px] text-white/70"}
+        >
+          {reviewSnippets.map((review) => (
+            <div key={review.id} className="inline-flex items-center gap-2">
+              <span className={isLight ? "text-[var(--candy-yellow)]" : "text-[var(--gold)]"}>
+                {starLine(review.rating)}
+              </span>
+              <span className="truncate">&quot;{review.body}&quot; — {review.author}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {error ? (
+        <div
+          className={
+            isLight
+              ? "text-xs font-semibold text-red-500"
+              : isCompact
+                ? "text-xs font-semibold text-red-200"
+                : "text-xs font-semibold text-red-200"
+          }
+        >
+          {error}
+        </div>
+      ) : null}
+      {success && !error ? (
+        <div
+          className={
+            isLight
+              ? "text-xs font-semibold text-[var(--candy-green)]"
+              : isCompact
+                ? "text-xs font-semibold text-[var(--gold)]"
+                : "text-xs font-semibold text-[var(--gold)]"
+          }
+        >
+          {lastAddedQty ? `Added ${lastAddedQty} bags to cart.` : "Added to cart."}
+        </div>
+      ) : null}
+      {ctaDisabled && availableForSale === false && !error ? (
+        <div className={isLight ? "text-xs text-[var(--muted)]" : isCompact ? "text-xs text-white/50" : "text-xs text-white/60"}>
+          Out of stock.
+        </div>
+      ) : null}
+    </div>
+  );
+
   const ctaContent = (
     <>
-      {selectedTier ? (
+      {!isCompact && selectedTier ? (
         <div
           className={[
             "relative space-y-2",
@@ -489,18 +770,6 @@ export default function BundleQuickBuy({
             .filter(Boolean)
             .join(" ")}
         >
-          {isCompact ? selectorContent : null}
-          {isCompact ? (
-            <Image
-              src="/website%20assets/Train-02.png"
-              alt=""
-              aria-hidden="true"
-              width={560}
-              height={340}
-              sizes="140px"
-              className="pointer-events-none absolute -right-6 -top-8 w-28 opacity-10"
-            />
-          ) : null}
           <div className={isLight ? "text-[12px] font-semibold text-[var(--muted)]" : "text-[12px] font-semibold text-white/75"}>
             {selectedTier.quantity} bags{selectedLabel ? ` — ${selectedLabel}` : ""}
           </div>
@@ -519,168 +788,7 @@ export default function BundleQuickBuy({
           ) : null}
         </div>
       ) : null}
-
-      <div
-        data-bundle-cta-stack
-        className={[
-          "mt-3 flex flex-col gap-2",
-          isFusion ? "bundle-fusion__ctaStack" : "",
-        ]
-          .filter(Boolean)
-          .join(" ")}
-      >
-        <button
-          data-primary-cta
-          type="button"
-          className={[
-            "w-full inline-flex items-center justify-center rounded-[12px] h-[54px] px-4 sm:px-5 text-[16px] sm:text-[17px] font-semibold whitespace-nowrap shadow-[0_14px_36px_rgba(214,64,58,0.28)] hover:brightness-110 active:brightness-95 disabled:opacity-60 disabled:cursor-not-allowed leading-tight relative overflow-hidden",
-            isLight
-              ? "bg-[var(--candy-red)] text-white shadow-[0_16px_36px_rgba(239,59,59,0.32)]"
-              : isCompact
-                ? "bg-[var(--red)] text-white"
-                : "bg-[#d6403a] text-white",
-          ].join(" ")}
-          onClick={() => addToCart()}
-          disabled={isAdding || ctaDisabled}
-        >
-          <span className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.14),transparent_50%)] opacity-95" />
-          <span className="relative inline-flex items-center gap-2">
-            {isAdding ? (
-              <>
-                <span
-                  aria-hidden="true"
-                  className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent opacity-60"
-                />
-                Locking in...
-              </>
-            ) : ctaVariant === "simple" ? (
-              selectedAdded ? "Added to cart" : primaryCtaLabel
-            ) : Number.isFinite(selectedTierState?.addTotal ?? NaN) ? (
-              selectedAdded && Number.isFinite(selectedTierState?.nextBags ?? NaN)
-                ? `Savings locked: ${selectedTier?.quantity} bags (total ${selectedTierState?.nextBags})`
-                : Number.isFinite(selectedTierState?.nextBags ?? NaN)
-                  ? `Lock in savings now: ${selectedTier?.quantity} bags (total ${selectedTierState?.nextBags})`
-                  : `Lock in savings now: ${selectedTier?.quantity} bags`
-            ) : (
-              "Lock in savings now"
-            )}
-          </span>
-        </button>
-        <AmazonOneBagNote
-          className={isLight ? "text-xs text-[var(--muted)]" : "text-xs text-white/65"}
-          linkClassName={
-            isLight
-              ? "underline underline-offset-4 text-[var(--text)] hover:text-[var(--navy)]"
-              : "underline underline-offset-4 text-white hover:text-white"
-          }
-        />
-        <div data-bundle-cta-trust>
-          <div
-            data-bundle-cta-note
-            className={[
-              isLight
-                ? "text-xs text-[var(--muted)]"
-                : isCompact
-                  ? "text-xs text-white/70"
-                  : "text-xs text-white/75",
-              isFusion ? "bundle-fusion__ctaNote" : "",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-          >
-            Love it or your money back • Ships within 24 hours • Secure checkout
-          </div>
-          <div
-            data-bundle-rating
-            className={[
-              isFlat
-                ? isLight
-                  ? "mt-2 text-[11px] text-[var(--muted)]"
-                  : "mt-2 text-[11px] text-white/70"
-                : isLight
-                  ? "mt-2 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white px-3 py-2 text-[11px] text-[var(--muted)]"
-                  : "mt-2 rounded-2xl border border-white/12 bg-white/5 px-3 py-2 text-[11px] text-white/70",
-              isFusion ? "bundle-fusion__ctaProof" : "",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-          >
-            <div className={isLight ? "font-semibold text-[var(--text)]" : "font-semibold text-white/90"}>
-              ⭐ {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars from verified Amazon buyers
-            </div>
-            <div className="mt-1 flex flex-wrap gap-2 text-[10px] font-semibold uppercase tracking-[0.12em]">
-              <span
-                className={
-                  isFlat
-                    ? "px-0 py-0"
-                    : isLight
-                      ? "rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-2 py-1"
-                      : "rounded-full border border-white/10 bg-white/5 px-2 py-1"
-                }
-              >
-                Made in the USA
-              </span>
-              <span
-                className={
-                  isFlat
-                    ? "px-0 py-0"
-                    : isLight
-                      ? "rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-2 py-1"
-                      : "rounded-full border border-white/10 bg-white/5 px-2 py-1"
-                }
-              >
-                No artificial dyes
-              </span>
-            </div>
-          </div>
-        </div>
-        {!isFusion && reviewSnippets.length ? (
-          <div
-            data-bundle-reviews
-            className={isLight ? "grid gap-1 text-[11px] text-[var(--muted)]" : "grid gap-1 text-[11px] text-white/70"}
-          >
-            {reviewSnippets.map((review) => (
-              <div key={review.id} className="inline-flex items-center gap-2">
-                <span className={isLight ? "text-[var(--candy-yellow)]" : "text-[var(--gold)]"}>
-                  {starLine(review.rating)}
-                </span>
-                <span className="truncate">&quot;{review.body}&quot; — {review.author}</span>
-              </div>
-            ))}
-          </div>
-        ) : null}
-        {error ? (
-          <div
-            className={
-              isLight
-                ? "text-xs font-semibold text-red-500"
-                : isCompact
-                  ? "text-xs font-semibold text-red-200"
-                  : "text-xs font-semibold text-red-200"
-            }
-          >
-            {error}
-          </div>
-        ) : null}
-        {success && !error ? (
-          <div
-            className={
-              isLight
-                ? "text-xs font-semibold text-[var(--candy-green)]"
-                : isCompact
-                  ? "text-xs font-semibold text-[var(--gold)]"
-                  : "text-xs font-semibold text-[var(--gold)]"
-            }
-          >
-            {lastAddedQty ? `Added ${lastAddedQty} bags to cart.` : "Added to cart."}
-          </div>
-        ) : null}
-        {ctaDisabled && availableForSale === false && !error ? (
-          <div className={isLight ? "text-xs text-[var(--muted)]" : isCompact ? "text-xs text-white/50" : "text-xs text-white/60"}>
-            Out of stock.
-          </div>
-        ) : null}
-      </div>
+      {isCompact ? compactRail : defaultCtaStack}
     </>
   );
 
