@@ -94,6 +94,7 @@ export function CartLineControls({
               setDraftQty(next);
             }
           }}
+          onFocus={(event) => event.currentTarget.select()}
           onBlur={() => commitDraft()}
           onKeyDown={(event) => {
             if (event.key === "Enter") {

@@ -189,6 +189,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
   const [bundleError, setBundleError] = useState<string | null>(null);
   const [stampBurstQty, setStampBurstQty] = useState<number | null>(null);
   const [dealToast, setDealToast] = useState<string | null>(null);
+  const [highlightTotals, setHighlightTotals] = useState(false);
   const dealToastTimerRef = useRef<number | null>(null);
   const cartItemsRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -456,6 +457,11 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
     () => normalizeCheckoutUrl(localCart?.checkoutUrl) ?? localCart?.checkoutUrl,
     [localCart?.checkoutUrl]
   );
+  const drawerStatus = bundleSavings > 0
+    ? { label: "Savings applied", tone: "success" }
+    : totalBags > 0
+      ? { label: "Savings pending", tone: "muted" }
+      : null;
   const drawerSavingsLine =
     bundleSavings > 0
       ? `You saved ${bundleSavingsText} vs single bags.`
@@ -473,6 +479,13 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
   const drawerUpsellLabel = nextTierAddQty
     ? `Add ${nextTierAddQty} bag${nextTierAddQty === 1 ? "" : "s"} for ${nextTierDescriptor}.`
     : "";
+
+  useEffect(() => {
+    if (!hasLines) return;
+    setHighlightTotals(true);
+    const timer = window.setTimeout(() => setHighlightTotals(false), 320);
+    return () => window.clearTimeout(timer);
+  }, [subtotalNumber, bundleSavings, totalBags, hasLines]);
 
   function handleCheckoutClick(event?: MouseEvent<HTMLAnchorElement>) {
     const safeCheckoutUrl = getSafeCheckoutUrl(
@@ -528,8 +541,22 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                 <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
                   Order summary
                 </div>
-                <div className="text-[11px] font-semibold text-[var(--muted)]">
-                  {totalBags} bag{totalBags === 1 ? "" : "s"}
+                <div className="flex items-center gap-2">
+                  {drawerStatus ? (
+                    <span
+                      className={cn(
+                        "rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.18em]",
+                        drawerStatus.tone === "success"
+                          ? "bg-[rgba(21,128,61,0.12)] text-[rgba(21,128,61,0.95)]"
+                          : "border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] text-[var(--muted)]"
+                      )}
+                    >
+                      {drawerStatus.label}
+                    </span>
+                  ) : null}
+                  <div className="text-[11px] font-semibold text-[var(--muted)]">
+                    {totalBags} bag{totalBags === 1 ? "" : "s"}
+                  </div>
                 </div>
               </div>
               <div className="mt-2 divide-y divide-[rgba(15,27,45,0.08)]">
@@ -589,12 +616,17 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                     <span className="font-semibold text-[var(--text)]">{shippingSummary}</span>
                   </div>
                 </div>
+                <div className="text-[10px] font-semibold text-[var(--muted)]">
+                  {shippingHint}
+                </div>
                 <div className="flex items-center justify-between text-[12px] font-semibold text-[var(--text)]">
                   <span>Total</span>
-                  <span className="text-base font-black">{estimatedTotal}</span>
+                  <span className={cn("text-base font-black", highlightTotals && "price-pop")}>
+                    {estimatedTotal}
+                  </span>
                 </div>
                 {drawerSavingsLine ? (
-                  <div className="text-[10px] font-semibold text-[var(--candy-red)]">
+                  <div className={cn("text-[10px] font-semibold text-[var(--candy-red)]", highlightTotals && "price-pop")}>
                     {drawerSavingsLine}
                   </div>
                 ) : null}
@@ -603,6 +635,9 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
 
             {localCart?.checkoutUrl ? (
               <div className="mt-3 grid gap-2">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
+                  Express checkout
+                </div>
                 <div className="grid grid-cols-3 gap-2">
                   {EXPRESS_CHECKOUT_METHODS.map((method) => (
                     <a
@@ -610,7 +645,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                       href={checkoutHref ?? localCart.checkoutUrl}
                       onClick={handleCheckoutClick}
                       aria-label={`${method.label} checkout`}
-                      className="flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[9px] font-semibold text-[var(--muted)] hover:text-[var(--text)] transition"
+                      className="flex items-center justify-center rounded-xl border border-transparent bg-[var(--surface-strong)] px-2 py-2 text-[9px] font-semibold text-[var(--muted)] transition hover:border-[rgba(15,27,45,0.12)] hover:text-[var(--text)]"
                     >
                       <span className="flex h-8 w-full items-center justify-center">
                         <Image
@@ -620,10 +655,9 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                           width={72}
                           height={20}
                           sizes="72px"
-                          className="h-4 w-auto opacity-75"
+                          className="h-5 w-auto opacity-80"
                         />
                       </span>
-                      <span className="text-[9px] text-[var(--muted)]">{method.label}</span>
                     </a>
                   ))}
                 </div>
