@@ -426,6 +426,7 @@ export default function BundleQuickBuy({
         : selectedTier?.quantity === 5
           ? "Free shipping"
           : "";
+  const selectedNextBags = selectedTierState?.nextBags ?? null;
   const selectedTotal = Number.isFinite(selectedTierState?.nextTotal ?? NaN)
     ? money(selectedTierState?.nextTotal, "USD")
     : null;
@@ -454,6 +455,7 @@ export default function BundleQuickBuy({
               : tier.quantity === 5
                 ? "Free shipping"
                 : "";
+        const qtyLabel = currentBags > 0 ? `Add ${tier.quantity} bags` : `${tier.quantity} bags`;
         return (
           <button
             key={tier.quantity}
@@ -477,7 +479,7 @@ export default function BundleQuickBuy({
                   : "text-white/70 hover:text-white",
             ].join(" ")}
           >
-            <span className="block text-[12px] font-semibold">{tier.quantity} bags</span>
+            <span className="block text-[12px] font-semibold">{qtyLabel}</span>
             {label ? <span className="block text-[10px] font-semibold opacity-70">{label}</span> : null}
           </button>
         );
@@ -499,6 +501,11 @@ export default function BundleQuickBuy({
         {selectedTotal ? (
           <div className={isLight ? "text-[26px] font-bold text-[var(--text)]" : "text-[26px] font-bold text-white"}>
             {totalLabel} {selectedTotal}
+          </div>
+        ) : null}
+        {currentBags > 0 && selectedNextBags ? (
+          <div className={isLight ? "text-[11px] font-semibold text-[var(--muted)]" : "text-[11px] font-semibold text-white/70"}>
+            Cart: {currentBags} bag{currentBags === 1 ? "" : "s"} → {selectedNextBags} bags total
           </div>
         ) : null}
         {selectedSavings ? (
@@ -811,6 +818,11 @@ export default function BundleQuickBuy({
               className={isLight ? "text-[22px] font-bold text-[var(--text)]" : "text-[22px] font-bold text-white"}
             >
               {totalLabel} {selectedTotal}
+            </div>
+          ) : null}
+          {currentBags > 0 && selectedNextBags ? (
+            <div className={isLight ? "text-[11px] font-semibold text-[var(--muted)]" : "text-[11px] font-semibold text-white/70"}>
+              Cart: {currentBags} bag{currentBags === 1 ? "" : "s"} → {selectedNextBags} bags total
             </div>
           ) : null}
           {selectedSavings ? (

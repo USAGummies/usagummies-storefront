@@ -272,6 +272,7 @@ export default function PurchaseBox({
     (selectedVariant?.priceV2 as any)?.currencyCode ||
     baselineCurrency;
   const selectedNextTotalText = money(selectedNextTotal, selectedCurrency);
+  const totalLabel = currentBags > 0 ? "New total" : "Total";
   const selectedSavingsText =
     selectedOption?.savingsAmount && selectedOption.savingsAmount > 0
       ? money(selectedOption.savingsAmount, selectedCurrency)
@@ -430,7 +431,9 @@ export default function PurchaseBox({
                       aria-checked={active}
                       tabIndex={active ? 0 : -1}
                     >
-                      <span className="pbx__segmentQty">{formatQtyLabel(o.qty)}</span>
+                      <span className="pbx__segmentQty">
+                        {currentBags > 0 ? `Add ${formatQtyLabel(o.qty)}` : formatQtyLabel(o.qty)}
+                      </span>
                       {badge ? <span className="pbx__segmentMeta">{badge}</span> : null}
                     </button>
                   );
@@ -450,10 +453,17 @@ export default function PurchaseBox({
                 className="pbx__panelAccent"
               />
               <div className="pbx__panelMeta">
-                <span>{formatQtyLabel(optionQty)}</span>
+                <span>
+                  {currentBags > 0 ? `Add ${formatQtyLabel(optionQty)}` : formatQtyLabel(optionQty)}
+                </span>
                 {selectedBadge ? <span className="pbx__panelBadge">{selectedBadge}</span> : null}
               </div>
-              <div className="pbx__panelTotal">Total {selectedNextTotalText}</div>
+              <div className="pbx__panelTotal">{totalLabel} {selectedNextTotalText}</div>
+              {currentBags > 0 ? (
+                <div className="pbx__panelNote">
+                  Cart: {formatQtyLabel(currentBags)} → {formatQtyLabel(selectedNextBags)} total
+                </div>
+              ) : null}
               {selectedSavingsText ? (
                 <div className="pbx__panelSavings">Save {selectedSavingsText} total</div>
               ) : null}
@@ -706,6 +716,11 @@ export default function PurchaseBox({
           font-weight: 900;
           font-size: 28px;
           color: var(--text);
+        }
+        .pbx__panelNote{
+          font-size: 11px;
+          font-weight: 600;
+          color: var(--muted);
         }
         .pbx__panelSavings{
           font-size: 12px;
