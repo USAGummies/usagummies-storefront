@@ -485,11 +485,11 @@ export default function BundleQuickBuy({
   );
 
   const compactRail = (
-    <div data-bundle-rail className="grid h-full grid-rows-[auto_1fr_auto] gap-4">
+    <div data-bundle-rail className="flex h-full flex-col gap-4">
       <div data-rail-top className="space-y-2">
         {selectorContent}
       </div>
-      <div data-rail-middle className="flex flex-col justify-center gap-2">
+      <div data-rail-middle className="flex flex-col gap-2">
         {selectedTier ? (
           <div className={isLight ? "text-[11px] font-semibold tracking-[0.12em] uppercase text-[var(--muted)]" : "text-[11px] font-semibold tracking-[0.12em] uppercase text-white/70"}>
             {selectedTier.quantity} bags{selectedLabel ? ` — ${selectedLabel}` : ""}
@@ -533,7 +533,7 @@ export default function BundleQuickBuy({
           </span>
         </button>
       </div>
-      <div data-rail-bottom className="space-y-3">
+      <div data-rail-bottom className="mt-auto space-y-3">
         <div className="grid gap-2 text-[12px] font-semibold text-[var(--muted)]">
           {[
             { label: "Ships within 24 hours", icon: "M3 7h11v5h4l3 4v3h-3a2 2 0 1 1-4 0H9a2 2 0 1 1-4 0H3V7zm13 5V9h3l2 3h-5z" },
