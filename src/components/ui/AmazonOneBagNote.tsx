@@ -29,7 +29,7 @@ export function AmazonOneBagNote({
           height={16}
           className="h-3.5 w-auto opacity-85"
         />
-        <span>Buy on Amazon</span>
+        <span>Available on Amazon</span>
       </a>
       .
     </div>

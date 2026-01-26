@@ -425,45 +425,91 @@ export default function BundleQuickBuy({
         : selectedTier?.quantity === 5
           ? "Free shipping"
           : "";
-  const selectedPrice = Number.isFinite(selectedTierState?.nextTotal ?? NaN)
+  const selectedTotal = Number.isFinite(selectedTierState?.nextTotal ?? NaN)
     ? money(selectedTierState?.nextTotal, "USD")
-    : Number.isFinite(selectedTierState?.addTotal ?? NaN)
-      ? money(selectedTierState?.addTotal, "USD")
-      : null;
+    : null;
   const selectedSavings =
     selectedTierState?.savings && Number.isFinite(selectedTierState.savings) && selectedTierState.savings > 0
       ? money(selectedTierState.savings, "USD")
       : null;
+  const selectorContent = (
+    <div
+      role="radiogroup"
+      aria-label="Bag count"
+      className={[
+        "w-full rounded-full border px-1 py-1 flex items-center gap-1",
+        isLight ? "border-[rgba(15,27,45,0.12)] bg-white" : "border-white/12 bg-white/5",
+      ].join(" ")}
+    >
+      {primaryTiers.map((tier) => {
+        const isActive = String(tier.quantity) === selected;
+        const label =
+          tier.quantity === 8
+            ? "Most popular"
+            : tier.quantity === 12
+              ? "Best price"
+              : tier.quantity === 5
+                ? "Free shipping"
+                : "";
+        return (
+          <button
+            key={tier.quantity}
+            type="button"
+            role="radio"
+            aria-checked={isActive}
+            aria-disabled={!isTierPurchasable(tier)}
+            onClick={() => handleSelect(tier.quantity, isTierPurchasable(tier))}
+            onKeyDown={(event) => handleRadioKeyDown(event, tier.quantity, isTierPurchasable(tier))}
+            className={[
+              "flex-1 rounded-full px-3 py-1.5 text-[12px] font-semibold transition",
+              isActive
+                ? isLight
+                  ? "bg-[rgba(239,59,59,0.12)] text-[var(--text)]"
+                  : "bg-white/15 text-white"
+                : isLight
+                  ? "text-[var(--muted)] hover:text-[var(--text)]"
+                  : "text-white/70 hover:text-white",
+            ].join(" ")}
+          >
+            {tier.quantity} bags{label ? ` — ${label}` : ""}
+          </button>
+        );
+      })}
+    </div>
+  );
 
   const ctaContent = (
     <>
       {selectedTier ? (
         <div
           className={[
-            "relative space-y-1",
+            "relative space-y-2",
             isFusion ? "bundle-fusion__ctaSummary" : "",
           ]
             .filter(Boolean)
             .join(" ")}
         >
-          <Image
-            src="/website%20assets/Train-02.png"
-            alt=""
-            aria-hidden="true"
-            width={560}
-            height={340}
-            sizes="140px"
-            className="pointer-events-none absolute -right-6 -top-8 w-28 opacity-10"
-          />
+          {isCompact ? selectorContent : null}
+          {isCompact ? (
+            <Image
+              src="/website%20assets/Train-02.png"
+              alt=""
+              aria-hidden="true"
+              width={560}
+              height={340}
+              sizes="140px"
+              className="pointer-events-none absolute -right-6 -top-8 w-28 opacity-10"
+            />
+          ) : null}
           <div className={isLight ? "text-[12px] font-semibold text-[var(--muted)]" : "text-[12px] font-semibold text-white/75"}>
             {selectedTier.quantity} bags{selectedLabel ? ` — ${selectedLabel}` : ""}
           </div>
-          {selectedPrice ? (
+          {selectedTotal ? (
             <div
-              key={`${selectedTier.quantity}-${selectedTierState?.nextTotal ?? selectedTierState?.addTotal}`}
+              key={`${selectedTier.quantity}-${selectedTierState?.nextTotal ?? "na"}`}
               className={isLight ? "text-[22px] font-bold text-[var(--text)]" : "text-[22px] font-bold text-white"}
             >
-              {selectedPrice}
+              Total {selectedTotal}
             </div>
           ) : null}
           {selectedSavings ? (
@@ -520,6 +566,14 @@ export default function BundleQuickBuy({
             )}
           </span>
         </button>
+        <AmazonOneBagNote
+          className={isLight ? "text-xs text-[var(--muted)]" : "text-xs text-white/65"}
+          linkClassName={
+            isLight
+              ? "underline underline-offset-4 text-[var(--text)] hover:text-[var(--navy)]"
+              : "underline underline-offset-4 text-white hover:text-white"
+          }
+        />
         <div data-bundle-cta-trust>
           <div
             data-bundle-cta-note
@@ -595,14 +649,6 @@ export default function BundleQuickBuy({
             ))}
           </div>
         ) : null}
-        <AmazonOneBagNote
-          className={isLight ? "text-xs text-[var(--muted)]" : "text-xs text-white/65"}
-          linkClassName={
-            isLight
-              ? "underline underline-offset-4 text-[var(--text)] hover:text-[var(--navy)]"
-              : "underline underline-offset-4 text-white hover:text-white"
-          }
-        />
         {error ? (
           <div
             className={
@@ -1442,24 +1488,26 @@ export default function BundleQuickBuy({
         </div>
       )}
 
-      <div data-bundle-grid className="relative mt-3">
-        <div
-          className="flex flex-col gap-2"
-          role="radiogroup"
-          aria-label="Bag count"
-        >
-          {primaryTiers.map((tier) => renderRow(tier))}
+      {!isCompact ? (
+        <div data-bundle-grid className="relative mt-3">
+          <div
+            className="flex flex-col gap-2"
+            role="radiogroup"
+            aria-label="Bag count"
+          >
+            {primaryTiers.map((tier) => renderRow(tier))}
+          </div>
         </div>
-      </div>
+      ) : null}
 
       <div
         data-bundle-cta
         className={[
-          isFlat ? "mt-5 pt-4 border-t border-[rgba(15,27,45,0.12)]" : "mt-5 rounded-2xl border p-3 sm:p-3.5",
+          isFlat ? "mt-4 rounded-2xl border p-4" : "mt-5 rounded-2xl border p-3 sm:p-3.5",
           isFlat
             ? isLight
-              ? "bg-transparent"
-              : "border-white/12 bg-transparent"
+              ? "border-[rgba(15,27,45,0.12)] bg-white"
+              : "border-white/12 bg-white/5"
             : isCompact
               ? isLight
                 ? "border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)]"

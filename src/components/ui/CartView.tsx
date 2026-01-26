@@ -610,9 +610,9 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                       href={checkoutHref ?? localCart.checkoutUrl}
                       onClick={handleCheckoutClick}
                       aria-label={`${method.label} checkout`}
-                      className="flex flex-col items-center justify-center gap-1 rounded-2xl border border-[rgba(15,27,45,0.1)] bg-white/80 px-2 py-2 text-[9px] font-semibold text-[var(--muted)]"
+                      className="flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[9px] font-semibold text-[var(--muted)] hover:text-[var(--text)] transition"
                     >
-                      <span className="flex h-9 w-full items-center justify-center rounded-full border border-[rgba(15,27,45,0.08)] bg-white">
+                      <span className="flex h-8 w-full items-center justify-center">
                         <Image
                           src={method.iconSrc}
                           alt=""
@@ -620,7 +620,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                           width={72}
                           height={20}
                           sizes="72px"
-                          className="h-4 w-auto opacity-80"
+                          className="h-4 w-auto opacity-75"
                         />
                       </span>
                       <span className="text-[9px] text-[var(--muted)]">{method.label}</span>
@@ -646,7 +646,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
               </div>
             ) : null}
 
-            <div className="mt-3 relative overflow-hidden rounded-2xl border border-[rgba(15,27,45,0.08)] bg-white/80 px-3 py-3 text-[11px] text-[var(--muted)]">
+            <div className="mt-3 relative border-t border-[rgba(15,27,45,0.08)] pt-3 text-[11px] text-[var(--muted)]">
               <Image
                 src="/website%20assets/Train-02.png"
                 alt=""
@@ -657,14 +657,23 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                 className="pointer-events-none absolute -right-8 -top-8 w-28 opacity-10"
               />
               <div className="relative grid gap-1 text-[11px] font-semibold text-[var(--muted)]">
-                <span>Fast shipping</span>
-                <span>Easy returns</span>
-                <span>Secure checkout</span>
+                {[
+                  "Ships within 24 hours",
+                  "Easy returns",
+                  "Secure checkout",
+                ].map((item) => (
+                  <div key={item} className="flex items-center gap-2">
+                    <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-[rgba(15,27,45,0.08)] text-[10px] text-[var(--text)]">
+                      ✓
+                    </span>
+                    <span>{item}</span>
+                  </div>
+                ))}
               </div>
             </div>
 
             {showNextTierCta ? (
-              <details className="mt-3 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-3 py-2 text-[11px] text-[var(--muted)]">
+              <details className="mt-3 border-t border-[rgba(15,27,45,0.08)] pt-3 text-[11px] text-[var(--muted)]">
                 <summary className="cursor-pointer font-semibold text-[var(--text)]">
                   A better value is available
                 </summary>
@@ -673,7 +682,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                     type="button"
                     onClick={() => (nextTierAddQty ? addBags(nextTierAddQty) : null)}
                     disabled={bundlePending}
-                    className="w-full rounded-full border border-[rgba(15,27,45,0.12)] bg-white px-3 py-2 text-[11px] font-semibold text-[var(--text)] transition hover:border-[rgba(239,59,59,0.35)]"
+                    className="inline-flex items-center rounded-full border border-[rgba(15,27,45,0.12)] px-3 py-1.5 text-[11px] font-semibold text-[var(--text)] transition hover:border-[rgba(239,59,59,0.35)]"
                   >
                     {bundlePending ? "Locking in..." : drawerUpsellLabel}
                   </button>
