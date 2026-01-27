@@ -182,6 +182,29 @@ function dealToastMessage(milestone: { qty: number; label: string }) {
   return `Deal improved: ${milestone.label.toLowerCase()}.`;
 }
 
+function buildGaItems(lines: any[]) {
+  return lines
+    .map((line) => {
+      const merch = line?.merchandise;
+      const itemName = merch?.product?.title || merch?.title || "USA Gummies";
+      const itemId =
+        merch?.id || merch?.sku || merch?.product?.handle || merch?.title || itemName;
+      const price = Number(merch?.price?.amount ?? 0);
+      const quantity = Number(line?.quantity ?? 0);
+      if (!quantity) return null;
+      return {
+        item_id: String(itemId),
+        item_name: String(itemName),
+        item_variant: merch?.title || undefined,
+        item_brand: "USA Gummies",
+        item_category: "Gummy Bears",
+        price: Number.isFinite(price) && price > 0 ? Number(price.toFixed(2)) : undefined,
+        quantity,
+      };
+    })
+    .filter(Boolean) as Array<Record<string, unknown>>;
+}
+
 export function CartView({ cart, onClose }: { cart: any; onClose?: () => void }) {
   const [localCart, setLocalCart] = useState(cart);
   const [justUnlocked, setJustUnlocked] = useState(false);
@@ -192,6 +215,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
   const [highlightTotals, setHighlightTotals] = useState(false);
   const dealToastTimerRef = useRef<number | null>(null);
   const cartItemsRef = useRef<HTMLDivElement | null>(null);
+  const hasTrackedViewCartRef = useRef(false);
   useEffect(() => {
     setLocalCart(cart);
   }, [cart]);
@@ -242,6 +266,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
   const subtotalNumber = bundlePricing
     ? bundlePricing.total
     : Number(localCart?.cost?.subtotalAmount?.amount ?? 0);
+  const gaItems = useMemo(() => buildGaItems(lines), [lines]);
   const animatedSubtotal = useCountUp(subtotalNumber);
   const animatedSavings = useCountUp(bundleSavings);
   const animatedPerBag = useCountUp(bundlePricing?.perBag ?? 0);
@@ -439,6 +464,30 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("cart:updated"));
       }
+      const nextPricing = pricingForQty(totalBags + finalQty);
+      const addValueRaw = Math.max(0, nextPricing.total - currentTotal);
+      const addValue = Number.isFinite(addValueRaw) ? Number(addValueRaw.toFixed(2)) : undefined;
+      const unitPrice =
+        addValue && finalQty > 0 ? Number((addValue / finalQty).toFixed(2)) : undefined;
+      const primaryName =
+        lines?.[0]?.merchandise?.product?.title ||
+        lines?.[0]?.merchandise?.title ||
+        "USA Gummies";
+      trackEvent("add_to_cart", {
+        currency: summaryCurrency,
+        value: addValue,
+        items: [
+          {
+            item_id: SINGLE_BAG_VARIANT_ID,
+            item_name: primaryName,
+            item_variant: `${finalQty} bags`,
+            item_brand: "USA Gummies",
+            item_category: "Gummy Bears",
+            price: unitPrice,
+            quantity: finalQty,
+          },
+        ],
+      });
     } catch (err: any) {
       setBundleError(err?.message || "Could not add bags.");
     } finally {
@@ -481,6 +530,17 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
     : "";
 
   useEffect(() => {
+    if (!lines.length) return;
+    if (hasTrackedViewCartRef.current) return;
+    hasTrackedViewCartRef.current = true;
+    trackEvent("view_cart", {
+      currency: summaryCurrency,
+      value: Number.isFinite(subtotalNumber) ? Number(subtotalNumber.toFixed(2)) : undefined,
+      items: gaItems,
+    });
+  }, [gaItems, lines.length, subtotalNumber, summaryCurrency]);
+
+  useEffect(() => {
     if (!hasLines) return;
     setHighlightTotals(true);
     const timer = window.setTimeout(() => setHighlightTotals(false), 320);
@@ -502,6 +562,11 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
       window.location.href = safeCheckoutUrl;
     }
     const fallbackSubtotal = Number(localCart?.cost?.subtotalAmount?.amount || 0);
+    trackEvent("begin_checkout", {
+      currency: summaryCurrency,
+      value: Number.isFinite(subtotalNumber) ? Number(subtotalNumber.toFixed(2)) : fallbackSubtotal,
+      items: gaItems,
+    });
     trackEvent("checkout_click", {
       context: cartContext,
       totalBags,

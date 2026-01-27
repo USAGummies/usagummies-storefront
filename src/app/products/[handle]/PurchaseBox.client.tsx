@@ -6,6 +6,7 @@ import Image from "next/image";
 import { pricingForQty, BASE_PRICE, FREE_SHIP_QTY } from "@/lib/bundles/pricing";
 import { SINGLE_BAG_SKU, SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
 import { fireCartToast } from "@/lib/cartFeedback";
+import { trackEvent } from "@/lib/analytics";
 import { useCartBagCount } from "@/hooks/useCartBagCount";
 import { AmazonOneBagNote } from "@/components/ui/AmazonOneBagNote";
 import { AMAZON_REVIEWS } from "@/data/amazonReviews";
@@ -298,6 +299,32 @@ export default function PurchaseBox({
   }, [radioOptions]);
 
   const radioRefs = useRef<Array<HTMLElement | null>>([]);
+  const hasTrackedViewRef = useRef(false);
+
+  useEffect(() => {
+    if (hasTrackedViewRef.current) return;
+    if (!selectedVariant?.id) return;
+    const viewPricing = pricingForQty(optionQty);
+    const viewTotal = Number.isFinite(viewPricing.total) ? viewPricing.total : undefined;
+    const unitPrice =
+      viewTotal && optionQty > 0 ? Number((viewTotal / optionQty).toFixed(2)) : undefined;
+    trackEvent("view_item", {
+      currency: selectedCurrency,
+      value: viewTotal,
+      items: [
+        {
+          item_id: selectedVariant.id,
+          item_name: product?.title || "USA Gummies",
+          item_variant: selectedVariant.title || undefined,
+          item_brand: "USA Gummies",
+          item_category: "Gummy Bears",
+          price: unitPrice,
+          quantity: optionQty,
+        },
+      ],
+    });
+    hasTrackedViewRef.current = true;
+  }, [optionQty, product?.title, selectedCurrency, selectedVariant?.id, selectedVariant?.title]);
 
   function handleRadioKey(index: number) {
     return (event: KeyboardEvent<HTMLElement>) => {
@@ -374,6 +401,32 @@ export default function PurchaseBox({
       }
       fireCartToast(qty);
       setLastAddedQty(qty);
+      const addValueRaw =
+        typeof selectedOption?.totalPrice === "number"
+          ? selectedOption.totalPrice
+          : Number.isFinite(selectedNextTotal)
+            ? selectedNextTotal
+            : undefined;
+      const addValue = Number.isFinite(addValueRaw ?? NaN)
+        ? Number((addValueRaw as number).toFixed(2))
+        : undefined;
+      const unitPrice =
+        addValue && qty > 0 ? Number((addValue / qty).toFixed(2)) : undefined;
+      trackEvent("add_to_cart", {
+        currency: selectedCurrency,
+        value: addValue,
+        items: [
+          {
+            item_id: selectedVariant.id,
+            item_name: product?.title || "USA Gummies",
+            item_variant: selectedVariant.title || undefined,
+            item_brand: "USA Gummies",
+            item_category: "Gummy Bears",
+            price: unitPrice,
+            quantity: qty,
+          },
+        ],
+      });
     } catch {
       setError("Couldn't add to cart. Please try again.");
     } finally {

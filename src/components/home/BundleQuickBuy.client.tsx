@@ -143,6 +143,10 @@ export default function BundleQuickBuy({
   const isFlat = surface === "flat";
   const isIntegrated = layout === "integrated";
   const isFusion = layout === "fusion";
+  const analyticsName =
+    (_productHandle || "USA Gummies")
+      .replace(/[-_]+/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase()) || "USA Gummies";
 
   const allTiers = React.useMemo(() => {
     const allowed = (tiers || []).filter((t) => {
@@ -340,6 +344,26 @@ export default function BundleQuickBuy({
       fireCartToast(qty);
       setLastAddedQty(qty);
       setSuccess(true);
+      const pricing = pricingForQty(currentBags + qty);
+      const addValueRaw = Math.max(0, (pricing.total ?? 0) - currentTotal);
+      const addValue = Number.isFinite(addValueRaw) ? Number(addValueRaw.toFixed(2)) : undefined;
+      const unitPrice =
+        addValue && qty > 0 ? Number((addValue / qty).toFixed(2)) : undefined;
+      trackEvent("add_to_cart", {
+        currency: "USD",
+        value: addValue,
+        items: [
+          {
+            item_id: singleBagVariantId,
+            item_name: analyticsName || "USA Gummies",
+            item_variant: `${qty} bags`,
+            item_brand: "USA Gummies",
+            item_category: "Gummy Bears",
+            price: unitPrice,
+            quantity: qty,
+          },
+        ],
+      });
     } catch (e: any) {
       setError(e?.message || "Could not add to cart.");
     } finally {
