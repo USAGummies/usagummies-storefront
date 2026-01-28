@@ -511,12 +511,15 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
     : totalBags > 0
       ? { label: "Savings pending", tone: "muted" }
       : null;
-  const drawerSavingsLine =
-    bundleSavings > 0
-      ? `You saved ${bundleSavingsText} vs single bags.`
-      : totalBags > 0
-        ? "Savings pending."
-        : "";
+  const hasSavings = bundleSavings > 0;
+  const regularPerBagText = hasSavings ? formatNumber(BASE_PRICE, summaryCurrency) : "";
+  const regularTotalText = hasSavings ? formatNumber(BASE_PRICE * totalBags, summaryCurrency) : "";
+  const drawerSavingsLine = hasSavings
+    ? `Save ${bundleSavingsText} total`
+    : totalBags > 0
+      ? "Savings pending."
+      : "";
+  const showRegularLine = hasSavings && Boolean(regularPerBagText && regularTotalText);
   const nextTierDescriptor =
     nextMilestone.qty === 4
       ? "savings pricing"
@@ -690,9 +693,19 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                     {estimatedTotal}
                   </span>
                 </div>
-                {drawerSavingsLine ? (
-                  <div className={cn("text-[10px] font-semibold text-[var(--candy-red)]", highlightTotals && "price-pop")}>
-                    {drawerSavingsLine}
+                {showRegularLine || drawerSavingsLine ? (
+                  <div className={cn("text-[10px] font-semibold text-[var(--muted)]", highlightTotals && "price-pop")}>
+                    {showRegularLine ? (
+                      <span>
+                        Regular {regularPerBagText}/bag ·{" "}
+                        <span className="line-through">{regularTotalText}</span> total
+                      </span>
+                    ) : null}
+                    {drawerSavingsLine ? (
+                      <span className="text-[var(--candy-red)]">
+                        {showRegularLine ? " · " : ""}{drawerSavingsLine}
+                      </span>
+                    ) : null}
                   </div>
                 ) : null}
               </div>
