@@ -458,6 +458,12 @@ export default function BundleQuickBuy({
     selectedTierState?.savings && Number.isFinite(selectedTierState.savings) && selectedTierState.savings > 0
       ? money(selectedTierState.savings, "USD")
       : null;
+  const basePerBag = money(BASE_PRICE, "USD");
+  const regularTotal =
+    selectedNextBags && Number.isFinite(BASE_PRICE)
+      ? money(BASE_PRICE * selectedNextBags, "USD")
+      : null;
+  const hasRegularLine = Boolean(basePerBag && regularTotal);
   const totalLabel = currentBags > 0 ? "New total" : "Total";
   const selectorContent = (
     <div
@@ -532,9 +538,19 @@ export default function BundleQuickBuy({
             Cart: {currentBags} bag{currentBags === 1 ? "" : "s"} → {selectedNextBags} bags total
           </div>
         ) : null}
-        {selectedSavings ? (
-          <div className={isLight ? "text-[12px] font-semibold text-[var(--candy-red)]" : "text-[12px] font-semibold text-[var(--gold)]"}>
-            Save {selectedSavings} total
+        {hasRegularLine || selectedSavings ? (
+          <div className={isLight ? "text-[11px] font-semibold text-[var(--muted)]" : "text-[11px] font-semibold text-white/70"}>
+            {hasRegularLine ? (
+              <span>
+                Regular {basePerBag}/bag ·{" "}
+                <span className="line-through">{regularTotal}</span> total
+              </span>
+            ) : null}
+            {selectedSavings ? (
+              <span className={isLight ? "text-[var(--candy-red)]" : "text-[var(--gold)]"}>
+                {hasRegularLine ? " · " : ""}Save {selectedSavings} total
+              </span>
+            ) : null}
           </div>
         ) : null}
         <button
@@ -849,9 +865,19 @@ export default function BundleQuickBuy({
               Cart: {currentBags} bag{currentBags === 1 ? "" : "s"} → {selectedNextBags} bags total
             </div>
           ) : null}
-          {selectedSavings ? (
-            <div className={isLight ? "text-[11px] font-semibold text-[var(--candy-red)]" : "text-[11px] font-semibold text-[var(--gold)]"}>
-              Save {selectedSavings} total
+          {hasRegularLine || selectedSavings ? (
+            <div className={isLight ? "text-[11px] font-semibold text-[var(--muted)]" : "text-[11px] font-semibold text-white/70"}>
+              {hasRegularLine ? (
+                <span>
+                  Regular {basePerBag}/bag ·{" "}
+                  <span className="line-through">{regularTotal}</span> total
+                </span>
+              ) : null}
+              {selectedSavings ? (
+                <span className={isLight ? "text-[var(--candy-red)]" : "text-[var(--gold)]"}>
+                  {hasRegularLine ? " · " : ""}Save {selectedSavings} total
+                </span>
+              ) : null}
             </div>
           ) : null}
         </div>

@@ -5,6 +5,10 @@ type LeadPayload = {
   phone?: string;
   source?: string;
   intent?: string;
+  storeName?: string;
+  buyerName?: string;
+  location?: string;
+  interest?: string;
 };
 
 function json(data: any, status = 200) {
@@ -26,12 +30,25 @@ export async function POST(req: Request) {
   const phone = String(body.phone || "").trim();
   const source = String(body.source || "unknown");
   const intent = String(body.intent || "newsletter");
+  const storeName = String(body.storeName || "").trim();
+  const buyerName = String(body.buyerName || "").trim();
+  const location = String(body.location || "").trim();
+  const interest = String(body.interest || "").trim();
 
   if (!email && !phone) {
     return json({ ok: false, error: "Missing email or phone." }, 400);
   }
 
-  console.info("Lead capture", { email, phone, source, intent });
+  console.info("Lead capture", {
+    email,
+    phone,
+    source,
+    intent,
+    storeName,
+    buyerName,
+    location,
+    interest,
+  });
 
   const webhookUrl = process.env.LEADS_WEBHOOK_URL;
   if (webhookUrl) {
@@ -48,6 +65,10 @@ export async function POST(req: Request) {
           phone,
           source,
           intent,
+          storeName,
+          buyerName,
+          location,
+          interest,
           timestamp: new Date().toISOString(),
         }),
       });

@@ -33,6 +33,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/patriotic-party-snacks`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
     { url: `${base}/bulk-gummy-bears`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
     { url: `${base}/gummies-101`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
+    { url: `${base}/wholesale`, lastModified: now, changeFrequency: "monthly", priority: 0.6 },
 
     // Policies hub + subpages
     { url: `${base}/policies`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },

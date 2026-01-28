@@ -122,6 +122,7 @@ const navSections = [
   {
     title: "Support",
     links: [
+      { href: "/wholesale", label: "Wholesale" },
       { href: "/contact", label: "Contact" },
       { href: "/policies", label: "Policies" },
       { href: "/policies/shipping", label: "Shipping" },
@@ -620,6 +621,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </Link>
               <Link href="/bulk-gummy-bears" className="link-underline">
                 Bulk gummy bears
+              </Link>
+              <Link href="/wholesale" className="link-underline">
+                Wholesale
               </Link>
               <Link href="/contact" className="link-underline">
                 Contact

@@ -278,6 +278,12 @@ export default function PurchaseBox({
     selectedOption?.savingsAmount && selectedOption.savingsAmount > 0
       ? money(selectedOption.savingsAmount, selectedCurrency)
       : null;
+  const regularPerBagText = money(BASE_PRICE, selectedCurrency);
+  const regularTotalText =
+    selectedNextBags && Number.isFinite(BASE_PRICE)
+      ? money(BASE_PRICE * selectedNextBags, selectedCurrency)
+      : null;
+  const hasRegularLine = Boolean(regularPerBagText && regularTotalText);
   const selectedBadge = badgeForTotal(optionQty);
   const hasAdded = lastAddedQty !== null;
   const selectedAdded = hasAdded && lastAddedQty === optionQty;
@@ -517,8 +523,20 @@ export default function PurchaseBox({
                   Cart: {formatQtyLabel(currentBags)} → {formatQtyLabel(selectedNextBags)} total
                 </div>
               ) : null}
-              {selectedSavingsText ? (
-                <div className="pbx__panelSavings">Save {selectedSavingsText} total</div>
+              {hasRegularLine || selectedSavingsText ? (
+                <div className="pbx__panelSavings">
+                  {hasRegularLine ? (
+                    <span className="pbx__panelRegular">
+                      Regular {regularPerBagText}/bag ·{" "}
+                      <span className="pbx__panelStrike">{regularTotalText}</span> total
+                    </span>
+                  ) : null}
+                  {selectedSavingsText ? (
+                    <span className="pbx__panelSave">
+                      {hasRegularLine ? " · " : ""}Save {selectedSavingsText} total
+                    </span>
+                  ) : null}
+                </div>
               ) : null}
 
               <button
@@ -777,8 +795,21 @@ export default function PurchaseBox({
         }
         .pbx__panelSavings{
           font-size: 12px;
-          font-weight: 700;
+          font-weight: 600;
+          color: var(--muted);
+          display: flex;
+          flex-wrap: wrap;
+          gap: 4px;
+        }
+        .pbx__panelRegular{
+          color: var(--muted);
+        }
+        .pbx__panelStrike{
+          text-decoration: line-through;
+        }
+        .pbx__panelSave{
           color: var(--red);
+          font-weight: 700;
         }
         .pbx__panelStatus{
           font-size: 11px;
