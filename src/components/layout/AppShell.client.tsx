@@ -13,7 +13,6 @@ import { LeadCapture } from "@/components/marketing/LeadCapture.client";
 import { SubscriptionUnlock } from "@/components/marketing/SubscriptionUnlock.client";
 import { getCartToastMessage, readLastAdd } from "@/lib/cartFeedback";
 import { SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
-import { BRAND_STORY_HEADLINE, BRAND_STORY_SHORT } from "@/data/brandStory";
 import { ExperienceBand } from "@/components/brand/ExperienceBand";
 
 function cx(...a: Array<string | false | null | undefined>) {
@@ -148,12 +147,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isShop = pathname === "/shop";
   const isProduct = pathname?.startsWith("/products");
   const experienceVariant = isHome || isShop || isProduct ? "full" : "compact";
-  const showExperienceBand =
-    isHome ||
-    isShop ||
-    isProduct ||
-    pathname === "/join-the-revolution" ||
-    pathname === "/thank-you";
+  const showExperienceBand = isHome || isShop;
   const menuRef = useRef<HTMLDivElement | null>(null);
   const toastTimerRef = useRef<number | null>(null);
 
@@ -568,23 +562,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <div className="text-xs text-[var(--muted)]">
                 Secure checkout • {FREE_SHIPPING_PHRASE} • Easy returns
               </div>
-          </div>
-
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-4 text-sm text-[var(--muted)]">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
-              Our story
-            </div>
-            <div className="mt-2 text-sm font-semibold text-[var(--text)]">
-              {BRAND_STORY_HEADLINE}
-            </div>
-            <div className="mt-3 space-y-2 text-xs text-[var(--muted)]">
-              {BRAND_STORY_SHORT.map((paragraph) => (
-                <p key={paragraph}>{paragraph}</p>
-              ))}
-            </div>
-            <Link href="/about" className="mt-3 inline-flex text-xs font-semibold text-[var(--navy)] link-underline">
-              Read our story
-            </Link>
           </div>
 
           <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">

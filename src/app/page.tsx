@@ -589,14 +589,6 @@ export default async function HomePage() {
                     Proudly sourced, manufactured, and packed entirely in America. No artificial
                     dyes or synthetic colors. Classic gummy bear flavor — done right.
                   </p>
-                  <div className="candy-panel rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-3">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.26em] text-[var(--muted)]">
-                      Our story
-                    </div>
-                    <div className="mt-1 text-sm font-semibold text-[var(--text)]">
-                      Purchasing these gummies is a vote in the America you believe in.
-                    </div>
-                  </div>
                   <div className="flex flex-wrap items-center gap-3 pt-1">
                     <a href="#bundle-pricing" className="btn btn-candy">
                       Shop now
