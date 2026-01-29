@@ -123,8 +123,21 @@ export default function WholesalePage() {
               </div>
             </div>
 
-            <div id="wholesale-form">
-              <WholesaleInquiryForm />
+            <div className="space-y-4">
+              <div className="rounded-3xl border border-[var(--border)] bg-white p-2 shadow-[0_18px_44px_rgba(15,27,45,0.12)]">
+                <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)]">
+                  <Image
+                    src="/brand/usa-gummies-family.webp"
+                    alt="USA Gummies bags with gummy bears"
+                    fill
+                    sizes="(max-width: 768px) 90vw, 420px"
+                    className="object-cover"
+                  />
+                </div>
+              </div>
+              <div id="wholesale-form">
+                <WholesaleInquiryForm />
+              </div>
             </div>
           </div>
         </div>

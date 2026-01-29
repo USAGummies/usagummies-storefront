@@ -110,7 +110,7 @@ const articleJsonLd = {
       url: `${SITE_URL}/brand/logo.png`,
     },
   },
-  image: [`${SITE_URL}/brand/hero.jpg`],
+  image: [`${SITE_URL}/brand/usa-gummies-family.webp`],
 };
 
 export default function MadeInUsaPage() {
@@ -160,7 +160,7 @@ export default function MadeInUsaPage() {
                 <div className="relative rounded-3xl border border-[var(--border)] bg-white p-2 text-[var(--text)] shadow-[0_20px_48px_rgba(15,27,45,0.12)]">
                   <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-[var(--border)] bg-white">
                     <Image
-                      src="/brand/hero.jpg"
+                      src="/brand/usa-gummies-family.webp"
                       alt="USA Gummies made in the USA"
                       fill
                       sizes="(max-width: 768px) 90vw, 460px"

@@ -147,7 +147,7 @@ export default async function HomePage() {
   const productImages =
     (detailedProduct?.images?.edges || []).map((e: any) => e?.node) || [];
   const whyImage = productImages[1] || productImages[0] || null;
-  const whyImageSrc = whyImage?.url || "/home-patriotic-product.jpg";
+  const whyImageSrc = whyImage?.url || "/brand/usa-gummies-family.webp";
   const whyImageAlt = whyImage?.altText || "USA Gummies in hand";
 
   const heroMediaSrc = "/website%20assets/hero.jpg";
@@ -163,7 +163,7 @@ export default async function HomePage() {
     heroBundleQuantities.includes(t.quantity)
   );
 
-  const heroImage = productImages[0]?.url || `${SITE_URL}/brand/hero.jpg`;
+  const heroImage = productImages[0]?.url || `${SITE_URL}/brand/usa-gummies-family.webp`;
   const priceAmount = detailedProduct?.priceRange?.minVariantPrice?.amount || null;
   const priceCurrency =
     detailedProduct?.priceRange?.minVariantPrice?.currencyCode || "USD";

@@ -125,6 +125,11 @@ export default function RootLayout({
       className={`${display.variable} ${sans.variable} ${script.variable}`}
       style={{ backgroundColor: "var(--bg, #f8f5ef)" }}
     >
+      <head>
+        <Script id="apollo-tracker" strategy="beforeInteractive">
+          {`function initApollo(){var n=Math.random().toString(36).substring(7),o=document.createElement("script");o.src="https://assets.apollo.io/micro/website-tracker/tracker.iife.js?nocache="+n,o.async=!0,o.defer=!0,o.onload=function(){window.trackingFunctions.onLoad({appId:"697a8732160a9800112f9a5b"})},document.head.appendChild(o)}initApollo();`}
+        </Script>
+      </head>
       <body
         className="min-h-screen bg-[var(--bg,#f8f5ef)] text-[var(--text,#1c2430)]"
         style={{

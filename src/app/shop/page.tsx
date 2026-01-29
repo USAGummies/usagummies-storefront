@@ -114,7 +114,7 @@ export default async function ShopPage() {
     : null;
 
   const stickyImage =
-    productFeatured?.url || productImages?.[0]?.url || "/home-patriotic-product.jpg";
+    productFeatured?.url || productImages?.[0]?.url || "/brand/usa-gummies-family.webp";
   const stickyAlt = productFeatured?.altText || "USA Gummies bag";
   const lowBundlePrice = pricingForQty(1).total;
   const featuredBundlePrice = pricingForQty(8).total;

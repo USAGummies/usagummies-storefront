@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 
@@ -139,6 +140,34 @@ export default function Gummies101Page() {
                 <Link href="/america-250" className="btn btn-outline">
                   America 250
                 </Link>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-4">
+            <div className="grid gap-4 sm:grid-cols-[0.9fr_1.1fr] sm:items-center">
+              <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)]">
+                <Image
+                  src="/brand/usa-gummies-family.webp"
+                  alt="USA Gummies bags with gummy bears"
+                  fill
+                  sizes="(max-width: 768px) 90vw, 360px"
+                  className="object-cover"
+                />
+              </div>
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
+                  What you are getting
+                </div>
+                <p className="mt-2 text-sm text-[var(--muted)]">
+                  Classic gummy bear flavor with a clean ingredient list, made in the USA and packed
+                  for gifting or bulk orders.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <span className="badge badge--navy">All natural flavors</span>
+                  <span className="badge badge--navy">No artificial dyes</span>
+                  <span className="badge badge--navy">7.5 oz bag</span>
+                </div>
               </div>
             </div>
           </div>
