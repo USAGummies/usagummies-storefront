@@ -5,6 +5,7 @@ import { getProductsPage } from "@/lib/shopify/products";
 import { getProductByHandle } from "@/lib/storefront";
 import BundleQuickBuy from "@/components/home/BundleQuickBuy.client";
 import ReviewsSection from "@/components/home/ReviewsSection";
+import { StickyAddToCartBar } from "@/components/product/StickyAddToCartBar";
 import { getBundleVariants } from "@/lib/bundles/getBundleVariants";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import HeroCTAWatcher from "@/components/home/HeroCTAWatcher";
@@ -164,6 +165,7 @@ export default async function HomePage() {
   );
 
   const heroImage = productImages[0]?.url || `${SITE_URL}/brand/usa-gummies-family.webp`;
+  const heroImageAlt = productImages[0]?.altText || "USA Gummies bag";
   const priceAmount = detailedProduct?.priceRange?.minVariantPrice?.amount || null;
   const priceCurrency =
     detailedProduct?.priceRange?.minVariantPrice?.currencyCode || "USD";
@@ -810,16 +812,13 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <div className="sticky-cta-bar fixed bottom-4 left-1/2 z-40 hidden w-[min(94vw,680px)] -translate-x-1/2 translate-y-4 bg-transparent opacity-0 transition-all duration-300">
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[22px] border border-[rgba(15,27,45,0.12)] bg-white/90 px-4 py-3 shadow-[0_18px_44px_rgba(15,27,45,0.12)] backdrop-blur-md">
-          <div className="hidden text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)] sm:block">
-            Save more with more bags
-          </div>
-          <a href="#bundle-pricing" className="btn btn-candy w-full sm:w-auto">
-            Shop now
-          </a>
-        </div>
-      </div>
+      <StickyAddToCartBar
+        title="In your cart"
+        imageUrl={heroImage}
+        imageAlt={heroImageAlt}
+        buttonLabel="Buy now"
+        source="home"
+      />
 
       <script
         type="application/ld+json"

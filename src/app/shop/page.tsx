@@ -539,11 +539,12 @@ export default async function ShopPage() {
       </section>
 
       <StickyAddToCartBar
-        title="USA Gummies"
-        priceText={`${bestValuePerBagText} / bag`}
+        title="In your cart"
         imageUrl={stickyImage}
         imageAlt={stickyAlt}
-        purchaseSelector="#bundle-pricing"
+        buttonLabel="Buy now"
+        source="shop"
+        className="sm:hidden"
       />
 
       <script
