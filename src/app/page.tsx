@@ -610,13 +610,13 @@ export default async function HomePage() {
 
                 <div className="space-y-3 lg:pt-2">
                   <div className="candy-panel relative overflow-hidden rounded-3xl p-2 text-[var(--text)] lg:ml-auto lg:max-w-[440px]">
-                    <div className="relative aspect-[4/5] overflow-hidden rounded-2xl border border-[rgba(15,27,45,0.1)] bg-white">
+                    <div className="relative aspect-[5/4] overflow-hidden rounded-2xl border border-[rgba(15,27,45,0.1)] bg-[var(--surface-strong)] p-3">
                       <Image
                         src={whyImageSrc}
                       alt={whyImageAlt}
                       fill
                       sizes="(max-width: 640px) 90vw, (max-width: 1024px) 40vw, 420px"
-                      className="object-cover"
+                      className="object-contain"
                     />
                     <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/45 via-black/0 to-transparent p-3">
                       <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-white/90">

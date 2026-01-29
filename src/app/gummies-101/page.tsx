@@ -146,13 +146,13 @@ export default function Gummies101Page() {
 
           <div className="mt-6 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-4">
             <div className="grid gap-4 sm:grid-cols-[0.9fr_1.1fr] sm:items-center">
-              <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)]">
+              <div className="relative aspect-[5/4] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-3">
                 <Image
                   src="/brand/usa-gummies-family.webp"
                   alt="USA Gummies bags with gummy bears"
                   fill
                   sizes="(max-width: 768px) 90vw, 360px"
-                  className="object-cover"
+                  className="object-contain"
                 />
               </div>
               <div>

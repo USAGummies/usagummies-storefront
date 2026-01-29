@@ -192,13 +192,13 @@ export default function AboutPage() {
 
               <div className="relative">
                 <div className="relative rounded-3xl border border-[var(--border)] bg-white p-2 text-[var(--text)] shadow-[0_20px_48px_rgba(15,27,45,0.12)]">
-                  <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-[var(--border)] bg-white">
+                  <div className="relative aspect-[5/4] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-3">
                     <Image
                       src="/brand/usa-gummies-family.webp"
                       alt={LISTING_TITLE}
                       fill
                       sizes="(max-width: 768px) 90vw, 460px"
-                      className="object-cover"
+                      className="object-contain"
                     />
                   </div>
                   <div className="mt-2 space-y-1">
