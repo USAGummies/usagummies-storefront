@@ -1719,6 +1719,9 @@ a:focus-visible:not(.btn):not(.focus-ring),
   grid-area: rail;
   min-width: 0;
   display: grid;
+  grid-template-areas:
+    "image"
+    "bundle";
   gap: 12px;
   align-self: stretch;
 }
