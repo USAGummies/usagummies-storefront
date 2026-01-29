@@ -2,7 +2,7 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import Script from "next/script";
-import { Analytics } from "@vercel/analytics/react";
+import { Analytics } from "@vercel/analytics/next";
 import { Oswald, Space_Grotesk, Yellowtail } from "next/font/google";
 import { AppShell } from "@/components/layout/AppShell.client";
 import { AMAZON_LISTING_URL } from "@/lib/amazon";
