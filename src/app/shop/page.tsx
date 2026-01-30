@@ -8,7 +8,7 @@ import { AmericanDreamCallout } from "@/components/story/AmericanDreamCallout";
 import { StickyAddToCartBar } from "@/components/product/StickyAddToCartBar";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { getProductsPage } from "@/lib/shopify/products";
-import { getProductByHandle, money } from "@/lib/storefront";
+import { getProductByHandle } from "@/lib/storefront";
 import { pricingForQty, FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import { getReviewAggregate } from "@/lib/reviews/aggregate";
 import { REVIEW_HIGHLIGHTS } from "@/data/reviewHighlights";
@@ -99,7 +99,6 @@ export default async function ShopPage() {
     primaryProduct?.priceRange?.minVariantPrice?.currencyCode ||
     "USD";
 
-  const bestValuePerBagText = money(pricingForQty(8).perBag.toFixed(2), currency);
   const productTitle = LISTING_TITLE;
   const productFeatured = detailedProduct?.featuredImage || primaryProduct?.featuredImage || null;
   const productImages = (detailedProduct?.images?.edges || []).map((e: any) => e.node);

@@ -72,7 +72,8 @@ export function ChatWidget() {
   async function sendMessage() {
     const value = input.trim();
     if (!value || loading) return;
-    const nextMessages = [...messages, { role: "user", content: value }];
+    const userMessage: ChatMessage = { role: "user", content: value };
+    const nextMessages = [...messages, userMessage];
     setMessages(nextMessages);
     setInput("");
     setLoading(true);
@@ -81,7 +82,7 @@ export function ChatWidget() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: trimmedMessages.concat({ role: "user", content: value }) }),
+        body: JSON.stringify({ messages: trimmedMessages.concat(userMessage) }),
       });
       const data = await res.json();
       if (res.ok && data?.reply) {
