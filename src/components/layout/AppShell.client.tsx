@@ -14,6 +14,7 @@ import { SubscriptionUnlock } from "@/components/marketing/SubscriptionUnlock.cl
 import { getCartToastMessage, readLastAdd } from "@/lib/cartFeedback";
 import { SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
 import { ExperienceBand } from "@/components/brand/ExperienceBand";
+import { ChatWidget } from "@/components/support/ChatWidget.client";
 
 function cx(...a: Array<string | false | null | undefined>) {
   return a.filter(Boolean).join(" ");
@@ -121,6 +122,7 @@ const navSections = [
   {
     title: "Support",
     links: [
+      { href: "/help", label: "Help Center" },
       { href: "/wholesale", label: "Wholesale" },
       { href: "/contact", label: "Contact" },
       { href: "/policies", label: "Policies" },
@@ -605,6 +607,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Link href="/contact" className="link-underline">
                 Contact
               </Link>
+              <Link href="/help" className="link-underline">
+                Help Center
+              </Link>
               <Link href="/policies" className="link-underline">
                 Policies
               </Link>
@@ -626,6 +631,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </footer>
+      <ChatWidget />
     </div>
   );
 }

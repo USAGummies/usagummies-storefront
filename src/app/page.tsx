@@ -11,6 +11,7 @@ import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import HeroCTAWatcher from "@/components/home/HeroCTAWatcher";
 import { BRAND_STORY_HEADLINE, BRAND_STORY_PARAGRAPHS } from "@/data/brandStory";
 import { DETAIL_BULLETS } from "@/data/productDetails";
+import { getReviewAggregate } from "@/lib/reviews/aggregate";
 import styles from "./homepage-scenes.module.css";
 
 function resolveSiteUrl() {
@@ -169,6 +170,7 @@ export default async function HomePage() {
   const priceAmount = detailedProduct?.priceRange?.minVariantPrice?.amount || null;
   const priceCurrency =
     detailedProduct?.priceRange?.minVariantPrice?.currencyCode || "USD";
+  const reviewAggregate = await getReviewAggregate();
   const productJsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -186,6 +188,15 @@ export default async function HomePage() {
           ? "https://schema.org/OutOfStock"
           : "https://schema.org/InStock",
     },
+    ...(reviewAggregate
+      ? {
+          aggregateRating: {
+            "@type": "AggregateRating",
+            ratingValue: reviewAggregate.ratingValue,
+            reviewCount: reviewAggregate.reviewCount,
+          },
+        }
+      : {}),
   };
 
   const whyCards = [

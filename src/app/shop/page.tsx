@@ -10,6 +10,7 @@ import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { getProductsPage } from "@/lib/shopify/products";
 import { getProductByHandle, money } from "@/lib/storefront";
 import { pricingForQty, FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
+import { getReviewAggregate } from "@/lib/reviews/aggregate";
 import { REVIEW_HIGHLIGHTS } from "@/data/reviewHighlights";
 import { BRAND_STORY_HEADLINE, BRAND_STORY_MEDIUM } from "@/data/brandStory";
 import { DETAIL_BULLETS } from "@/data/productDetails";
@@ -138,6 +139,9 @@ export default async function ShopPage() {
       ? REVIEW_HIGHLIGHTS.reduce((sum, review) => sum + review.rating, 0) /
         REVIEW_HIGHLIGHTS.length
       : null;
+  const reviewAggregate = await getReviewAggregate();
+  const aggregateRatingValue = reviewAggregate?.ratingValue ?? (avgRating ? Number(avgRating.toFixed(1)) : null);
+  const aggregateReviewCount = reviewAggregate?.reviewCount ?? REVIEW_HIGHLIGHTS.length;
 
   const productJsonLd = {
     "@context": "https://schema.org",
@@ -151,11 +155,11 @@ export default async function ShopPage() {
       name: "USA Gummies",
     },
     review: reviewItems.length ? reviewItems : undefined,
-    aggregateRating: avgRating
+    aggregateRating: aggregateRatingValue
       ? {
           "@type": "AggregateRating",
-          ratingValue: Number(avgRating.toFixed(1)),
-          reviewCount: REVIEW_HIGHLIGHTS.length,
+          ratingValue: aggregateRatingValue,
+          reviewCount: aggregateReviewCount,
         }
       : undefined,
     offers: {

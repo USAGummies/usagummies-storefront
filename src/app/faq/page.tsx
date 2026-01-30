@@ -174,7 +174,7 @@ export default function FaqPage() {
               </p>
               <div className="flex flex-wrap items-center gap-3">
                 <Link href="/shop" className="btn btn-candy">
-                  Shop now
+                  Shop USA Gummies
                 </Link>
                 <span className="text-xs text-[var(--muted)]">{FREE_SHIPPING_PHRASE}</span>
               </div>

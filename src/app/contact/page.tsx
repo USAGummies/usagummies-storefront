@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import ContactForm from "@/components/forms/ContactForm";
+import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 
 function resolveSiteUrl() {
   const preferred = "https://www.usagummies.com";
@@ -43,6 +44,12 @@ export const metadata: Metadata = {
 export default function ContactPage() {
   return (
     <main className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
+      <BreadcrumbJsonLd
+        items={[
+          { name: "Home", href: "/" },
+          { name: "Contact", href: "/contact" },
+        ]}
+      />
       <div className="mx-auto max-w-4xl px-4 py-10">
         <div className="mb-6 flex items-center justify-between gap-3">
           <Link
@@ -55,7 +62,7 @@ export default function ContactPage() {
             href="/shop"
             className="rounded-full border border-[var(--border)] bg-white px-3 py-1 text-sm text-[var(--text)] hover:bg-[var(--surface-strong)]"
           >
-            Shop now
+            Shop USA Gummies
           </Link>
         </div>
 
@@ -111,6 +118,13 @@ export default function ContactPage() {
 
           <div className="mt-6">
             <ContactForm context="Contact Page" />
+          </div>
+          <div className="mt-6 text-sm text-[var(--muted)]">
+            Looking for American-made gummy bears?{" "}
+            <Link href="/shop" className="underline underline-offset-4 text-[var(--text)]">
+              Shop all-natural USA Gummies
+            </Link>
+            .
           </div>
         </section>
       </div>

@@ -28,6 +28,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/ingredients`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
     { url: `${base}/made-in-usa`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
     { url: `${base}/contact`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
+    { url: `${base}/help`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
     { url: `${base}/bundle-guides`, lastModified: now, changeFrequency: "monthly", priority: 0.6 },
     { url: `${base}/gummy-gift-bundles`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
     { url: `${base}/patriotic-party-snacks`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
