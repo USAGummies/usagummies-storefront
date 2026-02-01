@@ -17,7 +17,7 @@ import type { BundleTier } from "@/lib/bundles/getBundleVariants";
 import { BASE_PRICE, FREE_SHIPPING_PHRASE, MIN_PER_BAG, pricingForQty } from "@/lib/bundles/pricing";
 import { trackEvent } from "@/lib/analytics";
 import { fireCartToast } from "@/lib/cartFeedback";
-import { GummyIconRow } from "@/components/ui/GummyIcon";
+import { GummyIconRow, HeroPackIcon } from "@/components/ui/GummyIcon";
 import { useCartBagCount } from "@/hooks/useCartBagCount";
 import { REVIEW_HIGHLIGHTS } from "@/data/reviewHighlights";
 import { AmazonOneBagNote } from "@/components/ui/AmazonOneBagNote";
@@ -560,8 +560,15 @@ export default function BundleQuickBuy({
   const hasRegularLine = Boolean(basePerBag && regularTotal);
   const totalLabel = currentBags > 0 ? "New total" : "Total";
   const perBagForQty = (qty: number) => money(pricingForQty(qty).perBag, "USD");
+  const savingsForQty = (qty: number) => {
+    const pricing = pricingForQty(qty);
+    const savings = Math.max(0, BASE_PRICE * qty - (pricing.total ?? 0));
+    return savings > 0 ? money(savings, "USD") : null;
+  };
   const perBagFive = perBagForQty(5);
   const perBagBest = perBagForQty(dtcBestQty);
+  const savingsFive = savingsForQty(5);
+  const savingsBest = savingsForQty(dtcBestQty);
   const optionCards: Array<{
     id: ChannelOptionId;
     channel: "amazon" | "dtc";
@@ -603,7 +610,9 @@ export default function BundleQuickBuy({
       channel: "dtc",
       label: "5 Bags",
       price: priceForQtyDisplay(5),
-      subtext: perBagFive ? `FREE shipping (USAG) • ${perBagFive}/bag` : "FREE shipping (USAG)",
+      subtext: perBagFive
+        ? `FREE shipping (USAG) • ${perBagFive}/bag${savingsFive ? ` • Save ${savingsFive}` : ""}`
+        : "FREE shipping (USAG)",
     },
     {
       id: "dtc-best",
@@ -612,7 +621,7 @@ export default function BundleQuickBuy({
       price: priceForQtyDisplay(8),
       pricePrefix: "From",
       subtext: perBagBest
-        ? `Free shipping included • ${perBagBest}/bag`
+        ? `Free shipping included • ${perBagBest}/bag${savingsBest ? ` • Save ${savingsBest}` : ""}`
         : "Free shipping included",
       badge: "Best Value",
       children: [
@@ -654,6 +663,16 @@ export default function BundleQuickBuy({
                       ? 5
                       : dtcBestQty;
             const isDisabled = option.channel === "dtc" && !canPurchaseQty(optionQty);
+            const bagQtyLabel =
+              option.id === "amazon-3-4"
+                ? isActive
+                  ? `x${amazonMultiQty}`
+                  : "x3-4"
+                : option.id === "dtc-best"
+                  ? isActive
+                    ? `x${dtcBestQty}`
+                    : "x8/12"
+                  : `x${optionQty}`;
             const badgeClass =
               option.badge === "Best Value"
                 ? "bg-[#E7F5EC] text-[#1F6B3B]"
@@ -696,7 +715,7 @@ export default function BundleQuickBuy({
                     {option.badge}
                   </span>
                 ) : null}
-                <div className="mt-2 flex flex-1 flex-col">
+                <div className="mt-2 flex flex-1 flex-col pr-12 relative z-10">
                   <div className="text-[12px] font-semibold text-[#161616]">{option.label}</div>
                   <div className="mt-1 flex items-baseline gap-1 whitespace-nowrap">
                     {option.pricePrefix ? (
@@ -763,6 +782,12 @@ export default function BundleQuickBuy({
                       </>
                     )}
                   </div>
+                </div>
+                <div className="pointer-events-none absolute right-2 top-9 flex flex-col items-center gap-1 text-[9px] font-semibold text-[#6B6B6B]">
+                  <HeroPackIcon size={28} className="opacity-80" />
+                  <span className="rounded-full border border-[#E6E0DA] bg-white/90 px-1.5 py-0.5 text-[9px] font-semibold text-[#6B6B6B] shadow-sm">
+                    {bagQtyLabel}
+                  </span>
                 </div>
               </label>
             );

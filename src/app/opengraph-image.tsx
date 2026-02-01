@@ -7,10 +7,23 @@ export const size = {
   height: 630,
 };
 
-const stars = Array.from({ length: 12 }, (_, index) => `star-${index}`);
-const stripes = Array.from({ length: 7 }, (_, index) => `stripe-${index}`);
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  process.env.SITE_URL ||
+  "https://www.usagummies.com";
+const HERO_IMAGE_URL = `${SITE_URL}/brand/hero-pack-icon.png`;
+const LOGO_IMAGE_URL = `${SITE_URL}/brand/logo.png`;
 
-export default function OpenGraphImage() {
+export default async function OpenGraphImage() {
+  const [heroRes, logoRes] = await Promise.all([
+    fetch(HERO_IMAGE_URL).catch(() => null),
+    fetch(LOGO_IMAGE_URL).catch(() => null),
+  ]);
+  const heroImage = heroRes && heroRes.ok ? await heroRes.arrayBuffer() : null;
+  const logoImage = logoRes && logoRes.ok ? await logoRes.arrayBuffer() : null;
+  const heroSrc = heroImage ?? HERO_IMAGE_URL;
+  const logoSrc = logoImage ?? LOGO_IMAGE_URL;
+
   return new ImageResponse(
     (
       <div
@@ -29,7 +42,7 @@ export default function OpenGraphImage() {
             position: "absolute",
             inset: 0,
             backgroundImage:
-              "radial-gradient(circle at 15% 20%, rgba(199, 160, 98, 0.35), transparent 45%), radial-gradient(circle at 90% 5%, rgba(13, 28, 51, 0.12), transparent 45%)",
+              "radial-gradient(circle at 15% 20%, rgba(199, 160, 98, 0.35), transparent 45%), radial-gradient(circle at 85% 10%, rgba(214, 69, 61, 0.18), transparent 42%)",
             opacity: 0.8,
           }}
         />
@@ -62,19 +75,28 @@ export default function OpenGraphImage() {
                 textTransform: "uppercase",
                 color: "#5f5b56",
                 fontWeight: 700,
+                display: "flex",
+                alignItems: "center",
+                gap: "12px",
               }}
             >
+              <img
+                src={logoSrc as any}
+                width={120}
+                height={40}
+                style={{ objectFit: "contain" }}
+              />
               Made in USA
             </div>
             <div
               style={{
-                fontSize: "72px",
+                fontSize: "70px",
                 fontWeight: 800,
                 lineHeight: 1.05,
                 letterSpacing: "-0.02em",
               }}
             >
-              USA Gummies
+              All-American Gummy Bears
             </div>
             <div
               style={{
@@ -83,9 +105,9 @@ export default function OpenGraphImage() {
                 lineHeight: 1.25,
               }}
             >
-              All American gummy bears. Buy more, save more.
+              1-4 bags ship free with Amazon. 5+ bags ship free direct.
             </div>
-            <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+            <div style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
               <div
                 style={{
                   padding: "10px 16px",
@@ -96,7 +118,7 @@ export default function OpenGraphImage() {
                   fontWeight: 700,
                 }}
               >
-                Try 1 bag on Amazon
+                Free shipping on 5+ bags
               </div>
               <div style={{ fontSize: "16px", color: "#5f5b56" }}>
                 No artificial dyes
@@ -122,42 +144,16 @@ export default function OpenGraphImage() {
                 display: "flex",
                 flexDirection: "column",
                 boxShadow: "0 18px 40px rgba(15, 27, 45, 0.18)",
+                alignItems: "center",
+                justifyContent: "center",
               }}
             >
-              <div
-                style={{
-                  height: "160px",
-                  backgroundColor: "#0d1c33",
-                  padding: "14px",
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: "10px",
-                }}
-              >
-                {stars.map((star) => (
-                  <div
-                    key={star}
-                    style={{
-                      width: "22px",
-                      height: "22px",
-                      borderRadius: "999px",
-                      backgroundColor: "#f8f5ef",
-                      opacity: 0.85,
-                    }}
-                  />
-                ))}
-              </div>
-              <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-                {stripes.map((stripe, index) => (
-                  <div
-                    key={stripe}
-                    style={{
-                      flex: 1,
-                      backgroundColor: index % 2 === 0 ? "#c7362c" : "#ffffff",
-                    }}
-                  />
-                ))}
-              </div>
+              <img
+                src={heroSrc as any}
+                width={260}
+                height={360}
+                style={{ objectFit: "contain" }}
+              />
             </div>
           </div>
         </div>

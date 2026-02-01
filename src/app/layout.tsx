@@ -72,6 +72,13 @@ export const metadata: Metadata = {
     template: "%s | USA Gummies",
   },
   description: DEFAULT_DESCRIPTION,
+  icons: {
+    icon: [
+      { url: "/favicon.ico", type: "image/x-icon" },
+      { url: "/favicon-32x32.png", type: "image/png", sizes: "32x32" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
   openGraph: {
     title: "USA Gummies",
     description: DEFAULT_DESCRIPTION,
