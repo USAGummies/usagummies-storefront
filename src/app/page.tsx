@@ -299,7 +299,7 @@ export default async function HomePage() {
         <div className={styles.sceneContent}>
           <div className="mx-auto max-w-6xl px-4 pb-1.5 sm:pb-2 lg:pb-2.5">
             <div className="mt-0">
-              <div id="hero-primary-cta" className="atomic-buy">
+              <div id="hero-primary-cta" className="atomic-buy americana-panel">
                 <div className="atomic-buy__glow" aria-hidden="true" />
                 <div className="atomic-buy__header">
                   <div className="atomic-buy__headerMain">
@@ -525,7 +525,7 @@ export default async function HomePage() {
 
       <section className="bg-[var(--surface-strong)]" data-zone="STORY" id="why-usa-gummies">
         <div className="mx-auto max-w-6xl px-4 py-5 lg:py-6 reveal-up">
-          <div className="candy-panel relative overflow-hidden rounded-[36px] p-4">
+          <div className="candy-panel americana-panel relative overflow-hidden rounded-[36px] p-4">
             <div className="relative z-10">
               <div className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
                 <div className="space-y-2">
@@ -564,7 +564,7 @@ export default async function HomePage() {
                 </div>
 
                 <div className="space-y-2 lg:pt-1">
-                  <div className="candy-panel relative overflow-hidden rounded-3xl p-2 text-[var(--text)] lg:ml-auto lg:max-w-[440px]">
+                  <div className="candy-panel americana-panel relative overflow-hidden rounded-3xl p-2 text-[var(--text)] lg:ml-auto lg:max-w-[440px]">
                     <div className="relative aspect-[5/4] overflow-hidden rounded-2xl border border-[rgba(15,27,45,0.1)] bg-[var(--surface-strong)] p-3">
                       <Image
                         src={whyImageSrc}
@@ -641,7 +641,7 @@ export default async function HomePage() {
         <div className={styles.sceneContent}>
         <div className="mx-auto max-w-6xl px-4 py-5 lg:py-6 reveal-up">
           <div className="grid gap-3 lg:grid-cols-[1.1fr_0.9fr]">
-              <div className="candy-panel rounded-[28px] p-3 sm:p-4 shadow-none bg-[var(--surface-strong)] border border-[rgba(15,27,45,0.12)]">
+              <div className="candy-panel americana-panel rounded-[28px] p-3 sm:p-4 shadow-none bg-[var(--surface-strong)] border border-[rgba(15,27,45,0.12)]">
                 <div className="flex flex-wrap items-end justify-between gap-4">
                   <div>
                     <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
@@ -691,7 +691,7 @@ export default async function HomePage() {
                   Tap any channel to follow and stay in the loop.
                 </div>
               </div>
-              <div className="candy-panel relative overflow-hidden rounded-[28px] p-3 sm:p-4 shadow-none bg-[var(--surface-strong)] border border-[rgba(15,27,45,0.12)]">
+              <div className="candy-panel americana-panel relative overflow-hidden rounded-[28px] p-3 sm:p-4 shadow-none bg-[var(--surface-strong)] border border-[rgba(15,27,45,0.12)]">
                 <div className="space-y-3">
                   <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
                     Get updates
@@ -728,7 +728,7 @@ export default async function HomePage() {
 
       <section className="bg-[#fffdf8]" data-zone="STORY">
         <div className="mx-auto max-w-6xl px-4 py-7">
-          <div className="candy-panel rounded-[36px] border border-[var(--border)] p-5 sm:p-6">
+          <div className="candy-panel americana-panel rounded-[36px] border border-[var(--border)] p-5 sm:p-6">
             <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
               Our story
             </div>

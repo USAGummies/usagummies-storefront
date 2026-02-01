@@ -169,6 +169,25 @@ details > summary::-webkit-details-marker{
   background-repeat: repeat;
   background-position: center;
 }
+.americana-panel{
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+.americana-panel::after{
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--star-pattern);
+  background-size: 150px 150px;
+  background-repeat: repeat;
+  opacity: 0.12;
+  pointer-events: none;
+}
+.americana-panel > *{
+  position: relative;
+  z-index: 1;
+}
 .usa-stamp{
   display: inline-flex;
   align-items: center;

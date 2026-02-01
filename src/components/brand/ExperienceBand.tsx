@@ -15,13 +15,14 @@ export function ExperienceBand({ variant = "compact", className }: Props) {
   return (
     <section
       className={[
-        "experience-band",
+        "experience-band americana-panel",
         isFull ? "experience-band--full" : "experience-band--compact",
         className || "",
       ]
         .filter(Boolean)
         .join(" ")}
     >
+      <span className="usa-stamp usa-stamp--corner">Made in USA</span>
       <Image
         src="/website%20assets/B17Bomber.png"
         alt=""

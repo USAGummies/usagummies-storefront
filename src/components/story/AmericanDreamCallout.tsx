@@ -47,7 +47,7 @@ export function AmericanDreamCallout({
   return (
     <div
       className={[
-        "relative overflow-hidden rounded-[32px] border p-4 sm:p-5",
+        "relative overflow-hidden rounded-[32px] border p-4 sm:p-5 americana-panel",
         isLight
           ? "border-[rgba(15,27,45,0.12)] bg-white text-[var(--text)] shadow-[0_18px_40px_rgba(15,27,45,0.12)]"
           : "border-[rgba(199,160,98,0.45)] bg-[rgba(8,16,30,0.88)] text-white shadow-[0_24px_70px_rgba(7,12,20,0.5)]",
@@ -70,6 +70,7 @@ export function AmericanDreamCallout({
           .filter(Boolean)
           .join(" ")}
       />
+      <span className="usa-stamp usa-stamp--corner">Made in USA</span>
       <div
         className="absolute inset-0 pointer-events-none"
         aria-hidden="true"

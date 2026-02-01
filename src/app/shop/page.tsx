@@ -381,7 +381,7 @@ export default async function ShopPage() {
 
       <section id="shop-bundles" aria-label="Savings pricing" className="bg-[#fffdf8] scroll-mt-24">
         <div className="mx-auto max-w-6xl px-4 pb-6 lg:pb-7">
-          <div className="bundle-home bundle-home--premium bundle-hero-stage buy-module relative rounded-[36px] border border-[rgba(15,27,45,0.12)] bg-white shadow-[0_30px_80px_rgba(15,27,45,0.14)]">
+          <div className="bundle-home bundle-home--premium bundle-hero-stage buy-module americana-panel relative rounded-[36px] border border-[rgba(15,27,45,0.12)] bg-white shadow-[0_30px_80px_rgba(15,27,45,0.14)]">
             <div className="buy-module__inner">
             <div className="buy-module__layout">
               <div
@@ -478,7 +478,7 @@ export default async function ShopPage() {
 
       <section aria-label="Bag count guides" className="bg-[#fffdf8]">
         <div className="mx-auto max-w-6xl px-4 pb-6 lg:pb-7">
-          <div className="candy-panel rounded-[32px] p-4 sm:p-5">
+          <div className="candy-panel americana-panel rounded-[32px] p-4 sm:p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="space-y-2">
                 <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
