@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { GummyIconRow } from "@/components/ui/GummyIcon";
+import { GummyIconRow, HeroPackIcon } from "@/components/ui/GummyIcon";
 
 type Props = {
   variant?: "full" | "compact";
@@ -53,6 +53,20 @@ export function ExperienceBand({ variant = "compact", className }: Props) {
           </div>
           <div className="experience-band__sub">
             Made in the USA. All natural flavors. No artificial dyes.
+          </div>
+          <div className="brand-cluster brand-cluster--soft">
+            <span className="brand-cluster__bags">
+              <HeroPackIcon size={18} className="brand-cluster__bag opacity-80" />
+              <HeroPackIcon size={18} className="brand-cluster__bag opacity-80" />
+            </span>
+            <Image
+              src="/brand/logo.png"
+              alt=""
+              aria-hidden="true"
+              width={72}
+              height={24}
+              className="brand-logo-mark"
+            />
           </div>
         </div>
 

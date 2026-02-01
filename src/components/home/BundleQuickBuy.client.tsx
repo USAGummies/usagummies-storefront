@@ -1596,7 +1596,13 @@ export default function BundleQuickBuy({
             ].join(" ")}
           >
             <span>Lock in your savings</span>
-            <GummyIconRow size={14} className={isLight ? "opacity-80" : "opacity-90"} />
+            <span className="brand-cluster">
+              <span className="brand-cluster__bags">
+                <HeroPackIcon size={18} className="brand-cluster__bag opacity-80" />
+                <HeroPackIcon size={18} className="brand-cluster__bag opacity-80" />
+              </span>
+              <GummyIconRow size={12} className={isLight ? "opacity-80" : "opacity-90"} />
+            </span>
           </div>
           <div
             data-bundle-sub

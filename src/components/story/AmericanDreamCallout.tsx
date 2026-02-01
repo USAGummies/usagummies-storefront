@@ -84,6 +84,14 @@ export function AmericanDreamCallout({
 
       <div className="relative space-y-3">
         <div className="flex flex-wrap items-center gap-2">
+          <Image
+            src="/brand/logo.png"
+            alt=""
+            aria-hidden="true"
+            width={68}
+            height={22}
+            className="brand-logo-mark"
+          />
           <div className={isLight ? "flex items-center gap-1 text-[var(--candy-yellow)]" : "flex items-center gap-1 text-[var(--gold)]"}>
             {Array.from({ length: 5 }).map((_, idx) => (
               <Star key={idx} />

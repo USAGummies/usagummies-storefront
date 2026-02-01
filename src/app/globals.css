@@ -218,6 +218,27 @@ details > summary::-webkit-details-marker{
   right: 14px;
   transform: rotate(6deg);
 }
+.brand-cluster{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.brand-cluster__bags{
+  display: inline-flex;
+  align-items: center;
+}
+.brand-cluster__bag + .brand-cluster__bag{
+  margin-left: -6px;
+}
+.brand-logo-mark{
+  display: inline-flex;
+  height: 16px;
+  width: auto;
+  opacity: 0.85;
+}
+.brand-cluster--soft .brand-logo-mark{
+  opacity: 0.7;
+}
 
 .metal-panel{
   background-color: var(--surface);
