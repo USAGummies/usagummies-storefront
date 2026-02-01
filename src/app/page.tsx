@@ -239,14 +239,14 @@ export default async function HomePage() {
   ];
 
   return (
-    <main className="relative overflow-hidden min-h-screen pb-16 lg:pb-0 home-candy text-[var(--text)]">
+    <main className="relative overflow-hidden min-h-screen pb-12 lg:pb-0 home-candy text-[var(--text)]">
       <section
         className="home-product-stage bg-[#FFF8F2]"
         data-zone="HERO"
         style={{ backgroundImage: "none" }}
       >
-        <div className="mx-auto max-w-6xl px-4 py-1.5 sm:py-2.5 lg:py-3">
-          <div className="relative grid gap-1.5 lg:gap-3 lg:grid-cols-[1fr_1fr] lg:items-center">
+        <div className="mx-auto max-w-6xl px-4 py-1 sm:py-2 lg:py-2.5">
+          <div className="relative grid gap-1 lg:gap-2 lg:grid-cols-[1fr_1fr] lg:items-center">
             <div className="order-2 relative lg:order-1">
               <div className="relative z-10 space-y-0.5">
                 <h1 className="text-[32px] font-black leading-[1.05] tracking-tight text-[var(--navy)] sm:text-4xl lg:text-5xl">
@@ -297,7 +297,7 @@ export default async function HomePage() {
         <div className={styles.sceneBg} aria-hidden="true" />
         <div className={styles.sceneOverlay} aria-hidden="true" />
         <div className={styles.sceneContent}>
-          <div className="mx-auto max-w-6xl px-4 pb-2 sm:pb-2.5 lg:pb-3">
+          <div className="mx-auto max-w-6xl px-4 pb-1.5 sm:pb-2 lg:pb-2.5">
             <div className="mt-0">
               <div id="hero-primary-cta" className="atomic-buy">
                 <div className="atomic-buy__glow" aria-hidden="true" />
@@ -372,7 +372,7 @@ export default async function HomePage() {
                   </div>
                 </div>
               </div>
-              <div className="mt-3 flex flex-wrap gap-1.5 text-[10px] text-[var(--muted)]">
+              <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] text-[var(--muted)]">
                 <span className="font-semibold text-[var(--text)]">Bag count guides:</span>
                 <Link href="/gummy-gift-bundles" className="underline underline-offset-4">
                   Gift bag options
@@ -390,7 +390,7 @@ export default async function HomePage() {
       </section>
 
       <section className="bg-[#fffdf8]" data-zone="VALUE" aria-label="Product value">
-        <div className="mx-auto max-w-6xl px-4 py-1 sm:py-1.5">
+        <div className="mx-auto max-w-6xl px-4 py-0.5 sm:py-1">
           <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
             <div className="rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-3">
               <div className="flex items-center gap-2">
@@ -488,15 +488,15 @@ export default async function HomePage() {
         <div className={styles.sceneBg} aria-hidden="true" />
         <div className={styles.sceneOverlay} aria-hidden="true" />
         <div className={styles.sceneContent}>
-          <div className="mx-auto max-w-6xl px-4 py-5 lg:py-6 reveal-up">
+        <div className="mx-auto max-w-6xl px-4 py-4 lg:py-5 reveal-up">
             <ReviewsSection />
           </div>
         </div>
       </section>
 
       <section className="bg-[#fffdf8]" data-zone="SHIPPING">
-        <div className="mx-auto max-w-6xl px-4 pb-6">
-          <div className="grid gap-3 rounded-[28px] border border-[rgba(15,27,45,0.12)] bg-white p-4 sm:p-5 lg:grid-cols-[1fr_200px] lg:items-center">
+        <div className="mx-auto max-w-6xl px-4 pb-4">
+          <div className="grid gap-3 rounded-[28px] border border-[rgba(15,27,45,0.12)] bg-white p-3 sm:p-4 lg:grid-cols-[1fr_200px] lg:items-center">
             <div className="space-y-2">
               <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
                 Shipping &amp; fulfillment
@@ -524,11 +524,11 @@ export default async function HomePage() {
       </section>
 
       <section className="bg-[var(--surface-strong)]" data-zone="STORY" id="why-usa-gummies">
-        <div className="mx-auto max-w-6xl px-4 py-6 lg:py-8 reveal-up">
-          <div className="candy-panel relative overflow-hidden rounded-[36px] p-4 sm:p-5">
+        <div className="mx-auto max-w-6xl px-4 py-5 lg:py-6 reveal-up">
+          <div className="candy-panel relative overflow-hidden rounded-[36px] p-4">
             <div className="relative z-10">
-              <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
-                <div className="space-y-3">
+              <div className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
+                <div className="space-y-2">
                   <div className="flex justify-center lg:justify-start">
                     <Image
                       src="/website%20assets/MtRushmore.png"
@@ -550,7 +550,7 @@ export default async function HomePage() {
                     Proudly sourced, manufactured, and packed entirely in America. No artificial
                     dyes or synthetic colors. Classic gummy bear flavor — done right.
                   </p>
-                  <div className="flex flex-wrap items-center gap-3 pt-1">
+                  <div className="flex flex-wrap items-center gap-3 pt-0.5">
                     <a href="#bundle-pricing" className="btn btn-candy">
                       Shop now
                     </a>
@@ -563,7 +563,7 @@ export default async function HomePage() {
                   </div>
                 </div>
 
-                <div className="space-y-3 lg:pt-2">
+                <div className="space-y-2 lg:pt-1">
                   <div className="candy-panel relative overflow-hidden rounded-3xl p-2 text-[var(--text)] lg:ml-auto lg:max-w-[440px]">
                     <div className="relative aspect-[5/4] overflow-hidden rounded-2xl border border-[rgba(15,27,45,0.1)] bg-[var(--surface-strong)] p-3">
                       <Image
@@ -579,7 +579,7 @@ export default async function HomePage() {
                       </div>
                     </div>
                   </div>
-                    <div className="mt-2 space-y-2">
+                    <div className="mt-2 space-y-1.5">
                       <div className="text-sm font-black text-[var(--text)]">
                         Classic gummy bear flavor — done right.
                       </div>
@@ -602,8 +602,8 @@ export default async function HomePage() {
       </section>
 
       <section className="bg-[var(--surface-strong)]" data-zone="BENEFITS">
-        <div className="mx-auto max-w-6xl px-4 pb-10">
-          <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
+        <div className="mx-auto max-w-6xl px-4 pb-7">
+          <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
             <div className="flex items-end justify-start">
               <Image
                 src="/website%20assets/Jeep.png"
@@ -619,7 +619,7 @@ export default async function HomePage() {
               {whyCards.map((card) => (
                 <div
                   key={card.title}
-                  className="candy-panel relative overflow-hidden rounded-2xl p-3 transition-transform duration-200 hover:-translate-y-1"
+                  className="candy-panel relative overflow-hidden rounded-2xl p-2.5 sm:p-3 transition-transform duration-200 hover:-translate-y-1"
                 >
                   <div className="flex items-center gap-3">
                     <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--surface-strong)]">
@@ -627,7 +627,7 @@ export default async function HomePage() {
                     </div>
                     <div className="text-base font-black text-[var(--text)]">{card.title}</div>
                   </div>
-                  <p className="mt-3 text-sm text-[var(--muted)]">{card.copy}</p>
+                  <p className="mt-2 text-sm text-[var(--muted)]">{card.copy}</p>
                 </div>
               ))}
             </div>
@@ -639,9 +639,9 @@ export default async function HomePage() {
         <div className={styles.sceneBg} aria-hidden="true" />
         <div className={styles.sceneOverlay} aria-hidden="true" />
         <div className={styles.sceneContent}>
-          <div className="mx-auto max-w-6xl px-4 py-6 lg:py-8 reveal-up">
-            <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-              <div className="candy-panel rounded-[28px] p-4 sm:p-5 shadow-none bg-[var(--surface-strong)] border border-[rgba(15,27,45,0.12)]">
+        <div className="mx-auto max-w-6xl px-4 py-5 lg:py-6 reveal-up">
+          <div className="grid gap-3 lg:grid-cols-[1.1fr_0.9fr]">
+              <div className="candy-panel rounded-[28px] p-3 sm:p-4 shadow-none bg-[var(--surface-strong)] border border-[rgba(15,27,45,0.12)]">
                 <div className="flex flex-wrap items-end justify-between gap-4">
                   <div>
                     <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
@@ -664,7 +664,7 @@ export default async function HomePage() {
                   </Link>
                 </div>
 
-                <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-2">
+                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-2">
                   {SOCIAL_LINKS.map((social) => (
                     <a
                       key={social.name}
@@ -687,11 +687,11 @@ export default async function HomePage() {
                   ))}
                 </div>
 
-                <div className="mt-4 text-xs text-[var(--muted)]">
+                <div className="mt-3 text-xs text-[var(--muted)]">
                   Tap any channel to follow and stay in the loop.
                 </div>
               </div>
-              <div className="candy-panel relative overflow-hidden rounded-[28px] p-4 sm:p-5 shadow-none bg-[var(--surface-strong)] border border-[rgba(15,27,45,0.12)]">
+              <div className="candy-panel relative overflow-hidden rounded-[28px] p-3 sm:p-4 shadow-none bg-[var(--surface-strong)] border border-[rgba(15,27,45,0.12)]">
                 <div className="space-y-3">
                   <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
                     Get updates
@@ -703,7 +703,7 @@ export default async function HomePage() {
                   <div className="inline-flex items-center gap-2 rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-3 py-1 text-[11px] font-semibold text-[var(--text)] w-fit">
                     VIP early access • limited-batch alerts
                   </div>
-                  <form className="flex flex-wrap gap-3 items-center rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-1.5 sm:p-2">
+                  <form className="flex flex-wrap gap-3 items-center rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-1.5">
                     <input
                       type="email"
                       name="email"
@@ -727,20 +727,20 @@ export default async function HomePage() {
       </section>
 
       <section className="bg-[#fffdf8]" data-zone="STORY">
-        <div className="mx-auto max-w-6xl px-4 py-10">
-          <div className="candy-panel rounded-[36px] border border-[var(--border)] p-6 sm:p-8">
+        <div className="mx-auto max-w-6xl px-4 py-7">
+          <div className="candy-panel rounded-[36px] border border-[var(--border)] p-5 sm:p-6">
             <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
               Our story
             </div>
             <h2 className="mt-2 text-2xl font-black text-[var(--text)] sm:text-3xl">
               {BRAND_STORY_HEADLINE}
             </h2>
-            <div className="mt-4 space-y-3 text-sm text-[var(--muted)]">
+            <div className="mt-3 space-y-3 text-sm text-[var(--muted)]">
               {BRAND_STORY_PARAGRAPHS.map((paragraph) => (
                 <p key={paragraph}>{paragraph}</p>
               ))}
             </div>
-            <div className="mt-4 flex flex-wrap gap-3">
+            <div className="mt-3 flex flex-wrap gap-3">
               <Link
                 href="/about"
                 className="text-sm font-semibold text-[var(--muted)] underline underline-offset-4 hover:text-[var(--text)] focus-ring"

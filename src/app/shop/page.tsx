@@ -380,7 +380,7 @@ export default async function ShopPage() {
       </section>
 
       <section id="shop-bundles" aria-label="Savings pricing" className="bg-[#fffdf8] scroll-mt-24">
-        <div className="mx-auto max-w-6xl px-4 pb-8 lg:pb-10">
+        <div className="mx-auto max-w-6xl px-4 pb-6 lg:pb-7">
           <div className="bundle-home bundle-home--premium bundle-hero-stage buy-module relative rounded-[36px] border border-[rgba(15,27,45,0.12)] bg-white shadow-[0_30px_80px_rgba(15,27,45,0.14)]">
             <div className="buy-module__inner">
             <div className="buy-module__layout">
@@ -399,7 +399,7 @@ export default async function ShopPage() {
                       </div>
                     ))}
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="pill-row-tight flex flex-wrap gap-2">
                     <span className="candy-pill">Made in USA</span>
                     <span className="candy-pill">No artificial dyes</span>
                     <span className="candy-pill">{FREE_SHIPPING_PHRASE}</span>
@@ -467,7 +467,7 @@ export default async function ShopPage() {
 
             </div>
           </div>
-          <div className="mt-5">
+          <div className="mt-4">
             <AmericanDreamCallout
               variant="compact"
               tone="light"
@@ -478,9 +478,9 @@ export default async function ShopPage() {
       </section>
 
       <section aria-label="Bag count guides" className="bg-[#fffdf8]">
-        <div className="mx-auto max-w-6xl px-4 pb-8 lg:pb-10">
-          <div className="candy-panel rounded-[32px] p-5 sm:p-6">
-            <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="mx-auto max-w-6xl px-4 pb-6 lg:pb-7">
+          <div className="candy-panel rounded-[32px] p-4 sm:p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="space-y-2">
                 <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
                   Bag count guides
@@ -497,7 +497,7 @@ export default async function ShopPage() {
               </Link>
             </div>
 
-            <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
               {[
                 {
                   href: "/gummy-gift-bundles",
@@ -533,8 +533,8 @@ export default async function ShopPage() {
       </section>
 
       <section aria-label="Our story" className="bg-[#fffdf8]">
-        <div className="mx-auto max-w-6xl px-4 pb-8 lg:pb-10">
-          <div className="candy-panel rounded-[32px] p-5 sm:p-6">
+        <div className="mx-auto max-w-6xl px-4 pb-6 lg:pb-7">
+          <div className="candy-panel rounded-[32px] p-4 sm:p-5">
             <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
               Our story
             </div>
@@ -546,7 +546,7 @@ export default async function ShopPage() {
                 <p key={paragraph}>{paragraph}</p>
               ))}
             </div>
-            <div className="mt-4 flex flex-wrap gap-3">
+            <div className="mt-3 flex flex-wrap gap-3">
               <Link href="/about" className="btn btn-outline">
                 Read our story
               </Link>
