@@ -3,13 +3,14 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { ProductGallery } from "@/components/product/ProductGallery.client";
-import PurchaseBox from "@/app/products/[handle]/PurchaseBox.client";
+import BundleQuickBuy from "@/components/home/BundleQuickBuy.client";
 import { AmericanDreamCallout } from "@/components/story/AmericanDreamCallout";
 import { StickyAddToCartBar } from "@/components/product/StickyAddToCartBar";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { getProductsPage } from "@/lib/shopify/products";
 import { getProductByHandle } from "@/lib/storefront";
 import { pricingForQty, FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
+import { getBundleVariants } from "@/lib/bundles/getBundleVariants";
 import { getReviewAggregate } from "@/lib/reviews/aggregate";
 import { REVIEW_HIGHLIGHTS } from "@/data/reviewHighlights";
 import { BRAND_STORY_HEADLINE, BRAND_STORY_MEDIUM } from "@/data/brandStory";
@@ -94,6 +95,13 @@ export default async function ShopPage() {
     detailedProduct = null;
   }
 
+  let bundleVariants: Awaited<ReturnType<typeof getBundleVariants>> | null = null;
+  try {
+    bundleVariants = await getBundleVariants();
+  } catch {
+    bundleVariants = null;
+  }
+
   const currency =
     detailedProduct?.priceRange?.minVariantPrice?.currencyCode ||
     primaryProduct?.priceRange?.minVariantPrice?.currencyCode ||
@@ -102,16 +110,8 @@ export default async function ShopPage() {
   const productTitle = LISTING_TITLE;
   const productFeatured = detailedProduct?.featuredImage || primaryProduct?.featuredImage || null;
   const productImages = (detailedProduct?.images?.edges || []).map((e: any) => e.node);
-  const productVariants = (detailedProduct?.variants?.edges || []).map((e: any) => e.node);
-  const purchaseProduct = detailedProduct
-    ? {
-        title: detailedProduct.title,
-        handle: detailedProduct.handle,
-        description: detailedProduct.description,
-        variants: { nodes: productVariants },
-        priceRange: detailedProduct.priceRange,
-      }
-    : null;
+  const productHandle =
+    detailedProduct?.handle || primaryProduct?.handle || "all-american-gummy-bears-7-5-oz-single-bag";
 
   const stickyImage =
     productFeatured?.url || productImages?.[0]?.url || "/brand/usa-gummies-family.webp";
@@ -437,8 +437,25 @@ export default async function ShopPage() {
                   </div>
 
                   <div className="buy-module__bundle">
-                    {purchaseProduct ? (
-                      <PurchaseBox product={purchaseProduct as any} surface="flat" layout="integrated" />
+                    {bundleVariants ? (
+                      <BundleQuickBuy
+                        anchorId="bundle-pricing"
+                        productHandle={productHandle}
+                        tiers={bundleVariants.variants}
+                        singleBagVariantId={bundleVariants.singleBagVariantId}
+                        availableForSale={bundleVariants.availableForSale}
+                        variant="compact"
+                        tone="light"
+                        surface="flat"
+                        layout="classic"
+                        showHowItWorks={false}
+                        summaryCopy=""
+                        showTrainAccent={false}
+                        showAccent={false}
+                        showEducation={false}
+                        ctaVariant="simple"
+                        primaryCtaLabel="Add to Cart"
+                      />
                     ) : (
                       <div className="p-4 text-sm text-[var(--muted)]">
                         Product details are loading. Please refresh to view savings pricing.
