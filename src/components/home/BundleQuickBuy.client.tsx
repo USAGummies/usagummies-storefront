@@ -523,34 +523,16 @@ export default function BundleQuickBuy({
         {selectorContent}
       </div>
       <div data-rail-middle className="flex flex-col gap-2">
-        {selectedTier ? (
-          <div className={isLight ? "text-[11px] font-semibold tracking-[0.12em] uppercase text-[var(--muted)]" : "text-[11px] font-semibold tracking-[0.12em] uppercase text-white/70"}>
-            {selectedTier.quantity} bags{selectedLabel ? ` — ${selectedLabel}` : ""}
-          </div>
-        ) : null}
         {selectedTotal ? (
           <div className={isLight ? "text-[26px] font-bold text-[var(--text)]" : "text-[26px] font-bold text-white"}>
             {totalLabel} {selectedTotal}
           </div>
         ) : null}
-        {currentBags > 0 && selectedNextBags ? (
+        {selectedSavings ? (
           <div className={isLight ? "text-[11px] font-semibold text-[var(--muted)]" : "text-[11px] font-semibold text-white/70"}>
-            Cart: {currentBags} bag{currentBags === 1 ? "" : "s"} → {selectedNextBags} bags total
-          </div>
-        ) : null}
-        {hasRegularLine || selectedSavings ? (
-          <div className={isLight ? "text-[11px] font-semibold text-[var(--muted)]" : "text-[11px] font-semibold text-white/70"}>
-            {hasRegularLine ? (
-              <span>
-                Regular {basePerBag}/bag ·{" "}
-                <span className="line-through">{regularTotal}</span> total
-              </span>
-            ) : null}
-            {selectedSavings ? (
-              <span className={isLight ? "text-[var(--candy-red)]" : "text-[var(--gold)]"}>
-                {hasRegularLine ? " · " : ""}Save {selectedSavings} total
-              </span>
-            ) : null}
+            <span className={isLight ? "text-[var(--candy-red)]" : "text-[var(--gold)]"}>
+              Save {selectedSavings} total
+            </span>
           </div>
         ) : null}
         <button
