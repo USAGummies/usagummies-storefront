@@ -25,9 +25,6 @@ export default async function OpenGraphImage() {
         style={{
           width: "100%",
           height: "100%",
-          display: "flex",
-          alignItems: "stretch",
-          justifyContent: "stretch",
           backgroundColor: "#f8f5ef",
           backgroundImage: `url(${heroSrc})`,
           backgroundSize: "cover",
