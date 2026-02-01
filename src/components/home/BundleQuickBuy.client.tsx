@@ -628,7 +628,7 @@ export default function BundleQuickBuy({
   const compactRail = (
     <div data-bundle-rail className="flex h-full flex-col gap-3">
       <div className="rounded-[16px] border border-[#E6E0DA] bg-[#F7F3EF] p-3.5">
-        <div className="flex flex-wrap items-end justify-between gap-2">
+        <div className="space-y-1">
           <div>
             <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#6B6B6B]">
               {compactPriceLabel}
@@ -647,7 +647,7 @@ export default function BundleQuickBuy({
         <div className="mt-1 text-[11px] text-[#6B6B6B]">
           1-4 bags ship free with Amazon. 5+ bags ship free direct.
         </div>
-        <div className="mt-3 grid gap-2 sm:grid-cols-5">
+        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-5 sm:auto-cols-[minmax(130px,1fr)] sm:grid-flow-col">
           {optionCards.map((option) => {
             const isExtra = !primaryOptionIds.has(option.id);
             const isActive = selectedOption === option.id;
@@ -712,7 +712,7 @@ export default function BundleQuickBuy({
                         {option.pricePrefix}
                       </span>
                     ) : null}
-                    <span className="text-[18px] font-black text-[#161616]">{option.price}</span>
+                    <span className="text-[16px] font-black text-[#161616]">{option.price}</span>
                   </div>
                   <div className="mt-1 text-[11px] text-[#6B6B6B]">{option.subtext}</div>
                   {isActive && option.children ? (
@@ -754,11 +754,10 @@ export default function BundleQuickBuy({
                         <Image
                           src={AMAZON_LOGO_URL}
                           alt="Amazon"
-                          width={40}
+                          width={36}
                           height={12}
                           className="h-3 w-auto opacity-80"
                         />
-                        <span>Amazon</span>
                       </>
                     ) : (
                       <>
@@ -768,7 +767,7 @@ export default function BundleQuickBuy({
                             d="m12 2 2.7 5.5 6 .9-4.4 4.3 1 6-5.3-2.9-5.3 2.9 1-6L3.3 8.4l6-.9L12 2z"
                           />
                         </svg>
-                        <span>Direct from USA Gummies</span>
+                        <span>USAG direct</span>
                       </>
                     )}
                   </div>
@@ -1513,7 +1512,7 @@ export default function BundleQuickBuy({
       aria-label="Savings pricing"
       data-bundle-root
       className={[
-        "relative overflow-hidden",
+        "relative overflow-hidden scroll-mt-24",
         isFlat ? "w-full" : "mx-auto rounded-3xl border p-4 sm:p-5",
         isCompact ? "w-full" : isFlat ? "w-full" : "max-w-3xl",
         isFlat
@@ -1527,7 +1526,7 @@ export default function BundleQuickBuy({
             : isLight
               ? "border-[rgba(15,27,45,0.12)] bg-white text-[var(--text)] shadow-[0_30px_90px_rgba(15,27,45,0.12)] pb-16 sm:pb-12"
               : "border-white/10 bg-white/[0.06] shadow-[0_30px_90px_rgba(0,0,0,0.35)] backdrop-blur-xl pb-16 sm:pb-12",
-      ].join(" ")}
+        ].join(" ")}
     >
       {showAccent ? (
         <Image

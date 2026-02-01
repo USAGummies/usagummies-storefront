@@ -2538,7 +2538,7 @@ a:focus-visible:not(.btn):not(.focus-ring),
 @media (max-width: 768px){
   .support-chat{
     right: 12px;
-    bottom: calc(16px + env(safe-area-inset-bottom) + 140px);
+    bottom: calc(16px + env(safe-area-inset-bottom) + 190px);
   }
   .support-chat__panel{
     width: min(340px, 92vw);
