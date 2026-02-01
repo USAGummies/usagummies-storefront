@@ -138,6 +138,10 @@ details > summary::-webkit-details-marker{
 .home-product-stage .sceneOverlay{
   display: none !important;
 }
+.hero-scroll-cta{
+  position: relative;
+  z-index: 1;
+}
 .brand-touch{
   pointer-events: none;
   user-select: none;
@@ -1938,7 +1942,9 @@ a:focus-visible:not(.btn):not(.focus-ring),
   border-radius: 20px;
   border: 1px solid rgba(15,27,45,0.12);
   background: linear-gradient(180deg, #fffdf8 0%, #fff7ee 100%);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.7),
+    0 18px 40px rgba(15,27,45,0.12);
 }
 .atomic-buy__media{
   display: grid;
@@ -1947,7 +1953,7 @@ a:focus-visible:not(.btn):not(.focus-ring),
 }
 @media (min-width: 1024px){
   .atomic-buy__grid{
-    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.7fr) minmax(0, 0.6fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.6fr) minmax(0, 0.85fr);
     grid-template-areas:
       "details media bundle";
     column-gap: clamp(16px, 2.6vw, 28px);
@@ -2046,6 +2052,11 @@ a:focus-visible:not(.btn):not(.focus-ring),
 @media (max-width: 640px){
   .atomic-buy{
     padding: 12px;
+  }
+  .hero-scroll-cta{
+    position: sticky;
+    top: 10px;
+    z-index: 15;
   }
   .atomic-buy__header{
     padding-bottom: 8px;

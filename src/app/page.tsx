@@ -245,21 +245,21 @@ export default async function HomePage() {
         data-zone="HERO"
         style={{ backgroundImage: "none" }}
       >
-        <div className="mx-auto max-w-6xl px-4 py-5 sm:py-6 lg:py-8">
-          <div className="relative grid gap-6 lg:grid-cols-[1fr_1fr] lg:items-center">
+        <div className="mx-auto max-w-6xl px-4 py-4 sm:py-5 lg:py-6">
+          <div className="relative grid gap-4 lg:gap-6 lg:grid-cols-[1fr_1fr] lg:items-center">
             <div className="order-2 relative lg:order-1">
-              <div className="relative z-10 space-y-3">
-                <h1 className="text-4xl font-black leading-[1.05] tracking-tight text-[var(--navy)] sm:text-5xl lg:text-6xl">
+              <div className="relative z-10 space-y-2">
+                <h1 className="text-3xl font-black leading-[1.05] tracking-tight text-[var(--navy)] sm:text-4xl lg:text-5xl">
                   All-American Gummy Bears
                 </h1>
-                <p className="text-base text-[var(--text)] sm:text-lg">
+                <p className="text-sm text-[var(--text)] sm:text-base">
                   Soft, chewy, classic gummy bears — made in the USA.
                 </p>
                 <div className="text-sm font-semibold text-[var(--navy)]">
                   No artificial dyes • All natural flavors
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <div className="flex items-center gap-2 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white px-3 py-1.5 text-[11px] font-semibold text-[var(--navy)]">
+                <div className="flex flex-wrap gap-1.5">
+                  <div className="flex items-center gap-2 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white px-2.5 py-1 text-[10px] font-semibold text-[var(--navy)]">
                     <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--navy)] text-white">
                       <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
                         <path
@@ -270,7 +270,7 @@ export default async function HomePage() {
                     </span>
                     Made in the USA
                   </div>
-                  <div className="flex items-center gap-2 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white px-3 py-1.5 text-[11px] font-semibold text-[var(--navy)]">
+                  <div className="flex items-center gap-2 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white px-2.5 py-1 text-[10px] font-semibold text-[var(--navy)]">
                     <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--navy)] text-white">
                       <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
                         <path
@@ -281,7 +281,7 @@ export default async function HomePage() {
                     </span>
                     No artificial dyes
                   </div>
-                  <div className="flex items-center gap-2 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white px-3 py-1.5 text-[11px] font-semibold text-[var(--navy)]">
+                  <div className="flex items-center gap-2 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white px-2.5 py-1 text-[10px] font-semibold text-[var(--navy)]">
                     <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--navy)] text-white">
                       <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
                         <path
@@ -292,7 +292,7 @@ export default async function HomePage() {
                     </span>
                     All natural flavors
                   </div>
-                  <div className="flex items-center gap-2 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white px-3 py-1.5 text-[11px] font-semibold text-[var(--navy)]">
+                  <div className="flex items-center gap-2 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white px-2.5 py-1 text-[10px] font-semibold text-[var(--navy)]">
                     <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--navy)] text-white">
                       <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
                         <path
@@ -304,17 +304,17 @@ export default async function HomePage() {
                     Loved by American families
                   </div>
                 </div>
-                <div className="pt-1 space-y-2">
+                <div className="pt-0.5 space-y-1.5">
                   <div className="text-xs font-semibold text-[var(--muted)]">
                     Save more per bag when you add 4+ bags.
                   </div>
                   <div className="flex flex-col gap-1.5">
                     <a
                       href="#bundle-pricing"
-                      className="btn btn-candy w-full sm:w-auto"
-                      style={{ padding: "14px 22px", boxShadow: "0 16px 34px rgba(239, 59, 59, 0.34)" }}
+                      className="btn btn-candy w-full sm:w-auto hero-scroll-cta"
+                      style={{ padding: "12px 20px", boxShadow: "0 14px 30px rgba(239, 59, 59, 0.32)" }}
                     >
-                      <span className="text-[15px] sm:text-[16px] font-semibold">Shop now</span>
+                      <span className="text-[14px] sm:text-[15px] font-semibold">Get Savings &amp; Ship Free</span>
                     </a>
                     <div className="text-xs font-semibold text-[var(--muted)]">
                       {FREE_SHIPPING_PHRASE} • Love it or your money back
@@ -356,7 +356,7 @@ export default async function HomePage() {
       </section>
 
       <section className="bg-[#fffdf8]" data-zone="VALUE" aria-label="Product value">
-        <div className="mx-auto max-w-6xl px-4 py-3 sm:py-4">
+        <div className="mx-auto max-w-6xl px-4 py-2.5 sm:py-3">
           <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
             <div className="rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-3">
               <div className="flex items-center gap-2">
@@ -411,7 +411,7 @@ export default async function HomePage() {
       </section>
 
       <section className="bg-[#fffdf8]" data-zone="FLAVORS">
-        <div className="mx-auto max-w-6xl px-4 py-3 sm:py-4">
+        <div className="mx-auto max-w-6xl px-4 py-2.5 sm:py-3">
           <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]/80">
             Inside every bag
           </div>
@@ -454,8 +454,8 @@ export default async function HomePage() {
         <div className={styles.sceneBg} aria-hidden="true" />
         <div className={styles.sceneOverlay} aria-hidden="true" />
         <div className={styles.sceneContent}>
-          <div className="mx-auto max-w-6xl px-4 pb-5 sm:pb-6 lg:pb-8">
-            <div className="mt-2">
+          <div className="mx-auto max-w-6xl px-4 pb-4 sm:pb-5 lg:pb-6">
+            <div className="mt-1">
               <div id="hero-primary-cta" className="atomic-buy">
                 <div className="atomic-buy__glow" aria-hidden="true" />
                 <div className="atomic-buy__header">
