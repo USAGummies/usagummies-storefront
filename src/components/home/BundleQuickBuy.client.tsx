@@ -648,7 +648,7 @@ export default function BundleQuickBuy({
         <div className="mt-1 text-[11px] text-[#6B6B6B]">
           1-4 bags ship free with Amazon. 5+ bags ship free direct.
         </div>
-        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-5 sm:auto-cols-[minmax(132px,1fr)] sm:grid-flow-col">
+        <div className="mt-3 grid grid-cols-1 gap-2">
           {optionCards.map((option) => {
             const isExtra = !primaryOptionIds.has(option.id);
             const isActive = selectedOption === option.id;
@@ -689,7 +689,7 @@ export default function BundleQuickBuy({
                     ? "border-[#D6453D] bg-[#FFF7F6] shadow-[0_10px_24px_rgba(214,69,61,0.2)]"
                     : "border-[#E6E0DA] hover:border-[rgba(214,69,61,0.45)]",
                   isDisabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer",
-                  isExtra ? (showMoreOptions ? "block" : "hidden sm:block") : "block",
+                  isExtra ? (showMoreOptions ? "block" : "hidden") : "block",
                 ].join(" ")}
               >
                 <input
@@ -783,8 +783,8 @@ export default function BundleQuickBuy({
                     )}
                   </div>
                 </div>
-                <div className="pointer-events-none absolute right-2 top-9 flex flex-col items-center gap-1 text-[9px] font-semibold text-[#6B6B6B]">
-                  <HeroPackIcon size={28} className="opacity-80" />
+                <div className="pointer-events-none absolute right-2 top-8 flex flex-col items-center gap-1 text-[9px] font-semibold text-[#6B6B6B]">
+                  <HeroPackIcon size={44} className="opacity-85" />
                   <span className="rounded-full border border-[#E6E0DA] bg-white/90 px-1.5 py-0.5 text-[9px] font-semibold text-[#6B6B6B] shadow-sm">
                     {bagQtyLabel}
                   </span>
@@ -796,7 +796,7 @@ export default function BundleQuickBuy({
         <button
           type="button"
           onClick={() => setShowMoreOptions((prev) => !prev)}
-          className="mt-2 text-xs font-semibold text-[#6B6B6B] underline underline-offset-4 sm:hidden"
+          className="mt-2 text-xs font-semibold text-[#6B6B6B] underline underline-offset-4"
         >
           {showMoreOptions ? "Fewer bundle options" : "More bundle options"}
         </button>
