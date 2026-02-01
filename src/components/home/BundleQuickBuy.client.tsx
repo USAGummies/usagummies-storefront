@@ -559,6 +559,9 @@ export default function BundleQuickBuy({
       : null;
   const hasRegularLine = Boolean(basePerBag && regularTotal);
   const totalLabel = currentBags > 0 ? "New total" : "Total";
+  const perBagForQty = (qty: number) => money(pricingForQty(qty).perBag, "USD");
+  const perBagFive = perBagForQty(5);
+  const perBagBest = perBagForQty(dtcBestQty);
   const optionCards: Array<{
     id: ChannelOptionId;
     channel: "amazon" | "dtc";
@@ -574,14 +577,14 @@ export default function BundleQuickBuy({
       channel: "amazon",
       label: "1 Bag",
       price: priceForQtyDisplay(1),
-      subtext: "Amazon free shipping",
+      subtext: "Amazon free ship",
     },
     {
       id: "amazon-2",
       channel: "amazon",
       label: "2 Bags",
       price: priceForQtyDisplay(2),
-      subtext: "Amazon free shipping",
+      subtext: "Amazon free ship",
     },
     {
       id: "amazon-3-4",
@@ -589,7 +592,7 @@ export default function BundleQuickBuy({
       label: "3-4 Bags",
       price: priceForQtyDisplay(3),
       pricePrefix: "From",
-      subtext: "Amazon free shipping",
+      subtext: "Amazon free ship",
       children: [
         { qty: 3, label: "3 bags" },
         { qty: 4, label: "4 bags" },
@@ -600,7 +603,7 @@ export default function BundleQuickBuy({
       channel: "dtc",
       label: "5 Bags",
       price: priceForQtyDisplay(5),
-      subtext: "FREE shipping (USAG)",
+      subtext: perBagFive ? `FREE shipping (USAG) • ${perBagFive}/bag` : "FREE shipping (USAG)",
     },
     {
       id: "dtc-best",
@@ -608,7 +611,9 @@ export default function BundleQuickBuy({
       label: "8 / 12 Bags",
       price: priceForQtyDisplay(8),
       pricePrefix: "From",
-      subtext: "Free shipping included",
+      subtext: perBagBest
+        ? `Free shipping included • ${perBagBest}/bag`
+        : "Free shipping included",
       badge: "Best Value",
       children: [
         { qty: 8, label: "8 bags" },
@@ -626,28 +631,15 @@ export default function BundleQuickBuy({
       : "Free shipping included";
 
   const compactRail = (
-    <div data-bundle-rail className="flex h-full flex-col gap-3">
-      <div className="rounded-[16px] border border-[#E6E0DA] bg-[#F7F3EF] p-3.5">
-        <div className="space-y-1">
-          <div>
-            <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#6B6B6B]">
-              {compactPriceLabel}
-            </div>
-            <div className={isLight ? "text-[22px] font-black text-[#161616]" : "text-[22px] font-black text-white"}>
-              {activeTotal ?? "--"}
-            </div>
-          </div>
-          <div className={isLight ? "text-[11px] font-semibold text-[#6B6B6B]" : "text-[11px] font-semibold text-white/70"}>
-            {compactSavingsLabel}
-          </div>
-        </div>
-        <div className="mt-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-[#6B6B6B]">
+    <div data-bundle-rail className="flex h-full flex-col gap-3 pt-2">
+      <div className="rounded-[16px] border border-[#E6E0DA] bg-[#F7F3EF] p-3">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#6B6B6B]">
           Choose your quantity
         </div>
         <div className="mt-1 text-[11px] text-[#6B6B6B]">
           1-4 bags ship free with Amazon. 5+ bags ship free direct.
         </div>
-        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-5 sm:auto-cols-[minmax(130px,1fr)] sm:grid-flow-col">
+        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-5 sm:auto-cols-[minmax(132px,1fr)] sm:grid-flow-col">
           {optionCards.map((option) => {
             const isExtra = !primaryOptionIds.has(option.id);
             const isActive = selectedOption === option.id;
@@ -712,9 +704,9 @@ export default function BundleQuickBuy({
                         {option.pricePrefix}
                       </span>
                     ) : null}
-                    <span className="text-[16px] font-black text-[#161616]">{option.price}</span>
+                    <span className="text-[15px] font-black text-[#161616]">{option.price}</span>
                   </div>
-                  <div className="mt-1 text-[11px] text-[#6B6B6B]">{option.subtext}</div>
+                  <div className="mt-1 text-[10.5px] text-[#6B6B6B]">{option.subtext}</div>
                   {isActive && option.children ? (
                     <div className="mt-2 flex flex-wrap gap-1">
                       {option.children.map((child) => {
@@ -754,7 +746,7 @@ export default function BundleQuickBuy({
                         <Image
                           src={AMAZON_LOGO_URL}
                           alt="Amazon"
-                          width={36}
+                          width={34}
                           height={12}
                           className="h-3 w-auto opacity-80"
                         />
@@ -786,6 +778,15 @@ export default function BundleQuickBuy({
       </div>
 
       <div className="flex flex-col gap-2">
+        <div className="space-y-1 text-[12px]">
+          <div className="flex items-baseline justify-between font-semibold text-[#161616]">
+            <span>{compactPriceLabel}</span>
+            <span>{activeTotal ?? "--"}</span>
+          </div>
+          <div className="text-[11px] font-semibold text-[#6B6B6B]">
+            {compactSavingsLabel}
+          </div>
+        </div>
         <button
           data-primary-cta
           type="button"
@@ -1512,7 +1513,7 @@ export default function BundleQuickBuy({
       aria-label="Savings pricing"
       data-bundle-root
       className={[
-        "relative overflow-hidden scroll-mt-24",
+        "relative overflow-hidden scroll-mt-32",
         isFlat ? "w-full" : "mx-auto rounded-3xl border p-4 sm:p-5",
         isCompact ? "w-full" : isFlat ? "w-full" : "max-w-3xl",
         isFlat
