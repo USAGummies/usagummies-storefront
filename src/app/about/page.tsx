@@ -286,6 +286,25 @@ export default function AboutPage() {
               </div>
             </div>
           </div>
+
+          <div className="mt-6 candy-panel rounded-[32px] border border-[var(--border)] p-5 sm:p-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+                  Ready to order
+                </div>
+                <h2 className="mt-2 text-2xl font-black text-[var(--text)]">
+                  Shop the best value bundles.
+                </h2>
+                <p className="mt-2 text-sm text-[var(--muted)]">
+                  Save more per bag when you add 4+ bags. {FREE_SHIPPING_PHRASE}.
+                </p>
+              </div>
+              <Link href="/shop" className="btn btn-candy">
+                Shop best value
+              </Link>
+            </div>
+          </div>
         </div>
       </section>
 

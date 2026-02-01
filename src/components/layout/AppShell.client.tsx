@@ -149,6 +149,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isHome = pathname === "/";
   const isShop = pathname === "/shop";
   const isProduct = pathname?.startsWith("/products");
+  const hideChatWidget = pathname === "/wholesale" || pathname === "/contact";
   const experienceVariant = isHome || isShop || isProduct ? "full" : "compact";
   const showExperienceBand = isHome || isShop;
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -650,7 +651,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </footer>
-      <ChatWidget />
+      {hideChatWidget ? null : <ChatWidget />}
     </div>
   );
 }

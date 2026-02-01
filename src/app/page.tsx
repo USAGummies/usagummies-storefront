@@ -524,8 +524,8 @@ export default async function HomePage() {
       </section>
 
       <section className="bg-[var(--surface-strong)]" data-zone="STORY" id="why-usa-gummies">
-        <div className="mx-auto max-w-6xl px-4 py-8 lg:py-10 reveal-up">
-          <div className="candy-panel relative overflow-hidden rounded-[36px] p-5 sm:p-6">
+        <div className="mx-auto max-w-6xl px-4 py-6 lg:py-8 reveal-up">
+          <div className="candy-panel relative overflow-hidden rounded-[36px] p-4 sm:p-5">
             <div className="relative z-10">
               <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
                 <div className="space-y-3">
@@ -543,10 +543,10 @@ export default async function HomePage() {
                   <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
                     Why USA Gummies
                   </div>
-                  <h2 className="text-3xl font-black text-[var(--text)] sm:text-4xl">
+                  <h2 className="text-2xl font-black text-[var(--text)] sm:text-3xl">
                     Why USA Gummies matters.
                   </h2>
-                  <p className="text-sm text-[var(--muted)] sm:text-base">
+                  <p className="text-sm text-[var(--muted)]">
                     Proudly sourced, manufactured, and packed entirely in America. No artificial
                     dyes or synthetic colors. Classic gummy bear flavor — done right.
                   </p>
@@ -580,7 +580,7 @@ export default async function HomePage() {
                     </div>
                   </div>
                     <div className="mt-2 space-y-2">
-                      <div className="text-base font-black text-[var(--text)]">
+                      <div className="text-sm font-black text-[var(--text)]">
                         Classic gummy bear flavor — done right.
                       </div>
                     <div className="text-xs text-[var(--muted)]">

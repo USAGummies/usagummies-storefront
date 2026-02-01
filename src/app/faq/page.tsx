@@ -215,6 +215,23 @@ export default function FaqPage() {
                 </Link>
               </div>
             </div>
+
+            <div className="mt-6 border-t border-[var(--border)] pt-5">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+                Ready to order
+              </div>
+              <h2 className="mt-2 text-2xl font-black text-[var(--text)]">
+                Shop the best value bundles.
+              </h2>
+              <p className="mt-2 text-sm text-[var(--muted)]">
+                Save more per bag when you add 4+ bags. {FREE_SHIPPING_PHRASE}.
+              </p>
+              <div className="mt-3">
+                <Link href="/shop" className="btn btn-candy">
+                  Shop best value
+                </Link>
+              </div>
+            </div>
           </div>
         </div>
       </section>
