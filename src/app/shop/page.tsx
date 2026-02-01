@@ -420,9 +420,6 @@ export default async function ShopPage() {
                     </Link>
                     .
                   </div>
-                </div>
-
-                <div className="buy-module__rail min-w-0">
                   <div className="buy-module__image">
                     <div className="buy-module__imagePanel">
                       <div className="relative">
@@ -435,7 +432,9 @@ export default async function ShopPage() {
                       </div>
                     </div>
                   </div>
+                </div>
 
+                <div className="buy-module__rail min-w-0">
                   <div className="buy-module__bundle">
                     {bundleVariants ? (
                       <BundleQuickBuy

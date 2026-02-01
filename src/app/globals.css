@@ -1083,8 +1083,12 @@ a:focus-visible:not(.btn):not(.focus-ring),
   }
   .bundle-home--premium .buy-module__image,
   .bundle-home--premium .buy-module__bundle{
-    max-width: 480px;
-    justify-self: start;
+    max-width: none;
+    width: 100%;
+    justify-self: stretch;
+  }
+  .bundle-home--premium .buy-module__details .buy-module__image{
+    max-width: none;
   }
 }
 
@@ -2010,9 +2014,11 @@ a:focus-visible:not(.btn):not(.focus-ring),
 }
 @media (min-width: 1024px){
   .atomic-buy__grid{
-    grid-template-columns: minmax(0, 0.95fr) minmax(0, 0.5fr) minmax(0, 1.2fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+    grid-template-rows: auto auto;
     grid-template-areas:
-      "details media bundle";
+      "details bundle"
+      "media bundle";
     column-gap: clamp(14px, 2vw, 22px);
   }
   .atomic-buy__bundle{
