@@ -144,6 +144,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [cartToast, setCartToast] = useState<string | null>(null);
   const [undoInfo, setUndoInfo] = useState<{ qty: number; at: number } | null>(null);
   const [undoPending, setUndoPending] = useState(false);
+  const [hideHomeHeader, setHideHomeHeader] = useState(false);
   const pathname = usePathname();
   const isHome = pathname === "/";
   const isShop = pathname === "/shop";
@@ -248,6 +249,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (stored) setCartCookie(stored);
     refreshCartCount();
   }, []);
+
+  useEffect(() => {
+    if (!isHome) {
+      setHideHomeHeader(false);
+      return;
+    }
+    const handleScroll = () => {
+      setHideHomeHeader(window.scrollY < 32);
+    };
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [isHome]);
 
   useEffect(() => {
     applyExperimentFromUrl();
@@ -357,7 +371,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       ) : null}
-      <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-white/92 text-[var(--text)] backdrop-blur-md shadow-[0_10px_24px_rgba(15,27,45,0.08)]">
+      <header
+        className={cx(
+          "sticky top-0 z-40 border-b border-[var(--border)] bg-white/92 text-[var(--text)] backdrop-blur-md shadow-[0_10px_24px_rgba(15,27,45,0.08)] transition-[transform,opacity] duration-300",
+          hideHomeHeader ? "home-header--hidden" : ""
+        )}
+      >
         <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between gap-3">
           <Link href="/" className="flex items-center gap-3 pressable focus-ring">
             <div className="relative h-9 w-32">

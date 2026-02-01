@@ -258,52 +258,6 @@ export default async function HomePage() {
                 <div className="text-sm font-semibold text-[var(--navy)]">
                   No artificial dyes • All natural flavors
                 </div>
-                <div className="flex flex-wrap gap-0.5">
-                  <div className="flex items-center gap-1.5 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white px-2 py-0.5 text-[10px] font-semibold text-[var(--navy)]">
-                    <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--navy)] text-white">
-                      <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" aria-hidden="true">
-                        <path
-                          fill="currentColor"
-                          d="M3 11l9-6 9 6v9H3v-9zm4 0h10v7H7v-7z"
-                        />
-                      </svg>
-                    </span>
-                    Made in the USA
-                  </div>
-                  <div className="flex items-center gap-1.5 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white px-2 py-0.5 text-[10px] font-semibold text-[var(--navy)]">
-                    <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--navy)] text-white">
-                      <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" aria-hidden="true">
-                        <path
-                          fill="currentColor"
-                          d="M12 3c4 3 6 6.3 6 9.6A6 6 0 0 1 6 12.6C6 9.3 8 6 12 3z"
-                        />
-                      </svg>
-                    </span>
-                    No artificial dyes
-                  </div>
-                  <div className="flex items-center gap-1.5 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white px-2 py-0.5 text-[10px] font-semibold text-[var(--navy)]">
-                    <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--navy)] text-white">
-                      <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" aria-hidden="true">
-                        <path
-                          fill="currentColor"
-                          d="M12 4c4.4 0 8 3.6 8 8s-3.6 8-8 8-8-3.6-8-8 3.6-8 8-8z"
-                        />
-                      </svg>
-                    </span>
-                    All natural flavors
-                  </div>
-                  <div className="flex items-center gap-1.5 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white px-2 py-0.5 text-[10px] font-semibold text-[var(--navy)]">
-                    <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--navy)] text-white">
-                      <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" aria-hidden="true">
-                        <path
-                          fill="currentColor"
-                          d="M12 21s-6.7-4.1-8.6-7.5C2.2 10.6 4.3 7 7.8 7c2 0 3.3 1 4.2 2.3C12.9 8 14.2 7 16.2 7c3.5 0 5.6 3.6 4.4 6.5C18.7 16.9 12 21 12 21z"
-                        />
-                      </svg>
-                    </span>
-                    Loved by American families
-                  </div>
-                </div>
                 <div className="pt-0 space-y-0.5">
                   <div className="text-xs font-semibold text-[var(--muted)]">
                     Save more per bag when you add 4+ bags.
@@ -315,24 +269,12 @@ export default async function HomePage() {
                     <div className="text-xs font-semibold text-[var(--muted)]">
                       {FREE_SHIPPING_PHRASE} • Love it or your money back
                     </div>
-                    <div className="flex flex-wrap gap-1 text-[10px] text-[var(--muted)]">
-                      <span className="font-semibold text-[var(--text)]">Bag count guides:</span>
-                      <Link href="/gummy-gift-bundles" className="underline underline-offset-4">
-                        Gift bag options
-                      </Link>
-                      <Link href="/patriotic-party-snacks" className="underline underline-offset-4">
-                        Party snacks
-                      </Link>
-                      <Link href="/bulk-gummy-bears" className="underline underline-offset-4">
-                        Bulk gummy bears
-                      </Link>
-                    </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="order-1 flex justify-center lg:order-2 lg:justify-end">
+            <div className="order-1 hidden justify-center sm:flex lg:order-2 lg:justify-end">
               <div className="relative w-full max-w-[280px] sm:max-w-[400px] lg:max-w-[480px]">
                 <div className="relative aspect-[4/5] overflow-visible">
                   <Image
@@ -345,6 +287,102 @@ export default async function HomePage() {
                     className="object-contain drop-shadow-[0_18px_30px_rgba(13,28,51,0.22)] z-10"
                   />
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className={`${styles.scene} ${styles.sceneBundle}`} data-zone="BUNDLE">
+        <div className={styles.sceneBg} aria-hidden="true" />
+        <div className={styles.sceneOverlay} aria-hidden="true" />
+        <div className={styles.sceneContent}>
+          <div className="mx-auto max-w-6xl px-4 pb-2 sm:pb-2.5 lg:pb-3">
+            <div className="mt-0">
+              <div id="hero-primary-cta" className="atomic-buy">
+                <div className="atomic-buy__glow" aria-hidden="true" />
+                <div className="atomic-buy__header">
+                  <div className="atomic-buy__headerMain">
+                    <div className="atomic-buy__kicker">USA Gummies</div>
+                    <div className="atomic-buy__headerTitle">
+                      Classic gummy bears, made in the USA.
+                    </div>
+                  </div>
+                  <div className="atomic-buy__headerSub">
+                    Add more bags and watch your per-bag price drop. Savings apply to your total bag count.
+                  </div>
+                </div>
+                <div className="atomic-buy__grid">
+                  <div className="atomic-buy__details">
+                    <ul className="atomic-buy__bullets">
+                      {DETAIL_BULLETS.slice(0, 3).map((bullet) => (
+                        <li key={bullet} className="atomic-buy__bullet">
+                          <span className="atomic-buy__bulletDot" aria-hidden="true" />
+                          <span>{bullet}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="atomic-buy__chips">
+                      <span className="atomic-buy__chip">Made in USA</span>
+                      <span className="atomic-buy__chip">No artificial dyes</span>
+                      <span className="atomic-buy__chip">All natural</span>
+                      <span className="atomic-buy__chip">{FREE_SHIPPING_PHRASE}</span>
+                    </div>
+                    <div className="atomic-buy__ingredients">
+                      Ingredients &amp; allergen info:{" "}
+                      <Link href="/ingredients">ingredients</Link>.
+                    </div>
+                  </div>
+                  <div className="atomic-buy__media">
+                    <div className="atomic-buy__mediaFrame">
+                      <div className="relative aspect-[4/5] w-full">
+                        <Image
+                          src="/Hero-pack.jpeg"
+                          alt="USA Gummies bag"
+                          fill
+                          sizes="(max-width: 640px) 90vw, (max-width: 1024px) 40vw, 420px"
+                          className="object-contain drop-shadow-[0_24px_50px_rgba(13,28,51,0.2)]"
+                        />
+                      </div>
+                      <span className="usa-stamp usa-stamp--small atomic-buy__stamp">
+                        Made in USA
+                      </span>
+                    </div>
+                  </div>
+                  <div className="atomic-buy__bundle">
+                    <BundleQuickBuy
+                      anchorId="bundle-pricing"
+                      productHandle={handle}
+                      tiers={homepageTiers}
+                      singleBagVariantId={bundleVariants?.singleBagVariantId}
+                      availableForSale={bundleVariants?.availableForSale}
+                      variant="compact"
+                      tone="light"
+                      surface="flat"
+                      layout="classic"
+                      showHowItWorks={false}
+                      summaryCopy=""
+                      showTrainAccent={false}
+                      showAccent={false}
+                      showEducation={false}
+                      ctaVariant="simple"
+                      primaryCtaLabel="Unlock Best Value + Free Shipping"
+                      featuredQuantities={[5, 8, 12]}
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-1.5 text-[10px] text-[var(--muted)]">
+                <span className="font-semibold text-[var(--text)]">Bag count guides:</span>
+                <Link href="/gummy-gift-bundles" className="underline underline-offset-4">
+                  Gift bag options
+                </Link>
+                <Link href="/patriotic-party-snacks" className="underline underline-offset-4">
+                  Party snacks
+                </Link>
+                <Link href="/bulk-gummy-bears" className="underline underline-offset-4">
+                  Bulk gummy bears
+                </Link>
               </div>
             </div>
           </div>
@@ -442,90 +480,6 @@ export default async function HomePage() {
               </Link>
               .
             </span>
-          </div>
-        </div>
-      </section>
-
-      <section className={`${styles.scene} ${styles.sceneBundle}`} data-zone="BUNDLE">
-        <div className={styles.sceneBg} aria-hidden="true" />
-        <div className={styles.sceneOverlay} aria-hidden="true" />
-        <div className={styles.sceneContent}>
-          <div className="mx-auto max-w-6xl px-4 pb-2 sm:pb-2.5 lg:pb-3">
-            <div className="mt-0">
-              <div id="hero-primary-cta" className="atomic-buy">
-                <div className="atomic-buy__glow" aria-hidden="true" />
-                <div className="atomic-buy__header">
-                  <div className="atomic-buy__headerMain">
-                    <div className="atomic-buy__kicker">USA Gummies</div>
-                    <div className="atomic-buy__headerTitle">
-                      Classic gummy bears, made in the USA.
-                    </div>
-                  </div>
-                  <div className="atomic-buy__headerSub">
-                    Add more bags and watch your per-bag price drop. Savings apply to your total bag count.
-                  </div>
-                </div>
-                <div className="atomic-buy__grid">
-                  <div className="atomic-buy__details">
-                    <ul className="atomic-buy__bullets">
-                      {DETAIL_BULLETS.slice(0, 3).map((bullet) => (
-                        <li key={bullet} className="atomic-buy__bullet">
-                          <span className="atomic-buy__bulletDot" aria-hidden="true" />
-                          <span>{bullet}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    <div className="atomic-buy__chips">
-                      <span className="atomic-buy__chip">Made in USA</span>
-                      <span className="atomic-buy__chip">No artificial dyes</span>
-                      <span className="atomic-buy__chip">All natural</span>
-                      <span className="atomic-buy__chip">{FREE_SHIPPING_PHRASE}</span>
-                    </div>
-                    <div className="atomic-buy__ingredients">
-                      Ingredients &amp; allergen info:{" "}
-                      <Link href="/ingredients">ingredients</Link>.
-                    </div>
-                  </div>
-                  <div className="atomic-buy__media">
-                    <div className="atomic-buy__mediaFrame">
-                      <div className="relative aspect-[4/5] w-full">
-                        <Image
-                          src="/Hero-pack.jpeg"
-                          alt="USA Gummies bag"
-                          fill
-                          sizes="(max-width: 640px) 90vw, (max-width: 1024px) 40vw, 420px"
-                          className="object-contain drop-shadow-[0_24px_50px_rgba(13,28,51,0.2)]"
-                        />
-                      </div>
-                      <span className="usa-stamp usa-stamp--small atomic-buy__stamp">
-                        Made in USA
-                      </span>
-                    </div>
-                  </div>
-                  <div className="atomic-buy__bundle">
-                    <BundleQuickBuy
-                      anchorId="bundle-pricing"
-                      productHandle={handle}
-                      tiers={homepageTiers}
-                      singleBagVariantId={bundleVariants?.singleBagVariantId}
-                      availableForSale={bundleVariants?.availableForSale}
-                      variant="compact"
-                      tone="light"
-                      surface="flat"
-                      layout="classic"
-                      showHowItWorks={false}
-                      summaryCopy=""
-                      showTrainAccent={false}
-                      showAccent={false}
-                      showEducation={false}
-                      ctaVariant="simple"
-                      primaryCtaLabel="Unlock Best Value + Free Shipping"
-                      featuredQuantities={[5, 8, 12]}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </section>

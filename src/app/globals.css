@@ -138,6 +138,11 @@ details > summary::-webkit-details-marker{
 .home-product-stage .sceneOverlay{
   display: none !important;
 }
+.home-header--hidden{
+  transform: translateY(-120%);
+  opacity: 0;
+  pointer-events: none;
+}
 .hero-scroll-link{
   display: inline-flex;
   align-items: center;
@@ -1959,7 +1964,7 @@ a:focus-visible:not(.btn):not(.focus-ring),
 }
 @media (min-width: 1024px){
   .atomic-buy__grid{
-    grid-template-columns: minmax(0, 1fr) minmax(0, 0.55fr) minmax(0, 1.05fr);
+    grid-template-columns: minmax(0, 0.95fr) minmax(0, 0.5fr) minmax(0, 1.2fr);
     grid-template-areas:
       "details media bundle";
     column-gap: clamp(16px, 2.6vw, 28px);
