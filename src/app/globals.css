@@ -226,17 +226,17 @@ details > summary::-webkit-details-marker{
     var(--foil-sheen),
     linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,253,248,0.98));
   box-shadow: var(--shadow-card);
-  padding: 20px;
+  padding: 16px;
 }
 .experience-band__inner{
   position: relative;
   z-index: 1;
   display: grid;
-  gap: 16px;
+  gap: 12px;
 }
 .experience-band__header{
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 .experience-band__eyebrow{
   font-size: 10px;
@@ -258,17 +258,17 @@ details > summary::-webkit-details-marker{
 }
 .experience-band__grid{
   display: grid;
-  gap: 12px;
+  gap: 10px;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 }
 .experience-band__card{
   border-radius: 20px;
   border: 1px solid rgba(15, 27, 45, 0.12);
   background: #ffffff;
-  padding: 14px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   box-shadow: 0 16px 32px rgba(15, 27, 45, 0.08);
 }
 .experience-band__cardEyebrow{
@@ -328,7 +328,7 @@ details > summary::-webkit-details-marker{
   pointer-events: none;
 }
 .experience-band--compact{
-  padding: 16px;
+  padding: 12px;
   border-radius: 28px;
 }
 .experience-band--compact .experience-band__title{

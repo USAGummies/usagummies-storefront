@@ -47,7 +47,7 @@ export function AmericanDreamCallout({
   return (
     <div
       className={[
-        "relative overflow-hidden rounded-[32px] border p-5 sm:p-6",
+        "relative overflow-hidden rounded-[32px] border p-4 sm:p-5",
         isLight
           ? "border-[rgba(15,27,45,0.12)] bg-white text-[var(--text)] shadow-[0_18px_40px_rgba(15,27,45,0.12)]"
           : "border-[rgba(199,160,98,0.45)] bg-[rgba(8,16,30,0.88)] text-white shadow-[0_24px_70px_rgba(7,12,20,0.5)]",
@@ -81,8 +81,8 @@ export function AmericanDreamCallout({
         }}
       />
 
-      <div className="relative space-y-4">
-        <div className="flex flex-wrap items-center gap-3">
+      <div className="relative space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
           <div className={isLight ? "flex items-center gap-1 text-[var(--candy-yellow)]" : "flex items-center gap-1 text-[var(--gold)]"}>
             {Array.from({ length: 5 }).map((_, idx) => (
               <Star key={idx} />
@@ -108,14 +108,14 @@ export function AmericanDreamCallout({
         <div
           className={
             isLight
-              ? "rounded-2xl border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] p-4 text-sm text-[var(--text)]"
-              : "rounded-2xl border border-[rgba(199,160,98,0.4)] bg-[rgba(12,20,38,0.8)] p-4 text-sm text-white/85"
+              ? "rounded-2xl border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] p-3 text-sm text-[var(--text)]"
+              : "rounded-2xl border border-[rgba(199,160,98,0.4)] bg-[rgba(12,20,38,0.8)] p-3 text-sm text-white/85"
           }
         >
           {STORY_HOOK}
         </div>
 
-        <div className={isLight ? "space-y-3 text-sm text-[var(--muted)]" : "space-y-3 text-sm text-white/75"}>
+        <div className={isLight ? "space-y-2 text-sm text-[var(--muted)]" : "space-y-2 text-sm text-white/75"}>
           {paragraphs.map((line) => (
             <p key={line}>{line}</p>
           ))}
