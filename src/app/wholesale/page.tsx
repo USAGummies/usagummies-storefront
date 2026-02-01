@@ -1,9 +1,9 @@
 import Link from "next/link";
 import Image from "next/image";
+import Script from "next/script";
 import type { Metadata } from "next";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { JsonLd } from "@/components/JsonLd";
-import { WholesaleInquiryForm } from "@/components/wholesale/WholesaleInquiryForm.client";
 
 function resolveSiteUrl() {
   const preferred = "https://www.usagummies.com";
@@ -136,7 +136,16 @@ export default function WholesalePage() {
                 </div>
               </div>
               <div id="wholesale-form">
-                <WholesaleInquiryForm />
+                <Script
+                  src="https://js-na2.hsforms.net/forms/embed/245038506.js"
+                  strategy="afterInteractive"
+                />
+                <div
+                  className="hs-form-frame"
+                  data-region="na2"
+                  data-form-id="22ab9284-ad89-4deb-b2ad-b6d6dc585cb1"
+                  data-portal-id="245038506"
+                />
               </div>
             </div>
           </div>

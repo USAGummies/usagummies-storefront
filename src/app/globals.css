@@ -2056,6 +2056,9 @@ a:focus-visible:not(.btn):not(.focus-ring),
   height: 100%;
 }
 @media (max-width: 640px){
+  .hero-scroll-link{
+    font-size: 11px;
+  }
   .atomic-buy{
     padding: 12px;
   }
