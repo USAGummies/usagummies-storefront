@@ -1,6 +1,8 @@
 // src/lib/analytics.ts
 
 type EventPayload = Record<string, unknown>;
+const UTM_STORAGE_KEY = "usa_utms";
+const UTM_KEYS = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"] as const;
 
 declare global {
   interface Window {
@@ -10,9 +12,37 @@ declare global {
   }
 }
 
+function getUtmParams() {
+  if (typeof window === "undefined") return {} as Record<string, string>;
+  try {
+    const url = new URL(window.location.href);
+    const params: Record<string, string> = {};
+    UTM_KEYS.forEach((key) => {
+      const value = url.searchParams.get(key);
+      if (value) params[key] = value;
+    });
+    if (Object.keys(params).length) {
+      window.localStorage.setItem(UTM_STORAGE_KEY, JSON.stringify(params));
+      return params;
+    }
+    const stored = window.localStorage.getItem(UTM_STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (parsed && typeof parsed === "object") {
+        return parsed as Record<string, string>;
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return {} as Record<string, string>;
+}
+
 export function trackEvent(event: string, payload: EventPayload = {}) {
   if (typeof window === "undefined") return;
-  const data = { event, ...payload };
+  const utmParams = getUtmParams();
+  const payloadWithUtm = { ...utmParams, ...payload };
+  const data = { event, ...payloadWithUtm };
 
   try {
     if (!Array.isArray(window.dataLayer)) window.dataLayer = [];
@@ -23,7 +53,7 @@ export function trackEvent(event: string, payload: EventPayload = {}) {
 
   try {
     if (typeof window.gtag === "function") {
-      window.gtag("event", event, payload);
+      window.gtag("event", event, payloadWithUtm);
     }
   } catch {
     // ignore
@@ -31,7 +61,7 @@ export function trackEvent(event: string, payload: EventPayload = {}) {
 
   try {
     if (!Array.isArray(window.__usaEvents)) window.__usaEvents = [];
-    window.__usaEvents.push({ event, payload, ts: Date.now() });
+    window.__usaEvents.push({ event, payload: payloadWithUtm, ts: Date.now() });
   } catch {
     // ignore
   }
@@ -39,7 +69,7 @@ export function trackEvent(event: string, payload: EventPayload = {}) {
   try {
     const body = JSON.stringify({
       event,
-      payload,
+      payload: payloadWithUtm,
       path: window.location?.pathname || "",
       ts: Date.now(),
     });

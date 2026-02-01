@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { trackEvent } from "@/lib/analytics";
 
 type ChatMessage = {
   role: "user" | "assistant";
@@ -93,6 +94,28 @@ export function ChatWidget() {
   const inputPlaceholder = awaitingContact
     ? "Share your email or phone number"
     : "Ask about shipping, ingredients, or your order";
+
+  function handleToggle() {
+    setOpen((prev) => {
+      const next = !prev;
+      trackEvent(next ? "chat_open" : "chat_close", {
+        source: "launcher",
+        path: window.location?.pathname || "",
+      });
+      return next;
+    });
+  }
+
+  function handleClose() {
+    setOpen((prev) => {
+      if (!prev) return prev;
+      trackEvent("chat_close", {
+        source: "panel",
+        path: window.location?.pathname || "",
+      });
+      return false;
+    });
+  }
 
   const sendTranscript = useCallback(
     async (reason: "session_end" | "human_request", transcript?: ChatMessage[]) => {
@@ -250,7 +273,7 @@ export function ChatWidget() {
               <div className="support-chat__title">USA Gummies Support</div>
               <div className="support-chat__sub">Average reply: within 1 business day</div>
             </div>
-            <button type="button" className="support-chat__close" onClick={() => setOpen(false)}>
+            <button type="button" className="support-chat__close" onClick={handleClose}>
               Close
             </button>
           </div>
@@ -306,7 +329,7 @@ export function ChatWidget() {
       <button
         type="button"
         className="support-chat__launcher"
-        onClick={() => setOpen((prev) => !prev)}
+        onClick={handleToggle}
         aria-label="Open support chat"
       >
         {open ? "Close chat" : "Chat with us"}

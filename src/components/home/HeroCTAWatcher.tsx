@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { trackEvent } from "@/lib/analytics";
 
 export default function HeroCTAWatcher() {
   useEffect(() => {
@@ -8,10 +9,14 @@ export default function HeroCTAWatcher() {
     const target = document.getElementById("hero-primary-cta");
     const story = document.getElementById("why-usa-gummies");
     const sticky = document.querySelector<HTMLElement>(".sticky-cta-bar");
+    const heroLink = document.querySelector<HTMLAnchorElement>("[data-hero-scroll]");
     if (!target || !sticky) return;
 
     let heroVisible = false;
     let storyVisible = false;
+    const handleHeroClick = () => {
+      trackEvent("hero_scroll_to_bundle", { path: window.location.pathname });
+    };
 
     const setStickyState = () => {
       if (heroVisible || storyVisible) {
@@ -42,8 +47,12 @@ export default function HeroCTAWatcher() {
 
     observer.observe(target);
     if (story) observer.observe(story);
+    if (heroLink) heroLink.addEventListener("click", handleHeroClick);
 
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      if (heroLink) heroLink.removeEventListener("click", handleHeroClick);
+    };
   }, []);
 
   return null;
