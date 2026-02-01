@@ -43,11 +43,13 @@ export function AmericanDreamCallout({
 }: Props) {
   const paragraphs = variant === "full" ? STORY_LINES : STORY_LINES.slice(0, 2);
   const isLight = tone === "light";
+  const isCompact = variant === "compact";
 
   return (
     <div
       className={[
-        "relative overflow-hidden rounded-[32px] border p-4 sm:p-5 americana-panel",
+        "relative overflow-hidden rounded-[32px] border americana-panel",
+        isCompact ? "p-3 sm:p-4" : "p-4 sm:p-5",
         isLight
           ? "border-[rgba(15,27,45,0.12)] bg-white text-[var(--text)] shadow-[0_18px_40px_rgba(15,27,45,0.12)]"
           : "border-[rgba(199,160,98,0.45)] bg-[rgba(8,16,30,0.88)] text-white shadow-[0_24px_70px_rgba(7,12,20,0.5)]",
@@ -64,7 +66,8 @@ export function AmericanDreamCallout({
         height={1024}
         sizes="(max-width: 768px) 1px, 220px"
         className={[
-          "pointer-events-none absolute -right-8 -bottom-10 w-44 opacity-12",
+          "pointer-events-none absolute",
+          isCompact ? "-right-3 -bottom-5 w-28 opacity-10" : "-right-8 -bottom-10 w-44 opacity-12",
           isLight ? "mix-blend-multiply" : "opacity-15",
         ]
           .filter(Boolean)
@@ -82,7 +85,7 @@ export function AmericanDreamCallout({
         }}
       />
 
-      <div className="relative space-y-3">
+      <div className={["relative", isCompact ? "space-y-2" : "space-y-3"].join(" ")}>
         <div className="flex flex-wrap items-center gap-2">
           <Image
             src="/brand/logo.png"
@@ -106,7 +109,17 @@ export function AmericanDreamCallout({
           <div className={isLight ? "text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]" : "text-[11px] font-semibold uppercase tracking-[0.24em] text-white/60"}>
             This is the
           </div>
-          <div className={isLight ? "text-2xl font-black text-[var(--text)] sm:text-3xl" : "text-2xl font-black text-white sm:text-3xl"}>
+          <div
+            className={
+              isLight
+                ? isCompact
+                  ? "text-xl font-black text-[var(--text)] sm:text-2xl"
+                  : "text-2xl font-black text-[var(--text)] sm:text-3xl"
+                : isCompact
+                  ? "text-xl font-black text-white sm:text-2xl"
+                  : "text-2xl font-black text-white sm:text-3xl"
+            }
+          >
             United States of America
           </div>
           <div className={isLight ? "text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]" : "text-xs font-semibold uppercase tracking-[0.2em] text-white/70"}>
@@ -117,14 +130,24 @@ export function AmericanDreamCallout({
         <div
           className={
             isLight
-              ? "rounded-2xl border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] p-3 text-sm text-[var(--text)]"
-              : "rounded-2xl border border-[rgba(199,160,98,0.4)] bg-[rgba(12,20,38,0.8)] p-3 text-sm text-white/85"
+              ? `rounded-2xl border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] ${
+                  isCompact ? "p-2.5 text-[13px]" : "p-3 text-sm"
+                } text-[var(--text)]`
+              : `rounded-2xl border border-[rgba(199,160,98,0.4)] bg-[rgba(12,20,38,0.8)] ${
+                  isCompact ? "p-2.5 text-[13px]" : "p-3 text-sm"
+                } text-white/85`
           }
         >
           {STORY_HOOK}
         </div>
 
-        <div className={isLight ? "space-y-2 text-sm text-[var(--muted)]" : "space-y-2 text-sm text-white/75"}>
+        <div
+          className={
+            isLight
+              ? `${isCompact ? "space-y-2 text-[13px]" : "space-y-2 text-sm"} text-[var(--muted)]`
+              : `${isCompact ? "space-y-2 text-[13px]" : "space-y-2 text-sm"} text-white/75`
+          }
+        >
           {paragraphs.map((line) => (
             <p key={line}>{line}</p>
           ))}

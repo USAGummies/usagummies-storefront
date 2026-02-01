@@ -245,7 +245,7 @@ export default async function HomePage() {
         data-zone="HERO"
         style={{ backgroundImage: "none" }}
       >
-        <div className="mx-auto max-w-6xl px-4 py-1 sm:py-2 lg:py-2.5">
+        <div className="mx-auto max-w-6xl px-4 py-0.5 sm:py-1.5 lg:py-2">
           <div className="relative grid gap-1 lg:gap-2 lg:grid-cols-[1fr_1fr] lg:items-center">
             <div className="order-2 relative lg:order-1">
               <div className="relative z-10 space-y-0.5">
@@ -297,13 +297,23 @@ export default async function HomePage() {
         <div className={styles.sceneBg} aria-hidden="true" />
         <div className={styles.sceneOverlay} aria-hidden="true" />
         <div className={styles.sceneContent}>
-          <div className="mx-auto max-w-6xl px-4 pb-1.5 sm:pb-2 lg:pb-2.5">
+          <div className="mx-auto max-w-6xl px-4 pb-1 sm:pb-1.5 lg:pb-2">
             <div className="mt-0">
               <div id="hero-primary-cta" className="atomic-buy americana-panel">
                 <div className="atomic-buy__glow" aria-hidden="true" />
                 <div className="atomic-buy__header">
                   <div className="atomic-buy__headerMain">
-                    <div className="atomic-buy__kicker">USA Gummies</div>
+                    <div className="atomic-buy__kicker flex items-center gap-2">
+                      <Image
+                        src="/brand/logo.png"
+                        alt=""
+                        aria-hidden="true"
+                        width={72}
+                        height={24}
+                        className="brand-logo-mark"
+                      />
+                      <span>USA Gummies</span>
+                    </div>
                     <div className="atomic-buy__headerTitle">
                       Classic gummy bears, made in the USA.
                     </div>
@@ -372,7 +382,7 @@ export default async function HomePage() {
                   </div>
                 </div>
               </div>
-              <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] text-[var(--muted)]">
+              <div className="mt-1.5 flex flex-wrap gap-1.5 text-[10px] text-[var(--muted)]">
                 <span className="font-semibold text-[var(--text)]">Bag count guides:</span>
                 <Link href="/gummy-gift-bundles" className="underline underline-offset-4">
                   Gift bag options
@@ -389,8 +399,10 @@ export default async function HomePage() {
         </div>
       </section>
 
+      <div className="americana-divider" aria-hidden="true" />
+
       <section className="bg-[#fffdf8]" data-zone="VALUE" aria-label="Product value">
-        <div className="mx-auto max-w-6xl px-4 py-0.5 sm:py-1">
+        <div className="mx-auto max-w-6xl px-4 py-0.5 sm:py-0.5">
           <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
             <div className="rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-3">
               <div className="flex items-center gap-2">
@@ -445,7 +457,7 @@ export default async function HomePage() {
       </section>
 
       <section className="bg-[#fffdf8]" data-zone="FLAVORS">
-        <div className="mx-auto max-w-6xl px-4 py-1 sm:py-1.5">
+        <div className="mx-auto max-w-6xl px-4 py-0.5 sm:py-1">
           <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]/80">
             Inside every bag
           </div>
@@ -488,14 +500,14 @@ export default async function HomePage() {
         <div className={styles.sceneBg} aria-hidden="true" />
         <div className={styles.sceneOverlay} aria-hidden="true" />
         <div className={styles.sceneContent}>
-        <div className="mx-auto max-w-6xl px-4 py-4 lg:py-5 reveal-up">
+        <div className="mx-auto max-w-6xl px-4 py-3 lg:py-4 reveal-up">
             <ReviewsSection />
           </div>
         </div>
       </section>
 
       <section className="bg-[#fffdf8]" data-zone="SHIPPING">
-        <div className="mx-auto max-w-6xl px-4 pb-4">
+        <div className="mx-auto max-w-6xl px-4 pb-3">
           <div className="grid gap-3 rounded-[28px] border border-[rgba(15,27,45,0.12)] bg-white p-3 sm:p-4 lg:grid-cols-[1fr_200px] lg:items-center">
             <div className="space-y-2">
               <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
@@ -524,7 +536,7 @@ export default async function HomePage() {
       </section>
 
       <section className="bg-[var(--surface-strong)]" data-zone="STORY" id="why-usa-gummies">
-        <div className="mx-auto max-w-6xl px-4 py-5 lg:py-6 reveal-up">
+        <div className="mx-auto max-w-6xl px-4 py-4 lg:py-5 reveal-up">
           <div className="candy-panel americana-panel relative overflow-hidden rounded-[36px] p-4">
             <div className="relative z-10">
               <div className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
@@ -540,8 +552,18 @@ export default async function HomePage() {
                       className="brand-touch h-auto w-full max-w-[200px] sm:max-w-[240px] lg:max-w-[320px] object-contain"
                     />
                   </div>
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-                    Why USA Gummies
+                  <div className="flex items-center gap-2">
+                    <Image
+                      src="/brand/logo.png"
+                      alt=""
+                      aria-hidden="true"
+                      width={64}
+                      height={20}
+                      className="brand-logo-mark"
+                    />
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+                      Why USA Gummies
+                    </div>
                   </div>
                   <h2 className="text-2xl font-black text-[var(--text)] sm:text-3xl">
                     Why USA Gummies matters.
@@ -602,7 +624,7 @@ export default async function HomePage() {
       </section>
 
       <section className="bg-[var(--surface-strong)]" data-zone="BENEFITS">
-        <div className="mx-auto max-w-6xl px-4 pb-7">
+        <div className="mx-auto max-w-6xl px-4 pb-5">
           <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
             <div className="flex items-end justify-start">
               <Image
@@ -639,13 +661,23 @@ export default async function HomePage() {
         <div className={styles.sceneBg} aria-hidden="true" />
         <div className={styles.sceneOverlay} aria-hidden="true" />
         <div className={styles.sceneContent}>
-        <div className="mx-auto max-w-6xl px-4 py-5 lg:py-6 reveal-up">
+        <div className="mx-auto max-w-6xl px-4 py-4 lg:py-5 reveal-up">
           <div className="grid gap-3 lg:grid-cols-[1.1fr_0.9fr]">
               <div className="candy-panel americana-panel rounded-[28px] p-3 sm:p-4 shadow-none bg-[var(--surface-strong)] border border-[rgba(15,27,45,0.12)]">
                 <div className="flex flex-wrap items-end justify-between gap-4">
                   <div>
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-                      Follow the fun
+                    <div className="flex items-center gap-2">
+                      <Image
+                        src="/brand/logo.png"
+                        alt=""
+                        aria-hidden="true"
+                        width={64}
+                        height={20}
+                        className="brand-logo-mark"
+                      />
+                      <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+                        Follow the fun
+                      </div>
                     </div>
                     <h2 className="mt-1 text-2xl font-black text-[var(--text)]">
                       Follow along with USA Gummies
@@ -693,8 +725,18 @@ export default async function HomePage() {
               </div>
               <div className="candy-panel americana-panel relative overflow-hidden rounded-[28px] p-3 sm:p-4 shadow-none bg-[var(--surface-strong)] border border-[rgba(15,27,45,0.12)]">
                 <div className="space-y-3">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-                    Get updates
+                  <div className="flex items-center gap-2">
+                    <Image
+                      src="/brand/logo.png"
+                      alt=""
+                      aria-hidden="true"
+                      width={64}
+                      height={20}
+                      className="brand-logo-mark"
+                    />
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+                      Get updates
+                    </div>
                   </div>
                   <h3 className="text-xl font-black text-[var(--text)] sm:text-2xl">Unlock early access + member-only drops</h3>
                   <p className="text-sm text-[var(--muted)]">
@@ -727,10 +769,20 @@ export default async function HomePage() {
       </section>
 
       <section className="bg-[#fffdf8]" data-zone="STORY">
-        <div className="mx-auto max-w-6xl px-4 py-7">
+        <div className="mx-auto max-w-6xl px-4 py-5">
           <div className="candy-panel americana-panel rounded-[36px] border border-[var(--border)] p-5 sm:p-6">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-              Our story
+            <div className="flex items-center gap-2">
+              <Image
+                src="/brand/logo.png"
+                alt=""
+                aria-hidden="true"
+                width={64}
+                height={20}
+                className="brand-logo-mark"
+              />
+              <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+                Our story
+              </div>
             </div>
             <h2 className="mt-2 text-2xl font-black text-[var(--text)] sm:text-3xl">
               {BRAND_STORY_HEADLINE}
@@ -759,7 +811,7 @@ export default async function HomePage() {
         <div className={styles.sceneBg} aria-hidden="true" />
         <div className={styles.sceneOverlay} aria-hidden="true" />
         <div className={styles.sceneContent}>
-          <div className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
+          <div className="mx-auto max-w-6xl px-4 py-5 sm:py-6">
             <div className="h-10 sm:h-12 lg:h-16" />
           </div>
         </div>

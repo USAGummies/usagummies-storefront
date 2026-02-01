@@ -239,15 +239,15 @@ export default async function ShopPage() {
       />
       <section className="relative overflow-hidden bg-[#fffdf8]">
 
-        <div className="relative mx-auto max-w-6xl px-4 py-10 lg:py-12">
-          <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
-            <div className="space-y-5">
+        <div className="relative mx-auto max-w-6xl px-4 py-7 lg:py-9">
+          <div className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
+            <div className="space-y-4">
               <div className="flex flex-wrap items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.32em] text-[var(--muted)] sm:text-xs">
                 <span className="rounded-full border border-[rgba(15,27,45,0.12)] bg-white px-3 py-1 text-[var(--navy)]">Made in the USA</span>
                 <span className="text-[var(--candy-red)]">No artificial dyes</span>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <h1 className="text-4xl font-black leading-[1.05] tracking-tight text-[var(--navy)] sm:text-5xl">
                   All-American Gummy Bears
                 </h1>
@@ -256,7 +256,7 @@ export default async function ShopPage() {
                 </p>
               </div>
 
-              <div className="grid gap-2 text-sm text-[var(--muted)]">
+              <div className="grid gap-1.5 text-sm text-[var(--muted)]">
                 {HERO_BULLETS.map((line, idx) => (
                   <div key={line} className="flex items-start gap-2">
                     <span
@@ -315,8 +315,8 @@ export default async function ShopPage() {
                 </Link>
               </div>
 
-              <div className="candy-panel rounded-3xl p-4">
-                <div className="grid gap-3 sm:grid-cols-3">
+              <div className="candy-panel rounded-3xl p-3">
+                <div className="grid gap-2 sm:grid-cols-3">
                   <div className="space-y-1">
                     <div className="text-[10px] uppercase tracking-[0.24em] text-[var(--muted)]">Savings tiers</div>
                     <div className="text-base font-black text-[var(--text)]">4+ bags</div>
@@ -336,7 +336,7 @@ export default async function ShopPage() {
               </div>
             </div>
 
-            <div className="relative space-y-4">
+            <div className="relative space-y-3">
               <div className="candy-panel relative overflow-hidden rounded-3xl p-2 text-[var(--text)]">
                 <div className="relative aspect-[3/2] overflow-hidden rounded-2xl border border-white/60 bg-white">
                   <Image
@@ -365,7 +365,7 @@ export default async function ShopPage() {
                 </div>
               </div>
 
-              <div className="relative aspect-[3/2] overflow-hidden">
+              <div className="relative aspect-[3/2] lg:aspect-[5/2] overflow-hidden">
                 <Image
                   src="/website%20assets/IwaJima.png"
                   alt="Iwo Jima memorial illustration"
@@ -380,7 +380,7 @@ export default async function ShopPage() {
       </section>
 
       <section id="shop-bundles" aria-label="Savings pricing" className="bg-[#fffdf8] scroll-mt-24">
-        <div className="mx-auto max-w-6xl px-4 pb-6 lg:pb-7">
+        <div className="mx-auto max-w-6xl px-4 pb-5 lg:pb-6">
           <div className="bundle-home bundle-home--premium bundle-hero-stage buy-module americana-panel relative rounded-[36px] border border-[rgba(15,27,45,0.12)] bg-white shadow-[0_30px_80px_rgba(15,27,45,0.14)]">
             <div className="buy-module__inner">
             <div className="buy-module__layout">
@@ -466,7 +466,7 @@ export default async function ShopPage() {
 
             </div>
           </div>
-          <div className="mt-4">
+          <div className="mt-3">
             <AmericanDreamCallout
               variant="compact"
               tone="light"
@@ -476,13 +476,25 @@ export default async function ShopPage() {
         </div>
       </section>
 
+      <div className="americana-divider" aria-hidden="true" />
+
       <section aria-label="Bag count guides" className="bg-[#fffdf8]">
-        <div className="mx-auto max-w-6xl px-4 pb-6 lg:pb-7">
+        <div className="mx-auto max-w-6xl px-4 pb-5 lg:pb-6">
           <div className="candy-panel americana-panel rounded-[32px] p-4 sm:p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="space-y-2">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-                  Bag count guides
+                <div className="flex items-center gap-2">
+                  <Image
+                    src="/brand/logo.png"
+                    alt=""
+                    aria-hidden="true"
+                    width={64}
+                    height={20}
+                    className="brand-logo-mark"
+                  />
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+                    Bag count guides
+                  </div>
                 </div>
                 <h2 className="text-2xl font-black text-[var(--text)]">
                   Need help picking a bag count?
@@ -496,7 +508,7 @@ export default async function ShopPage() {
               </Link>
             </div>
 
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="mt-3 grid gap-3 sm:grid-cols-3">
               {[
                 {
                   href: "/gummy-gift-bundles",
@@ -517,7 +529,7 @@ export default async function ShopPage() {
                 <Link
                   key={guide.href}
                   href={guide.href}
-                  className="rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-4 text-sm text-[var(--text)] transition hover:border-[rgba(15,27,45,0.22)] hover:shadow-[0_14px_28px_rgba(15,27,45,0.12)]"
+                  className="rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-3 text-sm text-[var(--text)] transition hover:border-[rgba(15,27,45,0.22)] hover:shadow-[0_14px_28px_rgba(15,27,45,0.12)]"
                 >
                   <div className="text-sm font-semibold">{guide.title}</div>
                   <div className="mt-2 text-xs text-[var(--muted)]">{guide.copy}</div>
@@ -532,20 +544,30 @@ export default async function ShopPage() {
       </section>
 
       <section aria-label="Our story" className="bg-[#fffdf8]">
-        <div className="mx-auto max-w-6xl px-4 pb-6 lg:pb-7">
+        <div className="mx-auto max-w-6xl px-4 pb-5 lg:pb-6">
           <div className="candy-panel rounded-[32px] p-4 sm:p-5">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-              Our story
+            <div className="flex items-center gap-2">
+              <Image
+                src="/brand/logo.png"
+                alt=""
+                aria-hidden="true"
+                width={64}
+                height={20}
+                className="brand-logo-mark"
+              />
+              <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+                Our story
+              </div>
             </div>
-            <h2 className="mt-2 text-2xl font-black text-[var(--text)]">
+            <h2 className="mt-1.5 text-2xl font-black text-[var(--text)]">
               {BRAND_STORY_HEADLINE}
             </h2>
-            <div className="mt-3 space-y-3 text-sm text-[var(--muted)]">
+            <div className="mt-2 space-y-3 text-sm text-[var(--muted)]">
               {BRAND_STORY_MEDIUM.map((paragraph) => (
                 <p key={paragraph}>{paragraph}</p>
               ))}
             </div>
-            <div className="mt-3 flex flex-wrap gap-3">
+            <div className="mt-2 flex flex-wrap gap-3">
               <Link href="/about" className="btn btn-outline">
                 Read our story
               </Link>

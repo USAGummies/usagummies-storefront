@@ -218,6 +218,20 @@ details > summary::-webkit-details-marker{
   right: 14px;
   transform: rotate(6deg);
 }
+.americana-divider{
+  height: 2px;
+  width: min(100%, 1120px);
+  margin: 10px auto;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(199,54,44,0.45) 20%,
+    rgba(13,28,51,0.35) 50%,
+    rgba(199,54,44,0.45) 80%,
+    transparent
+  );
+  border-radius: 999px;
+}
 .brand-cluster{
   display: inline-flex;
   align-items: center;
@@ -266,13 +280,13 @@ details > summary::-webkit-details-marker{
     var(--foil-sheen),
     linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,253,248,0.98));
   box-shadow: var(--shadow-card);
-  padding: 16px;
+  padding: 12px;
 }
 .experience-band__inner{
   position: relative;
   z-index: 1;
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 .experience-band__header{
   display: grid;
@@ -298,14 +312,14 @@ details > summary::-webkit-details-marker{
 }
 .experience-band__grid{
   display: grid;
-  gap: 10px;
+  gap: 8px;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 }
 .experience-band__card{
   border-radius: 20px;
   border: 1px solid rgba(15, 27, 45, 0.12);
   background: #ffffff;
-  padding: 12px;
+  padding: 10px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -396,8 +410,8 @@ details > summary::-webkit-details-marker{
   border-radius: 999px;
   border: 1px solid rgba(15, 27, 45, 0.12);
   background: #ffffff;
-  padding: 6px 10px;
-  font-size: 11px;
+  padding: 5px 9px;
+  font-size: 10px;
   font-weight: 700;
   color: var(--text);
 }
@@ -406,8 +420,8 @@ details > summary::-webkit-details-marker{
 }
 @media (min-width: 1024px){
   .pill-row-tight .candy-pill{
-    padding: 4px 8px;
-    font-size: 10px;
+    padding: 3px 7px;
+    font-size: 9px;
   }
 }
 .flavor-pill-row{
@@ -418,12 +432,12 @@ details > summary::-webkit-details-marker{
     gap: 6px;
   }
   .flavor-pill-row .candy-pill{
-    padding: 4px 8px;
-    font-size: 10px;
+    padding: 3px 7px;
+    font-size: 9px;
   }
   .flavor-pill-row .candy-dot{
-    width: 6px;
-    height: 6px;
+    width: 5px;
+    height: 5px;
   }
 }
 .candy-dot{
@@ -1064,21 +1078,21 @@ a:focus-visible:not(.btn):not(.focus-ring),
     linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(255,249,242,0.98) 100%);
 }
 .bundle-home--premium .buy-module__inner{
-  padding: clamp(14px, 2.4vw, 28px);
+  padding: clamp(12px, 2vw, 22px);
 }
 .bundle-home--premium .buy-module__layout{
   grid-template-areas:
     "details"
     "rail";
-  gap: 16px;
+  gap: 12px;
 }
 @media (min-width: 1024px){
   .bundle-home--premium .buy-module__layout{
     grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.85fr);
     grid-template-areas:
       "details rail";
-    column-gap: 20px;
-    row-gap: 20px;
+    column-gap: 16px;
+    row-gap: 16px;
     align-items: start;
   }
   .bundle-home--premium .buy-module__rail{
@@ -1086,12 +1100,12 @@ a:focus-visible:not(.btn):not(.focus-ring),
     grid-template-areas:
       "image"
       "bundle";
-    gap: 14px;
+    gap: 12px;
     align-self: start;
   }
 }
 .bundle-home--premium .buy-module__details{
-  gap: 10px;
+  gap: 8px;
   max-width: none;
 }
 .bundle-home--premium .buy-module__bundle{
@@ -1104,7 +1118,7 @@ a:focus-visible:not(.btn):not(.focus-ring),
   justify-self: stretch;
 }
 .bundle-home--premium .buy-module__rail{
-  gap: 16px;
+  gap: 12px;
 }
 .bundle-home--premium .buy-module__imagePanel{
   border-radius: 24px;
@@ -1801,11 +1815,11 @@ a:focus-visible:not(.btn):not(.focus-ring),
   z-index: 1;
   display: grid;
   gap: 12px;
-  padding: clamp(14px, 2.4vw, 26px);
+  padding: clamp(12px, 2vw, 22px);
 }
 .buy-module__layout{
   display: grid;
-  gap: 12px;
+  gap: 10px;
   grid-template-areas:
     "details"
     "rail";
@@ -1816,7 +1830,7 @@ a:focus-visible:not(.btn):not(.focus-ring),
   position: relative;
   z-index: 2;
   display: grid;
-  gap: 10px;
+  gap: 8px;
   max-width: 720px;
   justify-self: start;
 }
@@ -1827,14 +1841,14 @@ a:focus-visible:not(.btn):not(.focus-ring),
   grid-template-areas:
     "image"
     "bundle";
-  gap: 10px;
+  gap: 8px;
   align-self: stretch;
 }
 .buy-module__bundle{
   grid-area: bundle;
   min-width: 0;
   display: grid;
-  gap: 10px;
+  gap: 8px;
   position: relative;
   z-index: 2;
   max-width: 720px;
@@ -1853,7 +1867,7 @@ a:focus-visible:not(.btn):not(.focus-ring),
 .buy-module__imagePanel{
   position: relative;
   border-radius: 24px;
-  padding: 16px;
+  padding: 12px;
   background: #ffffff;
   border: 1px solid rgba(15,27,45,0.08);
   box-shadow: 0 22px 50px rgba(15,27,45,0.1);
@@ -1882,7 +1896,7 @@ a:focus-visible:not(.btn):not(.focus-ring),
 }
 .buy-module__zone{
   display: grid;
-  gap: 14px;
+  gap: 10px;
 }
 .buy-module__zoneHeader{
   display: flex;
@@ -1890,7 +1904,7 @@ a:focus-visible:not(.btn):not(.focus-ring),
 }
 .buy-module__top{
   display: grid;
-  gap: 20px;
+  gap: 14px;
 }
 .buy-module__step{
   display: inline-flex;
@@ -1926,7 +1940,7 @@ a:focus-visible:not(.btn):not(.focus-ring),
   background: linear-gradient(90deg, transparent, rgba(15,27,45,0.08), transparent);
 }
 .buy-module__footer{
-  padding-top: 8px;
+  padding-top: 6px;
 }
 @media (min-width: 1024px){
   .buy-module__layout{
@@ -1934,7 +1948,7 @@ a:focus-visible:not(.btn):not(.focus-ring),
     grid-template-areas:
       "details image bundle";
     align-items: stretch;
-    column-gap: 28px;
+    column-gap: 18px;
   }
   .buy-module__rail{
     display: contents;
@@ -1968,7 +1982,7 @@ a:focus-visible:not(.btn):not(.focus-ring),
     radial-gradient(circle at 85% 0%, rgba(12,28,51,0.08), transparent 48%),
     linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(255,249,242,0.98) 100%);
   box-shadow: 0 24px 60px rgba(15,27,45,0.12);
-  padding: clamp(12px, 2.2vw, 18px);
+  padding: clamp(10px, 2vw, 16px);
   overflow: hidden;
 }
 .atomic-buy__glow{
@@ -1988,8 +2002,8 @@ a:focus-visible:not(.btn):not(.focus-ring),
   align-items: flex-end;
   justify-content: space-between;
   gap: 8px 14px;
-  padding-bottom: 8px;
-  margin-bottom: 8px;
+  padding-bottom: 6px;
+  margin-bottom: 6px;
   border-bottom: 1px solid rgba(15,27,45,0.12);
 }
 .atomic-buy__headerMain{
@@ -2012,7 +2026,7 @@ a:focus-visible:not(.btn):not(.focus-ring),
   position: relative;
   z-index: 1;
   display: grid;
-  gap: clamp(8px, 1.6vw, 12px);
+  gap: clamp(6px, 1.4vw, 10px);
   align-items: stretch;
   grid-template-areas:
     "details"
@@ -2031,11 +2045,11 @@ a:focus-visible:not(.btn):not(.focus-ring),
 }
 .atomic-buy__details{
   display: grid;
-  gap: 8px;
+  gap: 6px;
   grid-area: details;
 }
 .atomic-buy__bundle{
-  padding: 10px;
+  padding: 8px;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -2059,7 +2073,7 @@ a:focus-visible:not(.btn):not(.focus-ring),
     grid-template-areas:
       "details bundle"
       "media bundle";
-    column-gap: clamp(14px, 2vw, 22px);
+    column-gap: clamp(12px, 1.6vw, 18px);
   }
   .atomic-buy__bundle{
     padding-left: 0;
@@ -2078,8 +2092,8 @@ a:focus-visible:not(.btn):not(.focus-ring),
   padding: 0;
   list-style: none;
   display: grid;
-  gap: 6px;
-  font-size: 13px;
+  gap: 4px;
+  font-size: 12px;
   color: var(--muted);
 }
 .atomic-buy__bullet{
@@ -2098,7 +2112,7 @@ a:focus-visible:not(.btn):not(.focus-ring),
 .atomic-buy__chips{
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 4px;
 }
 .atomic-buy__chip{
   display: inline-flex;
@@ -2107,7 +2121,7 @@ a:focus-visible:not(.btn):not(.focus-ring),
   border-radius: 999px;
   border: 1px solid rgba(15,27,45,0.12);
   background: rgba(15,27,45,0.04);
-  padding: 3px 7px;
+  padding: 3px 6px;
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.16em;
@@ -2127,7 +2141,7 @@ a:focus-visible:not(.btn):not(.focus-ring),
 .atomic-buy__mediaFrame{
   position: relative;
   border-radius: 20px;
-  padding: 12px;
+  padding: 10px;
   border: 1px solid rgba(15,27,45,0.12);
   background: #ffffff;
   box-shadow: 0 16px 36px rgba(15,27,45,0.1);
@@ -2242,7 +2256,7 @@ a:focus-visible:not(.btn):not(.focus-ring),
   display: none;
 }
 .atomic-buy__bundle [data-bundle-grid]{
-  margin-top: 8px;
+  margin-top: 6px;
 }
 .atomic-buy__bundle [data-bundle-grid] [role="radiogroup"]{
   gap: 8px;
@@ -2316,14 +2330,14 @@ a:focus-visible:not(.btn):not(.focus-ring),
 }
 .atomic-buy__bundle [data-bundle-rail]{
   margin-top: 0;
-  gap: 10px;
+  gap: 8px;
   flex: 1;
   display: flex;
   flex-direction: column;
   min-height: 100%;
 }
 .atomic-buy__bundle [data-rail-bottom]{
-  padding-top: 8px;
+  padding-top: 6px;
   border-top: 1px solid rgba(15,27,45,0.08);
   margin-top: auto;
 }
