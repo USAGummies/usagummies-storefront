@@ -245,22 +245,22 @@ export default async function HomePage() {
         data-zone="HERO"
         style={{ backgroundImage: "none" }}
       >
-        <div className="mx-auto max-w-6xl px-4 py-4 sm:py-5 lg:py-6">
-          <div className="relative grid gap-4 lg:gap-6 lg:grid-cols-[1fr_1fr] lg:items-center">
+        <div className="mx-auto max-w-6xl px-4 py-3 sm:py-4 lg:py-5">
+          <div className="relative grid gap-3 lg:gap-5 lg:grid-cols-[1fr_1fr] lg:items-center">
             <div className="order-2 relative lg:order-1">
-              <div className="relative z-10 space-y-2">
-                <h1 className="text-3xl font-black leading-[1.05] tracking-tight text-[var(--navy)] sm:text-4xl lg:text-5xl">
+              <div className="relative z-10 space-y-1.5">
+                <h1 className="text-[32px] font-black leading-[1.05] tracking-tight text-[var(--navy)] sm:text-4xl lg:text-5xl">
                   All-American Gummy Bears
                 </h1>
-                <p className="text-sm text-[var(--text)] sm:text-base">
+                <p className="text-[13px] text-[var(--text)] sm:text-sm">
                   Soft, chewy, classic gummy bears — made in the USA.
                 </p>
                 <div className="text-sm font-semibold text-[var(--navy)]">
                   No artificial dyes • All natural flavors
                 </div>
-                <div className="flex flex-wrap gap-1.5">
-                  <div className="flex items-center gap-2 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white px-2.5 py-1 text-[10px] font-semibold text-[var(--navy)]">
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--navy)] text-white">
+                <div className="flex flex-wrap gap-1">
+                  <div className="flex items-center gap-2 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white px-2 py-0.5 text-[10px] font-semibold text-[var(--navy)]">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--navy)] text-white">
                       <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
                         <path
                           fill="currentColor"
@@ -270,8 +270,8 @@ export default async function HomePage() {
                     </span>
                     Made in the USA
                   </div>
-                  <div className="flex items-center gap-2 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white px-2.5 py-1 text-[10px] font-semibold text-[var(--navy)]">
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--navy)] text-white">
+                  <div className="flex items-center gap-2 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white px-2 py-0.5 text-[10px] font-semibold text-[var(--navy)]">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--navy)] text-white">
                       <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
                         <path
                           fill="currentColor"
@@ -281,8 +281,8 @@ export default async function HomePage() {
                     </span>
                     No artificial dyes
                   </div>
-                  <div className="flex items-center gap-2 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white px-2.5 py-1 text-[10px] font-semibold text-[var(--navy)]">
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--navy)] text-white">
+                  <div className="flex items-center gap-2 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white px-2 py-0.5 text-[10px] font-semibold text-[var(--navy)]">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--navy)] text-white">
                       <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
                         <path
                           fill="currentColor"
@@ -292,8 +292,8 @@ export default async function HomePage() {
                     </span>
                     All natural flavors
                   </div>
-                  <div className="flex items-center gap-2 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white px-2.5 py-1 text-[10px] font-semibold text-[var(--navy)]">
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--navy)] text-white">
+                  <div className="flex items-center gap-2 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white px-2 py-0.5 text-[10px] font-semibold text-[var(--navy)]">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--navy)] text-white">
                       <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
                         <path
                           fill="currentColor"
@@ -304,22 +304,18 @@ export default async function HomePage() {
                     Loved by American families
                   </div>
                 </div>
-                <div className="pt-0.5 space-y-1.5">
+                <div className="pt-0 space-y-1">
                   <div className="text-xs font-semibold text-[var(--muted)]">
                     Save more per bag when you add 4+ bags.
                   </div>
-                  <div className="flex flex-col gap-1.5">
-                    <a
-                      href="#bundle-pricing"
-                      className="btn btn-candy w-full sm:w-auto hero-scroll-cta"
-                      style={{ padding: "12px 20px", boxShadow: "0 14px 30px rgba(239, 59, 59, 0.32)" }}
-                    >
-                      <span className="text-[14px] sm:text-[15px] font-semibold">Get Savings &amp; Ship Free</span>
+                  <div className="flex flex-col gap-1">
+                    <a href="#bundle-pricing" className="hero-scroll-link">
+                      Jump to bundle savings ↓
                     </a>
                     <div className="text-xs font-semibold text-[var(--muted)]">
                       {FREE_SHIPPING_PHRASE} • Love it or your money back
                     </div>
-                    <div className="flex flex-wrap gap-2 text-[11px] text-[var(--muted)]">
+                    <div className="flex flex-wrap gap-2 text-[10px] text-[var(--muted)]">
                       <span className="font-semibold text-[var(--text)]">Bag count guides:</span>
                       <Link href="/gummy-gift-bundles" className="underline underline-offset-4">
                         Gift bag options
@@ -337,7 +333,7 @@ export default async function HomePage() {
             </div>
 
             <div className="order-1 flex justify-center lg:order-2 lg:justify-end">
-              <div className="relative w-full max-w-[420px] sm:max-w-[520px] lg:max-w-[640px]">
+              <div className="relative w-full max-w-[360px] sm:max-w-[480px] lg:max-w-[560px]">
                 <div className="relative aspect-[4/5] overflow-visible">
                   <Image
                     src={heroMediaSrc}
@@ -356,7 +352,7 @@ export default async function HomePage() {
       </section>
 
       <section className="bg-[#fffdf8]" data-zone="VALUE" aria-label="Product value">
-        <div className="mx-auto max-w-6xl px-4 py-2.5 sm:py-3">
+        <div className="mx-auto max-w-6xl px-4 py-2 sm:py-2.5">
           <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
             <div className="rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-3">
               <div className="flex items-center gap-2">
@@ -411,7 +407,7 @@ export default async function HomePage() {
       </section>
 
       <section className="bg-[#fffdf8]" data-zone="FLAVORS">
-        <div className="mx-auto max-w-6xl px-4 py-2.5 sm:py-3">
+        <div className="mx-auto max-w-6xl px-4 py-2 sm:py-2.5">
           <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]/80">
             Inside every bag
           </div>
@@ -454,8 +450,8 @@ export default async function HomePage() {
         <div className={styles.sceneBg} aria-hidden="true" />
         <div className={styles.sceneOverlay} aria-hidden="true" />
         <div className={styles.sceneContent}>
-          <div className="mx-auto max-w-6xl px-4 pb-4 sm:pb-5 lg:pb-6">
-            <div className="mt-1">
+          <div className="mx-auto max-w-6xl px-4 pb-3 sm:pb-4 lg:pb-5">
+            <div className="mt-0.5">
               <div id="hero-primary-cta" className="atomic-buy">
                 <div className="atomic-buy__glow" aria-hidden="true" />
                 <div className="atomic-buy__header">
@@ -523,7 +519,7 @@ export default async function HomePage() {
                       showAccent={false}
                       showEducation={false}
                       ctaVariant="simple"
-                      primaryCtaLabel="Shop & save"
+                      primaryCtaLabel="Unlock Best Value + Free Shipping"
                       featuredQuantities={[5, 8, 12]}
                     />
                   </div>

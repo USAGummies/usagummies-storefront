@@ -138,9 +138,15 @@ details > summary::-webkit-details-marker{
 .home-product-stage .sceneOverlay{
   display: none !important;
 }
-.hero-scroll-cta{
-  position: relative;
-  z-index: 1;
+.hero-scroll-link{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--navy);
+  text-decoration: underline;
+  text-underline-offset: 4px;
 }
 .brand-touch{
   pointer-events: none;
@@ -1953,7 +1959,7 @@ a:focus-visible:not(.btn):not(.focus-ring),
 }
 @media (min-width: 1024px){
   .atomic-buy__grid{
-    grid-template-columns: minmax(0, 1fr) minmax(0, 0.6fr) minmax(0, 0.85fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.6fr) minmax(0, 0.95fr);
     grid-template-areas:
       "details media bundle";
     column-gap: clamp(16px, 2.6vw, 28px);
@@ -2052,11 +2058,6 @@ a:focus-visible:not(.btn):not(.focus-ring),
 @media (max-width: 640px){
   .atomic-buy{
     padding: 12px;
-  }
-  .hero-scroll-cta{
-    position: sticky;
-    top: 10px;
-    z-index: 15;
   }
   .atomic-buy__header{
     padding-bottom: 8px;
