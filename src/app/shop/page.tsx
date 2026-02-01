@@ -279,7 +279,7 @@ export default async function ShopPage() {
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
-                <a href="#bundle-pricing" className="btn btn-candy">
+                <a href="#shop-bundles" className="btn btn-candy">
                   Lock in savings now
                 </a>
                 <span className="text-xs text-[var(--muted)]">
@@ -379,7 +379,7 @@ export default async function ShopPage() {
         </div>
       </section>
 
-      <section id="bundle-pricing" aria-label="Savings pricing" className="bg-[#fffdf8] scroll-mt-24">
+      <section id="shop-bundles" aria-label="Savings pricing" className="bg-[#fffdf8] scroll-mt-24">
         <div className="mx-auto max-w-6xl px-4 pb-8 lg:pb-10">
           <div className="bundle-home bundle-home--premium bundle-hero-stage buy-module relative rounded-[36px] border border-[rgba(15,27,45,0.12)] bg-white shadow-[0_30px_80px_rgba(15,27,45,0.14)]">
             <div className="buy-module__inner">
@@ -439,7 +439,7 @@ export default async function ShopPage() {
                   <div className="buy-module__bundle">
                     {bundleVariants ? (
                       <BundleQuickBuy
-                        anchorId="bundle-pricing"
+                        anchorId="shop-bundles"
                         productHandle={productHandle}
                         tiers={bundleVariants.variants}
                         singleBagVariantId={bundleVariants.singleBagVariantId}
@@ -550,7 +550,7 @@ export default async function ShopPage() {
               <Link href="/about" className="btn btn-outline">
                 Read our story
               </Link>
-              <Link href="/shop#bundle-pricing" className="btn btn-candy">
+              <Link href="/shop#shop-bundles" className="btn btn-candy">
                 Lock in savings now
               </Link>
             </div>

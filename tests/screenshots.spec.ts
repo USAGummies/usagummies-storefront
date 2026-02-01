@@ -37,11 +37,11 @@ async function captureFullPage(page: any, testInfo: any, route: string, name: st
 
 test.describe("purchase rail screenshots", () => {
   test("home purchase rail", async ({ page }, testInfo) => {
-    await captureSection(page, testInfo, "/", "#bundle-pricing", "home-purchase-rail");
+    await captureSection(page, testInfo, "/", "[data-bundle-root]", "home-purchase-rail");
   });
 
   test("shop purchase rail", async ({ page }, testInfo) => {
-    await captureSection(page, testInfo, "/shop", "#bundle-pricing", "shop-purchase-rail");
+    await captureSection(page, testInfo, "/shop", "[data-bundle-root]", "shop-purchase-rail");
   });
 });
 
