@@ -30,6 +30,7 @@ const nextConfig: NextConfig = {
       { source: "/privacy", destination: "/policies/privacy", permanent: true },
       { source: "/shipping", destination: "/policies/shipping", permanent: true },
       { source: "/returns", destination: "/policies/returns", permanent: true },
+      { source: "/store", destination: "/shop", permanent: true },
     ];
   },
 };
