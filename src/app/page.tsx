@@ -452,7 +452,7 @@ export default async function HomePage() {
           <div className="mt-1.5 text-sm font-semibold text-[var(--text)]">
             Five classic gummy bear flavors.
           </div>
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-[var(--muted)]">
+          <div className="flavor-pill-row mt-3 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-[var(--muted)]">
             <span className="candy-pill">
               <span className="candy-dot bg-[var(--candy-red)]" />
               Cherry
