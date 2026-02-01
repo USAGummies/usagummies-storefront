@@ -25,6 +25,7 @@ import { AMAZON_REVIEWS } from "@/data/amazonReviews";
 import { AMAZON_LISTING_URL, AMAZON_LOGO_URL } from "@/lib/amazon";
 
 type TierKey = "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10" | "11" | "12";
+type ChannelOptionId = "amazon-1" | "amazon-2" | "amazon-3-4" | "dtc-5" | "dtc-best";
 
 type Props = {
   tiers?: BundleTier[] | null;
@@ -56,6 +57,12 @@ function money(amount?: number | null, currency = "USD") {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(n);
+}
+
+function priceForQtyDisplay(qty: number, prefix?: string) {
+  const total = money(pricingForQty(qty).total, "USD");
+  if (!total) return "";
+  return prefix ? `${prefix} ${total}` : total;
 }
 
 function storeCartId(cartId?: string | null) {
@@ -134,6 +141,10 @@ export default function BundleQuickBuy({
     : "Mystery extra unlocks at 12 bags.";
   const ctaRef = React.useRef<HTMLDivElement | null>(null);
   const [selected, setSelected] = React.useState<TierKey>("8");
+  const [selectedOption, setSelectedOption] = React.useState<ChannelOptionId>("dtc-5");
+  const [amazonMultiQty, setAmazonMultiQty] = React.useState<3 | 4>(3);
+  const [dtcBestQty, setDtcBestQty] = React.useState<8 | 12>(8);
+  const [showMoreOptions, setShowMoreOptions] = React.useState(false);
   const [addingQty, setAddingQty] = React.useState<number | null>(null);
   const [lastAddedQty, setLastAddedQty] = React.useState<number | null>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -240,10 +251,75 @@ export default function BundleQuickBuy({
     }
   }
 
+  function handleOptionSelect(optionId: ChannelOptionId, overrideQty?: number) {
+    const isAmazon = optionId.startsWith("amazon");
+    const optionQty =
+      overrideQty ??
+      (optionId === "amazon-1"
+        ? 1
+        : optionId === "amazon-2"
+          ? 2
+          : optionId === "amazon-3-4"
+            ? amazonMultiQty
+            : optionId === "dtc-5"
+              ? 5
+              : dtcBestQty);
+    if (!isAmazon && !canPurchaseQty(optionQty)) {
+      setError(availableForSale === false ? "Out of stock." : "Select a bag count to continue.");
+      return;
+    }
+    setSelectedOption(optionId);
+    if (!isAmazon) {
+      setSelected(String(optionQty) as TierKey);
+    }
+    setError(null);
+    setSuccess(false);
+    trackEvent("bundle_select", {
+      qty: optionQty,
+      channel: isAmazon ? "amazon" : "dtc",
+      variant,
+      anchorId: anchorId || null,
+    });
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      window.requestAnimationFrame(scrollToCTA);
+    }
+  }
+
+  function handleAmazonQtyPick(qty: 3 | 4) {
+    setAmazonMultiQty(qty);
+    handleOptionSelect("amazon-3-4", qty);
+  }
+
+  function handleDtcBestQtyPick(qty: 8 | 12) {
+    setDtcBestQty(qty);
+    handleOptionSelect("dtc-best", qty);
+  }
+
+  function handlePrimaryCtaClick() {
+    if (isAmazonSelection) {
+      trackEvent("bundle_amazon_click", {
+        qty: amazonSelectedQty,
+        variant,
+        anchorId: anchorId || null,
+      });
+      if (typeof window !== "undefined") {
+        window.open(AMAZON_LISTING_URL, "_blank", "noopener,noreferrer");
+      }
+      return;
+    }
+    addToCart(dtcSelectedQty, "cta");
+  }
+
   function isTierPurchasable(tier?: BundleTier | null) {
     if (!tier) return false;
     if (availableForSale === false) return false;
     return Number.isFinite(tier.totalPrice ?? NaN) && tier.totalPrice !== null;
+  }
+
+  function canPurchaseQty(qty: number) {
+    if (!singleBagVariantId) return false;
+    const tier = allTiers.find((item) => item.quantity === qty) || null;
+    return isTierPurchasable(tier);
   }
 
   const ctaDisabled = !singleBagVariantId || !isTierPurchasable(selectedTier);
@@ -257,6 +333,18 @@ export default function BundleQuickBuy({
       }),
     [selectableTiers, availableForSale]
   );
+
+  const isAmazonSelection = selectedOption.startsWith("amazon");
+  const amazonSelectedQty =
+    selectedOption === "amazon-1" ? 1 : selectedOption === "amazon-2" ? 2 : amazonMultiQty;
+  const dtcSelectedQty = selectedOption === "dtc-best" ? dtcBestQty : 5;
+  const activeQty = isAmazonSelection ? amazonSelectedQty : dtcSelectedQty;
+  const activePricing = pricingForQty(activeQty);
+  const activeTotal = money(activePricing.total, "USD");
+  const activeSavings = !isAmazonSelection
+    ? money(Math.max(0, BASE_PRICE * activeQty - activePricing.total), "USD")
+    : null;
+  const compactCtaDisabled = isAmazonSelection ? false : !canPurchaseQty(dtcSelectedQty);
 
   function handleRadioKeyDown(
     event: React.KeyboardEvent<HTMLElement>,
@@ -295,6 +383,12 @@ export default function BundleQuickBuy({
     const t = window.setTimeout(() => setSuccess(false), 2200);
     return () => window.clearTimeout(t);
   }, [success]);
+
+  React.useEffect(() => {
+    if (selectedOption === "amazon-3-4" || selectedOption === "dtc-best") {
+      setShowMoreOptions(true);
+    }
+  }, [selectedOption]);
 
   async function addToCart(
     targetQty?: number,
@@ -465,91 +559,234 @@ export default function BundleQuickBuy({
       : null;
   const hasRegularLine = Boolean(basePerBag && regularTotal);
   const totalLabel = currentBags > 0 ? "New total" : "Total";
-  const selectorContent = (
-    <div
-      role="radiogroup"
-      aria-label="Bag count"
-      data-segmented-control
-      className={[
-        "w-full flex items-stretch gap-0 rounded-[999px] border overflow-hidden",
-        isLight ? "border-[rgba(15,27,45,0.12)] bg-white/90" : "border-white/15 bg-white/5",
-      ].join(" ")}
-    >
-      {primaryTiers.map((tier, index) => {
-        const isActive = String(tier.quantity) === selected;
-        const label =
-          tier.quantity === 8
-            ? "Most popular"
-            : tier.quantity === 12
-              ? "Best price"
-              : tier.quantity === 5
-                ? "Free shipping"
-                : "";
-        const qtyLabel = currentBags > 0 ? `Add ${tier.quantity} bags` : `${tier.quantity} bags`;
-        return (
-          <button
-            key={tier.quantity}
-            type="button"
-            role="radio"
-            aria-checked={isActive}
-            aria-disabled={!isTierPurchasable(tier)}
-            data-segment
-            data-active={isActive ? "true" : "false"}
-            onClick={() => handleSelect(tier.quantity, isTierPurchasable(tier))}
-            onKeyDown={(event) => handleRadioKeyDown(event, tier.quantity, isTierPurchasable(tier))}
-            className={[
-              "flex-1 px-3 py-2 text-[12px] font-semibold transition",
-              index > 0 ? "border-l border-[rgba(15,27,45,0.08)]" : "",
-              isActive
-                ? isLight
-                  ? "text-[var(--text)]"
-                  : "text-white"
-                : isLight
-                  ? "text-[var(--muted)] hover:text-[var(--text)]"
-                  : "text-white/70 hover:text-white",
-            ].join(" ")}
-          >
-            <span className="block text-[12px] font-semibold">{qtyLabel}</span>
-            {label ? <span className="block text-[10px] font-semibold opacity-70">{label}</span> : null}
-          </button>
-        );
-      })}
-    </div>
-  );
+  const optionCards: Array<{
+    id: ChannelOptionId;
+    channel: "amazon" | "dtc";
+    label: string;
+    price: string;
+    subtext: string;
+    badge?: string;
+    children?: Array<{ qty: number; label: string }>;
+  }> = [
+    {
+      id: "amazon-1",
+      channel: "amazon",
+      label: "1 Bag",
+      price: priceForQtyDisplay(1),
+      subtext: "Amazon free shipping",
+    },
+    {
+      id: "amazon-2",
+      channel: "amazon",
+      label: "2 Bags",
+      price: priceForQtyDisplay(2),
+      subtext: "Amazon free shipping",
+    },
+    {
+      id: "amazon-3-4",
+      channel: "amazon",
+      label: "3-4 Bags",
+      price: priceForQtyDisplay(3, "From"),
+      subtext: "Amazon free shipping",
+      children: [
+        { qty: 3, label: "3 bags" },
+        { qty: 4, label: "4 bags" },
+      ],
+    },
+    {
+      id: "dtc-5",
+      channel: "dtc",
+      label: "5 Bags",
+      price: priceForQtyDisplay(5),
+      subtext: "FREE shipping (USAG)",
+    },
+    {
+      id: "dtc-best",
+      channel: "dtc",
+      label: "8 / 12 Bags",
+      price: priceForQtyDisplay(8, "From"),
+      subtext: "Direct from USA Gummies",
+      badge: "Best Value",
+      children: [
+        { qty: 8, label: "8 bags" },
+        { qty: 12, label: "12 bags" },
+      ],
+    },
+  ];
+
+  const primaryOptionIds = new Set<ChannelOptionId>(["amazon-1", "amazon-2", "dtc-5"]);
+  const compactPriceLabel = isAmazonSelection ? "Amazon price" : "Total";
+  const compactSavingsLabel = isAmazonSelection
+    ? "Amazon free shipping"
+    : activeSavings
+      ? `Save ${activeSavings} total`
+      : "Free shipping included";
 
   const compactRail = (
     <div data-bundle-rail className="flex h-full flex-col gap-4">
-      <div data-rail-top className="space-y-2">
-        {selectorContent}
+      <div className="space-y-1">
+        <div className={isLight ? "text-[26px] font-bold text-[#161616]" : "text-[26px] font-bold text-white"}>
+          {activeTotal ? `${compactPriceLabel} ${activeTotal}` : compactPriceLabel}
+        </div>
+        <div className={isLight ? "text-[11px] font-semibold text-[#6B6B6B]" : "text-[11px] font-semibold text-white/70"}>
+          {compactSavingsLabel}
+        </div>
       </div>
-      <div data-rail-middle className="flex flex-col gap-2">
-        {selectedTotal ? (
-          <div className={isLight ? "text-[26px] font-bold text-[var(--text)]" : "text-[26px] font-bold text-white"}>
-            {totalLabel} {selectedTotal}
-          </div>
-        ) : null}
-        {selectedSavings ? (
-          <div className={isLight ? "text-[11px] font-semibold text-[var(--muted)]" : "text-[11px] font-semibold text-white/70"}>
-            <span className={isLight ? "text-[var(--candy-red)]" : "text-[var(--gold)]"}>
-              Save {selectedSavings} total
-            </span>
-          </div>
-        ) : null}
+
+      <div className="rounded-[16px] border border-[#E6E0DA] bg-[#F7F3EF] p-4">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#6B6B6B]">
+          Choose your quantity
+        </div>
+        <div className="mt-1 text-[11px] text-[#6B6B6B]">
+          1-4 bags ship free with Amazon. 5+ bags ship free direct.
+        </div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-5">
+          {optionCards.map((option) => {
+            const isExtra = !primaryOptionIds.has(option.id);
+            const isActive = selectedOption === option.id;
+            const optionQty =
+              option.id === "amazon-1"
+                ? 1
+                : option.id === "amazon-2"
+                  ? 2
+                  : option.id === "amazon-3-4"
+                    ? amazonMultiQty
+                    : option.id === "dtc-5"
+                      ? 5
+                      : dtcBestQty;
+            const isDisabled = option.channel === "dtc" && !canPurchaseQty(optionQty);
+            const badgeClass =
+              option.badge === "Best Value"
+                ? "bg-[#E7F5EC] text-[#1F6B3B]"
+                : "bg-[#FCE8E7] text-[#B12E28]";
+            return (
+              <label
+                key={option.id}
+                role="radio"
+                aria-checked={isActive}
+                aria-disabled={isDisabled}
+                className={[
+                  "relative flex min-h-[120px] flex-col rounded-[16px] border bg-white p-3 text-left transition focus-within:ring-2 focus-within:ring-[rgba(214,69,61,0.25)] focus-within:ring-offset-2 focus-within:ring-offset-[#F7F3EF]",
+                  isActive
+                    ? "border-[#D6453D] shadow-[0_10px_24px_rgba(214,69,61,0.2)]"
+                    : "border-[#E6E0DA] hover:border-[rgba(214,69,61,0.45)]",
+                  isDisabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer",
+                  isExtra ? (showMoreOptions ? "block" : "hidden sm:block") : "block",
+                ].join(" ")}
+              >
+                <input
+                  type="radio"
+                  name="bundle-channel"
+                  value={option.id}
+                  checked={isActive}
+                  onChange={() => handleOptionSelect(option.id)}
+                  className="sr-only"
+                  disabled={isDisabled}
+                />
+                <div className="flex items-start justify-between gap-2">
+                  <span
+                    className={[
+                      "inline-flex h-4 w-4 items-center justify-center rounded-full border text-[10px]",
+                      isActive ? "border-[#D6453D] text-[#D6453D]" : "border-[#C9C1B9] text-[#C9C1B9]",
+                    ].join(" ")}
+                    aria-hidden="true"
+                  >
+                    {isActive ? "●" : "○"}
+                  </span>
+                  {option.badge ? (
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${badgeClass}`}>
+                      {option.badge}
+                    </span>
+                  ) : null}
+                </div>
+                <div className="mt-2 text-[13px] font-semibold text-[#161616]">{option.label}</div>
+                <div className="mt-1 text-[20px] font-black text-[#161616]">{option.price}</div>
+                <div className="mt-1 text-[11px] text-[#6B6B6B]">{option.subtext}</div>
+                <div className="mt-2 inline-flex items-center gap-1.5 text-[10px] font-semibold text-[#6B6B6B]">
+                  {option.channel === "amazon" ? (
+                    <>
+                      <Image
+                        src={AMAZON_LOGO_URL}
+                        alt="Amazon"
+                        width={48}
+                        height={14}
+                        className="h-3 w-auto opacity-80"
+                      />
+                      <span>Available on Amazon</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg viewBox="0 0 24 24" className="h-3 w-3 text-[#D6453D]" aria-hidden="true">
+                        <path
+                          fill="currentColor"
+                          d="m12 2 2.7 5.5 6 .9-4.4 4.3 1 6-5.3-2.9-5.3 2.9 1-6L3.3 8.4l6-.9L12 2z"
+                        />
+                      </svg>
+                      <span>Direct from USA Gummies</span>
+                    </>
+                  )}
+                </div>
+                {option.children ? (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {option.children.map((child) => {
+                      const isChildActive =
+                        option.id === "amazon-3-4"
+                          ? amazonMultiQty === child.qty
+                          : dtcBestQty === child.qty;
+                      return (
+                        <button
+                          key={child.qty}
+                          type="button"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            if (option.id === "amazon-3-4") {
+                              handleAmazonQtyPick(child.qty as 3 | 4);
+                            } else {
+                              handleDtcBestQtyPick(child.qty as 8 | 12);
+                            }
+                          }}
+                          className={[
+                            "rounded-full border px-2 py-0.5 text-[10px] font-semibold",
+                            isChildActive
+                              ? "border-[#D6453D] bg-[#FCE8E7] text-[#B12E28]"
+                              : "border-[#E6E0DA] text-[#6B6B6B] hover:border-[#D6453D]/50",
+                          ].join(" ")}
+                        >
+                          {child.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </label>
+            );
+          })}
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowMoreOptions((prev) => !prev)}
+          className="mt-2 text-xs font-semibold text-[#6B6B6B] underline underline-offset-4 sm:hidden"
+        >
+          {showMoreOptions ? "Fewer bundle options" : "More bundle options"}
+        </button>
+      </div>
+
+      <div className="flex flex-col gap-2">
         <button
           data-primary-cta
           type="button"
           className={[
-            "w-full inline-flex items-center justify-center rounded-[12px] h-[54px] px-4 sm:px-5 text-[16px] sm:text-[17px] font-semibold whitespace-nowrap shadow-[0_14px_36px_rgba(214,64,58,0.28)] hover:brightness-110 active:brightness-95 disabled:opacity-60 disabled:cursor-not-allowed leading-tight relative overflow-hidden",
-            isLight
-              ? "bg-[var(--candy-red)] text-white shadow-[0_16px_36px_rgba(239,59,59,0.32)]"
-              : "bg-[var(--red)] text-white",
+            "w-full inline-flex items-center justify-center rounded-[12px] h-[48px] px-4 text-[16px] font-semibold whitespace-nowrap shadow-[0_14px_36px_rgba(214,64,58,0.28)] transition disabled:opacity-60 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-[rgba(214,69,61,0.25)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#F7F3EF]",
+            isAmazonSelection
+              ? "bg-[#1F1F1F] text-white hover:bg-black"
+              : "bg-[#D6453D] text-white hover:bg-[#BF3B34] active:bg-[#A7322C]",
           ].join(" ")}
-          onClick={() => addToCart()}
-          disabled={isAdding || ctaDisabled}
+          onClick={handlePrimaryCtaClick}
+          disabled={isAdding || compactCtaDisabled}
         >
-          <span className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.14),transparent_50%)] opacity-95" />
-          <span className="relative inline-flex items-center gap-2">
-            {isAdding ? (
+          <span className="inline-flex items-center gap-2">
+            {!isAmazonSelection && isAdding ? (
               <>
                 <span
                   aria-hidden="true"
@@ -558,101 +795,87 @@ export default function BundleQuickBuy({
                 Adding...
               </>
             ) : (
-              selectedAdded ? "Added to Cart" : primaryCtaLabel
+              <>
+                {isAmazonSelection ? (
+                  <Image
+                    src={AMAZON_LOGO_URL}
+                    alt="Amazon"
+                    width={48}
+                    height={14}
+                    className="h-4 w-auto"
+                  />
+                ) : null}
+                <span>{isAmazonSelection ? "Buy on Amazon" : selectedAdded ? "Added to Cart" : "Add to Cart"}</span>
+                {isAmazonSelection ? (
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+                    <path
+                      fill="currentColor"
+                      d="M14 3h7v7h-2V6.4l-8.3 8.3-1.4-1.4L17.6 5H14V3zM5 5h5V3H3v7h2V5zm0 14v-5H3v7h7v-2H5z"
+                    />
+                  </svg>
+                ) : null}
+              </>
             )}
           </span>
         </button>
-      </div>
-      <div data-rail-bottom className="mt-auto space-y-3">
-        <div
-          data-rail-trust
-          className={[
-            "grid gap-1.5 text-[11px] font-semibold",
-            isLight ? "text-[var(--muted)]" : "text-white/70",
-          ].join(" ")}
-        >
-          <div className="flex items-center gap-2">
-            <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
-              <path
-                fill="currentColor"
-                d="M3 7h11l4 4v6h-2a3 3 0 0 1-6 0H8a3 3 0 0 1-6 0H1V9a2 2 0 0 1 2-2zm13 1.5V7H5v3h11v-1.5zM6.5 19a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zm9 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"
-              />
-            </svg>
-            <span>Ships within 24 hours</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
-              <path
-                fill="currentColor"
-                d="M12 2a5 5 0 0 1 5 5v2h2v4h-2.1A6 6 0 1 1 7 9h5V7a3 3 0 0 0-3-3H6V2h6z"
-              />
-            </svg>
-            <span>Easy returns</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
-              <path
-                fill="currentColor"
-                d="M6 10V8a6 6 0 1 1 12 0v2h1v12H5V10h1zm2 0h8V8a4 4 0 1 0-8 0v2z"
-              />
-            </svg>
-            <span>Secure checkout</span>
-          </div>
+        <div className={isLight ? "text-[11px] font-semibold text-[#6B6B6B]" : "text-[11px] font-semibold text-white/70"}>
+          {isAmazonSelection
+            ? "Prime shipping + helps our Amazon ranking 🇺🇸"
+            : "Direct from USA Gummies — free shipping included."}
         </div>
-        <div className={isLight ? "text-xs text-[var(--muted)]" : "text-xs text-white/65"}>
-          Buying 1-4 bags?{" "}
-          <a
-            href={AMAZON_LISTING_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={
-              isLight
-                ? "inline-flex items-center gap-2 font-semibold text-[var(--text)] underline underline-offset-4 hover:text-[var(--navy)]"
-                : "inline-flex items-center gap-2 font-semibold text-white underline underline-offset-4 hover:text-white"
-            }
-          >
-            <Image
-              src={AMAZON_LOGO_URL}
-              alt="Amazon"
-              width={56}
-              height={16}
-              className="h-3.5 w-auto opacity-85"
+      </div>
+
+      <div
+        data-rail-trust
+        className={[
+          "flex flex-wrap items-center gap-3 text-[11px] font-semibold",
+          isLight ? "text-[#6B6B6B]" : "text-white/70",
+        ].join(" ")}
+      >
+        <span className="inline-flex items-center gap-2">
+          <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+            <path
+              fill="currentColor"
+              d="M3 7h11l4 4v6h-2a3 3 0 0 1-6 0H8a3 3 0 0 1-6 0H1V9a2 2 0 0 1 2-2zm13 1.5V7H5v3h11v-1.5zM6.5 19a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zm9 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"
             />
-            <span>Available on Amazon</span>
-          </a>
-          .
-        </div>
-        <div className={isLight ? "text-[11px] font-semibold text-[var(--muted)]" : "text-[11px] font-semibold text-white/70"}>
-          ⭐ {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars from verified Amazon buyers
-        </div>
-        {error ? (
-          <div
-            className={
-              isLight
-                ? "text-xs font-semibold text-red-500"
-                : "text-xs font-semibold text-red-200"
-            }
-          >
-            {error}
-          </div>
-        ) : null}
-        {success && !error ? (
-          <div
-            className={
-              isLight
-                ? "text-xs font-semibold text-[var(--candy-green)]"
-                : "text-xs font-semibold text-[var(--gold)]"
-            }
-          >
-            {lastAddedQty ? `Added ${lastAddedQty} bags to cart.` : "Added to cart."}
-          </div>
-        ) : null}
-        {ctaDisabled && availableForSale === false && !error ? (
-          <div className={isLight ? "text-xs text-[var(--muted)]" : "text-xs text-white/60"}>
-            Out of stock.
-          </div>
-        ) : null}
+          </svg>
+          <span>Ships in 24 hours</span>
+        </span>
+        <span className="inline-flex items-center gap-2">
+          <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+            <path
+              fill="currentColor"
+              d="M12 2a5 5 0 0 1 5 5v2h2v4h-2.1A6 6 0 1 1 7 9h5V7a3 3 0 0 0-3-3H6V2h6z"
+            />
+          </svg>
+          <span>Easy returns</span>
+        </span>
+        <span className="inline-flex items-center gap-2">
+          <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+            <path
+              fill="currentColor"
+              d="M6 10V8a6 6 0 1 1 12 0v2h1v12H5V10h1zm2 0h8V8a4 4 0 1 0-8 0v2z"
+            />
+          </svg>
+          <span>Secure checkout</span>
+        </span>
       </div>
+
+      {error ? (
+        <div className={isLight ? "text-xs font-semibold text-red-500" : "text-xs font-semibold text-red-200"}>
+          {error}
+        </div>
+      ) : null}
+      {success && !error ? (
+        <div className={isLight ? "text-xs font-semibold text-[var(--candy-green)]" : "text-xs font-semibold text-[var(--gold)]"}>
+          {lastAddedQty ? `Added ${lastAddedQty} bags to cart.` : "Added to cart."}
+        </div>
+      ) : null}
+      {compactCtaDisabled && !isAmazonSelection && availableForSale === false && !error ? (
+        <div className={isLight ? "text-xs text-[var(--muted)]" : "text-xs text-white/60"}>
+          Out of stock.
+        </div>
+      ) : null}
     </div>
   );
 
