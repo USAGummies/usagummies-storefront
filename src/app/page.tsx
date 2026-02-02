@@ -249,10 +249,10 @@ export default async function HomePage() {
           <div className="relative grid gap-1 lg:gap-2 lg:grid-cols-[1fr_1fr] lg:items-center">
             <div className="order-2 relative lg:order-1">
               <div className="relative z-10 space-y-0.5">
-                <h1 className="text-[32px] font-black leading-[1.05] tracking-tight text-[var(--navy)] sm:text-4xl lg:text-5xl">
+                <h1 className="text-balance text-[32px] font-black leading-[1.05] tracking-tight text-[var(--navy)] sm:text-4xl lg:text-5xl">
                   All-American Gummy Bears
                 </h1>
-                <p className="text-[12px] text-[var(--text)] sm:text-sm">
+                <p className="text-pretty text-[12px] text-[var(--text)] sm:text-sm">
                   Soft, chewy, classic gummy bears — made in the USA.
                 </p>
                 <div className="text-sm font-semibold text-[var(--navy)]">
@@ -565,10 +565,10 @@ export default async function HomePage() {
                       Why USA Gummies
                     </div>
                   </div>
-                  <h2 className="text-2xl font-black text-[var(--text)] sm:text-3xl">
+                  <h2 className="text-balance text-2xl font-black text-[var(--text)] sm:text-3xl">
                     Why USA Gummies matters.
                   </h2>
-                  <p className="text-sm text-[var(--muted)]">
+                  <p className="text-pretty text-sm text-[var(--muted)]">
                     Proudly sourced, manufactured, and packed entirely in America. No artificial
                     dyes or synthetic colors. Classic gummy bear flavor — done right.
                   </p>
@@ -605,7 +605,7 @@ export default async function HomePage() {
                       <div className="text-sm font-black text-[var(--text)]">
                         Classic gummy bear flavor — done right.
                       </div>
-                    <div className="text-xs text-[var(--muted)]">
+                    <div className="text-pretty text-xs text-[var(--muted)]">
                       All the chewy, fruity flavor you expect, without artificial dyes or harsh aftertaste.
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -784,10 +784,10 @@ export default async function HomePage() {
                 Our story
               </div>
             </div>
-            <h2 className="mt-2 text-2xl font-black text-[var(--text)] sm:text-3xl">
+            <h2 className="text-balance mt-2 text-2xl font-black text-[var(--text)] sm:text-3xl">
               {BRAND_STORY_HEADLINE}
             </h2>
-            <div className="mt-3 space-y-3 text-sm text-[var(--muted)]">
+            <div className="mt-3 copy-stack copy-stack--rail text-sm text-[var(--muted)] text-pretty">
               {BRAND_STORY_PARAGRAPHS.map((paragraph) => (
                 <p key={paragraph}>{paragraph}</p>
               ))}

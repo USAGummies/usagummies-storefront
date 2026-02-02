@@ -446,6 +446,31 @@ details > summary::-webkit-details-marker{
   border-radius: 999px;
   display: inline-block;
 }
+.text-balance{
+  text-wrap: balance;
+}
+.text-pretty{
+  text-wrap: pretty;
+}
+.copy-stack{
+  display: grid;
+  gap: 8px;
+}
+.copy-stack--compact{
+  gap: 6px;
+}
+.copy-stack p{
+  margin: 0;
+  line-height: 1.6;
+}
+.copy-stack--rail p{
+  padding-left: 10px;
+  border-left: 2px solid rgba(199, 54, 44, 0.22);
+}
+.copy-stack--rail p:first-child{
+  color: var(--text);
+  font-weight: 600;
+}
 .metal-panel--light{
   background-color: var(--surface-strong);
   background-image: none;

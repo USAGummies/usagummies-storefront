@@ -130,10 +130,10 @@ export function AmericanDreamCallout({
         <div
           className={
             isLight
-              ? `rounded-2xl border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] ${
+              ? `text-pretty rounded-2xl border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] ${
                   isCompact ? "p-2.5 text-[13px]" : "p-3 text-sm"
                 } text-[var(--text)]`
-              : `rounded-2xl border border-[rgba(199,160,98,0.4)] bg-[rgba(12,20,38,0.8)] ${
+              : `text-pretty rounded-2xl border border-[rgba(199,160,98,0.4)] bg-[rgba(12,20,38,0.8)] ${
                   isCompact ? "p-2.5 text-[13px]" : "p-3 text-sm"
                 } text-white/85`
           }
@@ -142,11 +142,15 @@ export function AmericanDreamCallout({
         </div>
 
         <div
-          className={
+          className={[
+            "copy-stack copy-stack--rail text-pretty",
+            isCompact ? "copy-stack--compact" : "",
             isLight
-              ? `${isCompact ? "space-y-2 text-[13px]" : "space-y-2 text-sm"} text-[var(--muted)]`
-              : `${isCompact ? "space-y-2 text-[13px]" : "space-y-2 text-sm"} text-white/75`
-          }
+              ? `${isCompact ? "text-[13px]" : "text-sm"} text-[var(--muted)]`
+              : `${isCompact ? "text-[13px]" : "text-sm"} text-white/75`,
+          ]
+            .filter(Boolean)
+            .join(" ")}
         >
           {paragraphs.map((line) => (
             <p key={line}>{line}</p>

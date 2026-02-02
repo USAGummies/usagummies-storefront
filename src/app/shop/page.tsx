@@ -248,10 +248,10 @@ export default async function ShopPage() {
               </div>
 
               <div className="space-y-1">
-                <h1 className="text-4xl font-black leading-[1.05] tracking-tight text-[var(--navy)] sm:text-5xl">
+                <h1 className="text-balance text-4xl font-black leading-[1.05] tracking-tight text-[var(--navy)] sm:text-5xl">
                   All-American Gummy Bears
                 </h1>
-                <p className="text-sm text-[var(--muted)] sm:text-base max-w-prose">
+                <p className="text-pretty text-sm text-[var(--muted)] sm:text-base max-w-prose">
                   Made in the USA. Colored naturally. Classic flavor done right.
                 </p>
               </div>
@@ -388,7 +388,7 @@ export default async function ShopPage() {
                 id="product-details"
                 className="buy-module__details min-w-0 scroll-mt-24"
               >
-                  <h2 className="text-2xl font-black text-[var(--text)] sm:text-3xl">
+                  <h2 className="text-balance text-2xl font-black text-[var(--text)] sm:text-3xl">
                     {productTitle}
                   </h2>
                   <div className="grid gap-1.5 text-sm text-[var(--muted)]">
@@ -496,10 +496,10 @@ export default async function ShopPage() {
                     Bag count guides
                   </div>
                 </div>
-                <h2 className="text-2xl font-black text-[var(--text)]">
+                <h2 className="text-balance text-2xl font-black text-[var(--text)]">
                   Need help picking a bag count?
                 </h2>
-                <p className="text-sm text-[var(--muted)] max-w-prose">
+                <p className="text-pretty text-sm text-[var(--muted)] max-w-prose">
                   Match the right bag count for gifts, parties, and bulk orders.
                 </p>
               </div>
@@ -559,10 +559,10 @@ export default async function ShopPage() {
                 Our story
               </div>
             </div>
-            <h2 className="mt-1.5 text-2xl font-black text-[var(--text)]">
+            <h2 className="text-balance mt-1.5 text-2xl font-black text-[var(--text)]">
               {BRAND_STORY_HEADLINE}
             </h2>
-            <div className="mt-2 space-y-3 text-sm text-[var(--muted)]">
+            <div className="mt-2 copy-stack copy-stack--rail text-sm text-[var(--muted)] text-pretty">
               {BRAND_STORY_MEDIUM.map((paragraph) => (
                 <p key={paragraph}>{paragraph}</p>
               ))}
