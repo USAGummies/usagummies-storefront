@@ -637,16 +637,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 Shipping
               </Link>
             </div>
-            <div className="text-xs text-[var(--muted)]">
-              <div className="font-semibold text-[var(--text)]">Other places to buy</div>
-              <a
-                href={AMAZON_LISTING_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="link-underline"
-              >
-                Amazon
-              </a>
+            <div className="flex flex-col items-start gap-2 text-xs text-[var(--muted)]">
+              <Link href="/shop" className="btn btn-candy btn-compact">
+                Shop now
+              </Link>
+              <div>
+                <div className="font-semibold text-[var(--text)]">Other places to buy</div>
+                <a
+                  href={AMAZON_LISTING_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="link-underline"
+                >
+                  Amazon
+                </a>
+              </div>
             </div>
           </div>
         </div>

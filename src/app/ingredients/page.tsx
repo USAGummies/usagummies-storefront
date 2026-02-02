@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
+import BundleQuickBuy from "@/components/home/BundleQuickBuy.client";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
+import { getBundleVariants } from "@/lib/bundles/getBundleVariants";
 
 function resolveSiteUrl() {
   const preferred = "https://www.usagummies.com";
@@ -179,7 +181,15 @@ const articleJsonLd = {
   image: [`${SITE_URL}/brand/usa-gummies-family.webp`],
 };
 
-export default function IngredientsPage() {
+export default async function IngredientsPage() {
+  let bundleVariants: Awaited<ReturnType<typeof getBundleVariants>> | null = null;
+  try {
+    bundleVariants = await getBundleVariants();
+  } catch {
+    bundleVariants = null;
+  }
+  const productHandle = "all-american-gummy-bears-7-5-oz-single-bag";
+
   return (
     <main className="relative overflow-hidden bg-[var(--bg)] text-[var(--text)] min-h-screen home-candy">
       <section className="relative overflow-hidden">
@@ -270,6 +280,36 @@ export default function IngredientsPage() {
                 </ul>
                 <div className="mt-3 text-xs text-[var(--muted)]">
                   Contains gelatin. Ingredients listed as shown on our 7.5 oz bag.
+                </div>
+                <div className="mt-4 rounded-2xl border border-[var(--border)] bg-white p-3" id="ingredients-buy">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
+                    Shop bundles
+                  </div>
+                  {bundleVariants ? (
+                    <BundleQuickBuy
+                      anchorId="ingredients-buy"
+                      productHandle={productHandle}
+                      tiers={bundleVariants.variants}
+                      singleBagVariantId={bundleVariants.singleBagVariantId}
+                      availableForSale={bundleVariants.availableForSale}
+                      variant="compact"
+                      tone="light"
+                      surface="flat"
+                      layout="classic"
+                      showHowItWorks={false}
+                      summaryCopy=""
+                      showTrainAccent={false}
+                      showAccent={false}
+                      showEducation={false}
+                      ctaVariant="simple"
+                      primaryCtaLabel="Unlock Best Value + Free Shipping"
+                      featuredQuantities={[5, 8, 12]}
+                    />
+                  ) : (
+                    <div className="p-3 text-sm text-[var(--muted)]">
+                      Pricing is loading. Please refresh to view bundle options.
+                    </div>
+                  )}
                 </div>
               </div>
 
