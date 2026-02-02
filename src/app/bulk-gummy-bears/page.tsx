@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { OccasionBagPicker } from "@/components/guides/OccasionBagPicker.client";
 import { OCCASION_BAG_OPTIONS } from "@/data/occasionBagOptions";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
+import { getBundleVariants } from "@/lib/bundles/getBundleVariants";
 
 function resolveSiteUrl() {
   const preferred = "https://www.usagummies.com";
@@ -86,7 +87,15 @@ const articleJsonLd = {
   },
 };
 
-export default function BulkGummyBearsPage() {
+export default async function BulkGummyBearsPage() {
+  let bundleVariants: Awaited<ReturnType<typeof getBundleVariants>> | null = null;
+  try {
+    bundleVariants = await getBundleVariants();
+  } catch {
+    bundleVariants = null;
+  }
+  const singleBagVariantId = bundleVariants?.singleBagVariantId;
+
   return (
     <main className="relative overflow-hidden bg-[#fffdf8] text-[var(--text)] min-h-screen pb-16">
       <section className="mx-auto max-w-6xl px-4 py-8 lg:py-10">
@@ -138,7 +147,11 @@ export default function BulkGummyBearsPage() {
             ))}
           </div>
           <div className="mt-6">
-            <OccasionBagPicker options={OCCASION_BAG_OPTIONS} defaultKey="bulk" />
+            <OccasionBagPicker
+              options={OCCASION_BAG_OPTIONS}
+              defaultKey="bulk"
+              singleBagVariantId={singleBagVariantId}
+            />
           </div>
 
           <div className="mt-6 flex flex-wrap items-center gap-3">

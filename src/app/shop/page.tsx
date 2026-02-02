@@ -453,7 +453,8 @@ export default async function ShopPage() {
                         showAccent={false}
                         showEducation={false}
                         ctaVariant="simple"
-                        primaryCtaLabel="Add to Cart"
+                        primaryCtaLabel="Unlock Best Value + Free Shipping"
+                        featuredQuantities={[5, 8, 12]}
                       />
                     ) : (
                       <div className="p-4 text-sm text-[var(--muted)]">
