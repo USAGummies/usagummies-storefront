@@ -239,7 +239,7 @@ export default async function ShopPage() {
       />
       <section className="relative overflow-hidden bg-[#fffdf8]">
 
-        <div className="relative mx-auto max-w-6xl px-4 py-6 lg:py-8">
+        <div className="relative mx-auto max-w-6xl px-4 py-5 lg:py-7">
           <div className="grid gap-3 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
             <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.32em] text-[var(--muted)] sm:text-xs">

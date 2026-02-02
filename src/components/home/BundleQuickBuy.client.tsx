@@ -684,7 +684,7 @@ export default function BundleQuickBuy({
                 aria-checked={isActive}
                 aria-disabled={isDisabled}
                 className={[
-                  "relative flex min-h-[112px] flex-col rounded-[16px] border bg-white p-3 text-left transition focus-within:ring-2 focus-within:ring-[rgba(214,69,61,0.25)] focus-within:ring-offset-2 focus-within:ring-offset-[#F7F3EF]",
+                  "relative flex min-h-[104px] flex-col rounded-[16px] border bg-white p-2.5 text-left transition focus-within:ring-2 focus-within:ring-[rgba(214,69,61,0.25)] focus-within:ring-offset-2 focus-within:ring-offset-[#F7F3EF]",
                   isActive
                     ? "border-[#D6453D] bg-[#FFF7F6] shadow-[0_10px_24px_rgba(214,69,61,0.2)]"
                     : "border-[#E6E0DA] hover:border-[rgba(214,69,61,0.45)]",
@@ -715,7 +715,7 @@ export default function BundleQuickBuy({
                     {option.badge}
                   </span>
                 ) : null}
-                <div className="mt-2 flex flex-1 flex-col pr-12 relative z-10">
+                <div className="mt-1.5 flex flex-1 flex-col pr-12 relative z-10">
                   <div className="text-[12px] font-semibold text-[#161616]">{option.label}</div>
                   <div className="mt-1 flex items-baseline gap-1 whitespace-nowrap">
                     {option.pricePrefix ? (
@@ -725,7 +725,7 @@ export default function BundleQuickBuy({
                     ) : null}
                     <span className="text-[15px] font-black text-[#161616]">{option.price}</span>
                   </div>
-                  <div className="mt-1 text-[10.5px] text-[#6B6B6B]">{option.subtext}</div>
+                  <div className="mt-1 text-[10px] text-[#6B6B6B]">{option.subtext}</div>
                   {isActive && option.children ? (
                     <div className="mt-2 flex flex-wrap gap-1">
                       {option.children.map((child) => {

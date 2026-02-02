@@ -537,10 +537,10 @@ export default async function HomePage() {
 
       <section className="bg-[var(--surface-strong)]" data-zone="STORY" id="why-usa-gummies">
         <div className="mx-auto max-w-6xl px-4 py-4 lg:py-5 reveal-up">
-          <div className="candy-panel americana-panel relative overflow-hidden rounded-[36px] p-4">
+          <div className="candy-panel americana-panel relative overflow-hidden rounded-[36px] p-3 sm:p-4">
             <div className="relative z-10">
-              <div className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
-                <div className="space-y-2">
+              <div className="grid gap-3 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
+                <div className="space-y-1.5">
                   <div className="flex justify-center lg:justify-start">
                     <Image
                       src="/website%20assets/MtRushmore.png"
@@ -548,8 +548,8 @@ export default async function HomePage() {
                       aria-hidden="true"
                       width={1398}
                       height={857}
-                      sizes="(max-width: 640px) 200px, (max-width: 1024px) 260px, 320px"
-                      className="brand-touch h-auto w-full max-w-[200px] sm:max-w-[240px] lg:max-w-[320px] object-contain"
+                      sizes="(max-width: 640px) 180px, (max-width: 1024px) 240px, 280px"
+                      className="brand-touch h-auto w-full max-w-[180px] sm:max-w-[220px] lg:max-w-[280px] object-contain"
                     />
                   </div>
                   <div className="flex items-center gap-2">
@@ -565,7 +565,7 @@ export default async function HomePage() {
                       Why USA Gummies
                     </div>
                   </div>
-                  <h2 className="text-balance text-2xl font-black text-[var(--text)] sm:text-3xl">
+                  <h2 className="text-balance text-xl font-black text-[var(--text)] sm:text-2xl">
                     Why USA Gummies matters.
                   </h2>
                   <p className="text-pretty text-sm text-[var(--muted)]">
@@ -585,8 +585,8 @@ export default async function HomePage() {
                   </div>
                 </div>
 
-                <div className="space-y-2 lg:pt-1">
-                  <div className="candy-panel americana-panel relative overflow-hidden rounded-3xl p-2 text-[var(--text)] lg:ml-auto lg:max-w-[440px]">
+                <div className="space-y-1.5 lg:pt-1">
+                  <div className="candy-panel americana-panel relative overflow-hidden rounded-3xl p-1.5 text-[var(--text)] lg:ml-auto lg:max-w-[400px]">
                     <div className="relative aspect-[5/4] overflow-hidden rounded-2xl border border-[rgba(15,27,45,0.1)] bg-[var(--surface-strong)] p-3">
                       <Image
                         src={whyImageSrc}
@@ -601,7 +601,7 @@ export default async function HomePage() {
                       </div>
                     </div>
                   </div>
-                    <div className="mt-2 space-y-1.5">
+                    <div className="mt-1.5 space-y-1">
                       <div className="text-sm font-black text-[var(--text)]">
                         Classic gummy bear flavor — done right.
                       </div>
