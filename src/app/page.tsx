@@ -464,7 +464,7 @@ export default async function HomePage() {
           <div className="mt-1.5 text-sm font-semibold text-[var(--text)]">
             Five classic gummy bear flavors.
           </div>
-          <div className="flavor-pill-row mt-3 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-[var(--muted)]">
+          <div className="flavor-pill-row mt-2 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-[var(--muted)]">
             <span className="candy-pill">
               <span className="candy-dot bg-[var(--candy-red)]" />
               Cherry
@@ -770,7 +770,7 @@ export default async function HomePage() {
 
       <section className="bg-[#fffdf8]" data-zone="STORY">
         <div className="mx-auto max-w-6xl px-4 py-5">
-          <div className="candy-panel americana-panel rounded-[36px] border border-[var(--border)] p-5 sm:p-6">
+          <div className="candy-panel americana-panel rounded-[36px] border border-[var(--border)] p-4 sm:p-5">
             <div className="flex items-center gap-2">
               <Image
                 src="/brand/logo.png"

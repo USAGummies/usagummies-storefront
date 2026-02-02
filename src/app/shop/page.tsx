@@ -239,15 +239,15 @@ export default async function ShopPage() {
       />
       <section className="relative overflow-hidden bg-[#fffdf8]">
 
-        <div className="relative mx-auto max-w-6xl px-4 py-7 lg:py-9">
-          <div className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
-            <div className="space-y-4">
+        <div className="relative mx-auto max-w-6xl px-4 py-6 lg:py-8">
+          <div className="grid gap-3 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
+            <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.32em] text-[var(--muted)] sm:text-xs">
                 <span className="rounded-full border border-[rgba(15,27,45,0.12)] bg-white px-3 py-1 text-[var(--navy)]">Made in the USA</span>
                 <span className="text-[var(--candy-red)]">No artificial dyes</span>
               </div>
 
-              <div className="space-y-1.5">
+              <div className="space-y-1">
                 <h1 className="text-4xl font-black leading-[1.05] tracking-tight text-[var(--navy)] sm:text-5xl">
                   All-American Gummy Bears
                 </h1>
@@ -256,7 +256,7 @@ export default async function ShopPage() {
                 </p>
               </div>
 
-              <div className="grid gap-1.5 text-sm text-[var(--muted)]">
+              <div className="grid gap-1 text-sm text-[var(--muted)]">
                 {HERO_BULLETS.map((line, idx) => (
                   <div key={line} className="flex items-start gap-2">
                     <span
@@ -278,7 +278,7 @@ export default async function ShopPage() {
                 Most customers save more when they add more bags.
               </div>
 
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="flex flex-wrap items-center gap-2">
                 <a href="#shop-bundles" className="btn btn-candy">
                   Lock in savings now
                 </a>
@@ -315,7 +315,7 @@ export default async function ShopPage() {
                 </Link>
               </div>
 
-              <div className="candy-panel rounded-3xl p-3">
+              <div className="candy-panel rounded-3xl p-2.5">
                 <div className="grid gap-2 sm:grid-cols-3">
                   <div className="space-y-1">
                     <div className="text-[10px] uppercase tracking-[0.24em] text-[var(--muted)]">Savings tiers</div>
@@ -420,6 +420,9 @@ export default async function ShopPage() {
                     </Link>
                     .
                   </div>
+                </div>
+
+                <div className="buy-module__rail min-w-0">
                   <div className="buy-module__image">
                     <div className="buy-module__imagePanel">
                       <div className="relative">
@@ -432,9 +435,6 @@ export default async function ShopPage() {
                       </div>
                     </div>
                   </div>
-                </div>
-
-                <div className="buy-module__rail min-w-0">
                   <div className="buy-module__bundle">
                     {bundleVariants ? (
                       <BundleQuickBuy
@@ -466,7 +466,7 @@ export default async function ShopPage() {
 
             </div>
           </div>
-          <div className="mt-3">
+          <div className="mt-2">
             <AmericanDreamCallout
               variant="compact"
               tone="light"
@@ -480,7 +480,7 @@ export default async function ShopPage() {
 
       <section aria-label="Bag count guides" className="bg-[#fffdf8]">
         <div className="mx-auto max-w-6xl px-4 pb-5 lg:pb-6">
-          <div className="candy-panel americana-panel rounded-[32px] p-4 sm:p-5">
+          <div className="candy-panel americana-panel rounded-[32px] p-3 sm:p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
@@ -545,7 +545,7 @@ export default async function ShopPage() {
 
       <section aria-label="Our story" className="bg-[#fffdf8]">
         <div className="mx-auto max-w-6xl px-4 pb-5 lg:pb-6">
-          <div className="candy-panel rounded-[32px] p-4 sm:p-5">
+          <div className="candy-panel rounded-[32px] p-3 sm:p-4">
             <div className="flex items-center gap-2">
               <Image
                 src="/brand/logo.png"
