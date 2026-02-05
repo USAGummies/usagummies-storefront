@@ -762,8 +762,6 @@ export default function BundleQuickBuy({
             ? "Amazon checkout saves you on shipping."
             : "Direct from USA Gummies. Free shipping at 5+ bags."}
         </div>
-      </div>
-
         <div
           data-rail-trust
           className={[
