@@ -139,11 +139,11 @@ details > summary::-webkit-details-marker{
   display: none !important;
 }
 .home-purchase-stage{
-  margin-top: -10px;
+  margin-top: 12px;
 }
 @media (min-width: 1024px){
   .home-purchase-stage{
-    margin-top: -18px;
+    margin-top: 18px;
   }
 }
 @media (min-width: 768px){
@@ -1187,6 +1187,8 @@ a:focus-visible:not(.btn):not(.focus-ring),
     grid-template-areas:
       "details image bundle";
     align-items: stretch;
+    column-gap: 18px;
+    row-gap: 12px;
   }
   .bundle-home--shop .buy-module__image{
     align-self: stretch;
@@ -1204,9 +1206,17 @@ a:focus-visible:not(.btn):not(.focus-ring),
   }
   .bundle-home--shop .buy-module__imagePanel .media-frame > .relative{
     flex: 1;
-    min-height: 620px;
+    min-height: 680px;
     height: 100%;
-    aspect-ratio: 2 / 3;
+    aspect-ratio: 3 / 4;
+    padding: 18px;
+    box-sizing: border-box;
+  }
+  .bundle-home--shop .buy-module__imagePanel .media-frame > .relative img{
+    object-fit: contain !important;
+    inset: 6% !important;
+    width: 88% !important;
+    height: 88% !important;
   }
   .bundle-home--shop .buy-module__imagePanel .media-frame > div:last-child{
     margin-top: 8px;
@@ -2473,6 +2483,22 @@ a:focus-visible:not(.btn):not(.focus-ring),
     0 16px 36px rgba(15,27,45,0.12);
   flex: 1;
 }
+.bundle-quickbuy__panel > *{
+  position: relative;
+  z-index: 1;
+}
+.bundle-quickbuy__panel::before{
+  content: "";
+  position: absolute;
+  right: -24px;
+  bottom: -8px;
+  width: 320px;
+  height: 110px;
+  background: url("/website%20assets/Train-02.png") no-repeat right bottom / contain;
+  opacity: 0.9;
+  pointer-events: none;
+  z-index: 0;
+}
 .bundle-quickbuy__panel::after{
   content: "";
   position: absolute;
@@ -2484,6 +2510,7 @@ a:focus-visible:not(.btn):not(.focus-ring),
   background: radial-gradient(circle, rgba(239,59,59,0.18), transparent 70%);
   opacity: 0.6;
   pointer-events: none;
+  z-index: 0;
 }
 .bundle-quickbuy__kicker{
   font-size: 10px;
@@ -2572,6 +2599,11 @@ a:focus-visible:not(.btn):not(.focus-ring),
   }
   .bundle-quickbuy__panel [data-segment]{
     padding: 12px 8px;
+  }
+}
+@media (max-width: 1023px){
+  .bundle-quickbuy__panel::before{
+    display: none;
   }
 }
 .atomic-buy__bundle [data-bundle-cta-trust]{

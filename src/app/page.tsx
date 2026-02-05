@@ -240,6 +240,16 @@ export default async function HomePage() {
           <div className="relative grid gap-1 lg:gap-2 lg:grid-cols-[1fr_1fr] lg:items-center">
             <div className="order-2 relative lg:order-1">
               <div className="relative z-10 space-y-0.5">
+                <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+                  <Image
+                    src="/brand/logo.png"
+                    alt="USA Gummies"
+                    width={72}
+                    height={24}
+                    className="h-5 w-auto"
+                  />
+                  <span>USA Gummies</span>
+                </div>
                 <h1 className="text-balance text-[32px] font-black leading-[1.05] tracking-tight text-[var(--navy)] sm:text-4xl lg:text-5xl">
                   All-American Gummy Bears
                 </h1>
@@ -249,17 +259,34 @@ export default async function HomePage() {
                 <div className="text-sm font-semibold text-[var(--navy)]">
                   No artificial dyes • All natural flavors
                 </div>
+                <div className="text-xs font-semibold text-[var(--muted)]">
+                  4.8 stars from verified Amazon buyers
+                </div>
                 <div className="pt-0 space-y-0.5">
                   <div className="text-xs font-semibold text-[var(--muted)]">
                     Lower the per-bag price at 4+ bags.
                   </div>
-                  <div className="flex flex-col gap-0.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Link href="#bundle-pricing" className="btn btn-candy">
+                      Shop &amp; save
+                    </Link>
                     <a href="#bundle-pricing" className="hero-scroll-link" data-hero-scroll>
                       Jump to bundle pricing
                     </a>
-                    <div className="text-xs font-semibold text-[var(--muted)]">
-                      {FREE_SHIPPING_PHRASE} • Satisfaction guaranteed
-                    </div>
+                  </div>
+                  <div className="text-xs font-semibold text-[var(--muted)]">
+                    {FREE_SHIPPING_PHRASE} • Satisfaction guaranteed
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 pt-0.5 text-[11px] font-semibold text-[var(--muted)]">
+                    <span className="rounded-full border border-[rgba(15,27,45,0.12)] bg-white px-3 py-1 text-[var(--navy)]">
+                      Made in USA
+                    </span>
+                    <span className="rounded-full border border-[rgba(15,27,45,0.12)] bg-white px-3 py-1 text-[var(--navy)]">
+                      Ships in 24 hours
+                    </span>
+                    <span className="rounded-full border border-[rgba(15,27,45,0.12)] bg-white px-3 py-1 text-[var(--navy)]">
+                      Secure checkout
+                    </span>
                   </div>
                 </div>
               </div>
