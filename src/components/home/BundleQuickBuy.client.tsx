@@ -297,13 +297,28 @@ export default function BundleQuickBuy({
 
   function handlePrimaryCtaClick() {
     if (isAmazonSelection) {
+      const amazonUrl = AMAZON_LISTING_URL;
+      let didNavigate = false;
+      const navigateToAmazon = () => {
+        if (didNavigate || typeof window === "undefined") return;
+        didNavigate = true;
+        window.location.href = amazonUrl;
+      };
       trackEvent("bundle_amazon_click", {
         qty: amazonSelectedQty,
         variant,
         anchorId: anchorId || null,
       });
+      trackEvent("amazon_redirect", {
+        event_category: "commerce",
+        event_label: "amazon_outbound",
+        quantity: amazonSelectedQty,
+        sku: "AAGB-7.5OZ",
+        source_page: typeof window !== "undefined" ? window.location.pathname : "",
+        event_callback: navigateToAmazon,
+      });
       if (typeof window !== "undefined") {
-        window.open(AMAZON_LISTING_URL, "_blank", "noopener,noreferrer");
+        window.setTimeout(navigateToAmazon, 1200);
       }
       return;
     }
