@@ -152,7 +152,7 @@ export default async function HomePage() {
   const whyImageSrc = whyImage?.url || "/brand/usa-gummies-family.webp";
   const whyImageAlt = whyImage?.altText || "USA Gummies in hand";
 
-  const heroMediaSrc = "/website%20assets/hero.jpg";
+  const heroMediaSrc = "/Hero-new.jpeg";
   let bundleVariants: Awaited<ReturnType<typeof getBundleVariants>> | null = null;
   try {
     bundleVariants = await getBundleVariants();

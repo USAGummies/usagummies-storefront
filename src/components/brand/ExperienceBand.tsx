@@ -35,15 +35,6 @@ export function ExperienceBand({ variant = "compact", className }: Props) {
       <div className="experience-band__trail" aria-hidden="true">
         <GummyIconRow size={12} className="opacity-90" />
       </div>
-      <Image
-        src="/website%20assets/StatueofLiberty.png"
-        alt=""
-        aria-hidden="true"
-        width={780}
-        height={1024}
-        sizes="(max-width: 768px) 1px, 260px"
-        className="experience-band__liberty"
-      />
 
       <div className="experience-band__inner">
         <div className="experience-band__header">

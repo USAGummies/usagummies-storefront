@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Image from "next/image";
 import { AMAZON_REVIEWS } from "@/data/amazonReviews";
 
 export type ReviewSource = "legacy" | "shopify";
@@ -275,7 +276,7 @@ export default function ReviewsSectionClient({ reviews }: Props) {
         />
         <div className="relative z-10">
           <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
-            <div className="space-y-3">
+            <div className="relative space-y-3 lg:pb-20">
               <div className="flex flex-wrap items-center gap-2 text-sm font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
                 <Stars rating={displayRating} size="md" />
                 <span>{ratingLine}</span>
@@ -300,6 +301,14 @@ export default function ReviewsSectionClient({ reviews }: Props) {
                   See all verified reviews
                 </button>
               </div>
+              <Image
+                src="/website%20assets/Train-02.png"
+                alt=""
+                aria-hidden="true"
+                width={2048}
+                height={559}
+                className="pointer-events-none hidden lg:block absolute left-0 bottom-0 w-full max-w-[420px] opacity-90"
+              />
             </div>
 
             <div className="hidden lg:grid gap-3">

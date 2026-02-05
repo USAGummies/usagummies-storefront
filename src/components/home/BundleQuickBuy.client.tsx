@@ -702,7 +702,7 @@ export default function BundleQuickBuy({
         </div>
       </div>
 
-      <div className="flex flex-col gap-2">
+      <div data-rail-bottom className="flex flex-col gap-2">
         <div className="space-y-1 text-[12px]">
           <div className="flex items-baseline justify-between font-semibold text-[#161616]">
             <span>{compactPriceLabel}</span>
@@ -764,25 +764,26 @@ export default function BundleQuickBuy({
         </div>
       </div>
 
-      <div
-        data-rail-trust
-        className={[
-          "flex flex-wrap items-center gap-3 text-[11px] font-semibold",
-          isLight ? "text-[#6B6B6B]" : "text-white/70",
-        ].join(" ")}
-      >
-        <span className="inline-flex items-center gap-2">
-          <span aria-hidden="true">🚚</span>
-          <span>Ships within 24 hours</span>
-        </span>
-        <span className="inline-flex items-center gap-2">
-          <span aria-hidden="true">✅</span>
-          <span>Satisfaction guaranteed</span>
-        </span>
-        <span className="inline-flex items-center gap-2">
-          <span aria-hidden="true">🔒</span>
-          <span>Secure checkout</span>
-        </span>
+        <div
+          data-rail-trust
+          className={[
+            "flex flex-wrap items-center gap-3 text-[11px] font-semibold",
+            isLight ? "text-[#6B6B6B]" : "text-white/70",
+          ].join(" ")}
+        >
+          <span className="inline-flex items-center gap-2">
+            <span aria-hidden="true">🚚</span>
+            <span>Ships within 24 hours</span>
+          </span>
+          <span className="inline-flex items-center gap-2">
+            <span aria-hidden="true">✅</span>
+            <span>Satisfaction guaranteed</span>
+          </span>
+          <span className="inline-flex items-center gap-2">
+            <span aria-hidden="true">🔒</span>
+            <span>Secure checkout</span>
+          </span>
+        </div>
       </div>
 
       {error ? (

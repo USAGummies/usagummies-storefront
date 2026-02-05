@@ -527,21 +527,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           sizes="(max-width: 1024px) 1px, 520px"
           className="site-watermark site-watermark--bomber"
         />
-        <Image
-          src="/website%20assets/StatueofLiberty.png"
-          alt=""
-          aria-hidden="true"
-          width={780}
-          height={1024}
-          sizes="(max-width: 1024px) 1px, 360px"
-          className="site-watermark site-watermark--liberty"
-        />
         <div className="relative z-10">{children}</div>
       </main>
 
       {showExperienceBand ? (
-        <section className="bg-[#fffdf8]">
-          <div className="mx-auto max-w-6xl px-4 pb-10">
+        <section className="bg-[#fffdf8] -mt-6">
+          <div className="mx-auto max-w-6xl px-4 pb-6">
             <ExperienceBand variant={experienceVariant} />
           </div>
         </section>
