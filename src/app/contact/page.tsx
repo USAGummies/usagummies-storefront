@@ -84,8 +84,8 @@ export default function ContactPage() {
                 copy: "Include your order number for faster support.",
               },
               {
-                title: "Shipping & returns",
-                copy: "See our policies for timing and return details.",
+                title: "Shipping & satisfaction guarantee",
+                copy: "See our policies for timing and how we make it right.",
                 link: "/policies",
               },
             ].map((item) => (

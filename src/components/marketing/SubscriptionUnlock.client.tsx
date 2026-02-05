@@ -63,7 +63,7 @@ export function SubscriptionUnlock({
             variant === "dark" ? "text-white/65" : "text-[var(--muted)]"
           )}
         >
-          Subscriptions unlock after your first order. Premium access only.
+          Subscriptions unlock after your first order. Access is by purchase.
         </div>
         <div
           className={cn(
@@ -91,17 +91,17 @@ export function SubscriptionUnlock({
           "text-[13px] font-black",
           variant === "dark" ? "text-white" : "text-[var(--text)]"
         )}
-      >
-        Subscription eligible
-      </div>
-      <div
-        className={cn(
-          "mt-1 text-[11px]",
-          variant === "dark" ? "text-white/65" : "text-[var(--muted)]"
-        )}
-      >
-        You joined the Revolution. Subscription access is now unlocked, and your invite will arrive by email.
-      </div>
+        >
+          Subscription access unlocked
+        </div>
+        <div
+          className={cn(
+            "mt-1 text-[11px]",
+            variant === "dark" ? "text-white/65" : "text-[var(--muted)]"
+          )}
+        >
+          You're in. Subscription access is unlocked, and your invite will arrive by email.
+        </div>
       <div
         className={cn(
           "mt-2 inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold",

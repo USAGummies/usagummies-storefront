@@ -138,6 +138,14 @@ details > summary::-webkit-details-marker{
 .home-product-stage .sceneOverlay{
   display: none !important;
 }
+.home-purchase-stage{
+  margin-top: -10px;
+}
+@media (min-width: 1024px){
+  .home-purchase-stage{
+    margin-top: -18px;
+  }
+}
 @media (min-width: 768px){
   .home-header--hidden{
     transform: translateY(-120%);
@@ -1103,30 +1111,25 @@ a:focus-visible:not(.btn):not(.focus-ring),
     linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(255,249,242,0.98) 100%);
 }
 .bundle-home--premium .buy-module__inner{
-  padding: clamp(12px, 2vw, 22px);
+  padding: clamp(8px, 1.4vw, 16px);
 }
 .bundle-home--premium .buy-module__layout{
   grid-template-areas:
     "details"
     "rail";
-  gap: 12px;
+  gap: 8px;
 }
 @media (min-width: 1024px){
   .bundle-home--premium .buy-module__layout{
-    grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr) minmax(0, 0.9fr);
     grid-template-areas:
-      "details rail";
+      "details image bundle";
     column-gap: 14px;
-    row-gap: 14px;
+    row-gap: 10px;
     align-items: start;
   }
   .bundle-home--premium .buy-module__rail{
-    display: grid;
-    grid-template-areas:
-      "image"
-      "bundle";
-    gap: 12px;
-    align-self: start;
+    display: contents;
   }
 }
 .bundle-home--premium .buy-module__details{
@@ -1143,11 +1146,11 @@ a:focus-visible:not(.btn):not(.focus-ring),
   justify-self: stretch;
 }
 .bundle-home--premium .buy-module__rail{
-  gap: 12px;
+  gap: 10px;
 }
 .bundle-home--premium .buy-module__imagePanel{
   border-radius: 20px;
-  padding: 10px;
+  padding: 8px;
   border: 1px solid rgba(15,27,45,0.12);
   background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,250,244,0.92));
   box-shadow: 0 14px 32px rgba(15,27,45,0.1);
@@ -1158,7 +1161,7 @@ a:focus-visible:not(.btn):not(.focus-ring),
 }
 @media (min-width: 1024px){
   .bundle-home--premium .buy-module__imagePanel .media-frame > .relative{
-    aspect-ratio: 5 / 4;
+    aspect-ratio: 16 / 11;
   }
   .bundle-home--premium .buy-module__image,
   .bundle-home--premium .buy-module__bundle{
@@ -1168,6 +1171,39 @@ a:focus-visible:not(.btn):not(.focus-ring),
   }
   .bundle-home--premium .buy-module__details .buy-module__image{
     max-width: none;
+  }
+}
+
+.bundle-home--shop .buy-module__details{
+  gap: 6px;
+}
+.bundle-home--shop .pill-row-tight .candy-pill{
+  padding: 3px 6px;
+  font-size: 9px;
+}
+@media (min-width: 1024px){
+  .bundle-home--shop .buy-module__image{
+    align-self: start;
+  }
+  .bundle-home--shop .buy-module__imagePanel{
+    display: flex;
+    height: auto;
+  }
+  .bundle-home--shop .buy-module__imagePanel .media-frame{
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+  }
+  .bundle-home--shop .buy-module__imagePanel .media-frame > .relative{
+    flex: 1;
+    min-height: 360px;
+    aspect-ratio: 4 / 5;
+  }
+  .bundle-home--shop .buy-module__imagePanel .media-frame > div:last-child{
+    margin-top: 8px;
+  }
+  .bundle-home--shop .buy-module__bundle{
+    align-self: start;
   }
 }
 
@@ -2397,6 +2433,97 @@ a:focus-visible:not(.btn):not(.focus-ring),
   padding: 0 16px;
   box-shadow: 0 12px 26px rgba(239,59,59,0.22);
 }
+.bundle-quickbuy__rail{
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 2px;
+}
+.bundle-quickbuy__panel{
+  border-radius: 16px;
+  border: 1px solid rgba(15,27,45,0.12);
+  background: #f7f3ef;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+.bundle-quickbuy__kicker{
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.bundle-quickbuy__sub{
+  font-size: 11px;
+  color: var(--muted);
+}
+.bundle-quickbuy__group{
+  display: grid;
+  gap: 6px;
+}
+.bundle-quickbuy__groupHeader{
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.bundle-quickbuy__groupTitle{
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+.bundle-quickbuy__groupMeta{
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.bundle-quickbuy__groupDetail{
+  margin-top: 4px;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.bundle-quickbuy__groupDetail span:first-child{
+  color: var(--text);
+}
+.bundle-quickbuy__panel [data-segmented-control]{
+  display: flex;
+}
+.bundle-quickbuy__panel [data-segment]{
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 6px 4px;
+  text-align: center;
+}
+.bundle-quickbuy__panel [data-segment] + [data-segment]{
+  border-left: 1px solid rgba(15,27,45,0.12);
+}
+.bundle-quickbuy__segmentLabel{
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text);
+}
+.bundle-quickbuy__segmentPrice{
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.bundle-quickbuy__panel [data-segment][data-active="true"]{
+  background: rgba(239,59,59,0.12);
+}
+.bundle-quickbuy__panel [data-segment][data-active="true"] .bundle-quickbuy__segmentLabel{
+  color: var(--candy-red);
+}
 .atomic-buy__bundle [data-bundle-cta-trust]{
   display: flex;
   flex-wrap: wrap;
@@ -2430,6 +2557,12 @@ a:focus-visible:not(.btn):not(.focus-ring),
 }
 .atomic-buy__bundle [data-bundle-reviews] > div{
   max-width: 100%;
+}
+@media (min-width: 1024px){
+  .atomic-buy__bundle [data-bundle-reviews]{
+    display: grid;
+    gap: 6px;
+  }
 }
 .atomic-buy__bundle [data-bundle-explore]{
   display: none;
@@ -2529,7 +2662,7 @@ a:focus-visible:not(.btn):not(.focus-ring),
 /* Support chat widget */
 .support-chat{
   position: fixed;
-  right: 18px;
+  right: max(18px, calc((100vw - 1120px) / 2 - 8px));
   bottom: 18px;
   z-index: 60;
   display: flex;
@@ -2660,7 +2793,7 @@ a:focus-visible:not(.btn):not(.focus-ring),
   border: none;
   background: var(--candy-red);
   color: #fff;
-  padding: 12px 18px;
+  padding: 10px 16px;
   font-weight: 700;
   box-shadow: 0 16px 30px rgba(239, 59, 59, 0.28);
 }

@@ -30,7 +30,7 @@ type Props = {
 export function OccasionBagPicker({
   options,
   defaultKey,
-  title = "Occasion quick picks",
+  title = "Quick picks by occasion",
   singleBagVariantId,
 }: Props) {
   const fallbackKey = options[0]?.key || "gift";
@@ -51,7 +51,7 @@ export function OccasionBagPicker({
 
   async function handleAdd(qty: number) {
     if (!singleBagVariantId) {
-      setError("Out of stock");
+      setError("Out of stock.");
       return;
     }
     setAddingQty(qty);
@@ -69,7 +69,7 @@ export function OccasionBagPicker({
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || json?.ok === false) {
-        throw new Error(json?.error || "Could not add to cart.");
+        throw new Error(json?.error || "Couldn't add to cart.");
       }
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("cart:updated"));

@@ -23,7 +23,7 @@ export default function ThankYouPage() {
             USA Gummies
           </div>
           <h1 className="text-3xl font-black text-[var(--text)] leading-tight">
-            You’re officially part of the movement 🇺🇸
+            You’re officially part of the movement.
           </h1>
           <div className="text-sm font-semibold text-[var(--muted)]">
             Made in USA • All Natural • No Artificial Dyes

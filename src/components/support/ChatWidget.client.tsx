@@ -14,13 +14,13 @@ const STARTER: ChatMessage[] = [
   {
     role: "assistant",
     content:
-      "Hi! I can help with shipping, ingredients, bag counts, or order questions. What can I help with?",
+      "Hi. I can help with shipping, ingredients, bag counts, or order questions. What do you need?",
   },
 ];
 
 const QUICK_LINKS = [
   { label: "Shipping", href: "/policies/shipping" },
-  { label: "Returns", href: "/policies/returns" },
+  { label: "Satisfaction guarantee", href: "/policies/returns" },
   { label: "Ingredients", href: "/ingredients" },
   { label: "FAQ", href: "/faq" },
 ];
@@ -30,9 +30,9 @@ const HUMAN_REQUEST_REGEX =
 const EMAIL_REGEX = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
 const PHONE_REGEX = /(\+?\d[\d\s().-]{7,}\d)/;
 const HUMAN_PROMPT =
-  "Happy to connect you with a representative. Please share your email or phone number and a brief note.";
+  "We can connect you with a real person. Please share your email or phone number and a brief note.";
 const HUMAN_CONFIRMATION =
-  "Thanks! Our team will reach out within one business day. If you have an order number, include it.";
+  "Thanks. Our team will reach out within one business day. If you have an order number, include it.";
 
 function safeParse(raw: string | null) {
   if (!raw) return null;

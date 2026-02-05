@@ -80,7 +80,7 @@ export function StickyAddToCartBar({
   title,
   imageUrl,
   imageAlt,
-  buttonLabel = "Buy now",
+  buttonLabel = "Checkout",
   source = "shop",
   className,
   containerClassName,
@@ -169,7 +169,7 @@ export function StickyAddToCartBar({
             <div className="text-sm font-semibold text-[var(--text)] truncate">
               {bagLabel} • {totalText}
             </div>
-            <div className="text-xs text-[var(--muted)]">Savings {savingsText}</div>
+            <div className="text-xs text-[var(--muted)]">You save {savingsText}</div>
           </div>
           <a
             href={checkoutHref}

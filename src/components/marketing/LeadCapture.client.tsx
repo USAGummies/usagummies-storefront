@@ -20,10 +20,10 @@ type LeadCaptureProps = {
 export function LeadCapture({
   source,
   intent = "newsletter",
-  title = "Join the revolution",
-  subtitle = "Early drops, savings alerts, and patriotic releases.",
+  title = "Join the list",
+  subtitle = "Early drops, bag-count tips, and the occasional note.",
   ctaLabel = "Join the list",
-  successMessage = "Thanks for joining. We will only send the good stuff.",
+  successMessage = "Thanks for joining. We'll keep it simple.",
   variant = "light",
   emphasis = "default",
   showSms = true,
@@ -150,7 +150,7 @@ export function LeadCapture({
             isDark ? "text-white/70 hover:text-white" : "text-[var(--muted)] hover:text-[var(--text)]"
           )}
         >
-          Add SMS alerts (optional)
+          Add text alerts (optional)
         </button>
       ) : null}
 

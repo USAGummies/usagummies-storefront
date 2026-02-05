@@ -26,7 +26,7 @@ export function ReviewHighlights({ variant = "light", limit = 2 }: Props) {
     >
       <div className={cn("text-[11px] font-semibold uppercase tracking-[0.24em]", isDark ? "text-white/60" : "text-[var(--muted)]")}
       >
-        Verified review highlights
+        Verified reviews
       </div>
       <div className="mt-3 grid gap-3">
         {list.map((review) => (

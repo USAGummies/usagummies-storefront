@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { AMAZON_REVIEWS } from "@/data/amazonReviews";
 
 export type ReviewSource = "legacy" | "shopify";
 
@@ -65,13 +66,13 @@ function VerifiedBadge({ source }: { source: ReviewSource }) {
   if (source === "shopify") {
     return (
       <span className="inline-flex items-center gap-1 rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-3 py-1 text-xs font-semibold text-[var(--text)]">
-        Shopify • Verified buyer
+        Verified buyer • Shopify
       </span>
     );
   }
   return (
     <span className="inline-flex items-center gap-1 rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-3 py-1 text-xs font-semibold text-[var(--text)]">
-      Verified buyer (prior store)
+      Verified buyer (previous store)
     </span>
   );
 }
@@ -133,10 +134,10 @@ function CardShell({
 
 function getStats(reviews: Review[]) {
   const list = reviews.filter((r) => r.verified);
-  if (!list.length) return { avg: 0, count: 0 };
+  if (!list.length) return { avg: 0 };
   const avg =
     list.reduce((sum, r) => sum + (Number(r.rating) || 0), 0) / list.length;
-  return { avg: Number.isFinite(avg) ? avg : 0, count: list.length };
+  return { avg: Number.isFinite(avg) ? avg : 0 };
 }
 
 export default function ReviewsSectionClient({ reviews }: Props) {
@@ -159,7 +160,10 @@ export default function ReviewsSectionClient({ reviews }: Props) {
     () => deduped.filter((r) => r.verified),
     [deduped]
   );
-  const { avg, count } = getStats(verified);
+  const { avg } = getStats(verified);
+  const amazonRating = AMAZON_REVIEWS.aggregate.rating;
+  const ratingLine = `${amazonRating.toFixed(1)} stars from verified Amazon buyers`;
+  const displayRating = Number.isFinite(amazonRating) ? amazonRating : avg || 5;
   const [modalOpen, setModalOpen] = React.useState(false);
   const [filter, setFilter] = React.useState<ReviewSource | "all">("all");
   const [sort, setSort] = React.useState<"newest" | "helpful">("newest");
@@ -269,34 +273,51 @@ export default function ReviewsSectionClient({ reviews }: Props) {
             ].join(","),
           }}
         />
-        <div className="relative z-10 space-y-3">
-          <div className="flex flex-wrap items-center gap-2 text-sm font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
-            <Stars rating={avg || 5} size="md" />
-            <span>
-              {count > 0
-                ? `Rated ${avg.toFixed(1)} by verified buyers (${count} reviews)`
-                : "Verified reviews coming in"}
-            </span>
-          </div>
+        <div className="relative z-10">
+          <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-2 text-sm font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
+                <Stars rating={displayRating} size="md" />
+                <span>{ratingLine}</span>
+              </div>
 
-          <div className="space-y-1.5">
-            <p className="text-sm text-[var(--muted)] sm:text-base">
-              Verified buyer feedback, always unedited.
-            </p>
-            <h2 className="text-xl font-bold text-[var(--text)] sm:text-2xl">
-              Made in the USA. Real reviews.
-            </h2>
-          </div>
+              <div className="space-y-1.5">
+                <p className="text-sm text-[var(--muted)] sm:text-base">
+                  Verified buyer feedback, straight from customers.
+                </p>
+                <h2 className="text-xl font-bold text-[var(--text)] sm:text-2xl">
+                  Made in the USA. Real reviews.
+                </h2>
+              </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={openModal}
-              className="btn btn-outline min-h-[40px] text-xs"
-              ref={triggerRef}
-            >
-              See all verified reviews
-            </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={openModal}
+                  className="btn btn-outline min-h-[40px] text-xs"
+                  ref={triggerRef}
+                >
+                  See all verified reviews
+                </button>
+              </div>
+            </div>
+
+            <div className="hidden lg:grid gap-3">
+              {verified.slice(0, 2).map((r) => (
+                <div
+                  key={r.id}
+                  className="rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white/80 p-3 text-sm text-[var(--muted)] shadow-[0_14px_30px_rgba(15,27,45,0.12)]"
+                >
+                  <div className="flex items-center gap-2">
+                    <Stars rating={r.rating} />
+                    <span className="text-xs font-semibold text-[var(--text)]">
+                      {r.authorName}
+                    </span>
+                  </div>
+                  <p className="mt-2 line-clamp-3 text-sm">"{r.body}"</p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -319,7 +340,7 @@ export default function ReviewsSectionClient({ reviews }: Props) {
                   Verified reviews
                 </div>
                 <div className="text-xs text-[var(--muted)]">
-                  Filter, sort, search, expand.
+                  Filter, sort, and search.
                 </div>
               </div>
               <button
@@ -344,7 +365,7 @@ export default function ReviewsSectionClient({ reviews }: Props) {
                 >
                   <option value="all">All sources</option>
                   <option value="shopify">Shopify</option>
-                  <option value="legacy">Prior store</option>
+                  <option value="legacy">Previous store</option>
                 </select>
               </div>
               <div className="space-y-2">
@@ -365,7 +386,7 @@ export default function ReviewsSectionClient({ reviews }: Props) {
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search review text"
+                  placeholder="Search reviews"
                   className="w-full rounded-xl border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-3 py-2 text-sm text-[var(--text)] placeholder:text-[var(--muted)]"
                 />
               </div>
@@ -374,7 +395,7 @@ export default function ReviewsSectionClient({ reviews }: Props) {
             <div className="mt-4 max-h-[60vh] space-y-3 overflow-y-auto pr-1">
               {filteredList.length === 0 ? (
                 <div className="text-sm text-[var(--muted)]">
-                  No verified reviews match those filters yet.
+                  No reviews match those filters yet.
                 </div>
               ) : (
                 filteredList.map((r) => {

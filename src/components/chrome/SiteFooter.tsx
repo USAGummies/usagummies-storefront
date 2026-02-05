@@ -4,7 +4,7 @@ export function SiteFooter() {
     <footer style={{ padding: "40px 0 60px" }}>
       <div className="container">
         <div className="card" style={{ padding: 22 }}>
-          <div className="h-eyebrow">Built in America. Shipped fast.</div>
+          <div className="h-eyebrow">Made in the USA. Shipped fast.</div>
           <div
             style={{
               marginTop: 10,

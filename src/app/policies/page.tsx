@@ -19,7 +19,7 @@ function resolveSiteUrl() {
 const SITE_URL = resolveSiteUrl();
 const PAGE_TITLE = "Policies | USA Gummies";
 const PAGE_DESCRIPTION =
-  "USA Gummies policies including shipping, returns, privacy, and terms of service. Transparent, customer-first, and easy to understand.";
+  "USA Gummies policies including shipping, satisfaction guarantee, privacy, and terms of service. Transparent, customer-first, and easy to understand.";
 const OG_IMAGE = "/opengraph-image";
 
 export const metadata: Metadata = {
@@ -57,8 +57,8 @@ const POLICIES = [
   },
   {
     href: "/policies/returns",
-    title: "Returns & Refunds",
-    desc: "Food-safety rules, damaged/incorrect orders, and refund timing.",
+    title: "Satisfaction Guarantee",
+    desc: "Food-safety rules, damaged/incorrect orders, and how we make it right.",
     icon: (
       <svg viewBox="0 0 24 24" className="h-5 w-5 text-[#DBAA79]" aria-hidden="true">
         <path
@@ -124,8 +124,8 @@ export default function PoliciesIndexPage() {
         <section className="candy-panel p-7">
           <h1 className="text-3xl font-semibold tracking-tight">Policies</h1>
           <p className="mt-3 text-[var(--muted)]">
-            Clear, customer-first policies covering shipping, refund, privacy, and terms of service
-            so checkout stays simple and expectations stay transparent.
+            Clear, customer-first policies covering shipping, satisfaction guarantee, privacy, and
+            terms of service so checkout stays simple and expectations stay transparent.
           </p>
 
           <div className="mt-7 grid gap-3 sm:grid-cols-2">

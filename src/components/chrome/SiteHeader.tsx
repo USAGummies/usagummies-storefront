@@ -35,8 +35,7 @@ export function SiteHeader() {
                 USA Gummies
               </span>
               <span className="chip">
-                <span>🇺🇸</span>
-                <span>American-Made</span>
+                <span>Made in the USA</span>
               </span>
             </Link>
 

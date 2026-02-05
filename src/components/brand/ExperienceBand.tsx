@@ -49,7 +49,7 @@ export function ExperienceBand({ variant = "compact", className }: Props) {
         <div className="experience-band__header">
           <div className="experience-band__eyebrow">The USA Gummies way</div>
           <div className="experience-band__title">
-            Premium American gummies, built for sharing.
+            Gummy bears made here, built for sharing.
           </div>
           <div className="experience-band__sub">
             Made in the USA. All natural flavors. No artificial dyes.
@@ -73,12 +73,12 @@ export function ExperienceBand({ variant = "compact", className }: Props) {
         <div className="experience-band__grid">
           <div className="experience-band__card">
             <div className="experience-band__cardEyebrow">Gifting</div>
-            <div className="experience-band__cardTitle">Gift-ready bundles</div>
+            <div className="experience-band__cardTitle">Gift bag options</div>
             <div className="experience-band__cardCopy">
-              Care packages, celebrations, and patriotic moments.
+              Care packages, celebrations, and family moments.
             </div>
             <Link href="/gummy-gift-bundles" className="experience-band__link">
-              Explore gift bundles
+              Explore gift options
             </Link>
           </div>
 
@@ -86,10 +86,10 @@ export function ExperienceBand({ variant = "compact", className }: Props) {
             <div className="experience-band__cardEyebrow">Rewards</div>
             <div className="experience-band__cardTitle">Early access + member perks</div>
             <div className="experience-band__cardCopy">
-              Join the Revolution for drops, exclusives, and savings.
+              Join the list for drops, exclusives, and savings.
             </div>
             <Link href="/join-the-revolution" className="experience-band__link">
-              Join the Revolution
+              Join the list
             </Link>
           </div>
 
@@ -97,7 +97,7 @@ export function ExperienceBand({ variant = "compact", className }: Props) {
             <div className="experience-band__cardEyebrow">Flavors</div>
             <div className="experience-band__cardTitle">Classic fruit lineup</div>
             <div className="experience-band__cardCopy">
-              Five classic flavors with natural color from fruit + vegetable extracts.
+              Five classic flavors with natural color from fruit and vegetable extracts.
             </div>
             <div className="experience-band__gummyRow" aria-hidden="true">
               <GummyIconRow size={14} className="opacity-80" />
@@ -109,18 +109,18 @@ export function ExperienceBand({ variant = "compact", className }: Props) {
 
           <div className="experience-band__card">
             <div className="experience-band__cardEyebrow">Made in USA</div>
-            <div className="experience-band__cardTitle">American-made proof</div>
+            <div className="experience-band__cardTitle">Made here, on purpose</div>
             <div className="experience-band__cardCopy">
-              Packed in FDA-compliant facilities with full U.S. sourcing.
+              Packed in FDA-compliant facilities here in the USA.
             </div>
             <Link href="/made-in-usa" className="experience-band__link">
-              See our process
+              See how it's made
             </Link>
           </div>
         </div>
 
         <div className="experience-band__footer">
-          Ships within 24 hours • Easy returns • Secure checkout
+          Ships within 24 hours • Satisfaction guaranteed • Secure checkout
         </div>
       </div>
     </section>

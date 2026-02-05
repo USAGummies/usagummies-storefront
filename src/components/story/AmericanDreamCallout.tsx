@@ -13,13 +13,13 @@ type Props = {
 };
 
 const STORY_HOOK =
-  "Every bag supports American manufacturing and American jobs. The American Dream is something to always strive for and try to achieve.";
+  "We make our gummies in the USA because it keeps things close, clear, and accountable.";
 
 const STORY_LINES = [
-  "Sourced, made, and packed right here in the USA! Our gummies are a symbol of strength, grit, and the unstoppable American spirit.",
-  "When you choose USA Gummies, you're backing American jobs, American business, and the star-spangled pursuit of greatness! Because in America, dreams do come true!",
-  "Every bite is a thunderous cheer for the American spirit, a heartfelt salute to the tireless workers, dreamers, and doers who drive this great nation's heartbeat.",
-  "So snag a handful of these freedom-packed gummies, savor the taste of freedom, and awaken the unstoppable spirit of your own American Dream!",
+  "No speeches. No slogans. Just making candy here.",
+  "That keeps the people, process, and ingredients close to home.",
+  "We'd rather earn trust the slow way.",
+  "If that sounds like you, you're in the right place.",
 ];
 
 function Star() {
@@ -107,7 +107,7 @@ export function AmericanDreamCallout({
 
         <div className="space-y-1">
           <div className={isLight ? "text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]" : "text-[11px] font-semibold uppercase tracking-[0.24em] text-white/60"}>
-            This is the
+            Made in the
           </div>
           <div
             className={
@@ -123,7 +123,7 @@ export function AmericanDreamCallout({
             United States of America
           </div>
           <div className={isLight ? "text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]" : "text-xs font-semibold uppercase tracking-[0.2em] text-white/70"}>
-            Land of the free, home of the brave
+            Made here. Made on purpose.
           </div>
         </div>
 
@@ -160,7 +160,7 @@ export function AmericanDreamCallout({
         <div className="flex flex-wrap items-center gap-3">
           {showJoinButton ? (
             <Link href="/join-the-revolution" className={isLight ? "btn btn-outline" : "btn btn-outline-white"}>
-              Join the Revolution
+              Join the list
             </Link>
           ) : null}
           {ctaHref && ctaLabel ? (

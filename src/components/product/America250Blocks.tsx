@@ -12,7 +12,7 @@ export function America250Blocks({ productTitle }: Props) {
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-lg font-semibold text-[var(--text)]">
-              Perfect for America 250 🇺🇸
+              Perfect for America 250
             </h2>
             <p className="mt-2 text-[var(--muted)]">
               If you’re planning a 4th of July party, a parade, a community event,

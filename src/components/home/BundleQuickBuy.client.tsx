@@ -59,8 +59,13 @@ function money(amount?: number | null, currency = "USD") {
   }).format(n);
 }
 
-function priceForQtyDisplay(qty: number, prefix?: string) {
-  const total = money(pricingForQty(qty).total, "USD");
+function priceForQtyDisplay(
+  qty: number,
+  prefix?: string,
+  opts?: { forceBase?: boolean }
+) {
+  const totalValue = opts?.forceBase ? BASE_PRICE * qty : pricingForQty(qty).total;
+  const total = money(totalValue, "USD");
   if (!total) return "";
   return prefix ? `${prefix} ${total}` : total;
 }
@@ -91,11 +96,11 @@ const FEATURED_QTYS_COMPACT: TierKey[] = ["1", "2", "3", "4", "5", "8", "12"];
 const SAVINGS_LADDER = [
   { qty: 4, label: "Savings start", caption: "4+ bags" },
   { qty: 5, label: "Free shipping", caption: "5+ bags" },
-  { qty: 8, label: "Most popular", caption: "8 bags" },
+  { qty: 8, label: "Most picked", caption: "8 bags" },
   { qty: 12, label: "Best price", caption: "12 bags" },
 ];
 const MISSION_TARGET_QTY = 8;
-const MISSION_SOCIAL_PROOF = "87% of shoppers end at 8 bags.";
+const MISSION_SOCIAL_PROOF = "8 bags is the most popular pick.";
 
 export default function BundleQuickBuy({
   tiers = [],
@@ -134,17 +139,16 @@ export default function BundleQuickBuy({
   );
   const missionCtaLabel =
     missionRemaining > 0
-      ? `Lock in savings now: add ${missionRemaining} bag${missionRemaining === 1 ? "" : "s"} (total ${MISSION_TARGET_QTY})`
-      : `Savings locked at ${MISSION_TARGET_QTY} bags`;
+      ? `Add ${missionRemaining} more bag${missionRemaining === 1 ? "" : "s"} to reach ${MISSION_TARGET_QTY}`
+      : `${MISSION_TARGET_QTY} bags locked in`;
   const mysteryBonusLine = bestPriceReached
-    ? "Mystery extra revealed: Patriot Pride sticker (while supplies last)."
-    : "Mystery extra unlocks at 12 bags.";
+    ? "Mystery extra included at 12 bags (while supplies last)."
+    : "Mystery extra at 12 bags (while supplies last).";
   const ctaRef = React.useRef<HTMLDivElement | null>(null);
   const [selected, setSelected] = React.useState<TierKey>(() => (variant === "compact" ? "5" : "8"));
   const [selectedOption, setSelectedOption] = React.useState<ChannelOptionId>("dtc-5");
   const [amazonMultiQty, setAmazonMultiQty] = React.useState<3 | 4>(3);
   const [dtcBestQty, setDtcBestQty] = React.useState<8 | 12>(8);
-  const [showMoreOptions, setShowMoreOptions] = React.useState(false);
   const [addingQty, setAddingQty] = React.useState<number | null>(null);
   const [lastAddedQty, setLastAddedQty] = React.useState<number | null>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -208,13 +212,15 @@ export default function BundleQuickBuy({
   const selectedTierState = selectedTier ? resolveTier(selectedTier) : null;
   const perBagCapText = money(MIN_PER_BAG, "USD");
   const reviewSnippets = REVIEW_HIGHLIGHTS.slice(0, 2);
+  const shippingAdvocateLine =
+    "5+ bags ship free from us. Under 5 bags, we send you to Amazon to save you on shipping.";
   const summaryLine =
     summaryCopy !== undefined
       ? summaryCopy
       : showEducation
         ? currentBags > 0
-          ? `In your cart: ${currentBags} bags. Add more to save. ${FREE_SHIPPING_PHRASE}.`
-          : `${FREE_SHIPPING_PHRASE}. Most customers choose 8 bags.`
+          ? `In your cart: ${currentBags} bags. ${shippingAdvocateLine}`
+          : `${shippingAdvocateLine} 8 bags is the most popular pick.`
         : "";
   const selectedAdded = Boolean(
     selectedTier && lastAddedQty !== null && selectedTier.quantity === lastAddedQty
@@ -354,7 +360,9 @@ export default function BundleQuickBuy({
     selectedOption === "amazon-1" ? 1 : selectedOption === "amazon-2" ? 2 : amazonMultiQty;
   const dtcSelectedQty = selectedOption === "dtc-best" ? dtcBestQty : 5;
   const activeQty = isAmazonSelection ? amazonSelectedQty : dtcSelectedQty;
-  const activePricing = pricingForQty(activeQty);
+  const activePricing = isAmazonSelection
+    ? { total: BASE_PRICE * activeQty, perBag: BASE_PRICE }
+    : pricingForQty(activeQty);
   const activeTotal = money(activePricing.total, "USD");
   const activeSavings = !isAmazonSelection
     ? money(Math.max(0, BASE_PRICE * activeQty - activePricing.total), "USD")
@@ -398,12 +406,6 @@ export default function BundleQuickBuy({
     const t = window.setTimeout(() => setSuccess(false), 2200);
     return () => window.clearTimeout(t);
   }, [success]);
-
-  React.useEffect(() => {
-    if (selectedOption === "amazon-3-4" || selectedOption === "dtc-best") {
-      setShowMoreOptions(true);
-    }
-  }, [selectedOption]);
 
   async function addToCart(
     targetQty?: number,
@@ -495,9 +497,9 @@ export default function BundleQuickBuy({
     const isActive = String(tier.quantity) === selected;
     const bundleQty = tier.quantity;
     const canSelect = isTierPurchasable(tier);
-    const label =
-      bundleQty === 8
-        ? "Most popular"
+  const label =
+    bundleQty === 8
+        ? "Most picked"
         : bundleQty === 12
           ? "Best price"
           : bundleQty === 5
@@ -553,7 +555,7 @@ export default function BundleQuickBuy({
 
   const selectedLabel =
     selectedTier?.quantity === 8
-      ? "Most popular"
+      ? "Most picked"
       : selectedTier?.quantity === 12
         ? "Best price"
         : selectedTier?.quantity === 5
@@ -574,247 +576,130 @@ export default function BundleQuickBuy({
       : null;
   const hasRegularLine = Boolean(basePerBag && regularTotal);
   const totalLabel = currentBags > 0 ? "New total" : "Total";
-  const perBagForQty = (qty: number) => money(pricingForQty(qty).perBag, "USD");
-  const savingsForQty = (qty: number) => {
-    const pricing = pricingForQty(qty);
-    const savings = Math.max(0, BASE_PRICE * qty - (pricing.total ?? 0));
-    return savings > 0 ? money(savings, "USD") : null;
-  };
-  const perBagFive = perBagForQty(5);
-  const perBagBest = perBagForQty(dtcBestQty);
-  const savingsFive = savingsForQty(5);
-  const savingsBest = savingsForQty(dtcBestQty);
-  const optionCards: Array<{
-    id: ChannelOptionId;
-    channel: "amazon" | "dtc";
-    label: string;
-    price: string;
-    pricePrefix?: string;
-    subtext: string;
-    badge?: string;
-    children?: Array<{ qty: number; label: string }>;
-  }> = [
-    {
-      id: "amazon-1",
-      channel: "amazon",
-      label: "1 Bag",
-      price: priceForQtyDisplay(1),
-      subtext: "Amazon free ship",
-    },
-    {
-      id: "amazon-2",
-      channel: "amazon",
-      label: "2 Bags",
-      price: priceForQtyDisplay(2),
-      subtext: "Amazon free ship",
-    },
-    {
-      id: "amazon-3-4",
-      channel: "amazon",
-      label: "3-4 Bags",
-      price: priceForQtyDisplay(3),
-      pricePrefix: "From",
-      subtext: "Amazon free ship",
-      children: [
-        { qty: 3, label: "3 bags" },
-        { qty: 4, label: "4 bags" },
-      ],
-    },
-    {
-      id: "dtc-5",
-      channel: "dtc",
-      label: "5 Bags",
-      price: priceForQtyDisplay(5),
-      subtext: perBagFive
-        ? `FREE shipping (USAG) • ${perBagFive}/bag${savingsFive ? ` • Save ${savingsFive}` : ""}`
-        : "FREE shipping (USAG)",
-    },
-    {
-      id: "dtc-best",
-      channel: "dtc",
-      label: "8 / 12 Bags",
-      price: priceForQtyDisplay(8),
-      pricePrefix: "From",
-      subtext: perBagBest
-        ? `Free shipping included • ${perBagBest}/bag${savingsBest ? ` • Save ${savingsBest}` : ""}`
-        : "Free shipping included",
-      badge: "Best Value",
-      children: [
-        { qty: 8, label: "8 bags" },
-        { qty: 12, label: "12 bags" },
-      ],
-    },
-  ];
-
-  const primaryOptionIds = new Set<ChannelOptionId>(["amazon-1", "amazon-2", "dtc-5"]);
   const compactPriceLabel = isAmazonSelection ? "Amazon total" : "Total";
   const compactSavingsLabel = isAmazonSelection
-    ? "Prime shipping"
+    ? "Amazon checkout saves you on shipping"
     : activeSavings
-      ? `Save ${activeSavings} total`
-      : "Free shipping included";
+      ? `You save ${activeSavings}`
+      : "Free shipping on 5+ bags";
+  const dtcSelectedPricing = pricingForQty(dtcSelectedQty);
+  const dtcSelectedPerBag = money(dtcSelectedPricing.perBag, "USD");
+  const dtcSegments = [
+    { qty: 5, label: "5 bags" },
+    { qty: 8, label: "8 bags" },
+    { qty: 12, label: "12 bags" },
+  ];
+  const amazonSegments = [
+    { qty: 1, label: "1 bag" },
+    { qty: 2, label: "2 bags" },
+    { qty: 3, label: "3 bags" },
+    { qty: 4, label: "4 bags" },
+  ];
 
   const compactRail = (
-    <div data-bundle-rail className="flex h-full flex-col gap-3 pt-2">
-      <div className="rounded-[16px] border border-[#E6E0DA] bg-[#F7F3EF] p-3">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#6B6B6B]">
-          Choose your quantity
+    <div data-bundle-rail className="bundle-quickbuy__rail">
+      <div className="bundle-quickbuy__panel">
+        <div className="bundle-quickbuy__kicker">Pick a bag count</div>
+        <div className="bundle-quickbuy__sub">
+          5+ bags ship free from us. Under 5 bags, we send you to Amazon to save
+          you on shipping.
         </div>
-        <div className="mt-1 text-[11px] text-[#6B6B6B]">
-          1-4 bags ship free with Amazon. 5+ bags ship free direct.
-        </div>
-        <div className="mt-3 grid grid-cols-1 gap-2">
-          {optionCards.map((option) => {
-            const isExtra = !primaryOptionIds.has(option.id);
-            const isActive = selectedOption === option.id;
-            const optionQty =
-              option.id === "amazon-1"
-                ? 1
-                : option.id === "amazon-2"
-                  ? 2
-                  : option.id === "amazon-3-4"
-                    ? amazonMultiQty
-                    : option.id === "dtc-5"
-                      ? 5
-                      : dtcBestQty;
-            const isDisabled = option.channel === "dtc" && !canPurchaseQty(optionQty);
-            const bagQtyLabel =
-              option.id === "amazon-3-4"
-                ? isActive
-                  ? `x${amazonMultiQty}`
-                  : "x3-4"
-                : option.id === "dtc-best"
-                  ? isActive
-                    ? `x${dtcBestQty}`
-                    : "x8/12"
-                  : `x${optionQty}`;
-            const badgeClass =
-              option.badge === "Best Value"
-                ? "bg-[#E7F5EC] text-[#1F6B3B]"
-                : "bg-[#FCE8E7] text-[#B12E28]";
-            return (
-              <label
-                key={option.id}
-                role="radio"
-                aria-checked={isActive}
-                aria-disabled={isDisabled}
-                className={[
-                  "relative flex min-h-[104px] flex-col rounded-[16px] border bg-white p-2.5 text-left transition focus-within:ring-2 focus-within:ring-[rgba(214,69,61,0.25)] focus-within:ring-offset-2 focus-within:ring-offset-[#F7F3EF]",
-                  isActive
-                    ? "border-[#D6453D] bg-[#FFF7F6] shadow-[0_10px_24px_rgba(214,69,61,0.2)]"
-                    : "border-[#E6E0DA] hover:border-[rgba(214,69,61,0.45)]",
-                  isDisabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer",
-                  isExtra ? (showMoreOptions ? "block" : "hidden") : "block",
-                ].join(" ")}
-              >
-                <input
-                  type="radio"
-                  name="bundle-channel"
-                  value={option.id}
-                  checked={isActive}
-                  onChange={() => handleOptionSelect(option.id)}
-                  className="sr-only"
-                  disabled={isDisabled}
-                />
-                <span
+
+        <div className="bundle-quickbuy__group">
+          <div className="bundle-quickbuy__groupHeader">
+            <span className="bundle-quickbuy__groupTitle">Direct (5+ bags)</span>
+            <span className="bundle-quickbuy__groupMeta">Per-bag price drops at 5, 8, and 12</span>
+          </div>
+          <div data-segmented-control role="radiogroup" aria-label="Direct bag count">
+            {dtcSegments.map((segment) => {
+              const isActive =
+                segment.qty === 5
+                  ? selectedOption === "dtc-5"
+                  : selectedOption === "dtc-best" && dtcBestQty === segment.qty;
+              const canSelect = canPurchaseQty(segment.qty);
+              return (
+                <button
+                  key={segment.qty}
+                  type="button"
+                  role="radio"
+                  data-segment
+                  data-active={isActive}
+                  aria-checked={isActive}
+                  aria-disabled={!canSelect}
+                  tabIndex={isActive ? 0 : -1}
+                  disabled={!canSelect}
+                  onClick={() => {
+                    if (segment.qty === 5) {
+                      handleOptionSelect("dtc-5", 5);
+                    } else {
+                      handleDtcBestQtyPick(segment.qty as 8 | 12);
+                    }
+                  }}
                   className={[
-                    "inline-flex h-4 w-4 items-center justify-center rounded-full border text-[10px]",
-                    isActive ? "border-[#D6453D] text-[#D6453D]" : "border-[#C9C1B9] text-[#C9C1B9]",
+                    "bundle-quickbuy__segment",
+                    !canSelect ? "opacity-50 cursor-not-allowed" : "cursor-pointer",
                   ].join(" ")}
-                  aria-hidden="true"
                 >
-                  {isActive ? "●" : "○"}
-                </span>
-                {option.badge ? (
-                  <span className={`absolute right-3 top-3 rounded-full px-2 py-0.5 text-[9px] font-semibold ${badgeClass}`}>
-                    {option.badge}
+                  <span className="bundle-quickbuy__segmentLabel">{segment.label}</span>
+                  <span className="bundle-quickbuy__segmentPrice">
+                    {priceForQtyDisplay(segment.qty)}
                   </span>
-                ) : null}
-                <div className="mt-1.5 flex flex-1 flex-col pr-12 relative z-10">
-                  <div className="text-[12px] font-semibold text-[#161616]">{option.label}</div>
-                  <div className="mt-1 flex items-baseline gap-1 whitespace-nowrap">
-                    {option.pricePrefix ? (
-                      <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#6B6B6B]">
-                        {option.pricePrefix}
-                      </span>
-                    ) : null}
-                    <span className="text-[15px] font-black text-[#161616]">{option.price}</span>
-                  </div>
-                  <div className="mt-1 text-[10px] text-[#6B6B6B]">{option.subtext}</div>
-                  {isActive && option.children ? (
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {option.children.map((child) => {
-                        const isChildActive =
-                          option.id === "amazon-3-4"
-                            ? amazonMultiQty === child.qty
-                            : dtcBestQty === child.qty;
-                        return (
-                          <button
-                            key={child.qty}
-                            type="button"
-                            onClick={(event) => {
-                              event.preventDefault();
-                              event.stopPropagation();
-                              if (option.id === "amazon-3-4") {
-                                handleAmazonQtyPick(child.qty as 3 | 4);
-                              } else {
-                                handleDtcBestQtyPick(child.qty as 8 | 12);
-                              }
-                            }}
-                            className={[
-                              "rounded-full border px-2 py-0.5 text-[10px] font-semibold",
-                              isChildActive
-                                ? "border-[#D6453D] bg-[#FCE8E7] text-[#B12E28]"
-                                : "border-[#E6E0DA] text-[#6B6B6B] hover:border-[#D6453D]/50",
-                            ].join(" ")}
-                          >
-                            {child.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : null}
-                  <div className="mt-auto inline-flex items-center gap-1.5 text-[10px] font-semibold text-[#6B6B6B]">
-                    {option.channel === "amazon" ? (
-                      <>
-                        <Image
-                          src={AMAZON_LOGO_URL}
-                          alt="Amazon"
-                          width={34}
-                          height={12}
-                          className="h-3 w-auto opacity-80"
-                        />
-                      </>
-                    ) : (
-                      <>
-                        <svg viewBox="0 0 24 24" className="h-3 w-3 text-[#D6453D]" aria-hidden="true">
-                          <path
-                            fill="currentColor"
-                            d="m12 2 2.7 5.5 6 .9-4.4 4.3 1 6-5.3-2.9-5.3 2.9 1-6L3.3 8.4l6-.9L12 2z"
-                          />
-                        </svg>
-                        <span>USAG direct</span>
-                      </>
-                    )}
-                  </div>
-                </div>
-                <div className="pointer-events-none absolute right-2 top-8 flex flex-col items-center gap-1 text-[9px] font-semibold text-[#6B6B6B]">
-                  <HeroPackIcon size={44} className="opacity-85" />
-                  <span className="rounded-full border border-[#E6E0DA] bg-white/90 px-1.5 py-0.5 text-[9px] font-semibold text-[#6B6B6B] shadow-sm">
-                    {bagQtyLabel}
-                  </span>
-                </div>
-              </label>
-            );
-          })}
+                </button>
+              );
+            })}
+          </div>
+          {selectedOption.startsWith("dtc") ? (
+            <div className="bundle-quickbuy__groupDetail">
+              <span>{dtcSelectedPerBag} / bag</span>
+              <span>Bundle pricing applied</span>
+            </div>
+          ) : null}
         </div>
-        <button
-          type="button"
-          onClick={() => setShowMoreOptions((prev) => !prev)}
-          className="mt-2 text-xs font-semibold text-[#6B6B6B] underline underline-offset-4"
-        >
-          {showMoreOptions ? "Fewer bundle options" : "More bundle options"}
-        </button>
+
+        <div className="bundle-quickbuy__group bundle-quickbuy__group--amazon">
+          <div className="bundle-quickbuy__groupHeader">
+            <span className="bundle-quickbuy__groupTitle">Amazon (1-4 bags)</span>
+            <span className="bundle-quickbuy__groupMeta">$5.99 per bag on Amazon</span>
+          </div>
+          <div data-segmented-control role="radiogroup" aria-label="Amazon bag count">
+            {amazonSegments.map((segment) => {
+              const optionId =
+                segment.qty === 1 ? "amazon-1" : segment.qty === 2 ? "amazon-2" : "amazon-3-4";
+              const isActive =
+                optionId === "amazon-1"
+                  ? selectedOption === "amazon-1"
+                  : optionId === "amazon-2"
+                    ? selectedOption === "amazon-2"
+                    : selectedOption === "amazon-3-4" && amazonMultiQty === segment.qty;
+              return (
+                <button
+                  key={segment.qty}
+                  type="button"
+                  role="radio"
+                  data-segment
+                  data-active={isActive}
+                  aria-checked={isActive}
+                  tabIndex={isActive ? 0 : -1}
+                  onClick={() => {
+                    if (segment.qty === 1) {
+                      handleOptionSelect("amazon-1", 1);
+                    } else if (segment.qty === 2) {
+                      handleOptionSelect("amazon-2", 2);
+                    } else {
+                      handleAmazonQtyPick(segment.qty as 3 | 4);
+                    }
+                  }}
+                  className="bundle-quickbuy__segment cursor-pointer"
+                >
+                  <span className="bundle-quickbuy__segmentLabel">{segment.label}</span>
+                  <span className="bundle-quickbuy__segmentPrice">
+                    {priceForQtyDisplay(segment.qty, undefined, { forceBase: true })}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       <div className="flex flex-col gap-2">
@@ -874,8 +759,8 @@ export default function BundleQuickBuy({
         </button>
         <div className={isLight ? "text-[11px] font-semibold text-[#6B6B6B]" : "text-[11px] font-semibold text-white/70"}>
           {isAmazonSelection
-            ? "Prime shipping + helps our Amazon ranking 🇺🇸"
-            : "Direct from USA Gummies — free shipping included."}
+            ? "Amazon checkout saves you on shipping."
+            : "Direct from USA Gummies. Free shipping at 5+ bags."}
         </div>
       </div>
 
@@ -893,7 +778,7 @@ export default function BundleQuickBuy({
               d="M3 7h11l4 4v6h-2a3 3 0 0 1-6 0H8a3 3 0 0 1-6 0H1V9a2 2 0 0 1 2-2zm13 1.5V7H5v3h11v-1.5zM6.5 19a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zm9 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"
             />
           </svg>
-          <span>Ships in 24 hours</span>
+          <span>Ships within 24 hours</span>
         </span>
         <span className="inline-flex items-center gap-2">
           <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
@@ -902,7 +787,7 @@ export default function BundleQuickBuy({
               d="M12 2a5 5 0 0 1 5 5v2h2v4h-2.1A6 6 0 1 1 7 9h5V7a3 3 0 0 0-3-3H6V2h6z"
             />
           </svg>
-          <span>Easy returns</span>
+          <span>Satisfaction guaranteed</span>
         </span>
         <span className="inline-flex items-center gap-2">
           <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
@@ -971,12 +856,12 @@ export default function BundleQuickBuy({
             selectedAdded ? "Added to cart" : primaryCtaLabel
           ) : Number.isFinite(selectedTierState?.addTotal ?? NaN) ? (
             selectedAdded && Number.isFinite(selectedTierState?.nextBags ?? NaN)
-              ? `Savings locked: ${selectedTier?.quantity} bags (total ${selectedTierState?.nextBags})`
+              ? `Added ${selectedTier?.quantity} bags (cart ${selectedTierState?.nextBags})`
               : Number.isFinite(selectedTierState?.nextBags ?? NaN)
-                ? `Lock in savings now: ${selectedTier?.quantity} bags (total ${selectedTierState?.nextBags})`
-                : `Lock in savings now: ${selectedTier?.quantity} bags`
+                ? `Add ${selectedTier?.quantity} bags (cart ${selectedTierState?.nextBags})`
+                : `Add ${selectedTier?.quantity} bags`
           ) : (
-            "Lock in savings now"
+            "Add to cart"
           )}
         </span>
       </button>
@@ -1002,7 +887,7 @@ export default function BundleQuickBuy({
             .filter(Boolean)
             .join(" ")}
         >
-          Love it or your money back • Ships within 24 hours • Secure checkout
+          Satisfaction guaranteed • Ships within 24 hours • Secure checkout
         </div>
         <div
           data-bundle-rating
@@ -1020,7 +905,7 @@ export default function BundleQuickBuy({
             .join(" ")}
         >
           <div className={isLight ? "font-semibold text-[var(--text)]" : "font-semibold text-white/90"}>
-            ⭐ {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars from verified Amazon buyers
+            {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars from verified Amazon buyers
           </div>
           <div className="mt-1 flex flex-wrap gap-2 text-[10px] font-semibold uppercase tracking-[0.12em]">
             <span
@@ -1134,7 +1019,7 @@ export default function BundleQuickBuy({
               ) : null}
               {selectedSavings ? (
                 <span className={isLight ? "text-[var(--candy-red)]" : "text-[var(--gold)]"}>
-                  {hasRegularLine ? " · " : ""}Save {selectedSavings} total
+                  {hasRegularLine ? " · " : ""}You save {selectedSavings}
                 </span>
               ) : null}
             </div>
@@ -1167,10 +1052,10 @@ export default function BundleQuickBuy({
             isCompact ? (isLight ? "text-[var(--muted)]" : "text-white/60") : isLight ? "text-[var(--muted)]" : "text-white/60",
           ].join(" ")}
         >
-          Savings pricing
+          Bundle pricing
         </div>
         <div className="mt-2 text-sm">
-          Savings pricing is temporarily unavailable right now. Please try again or view product details.
+          Bundle pricing is loading. Please refresh or view product details.
         </div>
         <Link
           href="/shop#product-details"
@@ -1188,10 +1073,10 @@ export default function BundleQuickBuy({
         <div className="bundle-fusion__grid">
           <div className="bundle-fusion__guide">
             <div className="bundle-fusion__intro">
-              <div className="bundle-fusion__eyebrow">Bundle &amp; save</div>
-              <div className="bundle-fusion__title">Choose your bag count</div>
+              <div className="bundle-fusion__eyebrow">Bundle pricing</div>
+              <div className="bundle-fusion__title">Pick a bag count</div>
               <div className="bundle-fusion__sub">
-                Add more bags and watch your per-bag price drop. Savings apply to your total bag count.
+                Add more bags and the per-bag price drops. Pricing applies to your total bag count.
               </div>
               {summaryLine ? (
                 <div className="bundle-fusion__summary">{summaryLine}</div>
@@ -1222,7 +1107,7 @@ export default function BundleQuickBuy({
                         <div className="bundle-fusion__milestoneCaption">{milestone.caption}</div>
                         {isActive ? (
                           <div className="bundle-fusion__milestoneNote">
-                            {isBest ? "Best price applied" : "Next up"}
+                            {isBest ? "Best price active" : "Next up"}
                           </div>
                         ) : null}
                       </div>
@@ -1233,13 +1118,13 @@ export default function BundleQuickBuy({
 
                 <div className="bundle-fusion__mission">
                   <div className="bundle-fusion__missionHeader">
-                    <span>Mission to savings</span>
+                    <span>Savings progress</span>
                     <span>
                       Progress: {missionProgressCount}/{topMilestone.qty} bags
                     </span>
                   </div>
                   <div className="bundle-fusion__missionCopy">
-                    Hit 8 bags to unlock the crowd-favorite price.
+                    8 bags is the most picked price point.
                   </div>
                   <div className="mission-bar" aria-hidden="true">
                     <div className="mission-bar__fill" style={{ width: `${missionProgressPct}%` }} />
@@ -1266,7 +1151,7 @@ export default function BundleQuickBuy({
                     {[
                       { qty: 4, label: "Savings unlocked" },
                       { qty: 5, label: "Free shipping unlocked" },
-                      { qty: 8, label: "Crowd favorite unlocked" },
+                      { qty: 8, label: "Most picked unlocked" },
                       {
                         qty: 12,
                         label: bestPriceReached ? "Mystery extra revealed" : "Mystery extra unlocks",
@@ -1308,14 +1193,14 @@ export default function BundleQuickBuy({
                 {showHowItWorks ? (
                   <div className="bundle-fusion__how">
                     <div className="text-[11px] font-semibold">
-                      How pricing works: selections add bags, never replace your cart.
+                      How pricing works: selections add bags to your cart. They don't replace it.
                     </div>
                     <details className="mt-2">
                       <summary className="cursor-pointer text-[11px] font-semibold text-[var(--text)]">
                         Learn more
                       </summary>
                       <div className="mt-1 text-[11px] text-[var(--muted)]">
-                        Savings start at 4 bags, free shipping unlocks at 5 bags, and per-bag pricing caps at {perBagCapText} after 12+ bags.{" "}
+                        Savings start at 4 bags, free shipping starts at 5 bags, and per-bag pricing caps at {perBagCapText} after 12+ bags.{" "}
                         <Link href="/faq" className="underline underline-offset-2">
                           Read the FAQ
                         </Link>
@@ -1378,10 +1263,10 @@ export default function BundleQuickBuy({
         ) : null}
 
         <div className="bundle-integrated__header">
-          <div className="bundle-integrated__eyebrow">Bundle &amp; save</div>
-          <div className="bundle-integrated__title">Lock in your savings</div>
+          <div className="bundle-integrated__eyebrow">Bundle pricing</div>
+          <div className="bundle-integrated__title">Pick a bag count</div>
           <div className="bundle-integrated__sub">
-            Add more bags and watch your per-bag price drop. Savings apply to your total bag count.
+            Add more bags and the per-bag price drops. Pricing applies to your total bag count.
           </div>
           {summaryLine ? (
             <div className="bundle-integrated__summary">
@@ -1416,9 +1301,9 @@ export default function BundleQuickBuy({
                           <div className="bundle-integrated__ladderLabel">{milestone.label}</div>
                           <div className="bundle-integrated__ladderCaption">{milestone.caption}</div>
                           {isActive ? (
-                            <div className="bundle-integrated__ladderNote">
-                              {isBest ? "Best price applied" : "Next up"}
-                            </div>
+                          <div className="bundle-integrated__ladderNote">
+                            {isBest ? "Best price active" : "Next up"}
+                          </div>
                           ) : null}
                         </div>
                       );
@@ -1429,11 +1314,11 @@ export default function BundleQuickBuy({
 
                 <div className="bundle-integrated__mission">
                   <div className="bundle-integrated__missionHeader">
-                    <span>Mission to savings</span>
+                    <span>Savings progress</span>
                     <span>Progress: {missionProgressCount}/{topMilestone.qty} bags</span>
                   </div>
                   <div className="bundle-integrated__missionCopy">
-                    Hit 8 bags to unlock the crowd-favorite price.
+                    8 bags is the most picked price point.
                   </div>
                   <div className="mission-bar" aria-hidden="true">
                     <div className="mission-bar__fill" style={{ width: `${missionProgressPct}%` }} />
@@ -1460,7 +1345,7 @@ export default function BundleQuickBuy({
                     {[
                       { qty: 4, label: "Savings unlocked" },
                       { qty: 5, label: "Free shipping unlocked" },
-                      { qty: 8, label: "Crowd favorite unlocked" },
+                      { qty: 8, label: "Most picked unlocked" },
                       {
                         qty: 12,
                         label: bestPriceReached ? "Mystery extra revealed" : "Mystery extra unlocks",
@@ -1504,14 +1389,14 @@ export default function BundleQuickBuy({
                 {showHowItWorks ? (
                   <div className="bundle-integrated__how">
                     <div className="text-[11px] font-semibold">
-                      How pricing works: selections add bags, never replace your cart.
+                      How pricing works: selections add bags to your cart. They don't replace it.
                     </div>
                     <details className="mt-2">
                       <summary className="cursor-pointer text-[11px] font-semibold text-[var(--text)]">
                         Learn more
                       </summary>
                       <div className="mt-1 text-[11px] text-[var(--muted)]">
-                        Savings start at 4 bags, free shipping unlocks at 5 bags, and per-bag pricing caps at {perBagCapText} after 12+ bags.{" "}
+                      Savings start at 4 bags, free shipping starts at 5 bags, and per-bag pricing caps at {perBagCapText} after 12+ bags.{" "}
                         <Link href="/faq" className="underline underline-offset-2">
                           Read the FAQ
                         </Link>
@@ -1598,8 +1483,11 @@ export default function BundleQuickBuy({
           isCompact ? (isLight ? "text-[var(--muted)]" : "text-white/70") : isLight ? "text-[var(--muted)]" : "text-white/75",
         ].join(" ")}
       >
-        <span aria-hidden="true">🇺🇸</span>
-        <span>American-made savings pricing</span>
+        <span className="inline-flex items-center gap-2">
+          <HeroPackIcon size={14} className="opacity-80" />
+          <span>USA Gummies</span>
+        </span>
+        <span>Bundle pricing</span>
       </div>
       <div data-bundle-header className="relative mt-1 flex flex-col gap-3 sm:flex-row sm:items-start">
         <div data-bundle-header-body className="min-w-0 space-y-1.5">
@@ -1610,7 +1498,7 @@ export default function BundleQuickBuy({
               isCompact ? (isLight ? "text-2xl text-[var(--text)]" : "text-2xl text-white") : isLight ? "text-2xl text-[var(--text)]" : "text-2xl text-white",
             ].join(" ")}
           >
-            <span>Lock in your savings</span>
+            <span>Pick a bag count</span>
             <span className="brand-cluster">
               <span className="brand-cluster__bags">
                 <HeroPackIcon size={18} className="brand-cluster__bag opacity-80" />
@@ -1626,7 +1514,7 @@ export default function BundleQuickBuy({
               isCompact ? (isLight ? "text-[var(--muted)]" : "text-white/70") : isLight ? "text-[var(--muted)]" : "text-white/75",
             ].join(" ")}
           >
-            Add more bags and watch your per-bag price drop. Savings apply to your total bag count.
+            Add more bags and the per-bag price drops. Pricing applies to your total bag count.
           </div>
       {summaryLine ? (
         <p
@@ -1690,7 +1578,7 @@ export default function BundleQuickBuy({
                             isLight ? "text-[var(--candy-red)]" : "text-[var(--gold)]",
                           ].join(" ")}
                         >
-                          Best price applied
+                          Best price active
                         </div>
                       ) : isPopularComplete ? (
                         <div
@@ -1699,7 +1587,7 @@ export default function BundleQuickBuy({
                             isLight ? "text-[var(--candy-red)]" : "text-[var(--gold)]",
                           ].join(" ")}
                         >
-                          Most popular mission complete
+                          Most picked level reached
                         </div>
                       ) : null}
                     </div>
@@ -1729,7 +1617,7 @@ export default function BundleQuickBuy({
                 ].join(" ")}
               >
                 <div className="text-[10px] font-semibold uppercase tracking-[0.24em]">
-                  Mission to savings
+                  Savings progress
                 </div>
                 <div
                   className={[
@@ -1737,7 +1625,7 @@ export default function BundleQuickBuy({
                     isLight ? "text-[var(--text)]" : "text-white/85",
                   ].join(" ")}
                 >
-                  <span>Hit 8 bags to unlock the crowd-favorite price.</span>
+                  <span>8 bags is the most picked price point.</span>
                   <span>
                     Progress: {missionProgressCount}/{topMilestone.qty} bags
                   </span>
@@ -1778,7 +1666,7 @@ export default function BundleQuickBuy({
                   {[
                     { qty: 4, label: "Savings unlocked" },
                     { qty: 5, label: "Free shipping unlocked" },
-                    { qty: 8, label: "Crowd favorite unlocked" },
+                      { qty: 8, label: "Most picked unlocked" },
                     {
                       qty: 12,
                       label: bestPriceReached ? "Mystery extra revealed" : "Mystery extra unlocks",
@@ -1919,7 +1807,7 @@ export default function BundleQuickBuy({
               d="M12 2 19 5v6c0 5-3.5 9.4-7 11-3.5-1.6-7-6-7-11V5l7-3z"
             />
           </svg>
-          Love it or your money back
+          Satisfaction guaranteed
         </span>
         <span
           className={

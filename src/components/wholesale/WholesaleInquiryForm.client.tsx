@@ -27,7 +27,7 @@ export function WholesaleInquiryForm({ className }: { className?: string }) {
 
     if (!storeName || !buyerName || !email || !phone || !location) {
       setStatus("error");
-      setError("Please complete all fields to submit your wholesale request.");
+      setError("Please complete all fields to submit your request.");
       return;
     }
 
@@ -77,10 +77,10 @@ export function WholesaleInquiryForm({ className }: { className?: string }) {
         Wholesale inquiry
       </div>
       <div className="mt-2 text-xl font-black text-[var(--text)]">
-        Start a wholesale partnership
+        Start a wholesale conversation
       </div>
       <div className="mt-1 text-sm text-[var(--muted)]">
-        Fill out the short form and we will respond within 1–2 business days.
+        Fill out the short form. We'll respond within 1-2 business days.
       </div>
 
       <form onSubmit={handleSubmit} className="mt-4 grid gap-3">
@@ -132,7 +132,7 @@ export function WholesaleInquiryForm({ className }: { className?: string }) {
               status === "loading" && "opacity-70 pointer-events-none"
             )}
           >
-            {status === "loading" ? "Sending..." : "Request starter case"}
+            {status === "loading" ? "Sending..." : "Request a starter case"}
           </button>
           <button
             type="submit"
@@ -150,7 +150,7 @@ export function WholesaleInquiryForm({ className }: { className?: string }) {
 
       {status === "success" ? (
         <div className="mt-3 text-sm font-semibold text-[rgba(21,128,61,0.95)]">
-          Thanks — we received your wholesale request.
+          Thanks. We received your request.
         </div>
       ) : null}
       {status === "error" && error ? (

@@ -239,9 +239,9 @@ export default async function ShopPage() {
       />
       <section className="relative overflow-hidden bg-[#fffdf8]">
 
-        <div className="relative mx-auto max-w-6xl px-4 py-5 lg:py-7">
-          <div className="grid gap-3 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
-            <div className="space-y-3">
+        <div className="relative mx-auto max-w-6xl px-4 py-4 lg:py-5">
+          <div className="grid gap-2 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
+            <div className="space-y-2">
               <div className="flex flex-wrap items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.32em] text-[var(--muted)] sm:text-xs">
                 <span className="rounded-full border border-[rgba(15,27,45,0.12)] bg-white px-3 py-1 text-[var(--navy)]">Made in the USA</span>
                 <span className="text-[var(--candy-red)]">No artificial dyes</span>
@@ -278,12 +278,12 @@ export default async function ShopPage() {
                 Most customers save more when they add more bags.
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-1.5">
                 <a href="#shop-bundles" className="btn btn-candy">
                   Lock in savings now
                 </a>
                 <span className="text-xs text-[var(--muted)]">
-                  Love it or your money back - Ships within 24 hours - Limited daily production
+                  Satisfaction guaranteed - Ships within 24 hours - Limited daily production
                 </span>
               </div>
 
@@ -315,7 +315,7 @@ export default async function ShopPage() {
                 </Link>
               </div>
 
-              <div className="candy-panel rounded-3xl p-2.5">
+              <div className="candy-panel rounded-3xl p-2">
                 <div className="grid gap-2 sm:grid-cols-3">
                   <div className="space-y-1">
                     <div className="text-[10px] uppercase tracking-[0.24em] text-[var(--muted)]">Savings tiers</div>
@@ -336,7 +336,7 @@ export default async function ShopPage() {
               </div>
             </div>
 
-            <div className="relative space-y-3">
+            <div className="relative space-y-2">
               <div className="candy-panel relative overflow-hidden rounded-3xl p-2 text-[var(--text)]">
                 <div className="relative aspect-[3/2] overflow-hidden rounded-2xl border border-white/60 bg-white">
                   <Image
@@ -365,15 +365,6 @@ export default async function ShopPage() {
                 </div>
               </div>
 
-              <div className="relative aspect-[3/2] lg:aspect-[5/2] overflow-hidden">
-                <Image
-                  src="/website%20assets/IwaJima.png"
-                  alt="Iwo Jima memorial illustration"
-                  fill
-                  sizes="(max-width: 640px) 92vw, (max-width: 1024px) 44vw, 520px"
-                  className="object-contain"
-                />
-              </div>
             </div>
           </div>
         </div>
@@ -381,7 +372,7 @@ export default async function ShopPage() {
 
       <section id="shop-bundles" aria-label="Savings pricing" className="bg-[#fffdf8] scroll-mt-24">
         <div className="mx-auto max-w-6xl px-4 pb-5 lg:pb-6">
-          <div className="bundle-home bundle-home--premium bundle-hero-stage buy-module americana-panel relative rounded-[36px] border border-[rgba(15,27,45,0.12)] bg-white shadow-[0_30px_80px_rgba(15,27,45,0.14)]">
+          <div className="bundle-home bundle-home--premium bundle-home--shop bundle-hero-stage buy-module americana-panel relative rounded-[36px] border border-[rgba(15,27,45,0.12)] bg-white shadow-[0_30px_80px_rgba(15,27,45,0.14)]">
             <div className="buy-module__inner">
             <div className="buy-module__layout">
               <div
@@ -399,10 +390,10 @@ export default async function ShopPage() {
                       </div>
                     ))}
                   </div>
-                  <div className="pill-row-tight flex flex-wrap gap-2">
-                    <span className="candy-pill">Made in USA</span>
-                    <span className="candy-pill">No artificial dyes</span>
-                    <span className="candy-pill">{FREE_SHIPPING_PHRASE}</span>
+                  <div className="atomic-buy__chips">
+                    <span className="atomic-buy__chip">Made in USA</span>
+                    <span className="atomic-buy__chip">No artificial dyes</span>
+                    <span className="atomic-buy__chip">{FREE_SHIPPING_PHRASE}</span>
                   </div>
                   <div className="text-sm text-[var(--muted)]">
                     Every bag supports American manufacturing and American jobs.
@@ -435,7 +426,7 @@ export default async function ShopPage() {
                       </div>
                     </div>
                   </div>
-                  <div className="buy-module__bundle">
+                  <div className="buy-module__bundle atomic-buy__bundle">
                     {bundleVariants ? (
                       <BundleQuickBuy
                         anchorId="shop-bundles"

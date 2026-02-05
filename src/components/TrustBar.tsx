@@ -9,17 +9,17 @@ export function TrustBar({
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-[var(--text)]">
-              American-made. Backed by trust.
+              Made here. Built on trust.
             </h2>
             <p className="mt-1 text-sm text-[var(--muted)]">
-              Fast shipping, secure checkout, all natural flavors, and no artificial dyes.
+              Ships fast, secure checkout, all natural flavors, and no artificial dyes.
             </p>
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row">
-            <Pill title="Fast Shipping" desc="Ships quickly from the USA" />
-            <Pill title="Secure Checkout" desc="Shopify-powered checkout" />
-            <Pill title="Free shipping on 5+ bags" desc="Free shipping on 5+ bags" />
+            <Pill title="Ships fast" desc="Ships from the USA" />
+            <Pill title="Secure checkout" desc="Secure checkout through Shopify" />
+            <Pill title="Free shipping at 5+ bags" desc="Free shipping at 5+ bags" />
           </div>
         </div>
       </div>

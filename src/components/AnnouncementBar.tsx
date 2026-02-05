@@ -19,14 +19,14 @@ export function AnnouncementBar() {
   const { left, right, href } = useMemo(() => {
     if (isAmerica250) {
       return {
-        left: "America 250 limited drops",
+        left: "America 250: limited runs",
         right: FREE_SHIPPING_PHRASE,
         href: "/shop?campaign=america250",
       };
     }
     return {
       left: FREE_SHIPPING_PHRASE,
-      right: "Made in USA • No artificial dyes",
+      right: "Made in the USA • No artificial dyes",
       href: "/shop",
     };
   }, [isAmerica250]);
@@ -51,7 +51,7 @@ export function AnnouncementBar() {
               "rounded-full border border-[var(--border)] bg-[var(--surface-strong)] px-3 py-1 text-[11px] font-semibold text-[var(--text)] hover:bg-white"
             )}
           >
-            Shop now
+            Shop bags
           </Link>
         </div>
       </div>

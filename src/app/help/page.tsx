@@ -18,7 +18,7 @@ function resolveSiteUrl() {
 const SITE_URL = resolveSiteUrl();
 const PAGE_TITLE = "Help Center | USA Gummies";
 const PAGE_DESCRIPTION =
-  "Get quick answers on shipping, returns, ingredients, and ordering USA Gummies. Contact support in one click.";
+  "Get quick answers on shipping, satisfaction guarantee, ingredients, and ordering USA Gummies. Contact support in one click.";
 const OG_IMAGE = "/opengraph-image";
 
 export const metadata: Metadata = {
@@ -52,8 +52,8 @@ const SUPPORT_LINKS = [
     href: "/policies/shipping",
   },
   {
-    title: "Returns & Refunds",
-    copy: "Food-safety guidelines, refunds, and damaged orders.",
+    title: "Satisfaction Guarantee",
+    copy: "Food-safety guidelines, damaged orders, and how we make it right.",
     href: "/policies/returns",
   },
   {
@@ -108,7 +108,7 @@ export default function HelpCenterPage() {
                 How can we help?
               </h1>
               <p className="mt-3 text-[var(--muted)]">
-                Find fast answers about shipping, returns, ingredients, and ordering. If you need
+                Find fast answers about shipping, satisfaction guarantee, ingredients, and ordering. If you need
                 a human, contact support and we will reply within one business day.
               </p>
             </div>

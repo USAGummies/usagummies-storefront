@@ -432,7 +432,7 @@ export default function QuickView({ product, detailHref, bundleHref, children }:
                   <AmazonOneBagNote className="mt-2 text-[11px] text-[var(--muted)]" />
                   <div className="mt-2 rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-2 text-[11px] text-[var(--muted)]">
                     <div className="font-semibold text-[var(--text)]">
-                      ⭐ {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars from verified Amazon buyers
+                      {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars from verified Amazon buyers
                     </div>
                     <div className="mt-1 flex flex-wrap gap-2 text-[10px] font-semibold uppercase tracking-[0.12em]">
                       <span className="rounded-full border border-[var(--border)] bg-white px-2 py-1">

@@ -158,7 +158,7 @@ export function ShopProductCard({
             </div>
 
             <div className="flex flex-wrap gap-2 pt-1">
-              {["🇺🇸 Made in USA", "🌿 All Natural", "✅ Dye-Free"].map((t) => (
+              {["Made in USA", "All natural", "Dye-free"].map((t) => (
                 <span key={t} className="badge">
                   {t}
                 </span>

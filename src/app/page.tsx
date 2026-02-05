@@ -253,21 +253,21 @@ export default async function HomePage() {
                   All-American Gummy Bears
                 </h1>
                 <p className="text-pretty text-[12px] text-[var(--text)] sm:text-sm">
-                  Soft, chewy, classic gummy bears — made in the USA.
+                  Classic gummy bears, made in the USA.
                 </p>
                 <div className="text-sm font-semibold text-[var(--navy)]">
                   No artificial dyes • All natural flavors
                 </div>
                 <div className="pt-0 space-y-0.5">
                   <div className="text-xs font-semibold text-[var(--muted)]">
-                    Save more per bag when you add 4+ bags.
+                    Lower the per-bag price at 4+ bags.
                   </div>
                   <div className="flex flex-col gap-0.5">
                     <a href="#bundle-pricing" className="hero-scroll-link" data-hero-scroll>
-                      Jump to bundle savings ↓
+                      Jump to bundle pricing
                     </a>
                     <div className="text-xs font-semibold text-[var(--muted)]">
-                      {FREE_SHIPPING_PHRASE} • Love it or your money back
+                      {FREE_SHIPPING_PHRASE} • Satisfaction guaranteed
                     </div>
                   </div>
                 </div>
@@ -275,7 +275,7 @@ export default async function HomePage() {
             </div>
 
             <div className="order-1 hidden justify-center sm:flex lg:order-2 lg:justify-end">
-              <div className="relative w-full max-w-[280px] sm:max-w-[400px] lg:max-w-[480px]">
+              <div className="home-hero__media relative w-full max-w-[240px] sm:max-w-[340px] lg:max-w-[420px]">
                 <div className="relative aspect-[4/5] overflow-visible">
                   <Image
                     src={heroMediaSrc}
@@ -293,7 +293,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className={`${styles.scene} ${styles.sceneBundle}`} data-zone="BUNDLE">
+      <section className={`${styles.scene} ${styles.sceneBundle} home-purchase-stage`} data-zone="BUNDLE">
         <div className={styles.sceneBg} aria-hidden="true" />
         <div className={styles.sceneOverlay} aria-hidden="true" />
         <div className={styles.sceneContent}>
@@ -517,7 +517,7 @@ export default async function HomePage() {
                 Ships within 24 hours, every order packed with care.
               </div>
               <div className="text-sm font-semibold text-[var(--text)]">
-                Love it or your money back.
+                Satisfaction guaranteed.
               </div>
             </div>
             <div className="justify-self-end">

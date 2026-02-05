@@ -32,9 +32,9 @@ Simple, direct, high-trust.
 - Best per-bag price: 12 bags ($4.25 per bag, $51.00 total)
 - Per-bag price caps after 12+ bags
 
-## Shipping + returns
+## Shipping + satisfaction guarantee
 - Ships within 24 hours
-- Love it or your money back
+- Satisfaction guaranteed
 
 ## Where to buy
 - Primary: https://www.usagummies.com/shop

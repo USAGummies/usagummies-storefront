@@ -19,7 +19,7 @@ type Props = {
 
 export default function AddBagButton({
   label,
-  pendingLabel = "Locking in…",
+  pendingLabel = "Adding...",
   disabled,
   onAdd,
   lineId,
@@ -91,7 +91,7 @@ export default function AddBagButton({
       className="btn btn-outline pressable focus-ring"
       style={{ opacity: pending ? 0.6 : 1, minWidth: 120 }}
     >
-      {pending ? pendingLabel : label || "Lock in savings now"}
+      {pending ? pendingLabel : label || "Add bags"}
     </button>
   );
 }

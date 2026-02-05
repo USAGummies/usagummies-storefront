@@ -102,8 +102,8 @@ const navSections = [
     title: "Shop",
     links: [
       { href: "/shop", label: "Shop" },
-      { href: "/bundle-guides", label: "Bundle guides" },
-      { href: "/gummy-gift-bundles", label: "Gift bundles" },
+      { href: "/bundle-guides", label: "Bag count guides" },
+      { href: "/gummy-gift-bundles", label: "Gift bag options" },
       { href: "/patriotic-party-snacks", label: "Party snacks" },
       { href: "/bulk-gummy-bears", label: "Bulk gummy bears" },
     ],
@@ -116,7 +116,7 @@ const navSections = [
       { href: "/ingredients", label: "Ingredients" },
       { href: "/faq", label: "FAQ" },
       { href: "/gummies-101", label: "Gummies 101" },
-      { href: "/join-the-revolution", label: "Join the Revolution" },
+      { href: "/join-the-revolution", label: "Join the list" },
     ],
   },
   {
@@ -127,7 +127,7 @@ const navSections = [
       { href: "/contact", label: "Contact" },
       { href: "/policies", label: "Policies" },
       { href: "/policies/shipping", label: "Shipping" },
-      { href: "/policies/returns", label: "Returns" },
+      { href: "/policies/returns", label: "Satisfaction guarantee" },
       { href: "/policies/privacy", label: "Privacy" },
       { href: "/policies/terms", label: "Terms" },
     ],
@@ -252,16 +252,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!isHome) {
-      setHideHomeHeader(false);
-      return;
-    }
-    const handleScroll = () => {
-      setHideHomeHeader(window.scrollY < 32);
-    };
-    handleScroll();
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
+    setHideHomeHeader(false);
   }, [isHome]);
 
   useEffect(() => {
@@ -562,8 +553,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <LeadCapture
               source="footer"
               intent="newsletter"
-              title="Join the revolution"
-              subtitle="Early drops, savings alerts, and patriotic releases."
+              title="Join the list"
+              subtitle="Early drops, bag-count tips, and the occasional note."
               ctaLabel="Join the list"
               variant="light"
               emphasis="quiet"
@@ -578,11 +569,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <ul className="space-y-1 text-[var(--muted)]">
                 <li>Made in the USA • Classic gummy bear flavor</li>
                 <li>All natural flavors • No artificial dyes</li>
-                <li>Ships fast • Save more on 5+ bags</li>
+                <li>Ships fast • Free shipping at 5+ bags</li>
               </ul>
             </div>
               <div className="text-xs text-[var(--muted)]">
-                Secure checkout • {FREE_SHIPPING_PHRASE} • Easy returns
+                Secure checkout • {FREE_SHIPPING_PHRASE} • Satisfaction guaranteed
               </div>
           </div>
 
@@ -595,7 +586,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 About
               </Link>
               <Link href="/join-the-revolution" className="link-underline">
-                Join the Revolution
+                Join the list
               </Link>
               <Link href="/faq" className="link-underline">
                 FAQ
@@ -639,7 +630,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
             <div className="flex flex-col items-start gap-2 text-xs text-[var(--muted)]">
               <Link href="/shop" className="btn btn-candy btn-compact">
-                Shop now
+                Shop bags
               </Link>
               <div>
                 <div className="font-semibold text-[var(--text)]">Other places to buy</div>

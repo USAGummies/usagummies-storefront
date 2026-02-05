@@ -17,9 +17,9 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "Returns & Refunds | USA Gummies";
+const PAGE_TITLE = "Satisfaction Guarantee | USA Gummies";
 const PAGE_DESCRIPTION =
-  "USA Gummies returns and refunds policy. Food-safety rules, damaged or incorrect orders, and refund timing.";
+  "USA Gummies satisfaction guarantee and order issue policy. Food-safety rules, damaged or incorrect orders, and how we make it right.";
 const OG_IMAGE = "/opengraph-image";
 
 export const metadata: Metadata = {
@@ -48,7 +48,7 @@ export default function ReturnsPolicyPage() {
         items={[
           { name: "Home", href: "/" },
           { name: "Policies", href: "/policies" },
-          { name: "Returns", href: "/policies/returns" },
+          { name: "Satisfaction guarantee", href: "/policies/returns" },
         ]}
       />
       <div className="mx-auto max-w-4xl px-4 py-10">
@@ -68,27 +68,25 @@ export default function ReturnsPolicyPage() {
         </div>
 
         <section className="candy-panel p-7">
-          <h1 className="text-3xl font-semibold tracking-tight">Returns & Refunds</h1>
+          <h1 className="text-3xl font-semibold tracking-tight">Satisfaction guarantee</h1>
           <p className="mt-3 text-[var(--muted)]">
-            This returns and refund policy is customer-first while following food-safety best
-            practices. If something arrives wrong or damaged, we will make it right.
+            We sell food. If something arrives wrong or damaged, we will make it right.
           </p>
 
           <div className="mt-8 divide-y divide-[var(--border)] text-[var(--muted)]">
             <div className="py-4">
-              <h2 className="text-lg font-semibold text-[var(--text)]">30-day money-back guarantee</h2>
+              <h2 className="text-lg font-semibold text-[var(--text)]">30-day satisfaction guarantee</h2>
               <p className="mt-2 text-sm text-[var(--muted)]">
-                We offer a 30-day money-back guarantee from delivery. If you are not satisfied,
-                contact us and we’ll make it right with a refund or replacement, subject to
-                food-safety guidelines.
+                If you are not satisfied, contact us within 30 days of delivery. We will make it
+                right with a replacement or account credit, subject to food-safety guidelines.
               </p>
             </div>
 
             <div className="py-4">
               <h2 className="text-lg font-semibold text-[var(--text)]">Food item policy</h2>
               <p className="mt-2 text-sm text-[var(--muted)]">
-                Because our products are food items, we generally cannot accept returns of opened items.
-                If your order arrives damaged or incorrect, contact us and we’ll resolve it quickly.
+                Because our products are food items, we cannot take items back once delivered. If your
+                order arrives damaged or incorrect, contact us and we’ll resolve it quickly.
               </p>
             </div>
 
@@ -102,10 +100,10 @@ export default function ReturnsPolicyPage() {
             </div>
 
             <div className="py-4">
-              <h2 className="text-lg font-semibold text-[var(--text)]">Refund timing</h2>
+              <h2 className="text-lg font-semibold text-[var(--text)]">Resolution timing</h2>
               <p className="mt-2 text-sm text-[var(--muted)]">
-                If a refund is approved, it will be issued to the original payment method.
-                Processing times vary by bank and card issuer.
+                If a credit is approved, it will be issued to the original payment method. Processing
+                times vary by bank and card issuer.
               </p>
             </div>
 
@@ -121,11 +119,12 @@ export default function ReturnsPolicyPage() {
           <div className="mt-10 border-t border-[var(--border)] pt-8">
             <h2 className="text-xl font-semibold">Contact us</h2>
             <p className="mt-2 text-[var(--muted)]">
-              Returns or refund question? Send a message and we’ll respond within one business day.
+              Questions about the satisfaction guarantee? Send a message and we’ll respond within one
+              business day.
             </p>
 
             <div className="mt-5">
-              <ContactForm context="Returns & Refunds Question" />
+              <ContactForm context="Satisfaction Guarantee Question" />
             </div>
           </div>
           <div className="mt-6 text-sm text-[var(--muted)]">

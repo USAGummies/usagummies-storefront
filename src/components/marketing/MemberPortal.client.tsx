@@ -34,7 +34,7 @@ const STATUS_LABELS: Record<string, string> = {
   AUTHORIZED: "Authorized",
   PARTIALLY_PAID: "Partially paid",
   REFUNDED: "Refunded",
-  PARTIALLY_REFUNDED: "Partially refunded",
+  PARTIALLY_REFUNDED: "Partially credited",
   VOIDED: "Voided",
 };
 

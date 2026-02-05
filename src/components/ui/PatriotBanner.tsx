@@ -23,19 +23,19 @@ export function PatriotBanner({ showRibbon = true }: { showRibbon?: boolean }) {
         >
           <div>
             <div className="big-callout">
-              Premium gummy bears.
+              Gummy bears made here.
               <br />
-              Bold flavor.
+              Classic flavor.
               <br />
-              Patriotic backbone.
+              No artificial dyes.
             </div>
 
             <div className="muted" style={{ marginTop: 10 }}>
-              All natural flavors. No artificial dyes. Made in the USA. Fast shipping and savings on 5+ bags.
+              All natural flavors. Made in the USA. Free shipping at 5+ bags.
             </div>
 
             <div className="badge-row">
-              <span className="badge">Made in USA</span>
+              <span className="badge">Made in the USA</span>
               <span className="badge">Ships fast</span>
               <span className="badge">No artificial dyes</span>
               <span className="badge">4.8 stars from verified Amazon buyers</span>
@@ -53,14 +53,14 @@ export function PatriotBanner({ showRibbon = true }: { showRibbon?: boolean }) {
               className="pointer-events-none absolute -right-16 -top-8 w-48 opacity-12"
             />
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div className="kicker">Today’s move</div>
+              <div className="kicker">Today’s pick</div>
               <HeroPackIcon size={28} className="icon-float" />
             </div>
             <div style={{ fontWeight: 950, fontSize: 18, marginTop: 8 }}>
-              Save more with more bags
+              Lower the per-bag price with more bags
             </div>
             <div className="muted" style={{ marginTop: 8, fontSize: 14 }}>
-              The cart highlights the most popular size. Add bags to unlock free shipping.
+              The cart highlights the most picked size. Add bags to unlock free shipping.
             </div>
             <div style={{ marginTop: 10 }}>
               <GummyIconRow size={14} className="opacity-80" />
@@ -68,7 +68,7 @@ export function PatriotBanner({ showRibbon = true }: { showRibbon?: boolean }) {
 
             <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
               <Link className="btn btn-candy" href="/shop#bundle-pricing">
-                Shop now
+                Shop bags
               </Link>
             </div>
             <div style={{ marginTop: 8 }}>
