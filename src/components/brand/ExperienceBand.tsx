@@ -114,7 +114,7 @@ export function ExperienceBand({ variant = "compact", className }: Props) {
               Packed in FDA-compliant facilities here in the USA.
             </div>
             <Link href="/made-in-usa" className="experience-band__link">
-              See how it's made
+              See how it is made
             </Link>
           </div>
         </div>

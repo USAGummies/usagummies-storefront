@@ -80,7 +80,7 @@ export function WholesaleInquiryForm({ className }: { className?: string }) {
         Start a wholesale conversation
       </div>
       <div className="mt-1 text-sm text-[var(--muted)]">
-        Fill out the short form. We'll respond within 1-2 business days.
+        Fill out the short form. We will respond within 1-2 business days.
       </div>
 
       <form onSubmit={handleSubmit} className="mt-4 grid gap-3">

@@ -71,7 +71,7 @@ export default function ContactForm({
       ) : null}
 
       <p className="text-xs text-[var(--muted)]">
-        We'll reply to the email you provide. By submitting, you agree to our{" "}
+        We will reply to the email you provide. By submitting, you agree to our{" "}
         <Link href="/policies/privacy" className="underline underline-offset-4 hover:text-[var(--text)]">
           Privacy Policy
         </Link>

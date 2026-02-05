@@ -14,7 +14,7 @@ import * as React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import type { BundleTier } from "@/lib/bundles/getBundleVariants";
-import { BASE_PRICE, FREE_SHIPPING_PHRASE, MIN_PER_BAG, pricingForQty } from "@/lib/bundles/pricing";
+import { BASE_PRICE, MIN_PER_BAG, pricingForQty } from "@/lib/bundles/pricing";
 import { trackEvent } from "@/lib/analytics";
 import { fireCartToast } from "@/lib/cartFeedback";
 import { GummyIconRow, HeroPackIcon } from "@/components/ui/GummyIcon";
@@ -1193,7 +1193,7 @@ export default function BundleQuickBuy({
                 {showHowItWorks ? (
                   <div className="bundle-fusion__how">
                     <div className="text-[11px] font-semibold">
-                      How pricing works: selections add bags to your cart. They don't replace it.
+                      How pricing works: selections add bags to your cart. They do not replace it.
                     </div>
                     <details className="mt-2">
                       <summary className="cursor-pointer text-[11px] font-semibold text-[var(--text)]">
@@ -1389,7 +1389,7 @@ export default function BundleQuickBuy({
                 {showHowItWorks ? (
                   <div className="bundle-integrated__how">
                     <div className="text-[11px] font-semibold">
-                      How pricing works: selections add bags to your cart. They don't replace it.
+                      How pricing works: selections add bags to your cart. They do not replace it.
                     </div>
                     <details className="mt-2">
                       <summary className="cursor-pointer text-[11px] font-semibold text-[var(--text)]">

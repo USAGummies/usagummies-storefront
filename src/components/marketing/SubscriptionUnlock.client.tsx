@@ -100,7 +100,7 @@ export function SubscriptionUnlock({
             variant === "dark" ? "text-white/65" : "text-[var(--muted)]"
           )}
         >
-          You're in. Subscription access is unlocked, and your invite will arrive by email.
+          You are in. Subscription access is unlocked, and your invite will arrive by email.
         </div>
       <div
         className={cn(

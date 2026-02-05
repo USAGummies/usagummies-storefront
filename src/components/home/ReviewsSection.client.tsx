@@ -314,7 +314,7 @@ export default function ReviewsSectionClient({ reviews }: Props) {
                       {r.authorName}
                     </span>
                   </div>
-                  <p className="mt-2 line-clamp-3 text-sm">"{r.body}"</p>
+                  <p className="mt-2 line-clamp-3 text-sm">&ldquo;{r.body}&rdquo;</p>
                 </div>
               ))}
             </div>
