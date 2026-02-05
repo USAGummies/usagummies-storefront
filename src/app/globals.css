@@ -1182,22 +1182,31 @@ a:focus-visible:not(.btn):not(.focus-ring),
   font-size: 9px;
 }
 @media (min-width: 1024px){
+  .bundle-home--shop .buy-module__layout{
+    grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr) minmax(0, 1fr);
+    grid-template-areas:
+      "details image bundle";
+    align-items: stretch;
+  }
   .bundle-home--shop .buy-module__image{
-    align-self: start;
+    align-self: stretch;
+    max-width: none;
   }
   .bundle-home--shop .buy-module__imagePanel{
     display: flex;
-    height: auto;
+    height: 100%;
   }
   .bundle-home--shop .buy-module__imagePanel .media-frame{
     display: flex;
     flex-direction: column;
     width: 100%;
+    height: 100%;
   }
   .bundle-home--shop .buy-module__imagePanel .media-frame > .relative{
     flex: 1;
-    min-height: 360px;
-    aspect-ratio: 4 / 5;
+    min-height: 520px;
+    height: 100%;
+    aspect-ratio: 3 / 4;
   }
   .bundle-home--shop .buy-module__imagePanel .media-frame > div:last-child{
     margin-top: 8px;

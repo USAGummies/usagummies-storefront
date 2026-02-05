@@ -7,10 +7,10 @@ export function ProductTrustStack() {
     <div className="card" style={{ padding: 14 }}>
       <div className="kicker">Why people choose it</div>
       <div className="badge-row" style={{ marginTop: 10 }}>
-        <span className="badge">Made in the USA</span>
-        <span className="badge">No artificial dyes</span>
-        <span className="badge">All natural flavors</span>
-        <span className="badge">Ships fast</span>
+        <span className="badge">🇺🇸 Made in the USA</span>
+        <span className="badge">🌿 No artificial dyes</span>
+        <span className="badge">🍓 All natural flavors</span>
+        <span className="badge">🚚 Ships fast</span>
       </div>
 
       <div style={{ marginTop: 10 }} className="muted">

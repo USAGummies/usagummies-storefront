@@ -58,21 +58,6 @@ export function AmericanDreamCallout({
         .filter(Boolean)
         .join(" ")}
     >
-      <Image
-        src="/website%20assets/StatueofLiberty.png"
-        alt=""
-        aria-hidden="true"
-        width={780}
-        height={1024}
-        sizes="(max-width: 768px) 1px, 220px"
-        className={[
-          "pointer-events-none absolute",
-          isCompact ? "-right-3 -bottom-5 w-28 opacity-10" : "-right-8 -bottom-10 w-44 opacity-12",
-          isLight ? "mix-blend-multiply" : "opacity-15",
-        ]
-          .filter(Boolean)
-          .join(" ")}
-      />
       <span className="usa-stamp usa-stamp--corner">Made in USA</span>
       <div
         className="absolute inset-0 pointer-events-none"

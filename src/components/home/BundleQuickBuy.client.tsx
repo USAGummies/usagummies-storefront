@@ -772,30 +772,15 @@ export default function BundleQuickBuy({
         ].join(" ")}
       >
         <span className="inline-flex items-center gap-2">
-          <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
-            <path
-              fill="currentColor"
-              d="M3 7h11l4 4v6h-2a3 3 0 0 1-6 0H8a3 3 0 0 1-6 0H1V9a2 2 0 0 1 2-2zm13 1.5V7H5v3h11v-1.5zM6.5 19a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zm9 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"
-            />
-          </svg>
+          <span aria-hidden="true">🚚</span>
           <span>Ships within 24 hours</span>
         </span>
         <span className="inline-flex items-center gap-2">
-          <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
-            <path
-              fill="currentColor"
-              d="M12 2a5 5 0 0 1 5 5v2h2v4h-2.1A6 6 0 1 1 7 9h5V7a3 3 0 0 0-3-3H6V2h6z"
-            />
-          </svg>
+          <span aria-hidden="true">✅</span>
           <span>Satisfaction guaranteed</span>
         </span>
         <span className="inline-flex items-center gap-2">
-          <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
-            <path
-              fill="currentColor"
-              d="M6 10V8a6 6 0 1 1 12 0v2h1v12H5V10h1zm2 0h8V8a4 4 0 1 0-8 0v2z"
-            />
-          </svg>
+          <span aria-hidden="true">🔒</span>
           <span>Secure checkout</span>
         </span>
       </div>
@@ -887,7 +872,7 @@ export default function BundleQuickBuy({
             .filter(Boolean)
             .join(" ")}
         >
-          Satisfaction guaranteed • Ships within 24 hours • Secure checkout
+          🇺🇸 Made in the USA • ✅ Satisfaction guaranteed • 🚚 Ships within 24 hours • 🔒 Secure checkout
         </div>
         <div
           data-bundle-rating
@@ -917,7 +902,7 @@ export default function BundleQuickBuy({
                     : "rounded-full border border-white/10 bg-white/5 px-2 py-1"
               }
             >
-              Made in the USA
+              🇺🇸 Made in the USA
             </span>
             <span
               className={
@@ -928,7 +913,7 @@ export default function BundleQuickBuy({
                     : "rounded-full border border-white/10 bg-white/5 px-2 py-1"
               }
             >
-              No artificial dyes
+              🌿 No artificial dyes
             </span>
           </div>
         </div>
@@ -1801,13 +1786,8 @@ export default function BundleQuickBuy({
                 : "inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1"
           }
         >
-          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" aria-hidden="true">
-            <path
-              fill="currentColor"
-              d="M12 2 19 5v6c0 5-3.5 9.4-7 11-3.5-1.6-7-6-7-11V5l7-3z"
-            />
-          </svg>
-          Satisfaction guaranteed
+          <span aria-hidden="true">✅</span>
+          <span>Satisfaction guaranteed</span>
         </span>
         <span
           className={
@@ -1818,13 +1798,8 @@ export default function BundleQuickBuy({
                 : "inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1"
           }
         >
-          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" aria-hidden="true">
-            <path
-              fill="currentColor"
-              d="M3 6h10v7H3V6zm10 2h4l3 3v2h-7V8zm-8 9a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm11 0a2 2 0 1 0 .001 4A2 2 0 0 0 16 17z"
-            />
-          </svg>
-          Ships within 24 hours
+          <span aria-hidden="true">🚚</span>
+          <span>Ships within 24 hours</span>
         </span>
         <span
           className={
@@ -1835,13 +1810,8 @@ export default function BundleQuickBuy({
                 : "inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1"
           }
         >
-          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" aria-hidden="true">
-            <path
-              fill="currentColor"
-              d="M6 10V8a6 6 0 1 1 12 0v2h1v12H5V10h1zm2 0h8V8a4 4 0 1 0-8 0v2z"
-            />
-          </svg>
-          Secure checkout
+          <span aria-hidden="true">🔒</span>
+          <span>Secure checkout</span>
         </span>
       </div>
       {isCompact ? null : (

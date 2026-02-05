@@ -204,36 +204,27 @@ export default async function HomePage() {
       title: "Made in the USA",
       copy: "Proudly sourced, manufactured, and packed entirely in America.",
       icon: (
-        <svg viewBox="0 0 24 24" className="h-6 w-6 text-[var(--candy-red)]" aria-hidden="true">
-          <path
-            fill="currentColor"
-            d="M3 10.2 12 5l9 5.2v8.3H3v-8.3zm9-2.9-6.2 3.6h12.4L12 7.3zM7 12h2v5H7v-5zm4 0h2v5h-2v-5zm4 0h2v5h-2v-5z"
-          />
-        </svg>
+        <span className="text-lg" aria-hidden="true">
+          🇺🇸
+        </span>
       ),
     },
     {
       title: "No artificial dyes",
       copy: "Colored naturally using real fruit and vegetable extracts.",
       icon: (
-        <svg viewBox="0 0 24 24" className="h-6 w-6 text-[var(--candy-green)]" aria-hidden="true">
-          <path
-            fill="currentColor"
-            d="M12 3c4 3 6 6.3 6 9.6A6 6 0 0 1 6 12.6C6 9.3 8 6 12 3zm0 3.2C9.4 8.2 8 10.2 8 12.6a4 4 0 1 0 8 0c0-2.4-1.4-4.4-4-6.4z"
-          />
-        </svg>
+        <span className="text-lg" aria-hidden="true">
+          🌿
+        </span>
       ),
     },
     {
       title: "Classic gummy bear flavor",
       copy: "Chewy, fruity flavor without artificial ingredients or harsh aftertaste.",
       icon: (
-        <svg viewBox="0 0 24 24" className="h-6 w-6 text-[var(--candy-orange)]" aria-hidden="true">
-          <path
-            fill="currentColor"
-            d="M4 6h16v3H4V6zm0 5h16v7H4v-7zm5-4h6v-1H9v1zm3 6 3.5 2-1.2 1.8L12 15l-2.3 1.8-1.2-1.8L12 13z"
-          />
-        </svg>
+        <span className="text-lg" aria-hidden="true">
+          🍬
+        </span>
       ),
     },
   ];
@@ -371,7 +362,7 @@ export default async function HomePage() {
                       surface="flat"
                       layout="classic"
                       showHowItWorks={false}
-                      summaryCopy=""
+                      summaryCopy="5+ bags ship free from us. Under 5 bags, we send you to Amazon to save you on shipping."
                       showTrainAccent={false}
                       showAccent={false}
                       showEducation={false}
@@ -406,13 +397,8 @@ export default async function HomePage() {
           <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
             <div className="rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-3">
               <div className="flex items-center gap-2">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--surface-strong)] text-[var(--navy)]">
-                  <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
-                    <path
-                      fill="currentColor"
-                      d="M3 10.2 12 5l9 5.2v8.3H3v-8.3zm9-2.9-6.2 3.6h12.4L12 7.3z"
-                    />
-                  </svg>
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--surface-strong)] text-lg">
+                  <span aria-hidden="true">🇺🇸</span>
                 </div>
                 <div className="text-[13px] font-black text-[var(--text)]">Made in the USA</div>
               </div>
@@ -422,13 +408,8 @@ export default async function HomePage() {
             </div>
             <div className="rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-3">
               <div className="flex items-center gap-2">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--surface-strong)] text-[var(--navy)]">
-                  <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
-                    <path
-                      fill="currentColor"
-                      d="M12 3c4 3 6 6.3 6 9.6A6 6 0 0 1 6 12.6C6 9.3 8 6 12 3z"
-                    />
-                  </svg>
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--surface-strong)] text-lg">
+                  <span aria-hidden="true">🌿</span>
                 </div>
                 <div className="text-[13px] font-black text-[var(--text)]">No artificial dyes</div>
               </div>
@@ -438,13 +419,8 @@ export default async function HomePage() {
             </div>
             <div className="rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-3">
               <div className="flex items-center gap-2">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--surface-strong)] text-[var(--navy)]">
-                  <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
-                    <path
-                      fill="currentColor"
-                      d="M4 6h16v3H4V6zm0 5h16v7H4v-7z"
-                    />
-                  </svg>
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--surface-strong)] text-lg">
+                  <span aria-hidden="true">🍬</span>
                 </div>
                 <div className="text-[13px] font-black text-[var(--text)]">Classic gummy flavor</div>
               </div>

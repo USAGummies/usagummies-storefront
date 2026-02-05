@@ -297,7 +297,7 @@ export default async function IngredientsPage() {
                       surface="flat"
                       layout="classic"
                       showHowItWorks={false}
-                      summaryCopy=""
+                      summaryCopy="5+ bags ship free from us. Under 5 bags, we send you to Amazon to save you on shipping."
                       showTrainAccent={false}
                       showAccent={false}
                       showEducation={false}
