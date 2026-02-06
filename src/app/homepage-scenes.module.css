@@ -44,7 +44,9 @@
 }
 
 .sceneBundle {
-  background: #fffdf8;
+  background: #fff5ea;
+  background-image: var(--stripe-sheen);
+  background-size: auto;
 }
 
 .sceneBundle .sceneBg,

@@ -231,86 +231,6 @@ export default async function HomePage() {
 
   return (
     <main className="relative overflow-hidden min-h-screen pb-12 lg:pb-0 home-candy text-[var(--text)]">
-      <section
-        className="home-product-stage bg-[#FFF8F2]"
-        data-zone="HERO"
-        style={{ backgroundImage: "none" }}
-      >
-        <div className="mx-auto max-w-6xl px-4 py-0.5 sm:py-1.5 lg:py-2">
-          <div className="relative grid gap-1 lg:gap-2 lg:grid-cols-[1fr_1fr] lg:items-center">
-            <div className="order-2 relative lg:order-1">
-              <div className="relative z-10 space-y-0.5">
-                <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-                  <Image
-                    src="/brand/logo.png"
-                    alt="USA Gummies"
-                    width={72}
-                    height={24}
-                    className="h-5 w-auto"
-                  />
-                  <span>USA Gummies</span>
-                </div>
-                <h1 className="text-balance text-[32px] font-black leading-[1.05] tracking-tight text-[var(--navy)] sm:text-4xl lg:text-5xl">
-                  All-American Gummy Bears
-                </h1>
-                <p className="text-pretty text-[12px] text-[var(--text)] sm:text-sm">
-                  Classic gummy bears, made in the USA.
-                </p>
-                <div className="text-sm font-semibold text-[var(--navy)]">
-                  No artificial dyes • All natural flavors
-                </div>
-                <div className="text-xs font-semibold text-[var(--muted)]">
-                  4.8 stars from verified Amazon buyers
-                </div>
-                <div className="pt-0 space-y-0.5">
-                  <div className="text-xs font-semibold text-[var(--muted)]">
-                    Lower the per-bag price at 4+ bags.
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Link href="#bundle-pricing" className="btn btn-candy">
-                      Shop &amp; save
-                    </Link>
-                    <a href="#bundle-pricing" className="hero-scroll-link" data-hero-scroll>
-                      Jump to bundle pricing
-                    </a>
-                  </div>
-                  <div className="text-xs font-semibold text-[var(--muted)]">
-                    {FREE_SHIPPING_PHRASE} • Satisfaction guaranteed
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2 pt-0.5 text-[11px] font-semibold text-[var(--muted)]">
-                    <span className="rounded-full border border-[rgba(15,27,45,0.12)] bg-white px-3 py-1 text-[var(--navy)]">
-                      Made in USA
-                    </span>
-                    <span className="rounded-full border border-[rgba(15,27,45,0.12)] bg-white px-3 py-1 text-[var(--navy)]">
-                      Ships in 24 hours
-                    </span>
-                    <span className="rounded-full border border-[rgba(15,27,45,0.12)] bg-white px-3 py-1 text-[var(--navy)]">
-                      Secure checkout
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="order-1 hidden justify-center sm:flex lg:order-2 lg:justify-end">
-              <div className="home-hero__media relative w-full max-w-[240px] sm:max-w-[340px] lg:max-w-[420px]">
-                <div className="relative aspect-[4/5] overflow-visible">
-                  <Image
-                    src={heroMediaSrc}
-                    alt="USA Gummies bag"
-                    fill
-                    priority
-                    fetchPriority="high"
-                    sizes="(max-width: 640px) 92vw, (max-width: 1024px) 55vw, 640px"
-                    className="object-contain drop-shadow-[0_18px_30px_rgba(13,28,51,0.22)] z-10"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
       <section className={`${styles.scene} ${styles.sceneBundle} home-purchase-stage`} data-zone="BUNDLE">
         <div className={styles.sceneBg} aria-hidden="true" />
         <div className={styles.sceneOverlay} aria-hidden="true" />
@@ -411,6 +331,86 @@ export default async function HomePage() {
                 <Link href="/bulk-gummy-bears" className="underline underline-offset-4">
                   Bulk gummy bears
                 </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        className="home-product-stage bg-[#FFF8F2]"
+        data-zone="HERO"
+        style={{ backgroundImage: "none" }}
+      >
+        <div className="mx-auto max-w-6xl px-4 py-0.5 sm:py-1.5 lg:py-2">
+          <div className="relative grid gap-1 lg:gap-2 lg:grid-cols-[1fr_1fr] lg:items-center">
+            <div className="order-2 relative lg:order-1">
+              <div className="relative z-10 space-y-0.5">
+                <div className="flex items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+                  <Image
+                    src="/brand/logo.png"
+                    alt="USA Gummies"
+                    width={110}
+                    height={36}
+                    className="h-7 w-auto"
+                  />
+                  <span>USA Gummies</span>
+                </div>
+                <h1 className="text-balance text-[32px] font-black leading-[1.05] tracking-tight text-[var(--navy)] sm:text-4xl lg:text-5xl">
+                  All-American Gummy Bears
+                </h1>
+                <p className="text-pretty text-[12px] text-[var(--text)] sm:text-sm">
+                  Classic gummy bears, made in the USA.
+                </p>
+                <div className="text-sm font-semibold text-[var(--navy)]">
+                  No artificial dyes • All natural flavors
+                </div>
+                <div className="text-xs font-semibold text-[var(--muted)]">
+                  4.8 stars from verified Amazon buyers
+                </div>
+                <div className="pt-0 space-y-0.5">
+                  <div className="text-xs font-semibold text-[var(--muted)]">
+                    Lower the per-bag price at 4+ bags.
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Link href="#bundle-pricing" className="btn btn-candy">
+                      Shop &amp; save
+                    </Link>
+                    <a href="#bundle-pricing" className="hero-scroll-link" data-hero-scroll>
+                      Jump to bundle pricing
+                    </a>
+                  </div>
+                  <div className="text-xs font-semibold text-[var(--muted)]">
+                    {FREE_SHIPPING_PHRASE} • Satisfaction guaranteed
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 pt-0.5 text-[11px] font-semibold text-[var(--muted)]">
+                    <span className="rounded-full border border-[rgba(15,27,45,0.12)] bg-white px-3 py-1 text-[var(--navy)]">
+                      Made in USA
+                    </span>
+                    <span className="rounded-full border border-[rgba(15,27,45,0.12)] bg-white px-3 py-1 text-[var(--navy)]">
+                      Ships in 24 hours
+                    </span>
+                    <span className="rounded-full border border-[rgba(15,27,45,0.12)] bg-white px-3 py-1 text-[var(--navy)]">
+                      Secure checkout
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="order-1 hidden justify-center sm:flex lg:order-2 lg:justify-end">
+              <div className="home-hero__media relative w-full max-w-[240px] sm:max-w-[340px] lg:max-w-[420px]">
+                <div className="relative aspect-[4/5] overflow-visible">
+                  <Image
+                    src={heroMediaSrc}
+                    alt="USA Gummies bag"
+                    fill
+                    priority
+                    fetchPriority="high"
+                    sizes="(max-width: 640px) 92vw, (max-width: 1024px) 55vw, 640px"
+                    className="object-contain drop-shadow-[0_18px_30px_rgba(13,28,51,0.22)] z-10"
+                  />
+                </div>
               </div>
             </div>
           </div>

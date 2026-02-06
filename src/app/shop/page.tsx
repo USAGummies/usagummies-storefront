@@ -237,8 +237,104 @@ export default async function ShopPage() {
           { name: "Shop", href: "/shop" },
         ]}
       />
-      <section className="relative overflow-hidden bg-[#fffdf8]">
+      <section id="shop-bundles" aria-label="Savings pricing" className="bg-[#fffdf8] scroll-mt-24">
+        <div className="mx-auto max-w-6xl px-4 pt-4 pb-5 lg:pt-5 lg:pb-6">
+          <div className="bundle-home bundle-home--premium bundle-home--shop bundle-hero-stage buy-module americana-panel relative rounded-[36px] border border-[rgba(15,27,45,0.12)] bg-white shadow-[0_30px_80px_rgba(15,27,45,0.14)]">
+            <div className="buy-module__inner">
+            <div className="buy-module__layout">
+              <div
+                id="product-details"
+                className="buy-module__details min-w-0 scroll-mt-24"
+              >
+                  <h2 className="text-balance text-2xl font-black text-[var(--text)] sm:text-3xl">
+                    {productTitle}
+                  </h2>
+                  <div className="grid gap-1.5 text-sm text-[var(--muted)]">
+                    {DETAIL_BULLETS.map((bullet) => (
+                      <div key={bullet} className="flex items-start gap-2">
+                        <span className="mt-1.5 h-2 w-2 rounded-full bg-[var(--gold)]" />
+                        <span>{bullet}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="atomic-buy__chips">
+                    <span className="atomic-buy__chip">Made in USA</span>
+                    <span className="atomic-buy__chip">No artificial dyes</span>
+                    <span className="atomic-buy__chip">{FREE_SHIPPING_PHRASE}</span>
+                  </div>
+                  <div className="text-sm text-[var(--muted)]">
+                    Every bag supports American manufacturing and American jobs.
+                  </div>
+                  <div className="text-sm text-[var(--muted)]">
+                    Unlike imported gummies, USA Gummies are made and packed entirely in America.
+                  </div>
+                  <div className="text-xs text-[var(--muted)]">
+                    Ingredients &amp; allergen info: see the ingredient panel on the bag or{" "}
+                    <Link
+                      href="/ingredients"
+                      className="underline underline-offset-4 text-[var(--text)]"
+                    >
+                      ingredients
+                    </Link>
+                    .
+                  </div>
+                </div>
 
+                <div className="buy-module__rail min-w-0">
+                  <div className="buy-module__image">
+                    <div className="buy-module__imagePanel">
+                      <div className="relative">
+                        <ProductGallery
+                          title={productTitle}
+                          featured={productFeatured}
+                          images={productImages}
+                        />
+                        <span className="usa-stamp usa-stamp--small absolute left-4 top-4">Made in USA</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="buy-module__bundle atomic-buy__bundle">
+                    {bundleVariants ? (
+                      <BundleQuickBuy
+                        anchorId="shop-bundles"
+                        productHandle={productHandle}
+                        tiers={bundleVariants.variants}
+                        singleBagVariantId={bundleVariants.singleBagVariantId}
+                        availableForSale={bundleVariants.availableForSale}
+                        variant="compact"
+                        tone="light"
+                        surface="flat"
+                        layout="classic"
+                        showHowItWorks={false}
+                        summaryCopy="5+ bags ship free from us. Under 5 bags, we send you to Amazon to save you on shipping."
+                        showTrainAccent={false}
+                        showAccent={false}
+                        showEducation={false}
+                        ctaVariant="simple"
+                        primaryCtaLabel="Unlock Best Value + Free Shipping"
+                        featuredQuantities={[5, 8, 12]}
+                      />
+                    ) : (
+                      <div className="p-4 text-sm text-[var(--muted)]">
+                        Product details are loading. Please refresh to view savings pricing.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+          <div className="mt-2">
+            <AmericanDreamCallout
+              variant="compact"
+              tone="light"
+              showJoinButton={false}
+            />
+          </div>
+        </div>
+      </section>
+      <section className="relative overflow-hidden bg-[#fffdf8]">
         <div className="relative mx-auto max-w-6xl px-4 py-4 lg:py-5">
           <div className="grid gap-2 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
             <div className="space-y-2">
@@ -370,103 +466,7 @@ export default async function ShopPage() {
         </div>
       </section>
 
-      <section id="shop-bundles" aria-label="Savings pricing" className="bg-[#fffdf8] scroll-mt-24">
-        <div className="mx-auto max-w-6xl px-4 pb-5 lg:pb-6">
-          <div className="bundle-home bundle-home--premium bundle-home--shop bundle-hero-stage buy-module americana-panel relative rounded-[36px] border border-[rgba(15,27,45,0.12)] bg-white shadow-[0_30px_80px_rgba(15,27,45,0.14)]">
-            <div className="buy-module__inner">
-            <div className="buy-module__layout">
-              <div
-                id="product-details"
-                className="buy-module__details min-w-0 scroll-mt-24"
-              >
-                  <h2 className="text-balance text-2xl font-black text-[var(--text)] sm:text-3xl">
-                    {productTitle}
-                  </h2>
-                  <div className="grid gap-1.5 text-sm text-[var(--muted)]">
-                    {DETAIL_BULLETS.map((bullet) => (
-                      <div key={bullet} className="flex items-start gap-2">
-                        <span className="mt-1.5 h-2 w-2 rounded-full bg-[var(--gold)]" />
-                        <span>{bullet}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="atomic-buy__chips">
-                    <span className="atomic-buy__chip">Made in USA</span>
-                    <span className="atomic-buy__chip">No artificial dyes</span>
-                    <span className="atomic-buy__chip">{FREE_SHIPPING_PHRASE}</span>
-                  </div>
-                  <div className="text-sm text-[var(--muted)]">
-                    Every bag supports American manufacturing and American jobs.
-                  </div>
-                  <div className="text-sm text-[var(--muted)]">
-                    Unlike imported gummies, USA Gummies are made and packed entirely in America.
-                  </div>
-                  <div className="text-xs text-[var(--muted)]">
-                    Ingredients &amp; allergen info: see the ingredient panel on the bag or{" "}
-                    <Link
-                      href="/ingredients"
-                      className="underline underline-offset-4 text-[var(--text)]"
-                    >
-                      ingredients
-                    </Link>
-                    .
-                  </div>
-                </div>
-
-                <div className="buy-module__rail min-w-0">
-                  <div className="buy-module__image">
-                    <div className="buy-module__imagePanel">
-                      <div className="relative">
-                        <ProductGallery
-                          title={productTitle}
-                          featured={productFeatured}
-                          images={productImages}
-                        />
-                        <span className="usa-stamp usa-stamp--small absolute left-4 top-4">Made in USA</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="buy-module__bundle atomic-buy__bundle">
-                    {bundleVariants ? (
-                      <BundleQuickBuy
-                        anchorId="shop-bundles"
-                        productHandle={productHandle}
-                        tiers={bundleVariants.variants}
-                        singleBagVariantId={bundleVariants.singleBagVariantId}
-                        availableForSale={bundleVariants.availableForSale}
-                        variant="compact"
-                        tone="light"
-                        surface="flat"
-                        layout="classic"
-                        showHowItWorks={false}
-                        summaryCopy="5+ bags ship free from us. Under 5 bags, we send you to Amazon to save you on shipping."
-                        showTrainAccent={false}
-                        showAccent={false}
-                        showEducation={false}
-                        ctaVariant="simple"
-                        primaryCtaLabel="Unlock Best Value + Free Shipping"
-                        featuredQuantities={[5, 8, 12]}
-                      />
-                    ) : (
-                      <div className="p-4 text-sm text-[var(--muted)]">
-                        Product details are loading. Please refresh to view savings pricing.
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-            </div>
-          </div>
-          <div className="mt-2">
-            <AmericanDreamCallout
-              variant="compact"
-              tone="light"
-              showJoinButton={false}
-            />
-          </div>
-        </div>
-      </section>
+      
 
       <div className="americana-divider" aria-hidden="true" />
 

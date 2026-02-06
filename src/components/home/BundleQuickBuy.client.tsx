@@ -702,8 +702,8 @@ export default function BundleQuickBuy({
         </div>
       </div>
 
-      <div data-rail-bottom className="flex flex-col gap-2">
-        <div className="space-y-1 text-[12px]">
+      <div data-rail-bottom className="bundle-quickbuy__railBottom">
+        <div className="bundle-quickbuy__priceBlock">
           <div className="flex items-baseline justify-between font-semibold text-[#161616]">
             <span>{compactPriceLabel}</span>
             <span>{activeTotal ?? "--"}</span>
@@ -712,75 +712,94 @@ export default function BundleQuickBuy({
             {compactSavingsLabel}
           </div>
         </div>
-        <button
-          data-primary-cta
-          type="button"
-          className={[
-            "w-full inline-flex items-center justify-center rounded-[12px] h-[48px] px-4 text-[16px] font-semibold whitespace-nowrap shadow-[0_14px_36px_rgba(214,64,58,0.28)] transition disabled:opacity-60 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-[rgba(214,69,61,0.25)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#F7F3EF]",
-            isAmazonSelection
-              ? "bg-[#1F1F1F] text-white hover:bg-black"
-              : "bg-[#D6453D] text-white hover:bg-[#BF3B34] active:bg-[#A7322C]",
-          ].join(" ")}
-          onClick={handlePrimaryCtaClick}
-          disabled={isAdding || compactCtaDisabled}
-        >
-          <span className="inline-flex items-center gap-2">
-            {!isAmazonSelection && isAdding ? (
-              <>
-                <span
-                  aria-hidden="true"
-                  className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent opacity-60"
-                />
-                Adding...
-              </>
-            ) : (
-              <>
-                {isAmazonSelection ? (
-                  <Image
-                    src={AMAZON_LOGO_URL}
-                    alt="Amazon"
-                    width={48}
-                    height={14}
-                    className="h-4 w-auto"
-                  />
-                ) : null}
-                <span>{isAmazonSelection ? "Buy on Amazon" : selectedAdded ? "Added to Cart" : "Add to Cart"}</span>
-                {isAmazonSelection ? (
-                  <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
-                    <path
-                      fill="currentColor"
-                      d="M14 3h7v7h-2V6.4l-8.3 8.3-1.4-1.4L17.6 5H14V3zM5 5h5V3H3v7h2V5zm0 14v-5H3v7h7v-2H5z"
-                    />
-                  </svg>
-                ) : null}
-              </>
-            )}
-          </span>
-        </button>
-        <div className={isLight ? "text-[11px] font-semibold text-[#6B6B6B]" : "text-[11px] font-semibold text-white/70"}>
-          {isAmazonSelection
-            ? "Amazon checkout saves you on shipping."
-            : "Direct from USA Gummies. Free shipping at 5+ bags."}
+        <div className="bundle-quickbuy__rating">
+          <div className="bundle-quickbuy__ratingLine">
+            <span className="bundle-quickbuy__ratingStars">
+              {starLine(AMAZON_REVIEWS.aggregate.rating)}
+            </span>
+            <span>
+              {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars from verified Amazon buyers
+            </span>
+          </div>
+          <div className="bundle-quickbuy__snippets">
+            {reviewSnippets.map((review) => (
+              <div key={review.id} className="bundle-quickbuy__snippet">
+                &quot;{review.body}&quot; — {review.author}
+              </div>
+            ))}
+          </div>
         </div>
-        <div
-          data-rail-trust
-          className={[
-            "flex flex-wrap items-center gap-3 text-[11px] font-semibold",
-            isLight ? "text-[#6B6B6B]" : "text-white/70",
-          ].join(" ")}
-        >
-          <span className="inline-flex items-center gap-2">
-            <span aria-hidden="true">🚚</span>
-            <span>Ships within 24 hours</span>
-          </span>
-          <span className="inline-flex items-center gap-2">
-            <span aria-hidden="true">✅</span>
-            <span>Satisfaction guaranteed</span>
-          </span>
-          <span className="inline-flex items-center gap-2">
-            <span aria-hidden="true">🔒</span>
-            <span>Secure checkout</span>
-          </span>
+        <div className="bundle-quickbuy__ctaStack">
+          <button
+            data-primary-cta
+            type="button"
+            className={[
+              "w-full inline-flex items-center justify-center rounded-[12px] h-[48px] px-4 text-[16px] font-semibold whitespace-nowrap shadow-[0_14px_36px_rgba(214,64,58,0.28)] transition disabled:opacity-60 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-[rgba(214,69,61,0.25)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#F7F3EF]",
+              isAmazonSelection
+                ? "bg-[#1F1F1F] text-white hover:bg-black"
+                : "bg-[#D6453D] text-white hover:bg-[#BF3B34] active:bg-[#A7322C]",
+            ].join(" ")}
+            onClick={handlePrimaryCtaClick}
+            disabled={isAdding || compactCtaDisabled}
+          >
+            <span className="inline-flex items-center gap-2">
+              {!isAmazonSelection && isAdding ? (
+                <>
+                  <span
+                    aria-hidden="true"
+                    className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent opacity-60"
+                  />
+                  Adding...
+                </>
+              ) : (
+                <>
+                  {isAmazonSelection ? (
+                    <Image
+                      src={AMAZON_LOGO_URL}
+                      alt="Amazon"
+                      width={48}
+                      height={14}
+                      className="h-4 w-auto"
+                    />
+                  ) : null}
+                  <span>{isAmazonSelection ? "Buy on Amazon" : selectedAdded ? "Added to Cart" : "Add to Cart"}</span>
+                  {isAmazonSelection ? (
+                    <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+                      <path
+                        fill="currentColor"
+                        d="M14 3h7v7h-2V6.4l-8.3 8.3-1.4-1.4L17.6 5H14V3zM5 5h5V3H3v7h2V5zm0 14v-5H3v7h7v-2H5z"
+                      />
+                    </svg>
+                  ) : null}
+                </>
+              )}
+            </span>
+          </button>
+          <div className={isLight ? "text-[11px] font-semibold text-[#6B6B6B]" : "text-[11px] font-semibold text-white/70"}>
+            {isAmazonSelection
+              ? "Amazon checkout saves you on shipping."
+              : "Direct from USA Gummies. Free shipping at 5+ bags."}
+          </div>
+          <div
+            data-rail-trust
+            className={[
+              "flex flex-wrap items-center gap-3 text-[11px] font-semibold",
+              isLight ? "text-[#6B6B6B]" : "text-white/70",
+            ].join(" ")}
+          >
+            <span className="inline-flex items-center gap-2">
+              <span aria-hidden="true">🚚</span>
+              <span>Ships within 24 hours</span>
+            </span>
+            <span className="inline-flex items-center gap-2">
+              <span aria-hidden="true">✅</span>
+              <span>Satisfaction guaranteed</span>
+            </span>
+            <span className="inline-flex items-center gap-2">
+              <span aria-hidden="true">🔒</span>
+              <span>Secure checkout</span>
+            </span>
+          </div>
         </div>
       </div>
 
