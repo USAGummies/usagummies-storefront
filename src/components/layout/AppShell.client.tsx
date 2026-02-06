@@ -365,7 +365,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       ) : null}
       <header
         className={cx(
-          "sticky top-0 z-40 border-b border-[var(--border)] bg-white/92 text-[var(--text)] backdrop-blur-md shadow-[0_10px_24px_rgba(15,27,45,0.08)] transition-[transform,opacity] duration-300",
+          "site-header sticky top-0 z-40 border-b border-[var(--border)] bg-white/92 text-[var(--text)] backdrop-blur-md shadow-[0_10px_24px_rgba(15,27,45,0.08)] transition-[transform,opacity] duration-300",
           hideHomeHeader ? "home-header--hidden" : ""
         )}
       >

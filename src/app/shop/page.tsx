@@ -219,6 +219,7 @@ export default async function ShopPage() {
                       showEducation={false}
                       ctaVariant="simple"
                       primaryCtaLabel="Shop & save"
+                      selectorVariant="cards"
                       featuredQuantities={[5, 8, 12]}
                     />
                   </div>

@@ -330,9 +330,19 @@ export function ChatWidget() {
         type="button"
         className="support-chat__launcher"
         onClick={handleToggle}
-        aria-label="Open support chat"
+        aria-label={open ? "Close support chat" : "Open support chat"}
       >
-        {open ? "Close chat" : "Chat with us"}
+        <svg
+          className="support-chat__launcherIcon"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path
+            fill="currentColor"
+            d="M5 4h14a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H9l-4.5 3.5a1 1 0 0 1-1.5-.8V17a3 3 0 0 1-2-3V7a3 3 0 0 1 3-3Zm0 2a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h1v2.2L8.7 15H19a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1H5Z"
+          />
+        </svg>
+        <span className="sr-only">{open ? "Close chat" : "Chat with us"}</span>
       </button>
     </div>
   );
