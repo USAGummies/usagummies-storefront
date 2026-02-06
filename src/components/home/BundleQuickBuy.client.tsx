@@ -704,11 +704,11 @@ export default function BundleQuickBuy({
 
       <div data-rail-bottom className="bundle-quickbuy__railBottom">
         <div className="bundle-quickbuy__priceBlock">
-          <div className="flex items-baseline justify-between font-semibold text-[#161616]">
+          <div className="flex items-baseline justify-between font-semibold text-[#161616] text-[14px]">
             <span>{compactPriceLabel}</span>
             <span>{activeTotal ?? "--"}</span>
           </div>
-          <div className="text-[11px] font-semibold text-[#6B6B6B]">
+          <div className="text-[12px] font-semibold text-[#6B6B6B]">
             {compactSavingsLabel}
           </div>
         </div>
@@ -734,7 +734,7 @@ export default function BundleQuickBuy({
             data-primary-cta
             type="button"
             className={[
-              "w-full inline-flex items-center justify-center rounded-[12px] h-[48px] px-4 text-[16px] font-semibold whitespace-nowrap shadow-[0_14px_36px_rgba(214,64,58,0.28)] transition disabled:opacity-60 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-[rgba(214,69,61,0.25)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#F7F3EF]",
+              "w-full inline-flex items-center justify-center rounded-[12px] h-[52px] px-4 text-[17px] font-semibold whitespace-nowrap shadow-[0_14px_36px_rgba(214,64,58,0.28)] transition disabled:opacity-60 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-[rgba(214,69,61,0.25)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#F7F3EF]",
               isAmazonSelection
                 ? "bg-[#1F1F1F] text-white hover:bg-black"
                 : "bg-[#D6453D] text-white hover:bg-[#BF3B34] active:bg-[#A7322C]",
@@ -775,7 +775,7 @@ export default function BundleQuickBuy({
               )}
             </span>
           </button>
-          <div className={isLight ? "text-[11px] font-semibold text-[#6B6B6B]" : "text-[11px] font-semibold text-white/70"}>
+          <div className={isLight ? "text-[12px] font-semibold text-[#6B6B6B]" : "text-[12px] font-semibold text-white/70"}>
             {isAmazonSelection
               ? "Amazon checkout saves you on shipping."
               : "Direct from USA Gummies. Free shipping at 5+ bags."}
@@ -783,7 +783,7 @@ export default function BundleQuickBuy({
           <div
             data-rail-trust
             className={[
-              "flex flex-wrap items-center gap-3 text-[11px] font-semibold",
+              "flex flex-wrap items-center gap-3 text-[12px] font-semibold",
               isLight ? "text-[#6B6B6B]" : "text-white/70",
             ].join(" ")}
           >
