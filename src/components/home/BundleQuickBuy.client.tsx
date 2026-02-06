@@ -365,10 +365,6 @@ export default function BundleQuickBuy({
   const activePricing = isAmazonSelection
     ? { total: BASE_PRICE * activeQty, perBag: BASE_PRICE }
     : pricingForQty(activeQty);
-  const activeTotal = money(activePricing.total, "USD");
-  const activeSavings = !isAmazonSelection
-    ? money(Math.max(0, BASE_PRICE * activeQty - activePricing.total), "USD")
-    : null;
   const compactCtaDisabled = isAmazonSelection ? false : !canPurchaseQty(dtcSelectedQty);
 
   function handleRadioKeyDown(
@@ -578,17 +574,13 @@ export default function BundleQuickBuy({
       : null;
   const hasRegularLine = Boolean(basePerBag && regularTotal);
   const totalLabel = currentBags > 0 ? "New total" : "Total";
-  const compactPriceLabel = isAmazonSelection ? "Amazon total" : "Total";
-  const compactSavingsLabel = isAmazonSelection
-    ? "Amazon checkout saves you on shipping"
-    : "Direct checkout + free shipping at 5+ bags";
   const dtcSelectedPricing = pricingForQty(dtcSelectedQty);
   const dtcSelectedPerBag = money(dtcSelectedPricing.perBag, "USD");
   const useCardSelector = selectorVariant === "cards";
   const recommendedQty = 12;
   const dtcBenefitLabel = (qty: number) => {
-    if (qty === 12) return "Best value";
-    if (qty === 8) return "Most popular";
+    if (qty === 12) return "Best value · free shipping";
+    if (qty === 8) return "Most popular · free shipping";
     return "Free shipping";
   };
   const dtcSavingsLabel = (qty: number) => {
@@ -597,7 +589,7 @@ export default function BundleQuickBuy({
     if (savings > 0) {
       return `Save ${money(savings, "USD")}`;
     }
-    return "Free shipping";
+    return "Bundle price applied";
   };
   const dtcSegments = [
     { qty: 5, label: "5 bags" },
@@ -616,8 +608,8 @@ export default function BundleQuickBuy({
       <div className="bundle-quickbuy__panel">
         <div className="bundle-quickbuy__kicker">Pick a bag count</div>
         <div className="bundle-quickbuy__sub">
-          5+ bags ship free from us. Under 5 bags, we send you to Amazon to save
-          you on shipping.
+          All bundles (5, 8, 12) ship free from us. Under 5 bags, we send you to
+          Amazon to save you on shipping.
         </div>
 
         <div className="bundle-quickbuy__group">
@@ -663,16 +655,6 @@ export default function BundleQuickBuy({
                     {isFeatured ? (
                       <div className="bundle-quickbuy__cardBadge">Recommended</div>
                     ) : null}
-                    <div className="bundle-quickbuy__cardBrand" aria-hidden="true">
-                      <Image
-                        src="/logo-mark.png"
-                        alt=""
-                        width={28}
-                        height={28}
-                        className="h-7 w-7"
-                      />
-                      <span>Made in USA</span>
-                    </div>
                     <div className="bundle-quickbuy__cardCount">
                       <span>{segment.qty}</span>
                       <span>Bags</span>
@@ -689,6 +671,13 @@ export default function BundleQuickBuy({
                   </button>
                 );
               })}
+            </div>
+            <div className="bundle-quickbuy__selectorNote">
+              <span className="bundle-quickbuy__usaBadge">
+                <Image src="/logo-mark.png" alt="" width={18} height={18} className="h-4 w-4" />
+                <span>Made in USA</span>
+              </span>
+              <span>Every 5, 8, 12 bundle ships free.</span>
             </div>
           ) : (
             <div data-segmented-control role="radiogroup" aria-label="Direct bag count">
@@ -744,7 +733,12 @@ export default function BundleQuickBuy({
 
         <div className="bundle-quickbuy__group bundle-quickbuy__group--amazon">
           <div className="bundle-quickbuy__groupHeader">
-            <span className="bundle-quickbuy__groupTitle">Amazon (1-4 bags)</span>
+            <span className="bundle-quickbuy__groupTitle">
+              Amazon (1-4 bags)
+              <span className="bundle-quickbuy__amazonHeader" aria-hidden="true">
+                <Image src={AMAZON_LOGO_URL} alt="" width={44} height={14} className="h-3.5 w-auto" />
+              </span>
+            </span>
             <span className="bundle-quickbuy__groupMeta">Amazon checkout saves you on shipping</span>
           </div>
           <div data-segmented-control role="radiogroup" aria-label="Amazon bag count">
@@ -798,21 +792,12 @@ export default function BundleQuickBuy({
       </div>
 
       <div data-rail-bottom className="bundle-quickbuy__railBottom">
-        <div className="bundle-quickbuy__priceBlock">
-          <div className="flex items-baseline justify-between font-semibold text-[#161616] text-[13px]">
-            <span>{compactPriceLabel}</span>
-            <span>{activeTotal ?? "--"}</span>
-          </div>
-          <div className="text-[11px] font-semibold text-[#6B6B6B]">
-            {compactSavingsLabel}
-          </div>
-        </div>
         <div className="bundle-quickbuy__ctaStack">
           <button
             data-primary-cta
             type="button"
             className={[
-              "w-full inline-flex items-center justify-center rounded-[12px] h-[52px] px-4 text-[17px] font-semibold whitespace-nowrap shadow-[0_14px_36px_rgba(214,64,58,0.28)] transition disabled:opacity-60 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-[rgba(214,69,61,0.25)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#F7F3EF]",
+              "w-full inline-flex items-center justify-center rounded-[14px] h-[60px] px-4 text-[18px] font-semibold whitespace-nowrap shadow-[0_16px_40px_rgba(214,64,58,0.3)] transition disabled:opacity-60 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-[rgba(214,69,61,0.25)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#F7F3EF]",
               isAmazonSelection
                 ? "bg-[#1F1F1F] text-white hover:bg-black"
                 : "bg-[#D6453D] text-white hover:bg-[#BF3B34] active:bg-[#A7322C]",
@@ -840,7 +825,13 @@ export default function BundleQuickBuy({
                       className="h-4 w-auto"
                     />
                   ) : null}
-                  <span>{isAmazonSelection ? "Buy on Amazon" : selectedAdded ? "Added to Cart" : "Add to Cart"}</span>
+                  <span>
+                    {isAmazonSelection
+                      ? "Buy on Amazon"
+                      : selectedAdded
+                        ? "Added to Cart"
+                        : primaryCtaLabel || "Add to Cart"}
+                  </span>
                   {isAmazonSelection ? (
                     <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
                       <path
@@ -887,13 +878,6 @@ export default function BundleQuickBuy({
             <span>
               {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars from verified Amazon buyers
             </span>
-          </div>
-          <div className="bundle-quickbuy__snippets">
-            {reviewSnippets.map((review) => (
-              <div key={review.id} className="bundle-quickbuy__snippet">
-                &quot;{review.body}&quot; — {review.author}
-              </div>
-            ))}
           </div>
         </div>
       </div>

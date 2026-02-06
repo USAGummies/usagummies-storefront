@@ -4,8 +4,6 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
-import { CartLineControls } from "@/components/cart/CartLineControls.client";
-import AddBagButton from "@/components/cart/AddBagButton.client";
 import { cn } from "@/lib/cn";
 import { pricingForQty, BASE_PRICE, FREE_SHIP_QTY, MIN_PER_BAG } from "@/lib/bundles/pricing";
 import { SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
@@ -34,24 +32,6 @@ const PROGRESS_MILESTONES = [
 const MISSION_TARGET_QTY = 8;
 const MISSION_SOCIAL_PROOF = "8 bags is the most picked option.";
 const COMPLETE_TARGETS = [5, 8, 12];
-const TRUST_ITEMS = [
-  {
-    label: "Made in the USA",
-    icon: "M5 3h14l-2 4 2 4H5v10H3V3h2z",
-  },
-  {
-    label: "Satisfaction guaranteed",
-    icon: "M12 2 19 5v6c0 5-3.5 9.4-7 11-3.5-1.6-7-6-7-11V5l7-3z",
-  },
-  {
-    label: "Secure checkout",
-    icon: "M6 10V8a6 6 0 1 1 12 0v2h1v12H5V10h1zm2 0h8V8a4 4 0 1 0-8 0v2z",
-  },
-  {
-    label: "Satisfaction guaranteed",
-    icon: "M12 5V2L7 7l5 5V9c3.3 0 6 2.7 6 6a6 6 0 0 1-6 6H6v-2h6a4 4 0 0 0 0-8z",
-  },
-];
 const EXPRESS_CHECKOUT_METHODS = [
   {
     label: "Shop Pay",
@@ -99,6 +79,12 @@ function formatNumber(amount: number, currencyCode = "USD") {
 
 function clampPct(pct: number) {
   return Math.max(0, Math.min(100, pct));
+}
+
+function bundleSummaryText(lineBags: number) {
+  if (!lineBags) return "Bundle: —";
+  const shipping = lineBags >= FREE_SHIP_QTY ? "Free Shipping" : "Ships via Amazon";
+  return `Bundle: ${lineBags} Bag${lineBags === 1 ? "" : "s"} (${shipping})`;
 }
 
 function useCountUp(value: number, duration = 520) {
@@ -219,26 +205,8 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
   useEffect(() => {
     setLocalCart(cart);
   }, [cart]);
-  const refreshCart = useMemo(
-    () => () => {
-      const cartId =
-        typeof window !== "undefined" ? window.localStorage.getItem("cartId") : null;
-      fetch("/api/cart", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "get", cartId: cartId || undefined }),
-      })
-        .then((r) => r.json())
-        .then((data) => {
-          const nextCart = data.cart ?? null;
-          if (nextCart?.id) storeCartId(nextCart.id);
-          setLocalCart(nextCart);
-        })
-        .catch(() => {});
-    },
-    []
-  );
   const isDrawer = Boolean(onClose);
+  const allowInCartEdits = false;
 
   const lines =
     (localCart?.lines as any)?.nodes ??
@@ -328,20 +296,19 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
   const shippingHint = unlocked ? "Free shipping unlocked" : `Free at ${FREE_SHIP_QTY}+ bags`;
   const estimatedTotal = subtotal;
 
-  const savingsGap = Math.max(0, 4 - totalBags);
   let cartHeadline = "";
   if (totalBags === 0) {
-    cartHeadline = "Add bags to start savings.";
+    cartHeadline = "Bundle pricing starts at 4 bags.";
   } else if (totalBags < 4) {
-    cartHeadline = `${savingsGap} bag${savingsGap === 1 ? "" : "s"} away from savings pricing.`;
+    cartHeadline = "Bundle pricing starts at 4 bags.";
   } else if (totalBags === 4) {
-    cartHeadline = "Savings pricing active.";
+    cartHeadline = "Bundle pricing active.";
   } else if (totalBags >= 5 && totalBags < 8) {
     cartHeadline = "Free shipping unlocked.";
   } else if (totalBags === 8) {
-    cartHeadline = "Great choice. Most picked size.";
+    cartHeadline = "Most picked size active.";
   } else if (totalBags > 8 && totalBags < 12) {
-    cartHeadline = "Bulk savings active.";
+    cartHeadline = "Bundle pricing active.";
   } else {
     cartHeadline = "Best per-bag price active.";
   }
@@ -355,34 +322,15 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
   const dealStatusHint = bestPriceReached
     ? "You're at the lowest per-bag rate."
     : totalBags >= 4
-      ? "Pricing improves as you add bags."
-      : "Add bags to unlock savings and free shipping.";
+      ? "Bundle pricing is active."
+      : "Bundle pricing starts at 4 bags.";
   const dealSavingsLine =
     bundleSavings > 0
-      ? `You save ${bundleSavingsText} vs single bags.`
+      ? "Bundle price applied."
       : totalBags > 0
-        ? "Add bags to drop your per-bag price."
+        ? "Bundle pricing applies at 4+ bags."
         : "";
 
-  const savingsAddQty =
-    totalBags > 0 && totalBags < 4 ? 4 - totalBags : totalBags === 4 ? 1 : null;
-  const savingsButtonLabel = savingsAddQty
-    ? totalBags < 4
-      ? `Add +${savingsAddQty} bag${savingsAddQty === 1 ? "" : "s"} (total 4)`
-      : "Add +1 bag (total 5)"
-    : "";
-  const upgradeToEightAdd = totalBags > 0 && totalBags < 8 ? 8 - totalBags : null;
-  const upgradeToEightPrice =
-    upgradeToEightAdd && Number.isFinite(pricingForQty(8).total - currentTotal)
-      ? Math.max(0, pricingForQty(8).total - currentTotal)
-      : null;
-  const upgradeToEightLabel = upgradeToEightAdd
-    ? `Add +${upgradeToEightAdd} (total 8) - ${formatNumber(
-        upgradeToEightPrice ?? pricingForQty(8).total,
-        summaryCurrency
-      )}`
-    : "";
-  const showActionButtons = Boolean(savingsAddQty || upgradeToEightAdd);
 
   useEffect(() => {
     if (unlocked) {
@@ -496,7 +444,8 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
   }
 
   const hasLines = lines.length > 0;
-  const showNextTierCta = Boolean(hasLines && nextTierAddQty && nextTierAddQty > 0);
+  const showNextTierCta =
+    allowInCartEdits && Boolean(hasLines && nextTierAddQty && nextTierAddQty > 0);
   const cartContext = onClose ? "drawer" : "cart";
   const secondaryCta = onClose
     ? { href: "/cart", label: "View cart" }
@@ -515,9 +464,9 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
   const regularPerBagText = hasSavings ? formatNumber(BASE_PRICE, summaryCurrency) : "";
   const regularTotalText = hasSavings ? formatNumber(BASE_PRICE * totalBags, summaryCurrency) : "";
   const drawerSavingsLine = hasSavings
-    ? `You save ${bundleSavingsText}`
+    ? "You unlocked free shipping + bundle pricing."
     : totalBags > 0
-      ? "Savings pending."
+      ? "Bundle pricing applies at 4+ bags."
       : "";
   const showRegularLine = hasSavings && Boolean(regularPerBagText && regularTotalText);
   const nextTierDescriptor =
@@ -660,17 +609,19 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                           <div className="truncate text-[13px] font-semibold text-[var(--text)]">
                             {title}
                           </div>
-                          <div className="text-[10px] text-[var(--muted)]">
-                            Bag count: {lineBags} bag{lineBags === 1 ? "" : "s"}
+                          <div className="text-[10px] font-semibold text-[var(--muted)]">
+                            {bundleSummaryText(lineBags)}
                           </div>
                         </div>
                       </div>
                       <div className="mt-2">
-                        <CartLineControls
-                          lineId={l.id}
-                          quantity={lineQty}
-                          onChange={refreshCart}
-                        />
+                        <Link
+                          href="/shop#shop-bundles"
+                          className="text-[10px] font-semibold text-[var(--text)] underline underline-offset-4"
+                          onClick={onClose}
+                        >
+                          Change bag count
+                        </Link>
                       </div>
                     </div>
                   );
@@ -698,19 +649,17 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                     {estimatedTotal}
                   </span>
                 </div>
-                {showRegularLine || drawerSavingsLine ? (
-                  <div className={cn("text-[10px] font-semibold text-[var(--muted)]", highlightTotals && "price-pop")}>
-                    {showRegularLine ? (
-                      <span>
-                        Regular {regularPerBagText}/bag ·{" "}
-                        <span className="line-through">{regularTotalText}</span> total
-                      </span>
-                    ) : null}
-                    {drawerSavingsLine ? (
-                      <span className="text-[var(--candy-red)]">
-                        {showRegularLine ? " · " : ""}{drawerSavingsLine}
-                      </span>
-                    ) : null}
+                {totalBags > 0 ? (
+                  <div
+                    className={cn(
+                      "text-[10px] font-semibold",
+                      hasSavings ? "text-[var(--candy-red)]" : "text-[var(--muted)]",
+                      highlightTotals && "price-pop"
+                    )}
+                  >
+                    {showRegularLine
+                      ? `Normally ${regularTotalText} — today ${estimatedTotal}`
+                      : drawerSavingsLine}
                   </div>
                 ) : null}
               </div>
@@ -719,7 +668,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
             {localCart?.checkoutUrl ? (
               <div className="mt-3 grid gap-2">
                 <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
-                  Fast checkout
+                  Express checkout
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   {EXPRESS_CHECKOUT_METHODS.map((method) => (
@@ -728,7 +677,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                       href={checkoutHref ?? localCart.checkoutUrl}
                       onClick={(event) => handleCheckoutClick(event, method.label)}
                       aria-label={`${method.label} checkout`}
-                      className="flex items-center justify-center rounded-xl border border-transparent bg-[var(--surface-strong)] px-2 py-2 text-[9px] font-semibold text-[var(--muted)] transition hover:border-[rgba(15,27,45,0.12)] hover:text-[var(--text)]"
+                      className="flex items-center justify-center rounded-lg border border-transparent bg-[var(--surface-strong)]/70 px-2 py-1.5 text-[8px] font-semibold text-[var(--muted)] transition hover:border-[rgba(15,27,45,0.12)] hover:text-[var(--text)]"
                     >
                       <span className="flex h-9 w-full items-center justify-center">
                         <Image
@@ -738,11 +687,17 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                           width={96}
                           height={28}
                           sizes="96px"
-                          className="h-6 w-auto opacity-80"
+                          className="h-4 w-auto opacity-70"
                         />
                       </span>
                     </a>
                   ))}
+                </div>
+
+                <div className="mt-2 grid gap-1 text-[11px] font-semibold text-[var(--muted)]">
+                  <div>⭐ {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars from verified Amazon buyers</div>
+                  <div>🇺🇸 Made in the USA</div>
+                  <div>🚚 Ships within 24 hours</div>
                 </div>
 
                 <a
@@ -760,37 +715,12 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                     Secure checkout
                   </span>
                 </a>
+                <div className="text-[10px] font-semibold text-[var(--muted)]">
+                  Order now, ships tomorrow.
+                </div>
               </div>
             ) : null}
 
-            <div className="mt-3 relative border-t border-[rgba(15,27,45,0.08)] pt-3 text-[11px] text-[var(--muted)]">
-              <Image
-                src="/website%20assets/Train-02.png"
-                alt=""
-                aria-hidden="true"
-                width={640}
-                height={420}
-                sizes="120px"
-                className="pointer-events-none absolute -right-8 -top-8 w-28 opacity-10"
-              />
-              <div className="relative grid gap-1 text-[11px] font-semibold text-[var(--muted)]">
-                <div className="flex items-center gap-2 opacity-70" aria-hidden="true">
-                  <GummyIconRow size={12} />
-                </div>
-                {[
-                  "Ships within 24 hours",
-                  "Satisfaction guaranteed",
-                  "Secure checkout",
-                ].map((item) => (
-                  <div key={item} className="flex items-center gap-2">
-                    <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-[rgba(15,27,45,0.08)] text-[10px] text-[var(--text)]">
-                      ✓
-                    </span>
-                    <span>{item}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
 
             {showNextTierCta ? (
               <details className="mt-3 border-t border-[rgba(15,27,45,0.08)] pt-3 text-[11px] text-[var(--muted)]">
@@ -911,7 +841,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                     <div className="text-[10px] text-[var(--muted)]">{shippingHint}</div>
                     {bundleSavings > 0 ? (
                       <div className="text-[10px] font-semibold text-[var(--candy-red)]">
-                        You saved {bundleSavingsText} today vs single bags.
+                        Bundle price applied.
                       </div>
                     ) : null}
                   </div>
@@ -978,7 +908,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                     </Link>
                   </div>
                   <div className="mt-1 text-[10px] text-[var(--muted)]">
-                    Ships in 24 hours • Satisfaction guaranteed
+                    Order now, ships tomorrow.
                   </div>
                 </div>
               ) : null}
@@ -1096,38 +1026,16 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                 </div>
                 <div className="mt-2 text-[11px] text-[var(--muted)]">{freeShipLine}</div>
               </div>
-              {showActionButtons ? (
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <div className="flex flex-wrap items-center gap-2 flex-1">
-                    {savingsAddQty ? (
-                      <AddBagButton
-                        label={savingsButtonLabel}
-                        pendingLabel="Adding..."
-                        disabled={bundlePending}
-                        onAdd={() => addBags(savingsAddQty)}
-                      />
-                    ) : null}
-                    {upgradeToEightAdd ? (
-                      <AddBagButton
-                        label={upgradeToEightLabel}
-                        pendingLabel="Adding..."
-                        disabled={bundlePending}
-                        onAdd={() => addBags(upgradeToEightAdd)}
-                      />
-                    ) : null}
-                  </div>
-                  {isDrawer ? (
-                    <div className="relative h-28 w-24 shrink-0 self-center mr-8">
-                      <Image
-                        src="/website%20assets/StatueofLiberty.png"
-                        alt=""
-                        fill
-                        sizes="96px"
-                        className="object-contain"
-                        aria-hidden="true"
-                      />
-                    </div>
-                  ) : null}
+              {isDrawer ? (
+                <div className="relative h-28 w-24 shrink-0 self-center mr-8">
+                  <Image
+                    src="/website%20assets/StatueofLiberty.png"
+                    alt=""
+                    fill
+                    sizes="96px"
+                    className="object-contain"
+                    aria-hidden="true"
+                  />
                 </div>
               ) : null}
               <details className="mt-3 text-xs text-[var(--muted)]">
@@ -1261,46 +1169,50 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                     );
                   })}
                 </div>
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  {missionRemaining > 0 ? (
-                    <button
-                      type="button"
-                      onClick={() => addBags(missionRemaining)}
-                      disabled={bundlePending}
-                      className="btn btn-candy pressable w-full sm:w-auto"
-                    >
-                    {bundlePending ? "Adding..." : missionCtaLabel}
-                    </button>
-                  ) : (
-                    <span className="inline-flex rounded-full border border-[rgba(239,59,59,0.25)] bg-[rgba(239,59,59,0.12)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--candy-red)]">
-                      {missionCtaLabel}
-                    </span>
-                  )}
-                </div>
-                {completeTargets.length ? (
-                  <div className="mt-3 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-3">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
-                      Finish your bag count
-                    </div>
-                    <div className="mt-2 grid gap-2 sm:grid-cols-3">
-                      {completeTargets.map((target) => (
+                {allowInCartEdits ? (
+                  <>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      {missionRemaining > 0 ? (
                         <button
-                          key={target.target}
                           type="button"
-                          onClick={() => addBags(target.addQty)}
+                          onClick={() => addBags(missionRemaining)}
                           disabled={bundlePending}
-                          className="rounded-2xl border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-3 py-2 text-left text-[11px] font-semibold text-[var(--text)] transition hover:border-[rgba(239,59,59,0.35)]"
+                          className="btn btn-candy pressable w-full sm:w-auto"
                         >
-                          <div>
-                            Add +{target.addQty} bag{target.addQty === 1 ? "" : "s"} (total {target.target})
-                          </div>
-                          <div className="mt-1 text-[10px] text-[var(--muted)]">
-                            +{target.addTotalText}
-                          </div>
+                          {bundlePending ? "Adding..." : missionCtaLabel}
                         </button>
-                      ))}
+                      ) : (
+                        <span className="inline-flex rounded-full border border-[rgba(239,59,59,0.25)] bg-[rgba(239,59,59,0.12)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--candy-red)]">
+                          {missionCtaLabel}
+                        </span>
+                      )}
                     </div>
-                  </div>
+                    {completeTargets.length ? (
+                      <div className="mt-3 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-3">
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
+                          Finish your bag count
+                        </div>
+                        <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                          {completeTargets.map((target) => (
+                            <button
+                              key={target.target}
+                              type="button"
+                              onClick={() => addBags(target.addQty)}
+                              disabled={bundlePending}
+                              className="rounded-2xl border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-3 py-2 text-left text-[11px] font-semibold text-[var(--text)] transition hover:border-[rgba(239,59,59,0.35)]"
+                            >
+                              <div>
+                                Add +{target.addQty} bag{target.addQty === 1 ? "" : "s"} (total {target.target})
+                              </div>
+                              <div className="mt-1 text-[10px] text-[var(--muted)]">
+                                +{target.addTotalText}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                  </>
                 ) : null}
                 <div className="mt-3">
                   <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
@@ -1356,76 +1268,78 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                 </div>
                 <div className="mt-2 text-[11px] text-[var(--muted)]">{mysteryBonusLine}</div>
               </div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                {FEATURED_BUNDLE_QTYS.map((qty) => {
-                  const nextBags = totalBags + qty;
-                  const pricing = pricingForQty(nextBags);
-                  const addTotal = Math.max(0, pricing.total - currentTotal);
-                  const totalText = formatNumber(addTotal, summaryCurrency);
-                  const nextTotalText = formatNumber(pricing.total, summaryCurrency);
-                  const perBagText = formatNumber(pricing.perBag, summaryCurrency);
-                  const savings = Math.max(0, BASE_PRICE * nextBags - pricing.total);
-                  const savingsText = savings > 0 ? formatNumber(savings, summaryCurrency) : "";
-                  const label = bundleLabel(nextBags);
-                  const isActive = false;
-                  const isBest = nextBags === 8;
-                  const freeShip = nextBags >= FREE_SHIP_QTY;
+              {allowInCartEdits ? (
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  {FEATURED_BUNDLE_QTYS.map((qty) => {
+                    const nextBags = totalBags + qty;
+                    const pricing = pricingForQty(nextBags);
+                    const addTotal = Math.max(0, pricing.total - currentTotal);
+                    const totalText = formatNumber(addTotal, summaryCurrency);
+                    const nextTotalText = formatNumber(pricing.total, summaryCurrency);
+                    const perBagText = formatNumber(pricing.perBag, summaryCurrency);
+                    const savings = Math.max(0, BASE_PRICE * nextBags - pricing.total);
+                    const savingsText = savings > 0 ? formatNumber(savings, summaryCurrency) : "";
+                    const label = bundleLabel(nextBags);
+                    const isActive = false;
+                    const isBest = nextBags === 8;
+                    const freeShip = nextBags >= FREE_SHIP_QTY;
 
-                  return (
-                    <button
-                      key={qty}
-                      type="button"
-                      aria-pressed={isActive}
-                      onClick={() => addBags(qty)}
-                      disabled={bundlePending}
-                      className={cn(
-                        "relative rounded-2xl border px-3 py-3 text-left transition overflow-hidden",
-                        "bg-white text-[var(--text)]",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(239,59,59,0.35)]",
-                        "transition-transform",
-                        isActive
-                          ? "border-[var(--candy-red)] bg-[rgba(239,59,59,0.08)] shadow-[0_14px_32px_rgba(239,59,59,0.16)] ring-2 ring-[rgba(239,59,59,0.2)]"
-                          : "border-[rgba(15,27,45,0.12)] hover:border-[rgba(239,59,59,0.3)] hover:shadow-[0_12px_28px_rgba(15,27,45,0.12)]",
-                        isBest &&
-                          "scale-[1.04] sm:scale-[1.06] z-10 border-[rgba(239,59,59,0.35)] bg-[rgba(239,59,59,0.04)]",
-                        bundlePending && !isActive && "opacity-70 cursor-not-allowed"
-                      )}
-                    >
-                      {isBest ? (
-                        <span className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#ff4b4b] via-[#f8d44f] to-[#ff4b4b] opacity-90" />
-                      ) : null}
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="text-sm font-black text-[var(--text)]">+{qty} bags</div>
-                        {label ? (
-                          <span className="rounded-full border border-[rgba(239,59,59,0.25)] bg-[rgba(239,59,59,0.12)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--candy-red)]">
-                            {label}
-                          </span>
+                    return (
+                      <button
+                        key={qty}
+                        type="button"
+                        aria-pressed={isActive}
+                        onClick={() => addBags(qty)}
+                        disabled={bundlePending}
+                        className={cn(
+                          "relative rounded-2xl border px-3 py-3 text-left transition overflow-hidden",
+                          "bg-white text-[var(--text)]",
+                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(239,59,59,0.35)]",
+                          "transition-transform",
+                          isActive
+                            ? "border-[var(--candy-red)] bg-[rgba(239,59,59,0.08)] shadow-[0_14px_32px_rgba(239,59,59,0.16)] ring-2 ring-[rgba(239,59,59,0.2)]"
+                            : "border-[rgba(15,27,45,0.12)] hover:border-[rgba(239,59,59,0.3)] hover:shadow-[0_12px_28px_rgba(15,27,45,0.12)]",
+                          isBest &&
+                            "scale-[1.04] sm:scale-[1.06] z-10 border-[rgba(239,59,59,0.35)] bg-[rgba(239,59,59,0.04)]",
+                          bundlePending && !isActive && "opacity-70 cursor-not-allowed"
+                        )}
+                      >
+                        {isBest ? (
+                          <span className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#ff4b4b] via-[#f8d44f] to-[#ff4b4b] opacity-90" />
                         ) : null}
-                      </div>
-                      <div className="mt-2 text-[11px] text-[var(--muted)]">
-                        New total: {nextBags} bags
-                      </div>
-                      <div className="mt-2 text-xl font-black text-[var(--text)]">+{totalText}</div>
-                      <div className="text-[11px] text-[var(--muted)]">
-                        Total after add: {nextTotalText} - ~{perBagText} / bag
-                      </div>
-                      <div className="mt-2 flex items-center justify-between gap-2 text-[11px]">
-                        <span className="font-semibold text-[var(--candy-red)]">
-                          {savingsText ? `You save ${savingsText}` : "Standard price"}
-                        </span>
-                        {freeShip ? (
-                          <span className="text-[var(--muted)]">Free shipping</span>
-                        ) : null}
-                      </div>
-                      {isBest ? (
-                        <div className="mt-2 text-[11px] font-semibold text-[var(--muted)]">
-                          8 bags is the most picked total.
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="text-sm font-black text-[var(--text)]">+{qty} bags</div>
+                          {label ? (
+                            <span className="rounded-full border border-[rgba(239,59,59,0.25)] bg-[rgba(239,59,59,0.12)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--candy-red)]">
+                              {label}
+                            </span>
+                          ) : null}
                         </div>
-                      ) : null}
-                    </button>
-                  );
-                })}
-              </div>
+                        <div className="mt-2 text-[11px] text-[var(--muted)]">
+                          New total: {nextBags} bags
+                        </div>
+                        <div className="mt-2 text-xl font-black text-[var(--text)]">+{totalText}</div>
+                        <div className="text-[11px] text-[var(--muted)]">
+                          Total after add: {nextTotalText} - ~{perBagText} / bag
+                        </div>
+                        <div className="mt-2 flex items-center justify-between gap-2 text-[11px]">
+                          <span className="font-semibold text-[var(--candy-red)]">
+                            {savingsText ? `You save ${savingsText}` : "Standard price"}
+                          </span>
+                          {freeShip ? (
+                            <span className="text-[var(--muted)]">Free shipping</span>
+                          ) : null}
+                        </div>
+                        {isBest ? (
+                          <div className="mt-2 text-[11px] font-semibold text-[var(--muted)]">
+                            8 bags is the most picked total.
+                          </div>
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
               {bundleError ? (
                 <div className="mt-3 text-xs text-[var(--red)]">{bundleError}</div>
               ) : null}
@@ -1458,11 +1372,6 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                       : l.cost?.totalAmount
                         ? formatMoney(l.cost.totalAmount as MoneyV2)
                         : "";
-                    const bundleLabel = `${lineBags} bag${lineBags === 1 ? "" : "s"}`;
-                    const linePerBagText =
-                      linePricing && linePricing.perBag
-                        ? formatMoney({ amount: linePricing.perBag.toFixed(2), currencyCode: lineCurrency })
-                        : "";
                     return (
                       <div key={l.id} className="metal-panel rounded-2xl border border-[rgba(15,27,45,0.12)] p-4 flex gap-3 hover-lift">
                         <div
@@ -1484,15 +1393,16 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                           {variant ? (
                             <div className="text-xs text-[var(--muted)] mt-1">{variant}</div>
                           ) : null}
-                          <div className="text-xs text-[var(--muted)] mt-1">
-                            Bag count: {bundleLabel}
-                            {linePerBagText ? ` • ${linePerBagText} / bag` : ""}
+                          <div className="text-xs font-semibold text-[var(--muted)] mt-1">
+                            {bundleSummaryText(lineBags)}
                           </div>
                           <div className="mt-2">
-                            <CartLineControls lineId={l.id} quantity={l.quantity} onChange={refreshCart} />
-                          </div>
-                          <div className="mt-2 text-[10px] text-[var(--muted)]">
-                            Savings apply automatically at 4+ bags.
+                            <Link
+                              href="/shop#shop-bundles"
+                              className="text-[10px] font-semibold text-[var(--text)] underline underline-offset-4"
+                            >
+                              Change bag count
+                            </Link>
                           </div>
                         </div>
                         <div className="text-right text-sm font-black text-[var(--text)]">{lineTotal}</div>
@@ -1536,11 +1446,6 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                         : l.cost?.totalAmount
                           ? formatMoney(l.cost.totalAmount as MoneyV2)
                           : "";
-                      const bundleLabel = `${lineBags} bag${lineBags === 1 ? "" : "s"}`;
-                      const linePerBagText =
-                        linePricing && linePricing.perBag
-                          ? formatMoney({ amount: linePricing.perBag.toFixed(2), currencyCode: lineCurrency })
-                          : "";
                       return (
                         <div key={l.id} className="rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-3 flex gap-3">
                           <div className="media-thumb relative h-14 w-14" aria-hidden="true">
@@ -1559,15 +1464,16 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                             {variant ? (
                               <div className="text-xs text-[var(--muted)] mt-1">{variant}</div>
                             ) : null}
-                            <div className="text-xs text-[var(--muted)] mt-1">
-                              Bag count: {bundleLabel}
-                              {linePerBagText ? ` • ${linePerBagText} / bag` : ""}
+                            <div className="text-xs font-semibold text-[var(--muted)] mt-1">
+                              {bundleSummaryText(lineBags)}
                             </div>
                             <div className="mt-2">
-                              <CartLineControls lineId={l.id} quantity={l.quantity} onChange={refreshCart} />
-                            </div>
-                            <div className="mt-2 text-[10px] text-[var(--muted)]">
-                              Savings apply automatically at 4+ bags.
+                              <Link
+                                href="/shop#shop-bundles"
+                                className="text-[10px] font-semibold text-[var(--text)] underline underline-offset-4"
+                              >
+                                Change bag count
+                              </Link>
                             </div>
                           </div>
                           <div className="text-right text-sm font-black text-[var(--text)]">{lineTotal}</div>
@@ -1607,9 +1513,11 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                   Best price active
                 </div>
               ) : null}
-              {bundleSavings > 0 ? (
-                <div className="text-xs text-[var(--muted)]">
-                  You save {bundleSavingsText} vs single bags.
+              {totalBags > 0 ? (
+                <div className={cn("text-xs font-semibold", hasSavings ? "text-[var(--candy-red)]" : "text-[var(--muted)]")}>
+                  {showRegularLine
+                    ? `Normally ${regularTotalText} — today ${estimatedTotal}`
+                    : drawerSavingsLine}
                 </div>
               ) : null}
               {showNextTierCta ? (
@@ -1626,34 +1534,38 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                 {localCart?.checkoutUrl ? (
                   <div className="mb-3 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] p-3">
                     <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
-                      Fast checkout
+                      Express checkout
                     </div>
                     <div className="mt-2 grid grid-cols-3 gap-2">
                       <a
                         href={checkoutHref ?? localCart.checkoutUrl}
                         onClick={(event) => handleCheckoutClick(event, "Shop Pay")}
-                        className="rounded-full bg-[var(--navy)] px-2 py-2 text-center text-[11px] font-semibold text-white"
+                        className="rounded-full border border-[rgba(15,27,45,0.12)] bg-white px-2 py-1.5 text-center text-[10px] font-semibold text-[var(--muted)]"
                       >
                         Shop Pay
                       </a>
                       <a
                         href={checkoutHref ?? localCart.checkoutUrl}
                         onClick={(event) => handleCheckoutClick(event, "Apple Pay")}
-                        className="rounded-full bg-[#111111] px-2 py-2 text-center text-[11px] font-semibold text-white"
+                        className="rounded-full border border-[rgba(15,27,45,0.12)] bg-white px-2 py-1.5 text-center text-[10px] font-semibold text-[var(--muted)]"
                       >
                         Apple Pay
                       </a>
                       <a
                         href={checkoutHref ?? localCart.checkoutUrl}
                         onClick={(event) => handleCheckoutClick(event, "Google Pay")}
-                        className="rounded-full border border-[var(--border)] bg-white px-2 py-2 text-center text-[11px] font-semibold text-[var(--text)]"
+                        className="rounded-full border border-[rgba(15,27,45,0.12)] bg-white px-2 py-1.5 text-center text-[10px] font-semibold text-[var(--muted)]"
                       >
                         Google Pay
                       </a>
                     </div>
-                    <div className="mt-2 text-[10px] text-[var(--muted)]">
-                      Choose a payment method on the next step.
-                    </div>
+                  </div>
+                ) : null}
+                {localCart?.checkoutUrl ? (
+                  <div className="mb-2 grid gap-1 text-[11px] font-semibold text-[var(--muted)]">
+                    <div>⭐ {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars from verified Amazon buyers</div>
+                    <div>🇺🇸 Made in the USA</div>
+                    <div>🚚 Ships within 24 hours</div>
                   </div>
                 ) : null}
                 {localCart?.checkoutUrl ? (
@@ -1669,33 +1581,12 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                           d="M6 10V8a6 6 0 1 1 12 0v2h1v12H5V10h1zm2 0h8V8a4 4 0 1 0-8 0v2z"
                         />
                       </svg>
-                      Secure checkout - ships within 24 hours
+                      Secure checkout
                     </span>
                   </a>
                 ) : null}
                 <div className="mt-2 text-xs font-semibold text-[var(--muted)]">
-                  Ships within 24 hours • Satisfaction guaranteed
-                </div>
-                <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] font-semibold text-[var(--muted)] sm:grid-cols-4">
-                  {TRUST_ITEMS.map((item) => (
-                    <div
-                      key={item.label}
-                      className="flex items-center gap-2 rounded-full border border-[var(--border)] bg-white px-2 py-1 text-[10px] font-semibold text-[var(--text)]"
-                    >
-                      <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-[var(--candy-red)]" aria-hidden="true">
-                        <path fill="currentColor" d={item.icon} />
-                      </svg>
-                      <span className="leading-tight">{item.label}</span>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-2 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] p-2 text-[11px] text-[var(--muted)]">
-                  <div className="font-semibold text-[var(--text)]">
-                    {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars from verified Amazon buyers
-                  </div>
-                  <div className="mt-1 text-[10px] text-[var(--muted)]">
-                    Review highlights updated weekly from verified buyers.
-                  </div>
+                  Order now, ships tomorrow.
                 </div>
                 <Link
                   href={secondaryCta.href}

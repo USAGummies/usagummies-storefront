@@ -231,7 +231,7 @@ export default async function HomePage() {
 
   return (
     <main className="relative overflow-hidden min-h-screen pb-12 lg:pb-0 home-candy text-[var(--text)]">
-      <section className={`${styles.scene} ${styles.sceneBundle} home-purchase-stage`} data-zone="BUNDLE">
+      <section className={`${styles.scene} ${styles.sceneBundle} home-purchase-stage home-hero-theme`} data-zone="BUNDLE">
         <div className={styles.sceneBg} aria-hidden="true" />
         <div className={styles.sceneOverlay} aria-hidden="true" />
         <div className={styles.sceneContent}>
@@ -314,15 +314,15 @@ export default async function HomePage() {
                       showAccent={false}
                       showEducation={false}
                       ctaVariant="simple"
-                      primaryCtaLabel="Unlock Best Value + Free Shipping"
+                      primaryCtaLabel="Shop & save"
                       selectorVariant="cards"
                       featuredQuantities={[5, 8, 12]}
                     />
                   </div>
                 </div>
               </div>
-              <div className="mt-1.5 flex flex-wrap gap-1.5 text-[10px] text-[var(--muted)]">
-                <span className="font-semibold text-[var(--text)]">Bag count guides:</span>
+              <div className="mt-1.5 flex flex-wrap gap-1.5 text-[10px] text-white/70">
+                <span className="font-semibold text-white">Bag count guides:</span>
                 <Link href="/gummy-gift-bundles" className="underline underline-offset-4">
                   Gift bag options
                 </Link>
@@ -338,16 +338,12 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section
-        className="home-product-stage bg-[#FFF8F2]"
-        data-zone="HERO"
-        style={{ backgroundImage: "none" }}
-      >
+      <section className="home-product-stage home-hero-theme" data-zone="HERO">
         <div className="mx-auto max-w-6xl px-4 py-0.5 sm:py-1.5 lg:py-2">
           <div className="relative grid gap-1 lg:gap-2 lg:grid-cols-[1fr_1fr] lg:items-center">
             <div className="order-2 relative lg:order-1">
               <div className="relative z-10 space-y-0.5">
-                <div className="flex items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+                <div className="flex items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.3em] text-white/70">
                   <Image
                     src="/brand/logo.png"
                     alt="USA Gummies"
@@ -357,20 +353,20 @@ export default async function HomePage() {
                   />
                   <span>USA Gummies</span>
                 </div>
-                <h1 className="text-balance text-[32px] font-black leading-[1.05] tracking-tight text-[var(--navy)] sm:text-4xl lg:text-5xl">
+                <h1 className="text-balance text-[32px] font-black leading-[1.05] tracking-tight text-white sm:text-4xl lg:text-5xl">
                   All-American Gummy Bears
                 </h1>
-                <p className="text-pretty text-[12px] text-[var(--text)] sm:text-sm">
+                <p className="text-pretty text-[12px] text-white/85 sm:text-sm">
                   Classic gummy bears, made in the USA.
                 </p>
-                <div className="text-sm font-semibold text-[var(--navy)]">
+                <div className="text-sm font-semibold text-white">
                   No artificial dyes • All natural flavors
                 </div>
-                <div className="text-xs font-semibold text-[var(--muted)]">
+                <div className="text-xs font-semibold text-[var(--gold)]">
                   4.8 stars from verified Amazon buyers
                 </div>
                 <div className="pt-0 space-y-0.5">
-                  <div className="text-xs font-semibold text-[var(--muted)]">
+                  <div className="text-xs font-semibold text-white/70">
                     Lower the per-bag price at 4+ bags.
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -381,17 +377,17 @@ export default async function HomePage() {
                       Jump to bundle pricing
                     </a>
                   </div>
-                  <div className="text-xs font-semibold text-[var(--muted)]">
+                  <div className="text-xs font-semibold text-white/70">
                     {FREE_SHIPPING_PHRASE} • Satisfaction guaranteed
                   </div>
-                  <div className="flex flex-wrap items-center gap-2 pt-0.5 text-[11px] font-semibold text-[var(--muted)]">
-                    <span className="rounded-full border border-[rgba(15,27,45,0.12)] bg-white px-3 py-1 text-[var(--navy)]">
+                  <div className="flex flex-wrap items-center gap-2 pt-0.5 text-[11px] font-semibold text-white/70">
+                    <span className="rounded-full border border-white/20 bg-white px-3 py-1 text-[var(--navy)]">
                       Made in USA
                     </span>
-                    <span className="rounded-full border border-[rgba(15,27,45,0.12)] bg-white px-3 py-1 text-[var(--navy)]">
+                    <span className="rounded-full border border-white/20 bg-white px-3 py-1 text-[var(--navy)]">
                       Ships in 24 hours
                     </span>
-                    <span className="rounded-full border border-[rgba(15,27,45,0.12)] bg-white px-3 py-1 text-[var(--navy)]">
+                    <span className="rounded-full border border-white/20 bg-white px-3 py-1 text-[var(--navy)]">
                       Secure checkout
                     </span>
                   </div>

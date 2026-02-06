@@ -52,7 +52,7 @@ const BENEFITS = [
 
 export default function JoinTheRevolutionPage() {
   return (
-    <main className="relative overflow-hidden bg-[var(--bg)] text-[var(--text)] min-h-screen home-candy">
+    <main className="relative overflow-hidden home-hero-theme text-[var(--text)] min-h-screen home-candy">
       <section className="relative overflow-hidden">
         <div
           className="absolute inset-0 pointer-events-none"

@@ -128,7 +128,7 @@ export default async function ShopPage() {
   };
 
   return (
-    <main className="relative overflow-hidden bg-[#fffdf8] text-[var(--text)] min-h-screen pb-16">
+    <main className="relative overflow-hidden home-hero-theme text-[var(--text)] min-h-screen pb-16">
       <BreadcrumbJsonLd
         items={[
           { name: "Home", href: "/" },
@@ -218,14 +218,14 @@ export default async function ShopPage() {
                       showAccent={false}
                       showEducation={false}
                       ctaVariant="simple"
-                      primaryCtaLabel="Unlock Best Value + Free Shipping"
+                      primaryCtaLabel="Shop & save"
                       featuredQuantities={[5, 8, 12]}
                     />
                   </div>
                 </div>
               </div>
-              <div className="mt-1.5 flex flex-wrap gap-1.5 text-[10px] text-[var(--muted)]">
-                <span className="font-semibold text-[var(--text)]">Bag count guides:</span>
+              <div className="mt-1.5 flex flex-wrap gap-1.5 text-[10px] text-white/70">
+                <span className="font-semibold text-white">Bag count guides:</span>
                 <Link href="/gummy-gift-bundles" className="underline underline-offset-4">
                   Gift bag options
                 </Link>

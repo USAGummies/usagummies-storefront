@@ -98,7 +98,7 @@ const POLICIES = [
 
 export default function PoliciesIndexPage() {
   return (
-    <main className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
+    <main className="min-h-screen home-hero-theme text-[var(--text)]">
       <BreadcrumbJsonLd
         items={[
           { name: "Home", href: "/" },

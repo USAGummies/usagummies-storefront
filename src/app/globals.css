@@ -132,7 +132,7 @@ details > summary::-webkit-details-marker{
 }
 .home-product-stage{
   background-image: none !important;
-  background-color: #fff8f2;
+  background-color: transparent;
 }
 .home-product-stage .sceneBg,
 .home-product-stage .sceneOverlay{
@@ -163,6 +163,18 @@ details > summary::-webkit-details-marker{
   text-decoration: underline;
   text-underline-offset: 4px;
 }
+.home-hero-theme{
+  background:
+    radial-gradient(circle at 10% 12%, rgba(71, 42, 68, 0.62), transparent 56%),
+    radial-gradient(circle at 86% 8%, rgba(26, 44, 92, 0.55), transparent 52%),
+    linear-gradient(135deg, #1a1f34 0%, #151f3a 52%, #0d1c33 100%);
+}
+.home-hero-theme .hero-scroll-link{
+  color: #f7f4ee;
+}
+.home-hero-theme .hero-scroll-link:hover{
+  color: #ffffff;
+}
 .brand-touch{
   pointer-events: none;
   user-select: none;
@@ -170,10 +182,8 @@ details > summary::-webkit-details-marker{
 .patriot-sheen{
   background-image:
     var(--paper-grain),
-    var(--foil-sheen),
-    var(--star-pattern),
-    var(--stripe-sheen);
-  background-size: auto, auto, 160px 160px, auto;
+    var(--foil-sheen);
+  background-size: auto, auto;
   background-repeat: repeat;
   background-position: center;
 }
@@ -186,10 +196,10 @@ details > summary::-webkit-details-marker{
   content: "";
   position: absolute;
   inset: 0;
-  background-image: var(--star-pattern);
-  background-size: 150px 150px;
+  background-image: var(--paper-grain);
+  background-size: auto;
   background-repeat: repeat;
-  opacity: 0.12;
+  opacity: 0.25;
   pointer-events: none;
 }
 .americana-panel > *{
@@ -2461,21 +2471,21 @@ a:focus-visible:not(.btn):not(.focus-ring),
 .bundle-quickbuy__rail{
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding-top: 2px;
+  gap: 10px;
+  padding-top: 4px;
   height: 100%;
   flex: 1;
 }
 .bundle-quickbuy__panel{
-  border-radius: 16px;
-  border: 1px solid rgba(15,27,45,0.12);
+  border-radius: 20px;
+  border: 1px solid rgba(15,27,45,0.14);
   background:
     radial-gradient(circle at 15% 10%, rgba(255,255,255,0.9), transparent 55%),
     linear-gradient(180deg, rgba(255,247,238,0.98), rgba(255,253,248,0.98));
-  padding: 12px;
+  padding: 18px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
   position: relative;
   overflow: hidden;
   box-shadow:
@@ -2502,7 +2512,7 @@ a:focus-visible:not(.btn):not(.focus-ring),
 }
 .bundle-quickbuy__cardGrid{
   display: grid;
-  gap: 14px;
+  gap: 12px;
   align-items: stretch;
 }
 @media (min-width: 640px){
@@ -2511,16 +2521,17 @@ a:focus-visible:not(.btn):not(.focus-ring),
   }
 }
 .bundle-quickbuy__card{
-  border-radius: 20px;
-  border: 1px solid rgba(15,27,45,0.14);
-  background: #ffffff;
-  padding: 18px;
-  text-align: left;
+  border-radius: 24px;
+  border: 1px solid rgba(15,27,45,0.16);
+  background: linear-gradient(180deg, #ffffff 0%, #fff7f2 100%);
+  padding: 22px 18px;
+  text-align: center;
   display: grid;
-  gap: 6px;
-  box-shadow: 0 12px 24px rgba(15,27,45,0.12);
+  gap: 8px;
+  box-shadow: 0 14px 30px rgba(15,27,45,0.12);
   transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
   position: relative;
+  min-height: 170px;
 }
 .bundle-quickbuy__card:hover,
 .bundle-quickbuy__card:focus-visible{
@@ -2528,59 +2539,50 @@ a:focus-visible:not(.btn):not(.focus-ring),
   box-shadow: 0 18px 36px rgba(15,27,45,0.16);
 }
 .bundle-quickbuy__card[data-featured="true"]{
-  border-color: rgba(239,59,59,0.4);
-  box-shadow: 0 20px 40px rgba(239,59,59,0.22);
-  transform: translateY(-2px) scale(1.02);
-  background: linear-gradient(180deg, #ffffff 0%, #fff5f1 100%);
+  border-color: rgba(239,59,59,0.5);
+  box-shadow: 0 24px 50px rgba(239,59,59,0.24);
+  transform: translateY(-3px) scale(1.03);
+  background: linear-gradient(180deg, #ffffff 0%, #ffece4 100%);
 }
 .bundle-quickbuy__card[data-active="true"]{
   border-color: rgba(239,59,59,0.6);
   box-shadow: 0 20px 44px rgba(239,59,59,0.28);
 }
 .bundle-quickbuy__cardBadge{
-  align-self: flex-start;
+  align-self: center;
   border-radius: 999px;
   background: var(--candy-red);
   color: #fff;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  padding: 5px 10px;
-  box-shadow: 0 10px 20px rgba(239,59,59,0.25);
-}
-.bundle-quickbuy__cardBrand{
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--muted);
+  padding: 6px 12px;
+  box-shadow: 0 10px 20px rgba(239,59,59,0.25);
 }
 .bundle-quickbuy__cardCount{
   display: flex;
   align-items: baseline;
+  justify-content: center;
   gap: 6px;
-  font-size: 22px;
-  font-weight: 700;
+  font-size: 30px;
+  font-weight: 800;
   color: var(--text);
   line-height: 1;
 }
 .bundle-quickbuy__cardCount span:last-child{
-  font-size: 10px;
-  letter-spacing: 0.22em;
+  font-size: 12px;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--muted);
 }
 .bundle-quickbuy__cardPrice{
-  font-size: 26px;
+  font-size: 30px;
   font-weight: 800;
   color: var(--text);
 }
 .bundle-quickbuy__cardBenefit{
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.18em;
   text-transform: uppercase;
@@ -2589,10 +2591,34 @@ a:focus-visible:not(.btn):not(.focus-ring),
 .bundle-quickbuy__cardMeta{
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
+  justify-content: center;
   font-size: 11px;
   font-weight: 700;
-  color: var(--candy-red);
+  color: var(--muted);
+}
+.bundle-quickbuy__selectorNote{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.bundle-quickbuy__usaBadge{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: #fff;
+  border: 1px solid rgba(15,27,45,0.12);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text);
 }
 .bundle-quickbuy__microcopy{
   font-size: 11px;
@@ -2602,17 +2628,13 @@ a:focus-visible:not(.btn):not(.focus-ring),
 .bundle-quickbuy__railBottom{
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  flex: 1;
-}
-.bundle-quickbuy__priceBlock{
-  display: grid;
-  gap: 4px;
+  gap: 8px;
+  flex: 0 0 auto;
 }
 .bundle-quickbuy__ctaStack{
-  margin-top: auto;
+  margin-top: 0;
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 .bundle-quickbuy__rating{
   display: flex;
@@ -2659,21 +2681,32 @@ a:focus-visible:not(.btn):not(.focus-ring),
   display: grid;
   gap: 6px;
 }
+.bundle-quickbuy__group--amazon{
+  padding: 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(15,27,45,0.14);
+  background: linear-gradient(180deg, rgba(255,255,255,0.95), rgba(255,247,238,0.92));
+}
 .bundle-quickbuy__groupHeader{
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 8px;
 }
+.bundle-quickbuy__amazonHeader{
+  display: inline-flex;
+  margin-left: 8px;
+  vertical-align: middle;
+}
 .bundle-quickbuy__groupTitle{
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--text);
 }
 .bundle-quickbuy__groupMeta{
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--muted);
 }
@@ -2712,12 +2745,12 @@ a:focus-visible:not(.btn):not(.focus-ring),
   border-left: 1px solid rgba(15,27,45,0.12);
 }
 .bundle-quickbuy__segmentLabel{
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--text);
 }
 .bundle-quickbuy__segmentPrice{
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--muted);
 }
@@ -2747,7 +2780,7 @@ a:focus-visible:not(.btn):not(.focus-ring),
   border: 1px solid rgba(15,27,45,0.14);
   background: #fff;
   box-shadow: 0 10px 20px rgba(15,27,45,0.08);
-  padding: 18px 8px 22px;
+  padding: 16px 8px 20px;
 }
 .bundle-quickbuy__group--amazon [data-segment] + [data-segment]{
   border-left: 0;
@@ -3424,10 +3457,9 @@ a:focus-visible:not(.btn):not(.focus-ring),
   background:
     radial-gradient(circle at 18% 18%, rgba(239,59,59,0.12), transparent 45%),
     radial-gradient(circle at 82% 8%, rgba(248,212,79,0.18), transparent 40%),
-    var(--star-pattern),
-    var(--stripe-sheen);
-  background-size: auto, auto, 180px 180px, auto;
-  background-repeat: no-repeat, no-repeat, repeat, repeat;
+    var(--paper-grain);
+  background-size: auto, auto, auto;
+  background-repeat: no-repeat, no-repeat, repeat;
   opacity: 0.45;
   pointer-events:none;
 }

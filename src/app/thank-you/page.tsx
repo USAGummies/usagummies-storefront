@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 
 export default function ThankYouPage() {
   return (
-    <main className="relative overflow-hidden bg-[var(--bg)] text-[var(--text)] min-h-screen home-candy pb-16">
+    <main className="relative overflow-hidden home-hero-theme text-[var(--text)] min-h-screen home-candy pb-16">
       <div className="mx-auto max-w-6xl px-4 pt-10">
         <Reveal className="candy-panel rounded-3xl border border-[var(--border)] p-6 space-y-3 text-[var(--text)]">
           <div className="text-xs font-semibold tracking-[0.22em] text-[var(--muted)] uppercase">

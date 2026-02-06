@@ -191,7 +191,7 @@ export default async function IngredientsPage() {
   const productHandle = "all-american-gummy-bears-7-5-oz-single-bag";
 
   return (
-    <main className="relative overflow-hidden bg-[var(--bg)] text-[var(--text)] min-h-screen home-candy">
+    <main className="relative overflow-hidden home-hero-theme text-[var(--text)] min-h-screen home-candy">
       <section className="relative overflow-hidden">
         <div
           className="absolute inset-0 pointer-events-none"
@@ -302,7 +302,7 @@ export default async function IngredientsPage() {
                       showAccent={false}
                       showEducation={false}
                       ctaVariant="simple"
-                      primaryCtaLabel="Unlock Best Value + Free Shipping"
+                      primaryCtaLabel="Shop & save"
                       featuredQuantities={[5, 8, 12]}
                     />
                   ) : (

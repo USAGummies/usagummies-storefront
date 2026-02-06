@@ -43,7 +43,7 @@ export const metadata: Metadata = {
 
 export default function ContactPage() {
   return (
-    <main className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
+    <main className="min-h-screen home-hero-theme text-[var(--text)]">
       <BreadcrumbJsonLd
         items={[
           { name: "Home", href: "/" },

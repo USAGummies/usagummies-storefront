@@ -21,16 +21,16 @@ export default async function CartPage() {
   }
 
   return (
-    <main className="relative overflow-hidden bg-[#fffdf8] text-[var(--text)] min-h-screen pb-16">
+    <main className="relative overflow-hidden home-hero-theme text-[var(--text)] min-h-screen pb-16">
       <div className="mx-auto max-w-6xl px-4 pt-6">
         {/* Top nav */}
-        <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-[var(--muted)]">
+        <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-white/70">
           <div className="flex items-center gap-2">
-            <Link href="/" className="link-underline text-[var(--muted)] hover:text-[var(--text)]">
+            <Link href="/" className="link-underline text-white/70 hover:text-white">
               Home
             </Link>
             <span>›</span>
-            <span className="font-black text-[var(--text)]">Cart</span>
+            <span className="font-black text-white">Cart</span>
           </div>
 
           <div className="flex gap-2">

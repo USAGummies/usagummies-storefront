@@ -69,7 +69,7 @@ const blogPostingJsonLd = {
 
 export default function America250HubPage() {
   return (
-    <main className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
+    <main className="min-h-screen home-hero-theme text-[var(--text)]">
       <div className="mx-auto max-w-4xl px-4 py-14">
         <BreadcrumbJsonLd
           items={[
