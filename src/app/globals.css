@@ -2795,10 +2795,10 @@ a:focus-visible:not(.btn):not(.focus-ring),
   color: rgba(255,255,255,0.92);
 }
 .bundle-quickbuy__usaMark{
-  filter: brightness(0) invert(1) drop-shadow(0 1px 2px rgba(0,0,0,0.45));
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.45));
 }
 .logo-mark--light{
-  filter: brightness(0) invert(1) drop-shadow(0 1px 2px rgba(0,0,0,0.45));
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.45));
 }
 .bundle-quickbuy__microcopy{
   font-size: 11px;
