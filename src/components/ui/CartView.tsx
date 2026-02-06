@@ -38,19 +38,25 @@ const EXPRESS_CHECKOUT_METHODS = [
     label: "Shop Pay",
     iconSrc: "/payments/shop-pay.svg",
     className: "bg-[#5a31f4] text-white",
-    iconClassName: "h-7 w-auto",
+    iconClassName: "h-8 w-full max-w-[150px] object-contain",
+    iconWidth: 160,
+    iconHeight: 40,
   },
   {
     label: "Apple Pay",
     iconSrc: "/payments/apple-pay.svg",
     className: "bg-black text-white",
-    iconClassName: "h-6 w-auto",
+    iconClassName: "h-8 w-full max-w-[150px] object-contain",
+    iconWidth: 160,
+    iconHeight: 40,
   },
   {
     label: "Google Pay",
     iconSrc: "/payments/google-pay.svg",
     className: "bg-black text-white",
-    iconClassName: "h-6 w-auto",
+    iconClassName: "h-8 w-full max-w-[150px] object-contain",
+    iconWidth: 160,
+    iconHeight: 40,
   },
 ];
 
@@ -676,18 +682,18 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                       onClick={(event) => handleCheckoutClick(event, method.label)}
                       aria-label={`${method.label} checkout`}
                       className={cn(
-                        "flex h-11 items-center justify-center rounded-xl border border-white/10 px-3 py-2 text-[8px] font-semibold transition hover:brightness-105 shadow-[0_10px_20px_rgba(5,10,20,0.45)]",
+                        "flex h-12 items-center justify-center rounded-xl border border-white/10 px-3 py-2 text-[8px] font-semibold transition hover:brightness-105 shadow-[0_10px_20px_rgba(5,10,20,0.45)]",
                         method.className
                       )}
                     >
-                      <span className="flex h-9 w-full items-center justify-center">
+                      <span className="flex h-10 w-full items-center justify-center">
                         <Image
                           src={method.iconSrc}
                           alt=""
                           aria-hidden="true"
-                          width={96}
-                          height={28}
-                          sizes="96px"
+                          width={method.iconWidth ?? 96}
+                          height={method.iconHeight ?? 28}
+                          sizes="(max-width: 480px) 120px, 140px"
                           className={cn(method.iconClassName, "opacity-100")}
                         />
                       </span>
