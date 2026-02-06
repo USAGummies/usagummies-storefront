@@ -307,7 +307,7 @@ export default function ReviewsSectionClient({ reviews }: Props) {
                 aria-hidden="true"
                 width={2048}
                 height={559}
-                className="pointer-events-none hidden lg:block absolute -right-8 -bottom-6 w-full max-w-[520px] opacity-85"
+                className="pointer-events-none hidden lg:block absolute -right-12 -bottom-10 w-full max-w-[520px] opacity-85"
               />
             </div>
 

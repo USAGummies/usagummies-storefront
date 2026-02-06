@@ -38,19 +38,19 @@ const EXPRESS_CHECKOUT_METHODS = [
     label: "Shop Pay",
     iconSrc: "/payments/shop-pay.svg",
     className: "bg-[#5a31f4] text-white",
-    iconClassName: "h-6 w-auto",
+    iconClassName: "h-7 w-auto",
   },
   {
     label: "Apple Pay",
     iconSrc: "/payments/apple-pay.svg",
     className: "bg-black text-white",
-    iconClassName: "h-5 w-auto",
+    iconClassName: "h-6 w-auto",
   },
   {
     label: "Google Pay",
     iconSrc: "/payments/google-pay.svg",
     className: "bg-black text-white",
-    iconClassName: "h-5 w-auto",
+    iconClassName: "h-6 w-auto",
   },
 ];
 
@@ -567,16 +567,16 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                 <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
                   Order summary
                 </div>
-                <div className="flex items-center gap-2">
-                  {drawerStatus ? (
-                    <span
-                      className={cn(
-                        "rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.18em]",
-                        drawerStatus.tone === "success"
-                          ? "bg-[rgba(21,128,61,0.12)] text-[rgba(21,128,61,0.95)]"
-                          : "border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] text-[var(--muted)]"
-                      )}
-                    >
+              <div className="flex items-center gap-2">
+                {drawerStatus ? (
+                  <span
+                    className={cn(
+                        "rounded-full px-2 py-0.5 text-[8px] font-semibold uppercase tracking-[0.18em]",
+                      drawerStatus.tone === "success"
+                        ? "bg-[rgba(21,128,61,0.12)] text-[rgba(21,128,61,0.95)]"
+                        : "border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] text-[var(--muted)]"
+                    )}
+                  >
                       {drawerStatus.label}
                     </span>
                   ) : null}
@@ -676,7 +676,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                       onClick={(event) => handleCheckoutClick(event, method.label)}
                       aria-label={`${method.label} checkout`}
                       className={cn(
-                        "flex h-11 items-center justify-center rounded-xl border border-white/10 px-3 py-2 text-[8px] font-semibold transition hover:brightness-105",
+                        "flex h-11 items-center justify-center rounded-xl border border-white/10 px-3 py-2 text-[8px] font-semibold transition hover:brightness-105 shadow-[0_10px_20px_rgba(5,10,20,0.45)]",
                         method.className
                       )}
                     >
@@ -719,14 +719,14 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                 <div className="text-[10px] font-semibold text-[var(--muted)]">
                   Order now, ships tomorrow.
                 </div>
-                <div className="relative mt-6 flex items-end justify-center">
+                <div className="relative mt-4 flex items-end justify-center gap-2">
                   <Image
                     src="/website%20assets/StatueofLiberty.png"
                     alt=""
                     aria-hidden="true"
                     width={320}
                     height={320}
-                    className="h-24 w-auto opacity-75"
+                    className="h-28 w-auto opacity-75"
                   />
                   <Image
                     src="/logo-mark.png"
@@ -734,7 +734,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                     aria-hidden="true"
                     width={40}
                     height={40}
-                    className="absolute -right-2 bottom-0 h-6 w-auto opacity-85 logo-mark--light"
+                    className="absolute -right-4 bottom-2 h-7 w-auto opacity-90 logo-mark--light"
                   />
                 </div>
               </div>
