@@ -236,12 +236,9 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
     : Number(localCart?.cost?.subtotalAmount?.amount ?? 0);
   const gaItems = useMemo(() => buildGaItems(lines), [lines]);
   const animatedSubtotal = useCountUp(subtotalNumber);
-  const animatedSavings = useCountUp(bundleSavings);
   const animatedPerBag = useCountUp(bundlePricing?.perBag ?? 0);
   const bundlePerBagText =
     bundlePricing ? formatNumber(animatedPerBag, summaryCurrency) : "";
-  const bundleSavingsText =
-    bundleSavings > 0 ? formatNumber(animatedSavings, summaryCurrency) : "";
   const subtotal = Number.isFinite(subtotalNumber)
     ? formatNumber(animatedSubtotal, summaryCurrency)
     : "";

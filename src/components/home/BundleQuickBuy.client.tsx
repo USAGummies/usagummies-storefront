@@ -361,10 +361,6 @@ export default function BundleQuickBuy({
   const amazonSelectedQty =
     selectedOption === "amazon-1" ? 1 : selectedOption === "amazon-2" ? 2 : amazonMultiQty;
   const dtcSelectedQty = selectedOption === "dtc-best" ? dtcBestQty : 5;
-  const activeQty = isAmazonSelection ? amazonSelectedQty : dtcSelectedQty;
-  const activePricing = isAmazonSelection
-    ? { total: BASE_PRICE * activeQty, perBag: BASE_PRICE }
-    : pricingForQty(activeQty);
   const compactCtaDisabled = isAmazonSelection ? false : !canPurchaseQty(dtcSelectedQty);
 
   function handleRadioKeyDown(
@@ -620,65 +616,67 @@ export default function BundleQuickBuy({
             ) : null}
           </div>
           {useCardSelector ? (
-            <div className="bundle-quickbuy__cardGrid" role="radiogroup" aria-label="Direct bag count">
-              {dtcSegments.map((segment) => {
-                const isActive =
-                  segment.qty === 5
-                    ? selectedOption === "dtc-5"
-                    : selectedOption === "dtc-best" && dtcBestQty === segment.qty;
-                const canSelect = canPurchaseQty(segment.qty);
-                const isFeatured = segment.qty === recommendedQty;
-                return (
-                  <button
-                    key={segment.qty}
-                    type="button"
-                    role="radio"
-                    data-card
-                    data-active={isActive}
-                    data-featured={isFeatured}
-                    aria-checked={isActive}
-                    aria-disabled={!canSelect}
-                    tabIndex={isActive ? 0 : -1}
-                    disabled={!canSelect}
-                    onClick={() => {
-                      if (segment.qty === 5) {
-                        handleOptionSelect("dtc-5", 5);
-                      } else {
-                        handleDtcBestQtyPick(segment.qty as 8 | 12);
-                      }
-                    }}
-                    className={[
-                      "bundle-quickbuy__card",
-                      !canSelect ? "opacity-50 cursor-not-allowed" : "cursor-pointer",
-                    ].join(" ")}
-                  >
-                    {isFeatured ? (
-                      <div className="bundle-quickbuy__cardBadge">Recommended</div>
-                    ) : null}
-                    <div className="bundle-quickbuy__cardCount">
-                      <span>{segment.qty}</span>
-                      <span>Bags</span>
-                    </div>
-                    <div className="bundle-quickbuy__cardPrice">
-                      {priceForQtyDisplay(segment.qty)}
-                    </div>
-                    <div className="bundle-quickbuy__cardBenefit">
-                      {dtcBenefitLabel(segment.qty)}
-                    </div>
-                    <div className="bundle-quickbuy__cardMeta">
-                      <span>{dtcSavingsLabel(segment.qty)}</span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="bundle-quickbuy__selectorNote">
-              <span className="bundle-quickbuy__usaBadge">
-                <Image src="/logo-mark.png" alt="" width={18} height={18} className="h-4 w-4" />
-                <span>Made in USA</span>
-              </span>
-              <span>Every 5, 8, 12 bundle ships free.</span>
-            </div>
+            <>
+              <div className="bundle-quickbuy__cardGrid" role="radiogroup" aria-label="Direct bag count">
+                {dtcSegments.map((segment) => {
+                  const isActive =
+                    segment.qty === 5
+                      ? selectedOption === "dtc-5"
+                      : selectedOption === "dtc-best" && dtcBestQty === segment.qty;
+                  const canSelect = canPurchaseQty(segment.qty);
+                  const isFeatured = segment.qty === recommendedQty;
+                  return (
+                    <button
+                      key={segment.qty}
+                      type="button"
+                      role="radio"
+                      data-card
+                      data-active={isActive}
+                      data-featured={isFeatured}
+                      aria-checked={isActive}
+                      aria-disabled={!canSelect}
+                      tabIndex={isActive ? 0 : -1}
+                      disabled={!canSelect}
+                      onClick={() => {
+                        if (segment.qty === 5) {
+                          handleOptionSelect("dtc-5", 5);
+                        } else {
+                          handleDtcBestQtyPick(segment.qty as 8 | 12);
+                        }
+                      }}
+                      className={[
+                        "bundle-quickbuy__card",
+                        !canSelect ? "opacity-50 cursor-not-allowed" : "cursor-pointer",
+                      ].join(" ")}
+                    >
+                      {isFeatured ? (
+                        <div className="bundle-quickbuy__cardBadge">Recommended</div>
+                      ) : null}
+                      <div className="bundle-quickbuy__cardCount">
+                        <span>{segment.qty}</span>
+                        <span>Bags</span>
+                      </div>
+                      <div className="bundle-quickbuy__cardPrice">
+                        {priceForQtyDisplay(segment.qty)}
+                      </div>
+                      <div className="bundle-quickbuy__cardBenefit">
+                        {dtcBenefitLabel(segment.qty)}
+                      </div>
+                      <div className="bundle-quickbuy__cardMeta">
+                        <span>{dtcSavingsLabel(segment.qty)}</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="bundle-quickbuy__selectorNote">
+                <span className="bundle-quickbuy__usaBadge">
+                  <Image src="/logo-mark.png" alt="" width={18} height={18} className="h-4 w-4" />
+                  <span>Made in USA</span>
+                </span>
+                <span>Every 5, 8, 12 bundle ships free.</span>
+              </div>
+            </>
           ) : (
             <div data-segmented-control role="radiogroup" aria-label="Direct bag count">
               {dtcSegments.map((segment) => {
