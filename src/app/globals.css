@@ -2538,9 +2538,7 @@ a:focus-visible:not(.btn):not(.focus-ring),
   box-shadow: 0 20px 44px rgba(239,59,59,0.28);
 }
 .bundle-quickbuy__cardBadge{
-  position: absolute;
-  top: 12px;
-  right: 12px;
+  align-self: flex-start;
   border-radius: 999px;
   background: var(--candy-red);
   color: #fff;
@@ -2548,10 +2546,10 @@ a:focus-visible:not(.btn):not(.focus-ring),
   font-weight: 700;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  padding: 6px 10px;
+  padding: 5px 10px;
   box-shadow: 0 10px 20px rgba(239,59,59,0.25);
 }
-.bundle-quickbuy__cardLogo{
+.bundle-quickbuy__cardBrand{
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -2565,19 +2563,19 @@ a:focus-visible:not(.btn):not(.focus-ring),
   display: flex;
   align-items: baseline;
   gap: 6px;
-  font-size: 28px;
-  font-weight: 800;
+  font-size: 22px;
+  font-weight: 700;
   color: var(--text);
   line-height: 1;
 }
 .bundle-quickbuy__cardCount span:last-child{
-  font-size: 11px;
+  font-size: 10px;
   letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--muted);
 }
 .bundle-quickbuy__cardPrice{
-  font-size: 20px;
+  font-size: 26px;
   font-weight: 800;
   color: var(--text);
 }
@@ -2594,9 +2592,6 @@ a:focus-visible:not(.btn):not(.focus-ring),
   gap: 10px;
   font-size: 11px;
   font-weight: 700;
-  color: var(--muted);
-}
-.bundle-quickbuy__cardMeta span:last-child{
   color: var(--candy-red);
 }
 .bundle-quickbuy__microcopy{
@@ -2607,7 +2602,7 @@ a:focus-visible:not(.btn):not(.focus-ring),
 .bundle-quickbuy__railBottom{
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   flex: 1;
 }
 .bundle-quickbuy__priceBlock{
@@ -2623,8 +2618,6 @@ a:focus-visible:not(.btn):not(.focus-ring),
   display: flex;
   flex-direction: column;
   gap: 6px;
-  flex: 1;
-  justify-content: center;
 }
 .bundle-quickbuy__ratingLine{
   display: flex;
@@ -2730,15 +2723,34 @@ a:focus-visible:not(.btn):not(.focus-ring),
 }
 .bundle-quickbuy__amazonBadge{
   position: absolute;
-  top: 6px;
+  bottom: 6px;
   right: 8px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 4px 6px;
+  padding: 3px 6px;
   border-radius: 999px;
   background: #fff;
   box-shadow: 0 8px 16px rgba(15,27,45,0.1);
+  opacity: 0.85;
+}
+.bundle-quickbuy__group--amazon [data-segmented-control]{
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.bundle-quickbuy__group--amazon [data-segment]{
+  border-radius: 14px;
+  border: 1px solid rgba(15,27,45,0.14);
+  background: #fff;
+  box-shadow: 0 10px 20px rgba(15,27,45,0.08);
+  padding: 18px 8px 22px;
+}
+.bundle-quickbuy__group--amazon [data-segment] + [data-segment]{
+  border-left: 0;
 }
 .bundle-quickbuy__panel [data-segment][data-active="true"]{
   background: linear-gradient(180deg, rgba(239,59,59,0.22), rgba(239,59,59,0.08));

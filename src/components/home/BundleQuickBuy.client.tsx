@@ -581,9 +581,7 @@ export default function BundleQuickBuy({
   const compactPriceLabel = isAmazonSelection ? "Amazon total" : "Total";
   const compactSavingsLabel = isAmazonSelection
     ? "Amazon checkout saves you on shipping"
-    : activeSavings
-      ? `You save ${activeSavings}`
-      : "Free shipping on 5+ bags";
+    : "Direct checkout + free shipping at 5+ bags";
   const dtcSelectedPricing = pricingForQty(dtcSelectedQty);
   const dtcSelectedPerBag = money(dtcSelectedPricing.perBag, "USD");
   const useCardSelector = selectorVariant === "cards";
@@ -625,7 +623,9 @@ export default function BundleQuickBuy({
         <div className="bundle-quickbuy__group">
           <div className="bundle-quickbuy__groupHeader">
             <span className="bundle-quickbuy__groupTitle">Direct (5+ bags)</span>
-            <span className="bundle-quickbuy__groupMeta">Pick the bundle that fits the moment</span>
+            {!useCardSelector ? (
+              <span className="bundle-quickbuy__groupMeta">Pick the bundle that fits the moment</span>
+            ) : null}
           </div>
           {useCardSelector ? (
             <div className="bundle-quickbuy__cardGrid" role="radiogroup" aria-label="Direct bag count">
@@ -636,7 +636,6 @@ export default function BundleQuickBuy({
                     : selectedOption === "dtc-best" && dtcBestQty === segment.qty;
                 const canSelect = canPurchaseQty(segment.qty);
                 const isFeatured = segment.qty === recommendedQty;
-                const perBag = money(pricingForQty(segment.qty).perBag, "USD");
                 return (
                   <button
                     key={segment.qty}
@@ -664,7 +663,7 @@ export default function BundleQuickBuy({
                     {isFeatured ? (
                       <div className="bundle-quickbuy__cardBadge">Recommended</div>
                     ) : null}
-                    <div className="bundle-quickbuy__cardLogo" aria-hidden="true">
+                    <div className="bundle-quickbuy__cardBrand" aria-hidden="true">
                       <Image
                         src="/logo-mark.png"
                         alt=""
@@ -672,7 +671,7 @@ export default function BundleQuickBuy({
                         height={28}
                         className="h-7 w-7"
                       />
-                      <span>USA Gummies</span>
+                      <span>Made in USA</span>
                     </div>
                     <div className="bundle-quickbuy__cardCount">
                       <span>{segment.qty}</span>
@@ -685,7 +684,6 @@ export default function BundleQuickBuy({
                       {dtcBenefitLabel(segment.qty)}
                     </div>
                     <div className="bundle-quickbuy__cardMeta">
-                      <span>{perBag} / bag</span>
                       <span>{dtcSavingsLabel(segment.qty)}</span>
                     </div>
                   </button>
@@ -734,9 +732,7 @@ export default function BundleQuickBuy({
           )}
           {selectedOption.startsWith("dtc") ? (
             useCardSelector ? (
-              <div className="bundle-quickbuy__microcopy">
-                {selectedSavings ? `You save ${selectedSavings}` : "Free shipping on 5+ bags."}
-              </div>
+              null
             ) : (
               <div className="bundle-quickbuy__groupDetail">
                 <span>{dtcSelectedPerBag} / bag</span>
@@ -803,29 +799,12 @@ export default function BundleQuickBuy({
 
       <div data-rail-bottom className="bundle-quickbuy__railBottom">
         <div className="bundle-quickbuy__priceBlock">
-          <div className="flex items-baseline justify-between font-semibold text-[#161616] text-[14px]">
+          <div className="flex items-baseline justify-between font-semibold text-[#161616] text-[13px]">
             <span>{compactPriceLabel}</span>
             <span>{activeTotal ?? "--"}</span>
           </div>
-          <div className="text-[12px] font-semibold text-[#6B6B6B]">
+          <div className="text-[11px] font-semibold text-[#6B6B6B]">
             {compactSavingsLabel}
-          </div>
-        </div>
-        <div className="bundle-quickbuy__rating">
-          <div className="bundle-quickbuy__ratingLine">
-            <span className="bundle-quickbuy__ratingStars">
-              {starLine(AMAZON_REVIEWS.aggregate.rating)}
-            </span>
-            <span>
-              {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars from verified Amazon buyers
-            </span>
-          </div>
-          <div className="bundle-quickbuy__snippets">
-            {reviewSnippets.map((review) => (
-              <div key={review.id} className="bundle-quickbuy__snippet">
-                &quot;{review.body}&quot; — {review.author}
-              </div>
-            ))}
           </div>
         </div>
         <div className="bundle-quickbuy__ctaStack">
@@ -898,6 +877,23 @@ export default function BundleQuickBuy({
               <span aria-hidden="true">🔒</span>
               <span>Secure checkout</span>
             </span>
+          </div>
+        </div>
+        <div className="bundle-quickbuy__rating">
+          <div className="bundle-quickbuy__ratingLine">
+            <span className="bundle-quickbuy__ratingStars">
+              {starLine(AMAZON_REVIEWS.aggregate.rating)}
+            </span>
+            <span>
+              {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars from verified Amazon buyers
+            </span>
+          </div>
+          <div className="bundle-quickbuy__snippets">
+            {reviewSnippets.map((review) => (
+              <div key={review.id} className="bundle-quickbuy__snippet">
+                &quot;{review.body}&quot; — {review.author}
+              </div>
+            ))}
           </div>
         </div>
       </div>
