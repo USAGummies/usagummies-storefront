@@ -580,6 +580,7 @@ export default function BundleQuickBuy({
     return "Free shipping";
   };
   const dtcSavingsLabel = (qty: number) => {
+    if (qty === 5) return null;
     const pricing = pricingForQty(qty);
     const savings = Math.max(0, BASE_PRICE * qty - pricing.total);
     if (savings > 0) {
@@ -663,16 +664,24 @@ export default function BundleQuickBuy({
                       <div className="bundle-quickbuy__cardBenefit">
                         {dtcBenefitLabel(segment.qty)}
                       </div>
-                      <div className="bundle-quickbuy__cardMeta">
-                        <span>{dtcSavingsLabel(segment.qty)}</span>
-                      </div>
+                      {dtcSavingsLabel(segment.qty) ? (
+                        <div className="bundle-quickbuy__cardMeta">
+                          <span>{dtcSavingsLabel(segment.qty)}</span>
+                        </div>
+                      ) : null}
                     </button>
                   );
                 })}
               </div>
               <div className="bundle-quickbuy__selectorNote">
                 <span className="bundle-quickbuy__usaBadge">
-                  <Image src="/logo-mark.png" alt="" width={18} height={18} className="h-4 w-4" />
+                  <Image
+                    src="/logo-mark.png"
+                    alt=""
+                    width={18}
+                    height={18}
+                    className="h-4 w-4 bundle-quickbuy__usaMark"
+                  />
                   <span>Made in USA</span>
                 </span>
                 <span>Every 5, 8, 12 bundle ships free.</span>

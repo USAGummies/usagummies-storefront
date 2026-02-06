@@ -307,7 +307,7 @@ export default function ReviewsSectionClient({ reviews }: Props) {
                 aria-hidden="true"
                 width={2048}
                 height={559}
-                className="pointer-events-none hidden lg:block absolute left-0 bottom-0 w-full max-w-[420px] opacity-90"
+                className="pointer-events-none hidden lg:block absolute -right-8 -bottom-6 w-full max-w-[520px] opacity-85"
               />
             </div>
 
@@ -315,11 +315,11 @@ export default function ReviewsSectionClient({ reviews }: Props) {
               {verified.slice(0, 2).map((r) => (
                 <div
                   key={r.id}
-                  className="rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white/80 p-3 text-sm text-[var(--muted)] shadow-[0_14px_30px_rgba(15,27,45,0.12)]"
+                  className="rounded-2xl border border-[rgba(255,255,255,0.18)] bg-[rgba(12,20,38,0.85)] p-3 text-sm text-white/80 shadow-[0_14px_30px_rgba(5,10,20,0.45)]"
                 >
                   <div className="flex items-center gap-2">
                     <Stars rating={r.rating} />
-                    <span className="text-xs font-semibold text-[var(--text)]">
+                    <span className="text-xs font-semibold text-white">
                       {r.authorName}
                     </span>
                   </div>

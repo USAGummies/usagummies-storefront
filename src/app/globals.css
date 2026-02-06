@@ -198,6 +198,8 @@ details > summary::-webkit-details-marker{
   --border: rgba(15,27,45,0.12);
   --pill: rgba(13,28,51,0.06);
   --pill-border: rgba(13,28,51,0.2);
+  --surface: #ffffff;
+  --surface-strong: #ffffff;
 }
 .home-hero-theme .site-header .bg-white{
   background-color: #ffffff !important;
@@ -2784,13 +2786,19 @@ a:focus-visible:not(.btn):not(.focus-ring),
   gap: 6px;
   border-radius: 999px;
   padding: 4px 8px;
-  background: #fff;
-  border: 1px solid rgba(15,27,45,0.12);
+  background: rgba(12,20,38,0.9);
+  border: 1px solid rgba(255,255,255,0.24);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--text);
+  color: rgba(255,255,255,0.92);
+}
+.bundle-quickbuy__usaMark{
+  filter: brightness(0) invert(1);
+}
+.logo-mark--light{
+  filter: brightness(0) invert(1);
 }
 .bundle-quickbuy__microcopy{
   font-size: 11px;

@@ -37,14 +37,20 @@ const EXPRESS_CHECKOUT_METHODS = [
   {
     label: "Shop Pay",
     iconSrc: "/payments/shop-pay.svg",
+    className: "bg-[#5a31f4] text-white",
+    iconClassName: "h-6 w-auto",
   },
   {
     label: "Apple Pay",
     iconSrc: "/payments/apple-pay.svg",
+    className: "bg-black text-white",
+    iconClassName: "h-5 w-auto",
   },
   {
     label: "Google Pay",
     iconSrc: "/payments/google-pay.svg",
+    className: "bg-black text-white",
+    iconClassName: "h-5 w-auto",
   },
 ];
 
@@ -669,7 +675,10 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                       href={checkoutHref ?? localCart.checkoutUrl}
                       onClick={(event) => handleCheckoutClick(event, method.label)}
                       aria-label={`${method.label} checkout`}
-                      className="flex items-center justify-center rounded-lg border border-transparent bg-[var(--surface-strong)]/70 px-2 py-1.5 text-[8px] font-semibold text-[var(--muted)] transition hover:border-[rgba(15,27,45,0.12)] hover:text-[var(--text)]"
+                      className={cn(
+                        "flex h-11 items-center justify-center rounded-xl border border-white/10 px-3 py-2 text-[8px] font-semibold transition hover:brightness-105",
+                        method.className
+                      )}
                     >
                       <span className="flex h-9 w-full items-center justify-center">
                         <Image
@@ -679,7 +688,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                           width={96}
                           height={28}
                           sizes="96px"
-                          className="h-4 w-auto opacity-70"
+                          className={cn(method.iconClassName, "opacity-100")}
                         />
                       </span>
                     </a>
@@ -709,6 +718,24 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                 </a>
                 <div className="text-[10px] font-semibold text-[var(--muted)]">
                   Order now, ships tomorrow.
+                </div>
+                <div className="relative mt-6 flex items-end justify-center">
+                  <Image
+                    src="/website%20assets/StatueofLiberty.png"
+                    alt=""
+                    aria-hidden="true"
+                    width={320}
+                    height={320}
+                    className="h-24 w-auto opacity-75"
+                  />
+                  <Image
+                    src="/logo-mark.png"
+                    alt=""
+                    aria-hidden="true"
+                    width={40}
+                    height={40}
+                    className="absolute -right-2 bottom-0 h-6 w-auto opacity-85 logo-mark--light"
+                  />
                 </div>
               </div>
             ) : null}
