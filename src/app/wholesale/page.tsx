@@ -44,7 +44,7 @@ export const metadata: Metadata = {
 
 const VALUE_BULLETS = [
   "All natural gummy bears with no artificial dyes.",
-  "Made in the USA and packed in FDA-compliant facilities.",
+  "Made in the USA and packed in FDA-registered facilities.",
   "7.5 oz bags with classic gummy bear flavor and five fruit flavors.",
   "Patriotic packaging that stands out on shelf and in gift sets.",
 ];

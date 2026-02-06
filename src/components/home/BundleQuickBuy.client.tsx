@@ -147,6 +147,13 @@ export default function BundleQuickBuy({
     ? "Mystery extra included at 12 bags (while supplies last)."
     : "Mystery extra at 12 bags (while supplies last).";
   const ctaRef = React.useRef<HTMLDivElement | null>(null);
+  const amazonPrefireRef = React.useRef(0);
+  const amazonPrefireWindowMs = 1500;
+  const shouldFireAmazon = () =>
+    Date.now() - amazonPrefireRef.current > amazonPrefireWindowMs;
+  const markAmazonFired = () => {
+    amazonPrefireRef.current = Date.now();
+  };
   const [selected, setSelected] = React.useState<TierKey>(() => (variant === "compact" ? "5" : "8"));
   const [selectedOption, setSelectedOption] = React.useState<ChannelOptionId>("dtc-5");
   const [amazonMultiQty, setAmazonMultiQty] = React.useState<3 | 4>(3);
@@ -307,24 +314,42 @@ export default function BundleQuickBuy({
     if (isAmazonSelection) {
       const amazonUrl = AMAZON_LISTING_URL;
       let didNavigate = false;
+      const openedWindow =
+        typeof window !== "undefined"
+          ? window.open("", "_blank", "noopener,noreferrer")
+          : null;
       const navigateToAmazon = () => {
         if (didNavigate || typeof window === "undefined") return;
         didNavigate = true;
-        window.location.href = amazonUrl;
+        if (openedWindow && !openedWindow.closed) {
+          openedWindow.location.href = amazonUrl;
+        } else {
+          window.open(amazonUrl, "_blank", "noopener,noreferrer");
+        }
       };
       trackEvent("bundle_amazon_click", {
         qty: amazonSelectedQty,
         variant,
         anchorId: anchorId || null,
       });
-      trackEvent("amazon_redirect", {
-        event_category: "commerce",
-        event_label: "amazon_outbound",
-        quantity: amazonSelectedQty,
-        sku: "AAGB-7.5OZ",
-        source_page: typeof window !== "undefined" ? window.location.pathname : "",
-        event_callback: navigateToAmazon,
-      });
+      if (shouldFireAmazon()) {
+        markAmazonFired();
+        trackEvent("amazon_redirect", {
+          event_category: "commerce",
+          event_label: "amazon_outbound",
+          quantity: amazonSelectedQty,
+          sku: "AAGB-7.5OZ",
+          item_id: "AAGB-7.5OZ",
+          source_page: typeof window !== "undefined" ? window.location.pathname : "",
+          destination: "amazon",
+          destination_host: "amazon.com",
+          destination_url: amazonUrl,
+          cta_location: "bundle_picker",
+          selected_flow: "amazon",
+          bundle_tier: String(amazonSelectedQty),
+          event_callback: navigateToAmazon,
+        });
+      }
       if (typeof window !== "undefined") {
         window.setTimeout(navigateToAmazon, 1200);
       }
@@ -801,6 +826,24 @@ export default function BundleQuickBuy({
                 ? "bg-[#1F1F1F] text-white hover:bg-black"
                 : "bg-[#D6453D] text-white hover:bg-[#BF3B34] active:bg-[#A7322C]",
             ].join(" ")}
+            onPointerDown={() => {
+              if (!isAmazonSelection || !shouldFireAmazon()) return;
+              markAmazonFired();
+              trackEvent("amazon_redirect", {
+                event_category: "commerce",
+                event_label: "amazon_outbound",
+                quantity: amazonSelectedQty,
+                sku: "AAGB-7.5OZ",
+                item_id: "AAGB-7.5OZ",
+                source_page: typeof window !== "undefined" ? window.location.pathname : "",
+                destination: "amazon",
+                destination_host: "amazon.com",
+                destination_url: AMAZON_LISTING_URL,
+                cta_location: "bundle_picker",
+                selected_flow: "amazon",
+                bundle_tier: String(amazonSelectedQty),
+              });
+            }}
             onClick={handlePrimaryCtaClick}
             disabled={isAdding || compactCtaDisabled}
           >

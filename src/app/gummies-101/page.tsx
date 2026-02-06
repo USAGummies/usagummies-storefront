@@ -47,7 +47,7 @@ const FAQS = [
   {
     question: "Are USA Gummies made in the USA?",
     answer:
-      "Yes. USA Gummies are sourced, made, and packed in the USA at FDA-compliant facilities.",
+      "Yes. USA Gummies are sourced, made, and packed in the USA at FDA-registered facilities.",
   },
   {
     question: "Do USA Gummies use artificial dyes?",

@@ -154,6 +154,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const showExperienceBand = isHome || isShop;
   const menuRef = useRef<HTMLDivElement | null>(null);
   const toastTimerRef = useRef<number | null>(null);
+  const amazonPrefireRef = useRef(0);
+  const amazonPrefireWindowMs = 1500;
+  const shouldFireAmazon = () =>
+    Date.now() - amazonPrefireRef.current > amazonPrefireWindowMs;
+  const markAmazonFired = () => {
+    amazonPrefireRef.current = Date.now();
+  };
 
   async function refreshCartCount() {
     try {
@@ -630,6 +637,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   target="_blank"
                   rel="noopener noreferrer"
                   className="link-underline"
+                  onPointerDown={() => {
+                    if (!shouldFireAmazon()) return;
+                    markAmazonFired();
+                    trackEvent("amazon_redirect", {
+                      event_category: "commerce",
+                      event_label: "amazon_outbound",
+                      quantity: 1,
+                      sku: "AAGB-7.5OZ",
+                      item_id: "AAGB-7.5OZ",
+                      source_page: typeof window !== "undefined" ? window.location.pathname : "",
+                      destination: "amazon",
+                      destination_host: "amazon.com",
+                      destination_url: AMAZON_LISTING_URL,
+                      cta_location: "footer",
+                      selected_flow: "amazon",
+                      bundle_tier: "1",
+                    });
+                  }}
                   onClick={(event) => {
                     const amazonUrl = AMAZON_LISTING_URL;
                     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
@@ -638,25 +663,50 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         event_label: "amazon_outbound",
                         quantity: 1,
                         sku: "AAGB-7.5OZ",
+                        item_id: "AAGB-7.5OZ",
                         source_page: typeof window !== "undefined" ? window.location.pathname : "",
+                        destination: "amazon",
+                        destination_host: "amazon.com",
+                        destination_url: amazonUrl,
+                        cta_location: "footer",
+                        selected_flow: "amazon",
+                        bundle_tier: "1",
                       });
                       return;
                     }
                     event.preventDefault();
                     let didNavigate = false;
+                    const openedWindow =
+                      typeof window !== "undefined"
+                        ? window.open("", "_blank", "noopener,noreferrer")
+                        : null;
                     const navigateToAmazon = () => {
                       if (didNavigate || typeof window === "undefined") return;
                       didNavigate = true;
-                      window.location.href = amazonUrl;
+                      if (openedWindow && !openedWindow.closed) {
+                        openedWindow.location.href = amazonUrl;
+                      } else {
+                        window.open(amazonUrl, "_blank", "noopener,noreferrer");
+                      }
                     };
-                    trackEvent("amazon_redirect", {
-                      event_category: "commerce",
-                      event_label: "amazon_outbound",
-                      quantity: 1,
-                      sku: "AAGB-7.5OZ",
-                      source_page: typeof window !== "undefined" ? window.location.pathname : "",
-                      event_callback: navigateToAmazon,
-                    });
+                    if (shouldFireAmazon()) {
+                      markAmazonFired();
+                      trackEvent("amazon_redirect", {
+                        event_category: "commerce",
+                        event_label: "amazon_outbound",
+                        quantity: 1,
+                        sku: "AAGB-7.5OZ",
+                        item_id: "AAGB-7.5OZ",
+                        source_page: typeof window !== "undefined" ? window.location.pathname : "",
+                        destination: "amazon",
+                        destination_host: "amazon.com",
+                        destination_url: amazonUrl,
+                        cta_location: "footer",
+                        selected_flow: "amazon",
+                        bundle_tier: "1",
+                        event_callback: navigateToAmazon,
+                      });
+                    }
                     if (typeof window !== "undefined") {
                       window.setTimeout(navigateToAmazon, 1200);
                     }

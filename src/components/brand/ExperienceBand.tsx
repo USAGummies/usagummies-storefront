@@ -102,7 +102,7 @@ export function ExperienceBand({ variant = "compact", className }: Props) {
             <div className="experience-band__cardEyebrow">Made in USA</div>
             <div className="experience-band__cardTitle">Made here, on purpose</div>
             <div className="experience-band__cardCopy">
-              Packed in FDA-compliant facilities here in the USA.
+              Packed in FDA-registered facilities here in the USA.
             </div>
             <Link href="/made-in-usa" className="experience-band__link">
               See how it is made
