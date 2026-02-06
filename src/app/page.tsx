@@ -381,13 +381,13 @@ export default async function HomePage() {
                     {FREE_SHIPPING_PHRASE} • Satisfaction guaranteed
                   </div>
                   <div className="flex flex-wrap items-center gap-2 pt-0.5 text-[11px] font-semibold text-white/70">
-                    <span className="rounded-full border border-white/20 bg-white px-3 py-1 text-[var(--navy)]">
+                    <span className="theme-pill rounded-full border border-white/20 bg-white px-3 py-1 text-[var(--navy)]">
                       Made in USA
                     </span>
-                    <span className="rounded-full border border-white/20 bg-white px-3 py-1 text-[var(--navy)]">
+                    <span className="theme-pill rounded-full border border-white/20 bg-white px-3 py-1 text-[var(--navy)]">
                       Ships in 24 hours
                     </span>
-                    <span className="rounded-full border border-white/20 bg-white px-3 py-1 text-[var(--navy)]">
+                    <span className="theme-pill rounded-full border border-white/20 bg-white px-3 py-1 text-[var(--navy)]">
                       Secure checkout
                     </span>
                   </div>
@@ -416,7 +416,7 @@ export default async function HomePage() {
 
       <div className="americana-divider" aria-hidden="true" />
 
-      <section className="bg-[#fffdf8]" data-zone="VALUE" aria-label="Product value">
+      <section className="bg-transparent" data-zone="VALUE" aria-label="Product value">
         <div className="mx-auto max-w-6xl px-4 py-0.5 sm:py-0.5">
           <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
             <div className="rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-3">
@@ -456,7 +456,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="bg-[#fffdf8]" data-zone="FLAVORS">
+      <section className="bg-transparent" data-zone="FLAVORS">
         <div className="mx-auto max-w-6xl px-4 py-0.5 sm:py-1">
           <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]/80">
             Inside every bag
@@ -506,7 +506,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="bg-[#fffdf8]" data-zone="SHIPPING">
+      <section className="bg-transparent" data-zone="SHIPPING">
         <div className="mx-auto max-w-6xl px-4 pb-3">
           <div className="grid gap-3 rounded-[28px] border border-[rgba(15,27,45,0.12)] bg-white p-3 sm:p-4 lg:grid-cols-[1fr_200px] lg:items-center">
             <div className="space-y-2">
@@ -768,7 +768,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="bg-[#fffdf8]" data-zone="STORY">
+      <section className="bg-transparent" data-zone="STORY">
         <div className="mx-auto max-w-6xl px-4 py-5">
           <div className="candy-panel americana-panel rounded-[36px] border border-[var(--border)] p-4 sm:p-5">
             <div className="flex items-center gap-2">

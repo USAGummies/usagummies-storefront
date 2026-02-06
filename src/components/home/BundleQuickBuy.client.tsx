@@ -607,6 +607,7 @@ export default function BundleQuickBuy({
           All bundles (5, 8, 12) ship free from us. Under 5 bags, we send you to
           Amazon to save you on shipping.
         </div>
+        <div className="bundle-quickbuy__shipBadge">Free shipping on every 5, 8, 12 bundle.</div>
 
         <div className="bundle-quickbuy__group">
           <div className="bundle-quickbuy__groupHeader">
@@ -649,16 +650,16 @@ export default function BundleQuickBuy({
                         !canSelect ? "opacity-50 cursor-not-allowed" : "cursor-pointer",
                       ].join(" ")}
                     >
-                      {isFeatured ? (
-                        <div className="bundle-quickbuy__cardBadge">Recommended</div>
-                      ) : null}
-                      <div className="bundle-quickbuy__cardCount">
-                        <span>{segment.qty}</span>
-                        <span>Bags</span>
-                      </div>
-                      <div className="bundle-quickbuy__cardPrice">
-                        {priceForQtyDisplay(segment.qty)}
-                      </div>
+                    <div className="bundle-quickbuy__cardCount">
+                      <span>{segment.qty}</span>
+                      <span>Bags</span>
+                    </div>
+                    {isFeatured ? (
+                      <div className="bundle-quickbuy__cardBadge">Recommended</div>
+                    ) : null}
+                    <div className="bundle-quickbuy__cardPrice">
+                      {priceForQtyDisplay(segment.qty)}
+                    </div>
                       <div className="bundle-quickbuy__cardBenefit">
                         {dtcBenefitLabel(segment.qty)}
                       </div>
@@ -769,15 +770,6 @@ export default function BundleQuickBuy({
                   }}
                   className="bundle-quickbuy__segment cursor-pointer"
                 >
-                  <span className="bundle-quickbuy__amazonBadge" aria-hidden="true">
-                    <Image
-                      src={AMAZON_LOGO_URL}
-                      alt=""
-                      width={36}
-                      height={12}
-                      className="h-3 w-auto"
-                    />
-                  </span>
                   <span className="bundle-quickbuy__segmentLabel">{segment.label}</span>
                   <span className="bundle-quickbuy__segmentPrice">
                     {priceForQtyDisplay(segment.qty, undefined, { forceBase: true })}

@@ -164,10 +164,50 @@ details > summary::-webkit-details-marker{
   text-underline-offset: 4px;
 }
 .home-hero-theme{
+  --bg: #0d1c33;
+  --surface: #101b33;
+  --surface-strong: #12213b;
+  --text: #f7f2ea;
+  --muted: rgba(247,242,234,0.72);
+  --border: rgba(247,242,234,0.16);
+  --pill: rgba(247,242,234,0.08);
+  --pill-border: rgba(247,242,234,0.2);
   background:
     radial-gradient(circle at 10% 12%, rgba(71, 42, 68, 0.62), transparent 56%),
     radial-gradient(circle at 86% 8%, rgba(26, 44, 92, 0.55), transparent 52%),
     linear-gradient(135deg, #1a1f34 0%, #151f3a 52%, #0d1c33 100%);
+}
+.home-hero-theme .bg-white{
+  background-color: var(--surface) !important;
+}
+.home-hero-theme [class*="bg-white/"]{
+  background-color: rgba(16, 27, 51, 0.88) !important;
+}
+.home-hero-theme .bg-neutral-50,
+.home-hero-theme .bg-neutral-100,
+.home-hero-theme .bg-neutral-200{
+  background-color: rgba(16, 27, 51, 0.65) !important;
+}
+.home-hero-theme .text-neutral-900,
+.home-hero-theme .text-neutral-800,
+.home-hero-theme .text-neutral-700{
+  color: var(--text) !important;
+}
+.home-hero-theme .text-neutral-600,
+.home-hero-theme .text-neutral-500{
+  color: var(--muted) !important;
+}
+.home-hero-theme .text-\\[var\\(--navy\\)\\]{
+  color: var(--text) !important;
+}
+.home-hero-theme .border-neutral-200,
+.home-hero-theme .border-neutral-100{
+  border-color: var(--border) !important;
+}
+.home-hero-theme .theme-pill{
+  background-color: rgba(255,255,255,0.92) !important;
+  color: var(--navy) !important;
+  border-color: rgba(255,255,255,0.28) !important;
 }
 .home-hero-theme .hero-scroll-link{
   color: #f7f4ee;
@@ -2559,6 +2599,17 @@ a:focus-visible:not(.btn):not(.focus-ring),
   text-transform: uppercase;
   padding: 6px 12px;
   box-shadow: 0 10px 20px rgba(239,59,59,0.25);
+}
+.bundle-quickbuy__shipBadge{
+  align-self: flex-start;
+  border-radius: 999px;
+  background: rgba(239,59,59,0.12);
+  color: var(--candy-red);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 6px 12px;
 }
 .bundle-quickbuy__cardCount{
   display: flex;

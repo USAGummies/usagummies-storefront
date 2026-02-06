@@ -531,7 +531,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </main>
 
       {showExperienceBand ? (
-        <section className="bg-[#fffdf8] -mt-6">
+        <section className="bg-transparent -mt-6">
           <div className="mx-auto max-w-6xl px-4 pb-6">
             <ExperienceBand variant={experienceVariant} />
           </div>
