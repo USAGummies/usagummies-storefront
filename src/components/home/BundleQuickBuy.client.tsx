@@ -817,75 +817,89 @@ export default function BundleQuickBuy({
 
       <div data-rail-bottom className="bundle-quickbuy__railBottom">
         <div className="bundle-quickbuy__ctaStack">
-          <button
-            data-primary-cta
-            type="button"
-            className={[
-              "w-full inline-flex items-center justify-center rounded-[14px] h-[60px] px-4 text-[18px] font-semibold whitespace-nowrap shadow-[0_16px_40px_rgba(214,64,58,0.3)] transition disabled:opacity-60 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-[rgba(214,69,61,0.25)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#F7F3EF]",
-              isAmazonSelection
-                ? "bg-[#1F1F1F] text-white hover:bg-black"
-                : "bg-[#D6453D] text-white hover:bg-[#BF3B34] active:bg-[#A7322C]",
-            ].join(" ")}
-            onPointerDown={() => {
-              if (!isAmazonSelection || !shouldFireAmazon()) return;
-              markAmazonFired();
-              trackEvent("amazon_redirect", {
-                event_category: "commerce",
-                event_label: "amazon_outbound",
-                quantity: amazonSelectedQty,
-                sku: "AAGB-7.5OZ",
-                item_id: "AAGB-7.5OZ",
-                source_page: typeof window !== "undefined" ? window.location.pathname : "",
-                destination: "amazon",
-                destination_host: "amazon.com",
-                destination_url: AMAZON_LISTING_URL,
-                cta_location: "bundle_picker",
-                selected_flow: "amazon",
-                bundle_tier: String(amazonSelectedQty),
-              });
-            }}
-            onClick={handlePrimaryCtaClick}
-            disabled={isAdding || compactCtaDisabled}
-          >
-            <span className="inline-flex items-center gap-2">
-              {!isAmazonSelection && isAdding ? (
-                <>
-                  <span
-                    aria-hidden="true"
-                    className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent opacity-60"
+          {isAmazonSelection ? (
+            <div className="grid gap-3">
+              <button
+                data-primary-cta
+                type="button"
+                className="w-full inline-flex items-center justify-center rounded-[14px] h-[60px] px-4 text-[18px] font-semibold whitespace-nowrap shadow-[0_16px_40px_rgba(214,64,58,0.3)] transition disabled:opacity-60 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-[rgba(214,69,61,0.25)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#F7F3EF] bg-[#1F1F1F] text-white hover:bg-black"
+                onPointerDown={() => {
+                  if (!shouldFireAmazon()) return;
+                  markAmazonFired();
+                  trackEvent("amazon_redirect", {
+                    event_category: "commerce",
+                    event_label: "amazon_outbound",
+                    quantity: amazonSelectedQty,
+                    sku: "AAGB-7.5OZ",
+                    item_id: "AAGB-7.5OZ",
+                    source_page: typeof window !== "undefined" ? window.location.pathname : "",
+                    destination: "amazon",
+                    destination_host: "amazon.com",
+                    destination_url: AMAZON_LISTING_URL,
+                    cta_location: "bundle_picker",
+                    selected_flow: "amazon",
+                    bundle_tier: String(amazonSelectedQty),
+                  });
+                }}
+                onClick={handlePrimaryCtaClick}
+                disabled={isAdding || compactCtaDisabled}
+              >
+                <span className="inline-flex items-center gap-2">
+                  <Image
+                    src={AMAZON_LOGO_URL}
+                    alt="Amazon"
+                    width={48}
+                    height={14}
+                    className="h-4 w-auto"
                   />
-                  Adding...
-                </>
-              ) : (
-                <>
-                  {isAmazonSelection ? (
-                    <Image
-                      src={AMAZON_LOGO_URL}
-                      alt="Amazon"
-                      width={48}
-                      height={14}
-                      className="h-4 w-auto"
+                  <span>Buy on Amazon</span>
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+                    <path
+                      fill="currentColor"
+                      d="M14 3h7v7h-2V6.4l-8.3 8.3-1.4-1.4L17.6 5H14V3zM5 5h5V3H3v7h2V5zm0 14v-5H3v7h7v-2H5z"
                     />
-                  ) : null}
-                  <span>
-                    {isAmazonSelection
-                      ? "Buy on Amazon"
-                      : selectedAdded
-                        ? "Added to Cart"
-                        : primaryCtaLabel || "Add to Cart"}
-                  </span>
-                  {isAmazonSelection ? (
-                    <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
-                      <path
-                        fill="currentColor"
-                        d="M14 3h7v7h-2V6.4l-8.3 8.3-1.4-1.4L17.6 5H14V3zM5 5h5V3H3v7h2V5zm0 14v-5H3v7h7v-2H5z"
-                      />
-                    </svg>
-                  ) : null}
-                </>
-              )}
-            </span>
-          </button>
+                  </svg>
+                </span>
+              </button>
+              <button
+                type="button"
+                className="w-full inline-flex items-center justify-center rounded-[14px] h-[52px] px-4 text-[15px] font-semibold whitespace-nowrap border border-white/20 text-white/90 hover:text-white hover:border-white/40 transition"
+                onClick={() => {
+                  setSelectedOption("dtc-5");
+                  setSelected("5");
+                  setError(null);
+                  setSuccess(false);
+                  if (typeof window !== "undefined" && window.innerWidth < 768) {
+                    window.requestAnimationFrame(scrollToCTA);
+                  }
+                }}
+              >
+                Switch to direct bundles
+              </button>
+            </div>
+          ) : (
+            <button
+              data-primary-cta
+              type="button"
+              className="w-full inline-flex items-center justify-center rounded-[14px] h-[60px] px-4 text-[18px] font-semibold whitespace-nowrap shadow-[0_16px_40px_rgba(214,64,58,0.3)] transition disabled:opacity-60 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-[rgba(214,69,61,0.25)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#F7F3EF] bg-[#D6453D] text-white hover:bg-[#BF3B34] active:bg-[#A7322C]"
+              onClick={handlePrimaryCtaClick}
+              disabled={isAdding || compactCtaDisabled}
+            >
+              <span className="inline-flex items-center gap-2">
+                {isAdding ? (
+                  <>
+                    <span
+                      aria-hidden="true"
+                      className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent opacity-60"
+                    />
+                    Adding...
+                  </>
+                ) : (
+                  <span>{selectedAdded ? "Added to Cart" : primaryCtaLabel || "Add to Cart"}</span>
+                )}
+              </span>
+            </button>
+          )}
           <div className={isLight ? "text-[12px] font-semibold text-[#6B6B6B]" : "text-[12px] font-semibold text-white/70"}>
             {isAmazonSelection
               ? "Amazon checkout saves you on shipping."
