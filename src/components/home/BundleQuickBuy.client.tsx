@@ -46,6 +46,7 @@ type Props = {
   primaryCtaLabel?: string;
   surface?: "card" | "flat";
   layout?: "classic" | "integrated" | "fusion";
+  selectorVariant?: "segmented" | "cards";
 };
 
 function money(amount?: number | null, currency = "USD") {
@@ -121,6 +122,7 @@ export default function BundleQuickBuy({
   primaryCtaLabel = "Add to Cart",
   surface = "card",
   layout = "classic",
+  selectorVariant = "segmented",
 }: Props) {
   const { bagCount } = useCartBagCount();
   const currentBags = Math.max(0, Number(bagCount) || 0);
@@ -584,6 +586,21 @@ export default function BundleQuickBuy({
       : "Free shipping on 5+ bags";
   const dtcSelectedPricing = pricingForQty(dtcSelectedQty);
   const dtcSelectedPerBag = money(dtcSelectedPricing.perBag, "USD");
+  const useCardSelector = selectorVariant === "cards";
+  const recommendedQty = 12;
+  const dtcBenefitLabel = (qty: number) => {
+    if (qty === 12) return "Best value";
+    if (qty === 8) return "Most popular";
+    return "Free shipping";
+  };
+  const dtcSavingsLabel = (qty: number) => {
+    const pricing = pricingForQty(qty);
+    const savings = Math.max(0, BASE_PRICE * qty - pricing.total);
+    if (savings > 0) {
+      return `Save ${money(savings, "USD")}`;
+    }
+    return "Free shipping";
+  };
   const dtcSegments = [
     { qty: 5, label: "5 bags" },
     { qty: 8, label: "8 bags" },
@@ -608,58 +625,131 @@ export default function BundleQuickBuy({
         <div className="bundle-quickbuy__group">
           <div className="bundle-quickbuy__groupHeader">
             <span className="bundle-quickbuy__groupTitle">Direct (5+ bags)</span>
-            <span className="bundle-quickbuy__groupMeta">Per-bag price drops at 5, 8, and 12</span>
+            <span className="bundle-quickbuy__groupMeta">Pick the bundle that fits the moment</span>
           </div>
-          <div data-segmented-control role="radiogroup" aria-label="Direct bag count">
-            {dtcSegments.map((segment) => {
-              const isActive =
-                segment.qty === 5
-                  ? selectedOption === "dtc-5"
-                  : selectedOption === "dtc-best" && dtcBestQty === segment.qty;
-              const canSelect = canPurchaseQty(segment.qty);
-              return (
-                <button
-                  key={segment.qty}
-                  type="button"
-                  role="radio"
-                  data-segment
-                  data-active={isActive}
-                  aria-checked={isActive}
-                  aria-disabled={!canSelect}
-                  tabIndex={isActive ? 0 : -1}
-                  disabled={!canSelect}
-                  onClick={() => {
-                    if (segment.qty === 5) {
-                      handleOptionSelect("dtc-5", 5);
-                    } else {
-                      handleDtcBestQtyPick(segment.qty as 8 | 12);
-                    }
-                  }}
-                  className={[
-                    "bundle-quickbuy__segment",
-                    !canSelect ? "opacity-50 cursor-not-allowed" : "cursor-pointer",
-                  ].join(" ")}
-                >
-                  <span className="bundle-quickbuy__segmentLabel">{segment.label}</span>
-                  <span className="bundle-quickbuy__segmentPrice">
-                    {priceForQtyDisplay(segment.qty)}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-          {selectedOption.startsWith("dtc") ? (
-            <div className="bundle-quickbuy__groupDetail">
-              <span>{dtcSelectedPerBag} / bag</span>
-              <span>Bundle pricing applied</span>
+          {useCardSelector ? (
+            <div className="bundle-quickbuy__cardGrid" role="radiogroup" aria-label="Direct bag count">
+              {dtcSegments.map((segment) => {
+                const isActive =
+                  segment.qty === 5
+                    ? selectedOption === "dtc-5"
+                    : selectedOption === "dtc-best" && dtcBestQty === segment.qty;
+                const canSelect = canPurchaseQty(segment.qty);
+                const isFeatured = segment.qty === recommendedQty;
+                const perBag = money(pricingForQty(segment.qty).perBag, "USD");
+                return (
+                  <button
+                    key={segment.qty}
+                    type="button"
+                    role="radio"
+                    data-card
+                    data-active={isActive}
+                    data-featured={isFeatured}
+                    aria-checked={isActive}
+                    aria-disabled={!canSelect}
+                    tabIndex={isActive ? 0 : -1}
+                    disabled={!canSelect}
+                    onClick={() => {
+                      if (segment.qty === 5) {
+                        handleOptionSelect("dtc-5", 5);
+                      } else {
+                        handleDtcBestQtyPick(segment.qty as 8 | 12);
+                      }
+                    }}
+                    className={[
+                      "bundle-quickbuy__card",
+                      !canSelect ? "opacity-50 cursor-not-allowed" : "cursor-pointer",
+                    ].join(" ")}
+                  >
+                    {isFeatured ? (
+                      <div className="bundle-quickbuy__cardBadge">Recommended</div>
+                    ) : null}
+                    <div className="bundle-quickbuy__cardLogo" aria-hidden="true">
+                      <Image
+                        src="/logo-mark.png"
+                        alt=""
+                        width={28}
+                        height={28}
+                        className="h-7 w-7"
+                      />
+                      <span>USA Gummies</span>
+                    </div>
+                    <div className="bundle-quickbuy__cardCount">
+                      <span>{segment.qty}</span>
+                      <span>Bags</span>
+                    </div>
+                    <div className="bundle-quickbuy__cardPrice">
+                      {priceForQtyDisplay(segment.qty)}
+                    </div>
+                    <div className="bundle-quickbuy__cardBenefit">
+                      {dtcBenefitLabel(segment.qty)}
+                    </div>
+                    <div className="bundle-quickbuy__cardMeta">
+                      <span>{perBag} / bag</span>
+                      <span>{dtcSavingsLabel(segment.qty)}</span>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
+          ) : (
+            <div data-segmented-control role="radiogroup" aria-label="Direct bag count">
+              {dtcSegments.map((segment) => {
+                const isActive =
+                  segment.qty === 5
+                    ? selectedOption === "dtc-5"
+                    : selectedOption === "dtc-best" && dtcBestQty === segment.qty;
+                const canSelect = canPurchaseQty(segment.qty);
+                return (
+                  <button
+                    key={segment.qty}
+                    type="button"
+                    role="radio"
+                    data-segment
+                    data-active={isActive}
+                    aria-checked={isActive}
+                    aria-disabled={!canSelect}
+                    tabIndex={isActive ? 0 : -1}
+                    disabled={!canSelect}
+                    onClick={() => {
+                      if (segment.qty === 5) {
+                        handleOptionSelect("dtc-5", 5);
+                      } else {
+                        handleDtcBestQtyPick(segment.qty as 8 | 12);
+                      }
+                    }}
+                    className={[
+                      "bundle-quickbuy__segment",
+                      !canSelect ? "opacity-50 cursor-not-allowed" : "cursor-pointer",
+                    ].join(" ")}
+                  >
+                    <span className="bundle-quickbuy__segmentLabel">{segment.label}</span>
+                    <span className="bundle-quickbuy__segmentPrice">
+                      {priceForQtyDisplay(segment.qty)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {selectedOption.startsWith("dtc") ? (
+            useCardSelector ? (
+              <div className="bundle-quickbuy__microcopy">
+                {selectedSavings ? `You save ${selectedSavings}` : "Free shipping on 5+ bags."}
+              </div>
+            ) : (
+              <div className="bundle-quickbuy__groupDetail">
+                <span>{dtcSelectedPerBag} / bag</span>
+                <span>Bundle pricing applied</span>
+              </div>
+            )
           ) : null}
         </div>
 
         <div className="bundle-quickbuy__group bundle-quickbuy__group--amazon">
           <div className="bundle-quickbuy__groupHeader">
             <span className="bundle-quickbuy__groupTitle">Amazon (1-4 bags)</span>
-            <span className="bundle-quickbuy__groupMeta">$5.99 per bag on Amazon</span>
+            <span className="bundle-quickbuy__groupMeta">Amazon checkout saves you on shipping</span>
           </div>
           <div data-segmented-control role="radiogroup" aria-label="Amazon bag count">
             {amazonSegments.map((segment) => {
@@ -691,6 +781,15 @@ export default function BundleQuickBuy({
                   }}
                   className="bundle-quickbuy__segment cursor-pointer"
                 >
+                  <span className="bundle-quickbuy__amazonBadge" aria-hidden="true">
+                    <Image
+                      src={AMAZON_LOGO_URL}
+                      alt=""
+                      width={36}
+                      height={12}
+                      className="h-3 w-auto"
+                    />
+                  </span>
                   <span className="bundle-quickbuy__segmentLabel">{segment.label}</span>
                   <span className="bundle-quickbuy__segmentPrice">
                     {priceForQtyDisplay(segment.qty, undefined, { forceBase: true })}

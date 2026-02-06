@@ -315,6 +315,7 @@ export default async function HomePage() {
                       showEducation={false}
                       ctaVariant="simple"
                       primaryCtaLabel="Unlock Best Value + Free Shipping"
+                      selectorVariant="cards"
                       featuredQuantities={[5, 8, 12]}
                     />
                   </div>
