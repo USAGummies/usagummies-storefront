@@ -13,6 +13,7 @@ import { ReviewHighlights } from "@/components/reviews/ReviewHighlights";
 import { AmazonOneBagNote } from "@/components/ui/AmazonOneBagNote";
 import { AMAZON_REVIEWS } from "@/data/amazonReviews";
 import { GummyIconRow, HeroPackIcon } from "@/components/ui/GummyIcon";
+import { CartLineControls } from "@/components/cart/CartLineControls.client";
 
 type MoneyV2 = { amount: string; currencyCode: string };
 
@@ -612,13 +613,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                         </div>
                       </div>
                       <div className="mt-2">
-                        <Link
-                          href="/shop#shop-bundles"
-                          className="text-[10px] font-semibold text-[var(--text)] underline underline-offset-4"
-                          onClick={onClose}
-                        >
-                          Change bag count
-                        </Link>
+                        <CartLineControls lineId={l.id} quantity={lineQty} />
                       </div>
                     </div>
                   );

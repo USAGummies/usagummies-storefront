@@ -131,7 +131,7 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${display.variable} ${sans.variable} ${script.variable}`}
-      style={{ backgroundColor: "var(--bg, #f8f5ef)" }}
+      style={{ backgroundColor: "#0d1c33" }}
     >
       <head>
         <Script id="apollo-tracker" strategy="beforeInteractive">
@@ -139,11 +139,7 @@ export default function RootLayout({
         </Script>
       </head>
       <body
-        className="min-h-screen bg-[var(--bg,#f8f5ef)] text-[var(--text,#1c2430)]"
-        style={{
-          backgroundColor: "var(--bg, #f8f5ef)",
-          color: "var(--text, #1c2430)",
-        }}
+        className="min-h-screen home-hero-theme text-[var(--text,#1c2430)]"
       >
         <GoogleAnalytics />
         <script

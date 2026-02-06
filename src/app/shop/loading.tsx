@@ -1,8 +1,9 @@
 export default function LoadingShop() {
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-8">
+    <main className="min-h-screen home-hero-theme">
+      <div className="mx-auto w-full max-w-6xl px-4 py-8">
       {/* Header skeleton */}
-      <div className="mb-6">
+        <div className="mb-6">
         <div className="h-4 w-56 rounded bg-neutral-200" />
         <div className="mt-4 h-10 w-72 rounded bg-neutral-200" />
         <div className="mt-3 h-4 w-full max-w-2xl rounded bg-neutral-200" />
@@ -32,7 +33,7 @@ export default function LoadingShop() {
       </div>
 
       {/* Grid skeleton */}
-      <section className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4" aria-label="Loading products">
+        <section className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4" aria-label="Loading products">
         {Array.from({ length: 12 }).map((_, i) => (
           <div
             key={i}
@@ -50,12 +51,13 @@ export default function LoadingShop() {
       </section>
 
       {/* Pagination skeleton */}
-      <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
           <div className="h-10 w-28 rounded-xl bg-neutral-200" />
           <div className="h-10 w-24 rounded-xl bg-neutral-200" />
         </div>
         <div className="h-4 w-72 rounded bg-neutral-200" />
+        </div>
       </div>
     </main>
   );
