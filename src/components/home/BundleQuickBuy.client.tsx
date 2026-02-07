@@ -162,6 +162,7 @@ export default function BundleQuickBuy({
   const [lastAddedQty, setLastAddedQty] = React.useState<number | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState(false);
+  const [hasBundleInteraction, setHasBundleInteraction] = React.useState(false);
   const isCompact = variant === "compact";
   const isLight = tone === "light";
   const isFlat = surface === "flat";
@@ -242,13 +243,17 @@ export default function BundleQuickBuy({
 
   function scrollToCTA() {
     if (!ctaRef.current) return;
+    if (typeof window === "undefined") return;
     const prefersReduced =
-      typeof window !== "undefined" &&
       window.matchMedia &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    ctaRef.current.scrollIntoView({
+    const rect = ctaRef.current.getBoundingClientRect();
+    const currentY = window.scrollY || window.pageYOffset;
+    const targetY = rect.top + currentY - Math.round(window.innerHeight * 0.12);
+    if (targetY <= currentY) return;
+    window.scrollTo({
+      top: targetY,
       behavior: prefersReduced ? "auto" : "smooth",
-      block: "center",
     });
   }
 
@@ -261,9 +266,8 @@ export default function BundleQuickBuy({
     });
     setSelected(String(qty) as TierKey);
     setSuccess(false);
-    if (typeof window !== "undefined" && window.innerWidth < 768) {
-      window.requestAnimationFrame(scrollToCTA);
-    }
+    setHasBundleInteraction(true);
+    window.requestAnimationFrame(scrollToCTA);
   }
 
   function handleOptionSelect(optionId: ChannelOptionId, overrideQty?: number) {
@@ -295,9 +299,8 @@ export default function BundleQuickBuy({
       variant,
       anchorId: anchorId || null,
     });
-    if (typeof window !== "undefined" && window.innerWidth < 768) {
-      window.requestAnimationFrame(scrollToCTA);
-    }
+    setHasBundleInteraction(true);
+    window.requestAnimationFrame(scrollToCTA);
   }
 
   function handleAmazonQtyPick(qty: 3 | 4) {
@@ -869,9 +872,8 @@ export default function BundleQuickBuy({
                   setSelected("5");
                   setError(null);
                   setSuccess(false);
-                  if (typeof window !== "undefined" && window.innerWidth < 768) {
-                    window.requestAnimationFrame(scrollToCTA);
-                  }
+                  setHasBundleInteraction(true);
+                  window.requestAnimationFrame(scrollToCTA);
                 }}
               >
                 Switch to direct bundles
@@ -895,7 +897,13 @@ export default function BundleQuickBuy({
                     Adding...
                   </>
                 ) : (
-                  <span>{selectedAdded ? "Added to Cart" : primaryCtaLabel || "Add to Cart"}</span>
+                  <span>
+                    {selectedAdded
+                      ? "Added to Cart"
+                      : hasBundleInteraction
+                        ? "Add to Cart"
+                        : primaryCtaLabel || "Shop & save"}
+                  </span>
                 )}
               </span>
             </button>
