@@ -60,6 +60,11 @@ const EXPRESS_CHECKOUT_METHODS = [
   },
 ];
 
+const resolveLineImageAlt = (line: any) =>
+  line?.merchandise?.image?.altText ||
+  line?.merchandise?.product?.title ||
+  "Product photo";
+
 function storeCartId(cartId?: string | null) {
   if (!cartId || typeof window === "undefined") return;
   try {
@@ -598,6 +603,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                     l?.merchandise?.image?.url ||
                     l?.merchandise?.product?.featuredImage?.url ||
                     null;
+                  const imageAlt = resolveLineImageAlt(l);
                   const lineQty = Number(l?.quantity) || 0;
                   const bagsPerUnit = getBagsPerUnit(l?.merchandise);
                   const lineBags = bagsPerUnit * lineQty;
@@ -608,7 +614,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                           {img ? (
                             <Image
                               src={img}
-                              alt={title}
+                              alt={imageAlt}
                               fill
                               sizes="48px"
                               className="object-cover"
@@ -689,8 +695,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                       <span className="flex h-10 w-full items-center justify-center">
                         <Image
                           src={method.iconSrc}
-                          alt=""
-                          aria-hidden="true"
+                          alt={`${method.label} logo`}
                           width={method.iconWidth ?? 96}
                           height={method.iconHeight ?? 28}
                           sizes="(max-width: 480px) 120px, 140px"
@@ -728,7 +733,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                 <div className="relative mt-4 flex items-end justify-center gap-2">
                   <Image
                     src="/website%20assets/StatueofLiberty.png"
-                    alt=""
+                    alt="Statue of Liberty illustration"
                     aria-hidden="true"
                     width={320}
                     height={320}
@@ -736,7 +741,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                   />
                   <Image
                     src="/logo-mark.png"
-                    alt=""
+                    alt="USA Gummies logo mark"
                     aria-hidden="true"
                     width={40}
                     height={40}
@@ -810,6 +815,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                     l?.merchandise?.image?.url ||
                     l?.merchandise?.product?.featuredImage?.url ||
                     null;
+                  const imageAlt = resolveLineImageAlt(l);
                   const lineQty = Number(l?.quantity) || 0;
                   const bagsPerUnit = getBagsPerUnit(l?.merchandise);
                   const lineBags = bagsPerUnit * lineQty;
@@ -822,7 +828,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                         {img ? (
                           <Image
                             src={img}
-                            alt={title}
+                            alt={imageAlt}
                             fill
                             sizes="28px"
                             className="object-cover"
@@ -885,8 +891,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                             <span className="flex h-9 w-full items-center justify-center rounded-full border border-[rgba(15,27,45,0.08)] bg-white">
                               <Image
                                 src={method.iconSrc}
-                                alt=""
-                                aria-hidden="true"
+                                alt={`${method.label} logo`}
                                 width={72}
                                 height={20}
                                 sizes="72px"
@@ -1055,7 +1060,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                 <div className="relative h-28 w-24 shrink-0 self-center mr-8">
                   <Image
                     src="/website%20assets/StatueofLiberty.png"
-                    alt=""
+                    alt="Statue of Liberty illustration"
                     fill
                     sizes="96px"
                     className="object-contain"
@@ -1387,6 +1392,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                       l?.merchandise?.image?.url ||
                       l?.merchandise?.product?.featuredImage?.url ||
                       null;
+                    const imageAlt = resolveLineImageAlt(l);
                     const lineQty = Number(l?.quantity) || 0;
                     const bagsPerUnit = getBagsPerUnit(l?.merchandise);
                     const lineBags = bagsPerUnit * lineQty;
@@ -1406,7 +1412,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                           {img ? (
                             <Image
                               src={img}
-                              alt={title}
+                              alt={imageAlt}
                               fill
                               sizes="56px"
                               className="object-cover"
@@ -1461,6 +1467,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                         l?.merchandise?.image?.url ||
                         l?.merchandise?.product?.featuredImage?.url ||
                         null;
+                      const imageAlt = resolveLineImageAlt(l);
                       const lineQty = Number(l?.quantity) || 0;
                       const bagsPerUnit = getBagsPerUnit(l?.merchandise);
                       const lineBags = bagsPerUnit * lineQty;
@@ -1477,7 +1484,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                             {img ? (
                               <Image
                                 src={img}
-                                alt={title}
+                                alt={imageAlt}
                                 fill
                                 sizes="56px"
                                 className="object-cover"

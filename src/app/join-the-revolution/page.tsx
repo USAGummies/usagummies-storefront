@@ -4,10 +4,42 @@ import Image from "next/image";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 
+function resolveSiteUrl() {
+  const preferred = "https://www.usagummies.com";
+  const fromEnv = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || null;
+  const nodeEnv = (process.env.NODE_ENV as string | undefined) || "";
+  if (fromEnv && fromEnv.includes("usagummies.com")) return fromEnv.replace(/\/$/, "");
+  if (nodeEnv === "production") return preferred;
+  const vercel = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL.replace(/\/$/, "")}` : null;
+  if (vercel) return vercel;
+  if (fromEnv) return fromEnv.replace(/\/$/, "");
+  if (nodeEnv !== "production") return "http://localhost:3000";
+  return preferred;
+}
+
+const SITE_URL = resolveSiteUrl();
+const PAGE_TITLE = "Join the Revolution | USA Gummies";
+const PAGE_DESCRIPTION =
+  "Join the USA Gummies revolution for made in USA candy, dye-free gummies, and patriotic treats that skip artificial dyes.";
+const OG_IMAGE = "/opengraph-image";
+
 export const metadata: Metadata = {
-  title: "Join the Revolution | USA Gummies",
-  description:
-    "Join the Revolution by purchasing USA Gummies. Unlock member eligibility, savings benefits, and subscription access after your first order.",
+  title: PAGE_TITLE,
+  description: PAGE_DESCRIPTION,
+  alternates: { canonical: `${SITE_URL}/join-the-revolution` },
+  openGraph: {
+    title: PAGE_TITLE,
+    description: PAGE_DESCRIPTION,
+    url: `${SITE_URL}/join-the-revolution`,
+    type: "website",
+    images: [{ url: OG_IMAGE }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: PAGE_TITLE,
+    description: PAGE_DESCRIPTION,
+    images: [OG_IMAGE],
+  },
 };
 
 const STEPS = [
@@ -98,7 +130,7 @@ export default function JoinTheRevolutionPage() {
                   <div className="relative aspect-[5/4] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-3">
                     <Image
                       src="/brand/usa-gummies-family.webp"
-                      alt="USA Gummies All American gummy bears"
+                      alt="USA Gummies all-American gummy bear bags"
                       fill
                       sizes="(max-width: 768px) 90vw, 460px"
                       className="object-contain"

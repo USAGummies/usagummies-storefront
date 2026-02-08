@@ -16,7 +16,7 @@ export function HomeHero() {
           <span className="usa-stamp usa-stamp--corner">Made in USA</span>
           <Image
             src="/website%20assets/B17Bomber.png"
-            alt=""
+            alt="Vintage B-17 bomber illustration"
             aria-hidden="true"
             width={1200}
             height={800}

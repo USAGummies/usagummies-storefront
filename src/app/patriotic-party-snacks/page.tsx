@@ -5,6 +5,7 @@ import { OccasionBagPicker } from "@/components/guides/OccasionBagPicker.client"
 import { OCCASION_BAG_OPTIONS } from "@/data/occasionBagOptions";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { getBundleVariants } from "@/lib/bundles/getBundleVariants";
+import { LatestFromBlog } from "@/components/blog/LatestFromBlog";
 
 function resolveSiteUrl() {
   const preferred = "https://www.usagummies.com";
@@ -20,9 +21,9 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "Patriotic Party Snacks | USA Gummies Bag Options";
+const PAGE_TITLE = "Patriotic Party Snacks | USA Gummies";
 const PAGE_DESCRIPTION =
-  "Patriotic party snacks and gummy bag options for July 4th and USA-themed events. Add more bags to save more.";
+  "Plan a red, white, and blue spread with patriotic candy and dye-free gummies made in the USA - party-ready ideas.";
 
 export const metadata: Metadata = {
   title: PAGE_TITLE,
@@ -168,6 +169,12 @@ export default async function PatrioticPartySnacksPage() {
               {guide.label} {"->"}
             </Link>
           ))}
+        </div>
+      </section>
+
+      <section className="bg-transparent">
+        <div className="mx-auto max-w-6xl px-4 pb-10">
+          <LatestFromBlog />
         </div>
       </section>
 

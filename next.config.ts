@@ -2,6 +2,8 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   images: {
+    formats: ["image/avif", "image/webp"],
+    deviceSizes: [360, 420, 640, 750, 828, 1080, 1200, 1536, 1920],
     remotePatterns: [
       {
         protocol: "https",
@@ -23,6 +25,39 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  transpilePackages: ["next-mdx-remote"],
+
+  async headers() {
+    return [
+      {
+        source: "/_next/static/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+      {
+        source: "/:path*.:ext(woff2|woff|ttf|otf)",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+      {
+        source: "/:path*.:ext(png|jpg|jpeg|webp|avif|gif|svg|ico)",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=604800, stale-while-revalidate=86400",
+          },
+        ],
+      },
+    ];
+  },
 
   async redirects() {
     return [
@@ -31,6 +66,7 @@ const nextConfig: NextConfig = {
       { source: "/shipping", destination: "/policies/shipping", permanent: true },
       { source: "/returns", destination: "/policies/returns", permanent: true },
       { source: "/store", destination: "/shop", permanent: true },
+      { source: "/blog/rss.xml", destination: "/rss.xml", permanent: true },
     ];
   },
 };

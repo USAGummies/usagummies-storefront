@@ -91,7 +91,7 @@ export function ShopProductCard({
             {img?.url ? (
               <Image
                 src={img.url}
-                alt={img.altText || product.title}
+                alt={img.altText || (product.title ? `Product photo of ${product.title}` : "Product photo")}
                 fill
                 sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
                 className="object-contain transition-transform duration-300 group-hover:scale-[1.02]"

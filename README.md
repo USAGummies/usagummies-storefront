@@ -86,3 +86,9 @@ Test ladder in checkout:
 - Qty 5 → ladder total + free shipping
 - Qty 8 → ladder total
 - Qty 12 → $51.00 total ($4.25/bag)
+
+## Development Notes
+
+- Lint runs with cache enabled by default.
+- If lint fails, the cache auto-clears and lint retries once.
+- A second failure exits non-zero.

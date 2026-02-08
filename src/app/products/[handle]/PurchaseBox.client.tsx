@@ -504,7 +504,7 @@ export default function PurchaseBox({
             <div className="pbx__panelMid" aria-live="polite" role="status">
               <Image
                 src="/website%20assets/Jeep.png"
-                alt=""
+                alt="Vintage Jeep illustration"
                 aria-hidden="true"
                 width={900}
                 height={600}

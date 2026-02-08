@@ -86,7 +86,10 @@ export function StickyAddToCartBar({
   containerClassName,
 }: Props) {
   const [cart, setCart] = useState<any>(null);
-  const alt = useMemo(() => imageAlt || title, [imageAlt, title]);
+  const alt = useMemo(
+    () => imageAlt || (title ? `Product photo of ${title}` : "Product photo"),
+    [imageAlt, title]
+  );
 
   const refreshCart = useCallback(() => {
     const cartId =

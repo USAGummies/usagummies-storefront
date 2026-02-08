@@ -3,16 +3,33 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import BundleQuickBuy from "@/components/home/BundleQuickBuy.client";
-import { StickyAddToCartBar } from "@/components/product/StickyAddToCartBar";
+import { BundleQuickBuyCtaProof, BundleQuickBuyRailProof } from "@/components/home/BundleQuickBuyProof";
+import { GuideCard } from "@/components/internal-links/GuideCard";
+import { LinkModule } from "@/components/internal-links/LinkModule";
+import { RelatedProductCard } from "@/components/internal-links/RelatedProductCard";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
+import { LazyStickyAddToCartBar } from "@/components/product/LazyStickyAddToCartBar.client";
+import { LatestFromBlog } from "@/components/blog/LatestFromBlog";
 import { getProductsPage } from "@/lib/shopify/products";
+import { getProductsForInternalLinks } from "@/lib/shopify/internalLinks";
 import { getProductByHandle } from "@/lib/storefront";
-import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
+import { BASE_PRICE, FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import { getBundleVariants } from "@/lib/bundles/getBundleVariants";
+import { SINGLE_BAG_SKU } from "@/lib/bundles/atomic";
 import { DETAIL_BULLETS } from "@/data/productDetails";
+import { ProductJsonLd } from "@/components/seo/ProductJsonLd";
+import { buildCanonicalUrl } from "@/lib/seo/canonical";
+import {
+  MIN_RELATED_SCORE,
+  buildProductSignals,
+  buildSignalsFromValues,
+  rankRelated,
+} from "@/lib/internalLinks";
+import { getTopGuideCandidates } from "@/lib/guides";
 import styles from "../homepage-scenes.module.css";
 
 const PAGE_SIZE = 1;
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 function resolveSiteUrl() {
   const preferred = "https://www.usagummies.com";
   const fromEnv = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || null;
@@ -29,11 +46,20 @@ function resolveSiteUrl() {
 const SITE_URL = resolveSiteUrl();
 const OG_IMAGE = "/opengraph-image";
 
-export async function generateMetadata(): Promise<Metadata> {
-  const title = "Shop USA Gummies | Buy More, Save More on American-Made Gummies";
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams?: SearchParams;
+}): Promise<Metadata> {
+  const resolvedSearchParams = (await searchParams) ?? {};
+  const title = "Shop Dye-Free Gummies & Made in USA Candy";
   const description =
-    "Explore USA Gummies savings and best sellers. Made in the USA, all natural, dye-free. Free shipping on 5+ bags.";
-  const canonical = `${SITE_URL}/shop`;
+    "Browse all USA Gummies products: made in USA candy with no artificial dyes, patriotic favorites, and bundle savings.";
+  const canonical = buildCanonicalUrl({
+    pathname: "/shop",
+    searchParams: resolvedSearchParams,
+    siteUrl: SITE_URL,
+  });
 
   return {
     title,
@@ -91,8 +117,70 @@ export default async function ShopPage() {
     bundleVariants = null;
   }
 
+  let internalProducts: Awaited<ReturnType<typeof getProductsForInternalLinks>> = [];
+  try {
+    internalProducts = await getProductsForInternalLinks();
+  } catch {
+    internalProducts = [];
+  }
+
+  const guideCandidates = getTopGuideCandidates();
   const productHandle =
     detailedProduct?.handle || primaryProduct?.handle || "all-american-gummy-bears-7-5-oz-single-bag";
+
+  const sourceSignals = buildProductSignals({
+    handle: productHandle,
+    productType: detailedProduct?.productType,
+    tags: detailedProduct?.tags,
+    collections: detailedProduct?.collections?.nodes,
+    seoKeywords: detailedProduct?.seoKeywords?.value,
+    seoCategory: detailedProduct?.seoCategory?.value,
+    createdAt: detailedProduct?.createdAt || primaryProduct?.createdAt,
+  });
+
+  const relatedProducts = (() => {
+    if (!internalProducts.length) return [];
+    const candidates = internalProducts.map((product) => ({
+      item: product,
+      signals: buildProductSignals({
+        handle: product.handle,
+        productType: product.productType,
+        tags: product.tags,
+        collections: product.collections?.nodes,
+        seoKeywords: product.seoKeywords?.value,
+        seoCategory: product.seoCategory?.value,
+        createdAt: product.createdAt,
+      }),
+    }));
+    return rankRelated(sourceSignals, candidates, {
+      limit: 4,
+      includeProductType: true,
+      minScore: MIN_RELATED_SCORE,
+      minCount: 4,
+    });
+  })();
+
+  const topGuides = (() => {
+    if (!guideCandidates.length) return [];
+    const candidates = guideCandidates.map((guide) => ({
+      item: guide,
+      signals: buildSignalsFromValues({
+        url: guide.href,
+        category: guide.topic,
+        tags: guide.tags,
+        keywords: guide.keywords,
+        date: guide.updated || guide.date,
+      }),
+    }));
+    return rankRelated(sourceSignals, candidates, {
+      limit: 3,
+      minScore: MIN_RELATED_SCORE,
+      minCount: 3,
+    });
+  })();
+
+  const hasModules = relatedProducts.length || topGuides.length;
+
   const heroBundleQuantities = [1, 2, 3, 4, 5, 8, 12];
   const homepageTiers = (bundleVariants?.variants || []).filter((t: any) =>
     heroBundleQuantities.includes(t.quantity)
@@ -100,32 +188,22 @@ export default async function ShopPage() {
 
   const stickyImage =
     detailedProduct?.featuredImage?.url || primaryProduct?.featuredImage?.url || "/brand/usa-gummies-family.webp";
-  const stickyAlt = detailedProduct?.featuredImage?.altText || "USA Gummies bag";
-
-  const productJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "Product",
-    name: detailedProduct?.title || "USA Gummies - All American Gummy Bears",
-    description:
-      "All-American gummy bears made in the USA with all natural flavors and no artificial dyes.",
-    image: detailedProduct?.featuredImage?.url ? [detailedProduct.featuredImage.url] : undefined,
-    brand: {
-      "@type": "Brand",
-      name: "USA Gummies",
-    },
-    offers: {
-      "@type": "Offer",
-      url: `${SITE_URL}/shop`,
-      priceCurrency: detailedProduct?.priceRange?.minVariantPrice?.currencyCode || "USD",
-      ...(detailedProduct?.priceRange?.minVariantPrice?.amount
-        ? { price: detailedProduct.priceRange.minVariantPrice.amount }
-        : {}),
-      availability:
-        bundleVariants?.availableForSale === false
-          ? "https://schema.org/OutOfStock"
-          : "https://schema.org/InStock",
-    },
-  };
+  const stickyAlt = detailedProduct?.featuredImage?.altText || "Bag of USA Gummies classic gummy bears";
+  const productImages =
+    (detailedProduct?.images?.edges || []).map((edge: any) => edge?.node) || [];
+  const productImageUrls = productImages.map((img: any) => img?.url).filter(Boolean);
+  const fallbackPrice =
+    bundleVariants?.variants?.find((variant) => variant.quantity === 1)?.totalPrice ?? null;
+  const priceAmount =
+    detailedProduct?.priceRange?.minVariantPrice?.amount ||
+    (fallbackPrice !== null ? fallbackPrice.toFixed(2) : BASE_PRICE.toFixed(2));
+  const priceCurrency = detailedProduct?.priceRange?.minVariantPrice?.currencyCode || "USD";
+  const productSku =
+    detailedProduct?.variants?.edges
+      ?.map((edge: any) => edge?.node)
+      .find((variant: any) => variant?.sku)?.sku ||
+    bundleVariants?.singleBagSku ||
+    SINGLE_BAG_SKU;
 
   return (
     <main className="relative overflow-hidden home-hero-theme text-[var(--text)] min-h-screen pb-16">
@@ -135,6 +213,7 @@ export default async function ShopPage() {
           { name: "Shop", href: "/shop" },
         ]}
       />
+      <h1 className="sr-only">Shop USA Gummies</h1>
 
       <section className={`${styles.scene} ${styles.sceneBundle} home-purchase-stage`} data-zone="BUNDLE">
         <div className={styles.sceneBg} aria-hidden="true" />
@@ -149,7 +228,7 @@ export default async function ShopPage() {
                     <div className="atomic-buy__kicker flex items-center gap-2">
                       <Image
                         src="/brand/logo.png"
-                        alt=""
+                        alt="USA Gummies logo"
                         aria-hidden="true"
                         width={72}
                         height={24}
@@ -182,7 +261,8 @@ export default async function ShopPage() {
                       <span className="atomic-buy__chip">{FREE_SHIPPING_PHRASE}</span>
                     </div>
                     <div className="atomic-buy__ingredients">
-                      Ingredients &amp; allergen info: <Link href="/ingredients">ingredients</Link>.
+                      Ingredients &amp; allergen info: <Link href="/ingredients">ingredients</Link>. Guide:{" "}
+                      <Link href="/no-artificial-dyes-gummy-bears">No Artificial Dyes Gummy Bears</Link>.
                     </div>
                   </div>
                   <div className="atomic-buy__media">
@@ -190,9 +270,11 @@ export default async function ShopPage() {
                       <div className="relative aspect-[4/5] w-full">
                         <Image
                           src="/Hero-pack.jpeg"
-                          alt="USA Gummies bag"
+                          alt="Bag of USA Gummies classic gummy bears"
                           fill
-                          sizes="(max-width: 640px) 90vw, (max-width: 1024px) 40vw, 420px"
+                          priority
+                          fetchPriority="high"
+                          sizes="(max-width: 640px) 90vw, (max-width: 1023px) 92vw, 560px"
                           className="object-contain drop-shadow-[0_24px_50px_rgba(13,28,51,0.2)]"
                         />
                       </div>
@@ -212,6 +294,10 @@ export default async function ShopPage() {
                       tone="light"
                       surface="flat"
                       layout="classic"
+                      railProofSlot={<BundleQuickBuyRailProof tone="light" />}
+                      ctaProofSlot={
+                        <BundleQuickBuyCtaProof tone="light" surface="flat" layout="classic" variant="compact" />
+                      }
                       showHowItWorks={false}
                       summaryCopy="5+ bags ship free from us. Under 5 bags, we send you to Amazon to save you on shipping."
                       showTrainAccent={false}
@@ -236,13 +322,53 @@ export default async function ShopPage() {
                 <Link href="/bulk-gummy-bears" className="underline underline-offset-4">
                   Bulk gummy bears
                 </Link>
+                <Link href="/no-artificial-dyes-gummy-bears" className="underline underline-offset-4">
+                  Red 40 Free Gummies
+                </Link>
+              </div>
+              <div className="mt-2 text-[11px] text-white/80">
+                Learn about{" "}
+                <Link href="/made-in-usa-candy" className="underline underline-offset-4">
+                  American-Made Candy
+                </Link>
+                .
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      <StickyAddToCartBar
+      <section className="bg-transparent" data-zone="BLOG">
+        <div className="mx-auto max-w-6xl px-4 py-4">
+          <LatestFromBlog />
+        </div>
+      </section>
+
+      {hasModules ? (
+        <section className="bg-transparent" data-zone="INTERNAL-LINKS">
+          <div className="mx-auto max-w-6xl px-4 py-4">
+            <div className="link-modules">
+              {relatedProducts.length ? (
+                <LinkModule title="Related Products">
+                  {relatedProducts.map((product) => (
+                    <RelatedProductCard key={product.id} product={product} />
+                  ))}
+                </LinkModule>
+              ) : null}
+
+              {topGuides.length ? (
+                <LinkModule title="Top Guides">
+                  {topGuides.map((guide) => (
+                    <GuideCard key={guide.href} guide={guide} />
+                  ))}
+                </LinkModule>
+              ) : null}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      <LazyStickyAddToCartBar
         title="In your cart"
         imageUrl={stickyImage}
         imageAlt={stickyAlt}
@@ -251,9 +377,20 @@ export default async function ShopPage() {
         className="sm:hidden"
       />
 
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }}
+      <ProductJsonLd
+        name={detailedProduct?.title || "USA Gummies - All American Gummy Bears"}
+        description={
+          detailedProduct?.description ||
+          "All-American gummy bears made in the USA with all natural flavors and no artificial dyes."
+        }
+        handle={productHandle}
+        imageUrls={productImageUrls.length ? productImageUrls : [stickyImage]}
+        sku={productSku}
+        currencyCode={priceCurrency}
+        priceAmount={priceAmount}
+        brandName="USA Gummies"
+        siteUrl={SITE_URL}
+        availability={bundleVariants?.availableForSale === false ? "OutOfStock" : "InStock"}
       />
     </main>
   );

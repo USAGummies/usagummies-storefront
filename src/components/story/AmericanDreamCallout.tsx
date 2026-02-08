@@ -74,7 +74,7 @@ export function AmericanDreamCallout({
         <div className="flex flex-wrap items-center gap-2">
           <Image
             src="/brand/logo.png"
-            alt=""
+            alt="USA Gummies logo"
             aria-hidden="true"
             width={68}
             height={22}

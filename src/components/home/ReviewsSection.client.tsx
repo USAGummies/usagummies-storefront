@@ -303,7 +303,7 @@ export default function ReviewsSectionClient({ reviews }: Props) {
               </div>
               <Image
                 src="/website%20assets/Train-02.png"
-                alt=""
+                alt="Vintage train illustration"
                 aria-hidden="true"
                 width={2048}
                 height={559}

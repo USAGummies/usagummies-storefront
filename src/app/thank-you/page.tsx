@@ -6,12 +6,49 @@ import { Reveal } from "@/components/ui/Reveal";
 import { LeadCapture } from "@/components/marketing/LeadCapture.client";
 import { SubscriptionUnlock } from "@/components/marketing/SubscriptionUnlock.client";
 
+function resolveSiteUrl() {
+  const preferred = "https://www.usagummies.com";
+  const fromEnv = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || null;
+  const nodeEnv = (process.env.NODE_ENV as string | undefined) || "";
+  if (fromEnv && fromEnv.includes("usagummies.com")) return fromEnv.replace(/\/$/, "");
+  if (nodeEnv === "production") return preferred;
+  const vercel = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL.replace(/\/$/, "")}` : null;
+  if (vercel) return vercel;
+  if (fromEnv) return fromEnv.replace(/\/$/, "");
+  if (nodeEnv !== "production") return "http://localhost:3000";
+  return preferred;
+}
+
+const SITE_URL = resolveSiteUrl();
+const PAGE_TITLE = "Thank You | USA Gummies";
+const PAGE_DESCRIPTION = "Thanks for your USA Gummies order. You are officially part of the movement.";
+const OG_IMAGE = "/opengraph-image";
+
 const igImages = ["/home-patriotic-product.jpg", "/brand/hero.jpg", "/hero.jpg"];
+const IG_IMAGE_ALTS: Record<string, string> = {
+  "/home-patriotic-product.jpg": "USA Gummies bag on a patriotic backdrop",
+  "/brand/hero.jpg": "USA Gummies gummy bear bag hero photo",
+  "/hero.jpg": "USA Gummies gummy bear bag close-up",
+};
 
 export const metadata: Metadata = {
-  title: "Thank You | USA Gummies",
-  description: "Thanks for your USA Gummies order. You are officially part of the movement.",
+  title: PAGE_TITLE,
+  description: PAGE_DESCRIPTION,
   robots: { index: false, follow: false },
+  alternates: { canonical: `${SITE_URL}/thank-you` },
+  openGraph: {
+    title: PAGE_TITLE,
+    description: PAGE_DESCRIPTION,
+    url: `${SITE_URL}/thank-you`,
+    type: "website",
+    images: [{ url: OG_IMAGE }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: PAGE_TITLE,
+    description: PAGE_DESCRIPTION,
+    images: [OG_IMAGE],
+  },
 };
 
 export default function ThankYouPage() {
@@ -53,7 +90,7 @@ export default function ThankYouPage() {
                 <div key={src} className="relative aspect-square overflow-hidden rounded-xl border border-[var(--border)]">
                   <Image
                     src={src}
-                    alt="USA Gummies social"
+                    alt={IG_IMAGE_ALTS[src] || "USA Gummies Instagram photo"}
                     fill
                     sizes="(max-width: 768px) 28vw, 120px"
                     className="object-cover"

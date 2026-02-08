@@ -17,9 +17,9 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "Contact USA Gummies | Customer Support & Inquiries";
+const PAGE_TITLE = "Contact USA Gummies";
 const PAGE_DESCRIPTION =
-  "Contact USA Gummies for customer support or business inquiries. We respond within one business day.";
+  "Need help with made in USA candy orders or dye-free gummies? Contact USA Gummies for support, wholesale, or press.";
 const OG_IMAGE = "/opengraph-image";
 
 export const metadata: Metadata = {

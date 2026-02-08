@@ -5,6 +5,7 @@ import { OccasionBagPicker } from "@/components/guides/OccasionBagPicker.client"
 import { OCCASION_BAG_OPTIONS } from "@/data/occasionBagOptions";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { getBundleVariants } from "@/lib/bundles/getBundleVariants";
+import { LatestFromBlog } from "@/components/blog/LatestFromBlog";
 
 function resolveSiteUrl() {
   const preferred = "https://www.usagummies.com";
@@ -20,9 +21,9 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "Gummy Gift Bag Options | USA Gummies";
+const PAGE_TITLE = "Gummy Gift Bundles | Patriotic Candy";
 const PAGE_DESCRIPTION =
-  "Gift-ready gummy bag options made in the USA. Choose 4, 5, 8, or 12 bags for birthdays, thank you gifts, and care packages.";
+  "Send made in USA candy gifts with dye-free gummies and no artificial dyes. Bundles for birthdays, teams, and holidays.";
 
 export const metadata: Metadata = {
   title: PAGE_TITLE,
@@ -129,7 +130,7 @@ export default async function GummyGiftBundlesPage() {
                 <div className="relative aspect-[5/4] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-3">
                   <Image
                     src="/brand/usa-gummies-family.webp"
-                    alt="USA Gummies gift bags"
+                    alt="Gift-ready USA Gummies gummy bear bags"
                     fill
                     sizes="(max-width: 768px) 90vw, 420px"
                     className="object-contain"
@@ -185,6 +186,12 @@ export default async function GummyGiftBundlesPage() {
               {guide.label} {"->"}
             </Link>
           ))}
+        </div>
+      </section>
+
+      <section className="bg-transparent">
+        <div className="mx-auto max-w-6xl px-4 pb-10">
+          <LatestFromBlog />
         </div>
       </section>
 

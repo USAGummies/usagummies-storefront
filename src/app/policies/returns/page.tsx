@@ -17,9 +17,9 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "Satisfaction Guarantee | USA Gummies";
+const PAGE_TITLE = "Returns Policy | USA Gummies";
 const PAGE_DESCRIPTION =
-  "USA Gummies satisfaction guarantee and order issue policy. Food-safety rules, damaged or incorrect orders, and how we make it right.";
+  "Learn about returns and exchanges for USA Gummies made in USA candy orders.";
 const OG_IMAGE = "/opengraph-image";
 
 export const metadata: Metadata = {

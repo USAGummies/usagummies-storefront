@@ -5,6 +5,7 @@ import { OccasionBagPicker } from "@/components/guides/OccasionBagPicker.client"
 import { OCCASION_BAG_OPTIONS } from "@/data/occasionBagOptions";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { getBundleVariants } from "@/lib/bundles/getBundleVariants";
+import { LatestFromBlog } from "@/components/blog/LatestFromBlog";
 
 function resolveSiteUrl() {
   const preferred = "https://www.usagummies.com";
@@ -20,9 +21,9 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "USA Gummies Bag Count Guides | Gifts, Parties, and Bulk Orders";
+const PAGE_TITLE = "Bundle Guides | USA Gummies";
 const PAGE_DESCRIPTION =
-  "Explore USA Gummies bag count guides for gifts, parties, and bulk orders. Find the right bag count and save more per bag.";
+  "Pick the right gummy bundle for gifts, parties, and patriotic candy celebrations. Dye-free gummies made in the USA.";
 
 export const metadata: Metadata = {
   title: PAGE_TITLE,
@@ -53,6 +54,11 @@ const GUIDES = [
     href: "/patriotic-party-snacks",
     title: "Patriotic party snacks",
     description: "Bag-count picks for July 4th and USA-themed events.",
+  },
+  {
+    href: "/patriotic-candy",
+    title: "Patriotic candy gifts",
+    description: "American made candy gifts for July 4th, Veterans Day, and America 250.",
   },
   {
     href: "/bulk-gummy-bears",
@@ -109,7 +115,7 @@ export default async function BundleGuidesPage() {
                 <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-[var(--border)] bg-white">
                   <Image
                     src="/Hero-pack.jpeg"
-                    alt="USA Gummies bag"
+                    alt="USA Gummies gummy bear bag"
                     fill
                     sizes="(max-width: 768px) 90vw, 420px"
                     className="object-contain"
@@ -126,7 +132,7 @@ export default async function BundleGuidesPage() {
             />
           </div>
 
-          <div className="mt-6 grid gap-4 md:grid-cols-3">
+          <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {GUIDES.map((guide) => (
               <Link
                 key={guide.href}
@@ -156,6 +162,12 @@ export default async function BundleGuidesPage() {
           </div>
         </div>
 
+      </section>
+
+      <section className="bg-transparent">
+        <div className="mx-auto max-w-6xl px-4 pb-10">
+          <LatestFromBlog />
+        </div>
       </section>
 
       <script

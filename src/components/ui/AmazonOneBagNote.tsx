@@ -114,7 +114,7 @@ export function AmazonOneBagNote({
       >
         <Image
           src={AMAZON_LOGO_URL}
-          alt="Amazon"
+          alt="Amazon logo"
           width={56}
           height={16}
           className="h-3.5 w-auto opacity-85"

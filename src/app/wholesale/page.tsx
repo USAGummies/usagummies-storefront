@@ -19,9 +19,9 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "Wholesale USA Gummies | Stock All-Natural, Made-in-USA Gummy Bears";
+const PAGE_TITLE = "Wholesale Candy | USA Gummies";
 const PAGE_DESCRIPTION =
-  "Wholesale USA Gummies for retail partners. All natural gummy bears, made in the USA with no artificial dyes. Request a starter case or samples.";
+  "Wholesale made in USA candy and dye-free gummies for retailers, teams, and events. No artificial dyes, easy ordering.";
 
 export const metadata: Metadata = {
   title: PAGE_TITLE,
@@ -128,7 +128,7 @@ export default function WholesalePage() {
                 <div className="relative aspect-[5/4] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-3">
                   <Image
                     src="/brand/usa-gummies-family.webp"
-                    alt="USA Gummies bags with gummy bears"
+                    alt="Assorted USA Gummies gummy bear bags"
                     fill
                     sizes="(max-width: 768px) 90vw, 420px"
                     className="object-contain"
@@ -170,7 +170,7 @@ export default function WholesalePage() {
             <div className="mt-4 flex items-center gap-3 text-xs text-[var(--muted)]">
               <Image
                 src="/brand/logo.png"
-                alt="USA Gummies"
+                alt="USA Gummies logo"
                 width={72}
                 height={26}
                 className="h-auto w-16 object-contain"

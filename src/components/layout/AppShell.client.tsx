@@ -3,8 +3,8 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
-import { CartDrawer } from "@/components/layout/CartDrawer.client";
 import { usePathname } from "next/navigation";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import { AMAZON_LISTING_URL } from "@/lib/amazon";
@@ -14,7 +14,15 @@ import { SubscriptionUnlock } from "@/components/marketing/SubscriptionUnlock.cl
 import { getCartToastMessage, readLastAdd } from "@/lib/cartFeedback";
 import { SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
 import { ExperienceBand } from "@/components/brand/ExperienceBand";
-import { ChatWidget } from "@/components/support/ChatWidget.client";
+
+const CartDrawer = dynamic(
+  () => import("@/components/layout/CartDrawer.client").then((mod) => mod.CartDrawer),
+  { ssr: false }
+);
+const ChatWidget = dynamic(
+  () => import("@/components/support/ChatWidget.client").then((mod) => mod.ChatWidget),
+  { ssr: false }
+);
 
 function cx(...a: Array<string | false | null | undefined>) {
   return a.filter(Boolean).join(" ");
@@ -105,6 +113,7 @@ const navSections = [
       { href: "/bundle-guides", label: "Bag count guides" },
       { href: "/gummy-gift-bundles", label: "Gift bag options" },
       { href: "/patriotic-party-snacks", label: "Party snacks" },
+      { href: "/patriotic-candy", label: "Patriotic candy" },
       { href: "/bulk-gummy-bears", label: "Bulk gummy bears" },
     ],
   },
@@ -145,11 +154,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [undoInfo, setUndoInfo] = useState<{ qty: number; at: number } | null>(null);
   const [undoPending, setUndoPending] = useState(false);
   const [hideHomeHeader, setHideHomeHeader] = useState(false);
+  const [chatReady, setChatReady] = useState(false);
   const pathname = usePathname();
   const isHome = pathname === "/";
   const isShop = pathname === "/shop";
   const isProduct = pathname?.startsWith("/products");
   const hideChatWidget = pathname === "/wholesale" || pathname === "/contact";
+  const showChatWidget = !hideChatWidget && chatReady;
   const experienceVariant = isHome || isShop || isProduct ? "full" : "compact";
   const showExperienceBand = isHome || isShop;
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -161,6 +172,30 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const markAmazonFired = () => {
     amazonPrefireRef.current = Date.now();
   };
+
+  useEffect(() => {
+    if (hideChatWidget) return;
+    if (typeof window === "undefined") return;
+    let timeoutId: number | null = null;
+    const idleCallback = (
+      window as typeof window & {
+        requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      }
+    ).requestIdleCallback;
+    const cancelIdleCallback = (
+      window as typeof window & { cancelIdleCallback?: (id: number) => void }
+    ).cancelIdleCallback;
+
+    if (idleCallback) {
+      const idleId = idleCallback(() => setChatReady(true), { timeout: 2000 });
+      return () => cancelIdleCallback?.(idleId);
+    }
+
+    timeoutId = window.setTimeout(() => setChatReady(true), 1500);
+    return () => {
+      if (timeoutId !== null) window.clearTimeout(timeoutId);
+    };
+  }, [hideChatWidget]);
 
   async function refreshCartCount() {
     try {
@@ -346,7 +381,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div className="pointer-events-none absolute -right-6 -top-4 h-20 w-20 opacity-12">
               <Image
                 src="/website%20assets/StatueofLiberty.png"
-                alt=""
+                alt="Statue of Liberty illustration"
                 aria-hidden="true"
                 fill
                 sizes="80px"
@@ -381,7 +416,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div className="relative h-9 w-32">
               <Image
                 src="/brand/logo.png"
-                alt="USA Gummies"
+                alt="USA Gummies logo"
                 fill
                 sizes="128px"
                 className="object-contain"
@@ -444,6 +479,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   </div>
                 </div>
               ) : null}
+            </div>
+            <div className="hidden lg:flex items-center gap-4 text-sm font-semibold text-[var(--navy)]">
+              <Link href="/gummies-101" className="link-underline">
+                Learn
+              </Link>
+              <Link href="/blog" className="link-underline">
+                Blog
+              </Link>
             </div>
             <button
               type="button"
@@ -522,12 +565,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         ) : null}
       </header>
 
-      <CartDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+      {drawerOpen ? (
+        <CartDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+      ) : null}
 
       <main className="relative overflow-hidden pb-16 text-[var(--text)]">
         <Image
           src="/website%20assets/B17Bomber.png"
-          alt=""
+          alt="Vintage B-17 bomber illustration"
           aria-hidden="true"
           width={1405}
           height={954}
@@ -569,6 +614,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <li>All natural flavors • No artificial dyes</li>
                 <li>Ships fast • Free shipping at 5+ bags</li>
               </ul>
+              <div className="text-sm text-[var(--muted)]">
+                <Link href="/made-in-usa-candy" className="link-underline">
+                  Made in USA Candy
+                </Link>
+              </div>
             </div>
               <div className="text-xs text-[var(--muted)]">
                 Secure checkout • {FREE_SHIPPING_PHRASE} • Satisfaction guaranteed
@@ -595,6 +645,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Link href="/ingredients" className="link-underline">
                 Ingredients
               </Link>
+              <Link href="/no-artificial-dyes-gummy-bears" className="link-underline">
+                Dye-Free Gummy Bears
+              </Link>
               <Link href="/made-in-usa" className="link-underline">
                 Made in USA
               </Link>
@@ -606,6 +659,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </Link>
               <Link href="/patriotic-party-snacks" className="link-underline">
                 Party snacks
+              </Link>
+              <Link href="/patriotic-candy" className="link-underline">
+                Patriotic candy
               </Link>
               <Link href="/bulk-gummy-bears" className="link-underline">
                 Bulk gummy bears
@@ -719,7 +775,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </footer>
-      {hideChatWidget ? null : <ChatWidget />}
+      {showChatWidget ? <ChatWidget /> : null}
     </div>
   );
 }

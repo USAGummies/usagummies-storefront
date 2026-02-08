@@ -51,7 +51,7 @@ export function ProductGallery({
       <div className="relative aspect-square w-full bg-[var(--surface)]">
         <Image
           src={main?.url || "/home-patriotic-product.jpg"}
-          alt={main?.altText || title}
+          alt={main?.altText || (title ? `Product photo of ${title}` : "Product photo")}
           fill
           sizes="(max-width: 1024px) 100vw, 50vw"
           className="object-contain drop-shadow-[0_18px_40px_rgba(13,28,51,0.14)]"
@@ -79,7 +79,7 @@ export function ProductGallery({
             >
               <Image
                 src={im.url}
-                alt={im.altText || title}
+                alt={im.altText || (title ? `Product photo of ${title}` : "Product photo")}
                 fill
                 sizes="64px"
                 className="object-contain"

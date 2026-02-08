@@ -5,6 +5,7 @@ import { OccasionBagPicker } from "@/components/guides/OccasionBagPicker.client"
 import { OCCASION_BAG_OPTIONS } from "@/data/occasionBagOptions";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { getBundleVariants } from "@/lib/bundles/getBundleVariants";
+import { LatestFromBlog } from "@/components/blog/LatestFromBlog";
 
 function resolveSiteUrl() {
   const preferred = "https://www.usagummies.com";
@@ -20,9 +21,9 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "Bulk Gummy Bears | USA Gummies Bag Counts";
+const PAGE_TITLE = "Bulk Gummy Bears | Made in USA Candy";
 const PAGE_DESCRIPTION =
-  "Bulk gummy bears for events, teams, and gifting. Add more bags for better per bag value and fast shipping.";
+  "Stock up on dye-free gummies in bulk. Made in USA candy for events, offices, and patriotic celebrations.";
 
 export const metadata: Metadata = {
   title: PAGE_TITLE,
@@ -125,7 +126,7 @@ export default async function BulkGummyBearsPage() {
                 <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-[var(--border)] bg-white">
                   <Image
                     src="/website%20assets/B17Bomber.png"
-                    alt="B17 bomber illustration"
+                    alt="Vintage B-17 bomber illustration"
                     fill
                     sizes="(max-width: 768px) 90vw, 420px"
                     className="object-contain"
@@ -177,6 +178,12 @@ export default async function BulkGummyBearsPage() {
               {guide.label} {"->"}
             </Link>
           ))}
+        </div>
+      </section>
+
+      <section className="bg-transparent">
+        <div className="mx-auto max-w-6xl px-4 pb-10">
+          <LatestFromBlog />
         </div>
       </section>
 

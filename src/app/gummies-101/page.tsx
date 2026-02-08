@@ -3,6 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
+import { LatestFromBlog } from "@/components/blog/LatestFromBlog";
 
 function resolveSiteUrl() {
   const preferred = "https://www.usagummies.com";
@@ -18,9 +19,9 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "Gummies 101 | USA Gummies facts and buying guide";
+const PAGE_TITLE = "Gummies 101 | Dye-Free Gummies Guide";
 const PAGE_DESCRIPTION =
-  "Fast facts about USA Gummies: made in the USA, no artificial dyes, classic flavors, and bundle savings for multi-bag orders.";
+  "Learn about gummy ingredients, textures, and flavors, plus why we skip artificial dyes in our made in USA candy.";
 const PAGE_URL = `${SITE_URL}/gummies-101`;
 const OG_IMAGE = `${SITE_URL}/opengraph-image`;
 
@@ -149,7 +150,7 @@ export default function Gummies101Page() {
               <div className="relative aspect-[5/4] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-3">
                 <Image
                   src="/brand/usa-gummies-family.webp"
-                  alt="USA Gummies bags with gummy bears"
+                  alt="Assorted USA Gummies gummy bear bags"
                   fill
                   sizes="(max-width: 768px) 90vw, 360px"
                   className="object-contain"
@@ -186,6 +187,12 @@ export default function Gummies101Page() {
             >
               See ingredients
             </Link>
+            <Link
+              href="/no-artificial-dyes-gummy-bears"
+              className="mt-2 inline-flex text-xs font-semibold text-[var(--navy)] link-underline"
+            >
+              Red 40 Free Gummies
+            </Link>
           </div>
 
           <div className="mt-6 grid gap-3">
@@ -209,6 +216,12 @@ export default function Gummies101Page() {
           </div>
         </div>
       </div>
+
+      <section className="bg-transparent">
+        <div className="mx-auto max-w-6xl px-4 pb-10">
+          <LatestFromBlog />
+        </div>
+      </section>
 
       <script
         type="application/ld+json"

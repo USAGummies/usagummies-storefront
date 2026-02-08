@@ -19,7 +19,7 @@ function resolveSiteUrl() {
 const SITE_URL = resolveSiteUrl();
 const PAGE_TITLE = "Privacy Policy | USA Gummies";
 const PAGE_DESCRIPTION =
-  "USA Gummies privacy policy. What information we collect, how it’s used, and how Shopify checkout protects payment details.";
+  "Read how USA Gummies handles data, privacy, and security for shoppers of our dye-free gummies.";
 const OG_IMAGE = "/opengraph-image";
 
 export const metadata: Metadata = {

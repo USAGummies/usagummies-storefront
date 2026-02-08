@@ -7,19 +7,23 @@ import { Oswald, Space_Grotesk, Yellowtail } from "next/font/google";
 import { AppShell } from "@/components/layout/AppShell.client";
 import { AMAZON_LISTING_URL } from "@/lib/amazon";
 
+const GA4_ID = process.env.NEXT_PUBLIC_GA4_ID?.trim() || "G-31X673PSVY";
+const GOOGLE_SITE_VERIFICATION = process.env.NEXT_PUBLIC_GSC_VERIFICATION?.trim();
+
 function GoogleAnalytics() {
+  if (!GA4_ID) return null;
   return (
     <>
       <Script
-        src="https://www.googletagmanager.com/gtag/js?id=G-31X673PSVY"
-        strategy="afterInteractive"
+        src={`https://www.googletagmanager.com/gtag/js?id=${GA4_ID}`}
+        strategy="lazyOnload"
       />
-      <Script id="ga4-init" strategy="afterInteractive">
+      <Script id="ga4-init" strategy="lazyOnload">
         {`
           window.dataLayer = window.dataLayer || [];
           function gtag(){dataLayer.push(arguments);}
           gtag('js', new Date());
-          gtag('config', 'G-31X673PSVY', {
+          gtag('config', '${GA4_ID}', {
             send_page_view: true,
           });
         `}
@@ -47,15 +51,17 @@ const DEFAULT_DESCRIPTION = "All natural, American-made gummy bears with no arti
 const display = Oswald({
   subsets: ["latin"],
   variable: "--font-display",
-  weight: ["400", "500", "600", "700"],
+  weight: ["400", "700"],
   display: "swap",
+  preload: false,
 });
 
 const sans = Space_Grotesk({
   subsets: ["latin"],
   variable: "--font-sans",
-  weight: ["400", "500", "600", "700"],
+  weight: ["400", "700"],
   display: "swap",
+  preload: true,
 });
 
 const script = Yellowtail({
@@ -63,6 +69,7 @@ const script = Yellowtail({
   variable: "--font-script",
   weight: ["400"],
   display: "swap",
+  preload: false,
 });
 
 export const metadata: Metadata = {
@@ -85,7 +92,7 @@ export const metadata: Metadata = {
     url: SITE_URL,
     siteName: "USA Gummies",
     type: "website",
-    images: [{ url: "/opengraph-image", alt: "USA Gummies all natural gummy bears" }],
+    images: [{ url: "/opengraph-image", alt: "USA Gummies gummy bear bag" }],
   },
   twitter: {
     card: "summary_large_image",
@@ -93,6 +100,11 @@ export const metadata: Metadata = {
     description: DEFAULT_DESCRIPTION,
     images: ["/opengraph-image"],
   },
+  verification: GOOGLE_SITE_VERIFICATION
+    ? {
+        google: GOOGLE_SITE_VERIFICATION,
+      }
+    : undefined,
 };
 
 export default function RootLayout({
@@ -110,6 +122,9 @@ export default function RootLayout({
     logo: `${siteUrl}/brand/logo.png`,
     sameAs: [
       "https://www.instagram.com/usagummies/",
+      "https://www.facebook.com/people/USA-Gummies/61581802793282/",
+      "https://www.tiktok.com/@usa.gummies?lang=en",
+      "https://www.youtube.com/@USAGummies",
       AMAZON_LISTING_URL,
     ],
   };
@@ -134,6 +149,10 @@ export default function RootLayout({
       style={{ backgroundColor: "#0d1c33" }}
     >
       <head>
+        <link rel="preconnect" href="https://cdn.shopify.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://www.googletagmanager.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://www.google-analytics.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://assets.apollo.io" crossOrigin="anonymous" />
         <Script id="apollo-tracker" strategy="beforeInteractive">
           {`function initApollo(){var n=Math.random().toString(36).substring(7),o=document.createElement("script");o.src="https://assets.apollo.io/micro/website-tracker/tracker.iife.js?nocache="+n,o.async=!0,o.defer=!0,o.onload=function(){window.trackingFunctions.onLoad({appId:"697a8732160a9800112f9a5b"})},document.head.appendChild(o)}initApollo();`}
         </Script>

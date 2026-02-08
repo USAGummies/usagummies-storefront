@@ -25,7 +25,7 @@ export function ExperienceBand({ variant = "compact", className }: Props) {
       <span className="usa-stamp usa-stamp--corner">Made in USA</span>
       <Image
         src="/website%20assets/B17Bomber.png"
-        alt=""
+        alt="Vintage B-17 bomber illustration"
         aria-hidden="true"
         width={1405}
         height={954}
@@ -52,7 +52,7 @@ export function ExperienceBand({ variant = "compact", className }: Props) {
             </span>
             <Image
               src="/brand/logo.png"
-              alt=""
+              alt="USA Gummies logo"
               aria-hidden="true"
               width={72}
               height={24}

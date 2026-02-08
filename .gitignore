@@ -53,3 +53,7 @@ usagummies-storefront/
 node_modules/
 .env*
 .vercel/
+
+# artifacts (do not commit)
+output/
+tmp/

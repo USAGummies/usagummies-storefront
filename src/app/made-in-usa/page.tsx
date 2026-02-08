@@ -4,6 +4,7 @@ import Image from "next/image";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import { BRAND_STORY_HEADLINE, BRAND_STORY_MEDIUM } from "@/data/brandStory";
+import { LatestFromBlog } from "@/components/blog/LatestFromBlog";
 
 function resolveSiteUrl() {
   const preferred = "https://www.usagummies.com";
@@ -19,9 +20,9 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "Made in USA Gummies | USA Gummies";
+const PAGE_TITLE = "Made in USA Candy | USA Gummies";
 const PAGE_DESCRIPTION =
-  "USA Gummies are All American gummy bears made in the USA. Learn how we source, make, and pack premium gummy bears.";
+  "Learn how our gummies are crafted in the USA, with dye-free recipes and no artificial dyes for a patriotic candy you can trust.";
 const OG_IMAGE = "/opengraph-image";
 
 export const metadata: Metadata = {
@@ -154,6 +155,13 @@ export default function MadeInUsaPage() {
                   </Link>
                   <span className="text-xs text-[var(--muted)]">{FREE_SHIPPING_PHRASE}</span>
                 </div>
+                <div className="text-xs text-[var(--muted)]">
+                  Guide:{" "}
+                  <Link href="/no-artificial-dyes-gummy-bears" className="text-[var(--navy)] link-underline">
+                    Dye-Free Gummy Bears
+                  </Link>
+                  .
+                </div>
               </div>
 
               <div className="relative">
@@ -161,7 +169,7 @@ export default function MadeInUsaPage() {
                   <div className="relative aspect-[5/4] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-3">
                     <Image
                       src="/brand/usa-gummies-family.webp"
-                      alt="USA Gummies made in the USA"
+                      alt="USA Gummies gummy bear bags made in the USA"
                       fill
                       sizes="(max-width: 768px) 90vw, 460px"
                       className="object-contain"
@@ -258,8 +266,17 @@ export default function MadeInUsaPage() {
               <Link href="/ingredients" className="btn btn-candy">
                 Ingredients and flavors
               </Link>
+              <Link href="/made-in-usa-candy" className="btn btn-outline">
+                American-Made Candy
+              </Link>
             </div>
           </div>
+        </div>
+      </section>
+
+      <section className="bg-transparent">
+        <div className="mx-auto max-w-6xl px-4 pb-10">
+          <LatestFromBlog />
         </div>
       </section>
 

@@ -45,7 +45,7 @@ export function PatriotBanner({ showRibbon = true }: { showRibbon?: boolean }) {
           <div className="candy-panel rounded-2xl relative overflow-hidden" style={{ padding: 14 }}>
             <Image
               src="/website%20assets/B17Bomber.png"
-              alt=""
+              alt="Vintage B-17 bomber illustration"
               aria-hidden="true"
               width={1200}
               height={800}

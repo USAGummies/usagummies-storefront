@@ -19,7 +19,7 @@ function resolveSiteUrl() {
 const SITE_URL = resolveSiteUrl();
 const PAGE_TITLE = "Shipping Policy | USA Gummies";
 const PAGE_DESCRIPTION =
-  "USA Gummies shipping policy including processing times, delivery expectations, and tracking. Free shipping on 5+ bags.";
+  "Shipping details for USA Gummies orders, delivery times, and carrier info for made in USA candy.";
 const OG_IMAGE = "/opengraph-image";
 
 export const metadata: Metadata = {

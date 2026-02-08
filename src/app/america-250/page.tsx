@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
+import { BlogPostingJsonLd } from "@/components/seo/BlogPostingJsonLd";
+import { LatestFromBlog } from "@/components/blog/LatestFromBlog";
 
 function resolveSiteUrl() {
   const preferred = "https://www.usagummies.com";
@@ -17,11 +19,44 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "America 250";
+const PAGE_TITLE = "America250 Candy | USA Gummies";
 const PAGE_DESCRIPTION =
-  "America 250 hub - patriotic gummy gifts and limited drops built for celebrating America's 250th.";
+  "America250 hub from USA Gummies with celebration treats, gummy gifts, and event-ready bundles.";
 const PAGE_URL = `${SITE_URL}/america-250`;
 const OG_IMAGE = `${SITE_URL}/opengraph-image`;
+const PUBLISHED_DATE = "2026-01-01T15:10:31-08:00";
+const MODIFIED_DATE = "2026-02-05T22:32:05-08:00";
+
+const FAQS = [
+  {
+    question: "What is America250 candy?",
+    answer:
+      "America250 candy refers to celebration-ready gummy assortments designed for the 250th anniversary moment and year-round gifting.",
+  },
+  {
+    question: "Are USA Gummies products made in the USA?",
+    answer:
+      "Yes. We produce and pack our gummies in the United States for consistent quality and faster turnaround.",
+  },
+  {
+    question: "Which celebrations are these bundles best for?",
+    answer:
+      "They are built for community gatherings, team gifting, and milestone moments where shareable bags keep tables stocked.",
+  },
+];
+
+const faqJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: FAQS.map((item) => ({
+    "@type": "Question",
+    name: item.question,
+    acceptedAnswer: {
+      "@type": "Answer",
+      text: item.answer,
+    },
+  })),
+};
 
 export const metadata: Metadata = {
   title: PAGE_TITLE,
@@ -42,31 +77,6 @@ export const metadata: Metadata = {
   },
 };
 
-const blogPostingJsonLd = {
-  "@context": "https://schema.org",
-  "@type": "BlogPosting",
-  headline: PAGE_TITLE,
-  description: PAGE_DESCRIPTION,
-  url: PAGE_URL,
-  mainEntityOfPage: {
-    "@type": "WebPage",
-    "@id": PAGE_URL,
-  },
-  author: {
-    "@type": "Organization",
-    name: "USA Gummies",
-  },
-  publisher: {
-    "@type": "Organization",
-    name: "USA Gummies",
-    logo: {
-      "@type": "ImageObject",
-      url: `${SITE_URL}/brand/logo.png`,
-    },
-  },
-  image: [OG_IMAGE],
-};
-
 export default function America250HubPage() {
   return (
     <main className="min-h-screen home-hero-theme text-[var(--text)]">
@@ -74,7 +84,7 @@ export default function America250HubPage() {
         <BreadcrumbJsonLd
           items={[
             { name: "Home", href: "/" },
-            { name: "America 250", href: "/america-250" },
+            { name: "America250", href: "/america-250" },
           ]}
         />
 
@@ -88,15 +98,22 @@ export default function America250HubPage() {
         </div>
 
         <div className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface-strong)] px-3 py-1 text-xs text-[var(--text)]">
-          <span className="font-semibold tracking-wide">AMERICA 250</span>
+          <span className="font-semibold tracking-wide">AMERICA250 CANDY</span>
           <span className="text-[var(--muted)]">•</span>
           <span className="text-[var(--muted)]">Hub</span>
         </div>
 
-        <h1 className="mt-4 text-4xl font-semibold tracking-tight">America 250</h1>
+        <h1 className="mt-4 text-4xl font-semibold tracking-tight">America250 Candy</h1>
         <p className="mt-4 text-[var(--muted)]">
-          A focused hub for gifts, celebrations, and events tied to America&apos;s 250th - with
-          limited-run gummy drops built for sharing.
+          America250 celebration treats, gifts, and event-ready gummy bundles built for the 250th anniversary moment.
+        </p>
+        <p className="mt-3 text-sm text-[var(--muted)]">
+          USA Gummies is an America250 brand, creating shareable, USA-made gummy candy for community
+          gatherings, year-round gifting, and patriotic candy moments.
+        </p>
+        <p className="mt-3 text-sm text-[var(--muted)]">
+          Looking for America 250 candy for milestone celebrations? This hub maps America250 drops,
+          gifts, and planning guides.
         </p>
 
         <div className="mt-10 grid gap-4 md:grid-cols-3">
@@ -138,11 +155,12 @@ export default function America250HubPage() {
                 Featured bundle
               </div>
               <h2 className="mt-2 text-2xl font-black text-[var(--text)]">
-                America 250 gifting, ready to share.
+                America250 gifting, ready to share.
               </h2>
               <p className="mt-2 text-sm text-[var(--muted)]">
                 Our most popular bag counts for patriotic gifts, community events, and celebration tables.
               </p>
+              <p className="mt-3 text-sm text-[var(--muted)]">Made in the USA. No artificial dyes.</p>
               <div className="mt-4 flex flex-wrap gap-3">
                 <Link href="/shop?campaign=america250#bundle-pricing" className="btn btn-candy">
                   Shop America 250
@@ -159,7 +177,7 @@ export default function America250HubPage() {
               <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-[var(--border)] bg-white p-3">
                 <Image
                   src="/Hero-pack.jpeg"
-                  alt="USA Gummies bag"
+                  alt="USA Gummies gummy bear bag"
                   fill
                   sizes="(max-width: 768px) 80vw, 240px"
                   className="object-contain"
@@ -168,12 +186,162 @@ export default function America250HubPage() {
             </div>
           </div>
         </div>
+
+        <section className="mt-12 rounded-3xl border border-[var(--border)] bg-[var(--surface-strong)] p-6">
+          <h2 className="text-2xl font-semibold tracking-tight text-[var(--text)]">
+            America250 candy for patriotic celebrations
+          </h2>
+          <p className="mt-3 text-sm text-[var(--muted)]">
+            This pillar page highlights America250 candy ideas, patriotic celebration treats, and
+            gift-ready gummy bags from USA Gummies. Explore evergreen gifting options and event-based
+            moments that keep your table, parade route, or community event stocked with red, white,
+            and blue energy.
+          </p>
+          <div className="mt-6 grid gap-4 md:grid-cols-2">
+            <div className="rounded-2xl border border-[var(--border)] bg-white p-5">
+              <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
+                America250 brand
+              </div>
+              <p className="mt-2 text-sm text-[var(--muted)]">
+                USA Gummies celebrates America&apos;s 250th with curated gummy assortments, patriotic
+                packaging, and gifting formats that work for both small gatherings and large community
+                events.
+              </p>
+            </div>
+            <div className="rounded-2xl border border-[var(--border)] bg-white p-5">
+              <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
+                Quick links
+              </div>
+              <p className="mt-2 text-sm text-[var(--muted)]">
+                Explore <Link href="/america-250/gifts" className="text-[var(--text)] underline">America250 gifts</Link>,
+                plan <Link href="/america-250/celebrations" className="text-[var(--text)] underline">patriotic celebrations</Link>,
+                or align with <Link href="/america-250/events" className="text-[var(--text)] underline">America250 events</Link>.
+              </p>
+              <p className="mt-2 text-sm text-[var(--muted)]">
+                Prefer dye-free gummies? Read{" "}
+                <Link href="/no-artificial-dyes-gummy-bears" className="text-[var(--text)] underline">
+                  Red 40 Free Gummies
+                </Link>
+                .
+              </p>
+              <p className="mt-2 text-sm text-[var(--muted)]">
+                Need a sourcing primer? See{" "}
+                <Link href="/made-in-usa-candy" className="text-[var(--text)] underline">
+                  Candy Made in the USA
+                </Link>
+                .
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10 grid gap-6 md:grid-cols-2">
+          <div className="rounded-3xl border border-[var(--border)] bg-white p-6">
+            <h2 className="text-xl font-semibold text-[var(--text)]">Evergreen America250 candy ideas</h2>
+            <p className="mt-3 text-sm text-[var(--muted)]">
+              Year-round options for gifting, team celebrations, classroom treats, and corporate
+              events that want an America250 theme with made in USA candy.
+            </p>
+            <ul className="mt-4 space-y-2 text-sm text-[var(--muted)]">
+              <li>
+                Gift-forward bundles inspired by <Link href="/gummy-gift-bundles" className="text-[var(--text)] underline">gummy gift bundles</Link> and{" "}
+                <Link href="/america-250/gifts" className="text-[var(--text)] underline">America250 gifting</Link>.
+              </li>
+              <li>
+                Made-in-USA favorites from <Link href="/made-in-usa" className="text-[var(--text)] underline">USA-made candy</Link> collections.
+              </li>
+              <li>
+                Bulk-friendly options for community tables and offices via <Link href="/bulk-gummy-bears" className="text-[var(--text)] underline">bulk gummy bears</Link>.
+              </li>
+              <li>
+                Patriotic snack inspiration in <Link href="/patriotic-party-snacks" className="text-[var(--text)] underline">patriotic party snacks</Link>.
+              </li>
+            </ul>
+          </div>
+
+          <div className="rounded-3xl border border-[var(--border)] bg-white p-6">
+            <h2 className="text-xl font-semibold text-[var(--text)]">Event-based patriotic celebration treats</h2>
+            <p className="mt-3 text-sm text-[var(--muted)]">
+              Seasonal and event-driven candy moments that map naturally to America250 planning and
+              patriotic festivities.
+            </p>
+            <ul className="mt-4 space-y-2 text-sm text-[var(--muted)]">
+              <li>
+                parades with route-day snack tables and grab-and-go candy.
+              </li>
+              <li>
+                fireworks nights with picnic-ready gummy assortments.
+              </li>
+              <li>
+                school events where bagged treats keep tables stocked.
+              </li>
+              <li>
+                community festivals that need easy shareable sweets.
+              </li>
+              <li>
+                fundraisers that bundle candy for thank-you gifts.
+              </li>
+            </ul>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-3xl border border-[var(--border)] bg-[var(--surface-strong)] p-6">
+          <h2 className="text-xl font-semibold text-[var(--text)]">America250 candy search intent, covered</h2>
+          <p className="mt-3 text-sm text-[var(--muted)]">
+            Looking for America250 candy ideas, patriotic celebration treats, or America250 gifts? This
+            hub connects the most requested ideas with USA Gummies products and planning guides.
+            Explore the linked pages above or shop directly from the America250 bundle lineup.
+          </p>
+        </section>
+
+        <section className="mt-10 rounded-3xl border border-[var(--border)] bg-white p-6">
+          <h2 className="text-xl font-semibold text-[var(--text)]">America250 candy FAQs</h2>
+          <div className="mt-4 space-y-4 text-sm text-[var(--muted)]">
+            <div>
+              <h3 className="text-base font-semibold text-[var(--text)]">What is America250 candy?</h3>
+              <p className="mt-2">
+                America250 candy refers to celebration-ready gummy assortments designed for the 250th
+                anniversary moment and year-round gifting.
+              </p>
+            </div>
+            <div>
+              <h3 className="text-base font-semibold text-[var(--text)]">
+                Are USA Gummies products made in the USA?
+              </h3>
+              <p className="mt-2">
+                Yes. We produce and pack our gummies in the United States for consistent quality and
+                faster turnaround.
+              </p>
+            </div>
+            <div>
+              <h3 className="text-base font-semibold text-[var(--text)]">
+                Which celebrations are these bundles best for?
+              </h3>
+              <p className="mt-2">
+                They are built for community gatherings, team gifting, and milestone moments where
+                shareable bags keep tables stocked.
+              </p>
+            </div>
+          </div>
+        </section>
       </div>
 
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(blogPostingJsonLd) }}
+      <section className="bg-transparent">
+        <div className="mx-auto max-w-6xl px-4 pb-10">
+          <LatestFromBlog />
+        </div>
+      </section>
+
+      <BlogPostingJsonLd
+        headline={PAGE_TITLE}
+        description={PAGE_DESCRIPTION}
+        url={PAGE_URL}
+        image={OG_IMAGE}
+        datePublished={PUBLISHED_DATE}
+        dateModified={MODIFIED_DATE}
+        publisherLogoUrl={`${SITE_URL}/brand/logo.png`}
       />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
     </main>
   );
 }

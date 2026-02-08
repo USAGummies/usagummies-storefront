@@ -19,9 +19,7 @@ import { trackEvent } from "@/lib/analytics";
 import { fireCartToast } from "@/lib/cartFeedback";
 import { GummyIconRow, HeroPackIcon } from "@/components/ui/GummyIcon";
 import { useCartBagCount } from "@/hooks/useCartBagCount";
-import { REVIEW_HIGHLIGHTS } from "@/data/reviewHighlights";
 import { AmazonOneBagNote } from "@/components/ui/AmazonOneBagNote";
-import { AMAZON_REVIEWS } from "@/data/amazonReviews";
 import { AMAZON_LISTING_URL, AMAZON_LOGO_URL } from "@/lib/amazon";
 
 type TierKey = "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10" | "11" | "12";
@@ -47,6 +45,8 @@ type Props = {
   surface?: "card" | "flat";
   layout?: "classic" | "integrated" | "fusion";
   selectorVariant?: "segmented" | "cards";
+  railProofSlot?: React.ReactNode;
+  ctaProofSlot?: React.ReactNode;
 };
 
 function money(amount?: number | null, currency = "USD") {
@@ -123,6 +123,8 @@ export default function BundleQuickBuy({
   surface = "card",
   layout = "classic",
   selectorVariant = "segmented",
+  railProofSlot,
+  ctaProofSlot,
 }: Props) {
   const { bagCount } = useCartBagCount();
   const currentBags = Math.max(0, Number(bagCount) || 0);
@@ -147,6 +149,7 @@ export default function BundleQuickBuy({
     ? "Mystery extra included at 12 bags (while supplies last)."
     : "Mystery extra at 12 bags (while supplies last).";
   const ctaRef = React.useRef<HTMLDivElement | null>(null);
+  const hasTrackedViewRef = React.useRef(false);
   const amazonPrefireRef = React.useRef(0);
   const amazonPrefireWindowMs = 1500;
   const shouldFireAmazon = () =>
@@ -221,7 +224,6 @@ export default function BundleQuickBuy({
     selectableTiers.find((t) => String(t.quantity) === selected) || selectableTiers[0] || null;
   const selectedTierState = selectedTier ? resolveTier(selectedTier) : null;
   const perBagCapText = money(MIN_PER_BAG, "USD");
-  const reviewSnippets = REVIEW_HIGHLIGHTS.slice(0, 2);
   const shippingAdvocateLine =
     "5+ bags ship free from us. Under 5 bags, we send you to Amazon to save you on shipping.";
   const summaryLine =
@@ -236,10 +238,31 @@ export default function BundleQuickBuy({
     selectedTier && lastAddedQty !== null && selectedTier.quantity === lastAddedQty
   );
 
-  function starLine(rating: number) {
-    const full = Math.max(0, Math.min(5, Math.round(rating)));
-    return "★".repeat(full).padEnd(5, "☆");
-  }
+  React.useEffect(() => {
+    if (hasTrackedViewRef.current) return;
+    if (!selectedTier || !singleBagVariantId) return;
+    const viewQty = Math.max(1, Number(selectedTier.quantity) || 1);
+    const viewPricing = pricingForQty(viewQty);
+    const viewTotal = Number.isFinite(viewPricing.total) ? viewPricing.total : undefined;
+    const unitPrice =
+      viewTotal && viewQty > 0 ? Number((viewTotal / viewQty).toFixed(2)) : undefined;
+    trackEvent("view_item", {
+      currency: "USD",
+      value: viewTotal,
+      items: [
+        {
+          item_id: singleBagVariantId,
+          item_name: analyticsName || "USA Gummies",
+          item_variant: `${viewQty} bags`,
+          item_brand: "USA Gummies",
+          item_category: "Gummy Bears",
+          price: unitPrice,
+          quantity: viewQty,
+        },
+      ],
+    });
+    hasTrackedViewRef.current = true;
+  }, [analyticsName, selectedTier, singleBagVariantId]);
 
   function scrollToCTA() {
     if (!ctaRef.current) return;
@@ -705,7 +728,7 @@ export default function BundleQuickBuy({
                 <span className="bundle-quickbuy__usaBadge">
                   <Image
                     src="/logo-mark.png"
-                    alt=""
+                    alt="USA Gummies logo mark"
                     width={18}
                     height={18}
                     className="h-4 w-4 bundle-quickbuy__usaMark"
@@ -769,10 +792,10 @@ export default function BundleQuickBuy({
 
         <div className="bundle-quickbuy__group bundle-quickbuy__group--amazon">
           <div className="bundle-quickbuy__groupHeader">
-            <span className="bundle-quickbuy__groupTitle">
+              <span className="bundle-quickbuy__groupTitle">
               Amazon (1-4 bags)
               <span className="bundle-quickbuy__amazonHeader" aria-hidden="true">
-                <Image src={AMAZON_LOGO_URL} alt="" width={44} height={14} className="h-3.5 w-auto" />
+                <Image src={AMAZON_LOGO_URL} alt="Amazon logo" width={44} height={14} className="h-3.5 w-auto" />
               </span>
             </span>
             <span className="bundle-quickbuy__groupMeta">Amazon checkout saves you on shipping</span>
@@ -850,7 +873,7 @@ export default function BundleQuickBuy({
                 <span className="inline-flex items-center gap-2">
                   <Image
                     src={AMAZON_LOGO_URL}
-                    alt="Amazon"
+                    alt="Amazon logo"
                     width={48}
                     height={14}
                     className="h-4 w-auto"
@@ -913,36 +936,7 @@ export default function BundleQuickBuy({
               ? "Amazon checkout saves you on shipping."
               : "Direct from USA Gummies. Free shipping at 5+ bags."}
           </div>
-          <div
-            data-rail-trust
-            className={[
-              "flex flex-wrap items-center gap-3 text-[12px] font-semibold",
-              isLight ? "text-[#6B6B6B]" : "text-white/70",
-            ].join(" ")}
-          >
-            <span className="inline-flex items-center gap-2">
-              <span aria-hidden="true">🚚</span>
-              <span>Ships within 24 hours</span>
-            </span>
-            <span className="inline-flex items-center gap-2">
-              <span aria-hidden="true">✅</span>
-              <span>Satisfaction guaranteed</span>
-            </span>
-            <span className="inline-flex items-center gap-2">
-              <span aria-hidden="true">🔒</span>
-              <span>Secure checkout</span>
-            </span>
-          </div>
-        </div>
-        <div className="bundle-quickbuy__rating">
-          <div className="bundle-quickbuy__ratingLine">
-            <span className="bundle-quickbuy__ratingStars">
-              {starLine(AMAZON_REVIEWS.aggregate.rating)}
-            </span>
-            <span>
-              {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars from verified Amazon buyers
-            </span>
-          </div>
+          {railProofSlot}
         </div>
       </div>
 
@@ -1019,81 +1013,7 @@ export default function BundleQuickBuy({
             : "underline underline-offset-4 text-white hover:text-white"
         }
       />
-      <div data-bundle-cta-trust>
-        <div
-          data-bundle-cta-note
-          className={[
-            isLight
-              ? "text-xs text-[var(--muted)]"
-              : isCompact
-                ? "text-xs text-white/70"
-                : "text-xs text-white/75",
-            isFusion ? "bundle-fusion__ctaNote" : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
-        >
-          🇺🇸 Made in the USA • ✅ Satisfaction guaranteed • 🚚 Ships within 24 hours • 🔒 Secure checkout
-        </div>
-        <div
-          data-bundle-rating
-          className={[
-            isFlat
-              ? isLight
-                ? "mt-2 text-[11px] text-[var(--muted)]"
-                : "mt-2 text-[11px] text-white/70"
-              : isLight
-                ? "mt-2 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white px-3 py-2 text-[11px] text-[var(--muted)]"
-                : "mt-2 rounded-2xl border border-white/12 bg-white/5 px-3 py-2 text-[11px] text-white/70",
-            isFusion ? "bundle-fusion__ctaProof" : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
-        >
-          <div className={isLight ? "font-semibold text-[var(--text)]" : "font-semibold text-white/90"}>
-            {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars from verified Amazon buyers
-          </div>
-          <div className="mt-1 flex flex-wrap gap-2 text-[10px] font-semibold uppercase tracking-[0.12em]">
-            <span
-              className={
-                isFlat
-                  ? "px-0 py-0"
-                  : isLight
-                    ? "rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-2 py-1"
-                    : "rounded-full border border-white/10 bg-white/5 px-2 py-1"
-              }
-            >
-              🇺🇸 Made in the USA
-            </span>
-            <span
-              className={
-                isFlat
-                  ? "px-0 py-0"
-                  : isLight
-                    ? "rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-2 py-1"
-                    : "rounded-full border border-white/10 bg-white/5 px-2 py-1"
-              }
-            >
-              🌿 No artificial dyes
-            </span>
-          </div>
-        </div>
-      </div>
-      {!isFusion && reviewSnippets.length ? (
-        <div
-          data-bundle-reviews
-          className={isLight ? "grid gap-1 text-[11px] text-[var(--muted)]" : "grid gap-1 text-[11px] text-white/70"}
-        >
-          {reviewSnippets.map((review) => (
-            <div key={review.id} className="inline-flex items-center gap-2">
-              <span className={isLight ? "text-[var(--candy-yellow)]" : "text-[var(--gold)]"}>
-                {starLine(review.rating)}
-              </span>
-              <span className="truncate">&quot;{review.body}&quot; — {review.author}</span>
-            </div>
-          ))}
-        </div>
-      ) : null}
+      {ctaProofSlot}
       {error ? (
         <div
           className={
@@ -1394,7 +1314,7 @@ export default function BundleQuickBuy({
         {showTrainAccent ? (
           <Image
             src="/website%20assets/B17Bomber.png"
-            alt=""
+            alt="Vintage B-17 bomber illustration"
             aria-hidden="true"
             width={1405}
             height={954}
@@ -1603,7 +1523,7 @@ export default function BundleQuickBuy({
       {showAccent ? (
         <Image
           src={accentSrc}
-          alt=""
+          alt="Vintage train illustration"
           aria-hidden="true"
           width={1200}
           height={800}
@@ -1878,7 +1798,7 @@ export default function BundleQuickBuy({
         {showTrainAccent ? (
           <Image
             src="/website%20assets/B17Bomber.png"
-            alt=""
+            alt="Vintage B-17 bomber illustration"
             aria-hidden="true"
             width={1405}
             height={954}

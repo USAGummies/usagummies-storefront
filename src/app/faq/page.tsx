@@ -19,9 +19,9 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "FAQ | USA Gummies";
+const PAGE_TITLE = "USA Gummies FAQ | Dye-Free Gummies";
 const PAGE_DESCRIPTION =
-  "USA Gummies FAQ. Answers about All American gummy bears, ingredients, flavor notes, bag count savings, shipping, and pricing.";
+  "Answers on ingredients, shipping, and orders for our made in USA candy, including dye-free gummies with no artificial dyes.";
 const OG_IMAGE = "/opengraph-image";
 
 export const metadata: Metadata = {
@@ -46,6 +46,7 @@ export const metadata: Metadata = {
 type FaqItem = {
   question: string;
   answer: string;
+  answerText?: string;
   answerNode?: ReactNode;
 };
 
@@ -68,6 +69,7 @@ const FAQS: FaqItem[] = [
   {
     question: "What is the USA Gummies story?",
     answer: BRAND_STORY_SHORT.join(" "),
+    answerText: `${BRAND_STORY_SHORT.join("\n\n")}\n\nRead the full story`,
     answerNode: (
       <div className="space-y-2">
         {BRAND_STORY_SHORT.map((paragraph) => (
@@ -102,7 +104,9 @@ const FAQS: FaqItem[] = [
   {
     question: "Which bag count should I choose?",
     answer:
-      "Use our bag count guides to match the right size for gifts, parties, or bulk orders.",
+      "Use our bag count guides to match the right size for gifts, patriotic parties, or bulk orders.",
+    answerText:
+      "Use our bag count guides to match the right size for gifts, patriotic parties, or bulk orders.",
     answerNode: (
       <>
         Use our bag count guides to match the right size for{" "}
@@ -134,7 +138,7 @@ const faqJsonLd = {
     name: item.question,
     acceptedAnswer: {
       "@type": "Answer",
-      text: item.answer,
+      text: item.answerText ?? item.answer,
     },
   })),
 };

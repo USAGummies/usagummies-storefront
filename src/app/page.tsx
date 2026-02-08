@@ -4,14 +4,19 @@ import type { Metadata } from "next";
 import { getProductsPage } from "@/lib/shopify/products";
 import { getProductByHandle } from "@/lib/storefront";
 import BundleQuickBuy from "@/components/home/BundleQuickBuy.client";
+import { BundleQuickBuyCtaProof, BundleQuickBuyRailProof } from "@/components/home/BundleQuickBuyProof";
 import ReviewsSection from "@/components/home/ReviewsSection";
-import { StickyAddToCartBar } from "@/components/product/StickyAddToCartBar";
 import { getBundleVariants } from "@/lib/bundles/getBundleVariants";
-import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
-import HeroCTAWatcher from "@/components/home/HeroCTAWatcher";
+import { BASE_PRICE, FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
+import { SINGLE_BAG_SKU } from "@/lib/bundles/atomic";
 import { BRAND_STORY_HEADLINE, BRAND_STORY_PARAGRAPHS } from "@/data/brandStory";
 import { DETAIL_BULLETS } from "@/data/productDetails";
 import { getReviewAggregate } from "@/lib/reviews/aggregate";
+import { ProductJsonLd } from "@/components/seo/ProductJsonLd";
+import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
+import { LazyStickyAddToCartBar } from "@/components/product/LazyStickyAddToCartBar.client";
+import LazyHeroCTAWatcher from "@/components/home/LazyHeroCTAWatcher.client";
+import { LatestFromBlog } from "@/components/blog/LatestFromBlog";
 import styles from "./homepage-scenes.module.css";
 
 function resolveSiteUrl() {
@@ -29,9 +34,9 @@ function resolveSiteUrl() {
 
 const SITE_URL = resolveSiteUrl();
 const PAGE_TITLE =
-  "USA Gummies - All American Gummy Bears, 7.5 oz, Made in USA, No Artificial Dyes, All Natural Flavors";
+  "Made in USA Candy & Dye-Free Gummies | USA Gummies";
 const PAGE_DESCRIPTION =
-  "USA Gummies - All American Gummy Bears, 7.5 oz, Made in USA, No Artificial Dyes, All Natural Flavors.";
+  "Shop patriotic candy made in the USA. Dye-free gummies with no artificial dyes, plus bundles and gifts for any celebration.";
 const OG_IMAGE = "/opengraph-image";
 
 export const metadata: Metadata = {
@@ -78,7 +83,7 @@ const SOCIAL_LINKS = [
   },
   {
     name: "Facebook",
-    href: "https://www.facebook.com/profile.php?id=61581802793282#",
+    href: "https://www.facebook.com/people/USA-Gummies/61581802793282/",
     label: "USA Gummies",
     icon: (
       <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
@@ -166,38 +171,22 @@ export default async function HomePage() {
   );
 
   const heroImage = productImages[0]?.url || `${SITE_URL}/brand/usa-gummies-family.webp`;
-  const heroImageAlt = productImages[0]?.altText || "USA Gummies bag";
-  const priceAmount = detailedProduct?.priceRange?.minVariantPrice?.amount || null;
+  const heroImageAlt = productImages[0]?.altText || "Bag of USA Gummies classic gummy bears";
+  const fallbackPrice =
+    bundleVariants?.variants?.find((variant) => variant.quantity === 1)?.totalPrice ?? null;
+  const priceAmount =
+    detailedProduct?.priceRange?.minVariantPrice?.amount ||
+    (fallbackPrice !== null ? fallbackPrice.toFixed(2) : BASE_PRICE.toFixed(2));
   const priceCurrency =
     detailedProduct?.priceRange?.minVariantPrice?.currencyCode || "USD";
   const reviewAggregate = await getReviewAggregate();
-  const productJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "Product",
-    name: detailedProduct?.title || PAGE_TITLE,
-    image: [heroImage],
-    description: detailedProduct?.description || PAGE_DESCRIPTION,
-    brand: { "@type": "Brand", name: "USA Gummies" },
-    offers: {
-      "@type": "Offer",
-      url: `${SITE_URL}/shop`,
-      priceCurrency,
-      ...(priceAmount ? { price: priceAmount } : {}),
-      availability:
-        bundleVariants?.availableForSale === false
-          ? "https://schema.org/OutOfStock"
-          : "https://schema.org/InStock",
-    },
-    ...(reviewAggregate
-      ? {
-          aggregateRating: {
-            "@type": "AggregateRating",
-            ratingValue: reviewAggregate.ratingValue,
-            reviewCount: reviewAggregate.reviewCount,
-          },
-        }
-      : {}),
-  };
+  const productImageUrls = productImages.map((img: any) => img?.url).filter(Boolean);
+  const productSku =
+    detailedProduct?.variants?.edges
+      ?.map((edge: any) => edge?.node)
+      .find((variant: any) => variant?.sku)?.sku ||
+    bundleVariants?.singleBagSku ||
+    SINGLE_BAG_SKU;
 
   const whyCards = [
     {
@@ -231,6 +220,11 @@ export default async function HomePage() {
 
   return (
     <main className="relative overflow-hidden min-h-screen pb-12 lg:pb-0 home-candy text-[var(--text)]">
+      <BreadcrumbJsonLd
+        items={[
+          { name: "Home", href: "/" },
+        ]}
+      />
       <section className={`${styles.scene} ${styles.sceneBundle} home-purchase-stage home-hero-theme`} data-zone="BUNDLE">
         <div className={styles.sceneBg} aria-hidden="true" />
         <div className={styles.sceneOverlay} aria-hidden="true" />
@@ -244,7 +238,7 @@ export default async function HomePage() {
                     <div className="atomic-buy__kicker flex items-center gap-2">
                       <Image
                         src="/brand/logo.png"
-                        alt=""
+                        alt="USA Gummies logo"
                         aria-hidden="true"
                         width={72}
                         height={24}
@@ -286,9 +280,11 @@ export default async function HomePage() {
                       <div className="relative aspect-[4/5] w-full">
                         <Image
                           src="/Hero-pack.jpeg"
-                          alt="USA Gummies bag"
+                          alt="Bag of USA Gummies classic gummy bears"
                           fill
-                          sizes="(max-width: 640px) 90vw, (max-width: 1024px) 40vw, 420px"
+                          priority
+                          fetchPriority="high"
+                          sizes="(max-width: 640px) 90vw, (max-width: 1023px) 92vw, 560px"
                           className="object-contain drop-shadow-[0_24px_50px_rgba(13,28,51,0.2)]"
                         />
                       </div>
@@ -308,6 +304,10 @@ export default async function HomePage() {
                       tone="light"
                       surface="flat"
                       layout="classic"
+                      railProofSlot={<BundleQuickBuyRailProof tone="light" />}
+                      ctaProofSlot={
+                        <BundleQuickBuyCtaProof tone="light" surface="flat" layout="classic" variant="compact" />
+                      }
                       showHowItWorks={false}
                       summaryCopy="5+ bags ship free from us. Under 5 bags, we send you to Amazon to save you on shipping."
                       showTrainAccent={false}
@@ -346,7 +346,7 @@ export default async function HomePage() {
                 <div className="flex items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.3em] text-white/70">
                   <Image
                     src="/brand/logo.png"
-                    alt="USA Gummies"
+                    alt="USA Gummies logo"
                     width={110}
                     height={36}
                     className="h-7 w-auto"
@@ -400,10 +400,9 @@ export default async function HomePage() {
                 <div className="relative aspect-[4/5] overflow-visible">
                   <Image
                     src={heroMediaSrc}
-                    alt="USA Gummies bag"
+                    alt="Bag of USA Gummies classic gummy bears"
                     fill
-                    priority
-                    fetchPriority="high"
+                    fetchPriority="low"
                     sizes="(max-width: 640px) 92vw, (max-width: 1024px) 55vw, 640px"
                     className="object-contain drop-shadow-[0_18px_30px_rgba(13,28,51,0.22)] z-10"
                   />
@@ -453,6 +452,12 @@ export default async function HomePage() {
               </p>
             </div>
           </div>
+        </div>
+      </section>
+
+      <section className="bg-transparent" data-zone="BLOG">
+        <div className="mx-auto max-w-6xl px-4 py-4">
+          <LatestFromBlog />
         </div>
       </section>
 
@@ -523,7 +528,7 @@ export default async function HomePage() {
             <div className="justify-self-end">
               <Image
                 src="/website%20assets/Truck.png"
-                alt=""
+                alt="Delivery truck illustration"
                 aria-hidden="true"
                 width={1920}
                 height={1080}
@@ -544,7 +549,7 @@ export default async function HomePage() {
                   <div className="flex justify-center lg:justify-start">
                     <Image
                       src="/website%20assets/MtRushmore.png"
-                      alt=""
+                      alt="Mount Rushmore illustration"
                       aria-hidden="true"
                       width={1398}
                       height={857}
@@ -555,7 +560,7 @@ export default async function HomePage() {
                   <div className="flex items-center gap-2">
                     <Image
                       src="/brand/logo.png"
-                      alt=""
+                      alt="USA Gummies logo"
                       aria-hidden="true"
                       width={64}
                       height={20}
@@ -629,7 +634,7 @@ export default async function HomePage() {
             <div className="flex items-end justify-start">
               <Image
                 src="/website%20assets/Jeep.png"
-                alt=""
+                alt="Vintage Jeep illustration"
                 aria-hidden="true"
                 width={1041}
                 height={701}
@@ -669,7 +674,7 @@ export default async function HomePage() {
                     <div className="flex items-center gap-2">
                       <Image
                         src="/brand/logo.png"
-                        alt=""
+                        alt="USA Gummies logo"
                         aria-hidden="true"
                         width={64}
                         height={20}
@@ -728,7 +733,7 @@ export default async function HomePage() {
                   <div className="flex items-center gap-2">
                     <Image
                       src="/brand/logo.png"
-                      alt=""
+                      alt="USA Gummies logo"
                       aria-hidden="true"
                       width={64}
                       height={20}
@@ -738,7 +743,9 @@ export default async function HomePage() {
                       Get updates
                     </div>
                   </div>
-                  <h3 className="text-xl font-black text-[var(--text)] sm:text-2xl">Unlock early access + member-only drops</h3>
+                  <h2 className="text-xl font-black text-[var(--text)] sm:text-2xl">
+                    Unlock early access + member-only drops
+                  </h2>
                   <p className="text-sm text-[var(--muted)]">
                     First dibs on limited drops, restocks, and member-only savings alerts.
                   </p>
@@ -774,7 +781,7 @@ export default async function HomePage() {
             <div className="flex items-center gap-2">
               <Image
                 src="/brand/logo.png"
-                alt=""
+                alt="USA Gummies logo"
                 aria-hidden="true"
                 width={64}
                 height={20}
@@ -817,7 +824,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <StickyAddToCartBar
+      <LazyStickyAddToCartBar
         title="In your cart"
         imageUrl={heroImage}
         imageAlt={heroImageAlt}
@@ -825,12 +832,28 @@ export default async function HomePage() {
         source="home"
       />
 
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }}
+      <ProductJsonLd
+        name={detailedProduct?.title || PAGE_TITLE}
+        description={detailedProduct?.description || PAGE_DESCRIPTION}
+        handle={handle}
+        imageUrls={productImageUrls.length ? productImageUrls : [heroImage]}
+        sku={productSku}
+        currencyCode={priceCurrency}
+        priceAmount={priceAmount}
+        brandName="USA Gummies"
+        siteUrl={SITE_URL}
+        availability={bundleVariants?.availableForSale === false ? "OutOfStock" : "InStock"}
+        aggregateRating={
+          reviewAggregate
+            ? {
+                ratingValue: reviewAggregate.ratingValue,
+                reviewCount: reviewAggregate.reviewCount,
+              }
+            : null
+        }
       />
 
-      <HeroCTAWatcher />
+      <LazyHeroCTAWatcher />
     </main>
   );
 }

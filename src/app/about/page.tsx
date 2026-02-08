@@ -19,9 +19,9 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "About USA Gummies | Made in the USA Gummy Bears";
+const PAGE_TITLE = "About USA Gummies | Made in USA Candy";
 const PAGE_DESCRIPTION =
-  "Learn how USA Gummies are sourced, made, and packed in America with all natural flavors and no artificial dyes.";
+  "Meet the team behind USA Gummies and our mission to make dye-free gummies with no artificial dyes, proudly made in the USA.";
 const OG_IMAGE = "/opengraph-image";
 
 const LISTING_TITLE =
@@ -195,7 +195,7 @@ export default function AboutPage() {
                   <div className="relative aspect-[5/4] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-3">
                     <Image
                       src="/brand/usa-gummies-family.webp"
-                      alt={LISTING_TITLE}
+                      alt="Assorted USA Gummies gummy bear bags"
                       fill
                       sizes="(max-width: 768px) 90vw, 460px"
                       className="object-contain"

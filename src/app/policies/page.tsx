@@ -19,7 +19,7 @@ function resolveSiteUrl() {
 const SITE_URL = resolveSiteUrl();
 const PAGE_TITLE = "Policies | USA Gummies";
 const PAGE_DESCRIPTION =
-  "USA Gummies policies including shipping, satisfaction guarantee, privacy, and terms of service. Transparent, customer-first, and easy to understand.";
+  "Review policies for orders, shipping, returns, and privacy for USA Gummies made in USA candy.";
 const OG_IMAGE = "/opengraph-image";
 
 export const metadata: Metadata = {

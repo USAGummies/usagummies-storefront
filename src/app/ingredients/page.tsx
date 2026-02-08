@@ -3,8 +3,10 @@ import Link from "next/link";
 import Image from "next/image";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import BundleQuickBuy from "@/components/home/BundleQuickBuy.client";
+import { BundleQuickBuyCtaProof, BundleQuickBuyRailProof } from "@/components/home/BundleQuickBuyProof";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import { getBundleVariants } from "@/lib/bundles/getBundleVariants";
+import { LatestFromBlog } from "@/components/blog/LatestFromBlog";
 
 function resolveSiteUrl() {
   const preferred = "https://www.usagummies.com";
@@ -20,9 +22,9 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "Ingredients & Nutrition Facts | USA Gummies";
+const PAGE_TITLE = "Ingredients: No Artificial Dyes | USA Gummies";
 const PAGE_DESCRIPTION =
-  "Full ingredient list and nutrition facts for USA Gummies. See serving size, calories, and flavor notes for our All American gummy bears.";
+  "See what's inside our dye-free gummies and made in USA candy, plus the flavors and ingredients we avoid.";
 const ARTICLE_HEADLINE = "Ingredients and nutrition facts for USA Gummies";
 const OG_IMAGE = "/opengraph-image";
 
@@ -236,6 +238,13 @@ export default async function IngredientsPage() {
                   <span className="candy-pill">All natural flavors</span>
                   <span className="candy-pill">5 fruit flavors</span>
                 </div>
+                <div className="text-xs text-[var(--muted)]">
+                  Guide:{" "}
+                  <Link href="/no-artificial-dyes-gummy-bears" className="text-[var(--navy)] link-underline">
+                    No Artificial Dyes Gummy Bears
+                  </Link>
+                  .
+                </div>
               </div>
 
               <div className="relative">
@@ -243,7 +252,7 @@ export default async function IngredientsPage() {
                   <div className="relative aspect-[5/4] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-3">
                     <Image
                       src="/brand/usa-gummies-family.webp"
-                      alt="USA Gummies bags with gummy bears"
+                      alt="Assorted USA Gummies gummy bear bags"
                       fill
                       sizes="(max-width: 768px) 90vw, 460px"
                       className="object-contain"
@@ -296,6 +305,10 @@ export default async function IngredientsPage() {
                       tone="light"
                       surface="flat"
                       layout="classic"
+                      railProofSlot={<BundleQuickBuyRailProof tone="light" />}
+                      ctaProofSlot={
+                        <BundleQuickBuyCtaProof tone="light" surface="flat" layout="classic" variant="compact" />
+                      }
                       showHowItWorks={false}
                       summaryCopy="5+ bags ship free from us. Under 5 bags, we send you to Amazon to save you on shipping."
                       showTrainAccent={false}
@@ -444,6 +457,12 @@ export default async function IngredientsPage() {
               </Link>
             </div>
           </div>
+        </div>
+      </section>
+
+      <section className="bg-transparent">
+        <div className="mx-auto max-w-6xl px-4 pb-10">
+          <LatestFromBlog />
         </div>
       </section>
 

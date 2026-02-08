@@ -19,7 +19,7 @@ function resolveSiteUrl() {
 const SITE_URL = resolveSiteUrl();
 const PAGE_TITLE = "Terms of Service | USA Gummies";
 const PAGE_DESCRIPTION =
-  "USA Gummies terms of service. Purchase terms, site use, and secure Shopify-powered checkout details.";
+  "Terms and conditions for using USA Gummies and purchasing made in USA candy.";
 const OG_IMAGE = "/opengraph-image";
 
 export const metadata: Metadata = {

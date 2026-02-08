@@ -141,10 +141,15 @@ const PRODUCT_BY_HANDLE_QUERY = /* GraphQL */ `
       descriptionHtml
       vendor
       productType
+      tags
+      createdAt
       featuredImage { url altText width height }
       images(first: 12) { edges { node { url altText width height } } }
       priceRange { minVariantPrice { amount currencyCode } }
       bundleTiers: metafield(namespace: "usagummies", key: "bundle_tiers") { value type }
+      seoKeywords: metafield(namespace: "seo", key: "keywords") { value }
+      seoCategory: metafield(namespace: "seo", key: "category") { value }
+      collections(first: 6) { nodes { title handle } }
       variants(first: 50) {
         edges {
           node {
@@ -217,6 +222,8 @@ export type ProductByHandleResult = {
     description: string;
     vendor: string;
     productType: string;
+    tags: string[];
+    createdAt: string;
     featuredImage: {
       url: string;
       altText: string | null;
@@ -228,6 +235,9 @@ export type ProductByHandleResult = {
     };
     priceRange: { minVariantPrice: { amount: string; currencyCode: string } };
     bundleTiers: { value: string | null; type: string | null } | null;
+    seoKeywords: { value: string | null } | null;
+    seoCategory: { value: string | null } | null;
+    collections: { nodes: Array<{ title: string; handle: string }> };
     variants: {
       edges: Array<{
         node: {

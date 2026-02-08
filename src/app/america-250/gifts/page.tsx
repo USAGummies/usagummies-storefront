@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
+import { BlogPostingJsonLd } from "@/components/seo/BlogPostingJsonLd";
 
 function resolveSiteUrl() {
   const preferred = "https://www.usagummies.com";
@@ -17,11 +18,13 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "America 250 Gifts";
+const PAGE_TITLE = "America 250 Gifts | Patriotic Candy";
 const PAGE_DESCRIPTION =
-  "America 250 gifts - patriotic gummy bag options for hosting, gifting, and sharing.";
+  "Gift made in USA candy for America 250 - dye-free gummies and no artificial dyes for patriotic celebrations.";
 const PAGE_URL = `${SITE_URL}/america-250/gifts`;
 const OG_IMAGE = `${SITE_URL}/opengraph-image`;
+const PUBLISHED_DATE = "2026-01-01T15:10:31-08:00";
+const MODIFIED_DATE = "2026-02-05T22:32:05-08:00";
 
 export const metadata: Metadata = {
   title: PAGE_TITLE,
@@ -40,31 +43,6 @@ export const metadata: Metadata = {
     description: PAGE_DESCRIPTION,
     images: [OG_IMAGE],
   },
-};
-
-const blogPostingJsonLd = {
-  "@context": "https://schema.org",
-  "@type": "BlogPosting",
-  headline: PAGE_TITLE,
-  description: PAGE_DESCRIPTION,
-  url: PAGE_URL,
-  mainEntityOfPage: {
-    "@type": "WebPage",
-    "@id": PAGE_URL,
-  },
-  author: {
-    "@type": "Organization",
-    name: "USA Gummies",
-  },
-  publisher: {
-    "@type": "Organization",
-    name: "USA Gummies",
-    logo: {
-      "@type": "ImageObject",
-      url: `${SITE_URL}/brand/logo.png`,
-    },
-  },
-  image: [OG_IMAGE],
 };
 
 export default function America250GiftsPage() {
@@ -123,7 +101,7 @@ export default function America250GiftsPage() {
               <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-[var(--border)] bg-white p-3">
                 <Image
                   src="/website%20assets/Jeep.png"
-                  alt="Gift-ready USA Gummies"
+                  alt="Vintage Jeep illustration"
                   fill
                   sizes="(max-width: 768px) 80vw, 240px"
                   className="object-contain"
@@ -134,9 +112,14 @@ export default function America250GiftsPage() {
         </div>
       </div>
 
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(blogPostingJsonLd) }}
+      <BlogPostingJsonLd
+        headline={PAGE_TITLE}
+        description={PAGE_DESCRIPTION}
+        url={PAGE_URL}
+        image={OG_IMAGE}
+        datePublished={PUBLISHED_DATE}
+        dateModified={MODIFIED_DATE}
+        publisherLogoUrl={`${SITE_URL}/brand/logo.png`}
       />
     </main>
   );

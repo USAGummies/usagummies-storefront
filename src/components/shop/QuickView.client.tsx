@@ -198,7 +198,10 @@ export default function QuickView({ product, detailHref, bundleHref, children }:
                 {img?.url ? (
                   <Image
                     src={img.url}
-                    alt={img.altText || product?.title || "USA Gummies"}
+                    alt={
+                      img.altText ||
+                      (product?.title ? `Product photo of ${product.title}` : "USA Gummies product photo")
+                    }
                     fill
                     sizes="(max-width: 640px) 90vw, 360px"
                     className="object-contain drop-shadow-[0_18px_40px_rgba(13,28,51,0.14)]"
@@ -211,9 +214,9 @@ export default function QuickView({ product, detailHref, bundleHref, children }:
               </div>
 
               <div className="space-y-3">
-                <h3 className="text-xl font-black text-[var(--text)]">
+                <h2 className="text-xl font-black text-[var(--text)]">
                   {product?.title || "USA Gummies"}
-                </h3>
+                </h2>
                 <p className="text-sm text-[var(--muted)] line-clamp-6">
                   {description || "See the product page for full ingredients and nutrition details."}
                 </p>
