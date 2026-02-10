@@ -174,9 +174,10 @@ details > summary::-webkit-details-marker{
   --pill: rgba(247,242,234,0.08);
   --pill-border: rgba(247,242,234,0.2);
   background:
-    radial-gradient(circle at 10% 12%, rgba(71, 42, 68, 0.62), transparent 56%),
-    radial-gradient(circle at 86% 8%, rgba(26, 44, 92, 0.55), transparent 52%),
-    linear-gradient(135deg, #1a1f34 0%, #151f3a 52%, #0d1c33 100%);
+    radial-gradient(circle at 14% 18%, rgba(199, 54, 44, 0.22), transparent 52%),
+    radial-gradient(circle at 86% 10%, rgba(199, 160, 98, 0.18), transparent 54%),
+    radial-gradient(circle at 56% 86%, rgba(255, 255, 255, 0.06), transparent 55%),
+    linear-gradient(135deg, #081022 0%, #0b1428 40%, #0d1c33 100%);
 }
 .home-hero-theme .home-candy,
 .home-hero-theme .home-metal{
