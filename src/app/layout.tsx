@@ -113,6 +113,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   const siteUrl = SITE_URL;
+  const vercelEnv = process.env.VERCEL_ENV || "";
+  const vercelRef = process.env.VERCEL_GIT_COMMIT_REF || "";
+  const vercelSha = (process.env.VERCEL_GIT_COMMIT_SHA || "").slice(0, 7);
+  const showPreviewBadge = vercelEnv && vercelEnv !== "production";
+
   const orgJsonLd = {
     "@context": "https://schema.org",
     "@type": "Organization",
@@ -167,6 +172,32 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(webSiteJsonLd) }}
         />
         <AppShell>{children}</AppShell>
+
+        {showPreviewBadge ? (
+          <div
+            style={{
+              position: "fixed",
+              right: 12,
+              bottom: 12,
+              zIndex: 100,
+              padding: "8px 10px",
+              borderRadius: 14,
+              border: "1px solid rgba(255,255,255,0.14)",
+              background: "rgba(13,28,51,0.72)",
+              color: "rgba(255,255,255,0.92)",
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              backdropFilter: "blur(10px)",
+              boxShadow: "0 14px 34px rgba(0,0,0,0.28)",
+            }}
+            aria-label="Preview build badge"
+          >
+            Preview • {vercelEnv}{vercelRef ? ` • ${vercelRef}` : ""}{vercelSha ? ` • ${vercelSha}` : ""}
+          </div>
+        ) : null}
+
         <Analytics />
       </body>
     </html>
