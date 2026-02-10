@@ -204,7 +204,7 @@ export default async function IngredientsPage() {
             opacity: 0.5,
           }}
         />
-        <div className="relative mx-auto max-w-6xl px-4 py-10">
+        <div className="relative site-container py-10">
           <BreadcrumbJsonLd
             items={[
               { name: "Home", href: "/" },
@@ -461,7 +461,7 @@ export default async function IngredientsPage() {
       </section>
 
       <section className="bg-transparent">
-        <div className="mx-auto max-w-6xl px-4 pb-10">
+        <div className="site-container pb-10">
           <LatestFromBlog />
         </div>
       </section>

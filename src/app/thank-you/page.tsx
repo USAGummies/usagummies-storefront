@@ -1,7 +1,6 @@
 // src/app/thank-you/page.tsx
 import type { Metadata } from "next";
 import Link from "next/link";
-import Image from "next/image";
 import { Reveal } from "@/components/ui/Reveal";
 import { LeadCapture } from "@/components/marketing/LeadCapture.client";
 import { SubscriptionUnlock } from "@/components/marketing/SubscriptionUnlock.client";
@@ -23,13 +22,6 @@ const SITE_URL = resolveSiteUrl();
 const PAGE_TITLE = "Thank You | USA Gummies";
 const PAGE_DESCRIPTION = "Thanks for your USA Gummies order. You are officially part of the movement.";
 const OG_IMAGE = "/opengraph-image";
-
-const igImages = ["/home-patriotic-product.jpg", "/brand/hero.jpg", "/hero.jpg"];
-const IG_IMAGE_ALTS: Record<string, string> = {
-  "/home-patriotic-product.jpg": "USA Gummies bag on a patriotic backdrop",
-  "/brand/hero.jpg": "USA Gummies gummy bear bag hero photo",
-  "/hero.jpg": "USA Gummies gummy bear bag close-up",
-};
 
 export const metadata: Metadata = {
   title: PAGE_TITLE,
@@ -80,29 +72,6 @@ export default function ThankYouPage() {
               className="btn btn-candy pressable inline-flex w-fit"
             >
               Claim America 250 perks
-            </Link>
-          </Reveal>
-
-          <Reveal className="candy-panel rounded-2xl border border-[var(--border)] p-5 space-y-3 text-[var(--text)]">
-            <div className="text-lg font-black text-[var(--text)]">Follow @usagummies</div>
-            <div className="grid grid-cols-3 gap-2">
-              {igImages.map((src) => (
-                <div key={src} className="relative aspect-square overflow-hidden rounded-xl border border-[var(--border)]">
-                  <Image
-                    src={src}
-                    alt={IG_IMAGE_ALTS[src] || "USA Gummies Instagram photo"}
-                    fill
-                    sizes="(max-width: 768px) 28vw, 120px"
-                    className="object-cover"
-                  />
-                </div>
-              ))}
-            </div>
-            <Link
-              href="https://www.instagram.com/usagummies"
-              className="btn btn-outline pressable inline-flex w-fit"
-            >
-              Follow @usagummies
             </Link>
           </Reveal>
         </div>

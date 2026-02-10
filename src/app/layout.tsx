@@ -121,10 +121,6 @@ export default function RootLayout({
     url: siteUrl,
     logo: `${siteUrl}/brand/logo.png`,
     sameAs: [
-      "https://www.instagram.com/usagummies/",
-      "https://www.facebook.com/people/USA-Gummies/61581802793282/",
-      "https://www.tiktok.com/@usa.gummies?lang=en",
-      "https://www.youtube.com/@USAGummies",
       AMAZON_LISTING_URL,
     ],
   };
