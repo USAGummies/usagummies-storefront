@@ -29,20 +29,22 @@
   --shadow-soft: 0 10px 22px rgba(15, 27, 45, 0.08);
   --shadow-card: 0 18px 42px rgba(15, 27, 45, 0.12);
   --shadow-hero: 0 22px 54px rgba(13, 28, 51, 0.18);
+  /* Constitutional parchment texture: fibers + faint ink noise (no metal sheen) */
   --paper-grain: repeating-linear-gradient(
     135deg,
-    rgba(15, 27, 45, 0.015) 0,
-    rgba(15, 27, 45, 0.015) 1px,
-    transparent 1px,
-    transparent 6px
+    rgba(13, 28, 51, 0.018) 0,
+    rgba(13, 28, 51, 0.018) 1px,
+    rgba(255, 255, 255, 0) 1px,
+    rgba(255, 255, 255, 0) 6px
   );
-  --foil-sheen: linear-gradient(
-    120deg,
-    rgba(255, 255, 255, 0.7) 0%,
-    rgba(255, 255, 255, 0) 45%,
-    rgba(255, 255, 255, 0.35) 75%,
-    rgba(255, 255, 255, 0) 100%
+  --paper-fibers: repeating-linear-gradient(
+    0deg,
+    rgba(13, 28, 51, 0.012) 0px,
+    rgba(13, 28, 51, 0.012) 1px,
+    rgba(255,255,255,0) 1px,
+    rgba(255,255,255,0) 9px
   );
+  --ink-wash: radial-gradient(circle at 20% 15%, rgba(13,28,51,0.10), transparent 55%);
   --star-pattern: url("/brand/pattern-stars.svg");
   --stripe-sheen: repeating-linear-gradient(
     125deg,
@@ -63,6 +65,7 @@
   --pill: rgba(13, 28, 51, 0.06);
   --pill-border: rgba(13, 28, 51, 0.18);
   --pill-strong: rgba(199, 54, 44, 0.12);
+  /* Legacy metal tokens (deprecated): keep for compatibility but do not use for new surfaces */
   --metal-dark: #0b1428;
   --metal-ink: #0f1b36;
   --metal-sheen: rgba(255, 255, 255, 0.08);
@@ -244,8 +247,7 @@ details > summary::-webkit-details-marker{
     inset 0 1px 0 rgba(255,255,255,0.06);
   background-image:
     var(--paper-grain),
-    var(--foil-sheen),
-    linear-gradient(180deg, rgba(26, 38, 66, 0.98), rgba(12, 20, 38, 0.98));
+        linear-gradient(180deg, rgba(26, 38, 66, 0.98), rgba(12, 20, 38, 0.98));
 }
 .home-hero-theme .experience-band__card{
   background: rgba(12, 20, 38, 0.85);
@@ -323,9 +325,10 @@ details > summary::-webkit-details-marker{
 .patriot-sheen{
   background-image:
     var(--paper-grain),
-    var(--foil-sheen);
-  background-size: auto, auto;
-  background-repeat: repeat;
+    var(--paper-fibers),
+    radial-gradient(circle at 16% 18%, rgba(199,160,98,0.10), transparent 52%);
+  background-size: auto, auto, cover;
+  background-repeat: repeat, repeat, no-repeat;
   background-position: center;
 }
 .americana-panel{
@@ -417,8 +420,7 @@ details > summary::-webkit-details-marker{
   background-color: var(--surface);
   background-image:
     var(--paper-grain),
-    var(--foil-sheen),
-    linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,255,255,1));
+        linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,255,255,1));
   border: 1px solid rgba(15, 27, 45, 0.12);
   box-shadow: var(--shadow-card);
 }
@@ -426,7 +428,7 @@ details > summary::-webkit-details-marker{
   background: #ffffff;
   border: 1px solid rgba(15, 27, 45, 0.12);
   box-shadow: var(--shadow-card);
-  background-image: var(--paper-grain), var(--foil-sheen);
+  background-image: var(--paper-grain);
 }
 .experience-band{
   position: relative;
@@ -436,8 +438,7 @@ details > summary::-webkit-details-marker{
   background: #ffffff;
   background-image:
     var(--paper-grain),
-    var(--foil-sheen),
-    linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,253,248,0.98));
+        linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,253,248,0.98));
   box-shadow: var(--shadow-card);
   padding: 12px;
 }
@@ -990,8 +991,7 @@ a:focus-visible:not(.btn):not(.focus-ring),
 .bundle-hero-stage{
   background-image:
     var(--paper-grain),
-    var(--foil-sheen),
-    linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(255,253,248,0.98) 60%, rgba(255,255,255,0.96) 100%);
+        linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(255,253,248,0.98) 60%, rgba(255,255,255,0.96) 100%);
 }
 .bundle-integrated{
   position: relative;
@@ -3125,9 +3125,10 @@ a:focus-visible:not(.btn):not(.focus-ring),
   inset:0;
   pointer-events:none;
   background:
-    radial-gradient(120% 90% at 0% 0%, rgba(255,255,255,0.4), transparent 60%),
-    var(--foil-sheen);
-  opacity: 0.45;
+    radial-gradient(120% 90% at 0% 0%, rgba(255,255,255,0.22), transparent 62%),
+    radial-gradient(circle at 70% 30%, rgba(13,28,51,0.06), transparent 55%),
+    var(--paper-grain);
+  opacity: 0.32;
 }
 .media-thumb{
   border-radius: var(--radius-md);
