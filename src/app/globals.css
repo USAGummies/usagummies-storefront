@@ -182,10 +182,17 @@ details > summary::-webkit-details-marker{
   background-color: #101b33;
   background-image: none;
 }
-/* Dark bg-white override: scoped to explicit dark zones only */
+/* Dark bg-white override: scoped to explicit dark zones only.
+   Also restore dark-theme text vars since the general bg-white reset (below) flips them to dark. */
 .home-purchase-stage .bg-white:not(.theme-pill),
 .home-product-stage .bg-white:not(.theme-pill){
-  background-color: var(--surface) !important;
+  background-color: #101b33 !important;
+  --text: #f7f2ea;
+  --muted: rgba(247,242,234,0.72);
+  --border: rgba(247,242,234,0.16);
+  --surface: #101b33;
+  --surface-strong: #12213b;
+  color: #f7f2ea;
 }
 .home-purchase-stage [class*="bg-white/"]:not(.theme-pill),
 .home-product-stage [class*="bg-white/"]:not(.theme-pill){
@@ -194,6 +201,19 @@ details > summary::-webkit-details-marker{
 /* Allow section-light to guarantee white bg */
 .section-light .bg-white{
   background-color: #ffffff !important;
+}
+/* Reset CSS variables for bg-white elements in dark theme so text is readable.
+   The dark stage zones re-override bg-white to dark further below, so this only
+   visually affects bg-white elements outside those zones (blog, wholesale, etc.). */
+.home-hero-theme .bg-white:not(.theme-pill){
+  --text: #1c2430;
+  --muted: rgba(13,28,51,0.62);
+  --border: rgba(16,24,40,0.12);
+  --surface: #f8f5ef;
+  --surface-strong: #fefcf8;
+  --pill: rgba(13,28,51,0.06);
+  --pill-border: rgba(13,28,51,0.18);
+  color: var(--text);
 }
 .home-hero-theme .site-header{
   background: rgba(255,255,255,0.98) !important;
