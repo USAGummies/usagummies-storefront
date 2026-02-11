@@ -550,7 +550,7 @@ export default async function HomePage() {
                 { name: "Orange", color: "#d35400", img: "/brand/gummies/gummy-orange.jpg" },
                 { name: "Watermelon", color: "#e84a5f", img: "/brand/gummies/gummy-pink.jpg" },
               ].map((flavor) => (
-                <div key={flavor.name} className="group flex flex-col items-center rounded-2xl border border-white/10 bg-white p-4 transition-all duration-300 hover:shadow-[0_12px_32px_rgba(15,27,45,0.15)] hover:-translate-y-1">
+                <div key={flavor.name} className="group flex flex-col items-center rounded-2xl border border-white/20 p-4 transition-all duration-300 hover:shadow-[0_12px_32px_rgba(15,27,45,0.15)] hover:-translate-y-1" style={{ backgroundColor: "#ffffff" }}>
                   <div className="relative h-20 w-20 sm:h-24 sm:w-24">
                     <Image
                       src={flavor.img}
@@ -562,7 +562,7 @@ export default async function HomePage() {
                   </div>
                   <div className="mt-3 flex items-center gap-1.5">
                     <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: flavor.color }} />
-                    <span className="text-sm font-bold text-[var(--navy)]">{flavor.name}</span>
+                    <span className="text-sm font-bold" style={{ color: "#0d1c33" }}>{flavor.name}</span>
                   </div>
                 </div>
               ))}
