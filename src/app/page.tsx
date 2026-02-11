@@ -434,7 +434,7 @@ export default async function HomePage() {
         <div className="mx-auto max-w-6xl px-4 py-10 sm:py-14 lg:py-16">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <div className="group rounded-2xl border border-[rgba(15,27,45,0.10)] bg-white p-5 sm:p-6 transition-all duration-300 hover:shadow-[0_16px_40px_rgba(15,27,45,0.10)] hover:-translate-y-0.5">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--surface-strong)] text-2xl shadow-xs">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl text-2xl shadow-xs" style={{ backgroundColor: "#fef3e2" }}>
                 <span aria-hidden="true">🇺🇸</span>
               </div>
               <h3 className="mt-3 text-base font-black text-[var(--text)]">Made in the USA</h3>
@@ -443,7 +443,7 @@ export default async function HomePage() {
               </p>
             </div>
             <div className="group rounded-2xl border border-[rgba(15,27,45,0.10)] bg-white p-5 sm:p-6 transition-all duration-300 hover:shadow-[0_16px_40px_rgba(15,27,45,0.10)] hover:-translate-y-0.5">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--surface-strong)] text-2xl shadow-xs">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl text-2xl shadow-xs" style={{ backgroundColor: "#e8f5e9" }}>
                 <span aria-hidden="true">🌿</span>
               </div>
               <h3 className="mt-3 text-base font-black text-[var(--text)]">No artificial dyes</h3>
@@ -452,7 +452,7 @@ export default async function HomePage() {
               </p>
             </div>
             <div className="group rounded-2xl border border-[rgba(15,27,45,0.10)] bg-white p-5 sm:p-6 transition-all duration-300 hover:shadow-[0_16px_40px_rgba(15,27,45,0.10)] hover:-translate-y-0.5">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--surface-strong)] text-2xl shadow-xs">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl text-2xl shadow-xs" style={{ backgroundColor: "#fce4ec" }}>
                 <span aria-hidden="true">🍬</span>
               </div>
               <h3 className="mt-3 text-base font-black text-[var(--text)]">Classic gummy flavor</h3>
@@ -528,7 +528,7 @@ export default async function HomePage() {
 
       <section className="bg-transparent" data-zone="FLAVORS">
         <div className="mx-auto max-w-6xl px-4 py-10 sm:py-14 lg:py-16">
-          <div className="candy-panel americana-panel rounded-[28px] p-5 sm:p-7">
+          <div className="candy-panel americana-panel rounded-[28px] p-5 sm:p-7" style={{ backgroundColor: "#fefcf8" }}>
             <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-5">
               <div>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.35em] text-[var(--muted)]/70">
@@ -583,7 +583,7 @@ export default async function HomePage() {
 
       <section className="bg-transparent" data-zone="SHIPPING">
         <div className="mx-auto max-w-6xl px-4 py-10 sm:py-14 lg:py-16">
-          <div className="grid gap-4 rounded-[28px] border border-[rgba(15,27,45,0.08)] bg-white p-6 sm:p-8 lg:grid-cols-[1fr_240px] lg:items-center shadow-[0_8px_24px_rgba(15,27,45,0.05)]">
+          <div className="grid gap-4 rounded-[28px] border border-[rgba(15,27,45,0.08)] p-6 sm:p-8 lg:grid-cols-[1fr_240px] lg:items-center shadow-[0_8px_24px_rgba(15,27,45,0.05)]" style={{ backgroundColor: "#ffffff" }}>
             <div className="space-y-3">
               <div className="text-[11px] font-semibold uppercase tracking-[0.35em] text-[var(--muted)]/70">
                 Shipping &amp; fulfillment
@@ -617,7 +617,7 @@ export default async function HomePage() {
 
       <section className="bg-[var(--surface-strong)]" data-zone="STORY" id="why-usa-gummies">
         <div className="mx-auto max-w-6xl px-4 py-12 sm:py-16 lg:py-20 reveal-up">
-          <div className="candy-panel americana-panel relative overflow-hidden rounded-[36px] p-5 sm:p-8">
+          <div className="candy-panel americana-panel relative overflow-hidden rounded-[36px] p-5 sm:p-8" style={{ backgroundColor: "#fefcf8" }}>
             <div className="relative z-10">
               <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
                 <div className="space-y-4">
@@ -723,7 +723,7 @@ export default async function HomePage() {
                   className="candy-panel relative overflow-hidden rounded-2xl p-5 sm:p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_16px_40px_rgba(15,27,45,0.12)]"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--surface-strong)] shadow-xs">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl shadow-xs" style={{ backgroundColor: "#fef3e2" }}>
                       {card.icon}
                     </div>
                     <h3 className="text-lg font-black text-[var(--text)]">{card.title}</h3>
@@ -742,7 +742,7 @@ export default async function HomePage() {
         <div className={styles.sceneContent}>
         <div className="mx-auto max-w-6xl px-4 py-12 sm:py-16 lg:py-20 reveal-up">
           <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-              <div className="candy-panel americana-panel rounded-[28px] p-5 sm:p-6 shadow-none bg-[var(--surface-strong)] border border-[rgba(15,27,45,0.12)]">
+              <div className="candy-panel americana-panel rounded-[28px] p-5 sm:p-6 shadow-none border border-[rgba(15,27,45,0.12)]" style={{ backgroundColor: "#fefcf8" }}>
                 <div className="flex flex-wrap items-end justify-between gap-4">
                   <div>
                     <div className="flex items-center gap-2">
@@ -802,7 +802,7 @@ export default async function HomePage() {
                   Tap any channel to follow and stay in the loop.
                 </div>
               </div>
-              <div className="candy-panel americana-panel relative overflow-hidden rounded-[28px] p-5 sm:p-6 shadow-none bg-[var(--surface-strong)] border border-[rgba(15,27,45,0.12)]">
+              <div className="candy-panel americana-panel relative overflow-hidden rounded-[28px] p-5 sm:p-6 shadow-none border border-[rgba(15,27,45,0.12)]" style={{ backgroundColor: "#fefcf8" }}>
                 <div className="space-y-4">
                   <div className="flex items-center gap-2.5">
                     <Image
@@ -851,7 +851,7 @@ export default async function HomePage() {
 
       <section className="bg-transparent" data-zone="STORY">
         <div className="mx-auto max-w-6xl px-4 py-12 sm:py-16 lg:py-20">
-          <div className="candy-panel americana-panel rounded-[36px] border border-[var(--border)] p-6 sm:p-8 lg:p-10">
+          <div className="candy-panel americana-panel rounded-[36px] border border-[var(--border)] p-6 sm:p-8 lg:p-10" style={{ backgroundColor: "#fefcf8" }}>
             <div className="flex items-center gap-2.5">
               <Image
                 src="/brand/logo.png"
@@ -935,15 +935,6 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className={`${styles.scene} ${styles.sceneFooter}`} aria-hidden="true">
-        <div className={styles.sceneBg} aria-hidden="true" />
-        <div className={styles.sceneOverlay} aria-hidden="true" />
-        <div className={styles.sceneContent}>
-          <div className="mx-auto max-w-6xl px-4 py-5 sm:py-6">
-            <div className="h-10 sm:h-12 lg:h-16" />
-          </div>
-        </div>
-      </section>
 
       <LazyStickyAddToCartBar
         title="In your cart"

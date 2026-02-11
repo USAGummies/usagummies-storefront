@@ -31,16 +31,16 @@
   --shadow-hero: 0 22px 54px rgba(13, 28, 51, 0.18);
   --paper-grain: repeating-linear-gradient(
     135deg,
-    rgba(15, 27, 45, 0.015) 0,
-    rgba(15, 27, 45, 0.015) 1px,
+    rgba(15, 27, 45, 0.006) 0,
+    rgba(15, 27, 45, 0.006) 1px,
     transparent 1px,
     transparent 6px
   );
   --foil-sheen: linear-gradient(
     120deg,
-    rgba(255, 255, 255, 0.7) 0%,
+    rgba(199, 160, 98, 0.12) 0%,
     rgba(255, 255, 255, 0) 45%,
-    rgba(255, 255, 255, 0.35) 75%,
+    rgba(199, 160, 98, 0.08) 75%,
     rgba(255, 255, 255, 0) 100%
   );
   --star-pattern: url("/brand/pattern-stars.svg");
@@ -87,10 +87,9 @@ body {
   margin: 0;
   background-color: var(--bg, #f8f5ef);
   background-image:
-    var(--paper-grain),
-    radial-gradient(circle at 12% 8%, rgba(199, 160, 98, 0.12), transparent 40%),
-    radial-gradient(circle at 90% 0%, rgba(13, 28, 51, 0.08), transparent 45%),
-    linear-gradient(180deg, #fbf9f5 0%, #f4efe6 100%);
+    radial-gradient(circle at 12% 8%, rgba(199, 160, 98, 0.10), transparent 40%),
+    radial-gradient(circle at 90% 0%, rgba(199, 54, 44, 0.04), transparent 45%),
+    linear-gradient(180deg, #fefcf8 0%, #f8f4ec 100%);
   background-attachment: fixed;
   color: var(--text, #1c2430);
   font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
@@ -229,22 +228,24 @@ details > summary::-webkit-details-marker{
   border-color: var(--border) !important;
 }
 .home-hero-theme .theme-pill{
-  background-color: rgba(255,255,255,0.92) !important;
-  color: var(--navy) !important;
-  border-color: rgba(255,255,255,0.28) !important;
+  background-color: rgba(255,255,255,0.95) !important;
+  color: #0d1c33 !important;
+  border-color: rgba(199, 160, 98, 0.35) !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  padding: 6px 14px !important;
+  box-shadow: 0 2px 8px rgba(13, 28, 51, 0.12) !important;
 }
 .home-hero-theme .candy-panel,
 .home-hero-theme .experience-band,
 .home-hero-theme .metal-panel{
   background-color: rgba(20, 33, 60, 0.96);
-  border-color: rgba(255,255,255,0.18);
+  border-color: rgba(199, 160, 98, 0.15);
   box-shadow:
-    0 20px 44px rgba(5, 10, 20, 0.45),
-    inset 0 1px 0 rgba(255,255,255,0.06);
+    0 20px 44px rgba(5, 10, 20, 0.35),
+    inset 0 1px 0 rgba(199, 160, 98, 0.08);
   background-image:
-    var(--paper-grain),
-    var(--foil-sheen),
-    linear-gradient(180deg, rgba(26, 38, 66, 0.98), rgba(12, 20, 38, 0.98));
+    linear-gradient(180deg, rgba(26, 38, 66, 0.98), rgba(15, 23, 42, 0.98));
 }
 .home-hero-theme .experience-band__card{
   background: rgba(12, 20, 38, 0.85);
@@ -320,9 +321,7 @@ details > summary::-webkit-details-marker{
   user-select: none;
 }
 .patriot-sheen{
-  background-image:
-    var(--paper-grain),
-    var(--foil-sheen);
+  background-image: none;
   background-size: auto, auto;
   background-repeat: repeat;
   background-position: center;
@@ -336,10 +335,10 @@ details > summary::-webkit-details-marker{
   content: "";
   position: absolute;
   inset: 0;
-  background-image: var(--paper-grain);
+  background-image: none;
   background-size: auto;
   background-repeat: repeat;
-  opacity: 0.25;
+  opacity: 0;
   pointer-events: none;
 }
 .americana-panel > *{
@@ -414,30 +413,24 @@ details > summary::-webkit-details-marker{
 
 .metal-panel{
   background-color: var(--surface);
-  background-image:
-    var(--paper-grain),
-    var(--foil-sheen),
-    linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,255,255,1));
-  border: 1px solid rgba(15, 27, 45, 0.12);
-  box-shadow: var(--shadow-card);
+  background-image: none;
+  border: 1px solid rgba(15, 27, 45, 0.10);
+  box-shadow: 0 12px 32px rgba(15, 27, 45, 0.08);
 }
 .candy-panel{
   background: #ffffff;
-  border: 1px solid rgba(15, 27, 45, 0.12);
-  box-shadow: var(--shadow-card);
-  background-image: var(--paper-grain), var(--foil-sheen);
+  border: 1px solid rgba(15, 27, 45, 0.10);
+  box-shadow: 0 12px 32px rgba(15, 27, 45, 0.08);
+  background-image: none;
 }
 .experience-band{
   position: relative;
   overflow: hidden;
   border-radius: 32px;
-  border: 1px solid rgba(15, 27, 45, 0.12);
+  border: 1px solid rgba(15, 27, 45, 0.10);
   background: #ffffff;
-  background-image:
-    var(--paper-grain),
-    var(--foil-sheen),
-    linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,253,248,0.98));
-  box-shadow: var(--shadow-card);
+  background-image: none;
+  box-shadow: 0 12px 32px rgba(15, 27, 45, 0.08);
   padding: 12px;
 }
 .experience-band__inner{
@@ -988,8 +981,6 @@ a:focus-visible:not(.btn):not(.focus-ring),
 }
 .bundle-hero-stage{
   background-image:
-    var(--paper-grain),
-    var(--foil-sheen),
     linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(255,253,248,0.98) 60%, rgba(255,255,255,0.96) 100%);
 }
 .bundle-integrated{

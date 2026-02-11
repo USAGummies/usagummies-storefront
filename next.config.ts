@@ -67,6 +67,13 @@ const nextConfig: NextConfig = {
       { source: "/returns", destination: "/policies/returns", permanent: true },
       { source: "/store", destination: "/shop", permanent: true },
       { source: "/blog/rss.xml", destination: "/rss.xml", permanent: true },
+      // Google Search Console 404 cleanup
+      { source: "/home", destination: "/", permanent: true },
+      { source: "/contact-1", destination: "/contact", permanent: true },
+      { source: "/store/p/all-american-gummy-bears-katzh", destination: "/shop", permanent: true },
+      { source: "/store/p/all-american-gummy-bears", destination: "/shop", permanent: true },
+      { source: "/blog/blog-post-title-four-6k8cc", destination: "/blog", permanent: true },
+      { source: "/blog/category/Gummy\\+Bear\\+Tips", destination: "/blog", permanent: true },
     ];
   },
 };
