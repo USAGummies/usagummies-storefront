@@ -18,7 +18,7 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "Join the Revolution | USA Gummies";
+const PAGE_TITLE = "Join the Revolution";
 const PAGE_DESCRIPTION =
   "Join the USA Gummies revolution for made in USA candy, dye-free gummies, and patriotic treats that skip artificial dyes.";
 const OG_IMAGE = "/opengraph-image";

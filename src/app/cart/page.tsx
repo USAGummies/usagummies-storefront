@@ -20,7 +20,7 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "Cart | USA Gummies";
+const PAGE_TITLE = "Cart";
 const PAGE_DESCRIPTION = "Review your USA Gummies order and proceed to secure checkout.";
 const OG_IMAGE = "/opengraph-image";
 

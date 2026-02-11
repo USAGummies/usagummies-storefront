@@ -23,6 +23,10 @@ const ChatWidget = dynamic(
   () => import("@/components/support/ChatWidget.client").then((mod) => mod.ChatWidget),
   { ssr: false }
 );
+const ExitIntentPopup = dynamic(
+  () => import("@/components/marketing/ExitIntentPopup.client").then((mod) => mod.ExitIntentPopup),
+  { ssr: false }
+);
 
 function cx(...a: Array<string | false | null | undefined>) {
   return a.filter(Boolean).join(" ");
@@ -487,6 +491,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Link href="/blog" className="link-underline">
                 Blog
               </Link>
+              <Link href="/wholesale" className="link-underline">
+                Wholesale
+              </Link>
             </div>
             <button
               type="button"
@@ -686,6 +693,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Link href="/shop" className="btn btn-candy btn-compact">
                 Shop bags
               </Link>
+              <Link href="/wholesale" className="btn btn-outline btn-compact">
+                Wholesale inquiries
+              </Link>
               <div>
                 <div className="font-semibold text-[var(--text)]">Other places to buy</div>
                 <a
@@ -776,6 +786,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </footer>
       {showChatWidget ? <ChatWidget /> : null}
+      <ExitIntentPopup />
     </div>
   );
 }

@@ -19,7 +19,7 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "Patriotic Candy Gifts | USA Gummies";
+const PAGE_TITLE = "Patriotic Candy Gifts";
 const PAGE_DESCRIPTION =
   "Shop patriotic candy made in USA, including dye-free gummies with no artificial dyes for July 4th, Veterans Day, and America 250.";
 const PAGE_URL = `${SITE_URL}/patriotic-candy`;

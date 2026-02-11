@@ -17,7 +17,7 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "Returns Policy | USA Gummies";
+const PAGE_TITLE = "Returns Policy";
 const PAGE_DESCRIPTION =
   "Learn about returns and exchanges for USA Gummies made in USA candy orders.";
 const OG_IMAGE = "/opengraph-image";

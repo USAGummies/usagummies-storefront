@@ -18,7 +18,7 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "America 250 Events | USA Gummies";
+const PAGE_TITLE = "America 250 Events";
 const PAGE_DESCRIPTION =
   "Find America 250 event ideas and patriotic candy selections, including dye-free gummies made in the USA.";
 const PAGE_URL = `${SITE_URL}/america-250/events`;

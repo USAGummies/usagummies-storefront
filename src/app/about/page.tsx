@@ -305,6 +305,35 @@ export default function AboutPage() {
               </Link>
             </div>
           </div>
+
+          <div className="mt-6 rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-5 sm:p-6">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+              Explore more
+            </div>
+            <h2 className="mt-2 text-lg font-black text-[var(--text)]">
+              Learn more about USA Gummies.
+            </h2>
+            <div className="mt-3 flex flex-wrap gap-3">
+              <Link href="/no-artificial-dyes-gummy-bears" className="rounded-xl border border-[var(--border)] bg-white px-4 py-2.5 text-sm font-semibold text-[var(--text)] transition-all hover:shadow-[0_8px_20px_rgba(15,27,45,0.08)] hover:-translate-y-0.5">
+                Dye-free gummy bears
+              </Link>
+              <Link href="/made-in-usa" className="rounded-xl border border-[var(--border)] bg-white px-4 py-2.5 text-sm font-semibold text-[var(--text)] transition-all hover:shadow-[0_8px_20px_rgba(15,27,45,0.08)] hover:-translate-y-0.5">
+                Made in USA
+              </Link>
+              <Link href="/ingredients" className="rounded-xl border border-[var(--border)] bg-white px-4 py-2.5 text-sm font-semibold text-[var(--text)] transition-all hover:shadow-[0_8px_20px_rgba(15,27,45,0.08)] hover:-translate-y-0.5">
+                Ingredients
+              </Link>
+              <Link href="/gummies-101" className="rounded-xl border border-[var(--border)] bg-white px-4 py-2.5 text-sm font-semibold text-[var(--text)] transition-all hover:shadow-[0_8px_20px_rgba(15,27,45,0.08)] hover:-translate-y-0.5">
+                Gummies 101
+              </Link>
+              <Link href="/faq" className="rounded-xl border border-[var(--border)] bg-white px-4 py-2.5 text-sm font-semibold text-[var(--text)] transition-all hover:shadow-[0_8px_20px_rgba(15,27,45,0.08)] hover:-translate-y-0.5">
+                FAQ
+              </Link>
+              <Link href="/wholesale" className="rounded-xl border border-[var(--border)] bg-white px-4 py-2.5 text-sm font-semibold text-[var(--text)] transition-all hover:shadow-[0_8px_20px_rgba(15,27,45,0.08)] hover:-translate-y-0.5">
+                Wholesale
+              </Link>
+            </div>
+          </div>
         </div>
       </section>
 

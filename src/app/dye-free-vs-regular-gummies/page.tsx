@@ -17,9 +17,9 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "Dye-Free Gummies vs Regular Gummies — What\u2019s the Difference?";
+const PAGE_TITLE = "Dye-Free vs Regular Gummies — What\u2019s the Difference?";
 const PAGE_DESCRIPTION =
-  "Side-by-side comparison of dye-free gummies and regular gummies. Learn how ingredients, colors, taste, and safety differ so you can choose the best option for your family.";
+  "Side-by-side comparison of dye-free and regular gummies. See how ingredients, colors, taste, and safety differ to choose the best option for your family.";
 const OG_IMAGE = "/opengraph-image";
 
 export const metadata: Metadata = {

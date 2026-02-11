@@ -17,7 +17,7 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "Shipping Policy | USA Gummies";
+const PAGE_TITLE = "Shipping Policy";
 const PAGE_DESCRIPTION =
   "Shipping details for USA Gummies orders, delivery times, and carrier info for made in USA candy.";
 const OG_IMAGE = "/opengraph-image";

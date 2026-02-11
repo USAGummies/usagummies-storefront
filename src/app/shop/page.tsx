@@ -13,6 +13,7 @@ import { LatestFromBlog } from "@/components/blog/LatestFromBlog";
 import { getProductsPage } from "@/lib/shopify/products";
 import { getProductsForInternalLinks } from "@/lib/shopify/internalLinks";
 import { getProductByHandle } from "@/lib/storefront";
+import { getReviewAggregate } from "@/lib/reviews/aggregate";
 import { BASE_PRICE, FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import { getBundleVariants } from "@/lib/bundles/getBundleVariants";
 import { SINGLE_BAG_SKU } from "@/lib/bundles/atomic";
@@ -205,6 +206,8 @@ export default async function ShopPage() {
     bundleVariants?.singleBagSku ||
     SINGLE_BAG_SKU;
 
+  const reviewAggregate = await getReviewAggregate();
+
   return (
     <main className="relative overflow-hidden home-hero-theme text-[var(--text)] min-h-screen pb-16">
       <BreadcrumbJsonLd
@@ -213,13 +216,14 @@ export default async function ShopPage() {
           { name: "Shop", href: "/shop" },
         ]}
       />
-      <h1 className="sr-only">Shop USA Gummies</h1>
-
       <section className={`${styles.scene} ${styles.sceneBundle} home-purchase-stage`} data-zone="BUNDLE">
         <div className={styles.sceneBg} aria-hidden="true" />
         <div className={styles.sceneOverlay} aria-hidden="true" />
         <div className={styles.sceneContent}>
           <div className="mx-auto max-w-6xl px-4 pb-1 sm:pb-1.5 lg:pb-2">
+            <h1 className="text-[10px] font-semibold uppercase tracking-[0.3em] text-white/70 pt-2 pb-1">
+              Shop USA Gummies — Dye-Free, Made in the USA
+            </h1>
             <div className="mt-0">
               <div id="hero-primary-cta" className="atomic-buy americana-panel">
                 <div className="atomic-buy__glow" aria-hidden="true" />
@@ -391,6 +395,14 @@ export default async function ShopPage() {
         brandName="USA Gummies"
         siteUrl={SITE_URL}
         availability={bundleVariants?.availableForSale === false ? "OutOfStock" : "InStock"}
+        aggregateRating={
+          reviewAggregate
+            ? {
+                ratingValue: reviewAggregate.ratingValue,
+                reviewCount: reviewAggregate.reviewCount,
+              }
+            : null
+        }
       />
     </main>
   );

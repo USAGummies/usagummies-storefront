@@ -17,7 +17,7 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "Terms of Service | USA Gummies";
+const PAGE_TITLE = "Terms of Service";
 const PAGE_DESCRIPTION =
   "Terms and conditions for using USA Gummies and purchasing made in USA candy.";
 const OG_IMAGE = "/opengraph-image";

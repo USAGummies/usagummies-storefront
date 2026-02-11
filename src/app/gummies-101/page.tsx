@@ -218,6 +218,39 @@ export default function Gummies101Page() {
       </div>
 
       <section className="bg-transparent">
+        <div className="mx-auto max-w-6xl px-4 pb-4">
+          <div className="rounded-2xl border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] p-5 sm:p-6">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+              Keep exploring
+            </div>
+            <h2 className="mt-2 text-lg font-black text-[var(--text)]">
+              More about USA Gummies.
+            </h2>
+            <div className="mt-3 flex flex-wrap gap-2.5">
+              <Link href="/dye-free-candy" className="rounded-xl border border-[rgba(15,27,45,0.12)] bg-white px-3.5 py-2 text-sm font-semibold text-[var(--text)] transition-all hover:shadow-[0_8px_20px_rgba(15,27,45,0.08)] hover:-translate-y-0.5">
+                Dye-free candy guide
+              </Link>
+              <Link href="/made-in-usa" className="rounded-xl border border-[rgba(15,27,45,0.12)] bg-white px-3.5 py-2 text-sm font-semibold text-[var(--text)] transition-all hover:shadow-[0_8px_20px_rgba(15,27,45,0.08)] hover:-translate-y-0.5">
+                Made in USA
+              </Link>
+              <Link href="/about" className="rounded-xl border border-[rgba(15,27,45,0.12)] bg-white px-3.5 py-2 text-sm font-semibold text-[var(--text)] transition-all hover:shadow-[0_8px_20px_rgba(15,27,45,0.08)] hover:-translate-y-0.5">
+                About us
+              </Link>
+              <Link href="/bulk-gummy-bears" className="rounded-xl border border-[rgba(15,27,45,0.12)] bg-white px-3.5 py-2 text-sm font-semibold text-[var(--text)] transition-all hover:shadow-[0_8px_20px_rgba(15,27,45,0.08)] hover:-translate-y-0.5">
+                Bulk gummy bears
+              </Link>
+              <Link href="/patriotic-candy" className="rounded-xl border border-[rgba(15,27,45,0.12)] bg-white px-3.5 py-2 text-sm font-semibold text-[var(--text)] transition-all hover:shadow-[0_8px_20px_rgba(15,27,45,0.08)] hover:-translate-y-0.5">
+                Patriotic candy
+              </Link>
+              <Link href="/wholesale" className="rounded-xl border border-[rgba(15,27,45,0.12)] bg-white px-3.5 py-2 text-sm font-semibold text-[var(--text)] transition-all hover:shadow-[0_8px_20px_rgba(15,27,45,0.08)] hover:-translate-y-0.5">
+                Wholesale
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-transparent">
         <div className="mx-auto max-w-6xl px-4 pb-10">
           <LatestFromBlog />
         </div>

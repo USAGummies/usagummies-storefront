@@ -21,7 +21,7 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "Bundle Guides | USA Gummies";
+const PAGE_TITLE = "Bundle Guides";
 const PAGE_DESCRIPTION =
   "Pick the right gummy bundle for gifts, parties, and patriotic candy celebrations. Dye-free gummies made in the USA.";
 
@@ -151,6 +151,9 @@ export default async function BundleGuidesPage() {
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <Link href="/shop#bundle-pricing" className="btn btn-candy">
               Shop now
+            </Link>
+            <Link href="/gummy-calculator" className="btn btn-outline">
+              Gummy calculator
             </Link>
             <Link href="/faq" className="btn btn-outline">
               Bag count FAQ

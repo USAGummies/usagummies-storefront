@@ -17,7 +17,7 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "Policies | USA Gummies";
+const PAGE_TITLE = "Policies";
 const PAGE_DESCRIPTION =
   "Review policies for orders, shipping, returns, and privacy for USA Gummies made in USA candy.";
 const OG_IMAGE = "/opengraph-image";

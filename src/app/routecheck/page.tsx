@@ -14,7 +14,7 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "Routecheck | USA Gummies";
+const PAGE_TITLE = "Routecheck";
 const PAGE_DESCRIPTION = "Internal route health check for USA Gummies.";
 const OG_IMAGE = "/opengraph-image";
 

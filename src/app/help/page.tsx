@@ -16,7 +16,7 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "Help Center | USA Gummies";
+const PAGE_TITLE = "Help Center";
 const PAGE_DESCRIPTION =
   "Get support for orders, shipping, and products. Find info on made in USA candy and dye-free gummies.";
 const OG_IMAGE = "/opengraph-image";

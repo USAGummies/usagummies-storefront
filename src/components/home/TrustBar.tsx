@@ -8,40 +8,16 @@ export function TrustBar() {
   ];
 
   return (
-    <div
-      className="card"
-      style={{
-        padding: 14,
-        display: "grid",
-        gap: 10,
-        gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-      }}
-    >
+    <div className="grid gap-2.5 p-3.5 rounded-2xl border border-[rgba(15,27,45,0.08)] bg-white/60 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
       {items.map((x) => (
         <div
           key={x.t}
-          style={{
-            padding: 12,
-            borderRadius: 14,
-            border: "1px solid rgba(0,0,0,0.07)",
-            background: "rgba(255,255,255,0.70)",
-          }}
+          className="rounded-xl border border-[rgba(0,0,0,0.07)] bg-white/70 p-3"
         >
-          <div style={{ fontWeight: 900 }}>{x.t}</div>
-          <div style={{ opacity: 0.75, fontSize: 13, marginTop: 4 }}>
-            {x.d}
-          </div>
+          <div className="font-black text-sm">{x.t}</div>
+          <div className="mt-1 text-[13px] opacity-75">{x.d}</div>
         </div>
       ))}
-
-      <style>{`
-        @media (max-width: 980px){
-          div.card{ grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
-        }
-        @media (max-width: 520px){
-          div.card{ grid-template-columns: repeat(1, minmax(0, 1fr)) !important; }
-        }
-      `}</style>
     </div>
   );
 }

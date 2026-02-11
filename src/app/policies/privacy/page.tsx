@@ -17,7 +17,7 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "Privacy Policy | USA Gummies";
+const PAGE_TITLE = "Privacy Policy";
 const PAGE_DESCRIPTION =
   "Read how USA Gummies handles data, privacy, and security for shoppers of our dye-free gummies.";
 const OG_IMAGE = "/opengraph-image";

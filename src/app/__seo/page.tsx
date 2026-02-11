@@ -14,7 +14,7 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "SEO Debug | USA Gummies";
+const PAGE_TITLE = "SEO Debug";
 const PAGE_DESCRIPTION = "Internal SEO metadata diagnostics for USA Gummies (dev only).";
 const OG_IMAGE = "/opengraph-image";
 

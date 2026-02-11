@@ -19,7 +19,7 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "America250 Candy | USA Gummies";
+const PAGE_TITLE = "America250 Candy";
 const PAGE_DESCRIPTION =
   "America250 hub from USA Gummies with celebration treats, gummy gifts, and event-ready bundles.";
 const PAGE_URL = `${SITE_URL}/america-250`;
