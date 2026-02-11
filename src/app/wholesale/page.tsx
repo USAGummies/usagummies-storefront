@@ -156,13 +156,13 @@ export default function WholesalePage() {
 
             <div className="space-y-5">
               <div className="rounded-3xl border border-[var(--border)] bg-white p-2.5 shadow-[0_18px_44px_rgba(15,27,45,0.12)]">
-                <div className="relative aspect-[5/4] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-3">
+                <div className="relative aspect-[5/4] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)]">
                   <Image
-                    src="/brand/usa-gummies-family.webp"
-                    alt="Assorted USA Gummies gummy bear bags for wholesale"
+                    src="/brand/extras/wholesale-shelf.jpg"
+                    alt="USA Gummies on retail store shelf next to competitors"
                     fill
                     sizes="(max-width: 768px) 90vw, 420px"
-                    className="object-contain"
+                    className="object-cover"
                   />
                 </div>
               </div>
@@ -187,6 +187,17 @@ export default function WholesalePage() {
                     data-form-id="22ab9284-ad89-4deb-b2ad-b6d6dc585cb1"
                     data-portal-id="245038506"
                   />
+                  <div className="mt-5 rounded-xl border border-[var(--border)] bg-[var(--surface-strong)] p-4 text-center">
+                    <p className="text-sm text-[var(--muted)]">
+                      Prefer email? Reach us directly at{" "}
+                      <a href="mailto:ben@usagummies.com?subject=Wholesale%20Inquiry" className="font-bold text-[var(--text)] underline underline-offset-4 hover:text-[var(--red)] transition-colors">
+                        ben@usagummies.com
+                      </a>
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--muted)]/60">
+                      We respond within one business day.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
