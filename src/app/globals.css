@@ -182,11 +182,14 @@ details > summary::-webkit-details-marker{
   background-color: #101b33;
   background-image: none;
 }
-.home-hero-theme .bg-white{
+.home-hero-theme .bg-white:not(.theme-pill):not(.section-light .bg-white){
   background-color: var(--surface) !important;
 }
-.home-hero-theme [class*="bg-white/"]:not(.site-header){
+.home-hero-theme [class*="bg-white/"]:not(.site-header):not(.theme-pill){
   background-color: rgba(16, 27, 51, 0.88) !important;
+}
+.section-light .bg-white{
+  background-color: #ffffff !important;
 }
 .home-hero-theme .site-header{
   background: rgba(255,255,255,0.98) !important;
@@ -227,7 +230,9 @@ details > summary::-webkit-details-marker{
 .home-hero-theme .border-neutral-100{
   border-color: var(--border) !important;
 }
-.home-hero-theme .theme-pill{
+.home-hero-theme .theme-pill,
+.home-hero-theme span.theme-pill,
+.theme-pill[class*="bg-white"]{
   background-color: rgba(255,255,255,0.95) !important;
   color: #0d1c33 !important;
   border-color: rgba(199, 160, 98, 0.35) !important;
