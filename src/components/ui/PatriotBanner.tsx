@@ -4,6 +4,7 @@ import Image from "next/image";
 import { PatriotRibbon } from "@/components/ui/PatriotRibbon";
 import { AmazonOneBagNote } from "@/components/ui/AmazonOneBagNote";
 import { GummyIconRow, HeroPackIcon } from "@/components/ui/GummyIcon";
+import { AMAZON_REVIEWS } from "@/data/amazonReviews";
 
 export function PatriotBanner({ showRibbon = true }: { showRibbon?: boolean }) {
   return (
@@ -38,7 +39,7 @@ export function PatriotBanner({ showRibbon = true }: { showRibbon?: boolean }) {
               <span className="badge">Made in the USA</span>
               <span className="badge">Ships fast</span>
               <span className="badge">No artificial dyes</span>
-              <span className="badge">4.8 stars from verified Amazon buyers</span>
+              <span className="badge">{AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars from verified Amazon buyers</span>
             </div>
           </div>
 

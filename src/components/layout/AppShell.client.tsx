@@ -10,7 +10,7 @@ import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import { AMAZON_LISTING_URL } from "@/lib/amazon";
 import { applyExperimentFromUrl, trackEvent } from "@/lib/analytics";
 import { LeadCapture } from "@/components/marketing/LeadCapture.client";
-import { SubscriptionUnlock } from "@/components/marketing/SubscriptionUnlock.client";
+// SubscriptionUnlock removed from footer — import no longer needed
 import { getCartToastMessage, readLastAdd } from "@/lib/cartFeedback";
 import { SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
 import { ExperienceBand } from "@/components/brand/ExperienceBand";
@@ -631,70 +631,58 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </div>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
-            <div className="flex flex-wrap gap-3 text-[var(--muted)]">
-              <Link href="/shop" className="link-underline">
-                Shop
-              </Link>
-              <Link href="/about" className="link-underline">
-                About
-              </Link>
-              <Link href="/join-the-revolution" className="link-underline">
-                Join the list
-              </Link>
-              <Link href="/faq" className="link-underline">
-                FAQ
-              </Link>
-              <Link href="/gummies-101" className="link-underline">
-                Gummies 101
-              </Link>
-              <Link href="/ingredients" className="link-underline">
-                Ingredients
-              </Link>
-              <Link href="/no-artificial-dyes-gummy-bears" className="link-underline">
-                Dye-Free Gummy Bears
-              </Link>
-              <Link href="/made-in-usa" className="link-underline">
-                Made in USA
-              </Link>
-              <Link href="/bundle-guides" className="link-underline">
-                Bag count guides
-              </Link>
-              <Link href="/gummy-gift-bundles" className="link-underline">
-                Gift bag options
-              </Link>
-              <Link href="/patriotic-party-snacks" className="link-underline">
-                Party snacks
-              </Link>
-              <Link href="/patriotic-candy" className="link-underline">
-                Patriotic candy
-              </Link>
-              <Link href="/bulk-gummy-bears" className="link-underline">
-                Bulk gummy bears
-              </Link>
-              <Link href="/wholesale" className="link-underline">
-                Wholesale
-              </Link>
-              <Link href="/contact" className="link-underline">
-                Contact
-              </Link>
-              <Link href="/help" className="link-underline">
-                Help Center
-              </Link>
-              <Link href="/policies" className="link-underline">
-                Policies
-              </Link>
-              <Link href="/policies/shipping" className="link-underline">
-                Shipping
-              </Link>
+          <div className="grid gap-6 grid-cols-2 sm:grid-cols-4">
+            <div className="space-y-2">
+              <div className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--text)]">Shop</div>
+              <div className="flex flex-col gap-1.5 text-[var(--muted)]">
+                <Link href="/shop" className="link-underline">All gummies</Link>
+                <Link href="/bundle-guides" className="link-underline">Bag count guides</Link>
+                <Link href="/gummy-gift-bundles" className="link-underline">Gift bag options</Link>
+                <Link href="/bulk-gummy-bears" className="link-underline">Bulk gummy bears</Link>
+                <Link href="/gummy-calculator" className="link-underline">Bag calculator</Link>
+              </div>
             </div>
-            <div className="flex flex-col items-start gap-2 text-xs text-[var(--muted)]">
-              <Link href="/shop" className="btn btn-candy btn-compact">
-                Shop bags
-              </Link>
-              <Link href="/wholesale" className="btn btn-outline btn-compact">
-                Wholesale inquiries
-              </Link>
+            <div className="space-y-2">
+              <div className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--text)]">Learn</div>
+              <div className="flex flex-col gap-1.5 text-[var(--muted)]">
+                <Link href="/gummies-101" className="link-underline">Gummies 101</Link>
+                <Link href="/ingredients" className="link-underline">Ingredients</Link>
+                <Link href="/no-artificial-dyes-gummy-bears" className="link-underline">Dye-Free Gummy Bears</Link>
+                <Link href="/made-in-usa" className="link-underline">Made in USA</Link>
+                <Link href="/blog" className="link-underline">Blog</Link>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--text)]">Occasions</div>
+              <div className="flex flex-col gap-1.5 text-[var(--muted)]">
+                <Link href="/patriotic-party-snacks" className="link-underline">Party snacks</Link>
+                <Link href="/patriotic-candy" className="link-underline">Patriotic candy</Link>
+                <Link href="/dye-free-candy" className="link-underline">Dye-free candy</Link>
+                <Link href="/made-in-usa-candy" className="link-underline">USA-made candy</Link>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--text)]">Company</div>
+              <div className="flex flex-col gap-1.5 text-[var(--muted)]">
+                <Link href="/about" className="link-underline">About</Link>
+                <Link href="/wholesale" className="link-underline">Wholesale</Link>
+                <Link href="/contact" className="link-underline">Contact</Link>
+                <Link href="/faq" className="link-underline">FAQ</Link>
+                <Link href="/help" className="link-underline">Help center</Link>
+                <Link href="/policies" className="link-underline">Policies</Link>
+                <Link href="/policies/shipping" className="link-underline">Shipping</Link>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-[var(--border)]">
+            <Link href="/shop" className="btn btn-candy btn-compact">
+              Shop bags
+            </Link>
+            <Link href="/wholesale" className="btn btn-outline btn-compact">
+              Wholesale inquiries
+            </Link>
+            <div className="ml-auto flex flex-col items-end gap-1 text-xs text-[var(--muted)]">
               <div>
                 <div className="font-semibold text-[var(--text)]">Other places to buy</div>
                 <a
