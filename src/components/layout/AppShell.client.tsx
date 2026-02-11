@@ -599,7 +599,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <footer className="border-t border-[var(--border)] bg-white/85 backdrop-blur-md text-[var(--text)]">
         <div className="mx-auto max-w-6xl px-4 py-8 text-sm text-[var(--muted)] space-y-6">
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-1 max-w-xl">
             <LeadCapture
               source="footer"
               intent="newsletter"
@@ -610,7 +610,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               emphasis="quiet"
               showSms
             />
-            <SubscriptionUnlock source="footer" variant="light" />
           </div>
 
           <div className="grid gap-4 md:grid-cols-[1.1fr_auto] md:items-start">

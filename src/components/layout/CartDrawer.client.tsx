@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { CartView } from "@/components/ui/CartView";
 import { GiftNote } from "@/components/cart/GiftNote.client";
+import { AMAZON_REVIEWS } from "@/data/amazonReviews";
 import { cn } from "@/lib/cn";
 
 function getStoredCartId() {
@@ -124,7 +125,7 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
                 </button>
               </div>
               <div className="mt-1.5 flex flex-wrap items-center gap-3 text-[10px] font-semibold text-[var(--muted)]">
-                <span>⭐ 4.7/5 from 500+ reviews</span>
+                <span>⭐ {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars from verified Amazon buyers</span>
                 <span className="h-2.5 w-px bg-[var(--border)]" aria-hidden="true" />
                 <span>🇺🇸 Made in USA</span>
                 <span className="h-2.5 w-px bg-[var(--border)]" aria-hidden="true" />
