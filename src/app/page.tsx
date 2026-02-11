@@ -475,48 +475,26 @@ export default async function HomePage() {
             </h2>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <div className="group relative overflow-hidden rounded-[20px] border border-[rgba(15,27,45,0.08)] aspect-[4/3] shadow-[0_8px_24px_rgba(15,27,45,0.06)] transition-all duration-500 hover:shadow-[0_20px_48px_rgba(15,27,45,0.14)] hover:-translate-y-1">
-              <Image
-                src="/brand/standards/made-in-america.jpg"
-                alt="Made in America isn't a slogan — it's a standard. Gummy bears lined up with American flag background."
-                fill
-                sizes="(max-width: 640px) 92vw, (max-width: 1024px) 46vw, 360px"
-                className="object-cover transition-transform duration-700 group-hover:scale-105"
-              />
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent p-4 pt-10">
-                <div className="text-[13px] font-black text-white tracking-wide">Made in America</div>
+            {[
+              { label: "Made in America", icon: "🇺🇸", desc: "Sourced, manufactured, and packed entirely in the USA.", accent: "from-[var(--navy)] to-[#1a2d4f]" },
+              { label: "No Artificial Dyes", icon: "🍇", desc: "Colored with real fruit and vegetable extracts — never synthetic dyes.", accent: "from-[#7b1f2f] to-[#a02040]" },
+              { label: "All Natural Flavors", icon: "🍒", desc: "Five classic fruit flavors from natural sources in every bag.", accent: "from-[#1a5c2e] to-[#2a7a42]" },
+            ].map((standard, i) => (
+              <div key={standard.label} className={`group relative overflow-hidden rounded-[20px] shadow-[0_8px_24px_rgba(15,27,45,0.06)] transition-all duration-500 hover:shadow-[0_20px_48px_rgba(15,27,45,0.14)] hover:-translate-y-1 bg-gradient-to-br ${standard.accent} ${i === 2 ? "sm:col-span-2 lg:col-span-1" : ""}`}>
+                <div className="absolute inset-0 opacity-[0.06]" aria-hidden="true" style={{ backgroundImage: "url('/brand/pattern-stars.svg')", backgroundSize: "60px" }} />
+                <div className="relative z-10 flex flex-col justify-end p-5 sm:p-6 min-h-[180px]">
+                  <div className="text-3xl mb-3" aria-hidden="true">{standard.icon}</div>
+                  <div className="text-base font-black text-white tracking-wide sm:text-lg">{standard.label}</div>
+                  <p className="mt-1.5 text-[13px] text-white/70 leading-relaxed">{standard.desc}</p>
+                </div>
               </div>
-            </div>
-            <div className="group relative overflow-hidden rounded-[20px] border border-[rgba(15,27,45,0.08)] aspect-[4/3] shadow-[0_8px_24px_rgba(15,27,45,0.06)] transition-all duration-500 hover:shadow-[0_20px_48px_rgba(15,27,45,0.14)] hover:-translate-y-1">
-              <Image
-                src="/brand/standards/no-artificial-dyes.jpg"
-                alt="No artificial dyes isn't a slogan — it's a standard. Gummy bears with American flag background."
-                fill
-                sizes="(max-width: 640px) 92vw, (max-width: 1024px) 46vw, 360px"
-                className="object-cover transition-transform duration-700 group-hover:scale-105"
-              />
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent p-4 pt-10">
-                <div className="text-[13px] font-black text-white tracking-wide">No artificial dyes</div>
-              </div>
-            </div>
-            <div className="group relative overflow-hidden rounded-[20px] border border-[rgba(15,27,45,0.08)] aspect-[4/3] sm:col-span-2 lg:col-span-1 shadow-[0_8px_24px_rgba(15,27,45,0.06)] transition-all duration-500 hover:shadow-[0_20px_48px_rgba(15,27,45,0.14)] hover:-translate-y-1">
-              <Image
-                src="/brand/standards/all-natural-flavors.jpg"
-                alt="All natural flavors isn't a slogan — it's a standard. Gummy bears with American flag background."
-                fill
-                sizes="(max-width: 640px) 92vw, (max-width: 1024px) 92vw, 360px"
-                className="object-cover transition-transform duration-700 group-hover:scale-105"
-              />
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent p-4 pt-10">
-                <div className="text-[13px] font-black text-white tracking-wide">All natural flavors</div>
-              </div>
-            </div>
+            ))}
           </div>
           <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_1.2fr]">
             <div className="group relative overflow-hidden rounded-[20px] border border-[rgba(15,27,45,0.08)] aspect-[5/4] shadow-[0_8px_24px_rgba(15,27,45,0.06)] transition-all duration-500 hover:shadow-[0_20px_48px_rgba(15,27,45,0.14)]">
               <Image
                 src="/brand/standards/lifestyle-forest.jpg"
-                alt="USA Gummies bag outdoors in a pine forest with gummy bears on a rock"
+                alt="USA Gummies bag on rustic wood table with American flags and loose gummy bears"
                 fill
                 sizes="(max-width: 640px) 92vw, (max-width: 1024px) 46vw, 480px"
                 className="object-cover transition-transform duration-700 group-hover:scale-105"
@@ -565,20 +543,21 @@ export default async function HomePage() {
             </div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
               {[
-                { name: "Cherry", color: "var(--candy-red)", img: "/brand/gummies/gummy-red.png" },
-                { name: "Lemon", color: "var(--candy-yellow)", img: "/brand/gummies/gummy-yellow.png" },
-                { name: "Green Apple", color: "var(--candy-green)", img: "/brand/gummies/gummy-green.png" },
-                { name: "Orange", color: "var(--candy-orange)", img: "/brand/gummies/gummy-orange.png" },
-                { name: "Watermelon", color: "var(--candy-red)", img: "/brand/gummies/gummy-pink.png" },
+                { name: "Cherry", color: "#c0392b", highlight: "#e74c3c", shadow: "rgba(192,57,43,0.35)" },
+                { name: "Lemon", color: "#d4a017", highlight: "#f1c40f", shadow: "rgba(212,160,23,0.35)" },
+                { name: "Green Apple", color: "#27ae60", highlight: "#2ecc71", shadow: "rgba(39,174,96,0.35)" },
+                { name: "Orange", color: "#d35400", highlight: "#e67e22", shadow: "rgba(211,84,0,0.35)" },
+                { name: "Watermelon", color: "#c0392b", highlight: "#e84a5f", shadow: "rgba(232,74,95,0.35)" },
               ].map((flavor) => (
                 <div key={flavor.name} className="group flex flex-col items-center rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-4 transition-all duration-300 hover:shadow-[0_12px_32px_rgba(15,27,45,0.10)] hover:-translate-y-1">
-                  <div className="relative h-16 w-16 sm:h-20 sm:w-20">
-                    <Image
-                      src={flavor.img}
-                      alt={`${flavor.name} gummy bear`}
-                      fill
-                      sizes="80px"
-                      className="object-contain drop-shadow-[0_6px_12px_rgba(0,0,0,0.12)] transition-transform duration-300 group-hover:scale-110"
+                  <div className="relative h-16 w-16 sm:h-20 sm:w-20 flex items-center justify-center">
+                    <div
+                      className="h-12 w-10 sm:h-16 sm:w-13 rounded-[40%_40%_44%_44%] transition-transform duration-300 group-hover:scale-110"
+                      aria-hidden="true"
+                      style={{
+                        background: `radial-gradient(ellipse 60% 40% at 35% 30%, ${flavor.highlight}cc, ${flavor.color}ee 60%, ${flavor.color} 100%)`,
+                        boxShadow: `0 6px 16px ${flavor.shadow}, inset 0 -4px 8px rgba(0,0,0,0.15), inset 0 2px 6px rgba(255,255,255,0.3)`,
+                      }}
                     />
                   </div>
                   <div className="mt-2.5 flex items-center gap-1.5">
@@ -912,7 +891,7 @@ export default async function HomePage() {
       <section className="bg-transparent" data-zone="WHOLESALE">
         <div className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
           <div className="relative overflow-hidden rounded-[28px] border border-[rgba(15,27,45,0.10)] bg-[var(--navy)] p-6 sm:p-8 lg:p-10">
-            <div className="absolute inset-0 opacity-[0.04]" aria-hidden="true" style={{ backgroundImage: "url('/website%20assets/paper-grain.webp')", backgroundSize: "400px", mixBlendMode: "overlay" }} />
+            <div className="absolute inset-0 opacity-[0.04]" aria-hidden="true" style={{ backgroundImage: "url('/brand/pattern-stars.svg')", backgroundSize: "120px", mixBlendMode: "overlay" }} />
             <div className="relative z-10 grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
               <div className="space-y-4">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.35em] text-white/50">
