@@ -316,6 +316,58 @@ details > summary::-webkit-details-marker{
 .home-hero-theme .hero-scroll-link:hover{
   color: #ffffff;
 }
+
+/* ── Light section override ──
+   Resets dark theme variables back to light for sections that
+   should appear on a warm cream/white background.            */
+.section-light{
+  --bg: #fefcf8;
+  --surface: #ffffff;
+  --surface-strong: #fdf9f3;
+  --candy-cream: #fff7f0;
+  --text: #1c2430;
+  --muted: #5f5b56;
+  --border: rgba(16, 24, 40, 0.12);
+  --pill: rgba(13, 28, 51, 0.06);
+  --pill-border: rgba(13, 28, 51, 0.18);
+  --pill-strong: rgba(199, 54, 44, 0.12);
+  background-color: var(--bg);
+  color: var(--text);
+}
+.section-light .bg-white{
+  background-color: #ffffff !important;
+}
+.section-light [class*="bg-white/"]{
+  background-color: rgba(255,255,255,0.96) !important;
+}
+.section-light .candy-panel{
+  background-color: #ffffff;
+  border-color: rgba(15, 27, 45, 0.10);
+  background-image: none;
+}
+.section-light .badge--navy{
+  border-color: rgba(13, 28, 51, 0.24);
+  background: rgba(13, 28, 51, 0.08);
+  color: #0d1c33;
+}
+.section-light .badge--red{
+  border-color: rgba(199, 54, 44, 0.28);
+  background: rgba(199, 54, 44, 0.12);
+  color: #c7362c;
+}
+.section-light .btn-outline{
+  border-color: rgba(16, 24, 40, 0.12);
+  color: #1c2430;
+}
+.section-light .blog-latest{
+  background: #fdf9f3;
+  border-color: rgba(16, 24, 40, 0.12);
+}
+.section-light .blog-card{
+  background: #ffffff;
+  border-color: rgba(16, 24, 40, 0.12);
+}
+
 .brand-touch{
   pointer-events: none;
   user-select: none;
