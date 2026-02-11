@@ -24,7 +24,7 @@ function resolveSiteUrl() {
 const SITE_URL = resolveSiteUrl();
 const PAGE_TITLE = "Red 40 Free Gummies | No Artificial Dyes Gummy Bears";
 const PAGE_DESCRIPTION =
-  "Looking for red 40 free gummies? USA Gummies are no artificial dyes gummy bears made in the USA with colors from fruit and vegetable extracts.";
+  "Red 40 free gummy bears that actually taste great. Colored with real fruit extracts, made in an FDA-registered US facility. See ingredients, FAQs, and shop.";
 const PAGE_URL = `${SITE_URL}/no-artificial-dyes-gummy-bears`;
 const OG_IMAGE = "/opengraph-image";
 const ARTICLE_HEADLINE = "No Artificial Dyes Gummy Bears";
@@ -403,6 +403,38 @@ export default async function NoArtificialDyesPage() {
               </div>
               <Link href="/shop" className="btn btn-candy">
                 Shop & save
+              </Link>
+            </div>
+          </div>
+
+          <div className="mt-6 rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-5 sm:p-6">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+              Keep reading
+            </div>
+            <h2 className="mt-2 text-lg font-black text-[var(--text)]">
+              More about dye-free and made in USA candy.
+            </h2>
+            <div className="mt-3 flex flex-wrap gap-3">
+              <Link href="/dye-free-candy" className="rounded-xl border border-[var(--border)] bg-white px-4 py-2.5 text-sm font-semibold text-[var(--text)] transition-all hover:shadow-[0_8px_20px_rgba(15,27,45,0.08)] hover:-translate-y-0.5">
+                Dye-free candy guide
+              </Link>
+              <Link href="/dye-free-vs-regular-gummies" className="rounded-xl border border-[var(--border)] bg-white px-4 py-2.5 text-sm font-semibold text-[var(--text)] transition-all hover:shadow-[0_8px_20px_rgba(15,27,45,0.08)] hover:-translate-y-0.5">
+                Dye-free vs regular
+              </Link>
+              <Link href="/made-in-usa" className="rounded-xl border border-[var(--border)] bg-white px-4 py-2.5 text-sm font-semibold text-[var(--text)] transition-all hover:shadow-[0_8px_20px_rgba(15,27,45,0.08)] hover:-translate-y-0.5">
+                Made in USA
+              </Link>
+              <Link href="/gummies-101" className="rounded-xl border border-[var(--border)] bg-white px-4 py-2.5 text-sm font-semibold text-[var(--text)] transition-all hover:shadow-[0_8px_20px_rgba(15,27,45,0.08)] hover:-translate-y-0.5">
+                Gummies 101
+              </Link>
+              <Link href="/faq" className="rounded-xl border border-[var(--border)] bg-white px-4 py-2.5 text-sm font-semibold text-[var(--text)] transition-all hover:shadow-[0_8px_20px_rgba(15,27,45,0.08)] hover:-translate-y-0.5">
+                FAQ
+              </Link>
+              <Link href="/bulk-gummy-bears" className="rounded-xl border border-[var(--border)] bg-white px-4 py-2.5 text-sm font-semibold text-[var(--text)] transition-all hover:shadow-[0_8px_20px_rgba(15,27,45,0.08)] hover:-translate-y-0.5">
+                Bulk gummy bears
+              </Link>
+              <Link href="/gummy-gift-bundles" className="rounded-xl border border-[var(--border)] bg-white px-4 py-2.5 text-sm font-semibold text-[var(--text)] transition-all hover:shadow-[0_8px_20px_rgba(15,27,45,0.08)] hover:-translate-y-0.5">
+                Gift bag options
               </Link>
             </div>
           </div>

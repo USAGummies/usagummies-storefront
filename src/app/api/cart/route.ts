@@ -5,6 +5,7 @@ import {
   buyNow,
   updateLineQuantity,
   replaceCartWithVariant,
+  updateCartNote,
   getCart,
   getCartById,
   getCartConfigStatus,
@@ -12,11 +13,12 @@ import {
 import { normalizeSingleBagVariant } from "@/lib/bundles/atomic";
 
 type Body = {
-  action?: "add" | "buy" | "update" | "replace" | "get";
+  action?: "add" | "buy" | "update" | "replace" | "get" | "note";
   variantId?: string;
   quantity?: number;
   lineId?: string;
   cartId?: string;
+  note?: string;
 };
 
 function json(data: any, status = 200) {
@@ -53,6 +55,13 @@ export async function POST(req: Request) {
       const cart =
         cartId ? (await getCartById(cartId)) ?? (await getCart()) : await getCart();
       return json({ ok: true, cart });
+    }
+
+    if (action === "note") {
+      const note = String(body.note ?? "");
+      const cartId = await updateCartNote(note);
+      if (!cartId) return json({ ok: false, error: "Cart note update failed." }, 500);
+      return json({ ok: true });
     }
 
     if (action === "update") {

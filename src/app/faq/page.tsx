@@ -21,7 +21,7 @@ function resolveSiteUrl() {
 const SITE_URL = resolveSiteUrl();
 const PAGE_TITLE = "USA Gummies FAQ | Dye-Free Gummies";
 const PAGE_DESCRIPTION =
-  "Answers on ingredients, shipping, and orders for our made in USA candy, including dye-free gummies with no artificial dyes.";
+  "Got questions about dye-free gummies? Find answers on ingredients, Red 40, shipping, allergens, bulk orders, and more. 34 questions answered.";
 const OG_IMAGE = "/opengraph-image";
 
 export const metadata: Metadata = {
@@ -104,12 +104,16 @@ const FAQS: FaqItem[] = [
   {
     question: "Which bag count should I choose?",
     answer:
-      "Use our bag count guides to match the right size for gifts, patriotic parties, or bulk orders.",
+      "Use our bag count guides or gummy calculator to match the right size for gifts, patriotic parties, or bulk orders.",
     answerText:
-      "Use our bag count guides to match the right size for gifts, patriotic parties, or bulk orders.",
+      "Use our bag count guides or gummy calculator to match the right size for gifts, patriotic parties, or bulk orders.",
     answerNode: (
       <>
-        Use our bag count guides to match the right size for{" "}
+        Use our{" "}
+        <Link href="/gummy-calculator" className="link-underline font-semibold text-[var(--navy)]">
+          gummy calculator
+        </Link>{" "}
+        or bag count guides for{" "}
         <Link href="/gummy-gift-bundles" className="link-underline font-semibold text-[var(--navy)]">
           gifts
         </Link>
@@ -123,6 +127,191 @@ const FAQS: FaqItem[] = [
         , or{" "}
         <Link href="/bulk-gummy-bears" className="link-underline font-semibold text-[var(--navy)]">
           bulk orders
+        </Link>
+        .
+      </>
+    ),
+  },
+  // --- Ingredients & Dietary ---
+  {
+    question: "Are USA Gummies vegan?",
+    answer:
+      "No. USA Gummies contain gelatin, which is an animal-derived ingredient. They are not suitable for vegan diets.",
+  },
+  {
+    question: "Do USA Gummies contain gelatin?",
+    answer:
+      "Yes. Our gummy bears use gelatin for the classic gummy chew texture. Check the ingredients page for the full ingredient list.",
+  },
+  {
+    question: "Are your gummies kosher or halal?",
+    answer:
+      "We do not currently carry kosher or halal certification. Please review the ingredient panel for details.",
+  },
+  {
+    question: "Do USA Gummies contain any of the top allergens?",
+    answer:
+      "Please review the ingredient panel on the bag for the most current allergen information. If you have specific allergies, contact us before ordering.",
+  },
+  {
+    question: "What gives USA Gummies their color?",
+    answer:
+      "Colors come from fruit and vegetable extracts, spirulina, and curcumin. No FD&C certified synthetic colors are used.",
+  },
+  {
+    question: "Are USA Gummies organic?",
+    answer:
+      "We do not carry an organic certification. Our gummies are made with all natural flavors and colors from fruit and vegetable extracts in an FDA-registered facility.",
+  },
+  {
+    question: "How many calories are in a serving of USA Gummies?",
+    answer:
+      "Visit our ingredients page for the most current nutrition facts, including calories, sugar, and serving size information.",
+  },
+  {
+    question: "What does dye-free mean?",
+    answer:
+      "Dye-free means the product does not use FD&C certified synthetic color additives like Red 40, Yellow 5, or Blue 1. Colors come from natural sources like fruit and vegetable extracts.",
+  },
+  // --- Shipping & Orders ---
+  {
+    question: "How long does shipping take?",
+    answer:
+      "Orders of 5+ bags ship directly from us via USPS and typically arrive in 3-5 business days. Orders under 5 bags are fulfilled through Amazon with their standard delivery timeline.",
+  },
+  {
+    question: "Do you ship internationally?",
+    answer:
+      "We currently ship within the United States only. We hope to offer international shipping in the future.",
+  },
+  {
+    question: "Can I track my order?",
+    answer:
+      "Yes. You will receive a tracking number by email once your order ships. For Amazon-fulfilled orders, tracking is available in your Amazon account.",
+  },
+  {
+    question: "What is your return policy?",
+    answer:
+      "As a food product, we do not accept returns. If you receive a damaged or incorrect order, contact us within 7 days and we will make it right.",
+  },
+  {
+    question: "Why does buying under 5 bags go through Amazon?",
+    answer:
+      "Shipping small orders directly is expensive. By routing 1-4 bag orders through Amazon, you benefit from their shipping infrastructure and competitive delivery rates. Orders of 5+ bags ship free directly from us.",
+  },
+  // --- Product & Quality ---
+  {
+    question: "How many gummy bears are in each bag?",
+    answer:
+      "Each 7.5 oz bag contains approximately 50 gummy bears across five fruit flavors.",
+  },
+  {
+    question: "What does FDA-registered facility mean?",
+    answer:
+      "Our manufacturing facility is registered with the U.S. Food and Drug Administration. This means the facility meets federal food safety standards and is subject to FDA oversight.",
+  },
+  {
+    question: "Are USA Gummies made in China?",
+    answer:
+      "No. USA Gummies are sourced, made, and packed in the United States. Our name reflects our commitment to domestic manufacturing.",
+  },
+  {
+    question: "Can kids eat USA Gummies?",
+    answer:
+      "Yes. USA Gummies are made with no artificial dyes or synthetic colors, making them a popular choice for parents looking for cleaner candy options. As with any candy, parental discretion is advised for small children.",
+  },
+  {
+    question: "Do you offer sugar-free gummy bears?",
+    answer:
+      "We do not currently offer a sugar-free variety. Our gummies are made with real sugar and all natural flavors.",
+  },
+  {
+    question: "How should I store my gummy bears?",
+    answer:
+      "Store in a cool, dry place away from direct sunlight. Reseal the bag after opening to maintain freshness and texture.",
+  },
+  // --- Buying & Gifting ---
+  {
+    question: "Can I buy USA Gummies as a gift?",
+    answer:
+      "Yes. Our gummy bundles make great gifts. Check our gummy gift bundles guide for recommendations by occasion.",
+    answerNode: (
+      <>
+        Yes. Our gummy bundles make great gifts. Check our{" "}
+        <Link href="/gummy-gift-bundles" className="link-underline font-semibold text-[var(--navy)]">
+          gummy gift bundles guide
+        </Link>{" "}
+        for recommendations by occasion.
+      </>
+    ),
+  },
+  {
+    question: "Do you offer wholesale or bulk pricing?",
+    answer:
+      "Yes. We offer wholesale pricing for retailers, corporate gifting, and events. Visit our wholesale page or contact us for details.",
+    answerNode: (
+      <>
+        Yes. We offer wholesale pricing for retailers, corporate gifting, and events. Visit our{" "}
+        <Link href="/wholesale" className="link-underline font-semibold text-[var(--navy)]">
+          wholesale page
+        </Link>{" "}
+        or{" "}
+        <Link href="/contact" className="link-underline font-semibold text-[var(--navy)]">
+          contact us
+        </Link>{" "}
+        for details.
+      </>
+    ),
+  },
+  {
+    question: "How many bags do I need for a party?",
+    answer:
+      "Use our free gummy calculator to get a personalized recommendation based on your guest count and event type.",
+    answerNode: (
+      <>
+        Use our free{" "}
+        <Link href="/gummy-calculator" className="link-underline font-semibold text-[var(--navy)]">
+          gummy calculator
+        </Link>{" "}
+        to get a personalized recommendation based on your guest count and event type.
+      </>
+    ),
+  },
+  {
+    question: "Can I subscribe for regular deliveries?",
+    answer:
+      "We are building a subscription option for repeat customers. Join our email list to be notified when it launches.",
+  },
+  {
+    question: "Do you sell on Amazon?",
+    answer:
+      "Yes. USA Gummies are available on Amazon. Orders of 1-4 bags on our site are fulfilled through Amazon to give you the best shipping experience.",
+  },
+  {
+    question: "Is there a discount for first-time buyers?",
+    answer:
+      "Sign up for our email list to receive exclusive offers for new customers. Bundle savings also start at 4+ bags with the best per-bag price at 12 bags.",
+  },
+  // --- Comparison / Search Intent ---
+  {
+    question: "What is the difference between dye-free and natural gummies?",
+    answer:
+      "Dye-free specifically means no synthetic FD&C color additives. Natural gummies may or may not contain synthetic colors. USA Gummies are both dye-free and made with all natural flavors.",
+  },
+  {
+    question: "Are USA Gummies better than regular gummy bears?",
+    answer:
+      "USA Gummies use fruit and vegetable-based colors instead of synthetic dyes like Red 40, and they are made in the USA in an FDA-registered facility. The taste is a classic fruit gummy bear chew with all natural flavors.",
+  },
+  {
+    question: "What is Red 40 and why should I avoid it?",
+    answer:
+      "Red 40 (also called FD&C Red No. 40 or Allura Red) is a synthetic color additive used in many candies. Some parents choose to avoid it due to concerns about sensitivity in certain children. USA Gummies use fruit and vegetable extracts for color instead.",
+    answerNode: (
+      <>
+        Red 40 (also called FD&C Red No. 40 or Allura Red) is a synthetic color additive used in many candies. Some parents choose to avoid it due to concerns about sensitivity in certain children. USA Gummies use fruit and vegetable extracts for color instead.{" "}
+        <Link href="/no-artificial-dyes-gummy-bears" className="link-underline font-semibold text-[var(--navy)]">
+          Learn more
         </Link>
         .
       </>
@@ -216,6 +405,38 @@ export default function FaqPage() {
                 </Link>
                 <Link href="/about" className="btn btn-candy">
                   Learn our story
+                </Link>
+              </div>
+            </div>
+
+            <div className="mt-6 border-t border-[var(--border)] pt-5">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+                Keep reading
+              </div>
+              <h2 className="mt-2 text-lg font-black text-[var(--text)]">
+                More about USA Gummies.
+              </h2>
+              <div className="mt-3 flex flex-wrap gap-2.5">
+                <Link href="/no-artificial-dyes-gummy-bears" className="rounded-xl border border-[var(--border)] bg-[var(--surface-strong)] px-3.5 py-2 text-sm font-semibold text-[var(--text)] transition-all hover:shadow-[0_8px_20px_rgba(15,27,45,0.08)] hover:-translate-y-0.5">
+                  Dye-free gummy bears
+                </Link>
+                <Link href="/made-in-usa" className="rounded-xl border border-[var(--border)] bg-[var(--surface-strong)] px-3.5 py-2 text-sm font-semibold text-[var(--text)] transition-all hover:shadow-[0_8px_20px_rgba(15,27,45,0.08)] hover:-translate-y-0.5">
+                  Made in USA
+                </Link>
+                <Link href="/ingredients" className="rounded-xl border border-[var(--border)] bg-[var(--surface-strong)] px-3.5 py-2 text-sm font-semibold text-[var(--text)] transition-all hover:shadow-[0_8px_20px_rgba(15,27,45,0.08)] hover:-translate-y-0.5">
+                  Ingredients
+                </Link>
+                <Link href="/dye-free-candy" className="rounded-xl border border-[var(--border)] bg-[var(--surface-strong)] px-3.5 py-2 text-sm font-semibold text-[var(--text)] transition-all hover:shadow-[0_8px_20px_rgba(15,27,45,0.08)] hover:-translate-y-0.5">
+                  Dye-free candy guide
+                </Link>
+                <Link href="/gummies-101" className="rounded-xl border border-[var(--border)] bg-[var(--surface-strong)] px-3.5 py-2 text-sm font-semibold text-[var(--text)] transition-all hover:shadow-[0_8px_20px_rgba(15,27,45,0.08)] hover:-translate-y-0.5">
+                  Gummies 101
+                </Link>
+                <Link href="/wholesale" className="rounded-xl border border-[var(--border)] bg-[var(--surface-strong)] px-3.5 py-2 text-sm font-semibold text-[var(--text)] transition-all hover:shadow-[0_8px_20px_rgba(15,27,45,0.08)] hover:-translate-y-0.5">
+                  Wholesale
+                </Link>
+                <Link href="/gummy-calculator" className="rounded-xl border border-[var(--border)] bg-[var(--surface-strong)] px-3.5 py-2 text-sm font-semibold text-[var(--text)] transition-all hover:shadow-[0_8px_20px_rgba(15,27,45,0.08)] hover:-translate-y-0.5">
+                  Gummy calculator
                 </Link>
               </div>
             </div>

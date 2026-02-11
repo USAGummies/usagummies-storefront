@@ -23,7 +23,7 @@ function resolveSiteUrl() {
 const SITE_URL = resolveSiteUrl();
 const PAGE_TITLE = "Bulk Gummy Bears | Made in USA Candy";
 const PAGE_DESCRIPTION =
-  "Stock up on dye-free gummies in bulk. Made in USA candy for events, offices, and patriotic celebrations.";
+  "Buy gummy bears in bulk with volume discounts. Dye-free, made in the USA, free shipping on 5+ bags. Perfect for offices, parties, and events.";
 
 export const metadata: Metadata = {
   title: PAGE_TITLE,

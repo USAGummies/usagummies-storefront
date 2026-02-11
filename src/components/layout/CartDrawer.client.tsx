@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { CartView } from "@/components/ui/CartView";
+import { GiftNote } from "@/components/cart/GiftNote.client";
 import { cn } from "@/lib/cn";
 
 function getStoredCartId() {
@@ -111,18 +112,32 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
           aria-hidden={!open}
         >
           <div className="h-full rounded-none border-l border-[var(--border)] bg-[var(--surface)] text-[var(--text)] sm:rounded-l-[var(--radius-xl)] sm:shadow-[var(--shadow-card)]">
-            <div className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--surface-strong)] px-4 py-3">
-              <div className="text-lg font-black text-[var(--text)]">Your cart</div>
-              <button
-                type="button"
-                onClick={onClose}
-                className="pressable rounded-full border border-[var(--border)] px-3 py-1 text-sm text-[var(--muted)] hover:text-[var(--text)] focus-ring"
-              >
-                Close
-              </button>
+            <div className="border-b border-[var(--border)] bg-[var(--surface-strong)] px-4 py-3">
+              <div className="flex items-center justify-between">
+                <div className="text-lg font-black text-[var(--text)]">Your cart</div>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="pressable rounded-full border border-[var(--border)] px-3 py-1 text-sm text-[var(--muted)] hover:text-[var(--text)] focus-ring"
+                >
+                  Close
+                </button>
+              </div>
+              <div className="mt-1.5 flex flex-wrap items-center gap-3 text-[10px] font-semibold text-[var(--muted)]">
+                <span>⭐ 4.7/5 from 500+ reviews</span>
+                <span className="h-2.5 w-px bg-[var(--border)]" aria-hidden="true" />
+                <span>🇺🇸 Made in USA</span>
+                <span className="h-2.5 w-px bg-[var(--border)]" aria-hidden="true" />
+                <span>🏭 FDA-registered facility</span>
+              </div>
             </div>
             <div className="h-[calc(100%-64px)] overflow-y-auto">
               <CartView cart={cart} onClose={onClose} />
+              {cart?.lines?.edges?.length > 0 && (
+                <div className="px-4 pb-4">
+                  <GiftNote />
+                </div>
+              )}
             </div>
           </div>
         </div>

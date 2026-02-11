@@ -5,6 +5,7 @@ import Image from "next/image";
 import { Reveal } from "@/components/ui/Reveal";
 import { LeadCapture } from "@/components/marketing/LeadCapture.client";
 import { SubscriptionUnlock } from "@/components/marketing/SubscriptionUnlock.client";
+import { ShareBar } from "@/components/marketing/ShareBar.client";
 
 function resolveSiteUrl() {
   const preferred = "https://www.usagummies.com";
@@ -20,7 +21,7 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "Thank You | USA Gummies";
+const PAGE_TITLE = "Thank You";
 const PAGE_DESCRIPTION = "Thanks for your USA Gummies order. You are officially part of the movement.";
 const OG_IMAGE = "/opengraph-image";
 
@@ -107,6 +108,24 @@ export default function ThankYouPage() {
           </Reveal>
         </div>
 
+        {/* Share & Refer */}
+        <div className="mt-6">
+          <Reveal className="candy-panel rounded-2xl border border-[var(--border)] p-5 space-y-4 text-[var(--text)]">
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+                Spread the word
+              </div>
+              <div className="text-lg font-black text-[var(--text)]">
+                Love your gummies? Tell a friend.
+              </div>
+              <div className="mt-1 text-sm text-[var(--muted)]">
+                Share the dye-free movement with friends &amp; family. Every share helps us keep making candy the right way.
+              </div>
+            </div>
+            <ShareBar />
+          </Reveal>
+        </div>
+
         <div className="mt-6 grid gap-4 md:grid-cols-2">
           <Reveal>
             <LeadCapture
@@ -123,23 +142,56 @@ export default function ThankYouPage() {
           </Reveal>
         </div>
 
-        <div className="mt-6">
+        {/* Cross-sell */}
+        <div className="mt-6 grid gap-4 md:grid-cols-2">
           <Reveal className="candy-panel rounded-2xl border border-[var(--border)] p-5 space-y-3 text-[var(--text)]">
-            <div className="text-lg font-black text-[var(--text)]">Choose your next bag count</div>
+            <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+              Most popular next step
+            </div>
+            <div className="text-lg font-black text-[var(--text)]">Go bigger next time</div>
             <div className="text-sm text-[var(--muted)]">
-              Free shipping on 5+ bags. Most customers go bigger on the next run.
+              Customers who start with a small order usually upgrade to 8+ bags. Free shipping and lower per-bag pricing.
             </div>
             <div className="flex flex-wrap gap-2">
               <Link href="/shop" className="btn btn-candy pressable">
-                Shop now
+                Shop bundles
               </Link>
-              <Link href="/contact" className="btn btn-outline pressable">
-                Order support
+              <Link href="/gummy-calculator" className="btn btn-outline pressable">
+                Bag calculator
               </Link>
             </div>
-            <div className="text-xs text-[var(--muted)]">
-              Ships fast. If you need help, we have you covered.
+          </Reveal>
+          <Reveal className="candy-panel rounded-2xl border border-[var(--border)] p-5 space-y-3 text-[var(--text)]">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+              Great for gifting
             </div>
+            <div className="text-lg font-black text-[var(--text)]">Send gummies as a gift</div>
+            <div className="text-sm text-[var(--muted)]">
+              Dye-free gummy bears make a crowd-pleasing, unique gift for parties, teachers, and thank-you packages.
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Link href="/gummy-gift-bundles" className="btn btn-candy pressable">
+                Gift bundles
+              </Link>
+              <Link href="/wholesale" className="btn btn-outline pressable">
+                Wholesale
+              </Link>
+            </div>
+          </Reveal>
+        </div>
+
+        {/* Support */}
+        <div className="mt-6">
+          <Reveal className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-5 text-center space-y-2">
+            <div className="text-sm font-semibold text-[var(--text)]">
+              Need help with your order?
+            </div>
+            <div className="text-sm text-[var(--muted)]">
+              We respond fast. Reach out anytime.
+            </div>
+            <Link href="/contact" className="btn btn-outline pressable inline-flex">
+              Contact support
+            </Link>
           </Reveal>
         </div>
       </div>

@@ -176,6 +176,28 @@ const CART_LINES_UPDATE = /* GraphQL */ `
   }
 `;
 
+const CART_NOTE_UPDATE = /* GraphQL */ `
+  mutation CartNoteUpdate($cartId: ID!, $note: String!) {
+    cartNoteUpdate(cartId: $cartId, note: $note) {
+      cart {
+        id
+        note
+      }
+      userErrors {
+        field
+        message
+      }
+    }
+  }
+`;
+
+type CartNoteUpdateResult = {
+  cartNoteUpdate: {
+    cart: { id: string; note: string | null } | null;
+    userErrors: Array<{ field: string[] | null; message: string }>;
+  };
+};
+
 type CartCreateResult = {
   cartCreate: {
     cart: { id: string; checkoutUrl: string; totalQuantity: number } | null;
@@ -409,6 +431,28 @@ export async function replaceCartWithVariant(variantId: string, quantity: number
     return nextCart.id;
   }
   return null;
+}
+
+/**
+ * Update the cart-level note (used for gift messages).
+ * The note appears in Shopify order admin for fulfillment.
+ */
+export async function updateCartNote(note: string) {
+  "use server";
+  const cartId = await getOrCreateCartId();
+  if (!cartId) return null;
+
+  const safeNote = (note || "").trim().slice(0, 500);
+
+  const data = await shopify<CartNoteUpdateResult>(CART_NOTE_UPDATE, {
+    cartId,
+    note: safeNote,
+  });
+
+  const errs = data?.cartNoteUpdate?.userErrors;
+  if (errs?.length) return null;
+
+  return data?.cartNoteUpdate?.cart?.id ?? null;
 }
 
 export { getCartById };

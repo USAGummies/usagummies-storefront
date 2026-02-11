@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { BlogArchive } from "@/components/blog/BlogArchive";
 import { getAllPosts, paginatePosts, resolveSiteUrl } from "@/lib/blog";
 
-const PAGE_TITLE = "Blog | USA Gummies";
+const PAGE_TITLE = "Blog";
 const PAGE_DESCRIPTION =
-  "Dye-free and made in USA candy stories from USA Gummies, with patriotic gummy tips.";
+  "Tips, recipes, and guides on dye-free gummies, clean-label candy, and made in USA snacks from the USA Gummies team.";
 
 export const revalidate = 3600;
 

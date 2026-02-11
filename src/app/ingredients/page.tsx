@@ -22,9 +22,9 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "Ingredients: No Artificial Dyes | USA Gummies";
+const PAGE_TITLE = "Ingredients: No Artificial Dyes";
 const PAGE_DESCRIPTION =
-  "See what's inside our dye-free gummies and made in USA candy, plus the flavors and ingredients we avoid.";
+  "Full ingredient list and nutrition facts for USA Gummies. See exactly what goes into our dye-free gummy bears — and what we leave out.";
 const ARTICLE_HEADLINE = "Ingredients and nutrition facts for USA Gummies";
 const OG_IMAGE = "/opengraph-image";
 
@@ -435,6 +435,32 @@ export default async function IngredientsPage() {
               </Link>
               <Link href="/shop" className="btn btn-candy">
                 Shop now
+              </Link>
+            </div>
+          </div>
+
+          <div className="mt-6 rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-5 sm:p-6">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+              Related guides
+            </div>
+            <h2 className="mt-2 text-lg font-black text-[var(--text)]">
+              Learn more about what goes into every bag.
+            </h2>
+            <div className="mt-3 flex flex-wrap gap-2.5">
+              <Link href="/no-artificial-dyes-gummy-bears" className="rounded-xl border border-[var(--border)] bg-white px-3.5 py-2 text-sm font-semibold text-[var(--text)] transition-all hover:shadow-[0_8px_20px_rgba(15,27,45,0.08)] hover:-translate-y-0.5">
+                Dye-free gummy bears
+              </Link>
+              <Link href="/dye-free-candy" className="rounded-xl border border-[var(--border)] bg-white px-3.5 py-2 text-sm font-semibold text-[var(--text)] transition-all hover:shadow-[0_8px_20px_rgba(15,27,45,0.08)] hover:-translate-y-0.5">
+                Dye-free candy guide
+              </Link>
+              <Link href="/made-in-usa" className="rounded-xl border border-[var(--border)] bg-white px-3.5 py-2 text-sm font-semibold text-[var(--text)] transition-all hover:shadow-[0_8px_20px_rgba(15,27,45,0.08)] hover:-translate-y-0.5">
+                Made in USA
+              </Link>
+              <Link href="/gummies-101" className="rounded-xl border border-[var(--border)] bg-white px-3.5 py-2 text-sm font-semibold text-[var(--text)] transition-all hover:shadow-[0_8px_20px_rgba(15,27,45,0.08)] hover:-translate-y-0.5">
+                Gummies 101
+              </Link>
+              <Link href="/about" className="rounded-xl border border-[var(--border)] bg-white px-3.5 py-2 text-sm font-semibold text-[var(--text)] transition-all hover:shadow-[0_8px_20px_rgba(15,27,45,0.08)] hover:-translate-y-0.5">
+                About us
               </Link>
             </div>
           </div>

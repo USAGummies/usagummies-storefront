@@ -18,9 +18,9 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "Dye-Free Candy Guide | USA Gummies";
+const PAGE_TITLE = "Dye-Free Candy Guide";
 const PAGE_DESCRIPTION =
-  "Learn how to spot dye-free gummies and no artificial dyes on labels, plus why made in USA candy matters for patriotic gifts.";
+  "What does dye-free actually mean? Learn how to read labels, spot synthetic dyes like Red 40, and find candy colored with real fruit and vegetable extracts.";
 const PAGE_URL = `${SITE_URL}/dye-free-candy`;
 const OG_IMAGE = `${SITE_URL}/opengraph-image`;
 
@@ -402,6 +402,9 @@ export default function DyeFreeCandyPage() {
                 Keep exploring
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
+                <Link href="/dye-free-vs-regular-gummies" className="btn btn-outline">
+                  Dye-free vs regular
+                </Link>
                 <Link href="/bulk-gummy-bears" className="btn btn-outline">
                   Bulk gummy bears
                 </Link>

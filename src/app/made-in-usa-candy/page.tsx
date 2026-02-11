@@ -18,9 +18,9 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "Made in USA Candy Guide | USA Gummies";
+const PAGE_TITLE = "Made in USA Candy Guide";
 const PAGE_DESCRIPTION =
-  "Pillar guide to made in USA candy: what it means, how USA Gummies are made, bundle sizing, FAQs, and where to shop.";
+  "Everything you need to know about candy made in the USA. How to verify domestic sourcing, why it matters, and where to find dye-free gummies manufactured in America.";
 const PAGE_URL = `${SITE_URL}/made-in-usa-candy`;
 const OG_IMAGE = `${SITE_URL}/opengraph-image`;
 

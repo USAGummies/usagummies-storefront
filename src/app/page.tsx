@@ -36,7 +36,7 @@ const SITE_URL = resolveSiteUrl();
 const PAGE_TITLE =
   "Made in USA Candy & Dye-Free Gummies | USA Gummies";
 const PAGE_DESCRIPTION =
-  "Shop patriotic candy made in the USA. Dye-free gummies with no artificial dyes, plus bundles and gifts for any celebration.";
+  "Classic gummy bears made in the USA with zero artificial dyes. Free shipping on 5+ bags. Rated 4.8 stars by verified buyers. Shop bundles and save.";
 const OG_IMAGE = "/opengraph-image";
 
 export const metadata: Metadata = {
@@ -322,15 +322,21 @@ export default async function HomePage() {
                 </div>
               </div>
               <div className="mt-1.5 flex flex-wrap gap-1.5 text-[10px] text-white/70">
-                <span className="font-semibold text-white">Bag count guides:</span>
+                <span className="font-semibold text-white">Guides:</span>
                 <Link href="/gummy-gift-bundles" className="underline underline-offset-4">
-                  Gift bag options
+                  Gift bags
                 </Link>
                 <Link href="/patriotic-party-snacks" className="underline underline-offset-4">
                   Party snacks
                 </Link>
                 <Link href="/bulk-gummy-bears" className="underline underline-offset-4">
-                  Bulk gummy bears
+                  Bulk orders
+                </Link>
+                <Link href="/gummy-calculator" className="underline underline-offset-4">
+                  Bag calculator
+                </Link>
+                <Link href="/dye-free-vs-regular-gummies" className="underline underline-offset-4">
+                  Dye-free vs regular
                 </Link>
               </div>
             </div>
@@ -339,72 +345,81 @@ export default async function HomePage() {
       </section>
 
       <section className="home-product-stage home-hero-theme" data-zone="HERO">
-        <div className="mx-auto max-w-6xl px-4 py-0.5 sm:py-1.5 lg:py-2">
-          <div className="relative grid gap-1 lg:gap-2 lg:grid-cols-[1fr_1fr] lg:items-center">
+        <div className="mx-auto max-w-6xl px-4 py-6 sm:py-8 lg:py-12">
+          <div className="relative grid gap-6 lg:gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
             <div className="order-2 relative lg:order-1">
-              <div className="relative z-10 space-y-0.5">
-                <div className="flex items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.3em] text-white/70">
+              <div className="relative z-10 space-y-3 sm:space-y-4">
+                <div className="flex items-center gap-3">
                   <Image
                     src="/brand/logo.png"
                     alt="USA Gummies logo"
                     width={110}
                     height={36}
-                    className="h-7 w-auto"
+                    className="h-8 w-auto sm:h-9"
                   />
-                  <span>USA Gummies</span>
+                  <div className="h-5 w-px bg-white/25" aria-hidden="true" />
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.3em] text-white/60">
+                    Proudly American
+                  </span>
                 </div>
-                <h1 className="text-balance text-[32px] font-black leading-[1.05] tracking-tight text-white sm:text-4xl lg:text-5xl">
-                  All-American Gummy Bears
+                <h1 className="text-balance text-[36px] font-black leading-[1.02] tracking-tight text-white sm:text-5xl lg:text-6xl">
+                  All-American<br className="hidden sm:block" /> Gummy Bears
                 </h1>
-                <p className="text-pretty text-[12px] text-white/85 sm:text-sm">
-                  Classic gummy bears, made in the USA.
+                <p className="text-pretty text-base text-white/80 sm:text-lg max-w-md">
+                  Classic gummy bears, made in the USA with no artificial dyes and all natural flavors.
                 </p>
-                <div className="text-sm font-semibold text-white">
-                  No artificial dyes • All natural flavors
-                </div>
-                <div className="text-xs font-semibold text-[var(--gold)]">
-                  4.8 stars from verified Amazon buyers
-                </div>
-                <div className="pt-0 space-y-0.5">
-                  <div className="text-xs font-semibold text-white/70">
-                    Lower the per-bag price at 4+ bags.
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1">
+                    {[...Array(5)].map((_, i) => (
+                      <svg key={i} className="h-4 w-4 text-[var(--gold)]" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                      </svg>
+                    ))}
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Link href="#bundle-pricing" className="btn btn-candy">
-                      Shop &amp; save
-                    </Link>
-                    <a href="#bundle-pricing" className="hero-scroll-link" data-hero-scroll>
-                      Jump to bundle pricing
-                    </a>
-                  </div>
-                  <div className="text-xs font-semibold text-white/70">
+                  <span className="text-sm font-semibold text-[var(--gold)]">
+                    4.8 stars from verified Amazon buyers
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-3 pt-1">
+                  <Link href="#bundle-pricing" className="btn btn-candy text-base px-6 py-3.5">
+                    Shop &amp; save
+                  </Link>
+                  <a href="#bundle-pricing" className="hero-scroll-link text-sm text-white/80" data-hero-scroll>
+                    See bundle pricing
+                  </a>
+                </div>
+                <div className="pt-2 space-y-2">
+                  <div className="text-sm font-medium text-white/60">
                     {FREE_SHIPPING_PHRASE} • Satisfaction guaranteed
                   </div>
-                  <div className="flex flex-wrap items-center gap-2 pt-0.5 text-[11px] font-semibold text-white/70">
-                    <span className="theme-pill rounded-full border border-white/20 bg-white px-3 py-1 text-[var(--navy)]">
+                  <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
+                    <span className="theme-pill rounded-full border border-white/20 bg-white/95 px-3.5 py-1.5 text-[var(--navy)] shadow-xs">
                       Made in USA
                     </span>
-                    <span className="theme-pill rounded-full border border-white/20 bg-white px-3 py-1 text-[var(--navy)]">
+                    <span className="theme-pill rounded-full border border-white/20 bg-white/95 px-3.5 py-1.5 text-[var(--navy)] shadow-xs">
                       Ships in 24 hours
                     </span>
-                    <span className="theme-pill rounded-full border border-white/20 bg-white px-3 py-1 text-[var(--navy)]">
+                    <span className="theme-pill rounded-full border border-white/20 bg-white/95 px-3.5 py-1.5 text-[var(--navy)] shadow-xs">
                       Secure checkout
+                    </span>
+                    <span className="theme-pill rounded-full border border-white/20 bg-white/95 px-3.5 py-1.5 text-[var(--navy)] shadow-xs">
+                      FDA-registered facility
                     </span>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="order-1 hidden justify-center sm:flex lg:order-2 lg:justify-end">
-              <div className="home-hero__media relative w-full max-w-[240px] sm:max-w-[340px] lg:max-w-[420px]">
+            <div className="order-1 flex justify-center lg:order-2 lg:justify-end">
+              <div className="home-hero__media relative w-full max-w-[280px] sm:max-w-[380px] lg:max-w-[460px]">
                 <div className="relative aspect-[4/5] overflow-visible">
                   <Image
                     src={heroMediaSrc}
                     alt="Bag of USA Gummies classic gummy bears"
                     fill
                     fetchPriority="low"
-                    sizes="(max-width: 640px) 92vw, (max-width: 1024px) 55vw, 640px"
-                    className="object-contain drop-shadow-[0_18px_30px_rgba(13,28,51,0.22)] z-10"
+                    sizes="(max-width: 640px) 72vw, (max-width: 1024px) 50vw, 460px"
+                    className="object-contain drop-shadow-[0_24px_48px_rgba(13,28,51,0.35)] z-10"
                   />
                 </div>
               </div>
@@ -416,87 +431,163 @@ export default async function HomePage() {
       <div className="americana-divider" aria-hidden="true" />
 
       <section className="bg-transparent" data-zone="VALUE" aria-label="Product value">
-        <div className="mx-auto max-w-6xl px-4 py-0.5 sm:py-0.5">
-          <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-            <div className="rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-3">
-              <div className="flex items-center gap-2">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--surface-strong)] text-lg">
-                  <span aria-hidden="true">🇺🇸</span>
-                </div>
-                <div className="text-[13px] font-black text-[var(--text)]">Made in the USA</div>
+        <div className="mx-auto max-w-6xl px-4 py-4 sm:py-6">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="group rounded-2xl border border-[rgba(15,27,45,0.10)] bg-white p-5 sm:p-6 transition-all duration-300 hover:shadow-[0_16px_40px_rgba(15,27,45,0.10)] hover:-translate-y-0.5">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--surface-strong)] text-2xl shadow-xs">
+                <span aria-hidden="true">🇺🇸</span>
               </div>
-              <p className="mt-1.5 text-[11px] text-[var(--muted)]">
-                Proudly sourced, manufactured, and packed in America.
+              <h3 className="mt-3 text-base font-black text-[var(--text)]">Made in the USA</h3>
+              <p className="mt-1.5 text-sm leading-relaxed text-[var(--muted)]">
+                Proudly sourced, manufactured, and packed in America. Every bag, every time.
               </p>
             </div>
-            <div className="rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-3">
-              <div className="flex items-center gap-2">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--surface-strong)] text-lg">
-                  <span aria-hidden="true">🌿</span>
-                </div>
-                <div className="text-[13px] font-black text-[var(--text)]">No artificial dyes</div>
+            <div className="group rounded-2xl border border-[rgba(15,27,45,0.10)] bg-white p-5 sm:p-6 transition-all duration-300 hover:shadow-[0_16px_40px_rgba(15,27,45,0.10)] hover:-translate-y-0.5">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--surface-strong)] text-2xl shadow-xs">
+                <span aria-hidden="true">🌿</span>
               </div>
-              <p className="mt-1.5 text-[11px] text-[var(--muted)]">
-                Colored naturally using real fruit and vegetable extracts.
+              <h3 className="mt-3 text-base font-black text-[var(--text)]">No artificial dyes</h3>
+              <p className="mt-1.5 text-sm leading-relaxed text-[var(--muted)]">
+                Colored naturally with real fruit and vegetable extracts. No Red 40, no Yellow 5.
               </p>
             </div>
-            <div className="rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-3">
-              <div className="flex items-center gap-2">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--surface-strong)] text-lg">
-                  <span aria-hidden="true">🍬</span>
-                </div>
-                <div className="text-[13px] font-black text-[var(--text)]">Classic gummy flavor</div>
+            <div className="group rounded-2xl border border-[rgba(15,27,45,0.10)] bg-white p-5 sm:p-6 transition-all duration-300 hover:shadow-[0_16px_40px_rgba(15,27,45,0.10)] hover:-translate-y-0.5">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--surface-strong)] text-2xl shadow-xs">
+                <span aria-hidden="true">🍬</span>
               </div>
-              <p className="mt-1.5 text-[11px] text-[var(--muted)]">
-                Soft, chewy texture with all‑natural fruit flavors.
+              <h3 className="mt-3 text-base font-black text-[var(--text)]">Classic gummy flavor</h3>
+              <p className="mt-1.5 text-sm leading-relaxed text-[var(--muted)]">
+                Soft, chewy texture with five all-natural fruit flavors in every bag.
               </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-transparent" data-zone="STANDARDS" aria-label="Brand standards">
+        <div className="mx-auto max-w-6xl px-4 py-8 sm:py-10">
+          <div className="text-center mb-6 sm:mb-8">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.35em] text-[var(--muted)]/70 mb-2">
+              Our standards
+            </div>
+            <h2 className="text-2xl font-black text-[var(--text)] sm:text-3xl">
+              Standards, not slogans.
+            </h2>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="group relative overflow-hidden rounded-[20px] border border-[rgba(15,27,45,0.08)] aspect-[4/3] shadow-[0_8px_24px_rgba(15,27,45,0.06)] transition-all duration-500 hover:shadow-[0_20px_48px_rgba(15,27,45,0.14)] hover:-translate-y-1">
+              <Image
+                src="/brand/standards/made-in-america.jpg"
+                alt="Made in America isn't a slogan — it's a standard. Gummy bears lined up with American flag background."
+                fill
+                sizes="(max-width: 640px) 92vw, (max-width: 1024px) 46vw, 360px"
+                className="object-cover transition-transform duration-700 group-hover:scale-105"
+              />
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent p-4 pt-10">
+                <div className="text-[13px] font-black text-white tracking-wide">Made in America</div>
+              </div>
+            </div>
+            <div className="group relative overflow-hidden rounded-[20px] border border-[rgba(15,27,45,0.08)] aspect-[4/3] shadow-[0_8px_24px_rgba(15,27,45,0.06)] transition-all duration-500 hover:shadow-[0_20px_48px_rgba(15,27,45,0.14)] hover:-translate-y-1">
+              <Image
+                src="/brand/standards/no-artificial-dyes.jpg"
+                alt="No artificial dyes isn't a slogan — it's a standard. Gummy bears with American flag background."
+                fill
+                sizes="(max-width: 640px) 92vw, (max-width: 1024px) 46vw, 360px"
+                className="object-cover transition-transform duration-700 group-hover:scale-105"
+              />
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent p-4 pt-10">
+                <div className="text-[13px] font-black text-white tracking-wide">No artificial dyes</div>
+              </div>
+            </div>
+            <div className="group relative overflow-hidden rounded-[20px] border border-[rgba(15,27,45,0.08)] aspect-[4/3] sm:col-span-2 lg:col-span-1 shadow-[0_8px_24px_rgba(15,27,45,0.06)] transition-all duration-500 hover:shadow-[0_20px_48px_rgba(15,27,45,0.14)] hover:-translate-y-1">
+              <Image
+                src="/brand/standards/all-natural-flavors.jpg"
+                alt="All natural flavors isn't a slogan — it's a standard. Gummy bears with American flag background."
+                fill
+                sizes="(max-width: 640px) 92vw, (max-width: 1024px) 92vw, 360px"
+                className="object-cover transition-transform duration-700 group-hover:scale-105"
+              />
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent p-4 pt-10">
+                <div className="text-[13px] font-black text-white tracking-wide">All natural flavors</div>
+              </div>
+            </div>
+          </div>
+          <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_1.2fr]">
+            <div className="group relative overflow-hidden rounded-[20px] border border-[rgba(15,27,45,0.08)] aspect-[5/4] shadow-[0_8px_24px_rgba(15,27,45,0.06)] transition-all duration-500 hover:shadow-[0_20px_48px_rgba(15,27,45,0.14)]">
+              <Image
+                src="/brand/standards/lifestyle-forest.jpg"
+                alt="USA Gummies bag outdoors in a pine forest with gummy bears on a rock"
+                fill
+                sizes="(max-width: 640px) 92vw, (max-width: 1024px) 46vw, 480px"
+                className="object-cover transition-transform duration-700 group-hover:scale-105"
+              />
+            </div>
+            <div className="flex flex-col justify-center rounded-[20px] border border-[rgba(15,27,45,0.08)] bg-white p-6 sm:p-8 shadow-[0_8px_24px_rgba(15,27,45,0.06)]">
+              <p className="text-base text-[var(--muted)] text-pretty leading-relaxed sm:text-lg">
+                Every bag of USA Gummies is made in the USA, colored with real fruit and vegetable
+                extracts, and flavored with all&#8209;natural ingredients. These aren&apos;t marketing claims —
+                they&apos;re the standards we hold ourselves to on every production run.
+              </p>
+              <div className="mt-5 flex flex-wrap items-center gap-3">
+                <Link href="/ingredients" className="btn btn-outline">
+                  See ingredients
+                </Link>
+                <Link href="/no-artificial-dyes-gummy-bears" className="text-sm font-semibold text-[var(--muted)] underline underline-offset-4 hover:text-[var(--text)] transition-colors">
+                  Dye-free guide
+                </Link>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
       <section className="bg-transparent" data-zone="BLOG">
-        <div className="mx-auto max-w-6xl px-4 py-4">
+        <div className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
           <LatestFromBlog />
         </div>
       </section>
 
       <section className="bg-transparent" data-zone="FLAVORS">
-        <div className="mx-auto max-w-6xl px-4 py-0.5 sm:py-1">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]/80">
-            Inside every bag
-          </div>
-          <div className="mt-1.5 text-sm font-semibold text-[var(--text)]">
-            Five classic gummy bear flavors.
-          </div>
-          <div className="flavor-pill-row mt-2 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-[var(--muted)]">
-            <span className="candy-pill">
-              <span className="candy-dot bg-[var(--candy-red)]" />
-              Cherry
-            </span>
-            <span className="candy-pill">
-              <span className="candy-dot bg-[var(--candy-yellow)]" />
-              Lemon
-            </span>
-            <span className="candy-pill">
-              <span className="candy-dot bg-[var(--candy-green)]" />
-              Green apple
-            </span>
-            <span className="candy-pill">
-              <span className="candy-dot bg-[var(--candy-orange)]" />
-              Orange
-            </span>
-            <span className="candy-pill">
-              <span className="candy-dot bg-[var(--candy-red)]" />
-              Watermelon
-            </span>
-            <span className="text-[11px] text-[var(--muted)]">
-              Ingredients &amp; allergen info:{" "}
-              <Link href="/ingredients" className="underline underline-offset-4 text-[var(--text)]">
-                ingredients
+        <div className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
+          <div className="candy-panel americana-panel rounded-[28px] p-5 sm:p-7">
+            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-5">
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.35em] text-[var(--muted)]/70">
+                  Inside every bag
+                </div>
+                <h2 className="mt-1 text-xl font-black text-[var(--text)] sm:text-2xl">
+                  Five classic flavors.
+                </h2>
+              </div>
+              <Link href="/ingredients" className="text-sm font-semibold text-[var(--muted)] underline underline-offset-4 hover:text-[var(--text)] transition-colors whitespace-nowrap">
+                Ingredients &amp; allergen info
               </Link>
-              .
-            </span>
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+              {[
+                { name: "Cherry", color: "var(--candy-red)", img: "/brand/gummies/gummy-red.png" },
+                { name: "Lemon", color: "var(--candy-yellow)", img: "/brand/gummies/gummy-yellow.png" },
+                { name: "Green Apple", color: "var(--candy-green)", img: "/brand/gummies/gummy-green.png" },
+                { name: "Orange", color: "var(--candy-orange)", img: "/brand/gummies/gummy-orange.png" },
+                { name: "Watermelon", color: "var(--candy-red)", img: "/brand/gummies/gummy-pink.png" },
+              ].map((flavor) => (
+                <div key={flavor.name} className="group flex flex-col items-center rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-4 transition-all duration-300 hover:shadow-[0_12px_32px_rgba(15,27,45,0.10)] hover:-translate-y-1">
+                  <div className="relative h-16 w-16 sm:h-20 sm:w-20">
+                    <Image
+                      src={flavor.img}
+                      alt={`${flavor.name} gummy bear`}
+                      fill
+                      sizes="80px"
+                      className="object-contain drop-shadow-[0_6px_12px_rgba(0,0,0,0.12)] transition-transform duration-300 group-hover:scale-110"
+                    />
+                  </div>
+                  <div className="mt-2.5 flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: flavor.color }} />
+                    <span className="text-sm font-bold text-[var(--text)]">{flavor.name}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -505,35 +596,40 @@ export default async function HomePage() {
         <div className={styles.sceneBg} aria-hidden="true" />
         <div className={styles.sceneOverlay} aria-hidden="true" />
         <div className={styles.sceneContent}>
-        <div className="mx-auto max-w-6xl px-4 py-3 lg:py-4 reveal-up">
+          <div className="mx-auto max-w-6xl px-4 py-6 lg:py-10 reveal-up">
             <ReviewsSection />
           </div>
         </div>
       </section>
 
       <section className="bg-transparent" data-zone="SHIPPING">
-        <div className="mx-auto max-w-6xl px-4 pb-3">
-          <div className="grid gap-3 rounded-[28px] border border-[rgba(15,27,45,0.12)] bg-white p-3 sm:p-4 lg:grid-cols-[1fr_200px] lg:items-center">
-            <div className="space-y-2">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+        <div className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
+          <div className="grid gap-4 rounded-[28px] border border-[rgba(15,27,45,0.08)] bg-white p-6 sm:p-8 lg:grid-cols-[1fr_240px] lg:items-center shadow-[0_8px_24px_rgba(15,27,45,0.05)]">
+            <div className="space-y-3">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.35em] text-[var(--muted)]/70">
                 Shipping &amp; fulfillment
               </div>
-              <div className="text-[15px] font-black text-[var(--text)] sm:text-base">
-                Ships within 24 hours, every order packed with care.
-              </div>
-              <div className="text-sm font-semibold text-[var(--text)]">
-                Satisfaction guaranteed.
+              <h2 className="text-xl font-black text-[var(--text)] sm:text-2xl">
+                Ships within 24 hours.
+              </h2>
+              <p className="text-base text-[var(--muted)] max-w-md">
+                Every order packed with care and shipped fast. Satisfaction guaranteed, every time.
+              </p>
+              <div className="flex flex-wrap gap-2 pt-1">
+                <span className="badge badge--navy">Fast fulfillment</span>
+                <span className="badge badge--navy">{FREE_SHIPPING_PHRASE}</span>
+                <span className="badge badge--navy">Packed with care</span>
               </div>
             </div>
-            <div className="justify-self-end">
+            <div className="justify-self-center lg:justify-self-end">
               <Image
                 src="/website%20assets/Truck.png"
                 alt="Delivery truck illustration"
                 aria-hidden="true"
                 width={1920}
                 height={1080}
-                sizes="(max-width: 640px) 150px, 210px"
-                className="brand-touch h-auto w-full max-w-[170px] object-contain sm:max-w-[210px]"
+                sizes="(max-width: 640px) 180px, 240px"
+                className="brand-touch h-auto w-full max-w-[200px] object-contain sm:max-w-[240px]"
               />
             </div>
           </div>
@@ -541,11 +637,11 @@ export default async function HomePage() {
       </section>
 
       <section className="bg-[var(--surface-strong)]" data-zone="STORY" id="why-usa-gummies">
-        <div className="mx-auto max-w-6xl px-4 py-4 lg:py-5 reveal-up">
-          <div className="candy-panel americana-panel relative overflow-hidden rounded-[36px] p-3 sm:p-4">
+        <div className="mx-auto max-w-6xl px-4 py-8 lg:py-12 reveal-up">
+          <div className="candy-panel americana-panel relative overflow-hidden rounded-[36px] p-5 sm:p-8">
             <div className="relative z-10">
-              <div className="grid gap-3 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
-                <div className="space-y-1.5">
+              <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
+                <div className="space-y-4">
                   <div className="flex justify-center lg:justify-start">
                     <Image
                       src="/website%20assets/MtRushmore.png"
@@ -553,11 +649,11 @@ export default async function HomePage() {
                       aria-hidden="true"
                       width={1398}
                       height={857}
-                      sizes="(max-width: 640px) 180px, (max-width: 1024px) 240px, 280px"
-                      className="brand-touch h-auto w-full max-w-[180px] sm:max-w-[220px] lg:max-w-[280px] object-contain"
+                      sizes="(max-width: 640px) 200px, (max-width: 1024px) 260px, 320px"
+                      className="brand-touch h-auto w-full max-w-[200px] sm:max-w-[260px] lg:max-w-[320px] object-contain"
                     />
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2.5">
                     <Image
                       src="/brand/logo.png"
                       alt="USA Gummies logo"
@@ -566,95 +662,94 @@ export default async function HomePage() {
                       height={20}
                       className="brand-logo-mark"
                     />
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.35em] text-[var(--muted)]">
                       Why USA Gummies
                     </div>
                   </div>
-                  <h2 className="text-balance text-xl font-black text-[var(--text)] sm:text-2xl">
+                  <h2 className="text-balance text-2xl font-black text-[var(--text)] sm:text-3xl">
                     Why USA Gummies matters.
                   </h2>
-                  <p className="text-pretty text-sm text-[var(--muted)]">
+                  <p className="text-pretty text-base text-[var(--muted)] leading-relaxed">
                     Proudly sourced, manufactured, and packed entirely in America. No artificial
                     dyes or synthetic colors. Classic gummy bear flavor — done right.
                   </p>
-                  <div className="flex flex-wrap items-center gap-3 pt-0.5">
-                    <a href="#bundle-pricing" className="btn btn-candy">
+                  <div className="flex flex-wrap items-center gap-3 pt-2">
+                    <a href="#bundle-pricing" className="btn btn-candy text-base px-6 py-3">
                       Shop now
                     </a>
                     <Link
                       href="/shop#product-details"
-                      className="text-xs font-semibold text-[var(--muted)] underline underline-offset-4 hover:text-[var(--text)] focus-ring"
+                      className="text-sm font-semibold text-[var(--muted)] underline underline-offset-4 hover:text-[var(--text)] focus-ring transition-colors"
                     >
                       View product details
                     </Link>
                   </div>
                 </div>
 
-                <div className="space-y-1.5 lg:pt-1">
-                  <div className="candy-panel americana-panel relative overflow-hidden rounded-3xl p-1.5 text-[var(--text)] lg:ml-auto lg:max-w-[400px]">
+                <div className="space-y-3 lg:pt-1">
+                  <div className="candy-panel americana-panel relative overflow-hidden rounded-3xl p-2 text-[var(--text)] lg:ml-auto lg:max-w-[440px]">
                     <div className="relative aspect-[5/4] overflow-hidden rounded-2xl border border-[rgba(15,27,45,0.1)] bg-[var(--surface-strong)] p-3">
                       <Image
                         src={whyImageSrc}
-                      alt={whyImageAlt}
-                      fill
-                      sizes="(max-width: 640px) 90vw, (max-width: 1024px) 40vw, 420px"
-                      className="object-contain"
-                    />
-                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/45 via-black/0 to-transparent p-3">
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-white/90">
-                        Made in USA
+                        alt={whyImageAlt}
+                        fill
+                        sizes="(max-width: 640px) 90vw, (max-width: 1024px) 40vw, 440px"
+                        className="object-contain"
+                      />
+                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/45 via-black/0 to-transparent p-4">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.28em] text-white/90">
+                          Made in USA
+                        </div>
                       </div>
                     </div>
-                  </div>
-                    <div className="mt-1.5 space-y-1">
-                      <div className="text-sm font-black text-[var(--text)]">
+                    <div className="mt-2.5 space-y-1.5 px-1 pb-1">
+                      <div className="text-base font-black text-[var(--text)]">
                         Classic gummy bear flavor — done right.
                       </div>
-                    <div className="text-pretty text-xs text-[var(--muted)]">
-                      All the chewy, fruity flavor you expect, without artificial dyes or harsh aftertaste.
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <span className="badge badge--navy">Made in USA</span>
-                      <span className="badge badge--navy">No artificial dyes</span>
-                      <span className="badge badge--navy">{FREE_SHIPPING_PHRASE}</span>
+                      <div className="text-pretty text-sm text-[var(--muted)] leading-relaxed">
+                        All the chewy, fruity flavor you expect, without artificial dyes or harsh aftertaste.
+                      </div>
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        <span className="badge badge--navy">Made in USA</span>
+                        <span className="badge badge--navy">No artificial dyes</span>
+                        <span className="badge badge--navy">{FREE_SHIPPING_PHRASE}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
-
             </div>
           </div>
         </div>
       </section>
 
       <section className="bg-[var(--surface-strong)]" data-zone="BENEFITS">
-        <div className="mx-auto max-w-6xl px-4 pb-5">
-          <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
-            <div className="flex items-end justify-start">
+        <div className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
+          <div className="grid gap-6 lg:grid-cols-[240px_1fr] lg:items-end">
+            <div className="flex items-end justify-center lg:justify-start">
               <Image
                 src="/website%20assets/Jeep.png"
                 alt="Vintage Jeep illustration"
                 aria-hidden="true"
                 width={1041}
                 height={701}
-                sizes="(max-width: 640px) 160px, (max-width: 1024px) 220px, 280px"
-                className="brand-touch h-auto w-full max-w-[180px] sm:max-w-[220px] lg:max-w-[280px] object-contain"
+                sizes="(max-width: 640px) 180px, (max-width: 1024px) 240px, 300px"
+                className="brand-touch h-auto w-full max-w-[200px] sm:max-w-[240px] lg:max-w-[300px] object-contain"
               />
             </div>
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {whyCards.map((card) => (
                 <div
                   key={card.title}
-                  className="candy-panel relative overflow-hidden rounded-2xl p-2.5 sm:p-3 transition-transform duration-200 hover:-translate-y-1"
+                  className="candy-panel relative overflow-hidden rounded-2xl p-5 sm:p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_16px_40px_rgba(15,27,45,0.12)]"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--surface-strong)]">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--surface-strong)] shadow-xs">
                       {card.icon}
                     </div>
-                    <div className="text-base font-black text-[var(--text)]">{card.title}</div>
+                    <h3 className="text-lg font-black text-[var(--text)]">{card.title}</h3>
                   </div>
-                  <p className="mt-2 text-sm text-[var(--muted)]">{card.copy}</p>
+                  <p className="mt-3 text-sm leading-relaxed text-[var(--muted)]">{card.copy}</p>
                 </div>
               ))}
             </div>
@@ -666,9 +761,9 @@ export default async function HomePage() {
         <div className={styles.sceneBg} aria-hidden="true" />
         <div className={styles.sceneOverlay} aria-hidden="true" />
         <div className={styles.sceneContent}>
-        <div className="mx-auto max-w-6xl px-4 py-4 lg:py-5 reveal-up">
-          <div className="grid gap-3 lg:grid-cols-[1.1fr_0.9fr]">
-              <div className="candy-panel americana-panel rounded-[28px] p-3 sm:p-4 shadow-none bg-[var(--surface-strong)] border border-[rgba(15,27,45,0.12)]">
+        <div className="mx-auto max-w-6xl px-4 py-8 lg:py-10 reveal-up">
+          <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+              <div className="candy-panel americana-panel rounded-[28px] p-5 sm:p-6 shadow-none bg-[var(--surface-strong)] border border-[rgba(15,27,45,0.12)]">
                 <div className="flex flex-wrap items-end justify-between gap-4">
                   <div>
                     <div className="flex items-center gap-2">
@@ -728,9 +823,9 @@ export default async function HomePage() {
                   Tap any channel to follow and stay in the loop.
                 </div>
               </div>
-              <div className="candy-panel americana-panel relative overflow-hidden rounded-[28px] p-3 sm:p-4 shadow-none bg-[var(--surface-strong)] border border-[rgba(15,27,45,0.12)]">
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
+              <div className="candy-panel americana-panel relative overflow-hidden rounded-[28px] p-5 sm:p-6 shadow-none bg-[var(--surface-strong)] border border-[rgba(15,27,45,0.12)]">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2.5">
                     <Image
                       src="/brand/logo.png"
                       alt="USA Gummies logo"
@@ -739,7 +834,7 @@ export default async function HomePage() {
                       height={20}
                       className="brand-logo-mark"
                     />
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.35em] text-[var(--muted)]">
                       Get updates
                     </div>
                   </div>
@@ -776,9 +871,9 @@ export default async function HomePage() {
       </section>
 
       <section className="bg-transparent" data-zone="STORY">
-        <div className="mx-auto max-w-6xl px-4 py-5">
-          <div className="candy-panel americana-panel rounded-[36px] border border-[var(--border)] p-4 sm:p-5">
-            <div className="flex items-center gap-2">
+        <div className="mx-auto max-w-6xl px-4 py-8 sm:py-10">
+          <div className="candy-panel americana-panel rounded-[36px] border border-[var(--border)] p-6 sm:p-8 lg:p-10">
+            <div className="flex items-center gap-2.5">
               <Image
                 src="/brand/logo.png"
                 alt="USA Gummies logo"
@@ -787,28 +882,75 @@ export default async function HomePage() {
                 height={20}
                 className="brand-logo-mark"
               />
-              <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.35em] text-[var(--muted)]">
                 Our story
               </div>
             </div>
-            <h2 className="text-balance mt-2 text-2xl font-black text-[var(--text)] sm:text-3xl">
+            <h2 className="text-balance mt-3 text-2xl font-black text-[var(--text)] sm:text-3xl lg:text-4xl">
               {BRAND_STORY_HEADLINE}
             </h2>
-            <div className="mt-3 copy-stack copy-stack--rail text-sm text-[var(--muted)] text-pretty">
+            <div className="mt-4 copy-stack copy-stack--rail text-base text-[var(--muted)] text-pretty leading-relaxed max-w-prose">
               {BRAND_STORY_PARAGRAPHS.map((paragraph) => (
                 <p key={paragraph}>{paragraph}</p>
               ))}
             </div>
-            <div className="mt-3 flex flex-wrap gap-3">
-              <Link
-                href="/about"
-                className="text-sm font-semibold text-[var(--muted)] underline underline-offset-4 hover:text-[var(--text)] focus-ring"
-              >
-                Read our story
-              </Link>
-              <Link href="/shop" className="btn btn-candy">
+            <div className="mt-5 flex flex-wrap items-center gap-4">
+              <Link href="/shop" className="btn btn-candy text-base px-6 py-3">
                 Shop now
               </Link>
+              <Link
+                href="/about"
+                className="text-sm font-semibold text-[var(--muted)] underline underline-offset-4 hover:text-[var(--text)] focus-ring transition-colors"
+              >
+                Read our full story
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-transparent" data-zone="WHOLESALE">
+        <div className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
+          <div className="relative overflow-hidden rounded-[28px] border border-[rgba(15,27,45,0.10)] bg-[var(--navy)] p-6 sm:p-8 lg:p-10">
+            <div className="absolute inset-0 opacity-[0.04]" aria-hidden="true" style={{ backgroundImage: "url('/website%20assets/paper-grain.webp')", backgroundSize: "400px", mixBlendMode: "overlay" }} />
+            <div className="relative z-10 grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+              <div className="space-y-4">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.35em] text-white/50">
+                  Wholesale partnerships
+                </div>
+                <h2 className="text-2xl font-black text-white sm:text-3xl">
+                  Bring USA Gummies to your shelves.
+                </h2>
+                <p className="text-base text-white/70 max-w-md leading-relaxed">
+                  Retail-ready patriotic packaging, clean ingredients, and a brand story that sells. Request a starter case or samples today.
+                </p>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold text-white/80">Made in USA</span>
+                  <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold text-white/80">Shelf-ready format</span>
+                  <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold text-white/80">FDA-registered facility</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-3 pt-2">
+                  <Link href="/wholesale" className="inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-black text-[var(--navy)] shadow-[0_8px_24px_rgba(0,0,0,0.2)] transition-all duration-300 hover:shadow-[0_12px_32px_rgba(0,0,0,0.3)] hover:-translate-y-0.5">
+                    Request wholesale info
+                  </Link>
+                  <Link href="/contact" className="text-sm font-semibold text-white/70 underline underline-offset-4 hover:text-white transition-colors">
+                    Contact us
+                  </Link>
+                </div>
+              </div>
+              <div className="flex justify-center lg:justify-end">
+                <div className="relative w-full max-w-[280px] sm:max-w-[320px]">
+                  <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-white/10">
+                    <Image
+                      src="/brand/usa-gummies-family.webp"
+                      alt="Assorted USA Gummies bags for wholesale"
+                      fill
+                      sizes="(max-width: 640px) 280px, 320px"
+                      className="object-contain"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

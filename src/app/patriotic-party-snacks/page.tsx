@@ -21,9 +21,9 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "Patriotic Party Snacks | USA Gummies";
+const PAGE_TITLE = "Patriotic Party Snacks";
 const PAGE_DESCRIPTION =
-  "Plan a red, white, and blue spread with patriotic candy and dye-free gummies made in the USA - party-ready ideas.";
+  "Red, white, and blue party snack ideas with dye-free gummy bears. Made in the USA, no artificial colors. Bag count guide and serving tips included.";
 
 export const metadata: Metadata = {
   title: PAGE_TITLE,

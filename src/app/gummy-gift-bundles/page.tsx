@@ -23,7 +23,7 @@ function resolveSiteUrl() {
 const SITE_URL = resolveSiteUrl();
 const PAGE_TITLE = "Gummy Gift Bundles | Patriotic Candy";
 const PAGE_DESCRIPTION =
-  "Send made in USA candy gifts with dye-free gummies and no artificial dyes. Bundles for birthdays, teams, and holidays.";
+  "Gummy bear gift bundles for birthdays, teachers, and holidays. Dye-free, made in the USA. See bag counts, pricing, and free shipping options.";
 
 export const metadata: Metadata = {
   title: PAGE_TITLE,

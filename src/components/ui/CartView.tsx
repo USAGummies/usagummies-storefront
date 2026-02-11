@@ -99,6 +99,31 @@ function clampPct(pct: number) {
   return Math.max(0, Math.min(100, pct));
 }
 
+function estimateArrivalLabel(): string {
+  const now = new Date();
+  const hour = now.getHours();
+  // Ships next business day if ordered before 2pm ET, otherwise day after
+  let shipDate = new Date(now);
+  if (hour >= 14) shipDate.setDate(shipDate.getDate() + 1);
+  // Skip to next business day for shipping
+  const skipToBusinessDay = (d: Date) => {
+    const dow = d.getDay();
+    if (dow === 0) d.setDate(d.getDate() + 1);
+    if (dow === 6) d.setDate(d.getDate() + 2);
+    return d;
+  };
+  shipDate = skipToBusinessDay(shipDate);
+  // USPS Priority: 2-4 business days
+  let arrival = new Date(shipDate);
+  let transitDays = 0;
+  while (transitDays < 4) {
+    arrival.setDate(arrival.getDate() + 1);
+    if (arrival.getDay() !== 0 && arrival.getDay() !== 6) transitDays++;
+  }
+  const fmt = new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric" });
+  return `Estimated arrival: ${fmt.format(arrival)}`;
+}
+
 function bundleSummaryText(lineBags: number) {
   if (!lineBags) return "Bundle: —";
   const shipping = lineBags >= FREE_SHIP_QTY ? "Free Shipping" : "Ships via Amazon";
@@ -728,7 +753,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                   </span>
                 </a>
                 <div className="text-[10px] font-semibold text-[var(--muted)]">
-                  Order now, ships tomorrow.
+                  {estimateArrivalLabel()}
                 </div>
                 <div className="relative mt-4 flex items-end justify-center gap-2">
                   <Image
@@ -938,7 +963,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                     </Link>
                   </div>
                   <div className="mt-1 text-[10px] text-[var(--muted)]">
-                    Order now, ships tomorrow.
+                    {estimateArrivalLabel()}
                   </div>
                 </div>
               ) : null}
@@ -1618,7 +1643,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                   </a>
                 ) : null}
                 <div className="mt-2 text-xs font-semibold text-[var(--muted)]">
-                  Order now, ships tomorrow.
+                  {estimateArrivalLabel()}
                 </div>
                 <Link
                   href={secondaryCta.href}

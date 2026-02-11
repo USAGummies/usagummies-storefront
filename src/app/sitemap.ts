@@ -45,6 +45,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/dye-free-candy`, lastModified: now, changeFrequency: "monthly", priority: 0.6 },
     { url: `${base}/gummies-101`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
     { url: `${base}/wholesale`, lastModified: now, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${base}/gummy-calculator`, lastModified: now, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${base}/dye-free-vs-regular-gummies`, lastModified: now, changeFrequency: "monthly", priority: 0.6 },
     { url: `${base}/blog`, lastModified: now, changeFrequency: "weekly", priority: 0.7 },
 
     // Policies hub + subpages
