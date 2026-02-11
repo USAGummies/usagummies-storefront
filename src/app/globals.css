@@ -182,12 +182,16 @@ details > summary::-webkit-details-marker{
   background-color: #101b33;
   background-image: none;
 }
-.home-hero-theme .bg-white:not(.theme-pill):not(.section-light .bg-white){
+/* Dark bg-white override: scoped to explicit dark zones only */
+.home-purchase-stage .bg-white:not(.theme-pill),
+.home-product-stage .bg-white:not(.theme-pill){
   background-color: var(--surface) !important;
 }
-.home-hero-theme [class*="bg-white/"]:not(.site-header):not(.theme-pill){
+.home-purchase-stage [class*="bg-white/"]:not(.theme-pill),
+.home-product-stage [class*="bg-white/"]:not(.theme-pill){
   background-color: rgba(16, 27, 51, 0.88) !important;
 }
+/* Allow section-light to guarantee white bg */
 .section-light .bg-white{
   background-color: #ffffff !important;
 }
@@ -209,25 +213,37 @@ details > summary::-webkit-details-marker{
 .home-hero-theme .site-header [class*="bg-white/"]{
   background-color: rgba(255,255,255,0.96) !important;
 }
-.home-hero-theme .bg-neutral-50,
-.home-hero-theme .bg-neutral-100,
-.home-hero-theme .bg-neutral-200{
+/* Neutral overrides scoped to dark stage zones */
+.home-purchase-stage .bg-neutral-50,
+.home-purchase-stage .bg-neutral-100,
+.home-purchase-stage .bg-neutral-200,
+.home-product-stage .bg-neutral-50,
+.home-product-stage .bg-neutral-100,
+.home-product-stage .bg-neutral-200{
   background-color: rgba(16, 27, 51, 0.65) !important;
 }
-.home-hero-theme .text-neutral-900,
-.home-hero-theme .text-neutral-800,
-.home-hero-theme .text-neutral-700{
+.home-purchase-stage .text-neutral-900,
+.home-purchase-stage .text-neutral-800,
+.home-purchase-stage .text-neutral-700,
+.home-product-stage .text-neutral-900,
+.home-product-stage .text-neutral-800,
+.home-product-stage .text-neutral-700{
   color: var(--text) !important;
 }
-.home-hero-theme .text-neutral-600,
-.home-hero-theme .text-neutral-500{
+.home-purchase-stage .text-neutral-600,
+.home-purchase-stage .text-neutral-500,
+.home-product-stage .text-neutral-600,
+.home-product-stage .text-neutral-500{
   color: var(--muted) !important;
 }
-.home-hero-theme .text-\[var\(--navy\)\]{
+.home-purchase-stage .text-\[var\(--navy\)\],
+.home-product-stage .text-\[var\(--navy\)\]{
   color: var(--text) !important;
 }
-.home-hero-theme .border-neutral-200,
-.home-hero-theme .border-neutral-100{
+.home-purchase-stage .border-neutral-200,
+.home-purchase-stage .border-neutral-100,
+.home-product-stage .border-neutral-200,
+.home-product-stage .border-neutral-100{
   border-color: var(--border) !important;
 }
 .home-hero-theme .theme-pill,
