@@ -8,10 +8,6 @@ const FAQS = [
     a: "Every bag is made in the USA in an FDA-registered facility. We use real fruit and vegetable extracts for color — zero artificial dyes. The flavors are all natural, and the texture is soft and chewy, not hard or waxy. We're a small American business, not a big candy conglomerate.",
   },
   {
-    q: "Are these safe for kids?",
-    a: "Absolutely. No artificial dyes, no high-fructose corn syrup, and no synthetic colors. Parents love that the colors come from real fruits and vegetables. Check our full ingredient list on the ingredients page for allergen info.",
-  },
-  {
     q: "How does bundle pricing work?",
     a: "The more bags you buy, the lower your per-bag price drops. A single bag is $5.99. At 5 bags you unlock free shipping. At 8 bags you save $7.73. At 12 bags you hit the best price — $4.25 per bag — and save over $20. Your selection replaces your cart, so you always see the exact total.",
   },
@@ -21,7 +17,7 @@ const FAQS = [
   },
   {
     q: "How long does shipping take?",
-    a: "Orders ship within 24 hours on business days. Most US orders arrive in 3–5 business days. We ship via USPS Priority or UPS depending on your location.",
+    a: "Orders typically ship within 1–2 business days. Most US orders arrive in 3–5 business days. We ship via USPS Priority or UPS depending on your location.",
   },
   {
     q: "What if I don't like them?",

@@ -18,7 +18,6 @@ import { LazyStickyAddToCartBar } from "@/components/product/LazyStickyAddToCart
 import LazyHeroCTAWatcher from "@/components/home/LazyHeroCTAWatcher.client";
 import FAQSection from "@/components/home/FAQSection";
 import StickyShopCTA from "@/components/home/StickyShopCTA.client";
-import UrgencyBanner from "@/components/home/UrgencyBanner.client";
 import styles from "./homepage-scenes.module.css";
 
 function resolveSiteUrl() {
@@ -222,9 +221,6 @@ export default async function HomePage() {
               </div>
               {/* Sentinel for StickyShopCTA IntersectionObserver */}
               <div id="bundle-end-sentinel" aria-hidden="true" style={{ height: 1 }} />
-              <div className="mt-3">
-                <UrgencyBanner />
-              </div>
               <div className="mt-1.5 flex flex-wrap gap-1.5 text-[10px] text-white/70">
                 <span className="font-semibold text-white">Guides:</span>
                 <Link href="/gummy-gift-bundles" className="underline underline-offset-4">
@@ -303,7 +299,7 @@ export default async function HomePage() {
                 </div>
                 <div className="pt-2 space-y-2">
                   <div className="text-sm font-medium text-white/60">
-                    {FREE_SHIPPING_PHRASE} • Ships in 24 hours • Satisfaction guaranteed
+                    {FREE_SHIPPING_PHRASE} • Fast, reliable shipping • Satisfaction guaranteed
                   </div>
                   <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
                     <span className="theme-pill rounded-full border border-white/20 bg-white/95 px-3.5 py-1.5 text-[var(--navy)] shadow-xs">

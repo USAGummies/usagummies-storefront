@@ -734,7 +734,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                 <div className="mt-2 grid gap-1 text-[11px] font-semibold text-[var(--muted)]">
                   <div>⭐ {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars from verified Amazon buyers</div>
                   <div>🇺🇸 Made in the USA</div>
-                  <div>🚚 Ships within 24 hours</div>
+                  <div>🚚 Fast, reliable shipping</div>
                 </div>
 
                 <a
@@ -1622,7 +1622,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                   <div className="mb-2 grid gap-1 text-[11px] font-semibold text-[var(--muted)]">
                     <div>⭐ {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars from verified Amazon buyers</div>
                     <div>🇺🇸 Made in the USA</div>
-                    <div>🚚 Ships within 24 hours</div>
+                    <div>🚚 Fast, reliable shipping</div>
                   </div>
                 ) : null}
                 {localCart?.checkoutUrl ? (

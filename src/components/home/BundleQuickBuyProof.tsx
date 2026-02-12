@@ -24,7 +24,7 @@ export function BundleQuickBuyRailProof({ tone = "dark" }: { tone?: Tone }) {
       >
         <span className="inline-flex items-center gap-2">
           <span aria-hidden="true">🚚</span>
-          <span>Ships within 24 hours</span>
+          <span>Fast, reliable shipping</span>
         </span>
         <span className="inline-flex items-center gap-2">
           <span aria-hidden="true">✅</span>
@@ -84,7 +84,7 @@ export function BundleQuickBuyCtaProof({
             .filter(Boolean)
             .join(" ")}
         >
-          🇺🇸 Made in the USA • ✅ Satisfaction guaranteed • 🚚 Ships within 24 hours • 🔒 Secure checkout
+          🇺🇸 Made in the USA • ✅ Satisfaction guaranteed • 🚚 Fast, reliable shipping • 🔒 Secure checkout
         </div>
         <div
           data-bundle-rating

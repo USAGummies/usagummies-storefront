@@ -122,7 +122,7 @@ export default function Gummies101Page() {
                 <li>No artificial dyes</li>
                 <li>All natural flavors</li>
                 <li>7.5 oz bag</li>
-                <li>Ships within 24 hours</li>
+                <li>Fast, reliable shipping</li>
                 <li>{FREE_SHIPPING_PHRASE}</li>
                 <li>Bundles start at 5 bags</li>
               </ul>

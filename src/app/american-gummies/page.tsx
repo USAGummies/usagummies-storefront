@@ -42,11 +42,11 @@ export const metadata: Metadata = {
 };
 
 const FLAVORS = [
-  { name: "Strawberry", color: "rgba(239,59,59,0.12)", accent: "var(--candy-red, #ef3b3b)" },
+  { name: "Cherry", color: "rgba(239,59,59,0.12)", accent: "var(--candy-red, #ef3b3b)" },
   { name: "Orange", color: "rgba(249,115,22,0.12)", accent: "#f97316" },
   { name: "Lemon", color: "rgba(234,179,8,0.12)", accent: "#eab308" },
   { name: "Green Apple", color: "rgba(76,175,80,0.12)", accent: "#4caf50" },
-  { name: "Pineapple", color: "rgba(253,224,71,0.14)", accent: "#facc15" },
+  { name: "Watermelon", color: "rgba(232,74,95,0.12)", accent: "#e84a5f" },
 ];
 
 const BUNDLES = [

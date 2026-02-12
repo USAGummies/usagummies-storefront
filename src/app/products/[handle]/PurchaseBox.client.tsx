@@ -565,7 +565,7 @@ export default function PurchaseBox({
 
             <div className="pbx__panelBottom">
               <div className="pbx__trustLine">
-                Ships within 24 hours • Satisfaction guaranteed • Secure checkout
+                Fast, reliable shipping • Satisfaction guaranteed • Secure checkout
               </div>
               <AmazonOneBagNote className="pbx__amazonNote" />
               <div className="pbx__trustRating">

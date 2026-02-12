@@ -1879,7 +1879,7 @@ export default function BundleQuickBuy({
           }
         >
           <span aria-hidden="true">🚚</span>
-          <span>Ships within 24 hours</span>
+          <span>Fast, reliable shipping</span>
         </span>
         <span
           className={

@@ -28,6 +28,10 @@ const ExitIntentPopup = dynamic(
   () => import("@/components/marketing/ExitIntentPopup.client").then((mod) => mod.ExitIntentPopup),
   { ssr: false }
 );
+const CartCelebration = dynamic(
+  () => import("@/components/cart/CartCelebration.client").then((mod) => mod.CartCelebration),
+  { ssr: false }
+);
 
 function cx(...a: Array<string | false | null | undefined>) {
   return a.filter(Boolean).join(" ");
@@ -778,6 +782,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </footer>
       {showChatWidget ? <ChatWidget /> : null}
+      <CartCelebration />
       <ExitIntentPopup />
     </div>
   );

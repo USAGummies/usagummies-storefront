@@ -33,7 +33,7 @@ Simple, direct, high-trust.
 - Per-bag price caps after 12+ bags
 
 ## Shipping + satisfaction guarantee
-- Ships within 24 hours
+- Fast, reliable shipping
 - Satisfaction guaranteed
 
 ## Where to buy

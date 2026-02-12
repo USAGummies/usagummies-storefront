@@ -7,7 +7,7 @@ const MESSAGES = [
   "🚚 Free shipping on 5+ bags",
   "⭐ 4.8 stars from verified buyers",
   "🇺🇸 Made in the USA — FDA-registered facility",
-  "🎉 Order today, ships within 24 hours",
+  "🎉 Order today — fast, reliable shipping",
 ];
 
 export function AnnouncementBar() {

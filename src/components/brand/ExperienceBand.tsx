@@ -111,7 +111,7 @@ export function ExperienceBand({ variant = "compact", className }: Props) {
         </div>
 
         <div className="experience-band__footer">
-          Ships within 24 hours • Satisfaction guaranteed • Secure checkout
+          Fast, reliable shipping • Satisfaction guaranteed • Secure checkout
         </div>
       </div>
     </section>
