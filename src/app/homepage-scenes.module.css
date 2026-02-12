@@ -64,8 +64,9 @@
   --scene-pos: center;
 }
 
+.sceneEmail .sceneBg,
 .sceneEmail .sceneOverlay {
-  background: rgba(12, 20, 38, 0.35);
+  display: none;
 }
 
 .sceneFooter {
@@ -87,8 +88,9 @@
   .sceneReviews .sceneOverlay {
     background: rgba(12, 20, 38, 0.62);
   }
+  .sceneEmail .sceneBg,
   .sceneEmail .sceneOverlay {
-    background: rgba(12, 20, 38, 0.42);
+    display: none;
   }
   .sceneFooter .sceneOverlay {
     background: rgba(12, 20, 38, 0.48);
