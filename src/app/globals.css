@@ -368,8 +368,13 @@ details > summary::-webkit-details-marker{
   --pill: rgba(13, 28, 51, 0.06);
   --pill-border: rgba(13, 28, 51, 0.18);
   --pill-strong: rgba(199, 54, 44, 0.12);
-  background-color: var(--bg);
-  color: var(--text);
+  background-color: #ffffff;
+  color: #1c2430;
+}
+/* Homepage light wrapper — ensures white bg covers the dark body theme */
+.home-light-wrap{
+  background-color: #ffffff;
+  color: #1c2430;
 }
 .section-light .bg-white{
   background-color: #ffffff !important;

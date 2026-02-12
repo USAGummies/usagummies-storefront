@@ -113,7 +113,7 @@ export default async function HomePage() {
     SINGLE_BAG_SKU;
 
   return (
-    <main className="relative overflow-hidden min-h-screen pb-12 lg:pb-0 text-[var(--text)]" style={{ backgroundColor: "#ffffff" }}>
+    <div className="home-light-wrap relative overflow-hidden min-h-screen pb-12 lg:pb-0">
       <BreadcrumbJsonLd
         items={[
           { name: "Home", href: "/" },
@@ -382,7 +382,7 @@ export default async function HomePage() {
       </section>
 
       {/* ─── 4. REVIEWS — social proof ─── */}
-      <section className={`${styles.scene} ${styles.sceneReviews}`} data-zone="REVIEWS">
+      <section className={`${styles.scene} ${styles.sceneReviews} home-hero-theme`} data-zone="REVIEWS">
         <div className={styles.sceneBg} aria-hidden="true" />
         <div className={styles.sceneOverlay} aria-hidden="true" />
         <div className={styles.sceneContent}>
@@ -569,6 +569,6 @@ export default async function HomePage() {
       />
 
       <LazyHeroCTAWatcher />
-    </main>
+    </div>
   );
 }
