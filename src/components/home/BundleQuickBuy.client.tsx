@@ -230,9 +230,7 @@ export default function BundleQuickBuy({
     summaryCopy !== undefined
       ? summaryCopy
       : showEducation
-        ? currentBags > 0
-          ? `In your cart: ${currentBags} bags. ${shippingAdvocateLine}`
-          : `${shippingAdvocateLine} 8 bags is the most popular pick.`
+        ? `${shippingAdvocateLine} 8 bags is the most popular pick.`
         : "";
   const selectedAdded = Boolean(
     selectedTier && lastAddedQty !== null && selectedTier.quantity === lastAddedQty
@@ -483,7 +481,7 @@ export default function BundleQuickBuy({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: "add",
+          action: "replace",
           variantId: singleBagVariantId,
           merchandiseId: singleBagVariantId,
           quantity: qty,
@@ -500,9 +498,9 @@ export default function BundleQuickBuy({
       fireCartToast(qty);
       setLastAddedQty(qty);
       setSuccess(true);
-      const pricing = pricingForQty(currentBags + qty);
-      const addValueRaw = Math.max(0, (pricing.total ?? 0) - currentTotal);
-      const addValue = Number.isFinite(addValueRaw) ? Number(addValueRaw.toFixed(2)) : undefined;
+      // Replace semantics: cart = exactly qty bags
+      const pricing = pricingForQty(qty);
+      const addValue = Number.isFinite(pricing.total) ? Number(pricing.total.toFixed(2)) : undefined;
       const unitPrice =
         addValue && qty > 0 ? Number((addValue / qty).toFixed(2)) : undefined;
       trackEvent("add_to_cart", {
@@ -528,10 +526,11 @@ export default function BundleQuickBuy({
   }
 
   function resolveTier(tier: BundleTier) {
-    const nextBags = currentBags + tier.quantity;
+    // Replace semantics: cart will contain exactly tier.quantity bags
+    const nextBags = tier.quantity;
     const pricing = pricingForQty(nextBags);
     const nextTotal = Number.isFinite(pricing.total) ? pricing.total : null;
-    const addTotal = Math.max(0, (nextTotal ?? 0) - currentTotal);
+    const addTotal = nextTotal ?? 0;
     const perBag = Number.isFinite(pricing.perBag) ? pricing.perBag : null;
     const savings = nextTotal ? Math.max(0, BASE_PRICE * nextBags - nextTotal) : null;
     return { nextBags, nextTotal, addTotal, perBag, savings };
@@ -620,7 +619,7 @@ export default function BundleQuickBuy({
       ? money(BASE_PRICE * selectedNextBags, "USD")
       : null;
   const hasRegularLine = Boolean(basePerBag && regularTotal);
-  const totalLabel = currentBags > 0 ? "New total" : "Total";
+  const totalLabel = "Total";
   const dtcSelectedPricing = pricingForQty(dtcSelectedQty);
   const dtcSelectedPerBag = money(dtcSelectedPricing.perBag, "USD");
   const useCardSelector = selectorVariant === "cards";
@@ -1070,9 +1069,9 @@ export default function BundleQuickBuy({
               {totalLabel} {selectedTotal}
             </div>
           ) : null}
-          {currentBags > 0 && selectedNextBags ? (
+          {selectedNextBags ? (
             <div className={isLight ? "text-[11px] font-semibold text-[var(--muted)]" : "text-[11px] font-semibold text-white/70"}>
-              Cart: {currentBags} bag{currentBags === 1 ? "" : "s"} → {selectedNextBags} bags total
+              {selectedNextBags} bag{selectedNextBags === 1 ? "" : "s"} · ships free
             </div>
           ) : null}
           {hasRegularLine || selectedSavings ? (
@@ -1259,7 +1258,7 @@ export default function BundleQuickBuy({
                 {showHowItWorks ? (
                   <div className="bundle-fusion__how">
                     <div className="text-[11px] font-semibold">
-                      How pricing works: selections add bags to your cart. They do not replace it.
+                      How pricing works: your selection sets your cart total. Switching bundles replaces your cart.
                     </div>
                     <details className="mt-2">
                       <summary className="cursor-pointer text-[11px] font-semibold text-[var(--text)]">
@@ -1455,7 +1454,7 @@ export default function BundleQuickBuy({
                 {showHowItWorks ? (
                   <div className="bundle-integrated__how">
                     <div className="text-[11px] font-semibold">
-                      How pricing works: selections add bags to your cart. They do not replace it.
+                      How pricing works: your selection sets your cart total. Switching bundles replaces your cart.
                     </div>
                     <details className="mt-2">
                       <summary className="cursor-pointer text-[11px] font-semibold text-[var(--text)]">
@@ -1825,7 +1824,7 @@ export default function BundleQuickBuy({
           ].join(" ")}
         >
           <div className="text-[11px] font-semibold">
-            How pricing works: selections add bags, never replace your cart.
+            How pricing works: your selection sets your cart. Switching bundles replaces your cart.
           </div>
           <details className="mt-2">
             <summary
