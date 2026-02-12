@@ -508,9 +508,9 @@ export default async function HomePage() {
                   Retail-ready patriotic packaging, clean ingredients, and a brand story that sells. Request a starter case or samples today.
                 </p>
                 <div className="flex flex-wrap gap-2 pt-1">
-                  <span className="rounded-full border border-white/30 bg-white/20 px-3.5 py-1.5 text-[11px] font-bold text-white">Made in USA</span>
-                  <span className="rounded-full border border-white/30 bg-white/20 px-3.5 py-1.5 text-[11px] font-bold text-white">Shelf-ready format</span>
-                  <span className="rounded-full border border-white/30 bg-white/20 px-3.5 py-1.5 text-[11px] font-bold text-white">FDA-registered facility</span>
+                  <span className="rounded-full border border-white/40 bg-white px-3.5 py-1.5 text-[11px] font-bold text-[#0d1c33]">Made in USA</span>
+                  <span className="rounded-full border border-white/40 bg-white px-3.5 py-1.5 text-[11px] font-bold text-[#0d1c33]">Shelf-ready format</span>
+                  <span className="rounded-full border border-white/40 bg-white px-3.5 py-1.5 text-[11px] font-bold text-[#0d1c33]">FDA-registered facility</span>
                 </div>
                 <div className="flex flex-wrap items-center gap-3 pt-2">
                   <Link href="/wholesale" className="inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-black text-[var(--navy)] shadow-[0_8px_24px_rgba(0,0,0,0.2)] transition-all duration-300 hover:shadow-[0_12px_32px_rgba(0,0,0,0.3)] hover:-translate-y-0.5">
