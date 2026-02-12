@@ -188,36 +188,6 @@ export default async function HomePage() {
     bundleVariants?.singleBagSku ||
     SINGLE_BAG_SKU;
 
-  const whyCards = [
-    {
-      title: "Made in the USA",
-      copy: "Proudly sourced, manufactured, and packed entirely in America.",
-      icon: (
-        <span className="text-lg" aria-hidden="true">
-          🇺🇸
-        </span>
-      ),
-    },
-    {
-      title: "No artificial dyes",
-      copy: "Colored naturally using real fruit and vegetable extracts.",
-      icon: (
-        <span className="text-lg" aria-hidden="true">
-          🌿
-        </span>
-      ),
-    },
-    {
-      title: "Classic gummy bear flavor",
-      copy: "Chewy, fruity flavor without artificial ingredients or harsh aftertaste.",
-      icon: (
-        <span className="text-lg" aria-hidden="true">
-          🍬
-        </span>
-      ),
-    },
-  ];
-
   return (
     <main className="relative overflow-hidden min-h-screen pb-12 lg:pb-0 home-candy text-[var(--text)]">
       <BreadcrumbJsonLd
@@ -431,7 +401,7 @@ export default async function HomePage() {
       <div className="americana-divider" aria-hidden="true" />
 
       <section className="section-light" data-zone="VALUE" aria-label="Product value">
-        <div className="mx-auto max-w-6xl px-4 py-8 sm:py-10 lg:py-12">
+        <div className="mx-auto max-w-6xl px-4 py-5 sm:py-8 lg:py-12">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <div className="group rounded-2xl border border-[rgba(15,27,45,0.10)] bg-white p-5 sm:p-6 transition-all duration-300 hover:shadow-[0_16px_40px_rgba(15,27,45,0.10)] hover:-translate-y-0.5">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl text-2xl shadow-xs" style={{ backgroundColor: "#fef3e2" }}>
@@ -465,7 +435,7 @@ export default async function HomePage() {
       </section>
 
       <section className="section-light" data-zone="STANDARDS" aria-label="Brand standards">
-        <div className="mx-auto max-w-6xl px-4 py-8 sm:py-10 lg:py-14">
+        <div className="mx-auto max-w-6xl px-4 py-5 sm:py-8 lg:py-14">
           <div className="text-center mb-6 sm:mb-8">
             <div className="text-[11px] font-semibold uppercase tracking-[0.35em] text-[var(--muted)]/70 mb-2">
               Our standards
@@ -521,13 +491,13 @@ export default async function HomePage() {
       </section>
 
       <section className="section-light" data-zone="BLOG">
-        <div className="mx-auto max-w-6xl px-4 py-8 sm:py-10 lg:py-12">
+        <div className="mx-auto max-w-6xl px-4 py-5 sm:py-8 lg:py-12">
           <LatestFromBlog />
         </div>
       </section>
 
       <section className="section-light" data-zone="FLAVORS">
-        <div className="mx-auto max-w-6xl px-4 py-8 sm:py-10 lg:py-12">
+        <div className="mx-auto max-w-6xl px-4 py-5 sm:py-8 lg:py-12">
           <div className="candy-panel americana-panel rounded-[28px] p-5 sm:p-7" style={{ backgroundColor: "#fefcf8" }}>
             <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-5">
               <div>
@@ -582,7 +552,7 @@ export default async function HomePage() {
       </section>
 
       <section className="section-light" data-zone="SHIPPING">
-        <div className="mx-auto max-w-6xl px-4 py-8 sm:py-10 lg:py-12">
+        <div className="mx-auto max-w-6xl px-4 py-5 sm:py-8 lg:py-12">
           <div className="grid gap-4 rounded-[28px] border border-[rgba(15,27,45,0.08)] p-6 sm:p-8 lg:grid-cols-[1fr_240px] lg:items-center shadow-[0_8px_24px_rgba(15,27,45,0.05)]" style={{ backgroundColor: "#ffffff" }}>
             <div className="space-y-3">
               <div className="text-[11px] font-semibold uppercase tracking-[0.35em] text-[var(--muted)]/70">
@@ -616,7 +586,7 @@ export default async function HomePage() {
       </section>
 
       <section className="section-light" data-zone="STORY" id="why-usa-gummies">
-        <div className="mx-auto max-w-6xl px-4 py-8 sm:py-10 lg:py-14 reveal-up">
+        <div className="mx-auto max-w-6xl px-4 py-5 sm:py-8 lg:py-14 reveal-up">
           <div className="candy-panel americana-panel relative overflow-hidden rounded-[36px] p-5 sm:p-8" style={{ backgroundColor: "#fefcf8" }}>
             <div className="relative z-10">
               <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
@@ -702,45 +672,11 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="section-light" data-zone="BENEFITS">
-        <div className="mx-auto max-w-6xl px-4 py-8 sm:py-10 lg:py-12">
-          <div className="grid gap-6 lg:grid-cols-[240px_1fr] lg:items-end">
-            <div className="flex items-end justify-center lg:justify-start">
-              <Image
-                src="/website%20assets/Jeep.png"
-                alt="Vintage Jeep illustration"
-                aria-hidden="true"
-                width={1041}
-                height={701}
-                sizes="(max-width: 640px) 180px, (max-width: 1024px) 240px, 300px"
-                className="brand-touch h-auto w-full max-w-[200px] sm:max-w-[240px] lg:max-w-[300px] object-contain"
-              />
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {whyCards.map((card) => (
-                <div
-                  key={card.title}
-                  className="candy-panel relative overflow-hidden rounded-2xl p-5 sm:p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_16px_40px_rgba(15,27,45,0.12)]"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl shadow-xs" style={{ backgroundColor: "#fef3e2" }}>
-                      {card.icon}
-                    </div>
-                    <h3 className="text-lg font-black text-[var(--text)]">{card.title}</h3>
-                  </div>
-                  <p className="mt-3 text-sm leading-relaxed text-[var(--muted)]">{card.copy}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
       <section className={`${styles.scene} ${styles.sceneEmail} section-light`} data-zone="EMAIL">
         <div className={styles.sceneBg} aria-hidden="true" />
         <div className={styles.sceneOverlay} aria-hidden="true" />
         <div className={styles.sceneContent}>
-        <div className="mx-auto max-w-6xl px-4 py-8 sm:py-10 lg:py-14 reveal-up">
+        <div className="mx-auto max-w-6xl px-4 py-5 sm:py-8 lg:py-14 reveal-up">
           <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
               <div className="candy-panel americana-panel rounded-[28px] p-5 sm:p-6 shadow-none border border-[rgba(15,27,45,0.12)]" style={{ backgroundColor: "#fefcf8" }}>
                 <div className="flex flex-wrap items-end justify-between gap-4">
@@ -850,7 +786,7 @@ export default async function HomePage() {
       </section>
 
       <section className="section-light" data-zone="STORY">
-        <div className="mx-auto max-w-6xl px-4 py-8 sm:py-10 lg:py-14">
+        <div className="mx-auto max-w-6xl px-4 py-5 sm:py-8 lg:py-14">
           <div className="candy-panel americana-panel rounded-[36px] border border-[var(--border)] p-6 sm:p-8 lg:p-10" style={{ backgroundColor: "#fefcf8" }}>
             <div className="flex items-center gap-2.5">
               <Image
@@ -889,7 +825,7 @@ export default async function HomePage() {
       </section>
 
       <section className="section-light" data-zone="WHOLESALE">
-        <div className="mx-auto max-w-6xl px-4 pt-0 pb-8 sm:pb-10 lg:pb-14">
+        <div className="mx-auto max-w-6xl px-4 pt-0 pb-5 sm:pb-8 lg:pb-14">
           <div className="relative overflow-hidden rounded-[28px] border border-[rgba(15,27,45,0.10)] bg-[var(--navy)] p-6 sm:p-8 lg:p-10">
             <div className="absolute inset-0 opacity-[0.04]" aria-hidden="true" style={{ backgroundImage: "url('/brand/pattern-stars.svg')", backgroundSize: "120px", mixBlendMode: "overlay" }} />
             <div className="relative z-10 grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
