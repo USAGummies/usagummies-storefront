@@ -157,7 +157,7 @@ const FAQS = [
   },
   {
     question: "How fast do orders ship?",
-    answer: "Most orders ship within 24 hours, and tracking is provided once labels are created.",
+    answer: "Orders typically ship within 1–2 business days, and tracking is provided once labels are created.",
   },
   {
     question: "Are USA Gummies good for gifting?",

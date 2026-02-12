@@ -70,9 +70,9 @@ export default function ShippingPolicyPage() {
         <section className="candy-panel p-7">
           <h1 className="text-3xl font-semibold tracking-tight">Shipping Policy</h1>
           <p className="mt-3 text-[var(--muted)]">
-            This shipping policy keeps delivery simple and predictable. Orders ship within 24 hours,
-            with tracking sent fast. Savings pricing is clear on every product page, plus shipping
-            updates. Free shipping on 5+ bags.
+            This shipping policy keeps delivery simple and predictable. Orders typically ship within
+            1–2 business days, with tracking sent fast. Savings pricing is clear on every product
+            page, plus shipping updates. Free shipping on 5+ bags.
           </p>
 
           <div className="mt-8 divide-y divide-[var(--border)] text-[var(--muted)]">
@@ -87,9 +87,9 @@ export default function ShippingPolicyPage() {
             <div className="py-4">
               <h2 className="text-lg font-semibold text-[var(--text)]">Processing time</h2>
               <p className="mt-2 text-sm text-[var(--muted)]">
-                Orders ship within <strong className="text-[var(--text)]">24 hours</strong>.
+                Orders typically ship within <strong className="text-[var(--text)]">1–2 business days</strong>.
                 If an order is placed after the daily carrier pickup time or on weekends/holidays,
-                it ships the next business day. We prep and label orders within 24 hours.
+                it ships the next business day.
               </p>
             </div>
 
@@ -104,7 +104,7 @@ export default function ShippingPolicyPage() {
             <div className="py-4">
               <h2 className="text-lg font-semibold text-[var(--text)]">Tracking</h2>
               <p className="mt-2 text-sm text-[var(--muted)]">
-                Tracking details are sent within 24 hours of your order.
+                Tracking details are sent once your order ships.
               </p>
             </div>
 

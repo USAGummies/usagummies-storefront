@@ -73,7 +73,7 @@ const FAQS = [
   },
   {
     question: "How fast do orders ship?",
-    answer: "Most orders ship within 24 hours with tracking once labels are created.",
+    answer: "Orders typically ship within 1–2 business days with tracking once labels are created.",
   },
 ];
 
