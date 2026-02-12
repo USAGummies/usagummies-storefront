@@ -113,7 +113,7 @@ export default async function HomePage() {
     SINGLE_BAG_SKU;
 
   return (
-    <div className="home-light-wrap relative overflow-hidden min-h-screen pb-12 lg:pb-0">
+    <div className="home-light-wrap relative overflow-hidden min-h-screen">
       <BreadcrumbJsonLd
         items={[
           { name: "Home", href: "/" },
@@ -493,7 +493,7 @@ export default async function HomePage() {
 
       {/* ─── 7. WHOLESALE — readable pills, clear CTA ─── */}
       <section className="section-light" data-zone="WHOLESALE">
-        <div className="mx-auto max-w-6xl px-4 pb-6 sm:pb-10 lg:pb-14">
+        <div className="mx-auto max-w-6xl px-4 pb-0">
           <div className="relative overflow-hidden rounded-[28px] border border-[rgba(15,27,45,0.10)] bg-[var(--navy)] p-6 sm:p-8 lg:p-10">
             <div className="absolute inset-0 opacity-[0.04]" aria-hidden="true" style={{ backgroundImage: "url('/brand/pattern-stars.svg')", backgroundSize: "120px", mixBlendMode: "overlay" }} />
             <div className="relative z-10 grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
