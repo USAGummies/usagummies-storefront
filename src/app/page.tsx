@@ -360,6 +360,7 @@ export default async function HomePage() {
                 fill
                 sizes="(max-width: 640px) 92vw, (max-width: 1024px) 46vw, 480px"
                 className="object-cover transition-transform duration-700 group-hover:scale-105"
+                unoptimized
               />
             </div>
             <div className="flex flex-col justify-center rounded-[20px] border border-[rgba(15,27,45,0.08)] bg-white p-6 sm:p-8 shadow-[0_8px_24px_rgba(15,27,45,0.06)]">
