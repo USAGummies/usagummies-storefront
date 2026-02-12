@@ -32,9 +32,10 @@ export async function generateMetadata({
   const tag = getTags().find((item) => item.slug === tagSlug);
   if (!tag) return {};
 
+  const siteUrl = resolveSiteUrl();
   const title = `${tag.name} Posts | USA Gummies Blog`;
   const description = `Browse USA Gummies posts tagged with ${tag.name}.`;
-  const canonical = `/blog/tag/${tag.slug}`;
+  const canonical = `${siteUrl}/blog/tag/${tag.slug}`;
 
   return {
     title,
@@ -45,13 +46,13 @@ export async function generateMetadata({
       description,
       url: canonical,
       type: "website",
-      images: [{ url: "/opengraph-image" }],
+      images: [{ url: `${siteUrl}/opengraph-image` }],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      images: ["/opengraph-image"],
+      images: [`${siteUrl}/opengraph-image`],
     },
   };
 }

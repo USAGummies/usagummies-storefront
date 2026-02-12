@@ -24,9 +24,13 @@ export async function generateMetadata({
   const author = getAuthorBySlug(authorSlug);
   if (!author) return {};
 
+  const siteUrl = resolveSiteUrl();
   const title = `${author.name} | USA Gummies Blog`;
   const description = author.bio || `Posts by ${author.name} for USA Gummies.`;
-  const canonical = `/blog/author/${author.slug}`;
+  const canonical = `${siteUrl}/blog/author/${author.slug}`;
+  const ogImage = author.avatar
+    ? new URL(author.avatar, siteUrl).toString()
+    : `${siteUrl}/opengraph-image`;
 
   return {
     title,
@@ -37,13 +41,13 @@ export async function generateMetadata({
       description,
       url: canonical,
       type: "profile",
-      images: [{ url: author.avatar || "/opengraph-image" }],
+      images: [{ url: ogImage }],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      images: [author.avatar || "/opengraph-image"],
+      images: [ogImage],
     },
   };
 }

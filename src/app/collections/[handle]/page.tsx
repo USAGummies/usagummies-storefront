@@ -49,6 +49,8 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
     collection.description ||
     "Explore USA Gummies collections and bundle savings.";
 
+  const ogImage = collection.image?.url || `${siteUrl}/opengraph-image`;
+
   return {
     title,
     description,
@@ -57,19 +59,20 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
       title,
       description,
       url: canonical,
-      images: collection.image?.url ? [{ url: collection.image.url }] : undefined,
+      images: [{ url: ogImage }],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      images: collection.image?.url ? [collection.image.url] : undefined,
+      images: [ogImage],
     },
   };
 }
 
 export default async function CollectionPage({ params }: PageProps) {
   const { handle } = await params;
+  const siteUrl = resolveSiteUrl();
   const collection = await getCollectionByHandle(handle);
   if (!collection) {
     notFound();
@@ -77,8 +80,31 @@ export default async function CollectionPage({ params }: PageProps) {
 
   const products = collection.products?.nodes ?? [];
 
+  const collectionJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name: collection.title,
+    description:
+      collection.description || "Explore USA Gummies collections and bundle savings.",
+    url: `${siteUrl}/collections/${handle}`,
+    publisher: { "@id": `${siteUrl}#organization` },
+    mainEntity: {
+      "@type": "ItemList",
+      itemListElement: products.map((product, index) => ({
+        "@type": "ListItem",
+        position: index + 1,
+        url: `${siteUrl}/products/${product.handle}`,
+        name: product.title,
+      })),
+    },
+  };
+
   return (
     <main className="min-h-screen bg-white text-[var(--text)]">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(collectionJsonLd) }}
+      />
       <BreadcrumbJsonLd
         items={[
           { name: "Home", href: "/" },

@@ -41,24 +41,45 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
       description,
       url: canonical,
       type: "website",
+      images: [{ url: `${siteUrl}/opengraph-image` }],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
+      images: [`${siteUrl}/opengraph-image`],
     },
   };
 }
 
 export default async function ShopifyPage({ params }: PageProps) {
   const { handle } = await params;
+  const siteUrl = resolveSiteUrl();
   const page = await getPageByHandle(handle);
   if (!page) {
     notFound();
   }
 
+  const webPageJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    name: page.seo?.title || page.title,
+    description:
+      page.seo?.description || page.bodySummary || `Learn more about ${page.title}.`,
+    url: `${siteUrl}/pages/${handle}`,
+    isPartOf: {
+      "@type": "WebSite",
+      name: "USA Gummies",
+      url: siteUrl,
+    },
+  };
+
   return (
     <main className="min-h-screen bg-white text-[var(--text)]">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(webPageJsonLd) }}
+      />
       <BreadcrumbJsonLd
         items={[
           { name: "Home", href: "/" },
