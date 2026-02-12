@@ -2369,8 +2369,8 @@ a:focus-visible:not(.btn):not(.focus-ring),
   gap: clamp(6px, 1.4vw, 10px);
   align-items: stretch;
   grid-template-areas:
-    "details"
     "media"
+    "details"
     "bundle";
 }
 .atomic-buy__product,

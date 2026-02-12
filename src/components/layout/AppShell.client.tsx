@@ -14,6 +14,7 @@ import { LeadCapture } from "@/components/marketing/LeadCapture.client";
 import { getCartToastMessage, readLastAdd } from "@/lib/cartFeedback";
 import { SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
 import { ExperienceBand } from "@/components/brand/ExperienceBand";
+import { AnnouncementBar } from "@/components/AnnouncementBar";
 
 const CartDrawer = dynamic(
   () => import("@/components/layout/CartDrawer.client").then((mod) => mod.CartDrawer),
@@ -409,6 +410,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       ) : null}
+      <AnnouncementBar />
       <header
         className={cx(
           "site-header sticky top-0 z-40 border-b border-[var(--border)] bg-white/92 text-[var(--text)] backdrop-blur-md shadow-[0_10px_24px_rgba(15,27,45,0.08)] transition-[transform,opacity] duration-300",
@@ -577,13 +579,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       ) : null}
 
       <main className="relative overflow-hidden pb-16 text-[var(--text)]">
-        <Image
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
           src="/website%20assets/B17Bomber.png"
-          alt="Vintage B-17 bomber illustration"
+          alt=""
           aria-hidden="true"
           width={1405}
           height={954}
-          sizes="(max-width: 1024px) 1px, 520px"
+          loading="lazy"
+          decoding="async"
           className="site-watermark site-watermark--bomber"
         />
         <div className="relative z-10">{children}</div>

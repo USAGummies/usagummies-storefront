@@ -27,6 +27,46 @@ function storeCartId(cartId?: string | null) {
   }
 }
 
+function getCartBagCount(cart: any): number {
+  const lines = cart?.lines?.edges?.map((e: any) => e?.node) ?? [];
+  return lines.reduce((sum: number, line: any) => sum + (Number(line?.quantity) || 0), 0);
+}
+
+const UPSELL_TIERS = [
+  { min: 1, max: 4, message: "Add 1 more bag for free shipping!", target: 5, savings: null },
+  { min: 5, max: 7, message: "Upgrade to 8 bags and save $7.73", target: 8, savings: "$7.73" },
+  { min: 8, max: 11, message: "Go to 12 bags — best value at $4.25/bag", target: 12, savings: "$13.08" },
+];
+
+function CartUpsell({ cart }: { cart: any }) {
+  const bags = getCartBagCount(cart);
+  if (bags <= 0 || bags >= 12) return null;
+
+  const tier = UPSELL_TIERS.find((t) => bags >= t.min && bags <= t.max);
+  if (!tier) return null;
+
+  const progress = Math.min(100, Math.round((bags / 12) * 100));
+
+  return (
+    <div className="mx-4 mb-4 rounded-xl border border-[rgba(220,38,38,0.15)] bg-[rgba(220,38,38,0.04)] p-3">
+      <div className="flex items-center gap-2 text-[13px] font-bold text-red-700">
+        <span>🎉</span>
+        <span>{tier.message}</span>
+      </div>
+      <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[rgba(220,38,38,0.1)]">
+        <div
+          className="h-full rounded-full bg-red-500 transition-all duration-500"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+      <div className="mt-1 flex justify-between text-[10px] text-[var(--muted)]">
+        <span>{bags} bag{bags === 1 ? "" : "s"} in cart</span>
+        <span>12 bags = best value</span>
+      </div>
+    </div>
+  );
+}
+
 export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [mounted, setMounted] = useState(false);
   const [cart, setCart] = useState<any>(null);
@@ -139,6 +179,7 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
                   <GiftNote />
                 </div>
               )}
+              <CartUpsell cart={cart} />
             </div>
           </div>
         </div>

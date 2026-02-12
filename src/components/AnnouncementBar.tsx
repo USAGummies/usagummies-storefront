@@ -1,60 +1,39 @@
 // src/components/AnnouncementBar.tsx
 "use client";
 
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { useMemo } from "react";
-import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
-import { GummyIcon, HeroPackIcon } from "@/components/ui/GummyIcon";
+import { useEffect, useState } from "react";
 
-function cx(...parts: Array<string | false | null | undefined>) {
-  return parts.filter(Boolean).join(" ");
-}
+const MESSAGES = [
+  "🚚 Free shipping on 5+ bags",
+  "⭐ 4.8 stars from verified buyers",
+  "🇺🇸 Made in the USA — FDA-registered facility",
+  "🎉 Order today, ships within 24 hours",
+];
 
 export function AnnouncementBar() {
-  const searchParams = useSearchParams();
-  const campaign = (searchParams.get("campaign") || "").toLowerCase();
-  const isAmerica250 = campaign === "america250";
+  const [idx, setIdx] = useState(0);
 
-  const { left, right, href } = useMemo(() => {
-    if (isAmerica250) {
-      return {
-        left: "America 250: limited runs",
-        right: FREE_SHIPPING_PHRASE,
-        href: "/shop?campaign=america250",
-      };
-    }
-    return {
-      left: `🚚 ${FREE_SHIPPING_PHRASE}`,
-      right: "⭐ 4.8 stars · Made in the USA",
-      href: "/shop",
-    };
-  }, [isAmerica250]);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setIdx((i) => (i + 1) % MESSAGES.length);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, []);
 
   return (
-    <div className="sticky top-0 z-[60] border-b border-[var(--border)] bg-white/92 backdrop-blur supports-[backdrop-filter]:bg-white/70">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-2 text-xs text-[var(--text)]">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface-strong)] px-2 py-0.5 text-[11px] text-[var(--text)]">
-            <HeroPackIcon size={14} className="icon-float" />
-            <GummyIcon variant="red" size={14} />
-            USA Gummies
-          </span>
-          <span className="truncate">{left}</span>
-        </div>
-
-        <div className="flex shrink-0 items-center gap-3">
-          <span className="hidden sm:inline text-[var(--muted)]">{right}</span>
-          <Link
-            href={href}
-            className={cx(
-              "rounded-full border border-[var(--border)] bg-[var(--surface-strong)] px-3 py-1 text-[11px] font-semibold text-[var(--text)] hover:bg-white"
-            )}
-          >
-            Shop bags
-          </Link>
-        </div>
+    <div className="bg-[var(--navy)] text-white text-center text-[11px] sm:text-xs font-semibold py-1.5 px-4 tracking-wide overflow-hidden">
+      <div
+        key={idx}
+        className="animate-[fadeSlide_0.4s_ease-out]"
+      >
+        {MESSAGES[idx]}
       </div>
+      <style jsx>{`
+        @keyframes fadeSlide {
+          from { opacity: 0; transform: translateY(6px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 }
