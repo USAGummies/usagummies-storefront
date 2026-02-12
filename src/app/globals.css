@@ -4157,7 +4157,7 @@ main.text-white{
   color: var(--muted);
 }
 .blog-link {
-  color: var(--navy);
+  color: var(--text);
   font-weight: 600;
   text-decoration: none;
 }
