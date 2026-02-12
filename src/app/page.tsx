@@ -516,7 +516,7 @@ export default async function HomePage() {
                   <Link href="/wholesale" className="inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-black text-[var(--navy)] shadow-[0_8px_24px_rgba(0,0,0,0.2)] transition-all duration-300 hover:shadow-[0_12px_32px_rgba(0,0,0,0.3)] hover:-translate-y-0.5">
                     Request wholesale info
                   </Link>
-                  <Link href="/contact" className="text-sm font-semibold text-white/70 underline underline-offset-4 hover:text-white transition-colors">
+                  <Link href="/contact" className="text-sm font-semibold text-white/90 underline underline-offset-4 hover:text-white transition-colors">
                     Contact us
                   </Link>
                 </div>
