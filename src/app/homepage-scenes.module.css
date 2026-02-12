@@ -44,7 +44,7 @@
 }
 
 .sceneBundle {
-  background: transparent;
+  /* transparent removed — home-hero-theme on the section provides the dark bg */
 }
 
 .sceneBundle .sceneBg,

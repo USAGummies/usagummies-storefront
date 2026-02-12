@@ -126,8 +126,7 @@ details > summary::-webkit-details-marker{
   background-image: none;
 }
 .home-product-stage{
-  background-image: none !important;
-  background-color: transparent;
+  /* Let home-hero-theme gradients show through — scene overlays still hidden */
 }
 .home-product-stage .sceneBg,
 .home-product-stage .sceneOverlay{
