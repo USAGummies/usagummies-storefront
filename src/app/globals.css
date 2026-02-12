@@ -409,6 +409,28 @@ details > summary::-webkit-details-marker{
   border-color: rgba(16, 24, 40, 0.12);
 }
 
+/* ── Footer isolation ──
+   Override dark theme variables so footer always reads correctly.
+   The footer uses explicit dark bg + white text,
+   so we reset vars to prevent dark zone contamination. */
+footer.bg-\[\#0d1c33\]{
+  --text: #ffffff;
+  --muted: rgba(255,255,255,0.7);
+  --border: rgba(255,255,255,0.15);
+  --surface: rgba(255,255,255,0.08);
+  --surface-strong: rgba(255,255,255,0.12);
+  --bg: #0d1c33;
+}
+.home-hero-theme footer.bg-\[\#0d1c33\]{
+  background-color: #0d1c33 !important;
+}
+
+/* ── Americana accents ── */
+.americana-stripe-top{
+  height: 4px;
+  background: linear-gradient(90deg, #c7362c 0%, #c7362c 33%, #f8f5ef 33%, #f8f5ef 50%, #0d1c33 50%, #0d1c33 67%, #f8f5ef 67%, #f8f5ef 83%, #c7362c 83%, #c7362c 100%);
+}
+
 .brand-touch{
   pointer-events: none;
   user-select: none;
@@ -469,18 +491,22 @@ details > summary::-webkit-details-marker{
   transform: rotate(6deg);
 }
 .americana-divider{
-  height: 2px;
-  width: min(100%, 1120px);
-  margin: 10px auto;
+  height: 4px;
+  width: 100%;
+  margin: 0 auto;
   background: linear-gradient(
     90deg,
-    transparent,
-    rgba(199,54,44,0.45) 20%,
-    rgba(13,28,51,0.35) 50%,
-    rgba(199,54,44,0.45) 80%,
-    transparent
+    #c7362c 0%,
+    #c7362c 33%,
+    #f8f5ef 33%,
+    #f8f5ef 50%,
+    #0d1c33 50%,
+    #0d1c33 67%,
+    #f8f5ef 67%,
+    #f8f5ef 83%,
+    #c7362c 83%,
+    #c7362c 100%
   );
-  border-radius: 999px;
 }
 .brand-cluster{
   display: inline-flex;

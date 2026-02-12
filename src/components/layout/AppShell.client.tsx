@@ -597,8 +597,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </section>
       ) : null}
 
-      <footer className="border-t border-[var(--border)] bg-white/85 backdrop-blur-md text-[var(--text)]">
-        <div className="mx-auto max-w-6xl px-4 py-8 text-sm text-[var(--muted)] space-y-6">
+      <footer className="relative border-t-4 border-[#c7362c] bg-[#0d1c33] text-white">
+        <div className="absolute inset-0 opacity-[0.03] pointer-events-none" aria-hidden="true" style={{ backgroundImage: "url('/brand/pattern-stars.svg')", backgroundSize: "100px" }} />
+        <div className="relative z-10 mx-auto max-w-6xl px-4 py-10 text-sm space-y-8">
           <div className="grid gap-4 md:grid-cols-1 max-w-xl">
             <LeadCapture
               source="footer"
@@ -614,82 +615,82 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
           <div className="grid gap-4 md:grid-cols-[1.1fr_auto] md:items-start">
             <div className="space-y-2">
-              <div className="text-lg font-black text-[var(--text)]">USA Gummies</div>
-              <ul className="space-y-1 text-[var(--muted)]">
+              <div className="text-lg font-black text-white">🇺🇸 USA Gummies</div>
+              <ul className="space-y-1 text-white/70">
                 <li>Made in the USA • Classic gummy bear flavor</li>
                 <li>All natural flavors • No artificial dyes</li>
                 <li>Ships fast • Free shipping at 5+ bags</li>
               </ul>
-              <div className="text-sm text-[var(--muted)]">
-                <Link href="/made-in-usa-candy" className="link-underline">
+              <div className="text-sm text-white/70">
+                <Link href="/made-in-usa-candy" className="underline underline-offset-4 hover:text-white transition-colors">
                   Made in USA Candy
                 </Link>
               </div>
             </div>
-              <div className="text-xs text-[var(--muted)]">
+              <div className="text-xs text-white/60">
                 Secure checkout • {FREE_SHIPPING_PHRASE} • Satisfaction guaranteed
               </div>
           </div>
 
           <div className="grid gap-6 grid-cols-2 sm:grid-cols-4">
             <div className="space-y-2">
-              <div className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--text)]">Shop</div>
-              <div className="flex flex-col gap-1.5 text-[var(--muted)]">
-                <Link href="/shop" className="link-underline">All gummies</Link>
-                <Link href="/bundle-guides" className="link-underline">Bag count guides</Link>
-                <Link href="/gummy-gift-bundles" className="link-underline">Gift bag options</Link>
-                <Link href="/bulk-gummy-bears" className="link-underline">Bulk gummy bears</Link>
-                <Link href="/gummy-calculator" className="link-underline">Bag calculator</Link>
+              <div className="text-xs font-bold uppercase tracking-[0.2em] text-white">Shop</div>
+              <div className="flex flex-col gap-1.5 text-white/70">
+                <Link href="/shop" className="hover:text-white transition-colors">All gummies</Link>
+                <Link href="/bundle-guides" className="hover:text-white transition-colors">Bag count guides</Link>
+                <Link href="/gummy-gift-bundles" className="hover:text-white transition-colors">Gift bag options</Link>
+                <Link href="/bulk-gummy-bears" className="hover:text-white transition-colors">Bulk gummy bears</Link>
+                <Link href="/gummy-calculator" className="hover:text-white transition-colors">Bag calculator</Link>
               </div>
             </div>
             <div className="space-y-2">
-              <div className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--text)]">Learn</div>
-              <div className="flex flex-col gap-1.5 text-[var(--muted)]">
-                <Link href="/gummies-101" className="link-underline">Gummies 101</Link>
-                <Link href="/ingredients" className="link-underline">Ingredients</Link>
-                <Link href="/no-artificial-dyes-gummy-bears" className="link-underline">Dye-Free Gummy Bears</Link>
-                <Link href="/made-in-usa" className="link-underline">Made in USA</Link>
-                <Link href="/blog" className="link-underline">Blog</Link>
+              <div className="text-xs font-bold uppercase tracking-[0.2em] text-white">Learn</div>
+              <div className="flex flex-col gap-1.5 text-white/70">
+                <Link href="/gummies-101" className="hover:text-white transition-colors">Gummies 101</Link>
+                <Link href="/ingredients" className="hover:text-white transition-colors">Ingredients</Link>
+                <Link href="/no-artificial-dyes-gummy-bears" className="hover:text-white transition-colors">Dye-Free Gummy Bears</Link>
+                <Link href="/made-in-usa" className="hover:text-white transition-colors">Made in USA</Link>
+                <Link href="/blog" className="hover:text-white transition-colors">Blog</Link>
               </div>
             </div>
             <div className="space-y-2">
-              <div className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--text)]">Occasions</div>
-              <div className="flex flex-col gap-1.5 text-[var(--muted)]">
-                <Link href="/patriotic-party-snacks" className="link-underline">Party snacks</Link>
-                <Link href="/patriotic-candy" className="link-underline">Patriotic candy</Link>
-                <Link href="/dye-free-candy" className="link-underline">Dye-free candy</Link>
-                <Link href="/made-in-usa-candy" className="link-underline">USA-made candy</Link>
+              <div className="text-xs font-bold uppercase tracking-[0.2em] text-white">Occasions</div>
+              <div className="flex flex-col gap-1.5 text-white/70">
+                <Link href="/patriotic-party-snacks" className="hover:text-white transition-colors">Party snacks</Link>
+                <Link href="/patriotic-candy" className="hover:text-white transition-colors">Patriotic candy</Link>
+                <Link href="/dye-free-candy" className="hover:text-white transition-colors">Dye-free candy</Link>
+                <Link href="/made-in-usa-candy" className="hover:text-white transition-colors">USA-made candy</Link>
               </div>
             </div>
             <div className="space-y-2">
-              <div className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--text)]">Company</div>
-              <div className="flex flex-col gap-1.5 text-[var(--muted)]">
-                <Link href="/about" className="link-underline">About</Link>
-                <Link href="/wholesale" className="link-underline">Wholesale</Link>
-                <Link href="/contact" className="link-underline">Contact</Link>
-                <Link href="/faq" className="link-underline">FAQ</Link>
-                <Link href="/help" className="link-underline">Help center</Link>
-                <Link href="/policies" className="link-underline">Policies</Link>
-                <Link href="/policies/shipping" className="link-underline">Shipping</Link>
+              <div className="text-xs font-bold uppercase tracking-[0.2em] text-white">Company</div>
+              <div className="flex flex-col gap-1.5 text-white/70">
+                <Link href="/about" className="hover:text-white transition-colors">About</Link>
+                <Link href="/wholesale" className="hover:text-white transition-colors">Wholesale</Link>
+                <Link href="/contact" className="hover:text-white transition-colors">Contact</Link>
+                <Link href="/faq" className="hover:text-white transition-colors">FAQ</Link>
+                <Link href="/help" className="hover:text-white transition-colors">Help center</Link>
+                <Link href="/policies" className="hover:text-white transition-colors">Policies</Link>
+                <Link href="/policies/shipping" className="hover:text-white transition-colors">Shipping</Link>
               </div>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-[var(--border)]">
-            <Link href="/shop" className="btn btn-candy btn-compact">
+          <div className="flex flex-wrap items-center gap-3 pt-4 border-t border-white/15">
+            <Link href="/shop" className="inline-flex items-center gap-2 rounded-full bg-[#c7362c] px-5 py-2.5 text-sm font-black text-white shadow-[0_4px_16px_rgba(199,54,44,0.35)] transition-all hover:shadow-[0_6px_24px_rgba(199,54,44,0.45)] hover:-translate-y-0.5">
               Shop bags
             </Link>
-            <Link href="/wholesale" className="btn btn-outline btn-compact">
+            <Link href="/wholesale" className="inline-flex items-center gap-2 rounded-full border border-white/25 px-5 py-2.5 text-sm font-semibold text-white/90 transition-all hover:bg-white/10 hover:border-white/40">
               Wholesale inquiries
             </Link>
-            <div className="ml-auto flex flex-col items-end gap-1 text-xs text-[var(--muted)]">
+            <div className="ml-auto flex flex-col items-end gap-1 text-xs text-white/60">
               <div>
-                <div className="font-semibold text-[var(--text)]">Other places to buy</div>
+                <div className="font-semibold text-white">Other places to buy</div>
                 <a
                   href={AMAZON_LISTING_URL}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="link-underline"
+                  className="underline underline-offset-4 text-white/70 hover:text-white transition-colors"
                   onPointerDown={() => {
                     if (!shouldFireAmazon()) return;
                     markAmazonFired();
