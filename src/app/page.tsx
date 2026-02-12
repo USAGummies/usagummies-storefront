@@ -302,14 +302,14 @@ export default async function HomePage() {
                     {FREE_SHIPPING_PHRASE} • Fast, reliable shipping • Satisfaction guaranteed
                   </div>
                   <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
-                    <span className="theme-pill rounded-full border border-white/20 bg-white/95 px-3.5 py-1.5 text-[var(--navy)] shadow-xs">
-                      Made in USA
+                    <span className="theme-pill rounded-full border border-[rgba(199,160,98,0.5)] bg-[rgba(199,160,98,0.18)] px-3.5 py-1.5 text-[var(--gold)] shadow-xs">
+                      🇺🇸 Made in USA
                     </span>
-                    <span className="theme-pill rounded-full border border-white/20 bg-white/95 px-3.5 py-1.5 text-[var(--navy)] shadow-xs">
-                      No artificial dyes
+                    <span className="theme-pill rounded-full border border-[rgba(199,160,98,0.5)] bg-[rgba(199,160,98,0.18)] px-3.5 py-1.5 text-[var(--gold)] shadow-xs">
+                      🌿 No artificial dyes
                     </span>
-                    <span className="theme-pill rounded-full border border-white/20 bg-white/95 px-3.5 py-1.5 text-[var(--navy)] shadow-xs">
-                      FDA-registered facility
+                    <span className="theme-pill rounded-full border border-[rgba(199,160,98,0.5)] bg-[rgba(199,160,98,0.18)] px-3.5 py-1.5 text-[var(--gold)] shadow-xs">
+                      🏭 FDA-registered facility
                     </span>
                   </div>
                 </div>

@@ -789,6 +789,53 @@ export default function BundleQuickBuy({
           ) : null}
         </div>
 
+        {/* ── Inline DTC CTA: immediately after Direct tiles on mobile ── */}
+        {!isAmazonSelection ? (
+          <div className="bundle-quickbuy__inlineCta" ref={ctaRef}>
+            <button
+              data-primary-cta
+              type="button"
+              className="w-full inline-flex items-center justify-center rounded-[14px] h-[60px] px-4 text-[18px] font-semibold whitespace-nowrap shadow-[0_16px_40px_rgba(214,64,58,0.3)] transition disabled:opacity-60 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-[rgba(214,69,61,0.25)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#F7F3EF] bg-[#D6453D] text-white hover:bg-[#BF3B34] active:bg-[#A7322C]"
+              onClick={handlePrimaryCtaClick}
+              disabled={isAdding || compactCtaDisabled}
+            >
+              <span className="inline-flex items-center gap-2">
+                {isAdding ? (
+                  <>
+                    <span
+                      aria-hidden="true"
+                      className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent opacity-60"
+                    />
+                    Adding...
+                  </>
+                ) : (
+                  <span>
+                    {selectedAdded
+                      ? "Added to Cart ✓"
+                      : hasBundleInteraction
+                        ? `Add ${dtcSelectedQty} Bags to Cart`
+                        : primaryCtaLabel || "Shop & save"}
+                  </span>
+                )}
+              </span>
+            </button>
+            <div className={isLight ? "text-[12px] font-semibold text-[#6B6B6B] text-center" : "text-[12px] font-semibold text-white/70 text-center"}>
+              {dtcSelectedPerBag}/bag · Free shipping · Direct from USA Gummies
+            </div>
+            {success && !error ? (
+              <div className={isLight ? "text-xs font-semibold text-[var(--candy-green)] text-center" : "text-xs font-semibold text-[var(--gold)] text-center"}>
+                {lastAddedQty ? `Added ${lastAddedQty} bags to cart.` : "Added to cart."}
+              </div>
+            ) : null}
+            {error ? (
+              <div className={isLight ? "text-xs font-semibold text-red-500 text-center" : "text-xs font-semibold text-red-200 text-center"}>
+                {error}
+              </div>
+            ) : null}
+            {railProofSlot}
+          </div>
+        ) : null}
+
         <div className="bundle-quickbuy__group bundle-quickbuy__group--amazon">
           <div className="bundle-quickbuy__groupHeader">
               <span className="bundle-quickbuy__groupTitle">
@@ -843,7 +890,7 @@ export default function BundleQuickBuy({
       <div data-rail-bottom className="bundle-quickbuy__railBottom">
         <div className="bundle-quickbuy__ctaStack">
           {isAmazonSelection ? (
-            <div className="grid gap-3">
+            <div className="grid gap-3" ref={ctaRef}>
               <button
                 data-primary-cta
                 type="button"
@@ -901,41 +948,20 @@ export default function BundleQuickBuy({
                 Switch to direct bundles
               </button>
             </div>
-          ) : (
-            <button
-              data-primary-cta
-              type="button"
-              className="w-full inline-flex items-center justify-center rounded-[14px] h-[60px] px-4 text-[18px] font-semibold whitespace-nowrap shadow-[0_16px_40px_rgba(214,64,58,0.3)] transition disabled:opacity-60 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-[rgba(214,69,61,0.25)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#F7F3EF] bg-[#D6453D] text-white hover:bg-[#BF3B34] active:bg-[#A7322C]"
-              onClick={handlePrimaryCtaClick}
-              disabled={isAdding || compactCtaDisabled}
-            >
-              <span className="inline-flex items-center gap-2">
-                {isAdding ? (
-                  <>
-                    <span
-                      aria-hidden="true"
-                      className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent opacity-60"
-                    />
-                    Adding...
-                  </>
-                ) : (
-                  <span>
-                    {selectedAdded
-                      ? "Added to Cart"
-                      : hasBundleInteraction
-                        ? "Add to Cart"
-                        : primaryCtaLabel || "Shop & save"}
-                  </span>
-                )}
-              </span>
-            </button>
-          )}
+          ) : null}
+          {!isAmazonSelection ? (
+            <div className="text-center">
+              <div className={isLight ? "text-[11px] font-semibold text-[#6B6B6B]" : "text-[11px] font-semibold text-white/60"}>
+                Need 1-4 bags? Buy on Amazon above to save on shipping.
+              </div>
+            </div>
+          ) : null}
           <div className={isLight ? "text-[12px] font-semibold text-[#6B6B6B]" : "text-[12px] font-semibold text-white/70"}>
             {isAmazonSelection
               ? "Amazon checkout saves you on shipping."
-              : "Direct from USA Gummies. Free shipping at 5+ bags."}
+              : ""}
           </div>
-          {railProofSlot}
+          {isAmazonSelection ? railProofSlot : null}
         </div>
       </div>
 
