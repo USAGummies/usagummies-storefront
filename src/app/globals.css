@@ -10,15 +10,15 @@
   --candy-orange: #ff9f43;
   --candy-yellow: #f8d44f;
   --candy-green: #43c46b;
-  --candy-cream: #fff7f0;
+  --candy-cream: #ffffff;
   --rebel: #1a1a1a;
   --steel: #5f6368;
   --aluminum: #d4d6db;
 
   /* Semantic tokens */
-  --bg: #f8f5ef;
+  --bg: #ffffff;
   --surface: #ffffff;
-  --surface-strong: #fdf9f3;
+  --surface-strong: #ffffff;
   --text: #1c2430;
   --muted: #5f5b56;
   --border: rgba(16, 24, 40, 0.12);
@@ -85,12 +85,8 @@ body {
 
 body {
   margin: 0;
-  background-color: var(--bg, #f8f5ef);
-  background-image:
-    radial-gradient(circle at 12% 8%, rgba(199, 160, 98, 0.10), transparent 40%),
-    radial-gradient(circle at 90% 0%, rgba(199, 54, 44, 0.04), transparent 45%),
-    linear-gradient(180deg, #fefcf8 0%, #f8f4ec 100%);
-  background-attachment: fixed;
+  background-color: #ffffff;
+  background-image: none;
   color: var(--text, #1c2430);
   font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
   letter-spacing: -0.01em;
@@ -122,11 +118,11 @@ details > summary::-webkit-details-marker{
 }
 
 .home-metal{
-  background-color: var(--candy-cream);
+  background-color: #ffffff;
   background-image: none;
 }
 .home-candy{
-  background-color: var(--candy-cream);
+  background-color: #ffffff;
   background-image: none;
 }
 .home-product-stage{
@@ -362,10 +358,10 @@ details > summary::-webkit-details-marker{
    Resets dark theme variables back to light for sections that
    should appear on a warm cream/white background.            */
 .section-light{
-  --bg: #fefcf8;
+  --bg: #ffffff;
   --surface: #ffffff;
-  --surface-strong: #fdf9f3;
-  --candy-cream: #fff7f0;
+  --surface-strong: #ffffff;
+  --candy-cream: #ffffff;
   --text: #1c2430;
   --muted: #5f5b56;
   --border: rgba(16, 24, 40, 0.12);
@@ -401,7 +397,7 @@ details > summary::-webkit-details-marker{
   color: #1c2430;
 }
 .section-light .blog-latest{
-  background: #fdf9f3;
+  background: #ffffff;
   border-color: rgba(16, 24, 40, 0.12);
 }
 .section-light .blog-card{
