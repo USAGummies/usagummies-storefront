@@ -25,16 +25,17 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { page } = await params;
   const pageNumber = Number(page);
+  const siteUrl = resolveSiteUrl();
   if (!Number.isFinite(pageNumber) || pageNumber < 2) {
     return {
       title: PAGE_TITLE,
       description: PAGE_DESCRIPTION,
-      alternates: { canonical: "/blog" },
+      alternates: { canonical: `${siteUrl}/blog` },
     };
   }
 
   const title = `${PAGE_TITLE} — Page ${pageNumber}`;
-  const canonical = `/blog/page/${pageNumber}`;
+  const canonical = `${siteUrl}/blog/page/${pageNumber}`;
 
   return {
     title,
@@ -45,13 +46,13 @@ export async function generateMetadata({
       description: PAGE_DESCRIPTION,
       url: canonical,
       type: "website",
-      images: [{ url: "/opengraph-image" }],
+      images: [{ url: `${siteUrl}/opengraph-image` }],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description: PAGE_DESCRIPTION,
-      images: ["/opengraph-image"],
+      images: [`${siteUrl}/opengraph-image`],
     },
   };
 }

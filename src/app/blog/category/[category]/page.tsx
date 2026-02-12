@@ -23,9 +23,10 @@ export async function generateMetadata({
   const category = getCategories().find((item) => item.slug === categorySlug);
   if (!category) return {};
 
+  const siteUrl = resolveSiteUrl();
   const title = `${category.name} Articles | USA Gummies Blog`;
   const description = `Browse USA Gummies posts in the ${category.name} category.`;
-  const canonical = `/blog/category/${category.slug}`;
+  const canonical = `${siteUrl}/blog/category/${category.slug}`;
 
   return {
     title,
@@ -36,13 +37,13 @@ export async function generateMetadata({
       description,
       url: canonical,
       type: "website",
-      images: [{ url: "/opengraph-image" }],
+      images: [{ url: `${siteUrl}/opengraph-image` }],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      images: ["/opengraph-image"],
+      images: [`${siteUrl}/opengraph-image`],
     },
   };
 }
