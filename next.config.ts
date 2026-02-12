@@ -81,10 +81,11 @@ const nextConfig: NextConfig = {
       // Google Search Console 404 cleanup
       { source: "/home", destination: "/", permanent: true },
       { source: "/contact-1", destination: "/contact", permanent: true },
-      { source: "/store/p/all-american-gummy-bears-katzh", destination: "/shop", permanent: true },
-      { source: "/store/p/all-american-gummy-bears", destination: "/shop", permanent: true },
+      { source: "/store/p/all-american-gummy-bears-katzh", destination: "/products/all-american-gummy-bears-7-5-oz-single-bag", permanent: true },
+      { source: "/store/p/all-american-gummy-bears", destination: "/products/all-american-gummy-bears-7-5-oz-single-bag", permanent: true },
+      { source: "/store/p/:slug", destination: "/shop", permanent: true },
       { source: "/blog/blog-post-title-four-6k8cc", destination: "/blog", permanent: true },
-      { source: "/blog/category/Gummy\\+Bear\\+Tips", destination: "/blog", permanent: true },
+      { source: "/blog/category/:slug*", destination: "/blog", permanent: true },
     ];
   },
 };
