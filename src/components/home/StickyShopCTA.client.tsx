@@ -39,7 +39,7 @@ export default function StickyShopCTA() {
 
   return (
     <div
-      className="fixed inset-x-0 bottom-0 z-40 block sm:hidden animate-in slide-in-from-bottom-4 duration-300"
+      className="fixed inset-x-0 bottom-0 z-40 block sm:hidden"
       style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}
     >
       <div className="mx-auto max-w-lg px-3">
