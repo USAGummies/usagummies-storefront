@@ -16,6 +16,7 @@ import { ProductJsonLd } from "@/components/seo/ProductJsonLd";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { LazyStickyAddToCartBar } from "@/components/product/LazyStickyAddToCartBar.client";
 import LazyHeroCTAWatcher from "@/components/home/LazyHeroCTAWatcher.client";
+import FAQSection from "@/components/home/FAQSection";
 import styles from "./homepage-scenes.module.css";
 
 function resolveSiteUrl() {
@@ -277,6 +278,14 @@ export default async function HomePage() {
                     4.8 stars from verified Amazon buyers
                   </span>
                 </div>
+                <blockquote className="border-l-2 border-[var(--gold)]/40 pl-3 mt-1">
+                  <p className="text-[13px] italic text-white/70 leading-snug">
+                    &ldquo;Absolutely delicious soft gummy bears made in America. You will not be disappointed!&rdquo;
+                  </p>
+                  <cite className="mt-0.5 block text-[11px] font-semibold not-italic text-white/50">
+                    — Michael D., verified buyer
+                  </cite>
+                </blockquote>
                 <div className="flex flex-wrap items-center gap-3 pt-1">
                   <Link href="#bundle-pricing" className="btn btn-candy text-base px-6 py-3.5">
                     Shop &amp; save
@@ -492,7 +501,14 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* ─── 7. WHOLESALE — readable pills, clear CTA ─── */}
+      {/* ─── 7. FAQ — address buying objections ─── */}
+      <section className="section-light" data-zone="FAQ" aria-label="Frequently asked questions">
+        <div className="mx-auto max-w-6xl px-4 py-6 sm:py-10 lg:py-14">
+          <FAQSection />
+        </div>
+      </section>
+
+      {/* ─── 8. WHOLESALE — readable pills, clear CTA ─── */}
       <section className="section-light" data-zone="WHOLESALE">
         <div className="mx-auto max-w-6xl px-4 pb-0">
           <div className="relative overflow-hidden rounded-[28px] border border-[rgba(15,27,45,0.10)] bg-[var(--navy)] p-6 sm:p-8 lg:p-10">
