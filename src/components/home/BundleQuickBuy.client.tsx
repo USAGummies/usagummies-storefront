@@ -493,7 +493,8 @@ export default function BundleQuickBuy({
       }
       if (json?.cart?.id) storeCartId(json.cart.id);
       if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("cart:updated"));
+        // Pass cart data through event so listeners don't re-fetch with stale ID
+        window.dispatchEvent(new CustomEvent("cart:updated", { detail: { cart: json.cart } }));
       }
       fireCartToast(qty);
       setLastAddedQty(qty);

@@ -302,13 +302,13 @@ export default async function HomePage() {
                     {FREE_SHIPPING_PHRASE} • Fast, reliable shipping • Satisfaction guaranteed
                   </div>
                   <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
-                    <span className="theme-pill rounded-full border border-[rgba(199,160,98,0.5)] bg-[rgba(199,160,98,0.18)] px-3.5 py-1.5 text-[var(--gold)] shadow-xs">
+                    <span className="theme-pill rounded-full border border-[rgba(199,160,98,0.55)] bg-[rgba(199,160,98,0.22)] px-3.5 py-1.5 text-[#FDF6E8] shadow-xs" style={{textShadow:'0 1px 2px rgba(0,0,0,0.3)'}}>
                       🇺🇸 Made in USA
                     </span>
-                    <span className="theme-pill rounded-full border border-[rgba(199,160,98,0.5)] bg-[rgba(199,160,98,0.18)] px-3.5 py-1.5 text-[var(--gold)] shadow-xs">
+                    <span className="theme-pill rounded-full border border-[rgba(199,160,98,0.55)] bg-[rgba(199,160,98,0.22)] px-3.5 py-1.5 text-[#FDF6E8] shadow-xs" style={{textShadow:'0 1px 2px rgba(0,0,0,0.3)'}}>
                       🌿 No artificial dyes
                     </span>
-                    <span className="theme-pill rounded-full border border-[rgba(199,160,98,0.5)] bg-[rgba(199,160,98,0.18)] px-3.5 py-1.5 text-[var(--gold)] shadow-xs">
+                    <span className="theme-pill rounded-full border border-[rgba(199,160,98,0.55)] bg-[rgba(199,160,98,0.22)] px-3.5 py-1.5 text-[#FDF6E8] shadow-xs" style={{textShadow:'0 1px 2px rgba(0,0,0,0.3)'}}>
                       🏭 FDA-registered facility
                     </span>
                   </div>

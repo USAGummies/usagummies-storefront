@@ -94,7 +94,15 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
   }, [open]);
 
   useEffect(() => {
-    function refresh() {
+    function refresh(event: Event) {
+      // Use cart data from event if available (avoids stale-ID race condition on mobile)
+      const eventCart = (event as CustomEvent<{ cart?: any }>)?.detail?.cart;
+      if (eventCart?.id) {
+        storeCartId(eventCart.id);
+        setCart(eventCart);
+        return;
+      }
+      // Fallback: re-fetch from API
       const cartId = getStoredCartId();
       fetch("/api/cart", {
         method: "POST",
