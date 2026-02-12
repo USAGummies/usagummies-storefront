@@ -25,8 +25,8 @@ export function AnnouncementBar() {
       };
     }
     return {
-      left: FREE_SHIPPING_PHRASE,
-      right: "Made in the USA • No artificial dyes",
+      left: `🚚 ${FREE_SHIPPING_PHRASE}`,
+      right: "⭐ 4.8 stars · Made in the USA",
       href: "/shop",
     };
   }, [isAmerica250]);

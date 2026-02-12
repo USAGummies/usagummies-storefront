@@ -17,6 +17,7 @@ import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { LazyStickyAddToCartBar } from "@/components/product/LazyStickyAddToCartBar.client";
 import LazyHeroCTAWatcher from "@/components/home/LazyHeroCTAWatcher.client";
 import FAQSection from "@/components/home/FAQSection";
+import StickyShopCTA from "@/components/home/StickyShopCTA.client";
 import styles from "./homepage-scenes.module.css";
 
 function resolveSiteUrl() {
@@ -555,6 +556,8 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      <StickyShopCTA />
 
       <LazyStickyAddToCartBar
         title="In your cart"
