@@ -15,8 +15,10 @@ export default function StickyShopCTA() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
+    // Use a tiny sentinel at the end of the bundle section
+    // (not the giant hero-primary-cta container which is 2000+ px tall)
     const anchor =
-      document.getElementById("hero-primary-cta") ||
+      document.getElementById("bundle-end-sentinel") ||
       document.getElementById("bundle-pricing");
     if (!anchor) return;
 
@@ -24,7 +26,7 @@ export default function StickyShopCTA() {
       ([entry]) => {
         setVisible(!entry.isIntersecting);
       },
-      { rootMargin: "-100px 0px 0px 0px", threshold: 0 }
+      { threshold: 0 }
     );
 
     observer.observe(anchor);

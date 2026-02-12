@@ -219,6 +219,8 @@ export default async function HomePage() {
                   </div>
                 </div>
               </div>
+              {/* Sentinel for StickyShopCTA IntersectionObserver */}
+              <div id="bundle-end-sentinel" aria-hidden="true" style={{ height: 1 }} />
               <div className="mt-1.5 flex flex-wrap gap-1.5 text-[10px] text-white/70">
                 <span className="font-semibold text-white">Guides:</span>
                 <Link href="/gummy-gift-bundles" className="underline underline-offset-4">
