@@ -10,12 +10,11 @@ import { useCartBagCount } from "@/hooks/useCartBagCount";
  */
 export default function StickyShopCTA() {
   const { bagCount } = useCartBagCount();
-  const [show, setShow] = useState(false);
+  const [visible, setVisible] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // Find the bundle CTA anchor
     const anchor =
       document.getElementById("hero-primary-cta") ||
       document.getElementById("bundle-pricing");
@@ -23,8 +22,7 @@ export default function StickyShopCTA() {
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        // Show when bundle section is scrolled out of view
-        setShow(!entry.isIntersecting);
+        setVisible(!entry.isIntersecting);
       },
       { rootMargin: "-100px 0px 0px 0px", threshold: 0 }
     );
@@ -35,12 +33,20 @@ export default function StickyShopCTA() {
 
   // Don't show if cart has items (the StickyAddToCartBar handles that)
   const hasItems = (Number(bagCount) || 0) > 0;
-  if (!show || hasItems) return null;
+  const shouldShow = visible && !hasItems;
 
+  // Always render DOM so React hydrates it, use CSS + opacity to show/hide
   return (
     <div
       className="fixed inset-x-0 bottom-0 z-40 block sm:hidden"
-      style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}
+      style={{
+        paddingBottom: "max(12px, env(safe-area-inset-bottom))",
+        opacity: shouldShow ? 1 : 0,
+        pointerEvents: shouldShow ? "auto" : "none",
+        transform: shouldShow ? "translateY(0)" : "translateY(100%)",
+        transition: "opacity 0.3s ease, transform 0.3s ease",
+      }}
+      aria-hidden={!shouldShow}
     >
       <div className="mx-auto max-w-lg px-3">
         <div className="flex items-center justify-between gap-3 rounded-2xl border border-[rgba(15,27,45,0.10)] bg-white/95 px-4 py-3 shadow-[0_-4px_24px_rgba(0,0,0,0.12)] backdrop-blur-md">
