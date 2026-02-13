@@ -330,6 +330,39 @@ function sendIMessage(message) {
   }
 }
 
+// ── Behavior Summary ─────────────────────────────────────────────────────────
+function behaviorSummary(ga4) {
+  const lines = [];
+
+  // Session trend
+  const dir = ga4.sessions > 0 && ga4.sessionChange.startsWith('+') ? 'up' : 'down';
+  lines.push(
+    `Traffic is ${dir} today with ${ga4.sessions} sessions (${ga4.sessionChange} vs yesterday), ${ga4.newUsers} of which are new visitors.`
+  );
+
+  // Engagement quality
+  const bounce = Number(ga4.bounceRate);
+  const engageNote = bounce >= 80
+    ? `Bounce rate is high at ${bounce}% — most visitors are leaving after one page.`
+    : bounce >= 50
+      ? `Bounce rate is moderate at ${bounce}% — about half of visitors explore beyond the landing page.`
+      : `Bounce rate is low at ${bounce}% — visitors are actively browsing multiple pages.`;
+  lines.push(`${engageNote} Average session lasts ${ga4.avgDuration}.`);
+
+  // Top traffic source
+  if (ga4.sources) {
+    const topSrc = ga4.sources.split(',')[0]?.trim();
+    if (topSrc) lines.push(`Top traffic source is ${topSrc}.`);
+  }
+
+  // Conversions callout
+  if (ga4.conversions > 0) {
+    lines.push(`${ga4.conversions} conversion${ga4.conversions === 1 ? '' : 's'} tracked today.`);
+  }
+
+  return lines.join(' ');
+}
+
 // ── Main ────────────────────────────────────────────────────────────────────
 async function main() {
   console.log(`[${new Date().toISOString()}] Running daily report...`);
@@ -347,6 +380,7 @@ async function main() {
     msg += `\nPAGES: ${ga4.topPages}`;
     msg += `\nSOURCES: ${ga4.sources}`;
     msg += `\nBOUNCE: ${ga4.bounceRate}% | AVG: ${ga4.avgDuration}`;
+    msg += `\n\n${behaviorSummary(ga4)}`;
   } else {
     msg += `\nTRAFFIC: [GA4 unavailable]`;
   }
@@ -359,8 +393,7 @@ async function main() {
   }
 
   if (amazon) {
-    msg += `\n\nAMAZON: ${amazon.orders} orders (${amazon.orderChange}) | $${amazon.revenue} (${amazon.revenueChange})`;
-    msg += `\nAOV: $${amazon.aov}`;
+    msg += `\n\nAMAZON: ${amazon.orders} orders (${amazon.orderChange})`;
   } else {
     msg += `\n\nAMAZON: [unavailable]`;
   }
