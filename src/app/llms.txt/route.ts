@@ -25,12 +25,11 @@ Simple, direct, high-trust.
 - Made in the USA with no artificial dyes
 
 ## Bag-count pricing ladder
-- Base price: $5.99 per bag (1-3 bags, standard price)
-- Savings start at 4 bags
-- Free shipping at 5+ bags
-- Most popular bag count: 8 bags
-- Best per-bag price: 12 bags ($4.25 per bag, $51.00 total)
-- Per-bag price caps after 12+ bags
+- Base price: $5.99 per bag (1-4 bags, standard price)
+- Savings + free shipping start at 5 bags ($5.00 per bag, $25.00 total)
+- Most popular bag count: 8 bags ($4.70 per bag, $37.60 total)
+- Best per-bag price: 12 bags ($4.30 per bag, $51.60 total)
+- Per-bag price caps at $4.30 after 12+ bags
 
 ## Shipping + satisfaction guarantee
 - Ships within 24 hours

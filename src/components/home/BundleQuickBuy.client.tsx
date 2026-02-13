@@ -95,8 +95,7 @@ function getStoredCartId() {
 const FEATURED_QTYS: TierKey[] = ["1", "2", "3", "4", "5", "8", "12"];
 const FEATURED_QTYS_COMPACT: TierKey[] = ["1", "2", "3", "4", "5", "8", "12"];
 const SAVINGS_LADDER = [
-  { qty: 4, label: "Savings start", caption: "4+ bags" },
-  { qty: 5, label: "Free shipping", caption: "5+ bags" },
+  { qty: 5, label: "Save + free ship", caption: "5+ bags" },
   { qty: 8, label: "Most picked", caption: "8 bags" },
   { qty: 12, label: "Best price", caption: "12 bags" },
 ];
@@ -1215,8 +1214,7 @@ export default function BundleQuickBuy({
                   </div>
                   <div className="bundle-fusion__missionBadges">
                     {[
-                      { qty: 4, label: "Savings unlocked" },
-                      { qty: 5, label: "Free shipping unlocked" },
+                      { qty: 5, label: "Save + free shipping" },
                       { qty: 8, label: "Most picked unlocked" },
                       {
                         qty: 12,
@@ -1409,8 +1407,7 @@ export default function BundleQuickBuy({
                   </div>
                   <div className="bundle-integrated__missionBadges">
                     {[
-                      { qty: 4, label: "Savings unlocked" },
-                      { qty: 5, label: "Free shipping unlocked" },
+                      { qty: 5, label: "Save + free shipping" },
                       { qty: 8, label: "Most picked unlocked" },
                       {
                         qty: 12,
@@ -1730,8 +1727,7 @@ export default function BundleQuickBuy({
                 </div>
                 <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-semibold">
                   {[
-                    { qty: 4, label: "Savings unlocked" },
-                    { qty: 5, label: "Free shipping unlocked" },
+                    { qty: 5, label: "Save + free shipping" },
                       { qty: 8, label: "Most picked unlocked" },
                     {
                       qty: 12,

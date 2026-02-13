@@ -137,7 +137,7 @@ export default function GoLandingPage() {
           letterSpacing: "0.5px",
         }}
       >
-        🇺🇸 FREE SHIPPING on every 5-pack — <span style={{ color: "#c7a062" }}>Save $0.39 per bag vs. retail</span>
+        🇺🇸 FREE SHIPPING on every 5-pack — <span style={{ color: "#c7a062" }}>Save $0.99 per bag vs. retail</span>
       </div>
 
       {/* Hero */}
@@ -178,7 +178,7 @@ export default function GoLandingPage() {
             {/* Savings callout */}
             <div style={{ marginTop: 20, display: "flex", justifyContent: "center", gap: 16, flexWrap: "wrap" }}>
               <div style={{ background: "#ffffff", border: "2px solid #2D7A3A", borderRadius: 12, padding: "10px 20px", textAlign: "center" }}>
-                <div className="lp-display" style={{ fontSize: 28, color: "#2D7A3A", lineHeight: 1 }}>$5.60</div>
+                <div className="lp-display" style={{ fontSize: 28, color: "#2D7A3A", lineHeight: 1 }}>$5.00</div>
                 <div style={{ fontSize: 12, fontWeight: 600, color: "#5f5b56", marginTop: 2 }}>per bag in 5-pack</div>
               </div>
               <div style={{ background: "#ffffff", border: "1px solid rgba(15,27,45,0.12)", borderRadius: 12, padding: "10px 20px", textAlign: "center", opacity: 0.7 }}>
@@ -263,12 +263,12 @@ export default function GoLandingPage() {
           </div>
 
           <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginTop: 6 }}>
-            <span className="lp-display" style={{ fontSize: 42, color: "#1B2A4A", lineHeight: 1 }}>$28.02</span>
-            <span style={{ fontSize: 15, color: "#5f5b56", fontWeight: 500 }}>$5.60 / bag</span>
+            <span className="lp-display" style={{ fontSize: 42, color: "#1B2A4A", lineHeight: 1 }}>$25.00</span>
+            <span style={{ fontSize: 15, color: "#5f5b56", fontWeight: 500 }}>$5.00 / bag</span>
           </div>
 
           <div style={{ fontSize: 13, color: "#5f5b56", textDecoration: "line-through", opacity: 0.7, marginTop: 4 }}>
-            $29.95 retail (5 × $5.99)
+            $29.95 retail (5 × $5.99) — you save $4.95
           </div>
 
           <div style={{ display: "flex", gap: 16, marginTop: 20, flexWrap: "wrap", justifyContent: "center" }}>

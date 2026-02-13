@@ -96,8 +96,7 @@ function formatQtyLabel(qty: number) {
 }
 
 function badgeForTotal(qty: number) {
-  if (qty === 4) return "Starter savings";
-  if (qty === 5) return "Free shipping";
+  if (qty === 5) return "Save + free shipping";
   if (qty === 8) return "Most popular";
   if (qty === 12) return "Best price";
   return "";

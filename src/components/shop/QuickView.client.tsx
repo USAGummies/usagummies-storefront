@@ -13,8 +13,7 @@ import { GummyIconRow, HeroPackIcon } from "@/components/ui/GummyIcon";
 
 const QUICK_QTYS = [1, 2, 3, 4, 5, 8, 12];
 const SAVINGS_LADDER = [
-  { qty: 4, label: "Savings start", caption: "4+ bags" },
-  { qty: 5, label: "Free shipping", caption: "5+ bags" },
+  { qty: 5, label: "Save + free ship", caption: "5+ bags" },
   { qty: 8, label: "Most popular", caption: "8 bags" },
   { qty: 12, label: "Best price", caption: "12 bags" },
 ];

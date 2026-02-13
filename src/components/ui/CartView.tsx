@@ -19,14 +19,12 @@ type MoneyV2 = { amount: string; currencyCode: string };
 
 const FEATURED_BUNDLE_QTYS = [5, 8, 12];
 const SAVINGS_LADDER = [
-  { qty: 4, label: "Savings start", caption: "4+ bags" },
-  { qty: 5, label: "Free shipping", caption: "5+ bags" },
+  { qty: 5, label: "Save + free ship", caption: "5+ bags" },
   { qty: 8, label: "Most picked", caption: "8 bags" },
   { qty: 12, label: "Best price", caption: "12 bags" },
 ];
 const PROGRESS_MILESTONES = [
-  { qty: 4, label: "Savings" },
-  { qty: 5, label: "Free ship" },
+  { qty: 5, label: "Save + free ship" },
   { qty: 8, label: "Most picked" },
   { qty: 12, label: "Best price" },
 ];
@@ -1250,8 +1248,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                   </div>
                   <div className="mt-2 grid gap-1">
                     {[
-                      { qty: 4, label: "Savings pricing active" },
-                      { qty: 5, label: "Free shipping unlocked" },
+                      { qty: 5, label: "Save + free shipping" },
                       { qty: 8, label: "Most picked price unlocked" },
                       {
                         qty: 12,
