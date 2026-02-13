@@ -189,19 +189,22 @@ async function fetchShopify() {
   };
   const base = `https://${SHOPIFY_STORE}/admin/api/${SHOPIFY_API_VERSION}`;
 
-  // Get today's and yesterday's orders
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const yesterdayStart = new Date(todayStart);
-  yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+  // Build PT-aware date boundaries (same approach as GA4 / Amazon)
+  const todayPT = dateRange(0);
+  const yesterdayPT = dateRange(1);
+  const tomorrowPT = dateRange(-1);
+
+  const todayStartISO = `${todayPT}T00:00:00-08:00`;
+  const yesterdayStartISO = `${yesterdayPT}T00:00:00-08:00`;
+  const tomorrowStartISO = `${tomorrowPT}T00:00:00-08:00`;
 
   const [todayOrders, yesterdayOrders] = await Promise.all([
     fetch(
-      `${base}/orders.json?status=any&created_at_min=${todayStart.toISOString()}&limit=250`,
+      `${base}/orders.json?status=any&created_at_min=${todayStartISO}&created_at_max=${tomorrowStartISO}&limit=250`,
       { headers }
     ).then(r => r.json()),
     fetch(
-      `${base}/orders.json?status=any&created_at_min=${yesterdayStart.toISOString()}&created_at_max=${todayStart.toISOString()}&limit=250`,
+      `${base}/orders.json?status=any&created_at_min=${yesterdayStartISO}&created_at_max=${todayStartISO}&limit=250`,
       { headers }
     ).then(r => r.json()),
   ]);
@@ -257,31 +260,38 @@ async function fetchAmazon() {
 
   const accessToken = await getAmzAccessToken();
 
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const yesterdayStart = new Date(todayStart);
-  yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+  // Build PT-aware date boundaries (same approach as GA4)
+  const todayPT = dateRange(0);
+  const yesterdayPT = dateRange(1);
+
+  const todayStartISO = `${todayPT}T00:00:00-08:00`;
+  const yesterdayStartISO = `${yesterdayPT}T00:00:00-08:00`;
+  // Use "now minus 3 min" for upper bound — Amazon requires CreatedBefore to be in the past
+  const nowISO = new Date(Date.now() - 3 * 60 * 1000).toISOString();
 
   const headers = {
     'x-amz-access-token': accessToken,
     'Content-Type': 'application/json',
   };
 
-  // Fetch today's and yesterday's orders
+  // Fetch orders using PT-aware date strings
   const fetchOrders = async (after, before) => {
     const params = new URLSearchParams({
       MarketplaceIds: AMZ_MARKETPLACE_ID,
-      CreatedAfter: after.toISOString(),
-      CreatedBefore: before.toISOString(),
+      CreatedAfter: after,
+      CreatedBefore: before,
     });
     const res = await fetch(`${AMZ_SP_ENDPOINT}/orders/v0/orders?${params}`, { headers });
     const data = await res.json();
+    if (data.errors) {
+      console.error('Amazon API errors:', JSON.stringify(data.errors));
+    }
     return data.payload?.Orders || [];
   };
 
   const [tOrders, yOrders] = await Promise.all([
-    fetchOrders(todayStart, new Date()),
-    fetchOrders(yesterdayStart, todayStart),
+    fetchOrders(todayStartISO, nowISO),
+    fetchOrders(yesterdayStartISO, todayStartISO),
   ]);
 
   const tCount = tOrders.length;
