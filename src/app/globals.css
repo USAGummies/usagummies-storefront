@@ -2699,19 +2699,22 @@ a:focus-visible:not(.btn):not(.focus-ring),
   box-shadow: 0 22px 48px rgba(239,59,59,0.35);
 }
 .bundle-quickbuy__cardBadge{
-  align-self: center;
+  justify-self: center;
   border-radius: 999px;
   background: var(--candy-red);
   color: #fff;
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   padding: 6px 12px;
   box-shadow: 0 10px 20px rgba(239,59,59,0.25);
-}
-.bundle-quickbuy__cardBadge{
   margin-top: 4px;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-sizing: border-box;
 }
 .bundle-quickbuy__shipBadge{
   align-self: flex-start;

@@ -267,8 +267,10 @@ export default function GoLandingPage() {
             <span style={{ fontSize: 15, color: "#5f5b56", fontWeight: 500 }}>$5.00 / bag</span>
           </div>
 
-          <div style={{ fontSize: 13, color: "#5f5b56", textDecoration: "line-through", opacity: 0.7, marginTop: 4 }}>
-            $29.95 retail (5 × $5.99) — you save $4.95
+          <div style={{ fontSize: 13, color: "#5f5b56", marginTop: 4 }}>
+            <span style={{ textDecoration: "line-through", opacity: 0.7 }}>$29.95 retail (5 × $5.99)</span>
+            {" — "}
+            <span style={{ color: "#2D7A3A", fontWeight: 700 }}>you save $4.95</span>
           </div>
 
           <div style={{ display: "flex", gap: 16, marginTop: 20, flexWrap: "wrap", justifyContent: "center" }}>
