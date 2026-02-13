@@ -159,6 +159,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isHome = pathname === "/";
   const isShop = pathname === "/shop";
   const isProduct = pathname?.startsWith("/products");
+  const isLandingPage = pathname?.startsWith("/go");
   const hideChatWidget = pathname === "/wholesale" || pathname === "/contact";
   const showChatWidget = !hideChatWidget && chatReady;
   const experienceVariant = isHome || isShop || isProduct ? "full" : "compact";
@@ -372,6 +373,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       document.documentElement.style.overflow = originalHtml;
     };
   }, [mobileOpen]);
+
+  // Landing pages render standalone — no nav, footer, or shell chrome.
+  if (isLandingPage) {
+    return <>{children}</>;
+  }
 
   return (
     <div className="min-h-screen bg-[var(--bg,#f8f5ef)] text-[var(--text)]">
