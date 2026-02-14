@@ -3,8 +3,9 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { AMAZON_LISTING_URL } from "@/lib/amazon";
 
-const CART_PERMALINK =
-  "https://usa-gummies.myshopify.com/cart/62295921099123:5";
+// API route that creates a Storefront API cart and redirects to checkout
+// (bypasses the Shop Pay / shop.app redirect that the raw cart permalink triggers)
+const CHECKOUT_URL = "/go/checkout";
 
 export const metadata: Metadata = {
   title: "USA Gummies 5-Pack Bundle | Free Shipping | Made in USA",
@@ -127,7 +128,7 @@ export default function GoLandingPage() {
             </span>
           </Link>
           <a
-            href={CART_PERMALINK}
+            href={CHECKOUT_URL}
             className="lp-display"
             style={{
               background: "#c7362c",
@@ -288,7 +289,7 @@ export default function GoLandingPage() {
               </span>
             </div>
 
-            <a href={CART_PERMALINK} className="lp-cta" style={{ marginTop: 16 }}>
+            <a href={CHECKOUT_URL} className="lp-cta" style={{ marginTop: 16 }}>
               GET THE 5-PACK — $25 TOTAL
             </a>
 
@@ -366,7 +367,7 @@ export default function GoLandingPage() {
             Grab the 5-pack bundle — just $25 with free shipping, delivered to your door in 1–2 days.
           </p>
         </div>
-        <a href={CART_PERMALINK} className="lp-cta">
+        <a href={CHECKOUT_URL} className="lp-cta">
           GET THE 5-PACK — $25 TOTAL
         </a>
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, marginTop: 10, fontSize: 11, color: "#5f5b56", fontWeight: 500 }}>
@@ -397,7 +398,7 @@ export default function GoLandingPage() {
       {/* Mobile sticky bottom bar — Shopify primary */}
       <div className="lp-sticky-bar">
         <a
-          href={CART_PERMALINK}
+          href={CHECKOUT_URL}
           className="lp-display"
           style={{
             flex: 2,
