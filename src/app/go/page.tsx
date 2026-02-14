@@ -242,7 +242,7 @@ export default function GoLandingPage() {
           {/* Price + value prop */}
           <div style={{
             background: "#ffffff",
-            border: "2px solid #1B2A4A",
+            border: "2px solid #c7362c",
             borderRadius: 16,
             padding: "20px 20px 24px",
             position: "relative",
@@ -263,69 +263,63 @@ export default function GoLandingPage() {
               <span className="lp-display" style={{ fontSize: 20, letterSpacing: "1px", color: "#1B2A4A" }}>
                 5-BAG BUNDLE
               </span>
-              <span style={{ background: "#2D7A3A", color: "#fff", fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 20 }}>
-                BEST VALUE
+              <span style={{ background: "#c7362c", color: "#fff", fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 20 }}>
+                BEST DEAL
               </span>
             </div>
 
             <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 4 }}>
               <span className="lp-display" style={{ fontSize: 38, color: "#1B2A4A", lineHeight: 1 }}>$25.00</span>
-              <span style={{ fontSize: 14, color: "#5f5b56", fontWeight: 500 }}>$5.00 / bag</span>
-              <span style={{ fontSize: 12, color: "#2D7A3A", fontWeight: 700 }}>save $4.95</span>
+              <span style={{ textDecoration: "line-through", fontSize: 16, color: "#999", fontWeight: 500 }}>$29.95</span>
+            </div>
+            <div style={{ fontSize: 13, color: "#2D7A3A", fontWeight: 700, marginTop: 2 }}>
+              You save $4.95 — that&apos;s a free bag!
             </div>
 
-            <div style={{ display: "flex", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 12, marginTop: 10, flexWrap: "wrap" }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: "#1B2A4A", display: "flex", alignItems: "center", gap: 4 }}>
-                <span style={{ color: "#2D7A3A", fontSize: 15 }}>✓</span> Free shipping
+                <span style={{ color: "#2D7A3A", fontSize: 15 }}>✓</span> Free shipping included
               </span>
               <span style={{ fontSize: 12, fontWeight: 600, color: "#1B2A4A", display: "flex", alignItems: "center", gap: 4 }}>
-                <span style={{ color: "#2D7A3A", fontSize: 15 }}>✓</span> Made in USA
+                <span style={{ color: "#2D7A3A", fontSize: 15 }}>✓</span> Ships direct to you
               </span>
               <span style={{ fontSize: 12, fontWeight: 600, color: "#1B2A4A", display: "flex", alignItems: "center", gap: 4 }}>
-                <span style={{ color: "#2D7A3A", fontSize: 15 }}>✓</span> No artificial dyes
+                <span style={{ color: "#2D7A3A", fontSize: 15 }}>✓</span> $25 total — no surprises
               </span>
             </div>
 
             <a href={CART_PERMALINK} className="lp-cta" style={{ marginTop: 16 }}>
-              GET THE 5-PACK — FREE SHIPPING
+              GET THE 5-PACK — $25 TOTAL
             </a>
 
-            <div style={{ display: "flex", justifyContent: "center", gap: 16, marginTop: 10, fontSize: 11, color: "#5f5b56", fontWeight: 500, flexWrap: "wrap" }}>
-              <span>🔒 Secure checkout</span>
-              <span>📦 Ships in 1–2 days</span>
-              <span>⭐ 4.8-star rated</span>
+            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, marginTop: 10, fontSize: 11, color: "#5f5b56", fontWeight: 500 }}>
+              <span>🔒</span>
+              <span>Secure checkout via Shopify — trusted by millions of stores</span>
             </div>
           </div>
 
-          {/* Amazon CTA — equal billing, not secondary */}
+          {/* Amazon CTA — try 1 bag */}
           <div style={{
             marginTop: 12,
             background: "#ffffff",
-            border: "2px solid #1B2A4A",
+            border: "2px solid #e0dcd6",
             borderRadius: 16,
-            padding: "20px 20px",
+            padding: "16px 20px",
             textAlign: "center",
           }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-              <span className="lp-display" style={{ fontSize: 18, letterSpacing: "1px", color: "#1B2A4A" }}>
-                TRY 1 BAG
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+              <span className="lp-display" style={{ fontSize: 16, letterSpacing: "1px", color: "#1B2A4A" }}>
+                OR TRY 1 BAG — $5.99
               </span>
-              <span style={{ background: "#c7a062", color: "#1B2A4A", fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 20 }}>
-                MOST POPULAR
-              </span>
-            </div>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 4 }}>
-              <span className="lp-display" style={{ fontSize: 32, color: "#1B2A4A", lineHeight: 1 }}>$5.99</span>
-              <span style={{ fontSize: 13, color: "#5f5b56", fontWeight: 500 }}>+ free Prime shipping</span>
             </div>
             <a
               href={AMAZON_LISTING_URL}
               target="_blank"
               rel="noopener noreferrer"
               className="lp-amazon-cta"
-              style={{ marginTop: 14 }}
+              style={{ marginTop: 10 }}
             >
-              <svg viewBox="0 0 603 182" style={{ height: 20, width: "auto" }} aria-label="Amazon">
+              <svg viewBox="0 0 603 182" style={{ height: 18, width: "auto" }} aria-label="Amazon">
                 <path fill="#1B2A4A" d="M374.6 142.1c-34.1 25.2-83.6 38.6-126.2 38.6-59.7 0-113.5-22.1-154.2-58.8-3.2-2.9-.3-6.9 3.5-4.6 43.9 25.5 98.2 40.9 154.3 40.9 37.8 0 79.4-7.8 117.7-24.1 5.8-2.5 10.6 3.8 4.9 7.9z"/>
                 <path fill="#1B2A4A" d="M388.8 126c-4.3-5.6-28.8-2.6-39.8-1.3-3.3.4-3.8-2.5-.8-4.6 19.5-13.7 51.5-9.7 55.2-5.1 3.7 4.6-1 36.8-19.2 52.1-2.8 2.4-5.5 1.1-4.2-2 4.1-10.3 13.2-33.4 8.9-39.1z"/>
                 <path fill="#1B2A4A" d="M350 18.4V5.7c0-1.9 1.5-3.2 3.2-3.2h57c1.8 0 3.3 1.3 3.3 3.2v10.9c0 1.8-1.6 4.2-4.3 7.9l-29.5 42.2c11-.3 22.5 1.4 32.4 6.9 2.2 1.2 2.8 3.1 3 4.9v13.5c0 1.9-2.1 4.1-4.2 2.9-17.7-9.3-41.2-10.3-60.8.1-2 1.1-4.1-.9-4.1-2.9V79.2c0-2.1 0-5.7 2.1-8.9l34.2-49.1h-29.8c-1.8 0-3.3-1.3-3.3-3.2zM124.3 93.5h-17.3c-1.7-.1-3-1.4-3.1-3V5.8c0-1.8 1.5-3.3 3.4-3.3h16.2c1.7.1 3.1 1.4 3.2 3.1v11.1h.3c4.3-10.9 12.5-16 23.5-16 11.2 0 18.2 5.1 23.2 16 4.3-10.9 14.1-16 24.6-16 7.5 0 15.6 3.1 20.6 10 5.7 7.7 4.5 18.8 4.5 28.6l0 51.1c0 1.8-1.5 3.3-3.4 3.3h-17.3c-1.8-.1-3.2-1.6-3.2-3.3V45c0-3.8.3-13.4-.5-17-.1-5.7-4.5-7.3-8.9-7.3-3.7 0-7.5 2.4-9 6.3-1.6 3.9-1.4 10.4-1.4 18v45.5c0 1.8-1.5 3.3-3.4 3.3h-17.3c-1.8-.1-3.2-1.6-3.2-3.3V45c0-10.1 1.7-24.9-9.4-24.9-11.3 0-10.9 14.4-10.9 24.9v45.5c0 1.8-1.5 3.3-3.4 3.3zM461.6-1.4c25.7 0 39.6 22.1 39.6 50.2 0 27.2-15.4 48.7-39.6 48.7-25.2 0-38.9-22.1-38.9-49.6 0-27.6 13.8-49.3 38.9-49.3zm.1 18.2c-12.7 0-13.5 17.4-13.5 28.2 0 10.9-.2 34.1 13.4 34.1 13.4 0 14-18.7 14-30.1 0-7.5-.3-16.5-2.7-23.6-2-6.1-6-8.6-11.3-8.6zM536.8 93.5h-17.3c-1.8-.1-3.2-1.6-3.2-3.3l0-84.6c.1-1.7 1.6-3.1 3.4-3.1h16.1c1.6.1 2.8 1.2 3.2 2.7v12.9h.3c5-11.8 12-17.4 24.4-17.4 8 0 15.9 2.9 20.9 10.8 4.7 7.3 4.7 19.7 4.7 28.6v51.3c-.2 1.6-1.7 2.9-3.4 2.9h-17.4c-1.6-.1-3-1.4-3.1-2.9V44.3c0-10 1.2-24.6-9.5-24.6-3.7 0-7.1 2.5-8.8 6.3-2.1 4.8-2.4 9.5-2.4 18.4v45.9c0 1.8-1.6 3.3-3.4 3.3zM301.2 52c0 6.9.2 12.6-3.3 18.7-2.8 5-7.3 8-12.3 8-6.8 0-10.8-5.2-10.8-12.9 0-15.1 13.6-17.9 26.4-17.9v4.1zm17.9 43.3c-1.2 1-2.9 1.1-4.2.4-5.9-4.9-7-7.2-10.2-11.9-9.8 10-16.7 12.9-29.4 12.9-15 0-26.7-9.3-26.7-27.8 0-14.5 7.9-24.3 19.1-29.2 9.7-4.3 23.2-5.1 33.5-6.3v-2.3c0-4.3.3-9.4-2.2-13.1-2.2-3.3-6.3-4.7-10-4.7-6.8 0-12.9 3.5-14.4 10.7-.3 1.6-1.5 3.2-3.2 3.3l-16.8-1.8c-1.5-.3-3.2-1.5-2.8-3.8 4.1-21.8 23.8-28.4 41.5-28.4 9 0 20.8 2.4 27.9 9.2 9 8.4 8.1 19.7 8.1 31.9v28.9c0 8.7 3.6 12.5 7 17.2 1.2 1.7 1.4 3.7 0 4.9-3.7 3.1-10.3 8.8-13.9 12z"/>
@@ -362,30 +356,31 @@ export default function GoLandingPage() {
         </div>
       </section>
 
-      {/* Second CTA block — after social proof for scrollers */}
+      {/* Second CTA block — after social proof, Shopify-focused */}
       <section style={{ maxWidth: 560, margin: "0 auto", padding: "32px 20px" }}>
         <div style={{ textAlign: "center", marginBottom: 16 }}>
-          <p style={{ color: "#5f5b56", fontSize: 15, lineHeight: 1.6, maxWidth: 440, margin: "0 auto" }}>
-            Classic gummy bears made in the USA with natural fruit colors — zero artificial dyes. Grab the 5-pack and shipping&apos;s on us.
+          <span className="lp-display" style={{ fontSize: 22, letterSpacing: "1px", color: "#1B2A4A" }}>
+            READY TO TRY THEM?
+          </span>
+          <p style={{ color: "#5f5b56", fontSize: 14, lineHeight: 1.6, maxWidth: 440, margin: "8px auto 0" }}>
+            Grab the 5-pack bundle — just $25 with free shipping, delivered to your door in 1–2 days.
           </p>
         </div>
         <a href={CART_PERMALINK} className="lp-cta">
-          GET THE 5-PACK — FREE SHIPPING
+          GET THE 5-PACK — $25 TOTAL
         </a>
-        <div style={{ marginTop: 12, textAlign: "center" }}>
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, marginTop: 10, fontSize: 11, color: "#5f5b56", fontWeight: 500 }}>
+          <span>🔒</span>
+          <span>Secure checkout via Shopify — $25 total, nothing hidden</span>
+        </div>
+        <div style={{ marginTop: 16, textAlign: "center" }}>
           <a
             href={AMAZON_LISTING_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="lp-amazon-cta"
+            style={{ color: "#5f5b56", fontSize: 13, textDecoration: "underline", textUnderlineOffset: 3 }}
           >
-            <svg viewBox="0 0 603 182" style={{ height: 18, width: "auto" }} aria-label="Amazon">
-              <path fill="#1B2A4A" d="M374.6 142.1c-34.1 25.2-83.6 38.6-126.2 38.6-59.7 0-113.5-22.1-154.2-58.8-3.2-2.9-.3-6.9 3.5-4.6 43.9 25.5 98.2 40.9 154.3 40.9 37.8 0 79.4-7.8 117.7-24.1 5.8-2.5 10.6 3.8 4.9 7.9z"/>
-              <path fill="#1B2A4A" d="M388.8 126c-4.3-5.6-28.8-2.6-39.8-1.3-3.3.4-3.8-2.5-.8-4.6 19.5-13.7 51.5-9.7 55.2-5.1 3.7 4.6-1 36.8-19.2 52.1-2.8 2.4-5.5 1.1-4.2-2 4.1-10.3 13.2-33.4 8.9-39.1z"/>
-              <path fill="#1B2A4A" d="M350 18.4V5.7c0-1.9 1.5-3.2 3.2-3.2h57c1.8 0 3.3 1.3 3.3 3.2v10.9c0 1.8-1.6 4.2-4.3 7.9l-29.5 42.2c11-.3 22.5 1.4 32.4 6.9 2.2 1.2 2.8 3.1 3 4.9v13.5c0 1.9-2.1 4.1-4.2 2.9-17.7-9.3-41.2-10.3-60.8.1-2 1.1-4.1-.9-4.1-2.9V79.2c0-2.1 0-5.7 2.1-8.9l34.2-49.1h-29.8c-1.8 0-3.3-1.3-3.3-3.2zM124.3 93.5h-17.3c-1.7-.1-3-1.4-3.1-3V5.8c0-1.8 1.5-3.3 3.4-3.3h16.2c1.7.1 3.1 1.4 3.2 3.1v11.1h.3c4.3-10.9 12.5-16 23.5-16 11.2 0 18.2 5.1 23.2 16 4.3-10.9 14.1-16 24.6-16 7.5 0 15.6 3.1 20.6 10 5.7 7.7 4.5 18.8 4.5 28.6l0 51.1c0 1.8-1.5 3.3-3.4 3.3h-17.3c-1.8-.1-3.2-1.6-3.2-3.3V45c0-3.8.3-13.4-.5-17-.1-5.7-4.5-7.3-8.9-7.3-3.7 0-7.5 2.4-9 6.3-1.6 3.9-1.4 10.4-1.4 18v45.5c0 1.8-1.5 3.3-3.4 3.3h-17.3c-1.8-.1-3.2-1.6-3.2-3.3V45c0-10.1 1.7-24.9-9.4-24.9-11.3 0-10.9 14.4-10.9 24.9v45.5c0 1.8-1.5 3.3-3.4 3.3zM461.6-1.4c25.7 0 39.6 22.1 39.6 50.2 0 27.2-15.4 48.7-39.6 48.7-25.2 0-38.9-22.1-38.9-49.6 0-27.6 13.8-49.3 38.9-49.3zm.1 18.2c-12.7 0-13.5 17.4-13.5 28.2 0 10.9-.2 34.1 13.4 34.1 13.4 0 14-18.7 14-30.1 0-7.5-.3-16.5-2.7-23.6-2-6.1-6-8.6-11.3-8.6zM536.8 93.5h-17.3c-1.8-.1-3.2-1.6-3.2-3.3l0-84.6c.1-1.7 1.6-3.1 3.4-3.1h16.1c1.6.1 2.8 1.2 3.2 2.7v12.9h.3c5-11.8 12-17.4 24.4-17.4 8 0 15.9 2.9 20.9 10.8 4.7 7.3 4.7 19.7 4.7 28.6v51.3c-.2 1.6-1.7 2.9-3.4 2.9h-17.4c-1.6-.1-3-1.4-3.1-2.9V44.3c0-10 1.2-24.6-9.5-24.6-3.7 0-7.1 2.5-8.8 6.3-2.1 4.8-2.4 9.5-2.4 18.4v45.9c0 1.8-1.6 3.3-3.4 3.3zM301.2 52c0 6.9.2 12.6-3.3 18.7-2.8 5-7.3 8-12.3 8-6.8 0-10.8-5.2-10.8-12.9 0-15.1 13.6-17.9 26.4-17.9v4.1zm17.9 43.3c-1.2 1-2.9 1.1-4.2.4-5.9-4.9-7-7.2-10.2-11.9-9.8 10-16.7 12.9-29.4 12.9-15 0-26.7-9.3-26.7-27.8 0-14.5 7.9-24.3 19.1-29.2 9.7-4.3 23.2-5.1 33.5-6.3v-2.3c0-4.3.3-9.4-2.2-13.1-2.2-3.3-6.3-4.7-10-4.7-6.8 0-12.9 3.5-14.4 10.7-.3 1.6-1.5 3.2-3.2 3.3l-16.8-1.8c-1.5-.3-3.2-1.5-2.8-3.8 4.1-21.8 23.8-28.4 41.5-28.4 9 0 20.8 2.4 27.9 9.2 9 8.4 8.1 19.7 8.1 31.9v28.9c0 8.7 3.6 12.5 7 17.2 1.2 1.7 1.4 3.7 0 4.9-3.7 3.1-10.3 8.8-13.9 12z"/>
-              <path fill="#1B2A4A" d="M54.7 52c0 6.9.2 12.6-3.3 18.7-2.8 5-7.3 8-12.3 8-6.8 0-10.8-5.2-10.8-12.9 0-15.1 13.6-17.9 26.4-17.9v4.1zm17.9 43.3c-1.2 1-2.9 1.1-4.2.4-5.9-4.9-7-7.2-10.2-11.9-9.8 10-16.7 12.9-29.4 12.9C13.8 96.7 2 87.3 2 69 2 54.4 9.9 44.6 21.1 39.7c9.7-4.3 23.2-5.1 33.5-6.3v-2.3c0-4.3.3-9.4-2.2-13.1-2.2-3.3-6.3-4.7-10-4.7-6.8 0-12.9 3.5-14.4 10.7-.3 1.6-1.5 3.2-3.2 3.3L8 25.5c-1.5-.3-3.2-1.5-2.8-3.8C9.4 0 29 -6.6 46.7-6.6c9 0 20.8 2.4 27.9 9.2 9 8.4 8.1 19.7 8.1 31.9v28.9c0 8.7 3.6 12.5 7 17.2 1.2 1.7 1.4 3.7 0 4.9-3.7 3.1-10.3 8.8-13.9 12z"/>
-            </svg>
-            BUY 1 BAG ON AMAZON — $5.99
+            Or buy 1 bag on Amazon for $5.99 →
           </a>
         </div>
       </section>
@@ -399,8 +394,27 @@ export default function GoLandingPage() {
         </p>
       </footer>
 
-      {/* Mobile sticky bottom bar — equal weight for both options */}
+      {/* Mobile sticky bottom bar — Shopify primary */}
       <div className="lp-sticky-bar">
+        <a
+          href={CART_PERMALINK}
+          className="lp-display"
+          style={{
+            flex: 2,
+            background: "#c7362c",
+            color: "#fff",
+            padding: "12px 16px",
+            borderRadius: 10,
+            fontSize: 15,
+            letterSpacing: "0.5px",
+            textDecoration: "none",
+            fontWeight: 700,
+            textAlign: "center",
+            lineHeight: 1.2,
+          }}
+        >
+          5-PACK $25<br /><span style={{ fontSize: 11, fontWeight: 500, letterSpacing: 0 }}>free shipping</span>
+        </a>
         <a
           href={AMAZON_LISTING_URL}
           target="_blank"
@@ -409,11 +423,11 @@ export default function GoLandingPage() {
           style={{
             flex: 1,
             background: "#ffffff",
-            border: "2px solid #1B2A4A",
+            border: "2px solid #e0dcd6",
             color: "#1B2A4A",
-            padding: "12px 12px",
+            padding: "12px 8px",
             borderRadius: 10,
-            fontSize: 14,
+            fontSize: 13,
             letterSpacing: "0.5px",
             textDecoration: "none",
             fontWeight: 700,
@@ -421,26 +435,7 @@ export default function GoLandingPage() {
             lineHeight: 1.2,
           }}
         >
-          1 BAG<br /><span style={{ fontSize: 11, fontWeight: 500, letterSpacing: 0 }}>$5.99 Amazon</span>
-        </a>
-        <a
-          href={CART_PERMALINK}
-          className="lp-display"
-          style={{
-            flex: 1,
-            background: "#c7362c",
-            color: "#fff",
-            padding: "12px 16px",
-            borderRadius: 10,
-            fontSize: 14,
-            letterSpacing: "0.5px",
-            textDecoration: "none",
-            fontWeight: 700,
-            textAlign: "center",
-            lineHeight: 1.2,
-          }}
-        >
-          5-PACK<br /><span style={{ fontSize: 11, fontWeight: 500, letterSpacing: 0 }}>$25 free ship</span>
+          1 BAG<br /><span style={{ fontSize: 10, fontWeight: 500, letterSpacing: 0 }}>$5.99</span>
         </a>
       </div>
     </div>
