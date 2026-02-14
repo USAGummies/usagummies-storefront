@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { AMAZON_LISTING_URL } from "@/lib/amazon";
+import GoTracker from "./GoTracker.client";
 
 // API route that creates a Storefront API cart and redirects to checkout
 // (bypasses the Shop Pay / shop.app redirect that the raw cart permalink triggers)
@@ -24,6 +25,7 @@ export const metadata: Metadata = {
 export default function GoLandingPage() {
   return (
     <div className="lp-root">
+      <GoTracker />
       <style>{`
         .lp-root {
           min-height: 100vh;
