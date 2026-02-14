@@ -296,7 +296,7 @@ export default function GoLandingPage() {
 
             <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, marginTop: 10, fontSize: 11, color: "#5f5b56", fontWeight: 500 }}>
               <span>🔒</span>
-              <span>Family-owned American business · Shipped from Utah</span>
+              <span>Family-owned American business · Warehouses in Washington & Pennsylvania</span>
             </div>
           </div>
 
