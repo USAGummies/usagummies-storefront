@@ -8,8 +8,7 @@ import { trackEvent } from "@/lib/analytics";
  * Uses event delegation so we don't need onClick handlers on the server component.
  *
  * Events fired:
- *   - go_click_5pack        (any /go/checkout link without ?qty=1)
- *   - go_click_1bag         (any /go/checkout?qty=1 link)
+ *   - go_click_5pack        (any /go/checkout link)
  *   - go_click_amazon       (any amazon.com outbound link)
  *   - go_scroll_50          (user scrolled past 50% of the page)
  *   - go_scroll_90          (user scrolled past 90% of the page)
@@ -28,16 +27,12 @@ export default function GoTracker() {
       const href = anchor.getAttribute("href") || "";
 
       if (href.startsWith("/go/checkout")) {
-        const is1bag = href.includes("qty=1");
         const location = anchor.closest(".lp-sticky-bar")
           ? "sticky_bar"
           : anchor.closest("section")
             ? "section_2"
             : "section_1";
-        trackEvent(is1bag ? "go_click_1bag" : "go_click_5pack", {
-          location,
-          href,
-        });
+        trackEvent("go_click_5pack", { location, href });
       } else if (href.includes("amazon.com")) {
         trackEvent("go_click_amazon", { href });
       }

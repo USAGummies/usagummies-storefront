@@ -7,17 +7,16 @@ import GoTracker from "./GoTracker.client";
 // API route that creates a Storefront API cart and redirects to checkout
 // (bypasses the Shop Pay / shop.app redirect that the raw cart permalink triggers)
 const CHECKOUT_URL = "/go/checkout";
-const CHECKOUT_URL_1 = "/go/checkout?qty=1";
 
 export const metadata: Metadata = {
-  title: "USA Gummies 5-Pack Bundle | Free Shipping | Made in USA",
+  title: "USA Gummies — Try a Bag on Amazon Prime | Made in USA",
   description:
-    "Classic American gummy bears — no artificial dyes, all natural flavors. Get the 5-pack bundle with free shipping. Made in the USA.",
+    "Classic American gummy bears — no artificial dyes, all natural flavors. Try a bag with free Prime shipping, or stock up with the 5-pack bundle.",
   robots: { index: false, follow: false },
   openGraph: {
-    title: "USA Gummies 5-Pack Bundle | Free Shipping",
+    title: "USA Gummies — Try a Bag on Amazon Prime",
     description:
-      "Classic American gummy bears — no artificial dyes, all natural flavors. Get the 5-pack bundle with free shipping.",
+      "Classic American gummy bears — no artificial dyes, all natural flavors. Try a bag with free Prime shipping.",
     images: [{ url: "/Hero-pack.jpeg" }],
   },
 };
@@ -66,29 +65,6 @@ export default function GoLandingPage() {
           background: #a82920;
           transform: translateY(-1px);
         }
-        .lp-amazon-cta {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 10px;
-          width: 100%;
-          padding: 16px 24px;
-          background: #ffffff;
-          border: 2px solid #1B2A4A;
-          border-radius: 12px;
-          color: #1B2A4A;
-          font-family: var(--font-display), 'Oswald', sans-serif;
-          font-size: 18px;
-          letter-spacing: 1px;
-          text-decoration: none;
-          cursor: pointer;
-          transition: background 0.2s, border-color 0.2s, transform 0.15s;
-        }
-        .lp-amazon-cta:hover {
-          background: #f0ede6;
-          border-color: #c7362c;
-          transform: translateY(-1px);
-        }
         .lp-sticky-bar {
           position: fixed;
           bottom: 0;
@@ -131,7 +107,9 @@ export default function GoLandingPage() {
             </span>
           </Link>
           <a
-            href={CHECKOUT_URL}
+            href={AMAZON_LISTING_URL}
+            target="_blank"
+            rel="noopener noreferrer"
             className="lp-display"
             style={{
               background: "#c7362c",
@@ -144,7 +122,7 @@ export default function GoLandingPage() {
               fontWeight: 700,
             }}
           >
-            GET THE 5-PACK
+            TRY ON AMAZON
           </a>
         </div>
       </header>
@@ -161,7 +139,7 @@ export default function GoLandingPage() {
           letterSpacing: "0.5px",
         }}
       >
-        🇺🇸 FREE SHIPPING on every 5-pack — <span style={{ color: "#c7a062" }}>Save $0.99 per bag vs. retail</span>
+        🇺🇸 Try a bag with FREE Prime shipping — <span style={{ color: "#c7a062" }}>or stock up & save with the 5-pack</span>
       </div>
 
       {/* MOBILE-FIRST HERO: Image + Compact Offer */}
@@ -240,10 +218,11 @@ export default function GoLandingPage() {
         <div className="lp-animate-d1" style={{ marginTop: 20, maxWidth: 560, marginLeft: "auto", marginRight: "auto" }}>
           <div style={{ textAlign: "center", marginBottom: 14 }}>
             <span className="lp-display" style={{ fontSize: 16, letterSpacing: "2px", color: "#5f5b56" }}>
-              CHOOSE YOUR OPTION
+              GET YOUR FIRST BAG
             </span>
           </div>
-          {/* Price + value prop */}
+
+          {/* PRIMARY: Amazon — best option for first-time buyers */}
           <div style={{
             background: "#ffffff",
             border: "2px solid #c7362c",
@@ -265,35 +244,38 @@ export default function GoLandingPage() {
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
               <span className="lp-display" style={{ fontSize: 20, letterSpacing: "1px", color: "#1B2A4A" }}>
-                5-BAG BUNDLE
+                TRY 1 BAG
               </span>
               <span style={{ background: "#c7362c", color: "#fff", fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 20 }}>
-                BEST DEAL
+                MOST POPULAR
               </span>
             </div>
 
             <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 4 }}>
-              <span className="lp-display" style={{ fontSize: 38, color: "#1B2A4A", lineHeight: 1 }}>$25.00</span>
-              <span style={{ textDecoration: "line-through", fontSize: 16, color: "#999", fontWeight: 500 }}>$29.95</span>
-            </div>
-            <div style={{ fontSize: 13, color: "#2D7A3A", fontWeight: 700, marginTop: 2 }}>
-              You save $4.95 — that&apos;s a free bag!
+              <span className="lp-display" style={{ fontSize: 38, color: "#1B2A4A", lineHeight: 1 }}>$5.99</span>
+              <span style={{ fontSize: 14, color: "#2D7A3A", fontWeight: 700 }}>+ FREE shipping</span>
             </div>
 
             <div style={{ display: "flex", gap: 12, marginTop: 10, flexWrap: "wrap" }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: "#1B2A4A", display: "flex", alignItems: "center", gap: 4 }}>
-                <span style={{ color: "#2D7A3A", fontSize: 15 }}>✓</span> Free shipping included
+                <span style={{ color: "#2D7A3A", fontSize: 15 }}>✓</span> Free Prime shipping
               </span>
               <span style={{ fontSize: 12, fontWeight: 600, color: "#1B2A4A", display: "flex", alignItems: "center", gap: 4 }}>
-                <span style={{ color: "#2D7A3A", fontSize: 15 }}>✓</span> Ships direct to you
+                <span style={{ color: "#2D7A3A", fontSize: 15 }}>✓</span> Arrives in 1–2 days
               </span>
               <span style={{ fontSize: 12, fontWeight: 600, color: "#1B2A4A", display: "flex", alignItems: "center", gap: 4 }}>
-                <span style={{ color: "#2D7A3A", fontSize: 15 }}>✓</span> $25 total — no surprises
+                <span style={{ color: "#2D7A3A", fontSize: 15 }}>✓</span> $5.99 total — no surprises
               </span>
             </div>
 
-            <a href={CHECKOUT_URL} className="lp-cta" style={{ marginTop: 16 }}>
-              GET THE 5-PACK — $25 TOTAL
+            <a
+              href={AMAZON_LISTING_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="lp-cta"
+              style={{ marginTop: 16 }}
+            >
+              ORDER ON AMAZON — $5.99
             </a>
 
             <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, marginTop: 10, fontSize: 11, color: "#5f5b56", fontWeight: 500 }}>
@@ -302,7 +284,7 @@ export default function GoLandingPage() {
             </div>
           </div>
 
-          {/* Single bag Shopify — low commitment entry point */}
+          {/* SECONDARY: 5-pack bundle — for repeat buyers / stock up */}
           <div style={{
             marginTop: 12,
             background: "#ffffff",
@@ -312,15 +294,22 @@ export default function GoLandingPage() {
           }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
               <span className="lp-display" style={{ fontSize: 18, letterSpacing: "1px", color: "#1B2A4A" }}>
-                TRY 1 BAG
+                5-BAG BUNDLE
               </span>
-              <span className="lp-display" style={{ fontSize: 24, color: "#1B2A4A" }}>$5.99</span>
+              <span style={{ background: "#2D7A3A", color: "#fff", fontSize: 10, fontWeight: 700, padding: "3px 10px", borderRadius: 20 }}>
+                BEST VALUE
+              </span>
+            </div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 4 }}>
+              <span className="lp-display" style={{ fontSize: 24, color: "#1B2A4A" }}>$25.00</span>
+              <span style={{ textDecoration: "line-through", fontSize: 14, color: "#999" }}>$29.95</span>
+              <span style={{ fontSize: 12, color: "#2D7A3A", fontWeight: 700 }}>Save $4.95</span>
             </div>
             <div style={{ fontSize: 12, color: "#5f5b56", marginTop: 4 }}>
-              + shipping · Ships direct from our facility
+              Free shipping · Ships direct from our facility
             </div>
             <a
-              href={CHECKOUT_URL_1}
+              href={CHECKOUT_URL}
               className="lp-display"
               style={{
                 display: "block",
@@ -339,19 +328,7 @@ export default function GoLandingPage() {
                 transition: "background 0.2s",
               }}
             >
-              TRY 1 BAG — $5.99
-            </a>
-          </div>
-
-          {/* Amazon — third option */}
-          <div style={{ marginTop: 12, textAlign: "center" }}>
-            <a
-              href={AMAZON_LISTING_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ color: "#5f5b56", fontSize: 13, textDecoration: "underline", textUnderlineOffset: 3 }}
-            >
-              Or buy on Amazon →
+              GET THE 5-PACK — $25 TOTAL
             </a>
           </div>
 
@@ -406,14 +383,19 @@ export default function GoLandingPage() {
             READY TO TRY THEM?
           </span>
           <p style={{ color: "#5f5b56", fontSize: 14, lineHeight: 1.6, maxWidth: 440, margin: "8px auto 0" }}>
-            Free shipping on the 5-pack. Or grab a single bag to try us out — ships in 1–2 days.
+            Grab a bag on Amazon with free Prime shipping. Or stock up with the 5-pack bundle and save.
           </p>
         </div>
-        <a href={CHECKOUT_URL} className="lp-cta">
-          GET THE 5-PACK — $25 TOTAL
+        <a
+          href={AMAZON_LISTING_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="lp-cta"
+        >
+          ORDER ON AMAZON — $5.99
         </a>
         <a
-          href={CHECKOUT_URL_1}
+          href={CHECKOUT_URL}
           className="lp-display"
           style={{
             display: "block",
@@ -429,23 +411,14 @@ export default function GoLandingPage() {
             borderRadius: 10,
             cursor: "pointer",
             textDecoration: "none",
+            transition: "background 0.2s",
           }}
         >
-          TRY 1 BAG — $5.99
+          5-PACK BUNDLE — $25 TOTAL
         </a>
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, marginTop: 10, fontSize: 11, color: "#5f5b56", fontWeight: 500 }}>
           <span>🔒</span>
           <span>Family-owned American business · Love them or your money back</span>
-        </div>
-        <div style={{ marginTop: 12, textAlign: "center" }}>
-          <a
-            href={AMAZON_LISTING_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ color: "#5f5b56", fontSize: 13, textDecoration: "underline", textUnderlineOffset: 3 }}
-          >
-            Or buy on Amazon →
-          </a>
         </div>
       </section>
 
@@ -458,10 +431,12 @@ export default function GoLandingPage() {
         </p>
       </footer>
 
-      {/* Mobile sticky bottom bar — both Shopify options */}
+      {/* Mobile sticky bottom bar — Amazon primary, 5-pack secondary */}
       <div className="lp-sticky-bar">
         <a
-          href={CHECKOUT_URL}
+          href={AMAZON_LISTING_URL}
+          target="_blank"
+          rel="noopener noreferrer"
           className="lp-display"
           style={{
             flex: 2,
@@ -477,10 +452,10 @@ export default function GoLandingPage() {
             lineHeight: 1.2,
           }}
         >
-          5-PACK $25<br /><span style={{ fontSize: 11, fontWeight: 500, letterSpacing: 0 }}>free shipping</span>
+          AMAZON $5.99<br /><span style={{ fontSize: 11, fontWeight: 500, letterSpacing: 0 }}>free Prime shipping</span>
         </a>
         <a
-          href={CHECKOUT_URL_1}
+          href={CHECKOUT_URL}
           className="lp-display"
           style={{
             flex: 1,
@@ -496,7 +471,7 @@ export default function GoLandingPage() {
             lineHeight: 1.2,
           }}
         >
-          1 BAG<br /><span style={{ fontSize: 10, fontWeight: 500, letterSpacing: 0 }}>$5.99</span>
+          5-PACK<br /><span style={{ fontSize: 10, fontWeight: 500, letterSpacing: 0 }}>$25 free ship</span>
         </a>
       </div>
     </div>
