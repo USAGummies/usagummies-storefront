@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>USA Gummies -- Influencer CRM</title>
+<style>
+  :root {
+    --bg: #FDF6EC;
+    --bg-card: #FFFFFF;
+    --navy: #1B2A4A;
+    --navy-light: #2C3E5A;
+    --green: #2D7A3A;
+    --green-light: #E8F5E9;
+    --gold: #D4A843;
+    --red: #C0392B;
+    --red-light: #FDEDEC;
+    --gray: #6b7280;
+    --gray-light: #f3f4f6;
+    --border: #e5e7eb;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08);
+    --radius: 8px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--navy);
+    line-height: 1.5;
+  }
+
+  /* Header */
+  .header {
+    background: var(--navy);
+    color: #fff;
+    padding: 16px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .header h1 { font-size: 20px; font-weight: 700; }
+  .header h1 span { color: var(--gold); }
+  .header-stats {
+    display: flex;
+    gap: 24px;
+    font-size: 13px;
+    opacity: 0.9;
+  }
+  .header-stats strong { color: var(--gold); }
+
+  /* Pipeline */
+  .pipeline {
+    display: flex;
+    gap: 4px;
+    padding: 16px 24px;
+    background: #fff;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+  }
+  .pipe-stage {
+    flex: 1;
+    min-width: 120px;
+    text-align: center;
+    padding: 10px 8px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.15s;
+    border: 2px solid transparent;
+  }
+  .pipe-stage:hover { transform: translateY(-1px); }
+  .pipe-stage.active { border-color: var(--navy); }
+  .pipe-stage .count { font-size: 28px; font-weight: 800; }
+  .pipe-stage .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.8; }
+
+  /* Controls */
+  .controls {
+    padding: 16px 24px;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+  .controls input,
+  .controls select {
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 14px;
+    background: #fff;
+    color: var(--navy);
+  }
+  .controls input { flex: 1; min-width: 200px; }
+
+  .btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-primary { background: var(--navy); color: #fff; }
+  .btn-primary:hover { background: var(--navy-light); }
+  .btn-green { background: var(--green); color: #fff; }
+  .btn-green:hover { background: #246B31; }
+  .btn-outline { background: #fff; color: var(--navy); border: 1px solid var(--border); }
+  .btn-outline:hover { background: var(--gray-light); }
+  .btn-sm { padding: 4px 10px; font-size: 12px; }
+  .btn-danger { background: var(--red); color: #fff; }
+  .btn-danger:hover { background: #A93226; }
+
+  /* Stats bar */
+  .stats-bar {
+    display: flex;
+    gap: 16px;
+    padding: 12px 24px;
+    background: #fff;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  .stat-card {
+    background: var(--bg);
+    padding: 12px 16px;
+    border-radius: var(--radius);
+    min-width: 140px;
+  }
+  .stat-card .stat-val { font-size: 22px; font-weight: 800; color: var(--navy); }
+  .stat-card .stat-label { font-size: 11px; color: var(--gray); text-transform: uppercase; letter-spacing: 0.5px; }
+
+  /* Grid */
+  .grid {
+    padding: 16px 24px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 12px;
+  }
+
+  /* Cards */
+  .card {
+    background: var(--bg-card);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    padding: 16px;
+    box-shadow: var(--shadow);
+    transition: all 0.15s;
+  }
+  .card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 8px;
+  }
+  .card-username {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--navy);
+  }
+  .card-username a { color: inherit; text-decoration: none; }
+  .card-username a:hover { text-decoration: underline; }
+  .card-platform {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  .platform-instagram { background: #FDEEF4; color: #C13584; }
+  .platform-tiktok { background: #E8F5F5; color: #00C4CC; }
+  .platform-youtube { background: #FDECEC; color: #FF0000; }
+
+  .card-meta {
+    font-size: 13px;
+    color: var(--gray);
+    margin-bottom: 8px;
+  }
+  .card-meta span { margin-right: 12px; }
+
+  .card-niches {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 10px;
+  }
+  .niche-tag {
+    font-size: 11px;
+    padding: 2px 8px;
+    background: var(--green-light);
+    color: var(--green);
+    border-radius: 12px;
+    font-weight: 500;
+  }
+
+  .card-stage {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 12px;
+    color: #fff;
+    margin-bottom: 10px;
+  }
+
+  .card-bio {
+    font-size: 13px;
+    color: var(--gray);
+    margin-bottom: 10px;
+    max-height: 40px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .card-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    border-top: 1px solid var(--border);
+    padding-top: 10px;
+    margin-top: 8px;
+  }
+
+  /* Modal */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 200;
+    justify-content: center;
+    align-items: center;
+  }
+  .modal-overlay.active { display: flex; }
+
+  .modal {
+    background: #fff;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 85vh;
+    overflow-y: auto;
+    padding: 24px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  }
+  .modal h2 { margin-bottom: 16px; font-size: 18px; }
+
+  .modal-field { margin-bottom: 12px; }
+  .modal-field label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: var(--navy);
+  }
+  .modal-field input,
+  .modal-field select,
+  .modal-field textarea {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 14px;
+  }
+  .modal-field textarea { resize: vertical; min-height: 80px; font-family: inherit; }
+
+  .modal-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 16px;
+  }
+
+  /* Message preview */
+  .message-preview {
+    background: var(--bg);
+    padding: 12px;
+    border-radius: var(--radius);
+    font-size: 14px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    margin-bottom: 12px;
+    border: 1px solid var(--border);
+  }
+  .message-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 12px;
+  }
+  .message-tab {
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 12px;
+    cursor: pointer;
+    background: #fff;
+  }
+  .message-tab.active {
+    background: var(--navy);
+    color: #fff;
+    border-color: var(--navy);
+  }
+
+  .copy-btn {
+    font-size: 12px;
+    padding: 4px 10px;
+    background: var(--green);
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .copy-btn:hover { background: #246B31; }
+
+  /* Empty state */
+  .empty {
+    text-align: center;
+    padding: 60px 24px;
+    color: var(--gray);
+  }
+  .empty h3 { font-size: 18px; margin-bottom: 8px; color: var(--navy); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1><span>USA Gummies</span> Influencer CRM</h1>
+  <div class="header-stats">
+    <span>Total: <strong id="total-count">0</strong></span>
+    <span>Response Rate: <strong id="response-rate">--</strong></span>
+    <span>Post Rate: <strong id="post-rate">--</strong></span>
+    <span>Est. Reach: <strong id="est-reach">--</strong></span>
+  </div>
+</div>
+
+<div class="pipeline" id="pipeline"></div>
+
+<div class="stats-bar" id="stats-bar"></div>
+
+<div class="controls">
+  <input type="text" id="search" placeholder="Search by username, bio, email, notes...">
+  <select id="filter-platform">
+    <option value="">All Platforms</option>
+    <option value="instagram">Instagram</option>
+    <option value="tiktok">TikTok</option>
+    <option value="youtube">YouTube</option>
+  </select>
+  <select id="filter-niche">
+    <option value="">All Niches</option>
+  </select>
+  <select id="filter-stage">
+    <option value="">All Stages</option>
+  </select>
+  <button class="btn btn-primary" onclick="openAddModal()">+ Add Influencer</button>
+  <button class="btn btn-outline" onclick="loadData()">Refresh</button>
+</div>
+
+<div class="grid" id="grid"></div>
+
+<!-- Add/Edit Modal -->
+<div class="modal-overlay" id="add-modal">
+  <div class="modal">
+    <h2 id="modal-title">Add Influencer</h2>
+    <input type="hidden" id="edit-id">
+    <div class="modal-field">
+      <label>Username</label>
+      <input type="text" id="m-username" placeholder="@username">
+    </div>
+    <div class="modal-field">
+      <label>Platform</label>
+      <select id="m-platform">
+        <option value="instagram">Instagram</option>
+        <option value="tiktok">TikTok</option>
+        <option value="youtube">YouTube</option>
+      </select>
+    </div>
+    <div class="modal-field">
+      <label>First Name</label>
+      <input type="text" id="m-firstname" placeholder="Jane">
+    </div>
+    <div class="modal-field">
+      <label>Follower Count</label>
+      <input type="number" id="m-followers" placeholder="5000">
+    </div>
+    <div class="modal-field">
+      <label>Email</label>
+      <input type="email" id="m-email" placeholder="jane@email.com">
+    </div>
+    <div class="modal-field">
+      <label>Profile URL</label>
+      <input type="url" id="m-url" placeholder="https://instagram.com/username">
+    </div>
+    <div class="modal-field">
+      <label>Niches (comma-separated)</label>
+      <input type="text" id="m-niches" placeholder="mom-life, clean-eating">
+    </div>
+    <div class="modal-field">
+      <label>Bio</label>
+      <textarea id="m-bio" placeholder="Their bio or description..."></textarea>
+    </div>
+    <div class="modal-field">
+      <label>Notes</label>
+      <textarea id="m-notes" placeholder="Internal notes..."></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('add-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveInfluencer()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Message Modal -->
+<div class="modal-overlay" id="message-modal">
+  <div class="modal">
+    <h2>Outreach Message for <span id="msg-username"></span></h2>
+    <div class="message-tabs" id="msg-tabs"></div>
+    <div class="message-preview" id="msg-preview"></div>
+    <div style="display:flex;gap:8px;justify-content:space-between">
+      <button class="copy-btn" onclick="copyMessage()">Copy to Clipboard</button>
+      <button class="btn btn-outline" onclick="closeModal('message-modal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================================
+// State
+// ============================================================================
+let influencers = [];
+let interactions = [];
+let stages = [];
+let currentStageFilter = '';
+let currentMessageInfluencer = null;
+let currentTemplateId = 'fan_first';
+
+const API = window.location.origin;
+
+// ============================================================================
+// Data loading
+// ============================================================================
+async function loadData() {
+  try {
+    const [infRes, intRes, stgRes] = await Promise.all([
+      fetch(`${API}/api/influencers`),
+      fetch(`${API}/api/interactions`),
+      fetch(`${API}/api/stages`),
+    ]);
+    const infData = await infRes.json();
+    const intData = await intRes.json();
+    stages = await stgRes.json();
+
+    influencers = infData.influencers || [];
+    interactions = intData.interactions || [];
+
+    populateFilters();
+    renderPipeline();
+    renderStats();
+    renderGrid();
+  } catch (err) {
+    console.error('Failed to load data:', err);
+    document.getElementById('grid').innerHTML =
+      '<div class="empty"><h3>Cannot connect to server</h3><p>Make sure the CRM server is running: <code>node crm.mjs serve</code></p></div>';
+  }
+}
+
+// ============================================================================
+// Pipeline
+// ============================================================================
+function renderPipeline() {
+  const pipeline = document.getElementById('pipeline');
+  const activeStages = stages.filter(s => s.order >= 0).sort((a, b) => a.order - b.order);
+
+  pipeline.innerHTML = activeStages.map(stage => {
+    const count = influencers.filter(i => i.stage === stage.id).length;
+    const isActive = currentStageFilter === stage.id;
+    return `<div class="pipe-stage ${isActive ? 'active' : ''}"
+                 style="background:${stage.color}15"
+                 onclick="filterByStage('${stage.id}')">
+      <div class="count" style="color:${stage.color}">${count}</div>
+      <div class="label">${stage.label}</div>
+    </div>`;
+  }).join('');
+
+  // Add "All" at beginning
+  const allActive = currentStageFilter === '';
+  pipeline.innerHTML = `<div class="pipe-stage ${allActive ? 'active' : ''}"
+    style="background:${allActive ? '#1B2A4A15' : '#f9fafb'}"
+    onclick="filterByStage('')">
+    <div class="count" style="color:var(--navy)">${influencers.length}</div>
+    <div class="label">All</div>
+  </div>` + pipeline.innerHTML;
+}
+
+function filterByStage(stageId) {
+  currentStageFilter = stageId;
+  document.getElementById('filter-stage').value = stageId;
+  renderPipeline();
+  renderGrid();
+}
+
+// ============================================================================
+// Stats
+// ============================================================================
+function renderStats() {
+  const total = influencers.length;
+  const contacted = influencers.filter(i => !['discovered'].includes(i.stage)).length;
+  const responded = influencers.filter(i => !['discovered', 'contacted', 'unresponsive'].includes(i.stage)).length;
+  const sent = influencers.filter(i => ['product_sent', 'posted', 'relationship_active'].includes(i.stage)).length;
+  const posted = influencers.filter(i => ['posted', 'relationship_active'].includes(i.stage)).length;
+
+  document.getElementById('total-count').textContent = total;
+  document.getElementById('response-rate').textContent = contacted > 0 ? `${((responded / contacted) * 100).toFixed(0)}%` : '--';
+  document.getElementById('post-rate').textContent = sent > 0 ? `${((posted / sent) * 100).toFixed(0)}%` : '--';
+
+  const totalReach = influencers
+    .filter(i => ['posted', 'relationship_active'].includes(i.stage))
+    .reduce((s, i) => s + (i.followerCount || 0), 0);
+  document.getElementById('est-reach').textContent = totalReach > 0
+    ? `${(totalReach * 0.2 / 1000).toFixed(1)}K`
+    : '--';
+
+  const statsBar = document.getElementById('stats-bar');
+  const platforms = {};
+  influencers.forEach(i => { platforms[i.platform] = (platforms[i.platform] || 0) + 1; });
+
+  statsBar.innerHTML = `
+    <div class="stat-card">
+      <div class="stat-val">${total}</div>
+      <div class="stat-label">Total Influencers</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val">${contacted}</div>
+      <div class="stat-label">Contacted</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val">${responded}</div>
+      <div class="stat-label">Responded</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val">${sent}</div>
+      <div class="stat-label">Product Sent</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val">${posted}</div>
+      <div class="stat-label">Posted</div>
+    </div>
+    ${Object.entries(platforms).map(([p, c]) =>
+      `<div class="stat-card"><div class="stat-val">${c}</div><div class="stat-label">${p}</div></div>`
+    ).join('')}
+  `;
+}
+
+// ============================================================================
+// Filters
+// ============================================================================
+function populateFilters() {
+  const nicheSelect = document.getElementById('filter-niche');
+  const niches = new Set();
+  influencers.forEach(i => (i.niches || []).forEach(n => niches.add(n)));
+  nicheSelect.innerHTML = '<option value="">All Niches</option>' +
+    [...niches].sort().map(n => `<option value="${n}">${n}</option>`).join('');
+
+  const stageSelect = document.getElementById('filter-stage');
+  stageSelect.innerHTML = '<option value="">All Stages</option>' +
+    stages.map(s => `<option value="${s.id}">${s.label}</option>`).join('');
+}
+
+function getFilteredInfluencers() {
+  const search = document.getElementById('search').value.toLowerCase();
+  const platform = document.getElementById('filter-platform').value;
+  const niche = document.getElementById('filter-niche').value;
+  const stage = currentStageFilter || document.getElementById('filter-stage').value;
+
+  return influencers.filter(i => {
+    if (search && !(
+      i.username.toLowerCase().includes(search) ||
+      (i.bio || '').toLowerCase().includes(search) ||
+      (i.email || '').toLowerCase().includes(search) ||
+      (i.notes || '').toLowerCase().includes(search) ||
+      (i.firstName || '').toLowerCase().includes(search)
+    )) return false;
+    if (platform && i.platform !== platform) return false;
+    if (niche && !(i.niches || []).includes(niche)) return false;
+    if (stage && i.stage !== stage) return false;
+    return true;
+  });
+}
+
+// Debounced search
+let searchTimeout;
+document.getElementById('search').addEventListener('input', () => {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(renderGrid, 200);
+});
+document.getElementById('filter-platform').addEventListener('change', renderGrid);
+document.getElementById('filter-niche').addEventListener('change', renderGrid);
+document.getElementById('filter-stage').addEventListener('change', () => {
+  currentStageFilter = document.getElementById('filter-stage').value;
+  renderPipeline();
+  renderGrid();
+});
+
+// ============================================================================
+// Grid rendering
+// ============================================================================
+function renderGrid() {
+  const grid = document.getElementById('grid');
+  const filtered = getFilteredInfluencers();
+
+  if (filtered.length === 0) {
+    grid.innerHTML = `<div class="empty" style="grid-column:1/-1">
+      <h3>No influencers found</h3>
+      <p>Try adjusting filters, or add influencers with the + button above.<br>
+      Or run <code>node discover.mjs</code> to populate the database.</p>
+    </div>`;
+    return;
+  }
+
+  grid.innerHTML = filtered.map(i => {
+    const stageObj = stages.find(s => s.id === i.stage) || { label: i.stage, color: '#94a3b8' };
+    const followers = i.followerCount ? `${(i.followerCount / 1000).toFixed(1)}K` : '?';
+    const engagement = i.engagementRate ? `${(i.engagementRate * 100).toFixed(1)}%` : null;
+
+    return `<div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-username">
+            <a href="${i.profileUrl || '#'}" target="_blank" rel="noopener">@${esc(i.username)}</a>
+          </div>
+          ${i.firstName ? `<span style="font-size:13px;color:var(--gray)">${esc(i.firstName)}</span>` : ''}
+        </div>
+        <span class="card-platform platform-${i.platform}">${i.platform}</span>
+      </div>
+
+      <div class="card-meta">
+        <span>${followers} followers</span>
+        ${engagement ? `<span>${engagement} eng</span>` : ''}
+        ${i.email ? `<span>${esc(i.email)}</span>` : ''}
+      </div>
+
+      <div class="card-stage" style="background:${stageObj.color}">${stageObj.label}</div>
+
+      <div class="card-niches">
+        ${(i.niches || []).map(n => `<span class="niche-tag">${esc(n)}</span>`).join('')}
+      </div>
+
+      ${i.bio ? `<div class="card-bio">${esc(i.bio)}</div>` : ''}
+
+      <div class="card-actions">
+        ${i.stage === 'discovered' ? `<button class="btn btn-sm btn-primary" onclick="updateStage('${i.id}','contacted')">Mark Contacted</button>` : ''}
+        ${i.stage === 'contacted' ? `<button class="btn btn-sm btn-primary" onclick="updateStage('${i.id}','responded')">Mark Responded</button>` : ''}
+        ${i.stage === 'responded' ? `<button class="btn btn-sm btn-green" onclick="updateStage('${i.id}','product_sent')">Mark Sent</button>` : ''}
+        ${i.stage === 'product_sent' ? `<button class="btn btn-sm btn-green" onclick="updateStage('${i.id}','posted')">Mark Posted</button>` : ''}
+        ${i.stage === 'posted' ? `<button class="btn btn-sm btn-green" onclick="updateStage('${i.id}','relationship_active')">Mark Active</button>` : ''}
+        <button class="btn btn-sm btn-outline" onclick="openMessageModal('${i.id}')">Message</button>
+        <button class="btn btn-sm btn-outline" onclick="openEditModal('${i.id}')">Edit</button>
+        ${['discovered','contacted'].includes(i.stage) ? `<button class="btn btn-sm btn-outline" style="color:var(--red)" onclick="updateStage('${i.id}','declined')">Decline</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function esc(str) {
+  const el = document.createElement('span');
+  el.textContent = str || '';
+  return el.innerHTML;
+}
+
+// ============================================================================
+// Actions
+// ============================================================================
+async function updateStage(id, newStage) {
+  await fetch(`${API}/api/influencer/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ stage: newStage }),
+  });
+  await loadData();
+}
+
+// ============================================================================
+// Add / Edit Modal
+// ============================================================================
+function openAddModal() {
+  document.getElementById('modal-title').textContent = 'Add Influencer';
+  document.getElementById('edit-id').value = '';
+  document.getElementById('m-username').value = '';
+  document.getElementById('m-platform').value = 'instagram';
+  document.getElementById('m-firstname').value = '';
+  document.getElementById('m-followers').value = '';
+  document.getElementById('m-email').value = '';
+  document.getElementById('m-url').value = '';
+  document.getElementById('m-niches').value = '';
+  document.getElementById('m-bio').value = '';
+  document.getElementById('m-notes').value = '';
+  document.getElementById('add-modal').classList.add('active');
+}
+
+function openEditModal(id) {
+  const inf = influencers.find(i => i.id === id);
+  if (!inf) return;
+
+  document.getElementById('modal-title').textContent = `Edit @${inf.username}`;
+  document.getElementById('edit-id').value = inf.id;
+  document.getElementById('m-username').value = inf.username;
+  document.getElementById('m-platform').value = inf.platform;
+  document.getElementById('m-firstname').value = inf.firstName || '';
+  document.getElementById('m-followers').value = inf.followerCount || '';
+  document.getElementById('m-email').value = inf.email || '';
+  document.getElementById('m-url').value = inf.profileUrl || '';
+  document.getElementById('m-niches').value = (inf.niches || []).join(', ');
+  document.getElementById('m-bio').value = inf.bio || '';
+  document.getElementById('m-notes').value = inf.notes || '';
+  document.getElementById('add-modal').classList.add('active');
+}
+
+async function saveInfluencer() {
+  const editId = document.getElementById('edit-id').value;
+  const data = {
+    username: document.getElementById('m-username').value.replace('@', ''),
+    platform: document.getElementById('m-platform').value,
+    firstName: document.getElementById('m-firstname').value || null,
+    followerCount: parseInt(document.getElementById('m-followers').value) || null,
+    email: document.getElementById('m-email').value || null,
+    profileUrl: document.getElementById('m-url').value || null,
+    niches: document.getElementById('m-niches').value.split(',').map(s => s.trim()).filter(Boolean),
+    bio: document.getElementById('m-bio').value || null,
+    notes: document.getElementById('m-notes').value || '',
+  };
+
+  if (editId) {
+    await fetch(`${API}/api/influencer/${editId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  } else {
+    await fetch(`${API}/api/influencer`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  }
+
+  closeModal('add-modal');
+  await loadData();
+}
+
+// ============================================================================
+// Message Modal
+// ============================================================================
+const OUTREACH_TEMPLATES = {
+  fan_first: {
+    id: 'fan_first',
+    label: 'Fan First',
+    generate: (inf) => {
+      const name = inf.firstName || inf.username || 'there';
+      const niche = (inf.niches || [])[0] || '{{their niche}}';
+      return `Hey ${name}! I've been following your content about ${niche} and love what you're doing. I'm Ben, the founder of USA Gummies -- we make all-natural gummy bears right here in America, no artificial dyes or junk. I'd love to send you a free pack to try. No strings attached -- if you like them, awesome. If not, no worries at all. Would you be down to try them?`;
+    }
+  },
+  mission_alignment: {
+    id: 'mission_alignment',
+    label: 'Mission Alignment',
+    generate: (inf) => {
+      const name = inf.firstName || inf.username || 'there';
+      const topic = inf.recentTopic || '{{specific topic}}';
+      return `Hi ${name}! Your content about ${topic} really resonates with what we're building at USA Gummies. We're a small American candy company fighting to prove you can make gummy bears without artificial dyes and still have them taste amazing. We'd love to get your honest opinion -- can I send you a free bag?`;
+    }
+  },
+  collaboration: {
+    id: 'collaboration',
+    label: 'Collaboration',
+    generate: (inf) => {
+      const name = inf.firstName || inf.username || 'there';
+      return `${name} -- love your page! Quick question: would you be interested in trying an American-made gummy bear that uses zero artificial dyes? We're USA Gummies, a small brand that's taking on the big candy companies. We'd love to send you some for free and see what you think. Totally cool if it's not your thing!`;
+    }
+  },
+  exclusive_vip: {
+    id: 'exclusive_vip',
+    label: 'Exclusive / VIP',
+    generate: (inf) => {
+      const name = inf.firstName || inf.username || 'there';
+      return `Hey ${name}! We're hand-picking a small group of creators to be the first to try our new All American Gummy Bears. Made in the USA, no artificial colors, all natural flavors. I think your audience would love the story. Can I send you a pack on us?`;
+    }
+  }
+};
+
+function openMessageModal(id) {
+  currentMessageInfluencer = influencers.find(i => i.id === id);
+  if (!currentMessageInfluencer) return;
+
+  document.getElementById('msg-username').textContent = `@${currentMessageInfluencer.username}`;
+
+  // Render tabs
+  const tabs = document.getElementById('msg-tabs');
+  tabs.innerHTML = Object.values(OUTREACH_TEMPLATES).map(t =>
+    `<div class="message-tab ${currentTemplateId === t.id ? 'active' : ''}" onclick="selectTemplate('${t.id}')">${t.label}</div>`
+  ).join('');
+
+  renderMessage();
+  document.getElementById('message-modal').classList.add('active');
+}
+
+function selectTemplate(id) {
+  currentTemplateId = id;
+  document.querySelectorAll('.message-tab').forEach(el => el.classList.remove('active'));
+  document.querySelector(`.message-tab[onclick="selectTemplate('${id}')"]`).classList.add('active');
+  renderMessage();
+}
+
+function renderMessage() {
+  const template = OUTREACH_TEMPLATES[currentTemplateId];
+  if (!template || !currentMessageInfluencer) return;
+  document.getElementById('msg-preview').textContent = template.generate(currentMessageInfluencer);
+}
+
+function copyMessage() {
+  const text = document.getElementById('msg-preview').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.querySelector('.copy-btn');
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = 'Copy to Clipboard'; }, 1500);
+  });
+}
+
+// ============================================================================
+// Modal helpers
+// ============================================================================
+function closeModal(id) {
+  document.getElementById(id).classList.remove('active');
+}
+
+// Close modals on overlay click
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.classList.remove('active');
+  });
+});
+
+// Close modals on Escape
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.modal-overlay.active').forEach(m => m.classList.remove('active'));
+  }
+});
+
+// ============================================================================
+// Init
+// ============================================================================
+loadData();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,9 @@
+# Generated data files (JSON outputs from monitors)
+data/*.json
+
+# Log files
+logs/*.log
+
+# Keep directory structure
+!data/.gitkeep
+!logs/.gitkeep

@@ -1,6 +1,7 @@
 // src/app/sitemap.ts (FULL REPLACE)
 import type { MetadataRoute } from "next";
 import { getShopifySitemapResources } from "@/lib/shopify/sitemap";
+import { getAllCompetitorSlugs } from "@/data/competitors";
 
 // Revalidate periodically so the sitemap stays fresh.
 export const revalidate = 3600; // 1 hour
@@ -59,6 +60,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/america-250/events`, lastModified: now, changeFrequency: "monthly", priority: 0.4 },
     { url: `${base}/america-250/gifts`, lastModified: now, changeFrequency: "monthly", priority: 0.4 },
     { url: `${base}/america-250/celebrations`, lastModified: now, changeFrequency: "monthly", priority: 0.4 },
+
+    // Competitor comparison pages
+    { url: `${base}/vs`, lastModified: now, changeFrequency: "monthly", priority: 0.7 },
+    ...getAllCompetitorSlugs().map((slug) => ({
+      url: `${base}/vs/${slug}`,
+      lastModified: now,
+      changeFrequency: "monthly" as const,
+      priority: 0.7,
+    })),
   ];
 
   const seenUrls = new Set<string>(routes.map((route) => route.url));

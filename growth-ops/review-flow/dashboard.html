@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Review Flow Dashboard | USA Gummies</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #f8f5ef;
+      color: #1B2A4A;
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    h1, h2, h3 {
+      font-family: 'Oswald', sans-serif;
+      letter-spacing: 1px;
+    }
+
+    .dashboard-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .dashboard-header h1 {
+      font-size: 28px;
+      color: #1B2A4A;
+    }
+
+    .refresh-btn {
+      padding: 10px 24px;
+      background: #c7362c;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-family: 'Oswald', sans-serif;
+      font-size: 15px;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .refresh-btn:hover { background: #a82920; }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+
+    .stat-card {
+      background: #ffffff;
+      border-radius: 16px;
+      padding: 24px;
+      border: 1px solid #e0dcd6;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-family: 'Oswald', sans-serif;
+      font-size: 42px;
+      font-weight: 700;
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      color: #5f5b56;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .section {
+      background: #ffffff;
+      border-radius: 16px;
+      padding: 24px;
+      border: 1px solid #e0dcd6;
+      margin-bottom: 24px;
+    }
+
+    .section h2 {
+      font-size: 18px;
+      margin-bottom: 16px;
+      color: #1B2A4A;
+      letter-spacing: 2px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    th {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 2px solid #1B2A4A;
+      font-family: 'Oswald', sans-serif;
+      font-size: 13px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #5f5b56;
+    }
+
+    td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #e0dcd6;
+    }
+
+    tr:last-child td { border-bottom: none; }
+
+    .tier-badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #fff;
+      font-family: 'Oswald', sans-serif;
+      letter-spacing: 0.5px;
+    }
+
+    .bar-container {
+      width: 100%;
+      height: 20px;
+      background: #f0ede6;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 10px;
+      transition: width 0.6s ease;
+    }
+
+    .status-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 6px;
+    }
+
+    .loading-text {
+      text-align: center;
+      padding: 40px;
+      color: #9e9a94;
+      font-size: 16px;
+    }
+
+    .error-text {
+      text-align: center;
+      padding: 40px;
+      color: #c7362c;
+      font-size: 16px;
+    }
+
+    .api-url-note {
+      font-size: 12px;
+      color: #9e9a94;
+      margin-top: 16px;
+      text-align: center;
+    }
+
+    .api-url-note code {
+      background: #f0ede6;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+
+    @media (max-width: 600px) {
+      body { padding: 16px; }
+      .stat-value { font-size: 32px; }
+    }
+  </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&family=Space+Grotesk:wght@400;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+  <div class="dashboard-header">
+    <h1>Review Flow Dashboard</h1>
+    <button class="refresh-btn" onclick="loadData()">REFRESH DATA</button>
+  </div>
+
+  <div id="content">
+    <div class="loading-text">Loading dashboard data...</div>
+  </div>
+
+  <div class="api-url-note">
+    Data source: <code>GET /api/review-reward</code> &mdash;
+    Open <code>https://www.usagummies.com/api/review-reward</code> for raw JSON
+  </div>
+
+  <script>
+    const TIER_COLORS = {
+      "1_off": "#1B2A4A",
+      "2_off": "#c7362c",
+      "3_off": "#5f5b56",
+      "10_pct_off": "#c7a062",
+      "free_shipping": "#2D7A3A",
+      "free_bag": "#8B0000",
+    };
+
+    const TIER_LABELS = {
+      "1_off": "$1 Off",
+      "2_off": "$2 Off",
+      "3_off": "$3 Off",
+      "10_pct_off": "10% Off",
+      "free_shipping": "Free Shipping",
+      "free_bag": "Free Bag",
+    };
+
+    async function loadData() {
+      const content = document.getElementById("content");
+      content.innerHTML = '<div class="loading-text">Loading...</div>';
+
+      try {
+        // Try production URL first, then fall back to localhost
+        let data;
+        try {
+          const res = await fetch("/api/review-reward");
+          data = await res.json();
+        } catch {
+          // If opening as a file, try localhost
+          const res = await fetch("http://localhost:3000/api/review-reward");
+          data = await res.json();
+        }
+
+        if (!data.ok) {
+          content.innerHTML = '<div class="error-text">Failed to load data. Is the server running?</div>';
+          return;
+        }
+
+        renderDashboard(data);
+      } catch (err) {
+        content.innerHTML = `
+          <div class="error-text">
+            Could not connect to the API.<br/>
+            <small style="color: #9e9a94">Make sure the server is running at localhost:3000 or open this page from usagummies.com</small>
+          </div>
+        `;
+      }
+    }
+
+    function renderDashboard(data) {
+      const content = document.getElementById("content");
+      const completionRate = data.total_used > 0
+        ? ((data.total_used / data.total_codes) * 100).toFixed(1)
+        : "0.0";
+
+      let html = `
+        <!-- Summary Stats -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-value" style="color: #1B2A4A">${data.total_redemptions}</div>
+            <div class="stat-label">Total Redemptions</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" style="color: #2D7A3A">${data.total_remaining}</div>
+            <div class="stat-label">Codes Remaining</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" style="color: #c7362c">${data.total_used}</div>
+            <div class="stat-label">Codes Used</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" style="color: #c7a062">${completionRate}%</div>
+            <div class="stat-label">Pool Used</div>
+          </div>
+        </div>
+
+        <!-- Code Inventory -->
+        <div class="section">
+          <h2>CODE INVENTORY BY TIER</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Prize Tier</th>
+                <th>Remaining</th>
+                <th>Used</th>
+                <th>Total</th>
+                <th style="width: 30%">Usage</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
+
+      const tiers = Object.entries(data.inventory);
+      for (const [tier, inv] of tiers) {
+        const pct = inv.total > 0 ? (inv.used / inv.total * 100) : 0;
+        const color = TIER_COLORS[tier] || "#666";
+        const label = TIER_LABELS[tier] || tier;
+        const statusColor = inv.remaining < 5 ? "#c7362c" : inv.remaining < 15 ? "#c7a062" : "#2D7A3A";
+
+        html += `
+          <tr>
+            <td>
+              <span class="tier-badge" style="background: ${color}">${label}</span>
+            </td>
+            <td>
+              <span class="status-dot" style="background: ${statusColor}"></span>
+              ${inv.remaining}
+            </td>
+            <td>${inv.used}</td>
+            <td>${inv.total}</td>
+            <td>
+              <div class="bar-container">
+                <div class="bar-fill" style="width: ${pct}%; background: ${color}"></div>
+              </div>
+            </td>
+          </tr>
+        `;
+      }
+
+      html += `
+            </tbody>
+          </table>
+        </div>
+      `;
+
+      // Recent Redemptions
+      if (data.recent_redemptions && data.recent_redemptions.length > 0) {
+        html += `
+          <div class="section">
+            <h2>RECENT REDEMPTIONS</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>Email</th>
+                  <th>Prize</th>
+                  <th>Code</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+        `;
+
+        for (const r of data.recent_redemptions) {
+          const color = TIER_COLORS[r.prize_tier] || "#666";
+          const label = TIER_LABELS[r.prize_tier] || r.prize_tier;
+          const date = new Date(r.redeemed_at);
+          const dateStr = date.toLocaleDateString("en-US", {
+            month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"
+          });
+
+          // Mask email for privacy
+          const parts = r.email.split("@");
+          const masked = parts[0].slice(0, 2) + "***@" + parts[1];
+
+          html += `
+            <tr>
+              <td>${masked}</td>
+              <td><span class="tier-badge" style="background: ${color}">${label}</span></td>
+              <td><code>${r.code}</code></td>
+              <td>${dateStr}</td>
+            </tr>
+          `;
+        }
+
+        html += `
+              </tbody>
+            </table>
+          </div>
+        `;
+      } else {
+        html += `
+          <div class="section">
+            <h2>RECENT REDEMPTIONS</h2>
+            <p style="color: #9e9a94; text-align: center; padding: 20px;">No redemptions yet. Share the review link to get started!</p>
+          </div>
+        `;
+      }
+
+      content.innerHTML = html;
+    }
+
+    // Load on page open
+    loadData();
+  </script>
+
+</body>
+</html>

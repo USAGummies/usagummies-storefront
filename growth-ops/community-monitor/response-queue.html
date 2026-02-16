@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>USA Gummies - Response Queue</title>
+  <style>
+    :root {
+      --bg: #FAF8F5;
+      --card: #FFFFFF;
+      --border: #E5E1DB;
+      --navy: #1B2A4A;
+      --navy-light: #2C3E5A;
+      --green: #2D7A3A;
+      --green-light: #E8F5E9;
+      --red: #C62828;
+      --red-light: #FFEBEE;
+      --amber: #E65100;
+      --amber-light: #FFF3E0;
+      --gray: #6B7280;
+      --gray-light: #F3F4F6;
+      --text: #1B2A4A;
+      --text-muted: #6B7280;
+      --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --mono: 'SF Mono', 'Fira Code', 'Fira Mono', Menlo, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      padding: 20px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid var(--border);
+    }
+    .header h1 {
+      font-size: 24px;
+      color: var(--navy);
+      font-weight: 700;
+    }
+    .header-meta {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    /* Controls bar */
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+    .controls label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--navy);
+    }
+    .controls select, .controls input[type="text"] {
+      padding: 6px 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 13px;
+      background: white;
+      color: var(--text);
+    }
+    .controls input[type="text"] {
+      width: 200px;
+    }
+
+    /* Stats bar */
+    .stats {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 24px;
+    }
+    .stat {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 20px;
+      min-width: 120px;
+    }
+    .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--navy);
+    }
+    .stat-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* File loader */
+    .file-loader {
+      background: var(--card);
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      padding: 32px;
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    .file-loader p { margin-bottom: 12px; color: var(--text-muted); }
+    .file-loader input[type="file"] { display: none; }
+    .file-loader label {
+      display: inline-block;
+      padding: 10px 24px;
+      background: var(--navy);
+      color: white;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .file-loader label:hover { background: var(--navy-light); }
+
+    /* Post card */
+    .post-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 20px;
+      overflow: hidden;
+    }
+    .post-card.posted { opacity: 0.6; }
+    .post-card.skipped { display: none; }
+    .post-card.skipped.show-skipped { display: block; opacity: 0.5; }
+
+    .post-header {
+      padding: 16px 20px;
+      background: var(--gray-light);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .post-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--navy);
+      flex: 1;
+    }
+    .post-title a {
+      color: var(--navy);
+      text-decoration: none;
+    }
+    .post-title a:hover { text-decoration: underline; }
+    .post-meta {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+    .post-meta span { margin-right: 12px; }
+    .post-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    .keyword-tag {
+      display: inline-block;
+      padding: 2px 8px;
+      background: var(--amber-light);
+      color: var(--amber);
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      margin-right: 4px;
+      margin-top: 4px;
+    }
+
+    /* Response columns */
+    .responses-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0;
+    }
+    @media (max-width: 1000px) {
+      .responses-grid { grid-template-columns: 1fr; }
+    }
+
+    .response-col {
+      padding: 16px 20px;
+      border-right: 1px solid var(--border);
+    }
+    .response-col:last-child { border-right: none; }
+
+    .persona-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+      padding: 4px 10px;
+      border-radius: 4px;
+      display: inline-block;
+    }
+    .persona-helpful_parent { background: #E3F2FD; color: #1565C0; }
+    .persona-patriotic_consumer { background: #FFEEF0; color: #C62828; }
+    .persona-ingredient_nerd { background: #E8F5E9; color: #2E7D32; }
+
+    .confidence-badge {
+      float: right;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+    .confidence-high { background: var(--green-light); color: var(--green); }
+    .confidence-medium { background: var(--amber-light); color: var(--amber); }
+    .confidence-low { background: var(--red-light); color: var(--red); }
+
+    .response-text {
+      font-size: 13px;
+      line-height: 1.7;
+      color: var(--text);
+      margin: 10px 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .response-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .word-count {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* Buttons */
+    .btn {
+      padding: 6px 14px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      background: white;
+      color: var(--text);
+      transition: all 0.15s;
+    }
+    .btn:hover { background: var(--gray-light); }
+    .btn-copy { border-color: var(--green); color: var(--green); }
+    .btn-copy:hover { background: var(--green-light); }
+    .btn-copy.copied { background: var(--green); color: white; }
+    .btn-posted { border-color: var(--navy); color: var(--navy); }
+    .btn-posted.active { background: var(--navy); color: white; }
+    .btn-skip { border-color: var(--red); color: var(--red); }
+    .btn-skip:hover { background: var(--red-light); }
+
+    .btn-reset {
+      padding: 8px 20px;
+      background: var(--red-light);
+      color: var(--red);
+      border: 1px solid var(--red);
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    /* Empty state */
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-muted);
+    }
+    .empty-state h2 { font-size: 20px; margin-bottom: 8px; color: var(--navy); }
+
+    /* Validation issues */
+    .validation-issues {
+      margin-top: 6px;
+      font-size: 11px;
+      color: var(--red);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div>
+      <h1>Response Queue</h1>
+      <div class="header-meta">USA Gummies Community Monitor &mdash; Review and copy AI-generated responses</div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn" onclick="exportState()">Export State</button>
+      <button class="btn-reset" onclick="resetState()">Reset All</button>
+    </div>
+  </div>
+
+  <div class="file-loader" id="fileLoader">
+    <p>Load your generated responses JSON file to get started.</p>
+    <label for="fileInput">Load generated-responses.json</label>
+    <input type="file" id="fileInput" accept=".json" onchange="handleFileLoad(event)">
+    <p style="margin-top:12px;font-size:12px">
+      File location: <code>growth-ops/community-monitor/data/generated-responses.json</code>
+    </p>
+  </div>
+
+  <div id="dashboard" style="display:none">
+    <div class="controls">
+      <label>Filter:</label>
+      <select id="filterStatus" onchange="render()">
+        <option value="all">All</option>
+        <option value="pending_review">Pending Review</option>
+        <option value="posted">Posted</option>
+        <option value="skipped">Skipped</option>
+      </select>
+
+      <label>Persona:</label>
+      <select id="filterPersona" onchange="render()">
+        <option value="all">All Personas</option>
+        <option value="helpful_parent">Helpful Parent</option>
+        <option value="patriotic_consumer">Patriotic Consumer</option>
+        <option value="ingredient_nerd">Ingredient Nerd</option>
+      </select>
+
+      <label>Subreddit:</label>
+      <select id="filterSubreddit" onchange="render()">
+        <option value="all">All Subreddits</option>
+      </select>
+
+      <label>Sort:</label>
+      <select id="sortBy" onchange="render()">
+        <option value="confidence">Confidence</option>
+        <option value="score">Post Score</option>
+        <option value="date">Date</option>
+      </select>
+
+      <input type="text" id="searchBox" placeholder="Search posts..." oninput="render()">
+    </div>
+
+    <div class="stats" id="statsBar"></div>
+    <div id="postList"></div>
+  </div>
+
+  <script>
+    // -----------------------------------------------------------------------
+    // State management
+    // -----------------------------------------------------------------------
+
+    let responses = [];
+    let postState = {}; // { postUrl: { posted: bool, skipped: bool } }
+
+    const STORAGE_KEY = 'usagummies_response_queue';
+
+    function loadState() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) postState = JSON.parse(saved);
+      } catch { postState = {}; }
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(postState));
+      } catch {}
+    }
+
+    function resetState() {
+      if (!confirm('Reset all posted/skipped state? This cannot be undone.')) return;
+      postState = {};
+      saveState();
+      render();
+    }
+
+    function exportState() {
+      const data = {
+        exportedAt: new Date().toISOString(),
+        state: postState,
+        responseCount: responses.length,
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `response-queue-state-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // -----------------------------------------------------------------------
+    // File loading
+    // -----------------------------------------------------------------------
+
+    function handleFileLoad(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          responses = JSON.parse(e.target.result);
+          // Filter out error entries
+          responses = responses.filter(r => r.response_text);
+          document.getElementById('fileLoader').style.display = 'none';
+          document.getElementById('dashboard').style.display = 'block';
+          populateSubredditFilter();
+          render();
+        } catch (err) {
+          alert('Error parsing JSON file: ' + err.message);
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function populateSubredditFilter() {
+      const subreddits = [...new Set(responses.map(r => r.post_subreddit))].sort();
+      const select = document.getElementById('filterSubreddit');
+      select.innerHTML = '<option value="all">All Subreddits</option>';
+      for (const sub of subreddits) {
+        const opt = document.createElement('option');
+        opt.value = sub;
+        opt.textContent = 'r/' + sub;
+        select.appendChild(opt);
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Rendering
+    // -----------------------------------------------------------------------
+
+    function getPostStatus(postUrl) {
+      return postState[postUrl] || { posted: false, skipped: false };
+    }
+
+    function render() {
+      const filterStatus = document.getElementById('filterStatus').value;
+      const filterPersona = document.getElementById('filterPersona').value;
+      const filterSubreddit = document.getElementById('filterSubreddit').value;
+      const sortBy = document.getElementById('sortBy').value;
+      const search = document.getElementById('searchBox').value.toLowerCase();
+
+      // Group responses by post
+      const postMap = new Map();
+      for (const r of responses) {
+        if (!postMap.has(r.post_url)) {
+          postMap.set(r.post_url, {
+            url: r.post_url,
+            title: r.post_title,
+            subreddit: r.post_subreddit,
+            score: r.post_score,
+            keywords: r.post_keywords || [],
+            id: r.post_id,
+            responses: [],
+          });
+        }
+        postMap.get(r.post_url).responses.push(r);
+      }
+
+      let posts = Array.from(postMap.values());
+
+      // Apply filters
+      posts = posts.filter(post => {
+        const status = getPostStatus(post.url);
+
+        // Status filter
+        if (filterStatus === 'pending_review' && (status.posted || status.skipped)) return false;
+        if (filterStatus === 'posted' && !status.posted) return false;
+        if (filterStatus === 'skipped' && !status.skipped) return false;
+
+        // Persona filter
+        if (filterPersona !== 'all') {
+          const hasPersona = post.responses.some(r => r.persona_key === filterPersona);
+          if (!hasPersona) return false;
+        }
+
+        // Subreddit filter
+        if (filterSubreddit !== 'all' && post.subreddit !== filterSubreddit) return false;
+
+        // Search
+        if (search) {
+          const searchable = `${post.title} ${post.subreddit} ${post.keywords.join(' ')}`.toLowerCase();
+          if (!searchable.includes(search)) return false;
+        }
+
+        return true;
+      });
+
+      // Sort
+      posts.sort((a, b) => {
+        if (sortBy === 'confidence') {
+          const aMax = Math.max(...a.responses.map(r => r.confidence_score || 0));
+          const bMax = Math.max(...b.responses.map(r => r.confidence_score || 0));
+          return bMax - aMax;
+        }
+        if (sortBy === 'score') return (b.score || 0) - (a.score || 0);
+        if (sortBy === 'date') {
+          const aDate = a.responses[0]?.generated_at || '';
+          const bDate = b.responses[0]?.generated_at || '';
+          return bDate.localeCompare(aDate);
+        }
+        return 0;
+      });
+
+      // Render stats
+      const totalPosts = postMap.size;
+      const postedCount = Array.from(postMap.keys()).filter(u => postState[u]?.posted).length;
+      const skippedCount = Array.from(postMap.keys()).filter(u => postState[u]?.skipped).length;
+      const pendingCount = totalPosts - postedCount - skippedCount;
+
+      document.getElementById('statsBar').innerHTML = `
+        <div class="stat"><div class="stat-value">${totalPosts}</div><div class="stat-label">Total Posts</div></div>
+        <div class="stat"><div class="stat-value">${pendingCount}</div><div class="stat-label">Pending</div></div>
+        <div class="stat"><div class="stat-value">${postedCount}</div><div class="stat-label">Posted</div></div>
+        <div class="stat"><div class="stat-value">${skippedCount}</div><div class="stat-label">Skipped</div></div>
+        <div class="stat"><div class="stat-value">${responses.length}</div><div class="stat-label">Total Responses</div></div>
+      `;
+
+      // Render posts
+      const listEl = document.getElementById('postList');
+
+      if (posts.length === 0) {
+        listEl.innerHTML = `
+          <div class="empty-state">
+            <h2>No posts match your filters</h2>
+            <p>Try adjusting the filters above, or load a new responses file.</p>
+          </div>
+        `;
+        return;
+      }
+
+      listEl.innerHTML = posts.map(post => {
+        const status = getPostStatus(post.url);
+        const cardClass = status.posted ? 'posted' : status.skipped ? 'skipped show-skipped' : '';
+
+        // Filter responses by persona if needed
+        let postResponses = post.responses;
+        if (filterPersona !== 'all') {
+          postResponses = postResponses.filter(r => r.persona_key === filterPersona);
+        }
+
+        // Sort responses by persona order
+        const personaOrder = ['helpful_parent', 'patriotic_consumer', 'ingredient_nerd'];
+        postResponses.sort((a, b) => personaOrder.indexOf(a.persona_key) - personaOrder.indexOf(b.persona_key));
+
+        return `
+          <div class="post-card ${cardClass}" data-url="${escapeAttr(post.url)}">
+            <div class="post-header">
+              <div>
+                <div class="post-title">
+                  <a href="${escapeAttr(post.url)}" target="_blank" rel="noopener">
+                    ${escapeHtml(post.title)}
+                  </a>
+                </div>
+                <div class="post-meta">
+                  <span>r/${escapeHtml(post.subreddit)}</span>
+                  <span>Score: ${post.score || 0}</span>
+                </div>
+                <div>
+                  ${(post.keywords || []).map(kw => `<span class="keyword-tag">${escapeHtml(kw)}</span>`).join('')}
+                </div>
+              </div>
+              <div class="post-actions">
+                <button class="btn btn-posted ${status.posted ? 'active' : ''}"
+                        onclick="togglePosted('${escapeAttr(post.url)}')">
+                  ${status.posted ? 'Posted' : 'Mark Posted'}
+                </button>
+                <button class="btn btn-skip"
+                        onclick="toggleSkipped('${escapeAttr(post.url)}')">
+                  ${status.skipped ? 'Unskip' : 'Skip'}
+                </button>
+              </div>
+            </div>
+            <div class="responses-grid">
+              ${postResponses.map(r => renderResponse(r)).join('')}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderResponse(r) {
+      const wordCount = r.response_text ? r.response_text.split(/\s+/).length : 0;
+      const conf = r.confidence_score || 0;
+      const confClass = conf >= 80 ? 'confidence-high' : conf >= 50 ? 'confidence-medium' : 'confidence-low';
+      const issues = r.validation?.issues || [];
+
+      return `
+        <div class="response-col">
+          <span class="persona-label persona-${r.persona_key}">${escapeHtml(r.persona)}</span>
+          <span class="confidence-badge ${confClass}">${conf}%</span>
+          <div class="response-text">${escapeHtml(r.response_text || '(no response)')}</div>
+          ${issues.length > 0 ? `<div class="validation-issues">Issues: ${issues.map(i => escapeHtml(i)).join(', ')}</div>` : ''}
+          <div class="response-footer">
+            <span class="word-count">${wordCount} words</span>
+            <button class="btn btn-copy" onclick="copyResponse(this, '${escapeAttr(r.id)}')">Copy</button>
+          </div>
+        </div>
+      `;
+    }
+
+    // -----------------------------------------------------------------------
+    // Actions
+    // -----------------------------------------------------------------------
+
+    function togglePosted(url) {
+      if (!postState[url]) postState[url] = {};
+      postState[url].posted = !postState[url].posted;
+      if (postState[url].posted) postState[url].skipped = false;
+      saveState();
+      render();
+    }
+
+    function toggleSkipped(url) {
+      if (!postState[url]) postState[url] = {};
+      postState[url].skipped = !postState[url].skipped;
+      if (postState[url].skipped) postState[url].posted = false;
+      saveState();
+      render();
+    }
+
+    function copyResponse(btn, responseId) {
+      const response = responses.find(r => r.id === responseId);
+      if (!response || !response.response_text) return;
+
+      navigator.clipboard.writeText(response.response_text).then(() => {
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = 'Copy';
+          btn.classList.remove('copied');
+        }, 2000);
+      }).catch(() => {
+        // Fallback for non-HTTPS
+        const ta = document.createElement('textarea');
+        ta.value = response.response_text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = 'Copy';
+          btn.classList.remove('copied');
+        }, 2000);
+      });
+    }
+
+    // -----------------------------------------------------------------------
+    // Utils
+    // -----------------------------------------------------------------------
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function escapeAttr(str) {
+      if (!str) return '';
+      return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    }
+
+    // Init
+    loadState();
+  </script>
+</body>
+</html>
