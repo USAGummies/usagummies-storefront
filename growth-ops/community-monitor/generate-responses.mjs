@@ -329,6 +329,7 @@ export async function runResponseGenerator(options = {}) {
           validation: validation,
           generated_at: new Date().toISOString(),
           status: 'pending_review',
+          ftc_reminder: 'FTC/REDDIT DISCLOSURE: If posting on behalf of USA Gummies or as a brand affiliate, you MUST disclose your material connection. Reddit TOS prohibits undisclosed commercial promotion.',
         });
 
         if (!validation.valid) {
