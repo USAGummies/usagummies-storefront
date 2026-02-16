@@ -54,6 +54,8 @@ const DYE_FREE_PAGES = [
   "/blog/natural-color-candy-vs-artificial-dyes",
   "/blog/red-40-free-gummies-dye-free-meaning",
   "/blog/what-candy-has-red-40",
+  "/blog/food-dyes-adhd-children",
+  "/blog/yellow-5-yellow-6-side-effects",
 ];
 
 // ── Load env file (same as daily-report.mjs) ─────────────────────────────
