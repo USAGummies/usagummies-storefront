@@ -200,7 +200,7 @@ const articleJsonLd = {
 
 export default function DyeFreeCandyPage() {
   return (
-    <main className="min-h-screen home-hero-theme text-[var(--text)]">
+    <main className="min-h-screen text-[var(--text)]">
       <div className="mx-auto max-w-6xl px-4 py-12">
         <BreadcrumbJsonLd
           items={[

@@ -146,7 +146,7 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${display.variable} ${sans.variable} ${script.variable}`}
-      style={{ backgroundColor: "#0d1c33" }}
+      style={{ backgroundColor: "#f8f5ef" }}
     >
       <head>
         <link rel="preconnect" href="https://cdn.shopify.com" crossOrigin="anonymous" />
@@ -158,7 +158,7 @@ export default function RootLayout({
         </Script>
       </head>
       <body
-        className="min-h-screen home-hero-theme text-[var(--text,#1c2430)]"
+        className="min-h-screen text-[var(--text,#1B2A4A)]"
       >
         <GoogleAnalytics />
         <script

@@ -53,7 +53,7 @@ export default async function CartPage() {
   }
 
   return (
-    <main className="relative overflow-hidden home-hero-theme text-[var(--text)] min-h-screen pb-16">
+    <main className="relative overflow-hidden text-[var(--text)] min-h-screen pb-16">
       <h1 className="sr-only">Cart</h1>
       <div className="mx-auto max-w-6xl px-4 pt-6">
         {/* Top nav */}

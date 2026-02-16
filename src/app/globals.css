@@ -1,11 +1,12 @@
 @import "tailwindcss";
 
 :root {
-  /* Brand palette */
-  --navy: #0d1c33;
+  /* Brand palette — matches /go landing page design language */
+  --navy: #1B2A4A;
   --red: #c7362c; /* Stripe Red */
   --white: #ffffff;
   --gold: #c7a062;
+  --green: #2D7A3A; /* Savings / checkmark accent */
   --candy-red: #ef3b3b;
   --candy-orange: #ff9f43;
   --candy-yellow: #f8d44f;
@@ -19,7 +20,7 @@
   --bg: #f8f5ef;
   --surface: #ffffff;
   --surface-strong: #fdf9f3;
-  --text: #1c2430;
+  --text: #1B2A4A;
   --muted: #5f5b56;
   --border: rgba(16, 24, 40, 0.12);
   --radius-sm: 10px;
@@ -767,13 +768,13 @@ a:focus-visible:not(.btn):not(.focus-ring),
   background: #b02c26;
 }
 .btn-candy{
-  border-color: rgba(239, 59, 59, 0.35);
-  background: linear-gradient(180deg, #ff4b4b 0%, #e93b3e 100%);
+  border-color: rgba(199, 54, 44, 0.35);
+  background: #c7362c;
   color: var(--white);
-  box-shadow: 0 10px 22px rgba(239, 59, 59, 0.28);
+  box-shadow: 0 4px 12px rgba(199, 54, 44, 0.22);
 }
 .btn-candy:hover{
-  background: #e6383b;
+  background: #b02c26;
 }
 .btn-outline-white {
   border: 1px solid rgba(255, 255, 255, 0.7);

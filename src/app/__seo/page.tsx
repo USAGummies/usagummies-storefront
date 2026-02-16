@@ -48,7 +48,7 @@ export default function SeoDebugPage() {
   const canonicalProduct = `${siteUrl}/products/${sampleHandle}`;
 
   return (
-    <main className="min-h-screen home-hero-theme text-[var(--text)]" style={{ padding: "24px", fontFamily: "Inter, sans-serif" }}>
+    <main className="min-h-screen text-[var(--text)]" style={{ padding: "24px", fontFamily: "Inter, sans-serif" }}>
       <h1 style={{ fontSize: "20px", fontWeight: 800, marginBottom: "16px" }}>SEO Debug (dev-only)</h1>
       <div style={{ display: "grid", gap: "10px" }}>
         <div>

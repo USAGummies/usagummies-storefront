@@ -226,7 +226,7 @@ export default async function HomePage() {
           { name: "Home", href: "/" },
         ]}
       />
-      <section className={`${styles.scene} ${styles.sceneBundle} home-purchase-stage home-hero-theme`} data-zone="BUNDLE">
+      <section className={`${styles.scene} ${styles.sceneBundle} home-purchase-stage`} data-zone="BUNDLE">
         <div className={styles.sceneBg} aria-hidden="true" />
         <div className={styles.sceneOverlay} aria-hidden="true" />
         <div className={styles.sceneContent}>
@@ -339,7 +339,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="home-product-stage home-hero-theme" data-zone="HERO">
+      <section className="home-product-stage" data-zone="HERO">
         <div className="mx-auto max-w-6xl px-4 py-0.5 sm:py-1.5 lg:py-2">
           <div className="relative grid gap-1 lg:gap-2 lg:grid-cols-[1fr_1fr] lg:items-center">
             <div className="order-2 relative lg:order-1">

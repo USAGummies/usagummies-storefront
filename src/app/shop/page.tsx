@@ -206,7 +206,7 @@ export default async function ShopPage() {
     SINGLE_BAG_SKU;
 
   return (
-    <main className="relative overflow-hidden home-hero-theme text-[var(--text)] min-h-screen pb-16">
+    <main className="relative overflow-hidden text-[var(--text)] min-h-screen pb-16">
       <BreadcrumbJsonLd
         items={[
           { name: "Home", href: "/" },

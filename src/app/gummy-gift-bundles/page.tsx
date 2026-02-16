@@ -102,7 +102,7 @@ export default async function GummyGiftBundlesPage() {
   const singleBagVariantId = bundleVariants?.singleBagVariantId;
 
   return (
-    <main className="relative overflow-hidden home-hero-theme text-[var(--text)] min-h-screen pb-16">
+    <main className="relative overflow-hidden text-[var(--text)] min-h-screen pb-16">
       <section className="mx-auto max-w-6xl px-4 py-8 lg:py-10">
         <BreadcrumbJsonLd
           items={[

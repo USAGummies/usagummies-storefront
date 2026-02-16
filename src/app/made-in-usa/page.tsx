@@ -116,7 +116,7 @@ const articleJsonLd = {
 
 export default function MadeInUsaPage() {
   return (
-    <main className="relative overflow-hidden home-hero-theme text-[var(--text)] min-h-screen home-candy">
+    <main className="relative overflow-hidden text-[var(--text)] min-h-screen home-candy">
       <section className="relative overflow-hidden">
         <div
           className="absolute inset-0 pointer-events-none"

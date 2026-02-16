@@ -11,7 +11,7 @@ export default function ShopError({
   reset: () => void;
 }) {
   return (
-    <main className="min-h-screen home-hero-theme">
+    <main className="min-h-screen">
       <div className="mx-auto w-full max-w-3xl px-4 py-16">
         <div className="rounded-2xl border border-neutral-200 bg-white p-8 shadow-sm">
         <h1 className="text-2xl font-bold text-neutral-900">

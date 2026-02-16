@@ -75,7 +75,7 @@ const SUPPORT_LINKS = [
 
 export default function HelpCenterPage() {
   return (
-    <main className="min-h-screen home-hero-theme text-[var(--text)]">
+    <main className="min-h-screen text-[var(--text)]">
       <BreadcrumbJsonLd
         items={[
           { name: "Home", href: "/" },

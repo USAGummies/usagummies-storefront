@@ -1,6 +1,6 @@
 export default function LoadingShop() {
   return (
-    <main className="min-h-screen home-hero-theme">
+    <main className="min-h-screen">
       <div className="mx-auto w-full max-w-6xl px-4 py-8">
       {/* Header skeleton */}
         <div className="mb-6">
