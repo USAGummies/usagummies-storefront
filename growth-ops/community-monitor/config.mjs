@@ -42,8 +42,8 @@ export const SUBREDDITS = [
   'news',
   'todayilearned',
   'mildlyinteresting',
-  'Foodie',
   'nutrition',
+  'FoodScience',
 ];
 
 // ---------------------------------------------------------------------------

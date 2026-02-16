@@ -2,6 +2,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { Metadata } from "next";
+import { LeadCapture } from "@/components/marketing/LeadCapture.client";
 
 export const metadata: Metadata = {
   title: "The Dye-Free Movement — A Timeline of Candy Without Artificial Colors",
@@ -538,6 +539,58 @@ export default function DyeFreeMovementPage() {
               )}
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* Email Capture */}
+      <section
+        style={{
+          maxWidth: 800,
+          margin: "0 auto",
+          padding: "0 20px 48px",
+        }}
+      >
+        <div
+          style={{
+            background: "#1B2A4A",
+            borderRadius: 20,
+            padding: "32px 24px",
+            textAlign: "center",
+          }}
+        >
+          <h2
+            className="vs-display"
+            style={{
+              fontSize: 24,
+              color: "#ffffff",
+              margin: "0 0 8px",
+            }}
+          >
+            Stay Ahead of the Dye-Free Movement
+          </h2>
+          <p
+            style={{
+              fontSize: 14,
+              color: "rgba(255,255,255,0.7)",
+              margin: "0 auto 20px",
+              maxWidth: 440,
+              lineHeight: 1.5,
+            }}
+          >
+            Get ingredient news, label-reading tips, and first access to new
+            USA Gummies flavors. No spam — just the stuff that matters.
+          </p>
+          <div style={{ maxWidth: 400, margin: "0 auto" }}>
+            <LeadCapture
+              source="dye-free-movement"
+              intent="newsletter"
+              title=""
+              ctaLabel="Join the movement"
+              variant="dark"
+              emphasis="quiet"
+              showSms={false}
+            />
+          </div>
         </div>
       </section>
 
