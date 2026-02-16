@@ -17,6 +17,7 @@ import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { LazyStickyAddToCartBar } from "@/components/product/LazyStickyAddToCartBar.client";
 import LazyHeroCTAWatcher from "@/components/home/LazyHeroCTAWatcher.client";
 import { LatestFromBlog } from "@/components/blog/LatestFromBlog";
+import { DyeFreeNewsBanner } from "@/components/marketing/DyeFreeNewsBanner";
 import styles from "./homepage-scenes.module.css";
 
 function resolveSiteUrl() {
@@ -454,6 +455,8 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      <DyeFreeNewsBanner />
 
       <section className="bg-transparent" data-zone="BLOG">
         <div className="mx-auto max-w-6xl px-4 py-4">
