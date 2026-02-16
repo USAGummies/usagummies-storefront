@@ -1,0 +1,311 @@
+{
+  "meta": {
+    "generated": "2026-02-16",
+    "account": "usagummies",
+    "site": "https://www.usagummies.com",
+    "utm_base": "utm_source=pinterest&utm_medium=pin&utm_campaign=dyefree",
+    "schedule": {
+      "frequency": "3 pins/day",
+      "timing": "8pm-11pm EST",
+      "tool": "Tailwind or Pinterest native scheduler"
+    }
+  },
+  "boards": {
+    "food-dye-facts": {
+      "name": "Food Dye Facts",
+      "description": "What you need to know about artificial food dyes — research, regulations, and label reading tips.",
+      "category": "Education"
+    },
+    "kids-snack-ideas": {
+      "name": "Kids Snack Ideas",
+      "description": "Dye-free snacks, classroom treats, and lunch box ideas for parents.",
+      "category": "Food & Drink"
+    },
+    "dye-free-candy": {
+      "name": "Dye-Free Candy & Snacks",
+      "description": "The best candy and snacks made without artificial food dyes. Clean ingredients, real colors.",
+      "category": "Food & Drink"
+    },
+    "dye-free-gummy-bears": {
+      "name": "Dye-Free Gummy Bears",
+      "description": "Gummy bears made with natural colors from fruit and vegetables. No Red 40, no Yellow 5.",
+      "category": "Food & Drink"
+    },
+    "made-in-america": {
+      "name": "Made in America",
+      "description": "Products made in the USA. Supporting American businesses and manufacturing.",
+      "category": "Products"
+    },
+    "party-snacks": {
+      "name": "Party Snacks & Recipes",
+      "description": "Party ideas, snack boards, and treats for every occasion — all dye-free.",
+      "category": "Food & Drink"
+    }
+  },
+  "pins": [
+    {
+      "id": "pin-01",
+      "title": "Is Red 40 Bad For You? What the Research Says",
+      "description": "Red 40 is the most used artificial food dye in America. Here's what scientists know about Red 40 safety, side effects, and why it's banned or labeled in other countries. Learn what to look for on ingredient labels and discover dye-free alternatives.",
+      "hashtags": "#red40 #fooddyes #dyefree #ingredients #cleancandy",
+      "link": "/blog/is-red-40-bad-for-you",
+      "link_with_utm": "https://www.usagummies.com/blog/is-red-40-bad-for-you?utm_source=pinterest&utm_medium=pin&utm_campaign=dyefree&utm_content=red40_research",
+      "board": "food-dye-facts",
+      "secondary_boards": ["dye-free-candy", "kids-snack-ideas"],
+      "alt_text": "Infographic about Red 40 food dye safety research and side effects",
+      "pin_type": "blog_post",
+      "image_spec": {
+        "size": "1000x1500",
+        "background": "#f8f5ef",
+        "text_color": "#1B2A4A",
+        "accent": "#c7362c",
+        "title_lines": ["Is Red 40", "Bad For You?"],
+        "subtitle": "What the research says"
+      },
+      "schedule_day": 1,
+      "schedule_slot": 1
+    },
+    {
+      "id": "pin-02",
+      "title": "Yellow 5 & Yellow 6: What Parents Should Know",
+      "description": "Yellow 5 (Tartrazine) and Yellow 6 (Sunset Yellow) are in thousands of foods your kids eat daily. Learn about side effects, hyperactivity research, allergic reactions, and how to find dye-free alternatives for your family.",
+      "hashtags": "#yellow5 #yellow6 #fooddyes #parenting #dyefree",
+      "link": "/blog/yellow-5-yellow-6-side-effects",
+      "link_with_utm": "https://www.usagummies.com/blog/yellow-5-yellow-6-side-effects?utm_source=pinterest&utm_medium=pin&utm_campaign=dyefree&utm_content=yellow56_parents",
+      "board": "food-dye-facts",
+      "secondary_boards": ["kids-snack-ideas"],
+      "alt_text": "Guide for parents about Yellow 5 and Yellow 6 food dye side effects",
+      "pin_type": "blog_post",
+      "image_spec": {
+        "size": "1000x1500",
+        "background": "#1B2A4A",
+        "text_color": "#ffffff",
+        "accent": "#c7362c",
+        "title_lines": ["Yellow 5 & Yellow 6", "What Parents", "Should Know"],
+        "subtitle": "Side effects & alternatives"
+      },
+      "schedule_day": 1,
+      "schedule_slot": 2
+    },
+    {
+      "id": "pin-03",
+      "title": "Food Dyes and ADHD: What the Research Says",
+      "description": "Multiple studies link artificial food dyes to increased hyperactivity in children. The EU requires warning labels. Here's what every parent should know about the connection between food coloring and ADHD symptoms.",
+      "hashtags": "#adhd #fooddyes #parenting #dyefree #hyperactivity",
+      "link": "/blog/food-dyes-adhd-children",
+      "link_with_utm": "https://www.usagummies.com/blog/food-dyes-adhd-children?utm_source=pinterest&utm_medium=pin&utm_campaign=dyefree&utm_content=adhd_research",
+      "board": "food-dye-facts",
+      "secondary_boards": ["kids-snack-ideas"],
+      "alt_text": "Research summary on artificial food dyes and ADHD in children",
+      "pin_type": "blog_post",
+      "image_spec": {
+        "size": "1000x1500",
+        "background": "#f8f5ef",
+        "text_color": "#1B2A4A",
+        "accent": "#c7362c",
+        "title_lines": ["Food Dyes", "& ADHD"],
+        "subtitle": "What the research says"
+      },
+      "schedule_day": 1,
+      "schedule_slot": 3
+    },
+    {
+      "id": "pin-04",
+      "title": "Dye-Free Snacks for Kids: A Parent's Guide",
+      "description": "The best dye-free snacks for kids — gummy bears, fruit snacks, crackers, and more. All made without artificial colors. A practical label-reading guide for parents who want clean ingredients.",
+      "hashtags": "#kidssnacks #dyefree #parenting #schoolsnacks #cleaneating",
+      "link": "/blog/dye-free-snacks-for-kids",
+      "link_with_utm": "https://www.usagummies.com/blog/dye-free-snacks-for-kids?utm_source=pinterest&utm_medium=pin&utm_campaign=dyefree&utm_content=kids_guide",
+      "board": "kids-snack-ideas",
+      "secondary_boards": ["dye-free-candy"],
+      "alt_text": "Guide to finding dye-free snacks for kids with natural ingredients",
+      "pin_type": "blog_post",
+      "image_spec": {
+        "size": "1000x1500",
+        "background": "#f8f5ef",
+        "text_color": "#1B2A4A",
+        "accent": "#2D7A3A",
+        "title_lines": ["Dye-Free Snacks", "for Kids"],
+        "subtitle": "A parent's guide"
+      },
+      "schedule_day": 2,
+      "schedule_slot": 1
+    },
+    {
+      "id": "pin-05",
+      "title": "What Candy Has Red 40? A Complete List",
+      "description": "A label-checked list of popular candies that contain Red 40 — and the best dye-free alternatives. Know exactly which candy has artificial dyes before your next grocery run.",
+      "hashtags": "#red40 #candy #ingredientlist #dyefree #labelreading",
+      "link": "/blog/what-candy-has-red-40",
+      "link_with_utm": "https://www.usagummies.com/blog/what-candy-has-red-40?utm_source=pinterest&utm_medium=pin&utm_campaign=dyefree&utm_content=red40_list",
+      "board": "dye-free-candy",
+      "secondary_boards": ["food-dye-facts"],
+      "alt_text": "Complete list of popular candies containing Red 40 artificial dye",
+      "pin_type": "blog_post",
+      "image_spec": {
+        "size": "1000x1500",
+        "background": "#c7362c",
+        "text_color": "#ffffff",
+        "accent": "#ffffff",
+        "title_lines": ["What Candy", "Has Red 40?"],
+        "subtitle": "The complete list"
+      },
+      "schedule_day": 2,
+      "schedule_slot": 2
+    },
+    {
+      "id": "pin-06",
+      "title": "Best Dye-Free Candy Brands in 2026",
+      "description": "The best candy brands that use natural colors instead of artificial dyes. Gummy bears, chocolate, hard candy, and more — all without Red 40, Yellow 5, or Blue 1.",
+      "hashtags": "#dyefreecandy #naturalcandy #cleancandy #dyefree #gummybears",
+      "link": "/blog/best-dye-free-candy-brands",
+      "link_with_utm": "https://www.usagummies.com/blog/best-dye-free-candy-brands?utm_source=pinterest&utm_medium=pin&utm_campaign=dyefree&utm_content=best_brands",
+      "board": "dye-free-candy",
+      "secondary_boards": ["dye-free-gummy-bears", "kids-snack-ideas"],
+      "alt_text": "Roundup of the best dye-free candy brands with natural colors",
+      "pin_type": "blog_post",
+      "image_spec": {
+        "size": "1000x1500",
+        "background": "#f8f5ef",
+        "text_color": "#1B2A4A",
+        "accent": "#2D7A3A",
+        "title_lines": ["Best Dye-Free", "Candy Brands"],
+        "subtitle": "2026 roundup"
+      },
+      "schedule_day": 2,
+      "schedule_slot": 3
+    },
+    {
+      "id": "pin-07",
+      "title": "Artificial Dyes: Banned in Europe, Still in US Candy",
+      "description": "Why the same candy brands use artificial dyes in the US but natural colors in Europe. The double standard explained — same brand, different ingredients depending on your country.",
+      "hashtags": "#fooddyes #europe #usa #doublestandard #dyefree",
+      "link": "/blog/artificial-dyes-banned-in-europe-not-us",
+      "link_with_utm": "https://www.usagummies.com/blog/artificial-dyes-banned-in-europe-not-us?utm_source=pinterest&utm_medium=pin&utm_campaign=dyefree&utm_content=eu_vs_us",
+      "board": "food-dye-facts",
+      "secondary_boards": ["dye-free-candy"],
+      "alt_text": "Comparison of artificial food dye regulations in Europe versus the United States",
+      "pin_type": "infographic",
+      "image_spec": {
+        "size": "1000x2100",
+        "background": "#1B2A4A",
+        "text_color": "#ffffff",
+        "accent": "#c7362c",
+        "title_lines": ["Same Candy Brand", "Different Ingredients"],
+        "subtitle": "US vs Europe"
+      },
+      "schedule_day": 3,
+      "schedule_slot": 1
+    },
+    {
+      "id": "pin-08",
+      "title": "Dye-Free Gummy Bears: What's Inside?",
+      "description": "Our gummy bears get their colors from turmeric, spirulina, and beet juice — not Red 40 or Yellow 5. See the full ingredient breakdown and learn what makes dye-free gummy bears different.",
+      "hashtags": "#gummybears #dyefree #ingredients #naturalcolors #cleanlabel",
+      "link": "/blog/dye-free-gummy-bears-ingredients",
+      "link_with_utm": "https://www.usagummies.com/blog/dye-free-gummy-bears-ingredients?utm_source=pinterest&utm_medium=pin&utm_campaign=dyefree&utm_content=ingredients",
+      "board": "dye-free-gummy-bears",
+      "secondary_boards": ["dye-free-candy"],
+      "alt_text": "Ingredient breakdown of dye-free gummy bears colored with natural fruit and vegetable extracts",
+      "pin_type": "blog_post",
+      "image_spec": {
+        "size": "1000x1500",
+        "background": "#f8f5ef",
+        "text_color": "#1B2A4A",
+        "accent": "#2D7A3A",
+        "title_lines": ["Dye-Free", "Gummy Bears"],
+        "subtitle": "What's actually inside?"
+      },
+      "schedule_day": 3,
+      "schedule_slot": 2
+    },
+    {
+      "id": "pin-09",
+      "title": "Made in USA Dye-Free Gummy Bears",
+      "description": "American-made gummy bears with zero artificial dyes. Colored by nature with fruit and vegetable extracts, made with pride in the USA. Shop dye-free gummy bears.",
+      "hashtags": "#madeinusa #gummybears #americanmade #dyefree #cleancandy",
+      "link": "/shop",
+      "link_with_utm": "https://www.usagummies.com/shop?utm_source=pinterest&utm_medium=pin&utm_campaign=dyefree&utm_content=shop_usa",
+      "board": "made-in-america",
+      "secondary_boards": ["dye-free-gummy-bears"],
+      "alt_text": "Bag of USA Gummies dye-free gummy bears made in America",
+      "pin_type": "product",
+      "image_spec": {
+        "size": "1000x1500",
+        "background": "#f8f5ef",
+        "text_color": "#1B2A4A",
+        "accent": "#c7362c",
+        "title_lines": ["Made in USA", "Dye-Free", "Gummy Bears"],
+        "subtitle": "Shop at usagummies.com"
+      },
+      "schedule_day": 3,
+      "schedule_slot": 3
+    },
+    {
+      "id": "pin-10",
+      "title": "Mars Is Removing Artificial Dyes — Here's What It Means",
+      "description": "Mars announced plans to remove artificial dyes from M&Ms, Skittles, and Starburst by 2028. Here's what it means for the candy industry and why some brands already did it years ago.",
+      "hashtags": "#mars #fooddyes #candy #skittles #dyefree",
+      "link": "/blog/mars-removing-artificial-dyes-what-it-means",
+      "link_with_utm": "https://www.usagummies.com/blog/mars-removing-artificial-dyes-what-it-means?utm_source=pinterest&utm_medium=pin&utm_campaign=dyefree&utm_content=mars_news",
+      "board": "food-dye-facts",
+      "secondary_boards": ["dye-free-candy"],
+      "alt_text": "Analysis of Mars candy company removing artificial dyes from products",
+      "pin_type": "blog_post",
+      "image_spec": {
+        "size": "1000x1500",
+        "background": "#1B2A4A",
+        "text_color": "#ffffff",
+        "accent": "#c7362c",
+        "title_lines": ["Mars Is Removing", "Artificial Dyes"],
+        "subtitle": "What it means for you"
+      },
+      "schedule_day": 4,
+      "schedule_slot": 1
+    },
+    {
+      "id": "pin-11",
+      "title": "The Dye-Free Movement: A Timeline",
+      "description": "A timeline of the fight to remove artificial dyes from American food — from Dr. Feingold's 1973 research to the 2025 FDA Red 3 ban. The movement is growing.",
+      "hashtags": "#dyefreemovement #fooddyes #timeline #fda #cleanfood",
+      "link": "/dye-free-movement",
+      "link_with_utm": "https://www.usagummies.com/dye-free-movement?utm_source=pinterest&utm_medium=pin&utm_campaign=dyefree&utm_content=movement_timeline",
+      "board": "dye-free-candy",
+      "secondary_boards": ["food-dye-facts"],
+      "alt_text": "Timeline infographic of the dye-free movement from 1973 to present",
+      "pin_type": "infographic",
+      "image_spec": {
+        "size": "1000x2100",
+        "background": "#f8f5ef",
+        "text_color": "#1B2A4A",
+        "accent": "#c7362c",
+        "title_lines": ["The Dye-Free", "Movement"],
+        "subtitle": "A 50-year timeline"
+      },
+      "schedule_day": 4,
+      "schedule_slot": 2
+    },
+    {
+      "id": "pin-12",
+      "title": "Dye-Free Gummies for Kids' Birthday Parties",
+      "description": "Planning a birthday party? These dye-free gummy bears are colorful, delicious, and made without artificial dyes. Perfect for party bags, candy tables, and treats that every parent can feel good about.",
+      "hashtags": "#kidsparty #dyefree #birthdayparty #partytreats #gummybears",
+      "link": "/blog/dye-free-gummies-for-kids-parties",
+      "link_with_utm": "https://www.usagummies.com/blog/dye-free-gummies-for-kids-parties?utm_source=pinterest&utm_medium=pin&utm_campaign=dyefree&utm_content=party_gummies",
+      "board": "party-snacks",
+      "secondary_boards": ["kids-snack-ideas", "dye-free-gummy-bears"],
+      "alt_text": "Colorful dye-free gummy bears for kids birthday party treats",
+      "pin_type": "blog_post",
+      "image_spec": {
+        "size": "1000x1500",
+        "background": "#f8f5ef",
+        "text_color": "#1B2A4A",
+        "accent": "#c7362c",
+        "title_lines": ["Dye-Free Gummies", "for Kids' Parties"],
+        "subtitle": "Colorful without chemicals"
+      },
+      "schedule_day": 4,
+      "schedule_slot": 3
+    }
+  ]
+}
