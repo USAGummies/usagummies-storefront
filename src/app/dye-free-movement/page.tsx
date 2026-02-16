@@ -4,16 +4,40 @@ import Image from "next/image";
 import type { Metadata } from "next";
 import { LeadCapture } from "@/components/marketing/LeadCapture.client";
 
+const SITE_URL = "https://www.usagummies.com";
+
 export const metadata: Metadata = {
   title: "The Dye-Free Movement — A Timeline of Candy Without Artificial Colors",
   description:
     "From the EU's warning labels to the FDA's Red No. 3 ban: a complete timeline of the movement to remove artificial dyes from candy. See which brands led and which followed.",
+  alternates: { canonical: `${SITE_URL}/dye-free-movement` },
+  keywords: [
+    "dye free candy timeline",
+    "artificial dye ban history",
+    "Red No 3 ban",
+    "food dye removal candy",
+    "dye free candy brands",
+    "natural color candy",
+    "Red 40 free candy",
+    "candy without artificial dyes",
+    "Mars removing dyes",
+    "FDA food dye ban 2025",
+  ],
   openGraph: {
     title: "The Dye-Free Movement — A Timeline of Candy Without Artificial Colors",
     description:
       "From the EU's warning labels to the FDA's Red No. 3 ban: a complete timeline of the movement to remove artificial dyes from candy.",
-    url: "https://www.usagummies.com/dye-free-movement",
+    url: `${SITE_URL}/dye-free-movement`,
+    siteName: "USA Gummies",
+    type: "article",
     images: [{ url: "/opengraph-image", alt: "Dye-Free Movement Timeline" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "The Dye-Free Movement — Timeline of Candy Without Artificial Colors",
+    description:
+      "From EU warning labels to the FDA Red No. 3 ban — see which candy brands led the dye-free shift and which are still catching up.",
+    images: ["/opengraph-image"],
   },
 };
 
@@ -151,9 +175,47 @@ const BRANDS_TIMELINE = [
   { name: "Mars Wrigley", year: 2026, note: "Dye-free options (not full removal)" },
 ];
 
+const jsonLdArticle = {
+  "@context": "https://schema.org",
+  "@type": "Article",
+  headline: "The Dye-Free Movement — A Timeline of Candy Without Artificial Colors",
+  description:
+    "From the EU's warning labels to the FDA's Red No. 3 ban: a complete timeline of the movement to remove artificial dyes from candy.",
+  url: `${SITE_URL}/dye-free-movement`,
+  image: `${SITE_URL}/opengraph-image`,
+  datePublished: "2026-02-15",
+  dateModified: "2026-02-15",
+  author: { "@type": "Organization", name: "USA Gummies", url: SITE_URL },
+  publisher: {
+    "@type": "Organization",
+    name: "USA Gummies",
+    url: SITE_URL,
+    logo: { "@type": "ImageObject", url: `${SITE_URL}/brand/logo.png` },
+  },
+  mainEntityOfPage: { "@type": "WebPage", "@id": `${SITE_URL}/dye-free-movement` },
+};
+
+const jsonLdBreadcrumb = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: SITE_URL },
+    { "@type": "ListItem", position: 2, name: "Dye-Free Candy", item: `${SITE_URL}/dye-free-candy` },
+    { "@type": "ListItem", position: 3, name: "The Dye-Free Movement", item: `${SITE_URL}/dye-free-movement` },
+  ],
+};
+
 export default function DyeFreeMovementPage() {
   return (
     <div className="vs-root">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdArticle) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdBreadcrumb) }}
+      />
       <style>{`
         .vs-root {
           min-height: 100vh;
