@@ -402,6 +402,12 @@ export default function DyeFreeCandyPage() {
                 Keep exploring
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
+                <Link href="/dye-free-movement" className="btn btn-outline">
+                  Dye-free timeline
+                </Link>
+                <Link href="/vs" className="btn btn-outline">
+                  Brand comparisons
+                </Link>
                 <Link href="/bulk-gummy-bears" className="btn btn-outline">
                   Bulk gummy bears
                 </Link>

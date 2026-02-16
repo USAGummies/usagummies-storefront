@@ -38,6 +38,12 @@ export const SUBREDDITS = [
   'AskReddit',
   'ZeroWaste',
   'NaturalBeauty',
+  // Added for dye-free news cycle (2025-2026)
+  'news',
+  'todayilearned',
+  'mildlyinteresting',
+  'Foodie',
+  'nutrition',
 ];
 
 // ---------------------------------------------------------------------------
@@ -64,6 +70,23 @@ export const KEYWORDS = [
   'organic gummy',
   'fruit snacks',
   'healthy candy',
+  // Trending keywords — dye-free news cycle (2025-2026)
+  'Red No. 3',
+  'Red 3 ban',
+  'Red 3',
+  'food dye ban',
+  'food dye',
+  'synthetic dyes',
+  'Mars dye free',
+  'Skittles dye',
+  'M&M dye',
+  'make america healthy',
+  'Yellow 5',
+  'Yellow 6',
+  'Blue 1',
+  'food additive',
+  'natural colors',
+  'candy ingredients',
 ];
 
 // ---------------------------------------------------------------------------

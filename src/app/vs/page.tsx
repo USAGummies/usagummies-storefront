@@ -347,6 +347,26 @@ export default function VsIndexPage() {
           >
             SHOP USA GUMMIES
           </Link>
+          <Link
+            href="/dye-free-movement"
+            className="vs-display"
+            style={{
+              display: "block",
+              width: "100%",
+              padding: "14px",
+              background: "transparent",
+              color: "#1B2A4A",
+              fontSize: 14,
+              letterSpacing: "1px",
+              textAlign: "center",
+              border: "2px solid #e0dcd6",
+              borderRadius: 12,
+              cursor: "pointer",
+              textDecoration: "none",
+            }}
+          >
+            THE DYE-FREE MOVEMENT TIMELINE →
+          </Link>
         </div>
       </section>
 
