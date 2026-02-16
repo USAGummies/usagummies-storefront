@@ -151,6 +151,7 @@ function extractIndexableUrls() {
 
 function mapDynamicPath(pathPart) {
   if (!pathPart.includes("${")) return pathPart;
+  if (pathPart.startsWith("/vs/")) return "/vs/[competitor]";
   if (pathPart.startsWith("/products/")) return "/products/[handle]";
   if (pathPart.startsWith("/collections/")) return "/collections/[handle]";
   if (pathPart.startsWith("/pages/")) return "/pages/[handle]";
