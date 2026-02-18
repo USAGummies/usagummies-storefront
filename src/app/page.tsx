@@ -223,15 +223,15 @@ export default async function HomePage() {
       <section className="relative overflow-hidden" data-zone="BRAND_HERO">
         <div className="absolute inset-0 z-0">
           <Image
-            src="/brand/gallery/bag-navy-hero.jpg"
-            alt="USA Gummies bag with gummy bears on navy background"
+            src="/brand/lifestyle/picnic-scene.jpg"
+            alt="USA Gummies bag on a picnic table with American flag"
             fill
             priority
             fetchPriority="high"
             sizes="100vw"
-            className="object-cover object-center"
+            className="object-cover object-top"
           />
-          <div className="absolute inset-0 bg-[#1B2A4A]/60" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#1B2A4A]/30 to-[#1B2A4A]/60" />
         </div>
         <div className="relative z-10 mx-auto flex max-w-6xl flex-col items-center px-4 py-16 sm:py-20 lg:py-28 text-center">
           <Image
@@ -240,23 +240,23 @@ export default async function HomePage() {
             width={440}
             height={280}
             priority
-            className="h-auto w-[260px] sm:w-[340px] lg:w-[440px] drop-shadow-[0_8px_32px_rgba(0,0,0,0.4)]"
+            className="h-auto w-[260px] sm:w-[340px] lg:w-[440px] drop-shadow-[0_8px_32px_rgba(0,0,0,0.5)]"
           />
-          <h1 className="mt-6 font-display text-3xl font-black leading-tight tracking-tight text-white sm:text-4xl lg:text-5xl drop-shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
+          <h1 className="mt-6 font-display text-3xl font-black leading-tight tracking-tight text-white sm:text-4xl lg:text-5xl drop-shadow-[0_2px_12px_rgba(0,0,0,0.5)]">
             America&rsquo;s Gummy Bear
           </h1>
-          <p className="mt-3 max-w-lg text-sm text-white/90 sm:text-base">
+          <p className="mt-3 max-w-lg text-sm text-white/90 sm:text-base drop-shadow-[0_1px_4px_rgba(0,0,0,0.3)]">
             Classic gummy bears, made in the USA. No artificial dyes. Just real fruit colors and all-natural flavor.
           </p>
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
             <a href="#hero-primary-cta" className="inline-flex items-center gap-2 rounded-full bg-[#c7362c] px-7 py-3.5 text-sm font-bold text-white shadow-lg transition hover:bg-[#a82c24] hover:shadow-xl">
               Shop now
             </a>
-            <Link href="/about" className="inline-flex items-center gap-2 rounded-full border-2 border-white/40 px-6 py-3 text-sm font-semibold text-white transition hover:border-white/70 hover:bg-white/10">
+            <Link href="/about" className="inline-flex items-center gap-2 rounded-full border-2 border-white/40 px-6 py-3 text-sm font-semibold text-white backdrop-blur-sm transition hover:border-white/70 hover:bg-white/10">
               Our story
             </Link>
           </div>
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-4 text-[11px] font-semibold uppercase tracking-widest text-white/70">
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-4 text-[11px] font-semibold uppercase tracking-widest text-white/80 drop-shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
             <span className="flex items-center gap-1.5">
               <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#2D7A3A]" />
               Made in USA
@@ -648,7 +648,7 @@ export default async function HomePage() {
       </div>
 
       {/* ── MADE IN AMERICA ── */}
-      <section className="bg-[#1B2A4A]" data-zone="AMERICANA">
+      <section className="bg-[#f5f1ea]" data-zone="AMERICANA">
         <div className="mx-auto max-w-6xl px-4 py-10 sm:py-14 lg:py-16">
           <div className="grid gap-6 lg:grid-cols-2 lg:items-center">
             <div className="space-y-4">
@@ -659,31 +659,31 @@ export default async function HomePage() {
                   aria-hidden="true"
                   width={160}
                   height={102}
-                  className="h-auto w-[120px] sm:w-[160px] brightness-0 invert opacity-80"
+                  className="h-auto w-[120px] sm:w-[160px]"
                 />
               </div>
-              <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[#c7a062]">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[#1B2A4A]/50">
                 Made in America
               </div>
-              <h2 className="text-balance text-2xl font-black leading-tight text-white sm:text-3xl lg:text-4xl">
+              <h2 className="text-balance text-2xl font-black leading-tight text-[#1B2A4A] sm:text-3xl lg:text-4xl">
                 Made in America isn&rsquo;t a slogan. It&rsquo;s a standard.
               </h2>
-              <p className="text-pretty text-sm leading-relaxed text-white/75 sm:text-base">
+              <p className="text-pretty text-sm leading-relaxed text-[#1B2A4A]/70 sm:text-base">
                 Every bag of USA Gummies is sourced, manufactured, and packed entirely
                 in the United States. We chose American production not because it was
                 easy, but because it was right. Real fruit colors. No artificial dyes.
                 A gummy bear you can trust.
               </p>
               <div className="flex flex-wrap gap-3 pt-2">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 px-3 py-1.5 text-[11px] font-semibold text-white/80">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-[#1B2A4A]/15 bg-white px-3 py-1.5 text-[11px] font-semibold text-[#1B2A4A]/80">
                   <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#2D7A3A]" />
                   American sourced
                 </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 px-3 py-1.5 text-[11px] font-semibold text-white/80">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-[#1B2A4A]/15 bg-white px-3 py-1.5 text-[11px] font-semibold text-[#1B2A4A]/80">
                   <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#2D7A3A]" />
                   American manufactured
                 </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 px-3 py-1.5 text-[11px] font-semibold text-white/80">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-[#1B2A4A]/15 bg-white px-3 py-1.5 text-[11px] font-semibold text-[#1B2A4A]/80">
                   <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#2D7A3A]" />
                   American packed
                 </span>
@@ -721,7 +721,7 @@ export default async function HomePage() {
                   sizes="(max-width: 640px) 100vw, 560px"
                   className="object-cover"
                 />
-                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#1B2A4A]/80 to-transparent p-4">
+                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#1B2A4A]/60 to-transparent p-4">
                   <div className="text-center text-xs font-bold uppercase tracking-widest text-white/90">
                     From fake dyes to freedom
                   </div>

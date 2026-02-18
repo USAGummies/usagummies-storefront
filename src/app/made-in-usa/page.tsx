@@ -117,7 +117,7 @@ const articleJsonLd = {
 export default function MadeInUsaPage() {
   return (
     <main className="relative overflow-hidden text-[var(--text)] min-h-screen home-candy">
-      <div className="relative w-full h-[280px] sm:h-[340px] overflow-hidden">
+      <div className="relative w-full h-[320px] sm:h-[400px] lg:h-[440px] overflow-hidden">
         <Image
           src="/brand/americana/washington-crossing.jpg"
           alt="Washington crossing the Delaware with USA Gummies"
@@ -126,14 +126,17 @@ export default function MadeInUsaPage() {
           className="object-cover"
           priority
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#1B2A4A]/60 to-[#1B2A4A]/80" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#1B2A4A]/25 to-[#1B2A4A]/55" />
         <div className="relative z-10 flex flex-col items-center justify-center h-full text-center px-4">
-          <div className="relative w-48 h-24 mb-4">
-            <Image src="/brand/logo-full.png" alt="USA Gummies" fill sizes="192px" className="object-contain drop-shadow-lg" />
+          <div className="relative w-56 h-28 mb-3">
+            <Image src="/brand/logo-full.png" alt="USA Gummies" fill sizes="224px" className="object-contain drop-shadow-[0_4px_20px_rgba(0,0,0,0.4)]" />
           </div>
-          <h1 className="font-display text-3xl sm:text-4xl font-bold uppercase tracking-wide text-white drop-shadow-lg">
+          <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold uppercase tracking-wide text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
             Made in the USA
           </h1>
+          <p className="mt-2 text-sm text-white/85 max-w-md drop-shadow-sm">
+            Sourced, crafted, and packed right here in America.
+          </p>
         </div>
       </div>
 
@@ -156,8 +159,8 @@ export default function MadeInUsaPage() {
           />
 
           <div className="flex justify-center py-6">
-            <div className="relative w-48 h-24">
-              <Image src="/brand/logo-full.png" alt="USA Gummies" fill sizes="192px" className="object-contain" />
+            <div className="relative w-40 h-20">
+              <Image src="/brand/logo-full.png" alt="USA Gummies" fill sizes="160px" className="object-contain" />
             </div>
           </div>
 
