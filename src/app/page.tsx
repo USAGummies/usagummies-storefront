@@ -218,6 +218,61 @@ export default async function HomePage() {
           { name: "Home", href: "/" },
         ]}
       />
+
+      {/* ── DRAMATIC HERO ── */}
+      <section className="relative overflow-hidden" data-zone="BRAND_HERO">
+        <div className="absolute inset-0 z-0">
+          <Image
+            src="/brand/gallery/bag-navy-hero.jpg"
+            alt="USA Gummies bag with gummy bears on navy background"
+            fill
+            priority
+            fetchPriority="high"
+            sizes="100vw"
+            className="object-cover object-center"
+          />
+          <div className="absolute inset-0 bg-[#1B2A4A]/60" />
+        </div>
+        <div className="relative z-10 mx-auto flex max-w-6xl flex-col items-center px-4 py-16 sm:py-20 lg:py-28 text-center">
+          <Image
+            src="/brand/logo-full.png"
+            alt="USA Gummies — American-made gummy bears"
+            width={440}
+            height={280}
+            priority
+            className="h-auto w-[260px] sm:w-[340px] lg:w-[440px] drop-shadow-[0_8px_32px_rgba(0,0,0,0.4)]"
+          />
+          <h1 className="mt-6 font-display text-3xl font-black leading-tight tracking-tight text-white sm:text-4xl lg:text-5xl drop-shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
+            America&rsquo;s Gummy Bear
+          </h1>
+          <p className="mt-3 max-w-lg text-sm text-white/90 sm:text-base">
+            Classic gummy bears, made in the USA. No artificial dyes. Just real fruit colors and all-natural flavor.
+          </p>
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+            <a href="#hero-primary-cta" className="inline-flex items-center gap-2 rounded-full bg-[#c7362c] px-7 py-3.5 text-sm font-bold text-white shadow-lg transition hover:bg-[#a82c24] hover:shadow-xl">
+              Shop now
+            </a>
+            <Link href="/about" className="inline-flex items-center gap-2 rounded-full border-2 border-white/40 px-6 py-3 text-sm font-semibold text-white transition hover:border-white/70 hover:bg-white/10">
+              Our story
+            </Link>
+          </div>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-4 text-[11px] font-semibold uppercase tracking-widest text-white/70">
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#2D7A3A]" />
+              Made in USA
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#2D7A3A]" />
+              No artificial dyes
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#2D7A3A]" />
+              {FREE_SHIPPING_PHRASE}
+            </span>
+          </div>
+        </div>
+      </section>
+
       <section className={`${styles.scene} ${styles.sceneBundle} home-purchase-stage`} data-zone="BUNDLE">
         <div className={styles.sceneBg} aria-hidden="true" />
         <div className={styles.sceneOverlay} aria-hidden="true" />
@@ -383,7 +438,19 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <div className="americana-divider" aria-hidden="true" />
+      {/* ── LOGO DIVIDER ── */}
+      <div className="flex items-center justify-center gap-4 py-4" aria-hidden="true">
+        <div className="h-px flex-1 max-w-[120px] bg-[#1B2A4A]/10" />
+        <Image
+          src="/brand/logo.png"
+          alt=""
+          aria-hidden="true"
+          width={48}
+          height={16}
+          className="h-3 w-auto opacity-30"
+        />
+        <div className="h-px flex-1 max-w-[120px] bg-[#1B2A4A]/10" />
+      </div>
 
       <section className="bg-transparent" data-zone="VALUE" aria-label="Product value">
         <div className="mx-auto max-w-6xl px-4 py-0.5 sm:py-0.5">
@@ -427,48 +494,240 @@ export default async function HomePage() {
 
       <DyeFreeNewsBanner />
 
+      {/* ── BRAND GALLERY ── */}
+      <section className="bg-[#f8f5ef]" data-zone="GALLERY">
+        <div className="mx-auto max-w-6xl px-4 py-8 sm:py-12">
+          <div className="flex items-center justify-center gap-3 mb-2">
+            <Image
+              src="/brand/logo.png"
+              alt="USA Gummies logo"
+              aria-hidden="true"
+              width={80}
+              height={26}
+              className="h-5 w-auto opacity-60"
+            />
+          </div>
+          <div className="text-center">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[#1B2A4A]/60">
+              The brand
+            </div>
+            <h2 className="mt-1 text-2xl font-black text-[#1B2A4A] sm:text-3xl">
+              Made for moments that matter.
+            </h2>
+            <p className="mx-auto mt-2 max-w-md text-sm text-[#1B2A4A]/70">
+              From backyard cookouts to road trips across the heartland, USA Gummies belong wherever America gathers.
+            </p>
+          </div>
+          <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:gap-4">
+            <div className="relative aspect-[4/5] overflow-hidden rounded-2xl shadow-md">
+              <Image
+                src="/brand/gallery/bag-flag-hero.jpg"
+                alt="USA Gummies bag with American flag backdrop and gummy bears"
+                fill
+                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 320px"
+                className="object-cover transition duration-500 hover:scale-105"
+              />
+            </div>
+            <div className="relative aspect-[4/5] overflow-hidden rounded-2xl shadow-md">
+              <Image
+                src="/brand/lifestyle/woman-enjoying.jpg"
+                alt="Woman enjoying USA Gummies"
+                fill
+                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 320px"
+                className="object-cover transition duration-500 hover:scale-105"
+              />
+            </div>
+            <div className="relative aspect-[4/5] overflow-hidden rounded-2xl shadow-md">
+              <Image
+                src="/brand/gallery/neon-sign.jpg"
+                alt="USA Gummies neon sign on brick wall"
+                fill
+                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 320px"
+                className="object-cover transition duration-500 hover:scale-105"
+              />
+            </div>
+            <div className="relative aspect-[4/5] overflow-hidden rounded-2xl shadow-md">
+              <Image
+                src="/brand/gallery/bears-lineup-flag.jpg"
+                alt="Five gummy bears in a row with American flag"
+                fill
+                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 320px"
+                className="object-cover transition duration-500 hover:scale-105"
+              />
+            </div>
+            <div className="relative aspect-[4/5] overflow-hidden rounded-2xl shadow-md">
+              <Image
+                src="/brand/lifestyle/picnic-scene.jpg"
+                alt="USA Gummies bag on an American picnic table"
+                fill
+                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 320px"
+                className="object-cover transition duration-500 hover:scale-105"
+              />
+            </div>
+            <div className="relative aspect-[4/5] overflow-hidden rounded-2xl shadow-md">
+              <Image
+                src="/brand/gallery/bag-flag-bears.jpg"
+                alt="USA Gummies — Real Fruit Colors, Zero Artificial Dyes"
+                fill
+                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 320px"
+                className="object-cover transition duration-500 hover:scale-105"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section className="bg-transparent" data-zone="BLOG">
         <div className="mx-auto max-w-6xl px-4 py-4">
           <LatestFromBlog />
         </div>
       </section>
 
-      <section className="bg-transparent" data-zone="FLAVORS">
-        <div className="mx-auto max-w-6xl px-4 py-0.5 sm:py-1">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]/80">
-            Inside every bag
+      <section className="bg-[#f8f5ef]" data-zone="FLAVORS">
+        <div className="mx-auto max-w-6xl px-4 py-8 sm:py-10">
+          <div className="text-center">
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <Image
+                src="/brand/logo.png"
+                alt="USA Gummies logo"
+                aria-hidden="true"
+                width={64}
+                height={20}
+                className="h-4 w-auto opacity-50"
+              />
+            </div>
+            <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[#1B2A4A]/60">
+              Inside every bag
+            </div>
+            <h2 className="mt-1 text-xl font-black text-[#1B2A4A] sm:text-2xl">
+              Five classic gummy bear flavors.
+            </h2>
           </div>
-          <div className="mt-1.5 text-sm font-semibold text-[var(--text)]">
-            Five classic gummy bear flavors.
+          <div className="mt-6 flex flex-wrap items-stretch justify-center gap-4 sm:gap-6">
+            {[
+              { src: "/brand/gummies/gummy-red.png", alt: "Cherry gummy bear", name: "Cherry", color: "#c7362c" },
+              { src: "/brand/gummies/gummy-yellow.png", alt: "Lemon gummy bear", name: "Lemon", color: "#d4a017" },
+              { src: "/brand/gummies/gummy-green.png", alt: "Green Apple gummy bear", name: "Green Apple", color: "#2D7A3A" },
+              { src: "/brand/gummies/gummy-orange.png", alt: "Orange gummy bear", name: "Orange", color: "#d4702a" },
+              { src: "/brand/gummies/gummy-pink.png", alt: "Watermelon gummy bear", name: "Watermelon", color: "#a03050" },
+            ].map((bear) => (
+              <div key={bear.name} className="flex flex-col items-center gap-2 rounded-2xl border border-[rgba(15,27,45,0.08)] bg-white p-4 shadow-sm transition hover:-translate-y-1 hover:shadow-md" style={{ minWidth: "100px" }}>
+                <Image
+                  src={bear.src}
+                  alt={bear.alt}
+                  width={80}
+                  height={80}
+                  className="h-[60px] w-[60px] object-contain sm:h-[80px] sm:w-[80px] drop-shadow-[0_4px_12px_rgba(0,0,0,0.12)]"
+                />
+                <span className="text-xs font-bold text-[#1B2A4A] sm:text-sm">{bear.name}</span>
+                <span className="inline-block h-1 w-6 rounded-full" style={{ backgroundColor: bear.color }} />
+              </div>
+            ))}
           </div>
-          <div className="flavor-pill-row mt-2 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-[var(--muted)]">
-            <span className="candy-pill">
-              <Image src="/brand/gummies/gummy-red.png" alt="Cherry gummy bear" width={24} height={24} className="object-contain" />
-              Cherry
-            </span>
-            <span className="candy-pill">
-              <Image src="/brand/gummies/gummy-yellow.png" alt="Lemon gummy bear" width={24} height={24} className="object-contain" />
-              Lemon
-            </span>
-            <span className="candy-pill">
-              <Image src="/brand/gummies/gummy-green.png" alt="Green Apple gummy bear" width={24} height={24} className="object-contain" />
-              Green apple
-            </span>
-            <span className="candy-pill">
-              <Image src="/brand/gummies/gummy-orange.png" alt="Orange gummy bear" width={24} height={24} className="object-contain" />
-              Orange
-            </span>
-            <span className="candy-pill">
-              <Image src="/brand/gummies/gummy-pink.png" alt="Watermelon gummy bear" width={24} height={24} className="object-contain" />
-              Watermelon
-            </span>
-            <span className="text-[11px] text-[var(--muted)]">
-              Ingredients &amp; allergen info:{" "}
-              <Link href="/ingredients" className="underline underline-offset-4 text-[var(--text)]">
-                ingredients
-              </Link>
-              .
-            </span>
+          <div className="mt-4 text-center text-xs text-[#1B2A4A]/60">
+            All colored naturally with real fruit and vegetable extracts.{" "}
+            <Link href="/ingredients" className="font-semibold text-[#1B2A4A] underline underline-offset-4">
+              Ingredients &amp; allergen info
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* ── LOGO DIVIDER ── */}
+      <div className="flex items-center justify-center gap-4 py-4 bg-[#f8f5ef]" aria-hidden="true">
+        <div className="h-px flex-1 max-w-[120px] bg-[#1B2A4A]/10" />
+        <Image
+          src="/brand/logo.png"
+          alt=""
+          aria-hidden="true"
+          width={48}
+          height={16}
+          className="h-3 w-auto opacity-30"
+        />
+        <div className="h-px flex-1 max-w-[120px] bg-[#1B2A4A]/10" />
+      </div>
+
+      {/* ── MADE IN AMERICA ── */}
+      <section className="bg-[#1B2A4A]" data-zone="AMERICANA">
+        <div className="mx-auto max-w-6xl px-4 py-10 sm:py-14 lg:py-16">
+          <div className="grid gap-6 lg:grid-cols-2 lg:items-center">
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <Image
+                  src="/brand/logo-full.png"
+                  alt="USA Gummies logo"
+                  aria-hidden="true"
+                  width={160}
+                  height={102}
+                  className="h-auto w-[120px] sm:w-[160px] brightness-0 invert opacity-80"
+                />
+              </div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[#c7a062]">
+                Made in America
+              </div>
+              <h2 className="text-balance text-2xl font-black leading-tight text-white sm:text-3xl lg:text-4xl">
+                Made in America isn&rsquo;t a slogan. It&rsquo;s a standard.
+              </h2>
+              <p className="text-pretty text-sm leading-relaxed text-white/75 sm:text-base">
+                Every bag of USA Gummies is sourced, manufactured, and packed entirely
+                in the United States. We chose American production not because it was
+                easy, but because it was right. Real fruit colors. No artificial dyes.
+                A gummy bear you can trust.
+              </p>
+              <div className="flex flex-wrap gap-3 pt-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 px-3 py-1.5 text-[11px] font-semibold text-white/80">
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#2D7A3A]" />
+                  American sourced
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 px-3 py-1.5 text-[11px] font-semibold text-white/80">
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#2D7A3A]" />
+                  American manufactured
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 px-3 py-1.5 text-[11px] font-semibold text-white/80">
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#2D7A3A]" />
+                  American packed
+                </span>
+              </div>
+              <div className="pt-2">
+                <a href="#hero-primary-cta" className="inline-flex items-center gap-2 rounded-full bg-[#c7362c] px-7 py-3.5 text-sm font-bold text-white shadow-lg transition hover:bg-[#a82c24]">
+                  Shop USA Gummies
+                </a>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="relative aspect-[3/4] overflow-hidden rounded-2xl shadow-lg">
+                <Image
+                  src="/brand/americana/washington-crossing.jpg"
+                  alt="Washington crossing the Delaware holding USA Gummies"
+                  fill
+                  sizes="(max-width: 640px) 50vw, 280px"
+                  className="object-cover"
+                />
+              </div>
+              <div className="relative aspect-[3/4] overflow-hidden rounded-2xl shadow-lg">
+                <Image
+                  src="/brand/americana/founding-fathers-fireside.jpg"
+                  alt="Founding fathers sharing USA Gummies by the fireplace"
+                  fill
+                  sizes="(max-width: 640px) 50vw, 280px"
+                  className="object-cover"
+                />
+              </div>
+              <div className="relative col-span-2 aspect-[16/7] overflow-hidden rounded-2xl shadow-lg">
+                <Image
+                  src="/brand/americana/crossing-freedom.jpg"
+                  alt="From Fake to Freedom — USA Gummies crossing scene"
+                  fill
+                  sizes="(max-width: 640px) 100vw, 560px"
+                  className="object-cover"
+                />
+                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#1B2A4A]/80 to-transparent p-4">
+                  <div className="text-center text-xs font-bold uppercase tracking-widest text-white/90">
+                    From fake dyes to freedom
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>

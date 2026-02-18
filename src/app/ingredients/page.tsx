@@ -189,6 +189,26 @@ const articleJsonLd = {
 export default function IngredientsPage() {
   return (
     <main className="relative overflow-hidden text-[var(--text)] min-h-screen home-candy">
+      <div className="relative w-full h-[280px] sm:h-[340px] overflow-hidden">
+        <Image
+          src="/brand/gallery/bag-badges-infographic.jpg"
+          alt="USA Gummies bag with trust badges and quality certifications"
+          fill
+          sizes="100vw"
+          className="object-cover"
+          priority
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#1B2A4A]/60 to-[#1B2A4A]/80" />
+        <div className="relative z-10 flex flex-col items-center justify-center h-full text-center px-4">
+          <div className="relative w-48 h-24 mb-4">
+            <Image src="/brand/logo-full.png" alt="USA Gummies" fill sizes="192px" className="object-contain drop-shadow-lg" />
+          </div>
+          <h1 className="font-display text-3xl sm:text-4xl font-bold uppercase tracking-wide text-white drop-shadow-lg">
+            Ingredients &amp; Nutrition
+          </h1>
+        </div>
+      </div>
+
       <section className="relative overflow-hidden">
         <div
           className="absolute inset-0 pointer-events-none"
@@ -207,15 +227,21 @@ export default function IngredientsPage() {
             ]}
           />
 
+          <div className="flex justify-center py-6">
+            <div className="relative w-40 h-20">
+              <Image src="/brand/logo-full.png" alt="USA Gummies" fill sizes="160px" className="object-contain" />
+            </div>
+          </div>
+
           <div className="candy-panel rounded-[36px] border border-[var(--border)] p-6 sm:p-8">
             <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
               <div className="space-y-4">
                 <div className="text-[10px] font-semibold uppercase tracking-[0.32em] text-[var(--muted)]">
                   Ingredients and nutrition facts
                 </div>
-                <h1 className="text-3xl font-black leading-[1.1] tracking-tight text-[var(--text)] sm:text-4xl lg:text-5xl">
+                <h2 className="text-3xl font-black leading-[1.1] tracking-tight text-[var(--text)] sm:text-4xl lg:text-5xl">
                   Ingredients, nutrition facts, and flavor notes.
-                </h1>
+                </h2>
                 <p className="text-sm text-[var(--muted)] sm:text-base max-w-prose">
                   Find the full ingredient list and nutrition facts for our 7.5 oz bag. USA Gummies
                   are All American gummy bears with all natural flavors, no artificial dyes, and a

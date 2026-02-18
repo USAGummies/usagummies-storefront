@@ -117,6 +117,26 @@ const articleJsonLd = {
 export default function MadeInUsaPage() {
   return (
     <main className="relative overflow-hidden text-[var(--text)] min-h-screen home-candy">
+      <div className="relative w-full h-[280px] sm:h-[340px] overflow-hidden">
+        <Image
+          src="/brand/americana/washington-crossing.jpg"
+          alt="Washington crossing the Delaware with USA Gummies"
+          fill
+          sizes="100vw"
+          className="object-cover"
+          priority
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#1B2A4A]/60 to-[#1B2A4A]/80" />
+        <div className="relative z-10 flex flex-col items-center justify-center h-full text-center px-4">
+          <div className="relative w-48 h-24 mb-4">
+            <Image src="/brand/logo-full.png" alt="USA Gummies" fill sizes="192px" className="object-contain drop-shadow-lg" />
+          </div>
+          <h1 className="font-display text-3xl sm:text-4xl font-bold uppercase tracking-wide text-white drop-shadow-lg">
+            Made in the USA
+          </h1>
+        </div>
+      </div>
+
       <section className="relative overflow-hidden">
         <div
           className="absolute inset-0 pointer-events-none"
@@ -135,15 +155,21 @@ export default function MadeInUsaPage() {
             ]}
           />
 
+          <div className="flex justify-center py-6">
+            <div className="relative w-48 h-24">
+              <Image src="/brand/logo-full.png" alt="USA Gummies" fill sizes="192px" className="object-contain" />
+            </div>
+          </div>
+
           <div className="candy-panel rounded-[36px] border border-[var(--border)] p-6 sm:p-8">
             <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
               <div className="space-y-4">
                 <div className="text-[10px] font-semibold uppercase tracking-[0.32em] text-[var(--muted)]">
                   Made in the USA
                 </div>
-                <h1 className="text-3xl font-black leading-[1.1] tracking-tight text-[var(--text)] sm:text-4xl lg:text-5xl">
+                <h2 className="text-3xl font-black leading-[1.1] tracking-tight text-[var(--text)] sm:text-4xl lg:text-5xl">
                   All American gummy bears, made right here.
-                </h1>
+                </h2>
                 <p className="text-sm text-[var(--muted)] sm:text-base max-w-prose">
                   USA Gummies are built on American manufacturing and American pride. From sourcing
                   to packing, our gummy bears stay in the USA so every bag reflects the quality and
@@ -200,6 +226,36 @@ export default function MadeInUsaPage() {
                   <div className="mt-2 text-sm text-[var(--muted)]">{value.body}</div>
                 </div>
               ))}
+            </div>
+
+            <div className="mt-6 grid gap-3 sm:grid-cols-3">
+              <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-[var(--border)]">
+                <Image
+                  src="/brand/gallery/bag-flag-hero.jpg"
+                  alt="USA Gummies bag with American flag and gummy bears"
+                  fill
+                  sizes="(max-width: 640px) 90vw, 33vw"
+                  className="object-cover"
+                />
+              </div>
+              <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-[var(--border)]">
+                <Image
+                  src="/brand/lifestyle/hand-tractor.jpg"
+                  alt="USA Gummies bag by a tractor on an American farm"
+                  fill
+                  sizes="(max-width: 640px) 90vw, 33vw"
+                  className="object-cover"
+                />
+              </div>
+              <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-[var(--border)]">
+                <Image
+                  src="/brand/gallery/bag-old-glory.jpg"
+                  alt="USA Gummies bag with American flag at sunset"
+                  fill
+                  sizes="(max-width: 640px) 90vw, 33vw"
+                  className="object-cover"
+                />
+              </div>
             </div>
 
             <div className="mt-6 border-t border-[var(--border)] pt-5">

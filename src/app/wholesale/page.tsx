@@ -80,6 +80,26 @@ const pageJsonLd = {
 export default function WholesalePage() {
   return (
     <main className="relative overflow-hidden text-[var(--text)] min-h-screen pb-16">
+      <div className="relative w-full h-[280px] sm:h-[340px] overflow-hidden">
+        <Image
+          src="/brand/lifestyle/picnic-scene.jpg"
+          alt="USA Gummies on a picnic table in an American setting"
+          fill
+          sizes="100vw"
+          className="object-cover"
+          priority
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#1B2A4A]/60 to-[#1B2A4A]/80" />
+        <div className="relative z-10 flex flex-col items-center justify-center h-full text-center px-4">
+          <div className="relative w-48 h-24 mb-4">
+            <Image src="/brand/logo-full.png" alt="USA Gummies" fill sizes="192px" className="object-contain drop-shadow-lg" />
+          </div>
+          <h1 className="font-display text-3xl sm:text-4xl font-bold uppercase tracking-wide text-white drop-shadow-lg">
+            Wholesale
+          </h1>
+        </div>
+      </div>
+
       <section className="mx-auto max-w-6xl px-4 py-8 lg:py-10">
         <BreadcrumbJsonLd
           items={[
@@ -89,15 +109,21 @@ export default function WholesalePage() {
         />
         <JsonLd data={pageJsonLd} />
 
+        <div className="flex justify-center py-6">
+          <div className="relative w-40 h-20">
+            <Image src="/brand/logo-full.png" alt="USA Gummies" fill sizes="160px" className="object-contain" />
+          </div>
+        </div>
+
         <div className="candy-panel rounded-[36px] p-6 sm:p-7">
           <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
             <div className="space-y-4">
               <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
                 Wholesale USA Gummies
               </div>
-              <h1 className="text-3xl font-black text-[var(--text)] sm:text-4xl">
+              <h2 className="text-3xl font-black text-[var(--text)] sm:text-4xl">
                 Bring USA Gummies to your shelves.
-              </h1>
+              </h2>
               <p className="text-sm text-[var(--muted)] sm:text-base max-w-prose">
                 Built for retail partners who want clean ingredients, made‑in‑USA credibility, and
                 a bold patriotic brand story. Request a starter case or samples and we will follow up

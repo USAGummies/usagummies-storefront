@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useMemo } from "react";
 import Image from "next/image";
 import {
   BASE_PRICE,
@@ -44,6 +44,103 @@ const FLAVOR_BEARS = [
   { name: "Orange", src: "/brand/gummies/gummy-orange.png" },
   { name: "Watermelon", src: "/brand/gummies/gummy-pink.png" },
 ] as const;
+
+const BAG_IMAGE_SRC = "/brand/hero-pack-icon.png";
+
+/* ------------------------------------------------------------------ */
+/*  Bag layout                                                         */
+/* ------------------------------------------------------------------ */
+
+type BagPosition = {
+  x: number;
+  y: number;
+  rotate: number;
+  scale: number;
+};
+
+/** Deterministic pseudo-random rotation for bag at index i. */
+function bagRotation(i: number): number {
+  const seed = ((i * 7 + 3) % 13) / 13;
+  return (seed - 0.5) * 6; // range: -3 to +3 degrees
+}
+
+/**
+ * Compute positions for `count` bags in a container whose logical
+ * coordinate space is 100x100. Positions are expressed as percentages.
+ */
+function computeBagLayout(count: number): BagPosition[] {
+  const bags: BagPosition[] = [];
+
+  if (count === 1) {
+    bags.push({ x: 50, y: 50, rotate: bagRotation(0), scale: 1 });
+    return bags;
+  }
+
+  if (count <= 3) {
+    const spacing = 30;
+    const startX = 50 - ((count - 1) * spacing) / 2;
+    for (let i = 0; i < count; i++) {
+      bags.push({
+        x: startX + i * spacing,
+        y: 50,
+        rotate: bagRotation(i),
+        scale: 0.9,
+      });
+    }
+    return bags;
+  }
+
+  if (count <= 6) {
+    // Pyramid: top row centered, bottom row wider
+    const topCount = Math.floor(count / 2);
+    const botCount = count - topCount;
+    const spacing = 22;
+
+    for (let i = 0; i < topCount; i++) {
+      const startX = 50 - ((topCount - 1) * spacing) / 2;
+      bags.push({
+        x: startX + i * spacing,
+        y: 30,
+        rotate: bagRotation(i),
+        scale: 0.8,
+      });
+    }
+    for (let i = 0; i < botCount; i++) {
+      const startX = 50 - ((botCount - 1) * spacing) / 2;
+      bags.push({
+        x: startX + i * spacing,
+        y: 68,
+        rotate: bagRotation(topCount + i),
+        scale: 0.8,
+      });
+    }
+    return bags;
+  }
+
+  // 7-12: grid rows filling up
+  const cols = 4;
+  const rows = Math.ceil(count / cols);
+  const spacingX = 20;
+  const spacingY = rows <= 2 ? 38 : 30;
+  const startY = 50 - ((rows - 1) * spacingY) / 2;
+
+  let placed = 0;
+  for (let r = 0; r < rows; r++) {
+    const inRow = Math.min(cols, count - placed);
+    const startX = 50 - ((inRow - 1) * spacingX) / 2;
+    for (let c = 0; c < inRow; c++) {
+      bags.push({
+        x: startX + c * spacingX,
+        y: startY + r * spacingY,
+        rotate: bagRotation(placed),
+        scale: 0.7,
+      });
+      placed++;
+    }
+  }
+
+  return bags;
+}
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
@@ -92,6 +189,46 @@ function GradientAccentBar(): React.ReactElement {
         background: "linear-gradient(90deg, #c7362c, #1B2A4A, #c7362c)",
       }}
     />
+  );
+}
+
+function bagImageSize(qty: number): number {
+  if (qty <= 3) return 64;
+  if (qty <= 6) return 52;
+  return 44;
+}
+
+function BagStack({ qty }: { qty: number }): React.ReactElement {
+  const layout = useMemo(() => computeBagLayout(qty), [qty]);
+  const sizePx = bagImageSize(qty);
+
+  return (
+    <div
+      className="relative w-full h-[130px] md:h-[180px] my-2 select-none"
+      aria-hidden="true"
+    >
+      {layout.map((pos, i) => (
+        <div
+          key={i}
+          className="absolute transition-all duration-300 ease-out"
+          style={{
+            left: `${pos.x}%`,
+            top: `${pos.y}%`,
+            transform: `translate(-50%, -50%) rotate(${pos.rotate}deg) scale(${pos.scale})`,
+            zIndex: i,
+          }}
+        >
+          <Image
+            src={BAG_IMAGE_SRC}
+            alt=""
+            width={sizePx}
+            height={sizePx}
+            className="drop-shadow-md pointer-events-none w-[44px] md:w-[56px] h-auto"
+            draggable={false}
+          />
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -346,6 +483,9 @@ export default function BagSlider({
           </button>
         </div>
       </div>
+
+      {/* Bag stacking visualization */}
+      <BagStack qty={qty} />
 
       {/* Slider track */}
       <div className="relative mt-2 mb-1" ref={trackRef}>

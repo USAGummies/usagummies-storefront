@@ -199,13 +199,32 @@ export default async function ShopPage() {
 
   return (
     <main className="relative overflow-hidden text-[var(--text)] min-h-screen pb-16">
+      <div className="relative w-full h-[280px] sm:h-[340px] overflow-hidden">
+        <Image
+          src="/brand/gallery/bears-lineup-flag.jpg"
+          alt="Five USA Gummies gummy bears lined up with American flag"
+          fill
+          sizes="100vw"
+          className="object-cover"
+          priority
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#1B2A4A]/60 to-[#1B2A4A]/80" />
+        <div className="relative z-10 flex flex-col items-center justify-center h-full text-center px-4">
+          <div className="relative w-48 h-24 mb-4">
+            <Image src="/brand/logo-full.png" alt="USA Gummies" fill sizes="192px" className="object-contain drop-shadow-lg" />
+          </div>
+          <h1 className="font-display text-3xl sm:text-4xl font-bold uppercase tracking-wide text-white drop-shadow-lg">
+            Shop USA Gummies
+          </h1>
+        </div>
+      </div>
+
       <BreadcrumbJsonLd
         items={[
           { name: "Home", href: "/" },
           { name: "Shop", href: "/shop" },
         ]}
       />
-      <h1 className="sr-only">Shop USA Gummies</h1>
 
       <section className={`${styles.scene} ${styles.sceneBundle} home-purchase-stage`} data-zone="BUNDLE">
         <div className={styles.sceneBg} aria-hidden="true" />

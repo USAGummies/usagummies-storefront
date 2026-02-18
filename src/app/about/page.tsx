@@ -137,6 +137,26 @@ export default function AboutPage() {
 
   return (
     <main className="relative overflow-hidden text-[var(--text)] min-h-screen home-candy">
+      <div className="relative w-full h-[280px] sm:h-[340px] overflow-hidden">
+        <Image
+          src="/brand/americana/founding-fathers-fireside.jpg"
+          alt="Founding fathers sharing USA Gummies by the fireside"
+          fill
+          sizes="100vw"
+          className="object-cover"
+          priority
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#1B2A4A]/60 to-[#1B2A4A]/80" />
+        <div className="relative z-10 flex flex-col items-center justify-center h-full text-center px-4">
+          <div className="relative w-48 h-24 mb-4">
+            <Image src="/brand/logo-full.png" alt="USA Gummies" fill sizes="192px" className="object-contain drop-shadow-lg" />
+          </div>
+          <h1 className="font-display text-3xl sm:text-4xl font-bold uppercase tracking-wide text-white drop-shadow-lg">
+            About USA Gummies
+          </h1>
+        </div>
+      </div>
+
       <section className="relative overflow-hidden">
         <div
           className="absolute inset-0 pointer-events-none"
@@ -154,6 +174,12 @@ export default function AboutPage() {
               { name: "About", href: "/about" },
             ]}
           />
+
+          <div className="flex justify-center py-6">
+            <div className="relative w-40 h-20">
+              <Image src="/brand/logo-full.png" alt="USA Gummies" fill sizes="160px" className="object-contain" />
+            </div>
+          </div>
 
           <div className="candy-panel rounded-[36px] border border-[var(--border)] p-6 sm:p-8">
             <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">

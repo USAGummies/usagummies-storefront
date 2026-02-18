@@ -418,20 +418,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         )}
       >
         <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between gap-3">
-          <Link href="/" className="flex items-center gap-3 pressable focus-ring">
-            <div className="relative h-9 w-32">
+          <Link href="/" className="flex items-center pressable focus-ring">
+            <div className="relative h-10 w-36 sm:h-11 sm:w-40">
               <Image
-                src="/brand/logo.png"
+                src="/brand/logo-full.png"
                 alt="USA Gummies logo"
                 fill
-                sizes="128px"
+                sizes="(max-width: 640px) 144px, 160px"
                 className="object-contain"
                 priority
               />
             </div>
-            <span className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--navy)]">
-              Made in the USA
-            </span>
           </Link>
 
           <div className="flex items-center gap-2">
@@ -529,9 +526,28 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
+        <div
+          className="h-[2px] w-full"
+          style={{
+            background: "linear-gradient(90deg, #c7362c, #1B2A4A, #c7362c)",
+          }}
+          aria-hidden="true"
+        />
+
         {mobileOpen ? (
           <div className="md:hidden border-t border-[var(--border)] bg-white/96 backdrop-blur-md max-h-[calc(100vh-72px)] overflow-y-auto overscroll-contain">
             <div className="mx-auto max-w-6xl px-4 py-3 flex flex-col gap-3 text-[var(--text)]">
+              <div className="flex justify-center py-2">
+                <div className="relative h-10 w-36">
+                  <Image
+                    src="/brand/logo-full.png"
+                    alt="USA Gummies"
+                    fill
+                    sizes="144px"
+                    className="object-contain"
+                  />
+                </div>
+              </div>
               {navSections.map((section) => (
                 <div
                   key={section.title}
@@ -597,7 +613,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       ) : null}
 
       <footer className="border-t border-[var(--border)] bg-white/85 backdrop-blur-md text-[var(--text)]">
+        <div
+          className="h-[2px] w-full"
+          style={{
+            background: "linear-gradient(90deg, #c7362c, #1B2A4A, #c7362c)",
+          }}
+          aria-hidden="true"
+        />
         <div className="mx-auto max-w-6xl px-4 py-8 text-sm text-[var(--muted)] space-y-6">
+          <div className="flex justify-center pt-2 pb-4">
+            <div className="relative h-14 w-52 sm:h-16 sm:w-56">
+              <Image
+                src="/brand/logo-full.png"
+                alt="USA Gummies"
+                fill
+                sizes="(max-width: 640px) 208px, 224px"
+                className="object-contain"
+              />
+            </div>
+          </div>
+
           <div className="grid gap-4 md:grid-cols-2">
             <LeadCapture
               source="footer"
@@ -612,80 +647,63 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <SubscriptionUnlock source="footer" variant="light" />
           </div>
 
-          <div className="grid gap-4 md:grid-cols-[1.1fr_auto] md:items-start">
-            <div className="space-y-2">
-              <div className="text-lg font-black text-[var(--text)]">USA Gummies</div>
-              <ul className="space-y-1 text-[var(--muted)]">
-                <li>Made in the USA • Classic gummy bear flavor</li>
-                <li>All natural flavors • No artificial dyes</li>
-                <li>Ships fast • Free shipping at 5+ bags</li>
-              </ul>
-              <div className="text-sm text-[var(--muted)]">
-                <Link href="/made-in-usa-candy" className="link-underline">
-                  Made in USA Candy
-                </Link>
+          <div className="flex flex-col items-center gap-4 rounded-2xl border border-[var(--border)] bg-[var(--bg,#f8f5ef)]/60 px-6 py-5">
+            <div className="flex items-center gap-3">
+              <div className="relative h-12 w-12 shrink-0">
+                <Image
+                  src="/brand/icon-512.png"
+                  alt="USA Gummies emblem"
+                  fill
+                  sizes="48px"
+                  className="object-contain"
+                />
+              </div>
+              <div className="text-center text-sm font-semibold text-[var(--text)]">
+                100% Made in the USA &bull; All Natural Flavors &bull; No Artificial Dyes
               </div>
             </div>
-              <div className="text-xs text-[var(--muted)]">
-                Secure checkout • {FREE_SHIPPING_PHRASE} • Satisfaction guaranteed
-              </div>
+            <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-[var(--muted)]">
+              <span>Classic gummy bear flavor</span>
+              <span>Ships fast</span>
+              <span>{FREE_SHIPPING_PHRASE}</span>
+              <span>Satisfaction guaranteed</span>
+            </div>
+            <Link
+              href="/made-in-usa-candy"
+              className="link-underline text-xs text-[var(--muted)]"
+            >
+              Made in USA Candy
+            </Link>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
+          <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-3">
+            {navSections.map((section) => (
+              <div key={section.title}>
+                <div className="font-display text-[11px] font-black uppercase tracking-[0.2em] text-[var(--navy)]">
+                  {section.title}
+                </div>
+                <div className="mt-2 flex flex-col gap-1">
+                  {section.links.map((link) => (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      className="link-underline text-[var(--muted)]"
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border)] pt-4">
             <div className="flex flex-wrap gap-3 text-[var(--muted)]">
-              <Link href="/shop" className="link-underline">
-                Shop
-              </Link>
-              <Link href="/about" className="link-underline">
-                About
-              </Link>
-              <Link href="/join-the-revolution" className="link-underline">
-                Join the list
-              </Link>
-              <Link href="/faq" className="link-underline">
-                FAQ
-              </Link>
-              <Link href="/gummies-101" className="link-underline">
-                Gummies 101
-              </Link>
-              <Link href="/ingredients" className="link-underline">
-                Ingredients
-              </Link>
               <Link href="/no-artificial-dyes-gummy-bears" className="link-underline">
                 Dye-Free Gummy Bears
               </Link>
-              <Link href="/made-in-usa" className="link-underline">
-                Made in USA
-              </Link>
-              <Link href="/bundle-guides" className="link-underline">
-                Bag count guides
-              </Link>
-              <Link href="/gummy-gift-bundles" className="link-underline">
-                Gift bag options
-              </Link>
-              <Link href="/patriotic-party-snacks" className="link-underline">
-                Party snacks
-              </Link>
-              <Link href="/patriotic-candy" className="link-underline">
-                Patriotic candy
-              </Link>
-              <Link href="/bulk-gummy-bears" className="link-underline">
-                Bulk gummy bears
-              </Link>
-              <Link href="/wholesale" className="link-underline">
-                Wholesale
-              </Link>
-              <Link href="/contact" className="link-underline">
-                Contact
-              </Link>
-              <Link href="/help" className="link-underline">
-                Help Center
-              </Link>
-              <Link href="/policies" className="link-underline">
-                Policies
-              </Link>
-              <Link href="/policies/shipping" className="link-underline">
-                Shipping
+              <Link href="/made-in-usa-candy" className="link-underline">
+                Made in USA Candy
               </Link>
             </div>
             <div className="flex flex-col items-start gap-2 text-xs text-[var(--muted)]">
@@ -693,7 +711,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 Shop bags
               </Link>
               <div>
-                <div className="font-semibold text-[var(--text)]">Other places to buy</div>
+                <div className="font-display text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text)]">
+                  Other places to buy
+                </div>
                 <a
                   href={AMAZON_LISTING_URL}
                   target="_blank"
@@ -778,6 +798,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </a>
               </div>
             </div>
+          </div>
+
+          <div className="flex items-center justify-center gap-2 border-t border-[var(--border)] pt-4 text-xs text-[var(--muted)]">
+            <div className="relative h-5 w-5 shrink-0">
+              <Image
+                src="/brand/icon-512.png"
+                alt=""
+                aria-hidden="true"
+                fill
+                sizes="20px"
+                className="object-contain"
+              />
+            </div>
+            <span>&copy; {new Date().getFullYear()} USA Gummies. All rights reserved.</span>
           </div>
         </div>
       </footer>

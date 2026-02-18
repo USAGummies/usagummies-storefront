@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import type { ReactNode } from "react";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
@@ -146,6 +147,26 @@ const faqJsonLd = {
 export default function FaqPage() {
   return (
     <main className="relative overflow-hidden text-[var(--text)] min-h-screen home-candy">
+      <div className="relative w-full h-[280px] sm:h-[340px] overflow-hidden">
+        <Image
+          src="/brand/gallery/neon-sign.jpg"
+          alt="USA Gummies neon sign"
+          fill
+          sizes="100vw"
+          className="object-cover"
+          priority
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#1B2A4A]/60 to-[#1B2A4A]/80" />
+        <div className="relative z-10 flex flex-col items-center justify-center h-full text-center px-4">
+          <div className="relative w-48 h-24 mb-4">
+            <Image src="/brand/logo-full.png" alt="USA Gummies" fill sizes="192px" className="object-contain drop-shadow-lg" />
+          </div>
+          <h1 className="font-display text-3xl sm:text-4xl font-bold uppercase tracking-wide text-white drop-shadow-lg">
+            Frequently Asked Questions
+          </h1>
+        </div>
+      </div>
+
       <section className="relative overflow-hidden">
         <div
           className="absolute inset-0 pointer-events-none"
@@ -164,14 +185,20 @@ export default function FaqPage() {
             ]}
           />
 
+          <div className="flex justify-center py-6">
+            <div className="relative w-40 h-20">
+              <Image src="/brand/logo-full.png" alt="USA Gummies" fill sizes="160px" className="object-contain" />
+            </div>
+          </div>
+
           <div className="candy-panel rounded-[36px] border border-[var(--border)] p-6 sm:p-8">
             <div className="space-y-4">
               <div className="text-[10px] font-semibold uppercase tracking-[0.32em] text-[var(--muted)]">
                 FAQ
               </div>
-              <h1 className="text-3xl font-black leading-[1.1] tracking-tight text-[var(--text)] sm:text-4xl lg:text-5xl">
+              <h2 className="text-3xl font-black leading-[1.1] tracking-tight text-[var(--text)] sm:text-4xl lg:text-5xl">
                 USA Gummies FAQ
-              </h1>
+              </h2>
               <p className="text-sm text-[var(--muted)] sm:text-base max-w-prose">
                 Quick answers about our All American gummy bears, ingredients, flavor notes, bag count
                 savings, and where to buy.
