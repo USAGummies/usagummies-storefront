@@ -280,8 +280,8 @@ export default async function ShopPage() {
                   </div>
                 </div>
               </div>
-              <div className="mt-1.5 flex flex-wrap gap-1.5 text-[10px] text-white/70">
-                <span className="font-semibold text-white">Bag count guides:</span>
+              <div className="mt-1.5 flex flex-wrap gap-1.5 text-[10px] text-[#1B2A4A]/70">
+                <span className="font-semibold text-[#1B2A4A]">Bag count guides:</span>
                 <Link href="/gummy-gift-bundles" className="underline underline-offset-4">
                   Gift bag options
                 </Link>
@@ -295,7 +295,7 @@ export default async function ShopPage() {
                   Red 40 Free Gummies
                 </Link>
               </div>
-              <div className="mt-2 text-[11px] text-white/80">
+              <div className="mt-2 text-[11px] text-[#1B2A4A]/80">
                 Learn about{" "}
                 <Link href="/made-in-usa-candy" className="underline underline-offset-4">
                   American-Made Candy

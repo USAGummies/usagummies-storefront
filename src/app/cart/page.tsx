@@ -57,13 +57,13 @@ export default async function CartPage() {
       <h1 className="sr-only">Cart</h1>
       <div className="mx-auto max-w-6xl px-4 pt-6">
         {/* Top nav */}
-        <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-white/70">
+        <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-[#1B2A4A]/70">
           <div className="flex items-center gap-2">
-            <Link href="/" className="link-underline text-white/70 hover:text-white">
+            <Link href="/" className="link-underline text-[#1B2A4A]/70 hover:text-[#1B2A4A]">
               Home
             </Link>
             <span>›</span>
-            <span className="font-black text-white">Cart</span>
+            <span className="font-black text-[#1B2A4A]">Cart</span>
           </div>
 
           <div className="flex gap-2">
