@@ -3,8 +3,7 @@ import Image from "next/image";
 import type { Metadata } from "next";
 import { getProductsPage } from "@/lib/shopify/products";
 import { getProductByHandle } from "@/lib/storefront";
-import BundleQuickBuy from "@/components/home/BundleQuickBuy.client";
-import { BundleQuickBuyCtaProof, BundleQuickBuyRailProof } from "@/components/home/BundleQuickBuyProof";
+import BagSlider from "@/components/purchase/BagSlider.client";
 import ReviewsSection from "@/components/home/ReviewsSection";
 import { getBundleVariants } from "@/lib/bundles/getBundleVariants";
 import { BASE_PRICE, FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
@@ -14,7 +13,6 @@ import { DETAIL_BULLETS } from "@/data/productDetails";
 import { getReviewAggregate } from "@/lib/reviews/aggregate";
 import { ProductJsonLd } from "@/components/seo/ProductJsonLd";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
-import { LazyStickyAddToCartBar } from "@/components/product/LazyStickyAddToCartBar.client";
 import LazyHeroCTAWatcher from "@/components/home/LazyHeroCTAWatcher.client";
 import { LatestFromBlog } from "@/components/blog/LatestFromBlog";
 import { DyeFreeNewsBanner } from "@/components/marketing/DyeFreeNewsBanner";
@@ -166,13 +164,7 @@ export default async function HomePage() {
     bundleVariants = null;
   }
 
-  const heroBundleQuantities = [1, 2, 3, 4, 5, 8, 12];
-  const homepageTiers = (bundleVariants?.variants || []).filter((t) =>
-    heroBundleQuantities.includes(t.quantity)
-  );
-
   const heroImage = productImages[0]?.url || `${SITE_URL}/brand/usa-gummies-family.webp`;
-  const heroImageAlt = productImages[0]?.altText || "Bag of USA Gummies classic gummy bears";
   const fallbackPrice =
     bundleVariants?.variants?.find((variant) => variant.quantity === 1)?.totalPrice ?? null;
   const priceAmount =
@@ -295,30 +287,7 @@ export default async function HomePage() {
                     </div>
                   </div>
                   <div className="atomic-buy__bundle">
-                    <BundleQuickBuy
-                      anchorId="bundle-pricing"
-                      productHandle={handle}
-                      tiers={homepageTiers}
-                      singleBagVariantId={bundleVariants?.singleBagVariantId}
-                      availableForSale={bundleVariants?.availableForSale}
-                      variant="compact"
-                      tone="light"
-                      surface="flat"
-                      layout="classic"
-                      railProofSlot={<BundleQuickBuyRailProof tone="light" />}
-                      ctaProofSlot={
-                        <BundleQuickBuyCtaProof tone="light" surface="flat" layout="classic" variant="compact" />
-                      }
-                      showHowItWorks={false}
-                      summaryCopy="5+ bags ship free from us. Under 5 bags, we send you to Amazon to save you on shipping."
-                      showTrainAccent={false}
-                      showAccent={false}
-                      showEducation={false}
-                      ctaVariant="simple"
-                      primaryCtaLabel="Shop & save"
-                      selectorVariant="cards"
-                      featuredQuantities={[5, 8, 12]}
-                    />
+                    <BagSlider variant="full" defaultQty={5} />
                   </div>
                 </div>
               </div>
@@ -474,23 +443,23 @@ export default async function HomePage() {
           </div>
           <div className="flavor-pill-row mt-2 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-[var(--muted)]">
             <span className="candy-pill">
-              <span className="candy-dot bg-[var(--candy-red)]" />
+              <Image src="/brand/gummies/gummy-red.png" alt="Cherry gummy bear" width={24} height={24} className="object-contain" />
               Cherry
             </span>
             <span className="candy-pill">
-              <span className="candy-dot bg-[var(--candy-yellow)]" />
+              <Image src="/brand/gummies/gummy-yellow.png" alt="Lemon gummy bear" width={24} height={24} className="object-contain" />
               Lemon
             </span>
             <span className="candy-pill">
-              <span className="candy-dot bg-[var(--candy-green)]" />
+              <Image src="/brand/gummies/gummy-green.png" alt="Green Apple gummy bear" width={24} height={24} className="object-contain" />
               Green apple
             </span>
             <span className="candy-pill">
-              <span className="candy-dot bg-[var(--candy-orange)]" />
+              <Image src="/brand/gummies/gummy-orange.png" alt="Orange gummy bear" width={24} height={24} className="object-contain" />
               Orange
             </span>
             <span className="candy-pill">
-              <span className="candy-dot bg-[var(--candy-red)]" />
+              <Image src="/brand/gummies/gummy-pink.png" alt="Watermelon gummy bear" width={24} height={24} className="object-contain" />
               Watermelon
             </span>
             <span className="text-[11px] text-[var(--muted)]">
@@ -827,13 +796,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <LazyStickyAddToCartBar
-        title="In your cart"
-        imageUrl={heroImage}
-        imageAlt={heroImageAlt}
-        buttonLabel="Buy now"
-        source="home"
-      />
+      <BagSlider variant="sticky" defaultQty={5} />
 
       <ProductJsonLd
         name={detailedProduct?.title || PAGE_TITLE}

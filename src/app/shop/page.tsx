@@ -2,13 +2,11 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import BundleQuickBuy from "@/components/home/BundleQuickBuy.client";
-import { BundleQuickBuyCtaProof, BundleQuickBuyRailProof } from "@/components/home/BundleQuickBuyProof";
+import BagSlider from "@/components/purchase/BagSlider.client";
 import { GuideCard } from "@/components/internal-links/GuideCard";
 import { LinkModule } from "@/components/internal-links/LinkModule";
 import { RelatedProductCard } from "@/components/internal-links/RelatedProductCard";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
-import { LazyStickyAddToCartBar } from "@/components/product/LazyStickyAddToCartBar.client";
 import { LatestFromBlog } from "@/components/blog/LatestFromBlog";
 import { getProductsPage } from "@/lib/shopify/products";
 import { getProductsForInternalLinks } from "@/lib/shopify/internalLinks";
@@ -181,14 +179,8 @@ export default async function ShopPage() {
 
   const hasModules = relatedProducts.length || topGuides.length;
 
-  const heroBundleQuantities = [1, 2, 3, 4, 5, 8, 12];
-  const homepageTiers = (bundleVariants?.variants || []).filter((t: any) =>
-    heroBundleQuantities.includes(t.quantity)
-  );
-
   const stickyImage =
     detailedProduct?.featuredImage?.url || primaryProduct?.featuredImage?.url || "/brand/usa-gummies-family.webp";
-  const stickyAlt = detailedProduct?.featuredImage?.altText || "Bag of USA Gummies classic gummy bears";
   const productImages =
     (detailedProduct?.images?.edges || []).map((edge: any) => edge?.node) || [];
   const productImageUrls = productImages.map((img: any) => img?.url).filter(Boolean);
@@ -284,30 +276,7 @@ export default async function ShopPage() {
                     </div>
                   </div>
                   <div className="atomic-buy__bundle">
-                    <BundleQuickBuy
-                      anchorId="shop-bundles"
-                      productHandle={productHandle}
-                      tiers={homepageTiers}
-                      singleBagVariantId={bundleVariants?.singleBagVariantId}
-                      availableForSale={bundleVariants?.availableForSale}
-                      variant="compact"
-                      tone="light"
-                      surface="flat"
-                      layout="classic"
-                      railProofSlot={<BundleQuickBuyRailProof tone="light" />}
-                      ctaProofSlot={
-                        <BundleQuickBuyCtaProof tone="light" surface="flat" layout="classic" variant="compact" />
-                      }
-                      showHowItWorks={false}
-                      summaryCopy="5+ bags ship free from us. Under 5 bags, we send you to Amazon to save you on shipping."
-                      showTrainAccent={false}
-                      showAccent={false}
-                      showEducation={false}
-                      ctaVariant="simple"
-                      primaryCtaLabel="Shop & save"
-                      selectorVariant="cards"
-                      featuredQuantities={[5, 8, 12]}
-                    />
+                    <BagSlider variant="full" defaultQty={5} />
                   </div>
                 </div>
               </div>
@@ -368,14 +337,7 @@ export default async function ShopPage() {
         </section>
       ) : null}
 
-      <LazyStickyAddToCartBar
-        title="In your cart"
-        imageUrl={stickyImage}
-        imageAlt={stickyAlt}
-        buttonLabel="Buy now"
-        source="shop"
-        className="sm:hidden"
-      />
+      <BagSlider variant="sticky" defaultQty={5} />
 
       <ProductJsonLd
         name={detailedProduct?.title || "USA Gummies - All American Gummy Bears"}

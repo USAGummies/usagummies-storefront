@@ -776,6 +776,44 @@ a:focus-visible:not(.btn):not(.focus-ring),
 .btn-candy:hover{
   background: #b02c26;
 }
+/* ── Bag Slider ─────────────────────────────────────────── */
+.bag-slider__range{
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+}
+.bag-slider__range::-webkit-slider-thumb{
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid #c7362c;
+  box-shadow: 0 2px 8px rgba(199, 54, 44, 0.25);
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+.bag-slider__range::-webkit-slider-thumb:active{
+  transform: scale(1.15);
+}
+.bag-slider__range::-moz-range-thumb{
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid #c7362c;
+  box-shadow: 0 2px 8px rgba(199, 54, 44, 0.25);
+  cursor: pointer;
+}
+.bag-slider__range::-moz-range-track{
+  height: 6px;
+  border-radius: 3px;
+}
+
 .btn-outline-white {
   border: 1px solid rgba(255, 255, 255, 0.7);
   color: #ffffff;

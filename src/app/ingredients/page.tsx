@@ -2,10 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
-import BundleQuickBuy from "@/components/home/BundleQuickBuy.client";
-import { BundleQuickBuyCtaProof, BundleQuickBuyRailProof } from "@/components/home/BundleQuickBuyProof";
+import BagSlider from "@/components/purchase/BagSlider.client";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
-import { getBundleVariants } from "@/lib/bundles/getBundleVariants";
 import { LatestFromBlog } from "@/components/blog/LatestFromBlog";
 
 function resolveSiteUrl() {
@@ -183,15 +181,7 @@ const articleJsonLd = {
   image: [`${SITE_URL}/brand/usa-gummies-family.webp`],
 };
 
-export default async function IngredientsPage() {
-  let bundleVariants: Awaited<ReturnType<typeof getBundleVariants>> | null = null;
-  try {
-    bundleVariants = await getBundleVariants();
-  } catch {
-    bundleVariants = null;
-  }
-  const productHandle = "all-american-gummy-bears-7-5-oz-single-bag";
-
+export default function IngredientsPage() {
   return (
     <main className="relative overflow-hidden text-[var(--text)] min-h-screen home-candy">
       <section className="relative overflow-hidden">
@@ -294,35 +284,7 @@ export default async function IngredientsPage() {
                   <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
                     Shop bundles
                   </div>
-                  {bundleVariants ? (
-                    <BundleQuickBuy
-                      anchorId="ingredients-buy"
-                      productHandle={productHandle}
-                      tiers={bundleVariants.variants}
-                      singleBagVariantId={bundleVariants.singleBagVariantId}
-                      availableForSale={bundleVariants.availableForSale}
-                      variant="compact"
-                      tone="light"
-                      surface="flat"
-                      layout="classic"
-                      railProofSlot={<BundleQuickBuyRailProof tone="light" />}
-                      ctaProofSlot={
-                        <BundleQuickBuyCtaProof tone="light" surface="flat" layout="classic" variant="compact" />
-                      }
-                      showHowItWorks={false}
-                      summaryCopy="5+ bags ship free from us. Under 5 bags, we send you to Amazon to save you on shipping."
-                      showTrainAccent={false}
-                      showAccent={false}
-                      showEducation={false}
-                      ctaVariant="simple"
-                      primaryCtaLabel="Shop & save"
-                      featuredQuantities={[5, 8, 12]}
-                    />
-                  ) : (
-                    <div className="p-3 text-sm text-[var(--muted)]">
-                      Pricing is loading. Please refresh to view bundle options.
-                    </div>
-                  )}
+                  <BagSlider variant="full" defaultQty={5} />
                 </div>
               </div>
 

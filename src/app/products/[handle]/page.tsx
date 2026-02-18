@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import BundleQuickBuy from "@/components/home/BundleQuickBuy.client";
-import { BundleQuickBuyCtaProof } from "@/components/home/BundleQuickBuyProof";
+import BagSlider from "@/components/purchase/BagSlider.client";
 import { ProductGallery } from "@/components/product/ProductGallery.client";
-import { LazyStickyAddToCartBar } from "@/components/product/LazyStickyAddToCartBar.client";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { ProductJsonLd } from "@/components/seo/ProductJsonLd";
 import FocusBundles from "./FocusBundles.client";
@@ -123,15 +121,10 @@ export default async function ProductPage({ params }: PageProps) {
     bundleVariants = null;
   }
 
-  const bundleQuantities = [1, 2, 3, 4, 5, 8, 12];
-  const tiers = (bundleVariants?.variants || []).filter((t) => bundleQuantities.includes(t.quantity));
-
   const productImages = (product.images?.edges || []).map((edge: any) => edge?.node).filter(Boolean);
   const productImageUrls = productImages.map((img: any) => img?.url).filter(Boolean);
   const stickyImage =
     product.featuredImage?.url || productImageUrls[0] || "/brand/usa-gummies-family.webp";
-  const stickyAlt =
-    product.featuredImage?.altText || (product.title ? `Product photo of ${product.title}` : "Product photo");
   const fallbackPrice =
     bundleVariants?.variants?.find((variant) => variant.quantity === 1)?.totalPrice ?? null;
   const priceAmount =
@@ -201,33 +194,13 @@ export default async function ProductPage({ params }: PageProps) {
             </div>
 
             <div id="product-bundles" className="atomic-buy__bundle">
-              <BundleQuickBuy
-                anchorId="product-bundles"
-                productHandle={product.handle}
-                tiers={tiers}
-                singleBagVariantId={bundleVariants?.singleBagVariantId}
-                availableForSale={bundleVariants?.availableForSale}
-                tone="light"
-                surface="flat"
-                layout="classic"
-                ctaProofSlot={
-                  <BundleQuickBuyCtaProof tone="light" surface="flat" layout="classic" variant="default" />
-                }
-                selectorVariant="segmented"
-              />
+              <BagSlider variant="full" defaultQty={5} />
             </div>
           </div>
         </div>
       </section>
 
-      <LazyStickyAddToCartBar
-        title="In your cart"
-        imageUrl={stickyImage}
-        imageAlt={stickyAlt}
-        buttonLabel="Buy now"
-        source="shop"
-        className="sm:hidden"
-      />
+      <BagSlider variant="sticky" defaultQty={5} />
 
       <ProductJsonLd
         name={product.title}

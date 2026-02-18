@@ -177,7 +177,6 @@ function bundleLabel(qty: number) {
 }
 
 function dealToastMessage(milestone: { qty: number; label: string }) {
-  if (milestone.qty === 4) return "Price update: savings unlocked.";
   if (milestone.qty === 5) return "Price update: free shipping unlocked.";
   if (milestone.qty === 8) return "Price update: most picked price unlocked.";
   if (milestone.qty === 12) return "Price update: best per-bag price unlocked.";
@@ -222,7 +221,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
     setLocalCart(cart);
   }, [cart]);
   const isDrawer = Boolean(onClose);
-  const allowInCartEdits = false;
+  const allowInCartEdits = true;
 
   const lines =
     (localCart?.lines as any)?.nodes ??
@@ -310,13 +309,9 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
   const estimatedTotal = subtotal;
 
   let cartHeadline = "";
-  if (totalBags === 0) {
-    cartHeadline = "Bundle pricing starts at 4 bags.";
-  } else if (totalBags < 4) {
-    cartHeadline = "Bundle pricing starts at 4 bags.";
-  } else if (totalBags === 4) {
-    cartHeadline = "Bundle pricing active.";
-  } else if (totalBags >= 5 && totalBags < 8) {
+  if (totalBags < 5) {
+    cartHeadline = "Bundle pricing starts at 5 bags.";
+  } else if (totalBags < 8) {
     cartHeadline = "Free shipping unlocked.";
   } else if (totalBags === 8) {
     cartHeadline = "Most picked size active.";
@@ -329,19 +324,19 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
 
   const dealStatusLabel = bestPriceReached
     ? "Best price active"
-    : totalBags >= 4
+    : totalBags >= 5
       ? "Savings applied"
       : "Standard pricing";
   const dealStatusHint = bestPriceReached
     ? "You're at the lowest per-bag rate."
-    : totalBags >= 4
+    : totalBags >= 5
       ? "Bundle pricing is active."
-      : "Bundle pricing starts at 4 bags.";
+      : "Bundle pricing starts at 5 bags.";
   const dealSavingsLine =
     bundleSavings > 0
       ? "Bundle price applied."
       : totalBags > 0
-        ? "Bundle pricing applies at 4+ bags."
+        ? "Bundle pricing applies at 5+ bags."
         : "";
 
 
@@ -479,17 +474,15 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
   const drawerSavingsLine = hasSavings
     ? "You unlocked free shipping + bundle pricing."
     : totalBags > 0
-      ? "Bundle pricing applies at 4+ bags."
+      ? "Bundle pricing applies at 5+ bags."
       : "";
   const showRegularLine = hasSavings && Boolean(regularPerBagText && regularTotalText);
   const nextTierDescriptor =
-    nextMilestone.qty === 4
-      ? "savings pricing"
-      : nextMilestone.qty === 5
-        ? "free shipping"
-        : nextMilestone.qty === 8
-          ? "most picked price"
-          : "best price";
+    nextMilestone.qty === 5
+      ? "free shipping"
+      : nextMilestone.qty === 8
+        ? "most picked price"
+        : "best price";
   const drawerUpsellLabel = nextTierAddQty
     ? `Add ${nextTierAddQty} bag${nextTierAddQty === 1 ? "" : "s"} for ${nextTierDescriptor}.`
     : "";
@@ -1071,7 +1064,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                   See pricing rules
                 </summary>
                 <ul className="mt-2 space-y-1">
-                  <li>Savings start at 4 bags</li>
+                  <li>Savings start at 5 bags</li>
                   <li>Free shipping at 5+ bags</li>
                   <li>8 bags is the most picked option</li>
                   <li>Per-bag price caps at {formatNumber(MIN_PER_BAG, summaryCurrency)} after 12+ bags</li>
