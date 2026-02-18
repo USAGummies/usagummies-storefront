@@ -49,22 +49,27 @@ const FLAVORS = [
   {
     name: "Cherry",
     notes: "Bright, classic cherry with a clean, fruit-forward finish.",
+    image: "/brand/gummies/gummy-red.png",
   },
   {
     name: "Watermelon",
     notes: "Smooth and refreshing, a light summer watermelon note.",
+    image: "/brand/gummies/gummy-pink.png",
   },
   {
     name: "Orange",
     notes: "Citrus pop with a sweet, familiar orange flavor.",
+    image: "/brand/gummies/gummy-orange.png",
   },
   {
     name: "Green apple",
     notes: "Crisp green apple with a balanced sweet-tart bite.",
+    image: "/brand/gummies/gummy-green.png",
   },
   {
     name: "Lemon",
     notes: "Zesty lemon lift that keeps the chew bright and clean.",
+    image: "/brand/gummies/gummy-yellow.png",
   },
 ];
 
@@ -343,14 +348,25 @@ export default function IngredientsPage() {
               ))}
             </div>
 
-            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+            <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
               {FLAVORS.map((flavor) => (
                 <div
                   key={flavor.name}
-                  className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-4"
+                  className="flex flex-col items-center rounded-2xl border border-[var(--border)] bg-white p-4 text-center"
                 >
-                  <div className="text-sm font-semibold text-[var(--text)]">{flavor.name}</div>
-                  <div className="mt-2 text-sm text-[var(--muted)]">{flavor.notes}</div>
+                  <div className="relative h-20 w-20 sm:h-24 sm:w-24">
+                    <Image
+                      src={flavor.image}
+                      alt={`${flavor.name} gummy bear`}
+                      fill
+                      sizes="96px"
+                      className="object-contain drop-shadow-md"
+                    />
+                  </div>
+                  <div className="mt-3 text-sm font-bold text-[var(--text)] font-display uppercase tracking-wide">
+                    {flavor.name}
+                  </div>
+                  <div className="mt-1.5 text-xs text-[var(--muted)] leading-relaxed">{flavor.notes}</div>
                 </div>
               ))}
             </div>
