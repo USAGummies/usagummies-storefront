@@ -605,11 +605,11 @@ export default async function HomePage() {
           </div>
           <div className="mt-6 flex flex-wrap items-stretch justify-center gap-4 sm:gap-6">
             {[
-              { src: "/brand/gummies/gummy-red.png", alt: "Cherry gummy bear", name: "Cherry", color: "#c7362c" },
+              { src: "/brand/gummies/gummy-pink.png", alt: "Cherry gummy bear", name: "Cherry", color: "#c7362c" },
               { src: "/brand/gummies/gummy-yellow.png", alt: "Lemon gummy bear", name: "Lemon", color: "#d4a017" },
               { src: "/brand/gummies/gummy-green.png", alt: "Green Apple gummy bear", name: "Green Apple", color: "#2D7A3A" },
               { src: "/brand/gummies/gummy-orange.png", alt: "Orange gummy bear", name: "Orange", color: "#d4702a" },
-              { src: "/brand/gummies/gummy-pink.png", alt: "Watermelon gummy bear", name: "Watermelon", color: "#a03050" },
+              { src: "/brand/gummies/gummy-red.png", alt: "Watermelon gummy bear", name: "Watermelon", color: "#a03050" },
             ].map((bear) => (
               <div key={bear.name} className="flex flex-col items-center gap-2 rounded-2xl border border-[rgba(15,27,45,0.08)] bg-white p-4 shadow-sm transition hover:-translate-y-1 hover:shadow-md" style={{ minWidth: "100px" }}>
                 <Image

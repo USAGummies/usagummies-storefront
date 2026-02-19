@@ -49,12 +49,12 @@ const FLAVORS = [
   {
     name: "Cherry",
     notes: "Bright, classic cherry with a clean, fruit-forward finish.",
-    image: "/brand/gummies/gummy-red.png",
+    image: "/brand/gummies/gummy-pink.png",
   },
   {
     name: "Watermelon",
     notes: "Smooth and refreshing, a light summer watermelon note.",
-    image: "/brand/gummies/gummy-pink.png",
+    image: "/brand/gummies/gummy-red.png",
   },
   {
     name: "Orange",

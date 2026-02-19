@@ -38,11 +38,11 @@ const MILESTONES = [
 ] as const;
 
 const FLAVOR_BEARS = [
-  { name: "Cherry", src: "/brand/gummies/gummy-red.png" },
+  { name: "Cherry", src: "/brand/gummies/gummy-pink.png" },
   { name: "Lemon", src: "/brand/gummies/gummy-yellow.png" },
   { name: "Green Apple", src: "/brand/gummies/gummy-green.png" },
   { name: "Orange", src: "/brand/gummies/gummy-orange.png" },
-  { name: "Watermelon", src: "/brand/gummies/gummy-pink.png" },
+  { name: "Watermelon", src: "/brand/gummies/gummy-red.png" },
 ] as const;
 
 const BAG_IMAGE_SRC = "/brand/hero-pack-icon.png";
