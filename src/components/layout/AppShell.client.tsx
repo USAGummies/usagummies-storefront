@@ -23,6 +23,10 @@ const ChatWidget = dynamic(
   () => import("@/components/support/ChatWidget.client").then((mod) => mod.ChatWidget),
   { ssr: false }
 );
+const ExitIntentPopup = dynamic(
+  () => import("@/components/engagement/ExitIntentPopup.client"),
+  { ssr: false }
+);
 
 function cx(...a: Array<string | false | null | undefined>) {
   return a.filter(Boolean).join(" ");
@@ -816,6 +820,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </footer>
       {showChatWidget ? <ChatWidget /> : null}
+      <ExitIntentPopup />
     </div>
   );
 }

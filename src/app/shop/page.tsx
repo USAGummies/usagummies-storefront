@@ -24,6 +24,7 @@ import {
   rankRelated,
 } from "@/lib/internalLinks";
 import { getTopGuideCandidates } from "@/lib/guides";
+import { TrustBar, GuaranteeBadge } from "@/components/social-proof/TrustBar";
 import styles from "../homepage-scenes.module.css";
 
 const PAGE_SIZE = 1;
@@ -300,7 +301,13 @@ export default async function ShopPage() {
                   <div className="atomic-buy__bundle">
                     <BagSlider variant="full" defaultQty={5} />
                   </div>
+                  <div className="mt-3">
+                    <GuaranteeBadge />
+                  </div>
                 </div>
+              </div>
+              <div className="mt-3">
+                <TrustBar variant="compact" />
               </div>
               <div className="mt-1.5 flex flex-wrap gap-1.5 text-[10px] text-[#1B2A4A]/70">
                 <span className="font-semibold text-[#1B2A4A]">Bag count guides:</span>
