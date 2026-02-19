@@ -80,7 +80,7 @@ const pageJsonLd = {
 export default function WholesalePage() {
   return (
     <main className="relative overflow-hidden text-[var(--text)] min-h-screen pb-16">
-      <div className="relative w-full h-[320px] sm:h-[400px] lg:h-[440px] overflow-hidden">
+      <div className="relative w-full h-[280px] sm:h-[340px] lg:h-[400px] overflow-hidden">
         <Image
           src="/brand/lifestyle/picnic-scene.jpg"
           alt="USA Gummies on a picnic table in an American setting"
@@ -89,10 +89,10 @@ export default function WholesalePage() {
           className="object-cover"
           priority
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#1B2A4A]/25 to-[#1B2A4A]/55" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#1B2A4A]/50 to-[#1B2A4A]/75" />
         <div className="relative z-10 flex flex-col items-center justify-center h-full text-center px-4">
-          <div className="relative w-56 h-28 mb-3">
-            <Image src="/brand/logo-full.png" alt="USA Gummies" fill sizes="224px" className="object-contain drop-shadow-[0_4px_20px_rgba(0,0,0,0.4)]" />
+          <div className="relative w-44 h-20 sm:w-52 sm:h-24 mb-3">
+            <Image src="/brand/logo-full.png" alt="USA Gummies" fill sizes="208px" className="object-contain drop-shadow-[0_6px_24px_rgba(0,0,0,0.5)]" />
           </div>
           <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold uppercase tracking-wide text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
             Wholesale
