@@ -240,7 +240,13 @@ async function createCartId(): Promise<string> {
   }
 
   const jar = await cookies();
-  jar.set(CART_COOKIE, cart.id, { path: "/", httpOnly: true, sameSite: "lax" });
+  jar.set(CART_COOKIE, cart.id, {
+    path: "/",
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 60 * 60 * 24 * 14,
+  });
 
   return cart.id;
 }
@@ -307,7 +313,13 @@ export async function addToCart(variantId: string, quantity: number) {
   const cart = result.data?.cartLinesAdd?.cart;
   if (cart?.id) {
     const jar = await cookies();
-    jar.set(CART_COOKIE, cart.id, { path: "/", httpOnly: true, sameSite: "lax" });
+    jar.set(CART_COOKIE, cart.id, {
+      path: "/",
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 60 * 60 * 24 * 14,
+    });
     return cart.id;
   }
   throw new Error("Cart unavailable.");
@@ -355,7 +367,13 @@ export async function updateLineQuantity(lineId: string, quantity: number) {
   const cart = data?.cartLinesUpdate?.cart;
   if (cart?.id) {
     const jar = await cookies();
-    jar.set(CART_COOKIE, cart.id, { path: "/", httpOnly: true, sameSite: "lax" });
+    jar.set(CART_COOKIE, cart.id, {
+      path: "/",
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 60 * 60 * 24 * 14,
+    });
     return cart.id;
   }
   return null;
@@ -405,7 +423,13 @@ export async function replaceCartWithVariant(variantId: string, quantity: number
   const nextCart = added?.cartLinesAdd?.cart;
   if (nextCart?.id) {
     const jar = await cookies();
-    jar.set(CART_COOKIE, nextCart.id, { path: "/", httpOnly: true, sameSite: "lax" });
+    jar.set(CART_COOKIE, nextCart.id, {
+      path: "/",
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 60 * 60 * 24 * 14,
+    });
     return nextCart.id;
   }
   return null;

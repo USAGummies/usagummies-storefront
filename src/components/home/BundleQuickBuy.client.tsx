@@ -21,6 +21,7 @@ import { GummyIconRow, HeroPackIcon } from "@/components/ui/GummyIcon";
 import { useCartBagCount } from "@/hooks/useCartBagCount";
 import { AmazonOneBagNote } from "@/components/ui/AmazonOneBagNote";
 import { AMAZON_LISTING_URL, AMAZON_LOGO_URL } from "@/lib/amazon";
+import { storeCartId, getStoredCartId } from "@/lib/cartClientUtils";
 
 type TierKey = "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10" | "11" | "12";
 type ChannelOptionId = "amazon-1" | "amazon-2" | "amazon-3-4" | "dtc-5" | "dtc-best";
@@ -69,27 +70,6 @@ function priceForQtyDisplay(
   const total = money(totalValue, "USD");
   if (!total) return "";
   return prefix ? `${prefix} ${total}` : total;
-}
-
-function storeCartId(cartId?: string | null) {
-  if (!cartId || typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem("cartId", cartId);
-  } catch {
-    // ignore
-  }
-  if (typeof document !== "undefined") {
-    document.cookie = `cartId=${cartId}; path=/; samesite=lax`;
-  }
-}
-
-function getStoredCartId() {
-  if (typeof window === "undefined") return null;
-  try {
-    return window.localStorage.getItem("cartId");
-  } catch {
-    return null;
-  }
 }
 
 const FEATURED_QTYS: TierKey[] = ["1", "2", "3", "4", "5", "8", "12"];

@@ -14,6 +14,7 @@ import { SubscriptionUnlock } from "@/components/marketing/SubscriptionUnlock.cl
 import { getCartToastMessage, readLastAdd } from "@/lib/cartFeedback";
 import { SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
 import { ExperienceBand } from "@/components/brand/ExperienceBand";
+import { getStoredCartId, storeCartId, getBagsPerUnit } from "@/lib/cartClientUtils";
 
 const CartDrawer = dynamic(
   () => import("@/components/layout/CartDrawer.client").then((mod) => mod.CartDrawer),
@@ -32,20 +33,6 @@ function cx(...a: Array<string | false | null | undefined>) {
   return a.filter(Boolean).join(" ");
 }
 
-function getStoredCartId() {
-  if (typeof window === "undefined") return null;
-  try {
-    return window.localStorage.getItem("cartId");
-  } catch {
-    return null;
-  }
-}
-
-function setCartCookie(cartId?: string | null) {
-  if (!cartId || typeof document === "undefined") return;
-  document.cookie = `cartId=${cartId}; path=/; samesite=lax`;
-}
-
 function formatMoney(amount: string | number | null | undefined, currency = "USD") {
   const raw = typeof amount === "string" ? Number(amount) : Number(amount ?? 0);
   if (!Number.isFinite(raw)) return "$0.00";
@@ -58,34 +45,6 @@ function formatMoney(amount: string | number | null | undefined, currency = "USD
   } catch {
     return `$${raw.toFixed(2)}`;
   }
-}
-
-function parseBagsFromTitle(title?: string): number | undefined {
-  const t = (title || "").toLowerCase();
-  if (t.includes("single")) return 1;
-  const m = t.match(/(\d+)\s*(?:bag|bags)\b/);
-  if (m?.[1]) {
-    const n = Number(m[1]);
-    if (Number.isFinite(n)) return n;
-  }
-  const fallback = t.match(/(\d+)/);
-  if (fallback?.[1]) {
-    const n = Number(fallback[1]);
-    if (Number.isFinite(n)) return n;
-  }
-  return undefined;
-}
-
-function getBagsPerUnit(merchandise: any): number {
-  const meta =
-    merchandise?.bundleQty?.value ??
-    merchandise?.bundleBags?.value ??
-    merchandise?.metafield?.value;
-  const metaNum = Number(meta);
-  if (Number.isFinite(metaNum) && metaNum > 0) return metaNum;
-  const parsed = parseBagsFromTitle(merchandise?.title);
-  if (parsed && parsed > 0) return parsed;
-  return 1;
 }
 
 function summarizeCart(cart: any) {
@@ -205,7 +164,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   async function refreshCartCount() {
     try {
       const stored = getStoredCartId();
-      if (stored) setCartCookie(stored);
+      if (stored) storeCartId(stored);
       const res = await fetch("/api/cart", {
         method: "POST",
         cache: "no-store",
@@ -213,7 +172,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ action: "get", cartId: stored || undefined }),
       });
       const data = await res.json();
-      if (data?.cart?.id) setCartCookie(data.cart.id);
+      if (data?.cart?.id) storeCartId(data.cart.id);
       const summary = summarizeCart(data?.cart ?? null);
       const qty = Number(summary.totalBags || 0);
       setCartCount((prev) => {
@@ -265,7 +224,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       if (!updateRes.ok || updateJson?.ok === false) {
         throw new Error(updateJson?.error || "Undo failed.");
       }
-      if (updateJson?.cart?.id) setCartCookie(updateJson.cart.id);
+      if (updateJson?.cart?.id) storeCartId(updateJson.cart.id);
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("cart:updated"));
       }
@@ -294,7 +253,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const stored = getStoredCartId();
-    if (stored) setCartCookie(stored);
+    if (stored) storeCartId(stored);
     refreshCartCount();
   }, []);
 
@@ -524,6 +483,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               onClick={() => setMobileOpen((s) => !s)}
               className="md:hidden pressable focus-ring inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border)] text-[var(--text)] bg-white"
               aria-label="Toggle navigation"
+              aria-expanded={mobileOpen}
             >
               ☰
             </button>

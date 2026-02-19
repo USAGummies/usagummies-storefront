@@ -10,6 +10,7 @@ import { useCartBagCount } from "@/hooks/useCartBagCount";
 import { AmazonOneBagNote } from "@/components/ui/AmazonOneBagNote";
 import { AMAZON_REVIEWS } from "@/data/amazonReviews";
 import { GummyIconRow, HeroPackIcon } from "@/components/ui/GummyIcon";
+import { storeCartId, getStoredCartId } from "@/lib/cartClientUtils";
 
 const QUICK_QTYS = [1, 2, 3, 4, 5, 8, 12];
 const SAVINGS_LADDER = [
@@ -39,27 +40,6 @@ function money(amount?: number, currencyCode = "USD") {
     }).format(n);
   } catch {
     return `$${n.toFixed(2)}`;
-  }
-}
-
-function storeCartId(cartId?: string | null) {
-  if (!cartId || typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem("cartId", cartId);
-  } catch {
-    // ignore
-  }
-  if (typeof document !== "undefined") {
-    document.cookie = `cartId=${cartId}; path=/; samesite=lax`;
-  }
-}
-
-function getStoredCartId() {
-  if (typeof window === "undefined") return null;
-  try {
-    return window.localStorage.getItem("cartId");
-  } catch {
-    return null;
   }
 }
 

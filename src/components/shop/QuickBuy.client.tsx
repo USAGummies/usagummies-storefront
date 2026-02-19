@@ -3,20 +3,9 @@
 import * as React from "react";
 import { SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
 import { fireCartToast } from "@/lib/cartFeedback";
+import { storeCartId } from "@/lib/cartClientUtils";
 
 type AnyProduct = any;
-
-function storeCartId(cartId?: string | null) {
-  if (!cartId || typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem("cartId", cartId);
-  } catch {
-    // ignore
-  }
-  if (typeof document !== "undefined") {
-    document.cookie = `cartId=${cartId}; path=/; samesite=lax`;
-  }
-}
 
 function getVariants(product: AnyProduct): AnyProduct[] {
   return (

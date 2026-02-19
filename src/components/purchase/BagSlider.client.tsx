@@ -12,6 +12,7 @@ import { SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
 import { AMAZON_LISTING_URL } from "@/lib/amazon";
 import { trackEvent } from "@/lib/analytics";
 import { fireCartToast } from "@/lib/cartFeedback";
+import { storeCartId, getStoredCartId } from "@/lib/cartClientUtils";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -156,25 +157,6 @@ function money(n: number): string {
 
 function pct(qty: number): number {
   return ((qty - MIN_QTY) / (MAX_QTY - MIN_QTY)) * 100;
-}
-
-function storeCartId(cartId?: string | null): void {
-  if (!cartId || typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem("cartId", cartId);
-  } catch { /* ignore storage */ }
-  if (typeof document !== "undefined") {
-    document.cookie = `cartId=${cartId}; path=/; samesite=lax`;
-  }
-}
-
-function getStoredCartId(): string | null {
-  if (typeof window === "undefined") return null;
-  try {
-    return window.localStorage.getItem("cartId");
-  } catch {
-    return null;
-  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -403,6 +385,7 @@ export default function BagSlider({
             onClick={() => nudge(-1)}
             disabled={qty <= MIN_QTY}
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[rgba(27,42,74,0.15)] text-base font-bold text-[#1B2A4A] disabled:opacity-30"
+            aria-label="Decrease quantity"
           >
             −
           </button>
@@ -422,6 +405,7 @@ export default function BagSlider({
             onClick={() => nudge(1)}
             disabled={qty >= MAX_QTY}
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[rgba(27,42,74,0.15)] text-base font-bold text-[#1B2A4A] disabled:opacity-30"
+            aria-label="Increase quantity"
           >
             +
           </button>

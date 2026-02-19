@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 
 const STORAGE_KEY = "usa-gummies-exit-popup-dismissed";
+const SUBMITTED_KEY = "exitIntent:submitted";
 const DISMISS_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const DELAY_BEFORE_ACTIVE_MS = 8000; // Wait 8s before arming
 const MOBILE_SCROLL_THRESHOLD = 0.55; // 55% scroll depth on mobile
@@ -12,13 +13,18 @@ export default function ExitIntentPopup() {
   const [isVisible, setIsVisible] = useState(false);
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
   const [isArmed, setIsArmed] = useState(false);
   const hasTriggeredRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
 
-  // Check if previously dismissed
+  // Check if previously dismissed or already submitted
   const wasDismissed = useCallback(() => {
     try {
+      if (localStorage.getItem(SUBMITTED_KEY) === "true") return true;
       const ts = localStorage.getItem(STORAGE_KEY);
       if (!ts) return false;
       const elapsed = Date.now() - Number(ts);
@@ -120,9 +126,57 @@ export default function ExitIntentPopup() {
     };
   }, [isVisible]);
 
+  // Focus trap: trap Tab/Shift+Tab within the popup
+  useEffect(() => {
+    if (!isVisible || !popupRef.current) return;
+
+    previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
+
+    const focusableSelector =
+      'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
+    const focusableElements = popupRef.current.querySelectorAll<HTMLElement>(focusableSelector);
+    if (focusableElements.length > 0) {
+      focusableElements[0].focus();
+    }
+
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key !== "Tab") return;
+
+      const currentFocusables = popupRef.current?.querySelectorAll<HTMLElement>(focusableSelector);
+      if (!currentFocusables || currentFocusables.length === 0) return;
+
+      const first = currentFocusables[0];
+      const last = currentFocusables[currentFocusables.length - 1];
+
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      if (previouslyFocusedRef.current && typeof previouslyFocusedRef.current.focus === "function") {
+        previouslyFocusedRef.current.focus();
+      }
+    };
+  }, [isVisible]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim()) return;
+    if (!email.trim() || submitting) return;
+
+    setSubmitting(true);
+    setErrorMsg("");
 
     // Fire GA4 event
     if (typeof window !== "undefined" && (window as any).gtag) {
@@ -133,22 +187,41 @@ export default function ExitIntentPopup() {
       });
     }
 
-    // TODO: Wire to HubSpot or email provider API
-    // For now, store locally and show success
     try {
-      localStorage.setItem("usa-gummies-email-signup", email);
-    } catch {
-      // silent
-    }
+      const res = await fetch("/api/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, source: "exit-intent" }),
+      });
 
-    setSubmitted(true);
-    setTimeout(() => dismiss(), 3000);
+      const data = await res.json();
+
+      if (!res.ok || !data.ok) {
+        setErrorMsg(data.error || "Something went wrong. Please try again.");
+        setSubmitting(false);
+        return;
+      }
+
+      // Mark as submitted so popup never shows again
+      try {
+        localStorage.setItem(SUBMITTED_KEY, "true");
+      } catch {
+        // silent
+      }
+
+      setSubmitted(true);
+      setTimeout(() => dismiss(), 2000);
+    } catch {
+      setErrorMsg("Network error. Please try again.");
+      setSubmitting(false);
+    }
   };
 
   if (!isVisible) return null;
 
   return (
     <div
+      ref={popupRef}
       className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
       onClick={(e) => {
         if (e.target === e.currentTarget) dismiss();
@@ -240,11 +313,15 @@ export default function ExitIntentPopup() {
                   />
                   <button
                     type="submit"
-                    className="btn btn-candy pressable whitespace-nowrap px-5 py-3 text-sm font-bold"
+                    disabled={submitting}
+                    className="btn btn-candy pressable whitespace-nowrap px-5 py-3 text-sm font-bold disabled:opacity-60"
                   >
-                    Join free
+                    {submitting ? "Sending\u2026" : "Join free"}
                   </button>
                 </div>
+                {errorMsg && (
+                  <p className="mt-2 text-xs text-red-600">{errorMsg}</p>
+                )}
               </form>
 
               <button

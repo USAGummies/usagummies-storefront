@@ -1,33 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CartView } from "@/components/ui/CartView";
 import { cn } from "@/lib/cn";
-
-function getStoredCartId() {
-  if (typeof window === "undefined") return null;
-  try {
-    return window.localStorage.getItem("cartId");
-  } catch {
-    return null;
-  }
-}
-
-function storeCartId(cartId?: string | null) {
-  if (!cartId || typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem("cartId", cartId);
-  } catch {
-    // ignore
-  }
-  if (typeof document !== "undefined") {
-    document.cookie = `cartId=${cartId}; path=/; samesite=lax`;
-  }
-}
+import { getStoredCartId, storeCartId } from "@/lib/cartClientUtils";
 
 export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [mounted, setMounted] = useState(false);
   const [cart, setCart] = useState<any>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -89,11 +70,64 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
     };
   }, [open, onClose]);
 
+  // Focus trap: trap Tab/Shift+Tab within the drawer
+  useEffect(() => {
+    if (!open || !drawerRef.current) return;
+
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+
+    const focusableSelector =
+      'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
+    const focusableElements = drawerRef.current.querySelectorAll<HTMLElement>(focusableSelector);
+    const firstFocusable = focusableElements[0];
+
+    if (firstFocusable) {
+      firstFocusable.focus();
+    }
+
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key !== "Tab") return;
+
+      const currentFocusables = drawerRef.current?.querySelectorAll<HTMLElement>(focusableSelector);
+      if (!currentFocusables || currentFocusables.length === 0) return;
+
+      const first = currentFocusables[0];
+      const last = currentFocusables[currentFocusables.length - 1];
+
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      if (previouslyFocused && typeof previouslyFocused.focus === "function") {
+        previouslyFocused.focus();
+      }
+    };
+  }, [open]);
+
   if (!mounted || !open) return null;
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex justify-end md:justify-center">
+      <div
+        ref={drawerRef}
+        className="fixed inset-0 z-50 flex justify-end md:justify-center"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Shopping cart"
+      >
         <div
           className={cn(
             "absolute inset-0 bg-[rgba(0,0,0,0.55)] transition-opacity duration-200 ease-out",

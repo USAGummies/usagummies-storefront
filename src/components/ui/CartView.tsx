@@ -10,10 +10,14 @@ import { SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
 import { trackEvent } from "@/lib/analytics";
 import { getSafeCheckoutUrl, normalizeCheckoutUrl } from "@/lib/checkout";
 import { ReviewHighlights } from "@/components/reviews/ReviewHighlights";
-import { AmazonOneBagNote } from "@/components/ui/AmazonOneBagNote";
 import { AMAZON_REVIEWS } from "@/data/amazonReviews";
 import { GummyIconRow, HeroPackIcon } from "@/components/ui/GummyIcon";
 import { CartLineControls } from "@/components/cart/CartLineControls.client";
+import { ShippingProgressBar } from "@/components/cart/ShippingProgressBar";
+import { ExpressCheckoutButtons } from "@/components/cart/ExpressCheckoutButtons";
+import { EmptyCartView } from "@/components/cart/EmptyCartView";
+import { OrderSummaryPanel } from "@/components/cart/OrderSummaryPanel";
+import { storeCartId, getBagsPerUnit } from "@/lib/cartClientUtils";
 
 type MoneyV2 = { amount: string; currencyCode: string };
 
@@ -31,49 +35,11 @@ const PROGRESS_MILESTONES = [
 const MISSION_TARGET_QTY = 8;
 const MISSION_SOCIAL_PROOF = "8 bags is the most picked option.";
 const COMPLETE_TARGETS = [5, 8, 12];
-const EXPRESS_CHECKOUT_METHODS = [
-  {
-    label: "Shop Pay",
-    iconSrc: "/payments/shop-pay.svg",
-    className: "bg-[#5a31f4] text-white",
-    iconClassName: "h-8 w-full max-w-[150px] object-contain",
-    iconWidth: 160,
-    iconHeight: 40,
-  },
-  {
-    label: "Apple Pay",
-    iconSrc: "/payments/apple-pay.svg",
-    className: "bg-black text-white",
-    iconClassName: "h-8 w-full max-w-[150px] object-contain",
-    iconWidth: 160,
-    iconHeight: 40,
-  },
-  {
-    label: "Google Pay",
-    iconSrc: "/payments/google-pay.svg",
-    className: "bg-black text-white",
-    iconClassName: "h-8 w-full max-w-[150px] object-contain",
-    iconWidth: 160,
-    iconHeight: 40,
-  },
-];
 
 const resolveLineImageAlt = (line: any) =>
   line?.merchandise?.image?.altText ||
   line?.merchandise?.product?.title ||
   "Product photo";
-
-function storeCartId(cartId?: string | null) {
-  if (!cartId || typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem("cartId", cartId);
-  } catch {
-    // ignore
-  }
-  if (typeof document !== "undefined") {
-    document.cookie = `cartId=${cartId}; path=/; samesite=lax`;
-  }
-}
 
 function formatMoney(amount: MoneyV2 | null | undefined) {
   const n = Number(amount?.amount ?? 0);
@@ -137,36 +103,6 @@ function useCountUp(value: number, duration = 520) {
   }, [value, duration]);
 
   return display;
-}
-
-function parseBagsFromTitle(title?: string): number | undefined {
-  const t = (title || "").toLowerCase();
-  if (t.includes("single")) return 1;
-  const m = t.match(/(\d+)\s*(?:bag|bags)\b/);
-  if (m?.[1]) {
-    const n = Number(m[1]);
-    if (Number.isFinite(n)) return n;
-  }
-  const fallback = t.match(/(\d+)/);
-  if (fallback?.[1]) {
-    const n = Number(fallback[1]);
-    if (Number.isFinite(n)) return n;
-  }
-  return undefined;
-}
-
-function getBagsPerUnit(merchandise: any): number {
-  const meta =
-    merchandise?.bundleQty?.value ??
-    merchandise?.bundleBags?.value ??
-    merchandise?.metafield?.value;
-  const metaNum = Number(meta);
-  if (Number.isFinite(metaNum) && metaNum > 0) return metaNum;
-
-  const parsed = parseBagsFromTitle(merchandise?.title);
-  if (parsed && parsed > 0) return parsed;
-
-  return 1;
 }
 
 function bundleLabel(qty: number) {
@@ -555,27 +491,16 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
       <div className="px-4 py-4 text-[var(--text)]">
         {/* Free shipping progress bar — always visible in drawer */}
         {totalBags > 0 && (
-          <div className="mb-3 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-3">
-            <div className="flex items-center justify-between text-[11px] font-semibold">
-              <span className={unlocked ? "text-[#2D7A3A]" : "text-[var(--text)]"}>
-                {unlocked ? "✓ Free shipping unlocked!" : `Add ${freeShipGap} more bag${freeShipGap === 1 ? "" : "s"} for FREE shipping`}
-              </span>
-              <span className="text-[var(--muted)]">{totalBags}/{FREE_SHIP_QTY} bags</span>
-            </div>
-            <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-[rgba(15,27,45,0.08)]">
-              <div
-                className={cn(
-                  "h-full rounded-full transition-all duration-500 ease-out",
-                  unlocked ? "bg-[#2D7A3A]" : "bg-[#c7362c]"
-                )}
-                style={{ width: `${clampPct(Math.round((totalBags / FREE_SHIP_QTY) * 100))}%` }}
-              />
-            </div>
-            {!unlocked && hasSavings && (
-              <div className="mt-1 text-[10px] text-[#2D7A3A] font-semibold">
-                Bundle savings active — save {formatNumber(bundleSavings, summaryCurrency)}
-              </div>
-            )}
+          <div className="mb-3">
+            <ShippingProgressBar
+              totalBags={totalBags}
+              unlocked={unlocked}
+              savingsText={
+                !unlocked && hasSavings
+                  ? `Bundle savings active \u2014 save ${formatNumber(bundleSavings, summaryCurrency)}`
+                  : undefined
+              }
+            />
           </div>
         )}
 
@@ -685,34 +610,11 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
 
             {localCart?.checkoutUrl ? (
               <div className="mt-3 grid gap-2">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
-                  Express checkout
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  {EXPRESS_CHECKOUT_METHODS.map((method) => (
-                    <a
-                      key={method.label}
-                      href={checkoutHref ?? localCart.checkoutUrl}
-                      onClick={(event) => handleCheckoutClick(event, method.label)}
-                      aria-label={`${method.label} checkout`}
-                      className={cn(
-                        "flex h-12 items-center justify-center rounded-xl border border-white/10 px-3 py-2 text-[8px] font-semibold transition hover:brightness-105 shadow-[0_10px_20px_rgba(5,10,20,0.45)]",
-                        method.className
-                      )}
-                    >
-                      <span className="flex h-10 w-full items-center justify-center">
-                        <Image
-                          src={method.iconSrc}
-                          alt={`${method.label} logo`}
-                          width={method.iconWidth ?? 96}
-                          height={method.iconHeight ?? 28}
-                          sizes="(max-width: 480px) 120px, 140px"
-                          className={cn(method.iconClassName, "opacity-100")}
-                        />
-                      </span>
-                    </a>
-                  ))}
-                </div>
+                <ExpressCheckoutButtons
+                  checkoutUrl={checkoutHref ?? localCart.checkoutUrl}
+                  onCheckoutClick={handleCheckoutClick}
+                  variant="branded"
+                />
 
                 <div className="mt-2 grid gap-1 text-[11px] font-semibold text-[var(--muted)]">
                   <div>⭐ {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars from verified Amazon buyers</div>
@@ -783,61 +685,12 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
             ) : null}
           </>
         ) : (
-          <div className="rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-4">
-            <div className="text-center">
-              <div className="text-lg font-black text-[var(--text)]">Your cart is empty</div>
-              <div className="mt-1 text-xs text-[var(--muted)]">
-                Pick a bag count to get started. Free shipping at 5+ bags.
-              </div>
-            </div>
-            <div className="mt-4 grid grid-cols-3 gap-2">
-              {[5, 8, 12].map((q) => {
-                const p = pricingForQty(q);
-                const isBest = q === 8;
-                return (
-                  <button
-                    key={q}
-                    type="button"
-                    onClick={() => addBags(q)}
-                    disabled={bundlePending}
-                    className={cn(
-                      "relative rounded-xl border px-3 py-3 text-center transition hover:-translate-y-px",
-                      isBest
-                        ? "border-[#c7362c] bg-[rgba(199,54,44,0.04)] shadow-sm"
-                        : "border-[rgba(15,27,45,0.12)] bg-white"
-                    )}
-                  >
-                    {isBest && (
-                      <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-[#c7362c] px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white">
-                        Popular
-                      </span>
-                    )}
-                    <div className="text-base font-black text-[var(--text)]">{q}</div>
-                    <div className="text-[10px] font-semibold text-[var(--muted)]">bags</div>
-                    <div className="mt-1 text-xs font-bold text-[#2D7A3A]">
-                      {formatNumber(p.perBag, "USD")}/bag
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="mt-3">
-              <Link
-                href="/shop"
-                className="btn btn-candy w-full justify-center"
-                onClick={onClose}
-              >
-                Shop all bags
-              </Link>
-            </div>
-            <div className="mt-2 flex items-center justify-center gap-3 text-[10px] text-[var(--muted)]">
-              <span>🇺🇸 Made in USA</span>
-              <span>•</span>
-              <span>🚚 Free shipping 5+</span>
-              <span>•</span>
-              <span>⭐ 4.8 stars</span>
-            </div>
-          </div>
+          <EmptyCartView
+            variant="drawer"
+            onAddBags={addBags}
+            bundlePending={bundlePending}
+            onClose={onClose}
+          />
         )}
       </div>
     );
@@ -939,28 +792,12 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
 
                   {localCart?.checkoutUrl ? (
                     <>
-                      <div className="mt-3 grid grid-cols-3 gap-2">
-                        {EXPRESS_CHECKOUT_METHODS.map((method) => (
-                          <a
-                            key={method.label}
-                            href={checkoutHref ?? localCart.checkoutUrl}
-                            onClick={(event) => handleCheckoutClick(event, method.label)}
-                            aria-label={`${method.label} checkout`}
-                            className="flex flex-col items-center justify-center gap-1 rounded-2xl border border-[rgba(15,27,45,0.1)] bg-white/80 px-2 py-2 text-[9px] font-semibold text-[var(--muted)]"
-                          >
-                            <span className="flex h-9 w-full items-center justify-center rounded-full border border-[rgba(15,27,45,0.08)] bg-white">
-                              <Image
-                                src={method.iconSrc}
-                                alt={`${method.label} logo`}
-                                width={72}
-                                height={20}
-                                sizes="72px"
-                                className="h-4 w-auto opacity-80"
-                              />
-                            </span>
-                            <span className="text-[9px] text-[var(--muted)]">{method.label}</span>
-                          </a>
-                        ))}
+                      <div className="mt-3">
+                        <ExpressCheckoutButtons
+                          checkoutUrl={checkoutHref ?? localCart.checkoutUrl}
+                          onCheckoutClick={handleCheckoutClick}
+                          variant="compact"
+                        />
                       </div>
 
                       <a
@@ -1450,139 +1287,30 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
             ) : null}
 
             {!isDrawer ? (
-              <div className="metal-panel rounded-2xl border border-[rgba(199,160,98,0.35)] p-4 flex flex-col gap-2">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
-                Order summary
-              </div>
-              <div className="flex items-center justify-between text-sm text-[var(--muted)]">
-                <span>Items</span>
-                <span className="font-black text-[var(--text)]">{subtotal}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm text-[var(--muted)]">
-                <span>Shipping</span>
-                <span className="font-semibold text-[var(--text)]">{shippingSummary}</span>
-              </div>
-              <div className="text-[10px] text-[var(--muted)]">{shippingHint}</div>
-
-              {/* Free shipping progress bar */}
-              {totalBags > 0 && (
-                <div className="my-2 rounded-xl bg-[rgba(15,27,45,0.04)] p-2.5">
-                  <div className="flex items-center justify-between text-[11px] font-semibold">
-                    <span className={unlocked ? "text-[#2D7A3A]" : "text-[var(--text)]"}>
-                      {unlocked ? "✓ Free shipping unlocked!" : `Add ${freeShipGap} more bag${freeShipGap === 1 ? "" : "s"} for FREE shipping`}
-                    </span>
-                    <span className="text-[var(--muted)]">{totalBags}/{FREE_SHIP_QTY} bags</span>
-                  </div>
-                  <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-[rgba(15,27,45,0.08)]">
-                    <div
-                      className={cn(
-                        "h-full rounded-full transition-all duration-500 ease-out",
-                        unlocked ? "bg-[#2D7A3A]" : "bg-[#c7362c]"
-                      )}
-                      style={{ width: `${clampPct(Math.round((totalBags / FREE_SHIP_QTY) * 100))}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div className="flex items-center justify-between text-base text-[var(--text)]">
-                <span className="font-semibold">Estimated total</span>
-                <span className="font-black">{estimatedTotal}</span>
-              </div>
-              {bundlePricing ? (
-                <div className="text-xs text-[var(--muted)]">
-                  Price per bag at {totalBags} bags • {bundlePerBagText} / bag
-                </div>
-              ) : null}
-              {bestPriceApplied ? (
-                <div className="inline-flex w-fit rounded-full border border-[rgba(239,59,59,0.25)] bg-[rgba(239,59,59,0.12)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--candy-red)]">
-                  Best price active
-                </div>
-              ) : null}
-              {totalBags > 0 ? (
-                <div className={cn("text-xs font-semibold", hasSavings ? "text-[var(--candy-red)]" : "text-[var(--muted)]")}>
-                  {showRegularLine
-                    ? `Normally ${regularTotalText} — today ${estimatedTotal}`
-                    : drawerSavingsLine}
-                </div>
-              ) : null}
-              {showNextTierCta ? (
-                <button
-                  type="button"
-                  onClick={() => addBags(nextTierAddQty ?? 0)}
-                  disabled={bundlePending}
-                  className="btn btn-outline pressable w-full justify-center"
-                >
-                  {bundlePending ? "Adding..." : nextTierCtaLabel}
-                </button>
-              ) : null}
-              <div className="mt-2">
-                {localCart?.checkoutUrl ? (
-                  <div className="mb-3 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] p-3">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
-                      Express checkout
-                    </div>
-                    <div className="mt-2 grid grid-cols-3 gap-2">
-                      {EXPRESS_CHECKOUT_METHODS.map((method) => (
-                        <a
-                          key={method.label}
-                          href={checkoutHref ?? localCart.checkoutUrl}
-                          onClick={(event) => handleCheckoutClick(event, method.label)}
-                          aria-label={`${method.label} checkout`}
-                          className={cn(
-                            "flex h-12 items-center justify-center rounded-xl border border-white/10 px-3 py-2 transition hover:brightness-105 shadow-[0_10px_20px_rgba(5,10,20,0.45)]",
-                            method.className
-                          )}
-                        >
-                          <Image
-                            src={method.iconSrc}
-                            alt={`${method.label} logo`}
-                            width={method.iconWidth ?? 96}
-                            height={method.iconHeight ?? 28}
-                            sizes="(max-width: 480px) 100px, 120px"
-                            className={cn(method.iconClassName, "opacity-100")}
-                          />
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-                {localCart?.checkoutUrl ? (
-                  <div className="mb-2 grid gap-1 text-[11px] font-semibold text-[var(--muted)]">
-                    <div>⭐ {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars from verified Amazon buyers</div>
-                    <div>🇺🇸 Made in the USA</div>
-                    <div>🚚 Ships within 24 hours</div>
-                  </div>
-                ) : null}
-                {localCart?.checkoutUrl ? (
-                  <a
-                    href={checkoutHref ?? localCart.checkoutUrl}
-                    className="btn btn-candy w-full justify-center pressable"
-                    onClick={(event) => handleCheckoutClick(event, "secure")}
-                  >
-                    <span className="inline-flex items-center gap-2">
-                      <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
-                        <path
-                          fill="currentColor"
-                          d="M6 10V8a6 6 0 1 1 12 0v2h1v12H5V10h1zm2 0h8V8a4 4 0 1 0-8 0v2z"
-                        />
-                      </svg>
-                      Secure checkout
-                    </span>
-                  </a>
-                ) : null}
-                <div className="mt-2 text-xs font-semibold text-[var(--muted)]">
-                  Order now, ships tomorrow.
-                </div>
-                <Link
-                  href={secondaryCta.href}
-                  className="mt-2 inline-flex text-xs font-semibold text-[var(--muted)] underline underline-offset-4 hover:text-[var(--text)]"
-                  onClick={onClose}
-                >
-                  {secondaryCta.label}
-                </Link>
-              </div>
-              </div>
+              <OrderSummaryPanel
+                totalBags={totalBags}
+                unlocked={unlocked}
+                subtotal={subtotal}
+                estimatedTotal={estimatedTotal}
+                shippingSummary={shippingSummary}
+                shippingHint={shippingHint}
+                bundlePerBagText={bundlePerBagText}
+                bestPriceApplied={bestPriceApplied}
+                hasSavings={hasSavings}
+                showRegularLine={showRegularLine}
+                regularTotalText={regularTotalText}
+                drawerSavingsLine={drawerSavingsLine}
+                highlightTotals={highlightTotals}
+                showNextTierCta={showNextTierCta}
+                nextTierCtaLabel={nextTierCtaLabel}
+                bundlePending={bundlePending}
+                checkoutUrl={localCart?.checkoutUrl ?? null}
+                checkoutHref={checkoutHref ?? null}
+                secondaryCta={secondaryCta}
+                onAddNextTier={() => addBags(nextTierAddQty ?? 0)}
+                onCheckoutClick={handleCheckoutClick}
+                onClose={onClose}
+              />
             ) : null}
 
             <details className="rounded-2xl border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] p-4">
@@ -1598,75 +1326,12 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
         </div>
         </>
       ) : (
-        <div className="flex flex-col gap-4">
-          <div className="metal-panel rounded-[28px] border border-[rgba(15,27,45,0.12)] p-5">
-            <div className="text-center">
-              <div className="text-lg font-black text-[var(--text)]">Your cart is empty</div>
-              <div className="mt-1 text-sm text-[var(--muted)]">
-                Pick a bag count to get started. Free shipping at 5+ bags.
-              </div>
-            </div>
-            <div className="mt-5 grid grid-cols-3 gap-3">
-              {[5, 8, 12].map((q) => {
-                const p = pricingForQty(q);
-                const savings = Math.max(0, BASE_PRICE * q - p.total);
-                const isBest = q === 8;
-                return (
-                  <button
-                    key={q}
-                    type="button"
-                    onClick={() => addBags(q)}
-                    disabled={bundlePending}
-                    className={cn(
-                      "relative rounded-2xl border px-3 py-4 text-center transition hover:-translate-y-0.5",
-                      isBest
-                        ? "border-[#c7362c] bg-[rgba(199,54,44,0.04)] shadow-md"
-                        : "border-[rgba(15,27,45,0.12)] bg-white hover:shadow-sm"
-                    )}
-                  >
-                    {isBest && (
-                      <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-[#c7362c] px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white">
-                        Popular
-                      </span>
-                    )}
-                    <div className="text-2xl font-black text-[var(--text)]">{q}</div>
-                    <div className="text-[11px] font-semibold text-[var(--muted)]">bags</div>
-                    <div className="mt-1 text-sm font-bold text-[#2D7A3A]">
-                      {formatNumber(p.perBag, "USD")}/bag
-                    </div>
-                    {savings > 0 && (
-                      <div className="mt-0.5 text-[10px] font-semibold text-[var(--candy-red)]">
-                        Save {formatNumber(savings, "USD")}
-                      </div>
-                    )}
-                    {q >= FREE_SHIP_QTY && (
-                      <div className="mt-0.5 text-[10px] text-[var(--muted)]">Free shipping</div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-            <div className="mt-4">
-              <Link
-                href="/shop#bundle-pricing"
-                className="btn btn-candy w-full justify-center"
-                onClick={onClose}
-              >
-                Shop all bags
-              </Link>
-            </div>
-            <div className="mt-3 flex flex-wrap items-center justify-center gap-3 text-[11px] text-[var(--muted)]">
-              <span>🇺🇸 Made in USA</span>
-              <span>•</span>
-              <span>🚚 Free shipping 5+</span>
-              <span>•</span>
-              <span>⭐ {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars</span>
-            </div>
-            <div className="mt-2">
-              <AmazonOneBagNote className="text-[11px] text-[var(--muted)] text-center" />
-            </div>
-          </div>
-        </div>
+        <EmptyCartView
+          variant="page"
+          onAddBags={addBags}
+          bundlePending={bundlePending}
+          onClose={onClose}
+        />
       )}
 
       {showStickyCheckout ? (

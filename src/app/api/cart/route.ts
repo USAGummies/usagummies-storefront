@@ -11,6 +11,26 @@ import {
 } from "@/lib/cart";
 import { normalizeSingleBagVariant } from "@/lib/bundles/atomic";
 
+/* ── In-memory rate limiter (resets on cold start — acceptable on Vercel) ── */
+const RATE_LIMIT_WINDOW_MS = 60_000; // 60 seconds
+const RATE_LIMIT_MAX = 30; // max requests per window per IP
+
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+
+  if (!entry || now >= entry.resetAt) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return false;
+  }
+
+  entry.count += 1;
+  return entry.count > RATE_LIMIT_MAX;
+}
+/* ── End rate limiter ── */
+
 type Body = {
   action?: "add" | "buy" | "update" | "replace" | "get";
   variantId?: string;
@@ -27,6 +47,11 @@ function json(data: any, status = 200) {
 }
 
 export async function POST(req: Request) {
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  if (isRateLimited(ip)) {
+    return json({ ok: false, error: "Too many requests. Please try again later." }, 429);
+  }
+
   let body: Body;
   try {
     body = (await req.json()) as Body;
