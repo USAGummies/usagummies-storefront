@@ -189,24 +189,24 @@ const articleJsonLd = {
 export default function IngredientsPage() {
   return (
     <main className="relative overflow-hidden text-[var(--text)] min-h-screen home-candy">
-      <div className="relative w-full h-[320px] sm:h-[400px] lg:h-[440px] overflow-hidden">
+      <div className="relative w-full h-[280px] sm:h-[340px] lg:h-[380px] overflow-hidden">
         <Image
-          src="/brand/gallery/bag-badges-infographic.jpg"
-          alt="USA Gummies bag with trust badges and quality certifications"
+          src="/brand/gallery/bag-dye-free.jpg"
+          alt="USA Gummies dye-free gummy bears with natural fruit colors"
           fill
           sizes="100vw"
-          className="object-cover"
+          className="object-cover object-center"
           priority
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#1B2A4A]/25 to-[#1B2A4A]/55" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#1B2A4A]/45 to-[#1B2A4A]/70" />
         <div className="relative z-10 flex flex-col items-center justify-center h-full text-center px-4">
-          <div className="relative w-56 h-28 mb-3">
-            <Image src="/brand/logo-full.png" alt="USA Gummies" fill sizes="224px" className="object-contain drop-shadow-[0_4px_20px_rgba(0,0,0,0.4)]" />
+          <div className="relative w-52 h-24 mb-3">
+            <Image src="/brand/logo-full.png" alt="USA Gummies" fill sizes="208px" className="object-contain drop-shadow-[0_6px_24px_rgba(0,0,0,0.5)]" />
           </div>
-          <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold uppercase tracking-wide text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
+          <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold uppercase tracking-wide text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.5)]">
             Ingredients &amp; Nutrition
           </h1>
-          <p className="mt-2 text-sm text-white/85 max-w-md drop-shadow-sm">
+          <p className="mt-2 text-sm text-white/90 max-w-md drop-shadow-[0_1px_4px_rgba(0,0,0,0.3)]">
             Real fruit extracts, no artificial dyes. See exactly what goes into every bag.
           </p>
         </div>
@@ -421,6 +421,92 @@ export default function IngredientsPage() {
                   </details>
                 ))}
               </div>
+            </div>
+          </div>
+
+          {/* ── COMPETITOR COMPARISON ── */}
+          <div className="mt-6 candy-panel rounded-[32px] border border-[var(--border)] p-5 sm:p-6" id="vs-comparison">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+              How we compare
+            </div>
+            <h2 className="mt-2 text-2xl font-black text-[var(--text)]">
+              See how USA Gummies stacks up.
+            </h2>
+            <p className="mt-2 text-sm text-[var(--muted)] max-w-2xl">
+              Most gummy brands use artificial dyes like Red 40, Yellow 5, and Blue 1. USA Gummies uses
+              real fruit and vegetable extracts for color — no synthetic dyes, no titanium dioxide.
+            </p>
+
+            <div className="mt-5 overflow-hidden rounded-2xl border border-[var(--border)]">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="bg-[var(--surface-strong)]">
+                    <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-[var(--text)]">Feature</th>
+                    <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-[#2D7A3A]">USA Gummies</th>
+                    <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-[var(--muted)]">Most competitors</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--border)]">
+                  <tr className="bg-white">
+                    <td className="px-4 py-3 font-medium text-[var(--text)]">Artificial dyes</td>
+                    <td className="px-4 py-3 font-semibold text-[#2D7A3A]">✓ None</td>
+                    <td className="px-4 py-3 text-[#c7362c]">Red 40, Yellow 5, Blue 1</td>
+                  </tr>
+                  <tr className="bg-[var(--surface-strong)]">
+                    <td className="px-4 py-3 font-medium text-[var(--text)]">Titanium dioxide</td>
+                    <td className="px-4 py-3 font-semibold text-[#2D7A3A]">✓ None</td>
+                    <td className="px-4 py-3 text-[#c7362c]">Present in many brands</td>
+                  </tr>
+                  <tr className="bg-white">
+                    <td className="px-4 py-3 font-medium text-[var(--text)]">Flavors</td>
+                    <td className="px-4 py-3 font-semibold text-[#2D7A3A]">✓ All natural</td>
+                    <td className="px-4 py-3 text-[var(--muted)]">Artificial flavors</td>
+                  </tr>
+                  <tr className="bg-[var(--surface-strong)]">
+                    <td className="px-4 py-3 font-medium text-[var(--text)]">Made in USA</td>
+                    <td className="px-4 py-3 font-semibold text-[#2D7A3A]">✓ Sourced, made &amp; packed</td>
+                    <td className="px-4 py-3 text-[var(--muted)]">Germany, Mexico, Turkey, etc.</td>
+                  </tr>
+                  <tr className="bg-white">
+                    <td className="px-4 py-3 font-medium text-[var(--text)]">Color source</td>
+                    <td className="px-4 py-3 font-semibold text-[#2D7A3A]">✓ Fruit &amp; vegetable extracts</td>
+                    <td className="px-4 py-3 text-[var(--muted)]">Petroleum-derived dyes</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {[
+                { name: "Haribo", slug: "haribo", flag: "🇩🇪", note: "German-owned, uses Red 40 + titanium dioxide in US" },
+                { name: "Trolli", slug: "trolli", flag: "🇮🇹", note: "Italian-owned, made in Mexico, artificial colors" },
+                { name: "Sour Patch Kids", slug: "sour-patch-kids", flag: "🇨🇦", note: "Made in Canada/Mexico, artificial colors" },
+                { name: "Skittles Gummies", slug: "skittles-gummies", flag: "🇺🇸", note: "Promised to remove dyes in 2016 — still uses them" },
+              ].map((comp) => (
+                <Link
+                  key={comp.slug}
+                  href={`/vs/${comp.slug}`}
+                  className="group rounded-2xl border border-[var(--border)] bg-white p-4 transition hover:border-[#c7362c]/30 hover:shadow-md hover:-translate-y-0.5"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">{comp.flag}</span>
+                    <span className="text-sm font-bold text-[var(--text)]">{comp.name}</span>
+                  </div>
+                  <p className="mt-2 text-xs text-[var(--muted)] leading-relaxed">{comp.note}</p>
+                  <div className="mt-3 text-xs font-semibold text-[#c7362c] group-hover:underline">
+                    See full comparison →
+                  </div>
+                </Link>
+              ))}
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <Link href="/vs" className="btn btn-candy">
+                View all comparisons
+              </Link>
+              <span className="text-xs text-[var(--muted)]">
+                Side-by-side ingredient comparisons for 8+ brands
+              </span>
             </div>
           </div>
 

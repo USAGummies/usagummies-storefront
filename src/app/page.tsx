@@ -732,13 +732,9 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className={`${styles.scene} ${styles.sceneReviews}`} data-zone="REVIEWS">
-        <div className={styles.sceneBg} aria-hidden="true" />
-        <div className={styles.sceneOverlay} aria-hidden="true" />
-        <div className={styles.sceneContent}>
-        <div className="mx-auto max-w-6xl px-4 py-3 lg:py-4 reveal-up">
-            <ReviewsSection />
-          </div>
+      <section className="bg-white" data-zone="REVIEWS">
+        <div className="mx-auto max-w-6xl px-4 py-6 lg:py-8 reveal-up">
+          <ReviewsSection />
         </div>
       </section>
 
@@ -893,11 +889,8 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className={`${styles.scene} ${styles.sceneEmail}`} data-zone="EMAIL">
-        <div className={styles.sceneBg} aria-hidden="true" />
-        <div className={styles.sceneOverlay} aria-hidden="true" />
-        <div className={styles.sceneContent}>
-        <div className="mx-auto max-w-6xl px-4 py-4 lg:py-5 reveal-up">
+      <section className="bg-[#f8f5ef]" data-zone="EMAIL">
+        <div className="mx-auto max-w-6xl px-4 py-6 lg:py-8 reveal-up">
           <div className="grid gap-3 lg:grid-cols-[1.1fr_0.9fr]">
               <div className="candy-panel americana-panel rounded-[28px] p-3 sm:p-4 shadow-none bg-[var(--surface-strong)] border border-[rgba(15,27,45,0.12)]">
                 <div className="flex flex-wrap items-end justify-between gap-4">
@@ -1003,7 +996,6 @@ export default async function HomePage() {
               </div>
             </div>
           </div>
-        </div>
       </section>
 
       <section className="bg-transparent" data-zone="STORY">
@@ -1045,15 +1037,8 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className={`${styles.scene} ${styles.sceneFooter}`} aria-hidden="true">
-        <div className={styles.sceneBg} aria-hidden="true" />
-        <div className={styles.sceneOverlay} aria-hidden="true" />
-        <div className={styles.sceneContent}>
-          <div className="mx-auto max-w-6xl px-4 py-5 sm:py-6">
-            <div className="h-10 sm:h-12 lg:h-16" />
-          </div>
-        </div>
-      </section>
+      {/* Bottom breathing room — clean cream, no grey scene overlay */}
+      <div className="h-10 sm:h-12 lg:h-16 bg-transparent" aria-hidden="true" />
 
       <BagSlider variant="sticky" defaultQty={5} />
 
