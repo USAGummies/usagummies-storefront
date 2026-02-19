@@ -1523,27 +1523,27 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                       Express checkout
                     </div>
                     <div className="mt-2 grid grid-cols-3 gap-2">
-                      <a
-                        href={checkoutHref ?? localCart.checkoutUrl}
-                        onClick={(event) => handleCheckoutClick(event, "Shop Pay")}
-                        className="rounded-full border border-[rgba(15,27,45,0.12)] bg-white px-2 py-1.5 text-center text-[10px] font-semibold text-[var(--muted)]"
-                      >
-                        Shop Pay
-                      </a>
-                      <a
-                        href={checkoutHref ?? localCart.checkoutUrl}
-                        onClick={(event) => handleCheckoutClick(event, "Apple Pay")}
-                        className="rounded-full border border-[rgba(15,27,45,0.12)] bg-white px-2 py-1.5 text-center text-[10px] font-semibold text-[var(--muted)]"
-                      >
-                        Apple Pay
-                      </a>
-                      <a
-                        href={checkoutHref ?? localCart.checkoutUrl}
-                        onClick={(event) => handleCheckoutClick(event, "Google Pay")}
-                        className="rounded-full border border-[rgba(15,27,45,0.12)] bg-white px-2 py-1.5 text-center text-[10px] font-semibold text-[var(--muted)]"
-                      >
-                        Google Pay
-                      </a>
+                      {EXPRESS_CHECKOUT_METHODS.map((method) => (
+                        <a
+                          key={method.label}
+                          href={checkoutHref ?? localCart.checkoutUrl}
+                          onClick={(event) => handleCheckoutClick(event, method.label)}
+                          aria-label={`${method.label} checkout`}
+                          className={cn(
+                            "flex h-12 items-center justify-center rounded-xl border border-white/10 px-3 py-2 transition hover:brightness-105 shadow-[0_10px_20px_rgba(5,10,20,0.45)]",
+                            method.className
+                          )}
+                        >
+                          <Image
+                            src={method.iconSrc}
+                            alt={`${method.label} logo`}
+                            width={method.iconWidth ?? 96}
+                            height={method.iconHeight ?? 28}
+                            sizes="(max-width: 480px) 100px, 120px"
+                            className={cn(method.iconClassName, "opacity-100")}
+                          />
+                        </a>
+                      ))}
                     </div>
                   </div>
                 ) : null}
@@ -1599,20 +1599,71 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
         </>
       ) : (
         <div className="flex flex-col gap-4">
-          <div className="metal-panel rounded-[28px] border border-[rgba(15,27,45,0.12)] p-4">
-            <div className="text-sm font-semibold text-[var(--text)]">Your cart is empty.</div>
-            <div className="mt-2 text-xs text-[var(--muted)]">
-              Pick a bag count to get started and unlock free shipping at 5 bags.
+          <div className="metal-panel rounded-[28px] border border-[rgba(15,27,45,0.12)] p-5">
+            <div className="text-center">
+              <div className="text-lg font-black text-[var(--text)]">Your cart is empty</div>
+              <div className="mt-1 text-sm text-[var(--muted)]">
+                Pick a bag count to get started. Free shipping at 5+ bags.
+              </div>
             </div>
-            <Link
-              href="/shop#bundle-pricing"
-              className="btn btn-candy mt-4 w-full justify-center"
-              onClick={onClose}
-            >
-              Shop bags
-            </Link>
+            <div className="mt-5 grid grid-cols-3 gap-3">
+              {[5, 8, 12].map((q) => {
+                const p = pricingForQty(q);
+                const savings = Math.max(0, BASE_PRICE * q - p.total);
+                const isBest = q === 8;
+                return (
+                  <button
+                    key={q}
+                    type="button"
+                    onClick={() => addBags(q)}
+                    disabled={bundlePending}
+                    className={cn(
+                      "relative rounded-2xl border px-3 py-4 text-center transition hover:-translate-y-0.5",
+                      isBest
+                        ? "border-[#c7362c] bg-[rgba(199,54,44,0.04)] shadow-md"
+                        : "border-[rgba(15,27,45,0.12)] bg-white hover:shadow-sm"
+                    )}
+                  >
+                    {isBest && (
+                      <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-[#c7362c] px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white">
+                        Popular
+                      </span>
+                    )}
+                    <div className="text-2xl font-black text-[var(--text)]">{q}</div>
+                    <div className="text-[11px] font-semibold text-[var(--muted)]">bags</div>
+                    <div className="mt-1 text-sm font-bold text-[#2D7A3A]">
+                      {formatNumber(p.perBag, "USD")}/bag
+                    </div>
+                    {savings > 0 && (
+                      <div className="mt-0.5 text-[10px] font-semibold text-[var(--candy-red)]">
+                        Save {formatNumber(savings, "USD")}
+                      </div>
+                    )}
+                    {q >= FREE_SHIP_QTY && (
+                      <div className="mt-0.5 text-[10px] text-[var(--muted)]">Free shipping</div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-4">
+              <Link
+                href="/shop#bundle-pricing"
+                className="btn btn-candy w-full justify-center"
+                onClick={onClose}
+              >
+                Shop all bags
+              </Link>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-3 text-[11px] text-[var(--muted)]">
+              <span>🇺🇸 Made in USA</span>
+              <span>•</span>
+              <span>🚚 Free shipping 5+</span>
+              <span>•</span>
+              <span>⭐ {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars</span>
+            </div>
             <div className="mt-2">
-              <AmazonOneBagNote className="text-[11px] text-[var(--muted)]" />
+              <AmazonOneBagNote className="text-[11px] text-[var(--muted)] text-center" />
             </div>
           </div>
         </div>
