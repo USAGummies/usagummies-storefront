@@ -1264,7 +1264,7 @@ export default function BundleQuickBuy({
                         Learn more
                       </summary>
                       <div className="mt-1 text-[11px] text-[var(--muted)]">
-                        Savings start at 4 bags, free shipping starts at 5 bags, and per-bag pricing caps at {perBagCapText} after 12+ bags.{" "}
+                        Savings start at 5 bags, free shipping starts at 5 bags, and per-bag pricing caps at {perBagCapText} after 12+ bags.{" "}
                         <Link href="/faq" className="underline underline-offset-2">
                           Read the FAQ
                         </Link>
@@ -1459,7 +1459,7 @@ export default function BundleQuickBuy({
                         Learn more
                       </summary>
                       <div className="mt-1 text-[11px] text-[var(--muted)]">
-                      Savings start at 4 bags, free shipping starts at 5 bags, and per-bag pricing caps at {perBagCapText} after 12+ bags.{" "}
+                      Savings start at 5 bags, free shipping starts at 5 bags, and per-bag pricing caps at {perBagCapText} after 12+ bags.{" "}
                         <Link href="/faq" className="underline underline-offset-2">
                           Read the FAQ
                         </Link>
@@ -1833,7 +1833,7 @@ export default function BundleQuickBuy({
               Learn more
             </summary>
             <div className="mt-1 text-[11px]">
-              Savings start at 4 bags, free shipping unlocks at 5 bags, and per-bag pricing caps at {perBagCapText} after 12+ bags.{" "}
+              Savings start at 5 bags, free shipping unlocks at 5 bags, and per-bag pricing caps at {perBagCapText} after 12+ bags.{" "}
               <Link href="/faq" className="underline underline-offset-2">
                 Read the FAQ
               </Link>

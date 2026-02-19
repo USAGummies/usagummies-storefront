@@ -68,7 +68,7 @@ const FAQS = [
   {
     question: "How does bundle pricing work?",
     answer:
-      "Savings start at 4 bags, free shipping begins at 5+ bags, and the best per-bag price is at 12 bags.",
+      "Savings start at 5 bags, free shipping begins at 5+ bags, and the best per-bag price is at 12 bags.",
   },
   {
     question: "What is America 250?",

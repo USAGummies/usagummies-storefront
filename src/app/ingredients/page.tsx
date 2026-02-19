@@ -191,14 +191,14 @@ export default function IngredientsPage() {
     <main className="relative overflow-hidden text-[var(--text)] min-h-screen home-candy">
       <div className="relative w-full h-[280px] sm:h-[340px] lg:h-[380px] overflow-hidden">
         <Image
-          src="/brand/gallery/bag-dye-free.jpg"
-          alt="USA Gummies dye-free gummy bears with natural fruit colors"
+          src="/brand/lifestyle/picnic-scene.jpg"
+          alt="USA Gummies gummy bears on a picnic table in an American setting"
           fill
           sizes="100vw"
           className="object-cover object-center"
           priority
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#1B2A4A]/45 to-[#1B2A4A]/70" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#1B2A4A]/55 to-[#1B2A4A]/75" />
         <div className="relative z-10 flex flex-col items-center justify-center h-full text-center px-4">
           <div className="relative w-52 h-24 mb-3">
             <Image src="/brand/logo-full.png" alt="USA Gummies" fill sizes="208px" className="object-contain drop-shadow-[0_6px_24px_rgba(0,0,0,0.5)]" />

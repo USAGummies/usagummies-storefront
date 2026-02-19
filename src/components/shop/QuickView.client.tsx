@@ -374,7 +374,7 @@ export default function QuickView({ product, detailHref, bundleHref, children }:
                     <details className="mt-2">
                       <summary className="cursor-pointer font-semibold text-[var(--text)]">Learn more</summary>
                       <div className="mt-1 text-[11px]">
-                        Savings start at 4 bags, free shipping unlocks at 5 bags, and the best per-bag
+                        Savings start at 5 bags, free shipping unlocks at 5 bags, and the best per-bag
                         price shows up at 12 bags.{" "}
                         <Link href="/faq" className="underline underline-offset-2">
                           Read the FAQ

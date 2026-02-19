@@ -164,17 +164,28 @@ export default function WholesalePage() {
                   />
                 </div>
               </div>
-              <div id="wholesale-form">
-                <Script
-                  src="https://js-na2.hsforms.net/forms/embed/245038506.js"
-                  strategy="afterInteractive"
-                />
-                <div
-                  className="hs-form-frame"
-                  data-region="na2"
-                  data-form-id="22ab9284-ad89-4deb-b2ad-b6d6dc585cb1"
-                  data-portal-id="245038506"
-                />
+              <div className="grid gap-4 lg:grid-cols-[1fr_1fr] lg:items-start">
+                <div className="relative aspect-[4/5] overflow-hidden rounded-2xl border border-[var(--border)]">
+                  <Image
+                    src="/brand/gallery/bag-shelf-space.jpg"
+                    alt="USA Gummies taking shelf space in a retail store"
+                    fill
+                    sizes="(max-width: 1024px) 90vw, 280px"
+                    className="object-cover"
+                  />
+                </div>
+                <div id="wholesale-form">
+                  <Script
+                    src="https://js-na2.hsforms.net/forms/embed/245038506.js"
+                    strategy="afterInteractive"
+                  />
+                  <div
+                    className="hs-form-frame"
+                    data-region="na2"
+                    data-form-id="22ab9284-ad89-4deb-b2ad-b6d6dc585cb1"
+                    data-portal-id="245038506"
+                  />
+                </div>
               </div>
             </div>
           </div>
