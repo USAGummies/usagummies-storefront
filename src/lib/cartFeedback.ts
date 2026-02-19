@@ -33,10 +33,10 @@ export function getCartToastMessage(qty: number) {
   if (qty === 12) return "12 bags added — best price per bag.";
   if (qty === 8) return "8 bags added — great choice. This is our most popular size.";
   if (qty >= 5) return "Added to cart. Want better value? Most customers choose 8 bags.";
-  if (qty === 4) return "4 bags added. Add 1 more bag for free shipping.";
+  if (qty === 4) return "4 bags added. Add 1 more bag for free shipping + savings.";
   if (qty >= 1 && qty <= 3) {
-    const needed = 4 - qty;
-    return `Added to cart. Add ${needed} more bag${needed === 1 ? "" : "s"} to start saving.`;
+    const needed = 5 - qty;
+    return `Added to cart. Add ${needed} more bag${needed === 1 ? "" : "s"} for free shipping + savings.`;
   }
   return "Added to cart.";
 }

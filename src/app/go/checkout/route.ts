@@ -6,10 +6,12 @@
 // Also fires a server-side GA4 event via Measurement Protocol so we get
 // 100% accurate checkout-redirect counts regardless of ad blockers.
 import { NextRequest, NextResponse } from "next/server";
+import { SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
 
+const STOREFRONT_API_VERSION = "2025-01";
 const STOREFRONT_ENDPOINT =
   process.env.SHOPIFY_STOREFRONT_API_ENDPOINT ||
-  "https://usa-gummies.myshopify.com/api/2025-01/graphql.json";
+  `https://usa-gummies.myshopify.com/api/${STOREFRONT_API_VERSION}/graphql.json`;
 const STOREFRONT_TOKEN =
   process.env.SHOPIFY_STOREFRONT_API_TOKEN ||
   process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_API_TOKEN ||
@@ -17,8 +19,6 @@ const STOREFRONT_TOKEN =
 const GA4_MEASUREMENT_ID =
   process.env.NEXT_PUBLIC_GA4_ID?.trim() || "G-31X673PSVY";
 const GA4_API_SECRET = process.env.GA4_API_SECRET?.trim();
-
-const VARIANT_GID = "gid://shopify/ProductVariant/62295921099123";
 const DEFAULT_QTY = 5;
 
 const CART_CREATE_WITH_LINES = /* GraphQL */ `
@@ -35,8 +35,11 @@ const CART_CREATE_WITH_LINES = /* GraphQL */ `
   }
 `;
 
+/** Extract numeric ID from GID for Shopify cart permalink */
+const NUMERIC_VARIANT_ID = SINGLE_BAG_VARIANT_ID.split("/").pop()!;
+
 function fallbackPermalink(qty: number) {
-  return `https://usa-gummies.myshopify.com/cart/62295921099123:${qty}`;
+  return `https://usa-gummies.myshopify.com/cart/${NUMERIC_VARIANT_ID}:${qty}`;
 }
 
 /** Fire-and-forget GA4 Measurement Protocol event */
@@ -101,7 +104,7 @@ export async function GET(req: NextRequest) {
       body: JSON.stringify({
         query: CART_CREATE_WITH_LINES,
         variables: {
-          lines: [{ merchandiseId: VARIANT_GID, quantity: qty }],
+          lines: [{ merchandiseId: SINGLE_BAG_VARIANT_ID, quantity: qty }],
         },
       }),
       cache: "no-store",

@@ -5,7 +5,7 @@ import { normalizeSingleBagVariant } from "@/lib/bundles/atomic";
 import { normalizeCheckoutUrl } from "@/lib/checkout";
 
 const CART_COOKIE = "cartId";
-const DEFAULT_STOREFRONT_API_VERSION = "2024-07";
+const DEFAULT_STOREFRONT_API_VERSION = "2025-01";
 
 function getShopifyEndpoint() {
   const explicit = process.env.SHOPIFY_STOREFRONT_API_ENDPOINT;

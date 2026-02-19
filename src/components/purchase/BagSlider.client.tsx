@@ -291,6 +291,7 @@ export default function BagSlider({
       if (data.ok && data.cart?.id) {
         storeCartId(data.cart.id);
         fireCartToast(qty);
+        window.dispatchEvent(new Event("cart:updated"));
       }
     } catch {
       // silent fail — toast will still show via event
@@ -333,20 +334,41 @@ export default function BagSlider({
         <div className="mx-auto flex max-w-xl items-center gap-2">
           {/* Primary: Shopify CTA */}
           <button
-            onClick={() => {
+            onClick={async () => {
               if (!isAmazon) {
                 handleCta();
               } else {
-                // If currently in Amazon range, primary still goes to cart
-                // but we override to the 5-pack default
+                // If in Amazon range, snap to 5 bags and add to cart
                 setQty(5);
-                // handleCta will fire on next render via the button
+                setBusy(true);
+                trackEvent("bag_slider_sticky_upgrade", { from_qty: qty, to_qty: 5 });
+                try {
+                  const existingCartId = getStoredCartId();
+                  const res = await fetch("/api/cart", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      action: "replace",
+                      variantId: SINGLE_BAG_VARIANT_ID,
+                      quantity: 5,
+                      ...(existingCartId ? { cartId: existingCartId } : {}),
+                    }),
+                  });
+                  const data = await res.json();
+                  if (data.ok && data.cart?.id) {
+                    storeCartId(data.cart.id);
+                    fireCartToast(5);
+                    window.dispatchEvent(new Event("cart:updated"));
+                  }
+                } catch { /* silent */ } finally {
+                  setBusy(false);
+                }
               }
             }}
             disabled={busy}
             className={`flex-[1.2] py-3 bg-[#c7362c] text-white font-display text-sm tracking-[1px] uppercase rounded-xl text-center transition-all hover:-translate-y-px hover:bg-[#a82920] ${busy ? "opacity-60 pointer-events-none" : ""}`}
           >
-            {busy ? "Adding\u2026" : `${qty} BAGS \u2014 ${money(total)}`}
+            {busy ? "Adding\u2026" : isAmazon ? `5 BAGS \u2014 ${money(pricingForQty(5).total)}` : `${qty} BAGS \u2014 ${money(total)}`}
           </button>
 
           {/* Secondary: Amazon CTA */}
