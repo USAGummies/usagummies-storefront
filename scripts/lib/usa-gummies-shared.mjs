@@ -33,6 +33,11 @@ const HTTP_USER_AGENT =
 
 const PHONE_NUMBERS = ["4358967765", "6102356973"];
 
+/** Are we running on Vercel (cloud) or a local dev machine? */
+function _isCloud() {
+  return process.env.VERCEL === "1";
+}
+
 const PROJECT_ROOT = (() => {
   try {
     return path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
@@ -474,9 +479,32 @@ export function buildProperties(dbId, values) {
   return props;
 }
 
-// ── Email (himalaya) ────────────────────────────────────────────────────────
+// ── Email ────────────────────────────────────────────────────────────────────
+// Cloud: nodemailer (SMTP)  |  Local: himalaya CLI (bash scripts)
+
+let _nodemailer = null;
+
+async function _getNodemailerTransport() {
+  if (_nodemailer) return _nodemailer;
+  const nm = await import("nodemailer");
+  const pass = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS;
+  const user = process.env.SMTP_USER || "ben@usagummies.com";
+  if (!pass) throw new Error("No GMAIL_APP_PASSWORD or SMTP_PASS env var");
+  _nodemailer = nm.default.createTransport({
+    host: process.env.SMTP_HOST || "smtp.gmail.com",
+    port: Number(process.env.SMTP_PORT || "587"),
+    secure: false,
+    auth: { user, pass },
+  });
+  return _nodemailer;
+}
 
 export function sendEmail({ to, subject, body, dryRun }) {
+  if (_isCloud()) {
+    // Cloud path: use nodemailer (async, returns promise-like result)
+    return _sendEmailCloud({ to, subject, body, dryRun });
+  }
+  // Local path: himalaya CLI
   const args = [SEND_EMAIL_SCRIPT, "--to", to, "--subject", subject, "--body", body];
   if (dryRun) args.push("--dry-run");
   const res = spawnSync("bash", args, { encoding: "utf8" });
@@ -486,7 +514,28 @@ export function sendEmail({ to, subject, body, dryRun }) {
   };
 }
 
+async function _sendEmailCloud({ to, subject, body, dryRun }) {
+  if (dryRun) return { ok: true, output: `DRY RUN: Would send "${subject}" to ${to}` };
+  try {
+    const transport = await _getNodemailerTransport();
+    await transport.sendMail({
+      from: "Ben <ben@usagummies.com>",
+      to,
+      subject,
+      text: body,
+    });
+    return { ok: true, output: `SENT: "${subject}" to ${to}` };
+  } catch (err) {
+    return { ok: false, output: `SEND_FAILED: ${err.message}` };
+  }
+}
+
 export function checkEmail({ folder = "INBOX", count = 20, query = "" } = {}) {
+  if (_isCloud()) {
+    // On cloud, checkEmail is async — agents using this should await it
+    return _checkEmailCloud({ folder, count, query });
+  }
+  // Local path: himalaya CLI
   const args = [CHECK_EMAIL_SCRIPT, "--folder", folder, "--count", String(count)];
   if (query) args.push("--query", query);
   const res = spawnSync("bash", args, { encoding: "utf8", timeout: 30000 });
@@ -497,6 +546,47 @@ export function checkEmail({ folder = "INBOX", count = 20, query = "" } = {}) {
   };
 }
 
+async function _checkEmailCloud({ folder, count, query }) {
+  // Uses Gmail API via googleapis (already a dependency)
+  try {
+    const { google } = await import("googleapis");
+    const clientId = process.env.GMAIL_OAUTH_CLIENT_ID;
+    const clientSecret = process.env.GMAIL_OAUTH_CLIENT_SECRET;
+    const refreshToken = process.env.GMAIL_OAUTH_REFRESH_TOKEN;
+    if (!clientId || !clientSecret || !refreshToken) {
+      return { ok: false, output: "", error: "Gmail OAuth not configured" };
+    }
+    const oauth2 = new google.auth.OAuth2(clientId, clientSecret);
+    oauth2.setCredentials({ refresh_token: refreshToken });
+    const gmail = google.gmail({ version: "v1", auth: oauth2 });
+
+    const parts = [];
+    if (folder && folder !== "INBOX") parts.push(`in:${folder.toLowerCase()}`);
+    if (query) parts.push(query);
+    const q = parts.length > 0 ? parts.join(" ") : undefined;
+    const labelIds = folder === "INBOX" ? ["INBOX"] : undefined;
+
+    const listRes = await gmail.users.messages.list({
+      userId: "me", maxResults: count, q, labelIds,
+    });
+    const messages = listRes.data.messages || [];
+    const lines = [];
+    for (const msg of messages.slice(0, count)) {
+      if (!msg.id) continue;
+      const detail = await gmail.users.messages.get({
+        userId: "me", id: msg.id, format: "metadata",
+        metadataHeaders: ["From", "To", "Subject", "Date"],
+      });
+      const headers = detail.data.payload?.headers || [];
+      const getH = (n) => (headers.find((h) => h.name?.toLowerCase() === n.toLowerCase()))?.value || "";
+      lines.push(`${msg.id} | ${getH("From")} | ${getH("Subject")} | ${getH("Date")}`);
+    }
+    return { ok: true, output: lines.join("\n"), error: "" };
+  } catch (err) {
+    return { ok: false, output: "", error: `Gmail API error: ${err.message}` };
+  }
+}
+
 export function renderTemplate(text, vars) {
   let out = text;
   for (const [k, v] of Object.entries(vars)) {
@@ -505,9 +595,12 @@ export function renderTemplate(text, vars) {
   return out;
 }
 
-// ── iMessage ────────────────────────────────────────────────────────────────
+// ── Notifications (iMessage local / Slack cloud) ─────────────────────────────
 
 export function sendIMessage(message) {
+  if (_isCloud()) {
+    return _sendSlackNotification("alerts", message);
+  }
   const escaped = message.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   for (const phone of PHONE_NUMBERS) {
     const script = `
@@ -527,6 +620,35 @@ export function sendIMessage(message) {
 
 export function textBen(message) {
   return sendIMessage(message);
+}
+
+/** Send to Slack via incoming webhook (cloud-only) */
+async function _sendSlackNotification(channel, text) {
+  const webhookMap = {
+    alerts: process.env.SLACK_WEBHOOK_ALERTS,
+    pipeline: process.env.SLACK_WEBHOOK_PIPELINE,
+    daily: process.env.SLACK_WEBHOOK_DAILY,
+  };
+  const url = webhookMap[channel];
+  if (!url) {
+    log(`[notify] No Slack webhook for channel: ${channel}`);
+    return;
+  }
+  try {
+    await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+      signal: AbortSignal.timeout(10000),
+    });
+  } catch (err) {
+    log(`[notify] Slack send failed (${channel}): ${err.message}`);
+  }
+}
+
+/** Send to a specific Slack channel from any engine */
+export function notifySlack(channel, text) {
+  return _sendSlackNotification(channel, text);
 }
 
 // ── Run Status Management ───────────────────────────────────────────────────
