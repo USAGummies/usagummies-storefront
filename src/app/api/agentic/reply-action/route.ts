@@ -1,13 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import fs from "node:fs";
-import path from "node:path";
+import { readStateArray, writeState } from "@/lib/ops/state";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const HOME = process.env.HOME || "/Users/ben";
-const REPLY_ATTENTION_FILE = path.join(HOME, ".config/usa-gummies-mcp/reply-attention-queue.json");
-const APPROVED_SENDS_FILE = path.join(HOME, ".config/usa-gummies-mcp/reply-approved-sends.json");
 
 type QueueItem = {
   queueId: string;
@@ -28,36 +23,6 @@ type QueueItem = {
   deniedAtET?: string;
   deniedBy?: string;
 };
-
-function readQueue(): QueueItem[] {
-  try {
-    if (!fs.existsSync(REPLY_ATTENTION_FILE)) return [];
-    const raw = fs.readFileSync(REPLY_ATTENTION_FILE, "utf8");
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : (parsed.items || []);
-  } catch {
-    return [];
-  }
-}
-
-function writeQueue(items: QueueItem[]) {
-  fs.writeFileSync(REPLY_ATTENTION_FILE, JSON.stringify(items, null, 2), "utf8");
-}
-
-function readApprovedSends(): QueueItem[] {
-  try {
-    if (!fs.existsSync(APPROVED_SENDS_FILE)) return [];
-    const raw = fs.readFileSync(APPROVED_SENDS_FILE, "utf8");
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeApprovedSends(items: QueueItem[]) {
-  fs.writeFileSync(APPROVED_SENDS_FILE, JSON.stringify(items, null, 2), "utf8");
-}
 
 function etNow(): string {
   return new Intl.DateTimeFormat("en-US", {
@@ -89,7 +54,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const items = readQueue();
+    const items = await readStateArray<QueueItem>("reply-queue");
     const idx = items.findIndex((i) => i.queueId === queueId);
     if (idx === -1) {
       return NextResponse.json({ error: `Queue item ${queueId} not found` }, { status: 404 });
@@ -103,18 +68,17 @@ export async function POST(req: NextRequest) {
     const now = etNow();
 
     if (action === "approve") {
-      // Approve as-is — mark authorized and push to send queue
       items[idx] = {
         ...item,
         status: "authorized",
         authorizedAtET: now,
         authorizedBy: "ben-dashboard",
       };
-      writeQueue(items);
+      await writeState("reply-queue", items);
 
-      const approvedSends = readApprovedSends();
+      const approvedSends = await readStateArray<QueueItem>("approved-sends");
       approvedSends.push({ ...items[idx] });
-      writeApprovedSends(approvedSends);
+      await writeState("approved-sends", approvedSends);
 
       return NextResponse.json({
         ok: true,
@@ -124,7 +88,6 @@ export async function POST(req: NextRequest) {
       });
 
     } else if (action === "edit-and-send") {
-      // Ben edited the draft — send the edited version
       if (!editedSubject?.trim() || !editedBody?.trim()) {
         return NextResponse.json(
           { error: "editedSubject and editedBody are required for edit-and-send" },
@@ -136,18 +99,17 @@ export async function POST(req: NextRequest) {
         ...item,
         draftSubject: editedSubject.trim(),
         draftBody: editedBody.trim(),
-        subject: editedSubject.trim(), // alias for display
+        subject: editedSubject.trim(),
         status: "authorized",
         authorizedAtET: now,
         authorizedBy: "ben-dashboard-edited",
       };
       items[idx] = updatedItem;
-      writeQueue(items);
+      await writeState("reply-queue", items);
 
-      // Push edited version to approved sends for agent pickup
-      const approvedSends = readApprovedSends();
+      const approvedSends = await readStateArray<QueueItem>("approved-sends");
       approvedSends.push({ ...updatedItem });
-      writeApprovedSends(approvedSends);
+      await writeState("approved-sends", approvedSends);
 
       return NextResponse.json({
         ok: true,
@@ -157,14 +119,13 @@ export async function POST(req: NextRequest) {
       });
 
     } else {
-      // Deny completely — no email will be sent
       items[idx] = {
         ...item,
         status: "denied",
         deniedAtET: now,
         deniedBy: "ben-dashboard",
       };
-      writeQueue(items);
+      await writeState("reply-queue", items);
 
       return NextResponse.json({
         ok: true,

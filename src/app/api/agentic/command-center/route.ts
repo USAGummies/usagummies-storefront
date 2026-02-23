@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
-import { execSync } from "node:child_process";
-import fs from "node:fs";
-import path from "node:path";
+import {
+  readState,
+  readStateArray,
+  readStateObject,
+  readStateTail,
+  isCloud,
+} from "@/lib/ops/state";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -63,15 +67,9 @@ type StatusModel = {
   };
 };
 
+// File paths only used in local-dev mode (laptop). On Vercel, state.ts reads from KV.
 const HOME = process.env.HOME || "/Users/ben";
-const STATUS_FILE = path.join(HOME, ".config/usa-gummies-mcp/agentic-system-status.json");
-const LOG_FILE = path.join(HOME, ".config/usa-gummies-mcp/agentic-engine.log");
-const COMMAND_CENTER_PID_FILE = path.join(HOME, ".config/usa-gummies-mcp/command-center.pid");
-const COMMAND_CENTER_LOG_FILE = path.join(HOME, ".config/usa-gummies-mcp/command-center.log");
-const RUN_LEDGER_FILE = path.join(HOME, ".config/usa-gummies-mcp/agentic-run-ledger.json");
-const REPLY_ATTENTION_FILE = path.join(HOME, ".config/usa-gummies-mcp/reply-attention-queue.json");
-const KPI_TUNING_FILE = path.join(HOME, ".config/usa-gummies-mcp/agentic-kpi-tuning.json");
-const NOTION_CREDS_FILE = path.join(HOME, ".config/usa-gummies-mcp/.notion-credentials");
+const CONFIG_DIR = `${HOME}/.config/usa-gummies-mcp`;
 const B2B_SEND_FLOOR_PER_DAY = Number(process.env.B2B_SEND_FLOOR_PER_DAY || 35);
 const DISTRIBUTOR_SEND_FLOOR_PER_DAY = Number(process.env.DISTRIBUTOR_SEND_FLOOR_PER_DAY || 10);
 const DISTRIBUTOR_PROSPECTS_DB = "804b3270eb17483caac0441369c21f3a";
@@ -185,63 +183,19 @@ function minutesSinceIso(iso?: string) {
   return Math.floor((Date.now() - ms) / 60000);
 }
 
-function loadStatus(): StatusModel {
-  try {
-    if (!fs.existsSync(STATUS_FILE)) return {};
-    return JSON.parse(fs.readFileSync(STATUS_FILE, "utf8"));
-  } catch {
-    return {};
-  }
-}
+// Data loading is now handled by the state abstraction layer.
+// All reads happen at the top of the GET handler and are passed down.
 
-function tailLog(lines = 80) {
-  try {
-    if (!fs.existsSync(LOG_FILE)) return [];
-    const text = fs.readFileSync(LOG_FILE, "utf8");
-    return text.split("\n").filter(Boolean).slice(-lines);
-  } catch {
-    return [];
-  }
-}
-
-function tailFile(filePath: string, lines = 40) {
-  try {
-    if (!fs.existsSync(filePath)) return [];
-    const text = fs.readFileSync(filePath, "utf8");
-    return text.split("\n").filter(Boolean).slice(-lines);
-  } catch {
-    return [];
-  }
-}
-
-function loadJsonArray(filePath: string) {
-  try {
-    if (!fs.existsSync(filePath)) return [] as any[];
-    const parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function loadJsonObject(filePath: string) {
-  try {
-    if (!fs.existsSync(filePath)) return {} as Record<string, any>;
-    const parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-      ? parsed
-      : ({} as Record<string, any>);
-  } catch {
-    return {} as Record<string, any>;
-  }
-}
-
-function readNotionKeyFromCreds() {
+function readNotionKeyFromEnv(): string {
+  // On cloud or local: prefer env var. Fallback reads local creds file.
   const envKey = String(process.env.NOTION_API_KEY || "").trim();
   if (envKey) return envKey;
+  if (isCloud()) return "";
   try {
-    if (!fs.existsSync(NOTION_CREDS_FILE)) return "";
-    const lines = fs.readFileSync(NOTION_CREDS_FILE, "utf8").split("\n");
+    const credsFile = `${CONFIG_DIR}/.notion-credentials`;
+    const nodeFs = require("node:fs") as typeof import("node:fs");
+    if (!nodeFs.existsSync(credsFile)) return "";
+    const lines = nodeFs.readFileSync(credsFile, "utf8").split("\n");
     for (const rawLine of lines) {
       const line = rawLine.trim();
       if (!line || line.startsWith("#")) continue;
@@ -260,7 +214,7 @@ async function getNotionHealth() {
   if (nowMs - notionHealthCache.checkedAtMs < 2 * 60 * 1000) {
     return notionHealthCache;
   }
-  const key = readNotionKeyFromCreds();
+  const key = readNotionKeyFromEnv();
   if (!key) {
     notionHealthCache = {
       checkedAtMs: nowMs,
@@ -308,6 +262,8 @@ async function getNotionHealth() {
   }
 }
 
+// -- Process monitoring (laptop-only) ----------------------------------------
+
 function parsePid(raw: string) {
   const parsed = Number.parseInt(raw.trim(), 10);
   if (!Number.isFinite(parsed) || parsed <= 0) return null;
@@ -316,82 +272,73 @@ function parsePid(raw: string) {
 
 function isPidAlive(pid: number | null) {
   if (!pid) return false;
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
+  try { process.kill(pid, 0); return true; } catch { return false; }
 }
 
-function getPidCommand(pid: number | null) {
-  if (!pid) return "";
+function localExecSync(cmd: string, timeout = 5000): string {
+  if (isCloud()) return "";
   try {
-    return execSync(`ps -p ${pid} -o command=`, { encoding: "utf8", timeout: 5000 }).trim();
-  } catch {
-    return "";
-  }
+    const exec = require("node:child_process").execSync as typeof import("node:child_process").execSync;
+    return exec(cmd, { encoding: "utf8", timeout }).trim();
+  } catch { return ""; }
 }
 
-function getListenerPid(port: number) {
-  try {
-    const out = execSync(`lsof -tiTCP:${port} -sTCP:LISTEN -n -P | head -n 1`, {
-      encoding: "utf8",
-      timeout: 5000,
-    }).trim();
-    const pid = parsePid(out);
-    return pid;
-  } catch {
-    return null;
+function getCommandCenterRuntime(watchdogLogLines: string[]) {
+  if (isCloud()) {
+    return {
+      healthy: true,
+      mode: "cloud" as const,
+      trackedPid: null as number | null,
+      trackedPidAlive: false,
+      trackedPidCommand: "",
+      listenerPid: null as number | null,
+      listenerCommand: "",
+      watchdogLogUpdatedAt: "",
+      recentWatchdogLogs: [] as string[],
+    };
   }
-}
 
-function getCommandCenterRuntime() {
-  const pidRaw = fs.existsSync(COMMAND_CENTER_PID_FILE)
-    ? fs.readFileSync(COMMAND_CENTER_PID_FILE, "utf8")
-    : "";
+  const nodeFs = require("node:fs") as typeof import("node:fs");
+  const pidFile = `${CONFIG_DIR}/command-center.pid`;
+  const logFile = `${CONFIG_DIR}/command-center.log`;
+  const pidRaw = nodeFs.existsSync(pidFile) ? nodeFs.readFileSync(pidFile, "utf8") : "";
   const trackedPid = parsePid(pidRaw);
   const trackedPidAlive = isPidAlive(trackedPid);
-  const trackedPidCommand = getPidCommand(trackedPid);
-
-  const listenerPid = getListenerPid(4000);
-  const listenerCommand = getPidCommand(listenerPid);
-  const listenerHealthy = Boolean(listenerPid);
+  const trackedPidCommand = trackedPid ? localExecSync(`ps -p ${trackedPid} -o command=`) : "";
+  const listenerOut = localExecSync("lsof -tiTCP:4000 -sTCP:LISTEN -n -P | head -n 1");
+  const listenerPid = listenerOut ? parsePid(listenerOut) : null;
+  const listenerCommand = listenerPid ? localExecSync(`ps -p ${listenerPid} -o command=`) : "";
 
   let watchdogLogUpdatedAt = "";
   try {
-    if (fs.existsSync(COMMAND_CENTER_LOG_FILE)) {
-      watchdogLogUpdatedAt = fs.statSync(COMMAND_CENTER_LOG_FILE).mtime.toISOString();
-    }
-  } catch {
-    watchdogLogUpdatedAt = "";
-  }
+    if (nodeFs.existsSync(logFile)) watchdogLogUpdatedAt = nodeFs.statSync(logFile).mtime.toISOString();
+  } catch { /* */ }
 
   return {
-    healthy: listenerHealthy,
+    healthy: Boolean(listenerPid),
+    mode: "local" as const,
     trackedPid,
     trackedPidAlive,
     trackedPidCommand,
     listenerPid,
     listenerCommand,
     watchdogLogUpdatedAt,
-    recentWatchdogLogs: tailFile(COMMAND_CENTER_LOG_FILE, 20),
+    recentWatchdogLogs: watchdogLogLines,
   };
 }
 
 function readCronSection() {
+  if (isCloud()) {
+    return { installed: true, lines: ["Cloud scheduler (Vercel Cron + QStash)"] };
+  }
   try {
-    const raw = execSync("crontab -l", { encoding: "utf8", timeout: 8000 });
+    const raw = localExecSync("crontab -l", 8000);
+    if (!raw) return { installed: false, lines: [] as string[] };
     const lines = raw.split("\n");
     const start = lines.findIndex((l) => l.trim() === "# >>> USA_GUMMIES_AGENTIC >>>");
     const end = lines.findIndex((l) => l.trim() === "# <<< USA_GUMMIES_AGENTIC <<<");
-    if (start < 0 || end < 0 || end <= start) {
-      return { installed: false, lines: [] as string[] };
-    }
-    return {
-      installed: true,
-      lines: lines.slice(start + 1, end).filter((l) => l.trim().length > 0),
-    };
+    if (start < 0 || end < 0 || end <= start) return { installed: false, lines: [] as string[] };
+    return { installed: true, lines: lines.slice(start + 1, end).filter((l) => l.trim().length > 0) };
   } catch {
     return { installed: false, lines: [] as string[] };
   }
@@ -501,8 +448,7 @@ function sendFailuresFromResult(result: any) {
   return candidates.filter((x) => transportFailure.test(x) && !nonDeliveryFailure.test(x)).length;
 }
 
-function buildKpis(nowET: ReturnType<typeof etParts>) {
-  const ledger = loadJsonArray(RUN_LEDGER_FILE);
+function buildKpis(nowET: ReturnType<typeof etParts>, ledger: any[]) {
   const today = nowET.date;
   const todayEntries = ledger.filter((x) => x?.runDateET === today);
 
@@ -597,8 +543,8 @@ function buildKpis(nowET: ReturnType<typeof etParts>) {
   };
 }
 
-function buildAttentionQueue() {
-  const items = loadJsonArray(REPLY_ATTENTION_FILE)
+function buildAttentionQueue(replyQueue: any[]) {
+  const items = replyQueue
     .filter((x) => x && x.status !== "resolved")
     .reverse()
     .slice(0, 100);
@@ -751,9 +697,11 @@ function buildOperatorControl(input: {
   now: Date;
   nowET: ReturnType<typeof etParts>;
   agents: Record<string, AgentState>;
+  ledger: any[];
+  kpiTuning: Record<string, any>;
 }) {
-  const ledger = loadJsonArray(RUN_LEDGER_FILE);
-  const tuning = loadJsonObject(KPI_TUNING_FILE);
+  const ledger = input.ledger;
+  const tuning = input.kpiTuning;
   const cutoffMs = input.now.getTime() - 24 * 60 * 60 * 1000;
   const last24h = ledger.filter((row) => {
     const runAtMs = Date.parse(String(row?.runAt || ""));
@@ -844,7 +792,7 @@ function buildOperatorControl(input: {
   };
 }
 
-async function fetchWeekGoals(notionKey: string, nowET: ReturnType<typeof etParts>): Promise<WeekGoals> {
+async function fetchWeekGoals(notionKey: string, nowET: ReturnType<typeof etParts>, ledger: any[]): Promise<WeekGoals> {
   const nowMs = Date.now();
   if (nowMs - weekGoalsCache.checkedAtMs < 5 * 60 * 1000 && weekGoalsCache.data.fetchedAt) {
     return weekGoalsCache.data;
@@ -925,7 +873,6 @@ async function fetchWeekGoals(notionKey: string, nowET: ReturnType<typeof etPart
     }
 
     // 3. B2B orders this week from run ledger
-    const ledger = loadJsonArray(RUN_LEDGER_FILE);
     const weekOrders = ledger
       .filter((x: any) => { const d = String(x?.runDateET || ""); return d >= weekStart && d <= weekEnd; })
       .reduce((sum: number, x: any) => sum + Number(x?.result?.fairOrders || 0), 0);
@@ -948,7 +895,17 @@ async function fetchWeekGoals(notionKey: string, nowET: ReturnType<typeof etPart
 }
 
 export async function GET() {
-  const status = loadStatus();
+  // ── Pre-load all state (KV on Vercel, filesystem on laptop) ──────────
+  const [status, ledger, replyQueue, kpiTuning, engineLogLines, watchdogLogLines] =
+    await Promise.all([
+      readState<StatusModel>("system-status", {}),
+      readStateArray("run-ledger"),
+      readStateArray("reply-queue"),
+      readStateObject("kpi-tuning"),
+      readStateTail("engine-log", 120),
+      readStateTail("command-center-log", 20),
+    ]);
+
   const now = new Date();
   const nowET = etParts(now);
   const schedule = { ...DEFAULT_SCHEDULE_PLAN, ...(status.schedule || {}) };
@@ -981,12 +938,11 @@ export async function GET() {
     criticalCount > 0 ? "critical" : warningCount > 0 ? "warning" : "healthy";
 
   const cron = readCronSection();
-  const logs = tailLog(120);
-  const commandCenter = getCommandCenterRuntime();
-  const kpis = buildKpis(nowET);
-  const attentionQueue = buildAttentionQueue();
-  const notionKeyForGoals = readNotionKeyFromCreds();
-  const weekGoals = await fetchWeekGoals(notionKeyForGoals, nowET);
+  const commandCenter = getCommandCenterRuntime(watchdogLogLines);
+  const kpis = buildKpis(nowET, ledger);
+  const attentionQueue = buildAttentionQueue(replyQueue);
+  const notionKeyForGoals = readNotionKeyFromEnv();
+  const weekGoals = await fetchWeekGoals(notionKeyForGoals, nowET, ledger);
   const recentEvents = (status.recentEvents || []).slice(-20).reverse();
   const latestEventAt = status.recentEvents?.length
     ? status.recentEvents[status.recentEvents.length - 1]?.at
@@ -1003,6 +959,8 @@ export async function GET() {
     now,
     nowET,
     agents,
+    ledger,
+    kpiTuning: kpiTuning as Record<string, any>,
   });
 
   return NextResponse.json({
@@ -1032,12 +990,7 @@ export async function GET() {
     systemStatus,
     operatorControl,
     commandCenter,
-    logs,
-    paths: {
-      statusFile: STATUS_FILE,
-      logFile: LOG_FILE,
-      commandCenterPidFile: COMMAND_CENTER_PID_FILE,
-      commandCenterLogFile: COMMAND_CENTER_LOG_FILE,
-    },
+    logs: engineLogLines,
+    environment: isCloud() ? "cloud" : "local",
   });
 }
