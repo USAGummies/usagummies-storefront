@@ -16,7 +16,7 @@ import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import LazyHeroCTAWatcher from "@/components/home/LazyHeroCTAWatcher.client";
 import { LatestFromBlog } from "@/components/blog/LatestFromBlog";
 import { DyeFreeNewsBanner } from "@/components/marketing/DyeFreeNewsBanner";
-import { TrustBar, GuaranteeBadge } from "@/components/social-proof/TrustBar";
+import { TrustBar, GuaranteeBadge, SocialProofStat } from "@/components/social-proof/TrustBar";
 import styles from "./homepage-scenes.module.css";
 
 function resolveSiteUrl() {
@@ -234,7 +234,7 @@ export default async function HomePage() {
           />
           <div className="absolute inset-0 bg-gradient-to-b from-[#1B2A4A]/30 to-[#1B2A4A]/60" />
         </div>
-        <div className="relative z-10 mx-auto flex max-w-6xl flex-col items-center px-4 py-16 sm:py-20 lg:py-28 text-center">
+        <div className="relative z-10 mx-auto flex max-w-6xl flex-col items-center px-4 py-10 sm:py-20 lg:py-28 text-center">
           <Image
             src="/brand/logo-full.png"
             alt="USA Gummies — American-made gummy bears"
@@ -249,6 +249,7 @@ export default async function HomePage() {
           <p className="mt-3 max-w-lg text-sm text-white/90 sm:text-base drop-shadow-[0_1px_4px_rgba(0,0,0,0.3)]">
             Classic gummy bears, made in the USA. No artificial dyes. Just real fruit colors and all-natural flavor.
           </p>
+          <SocialProofStat className="mt-4" />
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
             <a href="#hero-primary-cta" className="inline-flex items-center gap-2 rounded-full bg-[#c7362c] px-7 py-3.5 text-sm font-bold text-white shadow-lg transition hover:bg-[#a82c24] hover:shadow-xl">
               Shop now

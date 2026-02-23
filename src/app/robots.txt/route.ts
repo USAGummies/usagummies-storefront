@@ -1,5 +1,3 @@
-import type { MetadataRoute } from "next";
-
 function resolveSiteUrl() {
   const preferred = "https://www.usagummies.com";
   const fromEnv = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || null;
@@ -12,17 +10,27 @@ function resolveSiteUrl() {
   return nodeEnv === "production" ? preferred : "http://localhost:3000";
 }
 
-export default function robots(): MetadataRoute.Robots {
+export function GET() {
   const siteUrl = resolveSiteUrl();
-  return {
-    rules: [
-      {
-        userAgent: "*",
-        allow: "/",
-        disallow: ["/api/", "/_next/", "/__seo", "/routecheck"],
-      },
-    ],
-    sitemap: `${siteUrl}/sitemap.xml`,
-    host: siteUrl,
-  };
+  const body = `User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /_next/
+Disallow: /__seo
+Disallow: /routecheck
+Disallow: /command-center
+
+Sitemap: ${siteUrl}/sitemap.xml
+Host: ${siteUrl}
+
+# LLM-friendly brand & product description
+# See https://llmstxt.org
+LLMs-Txt: ${siteUrl}/llms.txt
+`;
+  return new Response(body, {
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Cache-Control": "public, max-age=3600, s-maxage=86400",
+    },
+  });
 }

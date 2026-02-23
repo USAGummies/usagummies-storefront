@@ -67,6 +67,45 @@ Simple, direct, high-trust.
 - Bag-count savings and stocking-up value
 - Made in the USA, all natural flavors, no artificial dyes
 
+## Blog content clusters
+
+### Dye-Free & Ingredients (topical authority cluster)
+- /blog/is-red-40-bad-for-you — Red 40 health risks deep-dive
+- /blog/what-candy-has-red-40 — Which popular candies contain Red 40
+- /blog/yellow-5-yellow-6-side-effects — Yellow 5 & Yellow 6 safety
+- /blog/fda-red-no-3-ban-what-to-know — FDA Red No. 3 ban explainer
+- /blog/california-food-dye-ban-2027 — California Food Safety Act (AB 418)
+- /blog/mars-removing-artificial-dyes-what-it-means — Mars dye-free M&M's/Skittles
+- /blog/artificial-dyes-banned-in-europe-not-us — EU vs US dye regulations
+- /blog/best-dye-free-candy-brands — Top dye-free candy brands 2026
+- /blog/food-dyes-adhd-children — Food dyes and ADHD link
+- /blog/natural-colors-gummy-bears — How natural colors work in gummies
+- /blog/natural-color-candy-vs-artificial-dyes — Natural vs artificial color comparison
+- /blog/red-40-free-gummies-dye-free-meaning — What "dye-free" actually means
+- /blog/dye-free-gummy-bears-ingredients — Full ingredient breakdown
+- /blog/artificial-dye-free-candy-snacks — Dye-free candy alternatives
+- /blog/blue-1-dye-in-candy — Blue 1 (Brilliant Blue FCF) safety and alternatives
+- /blog/titanium-dioxide-in-candy — Titanium dioxide: banned in EU, still in US candy
+
+### Made in USA
+- /blog/made-in-usa-candy-guide — American-made candy overview
+- /blog/made-in-usa-candy-why-quality-matters — Why domestic manufacturing matters
+- /blog/made-in-usa-candy-bulk-orders — Bulk ordering American candy
+- /blog/inside-usa-gummies-production — Behind the scenes at our facility
+
+### Party, Gifting & Seasonal
+- /blog/patriotic-party-snack-guide — Patriotic party planning
+- /blog/patriotic-snack-board-ideas — Snack board inspiration
+- /blog/patriotic-snacks-for-parades-tailgates — Event snack ideas
+- /blog/dye-free-gummies-for-kids-parties — Kids party candy guide
+- /blog/dye-free-snacks-for-kids — Safe snacking for children
+- /blog/dye-free-candy-for-easter-2026 — Easter 2026 dye-free candy guide
+- /blog/red-white-blue-dye-free-gummies — Patriotic color gummies
+- /blog/usa-made-candy-gifts-for-events — Candy gift guide
+
+### Primary product page
+- /shop — Main purchase page with volume pricing, product details, and reviews
+
 ## Structured data notes
 Product and FAQ pages include structured data and product/offer information.
 

@@ -313,7 +313,16 @@ export default function BagSlider({
         className={`fixed bottom-0 left-0 right-0 z-50 bg-white/[0.97] backdrop-blur-[12px] border-t border-[rgba(15,27,45,0.1)] px-4 py-3 md:hidden ${className}`}
         style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
       >
-        <div className="mx-auto flex max-w-xl items-center gap-2">
+        <div className="mx-auto max-w-xl">
+          <div className="flex items-center justify-center gap-2 text-[10px] text-[var(--muted,#5f5b56)] mb-1.5">
+            <span className="text-[var(--candy-yellow,#f5c842)]">&#9733;</span>
+            <span>4.8 stars</span>
+            <span className="text-[var(--border)]">&middot;</span>
+            <span>Free shipping on 5+</span>
+            <span className="text-[var(--border)]">&middot;</span>
+            <span>Made in USA</span>
+          </div>
+          <div className="flex items-center gap-2">
           {/* Primary: Shopify CTA */}
           <button
             onClick={async () => {
@@ -363,6 +372,7 @@ export default function BagSlider({
           >
             AMAZON
           </a>
+          </div>
         </div>
       </div>
     );

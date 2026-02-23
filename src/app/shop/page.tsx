@@ -16,6 +16,8 @@ import { getBundleVariants } from "@/lib/bundles/getBundleVariants";
 import { SINGLE_BAG_SKU } from "@/lib/bundles/atomic";
 import { DETAIL_BULLETS } from "@/data/productDetails";
 import { ProductJsonLd } from "@/components/seo/ProductJsonLd";
+import { SocialProofStat } from "@/components/social-proof/TrustBar";
+import { getReviewAggregate } from "@/lib/reviews/aggregate";
 import { buildCanonicalUrl } from "@/lib/seo/canonical";
 import {
   MIN_RELATED_SCORE,
@@ -123,6 +125,8 @@ export default async function ShopPage() {
     internalProducts = [];
   }
 
+  const reviewAggregate = await getReviewAggregate();
+
   const guideCandidates = getTopGuideCandidates();
   const productHandle =
     detailedProduct?.handle || primaryProduct?.handle || "all-american-gummy-bears-7-5-oz-single-bag";
@@ -221,6 +225,10 @@ export default async function ShopPage() {
             Classic gummy bears, made in the USA. No artificial dyes.
           </p>
         </div>
+      </div>
+
+      <div className="mx-auto max-w-6xl px-4 -mt-5 relative z-10 flex justify-center">
+        <SocialProofStat />
       </div>
 
       <BreadcrumbJsonLd
@@ -382,6 +390,14 @@ export default async function ShopPage() {
         brandName="USA Gummies"
         siteUrl={SITE_URL}
         availability={bundleVariants?.availableForSale === false ? "OutOfStock" : "InStock"}
+        aggregateRating={
+          reviewAggregate
+            ? {
+                ratingValue: reviewAggregate.ratingValue,
+                reviewCount: reviewAggregate.reviewCount,
+              }
+            : null
+        }
       />
     </main>
   );

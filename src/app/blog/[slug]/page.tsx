@@ -37,6 +37,15 @@ const PILLAR_TAG_SLUGS = new Set([
   "clean-label",
 ]);
 
+const DYE_RELATED_TAGS = new Set([
+  "dye-free",
+  "no-artificial-dyes",
+  "red-40",
+  "ingredients",
+  "clean-label",
+  "artificial-dyes",
+]);
+
 type PageProps = {
   params: Promise<{ slug: string }>;
 };
@@ -106,7 +115,10 @@ export default async function BlogPostPage({ params }: PageProps) {
     sameAs: author?.links || undefined,
   };
 
-  const blogPostingJsonLd = {
+  const isDyeRelated = post.tagSlugs.some((s) => DYE_RELATED_TAGS.has(s)) ||
+    post.category.toLowerCase().includes("dye");
+
+  const blogPostingJsonLd: Record<string, unknown> = {
     "@context": "https://schema.org",
     "@type": "BlogPosting",
     headline: post.seoTitle || post.title,
@@ -130,6 +142,15 @@ export default async function BlogPostPage({ params }: PageProps) {
       "@id": pageUrl,
     },
     keywords: post.tags.join(", "),
+    ...(isDyeRelated && {
+      mentions: {
+        "@type": "Product",
+        name: "USA Gummies All American Gummy Bears",
+        url: `${siteUrl}/shop`,
+        brand: { "@type": "Brand", name: "USA Gummies" },
+        description: "Premium dye-free gummy bears made in the USA with natural fruit and vegetable colors.",
+      },
+    }),
   };
 
   const sourceSignals = buildPostSignals({
