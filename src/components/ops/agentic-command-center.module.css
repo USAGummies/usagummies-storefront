@@ -1,0 +1,166 @@
+.shell {
+  min-height: calc(100vh - 64px);
+  padding: 1.5rem 1rem 2rem;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(191, 10, 48, 0.12), transparent 42%),
+    radial-gradient(circle at 85% 10%, rgba(0, 40, 104, 0.16), transparent 45%),
+    linear-gradient(180deg, #f5f7fb 0%, #e8eef8 55%, #e6edf9 100%);
+  color: #12213f;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  gap: 1rem;
+}
+
+.header {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.title {
+  font-family: var(--font-display), "Impact", sans-serif;
+  font-size: clamp(1.6rem, 2.8vw, 2.4rem);
+  letter-spacing: 0.02em;
+}
+
+.subtitle {
+  font-size: 0.95rem;
+  opacity: 0.88;
+}
+
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+
+.kpiCard {
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(18, 33, 63, 0.12);
+  border-radius: 14px;
+  padding: 0.85rem 0.9rem;
+  box-shadow: 0 10px 24px rgba(16, 35, 77, 0.08);
+}
+
+.kpiLabel {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  opacity: 0.76;
+}
+
+.kpiValue {
+  margin-top: 0.25rem;
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.statusHealthy {
+  color: #0e6e35;
+}
+
+.statusWarning {
+  color: #9a5a00;
+}
+
+.statusCritical {
+  color: #b9122e;
+}
+
+.statusUnknown {
+  color: #505a73;
+}
+
+.panel {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(18, 33, 63, 0.12);
+  border-radius: 14px;
+  padding: 0.9rem;
+  box-shadow: 0 10px 24px rgba(16, 35, 77, 0.08);
+}
+
+.panelTitle {
+  font-size: 0.98rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.tableWrap {
+  overflow: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+}
+
+.table th,
+.table td {
+  border-bottom: 1px solid rgba(18, 33, 63, 0.12);
+  text-align: left;
+  padding: 0.45rem 0.35rem;
+  vertical-align: top;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.15rem 0.42rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.badgeHealthy {
+  background: rgba(18, 145, 73, 0.14);
+  color: #08612e;
+}
+
+.badgeWarning {
+  background: rgba(228, 139, 15, 0.18);
+  color: #8b4b00;
+}
+
+.badgeCritical {
+  background: rgba(206, 38, 72, 0.16);
+  color: #95152e;
+}
+
+.badgeUnknown {
+  background: rgba(73, 90, 123, 0.16);
+  color: #38445f;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+}
+
+.logBox {
+  max-height: 260px;
+  overflow: auto;
+  background: #0f1b34;
+  color: #d7e6ff;
+  border-radius: 10px;
+  padding: 0.6rem;
+}
+
+.row {
+  display: grid;
+  gap: 0.75rem;
+}
+
+@media (min-width: 980px) {
+  .row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
