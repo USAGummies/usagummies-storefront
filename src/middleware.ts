@@ -9,17 +9,40 @@
  *   /api/agentic/*  → 401 if unauthenticated
  *   /api/ops/*      → 401 if unauthenticated
  *
+ * Exceptions (self-authenticated routes — verify QStash sig / API key internally):
+ *   /api/ops/scheduler/master  → Vercel Cron (CRON_SECRET verified in route)
+ *   /api/ops/engine/*          → QStash callbacks (signature verified in route)
+ *   /api/ops/notify            → Internal notifications endpoint
+ *
  * Public routes (storefront, blog, shop, etc.) are unaffected.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 
+/** Routes that handle their own authentication (QStash signature, API key, etc.) */
+const SELF_AUTHENTICATED_PREFIXES = [
+  "/api/ops/scheduler/master",
+  "/api/ops/engine/",
+  "/api/ops/notify",
+];
+
+function isSelfAuthenticated(pathname: string): boolean {
+  return SELF_AUTHENTICATED_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(prefix)
+  );
+}
+
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Allow login page and auth API routes without session
   if (pathname === "/ops/login" || pathname.startsWith("/api/auth/")) {
+    return NextResponse.next();
+  }
+
+  // Allow self-authenticated routes (QStash, Vercel Cron) — they verify internally
+  if (isSelfAuthenticated(pathname)) {
     return NextResponse.next();
   }
 

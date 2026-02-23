@@ -43,6 +43,9 @@ export const STATE_KEYS = {
   "finops-invoice-cache": "finops-invoice-cache.json",
   "finops-reconciliation-state": "finops-reconciliation-state.json",
 
+  // Scheduler
+  "run-ledger-recent": "agentic-run-ledger-recent.json",
+
   // Logs (text, not JSON — stored as string)
   "engine-log": "agentic-engine.log",
   "command-center-log": "command-center.log",
