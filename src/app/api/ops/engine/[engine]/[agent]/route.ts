@@ -13,6 +13,7 @@ import { Receiver } from "@upstash/qstash";
 import { ENGINE_REGISTRY } from "@/lib/ops/engine-schedule";
 import { appendStateArray } from "@/lib/ops/state";
 import { notifyAlert } from "@/lib/ops/notify";
+import { runAgent as runEngineAgent } from "@/lib/ops/engine-runner";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -141,32 +142,31 @@ export async function POST(
   const startTime = Date.now();
 
   try {
-    // --- Dynamic import and execution ---
-    // Each engine exports a runAgent(key) function that executes a single agent
-    const engineModule = await importEngine(engineId);
-
-    if (!engineModule?.runAgent) {
-      throw new Error(`Engine "${engineId}" does not export runAgent()`);
-    }
-
-    const result = await engineModule.runAgent(agentKey);
+    // --- Execute agent via child process bridge ---
+    const result = await runEngineAgent(engineId, agentKey);
 
     const durationMs = Date.now() - startTime;
     record.completedAt = etTimestamp();
     record.durationMs = durationMs;
-    record.status = result?.status === "failed" ? "failed" : "success";
+    record.status = result.status === "failed" ? "failed" : "success";
 
     await appendStateArray("run-ledger", [record], 10000);
 
+    if (result.status === "failed") {
+      await notifyAlert(
+        `Agent failed: ${agent.name} (${engineId}/${agentKey})\nError: ${result.summary}\nDuration: ${durationMs}ms`
+      ).catch(() => {});
+    }
+
     return NextResponse.json({
-      ok: true,
+      ok: result.status !== "failed",
       engine: engineId,
       agent: agentKey,
       name: agent.name,
       status: record.status,
       durationMs,
-      result: result?.summary || "completed",
-    });
+      result: result.summary,
+    }, { status: result.status === "failed" ? 500 : 200 });
   } catch (err) {
     const durationMs = Date.now() - startTime;
     const errorMsg = err instanceof Error ? err.message : String(err);
@@ -178,9 +178,8 @@ export async function POST(
 
     await appendStateArray("run-ledger", [record], 10000);
 
-    // Notify on failure
     await notifyAlert(
-      `🔴 Agent failed: ${agent.name} (${engineId}/${agentKey})\nError: ${errorMsg}\nDuration: ${durationMs}ms`
+      `Agent crashed: ${agent.name} (${engineId}/${agentKey})\nError: ${errorMsg}\nDuration: ${durationMs}ms`
     ).catch(() => {});
 
     return NextResponse.json(
@@ -196,39 +195,4 @@ export async function POST(
       { status: 500 }
     );
   }
-}
-
-// ---------------------------------------------------------------------------
-// Engine importer — maps engine ID to the module
-// ---------------------------------------------------------------------------
-
-type EngineModule = {
-  runAgent: (agentKey: string) => Promise<{ status: string; summary?: string }>;
-};
-
-async function importEngine(engineId: string): Promise<EngineModule | null> {
-  // Phase 3D: These will be TypeScript modules in src/lib/ops/engines/
-  // For now, we provide a shim that explains the engines aren't yet extracted
-  const engineMap: Record<string, () => Promise<EngineModule>> = {
-    // These will be populated as engines are extracted to TS modules:
-    // "b2b": () => import("@/lib/ops/engines/b2b/agents"),
-    // "seo": () => import("@/lib/ops/engines/seo/agents"),
-    // "dtc": () => import("@/lib/ops/engines/dtc/agents"),
-    // "supply-chain": () => import("@/lib/ops/engines/supply-chain/agents"),
-    // "revenue-intel": () => import("@/lib/ops/engines/revenue-intel/agents"),
-    // "finops": () => import("@/lib/ops/engines/finops/agents"),
-  };
-
-  const loader = engineMap[engineId];
-  if (!loader) {
-    // Engine not yet extracted — return a stub that explains
-    return {
-      runAgent: async (agentKey: string) => ({
-        status: "skipped",
-        summary: `Engine "${engineId}" agent "${agentKey}" not yet extracted to cloud module. Still running via laptop cron.`,
-      }),
-    };
-  }
-
-  return loader();
 }
