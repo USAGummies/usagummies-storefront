@@ -46,6 +46,11 @@ export const STATE_KEYS = {
   // Scheduler
   "run-ledger-recent": "agentic-run-ledger-recent.json",
 
+  // Amazon KPI caches
+  "amazon-kpi-cache": "amazon-kpi-cache.json",
+  "amazon-inventory-cache": "amazon-inventory-cache.json",
+  "amazon-orders-cache": "amazon-orders-cache.json",
+
   // Logs (text, not JSON — stored as string)
   "engine-log": "agentic-engine.log",
   "command-center-log": "command-center.log",
