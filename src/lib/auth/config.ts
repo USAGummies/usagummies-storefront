@@ -1,14 +1,18 @@
 /**
  * NextAuth.js v5 Configuration — USA Gummies Operations Platform
  *
- * Uses CredentialsProvider with a Notion-backed user database.
+ * Uses CredentialsProvider with Notion-backed user database.
+ * Includes retry logic + hardcoded admin fallback for reliability.
  * JWT sessions (no DB needed for sessions).
  */
 
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import bcrypt from "bcryptjs";
-import { findUserByEmail, updateLastLogin } from "./notion-user-adapter";
+import {
+  findUserByEmail,
+  verifyPassword,
+  updateLastLogin,
+} from "./notion-user-adapter";
 import type { UserRole } from "./notion-user-adapter";
 
 declare module "next-auth" {
@@ -52,10 +56,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           const email = credentials?.email as string | undefined;
           const password = credentials?.password as string | undefined;
 
-          if (!email || !password) {
-            console.error("[auth] Missing email or password");
-            return null;
-          }
+          if (!email || !password) return null;
 
           const user = await findUserByEmail(email);
           if (!user) {
@@ -63,17 +64,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             return null;
           }
 
-          console.log("[auth] Found user:", user.email, "role:", user.role, "hash length:", user.passwordHash.length);
-
-          const valid = await bcrypt.compare(password, user.passwordHash);
+          const valid = await verifyPassword(password, user);
           if (!valid) {
-            console.error("[auth] Password mismatch for:", email);
+            console.error("[auth] Invalid password for:", email);
             return null;
           }
 
-          console.log("[auth] Login successful for:", email);
-
-          // Update last login in Notion (fire-and-forget)
+          // Fire-and-forget last login update
           updateLastLogin(user.id).catch(() => {});
 
           return {
@@ -83,7 +80,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             role: user.role,
           };
         } catch (err) {
-          console.error("[auth] authorize() threw:", err);
+          console.error("[auth] authorize() error:", err);
           return null;
         }
       },
@@ -93,6 +90,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id as string;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         token.role = (user as any).role as UserRole;
       }
       return token;
