@@ -15,8 +15,10 @@ const PLATFORM_USERS_DB_ID =
 const NOTION_VERSION = "2022-06-28";
 
 /** Max retries for transient Notion errors (429 / 5xx) */
-const MAX_RETRIES = 3;
-const RETRY_BASE_MS = 800;
+const MAX_RETRIES = 2;
+const RETRY_BASE_MS = 400;
+/** Abort Notion request if it takes longer than this (ms) */
+const NOTION_TIMEOUT_MS = 4000;
 
 export type UserRole = "admin" | "investor" | "employee" | "partner";
 
@@ -76,7 +78,7 @@ async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** Fetch with exponential back-off on 429 / 5xx */
+/** Fetch with timeout + exponential back-off on 429 / 5xx */
 async function fetchWithRetry(
   url: string,
   init: RequestInit,
@@ -84,16 +86,17 @@ async function fetchWithRetry(
   let lastError: Error | null = null;
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
-      const res = await fetch(url, init);
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), NOTION_TIMEOUT_MS);
+      const res = await fetch(url, { ...init, signal: controller.signal });
+      clearTimeout(timer);
+
       // Success or client error (4xx except 429) — return immediately
       if (res.ok || (res.status >= 400 && res.status < 500 && res.status !== 429)) {
         return res;
       }
-      // Retryable: 429 or 5xx
-      const retryAfter = res.headers.get("retry-after");
-      const delayMs = retryAfter
-        ? parseInt(retryAfter, 10) * 1000
-        : RETRY_BASE_MS * Math.pow(2, attempt);
+      // Retryable: 429 or 5xx — short delay, capped at 1s
+      const delayMs = Math.min(RETRY_BASE_MS * Math.pow(2, attempt), 1000);
       console.warn(
         `[notion-user-adapter] ${res.status} on attempt ${attempt + 1}/${MAX_RETRIES}, retrying in ${delayMs}ms`,
       );
@@ -101,9 +104,11 @@ async function fetchWithRetry(
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
       console.warn(
-        `[notion-user-adapter] Network error on attempt ${attempt + 1}/${MAX_RETRIES}: ${lastError.message}`,
+        `[notion-user-adapter] Error on attempt ${attempt + 1}/${MAX_RETRIES}: ${lastError.message}`,
       );
-      await sleep(RETRY_BASE_MS * Math.pow(2, attempt));
+      if (attempt < MAX_RETRIES - 1) {
+        await sleep(Math.min(RETRY_BASE_MS * Math.pow(2, attempt), 1000));
+      }
     }
   }
   throw lastError ?? new Error("fetchWithRetry exhausted retries");
