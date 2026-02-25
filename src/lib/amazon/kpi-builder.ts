@@ -1,18 +1,21 @@
 /**
  * Amazon KPI Builder — shared computation logic for both API routes.
  *
- * Extracts the KPI computation from the route handlers to avoid duplication.
- * Uses sequential order fetching to respect SP-API rate limits.
- * Uses batch unit estimation instead of per-order item fetching.
+ * KEY OPTIMIZATION: Fetches all orders from last 30 days in a SINGLE API call
+ * (instead of 5 sequential calls), then derives all period aggregates locally.
+ * This is ~4x faster and uses fewer API quota.
+ *
+ * Also computes daily breakdown for chart data.
  */
 
-import type { AmazonKPIs, AmazonOrder, FBAInventorySummary, FeeEstimate } from "./types";
+import type { AmazonKPIs, AmazonOrder, DailyDataPoint } from "./types";
 import {
-  fetchOrdersSequential,
+  fetchOrders,
   fetchFBAInventory,
   fetchFeesEstimate,
   fetchOrderItems,
   ptDateISO,
+  ptDate,
   nowMinusBuffer,
   weekStartPT,
   lastWeekStartPT,
@@ -59,40 +62,64 @@ function pctChange(current: number, previous: number): number {
   return Math.round(((current - previous) / previous) * 100);
 }
 
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+/**
+ * Filter orders within a date range.
+ * Both boundaries are ISO strings; `after` is inclusive, `before` is exclusive.
+ */
+function ordersInRange(
+  allOrders: AmazonOrder[],
+  after: string,
+  before: string,
+): AmazonOrder[] {
+  const afterTime = new Date(after).getTime();
+  const beforeTime = new Date(before).getTime();
+  return allOrders.filter((o) => {
+    const t = new Date(o.PurchaseDate).getTime();
+    return t >= afterTime && t < beforeTime;
+  });
+}
+
 /**
  * Estimate total units from orders.
  * Fetches items for a small sample (max 5) in parallel, then extrapolates.
- * Much faster than the previous per-order sequential approach.
  */
 async function estimateUnits(orders: AmazonOrder[]): Promise<number> {
   if (orders.length === 0) return 0;
 
-  // Sample up to 5 orders (not 20!) to stay fast and within rate limits
   const sampleSize = Math.min(5, orders.length);
   const sample = orders.slice(0, sampleSize);
 
-  // Fetch item details in parallel (OrderItems API has higher rate limits)
   const itemResults = await Promise.all(
     sample.map(async (order) => {
       try {
         const items = await fetchOrderItems(order.AmazonOrderId);
         return items.reduce((sum, item) => sum + item.QuantityOrdered, 0);
       } catch {
-        return 1; // fallback: 1 unit per order
+        return 1;
       }
     }),
   );
 
   const sampleTotal = itemResults.reduce((a, b) => a + b, 0);
-
-  // Extrapolate if needed
   if (orders.length <= sampleSize) return sampleTotal;
 
   const avgUnitsPerOrder = sampleTotal / sampleSize;
   return Math.round(avgUnitsPerOrder * orders.length);
 }
 
-function aggregateInventory(inventory: FBAInventorySummary[]) {
+function aggregateInventory(
+  inventory: { inventoryDetails?: {
+    fulfillableQuantity?: number;
+    inboundWorkingQuantity?: number;
+    inboundShippedQuantity?: number;
+    reservedQuantity?: { totalReservedQuantity?: number };
+    unfulfillableQuantity?: { totalUnfulfillableQuantity?: number };
+  }; totalQuantity?: number }[],
+) {
   let fulfillable = 0,
     inboundWorking = 0,
     inboundShipped = 0,
@@ -115,18 +142,43 @@ function aggregateInventory(inventory: FBAInventorySummary[]) {
   return { fulfillable, inboundWorking, inboundShipped, reserved, unfulfillable, totalQuantity };
 }
 
-function buildFees(fees: FeeEstimate, avgPrice: number) {
-  return {
-    referralFee: Math.round(fees.referralFee * 100) / 100,
-    fbaFee: Math.round(fees.fbaFee * 100) / 100,
-    totalFee: Math.round(fees.totalFee * 100) / 100,
-    estimatedNetMargin:
-      avgPrice > 0 ? Math.round(((avgPrice - fees.totalFee) / avgPrice) * 100) : 0,
-  };
-}
+/**
+ * Build daily breakdown from all orders for chart data.
+ * Groups orders by Pacific Time date and returns sorted array.
+ */
+function buildDailyBreakdown(
+  allOrders: AmazonOrder[],
+  daysBack: number,
+): DailyDataPoint[] {
+  // Build map of date → {revenue, orders}
+  const dailyMap = new Map<string, { revenue: number; orders: number }>();
 
-function round2(n: number): number {
-  return Math.round(n * 100) / 100;
+  for (const order of allOrders) {
+    const ptDay = new Date(order.PurchaseDate).toLocaleDateString("en-CA", {
+      timeZone: "America/Los_Angeles",
+    });
+    const existing = dailyMap.get(ptDay) || { revenue: 0, orders: 0 };
+    const amt = order.OrderTotal?.Amount;
+    existing.revenue += amt ? parseFloat(amt) : 0;
+    existing.orders += 1;
+    dailyMap.set(ptDay, existing);
+  }
+
+  // Fill in all days (including zero-order days) for clean chart
+  const result: DailyDataPoint[] = [];
+  for (let i = daysBack - 1; i >= 0; i--) {
+    const dateStr = ptDate(i);
+    const data = dailyMap.get(dateStr) || { revenue: 0, orders: 0 };
+    const d = new Date(dateStr + "T12:00:00Z"); // noon UTC to avoid timezone shift
+    result.push({
+      date: dateStr,
+      label: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      revenue: round2(data.revenue),
+      orders: data.orders,
+    });
+  }
+
+  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -135,8 +187,10 @@ function round2(n: number): number {
 
 /**
  * Build the complete Amazon KPI payload.
- * Fetches orders SEQUENTIALLY to respect SP-API rate limits.
- * Fetches inventory in parallel with the first order batch.
+ *
+ * OPTIMIZATION: Fetches all orders from last 30 days in ONE API call
+ * (vs. 5 sequential calls in v1). Then derives period aggregates locally.
+ * Also returns daily breakdown for chart rendering.
  */
 export async function buildAmazonKPIs(): Promise<AmazonKPIs> {
   const now = nowMinusBuffer();
@@ -145,22 +199,26 @@ export async function buildAmazonKPIs(): Promise<AmazonKPIs> {
   const weekStart = weekStartPT();
   const lastWeekStart = lastWeekStartPT();
   const monthStart = monthStartPT();
+  const thirtyDaysAgo = ptDateISO(30);
 
-  // Start inventory fetch in parallel (different API, different rate limit)
-  const inventoryPromise = fetchFBAInventory();
+  // Determine earliest date we need (whichever is earlier: 30 days ago or lastWeekStart)
+  const fetchFrom =
+    new Date(thirtyDaysAgo).getTime() < new Date(lastWeekStart).getTime()
+      ? thirtyDaysAgo
+      : lastWeekStart;
 
-  // Fetch orders SEQUENTIALLY to respect 1-req/5s rate limit
-  const [todayOrders, yesterdayOrders, weekOrders, lastWeekOrders, monthOrders] =
-    await fetchOrdersSequential([
-      { after: todayStart, before: now },
-      { after: yesterdayStart, before: todayStart },
-      { after: weekStart, before: now },
-      { after: lastWeekStart, before: weekStart },
-      { after: monthStart, before: now },
-    ]);
+  // SINGLE order fetch (30 days) + inventory in parallel
+  const [allOrders, inventory] = await Promise.all([
+    fetchOrders(fetchFrom, now),
+    fetchFBAInventory(),
+  ]);
 
-  // Wait for inventory
-  const inventory = await inventoryPromise;
+  // Derive period subsets locally (no additional API calls!)
+  const todayOrders = ordersInRange(allOrders, todayStart, now);
+  const yesterdayOrders = ordersInRange(allOrders, yesterdayStart, todayStart);
+  const weekOrders = ordersInRange(allOrders, weekStart, now);
+  const lastWeekOrders = ordersInRange(allOrders, lastWeekStart, weekStart);
+  const monthOrders = ordersInRange(allOrders, monthStart, now);
 
   // Revenue calculations
   const todayRevenue = sumRevenue(todayOrders);
@@ -198,6 +256,9 @@ export async function buildAmazonKPIs(): Promise<AmazonKPIs> {
   const avgPrice = todayOrders.length > 0 ? todayRevenue / todayOrders.length : 29.99;
   const fees = await fetchFeesEstimate(avgPrice);
 
+  // Daily breakdown for charts
+  const dailyBreakdown = buildDailyBreakdown(allOrders, 30);
+
   return {
     orders: {
       today: todayOrders.length,
@@ -224,7 +285,13 @@ export async function buildAmazonKPIs(): Promise<AmazonKPIs> {
       daysOfSupply,
       restockAlert: daysOfSupply < 14,
     },
-    fees: buildFees(fees, avgPrice),
+    fees: {
+      referralFee: round2(fees.referralFee),
+      fbaFee: round2(fees.fbaFee),
+      totalFee: round2(fees.totalFee),
+      estimatedNetMargin:
+        avgPrice > 0 ? Math.round(((avgPrice - fees.totalFee) / avgPrice) * 100) : 0,
+    },
     velocity: { unitsPerDay7d, trend },
     comparison: {
       todayVsYesterday: {
@@ -240,6 +307,7 @@ export async function buildAmazonKPIs(): Promise<AmazonKPIs> {
         ordersPct: pctChange(weekOrders.length, lastWeekOrders.length),
       },
     },
+    dailyBreakdown,
     lastUpdated: new Date().toISOString(),
   };
 }

@@ -97,6 +97,17 @@ export type FeeEstimate = {
 };
 
 // ---------------------------------------------------------------------------
+// Daily breakdown for charts
+// ---------------------------------------------------------------------------
+
+export type DailyDataPoint = {
+  date: string; // YYYY-MM-DD
+  label: string; // "Feb 1", "Feb 2" etc
+  revenue: number;
+  orders: number;
+};
+
+// ---------------------------------------------------------------------------
 // Aggregated KPI payload (what the API route returns)
 // ---------------------------------------------------------------------------
 
@@ -170,6 +181,8 @@ export type AmazonKPIs = {
       ordersPct: number;
     };
   };
+  /** Daily breakdown for charts (last 30 days) */
+  dailyBreakdown: DailyDataPoint[];
   lastUpdated: string;
 };
 
@@ -187,6 +200,8 @@ export type ShopifyKPIs = {
     financialStatus: string;
     total: string;
   }[];
+  /** Daily breakdown for charts */
+  dailyBreakdown: DailyDataPoint[];
 };
 
 export type UnifiedDashboard = {
@@ -197,6 +212,17 @@ export type UnifiedDashboard = {
   };
   shopify: ShopifyKPIs | null;
   amazon: AmazonKPIs | null;
+  /** Merged daily breakdown (combined channels) for the main chart */
+  chartData: {
+    date: string;
+    label: string;
+    amazon: number;
+    shopify: number;
+    combined: number;
+    amazonOrders: number;
+    shopifyOrders: number;
+    combinedOrders: number;
+  }[];
   generatedAt: string;
 };
 
