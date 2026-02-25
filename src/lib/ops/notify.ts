@@ -37,10 +37,12 @@ export type NotifyOpts = {
 // Slack Webhooks
 // ---------------------------------------------------------------------------
 
+const SLACK_FALLBACK_WEBHOOK = process.env.SLACK_SUPPORT_WEBHOOK_URL;
+
 const SLACK_WEBHOOK_MAP: Record<NotifyChannel, string | undefined> = {
-  alerts: process.env.SLACK_WEBHOOK_ALERTS,
-  pipeline: process.env.SLACK_WEBHOOK_PIPELINE,
-  daily: process.env.SLACK_WEBHOOK_DAILY,
+  alerts: process.env.SLACK_WEBHOOK_ALERTS || SLACK_FALLBACK_WEBHOOK,
+  pipeline: process.env.SLACK_WEBHOOK_PIPELINE || SLACK_FALLBACK_WEBHOOK,
+  daily: process.env.SLACK_WEBHOOK_DAILY || SLACK_FALLBACK_WEBHOOK,
 };
 
 async function sendSlack(channel: NotifyChannel, text: string): Promise<boolean> {
@@ -50,11 +52,15 @@ async function sendSlack(channel: NotifyChannel, text: string): Promise<boolean>
     return false;
   }
 
+  // Prefix with channel tag when using fallback webhook so messages are distinguishable
+  const isFallback = webhookUrl === SLACK_FALLBACK_WEBHOOK && SLACK_FALLBACK_WEBHOOK;
+  const prefixedText = isFallback ? `[${channel.toUpperCase()}] ${text}` : text;
+
   try {
     const res = await fetch(webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text: prefixedText }),
       signal: AbortSignal.timeout(10000),
     });
     return res.ok;
