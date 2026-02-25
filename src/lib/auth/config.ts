@@ -48,26 +48,44 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        const email = credentials?.email as string | undefined;
-        const password = credentials?.password as string | undefined;
+        try {
+          const email = credentials?.email as string | undefined;
+          const password = credentials?.password as string | undefined;
 
-        if (!email || !password) return null;
+          if (!email || !password) {
+            console.error("[auth] Missing email or password");
+            return null;
+          }
 
-        const user = await findUserByEmail(email);
-        if (!user) return null;
+          const user = await findUserByEmail(email);
+          if (!user) {
+            console.error("[auth] No user found for:", email);
+            return null;
+          }
 
-        const valid = await bcrypt.compare(password, user.passwordHash);
-        if (!valid) return null;
+          console.log("[auth] Found user:", user.email, "role:", user.role, "hash length:", user.passwordHash.length);
 
-        // Update last login in Notion (fire-and-forget)
-        updateLastLogin(user.id).catch(() => {});
+          const valid = await bcrypt.compare(password, user.passwordHash);
+          if (!valid) {
+            console.error("[auth] Password mismatch for:", email);
+            return null;
+          }
 
-        return {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-        };
+          console.log("[auth] Login successful for:", email);
+
+          // Update last login in Notion (fire-and-forget)
+          updateLastLogin(user.id).catch(() => {});
+
+          return {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+          };
+        } catch (err) {
+          console.error("[auth] authorize() threw:", err);
+          return null;
+        }
       },
     }),
   ],
