@@ -12,6 +12,8 @@ import type { AmazonKPIs, ShopifyKPIs, UnifiedDashboard, DailyDataPoint } from "
 import { isAmazonConfigured, ptDate } from "@/lib/amazon/sp-api";
 import { getCachedKPIs, setCachedKPIs } from "@/lib/amazon/cache";
 import { buildAmazonKPIs } from "@/lib/amazon/kpi-builder";
+import { readState, writeState } from "@/lib/ops/state";
+import { createPage, DB, NotionProp, queryDatabase } from "@/lib/notion/client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -245,6 +247,9 @@ export async function GET() {
     // Merge daily chart data
     const chartData = mergeChartData(shopify, amazon);
 
+    // Fire-and-forget: write KPI snapshot to Notion if new day
+    maybeWriteKPISnapshot(shopify, amazon).catch(() => {});
+
     const payload: UnifiedDashboard = {
       combined: {
         totalRevenue: round2(totalRevenue),
@@ -271,5 +276,65 @@ export async function GET() {
       },
       { status: 500 },
     );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Notion KPI snapshot (fire-and-forget, once per day)
+// ---------------------------------------------------------------------------
+
+async function maybeWriteKPISnapshot(
+  shopify: ShopifyKPIs | null,
+  amazon: AmazonKPIs | null,
+) {
+  try {
+    const today = ptDate(0); // "YYYY-MM-DD" in PT
+
+    // Fast check: already wrote today?
+    const lastSnapshot = await readState<string>("notion-kpi-snapshot", "");
+    if (lastSnapshot === today) return;
+
+    // Belt-and-suspenders: check Notion for existing row
+    const existing = await queryDatabase(DB.DAILY_PERFORMANCE, {
+      property: "Date",
+      date: { equals: today },
+    });
+    if (existing && existing.length > 0) {
+      await writeState("notion-kpi-snapshot", today);
+      return;
+    }
+
+    // Build daily snapshot values
+    const shopifyTodayRow = shopify?.dailyBreakdown?.find(
+      (d) => d.date === today,
+    );
+    const shopifyTodayRevenue = shopifyTodayRow?.revenue || 0;
+    const shopifyTodayOrders = shopifyTodayRow?.orders || 0;
+    const amazonTodayRevenue = amazon?.revenue.today || 0;
+    const amazonTodayOrders = amazon?.orders.today || 0;
+    const totalRevenue = shopifyTodayRevenue + amazonTodayRevenue;
+    const totalOrders = shopifyTodayOrders + amazonTodayOrders;
+    const aov = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+
+    await createPage(DB.DAILY_PERFORMANCE, {
+      Name: NotionProp.title(today),
+      Date: NotionProp.date(today),
+      "Shopify Revenue": NotionProp.number(round2(shopifyTodayRevenue)),
+      "Amazon Revenue": NotionProp.number(round2(amazonTodayRevenue)),
+      "Total Revenue": NotionProp.number(round2(totalRevenue)),
+      "Shopify Orders": NotionProp.number(shopifyTodayOrders),
+      "Amazon Orders": NotionProp.number(amazonTodayOrders),
+      "Total Orders": NotionProp.number(totalOrders),
+      AOV: NotionProp.number(round2(aov)),
+      "Amazon Units Sold": NotionProp.number(amazon?.unitsSold.today || 0),
+      "FBA Fulfillable Units": NotionProp.number(
+        amazon?.inventory.fulfillable || 0,
+      ),
+    });
+
+    await writeState("notion-kpi-snapshot", today);
+    console.log(`[dashboard] Wrote KPI snapshot to Notion for ${today}`);
+  } catch (err) {
+    console.error("[dashboard] KPI snapshot write failed:", err);
   }
 }

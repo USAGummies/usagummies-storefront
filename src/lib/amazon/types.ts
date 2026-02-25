@@ -234,3 +234,32 @@ export type CacheEnvelope<T> = {
   data: T;
   cachedAt: number; // epoch ms
 };
+
+// ---------------------------------------------------------------------------
+// Cash & Finance types (Found.com banking integration)
+// ---------------------------------------------------------------------------
+
+export type CashTransaction = {
+  id?: string; // Notion page ID (when reading from Notion)
+  date: string; // YYYY-MM-DD
+  description: string;
+  amount: number; // positive = income, negative = expense
+  category: "Income" | "Expense" | "Transfer" | "Refund";
+  channel:
+    | "Shopify"
+    | "Amazon"
+    | "Wholesale"
+    | "Found Transfer"
+    | "Other";
+  balanceAfter?: number;
+  source: "CSV Upload" | "Manual" | "Auto Sync";
+};
+
+export type CashPosition = {
+  balance: number;
+  lastUpdated: string; // ISO timestamp
+  recentTransactions: CashTransaction[];
+  monthlyIncome: number;
+  monthlyExpenses: number;
+  monthlyNet: number;
+};

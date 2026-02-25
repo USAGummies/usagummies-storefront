@@ -51,6 +51,10 @@ export const STATE_KEYS = {
   "amazon-inventory-cache": "amazon-inventory-cache.json",
   "amazon-orders-cache": "amazon-orders-cache.json",
 
+  // Notion integration
+  "notion-kpi-snapshot": "notion-kpi-snapshot.json",
+  "cash-position": "cash-position.json",
+
   // Logs (text, not JSON — stored as string)
   "engine-log": "agentic-engine.log",
   "command-center-log": "command-center.log",

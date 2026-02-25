@@ -1,7 +1,7 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import {
   AreaChart,
   Area,
@@ -39,8 +39,13 @@ import {
   GitBranch,
   Wallet,
   PackageOpen,
+  Upload,
+  Landmark,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
-import type { UnifiedDashboard, AmazonKPIs } from "@/lib/amazon/types";
+import type { UnifiedDashboard, AmazonKPIs, CashPosition } from "@/lib/amazon/types";
+import { OpsChat } from "./OpsChat.client";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -619,18 +624,23 @@ export function OpsDashboard() {
   const { data: session } = useSession();
   const [summary, setSummary] = useState<SummaryData | null>(null);
   const [dashboard, setDashboard] = useState<UnifiedDashboard | null>(null);
+  const [cashPosition, setCashPosition] = useState<CashPosition | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [range, setRange] = useState<DateRange>("30d");
   const [refreshing, setRefreshing] = useState(false);
   const [lastFetch, setLastFetch] = useState<number>(0);
+  const [csvUploading, setCsvUploading] = useState(false);
+  const [csvResult, setCsvResult] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchAll = useCallback(async (showRefresh = false) => {
     if (showRefresh) setRefreshing(true);
     try {
-      const [summaryRes, dashRes] = await Promise.all([
+      const [summaryRes, dashRes, cashRes] = await Promise.all([
         fetch("/api/agentic/command-center", { cache: "no-store" }).catch(() => null),
         fetch("/api/ops/dashboard", { cache: "no-store" }),
+        fetch("/api/ops/finance/cash", { cache: "no-store" }).catch(() => null),
       ]);
 
       if (summaryRes?.ok) {
@@ -650,11 +660,40 @@ export function OpsDashboard() {
       } else {
         setError("Failed to load dashboard data");
       }
+
+      if (cashRes?.ok) {
+        const data = await cashRes.json();
+        if (data && data.balance !== undefined) setCashPosition(data);
+      }
     } catch {
       setError("Failed to connect to dashboard API");
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  }, []);
+
+  const handleCSVUpload = useCallback(async (file: File) => {
+    setCsvUploading(true);
+    setCsvResult(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/ops/finance/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setCsvResult(`✓ ${data.written} transactions imported (${data.skipped} skipped)`);
+        if (data.cashPosition) setCashPosition(data.cashPosition);
+      } else {
+        setCsvResult(`✗ ${data.error || "Upload failed"}`);
+      }
+    } catch {
+      setCsvResult("✗ Upload failed — network error");
+    } finally {
+      setCsvUploading(false);
     }
   }, []);
 
@@ -863,6 +902,148 @@ export function OpsDashboard() {
           {/* ── Amazon Deep Dive ───────────────────────────────────── */}
           {amz && <AmazonSection amz={amz} />}
 
+          {/* ── Cash Position ──────────────────────────────────────── */}
+          {(session?.user as { role?: string })?.role === "admin" ||
+          (session?.user as { role?: string })?.role === "investor" ? (
+            <div style={{ marginBottom: 32 }}>
+              <SectionHeader title="Cash Position" badge="Found.com" icon={Landmark} />
+              {cashPosition ? (
+                <>
+                  <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 14 }}>
+                    <StatCard
+                      label="Cash Balance"
+                      value={fmt$(cashPosition.balance)}
+                      subtitle={`Updated ${new Date(cashPosition.lastUpdated).toLocaleDateString()}`}
+                      color={cashPosition.balance > 0 ? C.green : C.red}
+                      icon={Landmark}
+                      delay={1000}
+                    />
+                    <StatCard
+                      label="Monthly Income"
+                      value={fmt$(cashPosition.monthlyIncome)}
+                      color={C.green}
+                      icon={ArrowUp}
+                      delay={1050}
+                    />
+                    <StatCard
+                      label="Monthly Expenses"
+                      value={fmt$(cashPosition.monthlyExpenses)}
+                      color={C.red}
+                      icon={ArrowDown}
+                      delay={1100}
+                    />
+                    <StatCard
+                      label="Net Cash Flow"
+                      value={fmt$(cashPosition.monthlyNet)}
+                      color={cashPosition.monthlyNet >= 0 ? C.green : C.red}
+                      icon={cashPosition.monthlyNet >= 0 ? TrendingUp : TrendingDown}
+                      delay={1150}
+                    />
+                  </div>
+                  {cashPosition.recentTransactions.length > 0 && (
+                    <div className="dash-card" style={{ padding: "16px 20px", animationDelay: "1200ms" }}>
+                      <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", color: C.textMuted, marginBottom: 10 }}>
+                        Recent Transactions
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        {cashPosition.recentTransactions.slice(-5).reverse().map((tx, i) => (
+                          <div
+                            key={i}
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              padding: "6px 0",
+                              borderBottom: i < Math.min(cashPosition.recentTransactions.length, 5) - 1 ? `1px solid ${C.border}` : "none",
+                            }}
+                          >
+                            <div>
+                              <span style={{ fontSize: 12, color: C.textSecondary }}>{tx.description}</span>
+                              <span style={{ fontSize: 10, color: C.textFaint, marginLeft: 8 }}>{tx.date}</span>
+                            </div>
+                            <span
+                              style={{
+                                fontSize: 13,
+                                fontWeight: 600,
+                                color: tx.amount >= 0 ? C.green : C.red,
+                              }}
+                            >
+                              {tx.amount >= 0 ? "+" : ""}{fmt$(tx.amount)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div
+                  className="dash-card"
+                  style={{
+                    padding: "24px",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: 12,
+                    textAlign: "center",
+                    animationDelay: "1000ms",
+                  }}
+                >
+                  <Landmark size={28} color={C.textFaint} strokeWidth={1.5} />
+                  <div style={{ fontSize: 13, color: C.textMuted }}>
+                    No cash data yet. Upload a Found.com CSV export to see your live cash position.
+                  </div>
+                </div>
+              )}
+              {/* CSV Upload Button */}
+              <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 12 }}>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv"
+                  style={{ display: "none" }}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleCSVUpload(file);
+                    e.target.value = "";
+                  }}
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={csvUploading}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "10px 18px",
+                    borderRadius: 10,
+                    border: `1px solid ${C.border}`,
+                    background: "transparent",
+                    color: csvUploading ? C.textFaint : C.textSecondary,
+                    fontSize: 12,
+                    fontWeight: 500,
+                    cursor: csvUploading ? "default" : "pointer",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  <Upload size={14} strokeWidth={1.8} />
+                  {csvUploading ? "Uploading..." : "Upload Found.com CSV"}
+                </button>
+                {csvResult && (
+                  <span
+                    style={{
+                      fontSize: 12,
+                      color: csvResult.startsWith("✓") ? C.green : C.red,
+                      fontWeight: 500,
+                    }}
+                  >
+                    {csvResult}
+                  </span>
+                )}
+              </div>
+            </div>
+          ) : null}
+
           {/* ── System Health ──────────────────────────────────────── */}
           <div style={{ marginBottom: 32 }}>
             <SectionHeader title="System Health" icon={Activity} />
@@ -909,6 +1090,9 @@ export function OpsDashboard() {
           )}
         </>
       )}
+
+      {/* ── AI Chat Panel ────────────────────────────────────────── */}
+      <OpsChat />
     </div>
   );
 }
