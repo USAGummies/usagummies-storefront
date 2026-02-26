@@ -1,8 +1,8 @@
 /**
  * Route Protection Middleware — USA Gummies Operations Platform
  *
- * Uses getToken() from next-auth/jwt to avoid importing bcryptjs
- * (which uses Node.js crypto and is not Edge Runtime compatible).
+ * Uses NextAuth v5's `auth()` middleware wrapper — handles cookie names,
+ * secrets, and session parsing automatically (no manual getToken).
  *
  * Protects:
  *   /ops/*          → redirect to /ops/login if unauthenticated
@@ -17,8 +17,8 @@
  * Public routes (storefront, blog, shop, etc.) are unaffected.
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { getToken } from "next-auth/jwt";
+import { NextResponse } from "next/server";
+import { auth } from "@/lib/auth/config";
 
 /** Routes that handle their own authentication (QStash signature, API key, etc.) */
 const SELF_AUTHENTICATED_PREFIXES = [
@@ -33,7 +33,7 @@ function isSelfAuthenticated(pathname: string): boolean {
   );
 }
 
-export async function middleware(req: NextRequest) {
+export default auth((req) => {
   const { pathname } = req.nextUrl;
 
   // Allow login page and auth API routes without session
@@ -51,12 +51,12 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/ops/agents", req.url));
   }
 
-  // Check JWT session
-  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+  // req.auth is populated automatically by the auth() wrapper
+  const session = req.auth;
 
   // Protect /ops/* pages — redirect to login
   if (pathname.startsWith("/ops")) {
-    if (!token) {
+    if (!session) {
       const loginUrl = new URL("/ops/login", req.url);
       loginUrl.searchParams.set("callbackUrl", pathname);
       return NextResponse.redirect(loginUrl);
@@ -66,14 +66,14 @@ export async function middleware(req: NextRequest) {
 
   // Protect /api/agentic/* and /api/ops/* — return 401
   if (pathname.startsWith("/api/agentic") || pathname.startsWith("/api/ops")) {
-    if (!token) {
+    if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     return NextResponse.next();
   }
 
   return NextResponse.next();
-}
+});
 
 export const config = {
   matcher: [

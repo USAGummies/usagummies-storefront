@@ -37,6 +37,7 @@ declare module "@auth/core/jwt" {
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  trustHost: true, // Required for Vercel — behind proxy, host header varies
   pages: {
     signIn: "/ops/login",
   },
