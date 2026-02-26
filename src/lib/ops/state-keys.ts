@@ -55,6 +55,23 @@ export const STATE_KEYS = {
   "notion-kpi-snapshot": "notion-kpi-snapshot.json",
   "cash-position": "cash-position.json",
 
+  // Finance / Banking
+  "plaid-access-token": "plaid-access-token.json",
+  "plaid-balance-cache": "plaid-balance-cache.json",
+  "shopify-payments-cache": "shopify-payments-cache.json",
+  "amazon-finance-cache": "amazon-finance-cache.json",
+
+  // Pipeline
+  "pipeline-cache": "pipeline-cache.json",
+
+  // Forecasting & P&L
+  "forecast-cache": "forecast-cache.json",
+  "pnl-cache": "pnl-cache.json",
+
+  // Communications
+  "inbox-unified-cache": "inbox-unified-cache.json",
+  "slack-history-cache": "slack-history-cache.json",
+
   // Logs (text, not JSON — stored as string)
   "engine-log": "agentic-engine.log",
   "command-center-log": "command-center.log",

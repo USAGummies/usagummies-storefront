@@ -227,6 +227,24 @@ export type UnifiedDashboard = {
 };
 
 // ---------------------------------------------------------------------------
+// Financial Event Groups (Settlements)
+// ---------------------------------------------------------------------------
+
+export type FinancialEventGroup = {
+  FinancialEventGroupId: string;
+  ProcessingStatus: string;
+  FundTransferStatus: string;
+  OriginalTotal?: { CurrencyCode: string; CurrencyAmount: number };
+  ConvertedTotal?: { CurrencyCode: string; CurrencyAmount: number };
+  FundTransferDate?: string;
+  TraceId?: string;
+  AccountTail?: string;
+  BeginningBalance?: { CurrencyCode: string; CurrencyAmount: number };
+  FinancialEventGroupStart?: string;
+  FinancialEventGroupEnd?: string;
+};
+
+// ---------------------------------------------------------------------------
 // Cache envelope
 // ---------------------------------------------------------------------------
 

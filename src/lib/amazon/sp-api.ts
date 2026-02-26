@@ -14,6 +14,7 @@ import type {
   AmazonOrderItem,
   FBAInventorySummary,
   FeeEstimate,
+  FinancialEventGroup,
 } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -363,6 +364,54 @@ function fallbackFeeEstimate(price: number): FeeEstimate {
     totalFee,
     netPerUnit: price - totalFee,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Finances API — Settlement Event Groups
+// ---------------------------------------------------------------------------
+
+type FinancialEventGroupsResponse = {
+  payload?: {
+    FinancialEventGroupList: FinancialEventGroup[];
+    NextToken?: string;
+  };
+  errors?: { code: string; message: string }[];
+};
+
+/**
+ * Fetch financial event groups (settlement periods) from Amazon.
+ * Returns settlement info including pending balance and recent transfers.
+ */
+export async function fetchFinancialEventGroups(
+  financialEventGroupStartedAfter?: string,
+  financialEventGroupStartedBefore?: string,
+): Promise<FinancialEventGroup[]> {
+  try {
+    const params: Record<string, string> = {
+      MaxResultsPerPage: "10",
+    };
+    if (financialEventGroupStartedAfter) {
+      params.FinancialEventGroupStartedAfter = financialEventGroupStartedAfter;
+    }
+    if (financialEventGroupStartedBefore) {
+      params.FinancialEventGroupStartedBefore = financialEventGroupStartedBefore;
+    }
+
+    const res = await spApiGet<FinancialEventGroupsResponse>(
+      "/finances/v0/financialEventGroups",
+      params,
+    );
+
+    if (res.errors?.length) {
+      console.error("[amazon] Finances API errors:", JSON.stringify(res.errors));
+      return [];
+    }
+
+    return res.payload?.FinancialEventGroupList || [];
+  } catch (err) {
+    console.error("[amazon] Financial event groups fetch failed:", err);
+    return [];
+  }
 }
 
 // ---------------------------------------------------------------------------

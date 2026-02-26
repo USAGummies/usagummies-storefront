@@ -53,12 +53,19 @@ CONTEXT:
 - Amazon fees include referral fee (~15%) and FBA fulfillment fee
 - FBA inventory "days of supply" = fulfillable units / (7-day avg units sold per day)
 - Daily Performance Reports DB in Notion has historical daily snapshots
+- Cash is tracked across Found.com (banking via Plaid), Shopify Payments, and Amazon Settlements
+- B2B pipeline is tracked in Notion with stages: Lead → Contacted → Interested → Negotiation → Proposal Sent → Closed Won/Lost
+- Communications come from Email (Gmail), Slack, B2B pipeline notes, Shopify customers, Amazon buyers
 
 BEHAVIOR:
 - Be concise and data-driven. Lead with numbers.
 - When asked about trends, query the Notion KPI history for multi-day data.
 - When asked about "today" or "current", use the getKPIs tool.
-- When asked about cash/finance, use the getCashPosition tool.
+- When asked about cash/finance/balances, use the getBalances tool for account balances or getCashPosition for local financial data.
+- When asked about cash flow projections or runway, use the getForecast tool.
+- When asked about profit, P&L, margins, or expenses, use the getPnL tool.
+- When asked about pipeline, leads, deals, or wholesale prospects, use the getPipeline tool.
+- When asked about messages, communications, or inbox, use the getInbox tool.
 - Format currency as $X,XXX.XX. Format percentages with 1 decimal.
 - If a tool returns no data, say so clearly — don't guess.
 - You can compare time periods by querying the KPI history with different date ranges.
@@ -273,6 +280,152 @@ const tools = {
         };
       }
       return cashPosition;
+    },
+  }),
+
+  getBalances: tool({
+    description:
+      "Get unified cash position across all bank accounts and payment platforms. Returns balances from Found.com (Plaid), Shopify Payments, and Amazon Settlements, plus total cash available.",
+    parameters: z.object({}),
+    execute: async () => {
+      try {
+        const baseUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : "http://localhost:3000";
+        const res = await fetch(`${baseUrl}/api/ops/balances`, {
+          signal: AbortSignal.timeout(15000),
+        });
+        if (!res.ok) return { error: "Failed to fetch balances" };
+        return await res.json();
+      } catch {
+        return { error: "Balances API unavailable. Check Plaid/Shopify/Amazon configuration." };
+      }
+    },
+  }),
+
+  getForecast: tool({
+    description:
+      "Get cash flow forecast projections for 30, 60, and 90 days. Includes projected daily balances, known receivables (Amazon settlements, Shopify payouts, B2B invoices), known payables (COGS, recurring expenses), runway estimation, and cash alerts.",
+    parameters: z.object({
+      horizon: z.string().optional().describe("Forecast horizon: '30d', '60d', or '90d'. Default is '30d'."),
+    }),
+    execute: async ({ horizon }: { horizon?: string }) => {
+      try {
+        const baseUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : "http://localhost:3000";
+        const res = await fetch(`${baseUrl}/api/ops/forecast`, {
+          signal: AbortSignal.timeout(20000),
+        });
+        if (!res.ok) return { error: "Failed to fetch forecast" };
+        const data = await res.json();
+        // Return relevant horizon slice
+        const h = horizon || "30d";
+        const validH = ["30d", "60d", "90d"].includes(h) ? h : "30d";
+        return {
+          currentBalance: data.currentBalance,
+          runway: data.runway,
+          alerts: data.alerts,
+          projection: data.projections?.[validH]?.slice(0, 14) || [],
+          projectionDays: data.projections?.[validH]?.length || 0,
+          summary: {
+            startBalance: data.projections?.[validH]?.[0]?.openingBalance,
+            endBalance: data.projections?.[validH]?.slice(-1)?.[0]?.closingBalance,
+            totalInflows: data.projections?.[validH]?.reduce((s: number, d: { inflows: number }) => s + d.inflows, 0),
+            totalOutflows: data.projections?.[validH]?.reduce((s: number, d: { outflows: number }) => s + d.outflows, 0),
+          },
+        };
+      } catch {
+        return { error: "Forecast API unavailable." };
+      }
+    },
+  }),
+
+  getPnL: tool({
+    description:
+      "Get the Profit & Loss report. Returns revenue breakdown (Amazon, Shopify, Wholesale), COGS, gross profit, gross margin, operating expenses, net income, and net margin. Defaults to month-to-date.",
+    parameters: z.object({
+      period: z.string().optional().describe("Period: 'mtd' (month-to-date, default) or 'custom'"),
+      start: z.string().optional().describe("Start date YYYY-MM-DD (for custom period)"),
+      end: z.string().optional().describe("End date YYYY-MM-DD (for custom period)"),
+    }),
+    execute: async ({ period, start, end }: { period?: string; start?: string; end?: string }) => {
+      try {
+        const baseUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : "http://localhost:3000";
+        const params = new URLSearchParams();
+        if (period) params.set("period", period);
+        if (start) params.set("start", start);
+        if (end) params.set("end", end);
+        const res = await fetch(`${baseUrl}/api/ops/pnl?${params}`, {
+          signal: AbortSignal.timeout(15000),
+        });
+        if (!res.ok) return { error: "Failed to fetch P&L" };
+        return await res.json();
+      } catch {
+        return { error: "P&L API unavailable." };
+      }
+    },
+  }),
+
+  getPipeline: tool({
+    description:
+      "Get B2B and distributor sales pipeline data. Returns total leads, pipeline value, stage breakdown with deal counts and values, conversion rates between stages, pipeline velocity (avg days to close), recent activity, and weekly trends.",
+    parameters: z.object({}),
+    execute: async () => {
+      try {
+        const baseUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : "http://localhost:3000";
+        const res = await fetch(`${baseUrl}/api/ops/pipeline`, {
+          signal: AbortSignal.timeout(15000),
+        });
+        if (!res.ok) return { error: "Failed to fetch pipeline" };
+        const data = await res.json();
+        // Slim down for chat context — exclude full lead lists
+        return {
+          totalLeads: data.totalLeads,
+          b2bCount: data.b2bCount,
+          distributorCount: data.distributorCount,
+          stageCounts: data.stageCounts,
+          pipelineValue: data.pipelineValue,
+          velocity: data.velocity,
+          conversionRates: data.conversionRates,
+          recentActivity: data.recentActivity?.slice(0, 10),
+          weeklyTrend: data.weeklyTrend,
+          generatedAt: data.generatedAt,
+        };
+      } catch {
+        return { error: "Pipeline API unavailable. Check Notion configuration." };
+      }
+    },
+  }),
+
+  getInbox: tool({
+    description:
+      "Get unified communications inbox across all channels. Returns recent messages from Email (Gmail), Slack, B2B pipeline, Shopify customers, and Amazon buyers, with unread counts per source.",
+    parameters: z.object({
+      source: z.string().optional().describe("Filter by source: 'all' (default), 'email', 'slack', 'b2b', 'shopify', 'amazon'"),
+      unread: z.string().optional().describe("Set to 'true' to show only unread messages"),
+    }),
+    execute: async ({ source, unread }: { source?: string; unread?: string }) => {
+      try {
+        const baseUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : "http://localhost:3000";
+        const params = new URLSearchParams();
+        if (source) params.set("source", source);
+        if (unread) params.set("unread", unread);
+        params.set("limit", "20");
+        const res = await fetch(`${baseUrl}/api/ops/inbox?${params}`, {
+          signal: AbortSignal.timeout(15000),
+        });
+        if (!res.ok) return { error: "Failed to fetch inbox" };
+        return await res.json();
+      } catch {
+        return { error: "Inbox API unavailable." };
+      }
     },
   }),
 };
