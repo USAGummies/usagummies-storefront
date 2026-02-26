@@ -284,16 +284,33 @@ export async function POST(req: Request) {
     );
   }
 
-  const { messages } = await req.json();
+  try {
+    const { messages } = await req.json();
 
-  const result = streamText({
-    model: openai("gpt-4o-mini"),
-    system: OPS_SYSTEM_PROMPT,
-    messages,
-    tools,
-    maxSteps: 5,
-    temperature: 0.3,
-  });
+    const result = streamText({
+      model: openai("gpt-4o-mini"),
+      system: OPS_SYSTEM_PROMPT,
+      messages,
+      tools,
+      maxSteps: 5,
+      temperature: 0.3,
+      onError: ({ error }) => {
+        console.error("[ops-chat] Stream error:", error);
+      },
+    });
 
-  return result.toDataStreamResponse();
+    return result.toDataStreamResponse({
+      getErrorMessage: (error) => {
+        console.error("[ops-chat] Data stream error:", error);
+        if (error instanceof Error) return error.message;
+        return "Something went wrong. Please try again.";
+      },
+    });
+  } catch (err) {
+    console.error("[ops-chat] Route error:", err);
+    return new Response(
+      JSON.stringify({ error: err instanceof Error ? err.message : "Unknown error" }),
+      { status: 500, headers: { "Content-Type": "application/json" } },
+    );
+  }
 }
