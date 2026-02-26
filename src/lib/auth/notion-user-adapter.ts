@@ -39,11 +39,11 @@ export type PlatformUser = {
 const ADMIN_FALLBACK: PlatformUser = {
   id: "local-admin",
   name: "Ben Weinberg",
-  email: "benjamin.stutman@gmail.com",
+  email: "ben@usagummies.com",
   role: "admin",
-  // bcrypt hash of "usagummies2026"
+  // bcrypt hash of "Slaterson1!"
   passwordHash:
-    "$2b$12$PsOo5KbdVHP.4HTT.y4CGef3ThnQN0BGNdjjf5pE.g14X/k2KiViS",
+    "$2b$12$1acXOlXv2fCkw5yXC5AWtOsUD3y8jNTaa5hETXWCdSvrN4M.U7x.S",
   active: true,
 };
 
