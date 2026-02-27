@@ -12,7 +12,7 @@
  */
 
 import { readState, writeState } from "@/lib/ops/state";
-import { queryDatabase, DB, extractNumber, extractText, extractDate } from "@/lib/notion/client";
+import { queryDatabase, DB, extractNumber, extractText } from "@/lib/notion/client";
 import type { CacheEnvelope, AmazonKPIs } from "@/lib/amazon/types";
 import type { PnLReport } from "./types";
 import { getCachedKPIs } from "@/lib/amazon/cache";
@@ -27,14 +27,79 @@ function startOfMonth(d: Date = new Date()): string {
   return d.toISOString().slice(0, 8) + "01";
 }
 
-function endOfMonth(d: Date = new Date()): string {
-  const last = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-  return last.toISOString().slice(0, 10);
-}
-
 function daysElapsedInMonth(): number {
   const now = new Date();
   return now.getDate();
+}
+
+type InventoryCostSnapshot = {
+  costPerUnit: number;
+  source: "inventory" | "fallback";
+};
+
+function parseInventoryUnits(props: Record<string, unknown>): number {
+  return (
+    extractNumber(props["Current Stock"]) ||
+    extractNumber(props["Quantity"]) ||
+    extractNumber(props["Units"]) ||
+    0
+  );
+}
+
+function parseInventoryCost(props: Record<string, unknown>): number {
+  return (
+    extractNumber(props["Cost Per Unit"]) ||
+    extractNumber(props["Unit Cost"]) ||
+    extractNumber(props["COGS"]) ||
+    0
+  );
+}
+
+async function getInventoryCostSnapshot(): Promise<InventoryCostSnapshot> {
+  try {
+    const rows = await queryDatabase(DB.INVENTORY);
+    if (!rows || rows.length === 0) {
+      return { costPerUnit: 3.5, source: "fallback" };
+    }
+
+    let weightedCostTotal = 0;
+    let weightedUnitsTotal = 0;
+    let simpleCostTotal = 0;
+    let simpleCostCount = 0;
+
+    for (const row of rows) {
+      const props = (row.properties || {}) as Record<string, unknown>;
+      const costPerUnit = parseInventoryCost(props);
+      if (costPerUnit <= 0) continue;
+
+      const unitsOnHand = parseInventoryUnits(props);
+      simpleCostTotal += costPerUnit;
+      simpleCostCount += 1;
+
+      if (unitsOnHand > 0) {
+        weightedCostTotal += costPerUnit * unitsOnHand;
+        weightedUnitsTotal += unitsOnHand;
+      }
+    }
+
+    if (weightedUnitsTotal > 0) {
+      return {
+        costPerUnit: Math.round((weightedCostTotal / weightedUnitsTotal) * 100) / 100,
+        source: "inventory",
+      };
+    }
+
+    if (simpleCostCount > 0) {
+      return {
+        costPerUnit: Math.round((simpleCostTotal / simpleCostCount) * 100) / 100,
+        source: "inventory",
+      };
+    }
+  } catch (err) {
+    console.error("[pnl] Inventory cost lookup failed:", err);
+  }
+
+  return { costPerUnit: 3.5, source: "fallback" };
 }
 
 // ---------------------------------------------------------------------------
@@ -175,15 +240,19 @@ async function getCOGS(): Promise<{
   shopifyFees: number;
 }> {
   const kpis = await getCachedKPIs<AmazonKPIs>();
+  const inventoryCost = await getInventoryCostSnapshot();
 
   // Amazon fees from KPI data
   const amazonFees = kpis
     ? (kpis.fees?.totalFee || 0) * daysElapsedInMonth()
     : 0;
 
-  // Product cost estimate: units sold × $3.50 avg COGS per unit
+  // Product cost estimate: units sold × weighted inventory COGS per unit.
   const unitsSoldMTD = kpis?.unitsSold?.monthToDate || 0;
-  const productCost = unitsSoldMTD * 3.5;
+  const productCost = unitsSoldMTD * inventoryCost.costPerUnit;
+  if (inventoryCost.source === "fallback") {
+    console.warn("[pnl] Falling back to default COGS ($3.50) — inventory costs unavailable");
+  }
 
   // Shopify transaction fees (~2.9% + $0.30 per transaction)
   const shopifyRevenue = await getShopifyRevenue(
@@ -234,7 +303,6 @@ async function getOpEx(start: string, end: string): Promise<{
       const p = (row.properties || {}) as Record<string, unknown>;
       const amount = Math.abs(extractNumber(p["Amount"]));
       const desc = (extractText(p["Description"]) || "").toLowerCase();
-      const channel = extractText(p["Channel"]) || "";
 
       // Categorize by description keywords
       if (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useInboxData } from "@/lib/ops/use-war-room-data";
 
 const SOURCE_OPTIONS = [
@@ -26,8 +26,13 @@ function categoryStyle(cat: string) {
 export function InboxView() {
   const [source, setSource] = useState("all");
   const [unreadOnly, setUnreadOnly] = useState(false);
+  const [limit, setLimit] = useState(50);
 
-  const { data, loading, error, refresh } = useInboxData(source, 50, unreadOnly);
+  const { data, loading, error, refresh } = useInboxData(source, limit, unreadOnly);
+
+  useEffect(() => {
+    setLimit(50);
+  }, [source, unreadOnly]);
 
   const stats = useMemo(
     () => [
@@ -166,6 +171,25 @@ export function InboxView() {
             </article>
           );
         })}
+        {!loading && (data?.messages.length || 0) >= limit ? (
+          <div style={{ display: "flex", justifyContent: "center", marginTop: 6 }}>
+            <button
+              onClick={() => setLimit((prev) => prev + 50)}
+              style={{
+                border: "1px solid rgba(255,255,255,0.12)",
+                background: "rgba(255,255,255,0.04)",
+                color: "rgba(255,255,255,0.85)",
+                borderRadius: 8,
+                padding: "8px 12px",
+                fontSize: 12,
+                cursor: "pointer",
+                fontFamily: "inherit",
+              }}
+            >
+              Load more
+            </button>
+          </div>
+        ) : null}
       </div>
     </div>
   );

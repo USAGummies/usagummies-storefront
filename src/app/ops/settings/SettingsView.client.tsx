@@ -27,6 +27,12 @@ type SettingsData = {
     configured: boolean;
     envVars: { key: string; set: boolean }[];
   }>;
+  banking: {
+    plaidConfigured: boolean;
+    plaidConnected: boolean;
+    connectedAt: string | null;
+    lastSync: string | null;
+  };
   auditTimestamp: string | null;
   version: {
     build: string;
@@ -46,12 +52,48 @@ const CARD_STYLE: CSSProperties = {
   borderRadius: 12,
 };
 
+declare global {
+  interface Window {
+    Plaid?: {
+      create: (config: {
+        token: string;
+        onSuccess: (publicToken: string) => void;
+        onExit?: (error: unknown) => void;
+      }) => { open: () => void };
+    };
+  }
+}
+
+function loadPlaidScript(): Promise<void> {
+  if (typeof window === "undefined") return Promise.resolve();
+  if (window.Plaid) return Promise.resolve();
+
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector('script[data-plaid-link="1"]') as HTMLScriptElement | null;
+    if (existing) {
+      existing.addEventListener("load", () => resolve());
+      existing.addEventListener("error", () => reject(new Error("Failed to load Plaid script")));
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = "https://cdn.plaid.com/link/v2/stable/link-initialize.js";
+    script.async = true;
+    script.dataset.plaidLink = "1";
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Failed to load Plaid script"));
+    document.head.appendChild(script);
+  });
+}
+
 export function SettingsView() {
   const [data, setData] = useState<SettingsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [roleDrafts, setRoleDrafts] = useState<Record<string, string>>({});
+  const [connectingBank, setConnectingBank] = useState(false);
+  const [bankingNotice, setBankingNotice] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -100,6 +142,66 @@ export function SettingsView() {
       setError(err instanceof Error ? err.message : "Failed to update role");
     } finally {
       setSavingId(null);
+    }
+  }
+
+  async function connectFoundBank() {
+    if (!data?.banking.plaidConfigured) {
+      setBankingNotice("Plaid env vars are missing. Configure PLAID_CLIENT_ID and PLAID_SECRET first.");
+      return;
+    }
+
+    setConnectingBank(true);
+    setBankingNotice(null);
+    try {
+      const tokenRes = await fetch("/api/ops/plaid/link-token", { method: "POST" });
+      if (!tokenRes.ok) {
+        const payload = (await tokenRes.json().catch(() => ({}))) as { error?: string };
+        throw new Error(payload.error || `HTTP ${tokenRes.status}`);
+      }
+      const tokenJson = (await tokenRes.json()) as { linkToken?: string };
+      if (!tokenJson.linkToken) {
+        throw new Error("Missing Plaid link token");
+      }
+
+      await loadPlaidScript();
+      if (!window.Plaid) {
+        throw new Error("Plaid Link failed to initialize");
+      }
+
+      window.Plaid.create({
+        token: tokenJson.linkToken,
+        onSuccess: async (publicToken) => {
+          try {
+            const exchangeRes = await fetch("/api/ops/plaid/exchange", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ publicToken }),
+            });
+            if (!exchangeRes.ok) {
+              const payload = (await exchangeRes.json().catch(() => ({}))) as { error?: string };
+              throw new Error(payload.error || `HTTP ${exchangeRes.status}`);
+            }
+
+            await fetch("/api/ops/balances?force=1", { cache: "no-store" }).catch(() => null);
+            setBankingNotice("Found.com connected successfully.");
+            await refresh();
+          } catch (err) {
+            setBankingNotice(err instanceof Error ? err.message : "Plaid token exchange failed");
+          } finally {
+            setConnectingBank(false);
+          }
+        },
+        onExit: (err) => {
+          if (err) {
+            setBankingNotice("Plaid flow exited before completion.");
+          }
+          setConnectingBank(false);
+        },
+      }).open();
+    } catch (err) {
+      setBankingNotice(err instanceof Error ? err.message : "Unable to start Plaid Link");
+      setConnectingBank(false);
     }
   }
 
@@ -287,6 +389,72 @@ export function SettingsView() {
                 </div>
               </div>
             ))}
+          </div>
+        </section>
+
+        <section style={{ ...CARD_STYLE, padding: "14px 16px" }}>
+          <div style={{ fontSize: 12, letterSpacing: "0.07em", textTransform: "uppercase", color: "rgba(255,255,255,0.45)", fontWeight: 700, marginBottom: 10 }}>
+            Banking Connection
+          </div>
+          <div style={{ display: "grid", gap: 8, fontSize: 13, color: "rgba(255,255,255,0.82)" }}>
+            <div>
+              Plaid status:{" "}
+              <strong style={{ color: data?.banking.plaidConfigured ? "#4ade80" : "#f87171" }}>
+                {data?.banking.plaidConfigured ? "Configured" : "Missing env vars"}
+              </strong>
+            </div>
+            <div>
+              Found.com link:{" "}
+              <strong style={{ color: data?.banking.plaidConnected ? "#4ade80" : "#fbbf24" }}>
+                {data?.banking.plaidConnected ? "Connected" : "Not connected"}
+              </strong>
+            </div>
+            <div>
+              Connected at:{" "}
+              <strong>
+                {data?.banking.connectedAt ? new Date(data.banking.connectedAt).toLocaleString() : "—"}
+              </strong>
+            </div>
+            <div>
+              Last sync:{" "}
+              <strong>
+                {data?.banking.lastSync ? new Date(data.banking.lastSync).toLocaleString() : "No sync yet"}
+              </strong>
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button
+                onClick={connectFoundBank}
+                disabled={connectingBank || !data?.banking.plaidConfigured}
+                style={{
+                  border: "1px solid rgba(34,197,94,0.4)",
+                  background: "rgba(34,197,94,0.12)",
+                  color: "#86efac",
+                  borderRadius: 8,
+                  padding: "7px 11px",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: connectingBank ? "wait" : "pointer",
+                  opacity: connectingBank || !data?.banking.plaidConfigured ? 0.55 : 1,
+                  fontFamily: "inherit",
+                }}
+              >
+                {connectingBank ? "Connecting..." : data?.banking.plaidConnected ? "Reconnect Found.com" : "Connect Found.com"}
+              </button>
+            </div>
+            {bankingNotice ? (
+              <div
+                style={{
+                  borderRadius: 8,
+                  padding: "8px 10px",
+                  background: "rgba(59,130,246,0.12)",
+                  border: "1px solid rgba(59,130,246,0.3)",
+                  color: "#93c5fd",
+                  fontSize: 12,
+                }}
+              >
+                {bankingNotice}
+              </div>
+            ) : null}
           </div>
         </section>
 

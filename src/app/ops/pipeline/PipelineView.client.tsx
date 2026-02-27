@@ -87,6 +87,7 @@ function MetricCard({ label, value, sub }: { label: string; value: string; sub?:
 }
 
 export function PipelineView() {
+  const [expandedStages, setExpandedStages] = useState<Record<string, boolean>>({});
   const {
     data: pipeline,
     loading: pipeLoading,
@@ -299,7 +300,7 @@ export function PipelineView() {
                 </div>
 
                 <div style={{ display: "grid", gap: 8 }}>
-                  {stageLeads.slice(0, 15).map((lead) => {
+                  {(expandedStages[stage] ? stageLeads : stageLeads.slice(0, 15)).map((lead) => {
                     const email = lead.email ? emailByContact.get(lead.email.toLowerCase()) : undefined;
                     const snippet = email?.latestEmail?.snippet || "No recent email thread.";
                     const lastEmailDate = email?.latestEmail?.date
@@ -400,6 +401,28 @@ export function PipelineView() {
                         No deals in this stage.
                       </div>
                     )
+                  ) : null}
+                  {stageLeads.length > 15 ? (
+                    <button
+                      onClick={() =>
+                        setExpandedStages((prev) => ({
+                          ...prev,
+                          [stage]: !prev[stage],
+                        }))
+                      }
+                      style={{
+                        border: `1px solid ${BORDER}`,
+                        borderRadius: 8,
+                        background: CARD,
+                        color: NAVY,
+                        padding: "7px 8px",
+                        fontSize: 12,
+                        fontWeight: 700,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {expandedStages[stage] ? "Show top 15" : `Show all (${stageLeads.length})`}
+                    </button>
                   ) : null}
                 </div>
               </div>

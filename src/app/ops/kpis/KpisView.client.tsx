@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useSession } from "next-auth/react";
 import {
   AlertTriangle,
   Mail,
@@ -23,13 +24,6 @@ import {
 
 type PriorityFilter = "all" | "critical" | "warning" | "info";
 
-type ActionLog = {
-  id: string;
-  title: string;
-  action: string;
-  at: string;
-};
-
 function MetricCard({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px" }}>
@@ -51,8 +45,9 @@ function MetricCard({ label, value, color }: { label: string; value: string; col
 }
 
 export function KpisView() {
+  const { data: session } = useSession();
   const [filter, setFilter] = useState<PriorityFilter>("all");
-  const [log, setLog] = useState<ActionLog[]>([]);
+  const [actionMsg, setActionMsg] = useState<string | null>(null);
 
   const {
     data: alerts,
@@ -77,32 +72,52 @@ export function KpisView() {
     { label: "Audit", timestamp: audit?.lastFetched },
   ];
 
-  function markDone(id: string, title: string) {
-    setLog((prev) => [
-      {
-        id,
-        title,
-        action: "Marked complete",
-        at: new Date().toISOString(),
-      },
-      ...prev,
-    ]);
+  async function recordAlertAction(
+    alert: { id: string; title: string; source: string },
+    action: "resolved" | "reopened" | "draft_email",
+  ) {
+    const res = await fetch("/api/ops/alerts", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        alertId: alert.id,
+        action,
+        title: alert.title,
+        source: alert.source,
+        resolvedBy: session?.user?.email || session?.user?.name || "ops-user",
+      }),
+    });
+
+    if (!res.ok) {
+      const payload = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(payload.error || `HTTP ${res.status}`);
+    }
   }
 
-  function draftEmail(title: string, message: string) {
+  async function markDone(alert: { id: string; title: string; source: string }) {
+    try {
+      await recordAlertAction(alert, "resolved");
+      setActionMsg(`Marked "${alert.title}" as resolved.`);
+      refreshAlerts();
+      setTimeout(() => setActionMsg(null), 2500);
+    } catch (err) {
+      setActionMsg(err instanceof Error ? err.message : "Failed to resolve alert");
+      setTimeout(() => setActionMsg(null), 2500);
+    }
+  }
+
+  async function draftEmail(alert: { id: string; title: string; source: string; message: string }) {
+    try {
+      await recordAlertAction(alert, "draft_email");
+    } catch {
+      // continue with mailto flow even if logging fails
+    }
+
+    const title = alert.title;
+    const message = alert.message;
     const subject = `Action required: ${title}`;
     const body = `Hi team,\n\nPlease review this alert:\n\n${title}\n${message}\n\nThanks.`;
     window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-
-    setLog((prev) => [
-      {
-        id: `${Date.now()}`,
-        title,
-        action: "Drafted follow-up email",
-        at: new Date().toISOString(),
-      },
-      ...prev,
-    ]);
   }
 
   return (
@@ -144,6 +159,22 @@ export function KpisView() {
         >
           <AlertTriangle size={16} />
           {alertsError || auditError}
+        </div>
+      ) : null}
+      {actionMsg ? (
+        <div
+          style={{
+            border: `1px solid ${NAVY}2b`,
+            background: `${NAVY}10`,
+            color: NAVY,
+            borderRadius: 10,
+            padding: "8px 12px",
+            marginBottom: 12,
+            fontSize: 13,
+            fontWeight: 600,
+          }}
+        >
+          {actionMsg}
         </div>
       ) : null}
 
@@ -214,7 +245,7 @@ export function KpisView() {
 
                   <div style={{ display: "grid", gap: 6, minWidth: 165 }}>
                     <button
-                      onClick={() => draftEmail(alert.title, alert.message)}
+                      onClick={() => draftEmail(alert)}
                       style={{
                         border: "none",
                         borderRadius: 8,
@@ -234,7 +265,7 @@ export function KpisView() {
                       Draft Email
                     </button>
                     <button
-                      onClick={() => markDone(alert.id, alert.title)}
+                      onClick={() => markDone(alert)}
                       style={{
                         border: `1px solid ${BORDER}`,
                         borderRadius: 8,
@@ -309,14 +340,14 @@ export function KpisView() {
             <div style={{ fontWeight: 700, color: NAVY }}>Action Log</div>
           </div>
 
-          {log.length === 0 ? (
+          {(alerts?.actionLog || []).length === 0 ? (
             <div style={{ fontSize: 13, color: TEXT_DIM }}>No completed actions yet.</div>
           ) : (
             <div style={{ display: "grid", gap: 8 }}>
-              {log.slice(0, 20).map((entry, idx) => (
+              {(alerts?.actionLog || []).slice(0, 20).map((entry, idx) => (
                 <div key={`${entry.id}-${idx}`} style={{ borderTop: `1px solid ${BORDER}`, paddingTop: 8 }}>
                   <div style={{ color: NAVY, fontWeight: 700, fontSize: 13 }}>{entry.title}</div>
-                  <div style={{ color: TEXT_DIM, fontSize: 12 }}>{entry.action}</div>
+                  <div style={{ color: TEXT_DIM, fontSize: 12 }}>{entry.action.replace("_", " ")}</div>
                   <div style={{ color: TEXT_DIM, fontSize: 11 }}>{new Date(entry.at).toLocaleString("en-US")}</div>
                 </div>
               ))}

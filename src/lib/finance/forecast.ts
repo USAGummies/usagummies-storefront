@@ -19,8 +19,224 @@ import type {
   ForecastReport,
 } from "./types";
 import { getCachedKPIs } from "@/lib/amazon/cache";
+import {
+  DB,
+  queryDatabase,
+  extractNumber,
+  extractText,
+} from "@/lib/notion/client";
 
 const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+
+type PlaidBalanceCache = {
+  accounts?: Array<{
+    balances?: { current?: number | null; available?: number | null };
+  }>;
+};
+
+type InventoryCostSnapshot = {
+  costPerUnit: number;
+  source: "inventory" | "fallback";
+};
+
+type MonthlyExpenseEstimate = {
+  category: Payable["category"];
+  amount: number;
+  description: string;
+};
+
+function parseInventoryUnits(props: Record<string, unknown>): number {
+  return (
+    extractNumber(props["Current Stock"]) ||
+    extractNumber(props["Quantity"]) ||
+    extractNumber(props["Units"]) ||
+    0
+  );
+}
+
+function parseInventoryCost(props: Record<string, unknown>): number {
+  return (
+    extractNumber(props["Cost Per Unit"]) ||
+    extractNumber(props["Unit Cost"]) ||
+    extractNumber(props["COGS"]) ||
+    0
+  );
+}
+
+async function getInventoryCostSnapshot(): Promise<InventoryCostSnapshot> {
+  try {
+    const rows = await queryDatabase(DB.INVENTORY);
+    if (!rows || rows.length === 0) {
+      return { costPerUnit: 3.5, source: "fallback" };
+    }
+
+    let weightedCostTotal = 0;
+    let weightedUnitsTotal = 0;
+    let simpleCostTotal = 0;
+    let simpleCostCount = 0;
+
+    for (const row of rows) {
+      const props = (row.properties || {}) as Record<string, unknown>;
+      const costPerUnit = parseInventoryCost(props);
+      if (costPerUnit <= 0) continue;
+
+      const unitsOnHand = parseInventoryUnits(props);
+      simpleCostTotal += costPerUnit;
+      simpleCostCount += 1;
+
+      if (unitsOnHand > 0) {
+        weightedCostTotal += costPerUnit * unitsOnHand;
+        weightedUnitsTotal += unitsOnHand;
+      }
+    }
+
+    if (weightedUnitsTotal > 0) {
+      return {
+        costPerUnit: Math.round((weightedCostTotal / weightedUnitsTotal) * 100) / 100,
+        source: "inventory",
+      };
+    }
+
+    if (simpleCostCount > 0) {
+      return {
+        costPerUnit: Math.round((simpleCostTotal / simpleCostCount) * 100) / 100,
+        source: "inventory",
+      };
+    }
+  } catch (err) {
+    console.error("[forecast] Inventory cost lookup failed:", err);
+  }
+
+  return { costPerUnit: 3.5, source: "fallback" };
+}
+
+function classifyExpenseCategory(description: string): Payable["category"] {
+  const lower = description.toLowerCase();
+  if (
+    lower.includes("shopify") ||
+    lower.includes("notion") ||
+    lower.includes("vercel") ||
+    lower.includes("software") ||
+    lower.includes("subscription")
+  ) {
+    return "software";
+  }
+  if (
+    lower.includes("ad") ||
+    lower.includes("marketing") ||
+    lower.includes("facebook") ||
+    lower.includes("google ads") ||
+    lower.includes("tiktok")
+  ) {
+    return "marketing";
+  }
+  if (
+    lower.includes("ship") ||
+    lower.includes("usps") ||
+    lower.includes("ups") ||
+    lower.includes("fedex") ||
+    lower.includes("fulfillment")
+  ) {
+    return "shipping";
+  }
+  if (
+    lower.includes("payroll") ||
+    lower.includes("salary") ||
+    lower.includes("contractor")
+  ) {
+    return "payroll";
+  }
+  return "other";
+}
+
+async function buildRecurringMonthlyFromCashTransactions(): Promise<MonthlyExpenseEstimate[]> {
+  try {
+    const start = new Date();
+    start.setDate(start.getDate() - 90);
+
+    const rows = await queryDatabase(
+      DB.CASH_TRANSACTIONS,
+      {
+        and: [
+          { property: "Date", date: { on_or_after: start.toISOString().slice(0, 10) } },
+          { property: "Category", select: { equals: "Expense" } },
+        ],
+      },
+      [{ property: "Date", direction: "descending" }],
+      200,
+    );
+
+    if (!rows || rows.length === 0) {
+      return [
+        { category: "software", amount: 350, description: "Software subscriptions (fallback estimate)" },
+        { category: "marketing", amount: 500, description: "Marketing spend (fallback estimate)" },
+        { category: "shipping", amount: 200, description: "Shipping costs (fallback estimate)" },
+      ];
+    }
+
+    const totals: Record<Payable["category"], number> = {
+      cogs: 0,
+      shipping: 0,
+      software: 0,
+      marketing: 0,
+      payroll: 0,
+      other: 0,
+    };
+
+    for (const row of rows) {
+      const props = (row.properties || {}) as Record<string, unknown>;
+      const amount = Math.abs(extractNumber(props["Amount"]));
+      if (amount <= 0) continue;
+      const description = extractText(props["Description"]) || "";
+      const category = classifyExpenseCategory(description);
+      totals[category] += amount;
+    }
+
+    const monthly: MonthlyExpenseEstimate[] = [];
+    for (const [category, total] of Object.entries(totals)) {
+      if (category === "cogs") continue;
+      if (total <= 0) continue;
+      const monthlyAmount = Math.round(((total / 90) * 30) * 100) / 100;
+      if (monthlyAmount <= 0) continue;
+      monthly.push({
+        category: category as Payable["category"],
+        amount: monthlyAmount,
+        description: `Recurring ${category} (rolling 90-day average)`,
+      });
+    }
+
+    if (monthly.length > 0) {
+      return monthly;
+    }
+  } catch (err) {
+    console.error("[forecast] CASH_TRANSACTIONS recurring expense lookup failed:", err);
+  }
+
+  return [
+    { category: "software", amount: 350, description: "Software subscriptions (fallback estimate)" },
+    { category: "marketing", amount: 500, description: "Marketing spend (fallback estimate)" },
+    { category: "shipping", amount: 200, description: "Shipping costs (fallback estimate)" },
+  ];
+}
+
+function resolveCurrentBalance(
+  cache: CacheEnvelope<UnifiedBalances | PlaidBalanceCache> | null,
+): number {
+  const unified = cache?.data as UnifiedBalances | undefined;
+  if (typeof unified?.totalCash === "number") {
+    return unified.totalCash;
+  }
+
+  const plaidOnly = cache?.data as PlaidBalanceCache | undefined;
+  if (Array.isArray(plaidOnly?.accounts)) {
+    return plaidOnly.accounts.reduce((sum, account) => {
+      const current = account.balances?.current ?? account.balances?.available ?? 0;
+      return sum + (current || 0);
+    }, 0);
+  }
+
+  return 0;
+}
 
 // ---------------------------------------------------------------------------
 // Receivables — money coming in
@@ -110,14 +326,7 @@ async function buildReceivables(): Promise<Receivable[]> {
 async function buildPayables(): Promise<Payable[]> {
   const payables: Payable[] = [];
 
-  // Recurring expenses (estimated from historical patterns)
-  // These are typical for a DTC supplements brand
-  const recurringMonthly: { category: Payable["category"]; amount: number; description: string }[] = [
-    { category: "software", amount: 300, description: "Shopify + apps subscription" },
-    { category: "software", amount: 50, description: "Notion + tools" },
-    { category: "marketing", amount: 500, description: "Estimated ad spend" },
-    { category: "shipping", amount: 200, description: "Non-FBA shipping costs" },
-  ];
+  const recurringMonthly = await buildRecurringMonthlyFromCashTransactions();
 
   // Spread monthly recurring across the next 90 days
   for (const expense of recurringMonthly) {
@@ -134,9 +343,10 @@ async function buildPayables(): Promise<Payable[]> {
 
   // COGS estimate — based on Amazon velocity
   const amazonKPIs = await getCachedKPIs<AmazonKPIs>();
+  const inventoryCost = await getInventoryCostSnapshot();
   if (amazonKPIs) {
     const unitsPerDay = amazonKPIs.velocity?.unitsPerDay7d || 0;
-    const costPerUnit = 3.5; // Estimated COGS per gummy bottle
+    const costPerUnit = inventoryCost.costPerUnit;
 
     // Monthly COGS projection
     for (let month = 0; month < 3; month++) {
@@ -147,7 +357,7 @@ async function buildPayables(): Promise<Payable[]> {
           amount: Math.round(monthlyCOGS * 100) / 100,
           dueDate: futureDate(30 * month + 1),
           recurring: true,
-          description: `Product COGS (~${Math.round(unitsPerDay)} units/day × $${costPerUnit})`,
+          description: `Product COGS (~${Math.round(unitsPerDay)} units/day × $${costPerUnit.toFixed(2)})`,
         });
       }
     }
@@ -164,6 +374,10 @@ async function buildPayables(): Promise<Payable[]> {
         description: `FBA restock order (~${reorderUnits} units, ${amazonKPIs.inventory.daysOfSupply} days of supply remaining)`,
       });
     }
+  }
+
+  if (inventoryCost.source === "fallback") {
+    console.warn("[forecast] Falling back to default COGS ($3.50) — inventory costs unavailable");
   }
 
   // Amazon fees (estimated from current fee structure)
@@ -242,11 +456,11 @@ export async function buildForecastReport(): Promise<ForecastReport> {
   }
 
   // Get current balance from unified balances cache
-  const balancesCache = await readState<CacheEnvelope<UnifiedBalances> | null>(
+  const balancesCache = await readState<CacheEnvelope<UnifiedBalances | PlaidBalanceCache> | null>(
     "plaid-balance-cache",
     null,
   );
-  const currentBalance = balancesCache?.data?.totalCash || 0;
+  const currentBalance = resolveCurrentBalance(balancesCache);
 
   // Build receivables and payables
   const [receivables, payables] = await Promise.all([

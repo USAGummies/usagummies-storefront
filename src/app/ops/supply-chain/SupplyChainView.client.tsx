@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Truck, Boxes, Factory, DollarSign } from "lucide-react";
 import { useInventoryData, useSupplyChain, fmtDollar } from "@/lib/ops/use-war-room-data";
 import { StalenessBadge } from "@/app/ops/components/StalenessBadge";
@@ -36,6 +37,7 @@ function MetricCard({ label, value, icon }: { label: string; value: string; icon
 }
 
 export function SupplyChainView() {
+  const [inventoryPage, setInventoryPage] = useState(1);
   const {
     data: inventory,
     loading: invLoading,
@@ -52,6 +54,19 @@ export function SupplyChainView() {
     { label: "Inventory", timestamp: inventory?.generatedAt },
     { label: "Supply Chain", timestamp: supply?.generatedAt },
   ];
+  const pageSize = 20;
+  const inventoryItems = inventory?.items || [];
+  const inventoryPages = Math.max(1, Math.ceil(inventoryItems.length / pageSize));
+  const pagedInventory = useMemo(
+    () => inventoryItems.slice((inventoryPage - 1) * pageSize, inventoryPage * pageSize),
+    [inventoryItems, inventoryPage],
+  );
+
+  useEffect(() => {
+    if (inventoryPage > inventoryPages) {
+      setInventoryPage(inventoryPages);
+    }
+  }, [inventoryPage, inventoryPages]);
 
   const error = invError || scError;
 
@@ -120,7 +135,7 @@ export function SupplyChainView() {
                 </tr>
               </thead>
               <tbody>
-                {(inventory?.items || []).slice(0, 20).map((item) => (
+                {pagedInventory.map((item) => (
                   <tr key={item.id}>
                     <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 0", color: NAVY, fontWeight: 700 }}>{item.sku}</td>
                     <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 0", textAlign: "right", color: NAVY }}>{item.currentStock.toLocaleString()}</td>
@@ -147,6 +162,49 @@ export function SupplyChainView() {
             </table>
           </div>
         )}
+        {inventoryItems.length > pageSize ? (
+          <div style={{ marginTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ fontSize: 12, color: TEXT_DIM }}>
+              Page {inventoryPage} of {inventoryPages}
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={() => setInventoryPage((prev) => Math.max(1, prev - 1))}
+                disabled={inventoryPage === 1}
+                style={{
+                  border: `1px solid ${BORDER}`,
+                  borderRadius: 8,
+                  background: CARD,
+                  color: NAVY,
+                  padding: "6px 10px",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: inventoryPage === 1 ? "not-allowed" : "pointer",
+                  opacity: inventoryPage === 1 ? 0.5 : 1,
+                }}
+              >
+                Prev
+              </button>
+              <button
+                onClick={() => setInventoryPage((prev) => Math.min(inventoryPages, prev + 1))}
+                disabled={inventoryPage === inventoryPages}
+                style={{
+                  border: `1px solid ${BORDER}`,
+                  borderRadius: 8,
+                  background: CARD,
+                  color: NAVY,
+                  padding: "6px 10px",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: inventoryPage === inventoryPages ? "not-allowed" : "pointer",
+                  opacity: inventoryPage === inventoryPages ? 0.5 : 1,
+                }}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>

@@ -29,7 +29,8 @@ export const dynamic = "force-dynamic";
 
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-export async function GET() {
+export async function GET(req: Request) {
+  const forceRefresh = new URL(req.url).searchParams.get("force") === "1";
   // Check cache first
   const cached = await readState<CacheEnvelope<UnifiedBalances> | null>(
     "plaid-balance-cache",
@@ -37,6 +38,7 @@ export async function GET() {
   );
   // Only use cache if it's keyed as unified (has totalCash)
   if (
+    !forceRefresh &&
     cached &&
     Date.now() - cached.cachedAt < CACHE_TTL &&
     "totalCash" in (cached.data || {})
@@ -74,6 +76,11 @@ export async function GET() {
     totalCash: Math.round(totalCash * 100) / 100,
     lastUpdated: new Date().toISOString(),
   };
+
+  await writeState("plaid-balance-cache", {
+    data: result,
+    cachedAt: Date.now(),
+  });
 
   return NextResponse.json(result);
 }

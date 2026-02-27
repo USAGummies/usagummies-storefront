@@ -15,7 +15,6 @@ import {
   Cell,
 } from "recharts";
 import {
-  RefreshCw,
   AlertTriangle,
   DollarSign,
   Wallet,
@@ -47,6 +46,8 @@ import {
   cumulativeThrough,
 } from "@/lib/ops/pro-forma";
 import { StalenessBadge } from "@/app/ops/components/StalenessBadge";
+import { RefreshButton } from "@/app/ops/components/RefreshButton";
+import { SkeletonChart, SkeletonTable } from "@/app/ops/components/Skeleton";
 import {
   NAVY,
   RED,
@@ -284,24 +285,7 @@ export function OpsDashboard() {
             <StalenessBadge items={freshnessItems} />
           </div>
         </div>
-        <button
-          onClick={() => refresh()}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 8,
-            border: "none",
-            borderRadius: 8,
-            background: NAVY,
-            color: "#fff",
-            padding: "10px 14px",
-            fontWeight: 700,
-            cursor: "pointer",
-          }}
-        >
-          <RefreshCw size={15} />
-          Refresh
-        </button>
+        <RefreshButton loading={dashboardLoading} onClick={() => refresh()} />
       </div>
 
       {dashboardError ? (
@@ -392,32 +376,36 @@ export function OpsDashboard() {
       >
         <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px 14px 8px" }}>
           <div style={{ fontWeight: 700, color: NAVY, marginBottom: 10 }}>30-Day Revenue by Channel</div>
-          <div style={{ width: "100%", height: 280 }}>
-            <ResponsiveContainer>
-              <ComposedChart data={trendRows}>
-                <CartesianGrid strokeDasharray="3 3" stroke={BORDER} />
-                <XAxis dataKey="label" tick={{ fontSize: 11, fill: TEXT_DIM }} />
-                <YAxis tick={{ fontSize: 11, fill: TEXT_DIM }} />
-                <Tooltip formatter={(v: number | string | undefined) => fmtDollar(Number(v || 0))} />
-                <Bar dataKey="amazon" stackId="rev" fill={COLOR_AMAZON} name="Amazon" />
-                <Bar dataKey="dtc" stackId="rev" fill={COLOR_DTC} name="DTC" />
-                <Bar dataKey="faire" stackId="rev" fill={COLOR_FAIRE} name="Faire" />
-                <Bar dataKey="distributor" stackId="rev" fill={COLOR_DIST} name="Distributor" />
-                <Line
-                  type="monotone"
-                  dataKey={() => {
-                    if (!month) return 0;
-                    const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
-                    return TOTAL_REVENUE[month] / daysInMonth;
-                  }}
-                  stroke={NAVY}
-                  strokeDasharray="5 4"
-                  dot={false}
-                  name="Daily Plan"
-                />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
+          {dashboardLoading && trendRows.length === 0 ? (
+            <SkeletonChart height={280} />
+          ) : (
+            <div style={{ width: "100%", height: 280 }}>
+              <ResponsiveContainer>
+                <ComposedChart data={trendRows}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={BORDER} />
+                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: TEXT_DIM }} />
+                  <YAxis tick={{ fontSize: 11, fill: TEXT_DIM }} />
+                  <Tooltip formatter={(v: number | string | undefined) => fmtDollar(Number(v || 0))} />
+                  <Bar dataKey="amazon" stackId="rev" fill={COLOR_AMAZON} name="Amazon" />
+                  <Bar dataKey="dtc" stackId="rev" fill={COLOR_DTC} name="DTC" />
+                  <Bar dataKey="faire" stackId="rev" fill={COLOR_FAIRE} name="Faire" />
+                  <Bar dataKey="distributor" stackId="rev" fill={COLOR_DIST} name="Distributor" />
+                  <Line
+                    type="monotone"
+                    dataKey={() => {
+                      if (!month) return 0;
+                      const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+                      return TOTAL_REVENUE[month] / daysInMonth;
+                    }}
+                    stroke={NAVY}
+                    strokeDasharray="5 4"
+                    dot={false}
+                    name="Daily Plan"
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </div>
 
         <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px 14px 8px" }}>
@@ -487,7 +475,9 @@ export function OpsDashboard() {
           <div style={{ fontSize: 12, color: TEXT_DIM }}>{(alerts?.summary.total || 0).toLocaleString("en-US")} unresolved</div>
         </div>
 
-        {(alerts?.alerts || []).length === 0 ? (
+        {dashboardLoading && (alerts?.alerts || []).length === 0 ? (
+          <SkeletonTable rows={4} />
+        ) : (alerts?.alerts || []).length === 0 ? (
           <div style={{ fontSize: 13, color: TEXT_DIM }}>
             {dashboardLoading ? "Loading alerts..." : "No active alerts right now."}
           </div>

@@ -36,6 +36,12 @@ type SettingsResponse = {
     slack: boolean;
   };
   integrationDetails: IntegrationStatus[];
+  banking: {
+    plaidConfigured: boolean;
+    plaidConnected: boolean;
+    connectedAt: string | null;
+    lastSync: string | null;
+  };
   auditTimestamp: string | null;
   version: {
     build: string;
@@ -100,13 +106,24 @@ async function getAuditTimestamp(): Promise<string | null> {
   return cached?.data?.lastFetched || cached?.data?.generatedAt || null;
 }
 
+type PlaidTokenState = {
+  accessToken?: string;
+  connectedAt?: string;
+} | null;
+
+type UnifiedBalancesLike = {
+  lastUpdated?: string;
+  totalCash?: number;
+} | null;
+
 export async function GET() {
   try {
     const session = await auth();
     const canEditRoles = session?.user?.role === "admin";
     const integrationDetails = checkIntegrations();
+    const plaidConfigured = integrationDetails.find((d) => d.name === "Plaid")?.configured || false;
 
-    const [rows, auditTimestamp] = await Promise.all([
+    const [rows, auditTimestamp, plaidToken, balances] = await Promise.all([
       queryDatabase(
         DB.PLATFORM_USERS,
         undefined,
@@ -114,14 +131,27 @@ export async function GET() {
         200,
       ),
       getAuditTimestamp(),
+      readState<PlaidTokenState>("plaid-access-token", null),
+      readState<{ data?: UnifiedBalancesLike } | null>("plaid-balance-cache", null),
     ]);
 
     const users = (rows || []).map(parseUser);
+    const plaidConnected = Boolean(plaidToken?.accessToken);
+    const lastSync =
+      typeof balances?.data?.lastUpdated === "string"
+        ? balances.data.lastUpdated
+        : null;
 
     const result: SettingsResponse = {
       users,
       integrations: integrationSummary(integrationDetails),
       integrationDetails,
+      banking: {
+        plaidConfigured,
+        plaidConnected,
+        connectedAt: plaidToken?.connectedAt || null,
+        lastSync,
+      },
       auditTimestamp,
       version: {
         build: (process.env.VERCEL_GIT_COMMIT_SHA || "local").slice(0, 7),
@@ -150,6 +180,12 @@ export async function GET() {
         users: [],
         integrations: integrationSummary(integrationDetails),
         integrationDetails,
+        banking: {
+          plaidConfigured: integrationDetails.find((d) => d.name === "Plaid")?.configured || false,
+          plaidConnected: false,
+          connectedAt: null,
+          lastSync: null,
+        },
         auditTimestamp: null,
         version: {
           build: (process.env.VERCEL_GIT_COMMIT_SHA || "local").slice(0, 7),

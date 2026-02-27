@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import {
-  RefreshCw,
   AlertTriangle,
   TrendingUp,
   ShoppingCart,
@@ -51,6 +50,7 @@ import {
   SURFACE_BORDER as BORDER,
   SURFACE_TEXT_DIM as TEXT_DIM,
 } from "@/app/ops/tokens";
+import { RefreshButton } from "@/app/ops/components/RefreshButton";
 
 const COLOR_DTC = "#3b82f6";
 const COLOR_AMAZON = "#f59e0b";
@@ -75,21 +75,37 @@ function clamp(n: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, n));
 }
 
+function normalizePct(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  if (value > 1) return value / 100;
+  return value;
+}
+
 function estimateMargin(
   key: TabKey,
   grossMargin: number,
   data: ChannelData | null,
 ): number {
-  if (key === "all") return clamp(grossMargin, 0, 1);
+  const metrics = data?.channelMetrics;
+  if (metrics) {
+    if (key === "all") return clamp(metrics.all.marginPct, 0, 1);
+    if (key === "amazon") return clamp(metrics.amazon?.marginPct || 0, 0, 1);
+    if (key === "dtc") return clamp(metrics.dtc.marginPct, 0, 1);
+    if (key === "faire") return clamp(metrics.faire.marginPct, 0, 1);
+    if (key === "distributor") return clamp(metrics.distributor.marginPct, 0, 1);
+  }
+
+  const normalizedGross = normalizePct(grossMargin);
+  if (key === "all") return clamp(normalizedGross, 0, 1);
   if (key === "amazon") {
     if (data?.amazon?.fees?.estimatedNetMargin != null) {
-      return clamp(data.amazon.fees.estimatedNetMargin, 0, 1);
+      return clamp(normalizePct(data.amazon.fees.estimatedNetMargin), 0, 1);
     }
-    return clamp(grossMargin - 0.04, 0, 1);
+    return clamp(normalizedGross - 0.04, 0, 1);
   }
-  if (key === "dtc") return clamp(grossMargin - 0.03, 0, 1);
-  if (key === "faire") return clamp(grossMargin - 0.08, 0, 1);
-  return clamp(grossMargin - 0.1, 0, 1);
+  if (key === "dtc") return clamp(normalizedGross - 0.03, 0, 1);
+  if (key === "faire") return clamp(normalizedGross - 0.08, 0, 1);
+  return clamp(normalizedGross - 0.1, 0, 1);
 }
 
 function getPlanToDate(key: TabKey): number | null {
@@ -187,11 +203,11 @@ export function ChannelView() {
       return {
         date: d.date,
         label: d.label,
-        dtc: d.dtcRevenue,
-        faire: d.faireRevenue,
-        distributor: d.distributorRevenue,
+        dtc: d.dtcRevenue ?? d.dtc ?? 0,
+        faire: d.faireRevenue ?? d.faire ?? 0,
+        distributor: d.distributorRevenue ?? d.distributor ?? 0,
         amazon,
-        total: d.totalRevenue + amazon,
+        total: (d.totalRevenue ?? d.combined ?? 0) + amazon,
       };
     });
   }, [channels, dashboard]);
@@ -208,7 +224,17 @@ export function ChannelView() {
   const selected = stats[tab];
   const aov = selected.orders > 0 ? selected.revenue / selected.orders : 0;
   const margin = estimateMargin(tab, pnl?.grossMargin || 0, channels);
-  const contribution = selected.revenue * margin;
+  const selectedMetric =
+    tab === "all"
+      ? channels?.channelMetrics?.all
+      : tab === "amazon"
+        ? channels?.channelMetrics?.amazon
+        : tab === "dtc"
+          ? channels?.channelMetrics?.dtc
+          : tab === "faire"
+            ? channels?.channelMetrics?.faire
+            : channels?.channelMetrics?.distributor;
+  const contribution = selectedMetric?.netRevenue ?? (selected.revenue * margin);
 
   const plan = getPlanToDate(tab);
   const pva = plan != null ? comparePlanVsActual(plan, selected.revenue) : null;
@@ -254,24 +280,7 @@ export function ChannelView() {
           </div>
         </div>
 
-        <button
-          onClick={() => refresh()}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 8,
-            background: NAVY,
-            color: "#fff",
-            border: "none",
-            borderRadius: 8,
-            padding: "10px 14px",
-            cursor: "pointer",
-            fontWeight: 700,
-          }}
-        >
-          <RefreshCw size={15} />
-          Refresh
-        </button>
+        <RefreshButton loading={loading} onClick={() => refresh()} />
       </div>
 
       <div
@@ -341,8 +350,8 @@ export function ChannelView() {
         <KpiCard label="Revenue (MTD)" value={fmtDollar(selected.revenue)} />
         <KpiCard label="Orders (MTD)" value={selected.orders.toLocaleString("en-US")} />
         <KpiCard label="AOV" value={fmtDollar(aov)} />
-        <KpiCard label="Est. Contribution Margin" value={fmtPercent(safePct(margin))} />
-        <KpiCard label="Est. Contribution Profit" value={fmtDollar(contribution)} />
+        <KpiCard label="Contribution Margin" value={fmtPercent(safePct(margin))} />
+        <KpiCard label="Contribution Profit" value={fmtDollar(contribution)} />
       </div>
 
       <div
@@ -493,28 +502,40 @@ export function ChannelView() {
         <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px 14px 10px" }}>
           <div style={{ fontWeight: 700, color: NAVY, marginBottom: 10 }}>Channel Comparison</div>
 
-          {([
-            { label: "Amazon", key: "amazon" as TabKey },
-            { label: "Shopify DTC", key: "dtc" as TabKey },
-            { label: "Faire", key: "faire" as TabKey },
-            { label: "Distributors", key: "distributor" as TabKey },
-          ]).map((row) => {
-            const rev = stats[row.key].revenue;
-            const ord = stats[row.key].orders;
-            const channelMargin = estimateMargin(row.key, pnl?.grossMargin || 0, channels);
-            return (
-              <div key={row.key} style={{ borderTop: `1px solid ${BORDER}`, padding: "9px 0", display: "grid", gap: 4 }}>
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <div style={{ fontWeight: 700, color: NAVY }}>{row.label}</div>
-                  <div style={{ color: NAVY, fontWeight: 700 }}>{fmtDollar(rev)}</div>
+            {([
+              { label: "Amazon", key: "amazon" as TabKey },
+              { label: "Shopify DTC", key: "dtc" as TabKey },
+              { label: "Faire", key: "faire" as TabKey },
+              { label: "Distributors", key: "distributor" as TabKey },
+            ]).map((row) => {
+              const rev = stats[row.key].revenue;
+              const ord = stats[row.key].orders;
+              const channelMargin = estimateMargin(row.key, pnl?.grossMargin || 0, channels);
+              const feeInfo =
+                row.key === "amazon"
+                  ? channels?.channelMetrics?.amazon?.fees
+                  : row.key === "dtc"
+                    ? channels?.channelMetrics?.dtc.fees
+                    : row.key === "faire"
+                      ? channels?.channelMetrics?.faire.fees
+                      : channels?.channelMetrics?.distributor.fees;
+              return (
+                <div key={row.key} style={{ borderTop: `1px solid ${BORDER}`, padding: "9px 0", display: "grid", gap: 4 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <div style={{ fontWeight: 700, color: NAVY }}>{row.label}</div>
+                    <div style={{ color: NAVY, fontWeight: 700 }}>{fmtDollar(rev)}</div>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: TEXT_DIM }}>
+                    <span>{ord.toLocaleString("en-US")} orders</span>
+                    <span>Margin {fmtPercent(channelMargin)}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: TEXT_DIM }}>
+                    <span>Fees</span>
+                    <span>{fmtDollar(feeInfo || 0)}</span>
+                  </div>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: TEXT_DIM }}>
-                  <span>{ord.toLocaleString("en-US")} orders</span>
-                  <span>Est margin {fmtPercent(channelMargin)}</span>
-                </div>
-              </div>
-            );
-          })}
+              );
+            })}
         </div>
       </div>
 

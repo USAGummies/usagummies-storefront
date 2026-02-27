@@ -5,12 +5,6 @@
  * then uses the channel-splitter to classify each order as DTC, Faire,
  * Distributor, or Other. Also fetches Amazon data for the combined view.
  *
- * Returns:
- *  - Per-channel breakdown (revenue, orders, AOV, top items)
- *  - Daily channel chart data for stacked visualizations
- *  - Amazon metrics alongside Shopify channels
- *  - lastFetched timestamp for staleness detection
- *
  * Protected by middleware (requires JWT session).
  */
 
@@ -23,23 +17,24 @@ import {
   CHANNEL_ORDER_FRAGMENT,
   buildChannelBreakdown,
   buildDailyChannelData,
+  classifyOrder,
   type ChannelBreakdown,
-  type DailyChannelData,
+  type ChannelName,
   type ShopifyOrderNode,
 } from "@/lib/ops/channel-splitter";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// ---------------------------------------------------------------------------
-// Shopify fetcher — extended fields for channel classification
-// ---------------------------------------------------------------------------
-
 const shopifyToken = () => process.env.SHOPIFY_ADMIN_TOKEN || "";
 const shopifyDomain = () =>
   process.env.SHOPIFY_STORE_DOMAIN ||
   process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN ||
   "";
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
 
 async function fetchShopifyOrders(): Promise<ShopifyOrderNode[]> {
   if (!shopifyToken() || !shopifyDomain()) return [];
@@ -83,18 +78,12 @@ async function fetchShopifyOrders(): Promise<ShopifyOrderNode[]> {
 
     const json = await res.json();
     const edges = json.data?.orders?.edges || [];
-    return edges.map(
-      (e: { node: ShopifyOrderNode }) => e.node,
-    );
+    return edges.map((e: { node: ShopifyOrderNode }) => e.node);
   } catch (err) {
     console.error("[channels] Shopify fetch failed:", err);
     return [];
   }
 }
-
-// ---------------------------------------------------------------------------
-// Amazon fetcher (reuses existing cache + kpi-builder)
-// ---------------------------------------------------------------------------
 
 async function fetchAmazon(): Promise<AmazonKPIs | null> {
   if (!isAmazonConfigured()) return null;
@@ -112,9 +101,32 @@ async function fetchAmazon(): Promise<AmazonKPIs | null> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Response shape
-// ---------------------------------------------------------------------------
+type ChannelFeeMetric = {
+  revenue: number;
+  fees: number;
+  netRevenue: number;
+  marginPct: number;
+  orderCount: number;
+};
+
+type ChannelMetrics = {
+  dtc: ChannelFeeMetric;
+  faire: ChannelFeeMetric;
+  distributor: ChannelFeeMetric;
+  other: ChannelFeeMetric;
+  amazon: ChannelFeeMetric | null;
+  all: ChannelFeeMetric;
+};
+
+type DailyChannelResponse = {
+  date: string;
+  label: string;
+  dtcRevenue: number;
+  faireRevenue: number;
+  distributorRevenue: number;
+  otherRevenue: number;
+  totalRevenue: number;
+};
 
 type ChannelsResponse = {
   shopify: ChannelBreakdown;
@@ -125,7 +137,8 @@ type ChannelsResponse = {
     inventory: AmazonKPIs["inventory"] | null;
     fees: AmazonKPIs["fees"] | null;
   } | null;
-  dailyByChannel: DailyChannelData[];
+  dailyByChannel: DailyChannelResponse[];
+  channelMetrics: ChannelMetrics;
   combined: {
     totalRevenue: number;
     totalOrders: number;
@@ -133,25 +146,142 @@ type ChannelsResponse = {
   generatedAt: string;
 };
 
-// ---------------------------------------------------------------------------
-// Main handler
-// ---------------------------------------------------------------------------
+function shopifyFeeForOrder(channel: ChannelName, total: number, customerOrders: number): number {
+  if (channel === "faire") {
+    const commissionRate = customerOrders > 1 ? 0.15 : 0.25;
+    return total * commissionRate;
+  }
+  if (channel === "dtc" || channel === "distributor" || channel === "other") {
+    return total * 0.029 + 0.3;
+  }
+  return 0;
+}
+
+function normalizeMarginPct(value: number | null | undefined): number {
+  if (value == null || !Number.isFinite(value)) return 0;
+  if (value > 1) return value / 100;
+  return value;
+}
+
+function buildChannelMetrics(
+  shopifyOrders: ShopifyOrderNode[],
+  amazon: AmazonKPIs | null,
+): ChannelMetrics {
+  const interim: Record<ChannelName, { revenue: number; fees: number; orderCount: number }> = {
+    dtc: { revenue: 0, fees: 0, orderCount: 0 },
+    faire: { revenue: 0, fees: 0, orderCount: 0 },
+    distributor: { revenue: 0, fees: 0, orderCount: 0 },
+    other: { revenue: 0, fees: 0, orderCount: 0 },
+  };
+
+  for (const order of shopifyOrders) {
+    const channel = classifyOrder(order);
+    const total = parseFloat(order.totalPriceSet?.shopMoney?.amount || "0");
+    const customerOrders = order.customer?.numberOfOrders || 0;
+    const fees = shopifyFeeForOrder(channel, total, customerOrders);
+    interim[channel].revenue += total;
+    interim[channel].fees += fees;
+    interim[channel].orderCount += 1;
+  }
+
+  const finalize = (row: { revenue: number; fees: number; orderCount: number }): ChannelFeeMetric => {
+    const revenue = round2(row.revenue);
+    const fees = round2(row.fees);
+    const netRevenue = round2(revenue - fees);
+    const marginPct = revenue > 0 ? round2(netRevenue / revenue) : 0;
+    return { revenue, fees, netRevenue, marginPct, orderCount: row.orderCount };
+  };
+
+  const shopifyDtc = finalize(interim.dtc);
+  const shopifyFaire = finalize(interim.faire);
+  const shopifyDistributor = finalize(interim.distributor);
+  const shopifyOther = finalize(interim.other);
+
+  let amazonMetric: ChannelFeeMetric | null = null;
+  if (amazon) {
+    const revenue = round2(amazon.revenue.monthToDate || 0);
+    const orderCount = amazon.orders.monthToDate || 0;
+    const estimatedFeePerOrder = amazon.fees?.totalFee || 0;
+    let fees = round2(estimatedFeePerOrder * orderCount);
+    let netRevenue = round2(revenue - fees);
+    let marginPct = revenue > 0 ? round2(netRevenue / revenue) : 0;
+
+    const normalizedEstimatedMargin = normalizeMarginPct(
+      amazon.fees?.estimatedNetMargin,
+    );
+    if (normalizedEstimatedMargin > 0) {
+      marginPct = round2(normalizedEstimatedMargin);
+      if (fees <= 0 && revenue > 0) {
+        netRevenue = round2(revenue * marginPct);
+        fees = round2(revenue - netRevenue);
+      }
+    }
+
+    amazonMetric = {
+      revenue,
+      fees,
+      netRevenue,
+      marginPct,
+      orderCount,
+    };
+  }
+
+  const totalRevenue =
+    shopifyDtc.revenue +
+    shopifyFaire.revenue +
+    shopifyDistributor.revenue +
+    shopifyOther.revenue +
+    (amazonMetric?.revenue || 0);
+  const totalFees =
+    shopifyDtc.fees +
+    shopifyFaire.fees +
+    shopifyDistributor.fees +
+    shopifyOther.fees +
+    (amazonMetric?.fees || 0);
+  const totalOrders =
+    shopifyDtc.orderCount +
+    shopifyFaire.orderCount +
+    shopifyDistributor.orderCount +
+    shopifyOther.orderCount +
+    (amazonMetric?.orderCount || 0);
+
+  const all: ChannelFeeMetric = {
+    revenue: round2(totalRevenue),
+    fees: round2(totalFees),
+    netRevenue: round2(totalRevenue - totalFees),
+    marginPct: totalRevenue > 0 ? round2((totalRevenue - totalFees) / totalRevenue) : 0,
+    orderCount: totalOrders,
+  };
+
+  return {
+    dtc: shopifyDtc,
+    faire: shopifyFaire,
+    distributor: shopifyDistributor,
+    other: shopifyOther,
+    amazon: amazonMetric,
+    all,
+  };
+}
 
 export async function GET() {
   try {
-    // Fetch both channels in parallel
     const [shopifyOrders, amazon] = await Promise.all([
       fetchShopifyOrders(),
       fetchAmazon(),
     ]);
 
-    // Classify Shopify orders into channels
     const shopify = buildChannelBreakdown(shopifyOrders);
+    const dailyByChannel = buildDailyChannelData(shopifyOrders).map((row) => ({
+      date: row.date,
+      label: row.label,
+      dtcRevenue: row.dtc,
+      faireRevenue: row.faire,
+      distributorRevenue: row.distributor,
+      otherRevenue: row.other,
+      totalRevenue: row.combined,
+    }));
+    const channelMetrics = buildChannelMetrics(shopifyOrders, amazon);
 
-    // Build daily stacked chart data (Shopify only — Amazon has its own daily data)
-    const dailyByChannel = buildDailyChannelData(shopifyOrders);
-
-    // Combined totals across all channels
     const amazonRevenue = amazon?.revenue?.monthToDate ?? 0;
     const amazonOrders = amazon?.orders?.monthToDate ?? 0;
 
@@ -170,9 +300,9 @@ export async function GET() {
           }
         : null,
       dailyByChannel,
+      channelMetrics,
       combined: {
-        totalRevenue:
-          Math.round((shopify.total.revenue + amazonRevenue) * 100) / 100,
+        totalRevenue: round2(shopify.total.revenue + amazonRevenue),
         totalOrders: shopify.total.orders + amazonOrders,
       },
       generatedAt: new Date().toISOString(),
@@ -186,6 +316,7 @@ export async function GET() {
         shopify: null,
         amazon: null,
         dailyByChannel: [],
+        channelMetrics: null,
         combined: { totalRevenue: 0, totalOrders: 0 },
         error: err instanceof Error ? err.message : String(err),
         generatedAt: new Date().toISOString(),

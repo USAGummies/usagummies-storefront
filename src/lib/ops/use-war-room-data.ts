@@ -187,12 +187,25 @@ export type ChannelData = {
   dailyByChannel: Array<{
     date: string;
     label: string;
-    dtcRevenue: number;
-    faireRevenue: number;
-    distributorRevenue: number;
-    otherRevenue: number;
-    totalRevenue: number;
+    dtcRevenue?: number;
+    faireRevenue?: number;
+    distributorRevenue?: number;
+    otherRevenue?: number;
+    totalRevenue?: number;
+    dtc?: number;
+    faire?: number;
+    distributor?: number;
+    other?: number;
+    combined?: number;
   }>;
+  channelMetrics?: {
+    dtc: { revenue: number; fees: number; netRevenue: number; marginPct: number; orderCount: number };
+    faire: { revenue: number; fees: number; netRevenue: number; marginPct: number; orderCount: number };
+    distributor: { revenue: number; fees: number; netRevenue: number; marginPct: number; orderCount: number };
+    other: { revenue: number; fees: number; netRevenue: number; marginPct: number; orderCount: number };
+    amazon: { revenue: number; fees: number; netRevenue: number; marginPct: number; orderCount: number } | null;
+    all: { revenue: number; fees: number; netRevenue: number; marginPct: number; orderCount: number };
+  } | null;
   combined: { totalRevenue: number; totalOrders: number };
   generatedAt: string;
 };
@@ -284,7 +297,15 @@ export type AlertsData = {
     createdAt: string;
     actionLabel: string | null;
     actionHref: string | null;
-    status: "open";
+    status: "open" | "resolved";
+  }>;
+  actionLog?: Array<{
+    id: string;
+    title: string;
+    action: string;
+    at: string;
+    source?: string;
+    resolvedBy?: string | null;
   }>;
   summary: {
     critical: number;

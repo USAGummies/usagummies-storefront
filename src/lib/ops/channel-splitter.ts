@@ -81,6 +81,7 @@ export type ShopifyOrderNode = {
   note: string | null;
   sourceUrl: string | null;
   app: { name: string } | null;
+  customer?: { numberOfOrders: number } | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -100,6 +101,7 @@ export const CHANNEL_ORDER_FRAGMENT = `
   note
   sourceUrl
   app { name }
+  customer { numberOfOrders }
 `;
 
 // ---------------------------------------------------------------------------
