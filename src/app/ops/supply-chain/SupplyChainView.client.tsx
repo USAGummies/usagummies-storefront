@@ -1,16 +1,19 @@
 "use client";
 
-import { RefreshCw, AlertTriangle, Truck, Boxes, Factory, DollarSign } from "lucide-react";
+import { AlertTriangle, Truck, Boxes, Factory, DollarSign } from "lucide-react";
 import { useInventoryData, useSupplyChain, fmtDollar } from "@/lib/ops/use-war-room-data";
 import { StalenessBadge } from "@/app/ops/components/StalenessBadge";
-
-const NAVY = "#1B2A4A";
-const RED = "#c7362c";
-const GOLD = "#c7a062";
-const BG = "#f8f5ef";
-const CARD = "#ffffff";
-const BORDER = "rgba(27,42,74,0.08)";
-const TEXT_DIM = "rgba(27,42,74,0.56)";
+import { RefreshButton } from "@/app/ops/components/RefreshButton";
+import { SkeletonTable } from "@/app/ops/components/Skeleton";
+import {
+  NAVY,
+  RED,
+  GOLD,
+  CREAM as BG,
+  SURFACE_CARD as CARD,
+  SURFACE_BORDER as BORDER,
+  SURFACE_TEXT_DIM as TEXT_DIM,
+} from "@/app/ops/tokens";
 
 function statusColor(status: "healthy" | "low" | "critical" | "out-of-stock") {
   if (status === "healthy") return "#16a34a";
@@ -33,8 +36,18 @@ function MetricCard({ label, value, icon }: { label: string; value: string; icon
 }
 
 export function SupplyChainView() {
-  const { data: inventory, loading: invLoading, error: invError } = useInventoryData();
-  const { data: supply, loading: scLoading, error: scError } = useSupplyChain();
+  const {
+    data: inventory,
+    loading: invLoading,
+    error: invError,
+    refresh: refreshInventory,
+  } = useInventoryData();
+  const {
+    data: supply,
+    loading: scLoading,
+    error: scError,
+    refresh: refreshSupplyChain,
+  } = useSupplyChain();
   const freshnessItems = [
     { label: "Inventory", timestamp: inventory?.generatedAt },
     { label: "Supply Chain", timestamp: supply?.generatedAt },
@@ -54,24 +67,13 @@ export function SupplyChainView() {
             <StalenessBadge items={freshnessItems} />
           </div>
         </div>
-        <button
-          onClick={() => window.location.reload()}
-          style={{
-            border: "none",
-            borderRadius: 8,
-            background: NAVY,
-            color: "#fff",
-            padding: "10px 14px",
-            fontWeight: 700,
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 8,
-            cursor: "pointer",
+        <RefreshButton
+          loading={invLoading || scLoading}
+          onClick={() => {
+            refreshInventory();
+            refreshSupplyChain();
           }}
-        >
-          <RefreshCw size={15} />
-          Refresh
-        </button>
+        />
       </div>
 
       {error ? (
@@ -103,45 +105,48 @@ export function SupplyChainView() {
 
       <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px", marginBottom: 14 }}>
         <div style={{ fontWeight: 700, color: NAVY, marginBottom: 10 }}>Inventory Grid</div>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr>
-                <th style={{ textAlign: "left", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>SKU</th>
-                <th style={{ textAlign: "right", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Stock</th>
-                <th style={{ textAlign: "right", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Days</th>
-                <th style={{ textAlign: "right", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Reorder</th>
-                <th style={{ textAlign: "left", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(inventory?.items || []).slice(0, 20).map((item) => (
-                <tr key={item.id}>
-                  <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 0", color: NAVY, fontWeight: 700 }}>{item.sku}</td>
-                  <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 0", textAlign: "right", color: NAVY }}>{item.currentStock.toLocaleString()}</td>
-                  <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 0", textAlign: "right", color: NAVY }}>{item.daysOfSupply.toFixed(1)}</td>
-                  <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 0", textAlign: "right", color: TEXT_DIM }}>{item.reorderPoint}</td>
-                  <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 0" }}>
-                    <span
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 700,
-                        color: statusColor(item.status),
-                        background: `${statusColor(item.status)}16`,
-                        borderRadius: 999,
-                        padding: "2px 8px",
-                        textTransform: "uppercase",
-                      }}
-                    >
-                      {item.status}
-                    </span>
-                  </td>
+        {invLoading && (inventory?.items || []).length === 0 ? (
+          <SkeletonTable rows={8} />
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: "left", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>SKU</th>
+                  <th style={{ textAlign: "right", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Stock</th>
+                  <th style={{ textAlign: "right", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Days</th>
+                  <th style={{ textAlign: "right", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Reorder</th>
+                  <th style={{ textAlign: "left", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {invLoading ? <div style={{ marginTop: 8, fontSize: 12, color: TEXT_DIM }}>Loading inventory...</div> : null}
+              </thead>
+              <tbody>
+                {(inventory?.items || []).slice(0, 20).map((item) => (
+                  <tr key={item.id}>
+                    <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 0", color: NAVY, fontWeight: 700 }}>{item.sku}</td>
+                    <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 0", textAlign: "right", color: NAVY }}>{item.currentStock.toLocaleString()}</td>
+                    <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 0", textAlign: "right", color: NAVY }}>{item.daysOfSupply.toFixed(1)}</td>
+                    <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 0", textAlign: "right", color: TEXT_DIM }}>{item.reorderPoint}</td>
+                    <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 0" }}>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color: statusColor(item.status),
+                          background: `${statusColor(item.status)}16`,
+                          borderRadius: 999,
+                          padding: "2px 8px",
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        {item.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>

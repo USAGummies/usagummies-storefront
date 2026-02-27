@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import {
-  RefreshCw,
   Mail,
   StickyNote,
   Clock3,
@@ -17,13 +16,16 @@ import {
   fmtDollar,
 } from "@/lib/ops/use-war-room-data";
 import { StalenessBadge } from "@/app/ops/components/StalenessBadge";
-
-const NAVY = "#1B2A4A";
-const RED = "#c7362c";
-const BG = "#f8f5ef";
-const CARD = "#ffffff";
-const BORDER = "rgba(27,42,74,0.08)";
-const TEXT_DIM = "rgba(27,42,74,0.56)";
+import { RefreshButton } from "@/app/ops/components/RefreshButton";
+import { SkeletonTable } from "@/app/ops/components/Skeleton";
+import {
+  NAVY,
+  RED,
+  CREAM as BG,
+  SURFACE_CARD as CARD,
+  SURFACE_BORDER as BORDER,
+  SURFACE_TEXT_DIM as TEXT_DIM,
+} from "@/app/ops/tokens";
 
 const KANBAN_STAGES = [
   "Lead",
@@ -85,8 +87,17 @@ function MetricCard({ label, value, sub }: { label: string; value: string; sub?:
 }
 
 export function PipelineView() {
-  const { data: pipeline, loading: pipeLoading, error: pipeError } = usePipelineData();
-  const { data: dealEmails, loading: emailLoading } = useDealEmails();
+  const {
+    data: pipeline,
+    loading: pipeLoading,
+    error: pipeError,
+    refresh: refreshPipeline,
+  } = usePipelineData();
+  const {
+    data: dealEmails,
+    loading: emailLoading,
+    refresh: refreshEmails,
+  } = useDealEmails();
   const [actionMsg, setActionMsg] = useState<string | null>(null);
   const freshnessItems = [
     { label: "Pipeline", timestamp: pipeline?.generatedAt },
@@ -194,24 +205,13 @@ export function PipelineView() {
             <StalenessBadge items={freshnessItems} />
           </div>
         </div>
-        <button
-          onClick={() => window.location.reload()}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 8,
-            border: "none",
-            borderRadius: 8,
-            background: NAVY,
-            color: "#fff",
-            padding: "10px 14px",
-            fontWeight: 700,
-            cursor: "pointer",
+        <RefreshButton
+          loading={pipeLoading || emailLoading}
+          onClick={() => {
+            refreshPipeline();
+            refreshEmails();
           }}
-        >
-          <RefreshCw size={15} />
-          Refresh
-        </button>
+        />
       </div>
 
       {pipeError ? (
@@ -393,9 +393,13 @@ export function PipelineView() {
                   })}
 
                   {stageLeads.length === 0 ? (
-                    <div style={{ fontSize: 12, color: TEXT_DIM }}>
-                      {pipeLoading || emailLoading ? "Loading..." : "No deals in this stage."}
-                    </div>
+                    pipeLoading || emailLoading ? (
+                      <SkeletonTable rows={4} />
+                    ) : (
+                      <div style={{ fontSize: 12, color: TEXT_DIM }}>
+                        No deals in this stage.
+                      </div>
+                    )
                   ) : null}
                 </div>
               </div>

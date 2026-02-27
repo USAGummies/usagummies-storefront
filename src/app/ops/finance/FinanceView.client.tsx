@@ -33,13 +33,15 @@ import {
   cumulativeThrough,
 } from "@/lib/ops/pro-forma";
 import { StalenessBadge } from "@/app/ops/components/StalenessBadge";
-
-const NAVY = "#1B2A4A";
-const RED = "#c7362c";
-const BG = "#f8f5ef";
-const CARD = "#ffffff";
-const BORDER = "rgba(27,42,74,0.08)";
-const TEXT_DIM = "rgba(27,42,74,0.56)";
+import { SkeletonChart, SkeletonTable } from "@/app/ops/components/Skeleton";
+import {
+  NAVY,
+  RED,
+  CREAM as BG,
+  SURFACE_CARD as CARD,
+  SURFACE_BORDER as BORDER,
+  SURFACE_TEXT_DIM as TEXT_DIM,
+} from "@/app/ops/tokens";
 
 function avg(nums: number[]): number {
   if (!nums.length) return 0;
@@ -207,74 +209,78 @@ export function FinanceView() {
         <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px" }}>
           <div style={{ fontWeight: 700, color: NAVY, marginBottom: 12 }}>Contribution P&L (Actual | Plan | Variance)</div>
 
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr>
-                  <th style={{ textAlign: "left", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Line Item</th>
-                  <th style={{ textAlign: "right", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Actual</th>
-                  <th style={{ textAlign: "right", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Plan</th>
-                  <th style={{ textAlign: "right", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Budget</th>
-                  <th style={{ textAlign: "right", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Variance</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  {
-                    label: "Revenue",
-                    actual: pnl?.revenue.total || 0,
-                    plan: planRevenue,
-                    pva: pvaRevenue,
-                  },
-                  {
-                    label: "COGS",
-                    actual: pnl?.cogs.total || 0,
-                    plan: planCogs,
-                    pva: comparePlanVsActual(planCogs, pnl?.cogs.total || 0),
-                  },
-                  {
-                    label: "Gross Profit",
-                    actual: pnl?.grossProfit || 0,
-                    plan: planGrossProfit,
-                    pva: pvaGross,
-                  },
-                  {
-                    label: "OpEx",
-                    actual: pnl?.opex.total || 0,
-                    plan: planOpex,
-                    pva: pvaOpex,
-                  },
-                  {
-                    label: "Net Income",
-                    actual: pnl?.netIncome || 0,
-                    plan: planEbitda,
-                    pva: pvaNet,
-                  },
-                ].map((row) => (
-                  <tr key={row.label}>
-                    <td style={{ borderTop: `1px solid ${BORDER}`, padding: "9px 0", color: NAVY, fontWeight: 700 }}>{row.label}</td>
-                    <td style={{ borderTop: `1px solid ${BORDER}`, padding: "9px 0", textAlign: "right", color: NAVY }}>{fmtDollar(row.actual)}</td>
-                    <td style={{ borderTop: `1px solid ${BORDER}`, padding: "9px 0", textAlign: "right", color: TEXT_DIM }}>{fmtDollar(row.plan)}</td>
-                    <td style={{ borderTop: `1px solid ${BORDER}`, padding: "9px 0", textAlign: "right", color: TEXT_DIM }}>—</td>
-                    <td style={{ borderTop: `1px solid ${BORDER}`, padding: "9px 0", textAlign: "right" }}>
-                      <span
-                        style={{
-                          color: STATUS_COLORS[row.pva.status],
-                          background: `${STATUS_COLORS[row.pva.status]}14`,
-                          borderRadius: 999,
-                          padding: "2px 8px",
-                          fontWeight: 700,
-                          fontSize: 12,
-                        }}
-                      >
-                        {(row.pva.variancePct * 100).toFixed(1)}%
-                      </span>
-                    </td>
+          {pnlLoading && !pnl ? (
+            <SkeletonTable rows={6} />
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: "left", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Line Item</th>
+                    <th style={{ textAlign: "right", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Actual</th>
+                    <th style={{ textAlign: "right", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Plan</th>
+                    <th style={{ textAlign: "right", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Budget</th>
+                    <th style={{ textAlign: "right", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Variance</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {[
+                    {
+                      label: "Revenue",
+                      actual: pnl?.revenue.total || 0,
+                      plan: planRevenue,
+                      pva: pvaRevenue,
+                    },
+                    {
+                      label: "COGS",
+                      actual: pnl?.cogs.total || 0,
+                      plan: planCogs,
+                      pva: comparePlanVsActual(planCogs, pnl?.cogs.total || 0),
+                    },
+                    {
+                      label: "Gross Profit",
+                      actual: pnl?.grossProfit || 0,
+                      plan: planGrossProfit,
+                      pva: pvaGross,
+                    },
+                    {
+                      label: "OpEx",
+                      actual: pnl?.opex.total || 0,
+                      plan: planOpex,
+                      pva: pvaOpex,
+                    },
+                    {
+                      label: "Net Income",
+                      actual: pnl?.netIncome || 0,
+                      plan: planEbitda,
+                      pva: pvaNet,
+                    },
+                  ].map((row) => (
+                    <tr key={row.label}>
+                      <td style={{ borderTop: `1px solid ${BORDER}`, padding: "9px 0", color: NAVY, fontWeight: 700 }}>{row.label}</td>
+                      <td style={{ borderTop: `1px solid ${BORDER}`, padding: "9px 0", textAlign: "right", color: NAVY }}>{fmtDollar(row.actual)}</td>
+                      <td style={{ borderTop: `1px solid ${BORDER}`, padding: "9px 0", textAlign: "right", color: TEXT_DIM }}>{fmtDollar(row.plan)}</td>
+                      <td style={{ borderTop: `1px solid ${BORDER}`, padding: "9px 0", textAlign: "right", color: TEXT_DIM }}>—</td>
+                      <td style={{ borderTop: `1px solid ${BORDER}`, padding: "9px 0", textAlign: "right" }}>
+                        <span
+                          style={{
+                            color: STATUS_COLORS[row.pva.status],
+                            background: `${STATUS_COLORS[row.pva.status]}14`,
+                            borderRadius: 999,
+                            padding: "2px 8px",
+                            fontWeight: 700,
+                            fontSize: 12,
+                          }}
+                        >
+                          {(row.pva.variancePct * 100).toFixed(1)}%
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           <div style={{ marginTop: 10, fontSize: 12, color: TEXT_DIM }}>
             Budget column is intentionally dormant (`null`) until funding allocations are populated.
@@ -374,17 +380,21 @@ export function FinanceView() {
         <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px" }}>
           <div style={{ fontWeight: 700, color: NAVY, marginBottom: 10 }}>Cash Projection (90d)</div>
 
-          <div style={{ width: "100%", height: 190 }}>
-            <ResponsiveContainer>
-              <LineChart data={forecastChart}>
-                <CartesianGrid strokeDasharray="3 3" stroke={BORDER} />
-                <XAxis dataKey="date" tick={{ fontSize: 10, fill: TEXT_DIM }} />
-                <YAxis tick={{ fontSize: 10, fill: TEXT_DIM }} />
-                <Tooltip formatter={(v: number | string | undefined) => fmtDollar(Number(v || 0))} />
-                <Line type="monotone" dataKey="balance" stroke={NAVY} strokeWidth={2.2} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+          {forecastLoading && forecastChart.length === 0 ? (
+            <SkeletonChart height={190} />
+          ) : (
+            <div style={{ width: "100%", height: 190 }}>
+              <ResponsiveContainer>
+                <LineChart data={forecastChart}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={BORDER} />
+                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: TEXT_DIM }} />
+                  <YAxis tick={{ fontSize: 10, fill: TEXT_DIM }} />
+                  <Tooltip formatter={(v: number | string | undefined) => fmtDollar(Number(v || 0))} />
+                  <Line type="monotone" dataKey="balance" stroke={NAVY} strokeWidth={2.2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
 
           <div style={{ marginTop: 10, display: "grid", gap: 6 }}>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>

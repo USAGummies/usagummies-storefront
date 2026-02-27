@@ -559,19 +559,7 @@ export function useBalancesData() {
 // ---------------------------------------------------------------------------
 
 export function usePipelineData() {
-  const [data, setData] = useState<PipelineData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetchAPI<PipelineData>("/api/ops/pipeline").then((result) => {
-      setData(result);
-      if (!result) setError("Unable to load pipeline data");
-      setLoading(false);
-    });
-  }, []);
-
-  return { data, loading, error };
+  return useEndpointData<PipelineData>("/api/ops/pipeline");
 }
 
 // ---------------------------------------------------------------------------

@@ -4,6 +4,16 @@ import { useSession, signOut } from "next-auth/react";
 import { usePathname, useRouter } from "next/navigation";
 import { SessionProvider } from "next-auth/react";
 import { ReactNode, useState } from "react";
+import {
+  NAVY,
+  RED,
+  GOLD,
+  CREAM as BG_CREAM,
+  SIDEBAR_BG,
+  SIDEBAR_BORDER,
+  TEXT_DIM,
+  TEXT_MED,
+} from "@/app/ops/tokens";
 
 type NavItem = {
   href: string;
@@ -43,16 +53,6 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
 ];
-
-/* ── Design tokens ────────────────────────────────────────────────── */
-const NAVY = "#1B2A4A";
-const RED = "#c7362c";
-const GOLD = "#c7a062";
-const BG_CREAM = "#f8f5ef";
-const SIDEBAR_BG = "#0f1628";
-const SIDEBAR_BORDER = "rgba(199,160,98,0.12)";
-const TEXT_DIM = "rgba(255,255,255,0.45)";
-const TEXT_MED = "rgba(255,255,255,0.65)";
 
 function OpsNav() {
   const { data: session } = useSession();

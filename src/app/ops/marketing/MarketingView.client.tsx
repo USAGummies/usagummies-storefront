@@ -1,6 +1,6 @@
 "use client";
 
-import { RefreshCw, AlertTriangle, Users, MousePointerClick, Funnel } from "lucide-react";
+import { AlertTriangle, Users, MousePointerClick, Funnel } from "lucide-react";
 import {
   ResponsiveContainer,
   LineChart,
@@ -12,14 +12,17 @@ import {
 } from "recharts";
 import { useMarketingData, fmtPercent } from "@/lib/ops/use-war-room-data";
 import { StalenessBadge } from "@/app/ops/components/StalenessBadge";
-
-const NAVY = "#1B2A4A";
-const RED = "#c7362c";
-const GOLD = "#c7a062";
-const BG = "#f8f5ef";
-const CARD = "#ffffff";
-const BORDER = "rgba(27,42,74,0.08)";
-const TEXT_DIM = "rgba(27,42,74,0.56)";
+import { RefreshButton } from "@/app/ops/components/RefreshButton";
+import { SkeletonChart } from "@/app/ops/components/Skeleton";
+import {
+  NAVY,
+  RED,
+  GOLD,
+  CREAM as BG,
+  SURFACE_CARD as CARD,
+  SURFACE_BORDER as BORDER,
+  SURFACE_TEXT_DIM as TEXT_DIM,
+} from "@/app/ops/tokens";
 
 function MetricCard({ label, value, icon, sub }: { label: string; value: string; icon: React.ReactNode; sub?: string }) {
   return (
@@ -37,7 +40,7 @@ function MetricCard({ label, value, icon, sub }: { label: string; value: string;
 }
 
 export function MarketingView() {
-  const { data, loading, error } = useMarketingData();
+  const { data, loading, error, refresh } = useMarketingData();
 
   const funnel = data?.funnel;
   const freshnessItems = [{ label: "Marketing", timestamp: data?.generatedAt }];
@@ -54,24 +57,7 @@ export function MarketingView() {
             <StalenessBadge items={freshnessItems} />
           </div>
         </div>
-        <button
-          onClick={() => window.location.reload()}
-          style={{
-            border: "none",
-            borderRadius: 8,
-            background: NAVY,
-            color: "#fff",
-            padding: "10px 14px",
-            fontWeight: 700,
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 8,
-            cursor: "pointer",
-          }}
-        >
-          <RefreshCw size={15} />
-          Refresh
-        </button>
+        <RefreshButton onClick={refresh} loading={loading} />
       </div>
 
       {error ? (
@@ -114,18 +100,22 @@ export function MarketingView() {
       <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 12, marginBottom: 14 }}>
         <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px" }}>
           <div style={{ fontWeight: 700, color: NAVY, marginBottom: 10 }}>Daily Traffic (30d)</div>
-          <div style={{ width: "100%", height: 260 }}>
-            <ResponsiveContainer>
-              <LineChart data={data?.dailyTraffic || []}>
-                <CartesianGrid strokeDasharray="3 3" stroke={BORDER} />
-                <XAxis dataKey="label" tick={{ fontSize: 11, fill: TEXT_DIM }} />
-                <YAxis tick={{ fontSize: 11, fill: TEXT_DIM }} />
-                <Tooltip />
-                <Line type="monotone" dataKey="sessions" stroke={NAVY} strokeWidth={2.2} dot={false} name="Sessions" />
-                <Line type="monotone" dataKey="users" stroke={GOLD} strokeWidth={2.2} dot={false} name="Users" />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+          {loading && (data?.dailyTraffic || []).length === 0 ? (
+            <SkeletonChart height={260} />
+          ) : (
+            <div style={{ width: "100%", height: 260 }}>
+              <ResponsiveContainer>
+                <LineChart data={data?.dailyTraffic || []}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={BORDER} />
+                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: TEXT_DIM }} />
+                  <YAxis tick={{ fontSize: 11, fill: TEXT_DIM }} />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="sessions" stroke={NAVY} strokeWidth={2.2} dot={false} name="Sessions" />
+                  <Line type="monotone" dataKey="users" stroke={GOLD} strokeWidth={2.2} dot={false} name="Users" />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </div>
 
         <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px" }}>

@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import {
-  RefreshCw,
   AlertTriangle,
   Mail,
   CheckCircle2,
@@ -11,14 +10,16 @@ import {
 } from "lucide-react";
 import { useAlerts, useAuditStatus } from "@/lib/ops/use-war-room-data";
 import { StalenessBadge } from "@/app/ops/components/StalenessBadge";
-
-const NAVY = "#1B2A4A";
-const RED = "#c7362c";
-const GOLD = "#c7a062";
-const BG = "#f8f5ef";
-const CARD = "#ffffff";
-const BORDER = "rgba(27,42,74,0.08)";
-const TEXT_DIM = "rgba(27,42,74,0.56)";
+import { RefreshButton } from "@/app/ops/components/RefreshButton";
+import {
+  NAVY,
+  RED,
+  GOLD,
+  CREAM as BG,
+  SURFACE_CARD as CARD,
+  SURFACE_BORDER as BORDER,
+  SURFACE_TEXT_DIM as TEXT_DIM,
+} from "@/app/ops/tokens";
 
 type PriorityFilter = "all" | "critical" | "warning" | "info";
 
@@ -117,27 +118,13 @@ export function KpisView() {
           </div>
         </div>
 
-        <button
+        <RefreshButton
+          loading={alertsLoading || auditLoading}
           onClick={() => {
             refreshAlerts();
             refreshAudit();
           }}
-          style={{
-            border: "none",
-            borderRadius: 8,
-            background: NAVY,
-            color: "#fff",
-            padding: "10px 14px",
-            fontWeight: 700,
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 8,
-            cursor: "pointer",
-          }}
-        >
-          <RefreshCw size={15} />
-          Refresh
-        </button>
+        />
       </div>
 
       {(alertsError || auditError) ? (

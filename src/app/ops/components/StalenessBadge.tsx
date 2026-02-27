@@ -1,6 +1,7 @@
 "use client";
 
 import { freshnessFromTimestamp, type FreshnessStatus } from "@/lib/ops/freshness";
+import { RED, GOLD } from "@/app/ops/tokens";
 
 type StalenessItem = {
   label: string;
@@ -20,10 +21,10 @@ const STATUS_PRIORITY: Record<FreshnessStatus, number> = {
 
 function statusColors(status: FreshnessStatus) {
   if (status === "critical") {
-    return { text: "#c7362c", bg: "rgba(199,54,44,0.12)" };
+    return { text: RED, bg: "rgba(199,54,44,0.12)" };
   }
   if (status === "stale") {
-    return { text: "#c7a062", bg: "rgba(199,160,98,0.16)" };
+    return { text: GOLD, bg: "rgba(199,160,98,0.16)" };
   }
   if (status === "missing") {
     return { text: "#6b7280", bg: "rgba(107,114,128,0.16)" };
@@ -83,4 +84,3 @@ export function StalenessBadge({ items }: Props) {
     </span>
   );
 }
-

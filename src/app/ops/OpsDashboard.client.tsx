@@ -47,14 +47,15 @@ import {
   cumulativeThrough,
 } from "@/lib/ops/pro-forma";
 import { StalenessBadge } from "@/app/ops/components/StalenessBadge";
-
-const NAVY = "#1B2A4A";
-const RED = "#c7362c";
-const GOLD = "#c7a062";
-const BG = "#f8f5ef";
-const CARD = "#ffffff";
-const BORDER = "rgba(27,42,74,0.08)";
-const TEXT_DIM = "rgba(27,42,74,0.56)";
+import {
+  NAVY,
+  RED,
+  GOLD,
+  CREAM as BG,
+  SURFACE_CARD as CARD,
+  SURFACE_BORDER as BORDER,
+  SURFACE_TEXT_DIM as TEXT_DIM,
+} from "@/app/ops/tokens";
 
 const COLOR_AMAZON = "#f59e0b";
 const COLOR_DTC = "#3b82f6";
