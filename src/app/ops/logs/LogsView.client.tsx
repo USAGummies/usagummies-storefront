@@ -1,30 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
-type RunRecord = {
-  engineId?: string;
-  agentKey?: string;
-  agentName?: string;
-  agent?: string;
-  label?: string;
-  startedAt?: string;
-  completedAt?: string;
-  runAt?: string;
-  runAtET?: string;
-  durationMs?: number;
-  status?: string;
-  error?: string;
-  triggeredBy?: string;
-  source?: string;
-};
-
-type LogsData = {
-  runs: RunRecord[];
-  engineLog: string[];
-  stats: { total: number; last24h: number; successes24h: number; failures24h: number };
-  generatedAt: string;
-};
+import { useState } from "react";
+import { useLogsData } from "@/lib/ops/use-war-room-data";
 
 const ENGINE_OPTIONS = [
   { value: "", label: "All Engines" },
@@ -65,42 +42,38 @@ function StatusBadge({ status }: { status?: string }) {
 }
 
 export function LogsView() {
-  const [data, setData] = useState<LogsData | null>(null);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
   const [engine, setEngine] = useState("");
   const [tab, setTab] = useState<"runs" | "raw">("runs");
-
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      try {
-        setLoading(true);
-        const url = engine ? `/api/ops/logs?engine=${engine}` : "/api/ops/logs";
-        const res = await fetch(url, { cache: "no-store" });
-        if (!res.ok) throw new Error(`${res.status}`);
-        const json = await res.json();
-        if (!cancelled) setData(json);
-      } catch {
-        if (!cancelled) setError("Failed to load logs");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-    return () => { cancelled = true; };
-  }, [engine]);
+  const { data, loading, error, refresh } = useLogsData(engine, 200);
 
   return (
     <div>
-      <div style={{ marginBottom: 32 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 700, fontFamily: "var(--font-display)", margin: 0, marginBottom: 8 }}>
-          Execution Logs
-        </h1>
-        <p style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>
-          Agent run history and system events
-          {data?.generatedAt ? ` · Updated ${new Date(data.generatedAt).toLocaleTimeString()}` : ""}
-        </p>
+      <div style={{ marginBottom: 24, display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
+        <div>
+          <h1 style={{ fontSize: 26, fontWeight: 700, fontFamily: "var(--font-display)", margin: 0, marginBottom: 8 }}>
+            Execution Logs
+          </h1>
+          <p style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", margin: 0 }}>
+            Agent run history and system events
+            {data?.generatedAt ? ` · Updated ${new Date(data.generatedAt).toLocaleTimeString()}` : ""}
+          </p>
+        </div>
+        <button
+          onClick={refresh}
+          disabled={loading}
+          style={{
+            border: "1px solid rgba(255,255,255,0.12)",
+            background: "rgba(255,255,255,0.04)",
+            color: "rgba(255,255,255,0.85)",
+            borderRadius: 8,
+            padding: "8px 12px",
+            fontSize: 12,
+            cursor: loading ? "wait" : "pointer",
+            fontFamily: "inherit",
+          }}
+        >
+          {loading ? "Refreshing..." : "Refresh"}
+        </button>
       </div>
 
       {error && (
@@ -111,7 +84,6 @@ export function LogsView() {
 
       {data && (
         <>
-          {/* Stats row */}
           <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 24 }}>
             {[
               { label: "Total Runs", value: data.stats.total, color: "rgba(255,255,255,0.7)" },
@@ -126,7 +98,6 @@ export function LogsView() {
             ))}
           </div>
 
-          {/* Controls */}
           <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 18, flexWrap: "wrap" }}>
             <select
               value={engine}
@@ -170,7 +141,6 @@ export function LogsView() {
             </div>
           </div>
 
-          {/* Run history table */}
           {tab === "runs" && (
             <div style={{ background: "#1a1d27", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, overflow: "hidden" }}>
               {loading && (
@@ -215,7 +185,6 @@ export function LogsView() {
             </div>
           )}
 
-          {/* Raw log */}
           {tab === "raw" && (
             <div
               style={{

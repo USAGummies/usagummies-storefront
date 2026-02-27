@@ -412,15 +412,62 @@ export type AuditData = {
 };
 
 export type BudgetsData = {
-  lines: Array<{
+  status: "dormant" | "active";
+  budgets: Record<string, number> | null;
+  allocations: Array<{
     category: string;
-    allocated: number | null;
+    allocated: number;
     spent: number;
-    remaining: number | null;
-    utilizationPct: number | null;
+    remaining: number;
+    utilizationPct: number;
   }>;
   generatedAt: string;
-  budget: null;
+};
+
+export type InboxData = {
+  messages: Array<{
+    id: string;
+    source: "email" | "slack" | "b2b_pipeline" | "shopify_customer" | "amazon_buyer";
+    from: string;
+    subject: string;
+    snippet: string;
+    date: string;
+    read: boolean;
+    threadId?: string;
+    priority: "high" | "normal" | "low";
+    category: "support" | "sales" | "operations" | "finance" | "other";
+  }>;
+  unreadCount: {
+    email: number;
+    slack: number;
+    b2b: number;
+    shopify: number;
+    amazon: number;
+    total: number;
+  };
+  lastUpdated: string;
+};
+
+export type LogsData = {
+  runs: Array<{
+    engineId?: string;
+    agentKey?: string;
+    agentName?: string;
+    agent?: string;
+    label?: string;
+    startedAt?: string;
+    completedAt?: string;
+    runAt?: string;
+    runAtET?: string;
+    durationMs?: number;
+    status?: string;
+    error?: string;
+    triggeredBy?: string;
+    source?: string;
+  }>;
+  engineLog: string[];
+  stats: { total: number; last24h: number; successes24h: number; failures24h: number };
+  generatedAt: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -596,36 +643,23 @@ export function useAuditStatus(force = false) {
   );
 }
 
+export function useInboxData(source = "all", limit = 50, unreadOnly = false) {
+  const params = new URLSearchParams();
+  params.set("source", source);
+  params.set("limit", String(limit));
+  if (unreadOnly) params.set("unread", "true");
+  return useEndpointData<InboxData>(`/api/ops/inbox?${params.toString()}`);
+}
+
+export function useLogsData(engine = "", limit = 200) {
+  const params = new URLSearchParams();
+  if (engine) params.set("engine", engine);
+  params.set("limit", String(limit));
+  return useEndpointData<LogsData>(`/api/ops/logs?${params.toString()}`);
+}
+
 export function useBudgets() {
-  const [data, setData] = useState<BudgetsData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/ops/budgets", { cache: "no-store" });
-      if (res.status === 404) {
-        setData(null); // expected until funding + budgets route
-      } else if (res.ok) {
-        setData((await res.json()) as BudgetsData);
-      } else {
-        setError(`Unable to load budgets (${res.status})`);
-      }
-    } catch (err) {
-      console.warn("[War Room] /api/ops/budgets failed:", err);
-      setError("Unable to load budgets");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
-
-  return { data, loading, error, refresh };
+  return useEndpointData<BudgetsData>("/api/ops/budgets");
 }
 
 // ---------------------------------------------------------------------------
