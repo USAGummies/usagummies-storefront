@@ -73,6 +73,13 @@ type SupplyChainAlert = {
   relatedItem: string;
 };
 
+type InventorySignal = {
+  sku: string;
+  productName: string;
+  unitsOnHand: number;
+  reorderPoint: number;
+};
+
 type SupplyChainResponse = {
   suppliers: Supplier[];
   productionOrders: ProductionOrder[];
@@ -179,7 +186,12 @@ async function getProductionOrders(): Promise<ProductionOrder[]> {
 function buildCostTrend(page: Record<string, unknown>): CostTrend | null {
   const props = page.properties as Record<string, unknown>;
 
-  const sku = extractText(props["SKU"]) || extractText(props["Name"]) || "";
+  const sku =
+    extractText(props["SKU"]) ||
+    extractText(props["ASIN"]) ||
+    extractText(props["Shopify Handle"]) ||
+    extractText(props["Name"]) ||
+    "";
   const productName =
     extractText(props["Product Name"]) || extractText(props["Name"]) || sku;
   const currentCost =
@@ -213,9 +225,36 @@ function buildCostTrend(page: Record<string, unknown>): CostTrend | null {
 // Generate alerts
 // ---------------------------------------------------------------------------
 
+function parseInventorySignal(page: Record<string, unknown>): InventorySignal | null {
+  const props = page.properties as Record<string, unknown>;
+  const sku = extractText(props["SKU"]) || extractText(props["Item"]) || "";
+  const productName =
+    extractText(props["Item"]) ||
+    extractText(props["Product Name"]) ||
+    sku;
+  const unitsOnHand =
+    extractNumber(props["Units on Hand"]) ||
+    extractNumber(props["Current Stock"]) ||
+    0;
+  const reorderPoint =
+    extractNumber(props["Reorder Point"]) ||
+    extractNumber(props["Min Stock"]) ||
+    0;
+
+  if (!productName) return null;
+
+  return {
+    sku,
+    productName,
+    unitsOnHand,
+    reorderPoint,
+  };
+}
+
 function generateAlerts(
   suppliers: Supplier[],
   productionOrders: ProductionOrder[],
+  inventorySignals: InventorySignal[],
 ): SupplyChainAlert[] {
   const alerts: SupplyChainAlert[] = [];
   const now = Date.now();
@@ -278,6 +317,32 @@ function generateAlerts(
     }
   }
 
+  // Inventory low-stock / out-of-stock alerts
+  for (const inv of inventorySignals) {
+    if (inv.unitsOnHand <= 0) {
+      alerts.push({
+        type: "low-stock",
+        severity: "critical",
+        message: `${inv.productName} is out of stock`,
+        dueDate: null,
+        relatedItem: inv.sku || inv.productName,
+      });
+      continue;
+    }
+    if (inv.reorderPoint > 0 && inv.unitsOnHand <= inv.reorderPoint) {
+      const severity = inv.unitsOnHand <= inv.reorderPoint * 0.5
+        ? "critical"
+        : "warning";
+      alerts.push({
+        type: "low-stock",
+        severity,
+        message: `${inv.productName} is below reorder point (${inv.unitsOnHand} on hand)`,
+        dueDate: null,
+        relatedItem: inv.sku || inv.productName,
+      });
+    }
+  }
+
   // Sort: critical first
   const severityOrder: Record<string, number> = {
     critical: 0,
@@ -308,8 +373,9 @@ export async function GET() {
 
   try {
     // Parallel fetch
-    const [skuPages, productionOrders] = await Promise.all([
+    const [skuPages, inventoryPages, productionOrders] = await Promise.all([
       queryDatabase(DB.SKU_REGISTRY),
+      queryDatabase(DB.INVENTORY),
       getProductionOrders(),
     ]);
 
@@ -333,8 +399,16 @@ export async function GET() {
       }
     }
 
+    const inventorySignals: InventorySignal[] = [];
+    if (inventoryPages) {
+      for (const page of inventoryPages) {
+        const signal = parseInventorySignal(page);
+        if (signal) inventorySignals.push(signal);
+      }
+    }
+
     // Generate alerts
-    const alerts = generateAlerts(suppliers, productionOrders);
+    const alerts = generateAlerts(suppliers, productionOrders, inventorySignals);
 
     // Summary
     const activeSuppliers = suppliers.filter(

@@ -12,15 +12,23 @@
 import { NextResponse } from "next/server";
 import { readState, writeState } from "@/lib/ops/state";
 import type { CacheEnvelope } from "@/lib/amazon/types";
+import { getNotionApiKey, getNotionCredential } from "@/lib/notion/credentials";
+import { toNotionId } from "@/lib/notion/client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const NOTION_API_KEY = process.env.NOTION_API_KEY || "";
+const NOTION_API_KEY = getNotionApiKey();
 const NOTION_VERSION = "2022-06-28";
 
-const B2B_PROSPECTS_DB = process.env.NOTION_B2B_PROSPECTS_DB || "";
-const DISTRIBUTOR_PROSPECTS_DB = process.env.NOTION_DISTRIBUTOR_PROSPECTS_DB || "";
+const B2B_PROSPECTS_DB =
+  getNotionCredential("NOTION_B2B_PROSPECTS_DB") ||
+  getNotionCredential("NOTION_DB_OUTREACH") ||
+  "";
+const DISTRIBUTOR_PROSPECTS_DB =
+  getNotionCredential("NOTION_DISTRIBUTOR_PROSPECTS_DB") ||
+  getNotionCredential("NOTION_DB_OUTREACH") ||
+  "";
 
 const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 
@@ -53,7 +61,7 @@ async function queryNotion(
     if (filter) body.filter = filter;
 
     const res = await fetch(
-      `https://api.notion.com/v1/databases/${dbId}/query`,
+      `https://api.notion.com/v1/databases/${toNotionId(dbId)}/query`,
       {
         method: "POST",
         headers: {

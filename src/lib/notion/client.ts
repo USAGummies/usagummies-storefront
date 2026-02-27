@@ -11,31 +11,33 @@
  */
 
 import "server-only";
+import { getNotionApiKey, getNotionCredential } from "@/lib/notion/credentials";
 
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
 
-const NOTION_API_KEY = () => process.env.NOTION_API_KEY || "";
+const NOTION_API_KEY = () => getNotionApiKey();
 const NOTION_VERSION = "2022-06-28";
 
 /** All known Notion database IDs (env override → hardcoded fallback) */
 export const DB = {
   DAILY_PERFORMANCE:
-    process.env.NOTION_DAILY_PERF_DB_ID ||
+    getNotionCredential("NOTION_DAILY_PERF_DB_ID") ||
     "2f31cfad04b744e3b16da4edc9675502",
   FLEET_OPS_LOG:
-    process.env.NOTION_FLEET_OPS_DB_ID ||
+    getNotionCredential("NOTION_FLEET_OPS_DB_ID") ||
     "30d4c0c4-2c2e-81b0-914e-e534e56e2351",
   INVENTORY:
-    process.env.NOTION_INVENTORY_DB_ID || "d598e72e09974194bfe3624ee6e0117e",
+    getNotionCredential("NOTION_INVENTORY_DB_ID") ||
+    "d598e72e09974194bfe3624ee6e0117e",
   SKU_REGISTRY:
-    process.env.NOTION_SKU_DB_ID || "8173583d402145fb8d87ad74c0241f00",
+    getNotionCredential("NOTION_SKU_DB_ID") || "8173583d402145fb8d87ad74c0241f00",
   PLATFORM_USERS:
-    process.env.NOTION_PLATFORM_USERS_DB_ID ||
+    getNotionCredential("NOTION_PLATFORM_USERS_DB_ID") ||
     "f1f7500b35d34908addeba4b94b21c6e",
   CASH_TRANSACTIONS:
-    process.env.NOTION_CASH_TX_DB_ID || "6325d16870024b83876b9e591b3d2d9c",
+    getNotionCredential("NOTION_CASH_TX_DB_ID") || "6325d16870024b83876b9e591b3d2d9c",
 } as const;
 
 // ---------------------------------------------------------------------------
