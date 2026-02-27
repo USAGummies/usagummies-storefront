@@ -77,6 +77,7 @@ export const STATE_KEYS = {
   "marketing-cache": "marketing-cache.json",
   "alerts-cache": "alerts-cache.json",
   "audit-cache": "audit-cache.json",
+  "budgets-cache": "budgets-cache.json",
   "audit-cash-baseline": "audit-cash-baseline.json",
   "audit-inventory-baseline": "audit-inventory-baseline.json",
 
