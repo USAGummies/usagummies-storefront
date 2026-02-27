@@ -546,14 +546,14 @@ export function OpsDashboard() {
             </span>
             <span style={planBadge}>Pro Forma v22</span>
             {liveData && !liveLoading && (
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "#16a34a", fontWeight: 600 }}>
-                <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#16a34a", display: "inline-block" }} />
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: COLORS.liveGreen, fontWeight: 600 }}>
+                <PulseDot />
                 LIVE
               </span>
             )}
             {liveLoading && (
               <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: COLORS.gold, fontWeight: 600 }}>
-                <span style={{ width: 8, height: 8, borderRadius: "50%", background: COLORS.gold, display: "inline-block", animation: "pulse 1.5s infinite" }} />
+                <PulseDot color={COLORS.gold} />
                 Loading...
               </span>
             )}
@@ -638,43 +638,93 @@ export function OpsDashboard() {
         {/* ================================================================
             LIVE PERFORMANCE — Real-time actuals from Shopify + Amazon
         ================================================================ */}
-        <div style={{ ...cardStyle, marginBottom: 32, padding: "20px 24px", borderLeft: `4px solid ${liveData ? "#16a34a" : COLORS.gold}` }}>
+        <div
+          style={{
+            ...cardStyle,
+            marginBottom: 32,
+            padding: "20px 24px",
+            borderLeft: `4px solid ${liveData ? COLORS.liveGreen : COLORS.gold}`,
+            background: liveData ? `linear-gradient(135deg, ${COLORS.white}, ${COLORS.lightGreen})` : COLORS.white,
+          }}
+        >
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-            <h2 style={{ ...sectionTitleStyle, fontSize: 16 }}>
-              Live Performance — MTD Actuals
-            </h2>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <Activity size={18} color={liveData ? COLORS.liveGreen : COLORS.subtleText} strokeWidth={2} />
+              <h2 style={{ ...sectionTitleStyle, fontSize: 16 }}>
+                Live Performance
+              </h2>
+              {liveData && <PulseDot />}
+              <span style={liveBadge}>MTD Actuals</span>
+            </div>
             <button
               onClick={refresh}
-              style={{ border: `1px solid ${COLORS.lightBorder}`, borderRadius: 6, padding: "4px 12px", fontSize: 12, fontWeight: 600, color: COLORS.navy, background: COLORS.white, cursor: "pointer" }}
+              disabled={liveLoading}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                border: `1px solid ${COLORS.lightBorder}`,
+                borderRadius: 6,
+                padding: "4px 12px",
+                fontSize: 12,
+                fontWeight: 600,
+                color: COLORS.navy,
+                background: COLORS.white,
+                cursor: liveLoading ? "not-allowed" : "pointer",
+                opacity: liveLoading ? 0.6 : 1,
+              }}
             >
-              ↻ Refresh
+              <RefreshCw size={12} strokeWidth={2.5} style={liveLoading ? { animation: "spin 1s linear infinite" } : undefined} />
+              Refresh
             </button>
           </div>
           {liveLoading && (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
-              {[1,2,3,4].map(i => (
-                <div key={i} style={{ height: 60, borderRadius: 8, background: COLORS.lightNavy, animation: "pulse 1.5s infinite" }} />
+              {[1, 2, 3, 4].map((i) => (
+                <LoadingSkeleton key={i} height={60} />
               ))}
             </div>
           )}
           {liveData && !liveLoading && (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
-              <div style={{ background: COLORS.lightNavy, borderRadius: 8, padding: 16 }}>
-                <div style={{ fontSize: 11, color: COLORS.subtleText, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Combined Revenue</div>
-                <div style={{ fontSize: 24, fontWeight: 700, color: COLORS.navy, marginTop: 4 }}>{fmtDollar(liveData.combined.totalRevenue)}</div>
+              <div style={{ background: COLORS.lightGreen, borderRadius: 8, padding: 16, border: `1px solid ${COLORS.liveGreen}20` }}>
+                <div style={{ fontSize: 11, color: COLORS.subtleText, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  Combined Revenue
+                </div>
+                <div style={{ fontSize: 24, fontWeight: 700, color: COLORS.navy, marginTop: 4 }}>
+                  {liveFmtDollar(liveData.combined.totalRevenue)}
+                </div>
+                {revenuePva.status !== "no-data" && (
+                  <div style={{ marginTop: 4 }}>
+                    <VarianceBadge pva={revenuePva} />
+                    <span style={{ fontSize: 10, color: COLORS.subtleText, marginLeft: 6 }}>
+                      vs {liveFmtDollar(mtdPlanRevenue)} plan
+                    </span>
+                  </div>
+                )}
               </div>
               <div style={{ background: COLORS.lightNavy, borderRadius: 8, padding: 16 }}>
-                <div style={{ fontSize: 11, color: COLORS.subtleText, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Combined Orders</div>
-                <div style={{ fontSize: 24, fontWeight: 700, color: COLORS.navy, marginTop: 4 }}>{fmt(liveData.combined.totalOrders)}</div>
+                <div style={{ fontSize: 11, color: COLORS.subtleText, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  Combined Orders
+                </div>
+                <div style={{ fontSize: 24, fontWeight: 700, color: COLORS.navy, marginTop: 4 }}>
+                  {fmt(liveData.combined.totalOrders)}
+                </div>
               </div>
               <div style={{ background: COLORS.lightNavy, borderRadius: 8, padding: 16 }}>
-                <div style={{ fontSize: 11, color: COLORS.subtleText, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Avg Order Value</div>
-                <div style={{ fontSize: 24, fontWeight: 700, color: COLORS.navy, marginTop: 4 }}>{fmtDollarExact(liveData.combined.avgOrderValue)}</div>
+                <div style={{ fontSize: 11, color: COLORS.subtleText, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  Avg Order Value
+                </div>
+                <div style={{ fontSize: 24, fontWeight: 700, color: COLORS.navy, marginTop: 4 }}>
+                  {fmtDollarExact(liveData.combined.avgOrderValue)}
+                </div>
               </div>
-              <div style={{ background: balances ? "rgba(46, 125, 50, 0.06)" : COLORS.lightNavy, borderRadius: 8, padding: 16 }}>
-                <div style={{ fontSize: 11, color: COLORS.subtleText, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Cash Position</div>
+              <div style={{ background: balances ? "rgba(46, 125, 50, 0.06)" : COLORS.lightNavy, borderRadius: 8, padding: 16, border: balances ? `1px solid ${COLORS.greenAccent}20` : "none" }}>
+                <div style={{ fontSize: 11, color: COLORS.subtleText, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  Cash Position
+                </div>
                 <div style={{ fontSize: 24, fontWeight: 700, color: COLORS.greenAccent, marginTop: 4 }}>
-                  {balLoading ? "..." : balances ? fmtDollar(balances.totalCash) : "N/A"}
+                  {balLoading ? "..." : balances ? liveFmtDollar(balances.totalCash) : "N/A"}
                 </div>
               </div>
             </div>
@@ -686,10 +736,12 @@ export function OpsDashboard() {
           )}
           {!liveData && !liveLoading && liveError && (
             <div style={{ textAlign: "center", padding: 20, color: COLORS.subtleText, fontSize: 13 }}>
-              Live data unavailable — check API connection
+              <AlertTriangle size={16} color={COLORS.gold} style={{ verticalAlign: "middle", marginRight: 8 }} />
+              Live data unavailable -- check API connection
             </div>
           )}
         </div>
+        <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
 
         {/* ================================================================
             REVENUE TRAJECTORY CHART
@@ -697,12 +749,15 @@ export function OpsDashboard() {
         <div style={{ ...cardStyle, marginBottom: 32, padding: "24px 24px 16px" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
             <div>
-              <h2 style={sectionTitleStyle}>Revenue Trajectory -- 2026 Plan</h2>
+              <h2 style={sectionTitleStyle}>Revenue Trajectory -- 2026</h2>
               <p style={{ fontSize: 13, color: COLORS.subtleText, margin: "4px 0 0" }}>
-                Monthly revenue and cumulative trajectory across all channels
+                Plan targets vs actual monthly revenue across all channels
               </p>
             </div>
-            <span style={planBadge}>Pro Forma</span>
+            <div style={{ display: "flex", gap: 6 }}>
+              <span style={planBadge}>Pro Forma</span>
+              {liveData && <span style={liveBadge}>+ Actual</span>}
+            </div>
           </div>
           <ResponsiveContainer width="100%" height={320}>
             <ComposedChart data={revenueChartData} margin={{ top: 10, right: 30, left: 10, bottom: 0 }}>
@@ -750,16 +805,25 @@ export function OpsDashboard() {
                 yAxisId="monthly"
                 type="monotone"
                 dataKey="revenue"
-                name="Monthly Revenue"
+                name="Plan (Monthly)"
                 stroke={COLORS.red}
                 strokeWidth={2.5}
                 fill="url(#revenueGradient)"
+              />
+              <Bar
+                yAxisId="monthly"
+                dataKey="actualRevenue"
+                name="Actual (Monthly)"
+                fill={COLORS.liveGreen}
+                fillOpacity={0.7}
+                radius={[3, 3, 0, 0]}
+                barSize={24}
               />
               <Line
                 yAxisId="cumulative"
                 type="monotone"
                 dataKey="cumulative"
-                name="Cumulative Revenue"
+                name="Cumulative Plan"
                 stroke={COLORS.navy}
                 strokeWidth={2}
                 strokeDasharray="6 3"
@@ -1058,6 +1122,12 @@ export function OpsDashboard() {
           <div style={{ fontSize: 11, color: COLORS.subtleText, letterSpacing: "0.05em" }}>
             USA GUMMIES -- PRO FORMA V22 -- CONFIDENTIAL
           </div>
+          {liveData && (
+            <div style={{ fontSize: 10, color: COLORS.subtleText, marginTop: 4, opacity: 0.7 }}>
+              Live data as of {new Date(liveData.generatedAt).toLocaleString()}
+              {balances && ` | Cash data as of ${new Date(balances.lastUpdated).toLocaleString()}`}
+            </div>
+          )}
         </div>
       </div>
     </div>
