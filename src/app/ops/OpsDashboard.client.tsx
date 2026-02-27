@@ -7,7 +7,6 @@ import {
   useBalancesData,
   comparePlanVsActual,
   fmtDollar as liveFmtDollar,
-  fmtVariance,
   STATUS_COLORS,
   type PlanVsActual,
 } from "@/lib/ops/use-war-room-data";
@@ -560,7 +559,8 @@ export function OpsDashboard() {
           </div>
           {liveError && (
             <div style={{ marginLeft: 36, marginTop: 4, fontSize: 12, color: COLORS.red, display: "flex", alignItems: "center", gap: 6 }}>
-              ⚠ Live data unavailable — showing plan only
+              <AlertTriangle size={14} strokeWidth={2.5} />
+              Live data unavailable -- showing plan only
             </div>
           )}
         </div>
