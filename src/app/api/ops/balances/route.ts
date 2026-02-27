@@ -55,6 +55,12 @@ export async function GET() {
   const shopify = shopifyResult.status === "fulfilled" ? shopifyResult.value : null;
   const amazon = amazonResult.status === "fulfilled" ? amazonResult.value : null;
 
+  // Log which sources returned null for debugging
+  if (foundResult.status === "rejected") console.error("[balances] Found.com fetch rejected:", foundResult.reason);
+  if (shopifyResult.status === "rejected") console.error("[balances] Shopify fetch rejected:", shopifyResult.reason);
+  if (amazonResult.status === "rejected") console.error("[balances] Amazon fetch rejected:", amazonResult.reason);
+  console.log("[balances] Sources:", { found: !!found, shopify: !!shopify, amazon: !!amazon });
+
   // Sum up total cash
   let totalCash = 0;
   if (found) totalCash += found.available;

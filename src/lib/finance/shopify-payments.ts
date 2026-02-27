@@ -78,10 +78,13 @@ const PAYOUTS_QUERY = `
 async function shopifyAdminGql<T>(query: string): Promise<T | null> {
   const token = SHOPIFY_ADMIN_TOKEN();
   const domain = SHOPIFY_STORE_DOMAIN();
-  if (!token || !domain) return null;
+  if (!token || !domain) {
+    console.error("[shopify-payments] Missing token or domain", { hasToken: !!token, domain });
+    return null;
+  }
 
   try {
-    const res = await fetch(`https://${domain}/admin/api/2025-01/graphql.json`, {
+    const res = await fetch(`https://${domain}/admin/api/2024-10/graphql.json`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -91,10 +94,17 @@ async function shopifyAdminGql<T>(query: string): Promise<T | null> {
       signal: AbortSignal.timeout(10000),
     });
 
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.error("[shopify-payments] API error:", res.status, await res.text().catch(() => ""));
+      return null;
+    }
     const json = await res.json();
+    if (json.errors) {
+      console.error("[shopify-payments] GraphQL errors:", JSON.stringify(json.errors));
+    }
     return json.data as T;
-  } catch {
+  } catch (err) {
+    console.error("[shopify-payments] Exception:", err);
     return null;
   }
 }
@@ -142,7 +152,10 @@ export async function fetchShopifyPaymentsBalance(): Promise<ShopifyPaymentsBala
     shopifyAdminGql<PayoutsQueryResult>(PAYOUTS_QUERY),
   ]);
 
-  if (!balanceData?.shopifyPaymentsAccount) return null;
+  if (!balanceData?.shopifyPaymentsAccount) {
+    console.error("[shopify-payments] No shopifyPaymentsAccount in response. This usually means the Shopify Payments scope is missing from the Admin API token, or the store doesn't use Shopify Payments.", { balanceData });
+    return null;
+  }
 
   const balances = balanceData.shopifyPaymentsAccount.balance || [];
   const totalBalance = balances.reduce(

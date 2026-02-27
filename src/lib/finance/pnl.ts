@@ -103,12 +103,16 @@ async function fetchShopifyRevenueDirectly(start: string, end: string): Promise<
     .replace(/^https?:\/\//, "")
     .replace(/\/$/, "");
 
-  if (!token || !domain) return 0;
+  if (!token || !domain) {
+    console.error("[pnl] Shopify Admin API fallback: no token or domain", { hasToken: !!token, domain });
+    return 0;
+  }
 
   try {
+    // Use same API version as finance route (2024-10 works, 2025-01 may not)
     const dateFilter = `created_at:>=${start} created_at:<=${end}`;
     const res = await fetch(
-      `https://${domain}/admin/api/2025-01/graphql.json`,
+      `https://${domain}/admin/api/2024-10/graphql.json`,
       {
         method: "POST",
         headers: {
@@ -123,15 +127,25 @@ async function fetchShopifyRevenueDirectly(start: string, end: string): Promise<
       },
     );
 
-    if (!res.ok) return 0;
+    if (!res.ok) {
+      console.error("[pnl] Shopify Admin API fallback failed:", res.status, await res.text().catch(() => ""));
+      return 0;
+    }
     const json = await res.json();
+    if (json.errors) {
+      console.error("[pnl] Shopify GraphQL errors:", JSON.stringify(json.errors));
+      return 0;
+    }
     const edges = json.data?.orders?.edges || [];
-    return edges.reduce(
+    const total = edges.reduce(
       (sum: number, e: { node: { totalPriceSet: { shopMoney: { amount: string } } } }) =>
         sum + parseFloat(e.node.totalPriceSet?.shopMoney?.amount || "0"),
       0,
     );
-  } catch {
+    console.log("[pnl] Shopify Admin API fallback:", { orderCount: edges.length, total, dateFilter });
+    return total;
+  } catch (err) {
+    console.error("[pnl] Shopify Admin API fallback exception:", err);
     return 0;
   }
 }
