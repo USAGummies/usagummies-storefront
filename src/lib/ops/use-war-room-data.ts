@@ -137,13 +137,53 @@ export type PipelineData = {
 
 export type ChannelData = {
   shopify: {
-    total: { revenue: number; orders: number };
-    dtc: { revenue: number; orders: number };
-    faire: { revenue: number; orders: number };
-    distributor: { revenue: number; orders: number };
-    other: { revenue: number; orders: number };
+    total: { revenue: number; orders: number; avgOrderValue: number };
+    dtc: {
+      revenue: number;
+      orders: number;
+      avgOrderValue: number;
+      items: Array<{ name: string; createdAt: string; total: number; financialStatus: string }>;
+    };
+    faire: {
+      revenue: number;
+      orders: number;
+      avgOrderValue: number;
+      items: Array<{ name: string; createdAt: string; total: number; financialStatus: string }>;
+    };
+    distributor: {
+      revenue: number;
+      orders: number;
+      avgOrderValue: number;
+      items: Array<{ name: string; createdAt: string; total: number; financialStatus: string }>;
+    };
+    other: {
+      revenue: number;
+      orders: number;
+      avgOrderValue: number;
+      items: Array<{ name: string; createdAt: string; total: number; financialStatus: string }>;
+    };
   } | null;
-  amazon: { revenue: number; orders: number; avgOrderValue: number } | null;
+  amazon: {
+    revenue: number;
+    orders: number;
+    avgOrderValue: number;
+    inventory: {
+      fulfillable: number;
+      inboundWorking: number;
+      inboundShipped: number;
+      reserved: number;
+      unfulfillable: number;
+      totalQuantity: number;
+      daysOfSupply: number;
+      restockAlert: boolean;
+    } | null;
+    fees: {
+      referralFee: number;
+      fbaFee: number;
+      totalFee: number;
+      estimatedNetMargin: number;
+    } | null;
+  } | null;
   dailyByChannel: Array<{
     date: string;
     label: string;

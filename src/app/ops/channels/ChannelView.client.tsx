@@ -1,67 +1,47 @@
 "use client";
 
-import { useState } from "react";
-
+import { useMemo, useState } from "react";
 import {
-  MONTHS,
-  MONTH_LABELS,
-  AMAZON,
-  WHOLESALE,
-  DISTRIBUTOR,
-  TOTAL_REVENUE,
-  UNIT_ECONOMICS,
-  DISTRIBUTOR_NETWORK,
-  getCurrentProFormaMonth,
-  cumulativeThrough,
-  type Month,
-  type ChannelMetrics,
-} from "@/lib/ops/pro-forma";
-
+  RefreshCw,
+  AlertTriangle,
+  TrendingUp,
+  ShoppingCart,
+  Store,
+  Truck,
+  Layers,
+} from "lucide-react";
 import {
-  useDashboardData,
-  comparePlanVsActual,
-  fmtDollar,
-  fmtPercent,
-  fmtVariance,
-  STATUS_COLORS,
-  type PlanVsActual,
-  type UnifiedDashboard,
-} from "@/lib/ops/use-war-room-data";
-
-import {
-  BarChart,
+  ResponsiveContainer,
+  ComposedChart,
   Bar,
-  AreaChart,
-  Area,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
-  ResponsiveContainer,
-  Cell,
   PieChart,
   Pie,
-  ComposedChart,
-  Line,
+  Cell,
 } from "recharts";
 
 import {
-  ShoppingCart,
-  Store,
-  Truck,
-  TrendingUp,
-  DollarSign,
-  BarChart3,
-  Users,
-  Package,
-  ArrowUpRight,
-  ArrowDownRight,
-  RefreshCw,
-  AlertTriangle,
-  Activity,
-  Loader2,
-} from "lucide-react";
+  useChannelData,
+  useDashboardData,
+  usePnLData,
+  comparePlanVsActual,
+  STATUS_COLORS,
+  fmtDollar,
+  fmtPercent,
+  type ChannelData,
+} from "@/lib/ops/use-war-room-data";
+import {
+  AMAZON,
+  WHOLESALE,
+  DISTRIBUTOR,
+  TOTAL_REVENUE,
+  getCurrentProFormaMonth,
+  cumulativeThrough,
+} from "@/lib/ops/pro-forma";
 
 // ---------------------------------------------------------------------------
 // Design tokens
@@ -70,1197 +50,512 @@ const NAVY = "#1B2A4A";
 const RED = "#c7362c";
 const GOLD = "#c7a062";
 const BG = "#f8f5ef";
-const CARD_BG = "#ffffff";
+const CARD = "#ffffff";
 const BORDER = "rgba(27,42,74,0.08)";
-const TEXT_DIM = "rgba(27,42,74,0.5)";
-const TEXT_MED = "rgba(27,42,74,0.72)";
+const TEXT_DIM = "rgba(27,42,74,0.56)";
 
-const AMAZON_COLOR = "#FF9900";
-const SHOPIFY_COLOR = "#96bf48";
-const WHOLESALE_COLOR = "#c7a062";
+const COLOR_DTC = "#3b82f6";
+const COLOR_AMAZON = "#f59e0b";
+const COLOR_FAIRE = "#10b981";
+const COLOR_DIST = "#ef4444";
 
-const CHANNEL_COLORS = {
-  amazon: GOLD,
-  wholesale: NAVY,
-  distributor: RED,
-} as const;
+const TABS = [
+  { key: "all", label: "All Channels", icon: Layers },
+  { key: "dtc", label: "Shopify DTC", icon: ShoppingCart },
+  { key: "amazon", label: "Amazon", icon: Store },
+  { key: "faire", label: "Faire", icon: TrendingUp },
+  { key: "distributor", label: "Distributors", icon: Truck },
+] as const;
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-function sumChannel(ch: ChannelMetrics, key: "units" | "revenue" | "grossProfit"): number {
-  return MONTHS.reduce((s, m) => s + ch[key][m], 0);
+type TabKey = (typeof TABS)[number]["key"];
+
+function safePct(value: number): number {
+  return Number.isFinite(value) ? value : 0;
 }
 
-function fmt(n: number): string {
-  if (Math.abs(n) >= 1_000_000) return "$" + (n / 1_000_000).toFixed(2) + "M";
-  if (Math.abs(n) >= 1_000) return "$" + (n / 1_000).toFixed(1) + "K";
-  return "$" + n.toFixed(0);
+function clamp(n: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, n));
 }
 
-function fmtUnits(n: number): string {
-  if (n >= 1_000) return (n / 1_000).toFixed(1) + "K";
-  return n.toLocaleString();
-}
-
-function pct(n: number): string {
-  return (n * 100).toFixed(1) + "%";
-}
-
-/** Sum a numeric field from chartData array */
-function sumChartField(chartData: UnifiedDashboard["chartData"], field: "amazon" | "shopify" | "combined" | "amazonOrders" | "shopifyOrders" | "combinedOrders"): number {
-  return chartData.reduce((s, d) => s + (d[field] || 0), 0);
-}
-
-// ---------------------------------------------------------------------------
-// Data prep (plan / pro-forma)
-// ---------------------------------------------------------------------------
-const totalRevAll = MONTHS.reduce((s, m) => s + TOTAL_REVENUE[m], 0);
-
-const channels = [
-  {
-    key: "amazon" as const,
-    label: "Amazon",
-    icon: ShoppingCart,
-    color: GOLD,
-    liveColor: AMAZON_COLOR,
-    data: AMAZON,
-    gpPerUnit: UNIT_ECONOMICS.amazon.gpPerUnit,
-    pricing: {
-      cogs: UNIT_ECONOMICS.cogsPerBag + UNIT_ECONOMICS.amazon.fbaFees,
-      wholesale: UNIT_ECONOMICS.amazon.retailPrice,
-      retail: UNIT_ECONOMICS.amazon.retailPrice,
-      cogsLabel: "COGS + FBA",
-      wholesaleLabel: "Retail",
-    },
-    note: null as string | null,
-  },
-  {
-    key: "wholesale" as const,
-    label: "Wholesale / Faire",
-    icon: Store,
-    color: NAVY,
-    liveColor: WHOLESALE_COLOR,
-    data: WHOLESALE,
-    gpPerUnit: UNIT_ECONOMICS.wholesale.gpPerUnit,
-    pricing: {
-      cogs: UNIT_ECONOMICS.cogsPerBag,
-      wholesale: UNIT_ECONOMICS.wholesale.price,
-      retail: null as number | null,
-      cogsLabel: "COGS",
-      wholesaleLabel: "Wholesale",
-    },
-    note: "Includes Faire marketplace orders",
-  },
-  {
-    key: "distributor" as const,
-    label: "Distributor Network",
-    icon: Truck,
-    color: RED,
-    liveColor: RED,
-    data: DISTRIBUTOR,
-    gpPerUnit: UNIT_ECONOMICS.distributor.gpPerUnit,
-    pricing: {
-      cogs: UNIT_ECONOMICS.cogsPerBag + UNIT_ECONOMICS.distributor.displayCostPerUnit,
-      wholesale: UNIT_ECONOMICS.distributor.sellPrice,
-      retail: null as number | null,
-      cogsLabel: "COGS + Display",
-      wholesaleLabel: "Sell Price",
-    },
-    note: null,
-  },
-];
-
-// Monthly chart data (plan)
-const monthlyChartData = MONTHS.map((m) => ({
-  month: MONTH_LABELS[m],
-  Amazon: AMAZON.revenue[m],
-  Wholesale: WHOLESALE.revenue[m],
-  Distributor: DISTRIBUTOR.revenue[m],
-  total: AMAZON.revenue[m] + WHOLESALE.revenue[m] + DISTRIBUTOR.revenue[m],
-}));
-
-const monthlyUnitsData = MONTHS.map((m) => ({
-  month: MONTH_LABELS[m],
-  Amazon: AMAZON.units[m],
-  Wholesale: WHOLESALE.units[m],
-  Distributor: DISTRIBUTOR.units[m],
-}));
-
-// Distributor network table data
-type DistributorTableRow = {
-  month: string;
-  monthKey: Month;
-  newDistributors: number;
-  cumulative: number;
-  unitsPerDistributor: number;
-  totalUnits: number;
-  highlight: boolean;
-};
-
-const distTableData: DistributorTableRow[] = MONTHS.map((m) => {
-  const newThisMonth = DISTRIBUTOR_NETWORK.filter((d) => d.startMonth === m).length;
-  const cumulative = DISTRIBUTOR_NETWORK.filter(
-    (d) => typeof d.startMonth === "string" && MONTHS.includes(d.startMonth as Month) && MONTHS.indexOf(d.startMonth as Month) <= MONTHS.indexOf(m)
-  ).length;
-  const totalUnits = DISTRIBUTOR.units[m];
-  const unitsPerDist = cumulative > 0 ? Math.round(totalUnits / cumulative) : 0;
-
-  return {
-    month: MONTH_LABELS[m],
-    monthKey: m,
-    newDistributors: newThisMonth,
-    cumulative,
-    unitsPerDistributor: unitsPerDist,
-    totalUnits,
-    highlight: newThisMonth > 0,
-  };
-});
-
-// Margin comparison data
-const marginData = channels.map((ch) => ({
-  channel: ch.label,
-  gpPerUnit: ch.gpPerUnit,
-  cogs: ch.pricing.cogs,
-  sellPrice: ch.pricing.wholesale,
-  color: ch.color,
-}));
-
-// ---------------------------------------------------------------------------
-// Custom tooltip
-// ---------------------------------------------------------------------------
-function RevenueTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) {
-  if (!active || !payload) return null;
-  const total = payload.reduce((s, p) => s + p.value, 0);
-  return (
-    <div style={{ background: CARD_BG, border: `1px solid ${BORDER}`, borderRadius: 8, padding: "12px 16px", boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}>
-      <div style={{ fontWeight: 700, color: NAVY, marginBottom: 8 }}>{label}</div>
-      {payload.map((p) => (
-        <div key={p.name} style={{ display: "flex", justifyContent: "space-between", gap: 24, marginBottom: 4, fontSize: 13 }}>
-          <span style={{ color: p.color, fontWeight: 600 }}>{p.name}</span>
-          <span style={{ color: NAVY, fontWeight: 500 }}>{fmt(p.value)}</span>
-        </div>
-      ))}
-      <div style={{ borderTop: `1px solid ${BORDER}`, marginTop: 6, paddingTop: 6, display: "flex", justifyContent: "space-between", fontWeight: 700, color: NAVY, fontSize: 13 }}>
-        <span>Total</span>
-        <span>{fmt(total)}</span>
-      </div>
-    </div>
-  );
-}
-
-function UnitsTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) {
-  if (!active || !payload) return null;
-  const total = payload.reduce((s, p) => s + p.value, 0);
-  return (
-    <div style={{ background: CARD_BG, border: `1px solid ${BORDER}`, borderRadius: 8, padding: "12px 16px", boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}>
-      <div style={{ fontWeight: 700, color: NAVY, marginBottom: 8 }}>{label}</div>
-      {payload.map((p) => (
-        <div key={p.name} style={{ display: "flex", justifyContent: "space-between", gap: 24, marginBottom: 4, fontSize: 13 }}>
-          <span style={{ color: p.color, fontWeight: 600 }}>{p.name}</span>
-          <span style={{ color: NAVY, fontWeight: 500 }}>{fmtUnits(p.value)} units</span>
-        </div>
-      ))}
-      <div style={{ borderTop: `1px solid ${BORDER}`, marginTop: 6, paddingTop: 6, display: "flex", justifyContent: "space-between", fontWeight: 700, color: NAVY, fontSize: 13 }}>
-        <span>Total</span>
-        <span>{fmtUnits(total)} units</span>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Sub-components
-// ---------------------------------------------------------------------------
-
-function SectionHeading({ icon: Icon, title, subtitle }: { icon: React.ElementType; title: string; subtitle?: string }) {
-  return (
-    <div style={{ marginBottom: 20 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <Icon size={20} color={NAVY} strokeWidth={1.8} />
-        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: NAVY, letterSpacing: "-0.01em" }}>{title}</h2>
-      </div>
-      {subtitle && <p style={{ margin: "4px 0 0 30px", fontSize: 13, color: TEXT_DIM }}>{subtitle}</p>}
-    </div>
-  );
-}
-
-/** Variance badge shows plan vs actual status */
-function VarianceBadge({ pva }: { pva: PlanVsActual }) {
-  if (pva.status === "no-data") return null;
-  const color = STATUS_COLORS[pva.status];
-  const isPositive = pva.variance >= 0;
-  return (
-    <div style={{
-      display: "inline-flex",
-      alignItems: "center",
-      gap: 4,
-      fontSize: 11,
-      fontWeight: 700,
-      color,
-      background: color + "14",
-      padding: "3px 8px",
-      borderRadius: 4,
-    }}>
-      {isPositive ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
-      {fmtVariance(pva)}
-    </div>
-  );
-}
-
-/** Live indicator dot */
-function LiveDot({ size = 8 }: { size?: number }) {
-  return (
-    <span style={{
-      display: "inline-block",
-      width: size,
-      height: size,
-      borderRadius: "50%",
-      background: "#16a34a",
-      boxShadow: "0 0 6px rgba(22,163,74,0.5)",
-      animation: "pulse 2s infinite",
-    }} />
-  );
-}
-
-function ChannelScorecard({
-  ch,
-  liveData,
-  liveLoading,
-}: {
-  ch: (typeof channels)[0];
-  liveData: UnifiedDashboard | null;
-  liveLoading: boolean;
-}) {
-  const Icon = ch.icon;
-  const annualUnits = sumChannel(ch.data, "units");
-  const annualRevenue = sumChannel(ch.data, "revenue");
-  const annualGP = sumChannel(ch.data, "grossProfit");
-  const channelShare = annualRevenue / totalRevAll;
-
-  // Compute plan target for current month (cumulative through current month)
-  const currentMonth = getCurrentProFormaMonth();
-
-  // Pull live actuals
-  let actualRevenue: number | null = null;
-  let actualOrders: number | null = null;
-  let revenuePva: PlanVsActual | null = null;
-
-  if (liveData?.chartData && liveData.chartData.length > 0) {
-    if (ch.key === "amazon") {
-      actualRevenue = sumChartField(liveData.chartData, "amazon");
-      actualOrders = sumChartField(liveData.chartData, "amazonOrders");
-    } else if (ch.key === "wholesale") {
-      // Shopify/DTC = wholesale/faire channel in our model
-      actualRevenue = sumChartField(liveData.chartData, "shopify");
-      actualOrders = sumChartField(liveData.chartData, "shopifyOrders");
+function estimateMargin(
+  key: TabKey,
+  grossMargin: number,
+  data: ChannelData | null,
+): number {
+  if (key === "all") return clamp(grossMargin, 0, 1);
+  if (key === "amazon") {
+    if (data?.amazon?.fees?.estimatedNetMargin != null) {
+      return clamp(data.amazon.fees.estimatedNetMargin, 0, 1);
     }
-    // Distributor has no live API data yet
-
-    if (actualRevenue != null && currentMonth) {
-      const planRevCumulative = cumulativeThrough(ch.data.revenue, currentMonth);
-      revenuePva = comparePlanVsActual(planRevCumulative, actualRevenue);
-    }
+    return clamp(grossMargin - 0.04, 0, 1);
   }
+  if (key === "dtc") return clamp(grossMargin - 0.03, 0, 1);
+  if (key === "faire") return clamp(grossMargin - 0.08, 0, 1);
+  return clamp(grossMargin - 0.1, 0, 1);
+}
 
+function getPlanToDate(key: TabKey): number | null {
+  const month = getCurrentProFormaMonth();
+  if (!month) return null;
+
+  const amazonPlan = cumulativeThrough(AMAZON.revenue, month);
+  const wholesalePlan = cumulativeThrough(WHOLESALE.revenue, month);
+  const distributorPlan = cumulativeThrough(DISTRIBUTOR.revenue, month);
+  const allPlan = cumulativeThrough(TOTAL_REVENUE, month);
+
+  if (key === "all") return allPlan;
+  if (key === "amazon") return amazonPlan;
+  if (key === "faire") return wholesalePlan;
+  if (key === "distributor") return distributorPlan;
+  return null; // no dedicated DTC plan line in pro forma
+}
+
+function KpiCard({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+}) {
   return (
     <div
       style={{
-        flex: "1 1 0",
-        minWidth: 280,
-        background: CARD_BG,
-        borderRadius: 12,
+        background: CARD,
         border: `1px solid ${BORDER}`,
-        overflow: "hidden",
-        boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+        borderRadius: 12,
+        padding: "16px 18px",
       }}
     >
-      {/* Color bar */}
-      <div style={{ height: 4, background: ch.liveColor }} />
-
-      <div style={{ padding: "20px 24px" }}>
-        {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-          <div
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: 8,
-              background: ch.liveColor + "14",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Icon size={18} color={ch.liveColor} strokeWidth={2} />
-          </div>
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ fontWeight: 700, fontSize: 16, color: NAVY }}>{ch.label}</span>
-              {actualRevenue != null && <LiveDot size={6} />}
-            </div>
-            {ch.note && <div style={{ fontSize: 11, color: TEXT_DIM, marginTop: 1 }}>{ch.note}</div>}
-          </div>
-          <div
-            style={{
-              marginLeft: "auto",
-              background: ch.liveColor + "18",
-              color: ch.liveColor,
-              fontWeight: 700,
-              fontSize: 13,
-              padding: "4px 10px",
-              borderRadius: 6,
-            }}
-          >
-            {pct(channelShare)} share
-          </div>
-        </div>
-
-        {/* Live Actuals Section (when available) */}
-        {liveLoading && ch.key !== "distributor" && (
-          <div style={{
-            display: "flex", alignItems: "center", gap: 8, padding: "10px 14px",
-            background: "#f4f2ed", borderRadius: 8, marginBottom: 12,
-            fontSize: 12, color: TEXT_DIM,
-          }}>
-            <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} />
-            Loading live data...
-          </div>
-        )}
-
-        {actualRevenue != null && (
-          <div style={{
-            background: "#f0fdf4",
-            border: "1px solid #bbf7d0",
-            borderRadius: 8,
-            padding: "12px 14px",
-            marginBottom: 12,
-          }}>
-            <div style={{ fontSize: 10, color: "#166534", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700, marginBottom: 8 }}>
-              LIVE ACTUALS (30-Day Window)
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-              <div>
-                <div style={{ fontSize: 10, color: "#166534", opacity: 0.7 }}>Revenue</div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: "#166534" }}>{fmtDollar(actualRevenue)}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: 10, color: "#166534", opacity: 0.7 }}>Orders</div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: "#166534" }}>{actualOrders?.toLocaleString() ?? "--"}</div>
-              </div>
-            </div>
-            {revenuePva && revenuePva.status !== "no-data" && (
-              <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ fontSize: 10, color: TEXT_DIM }}>vs Plan:</span>
-                <VarianceBadge pva={revenuePva} />
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Plan Metrics grid */}
-        <div style={{ marginBottom: 4, fontSize: 10, color: TEXT_DIM, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>
-          2026 PRO FORMA PLAN
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
-          <MetricBox label="Annual Units" value={annualUnits.toLocaleString()} />
-          <MetricBox label="Annual Revenue" value={fmt(annualRevenue)} />
-          <MetricBox label="Gross Profit" value={fmt(annualGP)} />
-          <MetricBox label="GP / Unit" value={"$" + ch.gpPerUnit.toFixed(2)} highlight={ch.gpPerUnit > 1} />
-        </div>
-
-        {/* Pricing strip */}
-        <div
-          style={{
-            background: "#f4f2ed",
-            borderRadius: 8,
-            padding: "10px 14px",
-            display: "flex",
-            gap: 12,
-            justifyContent: "space-between",
-          }}
-        >
-          <PricePill label={ch.pricing.cogsLabel} value={"$" + ch.pricing.cogs.toFixed(2)} />
-          <PricePill label={ch.pricing.wholesaleLabel} value={"$" + ch.pricing.wholesale.toFixed(2)} />
-          {ch.pricing.retail && <PricePill label="Retail" value={"$" + ch.pricing.retail.toFixed(2)} />}
-        </div>
+      <div
+        style={{
+          fontSize: 11,
+          letterSpacing: "0.06em",
+          textTransform: "uppercase",
+          color: TEXT_DIM,
+          fontWeight: 700,
+          marginBottom: 8,
+        }}
+      >
+        {label}
       </div>
+      <div style={{ fontSize: 28, fontWeight: 800, color: NAVY }}>{value}</div>
+      {hint ? <div style={{ marginTop: 4, fontSize: 12, color: TEXT_DIM }}>{hint}</div> : null}
     </div>
   );
 }
-
-function MetricBox({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
-  return (
-    <div>
-      <div style={{ fontSize: 11, color: TEXT_DIM, marginBottom: 2, textTransform: "uppercase", letterSpacing: "0.04em" }}>{label}</div>
-      <div style={{ fontSize: 20, fontWeight: 700, color: highlight ? "#2d8a4e" : NAVY }}>{value}</div>
-    </div>
-  );
-}
-
-function PricePill({ label, value }: { label: string; value: string }) {
-  return (
-    <div style={{ textAlign: "center" }}>
-      <div style={{ fontSize: 10, color: TEXT_DIM, marginBottom: 2 }}>{label}</div>
-      <div style={{ fontSize: 14, fontWeight: 700, color: NAVY }}>{value}</div>
-    </div>
-  );
-}
-
-/** Amazon Deep Dive card using live amazon data */
-function AmazonDeepDive({ amazon }: { amazon: NonNullable<UnifiedDashboard["amazon"]> }) {
-  const inv = amazon.inventory;
-  const fees = amazon.fees;
-  const vel = amazon.velocity;
-  const comp = amazon.comparison;
-
-  return (
-    <div style={{
-      background: CARD_BG,
-      borderRadius: 12,
-      border: `1px solid ${BORDER}`,
-      overflow: "hidden",
-      boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
-      marginBottom: 32,
-    }}>
-      <div style={{ height: 4, background: AMAZON_COLOR }} />
-      <div style={{ padding: "24px 24px 20px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
-          <ShoppingCart size={20} color={AMAZON_COLOR} strokeWidth={1.8} />
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: NAVY }}>Amazon Deep Dive</h2>
-          <LiveDot />
-          <span style={{ marginLeft: "auto", fontSize: 11, color: TEXT_DIM }}>Updated: {new Date(amazon.lastUpdated).toLocaleString()}</span>
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 20 }}>
-          {/* Inventory Status */}
-          <div style={{ background: "#f9f7f3", borderRadius: 10, padding: "16px 18px", border: `1px solid ${BORDER}` }}>
-            <div style={{ fontSize: 11, color: TEXT_DIM, textTransform: "uppercase", letterSpacing: "0.04em", fontWeight: 700, marginBottom: 12 }}>
-              FBA Inventory
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-              <div>
-                <div style={{ fontSize: 10, color: TEXT_DIM }}>Fulfillable</div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: inv.fulfillable > 50 ? "#166534" : RED }}>{inv.fulfillable.toLocaleString()}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: 10, color: TEXT_DIM }}>Inbound</div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: NAVY }}>{(inv.inboundWorking + inv.inboundShipped).toLocaleString()}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: 10, color: TEXT_DIM }}>Reserved</div>
-                <div style={{ fontSize: 16, fontWeight: 600, color: TEXT_MED }}>{inv.reserved.toLocaleString()}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: 10, color: TEXT_DIM }}>Days of Supply</div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: inv.daysOfSupply < 14 ? RED : inv.daysOfSupply < 30 ? GOLD : "#166534" }}>
-                  {inv.daysOfSupply}d
-                </div>
-              </div>
-            </div>
-            {inv.restockAlert && (
-              <div style={{
-                marginTop: 10, display: "flex", alignItems: "center", gap: 6,
-                background: RED + "12", color: RED, padding: "6px 10px",
-                borderRadius: 6, fontSize: 11, fontWeight: 700,
-              }}>
-                <AlertTriangle size={13} /> RESTOCK ALERT
-              </div>
-            )}
-          </div>
-
-          {/* Fees & Margin */}
-          <div style={{ background: "#f9f7f3", borderRadius: 10, padding: "16px 18px", border: `1px solid ${BORDER}` }}>
-            <div style={{ fontSize: 11, color: TEXT_DIM, textTransform: "uppercase", letterSpacing: "0.04em", fontWeight: 700, marginBottom: 12 }}>
-              Fees & Margin
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-              <div>
-                <div style={{ fontSize: 10, color: TEXT_DIM }}>Referral Fee</div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: NAVY }}>{fmtDollar(fees.referralFee)}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: 10, color: TEXT_DIM }}>FBA Fee</div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: NAVY }}>{fmtDollar(fees.fbaFee)}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: 10, color: TEXT_DIM }}>Total Fees</div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: RED }}>{fmtDollar(fees.totalFee)}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: 10, color: TEXT_DIM }}>Est. Net Margin</div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: fees.estimatedNetMargin > 0 ? "#166534" : RED }}>
-                  {fmtPercent(fees.estimatedNetMargin)}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Velocity & Comparison */}
-          <div style={{ background: "#f9f7f3", borderRadius: 10, padding: "16px 18px", border: `1px solid ${BORDER}` }}>
-            <div style={{ fontSize: 11, color: TEXT_DIM, textTransform: "uppercase", letterSpacing: "0.04em", fontWeight: 700, marginBottom: 12 }}>
-              Velocity & Trends
-            </div>
-            <div style={{ marginBottom: 10 }}>
-              <div style={{ fontSize: 10, color: TEXT_DIM }}>Units/Day (7d avg)</div>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-                <span style={{ fontSize: 22, fontWeight: 800, color: NAVY }}>{vel.unitsPerDay7d.toFixed(1)}</span>
-                <span style={{
-                  fontSize: 11, fontWeight: 700,
-                  color: vel.trend === "up" ? "#166534" : vel.trend === "down" ? RED : TEXT_DIM,
-                }}>
-                  {vel.trend === "up" ? "Trending Up" : vel.trend === "down" ? "Trending Down" : "Flat"}
-                </span>
-              </div>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, fontSize: 11 }}>
-              <div>
-                <div style={{ color: TEXT_DIM, fontSize: 10 }}>Today vs Yesterday</div>
-                <div style={{ fontWeight: 700, color: comp.todayVsYesterday.revenuePct >= 0 ? "#166534" : RED }}>
-                  {comp.todayVsYesterday.revenuePct >= 0 ? "+" : ""}{(comp.todayVsYesterday.revenuePct * 100).toFixed(0)}% rev
-                </div>
-              </div>
-              <div>
-                <div style={{ color: TEXT_DIM, fontSize: 10 }}>Week over Week</div>
-                <div style={{ fontWeight: 700, color: comp.weekOverWeek.revenuePct >= 0 ? "#166534" : RED }}>
-                  {comp.weekOverWeek.revenuePct >= 0 ? "+" : ""}{(comp.weekOverWeek.revenuePct * 100).toFixed(0)}% rev
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/** Channel Mix Pie Chart using live data */
-function ChannelMixPie({ liveData }: { liveData: UnifiedDashboard }) {
-  const amazonRev = sumChartField(liveData.chartData, "amazon");
-  const shopifyRev = sumChartField(liveData.chartData, "shopify");
-  const total = amazonRev + shopifyRev;
-
-  if (total === 0) return null;
-
-  const pieData = [
-    { name: "Amazon", value: amazonRev, color: AMAZON_COLOR },
-    { name: "Shopify / DTC", value: shopifyRev, color: SHOPIFY_COLOR },
-  ];
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const renderLabel = ({ name, percent }: any) => `${name} ${(percent * 100).toFixed(0)}%`;
-
-  return (
-    <div style={{
-      background: CARD_BG,
-      borderRadius: 12,
-      border: `1px solid ${BORDER}`,
-      padding: "24px 24px 16px",
-      marginBottom: 32,
-      boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
-    }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-        <BarChart3 size={20} color={NAVY} strokeWidth={1.8} />
-        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: NAVY }}>Live Channel Mix</h2>
-        <LiveDot />
-        <span style={{ fontSize: 12, color: TEXT_DIM, marginLeft: 6 }}>Based on 30-day actuals</span>
-      </div>
-
-      <div style={{ display: "flex", alignItems: "center", gap: 32, flexWrap: "wrap" }}>
-        {/* Pie */}
-        <div style={{ width: 260, height: 260 }}>
-          <ResponsiveContainer>
-            <PieChart>
-              <Pie
-                data={pieData}
-                dataKey="value"
-                cx="50%"
-                cy="50%"
-                outerRadius={100}
-                innerRadius={50}
-                label={renderLabel}
-                labelLine={{ stroke: TEXT_DIM, strokeWidth: 1 }}
-              >
-                {pieData.map((entry, idx) => (
-                  <Cell key={idx} fill={entry.color} stroke={CARD_BG} strokeWidth={2} />
-                ))}
-              </Pie>
-              <Tooltip
-                formatter={(value) => [fmtDollar(Number(value) || 0), "Revenue"]}
-                contentStyle={{ background: CARD_BG, border: `1px solid ${BORDER}`, borderRadius: 8, fontSize: 13 }}
-              />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Legend details */}
-        <div style={{ flex: 1, minWidth: 200 }}>
-          {pieData.map((item) => {
-            const share = total > 0 ? item.value / total : 0;
-            return (
-              <div key={item.name} style={{
-                display: "flex", alignItems: "center", gap: 12,
-                padding: "12px 16px", marginBottom: 8,
-                background: "#f9f7f3", borderRadius: 8, border: `1px solid ${BORDER}`,
-              }}>
-                <div style={{ width: 6, height: 32, borderRadius: 3, background: item.color, flexShrink: 0 }} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: NAVY }}>{item.name}</div>
-                  <div style={{ fontSize: 11, color: TEXT_DIM }}>{pct(share)} of total</div>
-                </div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: NAVY }}>{fmtDollar(item.value)}</div>
-              </div>
-            );
-          })}
-          <div style={{
-            padding: "10px 16px",
-            background: NAVY + "08",
-            borderRadius: 8,
-            fontSize: 12,
-            color: NAVY,
-            fontWeight: 600,
-          }}>
-            Combined: {fmtDollar(total)} revenue across {sumChartField(liveData.chartData, "combinedOrders")} orders
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/** Daily actual revenue chart overlayed with plan pacing line */
-function DailyActualsChart({ liveData }: { liveData: UnifiedDashboard }) {
-  if (!liveData.chartData || liveData.chartData.length === 0) return null;
-
-  // Build chart data: each day shows actual amazon + shopify stacked, plus a combined line
-  const dailyData = liveData.chartData.map((d) => ({
-    date: d.label,
-    Amazon: d.amazon,
-    Shopify: d.shopify,
-    Combined: d.combined,
-  }));
-
-  return (
-    <div style={{
-      background: CARD_BG,
-      borderRadius: 12,
-      border: `1px solid ${BORDER}`,
-      padding: "24px 24px 16px",
-      marginBottom: 32,
-      boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
-    }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-        <Activity size={20} color={NAVY} strokeWidth={1.8} />
-        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: NAVY }}>Daily Actual Revenue</h2>
-        <LiveDot />
-        <span style={{ fontSize: 12, color: TEXT_DIM, marginLeft: 6 }}>Last {liveData.chartData.length} days</span>
-      </div>
-
-      <div style={{ width: "100%", height: 340 }}>
-        <ResponsiveContainer>
-          <ComposedChart data={dailyData}>
-            <CartesianGrid strokeDasharray="3 3" stroke={BORDER} vertical={false} />
-            <XAxis
-              dataKey="date"
-              tick={{ fill: NAVY, fontSize: 10 }}
-              tickLine={false}
-              axisLine={{ stroke: BORDER }}
-              interval={Math.max(0, Math.floor(dailyData.length / 8) - 1)}
-            />
-            <YAxis
-              tick={{ fill: TEXT_DIM, fontSize: 11 }}
-              tickLine={false}
-              axisLine={false}
-              tickFormatter={(v: number) => (v >= 1000 ? `$${(v / 1000).toFixed(0)}K` : `$${v}`)}
-            />
-            <Tooltip
-              formatter={(value, name) => [fmtDollar(Number(value) || 0), String(name ?? "")]}
-              contentStyle={{ background: CARD_BG, border: `1px solid ${BORDER}`, borderRadius: 8, fontSize: 13 }}
-            />
-            <Legend verticalAlign="top" align="right" iconType="square" wrapperStyle={{ fontSize: 12, paddingBottom: 8 }} />
-            <Bar dataKey="Amazon" stackId="rev" fill={AMAZON_COLOR} radius={[0, 0, 0, 0]} />
-            <Bar dataKey="Shopify" stackId="rev" fill={SHOPIFY_COLOR} radius={[3, 3, 0, 0]} />
-            <Line type="monotone" dataKey="Combined" stroke={NAVY} strokeWidth={2} dot={false} strokeDasharray="4 3" />
-          </ComposedChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Main Export
-// ---------------------------------------------------------------------------
 
 export function ChannelView() {
-  const { data: liveData, loading: liveLoading, error: liveError, refresh } = useDashboardData();
-  const [showPlanCharts, setShowPlanCharts] = useState(true);
+  const [tab, setTab] = useState<TabKey>("all");
+
+  const { data: channels, loading, error, refresh } = useChannelData();
+  const { data: dashboard } = useDashboardData();
+  const { data: pnl } = usePnLData();
+
+  const stats = useMemo(() => {
+    const amazonRevenue = channels?.amazon?.revenue ?? 0;
+    const amazonOrders = channels?.amazon?.orders ?? 0;
+
+    const dtcRevenue = channels?.shopify?.dtc.revenue ?? 0;
+    const dtcOrders = channels?.shopify?.dtc.orders ?? 0;
+
+    const faireRevenue = channels?.shopify?.faire.revenue ?? 0;
+    const faireOrders = channels?.shopify?.faire.orders ?? 0;
+
+    const distRevenue = channels?.shopify?.distributor.revenue ?? 0;
+    const distOrders = channels?.shopify?.distributor.orders ?? 0;
+
+    const totalRevenue = amazonRevenue + dtcRevenue + faireRevenue + distRevenue;
+    const totalOrders = amazonOrders + dtcOrders + faireOrders + distOrders;
+
+    return {
+      all: { revenue: totalRevenue, orders: totalOrders },
+      dtc: { revenue: dtcRevenue, orders: dtcOrders },
+      amazon: { revenue: amazonRevenue, orders: amazonOrders },
+      faire: { revenue: faireRevenue, orders: faireOrders },
+      distributor: { revenue: distRevenue, orders: distOrders },
+    } as Record<TabKey, { revenue: number; orders: number }>;
+  }, [channels]);
+
+  const trendRows = useMemo(() => {
+    const daily = channels?.dailyByChannel || [];
+    const amazonByDate = new Map(
+      (dashboard?.chartData || []).map((d) => [d.date, d.amazon]),
+    );
+
+    return daily.map((d) => {
+      const amazon = amazonByDate.get(d.date) || 0;
+      return {
+        date: d.date,
+        label: d.label,
+        dtc: d.dtcRevenue,
+        faire: d.faireRevenue,
+        distributor: d.distributorRevenue,
+        amazon,
+        total: d.totalRevenue + amazon,
+      };
+    });
+  }, [channels, dashboard]);
+
+  const mixRows = useMemo(() => {
+    return [
+      { name: "Amazon", value: stats.amazon.revenue, color: COLOR_AMAZON },
+      { name: "Shopify DTC", value: stats.dtc.revenue, color: COLOR_DTC },
+      { name: "Faire", value: stats.faire.revenue, color: COLOR_FAIRE },
+      { name: "Distributor", value: stats.distributor.revenue, color: COLOR_DIST },
+    ].filter((r) => r.value > 0);
+  }, [stats]);
+
+  const selected = stats[tab];
+  const aov = selected.orders > 0 ? selected.revenue / selected.orders : 0;
+  const margin = estimateMargin(tab, pnl?.grossMargin || 0, channels);
+  const contribution = selected.revenue * margin;
+
+  const plan = getPlanToDate(tab);
+  const pva = plan != null ? comparePlanVsActual(plan, selected.revenue) : null;
+
+  const topOrders = useMemo(() => {
+    const dtcOrders = channels?.shopify?.dtc.items || [];
+    const faireOrders = channels?.shopify?.faire.items || [];
+    const distOrders = channels?.shopify?.distributor.items || [];
+
+    let source = [...dtcOrders, ...faireOrders, ...distOrders];
+    if (tab === "dtc") source = [...dtcOrders];
+    if (tab === "faire") source = [...faireOrders];
+    if (tab === "distributor") source = [...distOrders];
+    if (tab === "amazon") source = [];
+
+    return source.sort((a, b) => b.total - a.total).slice(0, 10);
+  }, [channels, tab]);
 
   return (
-    <div style={{ padding: "32px 28px 60px", maxWidth: 1200, margin: "0 auto" }}>
-      {/* CSS keyframes for animations */}
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.4; }
-        }
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
-
-      {/* HEADER */}
-      <div style={{ marginBottom: 32, display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-        <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: NAVY, letterSpacing: "-0.02em" }}>Channel Intelligence</h1>
-            {liveData && !liveLoading && (
-              <span style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                background: "#f0fdf4",
-                border: "1px solid #bbf7d0",
-                color: "#166534",
-                fontSize: 11,
-                fontWeight: 700,
-                padding: "4px 10px",
-                borderRadius: 6,
-              }}>
-                <LiveDot size={7} />
-                LIVE
-              </span>
-            )}
-          </div>
-          <p style={{ margin: "6px 0 0", fontSize: 14, color: TEXT_MED }}>Multi-Channel Revenue &amp; Distribution Analysis</p>
-        </div>
-
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {/* Toggle plan charts */}
-          <button
-            onClick={() => setShowPlanCharts(!showPlanCharts)}
-            style={{
-              border: `1px solid ${BORDER}`,
-              background: showPlanCharts ? NAVY : CARD_BG,
-              color: showPlanCharts ? "#fff" : NAVY,
-              fontSize: 12,
-              fontWeight: 600,
-              padding: "6px 14px",
-              borderRadius: 6,
-              cursor: "pointer",
-            }}
-          >
-            {showPlanCharts ? "Hide" : "Show"} Plan Charts
-          </button>
-
-          {/* Refresh button */}
-          <button
-            onClick={refresh}
-            disabled={liveLoading}
-            style={{
-              border: `1px solid ${BORDER}`,
-              background: CARD_BG,
-              color: NAVY,
-              fontSize: 12,
-              fontWeight: 600,
-              padding: "6px 14px",
-              borderRadius: 6,
-              cursor: liveLoading ? "not-allowed" : "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              opacity: liveLoading ? 0.6 : 1,
-            }}
-          >
-            <RefreshCw size={13} style={liveLoading ? { animation: "spin 1s linear infinite" } : undefined} />
-            Refresh
-          </button>
-        </div>
-      </div>
-
-      {/* ERROR BANNER */}
-      {liveError && (
-        <div style={{
-          background: RED + "10",
-          border: `1px solid ${RED}30`,
-          borderRadius: 10,
-          padding: "12px 18px",
-          marginBottom: 20,
+    <div style={{ background: BG, minHeight: "100vh", paddingBottom: 20 }}>
+      <div
+        style={{
           display: "flex",
           alignItems: "center",
-          gap: 10,
-          fontSize: 13,
-          color: RED,
-        }}>
-          <AlertTriangle size={16} />
-          <span><strong>Live data unavailable:</strong> {liveError}. Showing plan data only.</span>
-        </div>
-      )}
-
-      {/* LIVE CHANNEL MIX PIE (only when live data is available) */}
-      {liveData && <ChannelMixPie liveData={liveData} />}
-
-      {/* CHANNEL SCORECARDS */}
-      <div style={{ display: "flex", gap: 20, marginBottom: 40, flexWrap: "wrap" }}>
-        {channels.map((ch) => (
-          <ChannelScorecard key={ch.key} ch={ch} liveData={liveData} liveLoading={liveLoading} />
-        ))}
-      </div>
-
-      {/* DAILY ACTUALS CHART (live data) */}
-      {liveData && <DailyActualsChart liveData={liveData} />}
-
-      {/* AMAZON DEEP DIVE (live data) */}
-      {liveData?.amazon && <AmazonDeepDive amazon={liveData.amazon} />}
-
-      {/* PLAN CHARTS (toggleable) */}
-      {showPlanCharts && (
-        <>
-          {/* MONTHLY REVENUE BY CHANNEL (Plan) */}
-          <div
-            style={{
-              background: CARD_BG,
-              borderRadius: 12,
-              border: `1px solid ${BORDER}`,
-              padding: "24px 24px 16px",
-              marginBottom: 32,
-              boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
-            }}
-          >
-            <SectionHeading icon={DollarSign} title="Monthly Revenue by Channel (Plan)" subtitle="Pro Forma stacked monthly view across all three sales channels" />
-            <div style={{ width: "100%", height: 360 }}>
-              <ResponsiveContainer>
-                <BarChart data={monthlyChartData} barCategoryGap="18%">
-                  <CartesianGrid strokeDasharray="3 3" stroke={BORDER} vertical={false} />
-                  <XAxis dataKey="month" tick={{ fill: NAVY, fontSize: 12 }} tickLine={false} axisLine={{ stroke: BORDER }} />
-                  <YAxis
-                    tick={{ fill: TEXT_DIM, fontSize: 11 }}
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={(v: number) => (v >= 1000 ? `$${(v / 1000).toFixed(0)}K` : `$${v}`)}
-                  />
-                  <Tooltip content={<RevenueTooltip />} />
-                  <Legend
-                    verticalAlign="top"
-                    align="right"
-                    iconType="square"
-                    wrapperStyle={{ fontSize: 12, paddingBottom: 8 }}
-                  />
-                  <Bar dataKey="Amazon" stackId="rev" fill={GOLD} radius={[0, 0, 0, 0]} />
-                  <Bar dataKey="Wholesale" stackId="rev" fill={NAVY} radius={[0, 0, 0, 0]} />
-                  <Bar dataKey="Distributor" stackId="rev" fill={RED} radius={[3, 3, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* MONTHLY UNITS BY CHANNEL (Plan) */}
-          <div
-            style={{
-              background: CARD_BG,
-              borderRadius: 12,
-              border: `1px solid ${BORDER}`,
-              padding: "24px 24px 16px",
-              marginBottom: 32,
-              boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
-            }}
-          >
-            <SectionHeading icon={Package} title="Monthly Units by Channel (Plan)" subtitle="Unit volume ramp showing growth trajectory by channel" />
-            <div style={{ width: "100%", height: 340 }}>
-              <ResponsiveContainer>
-                <AreaChart data={monthlyUnitsData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={BORDER} vertical={false} />
-                  <XAxis dataKey="month" tick={{ fill: NAVY, fontSize: 12 }} tickLine={false} axisLine={{ stroke: BORDER }} />
-                  <YAxis
-                    tick={{ fill: TEXT_DIM, fontSize: 11 }}
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={(v: number) => (v >= 1000 ? `${(v / 1000).toFixed(0)}K` : `${v}`)}
-                  />
-                  <Tooltip content={<UnitsTooltip />} />
-                  <Legend
-                    verticalAlign="top"
-                    align="right"
-                    iconType="square"
-                    wrapperStyle={{ fontSize: 12, paddingBottom: 8 }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="Distributor"
-                    stackId="units"
-                    stroke={RED}
-                    fill={RED + "30"}
-                    strokeWidth={2}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="Wholesale"
-                    stackId="units"
-                    stroke={NAVY}
-                    fill={NAVY + "25"}
-                    strokeWidth={2}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="Amazon"
-                    stackId="units"
-                    stroke={GOLD}
-                    fill={GOLD + "30"}
-                    strokeWidth={2}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* DISTRIBUTOR NETWORK PLAN (always shown) */}
-      <div
-        style={{
-          background: CARD_BG,
-          borderRadius: 12,
-          border: `1px solid ${BORDER}`,
-          padding: "24px 24px 20px",
-          marginBottom: 32,
-          boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+          justifyContent: "space-between",
+          marginBottom: 18,
         }}
       >
-        <SectionHeading icon={Users} title="Distributor Network Plan" subtitle="Ramp schedule from confirmed first distributor through planned expansion" />
+        <div>
+          <h1 style={{ margin: 0, fontSize: 28, color: NAVY, letterSpacing: "-0.02em" }}>
+            Revenue by Channel
+          </h1>
+          <div style={{ marginTop: 4, color: TEXT_DIM, fontSize: 13 }}>
+            Live channel split with Faire separated from Shopify DTC.
+          </div>
+        </div>
 
-        {/* Distributor roster */}
-        <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
-          {DISTRIBUTOR_NETWORK.map((d) => (
-            <div
-              key={d.id}
+        <button
+          onClick={() => refresh()}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            background: NAVY,
+            color: "#fff",
+            border: "none",
+            borderRadius: 8,
+            padding: "10px 14px",
+            cursor: "pointer",
+            fontWeight: 700,
+          }}
+        >
+          <RefreshCw size={15} />
+          Refresh
+        </button>
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+          gap: 10,
+          marginBottom: 16,
+        }}
+      >
+        {TABS.map((item) => {
+          const Icon = item.icon;
+          const active = tab === item.key;
+          return (
+            <button
+              key={item.key}
+              onClick={() => setTab(item.key)}
               style={{
-                display: "flex",
+                border: `1px solid ${active ? NAVY : BORDER}`,
+                background: active ? NAVY : CARD,
+                color: active ? "#fff" : NAVY,
+                borderRadius: 10,
+                padding: "10px 12px",
+                fontWeight: 700,
+                display: "inline-flex",
                 alignItems: "center",
-                gap: 8,
-                background: d.status === "confirmed" ? RED + "10" : "#f4f2ed",
-                border: `1px solid ${d.status === "confirmed" ? RED + "30" : BORDER}`,
-                borderRadius: 8,
-                padding: "8px 14px",
+                justifyContent: "center",
+                gap: 7,
+                cursor: "pointer",
               }}
             >
-              <div
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: 4,
-                  background: d.status === "confirmed" ? "#2d8a4e" : d.status === "prospecting" ? GOLD : TEXT_DIM,
-                }}
-              />
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: NAVY }}>{d.name}</div>
-                <div style={{ fontSize: 11, color: TEXT_DIM }}>
-                  {typeof d.startMonth === "string" && MONTHS.includes(d.startMonth as Month)
-                    ? MONTH_LABELS[d.startMonth as Month]
-                    : d.startMonth}{" "}
-                  &middot; {d.status}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Table */}
-        <div style={{ overflowX: "auto" }}>
-          <table
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              fontSize: 13,
-            }}
-          >
-            <thead>
-              <tr>
-                {["Month", "New Distributors", "Cumulative", "Units / Distributor", "Total Units"].map((h) => (
-                  <th
-                    key={h}
-                    style={{
-                      textAlign: h === "Month" ? "left" : "right",
-                      padding: "10px 14px",
-                      borderBottom: `2px solid ${NAVY}`,
-                      color: NAVY,
-                      fontWeight: 700,
-                      fontSize: 11,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.04em",
-                    }}
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {distTableData.map((row) => (
-                <tr
-                  key={row.monthKey}
-                  style={{
-                    background: row.highlight ? RED + "08" : "transparent",
-                  }}
-                >
-                  <td
-                    style={{
-                      padding: "10px 14px",
-                      borderBottom: `1px solid ${BORDER}`,
-                      fontWeight: row.highlight ? 700 : 500,
-                      color: NAVY,
-                    }}
-                  >
-                    {row.month}
-                    {row.highlight && (
-                      <span
-                        style={{
-                          marginLeft: 8,
-                          fontSize: 10,
-                          background: RED + "18",
-                          color: RED,
-                          padding: "2px 6px",
-                          borderRadius: 4,
-                          fontWeight: 600,
-                        }}
-                      >
-                        NEW
-                      </span>
-                    )}
-                  </td>
-                  <td style={{ padding: "10px 14px", borderBottom: `1px solid ${BORDER}`, textAlign: "right", color: row.newDistributors > 0 ? RED : TEXT_DIM, fontWeight: row.newDistributors > 0 ? 700 : 400 }}>
-                    {row.newDistributors > 0 ? `+${row.newDistributors}` : "--"}
-                  </td>
-                  <td style={{ padding: "10px 14px", borderBottom: `1px solid ${BORDER}`, textAlign: "right", color: NAVY, fontWeight: 600 }}>
-                    {row.cumulative || "--"}
-                  </td>
-                  <td style={{ padding: "10px 14px", borderBottom: `1px solid ${BORDER}`, textAlign: "right", color: TEXT_MED }}>
-                    {row.unitsPerDistributor > 0 ? row.unitsPerDistributor.toLocaleString() : "--"}
-                  </td>
-                  <td style={{ padding: "10px 14px", borderBottom: `1px solid ${BORDER}`, textAlign: "right", color: NAVY, fontWeight: 600 }}>
-                    {row.totalUnits > 0 ? row.totalUnits.toLocaleString() : "--"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              <Icon size={15} />
+              {item.label}
+            </button>
+          );
+        })}
       </div>
 
-      {/* MARGIN COMPARISON */}
+      {error ? (
+        <div
+          style={{
+            marginBottom: 16,
+            borderRadius: 10,
+            border: `1px solid ${RED}40`,
+            background: `${RED}12`,
+            color: RED,
+            padding: "12px 14px",
+            display: "flex",
+            gap: 8,
+            alignItems: "center",
+            fontWeight: 600,
+          }}
+        >
+          <AlertTriangle size={16} />
+          {error}
+        </div>
+      ) : null}
+
       <div
         style={{
-          background: CARD_BG,
-          borderRadius: 12,
-          border: `1px solid ${BORDER}`,
-          padding: "24px 24px 20px",
-          boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          gap: 12,
+          marginBottom: 14,
         }}
       >
-        <SectionHeading icon={TrendingUp} title="Margin Comparison" subtitle="Gross profit per unit across channels -- Wholesale leads on margin, Amazon on volume" />
+        <KpiCard label="Revenue (MTD)" value={fmtDollar(selected.revenue)} />
+        <KpiCard label="Orders (MTD)" value={selected.orders.toLocaleString("en-US")} />
+        <KpiCard label="AOV" value={fmtDollar(aov)} />
+        <KpiCard label="Est. Contribution Margin" value={fmtPercent(safePct(margin))} />
+        <KpiCard label="Est. Contribution Profit" value={fmtDollar(contribution)} />
+      </div>
 
-        <div style={{ display: "flex", gap: 32, flexWrap: "wrap" }}>
-          {/* Horizontal bar chart */}
-          <div style={{ flex: "1 1 420px", minWidth: 320 }}>
-            <div style={{ width: "100%", height: 240 }}>
-              <ResponsiveContainer>
-                <BarChart data={marginData} layout="vertical" barSize={28}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={BORDER} horizontal={false} />
-                  <XAxis
-                    type="number"
-                    tick={{ fill: TEXT_DIM, fontSize: 11 }}
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={(v: number) => `$${v.toFixed(2)}`}
-                    domain={[0, 2]}
-                  />
-                  <YAxis
-                    type="category"
-                    dataKey="channel"
-                    tick={{ fill: NAVY, fontSize: 12, fontWeight: 600 }}
-                    tickLine={false}
-                    axisLine={false}
-                    width={140}
-                  />
-                  <Tooltip
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    formatter={(value: any) => [`$${Number(value).toFixed(2)}`, "GP / Unit"]}
-                    contentStyle={{
-                      background: CARD_BG,
-                      border: `1px solid ${BORDER}`,
-                      borderRadius: 8,
-                      fontSize: 13,
-                    }}
-                  />
-                  <Bar dataKey="gpPerUnit" radius={[0, 4, 4, 0]}>
-                    {marginData.map((entry, idx) => (
-                      <Cell key={idx} fill={entry.color} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "2fr 1fr",
+          gap: 12,
+          marginBottom: 14,
+        }}
+      >
+        <div
+          style={{
+            background: CARD,
+            border: `1px solid ${BORDER}`,
+            borderRadius: 12,
+            padding: "14px 14px 8px",
+            minHeight: 320,
+          }}
+        >
+          <div style={{ fontWeight: 700, color: NAVY, marginBottom: 10 }}>
+            30-Day Revenue Trend
+          </div>
+          <div style={{ width: "100%", height: 270 }}>
+            <ResponsiveContainer>
+              <ComposedChart data={trendRows}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(27,42,74,0.08)" />
+                <XAxis dataKey="label" tick={{ fontSize: 11, fill: TEXT_DIM }} />
+                <YAxis tick={{ fontSize: 11, fill: TEXT_DIM }} />
+                <Tooltip
+                  formatter={(value: number | string | undefined) =>
+                    fmtDollar(Number(value || 0))
+                  }
+                  contentStyle={{ borderRadius: 8, border: `1px solid ${BORDER}` }}
+                />
+                <Bar dataKey="dtc" stackId="revenue" fill={COLOR_DTC} name="Shopify DTC" />
+                <Bar dataKey="faire" stackId="revenue" fill={COLOR_FAIRE} name="Faire" />
+                <Bar dataKey="distributor" stackId="revenue" fill={COLOR_DIST} name="Distributor" />
+                <Line
+                  dataKey="amazon"
+                  type="monotone"
+                  stroke={COLOR_AMAZON}
+                  strokeWidth={2.2}
+                  dot={false}
+                  name="Amazon"
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div
+          style={{
+            background: CARD,
+            border: `1px solid ${BORDER}`,
+            borderRadius: 12,
+            padding: "14px 14px 8px",
+            minHeight: 320,
+          }}
+        >
+          <div style={{ fontWeight: 700, color: NAVY, marginBottom: 10 }}>
+            Channel Mix
+          </div>
+          <div style={{ width: "100%", height: 180 }}>
+            <ResponsiveContainer>
+              <PieChart>
+                <Pie data={mixRows} dataKey="value" nameKey="name" outerRadius={70} innerRadius={42}>
+                  {mixRows.map((entry) => (
+                    <Cell key={entry.name} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  formatter={(value: number | string | undefined) =>
+                    fmtDollar(Number(value || 0))
+                  }
+                />
+              </PieChart>
+            </ResponsiveContainer>
           </div>
 
-          {/* Breakdown cards */}
-          <div style={{ flex: "1 1 300px", display: "flex", flexDirection: "column", gap: 12 }}>
-            {marginData.map((ch) => {
-              const margin = ((ch.sellPrice - ch.cogs) / ch.sellPrice * 100);
+          <div style={{ display: "grid", gap: 6 }}>
+            {mixRows.map((row) => {
+              const total = stats.all.revenue || 1;
               return (
-                <div
-                  key={ch.channel}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 16,
-                    padding: "14px 18px",
-                    background: "#f9f7f3",
-                    borderRadius: 10,
-                    border: `1px solid ${BORDER}`,
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 6,
-                      height: 40,
-                      borderRadius: 3,
-                      background: ch.color,
-                      flexShrink: 0,
-                    }}
-                  />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: NAVY, marginBottom: 2 }}>{ch.channel}</div>
-                    <div style={{ fontSize: 11, color: TEXT_DIM }}>
-                      Sell ${ch.sellPrice.toFixed(2)} &minus; COGS ${ch.cogs.toFixed(2)} = GP ${ch.gpPerUnit.toFixed(2)}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: 20, fontWeight: 800, color: ch.gpPerUnit > 1 ? "#2d8a4e" : NAVY }}>
-                      ${ch.gpPerUnit.toFixed(2)}
-                    </div>
-                    <div style={{ fontSize: 11, color: TEXT_DIM }}>{margin.toFixed(0)}% margin</div>
-                  </div>
+                <div key={row.name} style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                  <span style={{ color: NAVY }}>
+                    <span style={{ color: row.color, marginRight: 6 }}>●</span>
+                    {row.name}
+                  </span>
+                  <span style={{ color: TEXT_DIM, fontWeight: 700 }}>
+                    {(row.value / total * 100).toFixed(1)}%
+                  </span>
                 </div>
               );
             })}
-
-            {/* Key insight */}
-            <div
-              style={{
-                marginTop: 4,
-                padding: "12px 16px",
-                background: NAVY + "08",
-                borderRadius: 8,
-                border: `1px solid ${NAVY}18`,
-                fontSize: 12,
-                color: NAVY,
-                lineHeight: 1.5,
-              }}
-            >
-              <strong>Key Insight:</strong> Wholesale delivers <strong>$1.74 GP/unit</strong> (highest margin), Amazon drives unit velocity at scale, and Distributors provide the lowest per-unit margin but the highest total volume at maturity.
-            </div>
           </div>
         </div>
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1.2fr 1fr",
+          gap: 12,
+          marginBottom: 14,
+        }}
+      >
+        <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px 14px 10px" }}>
+          <div style={{ fontWeight: 700, color: NAVY, marginBottom: 10 }}>
+            Top Orders {tab === "amazon" ? "(Amazon unavailable in this table)" : "(Shopify channels)"}
+          </div>
+
+          {tab === "amazon" ? (
+            <div style={{ fontSize: 13, color: TEXT_DIM }}>
+              Amazon order line-items are sourced separately via SP-API. This table currently shows Shopify-derived channels only.
+            </div>
+          ) : topOrders.length === 0 ? (
+            <div style={{ fontSize: 13, color: TEXT_DIM }}>{loading ? "Loading..." : "No orders in this view."}</div>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: "left", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Order</th>
+                    <th style={{ textAlign: "left", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Date</th>
+                    <th style={{ textAlign: "right", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Revenue</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topOrders.map((order) => (
+                    <tr key={order.name + order.createdAt}>
+                      <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 0", color: NAVY, fontWeight: 600 }}>
+                        {order.name}
+                      </td>
+                      <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 0", color: TEXT_DIM, fontSize: 12 }}>
+                        {new Date(order.createdAt).toLocaleDateString("en-US")}
+                      </td>
+                      <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 0", textAlign: "right", color: NAVY, fontWeight: 700 }}>
+                        {fmtDollar(order.total)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px 14px 10px" }}>
+          <div style={{ fontWeight: 700, color: NAVY, marginBottom: 10 }}>Channel Comparison</div>
+
+          {([
+            { label: "Amazon", key: "amazon" as TabKey },
+            { label: "Shopify DTC", key: "dtc" as TabKey },
+            { label: "Faire", key: "faire" as TabKey },
+            { label: "Distributors", key: "distributor" as TabKey },
+          ]).map((row) => {
+            const rev = stats[row.key].revenue;
+            const ord = stats[row.key].orders;
+            const channelMargin = estimateMargin(row.key, pnl?.grossMargin || 0, channels);
+            return (
+              <div key={row.key} style={{ borderTop: `1px solid ${BORDER}`, padding: "9px 0", display: "grid", gap: 4 }}>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <div style={{ fontWeight: 700, color: NAVY }}>{row.label}</div>
+                  <div style={{ color: NAVY, fontWeight: 700 }}>{fmtDollar(rev)}</div>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: TEXT_DIM }}>
+                  <span>{ord.toLocaleString("en-US")} orders</span>
+                  <span>Est margin {fmtPercent(channelMargin)}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div
+        style={{
+          background: CARD,
+          border: `1px solid ${BORDER}`,
+          borderRadius: 12,
+          padding: "12px 14px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <div style={{ fontSize: 12, color: TEXT_DIM, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase" }}>
+          Plan Benchmark
+        </div>
+
+        {pva ? (
+          <>
+            <div style={{ fontSize: 13, color: NAVY }}>
+              Plan {fmtDollar(plan || 0)}
+            </div>
+            <div style={{ fontSize: 13, color: NAVY }}>
+              Actual {fmtDollar(selected.revenue)}
+            </div>
+            <div
+              style={{
+                fontSize: 13,
+                fontWeight: 800,
+                color: STATUS_COLORS[pva.status],
+                background: `${STATUS_COLORS[pva.status]}14`,
+                borderRadius: 6,
+                padding: "4px 8px",
+              }}
+            >
+              {pva.variance >= 0 ? "+" : ""}
+              {fmtDollar(pva.variance)} ({(pva.variancePct * 100).toFixed(1)}%)
+            </div>
+          </>
+        ) : (
+          <div style={{ fontSize: 13, color: TEXT_DIM }}>
+            No dedicated plan line for this tab yet (DTC currently rolls into wholesale planning).
+          </div>
+        )}
       </div>
     </div>
   );
