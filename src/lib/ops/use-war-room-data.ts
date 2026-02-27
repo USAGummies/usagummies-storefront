@@ -249,7 +249,13 @@ export type InventoryData = {
 
 export type SupplyChainData = {
   suppliers: Array<{ name: string; status: "active" | "pending" | "inactive" }>;
-  productionOrders: Array<{ id: string; status: string; expectedDate: string }>;
+  productionOrders: Array<{
+    id: string;
+    product: string;
+    supplier: string;
+    status: string;
+    expectedDate: string;
+  }>;
   costTrends: Array<{ sku: string; currentCost: number; previousCost: number; changePct: number }>;
   alerts: Array<{
     type: "reorder" | "payment-due" | "delivery-expected" | "low-stock";
