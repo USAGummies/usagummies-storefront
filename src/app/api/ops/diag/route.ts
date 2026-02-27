@@ -61,12 +61,17 @@ export async function GET() {
   };
   if (isAmazonConfigured()) {
     try {
+      // Try with no date filter first (returns all recent groups)
+      const groupsNoFilter = await fetchFinancialEventGroups();
+      // Then try with 90-day filter
       const ninetyDaysAgo = new Date();
       ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-      const groups = await fetchFinancialEventGroups(ninetyDaysAgo.toISOString());
+      const groupsFiltered = await fetchFinancialEventGroups(ninetyDaysAgo.toISOString());
       (results.amazonFinance as Record<string, unknown>).data = {
-        groupCount: groups.length,
-        firstGroup: groups[0] || null,
+        noFilterCount: groupsNoFilter.length,
+        filteredCount: groupsFiltered.length,
+        firstGroupNoFilter: groupsNoFilter[0] || null,
+        firstGroupFiltered: groupsFiltered[0] || null,
       };
     } catch (err) {
       (results.amazonFinance as Record<string, unknown>).error = String(err);

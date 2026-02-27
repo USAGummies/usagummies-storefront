@@ -128,27 +128,31 @@ type PipelineLead = {
 
 function parseLead(page: NotionPage, type: "b2b" | "distributor"): PipelineLead {
   const props = page.properties;
+  // Use the best deal value: Order Value > Quote Amount > Deal Value > Estimated Value
+  const dealValue = extractNumber(
+    props["Order Value"] ||
+      props["Quote Amount"] ||
+      props["Deal Value"] ||
+      props["Estimated Value"] ||
+      props["Est. Value"] ||
+      props.Value,
+  );
   return {
     id: page.id,
-    name: extractText(props.Name || props.Company || props["Company Name"]),
+    name: extractText(props["Business Name"] || props.Name || props.Company || props["Company Name"]),
     status: extractText(
-      props.Status || props.Stage || props["Pipeline Stage"],
+      props.Status || props["Outreach Status"] || props.Stage || props["Pipeline Stage"],
     ),
-    email: extractText(props.Email || props["Contact Email"]),
+    email: extractText(props["Email Address"] || props.Email || props["Contact Email"]),
     lastContact:
-      extractText(props["Last Contact"] || props["Last Contacted"]) ||
+      extractText(props["Date Follow-Up Sent"] || props["Last Contact"] || props["Last Contacted"]) ||
       page.last_edited_time.slice(0, 10),
     source: extractText(props.Source || props["Lead Source"]),
     type,
-    dealValue: extractNumber(
-      props["Deal Value"] ||
-        props["Estimated Value"] ||
-        props["Est. Value"] ||
-        props.Value,
-    ),
+    dealValue,
     createdAt: page.created_time,
     lastEdited: page.last_edited_time,
-    notes: extractText(props.Notes || props["Follow-up Notes"]),
+    notes: extractText(props.Notes || props["Reply Summary"] || props["Follow-up Notes"]),
   };
 }
 
@@ -157,15 +161,20 @@ function parseLead(page: NotionPage, type: "b2b" | "distributor"): PipelineLead 
 // ---------------------------------------------------------------------------
 
 const STAGE_ORDER = [
+  "New - Uncontacted",
   "New Lead",
   "Lead",
   "Contacted",
+  "Follow-Up Sent",
   "Interested",
+  "Quote Sent",
   "Negotiation",
   "Proposal Sent",
+  "Order Placed",
   "Closed Won",
   "Closed Lost",
   "Not Interested",
+  "Unresponsive",
   "Unknown",
 ];
 

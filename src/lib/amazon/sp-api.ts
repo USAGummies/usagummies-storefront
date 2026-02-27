@@ -407,7 +407,14 @@ export async function fetchFinancialEventGroups(
       return [];
     }
 
-    return res.payload?.FinancialEventGroupList || [];
+    const groups = res.payload?.FinancialEventGroupList || [];
+    console.log("[amazon] Finances API result:", {
+      groupCount: groups.length,
+      hasPayload: !!res.payload,
+      params,
+      firstGroupId: groups[0]?.FinancialEventGroupId || null,
+    });
+    return groups;
   } catch (err) {
     console.error("[amazon] Financial event groups fetch failed:", err);
     return [];
