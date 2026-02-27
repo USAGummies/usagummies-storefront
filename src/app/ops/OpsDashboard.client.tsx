@@ -3,7 +3,17 @@
 import { useMemo } from "react";
 import type { LucideProps } from "lucide-react";
 import {
+  useDashboardData,
+  useBalancesData,
+  comparePlanVsActual,
+  fmtDollar as liveFmtDollar,
+  fmtVariance,
+  STATUS_COLORS,
+  type PlanVsActual,
+} from "@/lib/ops/use-war-room-data";
+import {
   Area,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -26,6 +36,9 @@ import {
   Flag,
   CheckCircle,
   Target,
+  RefreshCw,
+  AlertTriangle,
+  Activity,
 } from "lucide-react";
 
 import {
@@ -43,6 +56,8 @@ import {
   TOTAL_CAPITAL_DEPLOYED,
   MILESTONES,
   UNIT_ECONOMICS,
+  getCurrentProFormaMonth,
+  cumulativeThrough,
   type Month,
 } from "@/lib/ops/pro-forma";
 
@@ -77,6 +92,8 @@ const COLORS = {
   lightRed: "rgba(199, 54, 44, 0.08)",
   lightGold: "rgba(199, 160, 98, 0.08)",
   lightNavy: "rgba(27, 42, 74, 0.06)",
+  liveGreen: "#16a34a",
+  lightGreen: "rgba(22, 163, 74, 0.08)",
 };
 
 // ---------------------------------------------------------------------------
@@ -100,6 +117,19 @@ const sectionTitleStyle: React.CSSProperties = {
   letterSpacing: "-0.01em",
 };
 
+const liveBadge: React.CSSProperties = {
+  display: "inline-block",
+  fontSize: 9,
+  fontWeight: 700,
+  letterSpacing: "0.1em",
+  color: COLORS.liveGreen,
+  background: COLORS.lightGreen,
+  border: `1px solid ${COLORS.liveGreen}`,
+  borderRadius: 3,
+  padding: "2px 6px",
+  textTransform: "uppercase" as const,
+};
+
 const planBadge: React.CSSProperties = {
   display: "inline-block",
   fontSize: 9,
@@ -114,6 +144,62 @@ const planBadge: React.CSSProperties = {
 };
 
 // ---------------------------------------------------------------------------
+// Helper Components — Live Data Indicators
+// ---------------------------------------------------------------------------
+
+function PulseDot({ color = COLORS.liveGreen }: { color?: string }) {
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        width: 8,
+        height: 8,
+        borderRadius: "50%",
+        background: color,
+        animation: "pulse 1.5s infinite",
+      }}
+    />
+  );
+}
+
+function LoadingSkeleton({ width = "100%", height = 20 }: { width?: string | number; height?: number }) {
+  return (
+    <div
+      style={{
+        width,
+        height,
+        borderRadius: 4,
+        background: COLORS.lightNavy,
+        animation: "pulse 1.5s infinite",
+      }}
+    />
+  );
+}
+
+function VarianceBadge({ pva }: { pva: PlanVsActual }) {
+  if (pva.status === "no-data") return null;
+  const color = STATUS_COLORS[pva.status];
+  const sign = pva.variance >= 0 ? "+" : "";
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        fontSize: 10,
+        fontWeight: 700,
+        color,
+        background: color + "14",
+        border: `1px solid ${color}40`,
+        borderRadius: 3,
+        padding: "1px 6px",
+        letterSpacing: "0.02em",
+      }}
+    >
+      {sign}{(pva.variancePct * 100).toFixed(1)}%
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // KPI Card Component
 // ---------------------------------------------------------------------------
 
@@ -125,12 +211,20 @@ function KpiCard({
   value,
   subtitle,
   accentColor,
+  liveValue,
+  liveLabel,
+  pva,
+  liveLoading,
 }: {
   icon: LucideIcon;
   label: string;
   value: string;
   subtitle?: string;
   accentColor?: string;
+  liveValue?: string;
+  liveLabel?: string;
+  pva?: PlanVsActual;
+  liveLoading?: boolean;
 }) {
   return (
     <div style={cardStyle}>
@@ -160,22 +254,61 @@ function KpiCard({
               {label}
             </span>
           </div>
-          <div
-            style={{
-              fontSize: 28,
-              fontWeight: 700,
-              color: COLORS.navy,
-              letterSpacing: "-0.02em",
-              lineHeight: 1.1,
-            }}
-          >
-            {value}
+          {/* Plan value */}
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+            <div
+              style={{
+                fontSize: liveValue ? 22 : 28,
+                fontWeight: 700,
+                color: liveValue ? COLORS.subtleText : COLORS.navy,
+                letterSpacing: "-0.02em",
+                lineHeight: 1.1,
+              }}
+            >
+              {value}
+            </div>
+            {liveValue && (
+              <span style={{ fontSize: 10, color: COLORS.subtleText, fontWeight: 600, textTransform: "uppercase" }}>
+                Plan
+              </span>
+            )}
           </div>
+          {/* Live actual value */}
+          {liveLoading && (
+            <div style={{ marginTop: 6 }}>
+              <LoadingSkeleton width={100} height={16} />
+            </div>
+          )}
+          {liveValue && !liveLoading && (
+            <div style={{ marginTop: 4 }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                <span
+                  style={{
+                    fontSize: 28,
+                    fontWeight: 700,
+                    color: pva ? STATUS_COLORS[pva.status] : COLORS.navy,
+                    letterSpacing: "-0.02em",
+                    lineHeight: 1.1,
+                  }}
+                >
+                  {liveValue}
+                </span>
+                <span style={{ fontSize: 10, fontWeight: 700, color: COLORS.liveGreen, textTransform: "uppercase" }}>
+                  {liveLabel || "Actual"}
+                </span>
+                {pva && <VarianceBadge pva={pva} />}
+              </div>
+            </div>
+          )}
           {subtitle && (
             <div style={{ fontSize: 12, color: COLORS.subtleText, marginTop: 6 }}>{subtitle}</div>
           )}
         </div>
-        <span style={planBadge}>Plan</span>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
+          <span style={planBadge}>Plan</span>
+          {liveValue && !liveLoading && <span style={liveBadge}>Live</span>}
+          {liveLoading && <PulseDot color={COLORS.gold} />}
+        </div>
       </div>
     </div>
   );
@@ -299,19 +432,45 @@ function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: 
 // ---------------------------------------------------------------------------
 
 export function OpsDashboard() {
-  // ------ Build chart data ------
+  // ------ Live data hooks ------
+  const { data: liveData, loading: liveLoading, error: liveError, refresh } = useDashboardData();
+  const { data: balances, loading: balLoading } = useBalancesData();
+
+  // ------ MTD Plan vs Actual computation ------
+  const currentMonth = getCurrentProFormaMonth();
+  const mtdPlanRevenue = currentMonth ? cumulativeThrough(TOTAL_REVENUE, currentMonth) : 0;
+  const revenuePva = comparePlanVsActual(mtdPlanRevenue, liveData?.combined.totalRevenue);
+
+  // ------ Build chart data (plan + actual overlay) ------
   const revenueChartData = useMemo(() => {
+    // Aggregate live daily data into monthly buckets keyed by MONTH_LABELS
+    const actualByMonth: Record<string, number> = {};
+    if (liveData?.chartData) {
+      for (const d of liveData.chartData) {
+        const dateObj = new Date(d.date);
+        const monthIdx = dateObj.getMonth(); // 0=Jan
+        // Map month index to our MONTH_LABELS: Mar=2, Apr=3 ... Dec=11
+        const monthKey = MONTHS[monthIdx - 2]; // Mar is index 0 in MONTHS
+        if (monthKey) {
+          const lbl = MONTH_LABELS[monthKey];
+          actualByMonth[lbl] = (actualByMonth[lbl] || 0) + d.combined;
+        }
+      }
+    }
+
     let cumulative = 0;
     return MONTHS.map((m) => {
       cumulative += TOTAL_REVENUE[m];
+      const lbl = MONTH_LABELS[m];
       return {
-        month: MONTH_LABELS[m],
+        month: lbl,
         revenue: Math.round(TOTAL_REVENUE[m]),
         cumulative: Math.round(cumulative),
         ebitda: Math.round(EBITDA[m]),
+        actualRevenue: actualByMonth[lbl] ? Math.round(actualByMonth[lbl]) : undefined,
       };
     });
-  }, []);
+  }, [liveData]);
 
   // ------ Channel annual totals ------
   const channelTotals = useMemo(() => {
@@ -383,11 +542,29 @@ export function OpsDashboard() {
             </span>
             <span style={{ color: COLORS.lightBorder }}>|</span>
             <span style={{ fontSize: 13, color: COLORS.subtleText }}>
-              Full-Year 2026 Plan Targets
+              Full-Year 2026 Plan Targets + Live Actuals
             </span>
             <span style={planBadge}>Pro Forma v22</span>
+            {liveData && !liveLoading && (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "#16a34a", fontWeight: 600 }}>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#16a34a", display: "inline-block" }} />
+                LIVE
+              </span>
+            )}
+            {liveLoading && (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: COLORS.gold, fontWeight: 600 }}>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: COLORS.gold, display: "inline-block", animation: "pulse 1.5s infinite" }} />
+                Loading...
+              </span>
+            )}
           </div>
+          {liveError && (
+            <div style={{ marginLeft: 36, marginTop: 4, fontSize: 12, color: COLORS.red, display: "flex", alignItems: "center", gap: 6 }}>
+              ⚠ Live data unavailable — showing plan only
+            </div>
+          )}
         </div>
+        <style>{`@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }`}</style>
 
         {/* ================================================================
             KPI CARDS — 6 cards, 3 columns x 2 rows
@@ -406,6 +583,10 @@ export function OpsDashboard() {
             value={fmtDollar(ANNUAL_SUMMARY.totalRevenue)}
             subtitle="10 months (Mar-Dec)"
             accentColor={COLORS.red}
+            liveValue={liveData ? liveFmtDollar(liveData.combined.totalRevenue) : undefined}
+            liveLabel="MTD Actual"
+            pva={liveData ? revenuePva : undefined}
+            liveLoading={liveLoading}
           />
           <KpiCard
             icon={Package}
@@ -413,6 +594,9 @@ export function OpsDashboard() {
             value={fmt(ANNUAL_SUMMARY.totalUnits)}
             subtitle="All channels combined"
             accentColor={COLORS.navy}
+            liveValue={liveData ? fmt(liveData.combined.totalOrders) : undefined}
+            liveLabel="MTD Orders"
+            liveLoading={liveLoading}
           />
           <KpiCard
             icon={TrendingUp}
@@ -434,6 +618,9 @@ export function OpsDashboard() {
             value={fmtPercent(ANNUAL_SUMMARY.blendedGrossMargin)}
             subtitle={`${fmtDollar(ANNUAL_SUMMARY.totalGrossProfit)} gross profit`}
             accentColor={COLORS.red}
+            liveValue={liveData ? fmtDollarExact(liveData.combined.avgOrderValue) : undefined}
+            liveLabel="Avg Order Value"
+            liveLoading={liveLoading}
           />
           <KpiCard
             icon={Wallet}
@@ -441,7 +628,67 @@ export function OpsDashboard() {
             value={fmtDollar(ANNUAL_SUMMARY.closingCashDec31)}
             subtitle="Closing cash after all obligations"
             accentColor={COLORS.greenAccent}
+            liveValue={balances ? liveFmtDollar(balances.totalCash) : undefined}
+            liveLabel="Current Cash"
+            pva={balances ? comparePlanVsActual(ANNUAL_SUMMARY.closingCashDec31, balances.totalCash) : undefined}
+            liveLoading={balLoading}
           />
+        </div>
+
+        {/* ================================================================
+            LIVE PERFORMANCE — Real-time actuals from Shopify + Amazon
+        ================================================================ */}
+        <div style={{ ...cardStyle, marginBottom: 32, padding: "20px 24px", borderLeft: `4px solid ${liveData ? "#16a34a" : COLORS.gold}` }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+            <h2 style={{ ...sectionTitleStyle, fontSize: 16 }}>
+              Live Performance — MTD Actuals
+            </h2>
+            <button
+              onClick={refresh}
+              style={{ border: `1px solid ${COLORS.lightBorder}`, borderRadius: 6, padding: "4px 12px", fontSize: 12, fontWeight: 600, color: COLORS.navy, background: COLORS.white, cursor: "pointer" }}
+            >
+              ↻ Refresh
+            </button>
+          </div>
+          {liveLoading && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+              {[1,2,3,4].map(i => (
+                <div key={i} style={{ height: 60, borderRadius: 8, background: COLORS.lightNavy, animation: "pulse 1.5s infinite" }} />
+              ))}
+            </div>
+          )}
+          {liveData && !liveLoading && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+              <div style={{ background: COLORS.lightNavy, borderRadius: 8, padding: 16 }}>
+                <div style={{ fontSize: 11, color: COLORS.subtleText, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Combined Revenue</div>
+                <div style={{ fontSize: 24, fontWeight: 700, color: COLORS.navy, marginTop: 4 }}>{fmtDollar(liveData.combined.totalRevenue)}</div>
+              </div>
+              <div style={{ background: COLORS.lightNavy, borderRadius: 8, padding: 16 }}>
+                <div style={{ fontSize: 11, color: COLORS.subtleText, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Combined Orders</div>
+                <div style={{ fontSize: 24, fontWeight: 700, color: COLORS.navy, marginTop: 4 }}>{fmt(liveData.combined.totalOrders)}</div>
+              </div>
+              <div style={{ background: COLORS.lightNavy, borderRadius: 8, padding: 16 }}>
+                <div style={{ fontSize: 11, color: COLORS.subtleText, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Avg Order Value</div>
+                <div style={{ fontSize: 24, fontWeight: 700, color: COLORS.navy, marginTop: 4 }}>{fmtDollarExact(liveData.combined.avgOrderValue)}</div>
+              </div>
+              <div style={{ background: balances ? "rgba(46, 125, 50, 0.06)" : COLORS.lightNavy, borderRadius: 8, padding: 16 }}>
+                <div style={{ fontSize: 11, color: COLORS.subtleText, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Cash Position</div>
+                <div style={{ fontSize: 24, fontWeight: 700, color: COLORS.greenAccent, marginTop: 4 }}>
+                  {balLoading ? "..." : balances ? fmtDollar(balances.totalCash) : "N/A"}
+                </div>
+              </div>
+            </div>
+          )}
+          {liveData && (
+            <div style={{ marginTop: 12, fontSize: 11, color: COLORS.subtleText, textAlign: "right" }}>
+              Last updated: {new Date(liveData.generatedAt).toLocaleString()}
+            </div>
+          )}
+          {!liveData && !liveLoading && liveError && (
+            <div style={{ textAlign: "center", padding: 20, color: COLORS.subtleText, fontSize: 13 }}>
+              Live data unavailable — check API connection
+            </div>
+          )}
         </div>
 
         {/* ================================================================

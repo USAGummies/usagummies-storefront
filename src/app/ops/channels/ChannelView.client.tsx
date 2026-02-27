@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import {
   MONTHS,
   MONTH_LABELS,
@@ -9,9 +11,22 @@ import {
   TOTAL_REVENUE,
   UNIT_ECONOMICS,
   DISTRIBUTOR_NETWORK,
+  getCurrentProFormaMonth,
+  cumulativeThrough,
   type Month,
   type ChannelMetrics,
 } from "@/lib/ops/pro-forma";
+
+import {
+  useDashboardData,
+  comparePlanVsActual,
+  fmtDollar,
+  fmtPercent,
+  fmtVariance,
+  STATUS_COLORS,
+  type PlanVsActual,
+  type UnifiedDashboard,
+} from "@/lib/ops/use-war-room-data";
 
 import {
   BarChart,
@@ -25,6 +40,10 @@ import {
   Legend,
   ResponsiveContainer,
   Cell,
+  PieChart,
+  Pie,
+  ComposedChart,
+  Line,
 } from "recharts";
 
 import {
@@ -38,6 +57,10 @@ import {
   Package,
   ArrowUpRight,
   ArrowDownRight,
+  RefreshCw,
+  AlertTriangle,
+  Activity,
+  Loader2,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -51,6 +74,10 @@ const CARD_BG = "#ffffff";
 const BORDER = "rgba(27,42,74,0.08)";
 const TEXT_DIM = "rgba(27,42,74,0.5)";
 const TEXT_MED = "rgba(27,42,74,0.72)";
+
+const AMAZON_COLOR = "#FF9900";
+const SHOPIFY_COLOR = "#96bf48";
+const WHOLESALE_COLOR = "#c7a062";
 
 const CHANNEL_COLORS = {
   amazon: GOLD,
@@ -80,8 +107,13 @@ function pct(n: number): string {
   return (n * 100).toFixed(1) + "%";
 }
 
+/** Sum a numeric field from chartData array */
+function sumChartField(chartData: UnifiedDashboard["chartData"], field: "amazon" | "shopify" | "combined" | "amazonOrders" | "shopifyOrders" | "combinedOrders"): number {
+  return chartData.reduce((s, d) => s + (d[field] || 0), 0);
+}
+
 // ---------------------------------------------------------------------------
-// Data prep
+// Data prep (plan / pro-forma)
 // ---------------------------------------------------------------------------
 const totalRevAll = MONTHS.reduce((s, m) => s + TOTAL_REVENUE[m], 0);
 
@@ -91,6 +123,7 @@ const channels = [
     label: "Amazon",
     icon: ShoppingCart,
     color: GOLD,
+    liveColor: AMAZON_COLOR,
     data: AMAZON,
     gpPerUnit: UNIT_ECONOMICS.amazon.gpPerUnit,
     pricing: {
@@ -107,6 +140,7 @@ const channels = [
     label: "Wholesale / Faire",
     icon: Store,
     color: NAVY,
+    liveColor: WHOLESALE_COLOR,
     data: WHOLESALE,
     gpPerUnit: UNIT_ECONOMICS.wholesale.gpPerUnit,
     pricing: {
@@ -123,6 +157,7 @@ const channels = [
     label: "Distributor Network",
     icon: Truck,
     color: RED,
+    liveColor: RED,
     data: DISTRIBUTOR,
     gpPerUnit: UNIT_ECONOMICS.distributor.gpPerUnit,
     pricing: {
@@ -136,7 +171,7 @@ const channels = [
   },
 ];
 
-// Monthly chart data
+// Monthly chart data (plan)
 const monthlyChartData = MONTHS.map((m) => ({
   month: MONTH_LABELS[m],
   Amazon: AMAZON.revenue[m],
@@ -250,12 +285,83 @@ function SectionHeading({ icon: Icon, title, subtitle }: { icon: React.ElementTy
   );
 }
 
-function ChannelScorecard({ ch }: { ch: (typeof channels)[0] }) {
+/** Variance badge shows plan vs actual status */
+function VarianceBadge({ pva }: { pva: PlanVsActual }) {
+  if (pva.status === "no-data") return null;
+  const color = STATUS_COLORS[pva.status];
+  const isPositive = pva.variance >= 0;
+  return (
+    <div style={{
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 4,
+      fontSize: 11,
+      fontWeight: 700,
+      color,
+      background: color + "14",
+      padding: "3px 8px",
+      borderRadius: 4,
+    }}>
+      {isPositive ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
+      {fmtVariance(pva)}
+    </div>
+  );
+}
+
+/** Live indicator dot */
+function LiveDot({ size = 8 }: { size?: number }) {
+  return (
+    <span style={{
+      display: "inline-block",
+      width: size,
+      height: size,
+      borderRadius: "50%",
+      background: "#16a34a",
+      boxShadow: "0 0 6px rgba(22,163,74,0.5)",
+      animation: "pulse 2s infinite",
+    }} />
+  );
+}
+
+function ChannelScorecard({
+  ch,
+  liveData,
+  liveLoading,
+}: {
+  ch: (typeof channels)[0];
+  liveData: UnifiedDashboard | null;
+  liveLoading: boolean;
+}) {
   const Icon = ch.icon;
   const annualUnits = sumChannel(ch.data, "units");
   const annualRevenue = sumChannel(ch.data, "revenue");
   const annualGP = sumChannel(ch.data, "grossProfit");
   const channelShare = annualRevenue / totalRevAll;
+
+  // Compute plan target for current month (cumulative through current month)
+  const currentMonth = getCurrentProFormaMonth();
+
+  // Pull live actuals
+  let actualRevenue: number | null = null;
+  let actualOrders: number | null = null;
+  let revenuePva: PlanVsActual | null = null;
+
+  if (liveData?.chartData && liveData.chartData.length > 0) {
+    if (ch.key === "amazon") {
+      actualRevenue = sumChartField(liveData.chartData, "amazon");
+      actualOrders = sumChartField(liveData.chartData, "amazonOrders");
+    } else if (ch.key === "wholesale") {
+      // Shopify/DTC = wholesale/faire channel in our model
+      actualRevenue = sumChartField(liveData.chartData, "shopify");
+      actualOrders = sumChartField(liveData.chartData, "shopifyOrders");
+    }
+    // Distributor has no live API data yet
+
+    if (actualRevenue != null && currentMonth) {
+      const planRevCumulative = cumulativeThrough(ch.data.revenue, currentMonth);
+      revenuePva = comparePlanVsActual(planRevCumulative, actualRevenue);
+    }
+  }
 
   return (
     <div
@@ -270,7 +376,7 @@ function ChannelScorecard({ ch }: { ch: (typeof channels)[0] }) {
       }}
     >
       {/* Color bar */}
-      <div style={{ height: 4, background: ch.color }} />
+      <div style={{ height: 4, background: ch.liveColor }} />
 
       <div style={{ padding: "20px 24px" }}>
         {/* Header */}
@@ -280,23 +386,26 @@ function ChannelScorecard({ ch }: { ch: (typeof channels)[0] }) {
               width: 36,
               height: 36,
               borderRadius: 8,
-              background: ch.color + "14",
+              background: ch.liveColor + "14",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
             }}
           >
-            <Icon size={18} color={ch.color} strokeWidth={2} />
+            <Icon size={18} color={ch.liveColor} strokeWidth={2} />
           </div>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 16, color: NAVY }}>{ch.label}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontWeight: 700, fontSize: 16, color: NAVY }}>{ch.label}</span>
+              {actualRevenue != null && <LiveDot size={6} />}
+            </div>
             {ch.note && <div style={{ fontSize: 11, color: TEXT_DIM, marginTop: 1 }}>{ch.note}</div>}
           </div>
           <div
             style={{
               marginLeft: "auto",
-              background: ch.color + "18",
-              color: ch.color,
+              background: ch.liveColor + "18",
+              color: ch.liveColor,
               fontWeight: 700,
               fontSize: 13,
               padding: "4px 10px",
@@ -307,7 +416,52 @@ function ChannelScorecard({ ch }: { ch: (typeof channels)[0] }) {
           </div>
         </div>
 
-        {/* Metrics grid */}
+        {/* Live Actuals Section (when available) */}
+        {liveLoading && ch.key !== "distributor" && (
+          <div style={{
+            display: "flex", alignItems: "center", gap: 8, padding: "10px 14px",
+            background: "#f4f2ed", borderRadius: 8, marginBottom: 12,
+            fontSize: 12, color: TEXT_DIM,
+          }}>
+            <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} />
+            Loading live data...
+          </div>
+        )}
+
+        {actualRevenue != null && (
+          <div style={{
+            background: "#f0fdf4",
+            border: "1px solid #bbf7d0",
+            borderRadius: 8,
+            padding: "12px 14px",
+            marginBottom: 12,
+          }}>
+            <div style={{ fontSize: 10, color: "#166534", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700, marginBottom: 8 }}>
+              LIVE ACTUALS (30-Day Window)
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <div>
+                <div style={{ fontSize: 10, color: "#166534", opacity: 0.7 }}>Revenue</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: "#166534" }}>{fmtDollar(actualRevenue)}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, color: "#166534", opacity: 0.7 }}>Orders</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: "#166534" }}>{actualOrders?.toLocaleString() ?? "--"}</div>
+              </div>
+            </div>
+            {revenuePva && revenuePva.status !== "no-data" && (
+              <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 10, color: TEXT_DIM }}>vs Plan:</span>
+                <VarianceBadge pva={revenuePva} />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Plan Metrics grid */}
+        <div style={{ marginBottom: 4, fontSize: 10, color: TEXT_DIM, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>
+          2026 PRO FORMA PLAN
+        </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
           <MetricBox label="Annual Units" value={annualUnits.toLocaleString()} />
           <MetricBox label="Annual Revenue" value={fmt(annualRevenue)} />
@@ -353,124 +507,516 @@ function PricePill({ label, value }: { label: string; value: string }) {
   );
 }
 
+/** Amazon Deep Dive card using live amazon data */
+function AmazonDeepDive({ amazon }: { amazon: NonNullable<UnifiedDashboard["amazon"]> }) {
+  const inv = amazon.inventory;
+  const fees = amazon.fees;
+  const vel = amazon.velocity;
+  const comp = amazon.comparison;
+
+  return (
+    <div style={{
+      background: CARD_BG,
+      borderRadius: 12,
+      border: `1px solid ${BORDER}`,
+      overflow: "hidden",
+      boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+      marginBottom: 32,
+    }}>
+      <div style={{ height: 4, background: AMAZON_COLOR }} />
+      <div style={{ padding: "24px 24px 20px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+          <ShoppingCart size={20} color={AMAZON_COLOR} strokeWidth={1.8} />
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: NAVY }}>Amazon Deep Dive</h2>
+          <LiveDot />
+          <span style={{ marginLeft: "auto", fontSize: 11, color: TEXT_DIM }}>Updated: {new Date(amazon.lastUpdated).toLocaleString()}</span>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 20 }}>
+          {/* Inventory Status */}
+          <div style={{ background: "#f9f7f3", borderRadius: 10, padding: "16px 18px", border: `1px solid ${BORDER}` }}>
+            <div style={{ fontSize: 11, color: TEXT_DIM, textTransform: "uppercase", letterSpacing: "0.04em", fontWeight: 700, marginBottom: 12 }}>
+              FBA Inventory
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <div>
+                <div style={{ fontSize: 10, color: TEXT_DIM }}>Fulfillable</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: inv.fulfillable > 50 ? "#166534" : RED }}>{inv.fulfillable.toLocaleString()}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, color: TEXT_DIM }}>Inbound</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: NAVY }}>{(inv.inboundWorking + inv.inboundShipped).toLocaleString()}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, color: TEXT_DIM }}>Reserved</div>
+                <div style={{ fontSize: 16, fontWeight: 600, color: TEXT_MED }}>{inv.reserved.toLocaleString()}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, color: TEXT_DIM }}>Days of Supply</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: inv.daysOfSupply < 14 ? RED : inv.daysOfSupply < 30 ? GOLD : "#166534" }}>
+                  {inv.daysOfSupply}d
+                </div>
+              </div>
+            </div>
+            {inv.restockAlert && (
+              <div style={{
+                marginTop: 10, display: "flex", alignItems: "center", gap: 6,
+                background: RED + "12", color: RED, padding: "6px 10px",
+                borderRadius: 6, fontSize: 11, fontWeight: 700,
+              }}>
+                <AlertTriangle size={13} /> RESTOCK ALERT
+              </div>
+            )}
+          </div>
+
+          {/* Fees & Margin */}
+          <div style={{ background: "#f9f7f3", borderRadius: 10, padding: "16px 18px", border: `1px solid ${BORDER}` }}>
+            <div style={{ fontSize: 11, color: TEXT_DIM, textTransform: "uppercase", letterSpacing: "0.04em", fontWeight: 700, marginBottom: 12 }}>
+              Fees & Margin
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <div>
+                <div style={{ fontSize: 10, color: TEXT_DIM }}>Referral Fee</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: NAVY }}>{fmtDollar(fees.referralFee)}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, color: TEXT_DIM }}>FBA Fee</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: NAVY }}>{fmtDollar(fees.fbaFee)}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, color: TEXT_DIM }}>Total Fees</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: RED }}>{fmtDollar(fees.totalFee)}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, color: TEXT_DIM }}>Est. Net Margin</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: fees.estimatedNetMargin > 0 ? "#166534" : RED }}>
+                  {fmtPercent(fees.estimatedNetMargin)}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Velocity & Comparison */}
+          <div style={{ background: "#f9f7f3", borderRadius: 10, padding: "16px 18px", border: `1px solid ${BORDER}` }}>
+            <div style={{ fontSize: 11, color: TEXT_DIM, textTransform: "uppercase", letterSpacing: "0.04em", fontWeight: 700, marginBottom: 12 }}>
+              Velocity & Trends
+            </div>
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 10, color: TEXT_DIM }}>Units/Day (7d avg)</div>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                <span style={{ fontSize: 22, fontWeight: 800, color: NAVY }}>{vel.unitsPerDay7d.toFixed(1)}</span>
+                <span style={{
+                  fontSize: 11, fontWeight: 700,
+                  color: vel.trend === "up" ? "#166534" : vel.trend === "down" ? RED : TEXT_DIM,
+                }}>
+                  {vel.trend === "up" ? "Trending Up" : vel.trend === "down" ? "Trending Down" : "Flat"}
+                </span>
+              </div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, fontSize: 11 }}>
+              <div>
+                <div style={{ color: TEXT_DIM, fontSize: 10 }}>Today vs Yesterday</div>
+                <div style={{ fontWeight: 700, color: comp.todayVsYesterday.revenuePct >= 0 ? "#166534" : RED }}>
+                  {comp.todayVsYesterday.revenuePct >= 0 ? "+" : ""}{(comp.todayVsYesterday.revenuePct * 100).toFixed(0)}% rev
+                </div>
+              </div>
+              <div>
+                <div style={{ color: TEXT_DIM, fontSize: 10 }}>Week over Week</div>
+                <div style={{ fontWeight: 700, color: comp.weekOverWeek.revenuePct >= 0 ? "#166534" : RED }}>
+                  {comp.weekOverWeek.revenuePct >= 0 ? "+" : ""}{(comp.weekOverWeek.revenuePct * 100).toFixed(0)}% rev
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Channel Mix Pie Chart using live data */
+function ChannelMixPie({ liveData }: { liveData: UnifiedDashboard }) {
+  const amazonRev = sumChartField(liveData.chartData, "amazon");
+  const shopifyRev = sumChartField(liveData.chartData, "shopify");
+  const total = amazonRev + shopifyRev;
+
+  if (total === 0) return null;
+
+  const pieData = [
+    { name: "Amazon", value: amazonRev, color: AMAZON_COLOR },
+    { name: "Shopify / DTC", value: shopifyRev, color: SHOPIFY_COLOR },
+  ];
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const renderLabel = ({ name, percent }: any) => `${name} ${(percent * 100).toFixed(0)}%`;
+
+  return (
+    <div style={{
+      background: CARD_BG,
+      borderRadius: 12,
+      border: `1px solid ${BORDER}`,
+      padding: "24px 24px 16px",
+      marginBottom: 32,
+      boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+        <BarChart3 size={20} color={NAVY} strokeWidth={1.8} />
+        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: NAVY }}>Live Channel Mix</h2>
+        <LiveDot />
+        <span style={{ fontSize: 12, color: TEXT_DIM, marginLeft: 6 }}>Based on 30-day actuals</span>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 32, flexWrap: "wrap" }}>
+        {/* Pie */}
+        <div style={{ width: 260, height: 260 }}>
+          <ResponsiveContainer>
+            <PieChart>
+              <Pie
+                data={pieData}
+                dataKey="value"
+                cx="50%"
+                cy="50%"
+                outerRadius={100}
+                innerRadius={50}
+                label={renderLabel}
+                labelLine={{ stroke: TEXT_DIM, strokeWidth: 1 }}
+              >
+                {pieData.map((entry, idx) => (
+                  <Cell key={idx} fill={entry.color} stroke={CARD_BG} strokeWidth={2} />
+                ))}
+              </Pie>
+              <Tooltip
+                formatter={(value) => [fmtDollar(Number(value) || 0), "Revenue"]}
+                contentStyle={{ background: CARD_BG, border: `1px solid ${BORDER}`, borderRadius: 8, fontSize: 13 }}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Legend details */}
+        <div style={{ flex: 1, minWidth: 200 }}>
+          {pieData.map((item) => {
+            const share = total > 0 ? item.value / total : 0;
+            return (
+              <div key={item.name} style={{
+                display: "flex", alignItems: "center", gap: 12,
+                padding: "12px 16px", marginBottom: 8,
+                background: "#f9f7f3", borderRadius: 8, border: `1px solid ${BORDER}`,
+              }}>
+                <div style={{ width: 6, height: 32, borderRadius: 3, background: item.color, flexShrink: 0 }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: NAVY }}>{item.name}</div>
+                  <div style={{ fontSize: 11, color: TEXT_DIM }}>{pct(share)} of total</div>
+                </div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: NAVY }}>{fmtDollar(item.value)}</div>
+              </div>
+            );
+          })}
+          <div style={{
+            padding: "10px 16px",
+            background: NAVY + "08",
+            borderRadius: 8,
+            fontSize: 12,
+            color: NAVY,
+            fontWeight: 600,
+          }}>
+            Combined: {fmtDollar(total)} revenue across {sumChartField(liveData.chartData, "combinedOrders")} orders
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Daily actual revenue chart overlayed with plan pacing line */
+function DailyActualsChart({ liveData }: { liveData: UnifiedDashboard }) {
+  if (!liveData.chartData || liveData.chartData.length === 0) return null;
+
+  // Build chart data: each day shows actual amazon + shopify stacked, plus a combined line
+  const dailyData = liveData.chartData.map((d) => ({
+    date: d.label,
+    Amazon: d.amazon,
+    Shopify: d.shopify,
+    Combined: d.combined,
+  }));
+
+  return (
+    <div style={{
+      background: CARD_BG,
+      borderRadius: 12,
+      border: `1px solid ${BORDER}`,
+      padding: "24px 24px 16px",
+      marginBottom: 32,
+      boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+        <Activity size={20} color={NAVY} strokeWidth={1.8} />
+        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: NAVY }}>Daily Actual Revenue</h2>
+        <LiveDot />
+        <span style={{ fontSize: 12, color: TEXT_DIM, marginLeft: 6 }}>Last {liveData.chartData.length} days</span>
+      </div>
+
+      <div style={{ width: "100%", height: 340 }}>
+        <ResponsiveContainer>
+          <ComposedChart data={dailyData}>
+            <CartesianGrid strokeDasharray="3 3" stroke={BORDER} vertical={false} />
+            <XAxis
+              dataKey="date"
+              tick={{ fill: NAVY, fontSize: 10 }}
+              tickLine={false}
+              axisLine={{ stroke: BORDER }}
+              interval={Math.max(0, Math.floor(dailyData.length / 8) - 1)}
+            />
+            <YAxis
+              tick={{ fill: TEXT_DIM, fontSize: 11 }}
+              tickLine={false}
+              axisLine={false}
+              tickFormatter={(v: number) => (v >= 1000 ? `$${(v / 1000).toFixed(0)}K` : `$${v}`)}
+            />
+            <Tooltip
+              formatter={(value, name) => [fmtDollar(Number(value) || 0), String(name ?? "")]}
+              contentStyle={{ background: CARD_BG, border: `1px solid ${BORDER}`, borderRadius: 8, fontSize: 13 }}
+            />
+            <Legend verticalAlign="top" align="right" iconType="square" wrapperStyle={{ fontSize: 12, paddingBottom: 8 }} />
+            <Bar dataKey="Amazon" stackId="rev" fill={AMAZON_COLOR} radius={[0, 0, 0, 0]} />
+            <Bar dataKey="Shopify" stackId="rev" fill={SHOPIFY_COLOR} radius={[3, 3, 0, 0]} />
+            <Line type="monotone" dataKey="Combined" stroke={NAVY} strokeWidth={2} dot={false} strokeDasharray="4 3" />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Main Export
 // ---------------------------------------------------------------------------
 
 export function ChannelView() {
+  const { data: liveData, loading: liveLoading, error: liveError, refresh } = useDashboardData();
+  const [showPlanCharts, setShowPlanCharts] = useState(true);
+
   return (
     <div style={{ padding: "32px 28px 60px", maxWidth: 1200, margin: "0 auto" }}>
+      {/* CSS keyframes for animations */}
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.4; }
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+
       {/* HEADER */}
-      <div style={{ marginBottom: 32 }}>
-        <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: NAVY, letterSpacing: "-0.02em" }}>Channel Intelligence</h1>
-        <p style={{ margin: "6px 0 0", fontSize: 14, color: TEXT_MED }}>Multi-Channel Revenue &amp; Distribution Analysis</p>
+      <div style={{ marginBottom: 32, display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: NAVY, letterSpacing: "-0.02em" }}>Channel Intelligence</h1>
+            {liveData && !liveLoading && (
+              <span style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                background: "#f0fdf4",
+                border: "1px solid #bbf7d0",
+                color: "#166534",
+                fontSize: 11,
+                fontWeight: 700,
+                padding: "4px 10px",
+                borderRadius: 6,
+              }}>
+                <LiveDot size={7} />
+                LIVE
+              </span>
+            )}
+          </div>
+          <p style={{ margin: "6px 0 0", fontSize: 14, color: TEXT_MED }}>Multi-Channel Revenue &amp; Distribution Analysis</p>
+        </div>
+
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {/* Toggle plan charts */}
+          <button
+            onClick={() => setShowPlanCharts(!showPlanCharts)}
+            style={{
+              border: `1px solid ${BORDER}`,
+              background: showPlanCharts ? NAVY : CARD_BG,
+              color: showPlanCharts ? "#fff" : NAVY,
+              fontSize: 12,
+              fontWeight: 600,
+              padding: "6px 14px",
+              borderRadius: 6,
+              cursor: "pointer",
+            }}
+          >
+            {showPlanCharts ? "Hide" : "Show"} Plan Charts
+          </button>
+
+          {/* Refresh button */}
+          <button
+            onClick={refresh}
+            disabled={liveLoading}
+            style={{
+              border: `1px solid ${BORDER}`,
+              background: CARD_BG,
+              color: NAVY,
+              fontSize: 12,
+              fontWeight: 600,
+              padding: "6px 14px",
+              borderRadius: 6,
+              cursor: liveLoading ? "not-allowed" : "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              opacity: liveLoading ? 0.6 : 1,
+            }}
+          >
+            <RefreshCw size={13} style={liveLoading ? { animation: "spin 1s linear infinite" } : undefined} />
+            Refresh
+          </button>
+        </div>
       </div>
+
+      {/* ERROR BANNER */}
+      {liveError && (
+        <div style={{
+          background: RED + "10",
+          border: `1px solid ${RED}30`,
+          borderRadius: 10,
+          padding: "12px 18px",
+          marginBottom: 20,
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          fontSize: 13,
+          color: RED,
+        }}>
+          <AlertTriangle size={16} />
+          <span><strong>Live data unavailable:</strong> {liveError}. Showing plan data only.</span>
+        </div>
+      )}
+
+      {/* LIVE CHANNEL MIX PIE (only when live data is available) */}
+      {liveData && <ChannelMixPie liveData={liveData} />}
 
       {/* CHANNEL SCORECARDS */}
       <div style={{ display: "flex", gap: 20, marginBottom: 40, flexWrap: "wrap" }}>
         {channels.map((ch) => (
-          <ChannelScorecard key={ch.key} ch={ch} />
+          <ChannelScorecard key={ch.key} ch={ch} liveData={liveData} liveLoading={liveLoading} />
         ))}
       </div>
 
-      {/* MONTHLY REVENUE BY CHANNEL */}
-      <div
-        style={{
-          background: CARD_BG,
-          borderRadius: 12,
-          border: `1px solid ${BORDER}`,
-          padding: "24px 24px 16px",
-          marginBottom: 32,
-          boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
-        }}
-      >
-        <SectionHeading icon={DollarSign} title="Monthly Revenue by Channel" subtitle="Stacked monthly view across all three sales channels" />
-        <div style={{ width: "100%", height: 360 }}>
-          <ResponsiveContainer>
-            <BarChart data={monthlyChartData} barCategoryGap="18%">
-              <CartesianGrid strokeDasharray="3 3" stroke={BORDER} vertical={false} />
-              <XAxis dataKey="month" tick={{ fill: NAVY, fontSize: 12 }} tickLine={false} axisLine={{ stroke: BORDER }} />
-              <YAxis
-                tick={{ fill: TEXT_DIM, fontSize: 11 }}
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(v: number) => (v >= 1000 ? `$${(v / 1000).toFixed(0)}K` : `$${v}`)}
-              />
-              <Tooltip content={<RevenueTooltip />} />
-              <Legend
-                verticalAlign="top"
-                align="right"
-                iconType="square"
-                wrapperStyle={{ fontSize: 12, paddingBottom: 8 }}
-              />
-              <Bar dataKey="Amazon" stackId="rev" fill={GOLD} radius={[0, 0, 0, 0]} />
-              <Bar dataKey="Wholesale" stackId="rev" fill={NAVY} radius={[0, 0, 0, 0]} />
-              <Bar dataKey="Distributor" stackId="rev" fill={RED} radius={[3, 3, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
+      {/* DAILY ACTUALS CHART (live data) */}
+      {liveData && <DailyActualsChart liveData={liveData} />}
 
-      {/* MONTHLY UNITS BY CHANNEL */}
-      <div
-        style={{
-          background: CARD_BG,
-          borderRadius: 12,
-          border: `1px solid ${BORDER}`,
-          padding: "24px 24px 16px",
-          marginBottom: 32,
-          boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
-        }}
-      >
-        <SectionHeading icon={Package} title="Monthly Units by Channel" subtitle="Unit volume ramp showing growth trajectory by channel" />
-        <div style={{ width: "100%", height: 340 }}>
-          <ResponsiveContainer>
-            <AreaChart data={monthlyUnitsData}>
-              <CartesianGrid strokeDasharray="3 3" stroke={BORDER} vertical={false} />
-              <XAxis dataKey="month" tick={{ fill: NAVY, fontSize: 12 }} tickLine={false} axisLine={{ stroke: BORDER }} />
-              <YAxis
-                tick={{ fill: TEXT_DIM, fontSize: 11 }}
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(v: number) => (v >= 1000 ? `${(v / 1000).toFixed(0)}K` : `${v}`)}
-              />
-              <Tooltip content={<UnitsTooltip />} />
-              <Legend
-                verticalAlign="top"
-                align="right"
-                iconType="square"
-                wrapperStyle={{ fontSize: 12, paddingBottom: 8 }}
-              />
-              <Area
-                type="monotone"
-                dataKey="Distributor"
-                stackId="units"
-                stroke={RED}
-                fill={RED + "30"}
-                strokeWidth={2}
-              />
-              <Area
-                type="monotone"
-                dataKey="Wholesale"
-                stackId="units"
-                stroke={NAVY}
-                fill={NAVY + "25"}
-                strokeWidth={2}
-              />
-              <Area
-                type="monotone"
-                dataKey="Amazon"
-                stackId="units"
-                stroke={GOLD}
-                fill={GOLD + "30"}
-                strokeWidth={2}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
+      {/* AMAZON DEEP DIVE (live data) */}
+      {liveData?.amazon && <AmazonDeepDive amazon={liveData.amazon} />}
 
-      {/* DISTRIBUTOR NETWORK PLAN */}
+      {/* PLAN CHARTS (toggleable) */}
+      {showPlanCharts && (
+        <>
+          {/* MONTHLY REVENUE BY CHANNEL (Plan) */}
+          <div
+            style={{
+              background: CARD_BG,
+              borderRadius: 12,
+              border: `1px solid ${BORDER}`,
+              padding: "24px 24px 16px",
+              marginBottom: 32,
+              boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+            }}
+          >
+            <SectionHeading icon={DollarSign} title="Monthly Revenue by Channel (Plan)" subtitle="Pro Forma stacked monthly view across all three sales channels" />
+            <div style={{ width: "100%", height: 360 }}>
+              <ResponsiveContainer>
+                <BarChart data={monthlyChartData} barCategoryGap="18%">
+                  <CartesianGrid strokeDasharray="3 3" stroke={BORDER} vertical={false} />
+                  <XAxis dataKey="month" tick={{ fill: NAVY, fontSize: 12 }} tickLine={false} axisLine={{ stroke: BORDER }} />
+                  <YAxis
+                    tick={{ fill: TEXT_DIM, fontSize: 11 }}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(v: number) => (v >= 1000 ? `$${(v / 1000).toFixed(0)}K` : `$${v}`)}
+                  />
+                  <Tooltip content={<RevenueTooltip />} />
+                  <Legend
+                    verticalAlign="top"
+                    align="right"
+                    iconType="square"
+                    wrapperStyle={{ fontSize: 12, paddingBottom: 8 }}
+                  />
+                  <Bar dataKey="Amazon" stackId="rev" fill={GOLD} radius={[0, 0, 0, 0]} />
+                  <Bar dataKey="Wholesale" stackId="rev" fill={NAVY} radius={[0, 0, 0, 0]} />
+                  <Bar dataKey="Distributor" stackId="rev" fill={RED} radius={[3, 3, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* MONTHLY UNITS BY CHANNEL (Plan) */}
+          <div
+            style={{
+              background: CARD_BG,
+              borderRadius: 12,
+              border: `1px solid ${BORDER}`,
+              padding: "24px 24px 16px",
+              marginBottom: 32,
+              boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+            }}
+          >
+            <SectionHeading icon={Package} title="Monthly Units by Channel (Plan)" subtitle="Unit volume ramp showing growth trajectory by channel" />
+            <div style={{ width: "100%", height: 340 }}>
+              <ResponsiveContainer>
+                <AreaChart data={monthlyUnitsData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={BORDER} vertical={false} />
+                  <XAxis dataKey="month" tick={{ fill: NAVY, fontSize: 12 }} tickLine={false} axisLine={{ stroke: BORDER }} />
+                  <YAxis
+                    tick={{ fill: TEXT_DIM, fontSize: 11 }}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(v: number) => (v >= 1000 ? `${(v / 1000).toFixed(0)}K` : `${v}`)}
+                  />
+                  <Tooltip content={<UnitsTooltip />} />
+                  <Legend
+                    verticalAlign="top"
+                    align="right"
+                    iconType="square"
+                    wrapperStyle={{ fontSize: 12, paddingBottom: 8 }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="Distributor"
+                    stackId="units"
+                    stroke={RED}
+                    fill={RED + "30"}
+                    strokeWidth={2}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="Wholesale"
+                    stackId="units"
+                    stroke={NAVY}
+                    fill={NAVY + "25"}
+                    strokeWidth={2}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="Amazon"
+                    stackId="units"
+                    stroke={GOLD}
+                    fill={GOLD + "30"}
+                    strokeWidth={2}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* DISTRIBUTOR NETWORK PLAN (always shown) */}
       <div
         style={{
           background: CARD_BG,

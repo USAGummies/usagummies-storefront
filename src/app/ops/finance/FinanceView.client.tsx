@@ -8,6 +8,7 @@ import {
 import {
   DollarSign, TrendingUp, TrendingDown, Landmark, PiggyBank,
   BarChart3, Wallet, CreditCard, Building2, ChevronDown, ChevronUp,
+  AlertTriangle, RefreshCw, Banknote,
 } from "lucide-react";
 import {
   MONTHS, MONTH_LABELS,
@@ -20,6 +21,18 @@ import {
   MARKETING, RENT_GA, ONE_TIME_SETUP,
   type Month,
 } from "@/lib/ops/pro-forma";
+import {
+  usePnLData,
+  useBalancesData,
+  useDashboardData,
+  comparePlanVsActual,
+  fmtDollar,
+  fmtDollarExact,
+  fmtPercent,
+  fmtVariance,
+  STATUS_COLORS,
+  type PlanVsActual,
+} from "@/lib/ops/use-war-room-data";
 
 // ─── Design tokens ──────────────────────────────────────────────────────────
 const NAVY = "#1B2A4A";
@@ -259,6 +272,57 @@ const metricValueStyle: React.CSSProperties = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const currencyTooltip: any = (value: number) => fmt(value);
 
+// ─── Variance helper for inline display ──────────────────────────────────────
+function VarianceBadge({ pva }: { pva: PlanVsActual }) {
+  if (pva.status === "no-data") {
+    return <span style={{ fontSize: 10, color: STATUS_COLORS["no-data"], fontStyle: "italic" }}>--</span>;
+  }
+  const color = STATUS_COLORS[pva.status];
+  const sign = pva.variance >= 0 ? "+" : "";
+  return (
+    <span style={{ fontSize: 10, fontWeight: 600, color }}>
+      {sign}{fmtDollar(pva.variance)} ({sign}{(pva.variancePct * 100).toFixed(1)}%)
+    </span>
+  );
+}
+
+// ─── Pulse dot for LIVE indicator ────────────────────────────────────────────
+function LiveDot() {
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, marginLeft: 12 }}>
+      <span
+        style={{
+          width: 8,
+          height: 8,
+          borderRadius: "50%",
+          background: "#16a34a",
+          display: "inline-block",
+          boxShadow: "0 0 6px rgba(22,163,74,0.6)",
+          animation: "pulse 2s infinite",
+        }}
+      />
+      <span style={{ fontSize: 11, fontWeight: 700, color: "#16a34a", letterSpacing: "0.04em" }}>LIVE</span>
+      <style>{`@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }`}</style>
+    </span>
+  );
+}
+
+// ─── Loading shimmer ─────────────────────────────────────────────────────────
+function LoadingShimmer({ width = "100%", height = 16 }: { width?: string | number; height?: number }) {
+  return (
+    <div style={{
+      width,
+      height,
+      borderRadius: 4,
+      background: `linear-gradient(90deg, ${SUBTLE_BG} 25%, ${LIGHT_BORDER} 50%, ${SUBTLE_BG} 75%)`,
+      backgroundSize: "200% 100%",
+      animation: "shimmer 1.5s infinite",
+    }}>
+      <style>{`@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }`}</style>
+    </div>
+  );
+}
+
 // ─── Component ──────────────────────────────────────────────────────────────
 
 export function FinanceView() {
@@ -267,6 +331,17 @@ export function FinanceView() {
   const [expandedLoan, setExpandedLoan] = useState(true);
   const [expandedUnit, setExpandedUnit] = useState(true);
   const [expandedOpEx, setExpandedOpEx] = useState(true);
+  const [expandedCash, setExpandedCash] = useState(true);
+  const [expandedActualPnL, setExpandedActualPnL] = useState(true);
+
+  // ── Live data hooks
+  const { data: pnl, loading: pnlLoading, error: pnlError } = usePnLData();
+  const { data: balances, loading: balLoading } = useBalancesData();
+  const { data: dashboard, loading: dashLoading } = useDashboardData();
+
+  const liveDataAvailable = !!(pnl || balances || dashboard);
+  const anyLoading = pnlLoading || balLoading || dashLoading;
+  const hasError = !!(pnlError);
 
   // ── Section toggle helper
   function SectionHeader({ title, icon, expanded, toggle }: {
@@ -294,6 +369,13 @@ export function FinanceView() {
   const closingCash = ANNUAL_SUMMARY.closingCashDec31;
   const loanBal = ANNUAL_SUMMARY.loanBalanceDec31;
 
+  // Live revenue comparison — use March plan as first month baseline
+  const liveRevenue = pnl?.revenue?.total ?? null;
+  const livePlanRevComparison = comparePlanVsActual(
+    TOTAL_REVENUE.mar,
+    liveRevenue
+  );
+
   // ══════════════════════════════════════════════════════════════════════════
   // 2. CAPITAL DEPLOYMENT
   // ══════════════════════════════════════════════════════════════════════════
@@ -303,7 +385,7 @@ export function FinanceView() {
   }));
 
   // ══════════════════════════════════════════════════════════════════════════
-  // 3. P&L TABLE
+  // 3. P&L TABLE (Plan)
   // ══════════════════════════════════════════════════════════════════════════
   const pnlRows = [
     { label: "Revenue", data: EXT_REVENUE, bold: false, green: false },
@@ -314,6 +396,53 @@ export function FinanceView() {
     { label: "Loan Repayment", data: EXT_LOAN_REPAYMENT, bold: false, green: false },
     { label: "Net Cash Flow", data: NET_CASH_FLOW, bold: true, green: false },
   ];
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // ACTUAL P&L TABLE ROWS (from live API data)
+  // ══════════════════════════════════════════════════════════════════════════
+  type ActualPnLRow = {
+    label: string;
+    plan: number;
+    actual: number | null;
+    bold: boolean;
+    isMargin?: boolean;
+    indent?: boolean;
+  };
+
+  // Build the actual vs plan P&L rows from the current period's live data
+  // The plan amounts here are cumulative through the current month for YTD comparison
+  // For simplicity, we'll use the March plan values as baseline (first month)
+  const currentMonthPlan = {
+    revenueAmazon: AMAZON.revenue.mar,
+    revenueShopify: 0, // Shopify DTC not in original pro forma (it's wholesale)
+    revenueWholesale: WHOLESALE.revenue.mar,
+    revenueTotal: TOTAL_REVENUE.mar,
+    cogsTotal: TOTAL_REVENUE.mar - TOTAL_GROSS_PROFIT.mar,
+    grossProfit: TOTAL_GROSS_PROFIT.mar,
+    opexTotal: TOTAL_OPEX.mar,
+    netIncome: EBITDA.mar, // EBITDA as proxy for net income in month 1
+  };
+
+  const actualPnLRows: ActualPnLRow[] = pnl ? [
+    { label: "Amazon Revenue", plan: currentMonthPlan.revenueAmazon, actual: pnl.revenue.amazon, bold: false, indent: true },
+    { label: "Shopify Revenue", plan: currentMonthPlan.revenueShopify, actual: pnl.revenue.shopify, bold: false, indent: true },
+    { label: "Wholesale Revenue", plan: currentMonthPlan.revenueWholesale, actual: pnl.revenue.wholesale, bold: false, indent: true },
+    { label: "Total Revenue", plan: currentMonthPlan.revenueTotal, actual: pnl.revenue.total, bold: true },
+    { label: "Product Cost", plan: 0, actual: pnl.cogs.productCost, bold: false, indent: true },
+    { label: "Shipping", plan: 0, actual: pnl.cogs.shipping, bold: false, indent: true },
+    { label: "Amazon Fees", plan: 0, actual: pnl.cogs.amazonFees, bold: false, indent: true },
+    { label: "Shopify Fees", plan: 0, actual: pnl.cogs.shopifyFees, bold: false, indent: true },
+    { label: "Total COGS", plan: currentMonthPlan.cogsTotal, actual: pnl.cogs.total, bold: true },
+    { label: "Gross Profit", plan: currentMonthPlan.grossProfit, actual: pnl.grossProfit, bold: true },
+    { label: "Gross Margin", plan: ANNUAL_SUMMARY.blendedGrossMargin, actual: pnl.grossMargin, bold: false, isMargin: true },
+    { label: "Software", plan: 0, actual: pnl.opex.software, bold: false, indent: true },
+    { label: "Marketing", plan: MARKETING.mar, actual: pnl.opex.marketing, bold: false, indent: true },
+    { label: "Payroll", plan: 0, actual: pnl.opex.payroll, bold: false, indent: true },
+    { label: "Other OpEx", plan: 0, actual: pnl.opex.other, bold: false, indent: true },
+    { label: "Total OpEx", plan: currentMonthPlan.opexTotal, actual: pnl.opex.total, bold: true },
+    { label: "Net Income", plan: currentMonthPlan.netIncome, actual: pnl.netIncome, bold: true },
+    { label: "Net Margin", plan: 0, actual: pnl.netMargin, bold: false, isMargin: true },
+  ] : [];
 
   // ══════════════════════════════════════════════════════════════════════════
   // 4. LOAN REPAYMENT CHART
@@ -396,30 +525,346 @@ export function FinanceView() {
     <div style={containerStyle}>
       {/* ── HEADER ──────────────────────────────────────────────────────── */}
       <div style={headerStyle}>
-        <h1 style={h1Style}>Financial Operations</h1>
-        <div style={subtitleStyle}>Pro Forma v22 — Capital &amp; Cash Flow Tracking</div>
+        <div style={{ display: "flex", alignItems: "center" }}>
+          <h1 style={h1Style}>Financial Operations</h1>
+          {liveDataAvailable && !anyLoading && <LiveDot />}
+          {anyLoading && (
+            <span style={{ marginLeft: 12, display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <RefreshCw size={14} color={GOLD} style={{ animation: "spin 1s linear infinite" }} />
+              <span style={{ fontSize: 11, color: GOLD, fontWeight: 600 }}>Loading live data...</span>
+              <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+            </span>
+          )}
+        </div>
+        <div style={subtitleStyle}>
+          Pro Forma v22 — Capital &amp; Cash Flow Tracking
+          {liveDataAvailable && pnl?.period?.label && (
+            <span style={{ marginLeft: 8, color: GREEN_POSITIVE, fontWeight: 700 }}>
+              | Live Period: {pnl.period.label}
+            </span>
+          )}
+        </div>
       </div>
+
+      {/* ── ERROR BANNER ────────────────────────────────────────────────── */}
+      {hasError && !anyLoading && (
+        <div style={{
+          background: "rgba(199,54,44,0.06)",
+          border: `1px solid ${RED}`,
+          borderRadius: 8,
+          padding: "12px 16px",
+          marginBottom: 20,
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          fontSize: 13,
+          color: RED,
+          fontWeight: 500,
+        }}>
+          <AlertTriangle size={16} />
+          Live data unavailable — showing plan only. Check API connections.
+        </div>
+      )}
 
       {/* ── KPI STRIP ──────────────────────────────────────────────────── */}
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 32 }}>
+        {/* Year 1 Revenue (Plan) + Live Actual */}
         <div style={metricCardStyle}>
           <div style={metricLabelStyle}>Year 1 Revenue (Plan)</div>
           <div style={metricValueStyle}>{fmt(annualRevenue)}</div>
+          {pnl && (
+            <div style={{ marginTop: 6 }}>
+              <div style={{ fontSize: 10, color: GOLD, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                MTD Actual
+              </div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: GREEN_POSITIVE }}>
+                {fmtDollar(pnl.revenue.total)}
+              </div>
+              <VarianceBadge pva={livePlanRevComparison} />
+            </div>
+          )}
+          {pnlLoading && <div style={{ marginTop: 6 }}><LoadingShimmer height={20} /></div>}
         </div>
+
+        {/* Year 1 EBITDA */}
         <div style={metricCardStyle}>
           <div style={metricLabelStyle}>Year 1 EBITDA</div>
           <div style={{ ...metricValueStyle, color: annualEBITDA < 0 ? RED_NEGATIVE : GREEN_POSITIVE }}>
             {fmt(annualEBITDA)}
           </div>
+          {pnl && (
+            <div style={{ marginTop: 6 }}>
+              <div style={{ fontSize: 10, color: GOLD, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                MTD Net Income
+              </div>
+              <div style={{
+                fontSize: 18, fontWeight: 800,
+                color: pnl.netIncome >= 0 ? GREEN_POSITIVE : RED_NEGATIVE,
+              }}>
+                {fmtDollar(pnl.netIncome)}
+              </div>
+            </div>
+          )}
+          {pnlLoading && <div style={{ marginTop: 6 }}><LoadingShimmer height={20} /></div>}
         </div>
+
+        {/* Closing Cash — show live total if available */}
         <div style={metricCardStyle}>
-          <div style={metricLabelStyle}>Closing Cash (Dec 31)</div>
-          <div style={{ ...metricValueStyle, color: GREEN_POSITIVE }}>{fmt(closingCash)}</div>
+          <div style={metricLabelStyle}>
+            {balances ? "Total Cash (Live)" : "Closing Cash (Dec 31 Plan)"}
+          </div>
+          <div style={{ ...metricValueStyle, color: GREEN_POSITIVE }}>
+            {balances ? fmtDollar(balances.totalCash) : fmt(closingCash)}
+          </div>
+          {balances && (
+            <div style={{ fontSize: 10, color: "#7a7060", marginTop: 2 }}>
+              Plan Dec 31: {fmt(closingCash)}
+            </div>
+          )}
+          {balLoading && <LoadingShimmer height={24} />}
         </div>
+
+        {/* Loan Balance */}
         <div style={metricCardStyle}>
           <div style={metricLabelStyle}>Loan Balance (Dec 31)</div>
           <div style={metricValueStyle}>{fmt(loanBal)}</div>
         </div>
+      </div>
+
+      {/* ══════════════════════════════════════════════════════════════════
+          NEW SECTION: CASH POSITION (Live)
+          ══════════════════════════════════════════════════════════════════ */}
+      <div style={{ ...cardStyle, borderLeft: `4px solid ${GREEN_POSITIVE}` }}>
+        <SectionHeader
+          title="Cash Position"
+          icon={<Banknote size={18} color={GREEN_POSITIVE} />}
+          expanded={expandedCash}
+          toggle={() => setExpandedCash(!expandedCash)}
+        />
+        {expandedCash && (
+          <>
+            {balLoading && (
+              <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} style={{ ...metricCardStyle, flex: "1 1 200px" }}>
+                    <LoadingShimmer height={12} width="60%" />
+                    <div style={{ marginTop: 8 }}><LoadingShimmer height={28} width="80%" /></div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {!balLoading && !balances && (
+              <div style={{ fontSize: 13, color: "#94a3b8", fontStyle: "italic", padding: "12px 0" }}>
+                Cash position data unavailable. Connect Found.com, Shopify Payments, and Amazon Seller Central to see live balances.
+              </div>
+            )}
+
+            {balances && (
+              <>
+                {/* Total Cash - prominent */}
+                <div style={{
+                  background: `linear-gradient(135deg, ${NAVY} 0%, #2d4a7a 100%)`,
+                  borderRadius: 8,
+                  padding: "20px 24px",
+                  marginBottom: 16,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  flexWrap: "wrap",
+                  gap: 12,
+                }}>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: GOLD, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                      Total Cash Position
+                    </div>
+                    <div style={{ fontSize: 32, fontWeight: 800, color: WHITE, marginTop: 4 }}>
+                      {fmtDollar(balances.totalCash)}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: 10, color: "rgba(255,255,255,0.6)", marginBottom: 2 }}>
+                      Last updated: {new Date(balances.lastUpdated).toLocaleString()}
+                    </div>
+                    <div style={{ fontSize: 11, color: GOLD, fontWeight: 600 }}>
+                      Plan Dec 31: {fmt(closingCash)} | Runway: Healthy
+                    </div>
+                  </div>
+                </div>
+
+                {/* Individual accounts */}
+                <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+                  {/* Found.com */}
+                  <div style={{ ...metricCardStyle, flex: "1 1 200px", borderTop: `3px solid ${NAVY}` }}>
+                    <div style={metricLabelStyle}>Found.com (Operating)</div>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: NAVY }}>
+                      {balances.found ? fmtDollar(balances.found.balance) : "--"}
+                    </div>
+                    {balances.found && (
+                      <div style={{ fontSize: 10, color: "#7a7060", marginTop: 2 }}>
+                        Available: {fmtDollar(balances.found.available)}
+                      </div>
+                    )}
+                    {!balances.found && (
+                      <div style={{ fontSize: 10, color: "#94a3b8", fontStyle: "italic" }}>Not connected</div>
+                    )}
+                  </div>
+
+                  {/* Shopify Payments */}
+                  <div style={{ ...metricCardStyle, flex: "1 1 200px", borderTop: `3px solid #96bf48` }}>
+                    <div style={metricLabelStyle}>Shopify Payments</div>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: NAVY }}>
+                      {balances.shopify ? fmtDollar(balances.shopify.balance) : "--"}
+                    </div>
+                    {balances.shopify?.pendingPayouts && balances.shopify.pendingPayouts.length > 0 && (
+                      <div style={{ marginTop: 4 }}>
+                        <div style={{ fontSize: 10, color: GOLD, fontWeight: 600, textTransform: "uppercase", marginBottom: 2 }}>
+                          Pending Payouts
+                        </div>
+                        {balances.shopify.pendingPayouts.slice(0, 3).map((p, i) => (
+                          <div key={i} style={{ fontSize: 10, color: "#7a7060", display: "flex", justifyContent: "space-between" }}>
+                            <span>{p.expectedDate ? new Date(p.expectedDate).toLocaleDateString() : "Pending"}</span>
+                            <span style={{ fontWeight: 600 }}>{fmtDollarExact(p.amount)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {!balances.shopify && (
+                      <div style={{ fontSize: 10, color: "#94a3b8", fontStyle: "italic" }}>Not connected</div>
+                    )}
+                  </div>
+
+                  {/* Amazon Pending */}
+                  <div style={{ ...metricCardStyle, flex: "1 1 200px", borderTop: `3px solid ${RED}` }}>
+                    <div style={metricLabelStyle}>Amazon Pending</div>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: NAVY }}>
+                      {balances.amazon ? fmtDollar(balances.amazon.pendingBalance) : "--"}
+                    </div>
+                    {balances.amazon?.lastSettlement && (
+                      <div style={{ fontSize: 10, color: "#7a7060", marginTop: 2 }}>
+                        Last settlement: {fmtDollar(balances.amazon.lastSettlement.amount)} on{" "}
+                        {new Date(balances.amazon.lastSettlement.date).toLocaleDateString()}
+                      </div>
+                    )}
+                    {!balances.amazon && (
+                      <div style={{ fontSize: 10, color: "#94a3b8", fontStyle: "italic" }}>Not connected</div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* ══════════════════════════════════════════════════════════════════
+          NEW SECTION: ACTUAL P&L (Live vs Plan)
+          ══════════════════════════════════════════════════════════════════ */}
+      <div style={{ ...cardStyle, borderLeft: `4px solid ${GREEN_POSITIVE}` }}>
+        <SectionHeader
+          title={`P&L — Plan vs Actual${pnl?.period?.label ? ` (${pnl.period.label})` : ""}`}
+          icon={<TrendingUp size={18} color={GREEN_POSITIVE} />}
+          expanded={expandedActualPnL}
+          toggle={() => setExpandedActualPnL(!expandedActualPnL)}
+        />
+        {expandedActualPnL && (
+          <>
+            {pnlLoading && (
+              <div style={{ padding: "16px 0" }}>
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <div key={i} style={{ marginBottom: 8 }}><LoadingShimmer height={18} /></div>
+                ))}
+              </div>
+            )}
+
+            {!pnlLoading && !pnl && (
+              <div style={{ fontSize: 13, color: "#94a3b8", fontStyle: "italic", padding: "12px 0" }}>
+                P&amp;L live data unavailable. Showing plan-only P&amp;L table below.
+              </div>
+            )}
+
+            {pnl && (
+              <div style={{ overflowX: "auto" }}>
+                <table style={tableStyle}>
+                  <thead>
+                    <tr>
+                      <th style={{ ...thStyle, minWidth: 160 }}>Line Item</th>
+                      <th style={thRightStyle}>Plan</th>
+                      <th style={{ ...thRightStyle, color: GREEN_POSITIVE }}>Actual</th>
+                      <th style={thRightStyle}>Variance</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {actualPnLRows.map((row) => {
+                      const pva = row.isMargin
+                        ? null
+                        : comparePlanVsActual(row.plan, row.actual);
+
+                      return (
+                        <tr
+                          key={row.label}
+                          style={row.bold ? { background: SUBTLE_BG } : undefined}
+                        >
+                          <td style={{
+                            ...tdStyle,
+                            fontWeight: row.bold ? 800 : 500,
+                            paddingLeft: row.indent ? 28 : 10,
+                            fontSize: row.indent ? 11 : 12,
+                          }}>
+                            {row.label}
+                          </td>
+                          <td style={{
+                            ...tdRightStyle,
+                            color: "#7a7060",
+                            fontSize: 11,
+                            fontWeight: row.bold ? 600 : 400,
+                          }}>
+                            {row.isMargin
+                              ? (row.plan ? fmtPct(row.plan) : "--")
+                              : (row.plan ? fmt(row.plan) : "--")}
+                          </td>
+                          <td style={{
+                            ...tdRightStyle,
+                            fontWeight: row.bold ? 800 : 600,
+                            color: row.actual !== null
+                              ? (row.isMargin ? NAVY : (row.actual < 0 ? RED_NEGATIVE : NAVY))
+                              : "#94a3b8",
+                          }}>
+                            {row.actual !== null
+                              ? (row.isMargin ? fmtPct(row.actual) : fmt(Math.round(row.actual)))
+                              : "--"}
+                          </td>
+                          <td style={{
+                            ...tdRightStyle,
+                            fontSize: 11,
+                          }}>
+                            {row.isMargin ? (
+                              row.actual !== null && row.plan ? (
+                                <span style={{
+                                  color: row.actual >= row.plan ? GREEN_POSITIVE : RED_NEGATIVE,
+                                  fontWeight: 600,
+                                }}>
+                                  {(row.actual - row.plan) >= 0 ? "+" : ""}{((row.actual - row.plan) * 100).toFixed(1)}pp
+                                </span>
+                              ) : <span style={{ color: "#94a3b8" }}>--</span>
+                            ) : (
+                              pva ? <VarianceBadge pva={pva} /> : <span style={{ color: "#94a3b8" }}>--</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+
+                {/* Period info */}
+                <div style={{ fontSize: 10, color: "#9a9080", marginTop: 8, fontStyle: "italic" }}>
+                  Period: {pnl.period.start} to {pnl.period.end} | Generated: {new Date(pnl.generatedAt).toLocaleString()}
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {/* ══════════════════════════════════════════════════════════════════
@@ -513,11 +958,11 @@ export function FinanceView() {
       </div>
 
       {/* ══════════════════════════════════════════════════════════════════
-          SECTION 2: MONTHLY P&L TABLE
+          SECTION 2: MONTHLY P&L TABLE (Full Year Plan)
           ══════════════════════════════════════════════════════════════════ */}
       <div style={cardStyle}>
         <SectionHeader
-          title="Monthly P&L Statement"
+          title="Monthly P&L Statement (Plan)"
           icon={<BarChart3 size={18} color={NAVY} />}
           expanded={expandedPnL}
           toggle={() => setExpandedPnL(!expandedPnL)}
@@ -1002,6 +1447,11 @@ export function FinanceView() {
         borderTop: `1px solid ${LIGHT_BORDER}`,
       }}>
         USA Gummies Inc. — Pro Forma v22 Financial Operations Report — Confidential
+        {liveDataAvailable && (
+          <span style={{ display: "block", color: GREEN_POSITIVE, fontWeight: 600, marginTop: 4 }}>
+            Live data connected | Last refresh: {new Date().toLocaleString()}
+          </span>
+        )}
       </div>
     </div>
   );
