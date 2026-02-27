@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
 
 type SettingsUser = {
   id: string;
@@ -22,6 +22,11 @@ type SettingsData = {
     amazon: boolean;
     slack: boolean;
   };
+  integrationDetails: Array<{
+    name: string;
+    configured: boolean;
+    envVars: { key: string; set: boolean }[];
+  }>;
   auditTimestamp: string | null;
   version: {
     build: string;
@@ -35,7 +40,7 @@ type SettingsData = {
 
 const ROLE_OPTIONS = ["admin", "employee", "partner", "investor", "banker"] as const;
 
-const CARD_STYLE: React.CSSProperties = {
+const CARD_STYLE: CSSProperties = {
   background: "#1a1d27",
   border: "1px solid rgba(255,255,255,0.06)",
   borderRadius: 12,
@@ -69,19 +74,6 @@ export function SettingsView() {
   useEffect(() => {
     refresh();
   }, [refresh]);
-
-  const integrationRows = useMemo(() => {
-    if (!data) return [];
-    return [
-      ["Shopify", data.integrations.shopify],
-      ["Plaid", data.integrations.plaid],
-      ["GA4", data.integrations.ga4],
-      ["Gmail", data.integrations.gmail],
-      ["Notion", data.integrations.notion],
-      ["Amazon", data.integrations.amazon],
-      ["Slack", data.integrations.slack],
-    ] as const;
-  }, [data]);
 
   async function saveRole(userId: string) {
     const role = roleDrafts[userId] || "employee";
@@ -267,12 +259,32 @@ export function SettingsView() {
             Integration Status
           </div>
           <div style={{ display: "grid", gap: 8 }}>
-            {integrationRows.map(([name, ok]) => (
-              <div key={name} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 13 }}>
-                <span style={{ color: "rgba(255,255,255,0.82)" }}>{name}</span>
-                <span style={{ color: ok ? "#4ade80" : "#f87171", fontWeight: 700 }}>
-                  {ok ? "\u2713 Configured" : "\u2717 Missing"}
-                </span>
+            {(data?.integrationDetails || []).map((integration) => (
+              <div key={integration.name} style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 13 }}>
+                  <span style={{ color: "rgba(255,255,255,0.82)", fontWeight: 600 }}>{integration.name}</span>
+                  <span style={{ color: integration.configured ? "#4ade80" : "#f87171", fontWeight: 700 }}>
+                    {integration.configured ? "\u2713 Configured" : "\u2717 Missing"}
+                  </span>
+                </div>
+                <div style={{ marginTop: 5, display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {integration.envVars.map((envVar) => (
+                    <span
+                      key={`${integration.name}-${envVar.key}`}
+                      style={{
+                        borderRadius: 999,
+                        padding: "2px 7px",
+                        fontSize: 10,
+                        letterSpacing: "0.02em",
+                        color: envVar.set ? "#4ade80" : "rgba(255,255,255,0.45)",
+                        border: `1px solid ${envVar.set ? "rgba(74,222,128,0.35)" : "rgba(255,255,255,0.15)"}`,
+                        background: envVar.set ? "rgba(34,197,94,0.1)" : "rgba(255,255,255,0.03)",
+                      }}
+                    >
+                      {envVar.key}
+                    </span>
+                  ))}
+                </div>
               </div>
             ))}
           </div>

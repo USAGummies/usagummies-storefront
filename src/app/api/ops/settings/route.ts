@@ -9,6 +9,7 @@ import {
   updatePage,
 } from "@/lib/notion/client";
 import { getNotionApiKey } from "@/lib/notion/credentials";
+import { checkIntegrations, type IntegrationStatus } from "@/lib/ops/env-check";
 import { readState } from "@/lib/ops/state";
 
 export const runtime = "nodejs";
@@ -34,6 +35,7 @@ type SettingsResponse = {
     amazon: boolean;
     slack: boolean;
   };
+  integrationDetails: IntegrationStatus[];
   auditTimestamp: string | null;
   version: {
     build: string;
@@ -56,23 +58,16 @@ type SettingsResponse = {
 
 const VALID_ROLES = ["admin", "investor", "employee", "partner", "banker"] as const;
 
-function hasEnv(key: string): boolean {
-  return Boolean(String(process.env[key] || "").trim());
-}
-
-function integrationStatus() {
+function integrationSummary(details: IntegrationStatus[]) {
+  const lookup = new Map(details.map((d) => [d.name, d.configured]));
   return {
-    shopify: hasEnv("SHOPIFY_ADMIN_TOKEN"),
-    plaid: hasEnv("PLAID_CLIENT_ID") && hasEnv("PLAID_SECRET"),
-    ga4: hasEnv("GA4_SERVICE_ACCOUNT_JSON") || hasEnv("GOOGLE_APPLICATION_CREDENTIALS"),
-    gmail:
-      hasEnv("GMAIL_SERVICE_ACCOUNT_JSON") ||
-      (hasEnv("GMAIL_OAUTH_CLIENT_ID") &&
-        hasEnv("GMAIL_OAUTH_CLIENT_SECRET") &&
-        hasEnv("GMAIL_OAUTH_REFRESH_TOKEN")),
-    notion: Boolean(getNotionApiKey()),
-    amazon: hasEnv("AMAZON_SP_REFRESH_TOKEN"),
-    slack: hasEnv("SLACK_WEBHOOK_ALERTS"),
+    shopify: lookup.get("Shopify Admin") || false,
+    plaid: lookup.get("Plaid") || false,
+    ga4: lookup.get("GA4") || false,
+    gmail: lookup.get("Gmail") || false,
+    notion: lookup.get("Notion") || false,
+    amazon: lookup.get("Amazon SP-API") || false,
+    slack: lookup.get("Slack") || false,
   };
 }
 
@@ -109,6 +104,7 @@ export async function GET() {
   try {
     const session = await auth();
     const canEditRoles = session?.user?.role === "admin";
+    const integrationDetails = checkIntegrations();
 
     const [rows, auditTimestamp] = await Promise.all([
       queryDatabase(
@@ -124,7 +120,8 @@ export async function GET() {
 
     const result: SettingsResponse = {
       users,
-      integrations: integrationStatus(),
+      integrations: integrationSummary(integrationDetails),
+      integrationDetails,
       auditTimestamp,
       version: {
         build: (process.env.VERCEL_GIT_COMMIT_SHA || "local").slice(0, 7),
@@ -147,10 +144,12 @@ export async function GET() {
 
     return NextResponse.json(result);
   } catch (err) {
+    const integrationDetails = checkIntegrations();
     return NextResponse.json(
       {
         users: [],
-        integrations: integrationStatus(),
+        integrations: integrationSummary(integrationDetails),
+        integrationDetails,
         auditTimestamp: null,
         version: {
           build: (process.env.VERCEL_GIT_COMMIT_SHA || "local").slice(0, 7),
