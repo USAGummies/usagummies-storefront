@@ -25,6 +25,7 @@ const SELF_AUTHENTICATED_PREFIXES = [
   "/api/ops/scheduler/master",
   "/api/ops/engine/",
   "/api/ops/notify",
+  "/api/ops/diag", // TEMP: diagnostic endpoint — remove after debugging
 ];
 
 function isSelfAuthenticated(pathname: string): boolean {
