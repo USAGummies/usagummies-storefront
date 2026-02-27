@@ -1,9 +1,9 @@
 import Link from "next/link";
 import Image from "next/image";
-import Script from "next/script";
 import type { Metadata } from "next";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { JsonLd } from "@/components/JsonLd";
+import { WholesaleForm } from "./WholesaleForm";
 
 function resolveSiteUrl() {
   const preferred = "https://www.usagummies.com";
@@ -175,16 +175,7 @@ export default function WholesalePage() {
                   />
                 </div>
                 <div id="wholesale-form">
-                  <Script
-                    src="https://js-na2.hsforms.net/forms/embed/245038506.js"
-                    strategy="afterInteractive"
-                  />
-                  <div
-                    className="hs-form-frame"
-                    data-region="na2"
-                    data-form-id="22ab9284-ad89-4deb-b2ad-b6d6dc585cb1"
-                    data-portal-id="245038506"
-                  />
+                  <WholesaleForm />
                 </div>
               </div>
             </div>
@@ -240,6 +231,45 @@ export default function WholesalePage() {
               <Link href="/contact" className="mt-3 inline-flex text-sm font-semibold text-[var(--navy)] underline underline-offset-4">
                 Contact wholesale support
               </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* Faire storefront */}
+        <div id="faire" className="mt-10">
+          <div className="candy-panel rounded-[36px] p-6 sm:p-8">
+            <div className="text-center space-y-3 mb-6">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+                Also available on
+              </div>
+              <h2 className="text-2xl font-black text-[var(--text)] sm:text-3xl">
+                Order on Faire
+              </h2>
+              <p className="text-sm text-[var(--muted)] max-w-lg mx-auto">
+                Already on Faire? Browse our full catalog and place wholesale orders directly
+                with net‑60 terms, free returns, and no minimums for your first order.
+              </p>
+            </div>
+            <div className="flex justify-center">
+              <iframe
+                src="https://www.faire.com/embed/bw_cqd5dvfzqu"
+                width="900"
+                height="600"
+                scrolling="no"
+                title="USA Gummies on Faire"
+                className="border-none block max-w-full"
+                style={{ width: 900, height: 600 }}
+              />
+            </div>
+            <div className="text-center mt-4">
+              <a
+                href="https://www.faire.com/brand/bw_cqd5dvfzqu"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-candy pressable"
+              >
+                View full catalog on Faire
+              </a>
             </div>
           </div>
         </div>
