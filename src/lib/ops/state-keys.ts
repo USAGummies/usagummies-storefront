@@ -63,10 +63,18 @@ export const STATE_KEYS = {
 
   // Pipeline
   "pipeline-cache": "pipeline-cache.json",
+  "deal-emails-cache": "deal-emails-cache.json",
 
   // Forecasting & P&L
   "forecast-cache": "forecast-cache.json",
   "pnl-cache": "pnl-cache.json",
+
+  // Ops dashboard caches
+  "inventory-cache": "inventory-cache.json",
+  "supply-chain-orders": "supply-chain-orders.json",
+  "supply-chain-cache": "supply-chain-cache.json",
+  "transactions-cache": "transactions-cache.json",
+  "marketing-cache": "marketing-cache.json",
 
   // Communications
   "inbox-unified-cache": "inbox-unified-cache.json",
