@@ -231,21 +231,6 @@ export async function GET() {
     queryNotion(DISTRIBUTOR_PROSPECTS_DB),
   ]);
 
-  // Debug: log first page's property names to identify deal value field
-  if (b2bPages.length > 0) {
-    console.log("[pipeline] B2B property names:", Object.keys(b2bPages[0].properties));
-    const firstProps = b2bPages[0].properties;
-    for (const [key, val] of Object.entries(firstProps)) {
-      const v = val as Record<string, unknown>;
-      if (v.type === "number" || key.toLowerCase().includes("value") || key.toLowerCase().includes("deal") || key.toLowerCase().includes("amount")) {
-        console.log(`[pipeline] B2B potential value field: "${key}" =`, JSON.stringify(val));
-      }
-    }
-  }
-  if (distPages.length > 0) {
-    console.log("[pipeline] Distributor property names:", Object.keys(distPages[0].properties));
-  }
-
   const b2bLeads = b2bPages.map((p) => parseLead(p, "b2b"));
   const distLeads = distPages.map((p) => parseLead(p, "distributor"));
   const allLeads = [...b2bLeads, ...distLeads];
