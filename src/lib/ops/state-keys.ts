@@ -75,6 +75,10 @@ export const STATE_KEYS = {
   "supply-chain-cache": "supply-chain-cache.json",
   "transactions-cache": "transactions-cache.json",
   "marketing-cache": "marketing-cache.json",
+  "alerts-cache": "alerts-cache.json",
+  "audit-cache": "audit-cache.json",
+  "audit-cash-baseline": "audit-cash-baseline.json",
+  "audit-inventory-baseline": "audit-inventory-baseline.json",
 
   // Communications
   "inbox-unified-cache": "inbox-unified-cache.json",
