@@ -68,7 +68,7 @@ async function getAmazonRevenue(start: string, end: string): Promise<number> {
 }
 
 async function getShopifyRevenue(start: string, end: string): Promise<number> {
-  // Query Notion daily performance
+  // Try Notion daily performance first (historical data)
   const rows = await queryDatabase(
     DB.DAILY_PERFORMANCE,
     {
@@ -80,11 +80,60 @@ async function getShopifyRevenue(start: string, end: string): Promise<number> {
     [{ property: "Date", direction: "ascending" }],
   );
 
-  if (!rows) return 0;
-  return rows.reduce((sum, row) => {
-    const p = (row.properties || {}) as Record<string, unknown>;
-    return sum + extractNumber(p["Shopify Revenue"]);
-  }, 0);
+  if (rows && rows.length > 0) {
+    const total = rows.reduce((sum, row) => {
+      const p = (row.properties || {}) as Record<string, unknown>;
+      return sum + extractNumber(p["Shopify Revenue"]);
+    }, 0);
+    if (total > 0) return total;
+  }
+
+  // Fallback: query Shopify Admin API directly
+  return fetchShopifyRevenueDirectly(start, end);
+}
+
+/** Direct Shopify Admin API fallback when Notion has no data */
+async function fetchShopifyRevenueDirectly(start: string, end: string): Promise<number> {
+  const token = process.env.SHOPIFY_ADMIN_TOKEN || "";
+  const domain = (
+    process.env.SHOPIFY_STORE_DOMAIN ||
+    process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN ||
+    ""
+  )
+    .replace(/^https?:\/\//, "")
+    .replace(/\/$/, "");
+
+  if (!token || !domain) return 0;
+
+  try {
+    const dateFilter = `created_at:>=${start} created_at:<=${end}`;
+    const res = await fetch(
+      `https://${domain}/admin/api/2025-01/graphql.json`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Shopify-Access-Token": token,
+        },
+        body: JSON.stringify({
+          query: `query($q:String!){orders(first:250,query:$q){edges{node{totalPriceSet{shopMoney{amount}}}}}}`,
+          variables: { q: dateFilter },
+        }),
+        signal: AbortSignal.timeout(10000),
+      },
+    );
+
+    if (!res.ok) return 0;
+    const json = await res.json();
+    const edges = json.data?.orders?.edges || [];
+    return edges.reduce(
+      (sum: number, e: { node: { totalPriceSet: { shopMoney: { amount: string } } } }) =>
+        sum + parseFloat(e.node.totalPriceSet?.shopMoney?.amount || "0"),
+      0,
+    );
+  } catch {
+    return 0;
+  }
 }
 
 async function getWholesaleRevenue(start: string, _end: string): Promise<number> {

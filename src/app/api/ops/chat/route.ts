@@ -27,6 +27,23 @@ import type { AmazonKPIs, CashPosition } from "@/lib/amazon/types";
 import { buildAmazonKPIs } from "@/lib/amazon/kpi-builder";
 import { getCachedKPIs } from "@/lib/amazon/cache";
 import { isAmazonConfigured } from "@/lib/amazon/sp-api";
+import { buildPnL } from "@/lib/finance/pnl";
+import { buildForecastReport } from "@/lib/finance/forecast";
+import {
+  isPlaidConfigured,
+  isPlaidConnected,
+  getBalances as getPlaidBalances,
+  getTransactions as getPlaidTransactions,
+} from "@/lib/finance/plaid";
+import {
+  isShopifyPaymentsConfigured,
+  fetchShopifyPaymentsBalance,
+} from "@/lib/finance/shopify-payments";
+import {
+  isAmazonConfigured as isAmazonFinConfigured,
+  fetchFinancialEventGroups,
+} from "@/lib/amazon/sp-api";
+import type { CacheEnvelope } from "@/lib/amazon/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -289,16 +306,58 @@ const tools = {
     parameters: z.object({}),
     execute: async () => {
       try {
-        const baseUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL
-          ? `https://${process.env.VERCEL_URL}`
-          : "http://localhost:3000";
-        const res = await fetch(`${baseUrl}/api/ops/balances`, {
-          signal: AbortSignal.timeout(15000),
-        });
-        if (!res.ok) return { error: "Failed to fetch balances" };
-        return await res.json();
-      } catch {
-        return { error: "Balances API unavailable. Check Plaid/Shopify/Amazon configuration." };
+        // Check cache first
+        const cached = await readState<CacheEnvelope<Record<string, unknown>> | null>(
+          "plaid-balance-cache",
+          null,
+        );
+        if (cached && Date.now() - cached.cachedAt < 5 * 60 * 1000 && "totalCash" in (cached.data || {})) {
+          return cached.data;
+        }
+
+        // Parallel fetch directly from sources (no HTTP self-call)
+        const [foundResult, shopifyResult, amazonResult] = await Promise.allSettled([
+          (async () => {
+            if (!isPlaidConfigured()) return null;
+            const connected = await isPlaidConnected();
+            if (!connected) return null;
+            const accounts = await getPlaidBalances();
+            if (accounts.length === 0) return null;
+            const balance = accounts.reduce((sum: number, a: { balances: { current: number | null } }) => sum + (a.balances.current || 0), 0);
+            const available = accounts.reduce((sum: number, a: { balances: { available: number | null; current: number | null } }) => sum + (a.balances.available || a.balances.current || 0), 0);
+            return { balance, available, lastUpdated: new Date().toISOString() };
+          })(),
+          (async () => {
+            if (!isShopifyPaymentsConfigured()) return null;
+            return fetchShopifyPaymentsBalance();
+          })(),
+          (async () => {
+            if (!isAmazonFinConfigured()) return null;
+            const amzCached = await readState<CacheEnvelope<{ pendingBalance: number }> | null>("amazon-finance-cache", null);
+            if (amzCached && Date.now() - amzCached.cachedAt < 30 * 60 * 1000) return amzCached.data;
+            return null;
+          })(),
+        ]);
+
+        const found = foundResult.status === "fulfilled" ? foundResult.value : null;
+        const shopify = shopifyResult.status === "fulfilled" ? shopifyResult.value : null;
+        const amazon = amazonResult.status === "fulfilled" ? amazonResult.value : null;
+
+        let totalCash = 0;
+        if (found) totalCash += (found as { available: number }).available;
+        if (shopify) totalCash += (shopify as { balance: number }).balance;
+        if (amazon) totalCash += (amazon as { pendingBalance: number }).pendingBalance;
+
+        return {
+          found,
+          shopify,
+          amazon,
+          totalCash: Math.round(totalCash * 100) / 100,
+          lastUpdated: new Date().toISOString(),
+        };
+      } catch (err) {
+        console.error("[chat] getBalances error:", err);
+        return { error: "Balances unavailable. Check Plaid/Shopify/Amazon configuration." };
       }
     },
   }),
@@ -311,17 +370,9 @@ const tools = {
     }),
     execute: async ({ horizon }: { horizon?: string }) => {
       try {
-        const baseUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL
-          ? `https://${process.env.VERCEL_URL}`
-          : "http://localhost:3000";
-        const res = await fetch(`${baseUrl}/api/ops/forecast`, {
-          signal: AbortSignal.timeout(20000),
-        });
-        if (!res.ok) return { error: "Failed to fetch forecast" };
-        const data = await res.json();
-        // Return relevant horizon slice
+        const data = await buildForecastReport();
         const h = horizon || "30d";
-        const validH = ["30d", "60d", "90d"].includes(h) ? h : "30d";
+        const validH = (["30d", "60d", "90d"].includes(h) ? h : "30d") as "30d" | "60d" | "90d";
         return {
           currentBalance: data.currentBalance,
           runway: data.runway,
@@ -335,8 +386,9 @@ const tools = {
             totalOutflows: data.projections?.[validH]?.reduce((s: number, d: { outflows: number }) => s + d.outflows, 0),
           },
         };
-      } catch {
-        return { error: "Forecast API unavailable." };
+      } catch (err) {
+        console.error("[chat] getForecast error:", err);
+        return { error: "Forecast unavailable." };
       }
     },
   }),
@@ -351,20 +403,12 @@ const tools = {
     }),
     execute: async ({ period, start, end }: { period?: string; start?: string; end?: string }) => {
       try {
-        const baseUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL
-          ? `https://${process.env.VERCEL_URL}`
-          : "http://localhost:3000";
-        const params = new URLSearchParams();
-        if (period) params.set("period", period);
-        if (start) params.set("start", start);
-        if (end) params.set("end", end);
-        const res = await fetch(`${baseUrl}/api/ops/pnl?${params}`, {
-          signal: AbortSignal.timeout(15000),
-        });
-        if (!res.ok) return { error: "Failed to fetch P&L" };
-        return await res.json();
-      } catch {
-        return { error: "P&L API unavailable." };
+        const startDate = period === "custom" ? start : undefined;
+        const endDate = period === "custom" ? end : undefined;
+        return await buildPnL(startDate, endDate);
+      } catch (err) {
+        console.error("[chat] getPnL error:", err);
+        return { error: "Failed to build P&L report." };
       }
     },
   }),
@@ -375,29 +419,58 @@ const tools = {
     parameters: z.object({}),
     execute: async () => {
       try {
-        const baseUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL
-          ? `https://${process.env.VERCEL_URL}`
-          : "http://localhost:3000";
-        const res = await fetch(`${baseUrl}/api/ops/pipeline`, {
-          signal: AbortSignal.timeout(15000),
-        });
-        if (!res.ok) return { error: "Failed to fetch pipeline" };
-        const data = await res.json();
-        // Slim down for chat context — exclude full lead lists
+        // Read from pipeline cache (populated by /api/ops/pipeline route)
+        const cached = await readState<CacheEnvelope<Record<string, unknown>> | null>(
+          "pipeline-cache",
+          null,
+        );
+        if (cached && Date.now() - cached.cachedAt < 10 * 60 * 1000) {
+          const data = cached.data;
+          return {
+            totalLeads: data.totalLeads,
+            b2bCount: data.b2bCount,
+            distributorCount: data.distributorCount,
+            stageCounts: data.stageCounts,
+            pipelineValue: data.pipelineValue,
+            velocity: data.velocity,
+            conversionRates: data.conversionRates,
+            recentActivity: (data.recentActivity as unknown[])?.slice(0, 10),
+            weeklyTrend: data.weeklyTrend,
+            generatedAt: data.generatedAt,
+          };
+        }
+
+        // No cache — query Notion B2B prospect databases directly
+        const B2B_DB = process.env.NOTION_B2B_PROSPECTS_DB || "";
+        const DIST_DB = process.env.NOTION_DISTRIBUTOR_PROSPECTS_DB || "";
+        if (!B2B_DB && !DIST_DB) {
+          return { error: "No pipeline databases configured. Set NOTION_B2B_PROSPECTS_DB in env vars." };
+        }
+
+        const [b2bPages, distPages] = await Promise.all([
+          B2B_DB ? queryDatabase(B2B_DB as unknown as Parameters<typeof queryDatabase>[0]) : Promise.resolve([]),
+          DIST_DB ? queryDatabase(DIST_DB as unknown as Parameters<typeof queryDatabase>[0]) : Promise.resolve([]),
+        ]);
+
+        const totalLeads = (b2bPages?.length || 0) + (distPages?.length || 0);
+        const stageCounts: Record<string, number> = {};
+        for (const page of [...(b2bPages || []), ...(distPages || [])]) {
+          const props = (page.properties || {}) as Record<string, unknown>;
+          const status = extractText(props.Status || props.Stage || props["Pipeline Stage"]) || "Unknown";
+          stageCounts[status] = (stageCounts[status] || 0) + 1;
+        }
+
         return {
-          totalLeads: data.totalLeads,
-          b2bCount: data.b2bCount,
-          distributorCount: data.distributorCount,
-          stageCounts: data.stageCounts,
-          pipelineValue: data.pipelineValue,
-          velocity: data.velocity,
-          conversionRates: data.conversionRates,
-          recentActivity: data.recentActivity?.slice(0, 10),
-          weeklyTrend: data.weeklyTrend,
-          generatedAt: data.generatedAt,
+          totalLeads,
+          b2bCount: b2bPages?.length || 0,
+          distributorCount: distPages?.length || 0,
+          stageCounts,
+          pipelineValue: { total: 0, byStage: {} },
+          note: "Showing live data — visit Pipeline tab to populate full cache with velocity & conversion data.",
         };
-      } catch {
-        return { error: "Pipeline API unavailable. Check Notion configuration." };
+      } catch (err) {
+        console.error("[chat] getPipeline error:", err);
+        return { error: "Pipeline unavailable. Check Notion configuration." };
       }
     },
   }),
@@ -409,22 +482,58 @@ const tools = {
       source: z.string().optional().describe("Filter by source: 'all' (default), 'email', 'slack', 'b2b', 'shopify', 'amazon'"),
       unread: z.string().optional().describe("Set to 'true' to show only unread messages"),
     }),
-    execute: async ({ source, unread }: { source?: string; unread?: string }) => {
+    execute: async () => {
       try {
-        const baseUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL
-          ? `https://${process.env.VERCEL_URL}`
-          : "http://localhost:3000";
-        const params = new URLSearchParams();
-        if (source) params.set("source", source);
-        if (unread) params.set("unread", unread);
-        params.set("limit", "20");
-        const res = await fetch(`${baseUrl}/api/ops/inbox?${params}`, {
-          signal: AbortSignal.timeout(15000),
-        });
-        if (!res.ok) return { error: "Failed to fetch inbox" };
-        return await res.json();
-      } catch {
-        return { error: "Inbox API unavailable." };
+        // Read from inbox cache (populated by /api/ops/inbox route)
+        const cached = await readState<CacheEnvelope<Record<string, unknown>> | null>(
+          "inbox-unified-cache",
+          null,
+        );
+        if (cached && Date.now() - cached.cachedAt < 5 * 60 * 1000) {
+          return cached.data;
+        }
+
+        // No cache — try fetching directly from sources
+        const messages: Record<string, unknown>[] = [];
+
+        // Gmail
+        try {
+          const { listEmails } = await import("@/lib/ops/gmail-reader");
+          const emails = await listEmails({ count: 10, unreadOnly: false });
+          for (const e of emails) {
+            messages.push({
+              id: `email-${e.id}`,
+              source: "email",
+              from: e.from,
+              subject: e.subject,
+              snippet: e.snippet,
+              date: new Date(e.date).toISOString(),
+              read: !e.labelIds.includes("UNREAD"),
+            });
+          }
+        } catch { /* Gmail not configured */ }
+
+        // B2B Pipeline comms from Notion
+        try {
+          const { fetchB2BPipelineComms } = await import("@/lib/comms/b2b-comms");
+          const b2b = await fetchB2BPipelineComms(10);
+          messages.push(...b2b.map((m) => ({ ...m })));
+        } catch { /* B2B comms not configured */ }
+
+        const unreadCount = messages.filter((m) => !m.read).length;
+
+        return {
+          messages: messages.slice(0, 20),
+          totalCount: messages.length,
+          unreadCount,
+          lastUpdated: new Date().toISOString(),
+          note: messages.length === 0
+            ? "No messages found. Configure Gmail (GMAIL_APP_PASSWORD), Slack (SLACK_BOT_TOKEN), or check Notion B2B database."
+            : undefined,
+        };
+      } catch (err) {
+        console.error("[chat] getInbox error:", err);
+        return { error: "Inbox unavailable." };
       }
     },
   }),
