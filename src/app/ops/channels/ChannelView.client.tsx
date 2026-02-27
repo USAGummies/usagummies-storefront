@@ -49,7 +49,6 @@ import { StalenessBadge } from "@/app/ops/components/StalenessBadge";
 // ---------------------------------------------------------------------------
 const NAVY = "#1B2A4A";
 const RED = "#c7362c";
-const GOLD = "#c7a062";
 const BG = "#f8f5ef";
 const CARD = "#ffffff";
 const BORDER = "rgba(27,42,74,0.08)";
