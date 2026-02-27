@@ -12,34 +12,62 @@ type NavItem = {
   roles: string[];
 };
 
-const NAV_ITEMS: NavItem[] = [
-  { href: "/ops", label: "Dashboard", icon: "\u{1F4CA}", roles: ["admin", "employee", "investor"] },
-  { href: "/ops/agents", label: "Agents", icon: "\u{1F916}", roles: ["admin", "employee", "investor"] },
-  { href: "/ops/inbox", label: "Inbox", icon: "\u{1F4E8}", roles: ["admin", "employee"] },
-  { href: "/ops/pipeline", label: "Pipeline", icon: "\u{1F4C8}", roles: ["admin", "employee"] },
-  { href: "/ops/wholesale", label: "Wholesale", icon: "\u{1F4E6}", roles: ["admin", "employee", "partner"] },
-  { href: "/ops/kpis", label: "KPIs", icon: "\u{1F3AF}", roles: ["admin", "employee", "investor"] },
-  { href: "/ops/finance", label: "Finance", icon: "\u{1F4B0}", roles: ["admin", "investor"] },
-  { href: "/ops/logs", label: "Logs", icon: "\u{1F4DD}", roles: ["admin", "employee"] },
-  { href: "/ops/settings", label: "Settings", icon: "\u2699\uFE0F", roles: ["admin"] },
+type NavSection = {
+  title: string;
+  items: NavItem[];
+  collapsible?: boolean;
+};
+
+const NAV_SECTIONS: NavSection[] = [
+  {
+    title: "COMMAND",
+    items: [
+      { href: "/ops", label: "Command Center", icon: "\u{1F3DB}\uFE0F", roles: ["admin", "employee", "investor", "banker"] },
+      { href: "/ops/finance", label: "Financial Ops", icon: "\u{1F4B5}", roles: ["admin", "investor", "banker"] },
+      { href: "/ops/channels", label: "Channel Intel", icon: "\u{1F4CA}", roles: ["admin", "employee", "investor", "banker"] },
+      { href: "/ops/pipeline", label: "Territory", icon: "\u{1F30E}", roles: ["admin", "employee", "investor"] },
+      { href: "/ops/kpis", label: "Scoreboard", icon: "\u{1F3AF}", roles: ["admin", "employee", "investor", "banker"] },
+    ],
+  },
+  {
+    title: "OPERATIONS",
+    collapsible: true,
+    items: [
+      { href: "/ops/agents", label: "Agents", icon: "\u{1F916}", roles: ["admin", "employee"] },
+      { href: "/ops/inbox", label: "Inbox", icon: "\u{1F4E8}", roles: ["admin", "employee"] },
+      { href: "/ops/logs", label: "Logs", icon: "\u{1F4DD}", roles: ["admin", "employee"] },
+      { href: "/ops/wholesale", label: "Wholesale", icon: "\u{1F4E6}", roles: ["admin", "employee", "partner"] },
+      { href: "/ops/settings", label: "Settings", icon: "\u2699\uFE0F", roles: ["admin"] },
+    ],
+  },
 ];
+
+/* ── Design tokens ────────────────────────────────────────────────── */
+const NAVY = "#1B2A4A";
+const RED = "#c7362c";
+const GOLD = "#c7a062";
+const BG_CREAM = "#f8f5ef";
+const SIDEBAR_BG = "#0f1628";
+const SIDEBAR_BORDER = "rgba(199,160,98,0.12)";
+const TEXT_DIM = "rgba(255,255,255,0.45)";
+const TEXT_MED = "rgba(255,255,255,0.65)";
 
 function OpsNav() {
   const { data: session } = useSession();
   const pathname = usePathname();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
+  const [opsOpen, setOpsOpen] = useState(false);
 
   const role = session?.user?.role || "employee";
-  const visibleItems = NAV_ITEMS.filter((item) => item.roles.includes(role));
 
   return (
     <nav
       style={{
-        width: collapsed ? 60 : 220,
+        width: collapsed ? 60 : 240,
         minHeight: "100vh",
-        background: "#12141c",
-        borderRight: "1px solid rgba(255,255,255,0.06)",
+        background: SIDEBAR_BG,
+        borderRight: `1px solid ${SIDEBAR_BORDER}`,
         display: "flex",
         flexDirection: "column",
         transition: "width 0.2s ease",
@@ -49,24 +77,38 @@ function OpsNav() {
         alignSelf: "flex-start",
       }}
     >
-      {/* Logo area */}
+      {/* ── Logo ──────────────────────────────────────── */}
       <div
         style={{
           padding: collapsed ? "20px 10px" : "20px 18px",
-          borderBottom: "1px solid rgba(255,255,255,0.06)",
+          borderBottom: `1px solid ${SIDEBAR_BORDER}`,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          minHeight: 64,
+          minHeight: 68,
         }}
       >
         {!collapsed && (
           <div>
-            <div style={{ fontWeight: 700, color: "#fff", fontSize: 16, fontFamily: "var(--font-display)" }}>
+            <div style={{
+              fontWeight: 800,
+              color: "#fff",
+              fontSize: 15,
+              fontFamily: "var(--font-display)",
+              letterSpacing: "0.04em",
+              textTransform: "uppercase",
+            }}>
               USA Gummies
             </div>
-            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-              OPS
+            <div style={{
+              fontSize: 9,
+              color: GOLD,
+              textTransform: "uppercase",
+              letterSpacing: "0.18em",
+              fontWeight: 700,
+              marginTop: 2,
+            }}>
+              War Room
             </div>
           </div>
         )}
@@ -75,9 +117,9 @@ function OpsNav() {
           style={{
             background: "none",
             border: "none",
-            color: "rgba(255,255,255,0.35)",
+            color: TEXT_DIM,
             cursor: "pointer",
-            fontSize: 16,
+            fontSize: 14,
             padding: 4,
           }}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
@@ -86,66 +128,108 @@ function OpsNav() {
         </button>
       </div>
 
-      {/* Nav items */}
-      <div style={{ flex: 1, padding: "12px 0" }}>
-        {visibleItems.map((item) => {
-          const active = pathname === item.href || (item.href !== "/ops" && pathname.startsWith(item.href));
+      {/* ── Nav Sections ──────────────────────────────── */}
+      <div style={{ flex: 1, padding: "8px 0", overflowY: "auto" }}>
+        {NAV_SECTIONS.map((section) => {
+          const visibleItems = section.items.filter((item) => item.roles.includes(role));
+          if (visibleItems.length === 0) return null;
+
+          const isOpsSection = section.collapsible;
+          const isExpanded = isOpsSection ? opsOpen : true;
+
           return (
-            <button
-              key={item.href}
-              onClick={() => router.push(item.href)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                width: "100%",
-                padding: collapsed ? "10px 0" : "10px 18px",
-                justifyContent: collapsed ? "center" : "flex-start",
-                background: active ? "rgba(199,54,44,0.15)" : "transparent",
-                borderLeft: active ? "3px solid #c7362c" : "3px solid transparent",
-                border: "none",
-                borderLeftWidth: 3,
-                borderLeftStyle: "solid",
-                borderLeftColor: active ? "#c7362c" : "transparent",
-                color: active ? "#fff" : "rgba(255,255,255,0.55)",
-                fontSize: 13,
-                fontWeight: active ? 600 : 400,
-                cursor: "pointer",
-                transition: "all 0.15s",
-                textAlign: "left",
-                fontFamily: "inherit",
-              }}
-            >
-              <span style={{ fontSize: 16 }}>{item.icon}</span>
-              {!collapsed && item.label}
-            </button>
+            <div key={section.title} style={{ marginBottom: 4 }}>
+              {/* Section header */}
+              {!collapsed && (
+                <div
+                  onClick={isOpsSection ? () => setOpsOpen(!opsOpen) : undefined}
+                  style={{
+                    padding: "10px 18px 4px",
+                    fontSize: 9,
+                    fontWeight: 700,
+                    letterSpacing: "0.14em",
+                    color: isOpsSection ? TEXT_DIM : GOLD,
+                    textTransform: "uppercase",
+                    cursor: isOpsSection ? "pointer" : "default",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    userSelect: "none",
+                  }}
+                >
+                  <span>{section.title}</span>
+                  {isOpsSection && (
+                    <span style={{ fontSize: 8, transition: "transform 0.15s", transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)" }}>
+                      \u25B6
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Items */}
+              {(isExpanded || collapsed) && visibleItems.map((item) => {
+                const active = pathname === item.href || (item.href !== "/ops" && pathname.startsWith(item.href));
+                return (
+                  <button
+                    key={item.href}
+                    onClick={() => router.push(item.href)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      width: "100%",
+                      padding: collapsed ? "9px 0" : "9px 18px",
+                      justifyContent: collapsed ? "center" : "flex-start",
+                      background: active ? `rgba(199,54,44,0.12)` : "transparent",
+                      borderLeft: "none",
+                      borderRight: "none",
+                      borderTop: "none",
+                      borderBottom: "none",
+                      borderLeftWidth: 3,
+                      borderLeftStyle: "solid",
+                      borderLeftColor: active ? RED : "transparent",
+                      color: active ? "#fff" : TEXT_MED,
+                      fontSize: 13,
+                      fontWeight: active ? 600 : 400,
+                      cursor: "pointer",
+                      transition: "all 0.15s",
+                      textAlign: "left",
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    <span style={{ fontSize: 15 }}>{item.icon}</span>
+                    {!collapsed && item.label}
+                  </button>
+                );
+              })}
+            </div>
           );
         })}
       </div>
 
-      {/* User section */}
+      {/* ── User Section ──────────────────────────────── */}
       <div
         style={{
           padding: collapsed ? "14px 8px" : "14px 18px",
-          borderTop: "1px solid rgba(255,255,255,0.06)",
+          borderTop: `1px solid ${SIDEBAR_BORDER}`,
           display: "flex",
           flexDirection: "column",
           gap: 8,
         }}
       >
         {!collapsed && session?.user && (
-          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.45)" }}>
-            <div style={{ fontWeight: 600, color: "rgba(255,255,255,0.7)" }}>{session.user.name}</div>
-            <div style={{ textTransform: "capitalize" }}>{session.user.role}</div>
+          <div style={{ fontSize: 12, color: TEXT_DIM }}>
+            <div style={{ fontWeight: 600, color: TEXT_MED }}>{session.user.name}</div>
+            <div style={{ textTransform: "capitalize", fontSize: 10 }}>{session.user.role}</div>
           </div>
         )}
         <button
           onClick={() => signOut({ callbackUrl: "/ops/login" })}
           style={{
-            background: "rgba(255,255,255,0.05)",
-            border: "1px solid rgba(255,255,255,0.08)",
+            background: "rgba(255,255,255,0.04)",
+            border: `1px solid ${SIDEBAR_BORDER}`,
             borderRadius: 6,
-            color: "rgba(255,255,255,0.45)",
+            color: TEXT_DIM,
             fontSize: 11,
             padding: "6px 10px",
             cursor: "pointer",
@@ -163,19 +247,18 @@ function OpsNav() {
 function OpsContent({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
-  // Login page gets rendered without the shell
   if (pathname === "/ops/login") {
     return <>{children}</>;
   }
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: "#0f1117" }}>
+    <div style={{ display: "flex", minHeight: "100vh", background: BG_CREAM }}>
       <OpsNav />
       <main
         style={{
           flex: 1,
-          padding: "28px 32px",
-          color: "#fff",
+          padding: "28px 36px",
+          color: NAVY,
           fontFamily: "var(--font-sans), system-ui, sans-serif",
           overflowX: "hidden",
           minWidth: 0,

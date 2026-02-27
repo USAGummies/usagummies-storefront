@@ -20,7 +20,7 @@ const RETRY_BASE_MS = 400;
 /** Abort Notion request if it takes longer than this (ms) */
 const NOTION_TIMEOUT_MS = 4000;
 
-export type UserRole = "admin" | "investor" | "employee" | "partner";
+export type UserRole = "admin" | "investor" | "employee" | "partner" | "banker";
 
 export type PlatformUser = {
   id: string;
