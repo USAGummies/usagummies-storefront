@@ -95,7 +95,38 @@ export async function GET() {
     }
   }
 
-  // 5. Env var presence (names only, not values)
+  // 5. Notion Pipeline — property names diagnostic
+  results.pipeline = { error: null as string | null, b2bProps: [] as string[], distProps: [] as string[], sampleValues: {} as Record<string, unknown> };
+  try {
+    const notionKey = process.env.NOTION_API_KEY || "";
+    const b2bDb = process.env.NOTION_B2B_PROSPECTS_DB || "";
+    if (notionKey && b2bDb) {
+      const res = await fetch(`https://api.notion.com/v1/databases/${b2bDb}/query`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${notionKey}`, "Notion-Version": "2022-06-28", "Content-Type": "application/json" },
+        body: JSON.stringify({ page_size: 1 }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const page = data.results?.[0];
+        if (page) {
+          (results.pipeline as Record<string, unknown>).b2bProps = Object.keys(page.properties);
+          // Show types + values for number/value fields
+          const sample: Record<string, unknown> = {};
+          for (const [key, val] of Object.entries(page.properties as Record<string, Record<string, unknown>>)) {
+            sample[key] = { type: val.type };
+            if (val.type === "number") sample[key] = { type: "number", value: val.number };
+            if (val.type === "select") sample[key] = { type: "select", value: (val.select as Record<string, unknown>)?.name };
+          }
+          (results.pipeline as Record<string, unknown>).sampleValues = sample;
+        }
+      }
+    }
+  } catch (err) {
+    (results.pipeline as Record<string, unknown>).error = String(err);
+  }
+
+  // 6. Env var presence (names only, not values)
   const envChecks = [
     "PLAID_CLIENT_ID", "PLAID_SECRET", "PLAID_ENV",
     "SHOPIFY_ADMIN_TOKEN", "SHOPIFY_STORE_DOMAIN",
