@@ -342,6 +342,36 @@ export type TransactionsData = {
   budget: null;
 };
 
+export type ForecastData = {
+  currentBalance: number;
+  projections: {
+    "30d": Array<{
+      date: string;
+      openingBalance: number;
+      inflows: number;
+      outflows: number;
+      closingBalance: number;
+    }>;
+    "60d": Array<{
+      date: string;
+      openingBalance: number;
+      inflows: number;
+      outflows: number;
+      closingBalance: number;
+    }>;
+    "90d": Array<{
+      date: string;
+      openingBalance: number;
+      inflows: number;
+      outflows: number;
+      closingBalance: number;
+    }>;
+  };
+  alerts: string[];
+  runway: number;
+  generatedAt: string;
+};
+
 export type AuditData = {
   rules: Array<{
     id: string;
@@ -548,6 +578,10 @@ export function useMarketingData() {
 
 export function useTransactions(days = 30) {
   return useEndpointData<TransactionsData>(`/api/ops/transactions?days=${days}`);
+}
+
+export function useForecastData() {
+  return useEndpointData<ForecastData>("/api/ops/forecast");
 }
 
 export function useAuditStatus(force = false) {
