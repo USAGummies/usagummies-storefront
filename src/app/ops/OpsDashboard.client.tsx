@@ -1,1134 +1,569 @@
 "use client";
 
 import { useMemo } from "react";
-import type { LucideProps } from "lucide-react";
 import {
-  useDashboardData,
-  useBalancesData,
-  comparePlanVsActual,
-  fmtDollar as liveFmtDollar,
-  STATUS_COLORS,
-  type PlanVsActual,
-} from "@/lib/ops/use-war-room-data";
-import {
-  Area,
+  ResponsiveContainer,
+  ComposedChart,
   Bar,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer,
-  Legend,
-  Line,
-  ComposedChart,
+  PieChart,
+  Pie,
+  Cell,
 } from "recharts";
 import {
-  DollarSign,
-  Package,
-  TrendingUp,
-  Landmark,
-  BarChart3,
-  Wallet,
-  ShoppingCart,
-  Truck,
-  Store,
-  Flag,
-  CheckCircle,
-  Target,
   RefreshCw,
   AlertTriangle,
-  Activity,
+  DollarSign,
+  Wallet,
+  Package,
+  Percent,
+  Briefcase,
+  Boxes,
 } from "lucide-react";
 
 import {
-  MONTHS,
-  MONTH_LABELS,
-  MONTH_FULL_LABELS,
+  useDashboardData,
+  useBalancesData,
+  usePipelineData,
+  useAlerts,
+  useChannelData,
+  usePnLData,
+  comparePlanVsActual,
+  fmtDollar,
+  fmtPercent,
+  STATUS_COLORS,
+} from "@/lib/ops/use-war-room-data";
+import {
   TOTAL_REVENUE,
+  TOTAL_UNITS,
   EBITDA,
-  LOAN,
-  AMAZON,
-  WHOLESALE,
-  DISTRIBUTOR,
-  ANNUAL_SUMMARY,
-  CAPITAL_DEPLOYMENT,
-  TOTAL_CAPITAL_DEPLOYED,
-  MILESTONES,
-  UNIT_ECONOMICS,
+  GROSS_MARGIN,
   getCurrentProFormaMonth,
+  getMonthsThrough,
   cumulativeThrough,
-  type Month,
 } from "@/lib/ops/pro-forma";
 
-// ---------------------------------------------------------------------------
-// Formatters
-// ---------------------------------------------------------------------------
+const NAVY = "#1B2A4A";
+const RED = "#c7362c";
+const GOLD = "#c7a062";
+const BG = "#f8f5ef";
+const CARD = "#ffffff";
+const BORDER = "rgba(27,42,74,0.08)";
+const TEXT_DIM = "rgba(27,42,74,0.56)";
 
-const fmt = (n: number) => n.toLocaleString("en-US");
-const fmtDollar = (n: number) =>
-  n < 0
-    ? "-$" + Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })
-    : "$" + n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-const fmtDollarExact = (n: number) =>
-  n < 0
-    ? "-$" + Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-    : "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const fmtPercent = (n: number) => (n * 100).toFixed(1) + "%";
+const COLOR_AMAZON = "#f59e0b";
+const COLOR_DTC = "#3b82f6";
+const COLOR_FAIRE = "#10b981";
+const COLOR_DIST = "#ef4444";
 
-// ---------------------------------------------------------------------------
-// Colors
-// ---------------------------------------------------------------------------
+function average(nums: number[]): number {
+  if (nums.length === 0) return 0;
+  return nums.reduce((sum, n) => sum + n, 0) / nums.length;
+}
 
-const COLORS = {
-  bg: "#f8f5ef",
-  navy: "#1B2A4A",
-  red: "#c7362c",
-  gold: "#c7a062",
-  white: "#ffffff",
-  lightBorder: "#e8e2d6",
-  subtleText: "#7a7060",
-  greenAccent: "#2e7d32",
-  lightRed: "rgba(199, 54, 44, 0.08)",
-  lightGold: "rgba(199, 160, 98, 0.08)",
-  lightNavy: "rgba(27, 42, 74, 0.06)",
-  liveGreen: "#16a34a",
-  lightGreen: "rgba(22, 163, 74, 0.08)",
-};
+function Sparkline({ values, color }: { values: number[]; color: string }) {
+  if (values.length < 2) return null;
+  const max = Math.max(...values, 1);
+  const min = Math.min(...values, 0);
+  const range = max - min || 1;
 
-// ---------------------------------------------------------------------------
-// Shared Styles
-// ---------------------------------------------------------------------------
+  const points = values
+    .map((v, i) => {
+      const x = (i / (values.length - 1)) * 100;
+      const y = 100 - ((v - min) / range) * 100;
+      return `${x},${y}`;
+    })
+    .join(" ");
 
-const cardStyle: React.CSSProperties = {
-  background: COLORS.white,
-  border: `1px solid ${COLORS.lightBorder}`,
-  borderRadius: 8,
-  padding: "20px 24px",
-  position: "relative",
-  overflow: "hidden",
-};
-
-const sectionTitleStyle: React.CSSProperties = {
-  fontSize: 18,
-  fontWeight: 700,
-  color: COLORS.navy,
-  margin: 0,
-  letterSpacing: "-0.01em",
-};
-
-const liveBadge: React.CSSProperties = {
-  display: "inline-block",
-  fontSize: 9,
-  fontWeight: 700,
-  letterSpacing: "0.1em",
-  color: COLORS.liveGreen,
-  background: COLORS.lightGreen,
-  border: `1px solid ${COLORS.liveGreen}`,
-  borderRadius: 3,
-  padding: "2px 6px",
-  textTransform: "uppercase" as const,
-};
-
-const planBadge: React.CSSProperties = {
-  display: "inline-block",
-  fontSize: 9,
-  fontWeight: 700,
-  letterSpacing: "0.1em",
-  color: COLORS.gold,
-  background: COLORS.lightGold,
-  border: `1px solid ${COLORS.gold}`,
-  borderRadius: 3,
-  padding: "2px 6px",
-  textTransform: "uppercase" as const,
-};
-
-// ---------------------------------------------------------------------------
-// Helper Components — Live Data Indicators
-// ---------------------------------------------------------------------------
-
-function PulseDot({ color = COLORS.liveGreen }: { color?: string }) {
   return (
-    <span
-      style={{
-        display: "inline-block",
-        width: 8,
-        height: 8,
-        borderRadius: "50%",
-        background: color,
-        animation: "pulse 1.5s infinite",
-      }}
-    />
+    <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ width: "100%", height: 30 }}>
+      <polyline
+        fill="none"
+        stroke={color}
+        strokeWidth="3"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        points={points}
+      />
+    </svg>
   );
 }
 
-function LoadingSkeleton({ width = "100%", height = 20 }: { width?: string | number; height?: number }) {
-  return (
-    <div
-      style={{
-        width,
-        height,
-        borderRadius: 4,
-        background: COLORS.lightNavy,
-        animation: "pulse 1.5s infinite",
-      }}
-    />
-  );
-}
-
-function VarianceBadge({ pva }: { pva: PlanVsActual }) {
-  if (pva.status === "no-data") return null;
-  const color = STATUS_COLORS[pva.status];
-  const sign = pva.variance >= 0 ? "+" : "";
-  return (
-    <span
-      style={{
-        display: "inline-block",
-        fontSize: 10,
-        fontWeight: 700,
-        color,
-        background: color + "14",
-        border: `1px solid ${color}40`,
-        borderRadius: 3,
-        padding: "1px 6px",
-        letterSpacing: "0.02em",
-      }}
-    >
-      {sign}{(pva.variancePct * 100).toFixed(1)}%
-    </span>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// KPI Card Component
-// ---------------------------------------------------------------------------
-
-type LucideIcon = React.ForwardRefExoticComponent<Omit<LucideProps, "ref"> & React.RefAttributes<SVGSVGElement>>;
-
-function KpiCard({
-  icon: Icon,
+function MetricCard({
+  icon,
   label,
   value,
-  subtitle,
-  accentColor,
-  liveValue,
-  liveLabel,
-  pva,
-  liveLoading,
+  plan,
+  variance,
+  spark,
 }: {
-  icon: LucideIcon;
+  icon: React.ReactNode;
   label: string;
   value: string;
-  subtitle?: string;
-  accentColor?: string;
-  liveValue?: string;
-  liveLabel?: string;
-  pva?: PlanVsActual;
-  liveLoading?: boolean;
+  plan: string | null;
+  variance: ReturnType<typeof comparePlanVsActual> | null;
+  spark: number[];
 }) {
-  return (
-    <div style={cardStyle}>
-      <div
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          height: 3,
-          background: accentColor || COLORS.navy,
-        }}
-      />
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-            <Icon size={16} color={COLORS.subtleText} strokeWidth={1.8} />
-            <span
-              style={{
-                fontSize: 12,
-                fontWeight: 600,
-                color: COLORS.subtleText,
-                textTransform: "uppercase",
-                letterSpacing: "0.06em",
-              }}
-            >
-              {label}
-            </span>
-          </div>
-          {/* Plan value */}
-          <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-            <div
-              style={{
-                fontSize: liveValue ? 22 : 28,
-                fontWeight: 700,
-                color: liveValue ? COLORS.subtleText : COLORS.navy,
-                letterSpacing: "-0.02em",
-                lineHeight: 1.1,
-              }}
-            >
-              {value}
-            </div>
-            {liveValue && (
-              <span style={{ fontSize: 10, color: COLORS.subtleText, fontWeight: 600, textTransform: "uppercase" }}>
-                Plan
-              </span>
-            )}
-          </div>
-          {/* Live actual value */}
-          {liveLoading && (
-            <div style={{ marginTop: 6 }}>
-              <LoadingSkeleton width={100} height={16} />
-            </div>
-          )}
-          {liveValue && !liveLoading && (
-            <div style={{ marginTop: 4 }}>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                <span
-                  style={{
-                    fontSize: 28,
-                    fontWeight: 700,
-                    color: pva ? STATUS_COLORS[pva.status] : COLORS.navy,
-                    letterSpacing: "-0.02em",
-                    lineHeight: 1.1,
-                  }}
-                >
-                  {liveValue}
-                </span>
-                <span style={{ fontSize: 10, fontWeight: 700, color: COLORS.liveGreen, textTransform: "uppercase" }}>
-                  {liveLabel || "Actual"}
-                </span>
-                {pva && <VarianceBadge pva={pva} />}
-              </div>
-            </div>
-          )}
-          {subtitle && (
-            <div style={{ fontSize: 12, color: COLORS.subtleText, marginTop: 6 }}>{subtitle}</div>
-          )}
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
-          <span style={planBadge}>Plan</span>
-          {liveValue && !liveLoading && <span style={liveBadge}>Live</span>}
-          {liveLoading && <PulseDot color={COLORS.gold} />}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Channel Card Component
-// ---------------------------------------------------------------------------
-
-function ChannelCard({
-  name,
-  icon: Icon,
-  accentColor,
-  units,
-  revenue,
-  gp,
-  gpPerUnit,
-}: {
-  name: string;
-  icon: LucideIcon;
-  accentColor: string;
-  units: number;
-  revenue: number;
-  gp: number;
-  gpPerUnit: number;
-}) {
-  return (
-    <div style={cardStyle}>
-      <div
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          height: 3,
-          background: accentColor,
-        }}
-      />
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-        <div
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: 8,
-            background: accentColor + "12",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Icon size={18} color={accentColor} strokeWidth={2} />
-        </div>
-        <h3 style={{ fontSize: 16, fontWeight: 700, color: COLORS.navy, margin: 0 }}>{name}</h3>
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 24px" }}>
-        <div>
-          <div style={{ fontSize: 11, color: COLORS.subtleText, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-            Annual Units
-          </div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: COLORS.navy, marginTop: 2 }}>
-            {fmt(units)}
-          </div>
-        </div>
-        <div>
-          <div style={{ fontSize: 11, color: COLORS.subtleText, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-            Revenue
-          </div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: COLORS.navy, marginTop: 2 }}>
-            {fmtDollar(revenue)}
-          </div>
-        </div>
-        <div>
-          <div style={{ fontSize: 11, color: COLORS.subtleText, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-            Gross Profit
-          </div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: COLORS.navy, marginTop: 2 }}>
-            {fmtDollar(gp)}
-          </div>
-        </div>
-        <div>
-          <div style={{ fontSize: 11, color: COLORS.subtleText, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-            GP / Unit
-          </div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: accentColor, marginTop: 2 }}>
-            {fmtDollarExact(gpPerUnit)}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Custom Tooltip for Charts
-// ---------------------------------------------------------------------------
-
-function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) {
-  if (!active || !payload || payload.length === 0) return null;
   return (
     <div
       style={{
-        background: COLORS.white,
-        border: `1px solid ${COLORS.lightBorder}`,
-        borderRadius: 6,
-        padding: "10px 14px",
-        boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+        background: CARD,
+        border: `1px solid ${BORDER}`,
+        borderRadius: 12,
+        padding: "14px 14px 10px",
+        display: "grid",
+        gap: 8,
       }}
     >
-      <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.navy, marginBottom: 6 }}>{label}</div>
-      {payload.map((entry, i) => (
-        <div key={i} style={{ fontSize: 12, color: entry.color, marginBottom: 2 }}>
-          {entry.name}: {fmtDollar(entry.value)}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ color: NAVY }}>{icon}</span>
+          <span
+            style={{
+              fontSize: 11,
+              color: TEXT_DIM,
+              fontWeight: 700,
+              letterSpacing: "0.05em",
+              textTransform: "uppercase",
+            }}
+          >
+            {label}
+          </span>
         </div>
-      ))}
+      </div>
+
+      <div style={{ fontSize: 27, fontWeight: 800, color: NAVY }}>{value}</div>
+
+      <Sparkline values={spark} color={NAVY} />
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12 }}>
+        <span style={{ color: TEXT_DIM }}>
+          Plan: {plan ?? "N/A"}
+        </span>
+        {variance ? (
+          <span
+            style={{
+              color: STATUS_COLORS[variance.status],
+              background: `${STATUS_COLORS[variance.status]}14`,
+              padding: "2px 8px",
+              borderRadius: 999,
+              fontWeight: 800,
+            }}
+          >
+            {(variance.variancePct * 100).toFixed(1)}%
+          </span>
+        ) : null}
+      </div>
     </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Main Component
-// ---------------------------------------------------------------------------
+function SourceRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+      <span style={{ color: TEXT_DIM }}>{label}</span>
+      <span style={{ color: NAVY, fontWeight: 700 }}>{value}</span>
+    </div>
+  );
+}
 
 export function OpsDashboard() {
-  // ------ Live data hooks ------
-  const { data: liveData, loading: liveLoading, error: liveError, refresh } = useDashboardData();
-  const { data: balances, loading: balLoading } = useBalancesData();
+  const { data: dashboard, loading: dashboardLoading, error: dashboardError, refresh } = useDashboardData();
+  const { data: balances } = useBalancesData();
+  const { data: pipeline } = usePipelineData();
+  const { data: alerts } = useAlerts(5);
+  const { data: channels } = useChannelData();
+  const { data: pnl } = usePnLData();
 
-  // ------ MTD Plan vs Actual computation ------
-  const currentMonth = getCurrentProFormaMonth();
-  const mtdPlanRevenue = currentMonth ? cumulativeThrough(TOTAL_REVENUE, currentMonth) : 0;
-  const revenuePva = comparePlanVsActual(mtdPlanRevenue, liveData?.combined.totalRevenue);
+  const month = getCurrentProFormaMonth();
+  const planRevenue = month ? cumulativeThrough(TOTAL_REVENUE, month) : null;
+  const planUnits = month ? cumulativeThrough(TOTAL_UNITS, month) : null;
+  const planEbitda = month ? cumulativeThrough(EBITDA, month) : null;
+  const planMargin = month
+    ? average(getMonthsThrough(month).map((m) => GROSS_MARGIN[m]))
+    : null;
 
-  // ------ Build chart data (plan + actual overlay) ------
-  const revenueChartData = useMemo(() => {
-    // Aggregate live daily data into monthly buckets keyed by MONTH_LABELS
-    const actualByMonth: Record<string, number> = {};
-    if (liveData?.chartData) {
-      for (const d of liveData.chartData) {
-        const dateObj = new Date(d.date);
-        const monthIdx = dateObj.getMonth(); // 0=Jan
-        // Map month index to our MONTH_LABELS: Mar=2, Apr=3 ... Dec=11
-        const monthKey = MONTHS[monthIdx - 2]; // Mar is index 0 in MONTHS
-        if (monthKey) {
-          const lbl = MONTH_LABELS[monthKey];
-          actualByMonth[lbl] = (actualByMonth[lbl] || 0) + d.combined;
-        }
-      }
+  const revenueActual = dashboard?.combined.totalRevenue ?? null;
+  const unitsActual =
+    ((dashboard?.amazon?.unitsSold?.monthToDate || 0) +
+      (dashboard?.shopify?.totalOrders || 0)) || null;
+  const marginActual = pnl?.grossMargin ?? null;
+  const ebitdaActual = pnl?.netIncome ?? null;
+
+  const revenuePva = planRevenue != null ? comparePlanVsActual(planRevenue, revenueActual) : null;
+  const unitsPva = planUnits != null ? comparePlanVsActual(planUnits, unitsActual) : null;
+  const marginPva =
+    planMargin != null && marginActual != null
+      ? comparePlanVsActual(planMargin, marginActual)
+      : null;
+  const ebitdaPva = planEbitda != null ? comparePlanVsActual(planEbitda, ebitdaActual) : null;
+
+  const openDeals = useMemo(() => {
+    if (!pipeline) return 0;
+    const closed = Object.entries(pipeline.stageCounts || {}).reduce((sum, [stage, count]) => {
+      return /closed|lost|not interested/i.test(stage) ? sum + count : sum;
+    }, 0);
+    return Math.max(0, pipeline.totalLeads - closed);
+  }, [pipeline]);
+
+  const inventoryDays = dashboard?.amazon?.inventory?.daysOfSupply ?? 0;
+
+  const trendRows = useMemo(() => {
+    const channelDaily = channels?.dailyByChannel || [];
+    const amazonByDate = new Map((dashboard?.chartData || []).map((d) => [d.date, d.amazon]));
+    if (channelDaily.length === 0) {
+      return (dashboard?.chartData || []).map((d) => ({
+        label: d.label,
+        amazon: d.amazon,
+        dtc: d.shopify,
+        faire: 0,
+        distributor: 0,
+      }));
     }
 
-    let cumulative = 0;
-    return MONTHS.map((m) => {
-      cumulative += TOTAL_REVENUE[m];
-      const lbl = MONTH_LABELS[m];
-      return {
-        month: lbl,
-        revenue: Math.round(TOTAL_REVENUE[m]),
-        cumulative: Math.round(cumulative),
-        ebitda: Math.round(EBITDA[m]),
-        actualRevenue: actualByMonth[lbl] ? Math.round(actualByMonth[lbl]) : undefined,
-      };
-    });
-  }, [liveData]);
+    return channelDaily.map((d) => ({
+      label: d.label,
+      amazon: amazonByDate.get(d.date) || 0,
+      dtc: d.dtcRevenue,
+      faire: d.faireRevenue,
+      distributor: d.distributorRevenue,
+    }));
+  }, [channels, dashboard]);
 
-  // ------ Channel annual totals ------
-  const channelTotals = useMemo(() => {
-    const sumChannel = (channel: { units: Record<Month, number>; revenue: Record<Month, number>; grossProfit: Record<Month, number> }) => {
-      let u = 0, r = 0, g = 0;
-      for (const m of MONTHS) {
-        u += channel.units[m];
-        r += channel.revenue[m];
-        g += channel.grossProfit[m];
-      }
-      return { units: u, revenue: r, gp: g };
-    };
-    return {
-      amazon: sumChannel(AMAZON),
-      wholesale: sumChannel(WHOLESALE),
-      distributor: sumChannel(DISTRIBUTOR),
-    };
-  }, []);
+  const channelMix = useMemo(() => {
+    const amazon = dashboard?.amazon?.revenue.monthToDate || 0;
+    const dtc = channels?.shopify?.dtc.revenue || 0;
+    const faire = channels?.shopify?.faire.revenue || 0;
+    const distributor = channels?.shopify?.distributor.revenue || 0;
 
-  // ------ Capital deployment categories (grouped) ------
-  const deploymentGroups = useMemo(() => {
-    const groups: Record<string, number> = {};
-    for (const item of CAPITAL_DEPLOYMENT) {
-      const key = item.category.replace(/ -- .*$/, "").replace(/ \u2014 .*$/, "").split(" \u2014")[0];
-      const baseCategory =
-        key.startsWith("Inventory") ? "Inventory" :
-        key.startsWith("Display") ? "Display Program" :
-        key.startsWith("Email") ? "Email & Domain" :
-        key.startsWith("Amazon") ? "Amazon (PPC + Listing)" :
-        key.startsWith("Faire") ? "Faire / B2B" :
-        key.startsWith("A+") ? "Content & Creative" :
-        key.startsWith("Google") ? "Google Ads" :
-        key.startsWith("Road") ? "Road Sales" :
-        key.startsWith("Rent") ? "Rent & G&A" :
-        key.startsWith("Working") ? "Working Capital Reserve" :
-        "Other";
-      groups[baseCategory] = (groups[baseCategory] || 0) + item.amount;
-    }
-    return Object.entries(groups).sort((a, b) => b[1] - a[1]);
-  }, []);
+    return [
+      { name: "Amazon", value: amazon, color: COLOR_AMAZON },
+      { name: "DTC", value: dtc, color: COLOR_DTC },
+      { name: "Faire", value: faire, color: COLOR_FAIRE },
+      { name: "Distributor", value: distributor, color: COLOR_DIST },
+    ].filter((x) => x.value > 0);
+  }, [channels, dashboard]);
 
-  const now = new Date();
-  const monthYear = now.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const sparkRevenue = (dashboard?.chartData || []).map((d) => d.combined);
+  const sparkCash = balances
+    ? [
+        balances.found?.available || 0,
+        balances.shopify?.balance || 0,
+        balances.amazon?.pendingBalance || 0,
+        balances.totalCash,
+      ]
+    : [0, 0, 0, 0];
+  const sparkUnits = (dashboard?.chartData || []).map((d) => d.combinedOrders);
+  const sparkDeals = Object.values(pipeline?.stageCounts || {});
+  const sparkInventory = (dashboard?.amazon?.dailyBreakdown || []).map((d) => d.orders);
 
   return (
-    <div style={{ minHeight: "100vh", background: COLORS.bg, padding: "32px 24px 64px" }}>
-      <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-        {/* ================================================================
-            HEADER
-        ================================================================ */}
-        <div style={{ marginBottom: 32 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4 }}>
-            <Target size={24} color={COLORS.red} strokeWidth={2} />
-            <h1
-              style={{
-                fontSize: 28,
-                fontWeight: 800,
-                color: COLORS.navy,
-                margin: 0,
-                letterSpacing: "-0.02em",
-              }}
-            >
-              Command Center
-            </h1>
+    <div style={{ background: BG, minHeight: "100vh", paddingBottom: 20 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: 30, color: NAVY, letterSpacing: "-0.02em" }}>
+            Command Center
+          </h1>
+          <div style={{ marginTop: 4, fontSize: 13, color: TEXT_DIM }}>
+            Live operational overview with channel, finance, and alert visibility.
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginLeft: 36 }}>
-            <span style={{ fontSize: 14, color: COLORS.subtleText }}>
-              {monthYear}
-            </span>
-            <span style={{ color: COLORS.lightBorder }}>|</span>
-            <span style={{ fontSize: 13, color: COLORS.subtleText }}>
-              Full-Year 2026 Plan Targets + Live Actuals
-            </span>
-            <span style={planBadge}>Pro Forma v22</span>
-            {liveData && !liveLoading && (
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: COLORS.liveGreen, fontWeight: 600 }}>
-                <PulseDot />
-                LIVE
-              </span>
-            )}
-            {liveLoading && (
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: COLORS.gold, fontWeight: 600 }}>
-                <PulseDot color={COLORS.gold} />
-                Loading...
-              </span>
-            )}
-          </div>
-          {liveError && (
-            <div style={{ marginLeft: 36, marginTop: 4, fontSize: 12, color: COLORS.red, display: "flex", alignItems: "center", gap: 6 }}>
-              <AlertTriangle size={14} strokeWidth={2.5} />
-              Live data unavailable -- showing plan only
-            </div>
-          )}
         </div>
-        <style>{`@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }`}</style>
-
-        {/* ================================================================
-            KPI CARDS — 6 cards, 3 columns x 2 rows
-        ================================================================ */}
-        <div
+        <button
+          onClick={() => refresh()}
           style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(3, 1fr)",
-            gap: 16,
-            marginBottom: 32,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            border: "none",
+            borderRadius: 8,
+            background: NAVY,
+            color: "#fff",
+            padding: "10px 14px",
+            fontWeight: 700,
+            cursor: "pointer",
           }}
         >
-          <KpiCard
-            icon={DollarSign}
-            label="Total Revenue"
-            value={fmtDollar(ANNUAL_SUMMARY.totalRevenue)}
-            subtitle="10 months (Mar-Dec)"
-            accentColor={COLORS.red}
-            liveValue={liveData ? liveFmtDollar(liveData.combined.totalRevenue) : undefined}
-            liveLabel="MTD Actual"
-            pva={liveData ? revenuePva : undefined}
-            liveLoading={liveLoading}
-          />
-          <KpiCard
-            icon={Package}
-            label="Total Units Sold"
-            value={fmt(ANNUAL_SUMMARY.totalUnits)}
-            subtitle="All channels combined"
-            accentColor={COLORS.navy}
-            liveValue={liveData ? fmt(liveData.combined.totalOrders) : undefined}
-            liveLabel="MTD Orders"
-            liveLoading={liveLoading}
-          />
-          <KpiCard
-            icon={TrendingUp}
-            label="EBITDA (Full Year)"
-            value={fmtDollar(ANNUAL_SUMMARY.ebitda)}
-            subtitle="Investment year -- EBITDA+ by June"
-            accentColor={COLORS.gold}
-          />
-          <KpiCard
-            icon={Landmark}
-            label="Loan Balance (Dec 31)"
-            value={fmtDollar(ANNUAL_SUMMARY.loanBalanceDec31)}
-            subtitle={`of ${fmtDollar(LOAN.totalObligation)} total obligation`}
-            accentColor={COLORS.navy}
-          />
-          <KpiCard
-            icon={BarChart3}
-            label="Blended Gross Margin"
-            value={fmtPercent(ANNUAL_SUMMARY.blendedGrossMargin)}
-            subtitle={`${fmtDollar(ANNUAL_SUMMARY.totalGrossProfit)} gross profit`}
-            accentColor={COLORS.red}
-            liveValue={liveData ? fmtDollarExact(liveData.combined.avgOrderValue) : undefined}
-            liveLabel="Avg Order Value"
-            liveLoading={liveLoading}
-          />
-          <KpiCard
-            icon={Wallet}
-            label="Cash Position (Dec 31)"
-            value={fmtDollar(ANNUAL_SUMMARY.closingCashDec31)}
-            subtitle="Closing cash after all obligations"
-            accentColor={COLORS.greenAccent}
-            liveValue={balances ? liveFmtDollar(balances.totalCash) : undefined}
-            liveLabel="Current Cash"
-            pva={balances ? comparePlanVsActual(ANNUAL_SUMMARY.closingCashDec31, balances.totalCash) : undefined}
-            liveLoading={balLoading}
-          />
-        </div>
+          <RefreshCw size={15} />
+          Refresh
+        </button>
+      </div>
 
-        {/* ================================================================
-            LIVE PERFORMANCE — Real-time actuals from Shopify + Amazon
-        ================================================================ */}
+      {dashboardError ? (
         <div
           style={{
-            ...cardStyle,
-            marginBottom: 32,
-            padding: "20px 24px",
-            borderLeft: `4px solid ${liveData ? COLORS.liveGreen : COLORS.gold}`,
-            background: liveData ? `linear-gradient(135deg, ${COLORS.white}, ${COLORS.lightGreen})` : COLORS.white,
+            border: `1px solid ${RED}33`,
+            background: `${RED}14`,
+            color: RED,
+            borderRadius: 10,
+            padding: "10px 12px",
+            marginBottom: 12,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            fontWeight: 700,
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <Activity size={18} color={liveData ? COLORS.liveGreen : COLORS.subtleText} strokeWidth={2} />
-              <h2 style={{ ...sectionTitleStyle, fontSize: 16 }}>
-                Live Performance
-              </h2>
-              {liveData && <PulseDot />}
-              <span style={liveBadge}>MTD Actuals</span>
-            </div>
-            <button
-              onClick={refresh}
-              disabled={liveLoading}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                border: `1px solid ${COLORS.lightBorder}`,
-                borderRadius: 6,
-                padding: "4px 12px",
-                fontSize: 12,
-                fontWeight: 600,
-                color: COLORS.navy,
-                background: COLORS.white,
-                cursor: liveLoading ? "not-allowed" : "pointer",
-                opacity: liveLoading ? 0.6 : 1,
-              }}
-            >
-              <RefreshCw size={12} strokeWidth={2.5} style={liveLoading ? { animation: "spin 1s linear infinite" } : undefined} />
-              Refresh
-            </button>
-          </div>
-          {liveLoading && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
-              {[1, 2, 3, 4].map((i) => (
-                <LoadingSkeleton key={i} height={60} />
-              ))}
-            </div>
-          )}
-          {liveData && !liveLoading && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
-              <div style={{ background: COLORS.lightGreen, borderRadius: 8, padding: 16, border: `1px solid ${COLORS.liveGreen}20` }}>
-                <div style={{ fontSize: 11, color: COLORS.subtleText, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                  Combined Revenue
-                </div>
-                <div style={{ fontSize: 24, fontWeight: 700, color: COLORS.navy, marginTop: 4 }}>
-                  {liveFmtDollar(liveData.combined.totalRevenue)}
-                </div>
-                {revenuePva.status !== "no-data" && (
-                  <div style={{ marginTop: 4 }}>
-                    <VarianceBadge pva={revenuePva} />
-                    <span style={{ fontSize: 10, color: COLORS.subtleText, marginLeft: 6 }}>
-                      vs {liveFmtDollar(mtdPlanRevenue)} plan
-                    </span>
-                  </div>
-                )}
-              </div>
-              <div style={{ background: COLORS.lightNavy, borderRadius: 8, padding: 16 }}>
-                <div style={{ fontSize: 11, color: COLORS.subtleText, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                  Combined Orders
-                </div>
-                <div style={{ fontSize: 24, fontWeight: 700, color: COLORS.navy, marginTop: 4 }}>
-                  {fmt(liveData.combined.totalOrders)}
-                </div>
-              </div>
-              <div style={{ background: COLORS.lightNavy, borderRadius: 8, padding: 16 }}>
-                <div style={{ fontSize: 11, color: COLORS.subtleText, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                  Avg Order Value
-                </div>
-                <div style={{ fontSize: 24, fontWeight: 700, color: COLORS.navy, marginTop: 4 }}>
-                  {fmtDollarExact(liveData.combined.avgOrderValue)}
-                </div>
-              </div>
-              <div style={{ background: balances ? "rgba(46, 125, 50, 0.06)" : COLORS.lightNavy, borderRadius: 8, padding: 16, border: balances ? `1px solid ${COLORS.greenAccent}20` : "none" }}>
-                <div style={{ fontSize: 11, color: COLORS.subtleText, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                  Cash Position
-                </div>
-                <div style={{ fontSize: 24, fontWeight: 700, color: COLORS.greenAccent, marginTop: 4 }}>
-                  {balLoading ? "..." : balances ? liveFmtDollar(balances.totalCash) : "N/A"}
-                </div>
-              </div>
-            </div>
-          )}
-          {liveData && (
-            <div style={{ marginTop: 12, fontSize: 11, color: COLORS.subtleText, textAlign: "right" }}>
-              Last updated: {new Date(liveData.generatedAt).toLocaleString()}
-            </div>
-          )}
-          {!liveData && !liveLoading && liveError && (
-            <div style={{ textAlign: "center", padding: 20, color: COLORS.subtleText, fontSize: 13 }}>
-              <AlertTriangle size={16} color={COLORS.gold} style={{ verticalAlign: "middle", marginRight: 8 }} />
-              Live data unavailable -- check API connection
-            </div>
-          )}
+          <AlertTriangle size={16} />
+          {dashboardError}
         </div>
-        <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+      ) : null}
 
-        {/* ================================================================
-            REVENUE TRAJECTORY CHART
-        ================================================================ */}
-        <div style={{ ...cardStyle, marginBottom: 32, padding: "24px 24px 16px" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-            <div>
-              <h2 style={sectionTitleStyle}>Revenue Trajectory -- 2026</h2>
-              <p style={{ fontSize: 13, color: COLORS.subtleText, margin: "4px 0 0" }}>
-                Plan targets vs actual monthly revenue across all channels
-              </p>
-            </div>
-            <div style={{ display: "flex", gap: 6 }}>
-              <span style={planBadge}>Pro Forma</span>
-              {liveData && <span style={liveBadge}>+ Actual</span>}
-            </div>
-          </div>
-          <ResponsiveContainer width="100%" height={320}>
-            <ComposedChart data={revenueChartData} margin={{ top: 10, right: 30, left: 10, bottom: 0 }}>
-              <defs>
-                <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={COLORS.red} stopOpacity={0.15} />
-                  <stop offset="95%" stopColor={COLORS.red} stopOpacity={0.02} />
-                </linearGradient>
-                <linearGradient id="cumulativeGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={COLORS.navy} stopOpacity={0.08} />
-                  <stop offset="95%" stopColor={COLORS.navy} stopOpacity={0.01} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke={COLORS.lightBorder} vertical={false} />
-              <XAxis
-                dataKey="month"
-                tick={{ fontSize: 12, fill: COLORS.subtleText }}
-                axisLine={{ stroke: COLORS.lightBorder }}
-                tickLine={false}
-              />
-              <YAxis
-                yAxisId="monthly"
-                orientation="left"
-                tick={{ fontSize: 11, fill: COLORS.subtleText }}
-                axisLine={false}
-                tickLine={false}
-                tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}K`}
-              />
-              <YAxis
-                yAxisId="cumulative"
-                orientation="right"
-                tick={{ fontSize: 11, fill: COLORS.subtleText }}
-                axisLine={false}
-                tickLine={false}
-                tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}K`}
-              />
-              <Tooltip content={<ChartTooltip />} />
-              <Legend
-                verticalAlign="top"
-                align="right"
-                iconType="line"
-                wrapperStyle={{ fontSize: 12, color: COLORS.subtleText, paddingBottom: 8 }}
-              />
-              <Area
-                yAxisId="monthly"
-                type="monotone"
-                dataKey="revenue"
-                name="Plan (Monthly)"
-                stroke={COLORS.red}
-                strokeWidth={2.5}
-                fill="url(#revenueGradient)"
-              />
-              <Bar
-                yAxisId="monthly"
-                dataKey="actualRevenue"
-                name="Actual (Monthly)"
-                fill={COLORS.liveGreen}
-                fillOpacity={0.7}
-                radius={[3, 3, 0, 0]}
-                barSize={24}
-              />
-              <Line
-                yAxisId="cumulative"
-                type="monotone"
-                dataKey="cumulative"
-                name="Cumulative Plan"
-                stroke={COLORS.navy}
-                strokeWidth={2}
-                strokeDasharray="6 3"
-                dot={{ fill: COLORS.navy, r: 3 }}
-              />
-            </ComposedChart>
-          </ResponsiveContainer>
-        </div>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          gap: 10,
+          marginBottom: 14,
+        }}
+      >
+        <MetricCard
+          icon={<DollarSign size={16} />}
+          label="MTD Revenue"
+          value={fmtDollar(revenueActual || 0)}
+          plan={planRevenue != null ? fmtDollar(planRevenue) : null}
+          variance={revenuePva}
+          spark={sparkRevenue.length ? sparkRevenue : [0, 0, 0]}
+        />
+        <MetricCard
+          icon={<Wallet size={16} />}
+          label="Cash Position"
+          value={fmtDollar(balances?.totalCash || 0)}
+          plan={null}
+          variance={null}
+          spark={sparkCash}
+        />
+        <MetricCard
+          icon={<Package size={16} />}
+          label="Units Shipped"
+          value={(unitsActual || 0).toLocaleString("en-US")}
+          plan={planUnits != null ? planUnits.toLocaleString("en-US") : null}
+          variance={unitsPva}
+          spark={sparkUnits.length ? sparkUnits : [0, 0, 0]}
+        />
+        <MetricCard
+          icon={<Percent size={16} />}
+          label="Contribution Margin"
+          value={fmtPercent(marginActual || 0)}
+          plan={planMargin != null ? fmtPercent(planMargin) : null}
+          variance={marginPva}
+          spark={sparkRevenue.length ? sparkRevenue : [0, 0, 0]}
+        />
+        <MetricCard
+          icon={<Briefcase size={16} />}
+          label="Open Deals"
+          value={openDeals.toLocaleString("en-US")}
+          plan={null}
+          variance={null}
+          spark={sparkDeals.length ? sparkDeals : [0, 0, 0]}
+        />
+        <MetricCard
+          icon={<Boxes size={16} />}
+          label="Days of Inventory"
+          value={`${inventoryDays.toFixed(0)}d`}
+          plan="30d"
+          variance={comparePlanVsActual(30, inventoryDays)}
+          spark={sparkInventory.length ? sparkInventory : [0, 0, 0]}
+        />
+      </div>
 
-        {/* ================================================================
-            CHANNEL MIX — 3 columns
-        ================================================================ */}
-        <div style={{ marginBottom: 32 }}>
-          <h2 style={{ ...sectionTitleStyle, marginBottom: 16 }}>Channel Mix -- Annual Targets</h2>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
-            <ChannelCard
-              name="Amazon FBA"
-              icon={ShoppingCart}
-              accentColor={COLORS.gold}
-              units={channelTotals.amazon.units}
-              revenue={channelTotals.amazon.revenue}
-              gp={channelTotals.amazon.gp}
-              gpPerUnit={UNIT_ECONOMICS.amazon.gpPerUnit}
-            />
-            <ChannelCard
-              name="Wholesale (Direct)"
-              icon={Store}
-              accentColor={COLORS.navy}
-              units={channelTotals.wholesale.units}
-              revenue={channelTotals.wholesale.revenue}
-              gp={channelTotals.wholesale.gp}
-              gpPerUnit={UNIT_ECONOMICS.wholesale.gpPerUnit}
-            />
-            <ChannelCard
-              name="Distributor Network"
-              icon={Truck}
-              accentColor={COLORS.red}
-              units={channelTotals.distributor.units}
-              revenue={channelTotals.distributor.revenue}
-              gp={channelTotals.distributor.gp}
-              gpPerUnit={UNIT_ECONOMICS.distributor.gpPerUnit}
-            />
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "2fr 1fr",
+          gap: 12,
+          marginBottom: 14,
+        }}
+      >
+        <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px 14px 8px" }}>
+          <div style={{ fontWeight: 700, color: NAVY, marginBottom: 10 }}>30-Day Revenue by Channel</div>
+          <div style={{ width: "100%", height: 280 }}>
+            <ResponsiveContainer>
+              <ComposedChart data={trendRows}>
+                <CartesianGrid strokeDasharray="3 3" stroke={BORDER} />
+                <XAxis dataKey="label" tick={{ fontSize: 11, fill: TEXT_DIM }} />
+                <YAxis tick={{ fontSize: 11, fill: TEXT_DIM }} />
+                <Tooltip formatter={(v: number | string | undefined) => fmtDollar(Number(v || 0))} />
+                <Bar dataKey="amazon" stackId="rev" fill={COLOR_AMAZON} name="Amazon" />
+                <Bar dataKey="dtc" stackId="rev" fill={COLOR_DTC} name="DTC" />
+                <Bar dataKey="faire" stackId="rev" fill={COLOR_FAIRE} name="Faire" />
+                <Bar dataKey="distributor" stackId="rev" fill={COLOR_DIST} name="Distributor" />
+                <Line
+                  type="monotone"
+                  dataKey={() => {
+                    if (!month) return 0;
+                    const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+                    return TOTAL_REVENUE[month] / daysInMonth;
+                  }}
+                  stroke={NAVY}
+                  strokeDasharray="5 4"
+                  dot={false}
+                  name="Daily Plan"
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
           </div>
         </div>
 
-        {/* ================================================================
-            CAPITAL DEPLOYMENT SUMMARY
-        ================================================================ */}
-        <div style={{ ...cardStyle, marginBottom: 32, padding: 24 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-            <div>
-              <h2 style={sectionTitleStyle}>Capital Deployment</h2>
-              <p style={{ fontSize: 13, color: COLORS.subtleText, margin: "4px 0 0" }}>
-                {fmtDollar(TOTAL_CAPITAL_DEPLOYED)} total deployed from {fmtDollar(LOAN.principal)} raise
-              </p>
-            </div>
-            <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: 24, fontWeight: 700, color: COLORS.navy }}>
-                {fmtDollar(TOTAL_CAPITAL_DEPLOYED)}
-              </div>
-              <div style={{ fontSize: 11, color: COLORS.subtleText }}>TOTAL DEPLOYED</div>
-            </div>
+        <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px 14px 8px" }}>
+          <div style={{ fontWeight: 700, color: NAVY, marginBottom: 10 }}>Channel Mix</div>
+          <div style={{ width: "100%", height: 180 }}>
+            <ResponsiveContainer>
+              <PieChart>
+                <Pie data={channelMix} dataKey="value" nameKey="name" outerRadius={70} innerRadius={42}>
+                  {channelMix.map((entry) => (
+                    <Cell key={entry.name} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(v: number | string | undefined) => fmtDollar(Number(v || 0))} />
+              </PieChart>
+            </ResponsiveContainer>
           </div>
 
-          {/* Progress bar */}
-          <div
-            style={{
-              height: 8,
-              background: COLORS.lightBorder,
-              borderRadius: 4,
-              overflow: "hidden",
-              marginBottom: 24,
-            }}
-          >
-            <div
-              style={{
-                height: "100%",
-                width: `${Math.min(100, (TOTAL_CAPITAL_DEPLOYED / LOAN.principal) * 100)}%`,
-                background: `linear-gradient(90deg, ${COLORS.red}, ${COLORS.gold})`,
-                borderRadius: 4,
-                transition: "width 0.6s ease",
-              }}
-            />
+          <div style={{ display: "grid", gap: 7 }}>
+            {channelMix.map((row) => {
+              const total = dashboard?.combined.totalRevenue || 1;
+              return (
+                <SourceRow
+                  key={row.name}
+                  label={`${row.name} (${((row.value / total) * 100).toFixed(1)}%)`}
+                  value={fmtDollar(row.value)}
+                />
+              );
+            })}
           </div>
+        </div>
+      </div>
 
-          {/* Deployment Table */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 0 }}>
-            {/* Header */}
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 120px 80px",
-                padding: "8px 12px",
-                borderBottom: `2px solid ${COLORS.lightBorder}`,
-              }}
-            >
-              <span style={{ fontSize: 11, fontWeight: 700, color: COLORS.subtleText, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                Category
-              </span>
-              <span style={{ fontSize: 11, fontWeight: 700, color: COLORS.subtleText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "right" }}>
-                Amount
-              </span>
-              <span style={{ fontSize: 11, fontWeight: 700, color: COLORS.subtleText, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "right" }}>
-                % of Total
-              </span>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 12,
+          marginBottom: 14,
+        }}
+      >
+        <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px" }}>
+          <div style={{ fontWeight: 700, color: NAVY, marginBottom: 10 }}>Cash Position Summary</div>
+          <div style={{ display: "grid", gap: 8 }}>
+            <SourceRow label="Found Available" value={fmtDollar(balances?.found?.available || 0)} />
+            <SourceRow label="Shopify Pending" value={fmtDollar(balances?.shopify?.balance || 0)} />
+            <SourceRow label="Amazon Pending" value={fmtDollar(balances?.amazon?.pendingBalance || 0)} />
+            <div style={{ borderTop: `1px solid ${BORDER}`, marginTop: 4, paddingTop: 8 }}>
+              <SourceRow label="Total Cash" value={fmtDollar(balances?.totalCash || 0)} />
             </div>
-            {/* Rows */}
-            {deploymentGroups.map(([category, amount], i) => (
+          </div>
+        </div>
+
+        <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px" }}>
+          <div style={{ fontWeight: 700, color: NAVY, marginBottom: 10 }}>Pipeline Snapshot</div>
+          <div style={{ display: "grid", gap: 8 }}>
+            <SourceRow label="Total Leads" value={String(pipeline?.totalLeads || 0)} />
+            <SourceRow label="Open Deals" value={String(openDeals)} />
+            <SourceRow label="Pipeline Value" value={fmtDollar(pipeline?.pipelineValue.total || 0)} />
+            <SourceRow label="Avg Days to Close" value={`${pipeline?.velocity.avgDaysToClose || 0}d`} />
+          </div>
+        </div>
+      </div>
+
+      <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px", marginBottom: 14 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
+          <div style={{ fontWeight: 700, color: NAVY }}>Active Alerts</div>
+          <div style={{ fontSize: 12, color: TEXT_DIM }}>{(alerts?.summary.total || 0).toLocaleString("en-US")} unresolved</div>
+        </div>
+
+        {(alerts?.alerts || []).length === 0 ? (
+          <div style={{ fontSize: 13, color: TEXT_DIM }}>
+            {dashboardLoading ? "Loading alerts..." : "No active alerts right now."}
+          </div>
+        ) : (
+          <div style={{ display: "grid", gap: 8 }}>
+            {(alerts?.alerts || []).slice(0, 5).map((alert) => (
               <div
-                key={category}
+                key={alert.id}
                 style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 120px 80px",
-                  padding: "10px 12px",
-                  borderBottom: `1px solid ${COLORS.lightBorder}`,
-                  background: i % 2 === 0 ? "transparent" : COLORS.lightNavy,
+                  display: "flex",
+                  gap: 10,
+                  alignItems: "flex-start",
+                  borderTop: `1px solid ${BORDER}`,
+                  paddingTop: 8,
                 }}
               >
-                <span style={{ fontSize: 13, color: COLORS.navy, fontWeight: 500 }}>{category}</span>
-                <span style={{ fontSize: 13, color: COLORS.navy, fontWeight: 600, textAlign: "right" }}>
-                  {fmtDollar(amount)}
-                </span>
-                <span style={{ fontSize: 13, color: COLORS.subtleText, textAlign: "right" }}>
-                  {((amount / TOTAL_CAPITAL_DEPLOYED) * 100).toFixed(1)}%
-                </span>
+                <span
+                  style={{
+                    marginTop: 2,
+                    width: 9,
+                    height: 9,
+                    borderRadius: 99,
+                    background:
+                      alert.priority === "critical"
+                        ? RED
+                        : alert.priority === "warning"
+                          ? GOLD
+                          : "#16a34a",
+                  }}
+                />
+                <div style={{ flex: 1 }}>
+                  <div style={{ color: NAVY, fontSize: 13, fontWeight: 700 }}>{alert.title}</div>
+                  <div style={{ fontSize: 12, color: TEXT_DIM }}>{alert.message}</div>
+                </div>
               </div>
             ))}
           </div>
+        )}
+      </div>
+
+      <div
+        style={{
+          background: CARD,
+          border: `1px solid ${BORDER}`,
+          borderRadius: 12,
+          padding: "12px 14px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: 12,
+        }}
+      >
+        <div style={{ fontSize: 12, color: TEXT_DIM, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase" }}>
+          Plan vs Actual Benchmark
         </div>
 
-        {/* ================================================================
-            MILESTONES TIMELINE
-        ================================================================ */}
-        <div style={{ ...cardStyle, padding: 24 }}>
-          <h2 style={{ ...sectionTitleStyle, marginBottom: 20 }}>Key Milestones -- 2026</h2>
-
-          <div style={{ position: "relative", padding: "0 0 0 20px" }}>
-            {/* Vertical line */}
-            <div
-              style={{
-                position: "absolute",
-                left: 8,
-                top: 4,
-                bottom: 4,
-                width: 2,
-                background: COLORS.lightBorder,
-              }}
-            />
-
-            {MILESTONES.map((ms, i) => {
-              const isHighlight =
-                ms.id === "ebitda-positive" ||
-                ms.id === "cash-floor" ||
-                ms.id === "100k-units";
-
-              const monthLabel =
-                typeof ms.targetMonth === "string" && ms.targetMonth in MONTH_FULL_LABELS
-                  ? MONTH_FULL_LABELS[ms.targetMonth as Month]
-                  : ms.targetMonth;
-
-              return (
-                <div
-                  key={ms.id}
-                  style={{
-                    position: "relative",
-                    display: "flex",
-                    alignItems: "flex-start",
-                    gap: 16,
-                    paddingBottom: i < MILESTONES.length - 1 ? 20 : 0,
-                  }}
-                >
-                  {/* Dot on timeline */}
-                  <div
-                    style={{
-                      position: "absolute",
-                      left: -16,
-                      top: 3,
-                      width: 14,
-                      height: 14,
-                      borderRadius: "50%",
-                      background: isHighlight ? COLORS.red : COLORS.white,
-                      border: `2px solid ${isHighlight ? COLORS.red : COLORS.gold}`,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      zIndex: 1,
-                    }}
-                  >
-                    {isHighlight && (
-                      <CheckCircle size={8} color={COLORS.white} strokeWidth={3} />
-                    )}
-                  </div>
-
-                  {/* Content */}
-                  <div style={{ flex: 1, paddingLeft: 8 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <span
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 700,
-                          color: COLORS.gold,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.06em",
-                          minWidth: 80,
-                        }}
-                      >
-                        {monthLabel}
-                      </span>
-                      <span
-                        style={{
-                          fontSize: 14,
-                          fontWeight: isHighlight ? 700 : 500,
-                          color: COLORS.navy,
-                        }}
-                      >
-                        {ms.label}
-                      </span>
-                      {isHighlight && (
-                        <Flag size={12} color={COLORS.red} strokeWidth={2.5} />
-                      )}
-                    </div>
-                    <div style={{ fontSize: 12, color: COLORS.subtleText, marginTop: 2, paddingLeft: 90 }}>
-                      {ms.unit === "dollars"
-                        ? `Target: ${fmtDollar(ms.threshold)}`
-                        : `Target: ${fmt(ms.threshold)} ${ms.unit}`}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-
-            {/* Final milestone: Full repayment */}
-            <div
-              style={{
-                position: "relative",
-                display: "flex",
-                alignItems: "flex-start",
-                gap: 16,
-              }}
-            >
-              <div
-                style={{
-                  position: "absolute",
-                  left: -16,
-                  top: 3,
-                  width: 14,
-                  height: 14,
-                  borderRadius: "50%",
-                  background: COLORS.greenAccent,
-                  border: `2px solid ${COLORS.greenAccent}`,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  zIndex: 1,
-                }}
-              >
-                <CheckCircle size={8} color={COLORS.white} strokeWidth={3} />
-              </div>
-              <div style={{ flex: 1, paddingLeft: 8 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 700,
-                      color: COLORS.greenAccent,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.06em",
-                      minWidth: 80,
-                    }}
-                  >
-                    Feb 2028
-                  </span>
-                  <span
-                    style={{
-                      fontSize: 14,
-                      fontWeight: 700,
-                      color: COLORS.navy,
-                    }}
-                  >
-                    Full Loan Repayment
-                  </span>
-                  <Flag size={12} color={COLORS.greenAccent} strokeWidth={2.5} />
-                </div>
-                <div style={{ fontSize: 12, color: COLORS.subtleText, marginTop: 2, paddingLeft: 90 }}>
-                  {fmtDollar(LOAN.totalObligation)} fully repaid ({fmtDollar(LOAN.principal)} + {fmtPercent(LOAN.flatReturnRate)} return)
-                </div>
-              </div>
-            </div>
+        <div style={{ fontSize: 13, color: NAVY }}>Revenue: {fmtDollar(revenueActual || 0)} / {fmtDollar(planRevenue || 0)}</div>
+        {revenuePva ? (
+          <div
+            style={{
+              fontSize: 13,
+              fontWeight: 800,
+              color: STATUS_COLORS[revenuePva.status],
+              background: `${STATUS_COLORS[revenuePva.status]}14`,
+              borderRadius: 6,
+              padding: "4px 8px",
+            }}
+          >
+            {(revenuePva.variancePct * 100).toFixed(1)}%
           </div>
-        </div>
+        ) : null}
 
-        {/* ================================================================
-            FOOTER
-        ================================================================ */}
-        <div style={{ textAlign: "center", marginTop: 40, paddingBottom: 16 }}>
-          <div style={{ fontSize: 11, color: COLORS.subtleText, letterSpacing: "0.05em" }}>
-            USA GUMMIES -- PRO FORMA V22 -- CONFIDENTIAL
+        <div style={{ fontSize: 13, color: NAVY }}>EBITDA proxy: {fmtDollar(ebitdaActual || 0)} / {fmtDollar(planEbitda || 0)}</div>
+        {ebitdaPva ? (
+          <div
+            style={{
+              fontSize: 13,
+              fontWeight: 800,
+              color: STATUS_COLORS[ebitdaPva.status],
+              background: `${STATUS_COLORS[ebitdaPva.status]}14`,
+              borderRadius: 6,
+              padding: "4px 8px",
+            }}
+          >
+            {(ebitdaPva.variancePct * 100).toFixed(1)}%
           </div>
-          {liveData && (
-            <div style={{ fontSize: 10, color: COLORS.subtleText, marginTop: 4, opacity: 0.7 }}>
-              Live data as of {new Date(liveData.generatedAt).toLocaleString()}
-              {balances && ` | Cash data as of ${new Date(balances.lastUpdated).toLocaleString()}`}
-            </div>
-          )}
-        </div>
+        ) : null}
       </div>
     </div>
   );
