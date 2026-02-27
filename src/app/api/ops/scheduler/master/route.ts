@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Client } from "@upstash/qstash";
 import { getDueAgents, ENGINE_REGISTRY } from "@/lib/ops/engine-schedule";
 import { appendStateArray, readState, writeState } from "@/lib/ops/state";
+import { runOpsAudit } from "@/lib/ops/audit-engine";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -177,12 +178,22 @@ export async function GET(req: NextRequest) {
     await appendStateArray("run-ledger", dispatched, 10000);
   }
 
+  // Keep audit cache warm so pages have recent reconciliation + freshness data.
+  let auditWarm = false;
+  try {
+    await runOpsAudit();
+    auditWarm = true;
+  } catch (err) {
+    console.error("[scheduler] Audit warmup failed:", err);
+  }
+
   return NextResponse.json({
     ok: true,
     timestamp: etTimestamp(),
     etTime: `${nowET.getHours().toString().padStart(2, "0")}:${nowET.getMinutes().toString().padStart(2, "0")}`,
     totalDue: dueAgents.length,
     dispatched: dispatched.length,
+    auditWarm,
     agents: dispatched,
   });
 }

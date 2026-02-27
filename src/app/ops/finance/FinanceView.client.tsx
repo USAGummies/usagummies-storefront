@@ -32,6 +32,7 @@ import {
   getMonthsThrough,
   cumulativeThrough,
 } from "@/lib/ops/pro-forma";
+import { StalenessBadge } from "@/app/ops/components/StalenessBadge";
 
 const NAVY = "#1B2A4A";
 const RED = "#c7362c";
@@ -127,6 +128,12 @@ export function FinanceView() {
       : 0;
 
   const hasError = pnlError || balError || txError || forecastError;
+  const freshnessItems = [
+    { label: "P&L", timestamp: pnl?.generatedAt },
+    { label: "Balances", timestamp: balances?.lastUpdated },
+    { label: "Transactions", timestamp: tx?.generatedAt },
+    { label: "Forecast", timestamp: forecast?.generatedAt },
+  ];
 
   return (
     <div style={{ background: BG, minHeight: "100vh", paddingBottom: 20 }}>
@@ -136,6 +143,9 @@ export function FinanceView() {
         </h1>
         <div style={{ marginTop: 4, fontSize: 13, color: TEXT_DIM }}>
           Live income statement, cash flow, runway, and transaction visibility.
+        </div>
+        <div style={{ marginTop: 8 }}>
+          <StalenessBadge items={freshnessItems} />
         </div>
       </div>
 

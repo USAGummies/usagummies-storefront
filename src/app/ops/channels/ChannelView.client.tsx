@@ -42,6 +42,7 @@ import {
   getCurrentProFormaMonth,
   cumulativeThrough,
 } from "@/lib/ops/pro-forma";
+import { StalenessBadge } from "@/app/ops/components/StalenessBadge";
 
 // ---------------------------------------------------------------------------
 // Design tokens
@@ -228,6 +229,11 @@ export function ChannelView() {
 
     return source.sort((a, b) => b.total - a.total).slice(0, 10);
   }, [channels, tab]);
+  const freshnessItems = [
+    { label: "Channels", timestamp: channels?.generatedAt },
+    { label: "Dashboard", timestamp: dashboard?.generatedAt },
+    { label: "P&L", timestamp: pnl?.generatedAt },
+  ];
 
   return (
     <div style={{ background: BG, minHeight: "100vh", paddingBottom: 20 }}>
@@ -245,6 +251,9 @@ export function ChannelView() {
           </h1>
           <div style={{ marginTop: 4, color: TEXT_DIM, fontSize: 13 }}>
             Live channel split with Faire separated from Shopify DTC.
+          </div>
+          <div style={{ marginTop: 8 }}>
+            <StalenessBadge items={freshnessItems} />
           </div>
         </div>
 

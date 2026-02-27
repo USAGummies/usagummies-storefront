@@ -46,6 +46,7 @@ import {
   getMonthsThrough,
   cumulativeThrough,
 } from "@/lib/ops/pro-forma";
+import { StalenessBadge } from "@/app/ops/components/StalenessBadge";
 
 const NAVY = "#1B2A4A";
 const RED = "#c7362c";
@@ -260,6 +261,13 @@ export function OpsDashboard() {
   const sparkUnits = (dashboard?.chartData || []).map((d) => d.combinedOrders);
   const sparkDeals = Object.values(pipeline?.stageCounts || {});
   const sparkInventory = (dashboard?.amazon?.dailyBreakdown || []).map((d) => d.orders);
+  const freshnessItems = [
+    { label: "Dashboard", timestamp: dashboard?.generatedAt },
+    { label: "Balances", timestamp: balances?.lastUpdated },
+    { label: "Pipeline", timestamp: pipeline?.generatedAt },
+    { label: "Alerts", timestamp: alerts?.lastFetched },
+    { label: "Channels", timestamp: channels?.generatedAt },
+  ];
 
   return (
     <div style={{ background: BG, minHeight: "100vh", paddingBottom: 20 }}>
@@ -270,6 +278,9 @@ export function OpsDashboard() {
           </h1>
           <div style={{ marginTop: 4, fontSize: 13, color: TEXT_DIM }}>
             Live operational overview with channel, finance, and alert visibility.
+          </div>
+          <div style={{ marginTop: 8 }}>
+            <StalenessBadge items={freshnessItems} />
           </div>
         </div>
         <button

@@ -2,6 +2,7 @@
 
 import { RefreshCw, AlertTriangle, Truck, Boxes, Factory, DollarSign } from "lucide-react";
 import { useInventoryData, useSupplyChain, fmtDollar } from "@/lib/ops/use-war-room-data";
+import { StalenessBadge } from "@/app/ops/components/StalenessBadge";
 
 const NAVY = "#1B2A4A";
 const RED = "#c7362c";
@@ -34,6 +35,10 @@ function MetricCard({ label, value, icon }: { label: string; value: string; icon
 export function SupplyChainView() {
   const { data: inventory, loading: invLoading, error: invError } = useInventoryData();
   const { data: supply, loading: scLoading, error: scError } = useSupplyChain();
+  const freshnessItems = [
+    { label: "Inventory", timestamp: inventory?.generatedAt },
+    { label: "Supply Chain", timestamp: supply?.generatedAt },
+  ];
 
   const error = invError || scError;
 
@@ -44,6 +49,9 @@ export function SupplyChainView() {
           <h1 style={{ margin: 0, fontSize: 30, color: NAVY, letterSpacing: "-0.02em" }}>Supply Chain</h1>
           <div style={{ marginTop: 4, fontSize: 13, color: TEXT_DIM }}>
             Inventory health, production progress, supplier lead times, and cost trends.
+          </div>
+          <div style={{ marginTop: 8 }}>
+            <StalenessBadge items={freshnessItems} />
           </div>
         </div>
         <button

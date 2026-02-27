@@ -11,6 +11,7 @@ import {
   Tooltip,
 } from "recharts";
 import { useMarketingData, fmtPercent } from "@/lib/ops/use-war-room-data";
+import { StalenessBadge } from "@/app/ops/components/StalenessBadge";
 
 const NAVY = "#1B2A4A";
 const RED = "#c7362c";
@@ -39,6 +40,7 @@ export function MarketingView() {
   const { data, loading, error } = useMarketingData();
 
   const funnel = data?.funnel;
+  const freshnessItems = [{ label: "Marketing", timestamp: data?.generatedAt }];
 
   return (
     <div style={{ background: BG, minHeight: "100vh", paddingBottom: 20 }}>
@@ -47,6 +49,9 @@ export function MarketingView() {
           <h1 style={{ margin: 0, fontSize: 30, color: NAVY, letterSpacing: "-0.02em" }}>Marketing & ROAS</h1>
           <div style={{ marginTop: 4, fontSize: 13, color: TEXT_DIM }}>
             GA4 traffic, conversion funnel, top pages, and budget-ready ad channels.
+          </div>
+          <div style={{ marginTop: 8 }}>
+            <StalenessBadge items={freshnessItems} />
           </div>
         </div>
         <button

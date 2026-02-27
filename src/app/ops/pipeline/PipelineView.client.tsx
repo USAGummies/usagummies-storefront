@@ -16,6 +16,7 @@ import {
   useDealEmails,
   fmtDollar,
 } from "@/lib/ops/use-war-room-data";
+import { StalenessBadge } from "@/app/ops/components/StalenessBadge";
 
 const NAVY = "#1B2A4A";
 const RED = "#c7362c";
@@ -88,6 +89,10 @@ export function PipelineView() {
   const { data: pipeline, loading: pipeLoading, error: pipeError } = usePipelineData();
   const { data: dealEmails, loading: emailLoading } = useDealEmails();
   const [actionMsg, setActionMsg] = useState<string | null>(null);
+  const freshnessItems = [
+    { label: "Pipeline", timestamp: pipeline?.generatedAt },
+    { label: "Deal Emails", timestamp: dealEmails?.generatedAt },
+  ];
 
   const leads = useMemo(() => {
     const rows = Object.values(pipeline?.stages || {}).flat();
@@ -185,6 +190,9 @@ export function PipelineView() {
           </h1>
           <div style={{ marginTop: 4, fontSize: 13, color: TEXT_DIM }}>
             Honest Kanban stages with live email context and follow-up actions.
+          </div>
+          <div style={{ marginTop: 8 }}>
+            <StalenessBadge items={freshnessItems} />
           </div>
         </div>
         <button

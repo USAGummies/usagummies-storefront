@@ -10,6 +10,7 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { useAlerts, useAuditStatus } from "@/lib/ops/use-war-room-data";
+import { StalenessBadge } from "@/app/ops/components/StalenessBadge";
 
 const NAVY = "#1B2A4A";
 const RED = "#c7362c";
@@ -70,6 +71,10 @@ export function KpisView() {
     if (filter === "all") return rows;
     return rows.filter((a) => a.priority === filter);
   }, [alerts, filter]);
+  const freshnessItems = [
+    { label: "Alerts", timestamp: alerts?.lastFetched },
+    { label: "Audit", timestamp: audit?.lastFetched },
+  ];
 
   function markDone(id: string, title: string) {
     setLog((prev) => [
@@ -106,6 +111,9 @@ export function KpisView() {
           <h1 style={{ margin: 0, fontSize: 30, color: NAVY, letterSpacing: "-0.02em" }}>Alerts & Actions</h1>
           <div style={{ marginTop: 4, fontSize: 13, color: TEXT_DIM }}>
             Unified operational inbox with priority triage and action log.
+          </div>
+          <div style={{ marginTop: 8 }}>
+            <StalenessBadge items={freshnessItems} />
           </div>
         </div>
 
