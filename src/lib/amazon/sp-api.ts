@@ -16,6 +16,7 @@ import type {
   FeeEstimate,
   FinancialEventGroup,
 } from "./types";
+import { getCachedInventory, setCachedInventory, getCachedKPIs as getCachedKPIsFromCache } from "./cache";
 
 // ---------------------------------------------------------------------------
 // Config
@@ -244,10 +245,18 @@ type InventoryResponse = {
   errors?: { code: string; message: string }[];
 };
 
+export type FBAInventoryFetchResult = {
+  items: FBAInventorySummary[];
+  error: string | null;
+  errorAt: string | null;
+  lastSuccessfulFetch: string | null;
+};
+
 /**
  * Fetch FBA inventory summaries with full details.
  */
-export async function fetchFBAInventory(): Promise<FBAInventorySummary[]> {
+export async function fetchFBAInventory(): Promise<FBAInventoryFetchResult> {
+  const cached = await getCachedInventory<FBAInventoryFetchResult>();
   try {
     const res = await spApiGet<InventoryResponse>(
       "/fba/inventory/v1/summaries",
@@ -260,16 +269,38 @@ export async function fetchFBAInventory(): Promise<FBAInventorySummary[]> {
     );
 
     if (res.errors?.length) {
-      console.error("[amazon] Inventory API errors:", JSON.stringify(res.errors));
-      return [];
+      const errorText = `Inventory API errors: ${JSON.stringify(res.errors)}`;
+      console.error("[amazon] " + errorText);
+      return {
+        items: cached?.items || [],
+        error: errorText,
+        errorAt: new Date().toISOString(),
+        lastSuccessfulFetch: cached?.lastSuccessfulFetch || null,
+      };
     }
 
-    return res.payload?.inventorySummaries || [];
+    const items = res.payload?.inventorySummaries || [];
+    const payload: FBAInventoryFetchResult = {
+      items,
+      error: null,
+      errorAt: null,
+      lastSuccessfulFetch: new Date().toISOString(),
+    };
+    await setCachedInventory(payload);
+    return payload;
   } catch (err) {
-    console.error("[amazon] FBA Inventory fetch failed:", err);
-    return [];
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[amazon] FBA Inventory fetch failed:", message);
+    return {
+      items: cached?.items || [],
+      error: message,
+      errorAt: new Date().toISOString(),
+      lastSuccessfulFetch: cached?.lastSuccessfulFetch || null,
+    };
   }
 }
+
+export const getCachedKPIs = getCachedKPIsFromCache;
 
 // ---------------------------------------------------------------------------
 // Fees API

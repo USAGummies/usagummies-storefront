@@ -106,16 +106,21 @@ export type UnifiedBalances = {
   amazon: { pendingBalance: number; lastSettlement: { amount: number; date: string } | null } | null;
   totalCash: number;
   lastUpdated: string;
+  cashSource?: "plaid-live" | "manual" | "plaid-nonprod" | "none";
+  cashSourceLabel?: string;
+  manualOverride?: { balance: number; note: string; updatedAt: string } | null;
 };
 
 export type PipelineLead = {
   id: string;
   name: string;
+  companyName?: string;
   status: string;
   email: string;
   lastContact: string;
   source: string;
   type: "b2b" | "distributor";
+  qualification?: "Qualified Lead" | "Unqualified Lead" | "Raw Scrape";
   dealValue: number;
   createdAt: string;
   lastEdited: string;
@@ -125,6 +130,11 @@ export type PipelineData = {
   totalLeads: number;
   b2bCount: number;
   distributorCount: number;
+  leadQuality?: {
+    qualified: number;
+    unqualified: number;
+    rawScrape: number;
+  };
   stageCounts: Record<string, number>;
   stages: Record<string, PipelineLead[]>;
   pipelineValue: { total: number; byStage: Record<string, number> };
@@ -255,6 +265,19 @@ export type InventoryData = {
     criticalCounts: number;
     outOfStockCounts: number;
     avgDaysOfSupply: number;
+  };
+  homeStock?: {
+    baseline: { pa: number; wa: number; asOf: string };
+    fulfilledSinceBaseline: { pa: number; wa: number; unassigned: number; total: number };
+    current: { pa: number; wa: number; total: number };
+    derivedAt: string;
+    source: "shopify-orders" | "baseline-only";
+    error?: string;
+  };
+  amazonFba?: {
+    error: string | null;
+    errorAt: string | null;
+    lastSuccessfulFetch: string | null;
   };
   generatedAt: string;
   budget: null;

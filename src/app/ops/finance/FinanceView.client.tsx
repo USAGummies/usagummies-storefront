@@ -20,7 +20,6 @@ import {
   useDashboardData,
   comparePlanVsActual,
   fmtDollar,
-  fmtPercent,
   STATUS_COLORS,
 } from "@/lib/ops/use-war-room-data";
 import {

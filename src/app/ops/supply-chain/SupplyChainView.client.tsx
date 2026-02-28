@@ -110,6 +110,25 @@ export function SupplyChainView() {
           {error}
         </div>
       ) : null}
+      {inventory?.amazonFba?.error ? (
+        <div
+          style={{
+            border: `1px solid ${GOLD}55`,
+            background: `${GOLD}18`,
+            color: NAVY,
+            borderRadius: 10,
+            padding: "10px 12px",
+            marginBottom: 12,
+            fontSize: 13,
+            fontWeight: 600,
+          }}
+        >
+          Amazon FBA connection error: {inventory.amazonFba.error}
+          {inventory.amazonFba.lastSuccessfulFetch
+            ? ` (last successful fetch: ${new Date(inventory.amazonFba.lastSuccessfulFetch).toLocaleString("en-US")})`
+            : ""}
+        </div>
+      ) : null}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10, marginBottom: 14 }}>
         <MetricCard label="Total SKUs" value={String(inventory?.summary.totalSKUs || 0)} icon={<Boxes size={16} />} />
@@ -120,6 +139,12 @@ export function SupplyChainView() {
 
       <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px", marginBottom: 14 }}>
         <div style={{ fontWeight: 700, color: NAVY, marginBottom: 10 }}>Inventory Grid</div>
+        {inventory?.homeStock ? (
+          <div style={{ marginBottom: 10, fontSize: 12, color: TEXT_DIM }}>
+            Home baseline {inventory.homeStock.baseline.asOf}: PA {inventory.homeStock.baseline.pa} / WA {inventory.homeStock.baseline.wa} •
+            Current PA {inventory.homeStock.current.pa} / WA {inventory.homeStock.current.wa}
+          </div>
+        ) : null}
         {invLoading && (inventory?.items || []).length === 0 ? (
           <SkeletonTable rows={8} />
         ) : (

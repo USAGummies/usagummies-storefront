@@ -208,10 +208,11 @@ export async function buildAmazonKPIs(): Promise<AmazonKPIs> {
       : lastWeekStart;
 
   // SINGLE order fetch (30 days) + inventory in parallel
-  const [allOrders, inventory] = await Promise.all([
+  const [allOrders, inventoryResult] = await Promise.all([
     fetchOrders(fetchFrom, now),
     fetchFBAInventory(),
   ]);
+  const inventory = inventoryResult.items || [];
 
   // Derive period subsets locally (no additional API calls!)
   const todayOrders = ordersInRange(allOrders, todayStart, now);

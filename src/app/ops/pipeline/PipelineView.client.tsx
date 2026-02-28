@@ -268,6 +268,11 @@ export function PipelineView() {
           value={`+${pipeline?.weeklyTrend.newLeads || 0}`}
           sub={`${pipeline?.weeklyTrend.stageAdvances || 0} stage moves`}
         />
+        <MetricCard
+          label="Lead Quality"
+          value={`${pipeline?.leadQuality?.qualified || 0} qualified`}
+          sub={`${pipeline?.leadQuality?.rawScrape || 0} raw scrape`}
+        />
       </div>
 
       <div style={{ marginBottom: 16 }}>
@@ -306,6 +311,7 @@ export function PipelineView() {
                     const lastEmailDate = email?.latestEmail?.date
                       ? new Date(email.latestEmail.date).toLocaleDateString("en-US")
                       : "No email yet";
+                    const isRawScrape = lead.qualification === "Raw Scrape";
 
                     return (
                       <div
@@ -317,6 +323,7 @@ export function PipelineView() {
                           padding: "10px",
                           display: "grid",
                           gap: 7,
+                          opacity: isRawScrape ? 0.62 : 1,
                         }}
                       >
                         <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
@@ -325,6 +332,11 @@ export function PipelineView() {
                             {fmtDollar(lead.dealValue || 0)}
                           </div>
                         </div>
+                        {lead.qualification ? (
+                          <div style={{ fontSize: 11, color: TEXT_DIM }}>
+                            {lead.qualification}
+                          </div>
+                        ) : null}
 
                         <div style={{ display: "grid", gap: 5, fontSize: 12, color: TEXT_DIM }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>

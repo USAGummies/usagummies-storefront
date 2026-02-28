@@ -38,8 +38,8 @@ export type PlatformUser = {
 // ---------------------------------------------------------------------------
 const ADMIN_FALLBACK: PlatformUser = {
   id: "local-admin",
-  name: "Ben Stutman",
-  email: "benjamin.stutman@gmail.com",
+  name: "Benjamin Stutman",
+  email: "ben@usagummies.com",
   role: "admin",
   // bcrypt hash of "Slaterson1!"
   passwordHash:

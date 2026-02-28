@@ -34,7 +34,6 @@ import {
   useInventoryData,
   comparePlanVsActual,
   fmtDollar,
-  fmtPercent,
   STATUS_COLORS,
 } from "@/lib/ops/use-war-room-data";
 import {
@@ -350,7 +349,13 @@ export function OpsDashboard() {
         />
         <MetricCard
           icon={<Wallet size={16} />}
-          label="Cash Position"
+          label={
+            balances?.cashSource === "manual"
+              ? "Cash Position (Manual)"
+              : balances?.cashSource === "plaid-live"
+                ? "Cash Position (Plaid)"
+                : "Cash Position"
+          }
           value={fmtDollar(balances?.totalCash || 0)}
           plan={null}
           variance={null}
@@ -473,6 +478,7 @@ export function OpsDashboard() {
         <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px" }}>
           <div style={{ fontWeight: 700, color: NAVY, marginBottom: 10 }}>Cash Position Summary</div>
           <div style={{ display: "grid", gap: 8 }}>
+            <SourceRow label="Cash Source" value={balances?.cashSourceLabel || "Unknown"} />
             <SourceRow label="Found Available" value={fmtDollar(balances?.found?.available || 0)} />
             <SourceRow label="Shopify Pending" value={fmtDollar(balances?.shopify?.balance || 0)} />
             <SourceRow label="Amazon Pending" value={fmtDollar(balances?.amazon?.pendingBalance || 0)} />

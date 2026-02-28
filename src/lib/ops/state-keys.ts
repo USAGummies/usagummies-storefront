@@ -58,6 +58,7 @@ export const STATE_KEYS = {
   // Finance / Banking
   "plaid-access-token": "plaid-access-token.json",
   "plaid-balance-cache": "plaid-balance-cache.json",
+  "manual-cash-override": "manual-cash-override.json",
   "shopify-payments-cache": "shopify-payments-cache.json",
   "amazon-finance-cache": "amazon-finance-cache.json",
 
@@ -71,6 +72,7 @@ export const STATE_KEYS = {
 
   // Ops dashboard caches
   "inventory-cache": "inventory-cache.json",
+  "home-stock-baseline": "home-stock-baseline.json",
   "supply-chain-orders": "supply-chain-orders.json",
   "supply-chain-cache": "supply-chain-cache.json",
   "transactions-cache": "transactions-cache.json",

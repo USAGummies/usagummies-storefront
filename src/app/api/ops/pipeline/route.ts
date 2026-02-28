@@ -123,16 +123,42 @@ function extractNumber(prop: unknown): number {
 type PipelineLead = {
   id: string;
   name: string;
+  companyName: string;
   status: string;
   email: string;
   lastContact: string;
   source: string;
   type: "b2b" | "distributor";
+  qualification: "Qualified Lead" | "Unqualified Lead" | "Raw Scrape";
   dealValue: number;
   createdAt: string;
   lastEdited: string;
   notes: string;
 };
+
+function looksLikeRawScrapeName(value: string): boolean {
+  const v = value.trim().toLowerCase();
+  if (!v) return false;
+  return (
+    v.startsWith("http://") ||
+    v.startsWith("https://") ||
+    /^(www\.)/.test(v) ||
+    /\.com(\/|$)/.test(v)
+  );
+}
+
+function classifyLeadQuality(
+  companyName: string,
+  email: string,
+  name: string,
+): PipelineLead["qualification"] {
+  if (!email && looksLikeRawScrapeName(name || companyName)) {
+    return "Raw Scrape";
+  }
+  if (email && companyName) return "Qualified Lead";
+  if (email) return "Unqualified Lead";
+  return "Raw Scrape";
+}
 
 function parseLead(page: NotionPage, type: "b2b" | "distributor"): PipelineLead {
   const props = page.properties;
@@ -145,18 +171,29 @@ function parseLead(page: NotionPage, type: "b2b" | "distributor"): PipelineLead 
       props["Est. Value"] ||
       props.Value,
   );
+  const companyName = extractText(
+    props["Business Name"] || props.Company || props["Company Name"] || props.Name,
+  );
+  const email = extractText(
+    props["Email Address"] || props.Email || props["Contact Email"],
+  );
+  const name = extractText(
+    props["Contact Name"] || props["Primary Contact"] || props.Name || props["Business Name"],
+  );
   return {
     id: page.id,
-    name: extractText(props["Business Name"] || props.Name || props.Company || props["Company Name"]),
+    name: name || companyName || "Unknown lead",
+    companyName,
     status: extractText(
       props.Status || props["Outreach Status"] || props.Stage || props["Pipeline Stage"],
     ),
-    email: extractText(props["Email Address"] || props.Email || props["Contact Email"]),
+    email,
     lastContact:
       extractText(props["Date Follow-Up Sent"] || props["Last Contact"] || props["Last Contacted"]) ||
       page.last_edited_time.slice(0, 10),
     source: extractText(props.Source || props["Lead Source"]),
     type,
+    qualification: classifyLeadQuality(companyName, email, name || companyName),
     dealValue,
     createdAt: page.created_time,
     lastEdited: page.last_edited_time,
@@ -193,6 +230,23 @@ function stageIndex(stage: string): number {
   return idx >= 0 ? idx : STAGE_ORDER.length - 1;
 }
 
+function normalizedDbId(raw: string): string {
+  return toNotionId(raw || "").toLowerCase();
+}
+
+function inferLeadTypeFromPage(page: NotionPage): "b2b" | "distributor" {
+  const props = page.properties || {};
+  const source = extractText(
+    (props as Record<string, unknown>).Source ||
+      (props as Record<string, unknown>)["Lead Source"] ||
+      (props as Record<string, unknown>).Category,
+  ).toLowerCase();
+  if (source.includes("distributor") || source.includes("wholesale")) {
+    return "distributor";
+  }
+  return "b2b";
+}
+
 // ---------------------------------------------------------------------------
 // Route handler
 // ---------------------------------------------------------------------------
@@ -201,6 +255,11 @@ type PipelineResult = {
   totalLeads: number;
   b2bCount: number;
   distributorCount: number;
+  leadQuality: {
+    qualified: number;
+    unqualified: number;
+    rawScrape: number;
+  };
   stageCounts: Record<string, number>;
   stages: Record<string, Omit<PipelineLead, "notes">[]>;
   pipelineValue: { total: number; byStage: Record<string, number> };
@@ -234,14 +293,50 @@ export async function GET() {
     return NextResponse.json(cached.data);
   }
 
-  const [b2bPages, distPages] = await Promise.all([
-    queryNotion(B2B_PROSPECTS_DB),
-    queryNotion(DISTRIBUTOR_PROSPECTS_DB),
-  ]);
+  const sameSourceDb =
+    normalizedDbId(B2B_PROSPECTS_DB) !== "" &&
+    normalizedDbId(B2B_PROSPECTS_DB) === normalizedDbId(DISTRIBUTOR_PROSPECTS_DB);
 
-  const b2bLeads = b2bPages.map((p) => parseLead(p, "b2b"));
-  const distLeads = distPages.map((p) => parseLead(p, "distributor"));
-  const allLeads = [...b2bLeads, ...distLeads];
+  let b2bLeads: PipelineLead[] = [];
+  let distLeads: PipelineLead[] = [];
+  let allLeads: PipelineLead[] = [];
+
+  if (sameSourceDb) {
+    const pages = await queryNotion(B2B_PROSPECTS_DB);
+    const deduped = new Map<string, PipelineLead>();
+    for (const page of pages) {
+      const inferredType = inferLeadTypeFromPage(page);
+      const lead = parseLead(page, inferredType);
+      deduped.set(lead.id, lead);
+    }
+    allLeads = Array.from(deduped.values());
+    b2bLeads = allLeads.filter((l) => l.type === "b2b");
+    distLeads = allLeads.filter((l) => l.type === "distributor");
+  } else {
+    const [b2bPages, distPages] = await Promise.all([
+      queryNotion(B2B_PROSPECTS_DB),
+      queryNotion(DISTRIBUTOR_PROSPECTS_DB),
+    ]);
+
+    const deduped = new Map<string, PipelineLead>();
+    for (const page of b2bPages) {
+      const lead = parseLead(page, "b2b");
+      deduped.set(lead.id, lead);
+    }
+    for (const page of distPages) {
+      const lead = parseLead(page, "distributor");
+      if (deduped.has(lead.id)) {
+        const existing = deduped.get(lead.id)!;
+        deduped.set(lead.id, { ...existing, type: existing.type === "distributor" ? "distributor" : lead.type });
+      } else {
+        deduped.set(lead.id, lead);
+      }
+    }
+
+    allLeads = Array.from(deduped.values());
+    b2bLeads = allLeads.filter((l) => l.type === "b2b");
+    distLeads = allLeads.filter((l) => l.type === "distributor");
+  }
 
   // Group by status
   const stages: Record<string, PipelineLead[]> = {};
@@ -350,10 +445,17 @@ export async function GET() {
     ).length,
   };
 
+  const leadQuality = {
+    qualified: allLeads.filter((l) => l.qualification === "Qualified Lead").length,
+    unqualified: allLeads.filter((l) => l.qualification === "Unqualified Lead").length,
+    rawScrape: allLeads.filter((l) => l.qualification === "Raw Scrape").length,
+  };
+
   const result: PipelineResult = {
     totalLeads: allLeads.length,
     b2bCount: b2bLeads.length,
     distributorCount: distLeads.length,
+    leadQuality,
     stageCounts,
     stages: Object.fromEntries(
       Object.entries(stages).map(([stage, leads]) => [
@@ -362,22 +464,26 @@ export async function GET() {
           ({
             id,
             name,
+            companyName,
             status,
             email,
             lastContact,
             source,
             type,
+            qualification,
             dealValue,
             createdAt,
             lastEdited,
           }) => ({
             id,
             name,
+            companyName,
             status,
             email,
             lastContact,
             source,
             type,
+            qualification,
             dealValue,
             createdAt,
             lastEdited,
