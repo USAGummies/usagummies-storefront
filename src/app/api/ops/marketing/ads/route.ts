@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
 import { readState, writeState } from "@/lib/ops/state";
+import { isMetaConfigured, fetchMetaCampaigns } from "@/lib/ads/meta";
+import { isTikTokConfigured, fetchTikTokCampaigns } from "@/lib/ads/tiktok";
+import { isGoogleAdsConfigured, fetchGoogleAdsCampaigns } from "@/lib/ads/google";
+import type { CacheEnvelope } from "@/lib/amazon/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const SYNC_TTL = 15 * 60 * 1000; // 15 min
 
 type ManualCampaign = {
   id: string;
@@ -18,6 +24,14 @@ type ManualCampaign = {
   endDate: string | null;
 };
 
+type PlatformStatus = {
+  platform: string;
+  configured: boolean;
+  lastSynced: string | null;
+  error: string | null;
+  campaignCount: number;
+};
+
 type AdsResponse = {
   campaigns: ManualCampaign[];
   byPlatform: Array<{
@@ -30,6 +44,7 @@ type AdsResponse = {
     ctr: number;
     cpc: number;
   }>;
+  platformStatus: PlatformStatus[];
   generatedAt: string;
 };
 
@@ -37,7 +52,7 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-function compute(campaigns: ManualCampaign[]): AdsResponse {
+function compute(campaigns: ManualCampaign[], platformStatus: PlatformStatus[]): AdsResponse {
   const grouped = new Map<string, { spend: number; revenue: number; impressions: number; clicks: number }>();
   for (const campaign of campaigns) {
     const current = grouped.get(campaign.platform) || {
@@ -71,24 +86,170 @@ function compute(campaigns: ManualCampaign[]): AdsResponse {
   return {
     campaigns,
     byPlatform,
+    platformStatus,
     generatedAt: new Date().toISOString(),
   };
 }
 
-export async function GET() {
-  const campaigns = await readState<ManualCampaign[]>("ad-campaigns-cache", []);
-  return NextResponse.json(compute(Array.isArray(campaigns) ? campaigns : []));
+/** Sync a single platform — returns campaigns or empty array on failure */
+async function syncPlatform(
+  platform: "meta" | "tiktok" | "google",
+  cacheKey: "meta-ads-cache" | "tiktok-ads-cache" | "google-ads-cache",
+  fetcher: () => Promise<Array<{ id: string; name: string; status: string; objective: string; dailyBudget: number; startTime: string | null; stopTime: string | null; spend: number; impressions: number; clicks: number; conversions: number; revenue: number; cpc: number; ctr: number; roas: number }>>,
+  force: boolean,
+): Promise<{ campaigns: ManualCampaign[]; status: PlatformStatus }> {
+  // Check cache
+  if (!force) {
+    const cached = await readState<CacheEnvelope<ManualCampaign[]> | null>(cacheKey, null);
+    if (cached && Date.now() - cached.cachedAt < SYNC_TTL) {
+      return {
+        campaigns: cached.data || [],
+        status: {
+          platform,
+          configured: true,
+          lastSynced: new Date(cached.cachedAt).toISOString(),
+          error: null,
+          campaignCount: (cached.data || []).length,
+        },
+      };
+    }
+  }
+
+  try {
+    const raw = await fetcher();
+    const campaigns: ManualCampaign[] = raw.map((c) => ({
+      id: `${platform}-${c.id}`,
+      platform,
+      name: c.name,
+      status: (c.status === "active" ? "active" : c.status === "paused" ? "paused" : "completed") as ManualCampaign["status"],
+      spend: c.spend,
+      impressions: c.impressions,
+      clicks: c.clicks,
+      conversions: c.conversions,
+      revenue: c.revenue,
+      startDate: c.startTime?.slice(0, 10) || new Date().toISOString().slice(0, 10),
+      endDate: c.stopTime?.slice(0, 10) || null,
+    }));
+
+    await writeState(cacheKey, { data: campaigns, cachedAt: Date.now() });
+
+    return {
+      campaigns,
+      status: {
+        platform,
+        configured: true,
+        lastSynced: new Date().toISOString(),
+        error: null,
+        campaignCount: campaigns.length,
+      },
+    };
+  } catch (err) {
+    // Return cached data on failure if available
+    const cached = await readState<CacheEnvelope<ManualCampaign[]> | null>(cacheKey, null);
+    return {
+      campaigns: cached?.data || [],
+      status: {
+        platform,
+        configured: true,
+        lastSynced: cached ? new Date(cached.cachedAt).toISOString() : null,
+        error: err instanceof Error ? err.message : String(err),
+        campaignCount: (cached?.data || []).length,
+      },
+    };
+  }
+}
+
+export async function GET(req: Request) {
+  const force = new URL(req.url).searchParams.get("force") === "1";
+
+  // Load manual campaigns (Rumble)
+  const manualCampaigns = await readState<ManualCampaign[]>("ad-campaigns-cache", []);
+  const rumble = Array.isArray(manualCampaigns) ? manualCampaigns.filter((c) => c.platform === "rumble") : [];
+
+  const platformStatus: PlatformStatus[] = [
+    {
+      platform: "rumble",
+      configured: true,
+      lastSynced: new Date().toISOString(),
+      error: null,
+      campaignCount: rumble.length,
+    },
+  ];
+
+  // Auto-sync configured platforms in parallel
+  const syncPromises: Promise<{ campaigns: ManualCampaign[]; status: PlatformStatus }>[] = [];
+
+  if (isMetaConfigured()) {
+    syncPromises.push(syncPlatform("meta", "meta-ads-cache", fetchMetaCampaigns, force));
+  } else {
+    platformStatus.push({ platform: "meta", configured: false, lastSynced: null, error: null, campaignCount: 0 });
+  }
+
+  if (isTikTokConfigured()) {
+    syncPromises.push(syncPlatform("tiktok", "tiktok-ads-cache", fetchTikTokCampaigns, force));
+  } else {
+    platformStatus.push({ platform: "tiktok", configured: false, lastSynced: null, error: null, campaignCount: 0 });
+  }
+
+  if (isGoogleAdsConfigured()) {
+    syncPromises.push(syncPlatform("google", "google-ads-cache", fetchGoogleAdsCampaigns, force));
+  } else {
+    platformStatus.push({ platform: "google", configured: false, lastSynced: null, error: null, campaignCount: 0 });
+  }
+
+  const results = await Promise.allSettled(syncPromises);
+
+  let allCampaigns = [...rumble];
+  for (const result of results) {
+    if (result.status === "fulfilled") {
+      allCampaigns = allCampaigns.concat(result.value.campaigns);
+      platformStatus.push(result.value.status);
+    }
+  }
+
+  return NextResponse.json(compute(allCampaigns, platformStatus));
 }
 
 type Body = {
-  action?: "add" | "update";
+  action?: "add" | "update" | "sync";
   id?: string;
   campaign?: Partial<ManualCampaign>;
+  platform?: "meta" | "tiktok" | "google";
 };
 
 export async function POST(req: Request) {
   try {
     const body = (await req.json()) as Body;
+
+    // Force re-sync a specific platform
+    if (body.action === "sync") {
+      const platform = body.platform;
+      if (!platform || !["meta", "tiktok", "google"].includes(platform)) {
+        return NextResponse.json({ error: "platform must be meta | tiktok | google" }, { status: 400 });
+      }
+
+      const fetchers: Record<string, () => ReturnType<typeof fetchMetaCampaigns>> = {
+        meta: fetchMetaCampaigns,
+        tiktok: fetchTikTokCampaigns,
+        google: fetchGoogleAdsCampaigns,
+      };
+      const cacheKeys: Record<string, "meta-ads-cache" | "tiktok-ads-cache" | "google-ads-cache"> = {
+        meta: "meta-ads-cache",
+        tiktok: "tiktok-ads-cache",
+        google: "google-ads-cache",
+      };
+
+      const result = await syncPlatform(
+        platform as "meta" | "tiktok" | "google",
+        cacheKeys[platform],
+        fetchers[platform],
+        true,
+      );
+
+      return NextResponse.json({ ok: true, synced: result.status });
+    }
+
+    // Manual campaign CRUD (for Rumble)
     const existing = await readState<ManualCampaign[]>("ad-campaigns-cache", []);
     const campaigns = Array.isArray(existing) ? [...existing] : [];
 
@@ -126,11 +287,11 @@ export async function POST(req: Request) {
         revenue: Number(body.campaign?.revenue ?? campaigns[idx].revenue),
       };
     } else {
-      return NextResponse.json({ error: "Unsupported action. Use add | update" }, { status: 400 });
+      return NextResponse.json({ error: "Unsupported action. Use add | update | sync" }, { status: 400 });
     }
 
     await writeState("ad-campaigns-cache", campaigns);
-    return NextResponse.json({ ok: true, ...compute(campaigns) });
+    return NextResponse.json({ ok: true, ...compute(campaigns, []) });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : String(err) },

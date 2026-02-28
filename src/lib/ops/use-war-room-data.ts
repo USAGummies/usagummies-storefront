@@ -576,6 +576,13 @@ export type AdsData = {
     ctr: number;
     cpc: number;
   }>;
+  platformStatus: Array<{
+    platform: string;
+    configured: boolean;
+    lastSynced: string | null;
+    error: string | null;
+    campaignCount: number;
+  }>;
   generatedAt: string;
 };
 

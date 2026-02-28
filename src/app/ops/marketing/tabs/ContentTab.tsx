@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { WandSparkles } from "lucide-react";
+import { useMemo, useState, useCallback } from "react";
+import { WandSparkles, X } from "lucide-react";
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip } from "recharts";
 import { useContentData, fmtDollar } from "@/lib/ops/use-war-room-data";
 import { RefreshButton } from "@/app/ops/components/RefreshButton";
@@ -36,6 +36,68 @@ function fmtDate(value: string | null | undefined) {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
+// ─── Inline Modal Components ────────────────────────────────────────────────
+
+function RejectModal({ onConfirm, onCancel }: { onConfirm: (reason: string) => void; onCancel: () => void }) {
+  const [reason, setReason] = useState("Needs revision");
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onCancel}>
+      <div style={{ background: "#fff", borderRadius: 14, padding: 20, width: 420, maxWidth: "90vw", boxShadow: "0 8px 32px rgba(0,0,0,0.18)" }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: NAVY }}>Reject Draft</div>
+          <button onClick={onCancel} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}><X size={18} color={TEXT_DIM} /></button>
+        </div>
+        <div style={{ marginBottom: 8, fontSize: 13, color: TEXT_DIM }}>Provide a reason (optional):</div>
+        <input
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          autoFocus
+          style={{ width: "100%", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "10px 12px", fontSize: 13, boxSizing: "border-box" }}
+        />
+        <div style={{ display: "flex", gap: 8, marginTop: 14, justifyContent: "flex-end" }}>
+          <button onClick={onCancel} style={{ border: `1px solid ${BORDER}`, borderRadius: 8, background: CARD, color: NAVY, padding: "8px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Cancel</button>
+          <button onClick={() => onConfirm(reason)} style={{ border: `1px solid ${RED}44`, borderRadius: 8, background: RED, color: "#fff", padding: "8px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Reject</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EditModal({ title: initTitle, body: initBody, onConfirm, onCancel }: { title: string; body: string; onConfirm: (title: string, body: string) => void; onCancel: () => void }) {
+  const [title, setTitle] = useState(initTitle);
+  const [body, setBody] = useState(initBody);
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onCancel}>
+      <div style={{ background: "#fff", borderRadius: 14, padding: 20, width: 640, maxWidth: "90vw", maxHeight: "85vh", overflow: "auto", boxShadow: "0 8px 32px rgba(0,0,0,0.18)" }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: NAVY }}>Edit Draft</div>
+          <button onClick={onCancel} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}><X size={18} color={TEXT_DIM} /></button>
+        </div>
+        <div style={{ marginBottom: 6, fontSize: 13, fontWeight: 700, color: NAVY }}>Title</div>
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          autoFocus
+          style={{ width: "100%", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "10px 12px", fontSize: 13, marginBottom: 12, boxSizing: "border-box" }}
+        />
+        <div style={{ marginBottom: 6, fontSize: 13, fontWeight: 700, color: NAVY }}>Body (MDX)</div>
+        <textarea
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          rows={14}
+          style={{ width: "100%", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "10px 12px", fontSize: 12, fontFamily: "ui-monospace, monospace", resize: "vertical", boxSizing: "border-box" }}
+        />
+        <div style={{ display: "flex", gap: 8, marginTop: 14, justifyContent: "flex-end" }}>
+          <button onClick={onCancel} style={{ border: `1px solid ${BORDER}`, borderRadius: 8, background: CARD, color: NAVY, padding: "8px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Cancel</button>
+          <button onClick={() => onConfirm(title, body)} style={{ border: `1px solid ${BORDER}`, borderRadius: 8, background: NAVY, color: "#fff", padding: "8px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Save Changes</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Component ─────────────────────────────────────────────────────────
+
 export function ContentTab() {
   const { data, loading, error, refresh } = useContentData();
   const [busy, setBusy] = useState(false);
@@ -43,9 +105,13 @@ export function ContentTab() {
   const [keyword, setKeyword] = useState("");
   const [outline, setOutline] = useState("");
 
+  // Modal state
+  const [rejectTarget, setRejectTarget] = useState<string | null>(null);
+  const [editTarget, setEditTarget] = useState<{ id: string; title: string; body: string } | null>(null);
+
   const topPosts = useMemo(() => (data?.topPosts || []).slice(0, 15), [data]);
 
-  const approve = async (id: string) => {
+  const approve = useCallback(async (id: string) => {
     setBusy(true);
     setMessage(null);
     try {
@@ -57,14 +123,15 @@ export function ContentTab() {
     } finally {
       setBusy(false);
     }
-  };
+  }, [refresh]);
 
-  const reject = async (id: string) => {
-    const reason = window.prompt("Reject reason (optional):", "Needs revision") || "Needs revision";
+  const confirmReject = useCallback(async (reason: string) => {
+    if (!rejectTarget) return;
+    setRejectTarget(null);
     setBusy(true);
     setMessage(null);
     try {
-      await runAction({ action: "reject", pageId: id, reason });
+      await runAction({ action: "reject", pageId: rejectTarget, reason });
       setMessage("Draft rejected.");
       await refresh();
     } catch (err) {
@@ -72,15 +139,15 @@ export function ContentTab() {
     } finally {
       setBusy(false);
     }
-  };
+  }, [rejectTarget, refresh]);
 
-  const edit = async (id: string, title: string, body: string) => {
-    const nextTitle = window.prompt("Edit title", title) || title;
-    const nextBody = window.prompt("Edit body (short edits recommended)", body) || body;
+  const confirmEdit = useCallback(async (title: string, body: string) => {
+    if (!editTarget) return;
+    setEditTarget(null);
     setBusy(true);
     setMessage(null);
     try {
-      await runAction({ action: "edit", pageId: id, title: nextTitle, body: nextBody });
+      await runAction({ action: "edit", pageId: editTarget.id, title, body });
       setMessage("Draft updated.");
       await refresh();
     } catch (err) {
@@ -88,7 +155,7 @@ export function ContentTab() {
     } finally {
       setBusy(false);
     }
-  };
+  }, [editTarget, refresh]);
 
   const generate = async () => {
     if (!keyword.trim()) return;
@@ -113,6 +180,10 @@ export function ContentTab() {
 
   return (
     <div>
+      {/* Modals */}
+      {rejectTarget ? <RejectModal onConfirm={confirmReject} onCancel={() => setRejectTarget(null)} /> : null}
+      {editTarget ? <EditModal title={editTarget.title} body={editTarget.body} onConfirm={confirmEdit} onCancel={() => setEditTarget(null)} /> : null}
+
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <div>
           <div style={{ fontSize: 22, color: NAVY, fontWeight: 800, letterSpacing: "-0.01em" }}>Content & SEO</div>
@@ -247,23 +318,23 @@ export function ContentTab() {
                     <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 0" }}>
                       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                         <button
-                          onClick={() => edit(draft.id, draft.title, draft.body)}
+                          onClick={() => setEditTarget({ id: draft.id, title: draft.title, body: draft.body })}
                           disabled={busy}
-                          style={{ border: `1px solid ${BORDER}`, borderRadius: 6, background: CARD, color: NAVY, fontSize: 11, fontWeight: 700, padding: "4px 8px" }}
+                          style={{ border: `1px solid ${BORDER}`, borderRadius: 6, background: CARD, color: NAVY, fontSize: 11, fontWeight: 700, padding: "4px 8px", cursor: busy ? "not-allowed" : "pointer" }}
                         >
                           Edit
                         </button>
                         <button
                           onClick={() => approve(draft.id)}
                           disabled={busy}
-                          style={{ border: `1px solid ${BORDER}`, borderRadius: 6, background: NAVY, color: "#fff", fontSize: 11, fontWeight: 700, padding: "4px 8px" }}
+                          style={{ border: `1px solid ${BORDER}`, borderRadius: 6, background: NAVY, color: "#fff", fontSize: 11, fontWeight: 700, padding: "4px 8px", cursor: busy ? "not-allowed" : "pointer" }}
                         >
                           Approve
                         </button>
                         <button
-                          onClick={() => reject(draft.id)}
+                          onClick={() => setRejectTarget(draft.id)}
                           disabled={busy}
-                          style={{ border: `1px solid ${RED}44`, borderRadius: 6, background: `${RED}12`, color: RED, fontSize: 11, fontWeight: 700, padding: "4px 8px" }}
+                          style={{ border: `1px solid ${RED}44`, borderRadius: 6, background: `${RED}12`, color: RED, fontSize: 11, fontWeight: 700, padding: "4px 8px", cursor: busy ? "not-allowed" : "pointer" }}
                         >
                           Reject
                         </button>
