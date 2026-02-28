@@ -163,7 +163,7 @@ function percentage(part: number, total: number): number {
 async function fetchCustomers(): Promise<CustomerNode[]> {
   const query = `
     query Customers($first: Int!) {
-      customers(first: $first, sortKey: TOTAL_SPENT, reverse: true) {
+      customers(first: $first, sortKey: ORDERS_COUNT, reverse: true) {
         edges {
           node {
             id

@@ -61,8 +61,6 @@ const PAYOUTS_QUERY = `
             summary {
               adjustmentsGross { amount }
               chargesGross { amount }
-              refundsGross { amount }
-              reservedFundsGross { amount }
             }
           }
         }
@@ -128,8 +126,6 @@ type PayoutsQueryResult = {
           summary: {
             adjustmentsGross: { amount: string };
             chargesGross: { amount: string };
-            refundsGross: { amount: string };
-            reservedFundsGross: { amount: string };
           } | null;
         };
       }[];

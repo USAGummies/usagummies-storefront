@@ -153,7 +153,6 @@ async function fetchShopifyOrdersSimple(
       totalPriceSet: e.node.totalPriceSet as { shopMoney: { amount: string } },
       tags: [],
       note: null,
-      sourceUrl: null,
       app: null,
       customer: null,
     }));

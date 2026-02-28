@@ -163,7 +163,7 @@ function OpsNav() {
                   <span>{section.title}</span>
                   {isOpsSection && (
                     <span style={{ fontSize: 8, transition: "transform 0.15s", transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)" }}>
-                      \u25B6
+                      {"\u25B6"}
                     </span>
                   )}
                 </div>

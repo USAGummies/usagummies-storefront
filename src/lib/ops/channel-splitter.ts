@@ -79,7 +79,6 @@ export type ShopifyOrderNode = {
   totalPriceSet: { shopMoney: { amount: string } };
   tags: string[];
   note: string | null;
-  sourceUrl: string | null;
   app: { name: string } | null;
   customer?: { numberOfOrders: number } | null;
 };
@@ -99,7 +98,6 @@ export const CHANNEL_ORDER_FRAGMENT = `
   totalPriceSet { shopMoney { amount } }
   tags
   note
-  sourceUrl
   app { name }
   customer { numberOfOrders }
 `;
@@ -114,23 +112,20 @@ export const CHANNEL_ORDER_FRAGMENT = `
  * Detection priority:
  *  1. Tags containing "faire" (case-insensitive)
  *  2. Source app name containing "faire" (case-insensitive)
- *  3. sourceUrl containing "faire" (case-insensitive)
- *  4. Order note mentioning "faire" (case-insensitive)
- *  5. Order name prefixed with "F-" (some Faire integrations)
- *  6. "wholesale" tag + total > $200 → distributor
- *  7. Default → dtc
+ *  3. Order note mentioning "faire" (case-insensitive)
+ *  4. Order name prefixed with "F-" (some Faire integrations)
+ *  5. "wholesale" tag + total > $200 → distributor
+ *  6. Default → dtc
  */
 export function classifyOrder(order: ShopifyOrderNode): ChannelName {
   const tags = (order.tags ?? []).map((t) => t.toLowerCase());
   const appName = (order.app?.name ?? "").toLowerCase();
-  const sourceUrl = (order.sourceUrl ?? "").toLowerCase();
   const note = (order.note ?? "").toLowerCase();
   const orderName = order.name ?? "";
 
   // --- Faire detection ---
   if (tags.some((t) => t.includes("faire"))) return "faire";
   if (appName.includes("faire")) return "faire";
-  if (sourceUrl.includes("faire")) return "faire";
   if (note.includes("faire")) return "faire";
   if (orderName.startsWith("F-")) return "faire";
 
