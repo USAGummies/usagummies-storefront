@@ -157,6 +157,17 @@ export const ENGINE_REGISTRY: EngineConfig[] = [
       { key: "F11", name: "Self-Heal Monitor", schedule: "Every 30 min" },
     ],
   },
+  {
+    id: "social",
+    name: "Social Engine",
+    scriptFile: "usa-gummies-social-engine.mjs",
+    agents: [
+      { key: "SOC1", name: "X Mention Monitor", schedule: "Every 30 min" },
+      { key: "SOC2", name: "Truth Social Monitor", schedule: "Every 30 min" },
+      { key: "SOC3", name: "Social Performance Tracker", schedule: "Daily 20:00" },
+      { key: "SOC4", name: "Auto-Responder", schedule: "Sequence", isSequence: true },
+    ],
+  },
 ];
 
 // ---------------------------------------------------------------------------

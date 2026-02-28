@@ -20,6 +20,7 @@ const ENGINE_SCRIPT_MAP: Record<string, string> = {
   "supply-chain": "usa-gummies-supply-chain.mjs",
   "revenue-intel": "usa-gummies-revenue-intel.mjs",
   finops: "usa-gummies-finops.mjs",
+  social: "usa-gummies-social-engine.mjs",
 };
 
 export type AgentResult = {

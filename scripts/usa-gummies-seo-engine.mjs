@@ -140,6 +140,7 @@ const IDS = {
   seoCalendar: process.env.NOTION_DB_SEO_CALENDAR || "",
   seoBlogPerf: process.env.NOTION_DB_SEO_BLOG_PERF || "",
   seoLinks: process.env.NOTION_DB_SEO_LINKS || "",
+  contentDrafts: process.env.NOTION_DB_CONTENT_DRAFTS || "",
 };
 
 // ── Required DB Schemas ──────────────────────────────────────────────────────
@@ -404,46 +405,112 @@ async function runS3() {
   }
 
   const target = candidates[0];
+  const openAiKey = process.env.OPENAI_API_KEY || "";
+  if (!openAiKey) {
+    const reason = "OPENAI_API_KEY missing — cannot generate draft";
+    log(`S3 — ${reason}`);
+    return engine.fail("S3", reason);
+  }
 
-  // Generate blog post outline for Notion attention queue
-  const outline = {
-    keyword: target.keyword,
-    suggestedTitle: target.suggestedTitle,
-    suggestedSlug: target.suggestedSlug,
-    sections: [
-      `Introduction — What is ${target.keyword}?`,
-      "Health & Safety Concerns",
-      "Regulatory Status (US vs EU)",
-      "How to Avoid It — Reading Labels",
-      "Better Alternatives (natural colors)",
-      "USA Gummies Approach — No Artificial Dyes",
-      "CTA: Shop USA Gummies",
-    ],
-    targetWordCount: 1000,
-    internalLinks: ["/shop", "/blog/mars-removing-artificial-dyes-what-it-means"],
-  };
+  function chunks(text, max = 1800) {
+    const out = [];
+    for (let i = 0; i < text.length; i += max) out.push(text.slice(i, i + max));
+    return out.length ? out : [""];
+  }
 
-  // Write draft to Notion content calendar (for Ben's review)
-  if (IDS.seoCalendar && !DRY_RUN) {
+  const systemPrompt = [
+    "You are writing for USA Gummies.",
+    "Tone: patriotic, health-conscious, informative, evidence-aware, no hype.",
+    "Output valid MDX only with YAML frontmatter.",
+    "Target 800-1200 words.",
+    "Include a CTA to /shop and at least 2 internal links to /blog/*.",
+    "Do not include fabricated claims or unverifiable statistics.",
+  ].join(" ");
+
+  const userPrompt = [
+    `Target keyword: ${target.keyword}`,
+    `Title direction: ${target.suggestedTitle}`,
+    `Slug direction: ${target.suggestedSlug}`,
+    "Sections to include: definition, health implications, regulatory context, how to avoid dyes, alternatives, USA Gummies position, CTA.",
+    "Return only MDX content.",
+  ].join("\n");
+
+  let mdx = "";
+  try {
+    const res = await fetchWithTimeout("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${openAiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        temperature: 0.7,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+      }),
+    }, 60000);
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`OpenAI ${res.status}: ${text.slice(0, 220)}`);
+    }
+
+    const json = await res.json();
+    mdx = json?.choices?.[0]?.message?.content?.trim() || "";
+    if (!mdx) throw new Error("OpenAI returned empty draft");
+  } catch (err) {
+    const reason = `Draft generation failed: ${err.message || err}`;
+    log(`S3 — ${reason}`);
+    return engine.fail("S3", reason);
+  }
+
+  const wordCount = mdx.split(/\s+/).filter(Boolean).length;
+  const titleMatch = mdx.match(/title:\s*"?([^\n"]+)"?/i);
+  const slugMatch = mdx.match(/slug:\s*"?([^\n"]+)"?/i);
+  const finalTitle = (titleMatch?.[1] || target.suggestedTitle || `USA Gummies — ${target.keyword}`).trim();
+  const finalSlug = ((slugMatch?.[1] || target.suggestedSlug || target.keyword).trim().toLowerCase().replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, "-").replace(/-+/g, "-"));
+
+  if (IDS.contentDrafts && !DRY_RUN) {
+    try {
+      await engine.createPage(IDS.contentDrafts, {
+        Title: { title: [{ text: { content: finalTitle } }] },
+        "Target Keyword": { rich_text: [{ text: { content: target.keyword } }] },
+        Slug: { rich_text: [{ text: { content: finalSlug } }] },
+        Status: { select: { name: "Draft" } },
+        "SEO Score": { number: Math.min(100, Math.max(55, Math.round(target.gapScore || 70))) },
+        "Word Count": { number: wordCount },
+        Author: { rich_text: [{ text: { content: "SEO Engine (GPT-4o-mini)" } }] },
+        "Generated At": { date: { start: todayET() } },
+        Body: { rich_text: chunks(mdx).map((chunk) => ({ text: { content: chunk } })) },
+      });
+    } catch (err) {
+      log(`S3 — Notion content drafts write failed: ${err.message}`);
+    }
+  } else if (IDS.seoCalendar && !DRY_RUN) {
+    // Fallback to existing calendar DB when content drafts DB is not yet configured.
     try {
       await engine.createPage(IDS.seoCalendar, {
-        Title: { title: [{ text: { content: target.suggestedTitle } }] },
+        Title: { title: [{ text: { content: finalTitle } }] },
         "Target Keyword": { rich_text: [{ text: { content: target.keyword } }] },
-        Status: { select: { name: "Idea" } },
-        "MDX Slug": { rich_text: [{ text: { content: target.suggestedSlug } }] },
-        Author: { rich_text: [{ text: { content: "SEO Engine (needs review)" } }] },
-        "Word Count": { number: outline.targetWordCount },
+        Status: { select: { name: "Drafted" } },
+        "MDX Slug": { rich_text: [{ text: { content: finalSlug } }] },
+        Author: { rich_text: [{ text: { content: "SEO Engine (GPT-4o-mini)" } }] },
+        "Word Count": { number: wordCount },
       });
-    } catch (err) { log(`S3 — Notion error: ${err.message}`); }
+    } catch (err) {
+      log(`S3 — Notion fallback write failed: ${err.message}`);
+    }
   }
 
-  // Alert Ben
   if (!DRY_RUN) {
-    textBen(`📝 SEO Engine: New blog post idea ready for review\n"${target.suggestedTitle}"\nKeyword: ${target.keyword}\nCheck Notion Content Calendar for outline.`);
+    textBen(`📝 SEO Engine: New GPT draft ready for review\n"${finalTitle}"\nKeyword: ${target.keyword}\nWord count: ${wordCount}\nCheck Notion Content Drafts.`).catch(() => {});
   }
 
-  log(`S3 — Done: Drafted outline for "${target.suggestedTitle}"`);
-  return engine.succeed("S3", { drafted: 1, keyword: target.keyword, title: target.suggestedTitle });
+  log(`S3 — Done: Generated full draft for "${finalTitle}"`);
+  return engine.succeed("S3", { drafted: 1, keyword: target.keyword, title: finalTitle, wordCount });
 }
 
 // ── S4: Internal Link Optimizer ──────────────────────────────────────────────

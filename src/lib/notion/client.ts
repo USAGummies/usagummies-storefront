@@ -38,6 +38,12 @@ export const DB = {
     "f1f7500b35d34908addeba4b94b21c6e",
   CASH_TRANSACTIONS:
     getNotionCredential("NOTION_CASH_TX_DB_ID") || "6325d16870024b83876b9e591b3d2d9c",
+  CONTENT_DRAFTS:
+    getNotionCredential("NOTION_DB_CONTENT_DRAFTS") ||
+    "00000000000000000000000000000000",
+  IMAGE_LIBRARY:
+    getNotionCredential("NOTION_DB_IMAGE_LIBRARY") ||
+    "00000000000000000000000000000000",
 } as const;
 
 // ---------------------------------------------------------------------------

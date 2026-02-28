@@ -376,6 +376,209 @@ export type MarketingData = {
   budget: null;
 };
 
+export type CustomersData = {
+  summary: {
+    totalCustomers: number;
+    repeatRate: number;
+    avgLtv: number;
+    aov: number;
+    orders90d: number;
+  };
+  ltvDistribution: Array<{ bucket: string; count: number; pct: number }>;
+  orderFrequency: Array<{ bucket: string; count: number; pct: number }>;
+  cohortRetention: {
+    months: string[];
+    rows: Array<{
+      cohort: string;
+      cohortLabel: string;
+      size: number;
+      retention: number[];
+    }>;
+  };
+  topCustomers: Array<{
+    id: string;
+    name: string;
+    email: string;
+    totalSpent: number;
+    ordersCount: number;
+    avgOrderValue: number;
+    lastOrderAt: string | null;
+    state: string;
+  }>;
+  geography: Array<{ state: string; count: number; pct: number }>;
+  generatedAt: string;
+  error?: string;
+};
+
+export type ContentData = {
+  summary: {
+    publishedPosts: number;
+    totalBlogPageviews: number;
+    avgEngagementTime: number;
+    blogToPurchaseConversions: number;
+  };
+  topPosts: Array<{
+    path: string;
+    title: string;
+    pageviews: number;
+    avgEngagementTime: number;
+    bounceRate: number;
+  }>;
+  draftQueue: Array<{
+    id: string;
+    title: string;
+    targetKeyword: string;
+    slug: string;
+    status: string;
+    seoScore: number;
+    wordCount: number;
+    generatedAt: string;
+    publishedAt: string;
+    body: string;
+  }>;
+  engineStatus: {
+    s1LastRun: string | null;
+    s3LastRun: string | null;
+    s5LastRun: string | null;
+  };
+  generatedAt: string;
+  error?: string;
+};
+
+export type SocialData = {
+  platforms: {
+    x: {
+      configured: boolean;
+      followers: number | null;
+      recentPosts: Array<{
+        id: string;
+        text: string;
+        createdAt: string | null;
+        likes: number;
+        replies: number;
+        reposts: number;
+        impressions: number;
+      }>;
+      unrespondedMentions: Array<{
+        id: string;
+        text: string;
+        authorId: string;
+        createdAt: string | null;
+      }>;
+    };
+    truth: {
+      configured: boolean;
+      followers: number | null;
+      recentPosts: Array<{
+        id: string;
+        text: string;
+        createdAt: string | null;
+        likes: number;
+        replies: number;
+        reposts: number;
+      }>;
+      unrespondedMentions: Array<{
+        id: string;
+        text: string;
+        account: string;
+        createdAt: string | null;
+      }>;
+    };
+  };
+  autoResponder: {
+    enabled: boolean;
+    responseCountToday: number;
+  };
+  generatedAt: string;
+  error?: string;
+};
+
+export type ImageLibraryData = {
+  images: Array<{
+    id: string;
+    title: string;
+    url: string;
+    tags: string[];
+    category: string;
+    source: "upload" | "ai-dalle";
+    prompt: string;
+    created: string;
+    usedIn: string;
+  }>;
+  summary: {
+    total: number;
+    uploadCount: number;
+    aiCount: number;
+  };
+  generatedAt: string;
+  error?: string;
+};
+
+export type IntelligenceData = {
+  tests: Array<{
+    id: string;
+    name: string;
+    channel: string;
+    hypothesis: string;
+    startDate: string;
+    endDate: string | null;
+    status: "active" | "completed" | "paused";
+    spend: number;
+    revenue: number;
+    roas: number;
+    impressions: number;
+    clicks: number;
+    creative: string;
+    audience: string;
+    result: "winner" | "loser" | "inconclusive" | null;
+  }>;
+  opportunities: Array<{
+    id: string;
+    name: string;
+    channel: string;
+    roas: number;
+    spend: number;
+    impressions: number;
+    suggestedScaleBudget: number;
+    status: "active" | "completed" | "paused";
+  }>;
+  channelRoas: Array<{ channel: string; spend: number; revenue: number; roas: number }>;
+  summary: {
+    activeTests: number;
+    avgRoas: number;
+    bestPerformer: string;
+    totalTestSpend: number;
+  };
+  generatedAt: string;
+};
+
+export type AdsData = {
+  campaigns: Array<{
+    id: string;
+    platform: "rumble" | "meta" | "google" | "tiktok";
+    name: string;
+    status: "active" | "paused" | "completed";
+    spend: number;
+    impressions: number;
+    clicks: number;
+    conversions: number;
+    revenue: number;
+    startDate: string;
+    endDate: string | null;
+  }>;
+  byPlatform: Array<{
+    platform: string;
+    spend: number;
+    revenue: number;
+    roas: number;
+    impressions: number;
+    clicks: number;
+    ctr: number;
+    cpc: number;
+  }>;
+  generatedAt: string;
+};
+
 export type TransactionsData = {
   transactions: PlaidTransaction[];
   categories: Array<{ category: string; totalSpent: number; count: number; pctOfTotal: number }>;
@@ -659,6 +862,30 @@ export function useAlerts(limit = 50) {
 
 export function useMarketingData() {
   return useEndpointData<MarketingData>("/api/ops/marketing");
+}
+
+export function useCustomersData() {
+  return useEndpointData<CustomersData>("/api/ops/marketing/customers");
+}
+
+export function useContentData() {
+  return useEndpointData<ContentData>("/api/ops/marketing/content");
+}
+
+export function useSocialData() {
+  return useEndpointData<SocialData>("/api/ops/marketing/social");
+}
+
+export function useImageLibrary() {
+  return useEndpointData<ImageLibraryData>("/api/ops/marketing/images");
+}
+
+export function useIntelligenceData() {
+  return useEndpointData<IntelligenceData>("/api/ops/marketing/intelligence");
+}
+
+export function useAdsData() {
+  return useEndpointData<AdsData>("/api/ops/marketing/ads");
 }
 
 export function useTransactions(days = 30) {
