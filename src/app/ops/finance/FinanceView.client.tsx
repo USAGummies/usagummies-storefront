@@ -272,7 +272,11 @@ export function FinanceView() {
                             fontSize: 12,
                           }}
                         >
-                          {(row.pva.variancePct * 100).toFixed(1)}%
+                          {row.pva.plan === 0 && row.pva.actual === 0
+                            ? "—"
+                            : row.pva.plan === 0
+                              ? "N/A"
+                              : `${(row.pva.variancePct * 100).toFixed(1)}%`}
                         </span>
                       </td>
                     </tr>
@@ -301,7 +305,7 @@ export function FinanceView() {
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
               <span style={{ color: TEXT_DIM }}>Gross margin</span>
-              <span style={{ color: NAVY, fontWeight: 700 }}>{fmtPercent(pnl?.grossMargin || 0)}</span>
+              <span style={{ color: NAVY, fontWeight: 700 }}>{(pnl?.grossMargin || 0).toFixed(1)}%</span>
             </div>
             <div style={{ borderTop: `1px solid ${BORDER}`, paddingTop: 8 }}>
               <div style={{ fontSize: 12, color: TEXT_DIM, marginBottom: 6 }}>Channel GP / unit</div>

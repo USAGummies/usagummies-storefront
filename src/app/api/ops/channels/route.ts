@@ -77,10 +77,88 @@ async function fetchShopifyOrders(): Promise<ShopifyOrderNode[]> {
     }
 
     const json = await res.json();
+
+    // Check for GraphQL-level errors (HTTP 200 but query failed)
+    if (json.errors) {
+      console.error("[channels] Shopify GraphQL errors:", JSON.stringify(json.errors));
+      // Fall back to simpler query without extended fields
+      return fetchShopifyOrdersSimple(endpoint, dateFilter);
+    }
+
     const edges = json.data?.orders?.edges || [];
+    if (edges.length === 0 && !json.data?.orders) {
+      console.warn("[channels] Shopify returned null orders data — falling back to simple query");
+      return fetchShopifyOrdersSimple(endpoint, dateFilter);
+    }
     return edges.map((e: { node: ShopifyOrderNode }) => e.node);
   } catch (err) {
     console.error("[channels] Shopify fetch failed:", err);
+    return [];
+  }
+}
+
+/**
+ * Fallback: fetch orders with only basic fields (same as dashboard API).
+ * All orders are classified as DTC since we can't distinguish channels
+ * without tags/app fields.
+ */
+async function fetchShopifyOrdersSimple(
+  endpoint: string,
+  dateFilter: string,
+): Promise<ShopifyOrderNode[]> {
+  try {
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Shopify-Access-Token": shopifyToken(),
+      },
+      body: JSON.stringify({
+        query: `
+          query($query: String!) {
+            orders(first: 250, query: $query, sortKey: CREATED_AT, reverse: true) {
+              edges {
+                node {
+                  name
+                  createdAt
+                  displayFinancialStatus
+                  totalPriceSet { shopMoney { amount } }
+                }
+              }
+            }
+          }
+        `,
+        variables: { query: dateFilter },
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+
+    if (!res.ok) {
+      console.error("[channels] Shopify simple fallback returned", res.status);
+      return [];
+    }
+
+    const json = await res.json();
+    if (json.errors) {
+      console.error("[channels] Shopify simple fallback GraphQL errors:", JSON.stringify(json.errors));
+      return [];
+    }
+
+    const edges = json.data?.orders?.edges || [];
+    console.log(`[channels] Simple fallback returned ${edges.length} orders (all classified as DTC)`);
+    return edges.map((e: { node: Record<string, unknown> }) => ({
+      name: (e.node.name as string) || "",
+      createdAt: (e.node.createdAt as string) || "",
+      displayFinancialStatus: (e.node.displayFinancialStatus as string) || "",
+      totalPriceSet: e.node.totalPriceSet as { shopMoney: { amount: string } },
+      tags: [],
+      note: null,
+      sourceUrl: null,
+      app: null,
+      customer: null,
+    }));
+  } catch (err) {
+    console.error("[channels] Shopify simple fallback failed:", err);
     return [];
   }
 }

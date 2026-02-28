@@ -358,7 +358,7 @@ export async function GET() {
     stages: Object.fromEntries(
       Object.entries(stages).map(([stage, leads]) => [
         stage,
-        leads.slice(0, 20).map(
+        leads.slice(0, 50).map(
           ({
             id,
             name,
