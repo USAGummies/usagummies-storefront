@@ -31,6 +31,7 @@ import {
   useAlerts,
   useChannelData,
   usePnLData,
+  useInventoryData,
   comparePlanVsActual,
   fmtDollar,
   fmtPercent,
@@ -179,16 +180,21 @@ export function OpsDashboard() {
   const { data: balances } = useBalancesData();
   const { data: pipeline } = usePipelineData();
   const { data: alerts } = useAlerts(5);
-  const { data: channels } = useChannelData();
+  const { data: channels, error: channelsError } = useChannelData();
   const { data: pnl } = usePnLData();
+  const { data: inventory } = useInventoryData();
 
   const month = getCurrentProFormaMonth();
   const planRevenue = month ? cumulativeThrough(TOTAL_REVENUE, month) : null;
   const planUnits = month ? cumulativeThrough(TOTAL_UNITS, month) : null;
   const planEbitda = month ? cumulativeThrough(EBITDA, month) : null;
-  const planMargin = month
+  // Pro-forma GROSS_MARGIN values are decimals (0.375 = 37.5%).
+  // P&L API returns grossMargin as a percentage (37.5 = 37.5%).
+  // Convert plan to percentage scale so both are comparable.
+  const planMarginDecimal = month
     ? average(getMonthsThrough(month).map((m) => GROSS_MARGIN[m]))
     : null;
+  const planMargin = planMarginDecimal != null ? planMarginDecimal * 100 : null;
 
   const revenueActual = dashboard?.combined.totalRevenue ?? null;
   const unitsActual =
@@ -205,15 +211,17 @@ export function OpsDashboard() {
       : null;
   const ebitdaPva = planEbitda != null ? comparePlanVsActual(planEbitda, ebitdaActual) : null;
 
+  // Only count leads in active engagement stages — not cold outreach, not closed.
+  // "Open Deals" means actual conversations in progress, not every email we've sent.
+  const ACTIVE_DEAL_STAGES = /interested|quote sent|negotiation|proposal sent|order placed/i;
   const openDeals = useMemo(() => {
     if (!pipeline) return 0;
-    const closed = Object.entries(pipeline.stageCounts || {}).reduce((sum, [stage, count]) => {
-      return /closed|lost|not interested/i.test(stage) ? sum + count : sum;
+    return Object.entries(pipeline.stageCounts || {}).reduce((sum, [stage, count]) => {
+      return ACTIVE_DEAL_STAGES.test(stage) ? sum + count : sum;
     }, 0);
-    return Math.max(0, pipeline.totalLeads - closed);
   }, [pipeline]);
 
-  const inventoryDays = dashboard?.amazon?.inventory?.daysOfSupply ?? 0;
+  const inventoryDays = inventory?.summary?.avgDaysOfSupply ?? 0;
 
   const trendRows = useMemo(() => {
     const channelDaily = channels?.dailyByChannel || [];
@@ -243,12 +251,25 @@ export function OpsDashboard() {
     const faire = channels?.shopify?.faire.revenue || 0;
     const distributor = channels?.shopify?.distributor.revenue || 0;
 
-    return [
-      { name: "Amazon", value: amazon, color: COLOR_AMAZON },
-      { name: "DTC", value: dtc, color: COLOR_DTC },
-      { name: "Faire", value: faire, color: COLOR_FAIRE },
-      { name: "Distributor", value: distributor, color: COLOR_DIST },
-    ].filter((x) => x.value > 0);
+    // If channels API returned no Shopify breakdown but dashboard has Shopify revenue,
+    // show it as "Shopify" so the donut isn't Amazon-only.
+    const shopifyTotal = dtc + faire + distributor;
+    const dashboardShopify = dashboard?.shopify?.totalRevenue || 0;
+    const useFallback = shopifyTotal === 0 && dashboardShopify > 0;
+
+    const items = useFallback
+      ? [
+          { name: "Amazon", value: amazon, color: COLOR_AMAZON },
+          { name: "Shopify", value: dashboardShopify, color: COLOR_DTC },
+        ]
+      : [
+          { name: "Amazon", value: amazon, color: COLOR_AMAZON },
+          { name: "DTC", value: dtc, color: COLOR_DTC },
+          { name: "Faire", value: faire, color: COLOR_FAIRE },
+          { name: "Distributor", value: distributor, color: COLOR_DIST },
+        ];
+
+    return items.filter((x) => x.value > 0);
   }, [channels, dashboard]);
 
   const sparkRevenue = (dashboard?.chartData || []).map((d) => d.combined);
@@ -269,6 +290,7 @@ export function OpsDashboard() {
     { label: "Pipeline", timestamp: pipeline?.generatedAt },
     { label: "Alerts", timestamp: alerts?.lastFetched },
     { label: "Channels", timestamp: channels?.generatedAt },
+    { label: "Inventory", timestamp: inventory?.generatedAt },
   ];
 
   return (
@@ -288,7 +310,7 @@ export function OpsDashboard() {
         <RefreshButton loading={dashboardLoading} onClick={() => refresh()} />
       </div>
 
-      {dashboardError ? (
+      {(dashboardError || channelsError) ? (
         <div
           style={{
             border: `1px solid ${RED}33`,
@@ -304,7 +326,7 @@ export function OpsDashboard() {
           }}
         >
           <AlertTriangle size={16} />
-          {dashboardError}
+          {dashboardError || channelsError}
         </div>
       ) : null}
 
@@ -343,8 +365,8 @@ export function OpsDashboard() {
         <MetricCard
           icon={<Percent size={16} />}
           label="Contribution Margin"
-          value={fmtPercent(marginActual || 0)}
-          plan={planMargin != null ? fmtPercent(planMargin) : null}
+          value={`${(marginActual || 0).toFixed(1)}%`}
+          plan={planMargin != null ? `${planMargin.toFixed(1)}%` : null}
           variance={marginPva}
           spark={sparkRevenue.length ? sparkRevenue : [0, 0, 0]}
         />
