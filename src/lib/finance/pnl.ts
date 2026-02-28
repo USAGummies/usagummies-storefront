@@ -133,28 +133,45 @@ async function getAmazonRevenue(start: string, end: string): Promise<number> {
 }
 
 async function getShopifyRevenue(start: string, end: string): Promise<number> {
-  // Try Notion daily performance first (historical data)
-  const rows = await queryDatabase(
-    DB.DAILY_PERFORMANCE,
-    {
-      and: [
-        { property: "Date", date: { on_or_after: start } },
-        { property: "Date", date: { on_or_before: end } },
-      ],
-    },
-    [{ property: "Date", direction: "ascending" }],
-  );
+  // Query both Notion and Shopify API in parallel, return the higher value.
+  // Notion may have incomplete daily entries (e.g., $50 when real total is $370).
+  // The API is the source of truth for the current month.
+  const [notionTotal, apiTotal] = await Promise.all([
+    getShopifyRevenueFromNotion(start, end),
+    fetchShopifyRevenueDirectly(start, end),
+  ]);
 
-  if (rows && rows.length > 0) {
-    const total = rows.reduce((sum, row) => {
-      const p = (row.properties || {}) as Record<string, unknown>;
-      return sum + extractNumber(p["Shopify Revenue"]);
-    }, 0);
-    if (total > 0) return total;
+  if (notionTotal > 0 && apiTotal > 0) {
+    // Use whichever reports higher — protects against incomplete Notion data
+    return Math.max(notionTotal, apiTotal);
   }
+  // If one source failed, use whichever returned data
+  return notionTotal || apiTotal;
+}
 
-  // Fallback: query Shopify Admin API directly
-  return fetchShopifyRevenueDirectly(start, end);
+async function getShopifyRevenueFromNotion(start: string, end: string): Promise<number> {
+  try {
+    const rows = await queryDatabase(
+      DB.DAILY_PERFORMANCE,
+      {
+        and: [
+          { property: "Date", date: { on_or_after: start } },
+          { property: "Date", date: { on_or_before: end } },
+        ],
+      },
+      [{ property: "Date", direction: "ascending" }],
+    );
+
+    if (rows && rows.length > 0) {
+      return rows.reduce((sum, row) => {
+        const p = (row.properties || {}) as Record<string, unknown>;
+        return sum + extractNumber(p["Shopify Revenue"]);
+      }, 0);
+    }
+  } catch (err) {
+    console.error("[pnl] Notion Shopify revenue lookup failed:", err);
+  }
+  return 0;
 }
 
 /** Direct Shopify Admin API fallback when Notion has no data */

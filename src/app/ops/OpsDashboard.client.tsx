@@ -158,7 +158,9 @@ function MetricCard({
               fontWeight: 800,
             }}
           >
-            {(variance.variancePct * 100).toFixed(1)}%
+            {variance.status === "no-data"
+              ? "N/A"
+              : `${(variance.variancePct * 100).toFixed(1)}%`}
           </span>
         ) : null}
       </div>

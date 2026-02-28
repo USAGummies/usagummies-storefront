@@ -239,22 +239,22 @@ export function ForecastView() {
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr>
-                    <th style={{ textAlign: "left", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Source</th>
-                    <th style={{ textAlign: "right", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Amount</th>
-                    <th style={{ textAlign: "left", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Date</th>
+                    <th style={{ textAlign: "left", fontSize: 11, color: TEXT_DIM, paddingBottom: 8, paddingRight: 12 }}>Source</th>
+                    <th style={{ textAlign: "right", fontSize: 11, color: TEXT_DIM, paddingBottom: 8, paddingRight: 12 }}>Amount</th>
+                    <th style={{ textAlign: "left", fontSize: 11, color: TEXT_DIM, paddingBottom: 8, paddingRight: 12 }}>Date</th>
                     <th style={{ textAlign: "left", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Confidence</th>
                   </tr>
                 </thead>
                 <tbody>
                   {receivables.map((row, idx) => (
                     <tr key={`${row.source}-${row.expectedDate}-${idx}`}>
-                      <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 0", color: NAVY, fontSize: 13, fontWeight: 700 }}>
+                      <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 12px 8px 0", color: NAVY, fontSize: 13, fontWeight: 700 }}>
                         {row.source.replace(/_/g, " ")}
                       </td>
-                      <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 0", textAlign: "right", color: NAVY, fontWeight: 700 }}>
+                      <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 12px 8px 0", textAlign: "right", color: NAVY, fontWeight: 700 }}>
                         {fmtDollar(row.amount)}
                       </td>
-                      <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 0", color: TEXT_DIM, fontSize: 12 }}>
+                      <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 12px 8px 0", color: TEXT_DIM, fontSize: 12 }}>
                         {new Date(row.expectedDate).toLocaleDateString("en-US")}
                       </td>
                       <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 0", color: TEXT_DIM, fontSize: 12 }}>
@@ -279,22 +279,22 @@ export function ForecastView() {
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr>
-                    <th style={{ textAlign: "left", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Category</th>
-                    <th style={{ textAlign: "right", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Amount</th>
-                    <th style={{ textAlign: "left", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Due Date</th>
+                    <th style={{ textAlign: "left", fontSize: 11, color: TEXT_DIM, paddingBottom: 8, paddingRight: 12 }}>Category</th>
+                    <th style={{ textAlign: "right", fontSize: 11, color: TEXT_DIM, paddingBottom: 8, paddingRight: 12 }}>Amount</th>
+                    <th style={{ textAlign: "left", fontSize: 11, color: TEXT_DIM, paddingBottom: 8, paddingRight: 12 }}>Due Date</th>
                     <th style={{ textAlign: "left", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Recurring</th>
                   </tr>
                 </thead>
                 <tbody>
                   {payables.map((row, idx) => (
                     <tr key={`${row.category}-${row.dueDate}-${idx}`}>
-                      <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 0", color: NAVY, fontSize: 13, fontWeight: 700 }}>
+                      <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 12px 8px 0", color: NAVY, fontSize: 13, fontWeight: 700 }}>
                         {row.category}
                       </td>
-                      <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 0", textAlign: "right", color: NAVY, fontWeight: 700 }}>
+                      <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 12px 8px 0", textAlign: "right", color: NAVY, fontWeight: 700 }}>
                         {fmtDollar(row.amount)}
                       </td>
-                      <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 0", color: TEXT_DIM, fontSize: 12 }}>
+                      <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 12px 8px 0", color: TEXT_DIM, fontSize: 12 }}>
                         {new Date(row.dueDate).toLocaleDateString("en-US")}
                       </td>
                       <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 0", color: TEXT_DIM, fontSize: 12 }}>
