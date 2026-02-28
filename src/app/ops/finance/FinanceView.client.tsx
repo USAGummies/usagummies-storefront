@@ -10,7 +10,7 @@ import {
   YAxis,
   Tooltip,
 } from "recharts";
-import { Wallet, TrendingUp, Flame, AlertTriangle } from "lucide-react";
+import { Wallet, TrendingUp, Flame, AlertTriangle, Landmark, Briefcase } from "lucide-react";
 
 import {
   usePnLData,
@@ -27,6 +27,19 @@ import {
   EBITDA,
   GROSS_MARGIN,
   UNIT_ECONOMICS,
+  LOAN,
+  LOAN_REPAYMENT,
+  LOAN_BALANCE,
+  AMORTIZATION_SCHEDULE,
+  FULL_REPAYMENT_SCHEDULE,
+  CAPITAL_DEPLOYMENT,
+  CAPITAL_BY_MONTH,
+  TOTAL_CAPITAL_DEPLOYED,
+  CAPITAL_TO_DATE,
+  FOUNDER_CAPITAL_2025,
+  FOUNDER_CAPITAL_2026_YTD,
+  FOUNDER_CAPITAL_TOTAL,
+  ANNUAL_SUMMARY,
   getCurrentProFormaMonth,
   getMonthsThrough,
   cumulativeThrough,
@@ -36,6 +49,7 @@ import { SkeletonChart, SkeletonTable } from "@/app/ops/components/Skeleton";
 import {
   NAVY,
   RED,
+  GOLD,
   CREAM as BG,
   SURFACE_CARD as CARD,
   SURFACE_BORDER as BORDER,
@@ -321,6 +335,179 @@ export function FinanceView() {
                   <span style={{ color: TEXT_DIM }}>Distributor</span>
                   <span style={{ color: NAVY, fontWeight: 700 }}>{fmtDollar(UNIT_ECONOMICS.distributor.gpPerUnit)}</span>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Loan Amortization + Capital Deployment ────────────── */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 12,
+          marginBottom: 14,
+        }}
+      >
+        {/* Loan Amortization */}
+        <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <Landmark size={16} color={NAVY} />
+            <div style={{ fontWeight: 700, color: NAVY }}>Revenue Participation Note</div>
+          </div>
+
+          <div style={{ display: "grid", gap: 8, marginBottom: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+              <span style={{ color: TEXT_DIM }}>Principal</span>
+              <span style={{ color: NAVY, fontWeight: 700 }}>{fmtDollar(LOAN.principal)}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+              <span style={{ color: TEXT_DIM }}>Total Obligation (8% flat)</span>
+              <span style={{ color: NAVY, fontWeight: 700 }}>{fmtDollar(LOAN.totalObligation)}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+              <span style={{ color: TEXT_DIM }}>Total Interest</span>
+              <span style={{ color: NAVY, fontWeight: 700 }}>{fmtDollar(LOAN.totalInterest)}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+              <span style={{ color: TEXT_DIM }}>Repayment Rate</span>
+              <span style={{ color: NAVY, fontWeight: 700 }}>15% of gross revenue</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+              <span style={{ color: TEXT_DIM }}>Deferral Period</span>
+              <span style={{ color: NAVY, fontWeight: 700 }}>6 months (starts Aug 2026)</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+              <span style={{ color: TEXT_DIM }}>Projected Payoff</span>
+              <span style={{ color: "#16a34a", fontWeight: 700 }}>{LOAN.projectedPayoffDate}</span>
+            </div>
+          </div>
+
+          {/* Progress bar */}
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: TEXT_DIM, marginBottom: 4 }}>
+              <span>{fmtDollar(ANNUAL_SUMMARY.totalLoanRepayment2026)} repaid in 2026</span>
+              <span>{((ANNUAL_SUMMARY.totalLoanRepayment2026 / LOAN.totalObligation) * 100).toFixed(1)}%</span>
+            </div>
+            <div style={{ width: "100%", height: 8, borderRadius: 99, background: BORDER }}>
+              <div style={{
+                width: `${(ANNUAL_SUMMARY.totalLoanRepayment2026 / LOAN.totalObligation) * 100}%`,
+                height: "100%",
+                borderRadius: 99,
+                background: NAVY,
+                transition: "width 0.6s ease",
+              }} />
+            </div>
+          </div>
+
+          {/* 2026 amortization table */}
+          <div style={{ fontSize: 11, color: TEXT_DIM, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
+            2026 Amortization Schedule
+          </div>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: "left", fontSize: 10, color: TEXT_DIM, paddingBottom: 6 }}>Month</th>
+                  <th style={{ textAlign: "right", fontSize: 10, color: TEXT_DIM, paddingBottom: 6 }}>Revenue</th>
+                  <th style={{ textAlign: "right", fontSize: 10, color: TEXT_DIM, paddingBottom: 6 }}>Payment</th>
+                  <th style={{ textAlign: "right", fontSize: 10, color: TEXT_DIM, paddingBottom: 6 }}>Principal</th>
+                  <th style={{ textAlign: "right", fontSize: 10, color: TEXT_DIM, paddingBottom: 6 }}>Interest</th>
+                  <th style={{ textAlign: "right", fontSize: 10, color: TEXT_DIM, paddingBottom: 6 }}>Balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {AMORTIZATION_SCHEDULE.filter((a) => a.month.includes("2026")).map((a) => (
+                  <tr key={a.month}>
+                    <td style={{ borderTop: `1px solid ${BORDER}`, padding: "6px 0", fontSize: 12, color: NAVY, fontWeight: 600 }}>{a.month.replace(" 2026", "")}</td>
+                    <td style={{ borderTop: `1px solid ${BORDER}`, padding: "6px 0", fontSize: 12, textAlign: "right", color: TEXT_DIM }}>{fmtDollar(a.grossRevenue)}</td>
+                    <td style={{ borderTop: `1px solid ${BORDER}`, padding: "6px 0", fontSize: 12, textAlign: "right", color: NAVY, fontWeight: 700 }}>{fmtDollar(a.totalPayment)}</td>
+                    <td style={{ borderTop: `1px solid ${BORDER}`, padding: "6px 0", fontSize: 12, textAlign: "right", color: NAVY }}>{fmtDollar(a.principalPortion)}</td>
+                    <td style={{ borderTop: `1px solid ${BORDER}`, padding: "6px 0", fontSize: 12, textAlign: "right", color: TEXT_DIM }}>{fmtDollar(a.interestPortion)}</td>
+                    <td style={{ borderTop: `1px solid ${BORDER}`, padding: "6px 0", fontSize: 12, textAlign: "right", color: NAVY, fontWeight: 600 }}>{fmtDollar(a.principalBalance)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Capital Deployment + Founder Capital */}
+        <div style={{ display: "grid", gap: 12 }}>
+          {/* Capital Deployment */}
+          <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+              <Briefcase size={16} color={NAVY} />
+              <div style={{ fontWeight: 700, color: NAVY }}>Capital Deployment Plan</div>
+            </div>
+            <div style={{ fontSize: 12, color: TEXT_DIM, marginBottom: 10 }}>
+              {fmtDollar(TOTAL_CAPITAL_DEPLOYED)} total · {fmtDollar(LOAN.principal)} loan proceeds
+            </div>
+
+            <div style={{ display: "grid", gap: 4 }}>
+              {Object.entries(CAPITAL_BY_MONTH).map(([month, amount]) => {
+                const pct = (amount / TOTAL_CAPITAL_DEPLOYED) * 100;
+                return (
+                  <div key={month}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 2 }}>
+                      <span style={{ color: NAVY, fontWeight: 600 }}>{month}</span>
+                      <span style={{ color: NAVY, fontWeight: 700 }}>{fmtDollar(amount)}</span>
+                    </div>
+                    <div style={{ width: "100%", height: 6, borderRadius: 99, background: BORDER }}>
+                      <div style={{
+                        width: `${pct}%`,
+                        height: "100%",
+                        borderRadius: 99,
+                        background: month === "Reserve" ? GOLD : NAVY,
+                      }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div style={{ borderTop: `1px solid ${BORDER}`, marginTop: 10, paddingTop: 8 }}>
+              <div style={{ fontSize: 11, color: TEXT_DIM, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
+                Key Line Items
+              </div>
+              <div style={{ display: "grid", gap: 4 }}>
+                {CAPITAL_DEPLOYMENT.filter((c) => c.amount >= 5000).map((c) => (
+                  <div key={c.category} style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                    <span style={{ color: TEXT_DIM, flex: 1 }}>{c.category}</span>
+                    <span style={{ color: NAVY, fontWeight: 600, marginLeft: 8 }}>{fmtDollar(c.amount)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Founder Capital */}
+          <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px" }}>
+            <div style={{ fontWeight: 700, color: NAVY, marginBottom: 10 }}>Founder Capital (Pre-Raise)</div>
+            <div style={{ display: "grid", gap: 6 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                <span style={{ color: TEXT_DIM }}>2025 Capital</span>
+                <span style={{ color: NAVY, fontWeight: 700 }}>{fmtDollar(FOUNDER_CAPITAL_2025)}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                <span style={{ color: TEXT_DIM }}>Jan-Feb 2026</span>
+                <span style={{ color: NAVY, fontWeight: 700 }}>{fmtDollar(FOUNDER_CAPITAL_2026_YTD)}</span>
+              </div>
+              <div style={{ borderTop: `1px solid ${BORDER}`, paddingTop: 6, display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                <span style={{ color: NAVY, fontWeight: 700 }}>Total Founder Capital</span>
+                <span style={{ color: NAVY, fontWeight: 800 }}>{fmtDollar(FOUNDER_CAPITAL_TOTAL)}</span>
+              </div>
+            </div>
+            <div style={{ marginTop: 8 }}>
+              <div style={{ fontSize: 11, color: TEXT_DIM, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Breakdown</div>
+              <div style={{ display: "grid", gap: 3 }}>
+                {CAPITAL_TO_DATE.map((c) => (
+                  <div key={`${c.category}-${c.period}`} style={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}>
+                    <span style={{ color: TEXT_DIM }}>{c.category} ({c.period})</span>
+                    <span style={{ color: NAVY, fontWeight: 600 }}>{fmtDollar(c.amount)}</span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>

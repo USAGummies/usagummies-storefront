@@ -1,11 +1,19 @@
 /**
- * USA Gummies — Pro Forma v22 | Full Year 2026
+ * USA Gummies — Pro Forma v23 | Full Year 2026
  *
  * All financial targets, unit projections, and KPI benchmarks
- * extracted from USA_Gummies_Pro_Forma_2026_v22.xlsx
+ * extracted from USA_Gummies_Pro_Forma_2026_v23.xlsx
  *
  * This is the SINGLE SOURCE OF TRUTH for plan-vs-actual comparison
  * across the entire War Room dashboard.
+ *
+ * v23 changes from v22:
+ *   — Added $500/mo contingency line to OpEx
+ *   — Added loan amortization principal/interest split
+ *   — Added projected monthly cash balance
+ *   — Added inventory at cost monthly tracking
+ *   — Added founder capital-to-date breakdown
+ *   — Corrected EBITDA = GP − full OpEx (spreadsheet formula errors fixed)
  */
 
 // ---------------------------------------------------------------------------
@@ -35,6 +43,24 @@ export type LoanMonth = {
   repayment: number;
   cumulativeRepaid: number;
   balanceRemaining: number;
+};
+
+export type AmortizationMonth = {
+  month: string;
+  grossRevenue: number;
+  totalPayment: number;
+  principalPortion: number;
+  interestPortion: number;
+  cumulativePrincipal: number;
+  cumulativeInterest: number;
+  principalBalance: number;
+};
+
+export type CapitalToDateEntry = {
+  category: string;
+  amount: number;
+  period: string;
+  notes: string;
 };
 
 export type Milestone = {
@@ -112,10 +138,14 @@ export const LOAN = {
   principal: 300_000,
   flatReturnRate: 0.08,
   totalObligation: 324_000,
+  totalInterest: 24_000,
   deferralMonths: 6,                // No repayment before Aug 2026
   monthlyRepaymentRate: 0.15,       // 15% of gross monthly revenue
   repaymentStartMonth: 'aug' as Month,
   projectedPayoffDate: 'Feb 2028',
+  /** Each payment splits: 92.59% principal, 7.41% interest */
+  principalRatio: 300_000 / 324_000,   // ≈ 0.92593
+  interestRatio: 24_000 / 324_000,     // ≈ 0.07407
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -162,7 +192,7 @@ export const GROSS_MARGIN: MonthlyData = {
 };
 
 // ---------------------------------------------------------------------------
-// Operating Expenses
+// Operating Expenses (v23: now includes Contingency)
 // ---------------------------------------------------------------------------
 
 export const MARKETING: MonthlyData = {
@@ -173,25 +203,50 @@ export const RENT_GA: MonthlyData = {
   mar: 2000, apr: 2000, may: 2000, jun: 2000, jul: 2000, aug: 2000, sep: 5000, oct: 5000, nov: 5000, dec: 5000,
 };
 
+/** v23 addition: $500/mo operational contingency buffer */
+export const CONTINGENCY: MonthlyData = {
+  mar: 500, apr: 500, may: 500, jun: 500, jul: 500, aug: 500, sep: 500, oct: 500, nov: 500, dec: 500,
+};
+
 export const ONE_TIME_SETUP: MonthlyData = {
   mar: 54300, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0,
 };
 
+/** Total OpEx = Marketing + Rent/G&A + Contingency + One-Time Setup */
 export const TOTAL_OPEX: MonthlyData = {
-  mar: 66800, apr: 12500, may: 11000, jun: 7000, jul: 5000, aug: 6010, sep: 9584, oct: 10319, nov: 11178, dec: 11822,
+  mar: 67300, apr: 13000, may: 11500, jun: 7500, jul: 5500, aug: 6510, sep: 10084, oct: 10819, nov: 11678, dec: 12322,
 };
 
 // ---------------------------------------------------------------------------
-// EBITDA
+// EBITDA (GP minus full OpEx — corrected from v23 spreadsheet formula errors)
 // ---------------------------------------------------------------------------
 
 export const EBITDA: MonthlyData = {
-  mar: -66051, apr: -10279.50, may: -5029.67, jun: 2520.33, jul: -2877,
-  aug: 5301, sep: 3101, oct: 4122.33, nov: 5228, dec: 6306,
+  mar: -66551, apr: -10779.50, may: -5529.67, jun: 2020.33, jul: -3377,
+  aug: 4801, sep: 2601, oct: 3622.33, nov: 4728, dec: 5806,
 };
 
 // ---------------------------------------------------------------------------
-// Loan Repayment Schedule
+// Projected Cash Balance (simplified model: Cash = prev + GP − OpEx − Loan)
+// ---------------------------------------------------------------------------
+
+/** Monthly ending cash balance, starting from $300K loan proceeds */
+export const PROJECTED_CASH: MonthlyData = {
+  mar: 233449, apr: 222669.50, may: 217139.83, jun: 219160.16, jul: 215783.16,
+  aug: 214569.76, sep: 210294.61, oct: 205939.19, nov: 201400.34, dec: 196973.05,
+};
+
+// ---------------------------------------------------------------------------
+// Inventory at Cost ($1.75/unit — tracks 50K initial + 30K reorders in Aug/Nov)
+// ---------------------------------------------------------------------------
+
+export const INVENTORY_AT_COST: MonthlyData = {
+  mar: 86625, apr: 84087.50, may: 74812.50, jun: 57487.50, jul: 53112.50,
+  aug: 83037.50, sep: 56962.50, oct: 26337.50, nov: 42787.50, dec: 2887.50,
+};
+
+// ---------------------------------------------------------------------------
+// Loan Repayment Schedule (total obligation: $324K)
 // ---------------------------------------------------------------------------
 
 export const LOAN_REPAYMENT: MonthlyData = {
@@ -224,6 +279,33 @@ export const FULL_REPAYMENT_SCHEDULE: LoanMonth[] = [
   { month: 'Dec 2027', revenue: 214107, repayment: 32116.05, cumulativeRepaid: 281080.80, balanceRemaining: 42919.20 },
   { month: 'Jan 2028', revenue: 235518, repayment: 35327.70, cumulativeRepaid: 316408.50, balanceRemaining: 7591.50 },
   { month: 'Feb 2028', revenue: 259070, repayment: 7591.50, cumulativeRepaid: 324000, balanceRemaining: 0 },
+];
+
+// ---------------------------------------------------------------------------
+// Loan Amortization — Principal / Interest Split (v23 addition)
+// Each payment: 92.59% → principal, 7.41% → interest (flat $24K return)
+// ---------------------------------------------------------------------------
+
+export const AMORTIZATION_SCHEDULE: AmortizationMonth[] = [
+  { month: 'Aug 2026', grossRevenue: 40096, totalPayment: 6014.40, principalPortion: 5568.89, interestPortion: 445.51, cumulativePrincipal: 5568.89, cumulativeInterest: 445.51, principalBalance: 294431.11 },
+  { month: 'Sep 2026', grossRevenue: 45841, totalPayment: 6876.15, principalPortion: 6366.81, interestPortion: 509.34, cumulativePrincipal: 11935.69, cumulativeInterest: 954.86, principalBalance: 288064.31 },
+  { month: 'Oct 2026', grossRevenue: 53185, totalPayment: 7977.75, principalPortion: 7386.81, interestPortion: 590.94, cumulativePrincipal: 19322.50, cumulativeInterest: 1545.80, principalBalance: 280677.50 },
+  { month: 'Nov 2026', grossRevenue: 61779, totalPayment: 9266.85, principalPortion: 8580.42, interestPortion: 686.43, cumulativePrincipal: 27902.92, cumulativeInterest: 2232.23, principalBalance: 272097.08 },
+  { month: 'Dec 2026', grossRevenue: 68222, totalPayment: 10233.30, principalPortion: 9475.28, interestPortion: 758.02, cumulativePrincipal: 37378.19, cumulativeInterest: 2990.26, principalBalance: 262621.81 },
+  { month: 'Jan 2027', grossRevenue: 75044, totalPayment: 11256.60, principalPortion: 10422.78, interestPortion: 833.82, cumulativePrincipal: 47800.97, cumulativeInterest: 3824.08, principalBalance: 252199.03 },
+  { month: 'Feb 2027', grossRevenue: 82548, totalPayment: 12382.20, principalPortion: 11465.00, interestPortion: 917.20, cumulativePrincipal: 59265.97, cumulativeInterest: 4741.28, principalBalance: 240734.03 },
+  { month: 'Mar 2027', grossRevenue: 90803, totalPayment: 13620.45, principalPortion: 12611.53, interestPortion: 1008.92, cumulativePrincipal: 71877.50, cumulativeInterest: 5750.20, principalBalance: 228122.50 },
+  { month: 'Apr 2027', grossRevenue: 99883, totalPayment: 14982.45, principalPortion: 13872.64, interestPortion: 1109.81, cumulativePrincipal: 85750.14, cumulativeInterest: 6860.01, principalBalance: 214249.86 },
+  { month: 'May 2027', grossRevenue: 109871, totalPayment: 16480.65, principalPortion: 15259.86, interestPortion: 1220.79, cumulativePrincipal: 101010.00, cumulativeInterest: 8080.80, principalBalance: 198990.00 },
+  { month: 'Jun 2027', grossRevenue: 120858, totalPayment: 18128.70, principalPortion: 16785.83, interestPortion: 1342.87, cumulativePrincipal: 117795.83, cumulativeInterest: 9423.67, principalBalance: 182204.17 },
+  { month: 'Jul 2027', grossRevenue: 132944, totalPayment: 19941.60, principalPortion: 18464.44, interestPortion: 1477.16, cumulativePrincipal: 136260.28, cumulativeInterest: 10900.82, principalBalance: 163739.72 },
+  { month: 'Aug 2027', grossRevenue: 146238, totalPayment: 21935.70, principalPortion: 20310.83, interestPortion: 1624.87, cumulativePrincipal: 156571.11, cumulativeInterest: 12525.69, principalBalance: 143428.89 },
+  { month: 'Sep 2027', grossRevenue: 160862, totalPayment: 24129.30, principalPortion: 22341.94, interestPortion: 1787.36, cumulativePrincipal: 178913.06, cumulativeInterest: 14313.04, principalBalance: 121086.94 },
+  { month: 'Oct 2027', grossRevenue: 176948, totalPayment: 26542.20, principalPortion: 24576.11, interestPortion: 1966.09, cumulativePrincipal: 203489.17, cumulativeInterest: 16279.13, principalBalance: 96510.83 },
+  { month: 'Nov 2027', grossRevenue: 194643, totalPayment: 29196.45, principalPortion: 27033.75, interestPortion: 2162.70, cumulativePrincipal: 230522.92, cumulativeInterest: 18441.83, principalBalance: 69477.08 },
+  { month: 'Dec 2027', grossRevenue: 214107, totalPayment: 32116.05, principalPortion: 29737.08, interestPortion: 2378.97, cumulativePrincipal: 260260.00, cumulativeInterest: 20820.80, principalBalance: 39740.00 },
+  { month: 'Jan 2028', grossRevenue: 235518, totalPayment: 35327.70, principalPortion: 32710.83, interestPortion: 2616.87, cumulativePrincipal: 292970.83, cumulativeInterest: 23437.67, principalBalance: 7029.17 },
+  { month: 'Feb 2028', grossRevenue: 259070, totalPayment: 7591.50, principalPortion: 7029.17, interestPortion: 562.33, cumulativePrincipal: 300000, cumulativeInterest: 24000, principalBalance: 0 },
 ];
 
 // ---------------------------------------------------------------------------
@@ -269,6 +351,26 @@ export const CAPITAL_BY_MONTH: Record<string, number> = {
 export const TOTAL_CAPITAL_DEPLOYED = 302000;
 
 // ---------------------------------------------------------------------------
+// Founder Capital To Date — Pre-Raise Spend (v23 addition)
+// ---------------------------------------------------------------------------
+
+export const CAPITAL_TO_DATE: CapitalToDateEntry[] = [
+  { category: 'Office, Supplies & Equipment', amount: 5959, period: '2025', notes: 'Packaging, samples, production supplies, equipment' },
+  { category: 'Professional Services', amount: 12063, period: '2025', notes: 'Legal, accounting, consulting, Amazon listing' },
+  { category: 'Travel & Auto', amount: 658, period: '2025', notes: 'Trade shows, distributor meetings, samples delivery' },
+  { category: 'Other / Misc', amount: 5209, period: '2025', notes: 'Insurance, software, misc operating' },
+  { category: 'COGS (initial product runs)', amount: 7780, period: '2025', notes: 'Test production runs, packaging trials' },
+  { category: 'Office & Supplies', amount: 1373, period: 'Jan-Feb 2026', notes: 'Continued product dev, packaging' },
+  { category: 'Professional Services', amount: 642, period: 'Jan-Feb 2026', notes: 'Legal, compliance' },
+  { category: 'Travel', amount: 150, period: 'Jan-Feb 2026', notes: 'Distributor outreach' },
+  { category: 'Other / Misc', amount: 684, period: 'Jan-Feb 2026', notes: 'Software, misc ops' },
+];
+
+export const FOUNDER_CAPITAL_2025 = 31669;
+export const FOUNDER_CAPITAL_2026_YTD = 2849;
+export const FOUNDER_CAPITAL_TOTAL = 31819; // Per Summary tab (investor headline figure)
+
+// ---------------------------------------------------------------------------
 // Distributor Network Plan
 // ---------------------------------------------------------------------------
 
@@ -292,7 +394,7 @@ export const INVENTORY_PLAN = [
 ];
 
 // ---------------------------------------------------------------------------
-// Annual Summary (2026)
+// Annual Summary (2026) — v23 corrected
 // ---------------------------------------------------------------------------
 
 export const ANNUAL_SUMMARY = {
@@ -300,12 +402,16 @@ export const ANNUAL_SUMMARY = {
   totalRevenue: 334161.50,
   totalGrossProfit: 93554.50,
   blendedGrossMargin: 0.28,
-  totalOpex: 151213,
-  ebitda: -57658.50,
+  totalOpex: 156213,
+  ebitda: -62658.50,
   totalLoanRepayment2026: 40368.45,
-  netIncome: -98026.95,
-  closingCashDec31: 201973.05,
+  netIncome: -103026.95,
+  closingCashDec31: 196973.05,
   loanBalanceDec31: 283631.55,
+  /** v23 addition: total pre-raise founder spend */
+  founderCapitalDeployed: 31819,
+  /** v23 addition: annualized contingency */
+  totalContingency: 5000,
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -320,8 +426,9 @@ export const MILESTONES: Milestone[] = [
   { id: 'first-reorder', label: '1st Inventory Reorder', targetMonth: 'aug', metric: 'reorder', threshold: 30000, unit: 'units' },
   { id: 'second-reorder', label: '2nd Inventory Reorder', targetMonth: 'nov', metric: 'reorder', threshold: 30000, unit: 'units' },
   { id: 'loan-repayment-start', label: 'Loan Repayment Begins', targetMonth: 'aug', metric: 'loan_payment', threshold: 6014.40, unit: 'dollars' },
-  { id: 'cash-floor', label: 'Cash Never Below $200K', targetMonth: 'dec', metric: 'cash', threshold: 200000, unit: 'dollars' },
+  { id: 'cash-floor', label: 'Cash Never Below $195K', targetMonth: 'dec', metric: 'cash', threshold: 195000, unit: 'dollars' },
   { id: '100k-units', label: '100K+ Units Sold', targetMonth: 'dec', metric: 'cumulative_units', threshold: 100000, unit: 'units' },
+  { id: 'loan-payoff', label: 'Full Loan Repayment', targetMonth: 'Feb 2028', metric: 'loan_balance', threshold: 0, unit: 'dollars' },
 ];
 
 // ---------------------------------------------------------------------------
