@@ -117,16 +117,20 @@ export function SupplyChainView() {
             background: `${GOLD}18`,
             color: NAVY,
             borderRadius: 10,
-            padding: "10px 12px",
+            padding: "10px 14px",
             marginBottom: 12,
             fontSize: 13,
-            fontWeight: 600,
           }}
         >
-          Amazon FBA connection error: {inventory.amazonFba.error}
-          {inventory.amazonFba.lastSuccessfulFetch
-            ? ` (last successful fetch: ${new Date(inventory.amazonFba.lastSuccessfulFetch).toLocaleString("en-US")})`
-            : ""}
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>⚠️ Amazon FBA — Awaiting Authorization</div>
+          <div style={{ fontWeight: 400, lineHeight: 1.5 }}>
+            {inventory.amazonFba.error.includes("403")
+              ? "The SP-API app needs the FBA Inventory role enabled in Amazon Seller Central → Apps & Services → Develop Apps."
+              : inventory.amazonFba.error}
+            {inventory.amazonFba.lastSuccessfulFetch
+              ? ` Last successful fetch: ${new Date(inventory.amazonFba.lastSuccessfulFetch).toLocaleString("en-US")}.`
+              : ""}
+          </div>
         </div>
       ) : null}
 

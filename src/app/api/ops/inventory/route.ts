@@ -178,8 +178,8 @@ function parseNotionItem(page: Record<string, unknown>): InventoryItem {
 
   return {
     id: page.id as string,
-    sku: extractText(props["SKU"]) || "USA-GUMMY-7.5OZ",
-    productName: notes || "All American Gummy Bears",
+    sku: extractText(props["SKU"]) || "(no SKU)",
+    productName: notes || extractText(props["Item"]) || extractText(props["Name"]) || "Unknown Item",
     currentStock,
     reorderPoint,
     reorderQty,
@@ -730,13 +730,21 @@ export async function GET(req: Request) {
     ]);
 
     const notionItems = (notionPages || [])
-      .map(parseNotionItem)
-      .filter((item) => {
-        const loc = item.location.toLowerCase();
+      .filter((page) => {
+        const props = page.properties as Record<string, unknown>;
+        const loc = (
+          extractText(props["Location"]) ||
+          extractText(props["Item"]) ||
+          extractText(props["Name"]) ||
+          ""
+        ).toLowerCase();
+        // Exclude Amazon rows (handled by SP-API)
         if (loc.includes("amazon")) return false;
-        if (looksLikeHomeStockRow(item.location)) return false;
+        // Exclude home-stock rows (handled by baseline system)
+        if (looksLikeHomeStockRow(loc)) return false;
         return true;
-      });
+      })
+      .map(parseNotionItem);
 
     const { rows: homeRows, rollup } = buildHomeStockItems(
       baseline,

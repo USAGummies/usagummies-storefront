@@ -230,6 +230,42 @@ export async function createPage(
 }
 
 /**
+ * Archive (soft-delete) a Notion page by setting archived: true.
+ * Returns the archived page or null on failure.
+ */
+export async function archivePage(
+  pageId: string,
+): Promise<Record<string, unknown> | null> {
+  if (!NOTION_API_KEY()) {
+    console.error("[notion] NOTION_API_KEY not set");
+    return null;
+  }
+
+  try {
+    const res = await fetch(
+      `https://api.notion.com/v1/pages/${toNotionId(pageId)}`,
+      {
+        method: "PATCH",
+        headers: notionHeaders(),
+        body: JSON.stringify({ archived: true }),
+      },
+    );
+
+    if (!res.ok) {
+      console.error(
+        `[notion] Archive page failed: ${res.status} ${res.statusText}`,
+      );
+      return null;
+    }
+
+    return (await res.json()) as Record<string, unknown>;
+  } catch (err) {
+    console.error("[notion] Archive page error:", err);
+    return null;
+  }
+}
+
+/**
  * Update properties on an existing Notion page.
  * Returns the updated page or null on failure.
  */

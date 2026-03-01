@@ -114,6 +114,13 @@ async function spApiGet<T>(
 
       if (!res.ok) {
         const text = await res.text();
+        if (res.status === 403) {
+          throw new Error(
+            `SP-API ${path}: 403 Forbidden — The SP-API app lacks the required role/scope for this endpoint. ` +
+            `Re-authorize the app in Amazon Seller Central → Apps & Services → Develop Apps → Edit App → Add required API sections (e.g., FBA Inventory). ` +
+            `Raw: ${text.slice(0, 200)}`,
+          );
+        }
         throw new Error(`SP-API ${path} failed: ${res.status} — ${text}`);
       }
 
