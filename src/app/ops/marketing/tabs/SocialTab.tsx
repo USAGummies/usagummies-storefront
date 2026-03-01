@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Share2 } from "lucide-react";
+import { Share2, Zap } from "lucide-react";
 import { useSocialData } from "@/lib/ops/use-war-room-data";
 import { RefreshButton } from "@/app/ops/components/RefreshButton";
 import { SkeletonTable } from "@/app/ops/components/Skeleton";
@@ -24,6 +24,17 @@ async function postSocial(payload: Record<string, unknown>) {
   return json;
 }
 
+async function autoPostAction(payload: Record<string, unknown>) {
+  const res = await fetch("/api/ops/marketing/auto-post", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error || `Auto-post failed (${res.status})`);
+  return json;
+}
+
 export function SocialTab() {
   const { data, loading, error, refresh } = useSocialData();
   const [busy, setBusy] = useState(false);
@@ -31,6 +42,12 @@ export function SocialTab() {
   const [text, setText] = useState("");
   const [xEnabled, setXEnabled] = useState(true);
   const [truthEnabled, setTruthEnabled] = useState(true);
+
+  // Auto-post state
+  const [autoTopic, setAutoTopic] = useState("");
+  const [autoStyle, setAutoStyle] = useState("social-post");
+  const [autoDryRun, setAutoDryRun] = useState(false);
+  const [autoResult, setAutoResult] = useState<Record<string, unknown> | null>(null);
 
   const submitPost = async () => {
     if (!text.trim()) return;
@@ -45,6 +62,29 @@ export function SocialTab() {
       setMessage(result.ok ? "Post dispatched." : "Post failed.");
       setText("");
       await refresh();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitAutoPost = async () => {
+    if (!autoTopic.trim()) return;
+    setBusy(true);
+    setMessage(null);
+    setAutoResult(null);
+    try {
+      const platforms = [xEnabled ? "x" : null, truthEnabled ? "truth" : null].filter(Boolean);
+      const result = await autoPostAction({
+        topic: autoTopic.trim(),
+        platforms,
+        style: autoStyle,
+        dryRun: autoDryRun,
+      });
+      setAutoResult(result);
+      setMessage(autoDryRun ? "Dry run complete — preview below." : `Auto-post sent to ${platforms.length} platform(s).`);
+      if (!autoDryRun) setAutoTopic("");
     } catch (err) {
       setMessage(err instanceof Error ? err.message : String(err));
     } finally {
@@ -138,6 +178,59 @@ export function SocialTab() {
         >
           Post Now
         </button>
+      </div>
+
+      {/* Auto-Post Engine */}
+      <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 14, marginBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700, color: NAVY, marginBottom: 8 }}>
+          <Zap size={16} />
+          Auto-Post Engine (Nano Banana 2 + GPT-4o)
+        </div>
+        <div style={{ fontSize: 12, color: TEXT_DIM, marginBottom: 10 }}>
+          Enter a topic — the engine generates social copy (GPT-4o), a matching image (Gemini), and posts to selected platforms.
+        </div>
+        <input
+          value={autoTopic}
+          onChange={(e) => setAutoTopic(e.target.value)}
+          placeholder="Topic (e.g., 'Why American-made gummy vitamins are the healthier choice')"
+          style={{ width: "100%", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "10px 12px", fontSize: 13, marginBottom: 8 }}
+        />
+        <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 8, flexWrap: "wrap" }}>
+          <select value={autoStyle} onChange={(e) => setAutoStyle(e.target.value)} style={{ border: `1px solid ${BORDER}`, borderRadius: 8, padding: "6px 10px", fontSize: 12 }}>
+            <option value="social-post">Social Post</option>
+            <option value="product-hero">Product Hero</option>
+            <option value="lifestyle">Lifestyle</option>
+            <option value="patriotic">Patriotic</option>
+            <option value="health-wellness">Health & Wellness</option>
+          </select>
+          <label style={{ fontSize: 12, color: NAVY, fontWeight: 700 }}>
+            <input type="checkbox" checked={autoDryRun} onChange={(e) => setAutoDryRun(e.target.checked)} /> Dry Run (preview only)
+          </label>
+        </div>
+        <button
+          onClick={submitAutoPost}
+          disabled={busy || !autoTopic.trim()}
+          style={{ border: `1px solid ${BORDER}`, borderRadius: 8, background: "#d4380d", color: "#fff", fontSize: 12, fontWeight: 700, padding: "8px 14px", cursor: "pointer" }}
+        >
+          {busy ? "Generating..." : autoDryRun ? "Preview Auto-Post" : "Generate & Post"}
+        </button>
+
+        {autoResult ? (
+          <div style={{ marginTop: 12, borderTop: `1px solid ${BORDER}`, paddingTop: 10 }}>
+            <div style={{ fontSize: 12, color: NAVY, fontWeight: 700, marginBottom: 6 }}>Generated Copy:</div>
+            {autoResult.copy ? (
+              <div style={{ display: "grid", gap: 6 }}>
+                <div style={{ fontSize: 11, color: TEXT_DIM }}><strong>X:</strong> {String((autoResult.copy as Record<string, unknown>).x || "")}</div>
+                <div style={{ fontSize: 11, color: TEXT_DIM }}><strong>Truth:</strong> {String((autoResult.copy as Record<string, unknown>).truth || "")}</div>
+                <div style={{ fontSize: 11, color: TEXT_DIM }}><strong>Instagram:</strong> {String((autoResult.copy as Record<string, unknown>).instagram || "")}</div>
+              </div>
+            ) : null}
+            <div style={{ marginTop: 6, fontSize: 11, color: TEXT_DIM }}>
+              Image: {autoResult.imageGenerated ? "Generated" : "Skipped"} |
+              Status: {autoResult.dryRun ? "Dry Run" : "Posted"}
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>

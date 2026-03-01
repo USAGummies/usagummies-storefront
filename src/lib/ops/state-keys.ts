@@ -97,6 +97,9 @@ export const STATE_KEYS = {
   "audit-inventory-baseline": "audit-inventory-baseline.json",
   "amazon-profitability": "amazon-profitability-cache.json",
 
+  // Marketing auto-post
+  "auto-post-log": "auto-post-log.json",
+
   // Communications
   "inbox-unified-cache": "inbox-unified-cache.json",
   "slack-history-cache": "slack-history-cache.json",

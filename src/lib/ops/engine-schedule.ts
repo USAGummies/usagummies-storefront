@@ -168,6 +168,16 @@ export const ENGINE_REGISTRY: EngineConfig[] = [
       { key: "SOC4", name: "Auto-Responder", schedule: "Sequence", isSequence: true },
     ],
   },
+  {
+    id: "marketing-autopost",
+    name: "Marketing Auto-Post Engine",
+    scriptFile: "usa-gummies-marketing-autopost.mjs",
+    agents: [
+      { key: "MKT1", name: "Daily Social Post Generator", schedule: "Daily 10:00" },
+      { key: "MKT2", name: "Content Recycler", schedule: "Daily 14:00" },
+      { key: "MKT3", name: "Auto-Post History Reporter", schedule: "Daily 20:00" },
+    ],
+  },
 ];
 
 // ---------------------------------------------------------------------------

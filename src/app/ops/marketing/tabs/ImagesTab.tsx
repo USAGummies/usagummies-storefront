@@ -42,6 +42,7 @@ export function ImagesTab() {
   const [generatePrompt, setGeneratePrompt] = useState("");
   const [generateTitle, setGenerateTitle] = useState("");
   const [generateTags, setGenerateTags] = useState("");
+  const [genEngine, setGenEngine] = useState<"gemini" | "dalle">("gemini");
 
   const filtered = useMemo(() => {
     const all = data?.images || [];
@@ -77,16 +78,16 @@ export function ImagesTab() {
     setMsg(null);
     try {
       await postAction({
-        action: "generate",
+        action: genEngine === "gemini" ? "generate-gemini" : "generate",
         title: generateTitle || undefined,
         prompt: generatePrompt,
         tags: generateTags
           .split(",")
           .map((tag) => tag.trim())
           .filter(Boolean),
-        category: "blog",
+        category: "social",
       });
-      setMsg("Image generated and saved.");
+      setMsg(`Image generated via ${genEngine === "gemini" ? "Nano Banana 2" : "DALL-E 3"} and saved.`);
       setGeneratePrompt("");
       setGenerateTitle("");
       setGenerateTags("");
@@ -126,7 +127,17 @@ export function ImagesTab() {
 
         <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 14 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, color: NAVY, fontWeight: 800, marginBottom: 8 }}>
-            <ImageIcon size={16} /> Generate (DALL-E 3)
+            <ImageIcon size={16} /> Generate Image
+          </div>
+          <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, cursor: "pointer" }}>
+              <input type="radio" name="genEngine" value="gemini" checked={genEngine === "gemini"} onChange={() => setGenEngine("gemini")} />
+              🍌 Nano Banana 2
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, cursor: "pointer" }}>
+              <input type="radio" name="genEngine" value="dalle" checked={genEngine === "dalle"} onChange={() => setGenEngine("dalle")} />
+              DALL-E 3
+            </label>
           </div>
           <input value={generateTitle} onChange={(e) => setGenerateTitle(e.target.value)} placeholder="Title (optional)" style={{ width: "100%", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "8px 10px", fontSize: 12, marginBottom: 8 }} />
           <textarea value={generatePrompt} onChange={(e) => setGeneratePrompt(e.target.value)} rows={3} placeholder="Prompt" style={{ width: "100%", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "8px 10px", fontSize: 12, marginBottom: 8 }} />

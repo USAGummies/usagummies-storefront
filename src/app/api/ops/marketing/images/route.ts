@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { readState, writeState } from "@/lib/ops/state";
 import type { CacheEnvelope } from "@/lib/amazon/types";
 import { DB, NotionProp, createPage, queryDatabase, extractText, extractDate } from "@/lib/notion/client";
+import { generateImage, isGeminiConfigured } from "@/lib/ai/gemini-image";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,7 +17,7 @@ type ImageRecord = {
   url: string;
   tags: string[];
   category: string;
-  source: "upload" | "ai-dalle";
+  source: "upload" | "ai-dalle" | "ai-gemini";
   prompt: string;
   created: string;
   usedIn: string;
@@ -56,7 +57,7 @@ function toImageRecord(row: Record<string, unknown>): ImageRecord {
     url: extractText(props.URL),
     tags: parseTags(extractText(props.Tags)),
     category: extractText(props.Category) || "uncategorized",
-    source: (extractText(props.Source) || "upload") as "upload" | "ai-dalle",
+    source: (extractText(props.Source) || "upload") as "upload" | "ai-dalle" | "ai-gemini",
     prompt: extractText(props.Prompt),
     created: extractDate(props.Created) || String(row.created_time || new Date().toISOString()),
     usedIn: extractText(props["Used In"]),
@@ -80,7 +81,7 @@ async function createNotionImageEntry(record: {
   url: string;
   tags: string[];
   category: string;
-  source: "upload" | "ai-dalle";
+  source: "upload" | "ai-dalle" | "ai-gemini";
   prompt: string;
 }) {
   if (!DB.IMAGE_LIBRARY || DB.IMAGE_LIBRARY.startsWith("0000")) {
@@ -148,13 +149,15 @@ export async function GET(req: Request) {
 }
 
 type UploadBody = {
-  action?: "upload" | "generate";
+  action?: "upload" | "generate" | "generate-gemini";
   title?: string;
   filename?: string;
   contentBase64?: string;
   tags?: string[];
   category?: string;
   prompt?: string;
+  /** Image style for Gemini marketing gen */
+  style?: string;
 };
 
 async function uploadAction(body: UploadBody) {
@@ -265,13 +268,55 @@ async function generateAction(body: UploadBody) {
   };
 }
 
+async function generateGeminiAction(body: UploadBody) {
+  const prompt = (body.prompt || "").trim();
+  if (!prompt) {
+    throw new Error("prompt is required for generate-gemini");
+  }
+
+  if (!isGeminiConfigured()) {
+    throw new Error("GEMINI_API_KEY or GOOGLE_AI_API_KEY not configured");
+  }
+
+  const title = body.title || `Gemini Image ${new Date().toISOString().slice(0, 10)}`;
+  const fileBase = sanitizeFileName(title) || `gemini-${Date.now()}`;
+  const fileName = `${fileBase}.png`;
+
+  const result = await generateImage(prompt, { timeoutMs: 60_000 });
+
+  await ensureContentLibraryDir();
+  const { absPath, publicUrl } = localPublicPath(fileName);
+  await fs.writeFile(absPath, Buffer.from(result.base64, "base64"));
+
+  await createNotionImageEntry({
+    title,
+    url: publicUrl,
+    tags: body.tags || [],
+    category: body.category || "social",
+    source: "ai-gemini",
+    prompt,
+  });
+
+  return {
+    ok: true,
+    image: {
+      title,
+      url: publicUrl,
+      category: body.category || "social",
+      tags: body.tags || [],
+      source: "ai-gemini",
+      prompt,
+      mimeType: result.mimeType,
+    },
+  };
+}
+
 export async function POST(req: Request) {
   try {
     const body = (await req.json()) as UploadBody;
 
     if (body.action === "upload") {
       const result = await uploadAction(body);
-      // Bust cache so next GET returns fresh data
       await writeState("image-library-cache", { data: null, cachedAt: 0 });
       return NextResponse.json(result);
     }
@@ -282,7 +327,16 @@ export async function POST(req: Request) {
       return NextResponse.json(result);
     }
 
-    return NextResponse.json({ error: "Unsupported action. Use upload | generate" }, { status: 400 });
+    if (body.action === "generate-gemini") {
+      const result = await generateGeminiAction(body);
+      await writeState("image-library-cache", { data: null, cachedAt: 0 });
+      return NextResponse.json(result);
+    }
+
+    return NextResponse.json(
+      { error: "Unsupported action. Use upload | generate | generate-gemini" },
+      { status: 400 },
+    );
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : String(err) },
