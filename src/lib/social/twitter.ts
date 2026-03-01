@@ -133,37 +133,24 @@ async function twitterRequest<T>(
 
   let headers: Record<string, string>;
 
-  if (isWrite) {
-    // Use OAuth 1.0a for writes
-    const creds = oauth1Credentials();
-    if (!creds.consumerKey || !creds.accessToken) {
-      throw new Error(
-        "Twitter OAuth 1.0a credentials required for writes: TWITTER_API_KEY, TWITTER_API_SECRET, TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_TOKEN_SECRET",
-      );
-    }
+  // Prefer OAuth 1.0a for ALL requests — Bearer token is credit-gated on
+  // X's Pay Per Use tier and returns 402 for most read endpoints.
+  const creds = oauth1Credentials();
+  if (creds.consumerKey && creds.accessToken) {
     headers = {
       Authorization: buildOAuth1Header(method, url, creds),
       "Content-Type": "application/json",
     };
+  } else if (!isWrite && twitterBearerToken()) {
+    // Fallback: Bearer token for reads only (if OAuth 1.0a not configured)
+    headers = {
+      Authorization: `Bearer ${twitterBearerToken()}`,
+      "Content-Type": "application/json",
+    };
   } else {
-    // Use Bearer token for reads (or fall back to OAuth 1.0a)
-    const bearer = twitterBearerToken();
-    if (bearer) {
-      headers = {
-        Authorization: `Bearer ${bearer}`,
-        "Content-Type": "application/json",
-      };
-    } else {
-      // Fallback: sign reads with OAuth 1.0a too
-      const creds = oauth1Credentials();
-      if (!creds.consumerKey || !creds.accessToken) {
-        throw new Error("Twitter token not configured (need TWITTER_BEARER_TOKEN or OAuth 1.0a credentials)");
-      }
-      headers = {
-        Authorization: buildOAuth1Header(method, url, creds),
-        "Content-Type": "application/json",
-      };
-    }
+    throw new Error(
+      "Twitter credentials not configured. Set TWITTER_API_KEY, TWITTER_API_SECRET, TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_TOKEN_SECRET for full access.",
+    );
   }
 
   const res = await fetch(url, {
