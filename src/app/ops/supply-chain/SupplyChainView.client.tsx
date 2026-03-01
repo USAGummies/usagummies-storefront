@@ -130,8 +130,55 @@ export function SupplyChainView() {
         </div>
       ) : null}
 
+      {/* ── Inventory by Location ── */}
+      {inventory ? (
+        <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px 16px", marginBottom: 14 }}>
+          <div style={{ fontWeight: 700, color: NAVY, marginBottom: 12, fontSize: 15 }}>Inventory by Location</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10 }}>
+            {/* PA */}
+            <div style={{ background: `${NAVY}08`, border: `1px solid ${BORDER}`, borderRadius: 10, padding: "12px 14px" }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: TEXT_DIM, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+                🏠 Pennsylvania (PA)
+              </div>
+              <div style={{ fontSize: 28, fontWeight: 800, color: NAVY }}>
+                {inventory.homeStock?.current?.pa ?? inventory.homeStock?.baseline?.pa ?? "—"}
+              </div>
+              <div style={{ fontSize: 11, color: TEXT_DIM, marginTop: 2 }}>
+                units • baseline {inventory.homeStock?.baseline?.pa ?? "?"} on {inventory.homeStock?.baseline?.asOf ?? "?"}
+              </div>
+            </div>
+            {/* WA */}
+            <div style={{ background: `${NAVY}08`, border: `1px solid ${BORDER}`, borderRadius: 10, padding: "12px 14px" }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: TEXT_DIM, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+                🏠 Washington (WA)
+              </div>
+              <div style={{ fontSize: 28, fontWeight: 800, color: NAVY }}>
+                {inventory.homeStock?.current?.wa ?? inventory.homeStock?.baseline?.wa ?? "—"}
+              </div>
+              <div style={{ fontSize: 11, color: TEXT_DIM, marginTop: 2 }}>
+                units • baseline {inventory.homeStock?.baseline?.wa ?? "?"} on {inventory.homeStock?.baseline?.asOf ?? "?"}
+              </div>
+            </div>
+            {/* Amazon FBA */}
+            <div style={{ background: `${NAVY}08`, border: `1px solid ${BORDER}`, borderRadius: 10, padding: "12px 14px" }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: TEXT_DIM, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+                📦 Amazon FBA
+              </div>
+              <div style={{ fontSize: 28, fontWeight: 800, color: inventory.amazonFba?.error ? TEXT_DIM : NAVY }}>
+                {inventory.amazonFba?.error
+                  ? "—"
+                  : (inventory.items || []).find((i) => i.source === "amazon-api")?.currentStock ?? "—"}
+              </div>
+              <div style={{ fontSize: 11, color: TEXT_DIM, marginTop: 2 }}>
+                {inventory.amazonFba?.error ? "API error — see alert above" : "units in FBA warehouse"}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10, marginBottom: 14 }}>
-        <MetricCard label="Total SKUs" value={String(inventory?.summary.totalSKUs || 0)} icon={<Boxes size={16} />} />
+        <MetricCard label="Total Units" value={String(inventory?.summary.totalUnits || 0)} icon={<Boxes size={16} />} />
         <MetricCard label="Inventory Value" value={fmtDollar(inventory?.summary.totalValue || 0)} icon={<DollarSign size={16} />} />
         <MetricCard label="Open Orders" value={String(supply?.summary.openOrders || 0)} icon={<Factory size={16} />} />
         <MetricCard label="Active Suppliers" value={String(supply?.summary.activeSuppliers || 0)} icon={<Truck size={16} />} />
@@ -139,10 +186,12 @@ export function SupplyChainView() {
 
       <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px", marginBottom: 14 }}>
         <div style={{ fontWeight: 700, color: NAVY, marginBottom: 10 }}>Inventory Grid</div>
-        {inventory?.homeStock ? (
-          <div style={{ marginBottom: 10, fontSize: 12, color: TEXT_DIM }}>
-            Home baseline {inventory.homeStock.baseline.asOf}: PA {inventory.homeStock.baseline.pa} / WA {inventory.homeStock.baseline.wa} •
-            Current PA {inventory.homeStock.current.pa} / WA {inventory.homeStock.current.wa}
+        {inventory?.homeStock?.source === "shopify-orders" ? (
+          <div style={{ marginBottom: 10, fontSize: 11, color: TEXT_DIM }}>
+            Home stock derived from baseline ({inventory.homeStock.baseline.asOf}) minus Shopify fulfilled orders.
+            {inventory.homeStock.fulfilledSinceBaseline.total > 0
+              ? ` ${inventory.homeStock.fulfilledSinceBaseline.total} units fulfilled since baseline.`
+              : ""}
           </div>
         ) : null}
         {invLoading && (inventory?.items || []).length === 0 ? (
@@ -152,20 +201,24 @@ export function SupplyChainView() {
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr>
+                  <th style={{ textAlign: "left", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Location</th>
                   <th style={{ textAlign: "left", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>SKU</th>
                   <th style={{ textAlign: "right", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Stock</th>
-                  <th style={{ textAlign: "right", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Days</th>
-                  <th style={{ textAlign: "right", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Reorder</th>
+                  <th style={{ textAlign: "right", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Days Supply</th>
+                  <th style={{ textAlign: "right", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Reorder Pt</th>
                   <th style={{ textAlign: "left", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Status</th>
                 </tr>
               </thead>
               <tbody>
                 {pagedInventory.map((item) => (
                   <tr key={item.id}>
-                    <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 0", color: NAVY, fontWeight: 700 }}>{item.sku}</td>
-                    <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 0", textAlign: "right", color: NAVY }}>{item.currentStock.toLocaleString()}</td>
-                    <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 0", textAlign: "right", color: NAVY }}>{item.daysOfSupply.toFixed(1)}</td>
-                    <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 0", textAlign: "right", color: TEXT_DIM }}>{item.reorderPoint}</td>
+                    <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 4px 8px 0", color: NAVY, fontWeight: 600, fontSize: 13 }}>{item.location || "Unknown"}</td>
+                    <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 4px", color: NAVY, fontWeight: 700 }}>{item.sku}</td>
+                    <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 4px", textAlign: "right", color: NAVY, fontWeight: 700 }}>{item.currentStock.toLocaleString()}</td>
+                    <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 4px", textAlign: "right", color: item.daysOfSupply >= 999 ? TEXT_DIM : NAVY }}>
+                      {item.daysOfSupply >= 999 ? "—" : item.daysOfSupply.toFixed(0)}
+                    </td>
+                    <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 4px", textAlign: "right", color: TEXT_DIM }}>{item.reorderPoint}</td>
                     <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 0" }}>
                       <span
                         style={{

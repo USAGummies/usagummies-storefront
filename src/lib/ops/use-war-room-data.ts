@@ -254,6 +254,7 @@ export type InventoryData = {
     lastUpdated: string;
     costPerUnit: number;
     totalValue: number;
+    source?: "notion" | "amazon-api" | "home-baseline";
     purchaseBudget: number | null;
   }>;
   summary: {
