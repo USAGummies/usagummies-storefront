@@ -10,7 +10,7 @@ import {
   YAxis,
   Tooltip,
 } from "recharts";
-import { Wallet, TrendingUp, Flame, AlertTriangle, Landmark, Briefcase } from "lucide-react";
+import { Wallet, TrendingUp, Flame, AlertTriangle, Landmark, Briefcase, ShoppingCart } from "lucide-react";
 
 import {
   usePnLData,
@@ -18,8 +18,10 @@ import {
   useTransactions,
   useForecastData,
   useDashboardData,
+  useAmazonProfitability,
   comparePlanVsActual,
   fmtDollar,
+  fmtDollarExact,
   STATUS_COLORS,
 } from "@/lib/ops/use-war-room-data";
 import {
@@ -107,6 +109,8 @@ export function FinanceView() {
   const { data: tx, loading: txLoading, error: txError } = useTransactions(30);
   const { data: forecast, loading: forecastLoading, error: forecastError } = useForecastData();
   const { data: dashboard } = useDashboardData();
+  const { data: amzProfit, loading: amzLoading } = useAmazonProfitability();
+  const ap = amzProfit?.profitability;
 
   const month = getCurrentProFormaMonth();
   const monthsThrough = month ? getMonthsThrough(month) : [];
@@ -352,7 +356,10 @@ export function FinanceView() {
               <div style={{ display: "grid", gap: 5, fontSize: 13 }}>
                 <div style={{ display: "flex", justifyContent: "space-between" }}>
                   <span style={{ color: TEXT_DIM }}>Amazon</span>
-                  <span style={{ color: NAVY, fontWeight: 700 }}>{fmtDollar(UNIT_ECONOMICS.amazon.gpPerUnit)}</span>
+                  <span style={{ color: ap ? (ap.profitPerUnit < 0 ? RED : NAVY) : NAVY, fontWeight: 700 }}>
+                    {ap ? fmtDollarExact(ap.profitPerUnit) : fmtDollar(UNIT_ECONOMICS.amazon.gpPerUnit)}
+                    {ap && <span style={{ fontSize: 10, color: TEXT_DIM, fontWeight: 500 }}> (live)</span>}
+                  </span>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between" }}>
                   <span style={{ color: TEXT_DIM }}>Wholesale</span>
@@ -366,6 +373,226 @@ export function FinanceView() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* ── Amazon Channel Profitability (LIVE from SP-API) ────── */}
+      <div
+        style={{
+          background: CARD,
+          border: `1px solid ${ap && ap.netProfit < 0 ? RED + "55" : BORDER}`,
+          borderRadius: 12,
+          padding: "14px",
+          marginBottom: 14,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <ShoppingCart size={16} color={ap && ap.netProfit < 0 ? RED : NAVY} />
+          <div style={{ fontWeight: 700, color: NAVY }}>
+            Amazon Channel Profitability
+            <span style={{ fontSize: 11, fontWeight: 600, marginLeft: 8, color: TEXT_DIM }}>
+              (Live SP-API · Last 30 Days)
+            </span>
+          </div>
+          {ap?.source === "cached" && (
+            <span style={{ fontSize: 10, color: TEXT_DIM, background: BORDER, borderRadius: 6, padding: "2px 6px" }}>
+              CACHED
+            </span>
+          )}
+        </div>
+
+        {amzLoading && !ap ? (
+          <div style={{ fontSize: 13, color: TEXT_DIM }}>Loading Amazon profitability data...</div>
+        ) : !ap ? (
+          <div style={{ fontSize: 13, color: TEXT_DIM }}>Amazon profitability data unavailable</div>
+        ) : (
+          <>
+            {/* Alert banner if losing money */}
+            {ap.netProfit < 0 && (
+              <div
+                style={{
+                  border: `1px solid ${RED}33`,
+                  background: `${RED}14`,
+                  color: RED,
+                  borderRadius: 10,
+                  padding: "10px 12px",
+                  marginBottom: 12,
+                  fontWeight: 700,
+                  fontSize: 13,
+                }}
+              >
+                <AlertTriangle size={14} style={{ display: "inline", marginRight: 6, verticalAlign: "middle" }} />
+                Amazon is losing {fmtDollarExact(Math.abs(ap.profitPerUnit))}/unit — every order is unprofitable.
+                Breakeven price: {fmtDollarExact(ap.breakeven.breakevenPrice)} (current: {fmtDollarExact(ap.avgSellingPrice)})
+              </div>
+            )}
+
+            {/* Top metric cards */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+                gap: 8,
+                marginBottom: 12,
+              }}
+            >
+              {[
+                { label: "Orders", value: String(ap.totalOrders) },
+                { label: "Units Sold", value: String(ap.totalUnits) },
+                { label: "Avg Price", value: fmtDollarExact(ap.avgSellingPrice) },
+                { label: "Net Revenue", value: fmtDollarExact(ap.netRevenue) },
+                {
+                  label: "Net Profit",
+                  value: fmtDollarExact(ap.netProfit),
+                  color: ap.netProfit < 0 ? RED : "#16a34a",
+                },
+                {
+                  label: "Per Unit",
+                  value: fmtDollarExact(ap.profitPerUnit),
+                  color: ap.profitPerUnit < 0 ? RED : "#16a34a",
+                },
+              ].map((m) => (
+                <div
+                  key={m.label}
+                  style={{
+                    background: BG,
+                    border: `1px solid ${BORDER}`,
+                    borderRadius: 8,
+                    padding: "8px 10px",
+                  }}
+                >
+                  <div style={{ fontSize: 10, color: TEXT_DIM, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700, marginBottom: 4 }}>
+                    {m.label}
+                  </div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: "color" in m && m.color ? m.color : NAVY }}>
+                    {m.value}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Two-column: Unit Economics Waterfall + Breakeven */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+              {/* Waterfall */}
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: NAVY, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>
+                  Unit Economics Waterfall
+                </div>
+                <div style={{ display: "grid", gap: 4 }}>
+                  {[
+                    { label: "Selling price", value: ap.avgSellingPrice, sign: "" },
+                    { label: "Promotions", value: -ap.promotions / Math.max(ap.totalUnits, 1), sign: "-" },
+                    { label: "Referral fee", value: -ap.feesPerUnit.referral, sign: "-" },
+                    { label: "FBA fee", value: -ap.feesPerUnit.fba, sign: "-" },
+                    { label: "COGS", value: -ap.cogsPerUnit, sign: "-" },
+                    { label: "Inbound ship", value: -ap.inboundPerUnit, sign: "-" },
+                  ].map((row) => (
+                    <div key={row.label} style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                      <span style={{ color: TEXT_DIM }}>{row.sign} {row.label}</span>
+                      <span style={{ color: row.value < 0 ? RED : NAVY, fontWeight: 600 }}>
+                        {row.value < 0 ? "-" : ""}${Math.abs(row.value).toFixed(2)}
+                      </span>
+                    </div>
+                  ))}
+                  <div style={{ borderTop: `1px solid ${BORDER}`, paddingTop: 4, display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                    <span style={{ color: NAVY, fontWeight: 800 }}>= Net Profit/Unit</span>
+                    <span style={{ color: ap.profitPerUnit < 0 ? RED : "#16a34a", fontWeight: 800 }}>
+                      {fmtDollarExact(ap.profitPerUnit)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Breakeven Analysis */}
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: NAVY, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>
+                  Breakeven Analysis
+                </div>
+                <div style={{ display: "grid", gap: 6 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                    <span style={{ color: TEXT_DIM }}>Current price</span>
+                    <span style={{ color: NAVY, fontWeight: 700 }}>{fmtDollarExact(ap.breakeven.currentPrice)}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                    <span style={{ color: RED, fontWeight: 600 }}>Breakeven price</span>
+                    <span style={{ color: RED, fontWeight: 800 }}>{fmtDollarExact(ap.breakeven.breakevenPrice)}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                    <span style={{ color: TEXT_DIM }}>15% margin target</span>
+                    <span style={{ color: NAVY, fontWeight: 700 }}>{fmtDollarExact(ap.breakeven.targetPrice15Margin)}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                    <span style={{ color: TEXT_DIM }}>25% margin target</span>
+                    <span style={{ color: NAVY, fontWeight: 700 }}>{fmtDollarExact(ap.breakeven.targetPrice25Margin)}</span>
+                  </div>
+                  <div style={{ borderTop: `1px solid ${BORDER}`, paddingTop: 6, marginTop: 4 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                      <span style={{ color: TEXT_DIM }}>Amazon fee % of price</span>
+                      <span style={{ color: RED, fontWeight: 700 }}>{ap.breakeven.feePercentOfPrice}%</span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginTop: 4 }}>
+                      <span style={{ color: TEXT_DIM }}>Net margin</span>
+                      <span style={{ color: ap.netMargin < 0 ? RED : "#16a34a", fontWeight: 700 }}>{ap.netMargin.toFixed(1)}%</span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginTop: 4 }}>
+                      <span style={{ color: TEXT_DIM }}>Price gap to breakeven</span>
+                      <span style={{ color: RED, fontWeight: 800 }}>
+                        +{fmtDollarExact(ap.breakeven.breakevenPrice - ap.avgSellingPrice)} needed
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Revenue waterfall total */}
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: "left", fontSize: 10, color: TEXT_DIM, paddingBottom: 6 }}>P&L Line</th>
+                    <th style={{ textAlign: "right", fontSize: 10, color: TEXT_DIM, paddingBottom: 6 }}>Total</th>
+                    <th style={{ textAlign: "right", fontSize: 10, color: TEXT_DIM, paddingBottom: 6 }}>Per Unit</th>
+                    <th style={{ textAlign: "right", fontSize: 10, color: TEXT_DIM, paddingBottom: 6 }}>% of Rev</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    { label: "Gross Revenue", total: ap.grossRevenue, perUnit: ap.avgSellingPrice, pct: 100 },
+                    { label: "Promotions", total: -ap.promotions, perUnit: -(ap.promotions / Math.max(ap.totalUnits, 1)), pct: ap.netRevenue > 0 ? -(ap.promotions / ap.grossRevenue) * 100 : 0 },
+                    { label: "Net Revenue", total: ap.netRevenue, perUnit: ap.netRevenue / Math.max(ap.totalUnits, 1), pct: ap.grossRevenue > 0 ? (ap.netRevenue / ap.grossRevenue) * 100 : 0, bold: true },
+                    { label: "Referral Fees", total: -ap.totalReferralFees, perUnit: -ap.feesPerUnit.referral, pct: ap.netRevenue > 0 ? -(ap.totalReferralFees / ap.netRevenue) * 100 : 0 },
+                    { label: "FBA Fees", total: -ap.totalFBAFees, perUnit: -ap.feesPerUnit.fba, pct: ap.netRevenue > 0 ? -(ap.totalFBAFees / ap.netRevenue) * 100 : 0 },
+                    { label: "Gross Profit", total: ap.grossProfit, perUnit: ap.grossProfit / Math.max(ap.totalUnits, 1), pct: ap.grossMargin, bold: true },
+                    { label: "COGS", total: -ap.totalCOGS, perUnit: -ap.cogsPerUnit, pct: ap.netRevenue > 0 ? -(ap.totalCOGS / ap.netRevenue) * 100 : 0 },
+                    { label: "Inbound Shipping", total: -ap.totalInbound, perUnit: -ap.inboundPerUnit, pct: ap.netRevenue > 0 ? -(ap.totalInbound / ap.netRevenue) * 100 : 0 },
+                    { label: "NET PROFIT", total: ap.netProfit, perUnit: ap.profitPerUnit, pct: ap.netMargin, bold: true },
+                  ].map((row) => (
+                    <tr key={row.label}>
+                      <td style={{ borderTop: `1px solid ${BORDER}`, padding: "6px 0", fontSize: 12, color: NAVY, fontWeight: row.bold ? 800 : 600 }}>
+                        {row.label}
+                      </td>
+                      <td style={{ borderTop: `1px solid ${BORDER}`, padding: "6px 0", fontSize: 12, textAlign: "right", color: row.total < 0 ? RED : NAVY, fontWeight: row.bold ? 800 : 600 }}>
+                        {row.total < 0 ? "-" : ""}{fmtDollarExact(Math.abs(row.total))}
+                      </td>
+                      <td style={{ borderTop: `1px solid ${BORDER}`, padding: "6px 0", fontSize: 12, textAlign: "right", color: row.perUnit < 0 ? RED : NAVY, fontWeight: row.bold ? 700 : 400 }}>
+                        {row.perUnit < 0 ? "-" : ""}${Math.abs(row.perUnit).toFixed(2)}
+                      </td>
+                      <td style={{ borderTop: `1px solid ${BORDER}`, padding: "6px 0", fontSize: 12, textAlign: "right", color: row.pct < 0 ? RED : TEXT_DIM }}>
+                        {row.pct < 0 ? "" : ""}{row.pct.toFixed(1)}%
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div style={{ marginTop: 8, fontSize: 11, color: TEXT_DIM }}>
+              Fees from Amazon SP-API Fees Estimate. COGS from pro-forma (${ap.cogsPerUnit.toFixed(2)}/unit).
+              Inbound shipping estimated at ${ap.inboundPerUnit.toFixed(2)}/unit.
+              {ap.feesSource === "fallback" && " ⚠ Fee estimate is using fallback rates (Fees API unavailable)."}
+            </div>
+          </>
+        )}
       </div>
 
       {/* ── Loan Amortization + Capital Deployment ────────────── */}

@@ -95,6 +95,7 @@ export const STATE_KEYS = {
   "budgets-cache": "budgets-cache.json",
   "audit-cash-baseline": "audit-cash-baseline.json",
   "audit-inventory-baseline": "audit-inventory-baseline.json",
+  "amazon-profitability": "amazon-profitability-cache.json",
 
   // Communications
   "inbox-unified-cache": "inbox-unified-cache.json",

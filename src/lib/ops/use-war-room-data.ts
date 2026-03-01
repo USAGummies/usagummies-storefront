@@ -941,6 +941,67 @@ export function useBudgets() {
 }
 
 // ---------------------------------------------------------------------------
+// Hook: useAmazonProfitability — Amazon channel P&L
+// ---------------------------------------------------------------------------
+
+export type AmazonProfitabilityData = {
+  profitability: {
+    period: string;
+    periodDays: number;
+    totalOrders: number;
+    completedOrders: number;
+    cancelledOrders: number;
+    totalUnits: number;
+    avgSellingPrice: number;
+    fbaOrders: number;
+    fbmOrders: number;
+    grossRevenue: number;
+    promotions: number;
+    netRevenue: number;
+    salesTax: number;
+    feesPerUnit: { referral: number; fba: number; closing: number; total: number };
+    totalReferralFees: number;
+    totalFBAFees: number;
+    totalAmazonFees: number;
+    cogsPerUnit: number;
+    inboundPerUnit: number;
+    totalCOGS: number;
+    totalInbound: number;
+    grossProfit: number;
+    grossMargin: number;
+    netProfit: number;
+    netMargin: number;
+    profitPerUnit: number;
+    breakeven: {
+      currentPrice: number;
+      breakevenPrice: number;
+      targetPrice15Margin: number;
+      targetPrice25Margin: number;
+      feePercentOfPrice: number;
+    };
+    monthlyBreakdown: {
+      month: string;
+      orders: number;
+      units: number;
+      revenue: number;
+      fees: number;
+      cogs: number;
+      profit: number;
+      margin: number;
+    }[];
+    source: "live-api" | "cached";
+    generatedAt: string;
+    feesSource: "fees-api" | "fallback";
+  } | null;
+  error?: string;
+  generatedAt: string;
+};
+
+export function useAmazonProfitability() {
+  return useEndpointData<AmazonProfitabilityData>("/api/ops/amazon-profitability");
+}
+
+// ---------------------------------------------------------------------------
 // Plan vs Actual comparison utilities
 // ---------------------------------------------------------------------------
 
