@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { CalendarClock } from "lucide-react";
 import { AlertTriangle, Truck, Boxes, Factory, DollarSign } from "lucide-react";
 import { useInventoryData, useSupplyChain, fmtDollar } from "@/lib/ops/use-war-room-data";
 import { StalenessBadge } from "@/app/ops/components/StalenessBadge";
@@ -67,6 +68,32 @@ export function SupplyChainView() {
       setInventoryPage(inventoryPages);
     }
   }, [inventoryPage, inventoryPages]);
+
+  // Compute sell-out dates per location
+  const sellOutTimeline = useMemo(() => {
+    const items = inventory?.items || [];
+    if (items.length === 0) return [];
+    const now = new Date();
+    return items
+      .filter((item) => item.currentStock > 0 && item.daysOfSupply > 0 && item.daysOfSupply < 999)
+      .map((item) => {
+        const sellOutDate = new Date(now.getTime() + item.daysOfSupply * 86_400_000);
+        return {
+          location: item.location || "Unknown",
+          stock: item.currentStock,
+          velocity: item.dailyVelocity,
+          daysLeft: Math.round(item.daysOfSupply),
+          sellOutDate,
+          sellOutLabel: sellOutDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+          urgent: item.daysOfSupply < 14,
+          critical: item.daysOfSupply < 7,
+        };
+      })
+      .sort((a, b) => a.daysLeft - b.daysLeft);
+  }, [inventory]);
+
+  // Soonest sell-out across all locations
+  const soonestSellOut = sellOutTimeline.length > 0 ? sellOutTimeline[0] : null;
 
   const error = invError || scError;
 
@@ -259,6 +286,51 @@ export function SupplyChainView() {
         </div>
       ) : null}
 
+      {/* ── Sell-Out Timeline ── */}
+      {sellOutTimeline.length > 0 ? (
+        <div style={{
+          background: soonestSellOut?.critical ? `${RED}08` : soonestSellOut?.urgent ? `${GOLD}10` : CARD,
+          border: `1px solid ${soonestSellOut?.critical ? `${RED}30` : soonestSellOut?.urgent ? `${GOLD}40` : BORDER}`,
+          borderRadius: 12,
+          padding: "14px 16px",
+          marginBottom: 14,
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <CalendarClock size={16} color={NAVY} />
+              <span style={{ fontWeight: 700, color: NAVY, fontSize: 15 }}>Estimated Sell-Out Dates</span>
+            </div>
+            <span style={{ fontSize: 11, color: TEXT_DIM }}>Based on current sales velocity</span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(sellOutTimeline.length, 4)}, 1fr)`, gap: 10 }}>
+            {sellOutTimeline.map((loc) => (
+              <div
+                key={loc.location}
+                style={{
+                  background: loc.critical ? `${RED}10` : loc.urgent ? `${GOLD}12` : `${NAVY}08`,
+                  border: `1px solid ${loc.critical ? `${RED}25` : loc.urgent ? `${GOLD}30` : BORDER}`,
+                  borderRadius: 10,
+                  padding: "12px 14px",
+                }}
+              >
+                <div style={{ fontSize: 11, fontWeight: 700, color: TEXT_DIM, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+                  {loc.location}
+                </div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: loc.critical ? RED : loc.urgent ? GOLD : NAVY }}>
+                  {loc.sellOutLabel}
+                </div>
+                <div style={{ fontSize: 12, color: loc.critical ? RED : loc.urgent ? GOLD : TEXT_DIM, fontWeight: loc.urgent ? 700 : 400, marginTop: 2 }}>
+                  {loc.daysLeft} days remaining
+                </div>
+                <div style={{ fontSize: 11, color: TEXT_DIM, marginTop: 1 }}>
+                  {loc.stock.toLocaleString()} units • {loc.velocity} units/day
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10, marginBottom: 14 }}>
         <MetricCard label="Total Units" value={String(inventory?.summary.totalUnits || 0)} icon={<Boxes size={16} />} />
         <MetricCard label="Inventory Value" value={fmtDollar(inventory?.summary.totalValue || 0)} icon={<DollarSign size={16} />} />
@@ -287,6 +359,7 @@ export function SupplyChainView() {
                   <th style={{ textAlign: "left", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>SKU</th>
                   <th style={{ textAlign: "right", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Stock</th>
                   <th style={{ textAlign: "right", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Days Supply</th>
+                  <th style={{ textAlign: "right", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Est. Sell-Out</th>
                   <th style={{ textAlign: "right", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Reorder Pt</th>
                   <th style={{ textAlign: "left", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Status</th>
                 </tr>
@@ -299,6 +372,17 @@ export function SupplyChainView() {
                     <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 4px", textAlign: "right", color: NAVY, fontWeight: 700 }}>{item.currentStock.toLocaleString()}</td>
                     <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 4px", textAlign: "right", color: item.daysOfSupply >= 999 ? TEXT_DIM : NAVY }}>
                       {item.daysOfSupply >= 999 ? "—" : item.daysOfSupply.toFixed(0)}
+                    </td>
+                    <td style={{
+                      borderTop: `1px solid ${BORDER}`,
+                      padding: "8px 4px",
+                      textAlign: "right",
+                      color: item.daysOfSupply > 0 && item.daysOfSupply < 14 ? RED : item.daysOfSupply >= 999 ? TEXT_DIM : NAVY,
+                      fontWeight: item.daysOfSupply > 0 && item.daysOfSupply < 14 ? 700 : 400,
+                    }}>
+                      {item.daysOfSupply >= 999 || item.daysOfSupply <= 0
+                        ? "—"
+                        : new Date(Date.now() + item.daysOfSupply * 86_400_000).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                     </td>
                     <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 4px", textAlign: "right", color: TEXT_DIM }}>{item.reorderPoint}</td>
                     <td style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 0" }}>

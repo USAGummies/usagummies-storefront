@@ -224,6 +224,28 @@ export function OpsDashboard() {
 
   const inventoryDays = inventory?.summary?.avgDaysOfSupply ?? 0;
 
+  // Compute sell-out dates per location from inventory items
+  const sellOutTimeline = useMemo(() => {
+    const items = inventory?.items || [];
+    if (items.length === 0) return [];
+    const now = new Date();
+    return items
+      .filter((item) => item.currentStock > 0 && item.daysOfSupply > 0 && item.daysOfSupply < 999)
+      .map((item) => {
+        const sellOutDate = new Date(now.getTime() + item.daysOfSupply * 86_400_000);
+        return {
+          location: item.location || "Unknown",
+          stock: item.currentStock,
+          velocity: item.dailyVelocity,
+          daysLeft: Math.round(item.daysOfSupply),
+          sellOutDate,
+          sellOutLabel: sellOutDate.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+          urgent: item.daysOfSupply < 14,
+        };
+      })
+      .sort((a, b) => a.daysLeft - b.daysLeft);
+  }, [inventory]);
+
   const trendRows = useMemo(() => {
     const channelDaily = channels?.dailyByChannel || [];
     const amazonByDate = new Map((dashboard?.chartData || []).map((d) => [d.date, d.amazon]));
@@ -387,13 +409,52 @@ export function OpsDashboard() {
         />
         <MetricCard
           icon={<Boxes size={16} />}
-          label="Days of Inventory"
+          label={sellOutTimeline.length > 0
+            ? `Inventory → ${sellOutTimeline[0].sellOutLabel}`
+            : "Days of Inventory"
+          }
           value={`${inventoryDays.toFixed(0)}d`}
           plan="30d"
           variance={comparePlanVsActual(30, inventoryDays)}
           spark={sparkInventory.length ? sparkInventory : [0, 0, 0]}
         />
       </div>
+
+      {/* ── Sell-Out Timeline ── */}
+      {sellOutTimeline.length > 0 ? (
+        <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px 16px", marginBottom: 14 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <div style={{ fontWeight: 700, color: NAVY, fontSize: 15 }}>📅 Estimated Sell-Out Dates</div>
+            <span style={{ fontSize: 11, color: TEXT_DIM }}>Based on current sales velocity</span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(sellOutTimeline.length, 4)}, 1fr)`, gap: 10 }}>
+            {sellOutTimeline.map((loc) => (
+              <div
+                key={loc.location}
+                style={{
+                  background: loc.urgent ? `${RED}0a` : `${NAVY}08`,
+                  border: `1px solid ${loc.urgent ? `${RED}30` : BORDER}`,
+                  borderRadius: 10,
+                  padding: "12px 14px",
+                }}
+              >
+                <div style={{ fontSize: 11, fontWeight: 700, color: TEXT_DIM, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+                  {loc.location}
+                </div>
+                <div style={{ fontSize: 24, fontWeight: 800, color: loc.urgent ? RED : NAVY }}>
+                  {loc.sellOutLabel}
+                </div>
+                <div style={{ fontSize: 12, color: loc.urgent ? RED : TEXT_DIM, fontWeight: loc.urgent ? 700 : 400, marginTop: 2 }}>
+                  {loc.daysLeft}d remaining • {loc.velocity}/day
+                </div>
+                <div style={{ fontSize: 11, color: TEXT_DIM, marginTop: 1 }}>
+                  {loc.stock.toLocaleString()} units on hand
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <div
         style={{
