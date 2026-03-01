@@ -156,7 +156,7 @@ export function FinanceView() {
           P&L / Finance
         </h1>
         <div style={{ marginTop: 4, fontSize: 13, color: TEXT_DIM }}>
-          Live income statement, cash flow, runway, and transaction visibility.
+          Pro forma plan vs live actuals. Financial data requires Plaid integration.
         </div>
         <div style={{ marginTop: 8 }}>
           <StalenessBadge items={freshnessItems} />
@@ -180,6 +180,26 @@ export function FinanceView() {
         >
           <AlertTriangle size={16} />
           {hasError}
+        </div>
+      ) : null}
+
+      {/* Plaid integration pending banner */}
+      {!pnlLoading && !balLoading && !pnl?.revenue.total && !balances?.totalCash ? (
+        <div
+          style={{
+            border: `1px solid ${GOLD}55`,
+            background: `${GOLD}12`,
+            color: NAVY,
+            borderRadius: 10,
+            padding: "12px 14px",
+            marginBottom: 12,
+            fontSize: 13,
+            fontWeight: 600,
+          }}
+        >
+          <strong>Awaiting Data — Plaid API pending.</strong> Live cash position, P&L actuals, transactions, and forecast
+          will populate once bank accounts are connected via Plaid. All financial figures below are from the Pro Forma plan
+          unless labeled otherwise.
         </div>
       ) : null}
 
@@ -220,7 +240,14 @@ export function FinanceView() {
         }}
       >
         <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px" }}>
-          <div style={{ fontWeight: 700, color: NAVY, marginBottom: 12 }}>Contribution P&L (Actual | Plan | Variance)</div>
+          <div style={{ fontWeight: 700, color: NAVY, marginBottom: 12 }}>
+            Contribution P&L (Actual | Plan | Variance)
+            {!pnl?.revenue.total && (
+              <span style={{ fontSize: 11, color: GOLD, fontWeight: 600, marginLeft: 8 }}>
+                — Actuals awaiting Plaid
+              </span>
+            )}
+          </div>
 
           {pnlLoading && !pnl ? (
             <SkeletonTable rows={6} />
@@ -384,26 +411,29 @@ export function FinanceView() {
             </div>
           </div>
 
-          {/* Progress bar */}
+          {/* Progress bar — actual repaid (starts Aug 2026, currently $0) */}
           <div style={{ marginBottom: 12 }}>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: TEXT_DIM, marginBottom: 4 }}>
-              <span>{fmtDollar(ANNUAL_SUMMARY.totalLoanRepayment2026)} repaid in 2026</span>
-              <span>{((ANNUAL_SUMMARY.totalLoanRepayment2026 / LOAN.totalObligation) * 100).toFixed(1)}%</span>
+              <span>{fmtDollar(0)} repaid to date (repayment starts Aug 2026)</span>
+              <span>0.0%</span>
             </div>
             <div style={{ width: "100%", height: 8, borderRadius: 99, background: BORDER }}>
               <div style={{
-                width: `${(ANNUAL_SUMMARY.totalLoanRepayment2026 / LOAN.totalObligation) * 100}%`,
+                width: "0%",
                 height: "100%",
                 borderRadius: 99,
                 background: NAVY,
                 transition: "width 0.6s ease",
               }} />
             </div>
+            <div style={{ fontSize: 11, color: TEXT_DIM, marginTop: 4 }}>
+              Plan projects {fmtDollar(ANNUAL_SUMMARY.totalLoanRepayment2026)} in 2026 ({((ANNUAL_SUMMARY.totalLoanRepayment2026 / LOAN.totalObligation) * 100).toFixed(1)}% of obligation)
+            </div>
           </div>
 
           {/* 2026 amortization table */}
           <div style={{ fontSize: 11, color: TEXT_DIM, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
-            2026 Amortization Schedule
+            2026 Amortization Schedule <span style={{ color: GOLD, fontWeight: 800 }}>(PROJECTED)</span>
           </div>
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>

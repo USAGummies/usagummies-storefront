@@ -174,6 +174,26 @@ export function ForecastView() {
         </div>
       ) : null}
 
+      {/* Awaiting data banner — Plaid not connected */}
+      {!loading && !forecast?.currentBalance && points.length === 0 ? (
+        <div
+          style={{
+            border: `1px solid ${GOLD}55`,
+            background: `${GOLD}12`,
+            color: NAVY,
+            borderRadius: 10,
+            padding: "12px 14px",
+            marginBottom: 12,
+            fontSize: 13,
+            fontWeight: 600,
+          }}
+        >
+          <strong>Awaiting Data — Plaid API pending.</strong> Cash forecast requires bank account
+          connectivity via Plaid. Current balance, runway, burn rate, receivables, and payables will
+          populate once Plaid is integrated. All figures below will show $0 until then.
+        </div>
+      ) : null}
+
       <div
         style={{
           display: "grid",

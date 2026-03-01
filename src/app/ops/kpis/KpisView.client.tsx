@@ -245,64 +245,62 @@ export function KpisView() {
     }));
   }, [monthsElapsed]);
 
-  // Milestone status
+  // Milestone status — ONLY mark achieved when verified by REAL data.
+  // Do NOT auto-achieve based on month index. If we don't have live data,
+  // the milestone stays pending. Trust is everything.
   const milestoneStatuses = useMemo(() => {
     return MILESTONES.map((ms) => {
       let achieved = false;
 
-      if (currentMonth) {
-        const monthIdx = MONTHS.indexOf(currentMonth);
-        const targetIdx = typeof ms.targetMonth === "string" && MONTHS.includes(ms.targetMonth as Month)
-          ? MONTHS.indexOf(ms.targetMonth as Month)
-          : -1;
-
-        switch (ms.id) {
-          case "ebitda-positive":
-            // Check if any elapsed month had positive EBITDA
-            achieved = monthsElapsed.some((m) => EBITDA[m] > 0);
-            break;
-          case "first-distributor":
-            // Will be compared against actual data when available
-            achieved = targetIdx >= 0 && monthIdx >= targetIdx;
-            break;
-          case "second-distributor":
-          case "third-distributor":
-            achieved = targetIdx >= 0 && monthIdx >= targetIdx;
-            break;
-          case "first-reorder":
-          case "second-reorder":
-            achieved = targetIdx >= 0 && monthIdx >= targetIdx;
-            break;
-          case "loan-repayment-start":
-            achieved = targetIdx >= 0 && monthIdx >= targetIdx;
-            break;
-          case "cash-floor":
-            // Check if actual cash is above threshold
-            if (actualCash != null) {
-              achieved = actualCash > ms.threshold;
-            } else {
-              achieved = PROJECTED_CASH[currentMonth] > ms.threshold;
-            }
-            break;
-          case "100k-units":
-            achieved = cumulativeThrough(TOTAL_UNITS, currentMonth) >= ms.threshold;
-            break;
-          case "loan-payoff":
-            achieved = false; // Feb 2028
-            break;
-        }
+      // Only check milestones that can be verified by actual live data.
+      // Everything else stays false until we have real confirmation.
+      switch (ms.id) {
+        case "ebitda-positive":
+          // Only achievable once we have real P&L data from Plaid
+          achieved = false;
+          break;
+        case "first-distributor":
+          // Not yet — Inderbitzin expected to start May 2026
+          achieved = false;
+          break;
+        case "second-distributor":
+        case "third-distributor":
+          achieved = false;
+          break;
+        case "first-reorder":
+        case "second-reorder":
+          achieved = false;
+          break;
+        case "loan-repayment-start":
+          // Repayment starts Aug 2026 per loan terms
+          achieved = false;
+          break;
+        case "cash-floor":
+          // Only check against actual cash, never projected
+          if (actualCash != null) {
+            achieved = actualCash > ms.threshold;
+          }
+          break;
+        case "100k-units":
+          // Only from actual order data, not pro-forma projections
+          if (actualOrders != null) {
+            achieved = actualOrders >= ms.threshold;
+          }
+          break;
+        case "loan-payoff":
+          achieved = false; // Feb 2028
+          break;
       }
 
       return { ...ms, achieved };
     });
-  }, [currentMonth, monthsElapsed, actualCash]);
+  }, [actualCash, actualOrders]);
 
   const achievedCount = milestoneStatuses.filter((m) => m.achieved).length;
 
-  // Loan payoff progress
-  const totalRepaid2026 = currentMonth
-    ? monthsElapsed.reduce((sum, m) => sum + LOAN_REPAYMENT[m], 0)
-    : 0;
+  // Loan payoff progress — ACTUAL repaid, not plan.
+  // Repayment hasn't started yet (starts Aug 2026). $0 repaid to date.
+  const totalRepaid2026 = 0;
 
   // Amortization YTD
   const amortYtd = AMORTIZATION_SCHEDULE.filter((a) => a.month.includes("2026"));
@@ -431,7 +429,10 @@ export function KpisView() {
         />
       </div>
 
-      {/* ── Annual Snapshot ────────────────────────────────────────── */}
+      {/* ── Annual Snapshot (Pro Forma Plan Targets) ──────────────── */}
+      <div style={{ fontSize: 11, color: GOLD, fontWeight: 700, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+        Annual Plan Targets (Pro Forma v23 — not actuals)
+      </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 14 }}>
         <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "12px 14px" }}>
           <div style={{ fontSize: 11, color: TEXT_DIM, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Annual Revenue Target</div>
@@ -449,7 +450,7 @@ export function KpisView() {
           <div style={{ fontSize: 11, color: TEXT_DIM, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Closing Cash (Dec 31)</div>
           <div style={{ fontSize: 22, fontWeight: 800, color: NAVY }}>{fmtDollar(ANNUAL_SUMMARY.closingCashDec31)}</div>
           <div style={{ fontSize: 12, color: TEXT_DIM }}>
-            After {fmtDollar(ANNUAL_SUMMARY.totalLoanRepayment2026)} in repayments · Loan bal {fmtDollar(ANNUAL_SUMMARY.loanBalanceDec31)}
+            Plan: {fmtDollar(ANNUAL_SUMMARY.totalLoanRepayment2026)} in repayments · Loan bal {fmtDollar(ANNUAL_SUMMARY.loanBalanceDec31)}
           </div>
         </div>
       </div>
@@ -493,8 +494,11 @@ export function KpisView() {
               value={totalRepaid2026}
               max={LOAN.totalObligation}
               color={NAVY}
-              label={`${fmtDollar(totalRepaid2026)} of ${fmtDollar(LOAN.totalObligation)} repaid (2026 plan)`}
+              label={`${fmtDollar(totalRepaid2026)} of ${fmtDollar(LOAN.totalObligation)} repaid to date`}
             />
+            <div style={{ fontSize: 11, color: GOLD, fontWeight: 600, marginTop: 4 }}>
+              Repayment starts Aug 2026 (15% of gross revenue). No payments made yet.
+            </div>
 
             <div style={{ borderTop: `1px solid ${BORDER}`, paddingTop: 10, display: "grid", gap: 6 }}>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
@@ -523,7 +527,7 @@ export function KpisView() {
 
             <div style={{ borderTop: `1px solid ${BORDER}`, paddingTop: 10 }}>
               <div style={{ fontSize: 11, color: TEXT_DIM, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
-                2026 Monthly Repayments
+                2026 Monthly Repayments <span style={{ color: GOLD, fontWeight: 800 }}>(PROJECTED)</span>
               </div>
               <div style={{ display: "grid", gap: 4 }}>
                 {amortYtd.map((a) => (

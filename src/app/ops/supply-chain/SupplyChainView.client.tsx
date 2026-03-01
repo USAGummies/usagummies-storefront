@@ -76,7 +76,7 @@ export function SupplyChainView() {
         <div>
           <h1 style={{ margin: 0, fontSize: 30, color: NAVY, letterSpacing: "-0.02em" }}>Supply Chain</h1>
           <div style={{ marginTop: 4, fontSize: 13, color: TEXT_DIM }}>
-            Inventory health, production progress, supplier lead times, and cost trends.
+            Inventory health, production, and logistics. Currently 1 SKU: USA-GUMMY-12PK (12-pack case).
           </div>
           <div style={{ marginTop: 8 }}>
             <StalenessBadge items={freshnessItems} />

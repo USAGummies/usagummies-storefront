@@ -200,7 +200,7 @@ export function PipelineView() {
             Pipeline & Deals
           </h1>
           <div style={{ marginTop: 4, fontSize: 13, color: TEXT_DIM }}>
-            Honest Kanban stages with live email context and follow-up actions.
+            B2B wholesale & distributor pipeline from Notion CRM. Stages: Lead → Outreach → Sampling → Negotiation → Committed → Shipping.
           </div>
           <div style={{ marginTop: 8 }}>
             <StalenessBadge items={freshnessItems} />

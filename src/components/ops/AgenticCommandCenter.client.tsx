@@ -423,6 +423,9 @@ export default function AgenticCommandCenter() {
           {error ? (
             <p className={`${styles.subtitle} ${styles.statusCritical}`}>Data fetch error: {error}</p>
           ) : null}
+          {!data && !error ? (
+            <p className={styles.subtitle} style={{ fontWeight: 600 }}>Connecting to agent system...</p>
+          ) : null}
         </header>
 
         {/* WEEK MISSION — funding targets */}
