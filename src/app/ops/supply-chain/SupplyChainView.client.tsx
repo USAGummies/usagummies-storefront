@@ -110,7 +110,7 @@ export function SupplyChainView() {
           {error}
         </div>
       ) : null}
-      {inventory?.amazonFba?.error ? (
+      {inventory?.amazonFba?.error && !inventory?.amazonFba?.orderStats ? (
         <div
           style={{
             border: `1px solid ${GOLD}55`,
@@ -168,15 +168,93 @@ export function SupplyChainView() {
               <div style={{ fontSize: 11, fontWeight: 700, color: TEXT_DIM, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
                 📦 Amazon FBA
               </div>
-              <div style={{ fontSize: 28, fontWeight: 800, color: inventory.amazonFba?.error ? TEXT_DIM : NAVY }}>
-                {inventory.amazonFba?.error
-                  ? "—"
-                  : (inventory.items || []).find((i) => i.source === "amazon-api")?.currentStock ?? "—"}
-              </div>
-              <div style={{ fontSize: 11, color: TEXT_DIM, marginTop: 2 }}>
-                {inventory.amazonFba?.error ? "API error — see alert above" : "units in FBA warehouse"}
-              </div>
+              {inventory.amazonFba?.orderStats ? (
+                <>
+                  <div style={{ fontSize: 28, fontWeight: 800, color: NAVY }}>
+                    {inventory.amazonFba.orderStats.totalUnits}
+                  </div>
+                  <div style={{ fontSize: 11, color: TEXT_DIM, marginTop: 2 }}>
+                    units sold ({inventory.amazonFba.orderStats.periodDays}d) • {inventory.amazonFba.orderStats.dailyVelocity}/day
+                  </div>
+                  <div style={{ fontSize: 11, color: TEXT_DIM, marginTop: 1 }}>
+                    {inventory.amazonFba.orderStats.totalOrders} orders • ${inventory.amazonFba.orderStats.totalRevenue.toLocaleString()}
+                  </div>
+                </>
+              ) : inventory.amazonFba?.error ? (
+                <>
+                  <div style={{ fontSize: 28, fontWeight: 800, color: TEXT_DIM }}>—</div>
+                  <div style={{ fontSize: 11, color: TEXT_DIM, marginTop: 2 }}>
+                    API error — see alert above
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={{ fontSize: 28, fontWeight: 800, color: NAVY }}>
+                    {(inventory.items || []).find((i) => i.source === "amazon-api")?.currentStock ?? "—"}
+                  </div>
+                  <div style={{ fontSize: 11, color: TEXT_DIM, marginTop: 2 }}>
+                    units in FBA warehouse
+                  </div>
+                </>
+              )}
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* ── Amazon Sales Stats (from Orders API) ── */}
+      {inventory?.amazonFba?.orderStats ? (
+        <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px 16px", marginBottom: 14 }}>
+          <div style={{ fontWeight: 700, color: NAVY, marginBottom: 12, fontSize: 15 }}>
+            Amazon Sales — Last {inventory.amazonFba.orderStats.periodDays} Days
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 14 }}>
+            <div style={{ background: `${NAVY}08`, border: `1px solid ${BORDER}`, borderRadius: 10, padding: "10px 12px" }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: TEXT_DIM, textTransform: "uppercase" }}>Orders</div>
+              <div style={{ fontSize: 24, fontWeight: 800, color: NAVY }}>{inventory.amazonFba.orderStats.totalOrders}</div>
+            </div>
+            <div style={{ background: `${NAVY}08`, border: `1px solid ${BORDER}`, borderRadius: 10, padding: "10px 12px" }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: TEXT_DIM, textTransform: "uppercase" }}>Units Sold</div>
+              <div style={{ fontSize: 24, fontWeight: 800, color: NAVY }}>{inventory.amazonFba.orderStats.totalUnits}</div>
+            </div>
+            <div style={{ background: `${NAVY}08`, border: `1px solid ${BORDER}`, borderRadius: 10, padding: "10px 12px" }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: TEXT_DIM, textTransform: "uppercase" }}>Revenue</div>
+              <div style={{ fontSize: 24, fontWeight: 800, color: NAVY }}>${inventory.amazonFba.orderStats.totalRevenue.toLocaleString()}</div>
+            </div>
+            <div style={{ background: `${NAVY}08`, border: `1px solid ${BORDER}`, borderRadius: 10, padding: "10px 12px" }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: TEXT_DIM, textTransform: "uppercase" }}>Daily Velocity</div>
+              <div style={{ fontSize: 24, fontWeight: 800, color: NAVY }}>{inventory.amazonFba.orderStats.dailyVelocity}</div>
+              <div style={{ fontSize: 10, color: TEXT_DIM }}>units/day</div>
+            </div>
+          </div>
+          {inventory.amazonFba.orderStats.monthlyBreakdown.length > 0 ? (
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: NAVY, marginBottom: 6 }}>Monthly Breakdown</div>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: "left", fontSize: 11, color: TEXT_DIM, paddingBottom: 6 }}>Month</th>
+                    <th style={{ textAlign: "right", fontSize: 11, color: TEXT_DIM, paddingBottom: 6 }}>Orders</th>
+                    <th style={{ textAlign: "right", fontSize: 11, color: TEXT_DIM, paddingBottom: 6 }}>Units</th>
+                    <th style={{ textAlign: "right", fontSize: 11, color: TEXT_DIM, paddingBottom: 6 }}>Revenue</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {inventory.amazonFba.orderStats.monthlyBreakdown.map((row) => (
+                    <tr key={row.month}>
+                      <td style={{ borderTop: `1px solid ${BORDER}`, padding: "6px 4px 6px 0", color: NAVY, fontWeight: 600, fontSize: 13 }}>{row.month}</td>
+                      <td style={{ borderTop: `1px solid ${BORDER}`, padding: "6px 4px", textAlign: "right", color: NAVY, fontWeight: 700 }}>{row.orders}</td>
+                      <td style={{ borderTop: `1px solid ${BORDER}`, padding: "6px 4px", textAlign: "right", color: NAVY }}>{row.units}</td>
+                      <td style={{ borderTop: `1px solid ${BORDER}`, padding: "6px 4px", textAlign: "right", color: NAVY, fontWeight: 700 }}>${row.revenue.toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+          <div style={{ fontSize: 11, color: TEXT_DIM, marginTop: 8 }}>
+            Source: Amazon Orders API • {inventory.amazonFba.orderStats.fbaOrders} FBA, {inventory.amazonFba.orderStats.fbmOrders} FBM
+            {inventory.amazonFba.error?.includes("403") ? " • FBA Inventory API blocked (Draft app)" : ""}
           </div>
         </div>
       ) : null}

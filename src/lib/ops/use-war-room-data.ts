@@ -279,6 +279,17 @@ export type InventoryData = {
     error: string | null;
     errorAt: string | null;
     lastSuccessfulFetch: string | null;
+    orderStats?: {
+      totalOrders: number;
+      totalUnits: number;
+      totalRevenue: number;
+      fbaOrders: number;
+      fbmOrders: number;
+      dailyVelocity: number;
+      monthlyBreakdown: { month: string; orders: number; units: number; revenue: number }[];
+      periodDays: number;
+      source: "orders-api";
+    } | null;
   };
   generatedAt: string;
   budget: null;

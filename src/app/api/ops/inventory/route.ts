@@ -23,8 +23,10 @@ import { readState, writeState } from "@/lib/ops/state";
 import {
   isAmazonConfigured,
   fetchFBAInventory,
+  fetchAmazonOrderStats,
   getCachedKPIs,
 } from "@/lib/amazon/sp-api";
+import type { AmazonOrderStats } from "@/lib/amazon/sp-api";
 import type { CacheEnvelope, AmazonKPIs } from "@/lib/amazon/types";
 
 export const runtime = "nodejs";
@@ -93,6 +95,7 @@ type AmazonFbaStatus = {
   error: string | null;
   errorAt: string | null;
   lastSuccessfulFetch: string | null;
+  orderStats?: AmazonOrderStats | null;
 };
 
 type InventoryResponse = {
@@ -479,7 +482,92 @@ async function fetchAmazonFBAItem(): Promise<{
 
   const fba = await fetchFBAInventory();
   const summaries = fba.items || [];
-  if (summaries.length === 0) {
+
+  // --- FBA Inventory API succeeded ---
+  if (summaries.length > 0) {
+    let fulfillable = 0;
+    let totalQuantity = 0;
+    let lastUpdatedTime = "";
+    let productName = "All American Gummy Bears";
+
+    for (const inv of summaries) {
+      const d = inv.inventoryDetails;
+      fulfillable += d?.fulfillableQuantity || 0;
+      totalQuantity += inv.totalQuantity || 0;
+      if (inv.lastUpdatedTime) lastUpdatedTime = inv.lastUpdatedTime;
+      if (inv.productName) productName = inv.productName;
+    }
+
+    const kpis = await getCachedKPIs<AmazonKPIs>();
+    const unitsOrdered30d =
+      (kpis?.dailyBreakdown || []).reduce((sum, row) => sum + (row.orders || 0), 0) || 0;
+    const velocity = unitsOrdered30d > 0 ? round2(unitsOrdered30d / 30) : 2.5;
+    const daysOfSupply = velocity > 0 ? round2(fulfillable / velocity) : 999;
+
+    return {
+      item: {
+        id: "amazon-fba-live",
+        sku: "USA-GUMMY-7.5OZ",
+        productName,
+        currentStock: totalQuantity,
+        reorderPoint: 50,
+        reorderQty: 100,
+        daysOfSupply,
+        dailyVelocity: velocity,
+        status: calcStatus(totalQuantity, 50, daysOfSupply),
+        location: "Amazon FBA",
+        lastUpdated: lastUpdatedTime || new Date().toISOString(),
+        costPerUnit: 0,
+        totalValue: 0,
+        source: "amazon-api",
+        purchaseBudget: null,
+      },
+      status: {
+        error: fba.error,
+        errorAt: fba.errorAt,
+        lastSuccessfulFetch: fba.lastSuccessfulFetch,
+      },
+    };
+  }
+
+  // --- FBA Inventory API failed — fall back to Orders API ---
+  // The Orders API works even with a Draft SP-API app and gives us
+  // real velocity, units, and revenue data.
+  try {
+    console.log("[inventory] FBA Inventory API failed, falling back to Orders API");
+    const orderStats = await fetchAmazonOrderStats(60);
+    const velocity = orderStats.dailyVelocity;
+
+    // We don't know exact current FBA stock from Orders API,
+    // but we can show the order-derived item with velocity data
+    // so the dashboard isn't empty.
+    return {
+      item: {
+        id: "amazon-fba-orders",
+        sku: "USA-GUMMY-7.5OZ",
+        productName: "All American Gummy Bears (Amazon FBA)",
+        currentStock: 0, // Unknown — FBA inventory API blocked
+        reorderPoint: 50,
+        reorderQty: 100,
+        daysOfSupply: 0,
+        dailyVelocity: velocity,
+        status: "healthy", // We're selling, just can't read stock level
+        location: "Amazon FBA",
+        lastUpdated: new Date().toISOString(),
+        costPerUnit: 0,
+        totalValue: 0,
+        source: "amazon-api",
+        purchaseBudget: null,
+      },
+      status: {
+        error: fba.error,
+        errorAt: fba.errorAt,
+        lastSuccessfulFetch: fba.lastSuccessfulFetch,
+        orderStats,
+      },
+    };
+  } catch (orderErr) {
+    console.error("[inventory] Orders API fallback also failed:", orderErr);
     return {
       item: null,
       status: {
@@ -489,50 +577,6 @@ async function fetchAmazonFBAItem(): Promise<{
       },
     };
   }
-
-  let fulfillable = 0;
-  let totalQuantity = 0;
-  let lastUpdatedTime = "";
-  let productName = "All American Gummy Bears";
-
-  for (const inv of summaries) {
-    const d = inv.inventoryDetails;
-    fulfillable += d?.fulfillableQuantity || 0;
-    totalQuantity += inv.totalQuantity || 0;
-    if (inv.lastUpdatedTime) lastUpdatedTime = inv.lastUpdatedTime;
-    if (inv.productName) productName = inv.productName;
-  }
-
-  const kpis = await getCachedKPIs<AmazonKPIs>();
-  const unitsOrdered30d =
-    (kpis?.dailyBreakdown || []).reduce((sum, row) => sum + (row.orders || 0), 0) || 0;
-  const velocity = unitsOrdered30d > 0 ? round2(unitsOrdered30d / 30) : 2.5;
-  const daysOfSupply = velocity > 0 ? round2(fulfillable / velocity) : 999;
-
-  return {
-    item: {
-      id: "amazon-fba-live",
-      sku: "USA-GUMMY-7.5OZ",
-      productName,
-      currentStock: totalQuantity,
-      reorderPoint: 50,
-      reorderQty: 100,
-      daysOfSupply,
-      dailyVelocity: velocity,
-      status: calcStatus(totalQuantity, 50, daysOfSupply),
-      location: "Amazon FBA",
-      lastUpdated: lastUpdatedTime || new Date().toISOString(),
-      costPerUnit: 0,
-      totalValue: 0,
-      source: "amazon-api",
-      purchaseBudget: null,
-    },
-    status: {
-      error: fba.error,
-      errorAt: fba.errorAt,
-      lastSuccessfulFetch: fba.lastSuccessfulFetch,
-    },
-  };
 }
 
 function emptyResponse(error?: string): InventoryResponse {

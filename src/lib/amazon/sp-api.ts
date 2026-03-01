@@ -310,6 +310,76 @@ export async function fetchFBAInventory(): Promise<FBAInventoryFetchResult> {
 export const getCachedKPIs = getCachedKPIsFromCache;
 
 // ---------------------------------------------------------------------------
+// Orders-based Amazon stats (fallback when FBA Inventory API is 403)
+// ---------------------------------------------------------------------------
+
+export type AmazonOrderStats = {
+  totalOrders: number;
+  totalUnits: number;
+  totalRevenue: number;
+  fbaOrders: number;
+  fbmOrders: number;
+  dailyVelocity: number;
+  monthlyBreakdown: { month: string; orders: number; units: number; revenue: number }[];
+  periodDays: number;
+  source: "orders-api";
+};
+
+/**
+ * Fetch Amazon order stats from the working Orders API.
+ * Uses this as a fallback when FBA Inventory API is blocked (403).
+ * Returns order volume, units, revenue, and velocity.
+ */
+export async function fetchAmazonOrderStats(
+  daysBack = 60,
+): Promise<AmazonOrderStats> {
+  const createdAfter = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000).toISOString();
+  const createdBefore = nowMinusBuffer();
+
+  const orders = await fetchOrders(createdAfter, createdBefore);
+
+  const totalOrders = orders.length;
+  const fbaOrders = orders.filter(o => o.FulfillmentChannel === "AFN").length;
+  const fbmOrders = orders.filter(o => o.FulfillmentChannel === "MFN").length;
+  const totalUnits = orders.reduce(
+    (sum, o) => sum + (o.NumberOfItemsShipped || 0) + (o.NumberOfItemsUnshipped || 0),
+    0,
+  );
+  const totalRevenue = orders.reduce(
+    (sum, o) => sum + parseFloat(o.OrderTotal?.Amount || "0"),
+    0,
+  );
+
+  // Monthly breakdown
+  const byMonth: Record<string, { orders: number; units: number; revenue: number }> = {};
+  for (const o of orders) {
+    const month = o.PurchaseDate?.substring(0, 7) || "unknown";
+    if (!byMonth[month]) byMonth[month] = { orders: 0, units: 0, revenue: 0 };
+    byMonth[month].orders++;
+    byMonth[month].units += (o.NumberOfItemsShipped || 0) + (o.NumberOfItemsUnshipped || 0);
+    byMonth[month].revenue += parseFloat(o.OrderTotal?.Amount || "0");
+  }
+
+  const monthlyBreakdown = Object.entries(byMonth)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, data]) => ({ month, ...data }));
+
+  const dailyVelocity = daysBack > 0 ? totalUnits / daysBack : 0;
+
+  return {
+    totalOrders,
+    totalUnits,
+    totalRevenue: Math.round(totalRevenue * 100) / 100,
+    fbaOrders,
+    fbmOrders,
+    dailyVelocity: Math.round(dailyVelocity * 100) / 100,
+    monthlyBreakdown,
+    periodDays: daysBack,
+    source: "orders-api",
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Fees API
 // ---------------------------------------------------------------------------
 
