@@ -28,6 +28,10 @@ const ExitIntentPopup = dynamic(
   () => import("@/components/engagement/ExitIntentPopup.client"),
   { ssr: false }
 );
+const ScrollPopup = dynamic(
+  () => import("@/components/engagement/ScrollPopup.client"),
+  { ssr: false }
+);
 
 function cx(...a: Array<string | false | null | undefined>) {
   return a.filter(Boolean).join(" ");
@@ -73,6 +77,8 @@ const navSections = [
     title: "Shop",
     links: [
       { href: "/shop", label: "Shop" },
+      { href: "/subscribe", label: "Subscribe & Save" },
+      { href: "/rewards", label: "Rewards" },
       { href: "/bundle-guides", label: "Bag count guides" },
       { href: "/gummy-gift-bundles", label: "Gift bag options" },
       { href: "/patriotic-party-snacks", label: "Party snacks" },
@@ -96,6 +102,7 @@ const navSections = [
     links: [
       { href: "/help", label: "Help Center" },
       { href: "/wholesale", label: "Wholesale" },
+      { href: "/where-to-buy", label: "Where to buy" },
       { href: "/contact", label: "Contact" },
       { href: "/policies", label: "Policies" },
       { href: "/policies/shipping", label: "Shipping" },
@@ -781,6 +788,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </footer>
       {showChatWidget ? <ChatWidget /> : null}
       <ExitIntentPopup />
+      <ScrollPopup />
     </div>
   );
 }
