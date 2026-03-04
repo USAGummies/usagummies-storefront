@@ -4,7 +4,13 @@ import {
   SUBSCRIPTION_FREQUENCIES,
   SUBSCRIPTION_MIN_QTY,
   subscriptionPricingForQty,
+  totalForQty,
 } from "@/lib/bundles/pricing";
+import { SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
+import {
+  createDiscountCode,
+  generateSubscriptionDiscountCode,
+} from "@/lib/shopify/admin";
 
 function json(data: unknown, status = 200) {
   return new NextResponse(JSON.stringify(data), {
@@ -29,7 +35,6 @@ function addDays(date: Date, days: number): Date {
   return d;
 }
 
-// Validate frequency label
 function isValidFrequency(label: string): boolean {
   return SUBSCRIPTION_FREQUENCIES.some((f) => f.label === label);
 }
@@ -40,7 +45,121 @@ function getFrequencyDays(label: string): number {
 }
 
 // ---------------------------------------------------------------------------
-// POST — create subscription
+// Shopify Storefront API — create cart with discount
+// ---------------------------------------------------------------------------
+
+const STOREFRONT_API_VERSION = "2025-01";
+
+function getStorefrontEndpoint() {
+  return (
+    process.env.SHOPIFY_STOREFRONT_API_ENDPOINT ||
+    `https://usa-gummies.myshopify.com/api/${STOREFRONT_API_VERSION}/graphql.json`
+  );
+}
+
+function getStorefrontToken() {
+  return (
+    process.env.SHOPIFY_STOREFRONT_API_TOKEN ||
+    process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN ||
+    ""
+  );
+}
+
+const CART_CREATE_WITH_LINES = /* GraphQL */ `
+  mutation CartCreate($lines: [CartLineInput!]!) {
+    cartCreate(input: { lines: $lines }) {
+      cart {
+        id
+        checkoutUrl
+      }
+      userErrors {
+        field
+        message
+      }
+    }
+  }
+`;
+
+const CART_DISCOUNT_APPLY = /* GraphQL */ `
+  mutation CartDiscountCodesUpdate($cartId: ID!, $discountCodes: [String!]!) {
+    cartDiscountCodesUpdate(cartId: $cartId, discountCodes: $discountCodes) {
+      cart {
+        id
+        checkoutUrl
+      }
+      userErrors {
+        field
+        message
+      }
+    }
+  }
+`;
+
+async function storefrontRequest<T>(query: string, variables: Record<string, unknown>): Promise<T | null> {
+  const endpoint = getStorefrontEndpoint();
+  const token = getStorefrontToken();
+  if (!token) return null;
+
+  try {
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Shopify-Storefront-Access-Token": token,
+      },
+      body: JSON.stringify({ query, variables }),
+      cache: "no-store",
+    });
+    const json = await res.json();
+    return json?.data ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Create a Shopify cart with the subscription items + discount code applied.
+ * Returns the checkout URL that the customer will be redirected to.
+ */
+async function createSubscriptionCart(
+  quantity: number,
+  discountCode: string,
+): Promise<{ checkoutUrl: string | null; error?: string }> {
+  // Step 1: Create cart with line items
+  const cartData = await storefrontRequest<{
+    cartCreate: {
+      cart: { id: string; checkoutUrl: string } | null;
+      userErrors: Array<{ message: string }>;
+    };
+  }>(CART_CREATE_WITH_LINES, {
+    lines: [{ merchandiseId: SINGLE_BAG_VARIANT_ID, quantity }],
+  });
+
+  const cart = cartData?.cartCreate?.cart;
+  if (!cart?.id) {
+    const errs = cartData?.cartCreate?.userErrors?.map((e) => e.message).join("; ");
+    return { checkoutUrl: null, error: errs || "Cart creation failed" };
+  }
+
+  // Step 2: Apply discount code to the cart
+  const discountData = await storefrontRequest<{
+    cartDiscountCodesUpdate: {
+      cart: { id: string; checkoutUrl: string } | null;
+      userErrors: Array<{ message: string }>;
+    };
+  }>(CART_DISCOUNT_APPLY, {
+    cartId: cart.id,
+    discountCodes: [discountCode],
+  });
+
+  const updatedCart = discountData?.cartDiscountCodesUpdate?.cart;
+  const checkoutUrl = updatedCart?.checkoutUrl || cart.checkoutUrl;
+
+  return { checkoutUrl };
+}
+
+// ---------------------------------------------------------------------------
+// POST — create subscription → Shopify checkout
 // ---------------------------------------------------------------------------
 export async function POST(req: Request) {
   let body: Record<string, unknown>;
@@ -82,11 +201,59 @@ export async function POST(req: Request) {
   }
 
   const pricing = subscriptionPricingForQty(quantity);
+  const bundleTotal = totalForQty(quantity);
   const frequencyDays = getFrequencyDays(frequency);
   const now = new Date();
   const nextDelivery = addDays(now, frequencyDays);
   const token = generateToken();
 
+  // --- Create Shopify discount code for subscription savings ---
+  const discountCodeStr = generateSubscriptionDiscountCode(email);
+  const savingsAmount = bundleTotal - pricing.total; // dollar amount to discount
+
+  let shopifyDiscountCode = "";
+  let checkoutUrl: string | null = null;
+
+  if (savingsAmount > 0) {
+    // Set expiry 24h from now — single-use, short-lived
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+    const discountResult = await createDiscountCode({
+      title: `Subscription: ${quantity} bags ${frequency} — ${email}`,
+      code: discountCodeStr,
+      amountOff: savingsAmount,
+      usageLimit: 1,
+      appliesOncePerCustomer: true,
+      endsAt: expiresAt,
+    });
+
+    if (discountResult.ok && discountResult.code) {
+      shopifyDiscountCode = discountResult.code;
+      console.info(`[subscriptions] Created discount code: ${shopifyDiscountCode} ($${savingsAmount.toFixed(2)} off)`);
+    } else {
+      console.warn("[subscriptions] Discount creation failed:", discountResult.error);
+      // Continue without discount — customer still gets a real checkout
+    }
+  }
+
+  // --- Create Shopify cart and apply discount ---
+  const cartResult = await createSubscriptionCart(
+    quantity,
+    shopifyDiscountCode,
+  );
+  checkoutUrl = cartResult.checkoutUrl;
+
+  if (!checkoutUrl) {
+    // Fallback: create a cart permalink
+    const numericVariantId = SINGLE_BAG_VARIANT_ID.split("/").pop();
+    checkoutUrl = `https://usa-gummies.myshopify.com/cart/${numericVariantId}:${quantity}`;
+    if (shopifyDiscountCode) {
+      checkoutUrl += `?discount=${shopifyDiscountCode}`;
+    }
+    console.warn("[subscriptions] Cart creation failed, using permalink fallback");
+  }
+
+  // --- Save subscription to KV ---
   const subscription = {
     email,
     name,
@@ -98,16 +265,16 @@ export async function POST(req: Request) {
     savings: pricing.savings,
     status: "active" as const,
     token,
+    discountCode: shopifyDiscountCode,
     createdAt: now.toISOString(),
     nextDeliveryDate: nextDelivery.toISOString(),
     pausedAt: null,
     cancelledAt: null,
   };
 
-  // Store in KV (no expiry — subscriptions persist)
   await kv.set(kvKey(email), subscription);
 
-  // Also add to a subscription index for admin queries
+  // Add to subscription index
   const index = (await kv.get<string[]>("sub:index")) || [];
   if (!index.includes(email)) {
     index.push(email);
@@ -115,11 +282,11 @@ export async function POST(req: Request) {
   }
 
   // Send confirmation email (fire-and-forget)
-  sendConfirmationEmail(subscription).catch((err) => {
+  sendConfirmationEmail({ ...subscription, checkoutUrl }).catch((err) => {
     console.error("[subscriptions] Email send failed:", err);
   });
 
-  // Log to leads webhook too
+  // Log to leads webhook
   const webhookUrl = process.env.LEADS_WEBHOOK_URL;
   if (webhookUrl) {
     fetch(webhookUrl, {
@@ -135,18 +302,20 @@ export async function POST(req: Request) {
     }).catch(() => {});
   }
 
-  console.info("[subscriptions] New subscription:", email, quantity, frequency);
+  console.info("[subscriptions] New subscription:", email, quantity, frequency, "→ checkout");
 
   return json({
     ok: true,
+    checkoutUrl,
     subscriptionId: kvKey(email),
     nextDeliveryDate: nextDelivery.toISOString(),
     total: pricing.total,
+    discountCode: shopifyDiscountCode || undefined,
   });
 }
 
 // ---------------------------------------------------------------------------
-// Confirmation email via SMTP
+// Confirmation email
 // ---------------------------------------------------------------------------
 async function sendConfirmationEmail(sub: {
   email: string;
@@ -158,6 +327,7 @@ async function sendConfirmationEmail(sub: {
   savings: number;
   nextDeliveryDate: string;
   token: string;
+  checkoutUrl: string;
 }) {
   try {
     const { sendOpsEmail } = await import("@/lib/ops/email");
@@ -172,11 +342,15 @@ async function sendConfirmationEmail(sub: {
 
     await sendOpsEmail({
       to: sub.email,
-      subject: "Your USA Gummies Subscription is Active!",
+      subject: "Your USA Gummies Subscription — Complete Your First Order!",
       body: [
         `Hey ${sub.name},`,
         "",
-        "Your subscription is confirmed! Here's what you've set up:",
+        "Your subscription is set up! Complete your first order here:",
+        "",
+        `  → ${sub.checkoutUrl}`,
+        "",
+        "Your subscription details:",
         "",
         `  Quantity: ${sub.quantity} bags`,
         `  Price: $${sub.perBag.toFixed(2)}/bag ($${sub.total.toFixed(2)} total)`,
@@ -184,7 +358,7 @@ async function sendConfirmationEmail(sub: {
         `  Next Delivery: ${nextDate}`,
         `  You save: $${sub.savings.toFixed(2)} per delivery vs bundles`,
         "",
-        "Before each delivery, we'll send you a checkout link to complete your order.",
+        "We'll email you a checkout link before each delivery.",
         "You're only charged when you check out.",
         "",
         `Manage your subscription: ${manageUrl}`,

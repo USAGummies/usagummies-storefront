@@ -7,6 +7,10 @@ import {
   nextTierProgress,
   REDEMPTION_TIERS,
 } from "@/lib/loyalty";
+import {
+  createDiscountCode,
+  generateLoyaltyDiscountCode,
+} from "@/lib/shopify/admin";
 
 function json(data: unknown, status = 200) {
   return new NextResponse(JSON.stringify(data), {
@@ -89,13 +93,49 @@ export async function POST(req: Request) {
       return json({ ok: false, error: "Tier (points value) is required." }, 400);
     }
 
+    const tier = REDEMPTION_TIERS.find((t) => t.points === tierPoints);
+    if (!tier) {
+      return json({ ok: false, error: "Invalid redemption tier." }, 400);
+    }
+
     const result = await redeemPoints(email, tierPoints);
     if (!result.ok) {
       return json({ ok: false, error: result.error }, 400);
     }
 
-    // Send redemption email (fire-and-forget)
-    sendRedemptionEmail(result.account!).catch((err) => {
+    // Create a REAL Shopify discount code for the reward
+    const discountCodeStr = generateLoyaltyDiscountCode(email, tierPoints);
+    // Reward value: tier.bags * $5.99 (base price per bag)
+    const rewardDollarValue = tier.bags * 5.99;
+    // Expires in 30 days
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    let shopifyCode = "";
+    const discountResult = await createDiscountCode({
+      title: `Loyalty Reward: ${tier.reward} — ${email}`,
+      code: discountCodeStr,
+      amountOff: rewardDollarValue,
+      usageLimit: 1,
+      appliesOncePerCustomer: true,
+      endsAt: expiresAt,
+    });
+
+    if (discountResult.ok && discountResult.code) {
+      shopifyCode = discountResult.code;
+      console.info(`[loyalty] Created reward discount: ${shopifyCode} ($${rewardDollarValue.toFixed(2)} off) for ${email}`);
+    } else {
+      console.warn("[loyalty] Discount creation failed:", discountResult.error);
+      // Points already deducted — we'll email them manually if this fails
+    }
+
+    // Send redemption email with the actual discount code
+    sendRedemptionEmail({
+      ...result.account!,
+      discountCode: shopifyCode,
+      reward: tier.reward,
+      rewardValue: rewardDollarValue,
+      expiresAt,
+    }).catch((err) => {
       console.error("[loyalty] Redemption email failed:", err);
     });
 
@@ -103,7 +143,8 @@ export async function POST(req: Request) {
       ok: true,
       redeemed: true,
       pointsSpent: tierPoints,
-      reward: REDEMPTION_TIERS.find((t) => t.points === tierPoints)?.reward,
+      reward: tier.reward,
+      discountCode: shopifyCode || undefined,
       newBalance: result.account!.balance,
     });
   }
@@ -112,29 +153,68 @@ export async function POST(req: Request) {
 }
 
 // ---------------------------------------------------------------------------
-// Redemption email
+// Redemption email — now includes a real Shopify discount code
 // ---------------------------------------------------------------------------
 async function sendRedemptionEmail(account: {
   email: string;
   name: string;
   balance: number;
+  discountCode: string;
+  reward: string;
+  rewardValue: number;
+  expiresAt: string;
 }) {
   try {
     const { sendOpsEmail } = await import("@/lib/ops/email");
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.usagummies.com";
+    const shopUrl = `${siteUrl}/shop`;
+    const expiryDate = new Date(account.expiresAt).toLocaleDateString("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    });
+
+    const bodyLines = [
+      `Hey ${account.name},`,
+      "",
+      `Congrats! You've redeemed your reward: ${account.reward}!`,
+      "",
+    ];
+
+    if (account.discountCode) {
+      bodyLines.push(
+        "Here's your discount code to use at checkout:",
+        "",
+        `  🎁  ${account.discountCode}`,
+        "",
+        `  Value: $${account.rewardValue.toFixed(2)} off your next order`,
+        `  Expires: ${expiryDate}`,
+        `  Single use — apply at checkout`,
+        "",
+        `Shop now: ${shopUrl}`,
+      );
+    } else {
+      bodyLines.push(
+        "We're processing your reward and will send your discount code shortly.",
+        "If you don't receive it within 24 hours, reply to this email.",
+      );
+    }
+
+    bodyLines.push(
+      "",
+      `Remaining balance: ${account.balance} points`,
+      "",
+      "Keep earning points with every purchase. 1 point per $1 spent.",
+      "",
+      "— USA Gummies Rewards Team",
+    );
+
     await sendOpsEmail({
       to: account.email,
-      subject: "Your USA Gummies Reward is Ready!",
-      body: [
-        `Hey ${account.name},`,
-        "",
-        "Your reward has been redeemed! We'll add the free bag(s) to your next order.",
-        "",
-        `Remaining balance: ${account.balance} points`,
-        "",
-        "Keep earning points with every purchase. 1 point per $1 spent.",
-        "",
-        "— USA Gummies Rewards Team",
-      ].join("\n"),
+      subject: account.discountCode
+        ? `Your USA Gummies Reward Code: ${account.discountCode}`
+        : "Your USA Gummies Reward is Ready!",
+      body: bodyLines.join("\n"),
       allowRepeat: true,
     });
   } catch (err) {

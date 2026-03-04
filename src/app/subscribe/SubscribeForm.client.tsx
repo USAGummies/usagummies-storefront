@@ -53,8 +53,8 @@ export function SubscribeForm() {
         setSubmitting(false);
         return;
       }
-      setSubmitted(true);
 
+      // Fire GA4 event before redirect
       if (typeof window !== "undefined" && (window as any).gtag) {
         (window as any).gtag("event", "subscription_signup", {
           event_category: "conversion",
@@ -62,6 +62,15 @@ export function SubscribeForm() {
           value: pricing.total,
         });
       }
+
+      // Redirect to Shopify checkout if we got a checkoutUrl
+      if (data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+        return;
+      }
+
+      // Fallback: show success if no checkout URL (shouldn't happen)
+      setSubmitted(true);
     } catch {
       setErrorMsg("Network error. Please try again.");
       setSubmitting(false);
@@ -231,8 +240,8 @@ export function SubscribeForm() {
             className="btn btn-candy pressable w-full py-3.5 text-base font-bold disabled:opacity-60"
           >
             {submitting
-              ? "Setting up\u2026"
-              : `Start subscription \u2014 $${pricing.total.toFixed(2)}/${frequency.label.toLowerCase()}`}
+              ? "Preparing checkout\u2026"
+              : `Subscribe & checkout \u2014 $${pricing.total.toFixed(2)}/${frequency.label.toLowerCase()}`}
           </button>
         </div>
         <p className="mt-3 text-center text-[10px] text-[var(--muted)]">
