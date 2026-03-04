@@ -20,6 +20,8 @@ export type OrderSummaryPanelProps = {
   hasSavings: boolean;
   showRegularLine: boolean;
   regularTotalText: string;
+  regularPerBagText: string;
+  bundleSavingsText: string;
   drawerSavingsLine: string;
   highlightTotals: boolean;
   showNextTierCta: boolean;
@@ -45,6 +47,8 @@ export function OrderSummaryPanel({
   hasSavings,
   showRegularLine,
   regularTotalText,
+  regularPerBagText,
+  bundleSavingsText,
   drawerSavingsLine,
   highlightTotals: _highlightTotals,
   showNextTierCta,
@@ -88,9 +92,18 @@ export function OrderSummaryPanel({
         <span className="font-semibold">Estimated total</span>
         <span className="font-black">{estimatedTotal}</span>
       </div>
-      {bundlePerBagText && (
-        <div className="text-xs text-[var(--muted)]">
-          Price per bag at {totalBags} bags &bull; {bundlePerBagText} / bag
+      {hasSavings && regularPerBagText && bundlePerBagText && (
+        <div className="flex items-center gap-2 text-xs">
+          <span className="text-[var(--muted)] line-through">{regularPerBagText}/bag</span>
+          <span className="font-bold text-[#2D7A3A]">{bundlePerBagText}/bag</span>
+        </div>
+      )}
+      {bundleSavingsText && (
+        <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#2D7A3A]">
+          <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true">
+            <path d="M8 1a7 7 0 1 1 0 14A7 7 0 0 1 8 1Zm3.03 4.97a.75.75 0 0 0-1.06 0L7 8.94 5.53 7.47a.75.75 0 0 0-1.06 1.06l2 2a.75.75 0 0 0 1.06 0l3.5-3.5a.75.75 0 0 0 0-1.06Z" />
+          </svg>
+          {bundleSavingsText}
         </div>
       )}
       {bestPriceApplied && (
@@ -98,7 +111,7 @@ export function OrderSummaryPanel({
           Best price active
         </div>
       )}
-      {totalBags > 0 && (
+      {totalBags > 0 && !bundleSavingsText && (
         <div
           className={cn(
             "text-xs font-semibold",
@@ -158,6 +171,23 @@ export function OrderSummaryPanel({
         <div className="mt-2 text-xs font-semibold text-[var(--muted)]">
           Order now, ships tomorrow.
         </div>
+        {totalBags >= 5 && (
+          <Link
+            href="/subscribe"
+            className="mt-3 flex flex-col gap-1.5 rounded-xl border border-[rgba(45,122,58,0.2)] bg-[rgba(45,122,58,0.04)] px-3 py-2.5 transition hover:bg-[rgba(45,122,58,0.08)]"
+            onClick={onClose}
+          >
+            <div className="flex items-center gap-1.5 text-xs font-bold text-[#2D7A3A]">
+              <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true">
+                <path d="M8 1a7 7 0 1 1 0 14A7 7 0 0 1 8 1Zm.75 3.5a.75.75 0 0 0-1.5 0v4a.75.75 0 0 0 .37.65l2.5 1.5a.75.75 0 1 0 .76-1.3L8.75 8.15V4.5Z" />
+              </svg>
+              Subscribe &amp; save $0.50/bag
+            </div>
+            <div className="text-[10px] text-[var(--muted)]">
+              Auto-delivered on your schedule. Free shipping. Cancel anytime.
+            </div>
+          </Link>
+        )}
         <Link
           href={secondaryCta.href}
           className="mt-2 inline-flex text-xs font-semibold text-[var(--muted)] underline underline-offset-4 hover:text-[var(--text)]"

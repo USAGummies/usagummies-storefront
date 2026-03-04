@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { SubscribeForm } from "./SubscribeForm.client";
@@ -90,48 +91,62 @@ const faqJsonLd = {
 export default function SubscribePage() {
   return (
     <main className="relative overflow-hidden text-[var(--text)] min-h-screen home-candy">
-      <section className="relative overflow-hidden">
-        <div
-          className="absolute inset-0 pointer-events-none"
-          aria-hidden="true"
-          style={{
-            backgroundImage:
-              "radial-gradient(circle at 12% 18%, rgba(45,122,58,0.12), transparent 48%), radial-gradient(circle at 85% 5%, rgba(199,166,98,0.14), transparent 38%)",
-            opacity: 0.5,
-          }}
-        />
-        <div className="relative mx-auto max-w-6xl px-4 py-10">
-          <BreadcrumbJsonLd
-            items={[
-              { name: "Home", href: "/" },
-              { name: "Subscribe & Save", href: "/subscribe" },
-            ]}
-          />
+      <BreadcrumbJsonLd
+        items={[
+          { name: "Home", href: "/" },
+          { name: "Subscribe & Save", href: "/subscribe" },
+        ]}
+      />
 
-          {/* Hero */}
+      {/* Full-bleed hero image */}
+      <div className="relative w-full h-[240px] sm:h-[300px] lg:h-[340px] overflow-hidden">
+        <Image
+          src="/brand/gallery/bag-navy-hero.jpg"
+          alt="USA Gummies bag with patriotic styling"
+          fill
+          sizes="100vw"
+          className="object-cover object-center"
+          priority
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#1B2A4A]/50 to-[#1B2A4A]/80" />
+        <div className="relative z-10 flex flex-col items-center justify-center h-full text-center px-4">
+          <div className="relative w-44 h-20 mb-3">
+            <Image
+              src="/brand/logo-full.png"
+              alt="USA Gummies"
+              fill
+              sizes="176px"
+              className="object-contain drop-shadow-[0_6px_24px_rgba(0,0,0,0.5)]"
+            />
+          </div>
+          <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold uppercase tracking-wide text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.5)]">
+            Subscribe &amp; Save
+          </h1>
+          <p className="mt-2 text-sm text-white/90 max-w-md drop-shadow-[0_1px_4px_rgba(0,0,0,0.3)]">
+            Save $0.50/bag on every delivery. Free shipping, cancel anytime.
+          </p>
+          <div className="mt-3 flex flex-wrap justify-center gap-2 text-[11px] font-semibold text-white/80">
+            <span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 backdrop-blur-sm">Cancel anytime</span>
+            <span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 backdrop-blur-sm">Free shipping</span>
+            <span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 backdrop-blur-sm">Save $0.50/bag</span>
+            <span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 backdrop-blur-sm">Made in USA</span>
+          </div>
+        </div>
+      </div>
+
+      <section className="relative overflow-hidden">
+        <div className="relative mx-auto max-w-6xl px-4 py-8">
+          {/* Main content panel */}
           <div className="candy-panel rounded-[36px] border border-[var(--border)] p-6 sm:p-8">
-            <div className="text-center max-w-2xl mx-auto">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.32em] text-[var(--muted)]">
-                Subscribe &amp; save
-              </div>
-              <h1 className="mt-3 text-3xl font-black leading-[1.1] tracking-tight text-[var(--text)] sm:text-4xl lg:text-5xl">
-                Gummies Delivered on Your Schedule
-              </h1>
-              <p className="mt-4 text-sm text-[var(--muted)] sm:text-base max-w-prose mx-auto">
-                Save <strong className="text-[var(--text)]">$0.50 per bag</strong> below our
-                bundle pricing. Choose your quantity, pick your frequency, and
-                we&rsquo;ll handle the rest. Free shipping on every delivery. Cancel anytime.
-              </p>
-              <div className="mt-4 flex flex-wrap justify-center gap-2 text-[11px] font-semibold text-[var(--muted)]">
-                <span className="candy-pill">Cancel anytime</span>
-                <span className="candy-pill">Free shipping</span>
-                <span className="candy-pill">Save $0.50/bag</span>
-                <span className="candy-pill">Made in USA</span>
-              </div>
-            </div>
 
             {/* How it works */}
-            <div className="mt-8 grid gap-4 sm:grid-cols-3">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+              How it works
+            </div>
+            <h2 className="mt-2 text-2xl font-black text-[var(--text)]">
+              3 simple steps to savings.
+            </h2>
+            <div className="mt-4 grid gap-4 sm:grid-cols-3">
               {STEPS.map((step) => (
                 <div key={step.num} className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-4 text-center">
                   <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-[#2D7A3A] text-white text-sm font-bold">
@@ -141,6 +156,28 @@ export default function SubscribePage() {
                   <div className="mt-1 text-xs text-[var(--muted)]">{step.desc}</div>
                 </div>
               ))}
+            </div>
+
+            {/* Product imagery strip */}
+            <div className="mt-8 grid gap-4 sm:grid-cols-2">
+              <div className="relative aspect-[16/9] overflow-hidden rounded-2xl border border-[var(--border)]">
+                <Image
+                  src="/brand/gallery/bag-flag-bears.jpg"
+                  alt="USA Gummies bag with American flag gummy bears"
+                  fill
+                  sizes="(min-width: 640px) 50vw, 100vw"
+                  className="object-cover"
+                />
+              </div>
+              <div className="relative aspect-[16/9] overflow-hidden rounded-2xl border border-[var(--border)]">
+                <Image
+                  src="/brand/gallery/bag-dye-free.jpg"
+                  alt="USA Gummies dye-free gummy bears — no artificial colors"
+                  fill
+                  sizes="(min-width: 640px) 50vw, 100vw"
+                  className="object-cover"
+                />
+              </div>
             </div>
 
             {/* Subscription Form (client component) */}
