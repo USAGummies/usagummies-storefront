@@ -16,15 +16,20 @@ function GoogleAnalytics() {
     <>
       <Script
         src={`https://www.googletagmanager.com/gtag/js?id=${GA4_ID}`}
-        strategy="lazyOnload"
+        strategy="afterInteractive"
       />
-      <Script id="ga4-init" strategy="lazyOnload">
+      <Script id="ga4-init" strategy="afterInteractive">
         {`
           window.dataLayer = window.dataLayer || [];
           function gtag(){dataLayer.push(arguments);}
           gtag('js', new Date());
           gtag('config', '${GA4_ID}', {
             send_page_view: true,
+            linker: {
+              domains: ['usagummies.com', 'www.usagummies.com', 'usa-gummies.myshopify.com'],
+              decorate_forms: true,
+              accept_incoming: true,
+            },
           });
         `}
       </Script>
