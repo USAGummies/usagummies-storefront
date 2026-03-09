@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { spawnSync } from "node:child_process";
+import path from "node:path";
 import { auth } from "@/lib/auth/config";
 import { readState, writeState } from "@/lib/ops/state";
 import {
@@ -33,6 +35,8 @@ type ApprovalRow = {
   confidence_level: number | null;
   risk_assessment: string | null;
   affected_departments?: string[] | null;
+  proposed_payload?: unknown;
+  resolved_payload?: unknown;
 };
 
 type AgentRow = {
@@ -64,9 +68,85 @@ type CacheEnvelope<T> = {
   cachedAt: number;
 };
 
+type DeployFileChange = {
+  path: string;
+  content?: string;
+  action: "create" | "modify" | "delete";
+};
+
+type DeployPayload = {
+  kind: "code_deploy_v1";
+  files: DeployFileChange[];
+  commit_message: string;
+  description?: string;
+  requested_by?: string;
+  requested_at?: string;
+};
+
+type DeployExecutionResult = {
+  kind: "code_deploy_v1";
+  ok: boolean;
+  commitSha?: string;
+  changedFiles?: string[];
+  noChanges?: boolean;
+  error?: string;
+};
+
 function isSupabaseRelatedError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return /supabase|rest\/v1|service_role|SUPABASE/i.test(message);
+}
+
+function isDeployPayload(payload: unknown): payload is DeployPayload {
+  if (!payload || typeof payload !== "object") return false;
+  const data = payload as Record<string, unknown>;
+  if (data.kind !== "code_deploy_v1") return false;
+  if (!Array.isArray(data.files) || data.files.length === 0) return false;
+  if (typeof data.commit_message !== "string" || data.commit_message.trim().length === 0) return false;
+  return true;
+}
+
+function executeDeployPayload(payload: DeployPayload): DeployExecutionResult {
+  const scriptPath = path.join(process.cwd(), "scripts/abra-deploy.mjs");
+  const result = spawnSync("node", [scriptPath], {
+    cwd: process.cwd(),
+    encoding: "utf8",
+    input: JSON.stringify(payload),
+    timeout: 180000,
+  });
+
+  const stdout = (result.stdout || "").trim();
+  const stderr = (result.stderr || "").trim();
+
+  let parsed: unknown = null;
+  if (stdout) {
+    try {
+      parsed = JSON.parse(stdout);
+    } catch {
+      parsed = null;
+    }
+  }
+
+  if (parsed && typeof parsed === "object" && "kind" in parsed && (parsed as { kind?: unknown }).kind === "code_deploy_v1") {
+    const response = parsed as DeployExecutionResult;
+    if (response.ok) return response;
+  }
+
+  const message = [
+    result.error?.message || "",
+    stderr,
+    stdout,
+    result.status !== null ? `exit ${result.status}` : "",
+  ]
+    .filter(Boolean)
+    .join(" | ")
+    .slice(0, 500);
+
+  return {
+    kind: "code_deploy_v1",
+    ok: false,
+    error: message || "Deploy execution failed",
+  };
 }
 
 async function readApprovalsCache(maxAgeMs = APPROVALS_CACHE_TTL): Promise<(ApprovalsPayload & {
@@ -354,7 +434,7 @@ export async function POST(req: NextRequest) {
     const deciderId = await resolveDeciderUserId(session.user.email);
 
     const approvalRows = (await sbFetch(
-      `/rest/v1/approvals?select=id,requesting_agent_id,action_type,approval_trigger,summary,supporting_data,status,confidence,risk_level,affected_departments&id=eq.${approvalId}&limit=1`,
+      `/rest/v1/approvals?select=id,requesting_agent_id,action_type,approval_trigger,summary,supporting_data,status,confidence,risk_level,affected_departments,proposed_payload&id=eq.${approvalId}&limit=1`,
     )) as ApprovalRow[];
 
     const approval = approvalRows[0];
@@ -440,6 +520,22 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    let execution: DeployExecutionResult | null = null;
+    if (decision === "approved" && isDeployPayload(approval.proposed_payload)) {
+      execution = executeDeployPayload(approval.proposed_payload);
+
+      await sbFetch(`/rest/v1/approvals?id=eq.${approval.id}`, {
+        method: "PATCH",
+        headers: {
+          Prefer: "return=minimal",
+        },
+        body: JSON.stringify({
+          resolved_payload: execution,
+          updated_at: new Date().toISOString(),
+        }),
+      });
+    }
+
     await markSupabaseSuccess();
 
     return NextResponse.json({
@@ -448,6 +544,7 @@ export async function POST(req: NextRequest) {
       decision,
       decisionLogId,
       decidedAt: now,
+      execution,
     });
   } catch (error) {
     if (isSupabaseRelatedError(error)) {
