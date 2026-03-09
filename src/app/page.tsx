@@ -346,6 +346,15 @@ export default async function HomePage() {
                   <div className="atomic-buy__bundle">
                     <BagSlider variant="full" defaultQty={5} />
                   </div>
+                  <div className="mt-2 flex items-center gap-3 rounded-xl border border-[rgba(15,27,45,0.08)] bg-[var(--surface-strong)] px-3 py-2">
+                    <div className="flex-1">
+                      <div className="text-xs font-semibold text-[var(--text)]">Not ready to commit?</div>
+                      <div className="text-[10px] text-[var(--muted)]">Try a single bag for $5.99. Love&nbsp;it?&nbsp;Come&nbsp;back&nbsp;for&nbsp;the&nbsp;5&#8209;pack.</div>
+                    </div>
+                    <Link href="/go/checkout?qty=1" className="btn btn-outline pressable whitespace-nowrap px-3 py-1.5 text-xs">
+                      Try 1 bag
+                    </Link>
+                  </div>
                   <div className="mt-3">
                     <GuaranteeBadge />
                   </div>
@@ -770,6 +779,64 @@ export default async function HomePage() {
                 sizes="(max-width: 640px) 150px, 210px"
                 className="brand-touch h-auto w-full max-w-[170px] object-contain sm:max-w-[210px]"
               />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-white" data-zone="SUBSCRIBE">
+        <div className="mx-auto max-w-6xl px-4 py-4 reveal-up">
+          <div className="rounded-[28px] border border-[rgba(45,122,58,0.2)] bg-[rgba(45,122,58,0.04)] p-4 sm:p-5">
+            <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
+              <div className="space-y-2">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[#2D7A3A]">
+                  Subscribe &amp; save
+                </div>
+                <div className="text-lg font-black text-[var(--text)] sm:text-xl">
+                  Get gummies delivered on your schedule &mdash; save $0.50/bag.
+                </div>
+                <div className="text-sm text-[var(--muted)]">
+                  Subscribers save <strong className="text-[#2D7A3A]">more than bundles</strong> on every delivery.
+                  Free shipping, cancel or pause anytime. As low as <strong className="text-[#2D7A3A]">$3.80/bag</strong>.
+                </div>
+                <div className="flex flex-wrap gap-2 text-[10px] font-semibold text-[var(--muted)]">
+                  <span className="rounded-full border border-[var(--border)] px-2 py-0.5">Free shipping</span>
+                  <span className="rounded-full border border-[var(--border)] px-2 py-0.5">Cancel anytime</span>
+                  <span className="rounded-full border border-[var(--border)] px-2 py-0.5">No commitment</span>
+                </div>
+              </div>
+              <Link
+                href="/subscribe"
+                className="inline-flex items-center gap-1.5 rounded-full bg-[#2D7A3A] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#246B2F] whitespace-nowrap"
+              >
+                Start a subscription &rarr;
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-[var(--surface-strong)]" data-zone="REWARDS">
+        <div className="mx-auto max-w-6xl px-4 py-4 reveal-up">
+          <div className="rounded-[28px] border border-[#C9A44A]/20 bg-[#C9A44A]/5 p-4 sm:p-5">
+            <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-center">
+              <div className="space-y-1.5">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[#C9A44A]">
+                  Rewards program
+                </div>
+                <div className="text-base font-black text-[var(--text)] sm:text-lg">
+                  Earn free gummy bears with every order.
+                </div>
+                <div className="text-sm text-[var(--muted)]">
+                  1 point per $1 spent. <strong className="text-[#C9A44A]">100 pts = 1 free bag</strong>. Refer a friend for 50 bonus points.
+                </div>
+              </div>
+              <Link
+                href="/rewards"
+                className="inline-flex items-center gap-1.5 rounded-full bg-[#C9A44A] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#B8933A] whitespace-nowrap"
+              >
+                Learn more &rarr;
+              </Link>
             </div>
           </div>
         </div>

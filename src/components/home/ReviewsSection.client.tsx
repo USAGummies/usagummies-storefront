@@ -3,6 +3,7 @@
 import React from "react";
 import Image from "next/image";
 import { AMAZON_REVIEWS } from "@/data/amazonReviews";
+import { ReviewForm } from "@/components/social-proof/ReviewForm.client";
 
 export type ReviewSource = "legacy" | "shopify";
 
@@ -166,6 +167,7 @@ export default function ReviewsSectionClient({ reviews }: Props) {
   const ratingLine = `${amazonRating.toFixed(1)} stars from verified Amazon buyers`;
   const displayRating = Number.isFinite(amazonRating) ? amazonRating : avg || 5;
   const [modalOpen, setModalOpen] = React.useState(false);
+  const [showReviewForm, setShowReviewForm] = React.useState(false);
   const [filter, setFilter] = React.useState<ReviewSource | "all">("all");
   const [sort, setSort] = React.useState<"newest" | "helpful">("newest");
   const [query, setQuery] = React.useState("");
@@ -220,6 +222,7 @@ export default function ReviewsSectionClient({ reviews }: Props) {
   const closeModal = React.useCallback(() => {
     setModalOpen(false);
     setExpanded({});
+    setShowReviewForm(false);
     setTimeout(() => triggerRef.current?.focus(), 0);
   }, []);
 
@@ -300,6 +303,17 @@ export default function ReviewsSectionClient({ reviews }: Props) {
                 >
                   See all verified reviews
                 </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowReviewForm(true);
+                    setModalOpen(true);
+                    setTimeout(() => closeBtnRef.current?.focus(), 0);
+                  }}
+                  className="btn btn-candy pressable min-h-[40px] text-xs"
+                >
+                  Write a review
+                </button>
               </div>
               <Image
                 src="/website%20assets/Train-02.png"
@@ -361,6 +375,29 @@ export default function ReviewsSectionClient({ reviews }: Props) {
                 Close
               </button>
             </div>
+
+            {showReviewForm && (
+              <div className="mt-4 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] p-4">
+                <ReviewForm
+                  onSuccess={() => {
+                    // Keep form visible with success state
+                  }}
+                  onCancel={() => setShowReviewForm(false)}
+                />
+              </div>
+            )}
+
+            {!showReviewForm && (
+              <div className="mt-3 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowReviewForm(true)}
+                  className="rounded-full bg-[var(--candy-red)] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#D42B2D]"
+                >
+                  Write a review
+                </button>
+              </div>
+            )}
 
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
               <div className="space-y-2">

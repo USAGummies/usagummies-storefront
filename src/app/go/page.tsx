@@ -2,12 +2,15 @@ import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { AMAZON_LISTING_URL } from "@/lib/amazon";
+import { AMAZON_REVIEWS } from "@/data/amazonReviews";
 import GoTracker from "./GoTracker.client";
 
 // API route that creates a Storefront API cart and redirects to checkout
 // (bypasses the Shop Pay / shop.app redirect that the raw cart permalink triggers)
 const CHECKOUT_URL = "/go/checkout";
 const CHECKOUT_URL_1 = "/go/checkout?qty=1";
+
+const TOP_REVIEWS = AMAZON_REVIEWS.reviews.slice(0, 3);
 
 export const metadata: Metadata = {
   title: "USA Gummies 5-Pack Bundle | Free Shipping | Made in USA",
@@ -196,6 +199,14 @@ export default function GoLandingPage() {
               <br />
               <span style={{ color: "#c7362c" }}>No Junk.</span>
             </h1>
+
+            {/* Social proof stat */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 12 }}>
+              <span style={{ color: "#c7a062", fontSize: 16 }}>★★★★★</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "#1B2A4A" }}>
+                {AMAZON_REVIEWS.aggregate.rating} from {AMAZON_REVIEWS.aggregate.count.toLocaleString()}+ verified buyers
+              </span>
+            </div>
           </div>
 
           {/* Image - smaller on mobile to keep CTA visible */}
@@ -234,6 +245,22 @@ export default function GoLandingPage() {
               </span>
             </div>
           </div>
+        </div>
+
+        {/* Trust bar */}
+        <div className="lp-animate-d1" style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "12px 24px", marginTop: 20, padding: "14px 20px", background: "#ffffff", borderRadius: 12, border: "1px solid #e0dcd6" }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "#1B2A4A", display: "flex", alignItems: "center", gap: 5 }}>
+            🇺🇸 Made in the USA
+          </span>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "#1B2A4A", display: "flex", alignItems: "center", gap: 5 }}>
+            🌿 No artificial dyes
+          </span>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "#1B2A4A", display: "flex", alignItems: "center", gap: 5 }}>
+            ⭐ 4.8 stars ({AMAZON_REVIEWS.aggregate.count.toLocaleString()}+ reviews)
+          </span>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "#1B2A4A", display: "flex", alignItems: "center", gap: 5 }}>
+            🚚 Ships in 24 hours
+          </span>
         </div>
 
         {/* Inline CTA section — visible above fold on mobile */}
@@ -317,7 +344,7 @@ export default function GoLandingPage() {
               <span className="lp-display" style={{ fontSize: 24, color: "#1B2A4A" }}>$5.99</span>
             </div>
             <div style={{ fontSize: 12, color: "#5f5b56", marginTop: 4 }}>
-              + shipping · Ships direct from our facility
+              + $5.99 shipping · Ships direct from our facility
             </div>
             <a
               href={CHECKOUT_URL_1}
@@ -374,28 +401,64 @@ export default function GoLandingPage() {
         </div>
       </section>
 
-      {/* Social Proof */}
+      {/* Social Proof — Reviews */}
       <section style={{ background: "#ffffff", borderTop: "1px solid #e0dcd6", borderBottom: "1px solid #e0dcd6", padding: "36px 20px", marginTop: 32 }}>
         <div style={{ maxWidth: 800, margin: "0 auto", textAlign: "center" }}>
-          <div style={{ color: "#c7a062", fontSize: 24, letterSpacing: 2 }}>★★★★★</div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: "#1B2A4A", marginTop: 6 }}>4.8 stars from verified Amazon buyers</div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 20, marginTop: 24, textAlign: "left" }} className="sm:!grid-cols-2">
-            <div style={{ background: "#f8f5ef", padding: 20, borderRadius: 12, border: "1px solid #e0dcd6" }}>
-              <div style={{ color: "#c7a062", fontSize: 14 }}>★★★★★</div>
-              <p style={{ fontSize: 14, lineHeight: 1.55, color: "#1B2A4A", marginTop: 8, marginBottom: 8 }}>
-                &ldquo;Absolutely delicious soft gummy bears made in America. You will not be disappointed!&rdquo;
-              </p>
-              <div style={{ fontSize: 12, color: "#5f5b56", fontWeight: 600 }}>— Michael D., verified buyer</div>
-            </div>
-            <div style={{ background: "#f8f5ef", padding: 20, borderRadius: 12, border: "1px solid #e0dcd6" }}>
-              <div style={{ color: "#c7a062", fontSize: 14 }}>★★★★★</div>
-              <p style={{ fontSize: 14, lineHeight: 1.55, color: "#1B2A4A", marginTop: 8, marginBottom: 8 }}>
-                &ldquo;Gummies arrived fast. Nice stocking stuffers for my kids! Fresh and very good — will order more!&rdquo;
-              </p>
-              <div style={{ fontSize: 12, color: "#5f5b56", fontWeight: 600 }}>— Rene G., verified buyer</div>
-            </div>
+          <div className="lp-display" style={{ fontSize: 22, letterSpacing: "1px", color: "#1B2A4A" }}>
+            CUSTOMERS LOVE US
           </div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 8 }}>
+            <span style={{ color: "#c7a062", fontSize: 24, letterSpacing: 2 }}>★★★★★</span>
+            <span style={{ fontSize: 14, fontWeight: 600, color: "#1B2A4A" }}>
+              {AMAZON_REVIEWS.aggregate.rating} stars from {AMAZON_REVIEWS.aggregate.count.toLocaleString()}+ verified buyers
+            </span>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 16, marginTop: 24, textAlign: "left" }} className="sm:!grid-cols-3">
+            {TOP_REVIEWS.map((r) => (
+              <div key={r.id} style={{ background: "#f8f5ef", padding: 20, borderRadius: 12, border: "1px solid #e0dcd6" }}>
+                <div style={{ color: "#c7a062", fontSize: 14 }}>{"★".repeat(r.rating)}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#1B2A4A", marginTop: 6 }}>
+                  &ldquo;{r.title}&rdquo;
+                </div>
+                <p style={{ fontSize: 13, lineHeight: 1.55, color: "#1B2A4A", marginTop: 6, marginBottom: 8 }}>
+                  {r.body.length > 120 ? r.body.slice(0, 120) + "…" : r.body}
+                </p>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 11 }}>
+                  <span style={{ color: "#5f5b56", fontWeight: 600 }}>— {r.authorName}</span>
+                  <span style={{ color: "#2D7A3A", fontWeight: 600 }}>✓ Verified</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <a
+            href="https://www.usagummies.com/review"
+            style={{ display: "inline-block", marginTop: 16, fontSize: 13, fontWeight: 600, color: "#1B2A4A", textDecoration: "underline", textUnderlineOffset: 3 }}
+          >
+            Read all reviews →
+          </a>
+        </div>
+      </section>
+
+      {/* Why USA Gummies */}
+      <section style={{ maxWidth: 800, margin: "0 auto", padding: "32px 20px" }}>
+        <div className="lp-display" style={{ fontSize: 20, letterSpacing: "1px", color: "#1B2A4A", textAlign: "center", marginBottom: 20 }}>
+          WHY CHOOSE USA GUMMIES?
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }} className="sm:!grid-cols-4">
+          {[
+            { icon: "🇺🇸", title: "Made in USA", desc: "FDA-registered facilities" },
+            { icon: "🌿", title: "No Artificial Dyes", desc: "All natural colors" },
+            { icon: "🍬", title: "5 Classic Flavors", desc: "Cherry, Lemon, Apple, Orange, Watermelon" },
+            { icon: "💯", title: "Money-Back Guarantee", desc: "Love them or full refund" },
+          ].map((item) => (
+            <div key={item.title} style={{ background: "#ffffff", border: "1px solid #e0dcd6", borderRadius: 12, padding: "16px 12px", textAlign: "center" }}>
+              <div style={{ fontSize: 28 }}>{item.icon}</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#1B2A4A", marginTop: 6 }}>{item.title}</div>
+              <div style={{ fontSize: 11, color: "#5f5b56", marginTop: 2 }}>{item.desc}</div>
+            </div>
+          ))}
         </div>
       </section>
 

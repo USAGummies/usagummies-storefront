@@ -280,15 +280,24 @@ export default function ExitIntentPopup() {
                 id="exit-popup-title"
                 className="text-xl font-black text-[var(--text,#1B2A4A)] sm:text-2xl"
               >
-                Wait&mdash;don&rsquo;t leave empty-handed!
+                Join 1,200+ Gummy Lovers
               </h2>
               <p className="mt-2 text-sm text-[var(--muted,#5f5b56)]">
-                Join the Gummy Revolution and get <strong className="text-[var(--text,#1B2A4A)]">exclusive deals, early access to new flavors</strong>, and member-only savings.
+                Get <strong className="text-[var(--text,#1B2A4A)]">new flavor drops, recipes, and Made in USA stories</strong> delivered to your inbox. No spam, ever.
               </p>
 
-              {/* Value props */}
-              <div className="mt-4 flex flex-wrap justify-center gap-2">
-                {["Early access", "Member savings", "No spam"].map((tag) => (
+              {/* Mini review quote */}
+              <div className="mt-3 rounded-xl bg-white/80 border border-[rgba(15,27,45,0.08)] px-4 py-2.5 text-left">
+                <div className="text-[#c7a062] text-xs">★★★★★</div>
+                <p className="text-xs text-[var(--text,#1B2A4A)] mt-1 italic">
+                  &ldquo;Best gummy bears I&rsquo;ve ever had. No artificial dyes and you can taste the difference.&rdquo;
+                </p>
+                <p className="text-[10px] text-[var(--muted)] mt-1">— Jennifer M., verified buyer</p>
+              </div>
+
+              {/* Trust pills */}
+              <div className="mt-3 flex flex-wrap justify-center gap-2">
+                {["Made in USA", "No Artificial Dyes", "Free Shipping on 5+"].map((tag) => (
                   <span
                     key={tag}
                     className="inline-flex items-center gap-1 rounded-full border border-[rgba(15,27,45,0.1)] bg-white px-3 py-1 text-[11px] font-semibold text-[var(--text,#1B2A4A)]"

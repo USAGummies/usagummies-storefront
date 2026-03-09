@@ -2,7 +2,7 @@
 "use client";
 
 import { cn } from "@/lib/cn";
-import { FREE_SHIP_QTY } from "@/lib/bundles/pricing";
+import { FREE_SHIP_QTY, SHIPPING_COST } from "@/lib/bundles/pricing";
 
 export type ShippingProgressBarProps = {
   totalBags: number;
@@ -34,7 +34,7 @@ export function ShippingProgressBar({
         <span className={unlocked ? "text-[#2D7A3A]" : "text-[var(--text)]"}>
           {unlocked
             ? "\u2713 Free shipping unlocked!"
-            : `Add ${freeShipGap} more bag${freeShipGap === 1 ? "" : "s"} for FREE shipping`}
+            : `Add ${freeShipGap} more bag${freeShipGap === 1 ? "" : "s"} to save $${SHIPPING_COST.toFixed(2)} on shipping`}
         </span>
         <span className="text-[var(--muted)]">
           {totalBags}/{freeShipQty} bags

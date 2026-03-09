@@ -20,10 +20,6 @@ const CartDrawer = dynamic(
   () => import("@/components/layout/CartDrawer.client").then((mod) => mod.CartDrawer),
   { ssr: false }
 );
-const ChatWidget = dynamic(
-  () => import("@/components/support/ChatWidget.client").then((mod) => mod.ChatWidget),
-  { ssr: false }
-);
 const ExitIntentPopup = dynamic(
   () => import("@/components/engagement/ExitIntentPopup.client"),
   { ssr: false }
@@ -124,14 +120,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [undoInfo, setUndoInfo] = useState<{ qty: number; at: number } | null>(null);
   const [undoPending, setUndoPending] = useState(false);
   const [hideHomeHeader, setHideHomeHeader] = useState(false);
-  const [chatReady, setChatReady] = useState(false);
   const pathname = usePathname();
   const isHome = pathname === "/";
   const isShop = pathname === "/shop";
   const isProduct = pathname?.startsWith("/products");
   const isLandingPage = pathname?.startsWith("/go");
-  const hideChatWidget = pathname === "/wholesale" || pathname === "/contact";
-  const showChatWidget = !hideChatWidget && chatReady;
   const experienceVariant = isHome || isShop || isProduct ? "full" : "compact";
   const showExperienceBand = isHome || isShop;
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -143,30 +136,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const markAmazonFired = () => {
     amazonPrefireRef.current = Date.now();
   };
-
-  useEffect(() => {
-    if (hideChatWidget) return;
-    if (typeof window === "undefined") return;
-    let timeoutId: number | null = null;
-    const idleCallback = (
-      window as typeof window & {
-        requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
-      }
-    ).requestIdleCallback;
-    const cancelIdleCallback = (
-      window as typeof window & { cancelIdleCallback?: (id: number) => void }
-    ).cancelIdleCallback;
-
-    if (idleCallback) {
-      const idleId = idleCallback(() => setChatReady(true), { timeout: 2000 });
-      return () => cancelIdleCallback?.(idleId);
-    }
-
-    timeoutId = window.setTimeout(() => setChatReady(true), 1500);
-    return () => {
-      if (timeoutId !== null) window.clearTimeout(timeoutId);
-    };
-  }, [hideChatWidget]);
 
   async function refreshCartCount() {
     try {
@@ -786,7 +755,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </footer>
-      {showChatWidget ? <ChatWidget /> : null}
       <ExitIntentPopup />
       <ScrollPopup />
     </div>

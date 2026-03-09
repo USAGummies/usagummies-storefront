@@ -1,8 +1,8 @@
 /**
  * Notion User Adapter — queries the "Platform Users" database for authentication.
  *
- * Enterprise-grade: retries on transient failures + hardcoded admin fallback
- * so login never depends on a single external API call.
+ * Enterprise-grade: retries on transient failures + optional env-based
+ * break-glass fallback so login never depends on a single external API call.
  *
  * Database ID: f1f7500b35d34908addeba4b94b21c6e
  */
@@ -31,21 +31,27 @@ export type PlatformUser = {
   active: boolean;
 };
 
-// ---------------------------------------------------------------------------
-// Hardcoded admin fallback — login works even when Notion is down / rate-limited
-// The hash is generated from the admin password via bcrypt (cost 12).
-// To rotate: `node -e "require('bcryptjs').hash('NEW_PW',12).then(console.log)"`
-// ---------------------------------------------------------------------------
-const ADMIN_FALLBACK: PlatformUser = {
-  id: "local-admin",
-  name: "Benjamin Stutman",
-  email: "ben@usagummies.com",
-  role: "admin",
-  // bcrypt hash of "Slaterson1!"
-  passwordHash:
-    "$2b$12$1acXOlXv2fCkw5yXC5AWtOsUD3y8jNTaa5hETXWCdSvrN4M.U7x.S",
-  active: true,
-};
+const BREAK_GLASS_ADMIN_EMAIL = (process.env.BREAK_GLASS_ADMIN_EMAIL || "").trim().toLowerCase();
+const BREAK_GLASS_ADMIN_PASSWORD_HASH = (process.env.BREAK_GLASS_ADMIN_PASSWORD_HASH || "").trim();
+const BREAK_GLASS_ADMIN_NAME = (process.env.BREAK_GLASS_ADMIN_NAME || "Break-Glass Admin").trim();
+const BREAK_GLASS_ADMIN_ROLE = (process.env.BREAK_GLASS_ADMIN_ROLE || "admin").trim().toLowerCase() as UserRole;
+
+function getBreakGlassAdmin(): PlatformUser | null {
+  if (!BREAK_GLASS_ADMIN_EMAIL || !BREAK_GLASS_ADMIN_PASSWORD_HASH) {
+    return null;
+  }
+  const role: UserRole = ["admin", "employee"].includes(BREAK_GLASS_ADMIN_ROLE)
+    ? BREAK_GLASS_ADMIN_ROLE
+    : "admin";
+  return {
+    id: "break-glass-admin",
+    name: BREAK_GLASS_ADMIN_NAME || "Break-Glass Admin",
+    email: BREAK_GLASS_ADMIN_EMAIL,
+    role,
+    passwordHash: BREAK_GLASS_ADMIN_PASSWORD_HASH,
+    active: true,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -122,6 +128,7 @@ export async function findUserByEmail(
   email: string,
 ): Promise<PlatformUser | null> {
   const normalizedEmail = email.toLowerCase().trim();
+  const breakGlassAdmin = getBreakGlassAdmin();
 
   // --- Try Notion first (with retries) ---
   if (NOTION_API_KEY) {
@@ -165,21 +172,21 @@ export async function findUserByEmail(
         }
         // User not found in Notion — don't fall through to fallback
         // (only fall through on Notion failure)
-        if (normalizedEmail !== ADMIN_FALLBACK.email) return null;
+        if (normalizedEmail !== breakGlassAdmin?.email) return null;
       }
       // If res not ok after retries, fall through to admin fallback
-      console.warn("[notion-user-adapter] Notion unavailable after retries, checking admin fallback");
+      console.warn("[notion-user-adapter] Notion unavailable after retries, checking break-glass fallback");
     } catch (err) {
-      console.warn("[notion-user-adapter] Notion query failed, checking admin fallback:", err);
+      console.warn("[notion-user-adapter] Notion query failed, checking break-glass fallback:", err);
     }
   } else {
-    console.warn("[notion-user-adapter] NOTION_API_KEY not set, using admin fallback only");
+    console.warn("[notion-user-adapter] NOTION_API_KEY not set, using break-glass fallback only");
   }
 
-  // --- Admin fallback — always available ---
-  if (normalizedEmail === ADMIN_FALLBACK.email) {
-    console.log("[notion-user-adapter] Using admin fallback credentials");
-    return { ...ADMIN_FALLBACK };
+  // --- Break-glass fallback (env configured) ---
+  if (breakGlassAdmin && normalizedEmail === breakGlassAdmin.email) {
+    console.log("[notion-user-adapter] Using break-glass fallback credentials");
+    return { ...breakGlassAdmin };
   }
 
   return null;
@@ -197,8 +204,8 @@ export async function verifyPassword(
 }
 
 export async function updateLastLogin(userId: string): Promise<void> {
-  // Skip for local fallback user
-  if (!NOTION_API_KEY || userId === "local-admin") return;
+  // Skip for break-glass fallback user
+  if (!NOTION_API_KEY || userId === "break-glass-admin") return;
 
   const now = new Date().toISOString().split("T")[0];
   try {

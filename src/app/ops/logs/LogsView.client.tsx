@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useLogsData } from "@/lib/ops/use-war-room-data";
 
 const ENGINE_OPTIONS = [
@@ -45,6 +45,28 @@ export function LogsView() {
   const [engine, setEngine] = useState("");
   const [tab, setTab] = useState<"runs" | "raw">("runs");
   const { data, loading, error, refresh } = useLogsData(engine, 200);
+  const [brain, setBrain] = useState<{ insights: string[]; sources: { title: string; source_table: string }[] } | null>(null);
+  const [brainLoading, setBrainLoading] = useState(false);
+  const [brainError, setBrainError] = useState<string | null>(null);
+
+  const fetchBrainInsights = useCallback(async () => {
+    setBrainLoading(true);
+    setBrainError(null);
+    try {
+      const res = await fetch("/api/ops/abra/insights", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic: "agent execution logs failures errors system health automation runs" }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "Failed to fetch insights");
+      setBrain(d);
+    } catch (err) {
+      setBrainError(err instanceof Error ? err.message : "Brain query failed");
+    } finally {
+      setBrainLoading(false);
+    }
+  }, []);
 
   return (
     <div>
@@ -58,23 +80,70 @@ export function LogsView() {
             {data?.generatedAt ? ` · Updated ${new Date(data.generatedAt).toLocaleTimeString()}` : ""}
           </p>
         </div>
-        <button
-          onClick={refresh}
-          disabled={loading}
-          style={{
-            border: "1px solid rgba(255,255,255,0.12)",
-            background: "rgba(255,255,255,0.04)",
-            color: "rgba(255,255,255,0.85)",
-            borderRadius: 8,
-            padding: "8px 12px",
-            fontSize: 12,
-            cursor: loading ? "wait" : "pointer",
-            fontFamily: "inherit",
-          }}
-        >
-          {loading ? "Refreshing..." : "Refresh"}
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button
+            onClick={() => void fetchBrainInsights()}
+            disabled={brainLoading}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 6,
+              border: `1px solid ${brain ? "rgba(199,160,98,0.4)" : "rgba(255,255,255,0.12)"}`,
+              borderRadius: 8, background: brain ? "rgba(199,160,98,0.08)" : "rgba(255,255,255,0.04)",
+              color: "rgba(255,255,255,0.85)", padding: "8px 12px", fontSize: 12, fontWeight: 700,
+              cursor: brainLoading ? "wait" : "pointer", fontFamily: "inherit",
+            }}
+          >
+            {brainLoading ? "Thinking..." : brain ? "Refresh Intel" : "🧠 Intel"}
+          </button>
+          <button
+            onClick={refresh}
+            disabled={loading}
+            style={{
+              border: "1px solid rgba(255,255,255,0.12)",
+              background: "rgba(255,255,255,0.04)",
+              color: "rgba(255,255,255,0.85)",
+              borderRadius: 8,
+              padding: "8px 12px",
+              fontSize: 12,
+              cursor: loading ? "wait" : "pointer",
+              fontFamily: "inherit",
+            }}
+          >
+            {loading ? "Refreshing..." : "Refresh"}
+          </button>
+        </div>
       </div>
+
+      {brainError && (
+        <div style={{ background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.2)", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#ef4444" }}>
+          🧠 Brain: {brainError}
+        </div>
+      )}
+      {brain && brain.insights.length > 0 && (
+        <div style={{ background: "rgba(199,160,98,0.06)", border: "1px solid rgba(199,160,98,0.2)", borderRadius: 12, padding: "14px 16px", marginBottom: 24 }}>
+          <div style={{ fontWeight: 700, color: "#fff", marginBottom: 10, fontSize: 14 }}>
+            🧠 System Intelligence
+          </div>
+          <ul style={{ margin: 0, padding: "0 0 0 18px", listStyle: "disc" }}>
+            {brain.insights.map((insight, i) => (
+              <li key={i} style={{ fontSize: 13, color: "rgba(255,255,255,0.75)", lineHeight: 1.6, marginBottom: 4 }}>{insight}</li>
+            ))}
+          </ul>
+          {brain.sources.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
+              {brain.sources.map((s, i) => (
+                <span key={i} style={{
+                  display: "inline-flex", alignItems: "center", gap: 4,
+                  background: s.source_table === "email" ? "rgba(255,255,255,0.06)" : "rgba(199,160,98,0.1)",
+                  border: `1px solid ${s.source_table === "email" ? "rgba(255,255,255,0.1)" : "rgba(199,160,98,0.2)"}`,
+                  borderRadius: 6, padding: "3px 8px", fontSize: 11, color: "rgba(255,255,255,0.6)", fontWeight: 600,
+                }}>
+                  {s.source_table === "email" ? "📧" : "🧠"} {s.title}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {error && (
         <div style={{ background: "rgba(220,38,38,0.1)", border: "1px solid rgba(220,38,38,0.2)", borderRadius: 8, padding: "12px 16px", marginBottom: 24, color: "#ef4444", fontSize: 13 }}>

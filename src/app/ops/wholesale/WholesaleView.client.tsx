@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 type Variant = {
   id: string;
@@ -40,6 +40,28 @@ export function WholesaleView() {
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [orderResult, setOrderResult] = useState<{ name?: string; total?: string; invoiceUrl?: string } | null>(null);
+  const [brain, setBrain] = useState<{ insights: string[]; sources: { title: string; source_table: string }[] } | null>(null);
+  const [brainLoading, setBrainLoading] = useState(false);
+  const [brainError, setBrainError] = useState<string | null>(null);
+
+  const fetchBrainInsights = useCallback(async () => {
+    setBrainLoading(true);
+    setBrainError(null);
+    try {
+      const res = await fetch("/api/ops/abra/insights", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic: "wholesale B2B distributors bulk orders pricing wholesale accounts" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to fetch insights");
+      setBrain(data);
+    } catch (err) {
+      setBrainError(err instanceof Error ? err.message : "Brain query failed");
+    } finally {
+      setBrainLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     async function load() {
@@ -123,14 +145,63 @@ export function WholesaleView() {
 
   return (
     <div>
-      <div style={{ marginBottom: 32 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 700, fontFamily: "var(--font-display)", margin: 0, marginBottom: 8 }}>
-          Wholesale Orders
-        </h1>
-        <p style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>
-          Create Shopify draft orders for wholesale and B2B customers.
-        </p>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 32 }}>
+        <div>
+          <h1 style={{ fontSize: 26, fontWeight: 700, fontFamily: "var(--font-display)", margin: 0, marginBottom: 8 }}>
+            Wholesale Orders
+          </h1>
+          <p style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", margin: 0 }}>
+            Create Shopify draft orders for wholesale and B2B customers.
+          </p>
+        </div>
+        <button
+          onClick={() => void fetchBrainInsights()}
+          disabled={brainLoading}
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 6,
+            border: `1px solid ${brain ? "rgba(199,160,98,0.4)" : "rgba(255,255,255,0.1)"}`,
+            borderRadius: 10,
+            background: brain ? "rgba(199,160,98,0.08)" : "#1a1d27",
+            color: "#fff", padding: "8px 12px", fontSize: 12, fontWeight: 700,
+            cursor: brainLoading ? "default" : "pointer",
+            opacity: brainLoading ? 0.7 : 1, fontFamily: "inherit",
+          }}
+        >
+          {brainLoading ? "Thinking..." : brain ? "Refresh Intel" : "🧠 Intel"}
+        </button>
       </div>
+
+      {brainError && (
+        <div style={{ background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.2)", borderRadius: 10, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#ef4444" }}>
+          🧠 Brain: {brainError}
+        </div>
+      )}
+      {brain && brain.insights.length > 0 && (
+        <div style={{ background: "rgba(199,160,98,0.06)", border: "1px solid rgba(199,160,98,0.2)", borderRadius: 12, padding: "14px 16px", marginBottom: 24 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700, color: "#fff", marginBottom: 10, fontSize: 14 }}>
+            🧠 Distributor Intelligence
+          </div>
+          <ul style={{ margin: 0, padding: "0 0 0 18px", listStyle: "disc" }}>
+            {brain.insights.map((insight, i) => (
+              <li key={i} style={{ fontSize: 13, color: "rgba(255,255,255,0.75)", lineHeight: 1.6, marginBottom: 4 }}>{insight}</li>
+            ))}
+          </ul>
+          {brain.sources.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
+              {brain.sources.map((s, i) => (
+                <span key={i} style={{
+                  display: "inline-flex", alignItems: "center", gap: 4,
+                  background: s.source_table === "email" ? "rgba(255,255,255,0.06)" : "rgba(199,160,98,0.1)",
+                  border: `1px solid ${s.source_table === "email" ? "rgba(255,255,255,0.1)" : "rgba(199,160,98,0.2)"}`,
+                  borderRadius: 6, padding: "3px 8px", fontSize: 11, color: "rgba(255,255,255,0.6)", fontWeight: 600,
+                }}>
+                  {s.source_table === "email" ? "📧" : "🧠"} {s.title}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {error && (
         <div style={{ background: "rgba(220,38,38,0.1)", border: "1px solid rgba(220,38,38,0.2)", borderRadius: 8, padding: "12px 16px", marginBottom: 24, color: "#ef4444", fontSize: 13 }}>

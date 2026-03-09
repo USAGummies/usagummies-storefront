@@ -21,12 +21,18 @@ import type { PlaidAccount, PlaidTransaction } from "./types";
 
 const PLAID_CLIENT_ID = () => process.env.PLAID_CLIENT_ID || "";
 const PLAID_SECRET = () => process.env.PLAID_SECRET || "";
-const PLAID_ENV = () => (process.env.PLAID_ENV || "sandbox") as "sandbox" | "production";
+const PLAID_ENV = () => (process.env.PLAID_ENV || "sandbox") as "sandbox" | "development" | "production";
 
 function plaidBaseUrl(): string {
   const env = PLAID_ENV();
   if (env === "production") return "https://production.plaid.com";
+  if (env === "development") return "https://development.plaid.com";
   return "https://sandbox.plaid.com";
+}
+
+/** Return the Plaid env string (needed by Plaid Link on the frontend) */
+export function getPlaidEnv(): "sandbox" | "development" | "production" {
+  return PLAID_ENV();
 }
 
 export function isPlaidConfigured(): boolean {

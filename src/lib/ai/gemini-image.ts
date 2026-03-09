@@ -1,15 +1,17 @@
 import "server-only";
 
 /**
- * Gemini Nano Banana 2 — Image Generation via Google AI API
+ * Gemini Image Generation via Google AI API
  *
- * Model: gemini-3.1-flash-image-preview (Nano Banana 2)
- * Docs:  https://ai.google.dev/gemini-api/docs/image-generation
+ * Default model: gemini-2.5-flash-image (production)
+ * Nano Banana 2:  gemini-3.1-flash-image-preview (pass as model override)
+ * Pro variant:    nano-banana-pro-preview
+ * Docs:           https://ai.google.dev/gemini-api/docs/image-generation
  *
- * Returns base64 PNG image data from a text prompt.
+ * Supports text-to-image and image-to-image (with reference) generation.
  */
 
-const MODEL = "gemini-2.0-flash-exp";
+const MODEL = "gemini-2.5-flash-image";
 
 function geminiApiKey(): string {
   return (
@@ -55,7 +57,7 @@ export type GeneratedImage = {
 export async function generateImage(
   prompt: string,
   options?: {
-    /** Override model (default: gemini-2.0-flash-exp) */
+    /** Override model (default: gemini-2.5-flash-image) */
     model?: string;
     /** Timeout in ms (default: 60000) */
     timeoutMs?: number;
@@ -147,35 +149,151 @@ export async function generateImage(
  *
  * Wraps generateImage with brand-specific prompt engineering.
  */
+/**
+ * Generate an image using a reference/source image for style consistency.
+ *
+ * Sends the reference image as an inlineData part alongside the text prompt,
+ * enabling the model to produce style-consistent output.
+ */
+export async function generateImageWithReference(
+  prompt: string,
+  referenceImageBase64: string,
+  mimeType: string = "image/png",
+  options?: {
+    model?: string;
+    timeoutMs?: number;
+  },
+): Promise<GeneratedImage> {
+  const key = geminiApiKey();
+  if (!key) {
+    throw new Error(
+      "Gemini API key not configured. Set GEMINI_API_KEY or GOOGLE_AI_API_KEY.",
+    );
+  }
+
+  const model = options?.model || MODEL;
+  const timeoutMs = options?.timeoutMs || 90_000;
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              { inlineData: { mimeType, data: referenceImageBase64 } },
+              { text: prompt },
+            ],
+          },
+        ],
+        generationConfig: {
+          responseModalities: ["TEXT", "IMAGE"],
+        },
+      }),
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(
+        `Gemini API failed (${res.status}): ${text.slice(0, 300)}`,
+      );
+    }
+
+    const json = (await res.json()) as GeminiResponse;
+
+    if (json.error) {
+      throw new Error(
+        `Gemini error: ${json.error.message || JSON.stringify(json.error)}`,
+      );
+    }
+
+    const parts = json.candidates?.[0]?.content?.parts || [];
+    let imageData: GeneratedImage | null = null;
+    let textContent = "";
+
+    for (const part of parts) {
+      if ("inlineData" in part && part.inlineData?.data) {
+        imageData = {
+          base64: part.inlineData.data,
+          mimeType: part.inlineData.mimeType || "image/png",
+        };
+      }
+      if ("text" in part && part.text) {
+        textContent += part.text;
+      }
+    }
+
+    if (!imageData) {
+      throw new Error(
+        "Gemini response contained no image data. " +
+          `Finish reason: ${json.candidates?.[0]?.finishReason || "unknown"}. ` +
+          (textContent ? `Model said: ${textContent.slice(0, 200)}` : ""),
+      );
+    }
+
+    if (textContent) {
+      imageData.text = textContent.trim();
+    }
+
+    return imageData;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export type MarketingStyle =
+  | "product-hero"
+  | "lifestyle"
+  | "patriotic"
+  | "health-wellness"
+  | "social-post"
+  | "amazon-listing"
+  | "infographic";
+
+/**
+ * Generate a social media image for USA Gummies marketing.
+ *
+ * Wraps generateImage with brand-specific prompt engineering.
+ */
 export async function generateMarketingImage(
   topic: string,
-  style:
-    | "product-hero"
-    | "lifestyle"
-    | "patriotic"
-    | "health-wellness"
-    | "social-post" = "social-post",
+  style: MarketingStyle = "social-post",
 ): Promise<GeneratedImage> {
   const styleGuides: Record<string, string> = {
     "product-hero":
       "Professional product photography style. White or light background. " +
-      "Show gummy vitamins in a clean, appetizing way. Bright, well-lit, commercial quality.",
+      "Show colorful gummy bears in a clean, appetizing way. Bright, well-lit, commercial quality.",
     lifestyle:
       "Lifestyle photography. Active, healthy American family or individual. " +
       "Natural lighting, warm tones. Outdoors or modern kitchen setting.",
     patriotic:
       "Patriotic American theme. Red, white, and blue color palette. " +
-      "Stars, stripes, or American landscapes. Uplifting and proud tone.",
+      "Stars, stripes, or American landscapes. Uplifting and proud tone. America 250 celebration energy.",
     "health-wellness":
       "Health and wellness theme. Clean, fresh, natural ingredients visible. " +
-      "Green and gold tones. Vitamins, fruit, nature imagery.",
+      "Green and gold tones. Fruit, nature imagery. No artificial dyes, dye-free messaging.",
     "social-post":
       "Eye-catching social media graphic. Bold colors, modern design. " +
       "Text-friendly composition with open space for overlay text. Square format.",
+    "amazon-listing":
+      "Amazon product listing photography. Pure white (#FFFFFF) background. " +
+      "Product fills 85% of frame. Studio lighting, no shadows. " +
+      "Clean, commercial, high-resolution product photography.",
+    infographic:
+      "Clean infographic style. Modern flat design, organized layout. " +
+      "Visual comparison or ingredient callout format. " +
+      "White background with accent colors. Data visualization aesthetic.",
   };
 
   const fullPrompt =
-    `Create a high-quality marketing image for USA Gummies, an American-made gummy vitamin brand. ` +
+    `Create a high-quality marketing image for USA Gummies, an American-made gummy bear candy brand. ` +
     `Topic: ${topic}. ` +
     `Style: ${styleGuides[style] || styleGuides["social-post"]}. ` +
     `The image should be vibrant, professional, and suitable for social media posting. ` +

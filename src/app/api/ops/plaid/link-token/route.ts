@@ -5,7 +5,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { createLinkToken, isPlaidConfigured } from "@/lib/finance/plaid";
+import { createLinkToken, isPlaidConfigured, getPlaidEnv } from "@/lib/finance/plaid";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,7 +20,7 @@ export async function POST() {
 
   try {
     const linkToken = await createLinkToken();
-    return NextResponse.json({ linkToken });
+    return NextResponse.json({ linkToken, env: getPlaidEnv() });
   } catch (err) {
     console.error("[plaid] Link token creation failed:", err);
     return NextResponse.json(

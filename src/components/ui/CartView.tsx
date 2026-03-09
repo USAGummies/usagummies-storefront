@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { cn } from "@/lib/cn";
-import { pricingForQty, BASE_PRICE, FREE_SHIP_QTY, MIN_PER_BAG } from "@/lib/bundles/pricing";
+import { pricingForQty, BASE_PRICE, FREE_SHIP_QTY, MIN_PER_BAG, SHIPPING_COST, shippingForQty } from "@/lib/bundles/pricing";
 import { SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
 import { trackEvent } from "@/lib/analytics";
 import { getSafeCheckoutUrl, normalizeCheckoutUrl } from "@/lib/checkout";
@@ -231,9 +231,13 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
   const freeShipLine = unlocked
     ? "Free shipping unlocked."
     : `Add ${freeShipGap} more bag${freeShipGap === 1 ? "" : "s"} for free shipping.`;
-  const shippingSummary = unlocked ? "Free" : "Calculated at checkout";
-  const shippingHint = unlocked ? "Free shipping unlocked" : `Free at ${FREE_SHIP_QTY}+ bags`;
-  const estimatedTotal = subtotal;
+  const shippingCost = shippingForQty(totalBags);
+  const shippingSummary = unlocked ? "Free" : `$${SHIPPING_COST.toFixed(2)}`;
+  const shippingHint = unlocked
+    ? "Free shipping unlocked"
+    : `Add ${freeShipGap} bag${freeShipGap === 1 ? "" : "s"} to save $${SHIPPING_COST.toFixed(2)} on shipping`;
+  const subtotalNum = Number(subtotal?.replace?.(/[^0-9.]/g, "") || 0);
+  const estimatedTotal = formatNumber(subtotalNum + shippingCost, summaryCurrency);
 
   let cartHeadline = "";
   if (totalBags < 5) {
@@ -403,6 +407,9 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
     : totalBags > 0
       ? "Bundle pricing applies at 5+ bags."
       : "";
+  const bundleSavingsText = bundleSavings > 0
+    ? `You're saving ${formatNumber(bundleSavings, summaryCurrency)} with your bundle`
+    : "";
   const showRegularLine = hasSavings && Boolean(regularPerBagText && regularTotalText);
   const nextTierDescriptor =
     nextMilestone.qty === 5
@@ -1299,6 +1306,8 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                 hasSavings={hasSavings}
                 showRegularLine={showRegularLine}
                 regularTotalText={regularTotalText}
+                regularPerBagText={regularPerBagText}
+                bundleSavingsText={bundleSavingsText}
                 drawerSavingsLine={drawerSavingsLine}
                 highlightTotals={highlightTotals}
                 showNextTierCta={showNextTierCta}

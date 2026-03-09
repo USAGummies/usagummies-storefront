@@ -75,6 +75,7 @@ type Payload = {
   };
   cron: {
     installed: boolean;
+    unknown?: boolean;
     lines: string[];
   };
   agents: AgentRow[];
@@ -150,6 +151,7 @@ type Payload = {
     checks: Array<{
       key: string;
       label: string;
+      status: "pass" | "fail" | "unknown";
       ok: boolean;
       details: string;
     }>;
@@ -194,6 +196,14 @@ type Payload = {
     commandCenterPidFile?: string;
     commandCenterLogFile?: string;
   };
+  freshness: Array<{
+    key: string;
+    label: string;
+    state: "fresh" | "stale" | "unknown";
+    ageMinutes: number | null;
+    staleAfterMinutes: number;
+    details: string;
+  }>;
 };
 
 function badgeClass(level: string) {
@@ -220,6 +230,12 @@ function systemBadgeClass(level: string) {
   if (level === "running") return `${styles.badge} ${styles.badgeHealthy}`;
   if (level === "degraded") return `${styles.badge} ${styles.badgeWarning}`;
   return `${styles.badge} ${styles.badgeCritical}`;
+}
+
+function freshnessBadgeClass(level: "fresh" | "stale" | "unknown") {
+  if (level === "fresh") return `${styles.badge} ${styles.badgeHealthy}`;
+  if (level === "stale") return `${styles.badge} ${styles.badgeCritical}`;
+  return `${styles.badge} ${styles.badgeUnknown}`;
 }
 
 function formatSchedule(agent: AgentRow) {
@@ -607,15 +623,14 @@ export default function AgenticCommandCenter() {
             <span className={systemBadgeClass(data?.systemStatus?.level || "error")}>
               {data?.systemStatus?.label || "LOADING"}
             </span>
-            {"\n"}A system is considered RUNNING only when dashboard, scheduler, self-heal freshness, and recent
-            agent activity checks are all passing.
+            {"\n"}A system is RUNNING only when critical checks pass. Unknown verification states degrade to DEGRADED.
           </p>
           <div className={styles.tableWrap}>
             <table className={styles.table}>
               <thead>
                 <tr>
                   <th>Check</th>
-                  <th>Pass</th>
+                  <th>Status</th>
                   <th>Details</th>
                 </tr>
               </thead>
@@ -624,11 +639,49 @@ export default function AgenticCommandCenter() {
                   <tr key={check.key}>
                     <td>{check.label}</td>
                     <td>
-                      <span className={check.ok ? `${styles.badge} ${styles.badgeHealthy}` : `${styles.badge} ${styles.badgeCritical}`}>
-                        {check.ok ? "PASS" : "FAIL"}
+                      <span className={
+                        check.status === "pass"
+                          ? `${styles.badge} ${styles.badgeHealthy}`
+                          : check.status === "fail"
+                            ? `${styles.badge} ${styles.badgeCritical}`
+                            : `${styles.badge} ${styles.badgeUnknown}`
+                      }>
+                        {check.status.toUpperCase()}
                       </span>
                     </td>
                     <td>{check.details}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section className={styles.panel}>
+          <h2 className={styles.panelTitle}>Freshness SLA</h2>
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>Panel</th>
+                  <th>State</th>
+                  <th>Age (min)</th>
+                  <th>SLA (min)</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(data?.freshness || []).map((item) => (
+                  <tr key={item.key}>
+                    <td>{item.label}</td>
+                    <td>
+                      <span className={freshnessBadgeClass(item.state)}>
+                        {item.state.toUpperCase()}
+                      </span>
+                    </td>
+                    <td>{item.ageMinutes ?? "n/a"}</td>
+                    <td>{item.staleAfterMinutes}</td>
+                    <td>{item.details}</td>
                   </tr>
                 ))}
               </tbody>
@@ -916,7 +969,9 @@ export default function AgenticCommandCenter() {
               <pre className={styles.mono}>
                 {data?.cron.installed
                   ? data.cron.lines.join("\n")
-                  : "USA_GUMMIES_AGENTIC cron block not found"}
+                  : data?.cron?.unknown
+                    ? "Cloud runtime: scheduler is managed outside local cron block"
+                    : "USA_GUMMIES_AGENTIC cron block not found"}
               </pre>
             </div>
           </section>

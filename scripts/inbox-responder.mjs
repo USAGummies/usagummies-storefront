@@ -23,6 +23,7 @@
  * Usage:
  *   node scripts/inbox-responder.mjs              # Process inbox (no live sends)
  *   node scripts/inbox-responder.mjs --dry-run     # Preview without sending
+ *   node scripts/inbox-responder.mjs --faire-only  # Only process Faire notifications
  *   INBOX_RESPONDER_SEND_ENABLED=true node scripts/inbox-responder.mjs --allow-send
  *   node scripts/inbox-responder.mjs --status      # Show reply log
  */
@@ -509,8 +510,12 @@ function extractEmail(from, body) {
 }
 
 // ── Main processing ─────────────────────────────────────────────────
-async function processInbox(dryRun = false) {
+async function processInbox(dryRun = false, options = {}) {
+  const faireOnly = Boolean(options.faireOnly);
   log("📬 Scanning inbox...");
+  if (faireOnly) {
+    log("🎯 Faire-only mode enabled (processing FAIRE_* categories only).");
+  }
   if (!dryRun && !INBOX_RESPONDER_SEND_ENABLED) {
     log("⛔ Inbox responder live send is disabled (requires --allow-send and INBOX_RESPONDER_SEND_ENABLED=true).");
   }
@@ -519,6 +524,7 @@ async function processInbox(dryRun = false) {
   let replied = 0;
   let skipped = 0;
   let newProcessed = 0;
+  let filteredOut = 0;
 
   // Scan first 3 pages (most recent ~30 emails)
   for (let page = 1; page <= 3; page++) {
@@ -550,6 +556,10 @@ async function processInbox(dryRun = false) {
       // Classify
       const category = classify(env, body);
       log(`  📧 ${env.from} | ${category} | "${(env.subject || "").slice(0, 50)}"`);
+      if (faireOnly && !category.startsWith("FAIRE_")) {
+        filteredOut++;
+        continue;
+      }
 
       // Get reply template
       const reply = getReply(category, env, body);
@@ -608,6 +618,9 @@ async function processInbox(dryRun = false) {
   if (!dryRun) saveProcessed(processed);
 
   log(`\n📊 Results: ${replied} replied, ${skipped} already processed, ${newProcessed} newly scanned`);
+  if (faireOnly) {
+    log(`🎯 Faire-only filter skipped ${filteredOut} non-Faire messages`);
+  }
 }
 
 // ── Status ──────────────────────────────────────────────────────────
@@ -648,5 +661,6 @@ if (args.includes("--status")) {
   showStatus();
 } else {
   const dryRun = args.includes("--dry-run");
-  await processInbox(dryRun);
+  const faireOnly = args.includes("--faire-only");
+  await processInbox(dryRun, { faireOnly });
 }

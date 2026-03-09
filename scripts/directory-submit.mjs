@@ -20,7 +20,8 @@ import { execSync } from "node:child_process";
 
 const HOME = process.env.HOME || "/Users/ben";
 const STATUS_FILE = path.join(HOME, ".config/usa-gummies-mcp/directory-submissions.json");
-const SEND_SCRIPT = path.join(HOME, ".openclaw/workspace/scripts/send-email.sh");
+const PROJECT_ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+const SEND_SCRIPT = path.join(PROJECT_ROOT, "scripts/send-email.sh");
 
 function log(msg) {
   console.log(`[${new Date().toISOString()}] ${msg}`);
@@ -393,10 +394,14 @@ function saveStatus(status) {
 }
 
 // ── Send email ───────────────────────────────────────────────────────
-function sendEmail(to, subject, body, dryRun = false) {
+function sendEmail(to, subject, body, dryRun = false, allowLiveSend = false) {
   if (dryRun) {
     log(`  [DRY RUN] Would send to ${to}: "${subject}"`);
     return true;
+  }
+  if (!allowLiveSend) {
+    log(`  ⛔ Live send blocked for ${to}. Use --allow-live-send to override.`);
+    return false;
   }
 
   try {
@@ -414,7 +419,7 @@ function sendEmail(to, subject, body, dryRun = false) {
 }
 
 // ── Submit to directories ────────────────────────────────────────────
-function submitDirectories(dryRun = false, batchSize = 5) {
+function submitDirectories(dryRun = false, batchSize = 5, allowLiveSend = false) {
   const status = loadStatus();
   let sent = 0;
   let skipped = 0;
@@ -433,7 +438,7 @@ function submitDirectories(dryRun = false, batchSize = 5) {
     }
 
     log(`  📧 ${dir.name} (${dir.email})`);
-    const ok = sendEmail(dir.email, dir.subject, dir.body, dryRun);
+    const ok = sendEmail(dir.email, dir.subject, dir.body, dryRun, allowLiveSend);
 
     if (ok) {
       status[dir.id] = {
@@ -482,7 +487,8 @@ if (args.includes("--status")) {
   showStatus();
 } else {
   const dryRun = args.includes("--dry-run");
+  const allowLiveSend = args.includes("--allow-live-send");
   const batchIdx = args.indexOf("--batch");
   const batchSize = batchIdx >= 0 ? parseInt(args[batchIdx + 1]) || 5 : 5;
-  submitDirectories(dryRun, batchSize);
+  submitDirectories(dryRun, batchSize, allowLiveSend);
 }

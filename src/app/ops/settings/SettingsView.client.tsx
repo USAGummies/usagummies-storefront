@@ -84,6 +84,27 @@ export function SettingsView() {
   const [roleDrafts, setRoleDrafts] = useState<Record<string, string>>({});
   const [connectingBank, setConnectingBank] = useState(false);
   const [bankingNotice, setBankingNotice] = useState<string | null>(null);
+  const [brainStatus, setBrainStatus] = useState<"idle" | "ok" | "error">("idle");
+  const [brainMsg, setBrainMsg] = useState("");
+
+  const checkBrain = useCallback(async () => {
+    setBrainStatus("idle");
+    setBrainMsg("Checking...");
+    try {
+      const res = await fetch("/api/ops/abra/insights", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic: "system health check", maxResults: 1 }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "Brain unavailable");
+      setBrainStatus("ok");
+      setBrainMsg(`Brain online — ${d.sources?.length ?? 0} sources available`);
+    } catch (err) {
+      setBrainStatus("error");
+      setBrainMsg(err instanceof Error ? err.message : "Brain check failed");
+    }
+  }, []);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -238,6 +259,31 @@ export function SettingsView() {
           {error}
         </div>
       ) : null}
+
+      {/* Brain Status Card */}
+      <section style={{ ...CARD_STYLE, padding: "14px 18px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <div style={{ fontSize: 12, letterSpacing: "0.07em", textTransform: "uppercase", color: "rgba(255,255,255,0.45)", fontWeight: 700, marginBottom: 6 }}>
+              🧠 Abra Brain Status
+            </div>
+            <div style={{ fontSize: 13, color: brainStatus === "ok" ? "#4ade80" : brainStatus === "error" ? "#f87171" : "rgba(255,255,255,0.5)" }}>
+              {brainMsg || "Not checked yet"}
+            </div>
+          </div>
+          <button
+            onClick={() => void checkBrain()}
+            style={{
+              border: `1px solid ${brainStatus === "ok" ? "rgba(34,197,94,0.3)" : "rgba(255,255,255,0.12)"}`,
+              background: brainStatus === "ok" ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.04)",
+              color: "rgba(255,255,255,0.85)", borderRadius: 8, padding: "8px 12px",
+              fontSize: 12, cursor: "pointer", fontFamily: "inherit",
+            }}
+          >
+            Check Brain
+          </button>
+        </div>
+      </section>
 
       <section style={{ ...CARD_STYLE, overflowX: "auto" }}>
         <div style={{ padding: "14px 16px", borderBottom: "1px solid rgba(255,255,255,0.06)", fontSize: 12, letterSpacing: "0.07em", textTransform: "uppercase", color: "rgba(255,255,255,0.45)", fontWeight: 700 }}>

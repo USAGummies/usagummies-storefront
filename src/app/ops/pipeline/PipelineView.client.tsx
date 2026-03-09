@@ -8,6 +8,7 @@ import {
   DollarSign,
   MapPin,
   AlertTriangle,
+  Brain,
 } from "lucide-react";
 
 import {
@@ -21,11 +22,19 @@ import { SkeletonTable } from "@/app/ops/components/Skeleton";
 import {
   NAVY,
   RED,
+  GOLD,
   CREAM as BG,
   SURFACE_CARD as CARD,
   SURFACE_BORDER as BORDER,
   SURFACE_TEXT_DIM as TEXT_DIM,
 } from "@/app/ops/tokens";
+
+type EnrichResult = {
+  id: string;
+  insight: string;
+  nextStep: string;
+  relatedEmails: string[];
+};
 
 const KANBAN_STAGES = [
   "Lead",
@@ -88,6 +97,9 @@ function MetricCard({ label, value, sub }: { label: string; value: string; sub?:
 
 export function PipelineView() {
   const [expandedStages, setExpandedStages] = useState<Record<string, boolean>>({});
+  const [enrichMap, setEnrichMap] = useState<Map<string, EnrichResult>>(new Map());
+  const [enrichLoading, setEnrichLoading] = useState(false);
+  const [enrichError, setEnrichError] = useState<string | null>(null);
   const {
     data: pipeline,
     loading: pipeLoading,
@@ -167,6 +179,38 @@ export function PipelineView() {
     }
   }
 
+  async function enrichDeals() {
+    if (enrichLoading || leads.length === 0) return;
+    setEnrichLoading(true);
+    setEnrichError(null);
+    try {
+      const topDeals = leads.slice(0, 10).map((l) => ({
+        id: l.id,
+        name: l.name,
+        email: l.email || "",
+        stage: l.kanbanStage,
+        dealValue: l.dealValue || 0,
+        qualification: l.qualification || "",
+      }));
+      const res = await fetch("/api/ops/pipeline/enrich", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deals: topDeals }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Enrichment failed");
+      const map = new Map<string, EnrichResult>();
+      for (const item of data.enriched || []) {
+        map.set(item.id, item);
+      }
+      setEnrichMap(map);
+    } catch (err) {
+      setEnrichError(err instanceof Error ? err.message : "Enrichment failed");
+    } finally {
+      setEnrichLoading(false);
+    }
+  }
+
   function draftFollowUp(lead: { name: string; email: string; status: string }, snippet?: string) {
     if (!lead.email) {
       setActionMsg(`No email on file for ${lead.name}.`);
@@ -206,13 +250,36 @@ export function PipelineView() {
             <StalenessBadge items={freshnessItems} />
           </div>
         </div>
-        <RefreshButton
-          loading={pipeLoading || emailLoading}
-          onClick={() => {
-            refreshPipeline();
-            refreshEmails();
-          }}
-        />
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <button
+            onClick={enrichDeals}
+            disabled={enrichLoading || leads.length === 0}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              border: enrichMap.size > 0 ? `1px solid ${GOLD}` : `1px solid ${BORDER}`,
+              borderRadius: 10,
+              background: enrichMap.size > 0 ? `${GOLD}18` : CARD,
+              color: enrichMap.size > 0 ? GOLD : NAVY,
+              padding: "8px 14px",
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: enrichLoading ? "default" : "pointer",
+              opacity: enrichLoading ? 0.7 : 1,
+            }}
+          >
+            <Brain size={14} />
+            {enrichLoading ? "Enriching..." : enrichMap.size > 0 ? "🧠 Enriched" : "🧠 Enrich"}
+          </button>
+          <RefreshButton
+            loading={pipeLoading || emailLoading}
+            onClick={() => {
+              refreshPipeline();
+              refreshEmails();
+            }}
+          />
+        </div>
       </div>
 
       {pipeError ? (
@@ -249,6 +316,27 @@ export function PipelineView() {
           }}
         >
           {actionMsg}
+        </div>
+      ) : null}
+
+      {enrichError ? (
+        <div
+          style={{
+            border: `1px solid ${RED}33`,
+            background: `${RED}14`,
+            color: RED,
+            borderRadius: 10,
+            padding: "8px 12px",
+            marginBottom: 12,
+            fontSize: 13,
+            fontWeight: 600,
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+          }}
+        >
+          <Brain size={14} />
+          Enrichment: {enrichError}
         </div>
       ) : null}
 
@@ -361,6 +449,35 @@ export function PipelineView() {
                         >
                           {snippet}
                         </div>
+
+                        {enrichMap.has(lead.id) && (() => {
+                          const ei = enrichMap.get(lead.id)!;
+                          return (
+                            <div
+                              style={{
+                                background: `${GOLD}0d`,
+                                border: `1px solid ${GOLD}30`,
+                                borderRadius: 8,
+                                padding: "7px 8px",
+                                fontSize: 12,
+                                display: "grid",
+                                gap: 4,
+                              }}
+                            >
+                              <div style={{ display: "flex", alignItems: "center", gap: 4, fontWeight: 700, color: NAVY }}>
+                                <Brain size={11} />
+                                Brain Intel
+                              </div>
+                              <div style={{ color: NAVY, lineHeight: 1.35 }}>{ei.insight}</div>
+                              <div style={{ color: GOLD, fontWeight: 700 }}>→ {ei.nextStep}</div>
+                              {ei.relatedEmails.length > 0 && (
+                                <div style={{ color: TEXT_DIM, fontSize: 11 }}>
+                                  Related: {ei.relatedEmails.slice(0, 2).join(", ")}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
 
                         <div style={{ display: "flex", gap: 6 }}>
                           <button

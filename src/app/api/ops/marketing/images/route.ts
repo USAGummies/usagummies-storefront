@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { readState, writeState } from "@/lib/ops/state";
 import type { CacheEnvelope } from "@/lib/amazon/types";
 import { DB, NotionProp, createPage, queryDatabase, extractText, extractDate } from "@/lib/notion/client";
-import { generateImage, isGeminiConfigured } from "@/lib/ai/gemini-image";
+import { generateImage, generateImageWithReference, isGeminiConfigured } from "@/lib/ai/gemini-image";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -149,7 +149,7 @@ export async function GET(req: Request) {
 }
 
 type UploadBody = {
-  action?: "upload" | "generate" | "generate-gemini";
+  action?: "upload" | "generate" | "generate-gemini" | "generate-gemini-ref";
   title?: string;
   filename?: string;
   contentBase64?: string;
@@ -158,6 +158,10 @@ type UploadBody = {
   prompt?: string;
   /** Image style for Gemini marketing gen */
   style?: string;
+  /** Base64-encoded reference image for image-to-image generation */
+  referenceImageBase64?: string;
+  /** MIME type of the reference image (default: image/png) */
+  referenceMimeType?: string;
 };
 
 async function uploadAction(body: UploadBody) {
@@ -311,6 +315,62 @@ async function generateGeminiAction(body: UploadBody) {
   };
 }
 
+async function generateGeminiRefAction(body: UploadBody) {
+  const prompt = (body.prompt || "").trim();
+  if (!prompt) {
+    throw new Error("prompt is required for generate-gemini-ref");
+  }
+
+  if (!body.referenceImageBase64) {
+    throw new Error("referenceImageBase64 is required for generate-gemini-ref");
+  }
+
+  if (!isGeminiConfigured()) {
+    throw new Error("GEMINI_API_KEY or GOOGLE_AI_API_KEY not configured");
+  }
+
+  const title = body.title || `Gemini Ref Image ${new Date().toISOString().slice(0, 10)}`;
+  const fileBase = sanitizeFileName(title) || `gemini-ref-${Date.now()}`;
+  const fileName = `${fileBase}.png`;
+
+  const refData = body.referenceImageBase64.includes(",")
+    ? body.referenceImageBase64.split(",").pop() || ""
+    : body.referenceImageBase64;
+
+  const result = await generateImageWithReference(
+    prompt,
+    refData,
+    body.referenceMimeType || "image/png",
+    { timeoutMs: 90_000 },
+  );
+
+  await ensureContentLibraryDir();
+  const { absPath, publicUrl } = localPublicPath(fileName);
+  await fs.writeFile(absPath, Buffer.from(result.base64, "base64"));
+
+  await createNotionImageEntry({
+    title,
+    url: publicUrl,
+    tags: body.tags || [],
+    category: body.category || "social",
+    source: "ai-gemini",
+    prompt,
+  });
+
+  return {
+    ok: true,
+    image: {
+      title,
+      url: publicUrl,
+      category: body.category || "social",
+      tags: body.tags || [],
+      source: "ai-gemini",
+      prompt,
+      mimeType: result.mimeType,
+    },
+  };
+}
+
 export async function POST(req: Request) {
   try {
     const body = (await req.json()) as UploadBody;
@@ -333,8 +393,14 @@ export async function POST(req: Request) {
       return NextResponse.json(result);
     }
 
+    if (body.action === "generate-gemini-ref") {
+      const result = await generateGeminiRefAction(body);
+      await writeState("image-library-cache", { data: null, cachedAt: 0 });
+      return NextResponse.json(result);
+    }
+
     return NextResponse.json(
-      { error: "Unsupported action. Use upload | generate | generate-gemini" },
+      { error: "Unsupported action. Use upload | generate | generate-gemini | generate-gemini-ref" },
       { status: 400 },
     );
   } catch (err) {

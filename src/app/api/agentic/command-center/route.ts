@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import {
+  appendStateArray,
   readState,
   readStateArray,
   readStateObject,
   readStateTail,
   isCloud,
+  writeState,
 } from "@/lib/ops/state";
+import { getCommandCenterConfig } from "@/lib/ops/command-center-config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,6 +30,7 @@ type AgentIndicator = {
 type SystemCheck = {
   key: string;
   label: string;
+  status: "pass" | "fail" | "unknown";
   ok: boolean;
   details: string;
 };
@@ -70,10 +74,7 @@ type StatusModel = {
 // File paths only used in local-dev mode (laptop). On Vercel, state.ts reads from KV.
 const HOME = process.env.HOME || "/Users/ben";
 const CONFIG_DIR = `${HOME}/.config/usa-gummies-mcp`;
-const B2B_SEND_FLOOR_PER_DAY = Number(process.env.B2B_SEND_FLOOR_PER_DAY || 35);
-const DISTRIBUTOR_SEND_FLOOR_PER_DAY = Number(process.env.DISTRIBUTOR_SEND_FLOOR_PER_DAY || 10);
-const DISTRIBUTOR_PROSPECTS_DB = "804b3270eb17483caac0441369c21f3a";
-const INDERBITZIN_PAGE_ID = "30f4c0c42c2e8102b1a2dfd7bace0238";
+const COMMAND_CENTER_CONFIG = getCommandCenterConfig();
 
 type WeekGoals = {
   weekStart: string;
@@ -88,7 +89,19 @@ type WeekGoals = {
     nextAction: string;
   };
   fetchedAt: string;
+  fetchedAtIso?: string;
   error?: string;
+};
+
+type FreshnessState = "fresh" | "stale" | "unknown";
+
+type FreshnessItem = {
+  key: string;
+  label: string;
+  state: FreshnessState;
+  ageMinutes: number | null;
+  staleAfterMinutes: number;
+  details: string;
 };
 
 const DEFAULT_WEEK_GOALS: WeekGoals = {
@@ -98,6 +111,7 @@ const DEFAULT_WEEK_GOALS: WeekGoals = {
   b2b: { target: 7, orders: 0 },
   inderbitzin: { status: "Unknown", lastContactedDate: "", followUpSent: false, replyReceived: false, nextAction: "Check status" },
   fetchedAt: "",
+  fetchedAtIso: "",
 };
 
 let weekGoalsCache: { checkedAtMs: number; data: WeekGoals } = {
@@ -181,6 +195,37 @@ function minutesSinceIso(iso?: string) {
   const ms = Date.parse(iso);
   if (!Number.isFinite(ms)) return null;
   return Math.floor((Date.now() - ms) / 60000);
+}
+
+function freshnessFromIso(input: {
+  key: string;
+  label: string;
+  staleAfterMinutes: number;
+  iso?: string;
+  unknownDetails: string;
+}): FreshnessItem {
+  const ageMinutes = minutesSinceIso(input.iso);
+  if (ageMinutes === null) {
+    return {
+      key: input.key,
+      label: input.label,
+      state: "unknown",
+      ageMinutes: null,
+      staleAfterMinutes: input.staleAfterMinutes,
+      details: input.unknownDetails,
+    };
+  }
+  const stale = ageMinutes > input.staleAfterMinutes;
+  return {
+    key: input.key,
+    label: input.label,
+    state: stale ? "stale" : "fresh",
+    ageMinutes,
+    staleAfterMinutes: input.staleAfterMinutes,
+    details: stale
+      ? `Stale (${ageMinutes} min old, SLA ${input.staleAfterMinutes} min)`
+      : `Fresh (${ageMinutes} min old, SLA ${input.staleAfterMinutes} min)`,
+  };
 }
 
 // Data loading is now handled by the state abstraction layer.
@@ -286,7 +331,8 @@ function localExecSync(cmd: string, timeout = 5000): string {
 function getCommandCenterRuntime(watchdogLogLines: string[]) {
   if (isCloud()) {
     return {
-      healthy: true,
+      healthy: false,
+      verifiable: false,
       mode: "cloud" as const,
       trackedPid: null as number | null,
       trackedPidAlive: false,
@@ -316,6 +362,7 @@ function getCommandCenterRuntime(watchdogLogLines: string[]) {
 
   return {
     healthy: Boolean(listenerPid),
+    verifiable: true,
     mode: "local" as const,
     trackedPid,
     trackedPidAlive,
@@ -329,18 +376,18 @@ function getCommandCenterRuntime(watchdogLogLines: string[]) {
 
 function readCronSection() {
   if (isCloud()) {
-    return { installed: true, lines: ["Cloud scheduler (Vercel Cron + QStash)"] };
+    return { installed: false, unknown: true, lines: ["Cloud scheduler (Vercel Cron + QStash)"] };
   }
   try {
     const raw = localExecSync("crontab -l", 8000);
-    if (!raw) return { installed: false, lines: [] as string[] };
+    if (!raw) return { installed: false, unknown: false, lines: [] as string[] };
     const lines = raw.split("\n");
     const start = lines.findIndex((l) => l.trim() === "# >>> USA_GUMMIES_AGENTIC >>>");
     const end = lines.findIndex((l) => l.trim() === "# <<< USA_GUMMIES_AGENTIC <<<");
-    if (start < 0 || end < 0 || end <= start) return { installed: false, lines: [] as string[] };
-    return { installed: true, lines: lines.slice(start + 1, end).filter((l) => l.trim().length > 0) };
+    if (start < 0 || end < 0 || end <= start) return { installed: false, unknown: false, lines: [] as string[] };
+    return { installed: true, unknown: false, lines: lines.slice(start + 1, end).filter((l) => l.trim().length > 0) };
   } catch {
-    return { installed: false, lines: [] as string[] };
+    return { installed: false, unknown: false, lines: [] as string[] };
   }
 }
 
@@ -471,8 +518,8 @@ function buildKpis(nowET: ReturnType<typeof etParts>, ledger: any[]) {
     sumByAgent(todayEntries, "agent4", (x) => sendFailuresFromResult(x?.result)) +
     sumByAgent(todayEntries, "agent5", (x) => sendFailuresFromResult(x?.result));
   const failedDeliveriesToday = sendFailuresToday + bouncedRepliesToday + inboxUnmatchedBouncesToday;
-  const b2bFloor = B2B_SEND_FLOOR_PER_DAY;
-  const distFloor = DISTRIBUTOR_SEND_FLOOR_PER_DAY;
+  const b2bFloor = COMMAND_CENTER_CONFIG.b2bSendFloorPerDay;
+  const distFloor = COMMAND_CENTER_CONFIG.distributorSendFloorPerDay;
   const b2bShortfall = Math.max(0, b2bFloor - b2bEmailsToday);
   const distShortfall = Math.max(0, distFloor - distributorEmailsToday);
 
@@ -625,6 +672,7 @@ async function computeSystemStatus(input: {
   nowET: ReturnType<typeof etParts>;
   commandCenter: ReturnType<typeof getCommandCenterRuntime>;
   cronInstalled: boolean;
+  cronUnknown: boolean;
   selfHealLastRunAt?: string;
   latestEventAt?: string;
   agents: Record<string, AgentState>;
@@ -638,26 +686,42 @@ async function computeSystemStatus(input: {
     {
       key: "dashboard",
       label: "Dashboard Process",
-      ok: input.commandCenter.healthy,
-      details: input.commandCenter.healthy
-        ? `Listening on pid ${input.commandCenter.listenerPid ?? "n/a"}`
-        : "Dashboard endpoint not reachable",
+      status: input.commandCenter.verifiable
+        ? (input.commandCenter.healthy ? "pass" : "fail")
+        : "unknown",
+      ok: input.commandCenter.verifiable ? input.commandCenter.healthy : false,
+      details: input.commandCenter.verifiable
+        ? input.commandCenter.healthy
+          ? `Listening on pid ${input.commandCenter.listenerPid ?? "n/a"}`
+          : "Dashboard endpoint not reachable"
+        : "Cloud runtime: local process health not verifiable",
     },
     {
       key: "scheduler",
       label: "Scheduler Installed",
-      ok: input.cronInstalled,
-      details: input.cronInstalled ? "USA_GUMMIES_AGENTIC cron block found" : "Cron block missing",
+      status: input.cronUnknown
+        ? "unknown"
+        : input.cronInstalled
+          ? "pass"
+          : "fail",
+      ok: !input.cronUnknown && input.cronInstalled,
+      details: input.cronUnknown
+        ? "Cloud runtime: cron block not directly inspectable"
+        : input.cronInstalled
+          ? "USA_GUMMIES_AGENTIC cron block found"
+          : "Cron block missing",
     },
     {
       key: "notion",
       label: "Notion Master Brain",
+      status: notion.ok ? "pass" : "fail",
       ok: notion.ok,
       details: notion.details,
     },
     {
       key: "selfHeal",
       label: "Self-Heal Freshness",
+      status: selfHealLag !== null && selfHealLag <= 90 ? "pass" : "fail",
       ok: selfHealLag !== null && selfHealLag <= 90,
       details:
         selfHealLag === null
@@ -667,6 +731,7 @@ async function computeSystemStatus(input: {
     {
       key: "activity",
       label: "Recent Agent Activity",
+      status: latestEventLag !== null && latestEventLag <= 180 ? "pass" : "fail",
       ok: latestEventLag !== null && latestEventLag <= 180,
       details:
         latestEventLag === null
@@ -676,16 +741,30 @@ async function computeSystemStatus(input: {
     {
       key: "coverage",
       label: "Agents With Run History",
+      status: agentsWithRuns > 0 ? "pass" : "fail",
       ok: agentsWithRuns > 0,
       details: `${agentsWithRuns} of ${Object.keys(input.agents).length} agents have run history`,
     },
+    {
+      key: "config",
+      label: "Command Center Config",
+      status: COMMAND_CENTER_CONFIG.validation.ok ? "pass" : "fail",
+      ok: COMMAND_CENTER_CONFIG.validation.ok,
+      details: COMMAND_CENTER_CONFIG.validation.ok
+        ? "Config valid"
+        : COMMAND_CENTER_CONFIG.validation.errors.join("; "),
+    },
   ];
 
-  const hardFail = checks.some((c) => (c.key === "dashboard" || c.key === "scheduler" || c.key === "notion") && !c.ok);
-  const anyFail = checks.some((c) => !c.ok);
+  const hardFail = checks.some(
+    (c) =>
+      (c.key === "dashboard" || c.key === "scheduler" || c.key === "notion" || c.key === "config")
+      && c.status === "fail"
+  );
+  const anyFailOrUnknown = checks.some((c) => c.status !== "pass");
   const level: "running" | "degraded" | "error" = hardFail
     ? "error"
-    : anyFail
+    : anyFailOrUnknown
       ? "degraded"
       : "running";
   const label = level === "running" ? "RUNNING" : level === "degraded" ? "DEGRADED" : "ERROR";
@@ -733,6 +812,7 @@ function buildOperatorControl(input: {
     {
       key: "manualOversight",
       label: "Manual oversight in last 24h",
+      status: manualRuns.length > 0 ? "pass" : "fail",
       ok: manualRuns.length > 0,
       details:
         manualRuns.length > 0
@@ -742,6 +822,7 @@ function buildOperatorControl(input: {
     {
       key: "replyLock",
       label: "Reply auto-send lock",
+      status: !replyAutoSendEnabled ? "pass" : "fail",
       ok: !replyAutoSendEnabled,
       details: !replyAutoSendEnabled
         ? "Locked (draft-only queue, founder authorization required)"
@@ -750,6 +831,7 @@ function buildOperatorControl(input: {
     {
       key: "noResend",
       label: "No-resend guard freshness",
+      status: noResendActive ? "pass" : "fail",
       ok: noResendActive,
       details: noResendActive
         ? `Agent18 OK (${noResendLag ?? "?"} min ago)`
@@ -758,6 +840,7 @@ function buildOperatorControl(input: {
     {
       key: "trainingFresh",
       label: "Training profile freshness",
+      status: trainingFresh ? "pass" : "fail",
       ok: trainingFresh,
       details: trainingFresh
         ? `Updated ${trainingLag} min ago`
@@ -809,7 +892,24 @@ async function fetchWeekGoals(notionKey: string, nowET: ReturnType<typeof etPart
   const weekEnd = saturday.toISOString().slice(0, 10);
 
   if (!notionKey) {
-    return { ...DEFAULT_WEEK_GOALS, weekStart, weekEnd, fetchedAt: nowET.timestamp, error: "No Notion key" };
+    return {
+      ...DEFAULT_WEEK_GOALS,
+      weekStart,
+      weekEnd,
+      fetchedAt: nowET.timestamp,
+      fetchedAtIso: new Date().toISOString(),
+      error: "No Notion key",
+    };
+  }
+  if (!COMMAND_CENTER_CONFIG.validation.ok) {
+    return {
+      ...DEFAULT_WEEK_GOALS,
+      weekStart,
+      weekEnd,
+      fetchedAt: nowET.timestamp,
+      fetchedAtIso: new Date().toISOString(),
+      error: COMMAND_CENTER_CONFIG.validation.errors.join("; "),
+    };
   }
 
   const headers = {
@@ -823,7 +923,7 @@ async function fetchWeekGoals(notionKey: string, nowET: ReturnType<typeof etPart
 
   try {
     // 1. Distributors who replied (conversation started)
-    const distRes = await fetch(`https://api.notion.com/v1/databases/${DISTRIBUTOR_PROSPECTS_DB}/query`, {
+    const distRes = await fetch(`https://api.notion.com/v1/databases/${COMMAND_CENTER_CONFIG.distributorProspectsDbId}/query`, {
       method: "POST",
       headers,
       body: JSON.stringify({
@@ -842,7 +942,7 @@ async function fetchWeekGoals(notionKey: string, nowET: ReturnType<typeof etPart
     }
 
     // 2. Inderbitzin page
-    const inderRes = await fetch(`https://api.notion.com/v1/pages/${INDERBITZIN_PAGE_ID}`, {
+    const inderRes = await fetch(`https://api.notion.com/v1/pages/${COMMAND_CENTER_CONFIG.inderbitzinPageId}`, {
       method: "GET",
       headers,
       signal: controller.signal,
@@ -884,11 +984,19 @@ async function fetchWeekGoals(notionKey: string, nowET: ReturnType<typeof etPart
       b2b: { target: 7, orders: weekOrders },
       inderbitzin: { status: inderStatus, lastContactedDate: inderLastContact, followUpSent: inderFollowUpSent, replyReceived: inderReplyReceived, nextAction },
       fetchedAt: nowET.timestamp,
+      fetchedAtIso: new Date().toISOString(),
     };
     weekGoalsCache = { checkedAtMs: nowMs, data: result };
     return result;
   } catch (err) {
-    return { ...weekGoalsCache.data, weekStart, weekEnd, fetchedAt: nowET.timestamp, error: String((err as Error)?.message || err).slice(0, 200) };
+    return {
+      ...weekGoalsCache.data,
+      weekStart,
+      weekEnd,
+      fetchedAt: nowET.timestamp,
+      fetchedAtIso: new Date().toISOString(),
+      error: String((err as Error)?.message || err).slice(0, 200),
+    };
   } finally {
     clearTimeout(timer);
   }
@@ -951,6 +1059,7 @@ export async function GET() {
     nowET,
     commandCenter,
     cronInstalled: cron.installed,
+    cronUnknown: Boolean((cron as { unknown?: boolean }).unknown),
     selfHealLastRunAt: status.selfHeal?.lastRunAt,
     latestEventAt,
     agents,
@@ -962,6 +1071,95 @@ export async function GET() {
     ledger,
     kpiTuning: kpiTuning as Record<string, any>,
   });
+
+  const newestQueueAtIso = (replyQueue || []).reduce((latest: string, item: any) => {
+    const candidate = String(item?.queuedAt || item?.receivedAt || "");
+    const candidateMs = Date.parse(candidate);
+    const latestMs = Date.parse(latest);
+    if (!Number.isFinite(candidateMs)) return latest;
+    if (!Number.isFinite(latestMs) || candidateMs > latestMs) return candidate;
+    return latest;
+  }, "");
+  const freshness: FreshnessItem[] = [
+    freshnessFromIso({
+      key: "heartbeat",
+      label: "System heartbeat",
+      staleAfterMinutes: 15,
+      iso: status.heartbeat?.lastSeenAt,
+      unknownDetails: "No heartbeat timestamp available",
+    }),
+    freshnessFromIso({
+      key: "selfHeal",
+      label: "Self-heal monitor",
+      staleAfterMinutes: 90,
+      iso: status.selfHeal?.lastRunAt,
+      unknownDetails: "No self-heal timestamp available",
+    }),
+    freshnessFromIso({
+      key: "agentEvents",
+      label: "Recent agent events",
+      staleAfterMinutes: 180,
+      iso: latestEventAt,
+      unknownDetails: "No agent events available",
+    }),
+    freshnessFromIso({
+      key: "replyQueue",
+      label: "Reply queue freshness",
+      staleAfterMinutes: 60,
+      iso: newestQueueAtIso,
+      unknownDetails:
+        attentionQueue.pendingCount > 0
+          ? "Pending queue items have no parseable timestamp"
+          : "No pending queue items",
+    }),
+    freshnessFromIso({
+      key: "weekGoals",
+      label: "Week goals sync",
+      staleAfterMinutes: 10,
+      iso: weekGoals.fetchedAtIso,
+      unknownDetails: "Week goals sync timestamp unavailable",
+    }),
+  ];
+
+  const paths = isCloud()
+    ? {
+      statusFile: "kv://usag:system-status",
+      logFile: "kv://usag:engine-log",
+      commandCenterPidFile: "kv://usag:command-center-pid",
+      commandCenterLogFile: "kv://usag:command-center-log",
+    }
+    : {
+      statusFile: `${CONFIG_DIR}/agentic-system-status.json`,
+      logFile: `${CONFIG_DIR}/agentic-engine.log`,
+      commandCenterPidFile: `${CONFIG_DIR}/command-center.pid`,
+      commandCenterLogFile: `${CONFIG_DIR}/command-center.log`,
+    };
+
+  const statusSnapshot = {
+    at: now.toISOString(),
+    generatedAtET: nowET.timestamp,
+    level: systemStatus.level,
+    label: systemStatus.label,
+    checks: systemStatus.checks,
+    overall,
+    counts: {
+      critical: criticalCount,
+      warning: warningCount,
+      healthy: agentRows.filter((x) => x.health.level === "healthy").length,
+      unknown: agentRows.filter((x) => x.health.level === "unknown").length,
+    },
+  };
+  const previousStatus = await readState<any>("command-center-status-cache", null);
+  const shouldLogTransition =
+    !previousStatus
+    || previousStatus.level !== statusSnapshot.level
+    || previousStatus.overall !== statusSnapshot.overall
+    || previousStatus.counts?.critical !== statusSnapshot.counts.critical
+    || previousStatus.counts?.warning !== statusSnapshot.counts.warning;
+  await writeState("command-center-status-cache", statusSnapshot);
+  if (shouldLogTransition) {
+    await appendStateArray("command-center-status-log", [statusSnapshot], 1000);
+  }
 
   return NextResponse.json({
     generatedAt: now.toISOString(),
@@ -991,6 +1189,9 @@ export async function GET() {
     operatorControl,
     commandCenter,
     logs: engineLogLines,
+    paths,
+    freshness,
+    statusTransitionLogged: shouldLogTransition,
     environment: isCloud() ? "cloud" : "local",
   });
 }

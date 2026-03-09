@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Reveal } from "@/components/ui/Reveal";
 import { LeadCapture } from "@/components/marketing/LeadCapture.client";
-import { SubscriptionUnlock } from "@/components/marketing/SubscriptionUnlock.client";
+// SubscriptionUnlock removed — replaced with direct subscription CTA
 
 function resolveSiteUrl() {
   const preferred = "https://www.usagummies.com";
@@ -119,7 +119,29 @@ export default function ThankYouPage() {
             />
           </Reveal>
           <Reveal>
-            <SubscriptionUnlock source="thank-you" unlockOnMount />
+            <div className="rounded-2xl border border-[rgba(45,122,58,0.2)] bg-[rgba(45,122,58,0.04)] p-4">
+              <div className="text-[13px] font-black text-[var(--text)]">Never run out again</div>
+              <div className="mt-1 text-[11px] text-[var(--muted)]">
+                Subscribe &amp; save $0.50/bag below bundle pricing. Free shipping on every delivery. Cancel anytime.
+              </div>
+              <Link href="/subscribe" className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-[#2D7A3A] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#246B2F]">
+                Start a subscription →
+              </Link>
+            </div>
+          </Reveal>
+        </div>
+
+        <div className="mt-4">
+          <Reveal>
+            <div className="rounded-2xl border border-[#C9A44A]/30 bg-[#C9A44A]/5 p-4">
+              <div className="text-[13px] font-black text-[var(--text)]">You just earned rewards points!</div>
+              <div className="mt-1 text-[11px] text-[var(--muted)]">
+                Every $1 you spend earns 1 point. Redeem 100 points for a free bag, or 250 for a 3-pack. Refer a friend for 50 bonus points.
+              </div>
+              <Link href="/rewards" className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-[#C9A44A] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#B8933A]">
+                Check your points &rarr;
+              </Link>
+            </div>
           </Reveal>
         </div>
 

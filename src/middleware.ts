@@ -33,8 +33,20 @@ function isSelfAuthenticated(pathname: string): boolean {
   );
 }
 
+const OPERATOR_ROLES = new Set(["admin", "employee"]);
+const READONLY_ROLES = new Set(["admin", "employee", "investor", "partner", "banker"]);
+
+function roleFromSession(session: any): string {
+  return String(session?.user?.role || "employee").toLowerCase();
+}
+
+function isReadMethod(method: string): boolean {
+  return method === "GET" || method === "HEAD" || method === "OPTIONS";
+}
+
 export default auth((req) => {
   const { pathname } = req.nextUrl;
+  const method = req.method.toUpperCase();
 
   // Allow login page and auth API routes without session
   if (pathname === "/ops/login" || pathname.startsWith("/api/auth/")) {
@@ -53,6 +65,7 @@ export default auth((req) => {
 
   // req.auth is populated automatically by the auth() wrapper
   const session = req.auth;
+  const role = roleFromSession(session);
 
   // Protect /ops/* pages — redirect to login
   if (pathname.startsWith("/ops")) {
@@ -61,13 +74,50 @@ export default auth((req) => {
       loginUrl.searchParams.set("callbackUrl", pathname);
       return NextResponse.redirect(loginUrl);
     }
+
+    // Defense-in-depth: protect pages that should not be available to readonly roles
+    if (pathname.startsWith("/ops/settings") && role !== "admin") {
+      return NextResponse.redirect(new URL("/ops", req.url));
+    }
+    if (pathname.startsWith("/ops/inbox") && !OPERATOR_ROLES.has(role)) {
+      return NextResponse.redirect(new URL("/ops", req.url));
+    }
     return NextResponse.next();
   }
 
   // Protect /api/agentic/* and /api/ops/* — return 401
-  if (pathname.startsWith("/api/agentic") || pathname.startsWith("/api/ops")) {
+  if (pathname.startsWith("/api/agentic")) {
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Read-only agent dashboard can be exposed to investor/partner/banker roles.
+    if (pathname === "/api/agentic/command-center" && isReadMethod(method)) {
+      if (!READONLY_ROLES.has(role)) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+      return NextResponse.next();
+    }
+
+    if (!OPERATOR_ROLES.has(role)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    return NextResponse.next();
+  }
+
+  if (pathname.startsWith("/api/ops")) {
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Settings is always admin-only (read and write).
+    if (pathname.startsWith("/api/ops/settings") && role !== "admin") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const allowedRoles = isReadMethod(method) ? READONLY_ROLES : OPERATOR_ROLES;
+    if (!allowedRoles.has(role)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     return NextResponse.next();
   }

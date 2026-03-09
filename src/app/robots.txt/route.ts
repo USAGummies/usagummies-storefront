@@ -12,6 +12,7 @@ function resolveSiteUrl() {
 
 export function GET() {
   const siteUrl = resolveSiteUrl();
+  const host = new URL(siteUrl).host;
   const body = `User-agent: *
 Allow: /
 Disallow: /api/
@@ -21,7 +22,7 @@ Disallow: /routecheck
 Disallow: /command-center
 
 Sitemap: ${siteUrl}/sitemap.xml
-Host: ${siteUrl}
+Host: ${host}
 
 # LLM-friendly brand & product description
 # See https://llmstxt.org

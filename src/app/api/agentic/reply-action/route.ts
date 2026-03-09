@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readStateArray, writeState } from "@/lib/ops/state";
+import { createHash, randomUUID } from "node:crypto";
+import { auth } from "@/lib/auth/config";
+import { appendStateArray, readStateArray, writeState } from "@/lib/ops/state";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,11 +20,36 @@ type QueueItem = {
   draftBody: string;
   authorizationRequired: boolean;
   status: string;
+  authorizationActionId?: string;
   authorizedAtET?: string;
   authorizedBy?: string;
+  authorizedByUserId?: string;
+  authorizedByEmail?: string;
+  authorizedByRole?: string;
+  authorizedByFingerprint?: string;
   deniedAtET?: string;
   deniedBy?: string;
+  deniedByUserId?: string;
+  deniedByEmail?: string;
+  deniedByRole?: string;
+  deniedByFingerprint?: string;
 };
+
+type ReplyActionAuditEntry = {
+  actionId: string;
+  queueId: string;
+  action: "approve" | "deny" | "edit-and-send";
+  atET: string;
+  actorUserId: string;
+  actorEmail: string;
+  actorRole: string;
+  actorFingerprint: string;
+  senderEmail: string;
+  statusAfter: "authorized" | "denied";
+  draftSubjectAfter: string;
+};
+
+const ACTION_ROLES = new Set(["admin", "employee"]);
 
 function etNow(): string {
   return new Intl.DateTimeFormat("en-US", {
@@ -37,8 +64,25 @@ function etNow(): string {
   }).format(new Date()).replace(",", "");
 }
 
+function actorFingerprint(req: NextRequest): string {
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+    || req.headers.get("x-real-ip")
+    || "unknown-ip";
+  const ua = req.headers.get("user-agent") || "unknown-ua";
+  return createHash("sha256").update(`${ip}|${ua}`).digest("hex").slice(0, 16);
+}
+
 export async function POST(req: NextRequest) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const actorRole = String(session.user.role || "").toLowerCase();
+    if (!ACTION_ROLES.has(actorRole)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const body = await req.json();
     const { queueId, action, editedSubject, editedBody } = body as {
       queueId: string;
@@ -66,24 +110,55 @@ export async function POST(req: NextRequest) {
     }
 
     const now = etNow();
+    const actionId = randomUUID();
+    const actor = {
+      userId: String(session.user.id),
+      email: String(session.user.email || "unknown"),
+      role: actorRole,
+      fingerprint: actorFingerprint(req),
+    };
+
+    const appendAudit = async (entry: ReplyActionAuditEntry) => {
+      await appendStateArray("reply-action-audit", [entry], 3000);
+    };
 
     if (action === "approve") {
       items[idx] = {
         ...item,
         status: "authorized",
+        authorizationActionId: actionId,
         authorizedAtET: now,
-        authorizedBy: "ben-dashboard",
+        authorizedBy: actor.email,
+        authorizedByUserId: actor.userId,
+        authorizedByEmail: actor.email,
+        authorizedByRole: actor.role,
+        authorizedByFingerprint: actor.fingerprint,
       };
       await writeState("reply-queue", items);
 
       const approvedSends = await readStateArray<QueueItem>("approved-sends");
       approvedSends.push({ ...items[idx] });
       await writeState("approved-sends", approvedSends);
+      await appendAudit({
+        actionId,
+        queueId,
+        action,
+        atET: now,
+        actorUserId: actor.userId,
+        actorEmail: actor.email,
+        actorRole: actor.role,
+        actorFingerprint: actor.fingerprint,
+        senderEmail: item.senderEmail,
+        statusAfter: "authorized",
+        draftSubjectAfter: items[idx].draftSubject,
+      });
 
       return NextResponse.json({
         ok: true,
         message: `Reply authorized. The agent will send "${item.draftSubject}" to ${item.senderEmail} on its next run (within ~30 min).`,
         queueId,
+        actionId,
+        actor,
         status: "authorized",
       });
 
@@ -101,8 +176,13 @@ export async function POST(req: NextRequest) {
         draftBody: editedBody.trim(),
         subject: editedSubject.trim(),
         status: "authorized",
+        authorizationActionId: actionId,
         authorizedAtET: now,
-        authorizedBy: "ben-dashboard-edited",
+        authorizedBy: actor.email,
+        authorizedByUserId: actor.userId,
+        authorizedByEmail: actor.email,
+        authorizedByRole: actor.role,
+        authorizedByFingerprint: actor.fingerprint,
       };
       items[idx] = updatedItem;
       await writeState("reply-queue", items);
@@ -110,11 +190,26 @@ export async function POST(req: NextRequest) {
       const approvedSends = await readStateArray<QueueItem>("approved-sends");
       approvedSends.push({ ...updatedItem });
       await writeState("approved-sends", approvedSends);
+      await appendAudit({
+        actionId,
+        queueId,
+        action,
+        atET: now,
+        actorUserId: actor.userId,
+        actorEmail: actor.email,
+        actorRole: actor.role,
+        actorFingerprint: actor.fingerprint,
+        senderEmail: item.senderEmail,
+        statusAfter: "authorized",
+        draftSubjectAfter: updatedItem.draftSubject,
+      });
 
       return NextResponse.json({
         ok: true,
         message: `Edited version authorized. The agent will send your edited draft to ${item.senderEmail} on its next run (within ~30 min).`,
         queueId,
+        actionId,
+        actor,
         status: "authorized",
       });
 
@@ -122,15 +217,35 @@ export async function POST(req: NextRequest) {
       items[idx] = {
         ...item,
         status: "denied",
+        authorizationActionId: actionId,
         deniedAtET: now,
-        deniedBy: "ben-dashboard",
+        deniedBy: actor.email,
+        deniedByUserId: actor.userId,
+        deniedByEmail: actor.email,
+        deniedByRole: actor.role,
+        deniedByFingerprint: actor.fingerprint,
       };
       await writeState("reply-queue", items);
+      await appendAudit({
+        actionId,
+        queueId,
+        action,
+        atET: now,
+        actorUserId: actor.userId,
+        actorEmail: actor.email,
+        actorRole: actor.role,
+        actorFingerprint: actor.fingerprint,
+        senderEmail: item.senderEmail,
+        statusAfter: "denied",
+        draftSubjectAfter: items[idx].draftSubject,
+      });
 
       return NextResponse.json({
         ok: true,
         message: `Draft killed. No email will be sent to ${item.senderEmail}.`,
         queueId,
+        actionId,
+        actor,
         status: "denied",
       });
     }
