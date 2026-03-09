@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -62,6 +62,15 @@ const COLOR_AMAZON = "#f59e0b";
 const COLOR_DTC = "#3b82f6";
 const COLOR_FAIRE = "#10b981";
 const COLOR_DIST = "#ef4444";
+const ABRA_INSIGHTS_PROMPT =
+  "Give me 3 bullet-point business highlights for today based on recent emails and brain data. Focus on: revenue trends, pipeline activity, and any urgent items.";
+
+type AbraSource = {
+  id: string;
+  source_table: "brain" | "email";
+  title: string;
+  similarity: number;
+};
 
 function average(nums: number[]): number {
   if (nums.length === 0) return 0;
@@ -184,6 +193,44 @@ export function OpsDashboard() {
   const { data: channels, error: channelsError } = useChannelData();
   const { data: pnl } = usePnLData();
   const { data: inventory } = useInventoryData();
+  const [abraInsights, setAbraInsights] = useState<string>("");
+  const [abraSources, setAbraSources] = useState<AbraSource[]>([]);
+  const [abraLoading, setAbraLoading] = useState<boolean>(false);
+  const [abraError, setAbraError] = useState<string | null>(null);
+
+  const fetchAbraInsights = useCallback(async () => {
+    setAbraLoading(true);
+    setAbraError(null);
+    try {
+      const res = await fetch("/api/ops/abra/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: ABRA_INSIGHTS_PROMPT,
+          history: [],
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const message = typeof data?.error === "string" ? data.error : `HTTP ${res.status}`;
+        throw new Error(message);
+      }
+
+      setAbraInsights(typeof data?.reply === "string" ? data.reply : "");
+      setAbraSources(Array.isArray(data?.sources) ? (data.sources as AbraSource[]) : []);
+    } catch (error) {
+      setAbraError(error instanceof Error ? error.message : "Failed to load Abra insights");
+      setAbraInsights("");
+      setAbraSources([]);
+    } finally {
+      setAbraLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchAbraInsights();
+  }, [fetchAbraInsights]);
 
   const month = getCurrentProFormaMonth();
   const planRevenue = month ? cumulativeThrough(TOTAL_REVENUE, month) : null;
@@ -418,6 +465,100 @@ export function OpsDashboard() {
           variance={comparePlanVsActual(30, inventoryDays)}
           spark={sparkInventory.length ? sparkInventory : [0, 0, 0]}
         />
+      </div>
+
+      <div
+        style={{
+          background: BG,
+          border: `1px solid ${NAVY}33`,
+          borderRadius: 12,
+          padding: "14px 16px",
+          marginBottom: 14,
+          boxShadow: "0 1px 0 rgba(0,0,0,0.04)",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 18 }}>{"\u{1F9E0}"}</span>
+            <div style={{ color: NAVY, fontWeight: 800, fontSize: 14, letterSpacing: "0.02em" }}>Abra Insights</div>
+          </div>
+          <button
+            onClick={() => void fetchAbraInsights()}
+            disabled={abraLoading}
+            style={{
+              border: `1px solid ${BORDER}`,
+              borderRadius: 8,
+              background: "white",
+              color: NAVY,
+              fontSize: 12,
+              fontWeight: 700,
+              padding: "6px 10px",
+              cursor: abraLoading ? "wait" : "pointer",
+              opacity: abraLoading ? 0.7 : 1,
+            }}
+          >
+            {abraLoading ? "Refreshing..." : "Refresh"}
+          </button>
+        </div>
+
+        {abraLoading ? (
+          <div
+            style={{
+              fontSize: 13,
+              color: TEXT_DIM,
+              animation: "abraPulse 1.2s ease-in-out infinite",
+            }}
+          >
+            Abra is analyzing...
+          </div>
+        ) : abraError ? (
+          <div style={{ fontSize: 13, color: RED, fontWeight: 700 }}>
+            {abraError}
+          </div>
+        ) : (
+          <div style={{ color: NAVY, fontSize: 14, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
+            {abraInsights || "No insights returned."}
+          </div>
+        )}
+
+        {!abraLoading && !abraError && abraSources.length > 0 ? (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
+            {abraSources.map((source) => (
+              <span
+                key={`dashboard-source-${source.id}`}
+                title={source.title}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  fontSize: 11,
+                  color: NAVY,
+                  border: `1px solid ${BORDER}`,
+                  background: "#fff",
+                  borderRadius: 999,
+                  padding: "4px 8px",
+                }}
+              >
+                <strong style={{ color: source.source_table === "email" ? RED : NAVY }}>
+                  {source.source_table.toUpperCase()}
+                </strong>
+                <span
+                  style={{
+                    maxWidth: 240,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {source.title}
+                </span>
+                <span style={{ color: TEXT_DIM }}>
+                  {Number(source.similarity || 0).toFixed(2)}
+                </span>
+              </span>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       {/* ── Sell-Out Timeline ── */}
@@ -658,6 +799,14 @@ export function OpsDashboard() {
           </div>
         ) : null}
       </div>
+
+      <style jsx>{`
+        @keyframes abraPulse {
+          0% { opacity: 0.45; }
+          50% { opacity: 1; }
+          100% { opacity: 0.45; }
+        }
+      `}</style>
     </div>
   );
 }
