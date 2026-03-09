@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ResponsiveContainer,
   LineChart,
@@ -10,7 +10,7 @@ import {
   YAxis,
   Tooltip,
 } from "recharts";
-import { Wallet, TrendingUp, Flame, AlertTriangle, Landmark, Briefcase, ShoppingCart } from "lucide-react";
+import { Wallet, TrendingUp, Flame, AlertTriangle, ShoppingCart } from "lucide-react";
 
 import {
   usePnLData,
@@ -19,33 +19,11 @@ import {
   useForecastData,
   useDashboardData,
   useAmazonProfitability,
-  comparePlanVsActual,
+  type PnLReport,
   fmtDollar,
   fmtDollarExact,
-  STATUS_COLORS,
 } from "@/lib/ops/use-war-room-data";
-import {
-  TOTAL_REVENUE,
-  EBITDA,
-  GROSS_MARGIN,
-  UNIT_ECONOMICS,
-  LOAN,
-  LOAN_REPAYMENT,
-  LOAN_BALANCE,
-  AMORTIZATION_SCHEDULE,
-  FULL_REPAYMENT_SCHEDULE,
-  CAPITAL_DEPLOYMENT,
-  CAPITAL_BY_MONTH,
-  TOTAL_CAPITAL_DEPLOYED,
-  CAPITAL_TO_DATE,
-  FOUNDER_CAPITAL_2025,
-  FOUNDER_CAPITAL_2026_YTD,
-  FOUNDER_CAPITAL_TOTAL,
-  ANNUAL_SUMMARY,
-  getCurrentProFormaMonth,
-  getMonthsThrough,
-  cumulativeThrough,
-} from "@/lib/ops/pro-forma";
+import { PlaidConnectButton } from "./PlaidConnectButton.client";
 import { StalenessBadge } from "@/app/ops/components/StalenessBadge";
 import { SkeletonChart, SkeletonTable } from "@/app/ops/components/Skeleton";
 import {
@@ -58,9 +36,25 @@ import {
   SURFACE_TEXT_DIM as TEXT_DIM,
 } from "@/app/ops/tokens";
 
-function avg(nums: number[]): number {
-  if (!nums.length) return 0;
-  return nums.reduce((s, n) => s + n, 0) / nums.length;
+function formatDelta(current: number | null, previous: number | null, opts?: { inverse?: boolean }) {
+  if (current == null || previous == null || previous === 0) {
+    return { label: "—", color: TEXT_DIM };
+  }
+  const pct = (current - previous) / previous;
+  const sign = pct > 0 ? "+" : "";
+  const betterUp = !opts?.inverse;
+  const isGood = betterUp ? pct >= 0 : pct <= 0;
+  return {
+    label: `${sign}${(pct * 100).toFixed(1)}%`,
+    color: isGood ? "#16a34a" : RED,
+  };
+}
+
+function monthBounds(base: Date) {
+  const start = new Date(base.getFullYear(), base.getMonth(), 1);
+  const end = new Date(base.getFullYear(), base.getMonth() + 1, 0);
+  const toIsoDate = (d: Date) => d.toISOString().slice(0, 10);
+  return { start: toIsoDate(start), end: toIsoDate(end) };
 }
 
 function HeaderCard({
@@ -110,30 +104,34 @@ export function FinanceView() {
   const { data: forecast, loading: forecastLoading, error: forecastError } = useForecastData();
   const { data: dashboard } = useDashboardData();
   const { data: amzProfit, loading: amzLoading } = useAmazonProfitability();
+  const [prevPnl, setPrevPnl] = useState<PnLReport | null>(null);
   const ap = amzProfit?.profitability;
 
-  const month = getCurrentProFormaMonth();
-  const monthsThrough = month ? getMonthsThrough(month) : [];
-
-  const planRevenue = month ? cumulativeThrough(TOTAL_REVENUE, month) : 0;
-  const planEbitda = month ? cumulativeThrough(EBITDA, month) : 0;
-  const planMargin = month ? avg(monthsThrough.map((m) => GROSS_MARGIN[m])) : 0;
-  const planCogs = planRevenue * (1 - planMargin);
-  const planGrossProfit = planRevenue - planCogs;
-  const planOpex = planGrossProfit - planEbitda;
+  useEffect(() => {
+    let cancelled = false;
+    const now = new Date();
+    const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const { start, end } = monthBounds(prevMonthDate);
+    fetch(`/api/ops/pnl?period=custom&start=${start}&end=${end}`, { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: PnLReport | null) => {
+        if (!cancelled) setPrevPnl(data);
+      })
+      .catch(() => {
+        if (!cancelled) setPrevPnl(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const burnRate = useMemo(() => {
     const proj = forecast?.projections?.["30d"] || [];
-    if (proj.length === 0) return 0;
+    if (proj.length === 0) return null;
     const totalOut = proj.reduce((sum, d) => sum + d.outflows, 0);
     const totalIn = proj.reduce((sum, d) => sum + d.inflows, 0);
     return (totalOut - totalIn) / proj.length;
   }, [forecast]);
-
-  const pvaRevenue = comparePlanVsActual(planRevenue, pnl?.revenue.total || 0);
-  const pvaGross = comparePlanVsActual(planGrossProfit, pnl?.grossProfit || 0);
-  const pvaOpex = comparePlanVsActual(planOpex, pnl?.opex.total || 0);
-  const pvaNet = comparePlanVsActual(planEbitda, pnl?.netIncome || 0);
 
   const forecastChart = (forecast?.projections?.["90d"] || []).map((d) => ({
     date: d.date.slice(5),
@@ -143,7 +141,7 @@ export function FinanceView() {
   const averageSellingPrice =
     dashboard && dashboard.combined.totalOrders > 0
       ? dashboard.combined.totalRevenue / dashboard.combined.totalOrders
-      : 0;
+      : null;
 
   const hasError = pnlError || balError || txError || forecastError;
   const freshnessItems = [
@@ -153,6 +151,39 @@ export function FinanceView() {
     { label: "Forecast", timestamp: forecast?.generatedAt },
   ];
 
+  const pnlRows = [
+    {
+      label: "Revenue",
+      current: pnl?.revenue.total ?? null,
+      previous: prevPnl?.revenue.total ?? null,
+      inverse: false,
+    },
+    {
+      label: "COGS",
+      current: pnl?.cogs.total ?? null,
+      previous: prevPnl?.cogs.total ?? null,
+      inverse: true,
+    },
+    {
+      label: "Gross Profit",
+      current: pnl?.grossProfit ?? null,
+      previous: prevPnl?.grossProfit ?? null,
+      inverse: false,
+    },
+    {
+      label: "OpEx",
+      current: pnl?.opex.total ?? null,
+      previous: prevPnl?.opex.total ?? null,
+      inverse: true,
+    },
+    {
+      label: "Net Income",
+      current: pnl?.netIncome ?? null,
+      previous: prevPnl?.netIncome ?? null,
+      inverse: false,
+    },
+  ];
+
   return (
     <div style={{ background: BG, minHeight: "100vh", paddingBottom: 20 }}>
       <div style={{ marginBottom: 16 }}>
@@ -160,7 +191,7 @@ export function FinanceView() {
           P&L / Finance
         </h1>
         <div style={{ marginTop: 4, fontSize: 13, color: TEXT_DIM }}>
-          Pro forma plan vs live actuals. Financial data requires Plaid integration.
+          Live financial metrics from connected systems.
         </div>
         <div style={{ marginTop: 8 }}>
           <StalenessBadge items={freshnessItems} />
@@ -187,23 +218,10 @@ export function FinanceView() {
         </div>
       ) : null}
 
-      {/* Plaid integration pending banner */}
+      {/* Plaid connect / awaiting data */}
       {!pnlLoading && !balLoading && !pnl?.revenue.total && !balances?.totalCash ? (
-        <div
-          style={{
-            border: `1px solid ${GOLD}55`,
-            background: `${GOLD}12`,
-            color: NAVY,
-            borderRadius: 10,
-            padding: "12px 14px",
-            marginBottom: 12,
-            fontSize: 13,
-            fontWeight: 600,
-          }}
-        >
-          <strong>Awaiting Data — Plaid API pending.</strong> Live cash position, P&L actuals, transactions, and forecast
-          will populate once bank accounts are connected via Plaid. All financial figures below are from the Pro Forma plan
-          unless labeled otherwise.
+        <div style={{ marginBottom: 12 }}>
+          <PlaidConnectButton onSuccess={() => window.location.reload()} />
         </div>
       ) : null}
 
@@ -217,19 +235,19 @@ export function FinanceView() {
       >
         <HeaderCard
           label="Cash Position"
-          value={fmtDollar(balances?.totalCash || 0)}
+          value={balances?.totalCash != null ? fmtDollar(balances.totalCash) : "—"}
           hint="Found + Shopify + Amazon"
           icon={<Wallet size={16} />}
         />
         <HeaderCard
           label="Daily Burn Rate"
-          value={fmtDollar(burnRate)}
+          value={burnRate != null ? fmtDollar(burnRate) : "—"}
           hint="30d projected average"
           icon={<Flame size={16} />}
         />
         <HeaderCard
           label="Runway"
-          value={`${forecast?.runway || 0} days`}
+          value={forecast?.runway != null ? `${forecast.runway} days` : "—"}
           hint="Days until cash floor"
           icon={<TrendingUp size={16} />}
         />
@@ -245,7 +263,7 @@ export function FinanceView() {
       >
         <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px" }}>
           <div style={{ fontWeight: 700, color: NAVY, marginBottom: 12 }}>
-            Contribution P&L (Actual | Plan | Variance)
+            Contribution P&L (Current vs Previous Month)
             {!pnl?.revenue.total && (
               <span style={{ fontSize: 11, color: GOLD, fontWeight: 600, marginLeft: 8 }}>
                 — Actuals awaiting Plaid
@@ -261,78 +279,33 @@ export function FinanceView() {
                 <thead>
                   <tr>
                     <th style={{ textAlign: "left", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Line Item</th>
-                    <th style={{ textAlign: "right", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Actual</th>
-                    <th style={{ textAlign: "right", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Plan</th>
-                    <th style={{ textAlign: "right", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Budget</th>
-                    <th style={{ textAlign: "right", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Variance</th>
+                    <th style={{ textAlign: "right", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Current</th>
+                    <th style={{ textAlign: "right", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Previous Month</th>
+                    <th style={{ textAlign: "right", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>MoM</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {[
-                    {
-                      label: "Revenue",
-                      actual: pnl?.revenue.total || 0,
-                      plan: planRevenue,
-                      pva: pvaRevenue,
-                    },
-                    {
-                      label: "COGS",
-                      actual: pnl?.cogs.total || 0,
-                      plan: planCogs,
-                      pva: comparePlanVsActual(planCogs, pnl?.cogs.total || 0),
-                    },
-                    {
-                      label: "Gross Profit",
-                      actual: pnl?.grossProfit || 0,
-                      plan: planGrossProfit,
-                      pva: pvaGross,
-                    },
-                    {
-                      label: "OpEx",
-                      actual: pnl?.opex.total || 0,
-                      plan: planOpex,
-                      pva: pvaOpex,
-                    },
-                    {
-                      label: "Net Income",
-                      actual: pnl?.netIncome || 0,
-                      plan: planEbitda,
-                      pva: pvaNet,
-                    },
-                  ].map((row) => (
+                  {pnlRows.map((row) => {
+                    const delta = formatDelta(row.current, row.previous, { inverse: row.inverse });
+                    return (
                     <tr key={row.label}>
                       <td style={{ borderTop: `1px solid ${BORDER}`, padding: "9px 0", color: NAVY, fontWeight: 700 }}>{row.label}</td>
-                      <td style={{ borderTop: `1px solid ${BORDER}`, padding: "9px 0", textAlign: "right", color: NAVY }}>{fmtDollar(row.actual)}</td>
-                      <td style={{ borderTop: `1px solid ${BORDER}`, padding: "9px 0", textAlign: "right", color: TEXT_DIM }}>{fmtDollar(row.plan)}</td>
-                      <td style={{ borderTop: `1px solid ${BORDER}`, padding: "9px 0", textAlign: "right", color: TEXT_DIM }}>—</td>
-                      <td style={{ borderTop: `1px solid ${BORDER}`, padding: "9px 0", textAlign: "right" }}>
-                        <span
-                          style={{
-                            color: STATUS_COLORS[row.pva.status],
-                            background: `${STATUS_COLORS[row.pva.status]}14`,
-                            borderRadius: 999,
-                            padding: "2px 8px",
-                            fontWeight: 700,
-                            fontSize: 12,
-                          }}
-                        >
-                          {row.pva.plan === 0 && row.pva.actual === 0
-                            ? "—"
-                            : row.pva.plan === 0
-                              ? "N/A"
-                              : `${(row.pva.variancePct * 100).toFixed(1)}%`}
-                        </span>
+                      <td style={{ borderTop: `1px solid ${BORDER}`, padding: "9px 0", textAlign: "right", color: NAVY }}>
+                        {row.current != null ? fmtDollar(row.current) : <span style={{ color: TEXT_DIM }}>—</span>}
+                      </td>
+                      <td style={{ borderTop: `1px solid ${BORDER}`, padding: "9px 0", textAlign: "right", color: TEXT_DIM }}>
+                        {row.previous != null ? fmtDollar(row.previous) : "—"}
+                      </td>
+                      <td style={{ borderTop: `1px solid ${BORDER}`, padding: "9px 0", textAlign: "right", color: delta.color, fontWeight: 700 }}>
+                        {delta.label}
                       </td>
                     </tr>
-                  ))}
+                  );
+                })}
                 </tbody>
               </table>
             </div>
           )}
-
-          <div style={{ marginTop: 10, fontSize: 12, color: TEXT_DIM }}>
-            Budget column is intentionally dormant (`null`) until funding allocations are populated.
-          </div>
         </div>
 
         <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px" }}>
@@ -340,16 +313,16 @@ export function FinanceView() {
 
           <div style={{ display: "grid", gap: 8 }}>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
-              <span style={{ color: TEXT_DIM }}>COGS / bag</span>
-              <span style={{ color: NAVY, fontWeight: 700 }}>{fmtDollar(UNIT_ECONOMICS.cogsPerBag)}</span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
               <span style={{ color: TEXT_DIM }}>Avg selling price</span>
-              <span style={{ color: NAVY, fontWeight: 700 }}>{fmtDollar(averageSellingPrice)}</span>
+              <span style={{ color: NAVY, fontWeight: 700 }}>
+                {averageSellingPrice != null ? fmtDollar(averageSellingPrice) : <span style={{ color: TEXT_DIM }}>—</span>}
+              </span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
               <span style={{ color: TEXT_DIM }}>Gross margin</span>
-              <span style={{ color: NAVY, fontWeight: 700 }}>{(pnl?.grossMargin || 0).toFixed(1)}%</span>
+              <span style={{ color: NAVY, fontWeight: 700 }}>
+                {pnl?.grossMargin != null ? `${pnl.grossMargin.toFixed(1)}%` : <span style={{ color: TEXT_DIM }}>—</span>}
+              </span>
             </div>
             <div style={{ borderTop: `1px solid ${BORDER}`, paddingTop: 8 }}>
               <div style={{ fontSize: 12, color: TEXT_DIM, marginBottom: 6 }}>Channel GP / unit</div>
@@ -357,17 +330,21 @@ export function FinanceView() {
                 <div style={{ display: "flex", justifyContent: "space-between" }}>
                   <span style={{ color: TEXT_DIM }}>Amazon</span>
                   <span style={{ color: ap ? (ap.profitPerUnit < 0 ? RED : NAVY) : NAVY, fontWeight: 700 }}>
-                    {ap ? fmtDollarExact(ap.profitPerUnit) : fmtDollar(UNIT_ECONOMICS.amazon.gpPerUnit)}
+                    {ap ? fmtDollarExact(ap.profitPerUnit) : <span style={{ color: TEXT_DIM }}>—</span>}
                     {ap && <span style={{ fontSize: 10, color: TEXT_DIM, fontWeight: 500 }}> (live)</span>}
                   </span>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span style={{ color: TEXT_DIM }}>Wholesale</span>
-                  <span style={{ color: NAVY, fontWeight: 700 }}>{fmtDollar(UNIT_ECONOMICS.wholesale.gpPerUnit)}</span>
+                  <span style={{ color: TEXT_DIM }}>Shopify revenue</span>
+                  <span style={{ color: NAVY, fontWeight: 700 }}>
+                    {dashboard?.shopify?.totalRevenue != null ? fmtDollar(dashboard.shopify.totalRevenue) : <span style={{ color: TEXT_DIM }}>—</span>}
+                  </span>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span style={{ color: TEXT_DIM }}>Distributor</span>
-                  <span style={{ color: NAVY, fontWeight: 700 }}>{fmtDollar(UNIT_ECONOMICS.distributor.gpPerUnit)}</span>
+                  <span style={{ color: TEXT_DIM }}>Amazon revenue</span>
+                  <span style={{ color: NAVY, fontWeight: 700 }}>
+                    {dashboard?.amazon?.revenue?.monthToDate != null ? fmtDollar(dashboard.amazon.revenue.monthToDate) : <span style={{ color: TEXT_DIM }}>—</span>}
+                  </span>
                 </div>
               </div>
             </div>
@@ -587,187 +564,38 @@ export function FinanceView() {
             </div>
 
             <div style={{ marginTop: 8, fontSize: 11, color: TEXT_DIM }}>
-              Fees from Amazon SP-API Fees Estimate. COGS from pro-forma (${ap.cogsPerUnit.toFixed(2)}/unit).
-              Inbound shipping estimated at ${ap.inboundPerUnit.toFixed(2)}/unit.
+              Fees from Amazon SP-API fee estimates.
+              COGS and inbound shipping are estimated from observed channel economics.
               {ap.feesSource === "fallback" && " ⚠ Fee estimate is using fallback rates (Fees API unavailable)."}
             </div>
           </>
         )}
       </div>
 
-      {/* ── Loan Amortization + Capital Deployment ────────────── */}
       <div
         style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: 12,
+          background: CARD,
+          border: `1px solid ${BORDER}`,
+          borderRadius: 12,
+          padding: "14px",
           marginBottom: 14,
         }}
       >
-        {/* Loan Amortization */}
-        <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-            <Landmark size={16} color={NAVY} />
-            <div style={{ fontWeight: 700, color: NAVY }}>Revenue Participation Note</div>
-          </div>
-
-          <div style={{ display: "grid", gap: 8, marginBottom: 14 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
-              <span style={{ color: TEXT_DIM }}>Principal</span>
-              <span style={{ color: NAVY, fontWeight: 700 }}>{fmtDollar(LOAN.principal)}</span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
-              <span style={{ color: TEXT_DIM }}>Total Obligation (8% flat)</span>
-              <span style={{ color: NAVY, fontWeight: 700 }}>{fmtDollar(LOAN.totalObligation)}</span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
-              <span style={{ color: TEXT_DIM }}>Total Interest</span>
-              <span style={{ color: NAVY, fontWeight: 700 }}>{fmtDollar(LOAN.totalInterest)}</span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
-              <span style={{ color: TEXT_DIM }}>Repayment Rate</span>
-              <span style={{ color: NAVY, fontWeight: 700 }}>15% of gross revenue</span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
-              <span style={{ color: TEXT_DIM }}>Deferral Period</span>
-              <span style={{ color: NAVY, fontWeight: 700 }}>6 months (starts Aug 2026)</span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
-              <span style={{ color: TEXT_DIM }}>Projected Payoff</span>
-              <span style={{ color: "#16a34a", fontWeight: 700 }}>{LOAN.projectedPayoffDate}</span>
-            </div>
-          </div>
-
-          {/* Progress bar — actual repaid (starts Aug 2026, currently $0) */}
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: TEXT_DIM, marginBottom: 4 }}>
-              <span>{fmtDollar(0)} repaid to date (repayment starts Aug 2026)</span>
-              <span>0.0%</span>
-            </div>
-            <div style={{ width: "100%", height: 8, borderRadius: 99, background: BORDER }}>
-              <div style={{
-                width: "0%",
-                height: "100%",
-                borderRadius: 99,
-                background: NAVY,
-                transition: "width 0.6s ease",
-              }} />
-            </div>
-            <div style={{ fontSize: 11, color: TEXT_DIM, marginTop: 4 }}>
-              Plan projects {fmtDollar(ANNUAL_SUMMARY.totalLoanRepayment2026)} in 2026 ({((ANNUAL_SUMMARY.totalLoanRepayment2026 / LOAN.totalObligation) * 100).toFixed(1)}% of obligation)
-            </div>
-          </div>
-
-          {/* 2026 amortization table */}
-          <div style={{ fontSize: 11, color: TEXT_DIM, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
-            2026 Amortization Schedule <span style={{ color: GOLD, fontWeight: 800 }}>(PROJECTED)</span>
-          </div>
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr>
-                  <th style={{ textAlign: "left", fontSize: 10, color: TEXT_DIM, paddingBottom: 6 }}>Month</th>
-                  <th style={{ textAlign: "right", fontSize: 10, color: TEXT_DIM, paddingBottom: 6 }}>Revenue</th>
-                  <th style={{ textAlign: "right", fontSize: 10, color: TEXT_DIM, paddingBottom: 6 }}>Payment</th>
-                  <th style={{ textAlign: "right", fontSize: 10, color: TEXT_DIM, paddingBottom: 6 }}>Principal</th>
-                  <th style={{ textAlign: "right", fontSize: 10, color: TEXT_DIM, paddingBottom: 6 }}>Interest</th>
-                  <th style={{ textAlign: "right", fontSize: 10, color: TEXT_DIM, paddingBottom: 6 }}>Balance</th>
-                </tr>
-              </thead>
-              <tbody>
-                {AMORTIZATION_SCHEDULE.filter((a) => a.month.includes("2026")).map((a) => (
-                  <tr key={a.month}>
-                    <td style={{ borderTop: `1px solid ${BORDER}`, padding: "6px 0", fontSize: 12, color: NAVY, fontWeight: 600 }}>{a.month.replace(" 2026", "")}</td>
-                    <td style={{ borderTop: `1px solid ${BORDER}`, padding: "6px 0", fontSize: 12, textAlign: "right", color: TEXT_DIM }}>{fmtDollar(a.grossRevenue)}</td>
-                    <td style={{ borderTop: `1px solid ${BORDER}`, padding: "6px 0", fontSize: 12, textAlign: "right", color: NAVY, fontWeight: 700 }}>{fmtDollar(a.totalPayment)}</td>
-                    <td style={{ borderTop: `1px solid ${BORDER}`, padding: "6px 0", fontSize: 12, textAlign: "right", color: NAVY }}>{fmtDollar(a.principalPortion)}</td>
-                    <td style={{ borderTop: `1px solid ${BORDER}`, padding: "6px 0", fontSize: 12, textAlign: "right", color: TEXT_DIM }}>{fmtDollar(a.interestPortion)}</td>
-                    <td style={{ borderTop: `1px solid ${BORDER}`, padding: "6px 0", fontSize: 12, textAlign: "right", color: NAVY, fontWeight: 600 }}>{fmtDollar(a.principalBalance)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Capital Deployment + Founder Capital */}
-        <div style={{ display: "grid", gap: 12 }}>
-          {/* Capital Deployment */}
-          <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-              <Briefcase size={16} color={NAVY} />
-              <div style={{ fontWeight: 700, color: NAVY }}>Capital Deployment Plan</div>
-            </div>
-            <div style={{ fontSize: 12, color: TEXT_DIM, marginBottom: 10 }}>
-              {fmtDollar(TOTAL_CAPITAL_DEPLOYED)} total · {fmtDollar(LOAN.principal)} loan proceeds
-            </div>
-
-            <div style={{ display: "grid", gap: 4 }}>
-              {Object.entries(CAPITAL_BY_MONTH).map(([month, amount]) => {
-                const pct = (amount / TOTAL_CAPITAL_DEPLOYED) * 100;
-                return (
-                  <div key={month}>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 2 }}>
-                      <span style={{ color: NAVY, fontWeight: 600 }}>{month}</span>
-                      <span style={{ color: NAVY, fontWeight: 700 }}>{fmtDollar(amount)}</span>
-                    </div>
-                    <div style={{ width: "100%", height: 6, borderRadius: 99, background: BORDER }}>
-                      <div style={{
-                        width: `${pct}%`,
-                        height: "100%",
-                        borderRadius: 99,
-                        background: month === "Reserve" ? GOLD : NAVY,
-                      }} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div style={{ borderTop: `1px solid ${BORDER}`, marginTop: 10, paddingTop: 8 }}>
-              <div style={{ fontSize: 11, color: TEXT_DIM, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
-                Key Line Items
+        <div style={{ fontWeight: 700, color: NAVY, marginBottom: 10 }}>Live Financial Snapshot</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 8 }}>
+          {[
+            { label: "Net Margin", value: pnl?.netMargin != null ? `${pnl.netMargin.toFixed(1)}%` : "—" },
+            { label: "Gross Margin", value: pnl?.grossMargin != null ? `${pnl.grossMargin.toFixed(1)}%` : "—" },
+            { label: "Total Orders (Dashboard)", value: dashboard?.combined?.totalOrders != null ? String(dashboard.combined.totalOrders) : "—" },
+            { label: "Amazon Orders (30d)", value: ap?.totalOrders != null ? String(ap.totalOrders) : "—" },
+          ].map((item) => (
+            <div key={item.label} style={{ border: `1px solid ${BORDER}`, borderRadius: 10, background: BG, padding: "8px 10px" }}>
+              <div style={{ fontSize: 10, color: TEXT_DIM, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700, marginBottom: 4 }}>
+                {item.label}
               </div>
-              <div style={{ display: "grid", gap: 4 }}>
-                {CAPITAL_DEPLOYMENT.filter((c) => c.amount >= 5000).map((c) => (
-                  <div key={c.category} style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
-                    <span style={{ color: TEXT_DIM, flex: 1 }}>{c.category}</span>
-                    <span style={{ color: NAVY, fontWeight: 600, marginLeft: 8 }}>{fmtDollar(c.amount)}</span>
-                  </div>
-                ))}
-              </div>
+              <div style={{ fontSize: 18, color: NAVY, fontWeight: 800 }}>{item.value}</div>
             </div>
-          </div>
-
-          {/* Founder Capital */}
-          <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px" }}>
-            <div style={{ fontWeight: 700, color: NAVY, marginBottom: 10 }}>Founder Capital (Pre-Raise)</div>
-            <div style={{ display: "grid", gap: 6 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
-                <span style={{ color: TEXT_DIM }}>2025 Capital</span>
-                <span style={{ color: NAVY, fontWeight: 700 }}>{fmtDollar(FOUNDER_CAPITAL_2025)}</span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
-                <span style={{ color: TEXT_DIM }}>Jan-Feb 2026</span>
-                <span style={{ color: NAVY, fontWeight: 700 }}>{fmtDollar(FOUNDER_CAPITAL_2026_YTD)}</span>
-              </div>
-              <div style={{ borderTop: `1px solid ${BORDER}`, paddingTop: 6, display: "flex", justifyContent: "space-between", fontSize: 13 }}>
-                <span style={{ color: NAVY, fontWeight: 700 }}>Total Founder Capital</span>
-                <span style={{ color: NAVY, fontWeight: 800 }}>{fmtDollar(FOUNDER_CAPITAL_TOTAL)}</span>
-              </div>
-            </div>
-            <div style={{ marginTop: 8 }}>
-              <div style={{ fontSize: 11, color: TEXT_DIM, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Breakdown</div>
-              <div style={{ display: "grid", gap: 3 }}>
-                {CAPITAL_TO_DATE.map((c) => (
-                  <div key={`${c.category}-${c.period}`} style={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}>
-                    <span style={{ color: TEXT_DIM }}>{c.category} ({c.period})</span>
-                    <span style={{ color: NAVY, fontWeight: 600 }}>{fmtDollar(c.amount)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          ))}
         </div>
       </div>
 
@@ -846,11 +674,15 @@ export function FinanceView() {
           <div style={{ marginTop: 10, display: "grid", gap: 6 }}>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
               <span style={{ color: TEXT_DIM }}>Current balance</span>
-              <span style={{ color: NAVY, fontWeight: 700 }}>{fmtDollar(forecast?.currentBalance || 0)}</span>
+              <span style={{ color: NAVY, fontWeight: 700 }}>
+                {forecast?.currentBalance != null ? fmtDollar(forecast.currentBalance) : <span style={{ color: TEXT_DIM }}>—</span>}
+              </span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
-              <span style={{ color: TEXT_DIM }}>Projected runway</span>
-              <span style={{ color: NAVY, fontWeight: 700 }}>{forecast?.runway || 0} days</span>
+              <span style={{ color: TEXT_DIM }}>Runway</span>
+              <span style={{ color: NAVY, fontWeight: 700 }}>
+                {forecast?.runway != null ? `${forecast.runway} days` : <span style={{ color: TEXT_DIM }}>—</span>}
+              </span>
             </div>
           </div>
 
@@ -871,6 +703,26 @@ export function FinanceView() {
       {(pnlLoading || balLoading) && !hasError ? (
         <div style={{ fontSize: 12, color: TEXT_DIM }}>Refreshing finance metrics...</div>
       ) : null}
+
+      <div style={{ marginTop: 10 }}>
+        <span
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            border: `1px solid ${BORDER}`,
+            borderRadius: 999,
+            padding: "5px 10px",
+            fontSize: 11,
+            color: TEXT_DIM,
+            fontWeight: 700,
+            textTransform: "uppercase",
+            letterSpacing: "0.06em",
+            background: CARD,
+          }}
+        >
+          Data sources: Shopify, Amazon
+        </span>
+      </div>
     </div>
   );
 }
