@@ -5,6 +5,7 @@ const ALLOWED_TABLES = ["open_brain_entries", "email_events", "decision_log"] as
 type AllowedTable = (typeof ALLOWED_TABLES)[number];
 
 const MAX_CONTENT_LENGTH = 50_000; // 50KB max for raw content
+const MAX_EMBED_LENGTH = 25_000; // ~6K tokens — fits text-embedding-3-small limit (8191 tokens)
 const EMBEDDING_MODEL = "text-embedding-3-small";
 const EMBEDDING_DIMENSIONS = 1536;
 
@@ -151,9 +152,12 @@ serve(async (req: Request) => {
       );
     }
 
-    // Generate embedding via OpenAI
+    // Generate embedding via OpenAI — truncate text to fit model token limit
+    const textForEmbedding = textToEmbed.length > MAX_EMBED_LENGTH
+      ? textToEmbed.slice(0, MAX_EMBED_LENGTH)
+      : textToEmbed;
     let embedding: number[] | null = null;
-    if (textToEmbed.length > 0) {
+    if (textForEmbedding.length > 0) {
       const embeddingRes = await fetch("https://api.openai.com/v1/embeddings", {
         method: "POST",
         headers: {
@@ -162,7 +166,7 @@ serve(async (req: Request) => {
         },
         body: JSON.stringify({
           model: EMBEDDING_MODEL,
-          input: textToEmbed,
+          input: textForEmbedding,
           dimensions: EMBEDDING_DIMENSIONS,
         }),
       });
