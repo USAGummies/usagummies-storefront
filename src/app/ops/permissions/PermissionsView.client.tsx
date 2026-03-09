@@ -237,6 +237,9 @@ export function PermissionsView() {
                         }
                       />
                     ) : null}
+                    {approval.agent_name === "abra" || approval.approval_trigger === "abra_proposal" ? (
+                      <span style={{ background: "rgba(199,160,98,0.2)", color: "#c7a062", padding: "2px 6px", borderRadius: 4, fontSize: 10, fontWeight: 700 }}>🧠 ABRA</span>
+                    ) : null}
                     <span style={{ color: "rgba(255,255,255,0.92)", fontWeight: 700, fontSize: 13 }}>{approval.agent_name}</span>
                     <span style={{ color: "rgba(255,255,255,0.45)", fontSize: 11 }}>
                       {approval.agent_department || "unknown dept"}
@@ -262,6 +265,46 @@ export function PermissionsView() {
                   <span style={{ background: "rgba(251,191,36,0.18)", color: "#fcd34d", padding: "2px 8px", borderRadius: 999, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em" }}>
                     tier {tier}
                   </span>
+                </div>
+
+                {/* Confidence progress bar + risk indicator */}
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+                  <div style={{ flex: 1, maxWidth: 180 }}>
+                    <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 3, letterSpacing: "0.04em" }}>CONFIDENCE</div>
+                    <div style={{ height: 6, borderRadius: 3, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
+                      <div
+                        style={{
+                          height: "100%",
+                          borderRadius: 3,
+                          background: confColor,
+                          width: `${approval.confidence === "high" ? 90 : approval.confidence === "medium" ? 55 : approval.confidence === "low" ? 25 : 0}%`,
+                          transition: "width 0.3s ease",
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div style={{ flex: 1, maxWidth: 180 }}>
+                    <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 3, letterSpacing: "0.04em" }}>RISK LEVEL</div>
+                    <div style={{ display: "flex", gap: 3 }}>
+                      {(["low", "medium", "high", "critical"] as const).map((level) => (
+                        <div
+                          key={level}
+                          style={{
+                            flex: 1,
+                            height: 6,
+                            borderRadius: 3,
+                            background:
+                              (approval.risk_level === "critical") ||
+                              (approval.risk_level === "high" && level !== "critical") ||
+                              (approval.risk_level === "medium" && (level === "low" || level === "medium")) ||
+                              (approval.risk_level === "low" && level === "low")
+                                ? risk
+                                : "rgba(255,255,255,0.06)",
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: expanded ? 10 : 0 }}>
