@@ -178,6 +178,19 @@ export const ENGINE_REGISTRY: EngineConfig[] = [
       { key: "MKT3", name: "Auto-Post History Reporter", schedule: "Daily 20:00" },
     ],
   },
+  {
+    id: "abra-sync",
+    name: "Abra Brain Sync Engine",
+    scriptFile: "abra-brain-sync.mjs",
+    agents: [
+      { key: "ABRA1", name: "Email Ingest (Incremental)", schedule: "Daily 06:00" },
+      { key: "ABRA2", name: "Notion B2B Sync", schedule: "Daily 06:10" },
+      { key: "ABRA3", name: "Notion Distributor Sync", schedule: "Daily 06:15" },
+      { key: "ABRA4", name: "Notion SKU Sync", schedule: "Weekly Mon 06:20" },
+      { key: "ABRA5", name: "Notion Performance Sync", schedule: "Daily 22:00" },
+      { key: "ABRA6", name: "Notion Finance Sync", schedule: "Daily 22:05" },
+    ],
+  },
 ];
 
 // ---------------------------------------------------------------------------

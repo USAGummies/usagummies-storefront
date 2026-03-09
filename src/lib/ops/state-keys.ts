@@ -109,6 +109,10 @@ export const STATE_KEYS = {
   "inbox-unified-cache": "inbox-unified-cache.json",
   "slack-history-cache": "slack-history-cache.json",
 
+  // Abra brain sync
+  "abra-email-ingest-cursor": "abra-email-ingest-cursor.json",
+  "abra-notion-sync-cursor": "abra-notion-sync-cursor.json",
+
   // Logs (text, not JSON — stored as string)
   "engine-log": "agentic-engine.log",
   "command-center-log": "command-center.log",
