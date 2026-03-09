@@ -14,6 +14,7 @@
  */
 
 import { NextResponse } from "next/server";
+import { after } from "next/server";
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 export const runtime = "nodejs";
@@ -362,8 +363,9 @@ export async function POST(req: Request) {
   }
 
   // Immediately respond with "thinking" (Slack requires response within 3s)
-  // Then process in background via a detached promise
-  const backgroundPromise = (async () => {
+  // Use Next.js after() to run background work — Vercel keeps the function
+  // alive after the response is sent until the callback completes or maxDuration.
+  after(async () => {
     try {
       // Fetch thread history for multi-turn context (if in a thread + bot token available)
       let history: ChatMessage[] = [];
@@ -388,13 +390,7 @@ export async function POST(req: Request) {
         () => {},
       );
     }
-  })();
-
-  // Edge: In serverless, we can't truly "fire and forget" — but Next.js
-  // will keep the function alive until all promises resolve within maxDuration.
-  // We use waitUntil-like pattern by not awaiting but returning immediately.
-  // For Vercel, the function stays alive for the response + any pending I/O.
-  void backgroundPromise;
+  });
 
   return NextResponse.json({
     response_type: "ephemeral",
