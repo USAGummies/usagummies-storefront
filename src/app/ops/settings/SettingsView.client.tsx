@@ -52,17 +52,7 @@ const CARD_STYLE: CSSProperties = {
   borderRadius: 12,
 };
 
-declare global {
-  interface Window {
-    Plaid?: {
-      create: (config: {
-        token: string;
-        onSuccess: (publicToken: string) => void;
-        onExit?: (error: unknown) => void;
-      }) => { open: () => void };
-    };
-  }
-}
+// Window.Plaid types provided by react-plaid-link
 
 function loadPlaidScript(): Promise<void> {
   if (typeof window === "undefined") return Promise.resolve();
