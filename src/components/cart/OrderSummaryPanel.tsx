@@ -20,8 +20,8 @@ export type OrderSummaryPanelProps = {
   hasSavings: boolean;
   showRegularLine: boolean;
   regularTotalText: string;
-  regularPerBagText: string;
-  bundleSavingsText: string;
+  regularPerBagText?: string;
+  bundleSavingsText?: string;
   drawerSavingsLine: string;
   highlightTotals: boolean;
   showNextTierCta: boolean;
@@ -47,8 +47,8 @@ export function OrderSummaryPanel({
   hasSavings,
   showRegularLine,
   regularTotalText,
-  regularPerBagText,
-  bundleSavingsText,
+  regularPerBagText = "",
+  bundleSavingsText = "",
   drawerSavingsLine,
   highlightTotals: _highlightTotals,
   showNextTierCta,
