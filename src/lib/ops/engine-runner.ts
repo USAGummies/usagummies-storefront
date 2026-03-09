@@ -21,6 +21,7 @@ const ENGINE_SCRIPT_MAP: Record<string, string> = {
   "revenue-intel": "usa-gummies-revenue-intel.mjs",
   finops: "usa-gummies-finops.mjs",
   social: "usa-gummies-social-engine.mjs",
+  "abra-sync": "abra-brain-sync.mjs",
 };
 
 export type AgentResult = {
