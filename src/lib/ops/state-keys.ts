@@ -20,6 +20,7 @@ export const STATE_KEYS = {
   // Reply / inbox pipeline
   "reply-queue": "reply-attention-queue.json",
   "approved-sends": "reply-approved-sends.json",
+  "reply-action-audit": "reply-action-audit.json",
   "processed-emails": "processed-emails.json",
   "inbox-responder-log": "inbox-responder-log.json",
   "inbox-processed": "agentic-inbox-processed.json",
@@ -91,11 +92,15 @@ export const STATE_KEYS = {
   "alerts-cache": "alerts-cache.json",
   "alerts-resolved": "alerts-resolved.json",
   "alerts-action-log": "alerts-action-log.json",
+  "approvals-cache": "approvals-cache.json",
   "audit-cache": "audit-cache.json",
   "budgets-cache": "budgets-cache.json",
   "audit-cash-baseline": "audit-cash-baseline.json",
   "audit-inventory-baseline": "audit-inventory-baseline.json",
   "amazon-profitability": "amazon-profitability-cache.json",
+  "supabase-circuit-state": "supabase-circuit-state.json",
+  "integration-sla-report": "integration-sla-report.json",
+  "chaos-suite-report": "chaos-suite-report.json",
 
   // Marketing auto-post
   "auto-post-log": "auto-post-log.json",
@@ -108,6 +113,8 @@ export const STATE_KEYS = {
   "engine-log": "agentic-engine.log",
   "command-center-log": "command-center.log",
   "command-center-pid": "command-center.pid",
+  "command-center-status-log": "command-center-status-log.json",
+  "command-center-status-cache": "command-center-status-cache.json",
 } as const;
 
 export type StateKey = keyof typeof STATE_KEYS;

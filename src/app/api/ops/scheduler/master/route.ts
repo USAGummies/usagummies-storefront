@@ -12,6 +12,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Client } from "@upstash/qstash";
 import { getDueAgents, ENGINE_REGISTRY } from "@/lib/ops/engine-schedule";
+import { buildIntegrationSLAReport, type IntegrationSLAReport } from "@/lib/ops/env-check";
+import { runFailureInjectionSuite } from "@/lib/ops/failure-injection";
 import { appendStateArray, readState, writeState } from "@/lib/ops/state";
 import { runOpsAudit } from "@/lib/ops/audit-engine";
 
@@ -187,6 +189,39 @@ export async function GET(req: NextRequest) {
     console.error("[scheduler] Audit warmup failed:", err);
   }
 
+  // Weekly connector SLA report (Monday ET) + nightly failure-injection report.
+  let integrationSLA: IntegrationSLAReport | null = null;
+  let integrationSLAUpdated = false;
+  try {
+    const currentWeekReport = buildIntegrationSLAReport();
+    const existing = await readState<IntegrationSLAReport | null>(
+      "integration-sla-report",
+      null,
+    );
+
+    if (nowET.getDay() === 1 && existing?.weekKey !== currentWeekReport.weekKey) {
+      await writeState("integration-sla-report", currentWeekReport);
+      integrationSLA = currentWeekReport;
+      integrationSLAUpdated = true;
+    } else {
+      integrationSLA = existing || currentWeekReport;
+      if (!existing) {
+        await writeState("integration-sla-report", currentWeekReport);
+        integrationSLAUpdated = true;
+      }
+    }
+  } catch (err) {
+    console.error("[scheduler] Integration SLA report failed:", err);
+  }
+
+  let chaos = null as Awaited<ReturnType<typeof runFailureInjectionSuite>> | null;
+  try {
+    chaos = await runFailureInjectionSuite();
+    await writeState("chaos-suite-report", chaos);
+  } catch (err) {
+    console.error("[scheduler] Failure-injection suite failed:", err);
+  }
+
   return NextResponse.json({
     ok: true,
     timestamp: etTimestamp(),
@@ -194,6 +229,24 @@ export async function GET(req: NextRequest) {
     totalDue: dueAgents.length,
     dispatched: dispatched.length,
     auditWarm,
+    integrationSLA: integrationSLA
+      ? {
+          weekKey: integrationSLA.weekKey,
+          coveragePct: integrationSLA.summary.coveragePct,
+          staleCredentials: integrationSLA.summary.staleCredentials,
+          notConfigured: integrationSLA.summary.notConfigured,
+          generatedAt: integrationSLA.generatedAt,
+          updated: integrationSLAUpdated,
+        }
+      : null,
+    chaos: chaos
+      ? {
+          generatedAt: chaos.generatedAt,
+          passed: chaos.summary.passed,
+          failed: chaos.summary.failed,
+          total: chaos.summary.total,
+        }
+      : null,
     agents: dispatched,
   });
 }

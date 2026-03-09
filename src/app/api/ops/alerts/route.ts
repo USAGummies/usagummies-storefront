@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { CacheEnvelope } from "@/lib/amazon/types";
 import type { PlaidTransaction } from "@/lib/finance/types";
+import { checkIntegrations } from "@/lib/ops/env-check";
 import { readState, writeState } from "@/lib/ops/state";
 import { runOpsAudit } from "@/lib/ops/audit-engine";
 import { DB, NotionProp, createPage } from "@/lib/notion/client";
@@ -153,6 +154,7 @@ async function persistActionToNotion(entry: AlertActionLog): Promise<void> {
 }
 
 async function buildAlerts(): Promise<AlertsResponse> {
+  const integrationDetails = checkIntegrations();
   const [
     audit,
     forecastCache,
@@ -247,6 +249,44 @@ async function buildAlerts(): Promise<AlertsResponse> {
             : new Date().toISOString(),
           actionLabel: "Open finance",
           actionHref: "/ops/finance",
+          status: "open",
+          resolvedAt: null,
+          resolvedBy: null,
+        },
+        resolvedState,
+      ),
+    );
+  }
+
+  for (const integration of integrationDetails) {
+    if (integration.status === "connected") continue;
+
+    const isCritical = integration.priority === "p0";
+    const priority: AlertPriority =
+      integration.status === "stale_credentials"
+        ? isCritical
+          ? "critical"
+          : "warning"
+        : isCritical
+          ? "critical"
+          : "warning";
+
+    alerts.push(
+      applyResolution(
+        {
+          id: cleanId(`integration-${integration.key}-${integration.status}`),
+          priority,
+          source: "integration",
+          title:
+            integration.status === "stale_credentials"
+              ? `${integration.name} credentials are stale`
+              : `${integration.name} is not configured`,
+          message: integration.staleReason
+            ? `${integration.staleReason} Owner: ${integration.owner}. Runbook: ${integration.runbookUrl}`
+            : `Owner: ${integration.owner}. Runbook: ${integration.runbookUrl}`,
+          createdAt: new Date().toISOString(),
+          actionLabel: "Open integrations",
+          actionHref: "/ops/settings",
           status: "open",
           resolvedAt: null,
           resolvedBy: null,

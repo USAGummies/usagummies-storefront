@@ -9,7 +9,12 @@ import {
   updatePage,
 } from "@/lib/notion/client";
 import { getNotionApiKey } from "@/lib/notion/credentials";
-import { checkIntegrations, type IntegrationStatus } from "@/lib/ops/env-check";
+import {
+  buildIntegrationSLAReport,
+  checkIntegrations,
+  type IntegrationSLAReport,
+  type IntegrationStatus,
+} from "@/lib/ops/env-check";
 import { readState } from "@/lib/ops/state";
 
 export const runtime = "nodejs";
@@ -36,6 +41,7 @@ type SettingsResponse = {
     slack: boolean;
   };
   integrationDetails: IntegrationStatus[];
+  integrationSLA: IntegrationSLAReport;
   banking: {
     plaidConfigured: boolean;
     plaidConnected: boolean;
@@ -121,6 +127,7 @@ export async function GET() {
     const session = await auth();
     const canEditRoles = session?.user?.role === "admin";
     const integrationDetails = checkIntegrations();
+    const integrationSLA = buildIntegrationSLAReport();
     const plaidConfigured = integrationDetails.find((d) => d.name === "Plaid")?.configured || false;
 
     const [rows, auditTimestamp, plaidToken, balances] = await Promise.all([
@@ -146,6 +153,7 @@ export async function GET() {
       users,
       integrations: integrationSummary(integrationDetails),
       integrationDetails,
+      integrationSLA,
       banking: {
         plaidConfigured,
         plaidConnected,
@@ -175,11 +183,13 @@ export async function GET() {
     return NextResponse.json(result);
   } catch (err) {
     const integrationDetails = checkIntegrations();
+    const integrationSLA = buildIntegrationSLAReport();
     return NextResponse.json(
       {
         users: [],
         integrations: integrationSummary(integrationDetails),
         integrationDetails,
+        integrationSLA,
         banking: {
           plaidConfigured: integrationDetails.find((d) => d.name === "Plaid")?.configured || false,
           plaidConnected: false,

@@ -6,8 +6,14 @@
  */
 
 import { NextResponse } from "next/server";
+import { checkIntegrations, type IntegrationSLAReport } from "@/lib/ops/env-check";
 import { readState, readStateArray } from "@/lib/ops/state";
 import { ENGINE_REGISTRY } from "@/lib/ops/engine-schedule";
+import {
+  getSupabaseCircuitState,
+  isCircuitOpen,
+  type SupabaseCircuitState,
+} from "@/lib/ops/supabase-resilience";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,11 +57,18 @@ type SystemStatus = {
 };
 
 export async function GET() {
-  const [ledger, status, recentDispatches] = await Promise.all([
+  const [ledger, status, recentDispatches, integrationSLA, chaosSuite, supabaseCircuit] = await Promise.all([
     readStateArray<RunRecord>("run-ledger"),
     readState<SystemStatus>("system-status", {}),
     readStateArray<RunRecord>("run-ledger-recent"),
+    readState<IntegrationSLAReport | null>("integration-sla-report", null),
+    readState<{
+      generatedAt?: string;
+      summary?: { passed?: number; failed?: number; total?: number };
+    } | null>("chaos-suite-report", null),
+    getSupabaseCircuitState(),
   ]);
+  const integrationDetails = checkIntegrations();
 
   // Last 100 runs
   const recentRuns = ledger.slice(-100).reverse();
@@ -109,6 +122,12 @@ export async function GET() {
       : "unknown";
 
   const totalAgents = ENGINE_REGISTRY.reduce((sum, e) => sum + e.agents.length, 0);
+  const integrationConnected = integrationDetails.filter(
+    (integration) => integration.status === "connected",
+  ).length;
+  const integrationCoveragePct = integrationDetails.length
+    ? Math.round((integrationConnected / integrationDetails.length) * 1000) / 10
+    : 0;
 
   return NextResponse.json({
     overall,
@@ -122,6 +141,44 @@ export async function GET() {
       agentCount,
     },
     recentDispatches: recentDispatches.slice(-20).reverse(),
+    integrationHealth: {
+      total: integrationDetails.length,
+      connected: integrationConnected,
+      staleCredentials: integrationDetails.filter((i) => i.status === "stale_credentials").length,
+      notConfigured: integrationDetails.filter((i) => i.status === "not_configured").length,
+      coveragePct: integrationCoveragePct,
+      topBacklog: integrationDetails
+        .filter((i) => i.status !== "connected")
+        .slice(0, 5)
+        .map((i) => ({
+          name: i.name,
+          status: i.status,
+          priority: i.priority,
+          owner: i.owner,
+          runbookUrl: i.runbookUrl,
+        })),
+      latestSLA: integrationSLA
+        ? {
+            weekKey: integrationSLA.weekKey,
+            generatedAt: integrationSLA.generatedAt,
+            coveragePct: integrationSLA.summary.coveragePct,
+          }
+        : null,
+    },
+    resilience: {
+      supabaseCircuit: {
+        ...(supabaseCircuit as SupabaseCircuitState),
+        open: isCircuitOpen(supabaseCircuit),
+      },
+      nightlyFailureInjection: chaosSuite
+        ? {
+            generatedAt: chaosSuite.generatedAt || null,
+            passed: chaosSuite.summary?.passed ?? 0,
+            failed: chaosSuite.summary?.failed ?? 0,
+            total: chaosSuite.summary?.total ?? 0,
+          }
+        : null,
+    },
     generatedAt: new Date().toISOString(),
   });
 }
