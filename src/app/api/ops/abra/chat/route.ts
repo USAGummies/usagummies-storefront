@@ -27,7 +27,12 @@ import {
   shouldAskQuestions,
 } from "@/lib/ops/abra-question-detector";
 import { detectDepartment, type PlaybookQuestion } from "@/lib/ops/department-playbooks";
-import { logAICost, extractClaudeUsage, getMonthlySpend } from "@/lib/ops/abra-cost-tracker";
+import {
+  logAICost,
+  extractClaudeUsage,
+  getMonthlySpend,
+  getPreferredClaudeModel,
+} from "@/lib/ops/abra-cost-tracker";
 import { searchTiered, buildTieredContext, type TieredSearchResult } from "@/lib/ops/abra-memory-tiers";
 import { logAnswer, extractProvenance } from "@/lib/ops/abra-source-provenance";
 import { getTeamMembers, getVendors, buildTeamContext } from "@/lib/ops/abra-team-directory";
@@ -405,11 +410,12 @@ async function generateClaudeReply(input: {
   costSummary?: AbraCostContext | null;
   teamContext?: string;
   signalsContext?: string;
-}) {
+}): Promise<{ reply: string; modelUsed: string }> {
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) {
     throw new Error("ANTHROPIC_API_KEY not configured");
   }
+  const selectedModel = await getPreferredClaudeModel(DEFAULT_CLAUDE_MODEL);
 
   const systemPrompt = buildAbraSystemPrompt({
     format: "web",
@@ -446,7 +452,7 @@ async function generateClaudeReply(input: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: DEFAULT_CLAUDE_MODEL,
+      model: selectedModel,
       max_tokens: 900,
       temperature: 0.2,
       system: systemPrompt,
@@ -475,7 +481,7 @@ async function generateClaudeReply(input: {
   const usage = extractClaudeUsage(payload);
   if (usage) {
     void logAICost({
-      model: DEFAULT_CLAUDE_MODEL,
+      model: selectedModel,
       provider: "anthropic",
       inputTokens: usage.inputTokens,
       outputTokens: usage.outputTokens,
@@ -499,7 +505,7 @@ async function generateClaudeReply(input: {
     throw new Error("Claude returned an empty response");
   }
 
-  return reply;
+  return { reply, modelUsed: selectedModel };
 }
 
 export async function POST(req: Request) {
@@ -828,7 +834,7 @@ export async function POST(req: Request) {
 
     const confidence = computeConfidence(tieredResults.all);
 
-    const reply = await generateClaudeReply({
+    const claudeResult = await generateClaudeReply({
       message,
       history,
       tieredResults,
@@ -839,6 +845,7 @@ export async function POST(req: Request) {
       teamContext,
       signalsContext,
     });
+    const reply = claudeResult.reply;
 
     // Log answer provenance (best-effort, non-blocking)
     const provenance = extractProvenance(tieredResults.all);
@@ -852,7 +859,7 @@ export async function POST(req: Request) {
       department: detectDepartment(message),
       asked_by: session.user.email,
       channel: "web",
-      model_used: DEFAULT_CLAUDE_MODEL,
+      model_used: claudeResult.modelUsed,
     });
 
     // Log unanswered questions

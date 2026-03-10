@@ -5,7 +5,24 @@
  * Monthly budget: $1,000 (configurable via ABRA_MONTHLY_BUDGET env var).
  */
 
+import { readState, writeState } from "@/lib/ops/state";
+import { notifyAlert, notifyDaily } from "@/lib/ops/notify";
+
 const MONTHLY_BUDGET = Number(process.env.ABRA_MONTHLY_BUDGET) || 1000;
+const BUDGET_FALLBACK_MODEL =
+  process.env.ABRA_BUDGET_FALLBACK_MODEL || "claude-3-5-haiku-latest";
+const GOVERNOR_STATE_KEY = "abra-model-governor" as const;
+
+type BudgetAlertLevel = "none" | "info" | "warning" | "critical";
+
+type GovernorState = {
+  month: string;
+  lastAlertLevel: BudgetAlertLevel;
+  forceHaiku: boolean;
+  updatedAt: string;
+  spend: number;
+  budget: number;
+};
 
 // Pricing per million tokens (as of March 2026)
 const PRICING: Record<string, { input: number; output: number }> = {
@@ -135,6 +152,8 @@ export async function logAICost(params: {
       endpoint: params.endpoint,
       department: params.department || null,
     });
+
+    await checkBudgetAndAlert();
   } catch {
     // Best-effort — never block the response
   }
@@ -288,6 +307,116 @@ export async function getSpendByModel(
   } catch {
     return {};
   }
+}
+
+function alertLevelFromPct(pctUsed: number): BudgetAlertLevel {
+  if (pctUsed >= 95) return "critical";
+  if (pctUsed >= 80) return "warning";
+  if (pctUsed >= 50) return "info";
+  return "none";
+}
+
+function defaultGovernorState(month: string): GovernorState {
+  return {
+    month,
+    lastAlertLevel: "none",
+    forceHaiku: false,
+    updatedAt: new Date().toISOString(),
+    spend: 0,
+    budget: MONTHLY_BUDGET,
+  };
+}
+
+export async function getModelGovernorState(): Promise<GovernorState> {
+  const month = new Date().toISOString().slice(0, 7);
+  const fallback = defaultGovernorState(month);
+  const state = await readState(GOVERNOR_STATE_KEY, fallback);
+  if (!state || typeof state !== "object") return fallback;
+  const row = state as Partial<GovernorState>;
+  if (row.month !== month) return fallback;
+  return {
+    month: row.month || month,
+    lastAlertLevel:
+      row.lastAlertLevel === "info" ||
+      row.lastAlertLevel === "warning" ||
+      row.lastAlertLevel === "critical"
+        ? row.lastAlertLevel
+        : "none",
+    forceHaiku: row.forceHaiku === true,
+    updatedAt: row.updatedAt || new Date().toISOString(),
+    spend: Number(row.spend || 0),
+    budget: Number(row.budget || MONTHLY_BUDGET),
+  };
+}
+
+export async function getPreferredClaudeModel(
+  defaultModel: string,
+): Promise<string> {
+  const state = await getModelGovernorState();
+  if (state.forceHaiku) return BUDGET_FALLBACK_MODEL;
+  return defaultModel;
+}
+
+export async function checkBudgetAndAlert(): Promise<{
+  level: BudgetAlertLevel;
+  spend: number;
+  budget: number;
+  pctUsed: number;
+  forceHaiku: boolean;
+}> {
+  const spend = await getMonthlySpend();
+  const month = new Date().toISOString().slice(0, 7);
+  const level = alertLevelFromPct(spend.pctUsed);
+  const previous = await getModelGovernorState();
+
+  const next: GovernorState = {
+    month,
+    lastAlertLevel: level,
+    forceHaiku: level === "critical",
+    updatedAt: new Date().toISOString(),
+    spend: spend.total,
+    budget: spend.budget,
+  };
+
+  const levelChanged = previous.lastAlertLevel !== level;
+
+  if (levelChanged) {
+    if (level === "info") {
+      console.info(
+        `[abra-cost] Budget at ${spend.pctUsed.toFixed(1)}% ($${spend.total.toFixed(2)} / $${spend.budget}).`,
+      );
+      void notifyDaily(
+        `🟦 Abra AI budget at ${spend.pctUsed.toFixed(1)}% ($${spend.total.toFixed(2)} / $${spend.budget}).`,
+      );
+    }
+
+    if (level === "warning") {
+      void notifyAlert(
+        `🟨 Abra AI spend warning: ${spend.pctUsed.toFixed(1)}% used ($${spend.total.toFixed(2)} / $${spend.budget}).`,
+      );
+    }
+
+    if (level === "critical") {
+      void notifyAlert(
+        `🟥 Abra AI spend critical: ${spend.pctUsed.toFixed(1)}% used ($${spend.total.toFixed(2)} / $${spend.budget}). Auto-downgrading to ${BUDGET_FALLBACK_MODEL}.`,
+        true,
+      );
+    }
+  }
+
+  if (level !== "critical" && previous.forceHaiku && spend.pctUsed < 90) {
+    next.forceHaiku = false;
+  }
+
+  await writeState(GOVERNOR_STATE_KEY, next);
+
+  return {
+    level,
+    spend: spend.total,
+    budget: spend.budget,
+    pctUsed: spend.pctUsed,
+    forceHaiku: next.forceHaiku,
+  };
 }
 
 /**
