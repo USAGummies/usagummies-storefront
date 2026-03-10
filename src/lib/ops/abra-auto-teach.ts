@@ -629,15 +629,23 @@ export async function handleShopifyProductsFeed(): Promise<FeedResult> {
 export async function handleGA4TrafficFeed(): Promise<FeedResult> {
   const feedKey = "ga4_traffic";
   try {
-    const sample = parseJsonEnv<{ sessions?: number; conversion_rate?: number }>(
-      "ABRA_GA4_TRAFFIC_SAMPLE_JSON",
-      {},
-    );
-    if (!sample.sessions) {
-      return { feed_key: feedKey, success: true, entriesCreated: 0 };
-    }
+    const { fetchGA4Report } = await import("@/lib/ops/abra-ga4-client");
+    const report = await fetchGA4Report({
+      startDate: "yesterday",
+      endDate: "yesterday",
+    });
+    const topPagesStr = report.topPages
+      .slice(0, 5)
+      .map((page) => `${page.path} (${page.views})`)
+      .join(", ");
+    const topSourcesStr = report.topSources
+      .slice(0, 3)
+      .map(
+        (source) => `${source.source}/${source.medium} (${source.sessions})`,
+      )
+      .join(", ");
 
-    const summary = `GA4 traffic snapshot: ${sample.sessions} sessions, conversion rate ${(sample.conversion_rate || 0).toFixed(2)}%.`;
+    const summary = `GA4 traffic (yesterday): ${report.sessions} sessions, ${report.pageViews} pageviews, ${report.users} users. Avg engagement: ${report.avgEngagementTime.toFixed(0)}s. Bounce rate: ${(report.bounceRate * 100).toFixed(1)}%. Top pages: ${topPagesStr}. Top sources: ${topSourcesStr}.`;
     const date = new Date().toISOString().split("T")[0];
     const saved = await writeBrainEntry({
       sourceRef: `ga4-traffic-${date}`,
@@ -646,6 +654,19 @@ export async function handleGA4TrafficFeed(): Promise<FeedResult> {
       category: "traffic_data",
       department: "sales_and_growth",
     });
+
+    if (report.sessions < 10) {
+      void emitSignal({
+        signal_type: "traffic_anomaly",
+        source: "ga4",
+        title: "Unusually low traffic",
+        detail: `Only ${report.sessions} sessions yesterday (expected 50+)`,
+        severity: "warning",
+        department: "sales_and_growth",
+        metadata: { sessions: report.sessions },
+      });
+    }
+
     return { feed_key: feedKey, success: true, entriesCreated: saved ? 1 : 0 };
   } catch (error) {
     return {
