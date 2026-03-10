@@ -243,3 +243,104 @@ export async function POST(req: Request) {
     }
   }
 }
+
+export async function PATCH(req: Request) {
+  const session = await auth();
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  let body: CompetitorInput & { id?: unknown } = {};
+  try {
+    body = (await req.json()) as CompetitorInput & { id?: unknown };
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 });
+  }
+
+  const id = asText(body.id);
+  if (!id) {
+    return NextResponse.json({ error: "id is required" }, { status: 400 });
+  }
+
+  const payload: Record<string, unknown> = {};
+  const competitorName = asText(body.competitor_name);
+  const dataType = asText(body.data_type);
+  const title = asText(body.title);
+  const detail = asText(body.detail);
+  const source = asText(body.source);
+  const sourceUrl = asText(body.source_url);
+  const department = asText(body.department);
+
+  if (competitorName) payload.competitor_name = competitorName;
+  if (dataType) {
+    if (!DATA_TYPES.has(dataType)) {
+      return NextResponse.json({ error: "Invalid data_type" }, { status: 400 });
+    }
+    payload.data_type = dataType;
+  }
+  if (title) payload.title = title;
+  if (typeof body.detail === "string") payload.detail = detail || null;
+  if (source) payload.source = source;
+  if (typeof body.source_url === "string") payload.source_url = sourceUrl || null;
+  if (department) payload.department = department;
+  if (body.metadata && typeof body.metadata === "object" && !Array.isArray(body.metadata)) {
+    payload.metadata = body.metadata;
+  }
+  payload.created_by = session.user.email;
+
+  try {
+    const updated = (await sbFetch(`/rest/v1/abra_competitor_intel?id=eq.${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: {
+        Prefer: "return=representation",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    })) as Array<Record<string, unknown>>;
+
+    return NextResponse.json({ entry: Array.isArray(updated) ? updated[0] || null : null });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to update competitor intel entry" },
+      { status: 500 },
+    );
+  }
+}
+
+export async function DELETE(req: Request) {
+  const session = await auth();
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  let id = "";
+  try {
+    const url = new URL(req.url);
+    id = asText(url.searchParams.get("id"));
+    if (!id) {
+      const body = (await req.json().catch(() => ({}))) as { id?: unknown };
+      id = asText(body.id);
+    }
+  } catch {
+    // Ignore, validated below.
+  }
+
+  if (!id) {
+    return NextResponse.json({ error: "id is required" }, { status: 400 });
+  }
+
+  try {
+    await sbFetch(`/rest/v1/abra_competitor_intel?id=eq.${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      headers: {
+        Prefer: "return=minimal",
+      },
+    });
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to delete competitor intel entry" },
+      { status: 500 },
+    );
+  }
+}

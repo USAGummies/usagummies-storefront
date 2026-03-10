@@ -34,6 +34,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: "COMMAND",
     items: [
       { href: "/ops/abra", label: "Abra", icon: "\u{1F9E0}", roles: ["admin", "employee"] },
+      { href: "/ops/competitors", label: "Competitive Intel", icon: "\u{1F3AF}", roles: ["admin", "employee"] },
       { href: "/ops", label: "Command Center", icon: "\u{1F3AF}", roles: ["admin", "employee", "investor", "partner", "banker"] },
       { href: "/ops/channels", label: "Revenue by Channel", icon: "\u{1F4CA}", roles: ["admin", "employee", "investor", "partner", "banker"] },
       { href: "/ops/permissions", label: "Permission Queue", icon: "\u{1F6E1}\uFE0F", roles: ["admin", "employee"] },
