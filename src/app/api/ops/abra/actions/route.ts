@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth/config";
+import { isAuthorized } from "@/lib/ops/abra-auth";
 import { executeAction, getAvailableActions } from "@/lib/ops/abra-actions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
-  const session = await auth();
-  if (!session?.user?.email) {
+export async function GET(req: Request) {
+  if (!(await isAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -17,8 +16,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const session = await auth();
-  if (!session?.user?.email) {
+  if (!(await isAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

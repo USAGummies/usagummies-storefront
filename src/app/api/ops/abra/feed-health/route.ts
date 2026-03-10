@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth/config";
+import { isAuthorized } from "@/lib/ops/abra-auth";
 import { getUnresolvedDeadLetters } from "@/lib/ops/abra-auto-teach";
 
 export const runtime = "nodejs";
@@ -59,15 +59,8 @@ async function sbFetch(path: string, init: RequestInit = {}): Promise<unknown> {
   return json;
 }
 
-function isCronAuthorized(req: Request): boolean {
-  const secret = process.env.CRON_SECRET;
-  const authHeader = req.headers.get("authorization");
-  return !!secret && authHeader === `Bearer ${secret}`;
-}
-
 export async function GET(req: Request) {
-  const session = await auth();
-  if (!session?.user?.email && !isCronAuthorized(req)) {
+  if (!(await isAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

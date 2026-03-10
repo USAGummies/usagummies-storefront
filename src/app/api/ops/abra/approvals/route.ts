@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/config";
+import { isAuthorized } from "@/lib/ops/abra-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -79,8 +80,7 @@ async function resolveUserIdFromEmail(email: string): Promise<string | null> {
 }
 
 export async function GET(req: Request) {
-  const session = await auth();
-  if (!session?.user?.email) {
+  if (!(await isAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -114,10 +114,10 @@ export async function GET(req: Request) {
 }
 
 export async function PATCH(req: Request) {
-  const session = await auth();
-  if (!session?.user?.email) {
+  if (!(await isAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const session = await auth();
 
   let payload: {
     id?: unknown;
@@ -157,7 +157,9 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: "Approval not found" }, { status: 404 });
     }
 
-    const deciderUserId = await resolveUserIdFromEmail(session.user.email);
+    const deciderUserId = session?.user?.email
+      ? await resolveUserIdFromEmail(session.user.email)
+      : null;
     const existingRow = existing[0];
 
     const updatePayload: Record<string, unknown> = {

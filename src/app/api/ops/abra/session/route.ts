@@ -11,6 +11,7 @@
 
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/config";
+import { isAuthorized } from "@/lib/ops/abra-auth";
 import {
   canUseSupabase,
   markSupabaseFailure,
@@ -468,10 +469,11 @@ async function createTasksFromActionItems(
 
 // ─── POST: Start new session ───
 async function handlePost(req: Request) {
-  const userSession = await auth();
-  if (!userSession?.user?.email) {
+  if (!(await isAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const userSession = await auth();
+  const actorEmail = userSession?.user?.email || "cron@system";
 
   let payload: {
     department?: unknown;
@@ -544,7 +546,7 @@ async function handlePost(req: Request) {
         decisions: [],
         open_questions: [],
         scratchpad: [],
-        user_email: userSession.user.email,
+        user_email: actorEmail,
         status: "active",
         started_at: new Date().toISOString(),
       }),
@@ -579,8 +581,7 @@ async function handlePost(req: Request) {
 
 // ─── GET: Fetch sessions ───
 async function handleGet(req: Request) {
-  const userSession = await auth();
-  if (!userSession?.user?.email) {
+  if (!(await isAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -626,8 +627,7 @@ async function handleGet(req: Request) {
 
 // ─── PATCH: Update session (notes, action items, decisions) ───
 async function handlePatch(req: Request) {
-  const userSession = await auth();
-  if (!userSession?.user?.email) {
+  if (!(await isAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -763,8 +763,7 @@ async function handlePatch(req: Request) {
 
 // ─── END SESSION: Save + task creation + complete ───
 async function handleEndSession(req: Request) {
-  const userSession = await auth();
-  if (!userSession?.user?.email) {
+  if (!(await isAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

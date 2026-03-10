@@ -1,21 +1,9 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth/config";
+import { isAuthorized } from "@/lib/ops/abra-auth";
 import { checkAndAlertHealth, getSystemHealth } from "@/lib/ops/abra-health-monitor";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function isCronAuthorized(req: Request): boolean {
-  const secret = process.env.CRON_SECRET;
-  const authHeader = req.headers.get("authorization");
-  return !!secret && authHeader === `Bearer ${secret}`;
-}
-
-async function isAuthorized(req: Request): Promise<boolean> {
-  const session = await auth();
-  if (session?.user?.email) return true;
-  return isCronAuthorized(req);
-}
 
 export async function GET(req: Request) {
   if (!(await isAuthorized(req))) {

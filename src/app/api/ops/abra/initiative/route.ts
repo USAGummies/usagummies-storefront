@@ -10,6 +10,7 @@
 
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/config";
+import { isAuthorized } from "@/lib/ops/abra-auth";
 import {
   canUseSupabase,
   markSupabaseFailure,
@@ -615,10 +616,11 @@ async function syncInitiativeToNotion(
 
 // ─── POST: Create new initiative ───
 async function handlePost(req: Request) {
-  const session = await auth();
-  if (!session?.user?.email) {
+  if (!(await isAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const session = await auth();
+  const actorEmail = session?.user?.email || "cron@system";
 
   let payload: { department?: unknown; goal?: unknown; depends_on?: unknown[] } = {};
   try {
@@ -730,7 +732,7 @@ async function handlePost(req: Request) {
         tasks: [],
         kpis: playbook?.kpis || [],
         research_findings: research.findings,
-        initiated_by: session.user.email,
+        initiated_by: actorEmail,
       }),
     })) as Initiative[];
 
@@ -771,8 +773,7 @@ async function handlePost(req: Request) {
 
 // ─── GET: Fetch initiatives ───
 async function handleGet(req: Request) {
-  const session = await auth();
-  if (!session?.user?.email) {
+  if (!(await isAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -833,10 +834,11 @@ async function handleGet(req: Request) {
 
 // ─── PATCH: Update initiative (answers, status) ───
 async function handlePatch(req: Request) {
-  const session = await auth();
-  if (!session?.user?.email) {
+  if (!(await isAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const session = await auth();
+  const actorEmail = session?.user?.email || "cron@system";
 
   let payload: {
     id?: unknown;
@@ -927,10 +929,10 @@ async function handlePatch(req: Request) {
         );
         updates.kpis = buildKpiTargets(playbook.kpis, normalizedAnswers);
         updates.status = "approved";
-        updates.approved_by = session.user.email;
+        updates.approved_by = actorEmail;
       } else if (allAnswered) {
         updates.status = "approved";
-        updates.approved_by = session.user.email;
+        updates.approved_by = actorEmail;
       } else {
         updates.status = "asking_questions";
       }

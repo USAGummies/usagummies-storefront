@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/config";
+import { isCronAuthorized } from "@/lib/ops/abra-auth";
 import { sendMonthlyReport, sendWeeklyDigest } from "@/lib/ops/abra-weekly-digest";
 import { notify } from "@/lib/ops/notify";
 
@@ -13,12 +14,6 @@ type DigestRow = {
   summary_text: string | null;
   created_at: string;
 };
-
-function isCronAuthorized(req: Request): boolean {
-  const authHeader = req.headers.get("authorization");
-  const secret = process.env.CRON_SECRET;
-  return Boolean(secret && authHeader === `Bearer ${secret}`);
-}
 
 function getSupabaseEnv() {
   const baseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth/config";
+import { isAuthorized } from "@/lib/ops/abra-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,12 +40,6 @@ function getSupabaseEnv() {
     throw new Error("Missing Supabase credentials");
   }
   return { baseUrl, serviceKey };
-}
-
-function isCronAuthorized(req: Request): boolean {
-  const secret = process.env.CRON_SECRET;
-  const authHeader = req.headers.get("authorization");
-  return !!secret && authHeader === `Bearer ${secret}`;
 }
 
 async function sbFetch(path: string, init: RequestInit = {}): Promise<unknown> {
@@ -124,8 +118,7 @@ function buildTrend(rows: KpiRow[], metricNames: string[]): Array<{ date: string
 }
 
 export async function GET(req: Request) {
-  const session = await auth();
-  if (!session?.user?.email && !isCronAuthorized(req)) {
+  if (!(await isAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

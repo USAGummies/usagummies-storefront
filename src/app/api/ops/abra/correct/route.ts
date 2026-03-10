@@ -10,6 +10,7 @@
 
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/config";
+import { isAuthorized } from "@/lib/ops/abra-auth";
 import {
   canUseSupabase,
   markSupabaseFailure,
@@ -108,10 +109,10 @@ async function buildEmbedding(text: string): Promise<number[]> {
 }
 
 export async function POST(req: Request) {
-  const session = await auth();
-  if (!session?.user?.email) {
+  if (!(await isAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const session = await auth();
 
   let payload: {
     original_claim?: unknown;
@@ -149,7 +150,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const correctedBy = session.user.email;
+    const correctedBy = session?.user?.email || "cron@system";
     const embeddingText = `CORRECTION: ${originalClaim} → ${correction}`;
     const embedding = await buildEmbedding(embeddingText.slice(0, 8000));
 

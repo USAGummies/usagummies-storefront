@@ -10,6 +10,7 @@
 
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/config";
+import { isAuthorized } from "@/lib/ops/abra-auth";
 import {
   canUseSupabase,
   markSupabaseFailure,
@@ -91,8 +92,7 @@ async function sbFetch(path: string, init: RequestInit = {}) {
  * Query params: ?department=finance
  */
 export async function GET(req: Request) {
-  const session = await auth();
-  if (!session?.user?.email) {
+  if (!(await isAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -166,10 +166,10 @@ export async function GET(req: Request) {
  * In the future, Abra can use /api/ops/abra/propose for approval flow.
  */
 export async function POST(req: Request) {
-  const session = await auth();
-  if (!session?.user?.email) {
+  if (!(await isAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const session = await auth();
 
   let body: {
     department?: string;
@@ -300,7 +300,7 @@ export async function POST(req: Request) {
       department: row.name,
       dashboard_config: row.dashboard_config || {},
       applied_changes: changes,
-      updated_by: session.user.email,
+      updated_by: session?.user?.email || "cron@system",
     });
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);

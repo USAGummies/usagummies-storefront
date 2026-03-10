@@ -1,15 +1,9 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth/config";
+import { isAuthorized } from "@/lib/ops/abra-auth";
 import { getActiveSignals } from "@/lib/ops/abra-operational-signals";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function isCronAuthorized(req: Request): boolean {
-  const secret = process.env.CRON_SECRET;
-  const authHeader = req.headers.get("authorization");
-  return !!secret && authHeader === `Bearer ${secret}`;
-}
 
 const SEVERITY_WEIGHT: Record<string, number> = {
   critical: 3,
@@ -18,8 +12,7 @@ const SEVERITY_WEIGHT: Record<string, number> = {
 };
 
 export async function GET(req: Request) {
-  const session = await auth();
-  if (!session?.user?.email && !isCronAuthorized(req)) {
+  if (!(await isAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

@@ -14,7 +14,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth/config";
+import { isAuthorized } from "@/lib/ops/abra-auth";
 import {
   canUseSupabase,
   markSupabaseFailure,
@@ -122,8 +122,7 @@ async function buildEmbedding(text: string): Promise<number[]> {
 }
 
 export async function POST(req: Request) {
-  const session = await auth();
-  if (!session?.user?.email) {
+  if (!(await isAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

@@ -1,16 +1,10 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth/config";
+import { isAuthorized } from "@/lib/ops/abra-auth";
 import { generateRevenueForecast } from "@/lib/ops/abra-forecasting";
 import { notify } from "@/lib/ops/notify";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function isCronAuthorized(req: Request): boolean {
-  const secret = process.env.CRON_SECRET;
-  const authHeader = req.headers.get("authorization");
-  return Boolean(secret && authHeader === `Bearer ${secret}`);
-}
 
 function parseDays(value: string | null): number {
   const parsed = Number(value || 30);
@@ -24,8 +18,7 @@ function parseChannel(value: string | null): "all" | "shopify" | "amazon" | "tot
 }
 
 export async function GET(req: Request) {
-  const session = await auth();
-  if (!session?.user?.email && !isCronAuthorized(req)) {
+  if (!(await isAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

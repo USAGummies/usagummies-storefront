@@ -10,6 +10,7 @@
 import { NextResponse } from "next/server";
 import { createHash } from "node:crypto";
 import { auth } from "@/lib/auth/config";
+import { isAuthorized } from "@/lib/ops/abra-auth";
 import {
   canUseSupabase,
   markSupabaseFailure,
@@ -843,10 +844,11 @@ async function generateClaudeReply(input: {
 }
 
 export async function POST(req: Request) {
-  const session = await auth();
-  if (!session?.user?.email) {
+  if (!(await isAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const session = await auth();
+  const actorEmail = session?.user?.email || "cron@system";
 
   let payload: { message?: unknown; history?: unknown; thread_id?: unknown } = {};
   try {
@@ -901,7 +903,7 @@ export async function POST(req: Request) {
     }
     void captureCompetitorIntelFromChat({
       message,
-      userEmail: session.user.email,
+      userEmail: actorEmail,
       threadId,
     }).catch(() => {});
 
@@ -936,7 +938,7 @@ export async function POST(req: Request) {
 
       queueChatHistory({
         threadId,
-        userEmail: session.user.email,
+        userEmail: actorEmail,
         userMessage: message,
         assistantMessage: costReply,
         metadata: { intent: "cost" },
@@ -1038,7 +1040,7 @@ export async function POST(req: Request) {
 
             queueChatHistory({
               threadId,
-              userEmail: session.user.email,
+              userEmail: actorEmail,
               userMessage: message,
               assistantMessage: approvedReply,
               metadata: {
@@ -1078,7 +1080,7 @@ export async function POST(req: Request) {
 
           queueChatHistory({
             threadId,
-            userEmail: session.user.email,
+            userEmail: actorEmail,
             userMessage: message,
             assistantMessage: followupReply,
             metadata: {
@@ -1144,7 +1146,7 @@ export async function POST(req: Request) {
 
           queueChatHistory({
             threadId,
-            userEmail: session.user.email,
+            userEmail: actorEmail,
             userMessage: message,
             assistantMessage: initReply,
             metadata: {
@@ -1203,7 +1205,7 @@ export async function POST(req: Request) {
 
           queueChatHistory({
             threadId,
-            userEmail: session.user.email,
+            userEmail: actorEmail,
             userMessage: message,
             assistantMessage: sessReply,
             metadata: {
@@ -1315,7 +1317,7 @@ export async function POST(req: Request) {
       confidence,
       memory_tiers_used: provenance.memory_tiers_used,
       department: messageDepartment,
-      asked_by: session.user.email,
+      asked_by: actorEmail,
       channel: "web",
       model_used: claudeResult.modelUsed,
     });
@@ -1329,7 +1331,7 @@ export async function POST(req: Request) {
       for (const q of detectedQuestions.slice(0, 3)) {
         await logUnansweredQuestion(
           q,
-          session.user.email,
+          actorEmail,
           `Original question: ${message}`,
         );
       }
@@ -1337,7 +1339,7 @@ export async function POST(req: Request) {
 
     queueChatHistory({
       threadId,
-      userEmail: session.user.email,
+      userEmail: actorEmail,
       userMessage: message,
       assistantMessage: reply,
       modelUsed: claudeResult.modelUsed,

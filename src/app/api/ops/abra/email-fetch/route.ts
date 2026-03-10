@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isCronAuthorized } from "@/lib/ops/abra-auth";
 import { notify } from "@/lib/ops/notify";
 import { runEmailFetch } from "@/lib/ops/abra-email-fetch";
 
@@ -6,14 +7,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-function isAuthorized(req: Request): boolean {
-  const secret = process.env.CRON_SECRET;
-  const authHeader = req.headers.get("authorization");
-  return !!secret && authHeader === `Bearer ${secret}`;
-}
-
 export async function POST(req: Request) {
-  if (!isAuthorized(req)) {
+  if (!isCronAuthorized(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
