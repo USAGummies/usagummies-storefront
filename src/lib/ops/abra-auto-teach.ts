@@ -856,6 +856,29 @@ export async function handleInventoryAlertsFeed(): Promise<FeedResult> {
   return handleShopifyInventoryFeed();
 }
 
+export async function handleInventoryForecastFeed(): Promise<FeedResult> {
+  const feedKey = "inventory_forecast";
+  try {
+    const { checkAndAlertReorders } = await import("@/lib/ops/abra-inventory-forecast");
+    const result = await checkAndAlertReorders();
+    return {
+      feed_key: feedKey,
+      success: true,
+      entriesCreated: result.alerts_sent,
+      ...(result.proposals_created > 0
+        ? { error: `proposals_created=${result.proposals_created}` }
+        : {}),
+    };
+  } catch (error) {
+    return {
+      feed_key: feedKey,
+      success: false,
+      entriesCreated: 0,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
 /**
  * Shopify inventory monitor feed.
  */
@@ -1177,6 +1200,7 @@ export async function runFeed(feedKey: string): Promise<FeedResult> {
     ga4_traffic: handleGA4TrafficFeed,
     email_fetch: handleEmailFetchFeed,
     inventory_alerts: handleInventoryAlertsFeed,
+    inventory_forecast: handleInventoryForecastFeed,
   };
 
   const handler = handlers[feedKey];
