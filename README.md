@@ -87,6 +87,17 @@ Test ladder in checkout:
 - Qty 8 → ladder total
 - Qty 12 → $51.00 total ($4.25/bag)
 
+## Slack Events environment variables (Abra channel intelligence)
+
+Required for `/api/slack/events`:
+
+- `SLACK_SIGNING_SECRET=<Slack app signing secret>` (validates Events API signatures)
+- `SLACK_BOT_TOKEN=<xoxb-...>` (lets Abra reply in threads via `chat.postMessage`)
+
+Optional:
+
+- `SLACK_MONITORED_CHANNELS=C0123456789,C0987654321` (comma-separated channel IDs Abra should monitor without explicit mention)
+
 ## Development Notes
 
 - Lint runs with cache enabled by default.
