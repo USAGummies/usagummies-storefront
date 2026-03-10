@@ -80,9 +80,41 @@ type EmailSignalBucket = {
   info: number;
 };
 
+type HealthIntegration = {
+  system_name: string;
+  connection_status: "connected" | "expired" | "error" | "not_configured";
+  last_success_at: string | null;
+  last_error_at: string | null;
+  error_summary: string | null;
+  retry_count: number;
+};
+
+type HealthFeedSummary = {
+  total_feeds: number;
+  active: number;
+  disabled: number;
+  unresolved_dead_letters: number;
+};
+
+type SystemHealthPayload = {
+  integrations: HealthIntegration[];
+  feeds: HealthFeedSummary;
+  uptime: { healthy: number; degraded: number; down: number };
+  last_checked: string;
+};
+
 function average(nums: number[]): number {
   if (nums.length === 0) return 0;
   return nums.reduce((sum, n) => sum + n, 0) / nums.length;
+}
+
+function integrationStatusColor(
+  status: HealthIntegration["connection_status"],
+): string {
+  if (status === "connected") return "#16a34a";
+  if (status === "expired") return GOLD;
+  if (status === "error") return RED;
+  return TEXT_DIM;
 }
 
 function Sparkline({ values, color }: { values: number[]; color: string }) {
@@ -208,6 +240,8 @@ export function OpsDashboard() {
   const [emailSignals, setEmailSignals] = useState<EmailSignalBucket[]>([]);
   const [emailSignalsTotal, setEmailSignalsTotal] = useState(0);
   const [emailSignalsLoading, setEmailSignalsLoading] = useState(false);
+  const [systemHealth, setSystemHealth] = useState<SystemHealthPayload | null>(null);
+  const [healthLoading, setHealthLoading] = useState(false);
 
   const fetchAbraInsights = useCallback(async () => {
     setAbraLoading(true);
@@ -264,10 +298,29 @@ export function OpsDashboard() {
     }
   }, []);
 
+  const fetchSystemHealth = useCallback(async () => {
+    setHealthLoading(true);
+    try {
+      const res = await fetch("/api/ops/abra/health", { cache: "no-store" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          typeof data?.error === "string" ? data.error : `HTTP ${res.status}`,
+        );
+      }
+      setSystemHealth(data as SystemHealthPayload);
+    } catch {
+      setSystemHealth(null);
+    } finally {
+      setHealthLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     void fetchAbraInsights();
     void fetchEmailSignals();
-  }, [fetchAbraInsights, fetchEmailSignals]);
+    void fetchSystemHealth();
+  }, [fetchAbraInsights, fetchEmailSignals, fetchSystemHealth]);
 
   const month = getCurrentProFormaMonth();
   const planRevenue = month ? cumulativeThrough(TOTAL_REVENUE, month) : null;
@@ -398,6 +451,7 @@ export function OpsDashboard() {
     { label: "Alerts", timestamp: alerts?.lastFetched },
     { label: "Channels", timestamp: channels?.generatedAt },
     { label: "Inventory", timestamp: inventory?.generatedAt },
+    { label: "Health", timestamp: systemHealth?.last_checked },
   ];
 
   return (
@@ -502,6 +556,125 @@ export function OpsDashboard() {
           variance={comparePlanVsActual(30, inventoryDays)}
           spark={sparkInventory.length ? sparkInventory : [0, 0, 0]}
         />
+      </div>
+
+      <div
+        style={{
+          background: CARD,
+          border: `1px solid ${BORDER}`,
+          borderRadius: 12,
+          padding: "14px 16px",
+          marginBottom: 14,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 10,
+            gap: 10,
+          }}
+        >
+          <div style={{ fontWeight: 700, color: NAVY }}>System Health</div>
+          <button
+            onClick={() => void fetchSystemHealth()}
+            disabled={healthLoading}
+            style={{
+              border: `1px solid ${BORDER}`,
+              borderRadius: 8,
+              background: "white",
+              color: NAVY,
+              fontSize: 12,
+              fontWeight: 700,
+              padding: "6px 10px",
+              cursor: healthLoading ? "wait" : "pointer",
+              opacity: healthLoading ? 0.7 : 1,
+            }}
+          >
+            {healthLoading ? "Refreshing..." : "Refresh"}
+          </button>
+        </div>
+
+        {healthLoading ? (
+          <div style={{ fontSize: 13, color: TEXT_DIM }}>Loading health status...</div>
+        ) : !systemHealth ? (
+          <div style={{ fontSize: 13, color: TEXT_DIM }}>
+            Health data unavailable.
+          </div>
+        ) : (
+          <>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+                gap: 8,
+                marginBottom: 10,
+              }}
+            >
+              <div style={{ fontSize: 12, color: NAVY, fontWeight: 700 }}>
+                Healthy: {systemHealth.uptime.healthy}
+              </div>
+              <div style={{ fontSize: 12, color: GOLD, fontWeight: 700 }}>
+                Degraded: {systemHealth.uptime.degraded}
+              </div>
+              <div style={{ fontSize: 12, color: RED, fontWeight: 700 }}>
+                Down: {systemHealth.uptime.down}
+              </div>
+              <div style={{ fontSize: 12, color: TEXT_DIM }}>
+                Feeds: {systemHealth.feeds.active}/{systemHealth.feeds.total_feeds} active
+              </div>
+              <div style={{ fontSize: 12, color: RED }}>
+                Disabled feeds: {systemHealth.feeds.disabled}
+              </div>
+              <div style={{ fontSize: 12, color: systemHealth.feeds.unresolved_dead_letters > 0 ? RED : TEXT_DIM }}>
+                Dead letters: {systemHealth.feeds.unresolved_dead_letters}
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                gap: 8,
+              }}
+            >
+              {systemHealth.integrations.map((integration) => (
+                <div
+                  key={integration.system_name}
+                  style={{
+                    border: `1px solid ${BORDER}`,
+                    borderRadius: 10,
+                    background: "#fff",
+                    padding: "8px 10px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 8,
+                  }}
+                  title={integration.error_summary || integration.connection_status}
+                >
+                  <span style={{ color: NAVY, fontSize: 12, fontWeight: 700 }}>
+                    {integration.system_name}
+                  </span>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    <span
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: 999,
+                        background: integrationStatusColor(integration.connection_status),
+                      }}
+                    />
+                    <span style={{ color: TEXT_DIM, fontSize: 11 }}>
+                      {integration.connection_status}
+                    </span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
       <div

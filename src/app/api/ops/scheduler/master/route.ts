@@ -180,6 +180,14 @@ export async function GET(req: NextRequest) {
     await appendStateArray("run-ledger", dispatched, 10000);
   }
 
+  // Integration/feed health check and alerting (best-effort).
+  try {
+    const { checkAndAlertHealth } = await import("@/lib/ops/abra-health-monitor");
+    await checkAndAlertHealth();
+  } catch (e) {
+    console.error("[scheduler] Health check failed:", e);
+  }
+
   // Keep audit cache warm so pages have recent reconciliation + freshness data.
   let auditWarm = false;
   try {
