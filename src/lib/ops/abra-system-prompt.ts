@@ -57,6 +57,7 @@ export type AbraPromptContext = {
   activeInitiatives?: AbraInitiativeContext[];
   activeSession?: AbraSessionContext | null;
   costSummary?: AbraCostContext | null;
+  financialContext?: string | null;
   teamContext?: string;
   signalsContext?: string;
 };
@@ -175,6 +176,11 @@ These are the ONLY current team members. Do NOT reference anyone else as team un
     sections.push(
       `AI SPEND: $${c.total.toFixed(2)} / $${c.budget} this month (${c.pctUsed}% used, $${c.remaining.toFixed(2)} remaining). Spend level: ${warningLevel}.${warningLevel === "CRITICAL" ? " Use shorter responses and avoid research calls." : ""}${warningLevel === "HIGH" ? " Be mindful of token usage." : ""}`,
     );
+  }
+
+  // 9b. Financial context (dynamic, finance-only)
+  if (ctx.financialContext) {
+    sections.push(`FINANCIAL CONTEXT (real data only):\n${ctx.financialContext}`);
   }
 
   // 10. Formatting rules

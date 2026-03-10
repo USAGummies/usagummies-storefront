@@ -33,6 +33,10 @@ import {
   getMonthlySpend,
   getPreferredClaudeModel,
 } from "@/lib/ops/abra-cost-tracker";
+import {
+  getMarginAnalysis,
+  getRevenueSnapshot,
+} from "@/lib/ops/abra-financial-intel";
 import { searchTiered, buildTieredContext, type TieredSearchResult } from "@/lib/ops/abra-memory-tiers";
 import { logAnswer, extractProvenance } from "@/lib/ops/abra-source-provenance";
 import { getTeamMembers, getVendors, buildTeamContext } from "@/lib/ops/abra-team-directory";
@@ -399,6 +403,32 @@ async function fetchCostSummary(): Promise<AbraCostContext | null> {
   }
 }
 
+function isFinanceQuestion(message: string): boolean {
+  return /\b(finance|financial|revenue|margin|cogs|gross profit|profitability|aov|cash flow|budget)\b/i.test(
+    message,
+  );
+}
+
+async function fetchFinancialContext(): Promise<string | null> {
+  try {
+    const [monthSnapshot, weekSnapshot, margins] = await Promise.all([
+      getRevenueSnapshot("month"),
+      getRevenueSnapshot("week"),
+      getMarginAnalysis(),
+    ]);
+
+    const lines = [
+      `Current month revenue: Shopify $${monthSnapshot.shopify_revenue.toFixed(2)}, Amazon $${monthSnapshot.amazon_revenue.toFixed(2)}, total $${monthSnapshot.total_revenue.toFixed(2)} (${monthSnapshot.order_count} orders, AOV $${monthSnapshot.avg_order_value.toFixed(2)}, ${monthSnapshot.vs_prior_period_pct >= 0 ? "+" : ""}${monthSnapshot.vs_prior_period_pct.toFixed(2)}% vs prior period).`,
+      `Last 7 days revenue: total $${weekSnapshot.total_revenue.toFixed(2)} (${weekSnapshot.order_count} orders, AOV $${weekSnapshot.avg_order_value.toFixed(2)}).`,
+      `Estimated gross margin: ${margins.estimated_gross_margin_pct.toFixed(2)}% with estimated COGS per unit $${margins.estimated_cogs_per_unit.toFixed(2)} (estimated gross profit $${margins.estimated_gross_profit.toFixed(2)} on revenue $${margins.revenue.toFixed(2)}).`,
+    ];
+
+    return lines.join("\n");
+  } catch {
+    return null;
+  }
+}
+
 async function buildEmbedding(query: string): Promise<number[]> {
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) {
@@ -530,6 +560,7 @@ async function generateClaudeReply(input: {
   departments: AbraDepartment[];
   activeInitiatives?: AbraInitiativeContext[];
   costSummary?: AbraCostContext | null;
+  financialContext?: string | null;
   teamContext?: string;
   signalsContext?: string;
   availableActions?: string[];
@@ -546,6 +577,7 @@ async function generateClaudeReply(input: {
     departments: input.departments,
     activeInitiatives: input.activeInitiatives,
     costSummary: input.costSummary,
+    financialContext: input.financialContext,
     teamContext: input.teamContext,
     signalsContext: input.signalsContext,
   });
@@ -1024,6 +1056,9 @@ export async function POST(req: Request) {
         getVendors(),
         getActiveSignals({ limit: 5 }),
       ]);
+    const financialContext = isFinanceQuestion(message)
+      ? await fetchFinancialContext()
+      : null;
 
     // Build dynamic context strings for system prompt
     const today = new Date().toISOString().split("T")[0];
@@ -1041,6 +1076,7 @@ export async function POST(req: Request) {
       departments,
       activeInitiatives,
       costSummary,
+      financialContext,
       teamContext,
       signalsContext,
       availableActions,
