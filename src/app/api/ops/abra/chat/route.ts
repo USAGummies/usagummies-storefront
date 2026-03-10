@@ -42,6 +42,10 @@ import {
   proposeAction,
   type AbraAction,
 } from "@/lib/ops/abra-actions";
+import {
+  buildConversationContext,
+  saveMessage,
+} from "@/lib/ops/abra-chat-history";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -52,7 +56,7 @@ const DEFAULT_CLAUDE_MODEL =
   process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-latest";
 
 type ChatMessage = {
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "system";
   content: string;
 };
 
@@ -121,7 +125,11 @@ function sanitizeHistory(history: unknown): ChatMessage[] {
     )
     .map((item): ChatMessage => {
       const role: ChatMessage["role"] =
-        item.role === "assistant" ? "assistant" : "user";
+        item.role === "assistant"
+          ? "assistant"
+          : item.role === "system"
+            ? "system"
+            : "user";
       return {
         role,
         content:
@@ -478,6 +486,42 @@ function buildConversation(history: ChatMessage[]): string {
     .join("\n");
 }
 
+function isUuidLike(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
+}
+
+function makeThreadId(): string {
+  return crypto.randomUUID();
+}
+
+function queueChatHistory(params: {
+  threadId: string;
+  userEmail: string;
+  userMessage: string;
+  assistantMessage: string;
+  modelUsed?: string;
+  metadata?: Record<string, unknown>;
+}) {
+  if (!isUuidLike(params.threadId)) return;
+  void saveMessage({
+    thread_id: params.threadId,
+    role: "user",
+    content: params.userMessage,
+    user_email: params.userEmail,
+  }).catch(() => {});
+
+  void saveMessage({
+    thread_id: params.threadId,
+    role: "assistant",
+    content: params.assistantMessage,
+    model_used: params.modelUsed,
+    metadata: params.metadata || {},
+    user_email: params.userEmail,
+  }).catch(() => {});
+}
+
 async function generateClaudeReply(input: {
   message: string;
   history: ChatMessage[];
@@ -597,7 +641,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let payload: { message?: unknown; history?: unknown } = {};
+  let payload: { message?: unknown; history?: unknown; thread_id?: unknown } = {};
   try {
     payload = await req.json();
   } catch {
@@ -617,6 +661,12 @@ export async function POST(req: Request) {
   }
 
   const history = sanitizeHistory(payload.history);
+  const requestedThreadId =
+    typeof payload.thread_id === "string" ? payload.thread_id.trim() : "";
+  const threadId =
+    requestedThreadId && isUuidLike(requestedThreadId)
+      ? requestedThreadId
+      : makeThreadId();
 
   try {
     const circuitCheck = await canUseSupabase();
@@ -630,6 +680,18 @@ export async function POST(req: Request) {
         },
         { status: 503 },
       );
+    }
+
+    let effectiveHistory = history;
+    if (isUuidLike(threadId)) {
+      try {
+        const stored = await buildConversationContext(threadId, 12);
+        if (stored.length > 0) {
+          effectiveHistory = stored;
+        }
+      } catch {
+        // Best-effort: fall back to client-provided history.
+      }
     }
 
     // ─── Intent Detection ───
@@ -649,11 +711,19 @@ export async function POST(req: Request) {
           ? `• By provider: ${Object.entries(spend.byProvider).map(([k, v]) => `${k}: $${(Number(v) || 0).toFixed(2)}`).join(", ")}`
           : "");
 
+      queueChatHistory({
+        threadId,
+        userEmail: session.user.email,
+        userMessage: message,
+        assistantMessage: costReply,
+        metadata: { intent: "cost" },
+      });
       return NextResponse.json({
         reply: costReply,
         confidence: 1,
         sources: [],
         intent: "cost",
+        thread_id: threadId,
       });
     }
 
@@ -743,6 +813,16 @@ export async function POST(req: Request) {
               .filter(Boolean)
               .join("\n\n");
 
+            queueChatHistory({
+              threadId,
+              userEmail: session.user.email,
+              userMessage: message,
+              assistantMessage: approvedReply,
+              metadata: {
+                intent: "initiative_answers",
+                initiative_id: updated.id || activeAskingInitiative.id,
+              },
+            });
             return NextResponse.json({
               reply: approvedReply,
               confidence: 1,
@@ -750,6 +830,7 @@ export async function POST(req: Request) {
               intent: "initiative_answers",
               initiative_id: updated.id || activeAskingInitiative.id,
               plan: patchData?.plan || null,
+              thread_id: threadId,
             });
           }
 
@@ -767,17 +848,29 @@ export async function POST(req: Request) {
             .slice(0, 5)
             .map((question, idx) => `${idx + 1}. ${question.q}`)
             .join("\n");
+          const followupReply =
+            openQuestions.length > 0
+              ? `Captured those answers for **${updated?.title || activeAskingInitiative.title || "your initiative"}**. I still need:\n\n${questionList}`
+              : `Captured those answers for **${updated?.title || activeAskingInitiative.title || "your initiative"}**.`;
 
+          queueChatHistory({
+            threadId,
+            userEmail: session.user.email,
+            userMessage: message,
+            assistantMessage: followupReply,
+            metadata: {
+              intent: "initiative_answers",
+              initiative_id: updated?.id || activeAskingInitiative.id,
+            },
+          });
           return NextResponse.json({
-            reply:
-              openQuestions.length > 0
-                ? `Captured those answers for **${updated?.title || activeAskingInitiative.title || "your initiative"}**. I still need:\n\n${questionList}`
-                : `Captured those answers for **${updated?.title || activeAskingInitiative.title || "your initiative"}**.`,
+            reply: followupReply,
             confidence: 1,
             sources: [],
             intent: "initiative_answers",
             initiative_id: updated?.id || activeAskingInitiative.id,
             plan: patchData?.plan || null,
+            thread_id: threadId,
           });
         }
       } catch {
@@ -826,12 +919,23 @@ export async function POST(req: Request) {
             `I've done some research and identified the baseline requirements. Now I need to ask you some questions to customize the plan:\n\n${qList}\n\n` +
             `You can answer these questions here, or I can use the defaults and generate a plan right away.`;
 
+          queueChatHistory({
+            threadId,
+            userEmail: session.user.email,
+            userMessage: message,
+            assistantMessage: initReply,
+            metadata: {
+              intent: "initiative",
+              initiative_id: initData.id,
+            },
+          });
           return NextResponse.json({
             reply: initReply,
             confidence: 1,
             sources: [],
             intent: "initiative",
             initiative_id: initData.id,
+            thread_id: threadId,
           });
         }
       } catch {
@@ -874,12 +978,23 @@ export async function POST(req: Request) {
             `**Agenda:**\n${agendaList}\n\n` +
             `Let's work through these items. What would you like to start with?`;
 
+          queueChatHistory({
+            threadId,
+            userEmail: session.user.email,
+            userMessage: message,
+            assistantMessage: sessReply,
+            metadata: {
+              intent: "session",
+              session_id: sessData.id,
+            },
+          });
           return NextResponse.json({
             reply: sessReply,
             confidence: 1,
             sources: [],
             intent: "session",
             session_id: sessData.id,
+            thread_id: threadId,
           });
         }
       } catch {
@@ -920,7 +1035,7 @@ export async function POST(req: Request) {
 
     const claudeResult = await generateClaudeReply({
       message,
-      history,
+      history: effectiveHistory,
       tieredResults,
       corrections,
       departments,
@@ -988,9 +1103,22 @@ export async function POST(req: Request) {
       }
     }
 
+    queueChatHistory({
+      threadId,
+      userEmail: session.user.email,
+      userMessage: message,
+      assistantMessage: reply,
+      modelUsed: claudeResult.modelUsed,
+      metadata: {
+        confidence,
+        tier_counts: tieredResults.tierCounts,
+      },
+    });
+
     return NextResponse.json({
       reply,
       confidence,
+      thread_id: threadId,
       tierCounts: tieredResults.tierCounts,
       sources: tieredResults.all.map((row) => ({
         id: row.id,

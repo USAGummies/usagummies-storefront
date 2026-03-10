@@ -432,6 +432,7 @@ export function AbraChat() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [activeSessionTitle, setActiveSessionTitle] = useState<string | null>(null);
   const [activeSessionAgenda, setActiveSessionAgenda] = useState<string[]>([]);
+  const [threadId, setThreadId] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
   const historyPayload = useMemo(
@@ -604,6 +605,7 @@ export function AbraChat() {
           body: JSON.stringify({
             message,
             history: historyPayload,
+            thread_id: threadId,
           }),
         });
 
@@ -630,6 +632,9 @@ export function AbraChat() {
         };
 
         setMessages((prev) => [...prev, assistantMessage]);
+        if (typeof data?.thread_id === "string" && data.thread_id.trim()) {
+          setThreadId(data.thread_id.trim());
+        }
 
         // Track session
         if (data?.session_id) {
@@ -683,7 +688,7 @@ export function AbraChat() {
         setPending(false);
       }
     },
-    [pending, historyPayload, refreshActiveSession, refreshCostSummary],
+    [pending, historyPayload, refreshActiveSession, refreshCostSummary, threadId],
   );
 
   async function onSubmit(event: FormEvent) {
@@ -736,6 +741,13 @@ export function AbraChat() {
         `What's the status of the ${init.department.replace(/_/g, " ")} initiative "${init.title || init.goal}"?`,
       );
     }
+  }
+
+  function handleNewConversation() {
+    if (pending) return;
+    setMessages([]);
+    setThreadId(null);
+    setError(null);
   }
 
   return (
@@ -817,34 +829,72 @@ export function AbraChat() {
                 </div>
               </div>
               {/* Cost badge (when no initiative panel) */}
-              {initiatives.length === 0 && costSummary && (
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    fontSize: 11,
-                    color: SURFACE_TEXT_DIM,
-                  }}
-                >
-                  <span>
-                    ${costSummary.total.toFixed(2)} / ${costSummary.budget}
-                  </span>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                {threadId && (
                   <span
                     style={{
-                      color:
-                        costSummary.pctUsed >= 90
-                          ? RED
-                          : costSummary.pctUsed >= 70
-                            ? "#eab308"
-                            : "#22c55e",
-                      fontWeight: 600,
+                      fontSize: 10,
+                      color: SURFACE_TEXT_DIM,
+                      fontFamily: "monospace",
                     }}
                   >
-                    ({costSummary.pctUsed}%)
+                    thread {threadId.slice(0, 8)}…
                   </span>
-                </div>
-              )}
+                )}
+                <button
+                  type="button"
+                  onClick={handleNewConversation}
+                  disabled={pending}
+                  style={{
+                    border: `1px solid ${SURFACE_BORDER}`,
+                    background: "#fff",
+                    color: NAVY,
+                    borderRadius: 8,
+                    padding: "5px 10px",
+                    fontSize: 11,
+                    fontWeight: 600,
+                    cursor: pending ? "default" : "pointer",
+                    opacity: pending ? 0.65 : 1,
+                  }}
+                >
+                  New conversation
+                </button>
+                {/* Cost badge (when no initiative panel) */}
+                {initiatives.length === 0 && costSummary && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      fontSize: 11,
+                      color: SURFACE_TEXT_DIM,
+                    }}
+                  >
+                    <span>
+                      ${costSummary.total.toFixed(2)} / ${costSummary.budget}
+                    </span>
+                    <span
+                      style={{
+                        color:
+                          costSummary.pctUsed >= 90
+                            ? RED
+                            : costSummary.pctUsed >= 70
+                              ? "#eab308"
+                              : "#22c55e",
+                        fontWeight: 600,
+                      }}
+                    >
+                      ({costSummary.pctUsed}%)
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
