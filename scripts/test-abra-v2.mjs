@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { createHmac } from "node:crypto";
+import { spawnSync } from "node:child_process";
 
 /**
  * Abra v2 integration smoke suite.
@@ -625,6 +626,18 @@ async function testCompetitorIntel() {
   );
 }
 
+async function testPhase8SmokeScriptSyntax() {
+  const run = spawnSync("node", ["--check", "scripts/abra-smoke-test.mjs"], {
+    encoding: "utf8",
+  });
+
+  if (run.status !== 0) {
+    throw new Error(
+      `scripts/abra-smoke-test.mjs syntax check failed: ${(run.stderr || run.stdout || "unknown error").trim()}`,
+    );
+  }
+}
+
 const tests = [
   { name: "Health check", fn: testHealth },
   { name: "Chat basic", fn: testChatBasic },
@@ -662,6 +675,8 @@ const tests = [
   { name: "Chat history save/load", fn: testChatHistory },
   { name: "Revenue snapshot", fn: testRevenueSnapshot },
   { name: "Competitor intel CRUD", fn: testCompetitorIntel },
+  // Phase 8 - Smoke test infrastructure
+  { name: "Phase 8 smoke script syntax", fn: testPhase8SmokeScriptSyntax },
 ];
 
 (async () => {
