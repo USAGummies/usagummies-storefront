@@ -29,6 +29,13 @@ export const maxDuration = 30;
 const DEFAULT_CLAUDE_MODEL =
   process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-latest";
 
+type InitiativeDependency = {
+  initiative_id: string;
+  department: string;
+  title: string;
+  relationship: "depends_on" | "blocks" | "related";
+};
+
 type Initiative = {
   id: string;
   department: string;
@@ -42,10 +49,27 @@ type Initiative = {
   tasks: unknown[];
   kpis: unknown[];
   research_findings: unknown[];
+  dependencies: InitiativeDependency[];
   initiated_by: string | null;
   approved_by: string | null;
   created_at: string;
   updated_at: string;
+};
+
+type InitiativeTask = {
+  title: string;
+  description: string;
+  priority: "critical" | "high" | "medium" | "low";
+  department: string;
+  estimated_hours?: number;
+  depends_on?: string[];
+};
+
+type InitiativeKpiTarget = {
+  metric: string;
+  target: string;
+  timeframe: string;
+  baseline?: string;
 };
 
 function getSupabaseEnv() {
@@ -190,116 +214,68 @@ async function generateTitle(
   }
 }
 
-/**
- * Generate plan (tasks + KPIs) from answered questions using Claude
- */
-async function generatePlan(
-  initiative: Initiative,
-): Promise<{ tasks: unknown[]; kpis: string[] }> {
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
-  if (!anthropicKey) {
-    // Fallback to playbook template
-    const playbook = getPlaybook(initiative.department);
-    return {
-      tasks: playbook?.taskTemplate || [],
-      kpis: playbook?.kpis || [],
-    };
+function valueToString(value: unknown, fallback = "TBD"): string {
+  if (typeof value === "string" && value.trim()) return value.trim();
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
   }
-
-  const playbook = getPlaybook(initiative.department);
-  const today = new Date().toISOString().split("T")[0];
-
-  const systemPrompt = `You are a business operations planner for USA Gummies (small CPG candy company, ~3 people). Today is ${today}.
-Generate a detailed task plan based on the initiative answers. Return ONLY valid JSON:
-{
-  "tasks": [
-    { "title": "string", "description": "string (1-2 sentences)", "priority": "critical|high|medium|low", "estimated_hours": number }
-  ],
-  "kpis": ["kpi_name_snake_case"]
+  return fallback;
 }
-Rules:
-- 8-15 tasks, ordered by priority and logical sequence
-- Be specific to USA Gummies (DTC via Shopify, Amazon marketplace, wholesale via Faire)
-- Consider their co-packer Powers Confections in Spokane, WA
-- Tasks should be actionable by a small team
-- No markdown fences — raw JSON only`;
 
-  const userPrompt = [
-    `Department: ${initiative.department}`,
-    `Goal: ${initiative.goal}`,
-    `Baseline requirements:\n${(initiative.baseline_requirements as string[]).map((r) => `- ${r}`).join("\n")}`,
-    `Answers:\n${Object.entries(initiative.answers as Record<string, string>)
-      .map(([k, v]) => `- ${k}: ${v}`)
-      .join("\n")}`,
-    playbook
-      ? `Template tasks for reference:\n${playbook.taskTemplate.map((t) => `- [${t.priority}] ${t.title}`).join("\n")}`
-      : "",
-  ]
-    .filter(Boolean)
-    .join("\n\n");
+function fillTemplate(
+  template: string,
+  answers: Record<string, unknown>,
+): string {
+  return template.replace(/\{([a-zA-Z0-9_]+)\}/g, (_, key: string) =>
+    valueToString(answers[key], key.replace(/_/g, " ")),
+  );
+}
 
-  try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": anthropicKey,
-        "anthropic-version": "2023-06-01",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: DEFAULT_CLAUDE_MODEL,
-        max_tokens: 1500,
-        temperature: 0.15,
-        system: systemPrompt,
-        messages: [{ role: "user", content: userPrompt }],
-      }),
-      signal: AbortSignal.timeout(25000),
-    });
+function buildTasksFromTemplate(
+  department: string,
+  taskTemplate: Array<{
+    title: string;
+    description: string;
+    priority: "critical" | "high" | "medium" | "low";
+    estimated_hours?: number;
+    depends_on?: string[];
+  }>,
+  answers: Record<string, unknown>,
+): InitiativeTask[] {
+  return taskTemplate.map((task) => ({
+    title: fillTemplate(task.title, answers),
+    description: fillTemplate(task.description, answers),
+    priority: task.priority,
+    department,
+    estimated_hours: task.estimated_hours,
+    depends_on: task.depends_on,
+  }));
+}
 
-    const text = await res.text();
-    if (!res.ok) throw new Error(`Claude failed: ${text.slice(0, 200)}`);
+function buildKpiTargets(
+  kpis: string[],
+  answers: Record<string, unknown>,
+): InitiativeKpiTarget[] {
+  return kpis.map((kpi) => {
+    const baselineValue =
+      answers.current_baseline ||
+      answers.current_metric ||
+      answers.current_state;
+    const targetValue =
+      answers.target ||
+      answers.target_outcome ||
+      answers.goal ||
+      "Improve by 10-20% from baseline";
 
-    const data = JSON.parse(text) as Record<string, unknown>;
-
-    // Log cost
-    const usage = extractClaudeUsage(data);
-    if (usage) {
-      void logAICost({
-        model: DEFAULT_CLAUDE_MODEL,
-        provider: "anthropic",
-        inputTokens: usage.inputTokens,
-        outputTokens: usage.outputTokens,
-        endpoint: "initiative/plan",
-        department: initiative.department,
-      });
-    }
-
-    const content = Array.isArray(data.content) ? data.content : [];
-    const reply = content
-      .map((item) =>
-        item && typeof item === "object" && "text" in item
-          ? String((item as Record<string, unknown>).text || "")
-          : "",
-      )
-      .join("")
-      .trim();
-
-    const jsonMatch = reply.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
-      return {
-        tasks: Array.isArray(parsed.tasks) ? parsed.tasks : [],
-        kpis: Array.isArray(parsed.kpis) ? (parsed.kpis as string[]) : [],
-      };
-    }
-  } catch {
-    // Fallback to playbook
-  }
-
-  return {
-    tasks: playbook?.taskTemplate || [],
-    kpis: playbook?.kpis || [],
-  };
+    return {
+      metric: kpi,
+      target: typeof targetValue === "string" ? targetValue : String(targetValue),
+      timeframe: valueToString(answers.timeframe, "90 days"),
+      ...(baselineValue
+        ? { baseline: valueToString(baselineValue) }
+        : {}),
+    };
+  });
 }
 
 // ─── POST: Create new initiative ───
@@ -309,7 +285,7 @@ async function handlePost(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let payload: { department?: unknown; goal?: unknown } = {};
+  let payload: { department?: unknown; goal?: unknown; depends_on?: unknown[] } = {};
   try {
     payload = await req.json();
   } catch {
@@ -361,9 +337,9 @@ async function handlePost(req: Request) {
     // 3. Call research (internal)
     const host =
       process.env.NEXTAUTH_URL ||
-      process.env.VERCEL_URL
+      (process.env.VERCEL_URL
         ? `https://${process.env.VERCEL_URL}`
-        : "http://localhost:3000";
+        : "http://localhost:3000");
     const cookie = req.headers.get("cookie") || "";
 
     const research = await callResearch(
@@ -395,7 +371,41 @@ async function handlePost(req: Request) {
       }
     }
 
-    // 5. Create initiative record
+    // 5. Resolve cross-department dependencies
+    const dependencies: InitiativeDependency[] = [];
+    if (Array.isArray(payload.depends_on)) {
+      for (const dep of payload.depends_on) {
+        if (typeof dep === "string") {
+          // dep is an initiative ID — look it up
+          try {
+            const depRows = (await sbFetch(
+              `/rest/v1/abra_initiatives?id=eq.${dep}&select=id,department,title`,
+            )) as Array<{ id: string; department: string; title: string }>;
+            if (depRows.length > 0) {
+              dependencies.push({
+                initiative_id: depRows[0].id,
+                department: depRows[0].department,
+                title: depRows[0].title || "Untitled",
+                relationship: "depends_on",
+              });
+            }
+          } catch {
+            // Skip invalid dependency IDs
+          }
+        } else if (dep && typeof dep === "object" && "initiative_id" in dep) {
+          // dep is a full dependency object
+          const d = dep as Record<string, unknown>;
+          dependencies.push({
+            initiative_id: String(d.initiative_id),
+            department: String(d.department || "unknown"),
+            title: String(d.title || "Untitled"),
+            relationship: (d.relationship as InitiativeDependency["relationship"]) || "depends_on",
+          });
+        }
+      }
+    }
+
+    // 6. Create initiative record
     const rows = (await sbFetch("/rest/v1/abra_initiatives", {
       method: "POST",
       headers: {
@@ -416,6 +426,7 @@ async function handlePost(req: Request) {
         tasks: [],
         kpis: playbook?.kpis || [],
         research_findings: research.findings,
+        dependencies,
         initiated_by: session.user.email,
       }),
     })) as Initiative[];
@@ -436,6 +447,7 @@ async function handlePost(req: Request) {
       questions: created.questions,
       baseline_requirements: created.baseline_requirements,
       research_findings: created.research_findings,
+      dependencies: created.dependencies,
     });
   } catch (error) {
     if (isSupabaseRelatedError(error)) {
@@ -509,6 +521,8 @@ async function handlePatch(req: Request) {
     id?: unknown;
     answers?: unknown;
     status?: unknown;
+    add_dependency?: unknown;
+    remove_dependency?: unknown;
   } = {};
   try {
     payload = await req.json();
@@ -547,48 +561,79 @@ async function handlePatch(req: Request) {
     const initiative = existing[0];
     const updates: Record<string, unknown> = {};
 
+    const playbook = getPlaybook(initiative.department);
+    const playbookQuestions = playbook?.questions || [];
+
     // Merge answers
     if (payload.answers && typeof payload.answers === "object") {
       const currentAnswers =
         (initiative.answers as Record<string, unknown>) || {};
-      updates.answers = { ...currentAnswers, ...payload.answers };
-    }
+      const mergedAnswers = { ...currentAnswers, ...payload.answers };
 
-    // If answers provided and all questions answered → generate plan
-    if (updates.answers) {
-      const questions = initiative.questions as PlaybookQuestion[];
-      const answers = updates.answers as Record<string, string>;
-      const requiredKeys = questions.map((q) => q.key);
-      const answeredKeys = Object.keys(answers);
+      const questionsFromInitiative = Array.isArray(initiative.questions)
+        ? (initiative.questions as PlaybookQuestion[])
+        : [];
+      const questions =
+        questionsFromInitiative.length > 0
+          ? questionsFromInitiative
+          : playbookQuestions;
 
-      // Check if all required questions have answers (or defaults)
-      const allAnswered = requiredKeys.every(
-        (key) =>
-          answeredKeys.includes(key) ||
-          questions.find((q) => q.key === key)?.default,
-      );
-
-      if (allAnswered) {
-        // Fill in defaults for unanswered questions
-        for (const q of questions) {
-          if (!answers[q.key] && q.default) {
-            answers[q.key] = q.default;
-          }
+      const normalizedAnswers: Record<string, unknown> = { ...mergedAnswers };
+      for (const question of questions) {
+        if (
+          (normalizedAnswers[question.key] === undefined ||
+            normalizedAnswers[question.key] === null ||
+            valueToString(normalizedAnswers[question.key], "").trim() === "") &&
+          question.default
+        ) {
+          normalizedAnswers[question.key] = question.default;
         }
-        updates.answers = answers;
+      }
 
-        // Generate plan
-        const plan = await generatePlan({
-          ...initiative,
-          answers: answers,
-        });
-        updates.tasks = plan.tasks;
-        updates.kpis = plan.kpis;
+      updates.answers = normalizedAnswers;
+
+      const requiredKeys = questions.map((q) => q.key);
+      const allAnswered = requiredKeys.every((key) => {
+        const value = normalizedAnswers[key];
+        return valueToString(value, "").trim().length > 0;
+      });
+
+      if (allAnswered && playbook) {
+        updates.tasks = buildTasksFromTemplate(
+          initiative.department,
+          playbook.taskTemplate,
+          normalizedAnswers,
+        );
+        updates.kpis = buildKpiTargets(playbook.kpis, normalizedAnswers);
+        updates.status = "approved";
+        updates.approved_by = session.user.email;
+      } else if (allAnswered) {
         updates.status = "approved";
         updates.approved_by = session.user.email;
       } else {
         updates.status = "asking_questions";
       }
+    }
+
+    // Dependency management
+    if (payload.add_dependency && typeof payload.add_dependency === "object") {
+      const dep = payload.add_dependency as Record<string, unknown>;
+      const currentDeps = Array.isArray(initiative.dependencies) ? [...initiative.dependencies] : [];
+      const newDep: InitiativeDependency = {
+        initiative_id: String(dep.initiative_id || ""),
+        department: String(dep.department || "unknown"),
+        title: String(dep.title || "Untitled"),
+        relationship: (dep.relationship as InitiativeDependency["relationship"]) || "depends_on",
+      };
+      if (newDep.initiative_id && !currentDeps.some((d) => d.initiative_id === newDep.initiative_id)) {
+        currentDeps.push(newDep);
+        updates.dependencies = currentDeps;
+      }
+    }
+
+    if (typeof payload.remove_dependency === "string") {
+      const currentDeps = Array.isArray(initiative.dependencies) ? [...initiative.dependencies] : [];
+      updates.dependencies = currentDeps.filter((d) => d.initiative_id !== payload.remove_dependency);
     }
 
     // Manual status override
@@ -622,8 +667,20 @@ async function handlePatch(req: Request) {
 
     await markSupabaseSuccess();
 
+    const updatedInitiative = updated[0] || { ...initiative, ...updates };
     return NextResponse.json({
-      initiative: updated[0] || { ...initiative, ...updates },
+      initiative: updatedInitiative,
+      plan:
+        updatedInitiative.status === "approved"
+          ? {
+              tasks: Array.isArray(updatedInitiative.tasks)
+                ? updatedInitiative.tasks
+                : [],
+              kpis: Array.isArray(updatedInitiative.kpis)
+                ? updatedInitiative.kpis
+                : [],
+            }
+          : null,
     });
   } catch (error) {
     if (isSupabaseRelatedError(error)) {

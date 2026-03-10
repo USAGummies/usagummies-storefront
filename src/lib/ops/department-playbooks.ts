@@ -110,6 +110,13 @@ export const DEPARTMENT_PLAYBOOKS: Record<string, DepartmentPlaybook> = {
         estimated_hours: 4,
       },
       {
+        title: "Configure {accounting_basis} accounting basis",
+        description:
+          "Configure bookkeeping workflows for {accounting_basis} accounting and align month-end close procedures with the selected basis.",
+        priority: "critical",
+        estimated_hours: 2,
+      },
+      {
         title: "Configure accounts receivable",
         description:
           "Set up AR tracking for wholesale customers, Faire orders, and any net-30/60 terms. Include aging buckets (current, 30, 60, 90+ days).",
@@ -140,14 +147,14 @@ export const DEPARTMENT_PLAYBOOKS: Record<string, DepartmentPlaybook> = {
       {
         title: "Set up revenue recognition by channel",
         description:
-          "Configure separate revenue tracking for DTC (Shopify), Amazon (marketplace fees, FBA fees), Wholesale (terms, returns), and Faire (commission structure).",
+          "Configure separate revenue tracking for {revenue_streams}, including marketplace fees, wholesale terms, and channel-specific adjustments.",
         priority: "high",
         estimated_hours: 3,
       },
       {
         title: "Configure sales tax compliance",
         description:
-          "Set up sales tax collection for nexus states, configure automated remittance if possible, document exemption certificates for wholesale.",
+          "Set up sales tax collection for nexus states ({sales_tax}), configure automated remittance when possible, and document exemption certificates for wholesale.",
         priority: "high",
         estimated_hours: 3,
       },
@@ -252,9 +259,16 @@ export const DEPARTMENT_PLAYBOOKS: Record<string, DepartmentPlaybook> = {
       {
         title: "Build production planning calendar",
         description:
-          "Rolling production schedule based on sales velocity, inventory levels, and seasonal demand patterns.",
+          "Build a rolling {production_frequency} production schedule based on sales velocity, inventory levels, and seasonal demand patterns.",
         priority: "high",
         estimated_hours: 3,
+      },
+      {
+        title: "Document inventory locations and ownership",
+        description:
+          "Map inventory ownership and transfer points across {inventory_location} to reduce handoff delays and mismatched counts.",
+        priority: "medium",
+        estimated_hours: 2,
       },
     ],
     kpis: [
@@ -315,9 +329,16 @@ export const DEPARTMENT_PLAYBOOKS: Record<string, DepartmentPlaybook> = {
         estimated_hours: 4,
       },
       {
+        title: "Prioritize active sales channels",
+        description:
+          "Set a channel strategy for {channels} with clear weekly ownership, target revenue, and escalation paths for blocked deals.",
+        priority: "high",
+        estimated_hours: 2,
+      },
+      {
         title: "Create wholesale rate card",
         description:
-          "Develop tiered wholesale pricing: case pricing, pallet pricing, distributor pricing. Include minimum order quantities and payment terms.",
+          "Develop tiered wholesale pricing for {target_accounts}: case pricing, pallet pricing, distributor pricing, plus minimum order quantities and payment terms.",
         priority: "high",
         estimated_hours: 3,
       },
@@ -390,7 +411,14 @@ export const DEPARTMENT_PLAYBOOKS: Record<string, DepartmentPlaybook> = {
       {
         title: "Build supplier scorecard",
         description:
-          "Track supplier performance: on-time delivery, quality, pricing, communication. Identify backup suppliers for critical ingredients.",
+          "Track supplier performance: on-time delivery, quality, pricing, communication. Use {ingredient_suppliers} answer to identify backup suppliers for critical ingredients.",
+        priority: "medium",
+        estimated_hours: 2,
+      },
+      {
+        title: "Tune safety stock for seasonality",
+        description:
+          "Adjust safety stock and reorder triggers using seasonal demand profile: {seasonal_demand}.",
         priority: "medium",
         estimated_hours: 2,
       },
@@ -446,7 +474,7 @@ export const DEPARTMENT_PLAYBOOKS: Record<string, DepartmentPlaybook> = {
       {
         title: "Build executive dashboard",
         description:
-          "Create weekly dashboard: revenue (by channel), cash position, inventory status, pipeline value, key blockers, upcoming milestones.",
+          "Create {reporting_cadence} executive dashboard: revenue (by channel), cash position, inventory status, pipeline value, key blockers, upcoming milestones.",
         priority: "critical",
         estimated_hours: 4,
       },
@@ -464,6 +492,13 @@ export const DEPARTMENT_PLAYBOOKS: Record<string, DepartmentPlaybook> = {
         priority: "medium",
         estimated_hours: 2,
       },
+      {
+        title: "Mitigate current top company risk",
+        description:
+          "Create and assign a mitigation plan for top stated risk: {biggest_risk}. Include owner and weekly checkpoint.",
+        priority: "high",
+        estimated_hours: 2,
+      },
     ],
     kpis: [
       "total_revenue_monthly",
@@ -477,7 +512,7 @@ export const DEPARTMENT_PLAYBOOKS: Record<string, DepartmentPlaybook> = {
 };
 
 /**
- * Get playbook for a department, matching loosely on name.
+ * Get playbook for a department from hardcoded registry, matching loosely on name.
  */
 export function getPlaybook(
   department: string,
@@ -491,6 +526,110 @@ export function getPlaybook(
     if (key.includes(k) || k.includes(key)) return v;
   }
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// DB-backed Playbook Evolution
+// ---------------------------------------------------------------------------
+
+function getSupabaseEnv() {
+  const baseUrl =
+    process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!baseUrl || !serviceKey) return null;
+  return { baseUrl, serviceKey };
+}
+
+/**
+ * Load a playbook from the DB (abra_departments.playbook_overrides JSONB).
+ * Returns null if not found or DB unavailable.
+ */
+export async function getPlaybookFromDB(
+  department: string,
+): Promise<DepartmentPlaybook | null> {
+  const env = getSupabaseEnv();
+  if (!env) return null;
+
+  try {
+    const headers = new Headers({
+      apikey: env.serviceKey,
+      Authorization: `Bearer ${env.serviceKey}`,
+      "Content-Type": "application/json",
+    });
+
+    const res = await fetch(
+      `${env.baseUrl}/rest/v1/abra_departments?name=eq.${department}&select=playbook_overrides`,
+      { headers, cache: "no-store", signal: AbortSignal.timeout(5000) },
+    );
+
+    if (!res.ok) return null;
+    const rows = (await res.json()) as Array<{
+      playbook_overrides: DepartmentPlaybook | null;
+    }>;
+
+    return rows?.[0]?.playbook_overrides || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Save an evolved playbook back to the DB for a department.
+ * This allows playbooks to evolve as Abra learns what works.
+ */
+export async function savePlaybookToDB(
+  department: string,
+  playbook: DepartmentPlaybook,
+): Promise<boolean> {
+  const env = getSupabaseEnv();
+  if (!env) return false;
+
+  try {
+    const headers = new Headers({
+      apikey: env.serviceKey,
+      Authorization: `Bearer ${env.serviceKey}`,
+      Prefer: "return=minimal",
+      "Content-Type": "application/json",
+    });
+
+    const res = await fetch(
+      `${env.baseUrl}/rest/v1/abra_departments?name=eq.${department}`,
+      {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ playbook_overrides: playbook }),
+        signal: AbortSignal.timeout(5000),
+      },
+    );
+
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Get playbook with DB-first, hardcoded fallback strategy.
+ * Merges DB overrides on top of hardcoded baseline if both exist.
+ */
+export async function getPlaybookWithFallback(
+  department: string,
+): Promise<DepartmentPlaybook | null> {
+  const hardcoded = getPlaybook(department);
+  const dbPlaybook = await getPlaybookFromDB(department);
+
+  if (dbPlaybook && hardcoded) {
+    // Merge: DB overrides take precedence, hardcoded fills gaps
+    return {
+      description: dbPlaybook.description || hardcoded.description,
+      baseline: dbPlaybook.baseline.length > 0 ? dbPlaybook.baseline : hardcoded.baseline,
+      questions: dbPlaybook.questions.length > 0 ? dbPlaybook.questions : hardcoded.questions,
+      taskTemplate: dbPlaybook.taskTemplate.length > 0 ? dbPlaybook.taskTemplate : hardcoded.taskTemplate,
+      kpis: dbPlaybook.kpis.length > 0 ? dbPlaybook.kpis : hardcoded.kpis,
+    };
+  }
+
+  return dbPlaybook || hardcoded;
 }
 
 /**

@@ -16,8 +16,6 @@ import {
 } from "@/lib/ops/supabase-resilience";
 import {
   buildAbraSystemPrompt,
-  buildTemporalContext,
-  type TemporalSearchRow,
   type AbraCorrection,
   type AbraDepartment,
   type AbraInitiativeContext,
@@ -28,8 +26,12 @@ import {
   computeConfidence,
   shouldAskQuestions,
 } from "@/lib/ops/abra-question-detector";
-import { detectDepartment } from "@/lib/ops/department-playbooks";
+import { detectDepartment, type PlaybookQuestion } from "@/lib/ops/department-playbooks";
 import { logAICost, extractClaudeUsage, getMonthlySpend } from "@/lib/ops/abra-cost-tracker";
+import { searchTiered, buildTieredContext, type TieredSearchResult } from "@/lib/ops/abra-memory-tiers";
+import { logAnswer, extractProvenance } from "@/lib/ops/abra-source-provenance";
+import { getTeamMembers, getVendors, buildTeamContext } from "@/lib/ops/abra-team-directory";
+import { getActiveSignals, buildSignalsContext } from "@/lib/ops/abra-operational-signals";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -174,6 +176,124 @@ async function fetchActiveInitiatives(): Promise<AbraInitiativeContext[]> {
   }
 }
 
+type AskingInitiative = {
+  id: string;
+  department: string;
+  title: string | null;
+  questions: PlaybookQuestion[];
+  answers: Record<string, unknown>;
+};
+
+async function fetchAskingInitiative(
+  department: string | null,
+): Promise<AskingInitiative | null> {
+  try {
+    let path =
+      "/rest/v1/abra_initiatives?status=eq.asking_questions&select=id,department,title,questions,answers&order=updated_at.desc&limit=5";
+    if (department) {
+      path += `&department=eq.${department}`;
+    }
+
+    const rows = (await sbFetch(path)) as Array<{
+      id: string;
+      department: string;
+      title: string | null;
+      questions: unknown;
+      answers: unknown;
+    }>;
+
+    for (const row of rows) {
+      const questions = Array.isArray(row.questions)
+        ? (row.questions as PlaybookQuestion[])
+        : [];
+      if (!questions.length) continue;
+      const answers =
+        row.answers && typeof row.answers === "object"
+          ? (row.answers as Record<string, unknown>)
+          : {};
+      const hasOpen = questions.some((q) => !valueAsText(answers[q.key], ""));
+      if (hasOpen) {
+        return {
+          id: row.id,
+          department: row.department,
+          title: row.title,
+          questions,
+          answers,
+        };
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function valueAsText(value: unknown, fallback = ""): string {
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  return fallback;
+}
+
+function extractInitiativeAnswers(
+  message: string,
+  initiative: AskingInitiative,
+): Record<string, string> | null {
+  const openQuestions = initiative.questions.filter(
+    (question) => !valueAsText(initiative.answers[question.key], ""),
+  );
+  if (!openQuestions.length) return null;
+
+  const parsed: Record<string, string> = {};
+  const numbered = Array.from(
+    message.matchAll(/(?:^|\n)\s*(\d+)[).:-]\s*([^\n]+)/g),
+  );
+  if (numbered.length > 0) {
+    for (const match of numbered) {
+      const index = Number.parseInt(match[1], 10) - 1;
+      if (index >= 0 && index < openQuestions.length) {
+        const answer = match[2].trim();
+        if (answer) {
+          parsed[openQuestions[index].key] = answer;
+        }
+      }
+    }
+  }
+
+  const lines = message
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  for (const line of lines) {
+    const pair = line.match(/^([^:]{2,80}):\s*(.+)$/);
+    if (!pair) continue;
+    const keyText = pair[1].toLowerCase().trim().replace(/\s+/g, "_");
+    const answer = pair[2].trim();
+    if (!answer) continue;
+    const question = openQuestions.find((q) => {
+      const keyMatch = q.key.toLowerCase() === keyText;
+      const fuzzyMatch = q.q.toLowerCase().includes(pair[1].toLowerCase().trim());
+      return keyMatch || fuzzyMatch;
+    });
+    if (question) {
+      parsed[question.key] = answer;
+    }
+  }
+
+  if (Object.keys(parsed).length === 0 && openQuestions.length === 1) {
+    const fallback = message.trim();
+    if (fallback.length >= 2 && fallback.length <= 500) {
+      parsed[openQuestions[0].key] = fallback;
+    }
+  }
+
+  if (Object.keys(parsed).length === 0) {
+    return null;
+  }
+  return parsed;
+}
+
 async function fetchCostSummary(): Promise<AbraCostContext | null> {
   try {
     const spend = await getMonthlySpend();
@@ -278,11 +398,13 @@ function buildConversation(history: ChatMessage[]): string {
 async function generateClaudeReply(input: {
   message: string;
   history: ChatMessage[];
-  results: TemporalSearchRow[];
+  tieredResults: TieredSearchResult;
   corrections: AbraCorrection[];
   departments: AbraDepartment[];
   activeInitiatives?: AbraInitiativeContext[];
   costSummary?: AbraCostContext | null;
+  teamContext?: string;
+  signalsContext?: string;
 }) {
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) {
@@ -295,14 +417,16 @@ async function generateClaudeReply(input: {
     departments: input.departments,
     activeInitiatives: input.activeInitiatives,
     costSummary: input.costSummary,
+    teamContext: input.teamContext,
+    signalsContext: input.signalsContext,
   });
 
   const historyText = buildConversation(input.history);
-  const contextText = buildTemporalContext(input.results);
-  const confidence = computeConfidence(input.results);
+  const contextText = buildTieredContext(input.tieredResults);
+  const confidence = computeConfidence(input.tieredResults.all);
 
   const confidenceHint =
-    shouldAskQuestions(confidence, input.results)
+    shouldAskQuestions(confidence, input.tieredResults.all)
       ? "\n\nIMPORTANT: Your confidence for this query is LOW. Consider asking the user to confirm or provide more information rather than guessing."
       : "";
 
@@ -444,6 +568,134 @@ export async function POST(req: Request) {
       });
     }
 
+    // If there is an active initiative in question phase and this message looks
+    // like answers, auto-route to initiative PATCH flow.
+    const initiativeDepartmentHint = detectDepartment(message);
+    const activeAskingInitiative = await fetchAskingInitiative(
+      initiativeDepartmentHint,
+    );
+    const extractedAnswers = activeAskingInitiative
+      ? extractInitiativeAnswers(message, activeAskingInitiative)
+      : null;
+
+    if (activeAskingInitiative && extractedAnswers) {
+      const host =
+        process.env.NEXTAUTH_URL ||
+        (process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : "http://localhost:3000");
+      const cookie = req.headers.get("cookie") || "";
+
+      try {
+        const patchRes = await fetch(`${host}/api/ops/abra/initiative`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Cookie: cookie,
+          },
+          body: JSON.stringify({
+            id: activeAskingInitiative.id,
+            answers: extractedAnswers,
+          }),
+          signal: AbortSignal.timeout(20000),
+        });
+
+        if (patchRes.ok) {
+          const patchData = await patchRes.json();
+          const updated =
+            patchData?.initiative && typeof patchData.initiative === "object"
+              ? (patchData.initiative as {
+                  id: string;
+                  title?: string | null;
+                  status?: string;
+                  questions?: PlaybookQuestion[];
+                  answers?: Record<string, unknown>;
+                  tasks?: Array<{ title?: string; priority?: string }>;
+                  kpis?: Array<{ metric?: string; target?: string }>;
+                })
+              : null;
+
+          if (updated?.status === "approved") {
+            const topTasks = Array.isArray(updated.tasks)
+              ? updated.tasks
+                  .slice(0, 5)
+                  .map((task, idx) => {
+                    const label =
+                      typeof task?.title === "string"
+                        ? task.title
+                        : `Task ${idx + 1}`;
+                    const priority =
+                      typeof task?.priority === "string"
+                        ? ` [${task.priority}]`
+                        : "";
+                    return `${idx + 1}. ${label}${priority}`;
+                  })
+                  .join("\n")
+              : "";
+            const topKpis = Array.isArray(updated.kpis)
+              ? updated.kpis
+                  .slice(0, 4)
+                  .map((kpi) => {
+                    if (typeof kpi === "string") return `- ${kpi}`;
+                    const metric =
+                      typeof kpi?.metric === "string" ? kpi.metric : "kpi";
+                    const target =
+                      typeof kpi?.target === "string" ? kpi.target : "";
+                    return target ? `- ${metric}: ${target}` : `- ${metric}`;
+                  })
+                  .join("\n")
+              : "";
+
+            const approvedReply = [
+              `Initiative **${updated.title || activeAskingInitiative.title || "plan"}** is now approved.`,
+              topTasks ? `Top tasks:\n${topTasks}` : "",
+              topKpis ? `KPI targets:\n${topKpis}` : "",
+            ]
+              .filter(Boolean)
+              .join("\n\n");
+
+            return NextResponse.json({
+              reply: approvedReply,
+              confidence: 1,
+              sources: [],
+              intent: "initiative_answers",
+              initiative_id: updated.id || activeAskingInitiative.id,
+              plan: patchData?.plan || null,
+            });
+          }
+
+          const questions = Array.isArray(updated?.questions)
+            ? (updated?.questions as PlaybookQuestion[])
+            : activeAskingInitiative.questions;
+          const answers =
+            updated?.answers && typeof updated.answers === "object"
+              ? (updated.answers as Record<string, unknown>)
+              : activeAskingInitiative.answers;
+          const openQuestions = questions.filter(
+            (question) => !valueAsText(answers[question.key], ""),
+          );
+          const questionList = openQuestions
+            .slice(0, 5)
+            .map((question, idx) => `${idx + 1}. ${question.q}`)
+            .join("\n");
+
+          return NextResponse.json({
+            reply:
+              openQuestions.length > 0
+                ? `Captured those answers for **${updated?.title || activeAskingInitiative.title || "your initiative"}**. I still need:\n\n${questionList}`
+                : `Captured those answers for **${updated?.title || activeAskingInitiative.title || "your initiative"}**.`,
+            confidence: 1,
+            sources: [],
+            intent: "initiative_answers",
+            initiative_id: updated?.id || activeAskingInitiative.id,
+            plan: patchData?.plan || null,
+          });
+        }
+      } catch {
+        // If patch route fails, continue with standard intent handling.
+      }
+    }
+
     // Handle initiative trigger — redirect to initiative flow
     if (intent.type === "initiative") {
       const host =
@@ -547,45 +799,67 @@ export async function POST(req: Request) {
     }
 
     // ─── Normal RAG Chat Flow ───
-    // Temporal search
+    // Tiered memory search (hot/warm/cold with fallback)
     const embedding = await buildEmbedding(message);
-    const results = (await sbFetch("/rest/v1/rpc/search_temporal", {
-      method: "POST",
-      body: JSON.stringify({
-        query_embedding: embedding,
-        match_count: DEFAULT_MATCH_COUNT,
-        filter_tables: ["brain", "email"],
-      }),
-    })) as TemporalSearchRow[];
+    const tieredResults = await searchTiered({
+      embedding,
+      matchCount: DEFAULT_MATCH_COUNT,
+      filterTables: ["brain", "email"],
+    });
 
     await markSupabaseSuccess();
 
-    // Fetch corrections + departments + initiatives + cost (parallel)
-    const [corrections, departments, activeInitiatives, costSummary] =
+    // Fetch corrections + departments + initiatives + cost + team + signals (parallel)
+    const [corrections, departments, activeInitiatives, costSummary, teamMembers, vendors, signals] =
       await Promise.all([
         fetchCorrections(),
         fetchDepartments(),
         fetchActiveInitiatives(),
         fetchCostSummary(),
+        getTeamMembers(),
+        getVendors(),
+        getActiveSignals({ limit: 5 }),
       ]);
 
-    const confidence = computeConfidence(results.slice(0, DEFAULT_MATCH_COUNT));
+    // Build dynamic context strings for system prompt
+    const today = new Date().toISOString().split("T")[0];
+    const teamContext = buildTeamContext(teamMembers, vendors, today);
+    const signalsContext = buildSignalsContext(signals);
+
+    const confidence = computeConfidence(tieredResults.all);
 
     const reply = await generateClaudeReply({
       message,
       history,
-      results: results.slice(0, DEFAULT_MATCH_COUNT),
+      tieredResults,
       corrections,
       departments,
       activeInitiatives,
       costSummary,
+      teamContext,
+      signalsContext,
+    });
+
+    // Log answer provenance (best-effort, non-blocking)
+    const provenance = extractProvenance(tieredResults.all);
+    void logAnswer({
+      question: message,
+      answer: reply,
+      source_ids: provenance.source_ids,
+      source_tables: provenance.source_tables,
+      confidence,
+      memory_tiers_used: provenance.memory_tiers_used,
+      department: detectDepartment(message),
+      asked_by: session.user.email,
+      channel: "web",
+      model_used: DEFAULT_CLAUDE_MODEL,
     });
 
     // Log unanswered questions
     const detectedQuestions = detectQuestions(reply);
     if (
       detectedQuestions.length > 0 ||
-      shouldAskQuestions(confidence, results.slice(0, DEFAULT_MATCH_COUNT))
+      shouldAskQuestions(confidence, tieredResults.all)
     ) {
       for (const q of detectedQuestions.slice(0, 3)) {
         await logUnansweredQuestion(
@@ -599,7 +873,8 @@ export async function POST(req: Request) {
     return NextResponse.json({
       reply,
       confidence,
-      sources: results.slice(0, DEFAULT_MATCH_COUNT).map((row) => ({
+      tierCounts: tieredResults.tierCounts,
+      sources: tieredResults.all.map((row) => ({
         id: row.id,
         source_table: row.source_table,
         title: row.title || "(untitled)",
@@ -608,6 +883,7 @@ export async function POST(req: Request) {
         days_ago: row.days_ago,
         category: row.category,
         department: row.department,
+        memory_tier: row.memory_tier,
         metadata: row.metadata || {},
       })),
     });
