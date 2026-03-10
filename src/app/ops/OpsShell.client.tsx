@@ -38,6 +38,7 @@ const NAV_SECTIONS: NavSection[] = [
       { href: "/ops/channels", label: "Revenue by Channel", icon: "\u{1F4CA}", roles: ["admin", "employee", "investor", "partner", "banker"] },
       { href: "/ops/permissions", label: "Permission Queue", icon: "\u{1F6E1}\uFE0F", roles: ["admin", "employee"] },
       { href: "/ops/approvals", label: "Approvals", icon: "\u2705", roles: ["admin", "employee"], badge: "pendingApprovals" },
+      { href: "/ops/documents", label: "Documents", icon: "\u{1F4C4}", roles: ["admin", "employee"] },
       { href: "/ops/finance", label: "P&L / Finance", icon: "\u{1F4B5}", roles: ["admin", "investor", "partner", "banker"] },
       { href: "/ops/forecast", label: "Cash Forecast", icon: "\u{1F52E}", roles: ["admin", "investor", "partner", "banker"] },
       { href: "/ops/pipeline", label: "Pipeline & Deals", icon: "\u{1F30E}", roles: ["admin", "employee", "investor", "partner"] },
