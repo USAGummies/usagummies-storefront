@@ -45,8 +45,10 @@ type BalancesResponse = UnifiedBalances & {
   manualOverride: ManualCashOverride | null;
 };
 
-function isPlaidProductionEnv(): boolean {
-  return (process.env.PLAID_ENV || "sandbox").toLowerCase() === "production";
+/** Plaid "development" uses real bank data (not test data). Only "sandbox" is fake. */
+function isPlaidLiveEnv(): boolean {
+  const env = (process.env.PLAID_ENV || "sandbox").toLowerCase();
+  return env === "production" || env === "development";
 }
 
 function buildManualFoundBalance(manual: ManualCashOverride): NonNullable<UnifiedBalances["found"]> {
@@ -94,7 +96,7 @@ export async function GET(req: Request) {
   const shopify = shopifyResult.status === "fulfilled" ? shopifyResult.value : null;
   const amazon = amazonResult.status === "fulfilled" ? amazonResult.value : null;
 
-  const plaidIsLive = isPlaidProductionEnv() && plaidFound !== null;
+  const plaidIsLive = isPlaidLiveEnv() && plaidFound !== null;
   let found: UnifiedBalances["found"] = null;
   let cashSource: BalancesResponse["cashSource"] = "none";
   let cashSourceLabel = "No Found.com source";
@@ -161,7 +163,7 @@ export async function POST(req: Request) {
       ok: true,
       manualOverride: manual,
       message:
-        isPlaidProductionEnv()
+        isPlaidLiveEnv()
           ? "Manual cash stored, but Plaid production data will take precedence while live."
           : "Manual cash override stored and active.",
     });

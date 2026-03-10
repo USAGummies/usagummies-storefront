@@ -28,6 +28,7 @@ const SELF_AUTHENTICATED_PREFIXES = [
   "/api/ops/slack/",
   "/api/ops/abra/", // All Abra routes use isAuthorized() from abra-auth.ts (session + CRON_SECRET)
   "/api/ops/department/", // Department API uses isAuthorized() (session + CRON_SECRET)
+  "/api/ops/plaid/webhook", // Plaid webhook — verified by item_id match (JWK fast-follow)
 ];
 
 function isSelfAuthenticated(pathname: string): boolean {

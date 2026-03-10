@@ -74,12 +74,17 @@ type LinkTokenResponse = {
 };
 
 export async function createLinkToken(): Promise<string> {
+  const webhookUrl =
+    process.env.PLAID_WEBHOOK_URL ||
+    `${process.env.NEXT_PUBLIC_BASE_URL || "https://usagummies.com"}/api/ops/plaid/webhook`;
+
   const response = await plaidPost<LinkTokenResponse>("/link/token/create", {
     user: { client_user_id: "usagummies-ops" },
     client_name: "USA Gummies Ops",
     products: ["transactions"],
     country_codes: ["US"],
     language: "en",
+    webhook: webhookUrl,
   });
 
   return response.link_token;
@@ -103,12 +108,35 @@ export async function exchangePublicToken(publicToken: string): Promise<{
     public_token: publicToken,
   });
 
-  // Store access token securely in KV
+  const connectedAt = new Date().toISOString();
+
+  // Write to KV (fast path for reads)
   await writeState("plaid-access-token", {
     accessToken: response.access_token,
     itemId: response.item_id,
-    connectedAt: new Date().toISOString(),
+    connectedAt,
   });
+
+  // Write to Supabase (durable backup — survives KV eviction)
+  try {
+    await sbFetch("/rest/v1/plaid_items", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Prefer: "resolution=merge-duplicates",
+      },
+      body: JSON.stringify({
+        item_id: response.item_id,
+        access_token: response.access_token,
+        institution_name: "Found",
+        connected_at: connectedAt,
+        status: "active",
+      }),
+    });
+    console.log("[plaid] Token stored in both KV and Supabase");
+  } catch (err) {
+    console.warn("[plaid] Supabase token backup failed (KV still active):", err);
+  }
 
   return {
     accessToken: response.access_token,
@@ -117,7 +145,43 @@ export async function exchangePublicToken(publicToken: string): Promise<{
 }
 
 // ---------------------------------------------------------------------------
-// Get stored access token
+// Supabase helpers (durable backup for access tokens)
+// ---------------------------------------------------------------------------
+
+function getSupabaseEnv() {
+  const baseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!baseUrl || !serviceKey) return null;
+  return { baseUrl, serviceKey };
+}
+
+async function sbFetch(path: string, init: RequestInit = {}): Promise<unknown> {
+  const env = getSupabaseEnv();
+  if (!env) return null;
+
+  const headers = new Headers(init.headers || {});
+  headers.set("apikey", env.serviceKey);
+  headers.set("Authorization", `Bearer ${env.serviceKey}`);
+  if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+
+  const res = await fetch(`${env.baseUrl}${path}`, {
+    ...init,
+    headers,
+    cache: "no-store",
+    signal: init.signal || AbortSignal.timeout(10000),
+  });
+
+  const text = await res.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Get stored access token (KV fast-path, Supabase fallback)
 // ---------------------------------------------------------------------------
 
 type StoredPlaidToken = {
@@ -127,8 +191,30 @@ type StoredPlaidToken = {
 } | null;
 
 export async function getStoredAccessToken(): Promise<string | null> {
+  // Fast path: KV
   const stored = await readState<StoredPlaidToken>("plaid-access-token", null);
-  return stored?.accessToken ?? null;
+  if (stored?.accessToken) return stored.accessToken;
+
+  // Fallback: Supabase (KV may have been evicted)
+  try {
+    const rows = await sbFetch(
+      "/rest/v1/plaid_items?status=eq.active&order=connected_at.desc&limit=1",
+      { method: "GET" },
+    );
+    if (Array.isArray(rows) && rows.length > 0 && rows[0].access_token) {
+      // Re-populate KV for next read
+      await writeState("plaid-access-token", {
+        accessToken: rows[0].access_token,
+        itemId: rows[0].item_id,
+        connectedAt: rows[0].connected_at,
+      });
+      return rows[0].access_token;
+    }
+  } catch (err) {
+    console.warn("[plaid] Supabase fallback failed:", err);
+  }
+
+  return null;
 }
 
 export async function isPlaidConnected(): Promise<boolean> {
