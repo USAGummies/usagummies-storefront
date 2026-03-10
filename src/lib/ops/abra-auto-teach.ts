@@ -494,16 +494,32 @@ export async function handleAmazonInventoryFeed(): Promise<FeedResult> {
 export async function handleFaireOrdersFeed(): Promise<FeedResult> {
   const feedKey = "faire_orders";
   try {
-    const sample = parseJsonEnv<Array<{ order_id: string; total: number }>>(
-      "ABRA_FAIRE_ORDERS_SAMPLE_JSON",
-      [],
+    const { fetchFaireOrders, isFaireConfigured } = await import(
+      "@/lib/ops/abra-faire-client"
     );
-    if (!Array.isArray(sample) || sample.length === 0) {
+    const hasCreds = isFaireConfigured();
+    const orders = await fetchFaireOrders({
+      since: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+    });
+
+    if (!hasCreds && orders.length === 0) {
+      return {
+        feed_key: feedKey,
+        success: true,
+        entriesCreated: 0,
+        error: "Faire credentials not configured",
+      };
+    }
+
+    if (orders.length === 0) {
       return { feed_key: feedKey, success: true, entriesCreated: 0 };
     }
 
-    const total = sample.reduce((sum, order) => sum + (order.total || 0), 0);
-    const summary = `Faire orders snapshot: ${sample.length} wholesale orders, $${total.toFixed(2)} sampled revenue.`;
+    const total = orders.reduce(
+      (sum, order) => sum + Number(order.total_amount || 0),
+      0,
+    );
+    const summary = `Faire orders (last 24h): ${orders.length} wholesale orders, $${total.toFixed(2)} revenue.`;
     const date = new Date().toISOString().split("T")[0];
     const saved = await writeBrainEntry({
       sourceRef: `faire-orders-${date}`,
