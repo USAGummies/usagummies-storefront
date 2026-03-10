@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
-import { runAllDueFeeds } from "@/lib/ops/abra-auto-teach";
+import { runAllDueFeeds, runFeed } from "@/lib/ops/abra-auto-teach";
 import { detectAnomalies } from "@/lib/ops/abra-anomaly-detection";
 import { emitSignal } from "@/lib/ops/abra-operational-signals";
 import { autoManageInitiatives } from "@/lib/ops/abra-initiative-health";
 import { sendMorningBrief } from "@/lib/ops/abra-morning-brief";
-import { readState, writeState } from "@/lib/ops/state";
+import { appendStateArray, readState, writeState } from "@/lib/ops/state";
 import { notify } from "@/lib/ops/notify";
 import {
   sendWeeklyDigest,
@@ -48,6 +48,15 @@ type StepOutcome<T = unknown> = {
 };
 
 const LOCK_TTL_MS = 20 * 60 * 1000;
+
+type SchedulerLedgerEntry = {
+  run_id: string;
+  timestamp: string;
+  mode: "feed" | "cycle";
+  feed?: string;
+  ok: boolean;
+  errors: Array<{ step: string; error: string }>;
+};
 
 async function acquireSchedulerLock(): Promise<SchedulerLock | null> {
   const now = Date.now();
@@ -129,6 +138,14 @@ async function notifySchedulerFailure(params: {
   await notify({ channel: "alerts", text });
 }
 
+async function recordSchedulerLedger(entry: SchedulerLedgerEntry): Promise<void> {
+  try {
+    await appendStateArray("abra-scheduler-ledger" as never, [entry], 1000);
+  } catch {
+    // best-effort
+  }
+}
+
 export async function POST(req: Request) {
   if (!isAuthorizedCron(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -146,9 +163,39 @@ export async function POST(req: Request) {
   }
 
   const nowPT = getPTNow();
+  const reqUrl = new URL(req.url);
+  const targetFeed = reqUrl.searchParams.get("feed");
   const outcomes: StepOutcome[] = [];
 
   try {
+    if (targetFeed) {
+      const feedStep = await runStep("feed", async () => runFeed(targetFeed));
+      outcomes.push(feedStep);
+      const errors = feedStep.ok
+        ? []
+        : [{ step: "feed", error: feedStep.error || "unknown error" }];
+      const responsePayload = {
+        ok: errors.length === 0,
+        run_id: lock.run_id,
+        timestamp: new Date().toISOString(),
+        mode: "feed",
+        feed: targetFeed,
+        steps: outcomes,
+        errors,
+      };
+      await recordSchedulerLedger({
+        run_id: lock.run_id,
+        timestamp: responsePayload.timestamp,
+        mode: "feed",
+        feed: targetFeed,
+        ok: responsePayload.ok,
+        errors,
+      });
+      return NextResponse.json(responsePayload, {
+        status: responsePayload.ok ? 200 : 207,
+      });
+    }
+
     const feedsStep = await runStep("feeds", async () => {
       const feedResults = await runAllDueFeeds();
       return {
@@ -223,11 +270,20 @@ export async function POST(req: Request) {
       }).catch(() => {});
     }
 
+    const timestamp = new Date().toISOString();
+    await recordSchedulerLedger({
+      run_id: lock.run_id,
+      timestamp,
+      mode: "cycle",
+      ok: errors.length === 0,
+      errors,
+    });
+
     return NextResponse.json(
       {
         ok: errors.length === 0,
         run_id: lock.run_id,
-        timestamp: new Date().toISOString(),
+        timestamp,
         steps: outcomes,
         notifications: notificationData,
         errors,
@@ -235,6 +291,19 @@ export async function POST(req: Request) {
       { status: errors.length > 0 ? 207 : 200 },
     );
   } catch (error) {
+    await recordSchedulerLedger({
+      run_id: lock.run_id,
+      timestamp: new Date().toISOString(),
+      mode: targetFeed ? "feed" : "cycle",
+      ...(targetFeed ? { feed: targetFeed } : {}),
+      ok: false,
+      errors: [
+        {
+          step: "fatal",
+          error: error instanceof Error ? error.message : "Scheduler cycle failed",
+        },
+      ],
+    });
     void notify({
       channel: "alerts",
       text:

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { createHmac } from "node:crypto";
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 
 /**
  * Abra v2 integration smoke suite.
@@ -638,6 +639,30 @@ async function testPhase8SmokeScriptSyntax() {
   }
 }
 
+async function testPhase8ScheduleScripts() {
+  const setupRun = spawnSync("node", ["--check", "scripts/setup-qstash-schedules.mjs"], {
+    encoding: "utf8",
+  });
+  if (setupRun.status !== 0) {
+    throw new Error(
+      `scripts/setup-qstash-schedules.mjs syntax check failed: ${(setupRun.stderr || setupRun.stdout || "unknown error").trim()}`,
+    );
+  }
+
+  const verifyRun = spawnSync("node", ["--check", "scripts/verify-schedules.mjs"], {
+    encoding: "utf8",
+  });
+  if (verifyRun.status !== 0) {
+    throw new Error(
+      `scripts/verify-schedules.mjs syntax check failed: ${(verifyRun.stderr || verifyRun.stdout || "unknown error").trim()}`,
+    );
+  }
+
+  const setupSource = readFileSync("scripts/setup-qstash-schedules.mjs", "utf8");
+  const count = (setupSource.match(/name:\\s*\"abra-/g) || []).length;
+  assert(count === 11, `Expected 11 Abra schedules, found ${count}`);
+}
+
 const tests = [
   { name: "Health check", fn: testHealth },
   { name: "Chat basic", fn: testChatBasic },
@@ -677,6 +702,8 @@ const tests = [
   { name: "Competitor intel CRUD", fn: testCompetitorIntel },
   // Phase 8 - Smoke test infrastructure
   { name: "Phase 8 smoke script syntax", fn: testPhase8SmokeScriptSyntax },
+  // Phase 8 - Schedule activation
+  { name: "Phase 8 schedule scripts + expected count", fn: testPhase8ScheduleScripts },
 ];
 
 (async () => {
