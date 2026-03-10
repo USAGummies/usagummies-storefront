@@ -340,25 +340,143 @@ export async function runShopifyOrdersFeed(): Promise<FeedResult> {
 export async function handleAmazonOrdersFeed(): Promise<FeedResult> {
   const feedKey = "amazon_orders";
   try {
-    const sample = parseJsonEnv<Array<{ order_id: string; total: number }>>(
-      "ABRA_AMAZON_ORDERS_SAMPLE_JSON",
-      [],
+    const { fetchAmazonOrderStats, fetchOrders } = await import(
+      "@/lib/amazon/sp-api"
     );
-    if (!Array.isArray(sample) || sample.length === 0) {
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const now = new Date().toISOString();
+
+    let orders: Array<{
+      AmazonOrderId?: string;
+      OrderTotal?: { Amount?: string };
+      NumberOfItemsShipped?: number;
+      NumberOfItemsUnshipped?: number;
+    }> = [];
+
+    try {
+      const fetched = await fetchOrders(yesterday, now);
+      orders = Array.isArray(fetched) ? fetched : [];
+    } catch {
+      const stats = await fetchAmazonOrderStats(1);
+      const text = `Amazon (last 24h via stats): ${stats.totalOrders} orders, $${stats.totalRevenue.toFixed(2)} revenue.`;
+      const saved = await writeBrainEntry({
+        sourceRef: `amazon-orders-${new Date().toISOString().split("T")[0]}`,
+        title: `Amazon Orders Summary — ${new Date().toISOString().split("T")[0]}`,
+        rawText: text,
+        category: "amazon_orders",
+        department: "sales_and_growth",
+      });
+      return {
+        feed_key: feedKey,
+        success: true,
+        entriesCreated: saved ? 1 : 0,
+      };
+    }
+
+    if (orders.length === 0) {
       return { feed_key: feedKey, success: true, entriesCreated: 0 };
     }
 
-    const total = sample.reduce((sum, order) => sum + (order.total || 0), 0);
-    const summary = `Amazon orders snapshot: ${sample.length} orders, $${total.toFixed(2)} in sampled revenue.`;
+    const revenue = orders.reduce((sum, order) => {
+      return sum + parseFloat(order.OrderTotal?.Amount || "0");
+    }, 0);
+    const summary = `Amazon orders (last 24h): ${orders.length} orders, $${revenue.toFixed(2)} total revenue. Marketplace: US.`;
     const date = new Date().toISOString().split("T")[0];
     const saved = await writeBrainEntry({
       sourceRef: `amazon-orders-${date}`,
-      title: `Amazon Orders Trend — ${date}`,
+      title: `Amazon Orders Summary — ${date}`,
       rawText: summary,
-      category: "sales_data",
+      category: "amazon_orders",
       department: "sales_and_growth",
     });
+
+    for (const order of orders) {
+      const amount = parseFloat(order.OrderTotal?.Amount || "0");
+      if (amount > 50) {
+        void emitSignal({
+          signal_type: "large_order",
+          source: "amazon",
+          title: `Large Amazon order: $${amount.toFixed(2)}`,
+          detail: `Order ${order.AmazonOrderId || "unknown"} — ${order.NumberOfItemsShipped || order.NumberOfItemsUnshipped || "?"} items`,
+          severity: amount > 200 ? "warning" : "info",
+          department: "sales_and_growth",
+          metadata: {
+            order_id: order.AmazonOrderId || null,
+            amount,
+          },
+        });
+      }
+    }
+
     return { feed_key: feedKey, success: true, entriesCreated: saved ? 1 : 0 };
+  } catch (error) {
+    return {
+      feed_key: feedKey,
+      success: false,
+      entriesCreated: 0,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
+export async function handleAmazonInventoryFeed(): Promise<FeedResult> {
+  const feedKey = "amazon_inventory";
+  try {
+    const { fetchFBAInventory } = await import("@/lib/amazon/sp-api");
+    const result = await fetchFBAInventory();
+    const items = Array.isArray(result.items)
+      ? (result.items as Array<{
+          asin?: string;
+          fnSku?: string;
+          totalQuantity?: number;
+        }>)
+      : [];
+
+    if (items.length === 0) {
+      return {
+        feed_key: feedKey,
+        success: !result.error,
+        entriesCreated: 0,
+        error: result.error || undefined,
+      };
+    }
+
+    let lowStockCount = 0;
+    for (const item of items) {
+      const qty = Number(item.totalQuantity || 0);
+      if (qty < 50) {
+        lowStockCount += 1;
+        void emitSignal({
+          signal_type: "inventory_alert",
+          source: "amazon",
+          title: `Low FBA stock: ${item.fnSku || item.asin || "unknown"}`,
+          detail: `${qty} units at FBA. ASIN: ${item.asin || "unknown"}`,
+          severity: qty < 10 ? "critical" : "warning",
+          department: "supply_chain",
+          metadata: {
+            asin: item.asin || null,
+            fn_sku: item.fnSku || null,
+            quantity: qty,
+          },
+        });
+      }
+    }
+
+    const text = `Amazon FBA inventory: ${items.length} SKUs tracked. ${lowStockCount} below safety stock.`;
+    const saved = await writeBrainEntry({
+      sourceRef: `amazon-inventory-${new Date().toISOString().split("T")[0]}`,
+      title: `Amazon FBA Inventory Snapshot — ${new Date().toISOString().split("T")[0]}`,
+      rawText: text,
+      category: "inventory_snapshot",
+      department: "supply_chain",
+    });
+
+    return {
+      feed_key: feedKey,
+      success: true,
+      entriesCreated: saved ? 1 : 0,
+      ...(result.error ? { error: result.error } : {}),
+    };
   } catch (error) {
     return {
       feed_key: feedKey,
@@ -695,6 +813,7 @@ export async function runFeed(feedKey: string): Promise<FeedResult> {
   const handlers: Record<string, () => Promise<FeedResult>> = {
     shopify_orders: runShopifyOrdersFeed,
     amazon_orders: handleAmazonOrdersFeed,
+    amazon_inventory: handleAmazonInventoryFeed,
     faire_orders: handleFaireOrdersFeed,
     shopify_products: handleShopifyProductsFeed,
     shopify_inventory: handleShopifyInventoryFeed,
