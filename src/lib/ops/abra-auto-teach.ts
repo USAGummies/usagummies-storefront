@@ -388,6 +388,7 @@ export async function handleAmazonOrdersFeed(): Promise<FeedResult> {
         category: "amazon_orders",
         department: "sales_and_growth",
       });
+      void updateIntHealth("amazon", true);
       return {
         feed_key: feedKey,
         success: true,
@@ -396,6 +397,7 @@ export async function handleAmazonOrdersFeed(): Promise<FeedResult> {
     }
 
     if (orders.length === 0) {
+      void updateIntHealth("amazon", true);
       return { feed_key: feedKey, success: true, entriesCreated: 0 };
     }
 
@@ -453,8 +455,14 @@ export async function handleAmazonOrdersFeed(): Promise<FeedResult> {
       // best-effort
     }
 
+    void updateIntHealth("amazon", true);
     return { feed_key: feedKey, success: true, entriesCreated: saved ? 1 : 0 };
   } catch (error) {
+    void updateIntHealth(
+      "amazon",
+      false,
+      error instanceof Error ? error.message : String(error),
+    );
     return {
       feed_key: feedKey,
       success: false,
@@ -478,6 +486,7 @@ export async function handleAmazonInventoryFeed(): Promise<FeedResult> {
       : [];
 
     if (items.length === 0) {
+      void updateIntHealth("amazon", !result.error, result.error || undefined);
       return {
         feed_key: feedKey,
         success: !result.error,
@@ -516,6 +525,7 @@ export async function handleAmazonInventoryFeed(): Promise<FeedResult> {
       department: "supply_chain",
     });
 
+    void updateIntHealth("amazon", true, result.error || undefined);
     return {
       feed_key: feedKey,
       success: true,
@@ -523,6 +533,11 @@ export async function handleAmazonInventoryFeed(): Promise<FeedResult> {
       ...(result.error ? { error: result.error } : {}),
     };
   } catch (error) {
+    void updateIntHealth(
+      "amazon",
+      false,
+      error instanceof Error ? error.message : String(error),
+    );
     return {
       feed_key: feedKey,
       success: false,
@@ -932,6 +947,58 @@ async function patchFeedStatus(
   }
 }
 
+function integrationSystemForFeed(feedKey: string): string | null {
+  if (
+    feedKey === "shopify_orders" ||
+    feedKey === "shopify_products" ||
+    feedKey === "shopify_inventory" ||
+    feedKey === "inventory_alerts"
+  ) {
+    return "shopify";
+  }
+  if (feedKey === "amazon_orders" || feedKey === "amazon_inventory") {
+    return "amazon";
+  }
+  if (feedKey === "ga4_traffic") return "ga4_analytics";
+  if (feedKey === "faire_orders") return "faire";
+  if (feedKey === "email_fetch") return "gmail";
+  return null;
+}
+
+async function updateIntHealth(
+  systemName: string,
+  success: boolean,
+  error?: string,
+): Promise<void> {
+  try {
+    const payload = {
+      system_name: systemName,
+      connection_status: success ? "connected" : "error",
+      ...(success
+        ? {
+            last_success_at: new Date().toISOString(),
+            error_summary: null,
+            retry_count: 0,
+          }
+        : {
+            last_error_at: new Date().toISOString(),
+            error_summary: (error || "Unknown feed failure").slice(0, 500),
+          }),
+      updated_at: new Date().toISOString(),
+    };
+    await sbFetch("/rest/v1/integration_health?on_conflict=system_name", {
+      method: "POST",
+      headers: {
+        Prefer: "resolution=merge-duplicates,return=minimal",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify([payload]),
+    });
+  } catch {
+    // best-effort
+  }
+}
+
 /**
  * Run a generic feed by key. Dispatches to the appropriate handler.
  */
@@ -962,6 +1029,10 @@ export async function runFeed(feedKey: string): Promise<FeedResult> {
   const updatedV2 = await patchFeedStatus("abra_auto_teach_feeds", feedKey, result);
   if (!updatedV2) {
     void patchFeedStatus("abra_knowledge_feeds", feedKey, result);
+  }
+  const systemName = integrationSystemForFeed(feedKey);
+  if (systemName) {
+    void updateIntHealth(systemName, result.success, result.error);
   }
   return result;
 }

@@ -61,7 +61,19 @@ export async function getAccessToken(): Promise<string> {
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`LWA token exchange failed: ${res.status} — ${text}`);
+    let parsedMessage = text;
+    try {
+      const parsed = JSON.parse(text) as {
+        error_description?: string;
+        error?: string;
+      };
+      parsedMessage = parsed.error_description || parsed.error || text;
+    } catch {
+      // Use raw text when response is not JSON.
+    }
+    throw new Error(
+      `LWA token exchange failed (${res.status}): ${parsedMessage.slice(0, 300)}`,
+    );
   }
 
   const data = await res.json();
@@ -115,10 +127,15 @@ async function spApiGet<T>(
       if (!res.ok) {
         const text = await res.text();
         if (res.status === 403) {
+          if (path.includes("/orders/v0/orders")) {
+            throw new Error(
+              `SP-API Orders 403 — check IAM role or app registration. Raw: ${text.slice(0, 200)}`,
+            );
+          }
           throw new Error(
             `SP-API ${path}: 403 Forbidden — The SP-API app lacks the required role/scope for this endpoint. ` +
-            `Re-authorize the app in Amazon Seller Central → Apps & Services → Develop Apps → Edit App → Add required API sections (e.g., FBA Inventory). ` +
-            `Raw: ${text.slice(0, 200)}`,
+              `Re-authorize the app in Amazon Seller Central → Apps & Services → Develop Apps → Edit App → Add required API sections (e.g., FBA Inventory). ` +
+              `Raw: ${text.slice(0, 200)}`,
           );
         }
         throw new Error(`SP-API ${path} failed: ${res.status} — ${text}`);
@@ -258,6 +275,58 @@ export type FBAInventoryFetchResult = {
   errorAt: string | null;
   lastSuccessfulFetch: string | null;
 };
+
+export async function testAmazonConnection(): Promise<{
+  configured: boolean;
+  tokenOk: boolean;
+  ordersOk: boolean;
+  inventoryOk: boolean;
+  errors: string[];
+}> {
+  const errors: string[] = [];
+  if (!isAmazonConfigured()) {
+    return {
+      configured: false,
+      tokenOk: false,
+      ordersOk: false,
+      inventoryOk: false,
+      errors: ["SP-API env vars not set"],
+    };
+  }
+
+  let tokenOk = false;
+  try {
+    await getAccessToken();
+    tokenOk = true;
+  } catch (error) {
+    errors.push(`Token: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  let ordersOk = false;
+  try {
+    const now = new Date();
+    const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    await fetchOrders(dayAgo.toISOString(), now.toISOString());
+    ordersOk = true;
+  } catch (error) {
+    errors.push(
+      `Orders: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+
+  let inventoryOk = false;
+  try {
+    const inv = await fetchFBAInventory();
+    inventoryOk = !inv.error;
+    if (inv.error) errors.push(`Inventory: ${inv.error}`);
+  } catch (error) {
+    errors.push(
+      `Inventory: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+
+  return { configured: true, tokenOk, ordersOk, inventoryOk, errors };
+}
 
 /**
  * Fetch FBA inventory summaries with full details.
