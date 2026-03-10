@@ -36,6 +36,26 @@ type FetchResult = {
   error: string | null;
 };
 
+type DependencyNode = {
+  dependency_id?: string;
+  initiative_id?: string;
+  title?: string;
+  department?: string;
+  status?: string;
+  relationship_type?: string;
+};
+
+type InitiativeWithDependencies = Record<string, unknown> & {
+  id?: string;
+  title?: string;
+  goal?: string;
+  status?: string;
+  blocks?: DependencyNode[];
+  blocked_by?: DependencyNode[];
+  informs?: DependencyNode[];
+  informed_by?: DependencyNode[];
+};
+
 export const metadata: Metadata = {
   title: "Department Dashboard",
 };
@@ -84,6 +104,29 @@ async function fetchDepartmentState(dept: string): Promise<FetchResult> {
   }
 }
 
+async function fetchInitiativesWithDependencies(
+  dept: string,
+): Promise<InitiativeWithDependencies[]> {
+  try {
+    const h = await headers();
+    const host = h.get("x-forwarded-host") || h.get("host");
+    const proto = h.get("x-forwarded-proto") || "http";
+    if (!host) return [];
+
+    const res = await fetch(
+      `${proto}://${host}/api/ops/abra/initiative?department=${dept}&status=active&include_dependencies=true`,
+      { cache: "no-store" },
+    );
+    if (!res.ok) return [];
+    const json = (await res.json()) as {
+      initiatives?: InitiativeWithDependencies[];
+    };
+    return Array.isArray(json.initiatives) ? json.initiatives : [];
+  } catch {
+    return [];
+  }
+}
+
 function statusClass(status: string): string {
   switch (status) {
     case "approved":
@@ -112,7 +155,10 @@ export default async function DepartmentPage({
     notFound();
   }
 
-  const { data, error } = await fetchDepartmentState(dept);
+  const [{ data, error }, dependencyInitiatives] = await Promise.all([
+    fetchDepartmentState(dept),
+    fetchInitiativesWithDependencies(dept),
+  ]);
 
   const initiatives = Array.isArray(data?.initiatives) ? data.initiatives : [];
   const openQuestions = Array.isArray(data?.open_questions)
@@ -123,6 +169,46 @@ export default async function DepartmentPage({
     : [];
   const kpis = Array.isArray(data?.kpis) ? data.kpis : [];
   const teamMembers = Array.isArray(data?.team_members) ? data.team_members : [];
+  const blockedInitiatives = dependencyInitiatives.filter((initiative) =>
+    Array.isArray(initiative.blocked_by) && initiative.blocked_by.length > 0,
+  );
+  const blockingOthers = dependencyInitiatives
+    .flatMap((initiative) => {
+      const sourceTitle = valueText(
+        initiative.title,
+        valueText(initiative.goal, "Untitled initiative"),
+      );
+      const deps = Array.isArray(initiative.blocks) ? initiative.blocks : [];
+      return deps.map((dependency) => ({
+        sourceTitle,
+        sourceStatus: valueText(initiative.status, "unknown"),
+        targetTitle: valueText(dependency.title, "Untitled initiative"),
+        targetDepartment: valueText(dependency.department, "unknown"),
+        targetStatus: valueText(dependency.status, "unknown"),
+      }));
+    })
+    .filter((item) => item.targetDepartment !== dept);
+  const informationalLinks = dependencyInitiatives.flatMap((initiative) => {
+    const sourceTitle = valueText(
+      initiative.title,
+      valueText(initiative.goal, "Untitled initiative"),
+    );
+    const outward = Array.isArray(initiative.informs)
+      ? initiative.informs.map((dependency) => ({
+          sourceTitle,
+          targetTitle: valueText(dependency.title, "Untitled initiative"),
+          targetDepartment: valueText(dependency.department, "unknown"),
+        }))
+      : [];
+    const inward = Array.isArray(initiative.informed_by)
+      ? initiative.informed_by.map((dependency) => ({
+          sourceTitle,
+          targetTitle: valueText(dependency.title, "Untitled initiative"),
+          targetDepartment: valueText(dependency.department, "unknown"),
+        }))
+      : [];
+    return [...outward, ...inward];
+  });
 
   const priorities = Array.isArray(data?.department?.current_priorities)
     ? data?.department?.current_priorities
@@ -286,6 +372,95 @@ export default async function DepartmentPage({
                   <li key={valueText(correction.id, valueText(correction.correction))} className="rounded-lg border border-slate-200 p-2">
                     <div className="font-medium text-slate-900">{valueText(correction.correction, "Correction")}</div>
                     <div className="text-xs text-slate-500">Original: {valueText(correction.original_claim, "—")}</div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-slate-200 bg-white p-4">
+        <div className="mb-3 text-sm font-semibold text-slate-900">Dependencies</div>
+        <div className="grid gap-3 md:grid-cols-3">
+          <div>
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-rose-700">
+              Blocked Initiatives
+            </div>
+            {blockedInitiatives.length === 0 ? (
+              <div className="text-sm text-slate-600">No blocked initiatives.</div>
+            ) : (
+              <ul className="space-y-2 text-sm">
+                {blockedInitiatives.slice(0, 12).map((initiative) => {
+                  const title = valueText(
+                    initiative.title,
+                    valueText(initiative.goal, "Untitled initiative"),
+                  );
+                  const blockers = Array.isArray(initiative.blocked_by)
+                    ? initiative.blocked_by
+                    : [];
+                  return (
+                    <li
+                      key={`${valueText(initiative.id, title)}-blocked`}
+                      className="rounded-lg border border-rose-200 bg-rose-50 p-2 text-rose-900"
+                    >
+                      <div className="font-medium">{title}</div>
+                      <div className="mt-1 text-xs text-rose-800">
+                        Blocked by:{" "}
+                        {blockers
+                          .slice(0, 3)
+                          .map((blocker) =>
+                            `${valueText(blocker.title, "Untitled")} (${valueText(blocker.department, "unknown").replace(/_/g, " ")})`,
+                          )
+                          .join(", ")}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+
+          <div>
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-emerald-700">
+              This Department Blocks
+            </div>
+            {blockingOthers.length === 0 ? (
+              <div className="text-sm text-slate-600">No cross-department blockers.</div>
+            ) : (
+              <ul className="space-y-2 text-sm">
+                {blockingOthers.slice(0, 12).map((item, idx) => (
+                  <li
+                    key={`${item.sourceTitle}-${item.targetTitle}-${idx}`}
+                    className="rounded-lg border border-emerald-200 bg-emerald-50 p-2 text-emerald-900"
+                  >
+                    <div className="font-medium">{item.targetTitle}</div>
+                    <div className="mt-1 text-xs text-emerald-800">
+                      Blocked by {item.sourceTitle} ({item.sourceStatus.replace(/_/g, " ")})
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div>
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+              Informational Links
+            </div>
+            {informationalLinks.length === 0 ? (
+              <div className="text-sm text-slate-600">No informational links.</div>
+            ) : (
+              <ul className="space-y-2 text-sm text-slate-700">
+                {informationalLinks.slice(0, 12).map((item, idx) => (
+                  <li
+                    key={`${item.sourceTitle}-${item.targetTitle}-${idx}-info`}
+                    className="rounded-lg border border-slate-200 bg-slate-50 p-2"
+                  >
+                    <div className="font-medium text-slate-900">{item.sourceTitle}</div>
+                    <div className="mt-1 text-xs text-slate-600">
+                      Linked with {item.targetTitle} ({item.targetDepartment.replace(/_/g, " ")})
+                    </div>
                   </li>
                 ))}
               </ul>

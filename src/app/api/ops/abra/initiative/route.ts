@@ -21,6 +21,7 @@ import {
   type PlaybookQuestion,
 } from "@/lib/ops/department-playbooks";
 import { logAICost, extractClaudeUsage } from "@/lib/ops/abra-cost-tracker";
+import { notify } from "@/lib/ops/notify";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,11 +30,30 @@ export const maxDuration = 30;
 const DEFAULT_CLAUDE_MODEL =
   process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-latest";
 
-type InitiativeDependency = {
+type DependencyRelationship = "blocks" | "informs" | "requires" | "enables";
+
+type DependencyRow = {
+  id: string;
   initiative_id: string;
-  department: string;
+  depends_on_id: string;
+  relationship_type: DependencyRelationship;
+  created_at?: string;
+};
+
+type DependencyNode = {
+  dependency_id: string;
+  initiative_id: string;
   title: string;
-  relationship: "depends_on" | "blocks" | "related";
+  department: string;
+  status: string;
+  relationship_type: DependencyRelationship;
+};
+
+type DependencyView = {
+  blocks: DependencyNode[];
+  blocked_by: DependencyNode[];
+  informs: DependencyNode[];
+  informed_by: DependencyNode[];
 };
 
 type Initiative = {
@@ -49,7 +69,6 @@ type Initiative = {
   tasks: unknown[];
   kpis: unknown[];
   research_findings: unknown[];
-  dependencies: InitiativeDependency[];
   initiated_by: string | null;
   approved_by: string | null;
   created_at: string;
@@ -278,6 +297,216 @@ function buildKpiTargets(
   });
 }
 
+function inClause(values: string[]): string {
+  return encodeURIComponent(`(${values.join(",")})`);
+}
+
+function normalizeRelationship(value: unknown): DependencyRelationship {
+  if (
+    typeof value === "string" &&
+    ["blocks", "informs", "requires", "enables"].includes(value)
+  ) {
+    return value as DependencyRelationship;
+  }
+  return "blocks";
+}
+
+function emptyDependencyView(): DependencyView {
+  return {
+    blocks: [],
+    blocked_by: [],
+    informs: [],
+    informed_by: [],
+  };
+}
+
+function parseInitialDependencies(
+  raw: unknown,
+): Array<{ depends_on_id: string; relationship_type: DependencyRelationship }> {
+  if (!Array.isArray(raw)) return [];
+  const parsed: Array<{ depends_on_id: string; relationship_type: DependencyRelationship }> = [];
+
+  for (const item of raw) {
+    if (typeof item === "string" && item.trim()) {
+      parsed.push({
+        depends_on_id: item.trim(),
+        relationship_type: "blocks",
+      });
+      continue;
+    }
+
+    if (item && typeof item === "object") {
+      const dep = item as Record<string, unknown>;
+      const dependsOnId =
+        typeof dep.depends_on_id === "string"
+          ? dep.depends_on_id
+          : typeof dep.initiative_id === "string"
+            ? dep.initiative_id
+            : "";
+      if (!dependsOnId.trim()) continue;
+      parsed.push({
+        depends_on_id: dependsOnId.trim(),
+        relationship_type: normalizeRelationship(
+          dep.relationship_type || dep.relationship,
+        ),
+      });
+    }
+  }
+
+  const seen = new Set<string>();
+  return parsed.filter((dep) => {
+    const key = `${dep.depends_on_id}:${dep.relationship_type}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+async function addDependencies(
+  initiativeId: string,
+  deps: Array<{ depends_on_id: string; relationship_type: DependencyRelationship }>,
+): Promise<void> {
+  if (!deps.length) return;
+
+  const rows = deps
+    .filter((dep) => dep.depends_on_id !== initiativeId)
+    .map((dep) => ({
+      initiative_id: initiativeId,
+      depends_on_id: dep.depends_on_id,
+      relationship_type: dep.relationship_type,
+    }));
+
+  if (!rows.length) return;
+
+  await sbFetch("/rest/v1/abra_initiative_dependencies", {
+    method: "POST",
+    headers: {
+      Prefer: "resolution=ignore-duplicates,return=minimal",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(rows),
+  });
+}
+
+async function removeDependency(initiativeId: string, dependencyId: string): Promise<void> {
+  if (!initiativeId || !dependencyId) return;
+  await sbFetch(
+    `/rest/v1/abra_initiative_dependencies?id=eq.${dependencyId}&initiative_id=eq.${initiativeId}`,
+    { method: "DELETE", headers: { Prefer: "return=minimal" } },
+  );
+}
+
+async function buildDependencyViews(
+  initiatives: Initiative[],
+): Promise<Record<string, DependencyView>> {
+  const initiativeIds = initiatives.map((initiative) => initiative.id).filter(Boolean);
+  const views: Record<string, DependencyView> = {};
+  for (const id of initiativeIds) {
+    views[id] = emptyDependencyView();
+  }
+  if (!initiativeIds.length) return views;
+
+  const [outgoing, incoming] = (await Promise.all([
+    sbFetch(
+      `/rest/v1/abra_initiative_dependencies?initiative_id=in.${inClause(initiativeIds)}&select=id,initiative_id,depends_on_id,relationship_type,created_at&limit=500`,
+    ),
+    sbFetch(
+      `/rest/v1/abra_initiative_dependencies?depends_on_id=in.${inClause(initiativeIds)}&select=id,initiative_id,depends_on_id,relationship_type,created_at&limit=500`,
+    ),
+  ])) as [DependencyRow[], DependencyRow[]];
+
+  const allDeps = [...outgoing, ...incoming];
+  if (!allDeps.length) return views;
+
+  const relatedIds = new Set<string>(initiativeIds);
+  for (const dep of allDeps) {
+    if (dep.initiative_id) relatedIds.add(dep.initiative_id);
+    if (dep.depends_on_id) relatedIds.add(dep.depends_on_id);
+  }
+
+  const relatedRows = (await sbFetch(
+    `/rest/v1/abra_initiatives?id=in.${inClause(Array.from(relatedIds))}&select=id,title,department,status&limit=500`,
+  )) as Array<{ id: string; title: string | null; department: string | null; status: string | null }>;
+  const relatedMap = new Map(relatedRows.map((row) => [row.id, row]));
+
+  function makeNode(depId: string, id: string, relationship: DependencyRelationship): DependencyNode {
+    const row = relatedMap.get(id);
+    return {
+      dependency_id: depId,
+      initiative_id: id,
+      title: row?.title || "Untitled initiative",
+      department: row?.department || "unknown",
+      status: row?.status || "unknown",
+      relationship_type: relationship,
+    };
+  }
+
+  for (const dep of allDeps) {
+    const sourceId = dep.initiative_id;
+    const targetId = dep.depends_on_id;
+    if (!sourceId || !targetId) continue;
+    if (!views[sourceId]) views[sourceId] = emptyDependencyView();
+    if (!views[targetId]) views[targetId] = emptyDependencyView();
+
+    const sourceView = views[sourceId];
+    const targetView = views[targetId];
+    const sourceToTarget = makeNode(dep.id, targetId, dep.relationship_type);
+    const targetToSource = makeNode(dep.id, sourceId, dep.relationship_type);
+
+    if (dep.relationship_type === "blocks" || dep.relationship_type === "requires") {
+      sourceView.blocked_by.push(sourceToTarget);
+      targetView.blocks.push(targetToSource);
+      continue;
+    }
+
+    sourceView.informed_by.push(sourceToTarget);
+    targetView.informs.push(targetToSource);
+  }
+
+  return views;
+}
+
+async function notifyDependencyStatusChange(
+  initiative: Initiative,
+  nextStatus: string,
+): Promise<void> {
+  if (!["completed", "paused"].includes(nextStatus)) return;
+
+  const rows = (await sbFetch(
+    `/rest/v1/abra_initiative_dependencies?depends_on_id=eq.${initiative.id}&relationship_type=in.${encodeURIComponent("(blocks,requires)")}&select=id,initiative_id,depends_on_id,relationship_type`,
+  )) as DependencyRow[];
+
+  if (!rows.length) return;
+
+  const blockedIds = Array.from(new Set(rows.map((row) => row.initiative_id)));
+  if (!blockedIds.length) return;
+
+  const blockedRows = (await sbFetch(
+    `/rest/v1/abra_initiatives?id=in.${inClause(blockedIds)}&select=id,title,department,status&limit=500`,
+  )) as Array<{ id: string; title: string | null; department: string | null; status: string | null }>;
+
+  const title = initiative.title || initiative.goal || "Untitled initiative";
+  const dept = initiative.department.replace(/_/g, " ");
+  const actionText =
+    nextStatus === "completed"
+      ? `${title} (${dept}) is now complete.`
+      : `${title} (${dept}) is now paused.`;
+
+  const lines = blockedRows.map((row) => {
+    const blockedTitle = row.title || "Untitled initiative";
+    const blockedDept = (row.department || "unknown").replace(/_/g, " ");
+    if (nextStatus === "completed") {
+      return `• This unblocks: "${blockedTitle}" (${blockedDept})`;
+    }
+    return `• Impacted: "${blockedTitle}" (${blockedDept})`;
+  });
+
+  await notify({
+    channel: "alerts",
+    text: `${nextStatus === "completed" ? "🔓 *Blocker Resolved*" : "⏸️ *Blocker Status Changed*"}\n${actionText}\n${lines.join("\n")}`,
+  });
+}
+
 // ─── POST: Create new initiative ───
 async function handlePost(req: Request) {
   const session = await auth();
@@ -371,39 +600,8 @@ async function handlePost(req: Request) {
       }
     }
 
-    // 5. Resolve cross-department dependencies
-    const dependencies: InitiativeDependency[] = [];
-    if (Array.isArray(payload.depends_on)) {
-      for (const dep of payload.depends_on) {
-        if (typeof dep === "string") {
-          // dep is an initiative ID — look it up
-          try {
-            const depRows = (await sbFetch(
-              `/rest/v1/abra_initiatives?id=eq.${dep}&select=id,department,title`,
-            )) as Array<{ id: string; department: string; title: string }>;
-            if (depRows.length > 0) {
-              dependencies.push({
-                initiative_id: depRows[0].id,
-                department: depRows[0].department,
-                title: depRows[0].title || "Untitled",
-                relationship: "depends_on",
-              });
-            }
-          } catch {
-            // Skip invalid dependency IDs
-          }
-        } else if (dep && typeof dep === "object" && "initiative_id" in dep) {
-          // dep is a full dependency object
-          const d = dep as Record<string, unknown>;
-          dependencies.push({
-            initiative_id: String(d.initiative_id),
-            department: String(d.department || "unknown"),
-            title: String(d.title || "Untitled"),
-            relationship: (d.relationship as InitiativeDependency["relationship"]) || "depends_on",
-          });
-        }
-      }
-    }
+    // 5. Parse optional dependency links for this initiative
+    const dependencies = parseInitialDependencies(payload.depends_on);
 
     // 6. Create initiative record
     const rows = (await sbFetch("/rest/v1/abra_initiatives", {
@@ -426,7 +624,6 @@ async function handlePost(req: Request) {
         tasks: [],
         kpis: playbook?.kpis || [],
         research_findings: research.findings,
-        dependencies,
         initiated_by: session.user.email,
       }),
     })) as Initiative[];
@@ -438,6 +635,10 @@ async function handlePost(req: Request) {
       throw new Error("Failed to create initiative");
     }
 
+    await addDependencies(created.id, dependencies);
+    const dependencyViews = await buildDependencyViews([created]);
+    const view = dependencyViews[created.id] || emptyDependencyView();
+
     return NextResponse.json({
       id: created.id,
       department: created.department,
@@ -447,7 +648,10 @@ async function handlePost(req: Request) {
       questions: created.questions,
       baseline_requirements: created.baseline_requirements,
       research_findings: created.research_findings,
-      dependencies: created.dependencies,
+      blocks: view.blocks,
+      blocked_by: view.blocked_by,
+      informs: view.informs,
+      informed_by: view.informed_by,
     });
   } catch (error) {
     if (isSupabaseRelatedError(error)) {
@@ -470,6 +674,7 @@ async function handleGet(req: Request) {
   const department = url.searchParams.get("department");
   const status = url.searchParams.get("status");
   const id = url.searchParams.get("id");
+  const includeDependencies = url.searchParams.get("include_dependencies") === "true";
 
   try {
     const circuitCheck = await canUseSupabase();
@@ -497,9 +702,19 @@ async function handleGet(req: Request) {
     path += "&limit=20";
 
     const results = (await sbFetch(path)) as Initiative[];
+    const dependencyViews = includeDependencies
+      ? await buildDependencyViews(results)
+      : {};
     await markSupabaseSuccess();
 
-    return NextResponse.json({ initiatives: results });
+    const initiatives = includeDependencies
+      ? results.map((initiative) => ({
+          ...initiative,
+          ...(dependencyViews[initiative.id] || emptyDependencyView()),
+        }))
+      : results;
+
+    return NextResponse.json({ initiatives });
   } catch (error) {
     if (isSupabaseRelatedError(error)) {
       await markSupabaseFailure(error);
@@ -615,25 +830,35 @@ async function handlePatch(req: Request) {
       }
     }
 
-    // Dependency management
+    // Dependency management (table-backed)
     if (payload.add_dependency && typeof payload.add_dependency === "object") {
       const dep = payload.add_dependency as Record<string, unknown>;
-      const currentDeps = Array.isArray(initiative.dependencies) ? [...initiative.dependencies] : [];
-      const newDep: InitiativeDependency = {
-        initiative_id: String(dep.initiative_id || ""),
-        department: String(dep.department || "unknown"),
-        title: String(dep.title || "Untitled"),
-        relationship: (dep.relationship as InitiativeDependency["relationship"]) || "depends_on",
-      };
-      if (newDep.initiative_id && !currentDeps.some((d) => d.initiative_id === newDep.initiative_id)) {
-        currentDeps.push(newDep);
-        updates.dependencies = currentDeps;
+      const dependsOnId =
+        typeof dep.depends_on_id === "string"
+          ? dep.depends_on_id.trim()
+          : "";
+      const relationshipType = normalizeRelationship(dep.relationship_type);
+      if (dependsOnId) {
+        await addDependencies(id, [
+          {
+            depends_on_id: dependsOnId,
+            relationship_type: relationshipType,
+          },
+        ]);
       }
     }
 
-    if (typeof payload.remove_dependency === "string") {
-      const currentDeps = Array.isArray(initiative.dependencies) ? [...initiative.dependencies] : [];
-      updates.dependencies = currentDeps.filter((d) => d.initiative_id !== payload.remove_dependency);
+    const removeDependencyId =
+      payload.remove_dependency &&
+      typeof payload.remove_dependency === "object" &&
+      typeof (payload.remove_dependency as Record<string, unknown>).dependency_id === "string"
+        ? ((payload.remove_dependency as Record<string, unknown>)
+            .dependency_id as string)
+        : typeof payload.remove_dependency === "string"
+          ? payload.remove_dependency
+          : "";
+    if (removeDependencyId) {
+      await removeDependency(id, removeDependencyId);
     }
 
     // Manual status override
@@ -653,23 +878,41 @@ async function handlePatch(req: Request) {
     }
 
     // Apply updates
-    const updated = (await sbFetch(
-      `/rest/v1/abra_initiatives?id=eq.${id}`,
-      {
-        method: "PATCH",
-        headers: {
-          Prefer: "return=representation",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(updates),
-      },
-    )) as Initiative[];
+    const updated =
+      Object.keys(updates).length > 0
+        ? ((await sbFetch(
+            `/rest/v1/abra_initiatives?id=eq.${id}`,
+            {
+              method: "PATCH",
+              headers: {
+                Prefer: "return=representation",
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(updates),
+            },
+          )) as Initiative[])
+        : [initiative];
 
     await markSupabaseSuccess();
 
     const updatedInitiative = updated[0] || { ...initiative, ...updates };
+    if (
+      initiative.status !== updatedInitiative.status &&
+      (updatedInitiative.status === "completed" ||
+        updatedInitiative.status === "paused")
+    ) {
+      void notifyDependencyStatusChange(
+        updatedInitiative,
+        updatedInitiative.status,
+      ).catch(() => {});
+    }
+    const dependencyViews = await buildDependencyViews([updatedInitiative]);
+    const enrichedInitiative = {
+      ...updatedInitiative,
+      ...(dependencyViews[updatedInitiative.id] || emptyDependencyView()),
+    };
     return NextResponse.json({
-      initiative: updatedInitiative,
+      initiative: enrichedInitiative,
       plan:
         updatedInitiative.status === "approved"
           ? {
