@@ -1,11 +1,19 @@
 import { getAccuracyReport } from "@/lib/ops/abra-truth-benchmark";
 import { getActiveSignals } from "@/lib/ops/abra-operational-signals";
 import {
+  extractClaudeUsage,
+  getPreferredClaudeModel,
   getMonthlySpend,
   getSpendByDepartment,
   getSpendByModel,
   logAICost,
 } from "@/lib/ops/abra-cost-tracker";
+import { generateRevenueForecast } from "@/lib/ops/abra-forecasting";
+import { analyzePipeline } from "@/lib/ops/abra-pipeline-intelligence";
+import { generateAttributionReport } from "@/lib/ops/abra-attribution";
+import { analyzeInventory } from "@/lib/ops/abra-inventory-forecast";
+import { getSystemHealth } from "@/lib/ops/abra-health-monitor";
+import { recordKPI } from "@/lib/ops/abra-kpi-recorder";
 import { notify } from "@/lib/ops/notify";
 import { sendOpsEmail } from "@/lib/ops/email";
 
@@ -156,25 +164,6 @@ async function getMeetingCount(sinceIso: string): Promise<number> {
   }
 }
 
-async function getOpenQuestionList(limit = 5): Promise<string[]> {
-  try {
-    const rows = (await sbFetch(
-      `/rest/v1/abra_unanswered_questions?answered=eq.false&select=department,question&order=created_at.desc&limit=${limit}`,
-    )) as Array<{ department?: string; question?: string }>;
-
-    return rows
-      .map((row) => {
-        const question = (row.question || "").trim();
-        const department = (row.department || "general").trim();
-        if (!question) return "";
-        return `[${department}] ${question}`;
-      })
-      .filter(Boolean);
-  } catch {
-    return [];
-  }
-}
-
 async function getInitiative30DaySummary(
   department: string,
   sinceIso: string,
@@ -202,74 +191,370 @@ async function getInitiative30DaySummary(
   };
 }
 
+function isoDateDaysAgo(days: number): string {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - days);
+  return d.toISOString().slice(0, 10);
+}
+
+async function sumMetricWindow(
+  metricName: string,
+  startDaysAgo: number,
+  endDaysAgo: number,
+): Promise<number> {
+  const start = isoDateDaysAgo(startDaysAgo);
+  const end = isoDateDaysAgo(endDaysAgo);
+  try {
+    const rows = (await sbFetch(
+      `/rest/v1/kpi_timeseries?metric_name=eq.${encodeURIComponent(metricName)}&window_type=eq.daily&captured_for_date=gte.${start}&captured_for_date=lt.${end}&select=value&limit=5000`,
+    )) as Array<{ value?: number | string }>;
+    return rows.reduce((sum, row) => sum + Number(row.value || 0), 0);
+  } catch {
+    return 0;
+  }
+}
+
+function safePctDelta(current: number, base: number): number {
+  if (!base) return 0;
+  return ((current - base) / Math.abs(base)) * 100;
+}
+
+async function runClaudeDigestText(
+  prompt: string,
+  endpoint: "digest/weekly-summary" | "digest/weekly-priorities",
+): Promise<string> {
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  if (!anthropicKey) return "Claude summary unavailable (missing ANTHROPIC_API_KEY).";
+  const model = await getPreferredClaudeModel(
+    process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-latest",
+  );
+
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": anthropicKey,
+      "anthropic-version": "2023-06-01",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: endpoint === "digest/weekly-summary" ? 250 : 450,
+      temperature: 0.2,
+      messages: [{ role: "user", content: prompt }],
+    }),
+    signal: AbortSignal.timeout(30000),
+  });
+  const text = await res.text();
+  let payload: Record<string, unknown> = {};
+  if (text) {
+    try {
+      payload = JSON.parse(text) as Record<string, unknown>;
+    } catch {
+      payload = {};
+    }
+  }
+  if (!res.ok) {
+    return `Claude output unavailable (${res.status}).`;
+  }
+
+  const usage = extractClaudeUsage(payload);
+  if (usage) {
+    void logAICost({
+      model,
+      provider: "anthropic",
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+      endpoint,
+      department: "executive",
+    });
+  }
+
+  const content = Array.isArray(payload.content)
+    ? payload.content
+    : [];
+  const out = content
+    .map((item) =>
+      item && typeof item === "object" && "text" in item
+        ? String(item.text || "")
+        : "",
+    )
+    .join("\n")
+    .trim();
+  return out || "No summary generated.";
+}
+
 export async function generateWeeklyDigest(): Promise<string> {
-  const sinceIso = lookbackIso(7);
-  const weekLabel = new Date(sinceIso).toLocaleDateString("en-US", {
-    month: "short",
+  const weekLabel = new Date().toLocaleDateString("en-US", {
+    month: "long",
     day: "numeric",
     year: "numeric",
   });
 
-  const [deptRows, accuracy, signals, monthlySpend, openQuestions, meetings] =
+  const [
+    thisWeekRevenueShopify,
+    lastWeekRevenueShopify,
+    fourWeekAvgRevenueShopify,
+    thisWeekRevenueAmazon,
+    lastWeekRevenueAmazon,
+    fourWeekAvgRevenueAmazon,
+    thisWeekOrdersShopify,
+    lastWeekOrdersShopify,
+    fourWeekAvgOrdersShopify,
+    thisWeekOrdersAmazon,
+    lastWeekOrdersAmazon,
+    fourWeekAvgOrdersAmazon,
+    thisWeekSessions,
+    lastWeekSessions,
+    fourWeekAvgSessions,
+  ] = await Promise.all([
+    sumMetricWindow("daily_revenue_shopify", 7, 0),
+    sumMetricWindow("daily_revenue_shopify", 14, 7),
+    sumMetricWindow("daily_revenue_shopify", 35, 7).then((value) => value / 4),
+    sumMetricWindow("daily_revenue_amazon", 7, 0),
+    sumMetricWindow("daily_revenue_amazon", 14, 7),
+    sumMetricWindow("daily_revenue_amazon", 35, 7).then((value) => value / 4),
+    sumMetricWindow("daily_orders_shopify", 7, 0),
+    sumMetricWindow("daily_orders_shopify", 14, 7),
+    sumMetricWindow("daily_orders_shopify", 35, 7).then((value) => value / 4),
+    sumMetricWindow("daily_orders_amazon", 7, 0),
+    sumMetricWindow("daily_orders_amazon", 14, 7),
+    sumMetricWindow("daily_orders_amazon", 35, 7).then((value) => value / 4),
+    sumMetricWindow("daily_sessions", 7, 0),
+    sumMetricWindow("daily_sessions", 14, 7),
+    sumMetricWindow("daily_sessions", 35, 7).then((value) => value / 4),
+  ]);
+
+  const [attribution, forecasts, pipeline, inventory, activeSignals, health, spend] =
     await Promise.all([
-      Promise.all(DEPARTMENTS.map((department) => getDepartmentDigest(department, sinceIso))),
-      getAccuracyReport(7),
+      generateAttributionReport(),
+      generateRevenueForecast({ days_ahead: 7 }),
+      analyzePipeline(),
+      analyzeInventory(),
       getActiveSignals({ limit: 200 }),
+      getSystemHealth(),
       getMonthlySpend(),
-      getOpenQuestionList(5),
-      getMeetingCount(sinceIso),
     ]);
 
-  const signalCounts = {
-    critical: signals.filter((signal) => signal.severity === "critical").length,
-    warning: signals.filter((signal) => signal.severity === "warning").length,
-    info: signals.filter((signal) => signal.severity === "info").length,
+  const totalThisWeekRevenue = thisWeekRevenueShopify + thisWeekRevenueAmazon;
+  const totalLastWeekRevenue = lastWeekRevenueShopify + lastWeekRevenueAmazon;
+  const totalFourWeekAvgRevenue = fourWeekAvgRevenueShopify + fourWeekAvgRevenueAmazon;
+  const totalThisWeekOrders = thisWeekOrdersShopify + thisWeekOrdersAmazon;
+  const totalLastWeekOrders = lastWeekOrdersShopify + lastWeekOrdersAmazon;
+  const totalFourWeekAvgOrders = fourWeekAvgOrdersShopify + fourWeekAvgOrdersAmazon;
+  const aovThisWeek =
+    totalThisWeekOrders > 0 ? totalThisWeekRevenue / totalThisWeekOrders : 0;
+  const aovLastWeek =
+    totalLastWeekOrders > 0 ? totalLastWeekRevenue / totalLastWeekOrders : 0;
+  const aovFourWeekAvg =
+    totalFourWeekAvgOrders > 0 ? totalFourWeekAvgRevenue / totalFourWeekAvgOrders : 0;
+
+  const forecastTotal = forecasts.find((item) => item.channel === "total");
+  const forecast7dRevenue = (forecastTotal?.points || []).reduce(
+    (sum, point) => sum + point.predicted,
+    0,
+  );
+  const inventoryWatch = inventory
+    .filter((item) => item.channel === "total" && item.urgency !== "ok")
+    .slice(0, 5);
+
+  const summaryPrompt = [
+    "Given the following weekly business data for USA Gummies (DTC gummy vitamin brand),",
+    "write a 3-sentence executive summary highlighting the most important trends and risks:",
+    `Revenue: ${JSON.stringify({
+      this_week: totalThisWeekRevenue,
+      last_week: totalLastWeekRevenue,
+      delta_pct: safePctDelta(totalThisWeekRevenue, totalLastWeekRevenue),
+    })}`,
+    `Pipeline: ${JSON.stringify({
+      total_pipeline_value: pipeline.total_pipeline_value,
+      at_risk_count: pipeline.at_risk_deals.length,
+      win_rate_30d: pipeline.win_rate_30d,
+    })}`,
+    `Signals: ${JSON.stringify(
+      activeSignals.slice(0, 8).map((signal) => ({
+        severity: signal.severity,
+        title: signal.title,
+      })),
+    )}`,
+    `Inventory: ${JSON.stringify(
+      inventoryWatch.map((item) => ({
+        sku: item.sku,
+        urgency: item.urgency,
+        days_until_stockout: item.days_until_stockout,
+      })),
+    )}`,
+  ].join("\n");
+  const executiveSummary = await runClaudeDigestText(
+    summaryPrompt,
+    "digest/weekly-summary",
+  );
+
+  const prioritiesPrompt = [
+    "You are Abra, operations strategist for USA Gummies.",
+    "Given this weekly snapshot, return 3-5 priorities for this week as a numbered list.",
+    "Each item must include a short rationale after a dash.",
+    `Revenue summary: ${JSON.stringify({
+      total_this_week: totalThisWeekRevenue,
+      total_last_week: totalLastWeekRevenue,
+      sessions_this_week: thisWeekSessions,
+      sessions_last_week: lastWeekSessions,
+    })}`,
+    `Attribution: ${JSON.stringify(attribution.channels)}`,
+    `Forecast: ${JSON.stringify({
+      trend: forecastTotal?.trend || "flat",
+      growth_rate_pct: forecastTotal?.growth_rate_pct || 0,
+      projected_7d: forecast7dRevenue,
+    })}`,
+    `Pipeline: ${JSON.stringify(pipeline)}`,
+    `Inventory: ${JSON.stringify(inventoryWatch)}`,
+    `Signals: ${JSON.stringify(
+      activeSignals.slice(0, 8).map((signal) => ({
+        severity: signal.severity,
+        title: signal.title,
+      })),
+    )}`,
+    `Health: ${JSON.stringify({
+      active_feeds: health.feeds.active,
+      disabled_feeds: health.feeds.disabled,
+      unresolved_dead_letters: health.feeds.unresolved_dead_letters,
+      down_integrations: health.uptime.down,
+    })}`,
+    `AI spend: ${JSON.stringify(spend)}`,
+  ].join("\n");
+  const prioritiesText = await runClaudeDigestText(
+    prioritiesPrompt,
+    "digest/weekly-priorities",
+  );
+
+  const severityCounts = {
+    critical: activeSignals.filter((signal) => signal.severity === "critical").length,
+    warning: activeSignals.filter((signal) => signal.severity === "warning").length,
+    info: activeSignals.filter((signal) => signal.severity === "info").length,
   };
 
-  const totalWeeklySpend = Math.round(
-    deptRows.reduce((sum, row) => sum + row.weeklySpend, 0) * 100,
-  ) / 100;
-
   const lines: string[] = [];
-  lines.push(`📊 *Abra Weekly Digest* — Week of ${weekLabel}`);
+  lines.push(`📊 *WEEKLY STRATEGY SESSION — Week of ${weekLabel}*`);
   lines.push("");
-  lines.push("*Department Summary*");
-  for (const row of deptRows) {
-    const statuses = Object.entries(row.statusCounts)
-      .map(([status, count]) => `${status}:${count}`)
-      .join(", ");
+  lines.push("## Executive Summary");
+  lines.push(executiveSummary);
+  lines.push("");
+  lines.push("## Performance Scorecard");
+  lines.push("| Metric | This Week | Last Week | 4-Week Avg | vs Last Week |");
+  lines.push("| --- | ---: | ---: | ---: | ---: |");
+  lines.push(
+    `| Revenue (Shopify) | ${usd(thisWeekRevenueShopify)} | ${usd(lastWeekRevenueShopify)} | ${usd(fourWeekAvgRevenueShopify)} | ${safePctDelta(thisWeekRevenueShopify, lastWeekRevenueShopify).toFixed(1)}% |`,
+  );
+  lines.push(
+    `| Revenue (Amazon) | ${usd(thisWeekRevenueAmazon)} | ${usd(lastWeekRevenueAmazon)} | ${usd(fourWeekAvgRevenueAmazon)} | ${safePctDelta(thisWeekRevenueAmazon, lastWeekRevenueAmazon).toFixed(1)}% |`,
+  );
+  lines.push(
+    `| Revenue (Total) | ${usd(totalThisWeekRevenue)} | ${usd(totalLastWeekRevenue)} | ${usd(totalFourWeekAvgRevenue)} | ${safePctDelta(totalThisWeekRevenue, totalLastWeekRevenue).toFixed(1)}% |`,
+  );
+  lines.push(
+    `| Orders (Shopify) | ${Math.round(thisWeekOrdersShopify)} | ${Math.round(lastWeekOrdersShopify)} | ${Math.round(fourWeekAvgOrdersShopify)} | ${safePctDelta(thisWeekOrdersShopify, lastWeekOrdersShopify).toFixed(1)}% |`,
+  );
+  lines.push(
+    `| Orders (Amazon) | ${Math.round(thisWeekOrdersAmazon)} | ${Math.round(lastWeekOrdersAmazon)} | ${Math.round(fourWeekAvgOrdersAmazon)} | ${safePctDelta(thisWeekOrdersAmazon, lastWeekOrdersAmazon).toFixed(1)}% |`,
+  );
+  lines.push(
+    `| Orders (Total) | ${Math.round(totalThisWeekOrders)} | ${Math.round(totalLastWeekOrders)} | ${Math.round(totalFourWeekAvgOrders)} | ${safePctDelta(totalThisWeekOrders, totalLastWeekOrders).toFixed(1)}% |`,
+  );
+  lines.push(
+    `| AOV | ${usd(aovThisWeek)} | ${usd(aovLastWeek)} | ${usd(aovFourWeekAvg)} | ${safePctDelta(aovThisWeek, aovLastWeek).toFixed(1)}% |`,
+  );
+  lines.push(
+    `| Sessions | ${Math.round(thisWeekSessions)} | ${Math.round(lastWeekSessions)} | ${Math.round(fourWeekAvgSessions)} | ${safePctDelta(thisWeekSessions, lastWeekSessions).toFixed(1)}% |`,
+  );
+  lines.push("");
+  lines.push("## Channel Attribution");
+  lines.push(
+    `Revenue split (30d): ${attribution.channels
+      .map((channel) => `${channel.channel}: ${usd(channel.revenue_30d)}`)
+      .join(" | ")}`,
+  );
+  const sortedChannels = [...attribution.channels].sort(
+    (a, b) => b.revenue_30d - a.revenue_30d,
+  );
+  lines.push(
+    `Top channel: ${sortedChannels[0]?.channel || "n/a"} (${usd(sortedChannels[0]?.revenue_30d || 0)}).`,
+  );
+  const channelGrowth = [
+    {
+      channel: "shopify_dtc",
+      growth_pct: safePctDelta(thisWeekRevenueShopify, lastWeekRevenueShopify),
+    },
+    {
+      channel: "amazon_fba",
+      growth_pct: safePctDelta(thisWeekRevenueAmazon, lastWeekRevenueAmazon),
+    },
+  ].sort((a, b) => b.growth_pct - a.growth_pct);
+  lines.push(
+    `Fastest-growing channel: ${channelGrowth[0]?.channel || "n/a"} (${(channelGrowth[0]?.growth_pct || 0).toFixed(1)}% WoW).`,
+  );
+  lines.push("");
+  lines.push("## Revenue Forecast");
+  lines.push(
+    `Next 7-day projection: ${usd(forecast7dRevenue)}. Trend: ${forecastTotal?.trend || "flat"} (${forecastTotal?.growth_rate_pct?.toFixed(1) || "0.0"}% annualized).`,
+  );
+  lines.push("");
+  lines.push("## Pipeline Update");
+  lines.push(
+    `Total pipeline value: ${usd(pipeline.total_pipeline_value)} | Win rate (30d): ${pipeline.win_rate_30d.toFixed(1)}% | Avg cycle: ${pipeline.avg_deal_cycle_days.toFixed(1)} days`,
+  );
+  lines.push(
+    `Deals by stage: ${Object.entries(pipeline.deals_by_stage)
+      .map(([stage, data]) => `${stage}: ${data.count} (${usd(data.value)})`)
+      .join(" | ")}`,
+  );
+  for (const deal of pipeline.at_risk_deals.slice(0, 3)) {
     lines.push(
-      `• *${row.department.replace(/_/g, " ")}* — initiatives: ${row.activeInitiatives}${statuses ? ` (${statuses})` : ""}; open questions: ${row.openQuestions}; weekly AI spend: ${usd(row.weeklySpend)}`,
+      `- At-risk: ${deal.company_name} (${deal.stage}, ${deal.days_in_stage}d) — ${deal.recommended_action}`,
     );
-    if (row.kpiHighlight) {
-      lines.push(`  KPI: ${row.kpiHighlight}`);
-    }
   }
-
   lines.push("");
-  lines.push(
-    `*AI Spend* — ${usd(totalWeeklySpend)} this week / ${usd(monthlySpend.total)} this month (budget: ${usd(monthlySpend.budget)})`,
-  );
-  lines.push(
-    `*Accuracy (7d)* — ${accuracy.overall.totalAnswers} answers, ${accuracy.overall.correctionRate}% correction rate`,
-  );
-  lines.push(
-    `*Meetings (7d)* — ${meetings}`,
-  );
-  lines.push(
-    `*Active Signals* — critical: ${signalCounts.critical}, warning: ${signalCounts.warning}, info: ${signalCounts.info}`,
-  );
-
-  lines.push("");
-  lines.push("*Open Questions (max 5)*");
-  if (openQuestions.length === 0) {
-    lines.push("• None");
+  lines.push("## Inventory Watch");
+  if (inventoryWatch.length === 0) {
+    lines.push("- No critical inventory risks this week.");
   } else {
-    for (const question of openQuestions) {
-      lines.push(`• ${question}`);
+    for (const item of inventoryWatch.slice(0, 5)) {
+      lines.push(
+        `- ${item.urgency.toUpperCase()}: ${item.product_name} (${item.sku}) — ${item.current_stock} units, ${Number.isFinite(item.days_until_stockout) ? `${item.days_until_stockout}d` : "unknown"} to stockout; reorder ${Math.ceil(item.suggested_reorder_qty)}.`,
+      );
     }
   }
-
+  lines.push("");
+  lines.push("## Unresolved Signals");
+  lines.push(
+    `Counts — critical: ${severityCounts.critical}, warning: ${severityCounts.warning}, info: ${severityCounts.info}`,
+  );
+  for (const signal of activeSignals.slice(0, 5)) {
+    lines.push(`- [${signal.severity}] ${signal.title}`);
+  }
+  lines.push("");
+  lines.push("## System Health");
+  lines.push(
+    `Integrations: healthy ${health.uptime.healthy}, degraded ${health.uptime.degraded}, down ${health.uptime.down}.`,
+  );
+  lines.push(
+    `Feeds: active ${health.feeds.active}/${health.feeds.total_feeds}, disabled ${health.feeds.disabled}, dead letters ${health.feeds.unresolved_dead_letters}.`,
+  );
+  lines.push("");
+  lines.push("## AI Budget");
+  const dayOfMonth = new Date().getUTCDate();
+  const daysInMonth = new Date(
+    new Date().getUTCFullYear(),
+    new Date().getUTCMonth() + 1,
+    0,
+  ).getUTCDate();
+  const projectedMonthEnd = dayOfMonth > 0 ? (spend.total / dayOfMonth) * daysInMonth : spend.total;
+  lines.push(
+    `Month-to-date spend: ${usd(spend.total)} / ${usd(spend.budget)} (${spend.pctUsed.toFixed(1)}%). Projected month-end: ${usd(projectedMonthEnd)}.`,
+  );
+  lines.push("");
+  lines.push("## Recommended Priorities for This Week");
+  lines.push(prioritiesText);
+  lines.push("");
+  lines.push("Generated by Abra | Reply `/abra <question>` for details");
   return lines.join("\n");
 }
 
@@ -277,15 +562,43 @@ export async function sendWeeklyDigest(): Promise<void> {
   const digest = await generateWeeklyDigest();
   await notify({ channel: "daily", text: digest });
 
-  const approxTokens = Math.max(200, Math.round(digest.length / 4));
-  void logAICost({
-    model: "claude-3-5-haiku-latest",
-    provider: "anthropic",
-    inputTokens: approxTokens,
-    outputTokens: 0,
-    endpoint: "digest/weekly",
-    department: "executive",
-  });
+  const today = new Date().toISOString().slice(0, 10);
+  try {
+    await sbFetch("/rest/v1/open_brain_entries", {
+      method: "POST",
+      headers: {
+        Prefer: "return=minimal",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        source_type: "agent",
+        source_ref: "weekly-digest",
+        entry_type: "report",
+        title: `Weekly Strategy Session — ${today}`,
+        raw_text: digest,
+        summary_text: digest.slice(0, 500),
+        category: "report",
+        department: "executive",
+        confidence: "high",
+        priority: "important",
+        processed: true,
+      }),
+    });
+  } catch {
+    // best-effort persistence
+  }
+
+  try {
+    await recordKPI({
+      metric_name: "weekly_digest_generated",
+      value: 1,
+      department: "executive",
+      source_system: "calculated",
+      metric_group: "operations",
+    });
+  } catch {
+    // best-effort KPI record
+  }
 }
 
 export async function generateMonthlyReport(): Promise<string> {
