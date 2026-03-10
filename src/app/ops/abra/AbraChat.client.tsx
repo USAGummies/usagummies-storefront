@@ -100,6 +100,10 @@ function daysAgoLabel(days: number | undefined): string {
   return `${Math.round(days / 30)}mo ago`;
 }
 
+function isPlaybookLine(line: string): boolean {
+  return /following(?: the)? .+ playbook/i.test(line);
+}
+
 // ─── Sub-components ───
 
 function InitiativePanel({
@@ -1051,7 +1055,35 @@ export function AbraChat() {
                       lineHeight: 1.5,
                     }}
                   >
-                    {message.content}
+                    {isUser
+                      ? message.content
+                      : message.content.split("\n").map((line, index) => {
+                          const highlight = isPlaybookLine(line);
+                          return (
+                            <div
+                              key={`${message.id}-line-${index}`}
+                              style={
+                                highlight
+                                  ? {
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      gap: 6,
+                                      background: `${GOLD}1f`,
+                                      border: `1px solid ${GOLD}66`,
+                                      borderRadius: 8,
+                                      padding: "4px 8px",
+                                      marginBottom: 4,
+                                      color: NAVY,
+                                      fontWeight: 700,
+                                    }
+                                  : undefined
+                              }
+                            >
+                              {highlight ? "📋 " : ""}
+                              {line || "\u00A0"}
+                            </div>
+                          );
+                        })}
                   </div>
 
                   {/* Source pills */}

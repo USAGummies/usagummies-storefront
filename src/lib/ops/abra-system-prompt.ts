@@ -1,3 +1,5 @@
+import { getActivePlaybooks } from "@/lib/ops/department-playbooks";
+
 /**
  * Abra Dynamic System Prompt Builder
  *
@@ -137,6 +139,26 @@ These are the ONLY current team members. Do NOT reference anyone else as team un
       )
       .join("\n");
     sections.push(`DEPARTMENTS:\n${deptLines}`);
+  }
+
+  const playbooks = getActivePlaybooks();
+  if (playbooks.length > 0) {
+    const playbookText = playbooks
+      .map((playbook) => {
+        const steps = playbook.steps
+          .map((step, index) => `${index + 1}. ${step}`)
+          .join("\n");
+        return [
+          `### ${playbook.department} — ${playbook.name}`,
+          `Triggers: ${playbook.triggers.join(", ")}`,
+          "Steps:",
+          steps,
+        ].join("\n");
+      })
+      .join("\n\n");
+    sections.push(
+      `DECISION PLAYBOOKS:\nWhen a question falls into one of these domains, follow the structured approach.\n${playbookText}\nUse these playbooks as a framework before making recommendations. If you are using one, explicitly state: "Following the <Playbook Name> playbook."`,
+    );
   }
 
   // 7. Active Initiatives (dynamic)

@@ -528,6 +528,55 @@ export function getPlaybook(
   return null;
 }
 
+export type ActivePlaybookSummary = {
+  department: string;
+  name: string;
+  triggers: string[];
+  steps: string[];
+};
+
+const PLAYBOOK_TRIGGERS: Record<string, string[]> = {
+  finance: ["finance", "cash flow", "margin", "cogs", "burn rate", "runway"],
+  operations: ["operations", "production", "fulfillment", "quality", "returns"],
+  sales_and_growth: ["sales", "growth", "pipeline", "wholesale", "pricing", "conversion"],
+  supply_chain: ["supply chain", "inventory", "supplier", "lead time", "stockout"],
+  executive: ["strategy", "investor", "risk", "okr", "hiring", "board"],
+};
+
+function toTitleCase(value: string): string {
+  return value
+    .replace(/_/g, " ")
+    .split(" ")
+    .filter(Boolean)
+    .map((token) => token.charAt(0).toUpperCase() + token.slice(1))
+    .join(" ");
+}
+
+/**
+ * Returns simplified active playbooks suitable for system prompt injection.
+ * Uses the hardcoded registry as source of truth.
+ */
+export function getActivePlaybooks(): ActivePlaybookSummary[] {
+  return Object.entries(DEPARTMENT_PLAYBOOKS).map(([department, playbook]) => {
+    const topQuestions = playbook.questions.slice(0, 3).map((q) => q.q);
+    const topTasks = playbook.taskTemplate.slice(0, 3).map((task) => task.title);
+    const topKpis = playbook.kpis.slice(0, 3).join(", ");
+
+    return {
+      department,
+      name: `${toTitleCase(department)} Playbook`,
+      triggers: PLAYBOOK_TRIGGERS[department] || [department],
+      steps: [
+        `Clarify objective and timeframe for ${toTitleCase(department)}.`,
+        `Collect critical context: ${topQuestions.join(" | ")}`,
+        `Verify baseline capabilities: ${playbook.baseline.slice(0, 3).join(", ")}.`,
+        `Prioritize execution tasks: ${topTasks.join(" | ")}.`,
+        `Track progress with KPIs: ${topKpis}.`,
+      ],
+    };
+  });
+}
+
 // ---------------------------------------------------------------------------
 // DB-backed Playbook Evolution
 // ---------------------------------------------------------------------------
