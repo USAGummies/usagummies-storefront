@@ -6,6 +6,7 @@
  */
 
 import { emitSignal } from "@/lib/ops/abra-operational-signals";
+import { recordKPI } from "@/lib/ops/abra-kpi-recorder";
 
 export type AutoTeachFeed = {
   id: string;
@@ -104,16 +105,6 @@ async function buildEmbedding(text: string): Promise<number[]> {
 
   const data = await res.json();
   return data?.data?.[0]?.embedding || [];
-}
-
-function parseJsonEnv<T>(key: string, fallback: T): T {
-  const raw = process.env[key];
-  if (!raw) return fallback;
-  try {
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
 }
 
 function normalizeFeed(raw: AutoTeachFeed): AutoTeachFeed {
@@ -322,6 +313,37 @@ export async function runShopifyOrdersFeed(): Promise<FeedResult> {
       });
     }
 
+    try {
+      await Promise.all([
+        recordKPI({
+          metric_name: "daily_revenue_shopify",
+          value: totalRevenue,
+          department: "sales_and_growth",
+          source_system: "shopify",
+          metric_group: "sales",
+          entity_ref: "shopify",
+        }),
+        recordKPI({
+          metric_name: "daily_orders_shopify",
+          value: orders.length,
+          department: "sales_and_growth",
+          source_system: "shopify",
+          metric_group: "sales",
+          entity_ref: "shopify",
+        }),
+        recordKPI({
+          metric_name: "daily_aov",
+          value: orders.length > 0 ? totalRevenue / orders.length : 0,
+          department: "sales_and_growth",
+          source_system: "shopify",
+          metric_group: "sales",
+          entity_ref: "shopify",
+        }),
+      ]);
+    } catch {
+      // KPI recording is best-effort for feed continuity.
+    }
+
     return { feed_key: feedKey, success: true, entriesCreated: saved ? 1 : 0 };
   } catch (error) {
     return {
@@ -406,6 +428,29 @@ export async function handleAmazonOrdersFeed(): Promise<FeedResult> {
           },
         });
       }
+    }
+
+    try {
+      await Promise.all([
+        recordKPI({
+          metric_name: "daily_revenue_amazon",
+          value: revenue,
+          department: "sales_and_growth",
+          source_system: "amazon",
+          metric_group: "sales",
+          entity_ref: "amazon",
+        }),
+        recordKPI({
+          metric_name: "daily_orders_amazon",
+          value: orders.length,
+          department: "sales_and_growth",
+          source_system: "amazon",
+          metric_group: "sales",
+          entity_ref: "amazon",
+        }),
+      ]);
+    } catch {
+      // best-effort
     }
 
     return { feed_key: feedKey, success: true, entriesCreated: saved ? 1 : 0 };
@@ -681,6 +726,29 @@ export async function handleGA4TrafficFeed(): Promise<FeedResult> {
         department: "sales_and_growth",
         metadata: { sessions: report.sessions },
       });
+    }
+
+    try {
+      await Promise.all([
+        recordKPI({
+          metric_name: "daily_sessions",
+          value: report.sessions,
+          department: "sales_and_growth",
+          source_system: "calculated",
+          metric_group: "operations",
+          entity_ref: "ga4",
+        }),
+        recordKPI({
+          metric_name: "daily_pageviews",
+          value: report.pageViews,
+          department: "sales_and_growth",
+          source_system: "calculated",
+          metric_group: "operations",
+          entity_ref: "ga4",
+        }),
+      ]);
+    } catch {
+      // best-effort
     }
 
     return { feed_key: feedKey, success: true, entriesCreated: saved ? 1 : 0 };
