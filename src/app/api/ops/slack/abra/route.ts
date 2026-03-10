@@ -29,6 +29,10 @@ import { NextResponse } from "next/server";
 import { after } from "next/server";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import {
+  detectDepartment,
+  OPERATING_PILLARS,
+} from "@/lib/ops/department-playbooks";
+import {
   buildAbraSystemPrompt,
   type AbraCorrection,
   type AbraDepartment,
@@ -49,6 +53,18 @@ export const maxDuration = 30;
 
 const SIGNING_SECRET = process.env.SLACK_SIGNING_SECRET || "";
 const BOT_TOKEN = process.env.SLACK_BOT_TOKEN || "";
+const ALL_DEPARTMENTS = Array.from(
+  new Set(
+    Object.values(OPERATING_PILLARS).flatMap((pillar) => pillar.departments),
+  ),
+);
+
+const DEPARTMENT_HELP_TEXT = Object.entries(OPERATING_PILLARS)
+  .map(
+    ([pillarId, pillar]) =>
+      `• ${pillar.name} [${pillarId}]: ${pillar.departments.join(", ")}`,
+  )
+  .join("\n");
 
 // ---------------------------------------------------------------------------
 // Resilience: retry with exponential backoff
@@ -412,7 +428,7 @@ async function fetchCorrections(): Promise<AbraCorrection[]> {
 async function fetchDepartments(): Promise<AbraDepartment[]> {
   try {
     const rows = (await sbFetch(
-      "/rest/v1/abra_departments?select=name,owner_name,description,key_context&order=name",
+      "/rest/v1/abra_departments?select=name,owner_name,description,key_context,operating_pillar,executive_role,sub_departments,parent_department&order=name",
     )) as AbraDepartment[];
     return rows;
   } catch {
@@ -650,6 +666,39 @@ async function handleCostCommand(): Promise<string> {
   }
 }
 
+function parseInitiativeInput(
+  initiativeText: string,
+): { department: string | null; goal: string } {
+  const raw = initiativeText.trim();
+  if (!raw) return { department: null, goal: "" };
+
+  const lowered = raw.toLowerCase();
+  const departmentCandidates = [...ALL_DEPARTMENTS].sort(
+    (a, b) => b.length - a.length,
+  );
+
+  for (const department of departmentCandidates) {
+    const aliases = [
+      department,
+      department.replace(/_/g, " "),
+      department.replace(/_/g, "-"),
+    ];
+    for (const alias of aliases) {
+      if (lowered === alias) {
+        return { department, goal: "" };
+      }
+      if (lowered.startsWith(`${alias} `)) {
+        return {
+          department,
+          goal: raw.slice(alias.length).trim(),
+        };
+      }
+    }
+  }
+
+  return { department: null, goal: raw };
+}
+
 // ---------------------------------------------------------------------------
 // Subcommand: initiative
 // ---------------------------------------------------------------------------
@@ -657,15 +706,10 @@ async function handleInitiativeCommand(
   initiativeText: string,
   userEmail: string,
 ): Promise<string> {
-  const match = initiativeText.match(
-    /^(finance|operations|sales_and_growth|supply_chain|executive)\s+(.+)$/i,
-  );
-  if (!match) {
-    return "❌ Invalid format. Try: `/abra initiative: finance Improve gross margin by 3% this quarter`";
+  const { department, goal } = parseInitiativeInput(initiativeText);
+  if (!department) {
+    return `❌ Invalid format. Use: \`/abra initiative: <department> <goal>\`\nValid departments:\n${DEPARTMENT_HELP_TEXT}`;
   }
-
-  const department = match[1].toLowerCase();
-  const goal = match[2].trim();
   if (!goal) {
     return "❌ Initiative goal is required.";
   }
@@ -789,6 +833,7 @@ async function callAbraChat(
     fetchDepartments(),
     getActiveSignals({ limit: 8 }),
   ]);
+  const messageDepartment = detectDepartment(message);
 
   // --------------- Step 4: Build dynamic system prompt + context ---------------
   const signalsContext = buildSignalsContext(activeSignals);
@@ -796,6 +841,7 @@ async function callAbraChat(
     format: "slack",
     corrections,
     departments,
+    conversationDepartment: messageDepartment,
     signalsContext,
   });
 
@@ -1029,7 +1075,14 @@ export async function POST(req: Request) {
   if (!text.trim()) {
     return NextResponse.json({
       response_type: "ephemeral",
-      text: "Usage:\n• `/abra <question>` — Ask Abra anything\n• `/abra correct: X but actually Y` — Correct wrong info\n• `/abra teach: [dept] content` — Teach Abra new knowledge",
+      text:
+        "Usage:\n" +
+        "• `/abra <question>` — Ask Abra anything\n" +
+        "• `/abra correct: X but actually Y` — Correct wrong info\n" +
+        "• `/abra teach: [dept] content` — Teach Abra new knowledge\n" +
+        "• `/abra initiative: <department> <goal>` — Create initiative\n\n" +
+        "Departments (20) grouped by operating pillar:\n" +
+        DEPARTMENT_HELP_TEXT,
     });
   }
 
@@ -1063,7 +1116,9 @@ export async function POST(req: Request) {
         "• `/abra teach: [dept] content` — Teach Abra new knowledge\n" +
         "• `/abra initiative: <department> <goal>` — Create initiative\n" +
         "• `/abra cost` — Show monthly AI spend\n" +
-        "• `/abra status` — Check service status",
+        "• `/abra status` — Check service status\n\n" +
+        "Departments (20) grouped by operating pillar:\n" +
+        DEPARTMENT_HELP_TEXT,
     });
   }
 

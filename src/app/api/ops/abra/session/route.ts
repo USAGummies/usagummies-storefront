@@ -28,7 +28,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 const DEFAULT_CLAUDE_MODEL =
-  process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-latest";
+  process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514";
 
 const VALID_SESSION_TYPES = [
   "meeting",

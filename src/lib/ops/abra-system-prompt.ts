@@ -1,4 +1,7 @@
-import { getActivePlaybooks } from "@/lib/ops/department-playbooks";
+import {
+  getActivePlaybooks,
+  OPERATING_PILLARS,
+} from "@/lib/ops/department-playbooks";
 
 /**
  * Abra Dynamic System Prompt Builder
@@ -25,6 +28,10 @@ export type AbraDepartment = {
   owner_name: string;
   description: string;
   key_context?: string | null;
+  operating_pillar?: string | null;
+  executive_role?: string | null;
+  sub_departments?: unknown;
+  parent_department?: string | null;
 };
 
 export type AbraInitiativeContext = {
@@ -57,6 +64,7 @@ export type AbraPromptContext = {
   format?: "slack" | "web";
   corrections?: AbraCorrection[];
   departments?: AbraDepartment[];
+  conversationDepartment?: string | null;
   currentDate?: string;
   activeInitiatives?: AbraInitiativeContext[];
   activeSession?: AbraSessionContext | null;
@@ -66,6 +74,41 @@ export type AbraPromptContext = {
   teamContext?: string;
   signalsContext?: string;
 };
+
+function normalizeDepartmentName(value: string): string {
+  return value.trim().toLowerCase().replace(/[\s-]+/g, "_");
+}
+
+function toStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) =>
+        typeof item === "string" ? item.trim() : String(item || "").trim(),
+      )
+      .filter(Boolean);
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    try {
+      const parsed = JSON.parse(trimmed) as unknown;
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map((item) =>
+            typeof item === "string" ? item.trim() : String(item || "").trim(),
+          )
+          .filter(Boolean);
+      }
+    } catch {
+      // Fall back to comma-separated parsing.
+    }
+    return trimmed
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
 
 export function buildAbraSystemPrompt(ctx: AbraPromptContext = {}): string {
   const format = ctx.format || "slack";
@@ -132,15 +175,81 @@ These are the ONLY current team members. Do NOT reference anyone else as team un
     );
   }
 
-  // 6. Departments (dynamic)
-  if (ctx.departments && ctx.departments.length > 0) {
-    const deptLines = ctx.departments
+  // 6. Org model + Departments (dynamic, 20-department aware)
+  const canonicalPillarModel = [
+    "ORGANIZATIONAL MODEL (5 OPERATING PILLARS):",
+    "• Build the Product: product, quality, operations, research_lab",
+    "• Move the Product: supply_chain, retail_execution",
+    "• Sell the Product: sales_and_growth, trade_marketing, amazon",
+    "• Grow the Brand: marketing, ecommerce, brand_studio, customer_experience",
+    "• Control the Business: finance, legal, data_analytics, it, corporate_affairs, executive, people",
+  ].join("\n");
+  sections.push(canonicalPillarModel);
+
+  const knownDepartments = ctx.departments || [];
+  if (knownDepartments.length > 0) {
+    const byName = new Map(
+      knownDepartments.map((dept) => [normalizeDepartmentName(dept.name), dept]),
+    );
+    const pillarLines = Object.entries(OPERATING_PILLARS).map(
+      ([pillarId, pillar]) => {
+        const listed = pillar.departments
+          .map((deptName) => {
+            const dept = byName.get(deptName);
+            if (!dept) return deptName;
+            const owner = dept.owner_name ? ` (owner: ${dept.owner_name})` : "";
+            return `${deptName}${owner}`;
+          })
+          .join(", ");
+        return `• ${pillar.name} [${pillarId}]: ${listed}`;
+      },
+    );
+    sections.push(`DEPARTMENTS BY PILLAR:\n${pillarLines.join("\n")}`);
+
+    const deptLines = knownDepartments
       .map(
         (d) =>
-          `• ${d.name}: ${d.owner_name} — ${d.description}${d.key_context ? ` Key context: ${d.key_context}` : ""}`,
+          `• ${d.name}: ${d.owner_name} — ${d.description}${d.key_context ? ` Key context: ${d.key_context}` : ""}${d.executive_role ? ` | Exec role: ${d.executive_role}` : ""}`,
       )
       .join("\n");
-    sections.push(`DEPARTMENTS:\n${deptLines}`);
+    sections.push(`DEPARTMENT DETAILS:\n${deptLines}`);
+
+    if (ctx.conversationDepartment) {
+      const normalized = normalizeDepartmentName(ctx.conversationDepartment);
+      const focused = byName.get(normalized);
+      if (focused) {
+        const pillarId =
+          (typeof focused.operating_pillar === "string" &&
+          focused.operating_pillar
+            ? focused.operating_pillar
+            : null) ||
+          Object.entries(OPERATING_PILLARS).find(([, pillar]) =>
+            pillar.departments.includes(normalized),
+          )?.[0] ||
+          null;
+        const siblingDepartments = pillarId
+          ? (OPERATING_PILLARS[pillarId]?.departments || []).filter(
+              (name) => name !== normalized,
+            )
+          : [];
+        const subDepartments = toStringArray(focused.sub_departments);
+        sections.push(
+          [
+            `FOCUSED DEPARTMENT CONTEXT (${focused.name}):`,
+            `• Operating pillar: ${pillarId || "unknown"}`,
+            `• Executive role: ${focused.executive_role || "unknown"}`,
+            `• Sub-departments: ${subDepartments.length > 0 ? subDepartments.join(", ") : "none listed"}`,
+            `• Sibling departments: ${siblingDepartments.length > 0 ? siblingDepartments.join(", ") : "none listed"}`,
+          ].join("\n"),
+        );
+      }
+    }
+  } else {
+    const fallbackLines = Object.entries(OPERATING_PILLARS).map(
+      ([pillarId, pillar]) =>
+        `• ${pillar.name} [${pillarId}]: ${pillar.departments.join(", ")}`,
+    );
+    sections.push(`DEPARTMENTS BY PILLAR:\n${fallbackLines.join("\n")}`);
   }
 
   const playbooks = getActivePlaybooks();

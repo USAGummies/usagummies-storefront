@@ -23,7 +23,7 @@ export const maxDuration = 30;
 const EMBEDDING_MODEL = "text-embedding-3-small";
 const EMBEDDING_DIMENSIONS = 1536;
 const DEFAULT_CLAUDE_MODEL =
-  process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-latest";
+  process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514";
 
 type TriageInput = {
   id: string;

@@ -226,7 +226,7 @@ async function runClaudeDigestText(
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) return "Claude summary unavailable (missing ANTHROPIC_API_KEY).";
   const model = await getPreferredClaudeModel(
-    process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-latest",
+    process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514",
   );
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {

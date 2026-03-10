@@ -246,7 +246,7 @@ export async function generateMorningBrief(): Promise<string> {
     const [spend, preferredModel] = await Promise.all([
       getMonthlySpend(),
       getPreferredClaudeModel(
-        process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-latest",
+        process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514",
       ),
     ]);
     lines.push("💰 *AI Budget*");

@@ -19,6 +19,7 @@ import {
 import {
   getPlaybook,
   detectDepartment,
+  OPERATING_PILLARS,
   type PlaybookQuestion,
 } from "@/lib/ops/department-playbooks";
 import { logAICost, extractClaudeUsage } from "@/lib/ops/abra-cost-tracker";
@@ -33,7 +34,12 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 const DEFAULT_CLAUDE_MODEL =
-  process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-latest";
+  process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514";
+const ALL_DEPARTMENTS = Array.from(
+  new Set(
+    Object.values(OPERATING_PILLARS).flatMap((pillar) => pillar.departments),
+  ),
+);
 
 type DependencyRelationship = "blocks" | "informs" | "requires" | "enables";
 
@@ -304,6 +310,10 @@ function buildKpiTargets(
 
 function inClause(values: string[]): string {
   return encodeURIComponent(`(${values.join(",")})`);
+}
+
+function normalizeDepartmentName(value: string): string {
+  return value.trim().toLowerCase().replace(/[\s-]+/g, "_");
 }
 
 function normalizeRelationship(value: unknown): DependencyRelationship {
@@ -641,16 +651,17 @@ async function handlePost(req: Request) {
   // Auto-detect department from goal if not provided
   let department =
     typeof payload.department === "string"
-      ? payload.department.trim().toLowerCase().replace(/[\s-]+/g, "_")
+      ? normalizeDepartmentName(payload.department)
       : null;
   if (!department) {
     department = detectDepartment(goalRaw);
   }
-  if (!department) {
+  if (!department || !ALL_DEPARTMENTS.includes(department)) {
     return NextResponse.json(
       {
         error:
-          "Could not determine department. Please specify: finance, operations, sales_and_growth, supply_chain, or executive.",
+          "Could not determine a valid department from this goal.",
+        valid_departments: ALL_DEPARTMENTS,
       },
       { status: 400 },
     );
@@ -778,10 +789,31 @@ async function handleGet(req: Request) {
   }
 
   const url = new URL(req.url);
-  const department = url.searchParams.get("department");
+  const departmentParam = url.searchParams.get("department");
+  const department = departmentParam
+    ? normalizeDepartmentName(departmentParam)
+    : null;
+  const pillarParam = url.searchParams.get("pillar");
+  const pillar = pillarParam
+    ? pillarParam.trim().toLowerCase().replace(/[\s-]+/g, "_")
+    : null;
   const status = url.searchParams.get("status");
   const id = url.searchParams.get("id");
-  const includeDependencies = url.searchParams.get("include_dependencies") === "true";
+  const includeDependencies =
+    url.searchParams.get("include_dependencies") === "true";
+
+  if (department && !ALL_DEPARTMENTS.includes(department)) {
+    return NextResponse.json(
+      { error: `Invalid department: ${departmentParam}` },
+      { status: 400 },
+    );
+  }
+  if (pillar && !OPERATING_PILLARS[pillar]) {
+    return NextResponse.json(
+      { error: `Invalid operating pillar: ${pillarParam}` },
+      { status: 400 },
+    );
+  }
 
   try {
     const circuitCheck = await canUseSupabase();
@@ -798,6 +830,9 @@ async function handleGet(req: Request) {
     }
     if (department) {
       path += `&department=eq.${department}`;
+    } else if (pillar) {
+      const departmentsInPillar = OPERATING_PILLARS[pillar].departments;
+      path += `&department=in.${inClause(departmentsInPillar)}`;
     }
     if (status) {
       if (status === "active") {

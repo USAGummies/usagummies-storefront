@@ -60,7 +60,7 @@ export const maxDuration = 30;
 
 const DEFAULT_MATCH_COUNT = 8;
 const DEFAULT_CLAUDE_MODEL =
-  process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-latest";
+  process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514";
 const MAX_MESSAGE_LENGTH = 4000;
 
 type ChatMessage = {
@@ -655,7 +655,7 @@ async function fetchCorrections(): Promise<AbraCorrection[]> {
 async function fetchDepartments(): Promise<AbraDepartment[]> {
   try {
     return (await sbFetch(
-      "/rest/v1/abra_departments?select=name,owner_name,description,key_context&order=name",
+      "/rest/v1/abra_departments?select=name,owner_name,description,key_context,operating_pillar,executive_role,sub_departments,parent_department&order=name",
     )) as AbraDepartment[];
   } catch {
     return [];
@@ -761,6 +761,7 @@ async function generateClaudeReply(input: {
     format: "web",
     corrections: input.corrections,
     departments: input.departments,
+    conversationDepartment: input.detectedDepartment || null,
     activeInitiatives: input.activeInitiatives,
     costSummary: input.costSummary,
     financialContext: input.financialContext,
