@@ -509,6 +509,420 @@ export const DEPARTMENT_PLAYBOOKS: Record<string, DepartmentPlaybook> = {
       "customer_count_growth",
     ],
   },
+
+  legal: {
+    description:
+      "Legal, risk management, corporate governance, contracts, IP protection, and FDA regulatory compliance for a CPG gummy company.",
+    baseline: [
+      "Contract templates (vendor, distributor, co-packer, employment)",
+      "Intellectual property protection (trademarks, trade secrets)",
+      "FDA food labeling compliance",
+      "State-by-state food regulations",
+      "Insurance coverage (product liability, general, D&O)",
+      "Corporate governance documents",
+      "Terms of service and privacy policy",
+      "HACCP and food safety regulatory compliance",
+    ],
+    questions: [
+      { key: "entity_type", q: "Current entity structure? (LLC, S-Corp, C-Corp)", options: ["LLC", "S-Corp", "C-Corp"] },
+      { key: "trademarks", q: "Are trademarks filed for brand name and logo?" },
+      { key: "insurance", q: "Current insurance coverage? (Product liability, general liability)" },
+      { key: "fda_compliance", q: "Are labels FDA-compliant with Supplement Facts / Nutrition Facts?" },
+    ],
+    taskTemplate: [
+      { title: "Audit contract templates", description: "Review and standardize vendor, distributor, co-packer, and partnership contract templates.", priority: "critical", estimated_hours: 4 },
+      { title: "Verify FDA label compliance", description: "Ensure all product labels meet FDA requirements for food/supplement labeling.", priority: "critical", estimated_hours: 3 },
+      { title: "File trademark registrations", description: "File trademarks for brand name, logo, and key product names if not already registered.", priority: "high", estimated_hours: 2 },
+      { title: "Review insurance coverage", description: "Audit product liability, general liability, and D&O insurance policies for adequacy.", priority: "high", estimated_hours: 2 },
+    ],
+    kpis: ["open_legal_issues", "contract_turnaround_days", "compliance_audit_score", "insurance_coverage_adequacy"],
+  },
+
+  people: {
+    description:
+      "AI systems administration, agent performance optimization, workforce automation, and AI training. Manages AI agents, NOT human employees.",
+    baseline: [
+      "AI agent inventory and capability mapping",
+      "Agent performance monitoring and SLAs",
+      "Automated workflow design and optimization",
+      "AI model cost tracking and optimization",
+      "Agent deployment and versioning",
+      "Capability gap analysis",
+      "AI safety and guardrail management",
+      "Cross-agent orchestration and scheduling",
+    ],
+    questions: [
+      { key: "agent_count", q: "How many AI agents are currently deployed? (We have 80+ registered)", default: "80+" },
+      { key: "performance_tracking", q: "How is agent performance tracked? (Logs, dashboards, manual review?)" },
+      { key: "cost_per_agent", q: "Do you track cost per agent or per engine?" },
+      { key: "capability_gaps", q: "What tasks are agents NOT handling well?" },
+    ],
+    taskTemplate: [
+      { title: "Build AI agent inventory", description: "Catalog all deployed AI agents with capabilities, costs, schedules, and performance metrics.", priority: "critical", estimated_hours: 4 },
+      { title: "Establish agent SLAs", description: "Define success/failure criteria and response time targets for each agent type.", priority: "high", estimated_hours: 3 },
+      { title: "Create agent performance dashboard", description: "Build monitoring for agent run success rates, costs, and output quality.", priority: "high", estimated_hours: 4 },
+      { title: "Identify automation gaps", description: "Analyze which manual processes could be automated with new agents.", priority: "medium", estimated_hours: 2 },
+    ],
+    kpis: ["agent_success_rate_pct", "ai_cost_per_task", "automation_coverage_pct", "agent_uptime_pct", "capability_gap_count"],
+  },
+
+  product: {
+    description:
+      "R&D, new product development, ingredient standards, packaging innovation, and product portfolio strategy for gummy candy.",
+    baseline: [
+      "Product development pipeline",
+      "Ingredient sourcing specifications",
+      "Flavor/formulation R&D process",
+      "Packaging design and engineering",
+      "SKU rationalization and portfolio management",
+      "Dietary variant roadmap (vegan, sugar-free, organic)",
+      "Competitive product benchmarking",
+      "Product cost modeling",
+    ],
+    questions: [
+      { key: "current_skus", q: "How many active SKUs? Any planned launches?" },
+      { key: "dietary_variants", q: "Which dietary variants are planned? (Vegan, sugar-free, organic, keto?)" },
+      { key: "rd_process", q: "How are new products developed? (In-house, co-packer R&D, external lab?)" },
+      { key: "packaging_type", q: "Current packaging format? (Stand-up pouch, jar, bag?)" },
+    ],
+    taskTemplate: [
+      { title: "Map product development pipeline", description: "Document all products in development from concept through launch with stage gates.", priority: "critical", estimated_hours: 3 },
+      { title: "Create ingredient specification docs", description: "Standardize ingredient specs for each product with supplier alternatives.", priority: "high", estimated_hours: 4 },
+      { title: "Build SKU performance scorecard", description: "Track revenue, margin, velocity, and growth for each SKU to inform portfolio decisions.", priority: "high", estimated_hours: 3 },
+      { title: "Design packaging innovation roadmap", description: "Plan packaging improvements for cost, sustainability, and shelf appeal.", priority: "medium", estimated_hours: 2 },
+    ],
+    kpis: ["new_product_launch_count", "rd_to_launch_time_weeks", "sku_count_active", "product_margin_by_sku", "innovation_pipeline_value"],
+  },
+
+  quality: {
+    description:
+      "Quality assurance, food safety, HACCP compliance, regulatory compliance, and lab/testing oversight for CPG gummy products.",
+    baseline: [
+      "Quality control inspection protocols",
+      "HACCP plan documentation",
+      "Third-party lab testing schedule",
+      "Retention sample management",
+      "Supplier quality audits",
+      "Complaint tracking and CAPA",
+      "Shelf-life testing program",
+      "Allergen management protocol",
+    ],
+    questions: [
+      { key: "haccp", q: "Is there a documented HACCP plan?" },
+      { key: "lab_testing", q: "What third-party labs are used? Testing frequency?" },
+      { key: "complaints", q: "How are customer quality complaints tracked?" },
+      { key: "certifications", q: "Current certifications? (GMP, organic, kosher, NSF?)" },
+    ],
+    taskTemplate: [
+      { title: "Document HACCP plan", description: "Create or update Hazard Analysis Critical Control Points plan for all product lines.", priority: "critical", estimated_hours: 6 },
+      { title: "Establish lab testing schedule", description: "Set recurring third-party testing for microbial, heavy metals, potency, and shelf stability.", priority: "critical", estimated_hours: 3 },
+      { title: "Build complaint tracking system", description: "Implement CAPA (Corrective and Preventive Action) tracking for quality complaints.", priority: "high", estimated_hours: 3 },
+      { title: "Create supplier audit program", description: "Define and schedule quality audits for ingredient suppliers and co-packer.", priority: "high", estimated_hours: 2 },
+    ],
+    kpis: ["quality_complaint_rate", "lab_test_pass_rate", "capa_closure_time_days", "supplier_audit_score", "shelf_life_compliance_pct"],
+  },
+
+  trade_marketing: {
+    description:
+      "In-store promotions, retailer marketing programs, category insights, planogram strategy for CPG gummy brand in retail.",
+    baseline: [
+      "Trade promotion calendar",
+      "Retailer co-op marketing programs",
+      "Category management presentations",
+      "Planogram and shelf placement strategy",
+      "In-store demo program",
+      "Trade spend tracking and ROI",
+      "Retailer scorecard",
+      "Competitive shelf analysis",
+    ],
+    questions: [
+      { key: "current_retailers", q: "Which retailers currently carry products?" },
+      { key: "trade_spend", q: "Annual trade marketing budget?" },
+      { key: "demo_program", q: "Do you run in-store demos? How frequently?" },
+      { key: "planogram", q: "Are products in retailer planograms or off-shelf?" },
+    ],
+    taskTemplate: [
+      { title: "Build trade promotion calendar", description: "Plan quarterly trade promotions aligned with retailer resets and seasonal events.", priority: "critical", estimated_hours: 3 },
+      { title: "Create category management deck", description: "Build data-driven pitch showing gummy category trends and brand positioning.", priority: "high", estimated_hours: 4 },
+      { title: "Track trade spend ROI", description: "Implement tracking for trade promotion lift, incremental revenue, and cost per incremental unit.", priority: "high", estimated_hours: 3 },
+      { title: "Design in-store demo playbook", description: "Standardize demo execution: staffing, materials, sampling, data capture.", priority: "medium", estimated_hours: 2 },
+    ],
+    kpis: ["trade_spend_roi", "retailer_count", "shelf_velocity_per_store", "demo_conversion_rate", "category_share_pct"],
+  },
+
+  marketing: {
+    description:
+      "Brand marketing, growth/performance marketing, content creation, social media, influencer partnerships for a DTC gummy brand.",
+    baseline: [
+      "Brand identity and style guide",
+      "Growth marketing strategy (paid + organic)",
+      "Content calendar and production workflow",
+      "Social media management",
+      "Influencer and partnership program",
+      "Marketing attribution and analytics",
+      "Community building strategy",
+      "PR and media outreach",
+    ],
+    questions: [
+      { key: "brand_guidelines", q: "Do you have a brand style guide? (Colors, voice, typography)" },
+      { key: "paid_channels", q: "Active paid channels? (Meta, Google, TikTok, Amazon PPC?)" },
+      { key: "content_cadence", q: "Content publishing frequency? (Blog, social, email?)" },
+      { key: "influencer_strategy", q: "Active influencer partnerships? Budget allocated?" },
+    ],
+    taskTemplate: [
+      { title: "Audit brand identity", description: "Review and formalize brand guidelines: voice, visual identity, messaging pillars.", priority: "critical", estimated_hours: 4 },
+      { title: "Build content calendar", description: "Plan 90-day content calendar across blog, social, email, and video.", priority: "high", estimated_hours: 3 },
+      { title: "Launch influencer program", description: "Identify, recruit, and manage micro-influencers for product seeding and content.", priority: "high", estimated_hours: 4 },
+      { title: "Set up marketing attribution", description: "Implement UTM tracking, GA4 conversions, and channel-level ROAS measurement.", priority: "high", estimated_hours: 3 },
+    ],
+    kpis: ["roas_by_channel", "social_engagement_rate", "email_open_rate", "content_pieces_published", "brand_awareness_index"],
+  },
+
+  ecommerce: {
+    description:
+      "Shopify store management, CRO, email/SMS marketing, subscription programs, and customer data for DTC gummy sales.",
+    baseline: [
+      "Shopify store optimization",
+      "Conversion rate optimization (CRO)",
+      "Email marketing flows (welcome, abandoned cart, post-purchase)",
+      "SMS marketing program",
+      "Subscription and loyalty programs",
+      "Customer segmentation and personalization",
+      "A/B testing framework",
+      "Site speed and performance",
+    ],
+    questions: [
+      { key: "email_platform", q: "Email/SMS platform? (Klaviyo, Mailchimp, Postscript?)", default: "Klaviyo" },
+      { key: "subscription", q: "Is a subscription program active or planned?" },
+      { key: "avg_order_value", q: "Current average order value?" },
+      { key: "email_list_size", q: "Email subscriber count?" },
+    ],
+    taskTemplate: [
+      { title: "Optimize checkout flow", description: "Audit and optimize Shopify checkout: reduce friction, add trust signals, test upsells.", priority: "critical", estimated_hours: 4 },
+      { title: "Build email automation flows", description: "Create welcome series, abandoned cart, post-purchase, and win-back email flows.", priority: "critical", estimated_hours: 6 },
+      { title: "Launch subscription program", description: "Implement subscribe-and-save with flexible frequency and discount incentives.", priority: "high", estimated_hours: 4 },
+      { title: "Set up A/B testing", description: "Implement systematic testing for product pages, pricing, and checkout.", priority: "medium", estimated_hours: 2 },
+    ],
+    kpis: ["dtc_conversion_rate", "avg_order_value", "email_revenue_pct", "subscription_rate", "cart_abandonment_rate", "customer_ltv"],
+  },
+
+  amazon: {
+    description:
+      "Amazon Seller Central account management, PPC, listing optimization, FBA logistics, reviews, and brand protection.",
+    baseline: [
+      "Amazon account health monitoring",
+      "PPC campaign management (Sponsored Products, Brands, Display)",
+      "Listing optimization (titles, bullets, A+ content, backend keywords)",
+      "FBA inventory management and replenishment",
+      "Review generation and reputation management",
+      "Brand Registry and brand protection",
+      "Competitor monitoring on Amazon",
+      "Amazon advertising reporting and ACOS optimization",
+    ],
+    questions: [
+      { key: "seller_type", q: "Seller Central or Vendor Central?", default: "Seller Central" },
+      { key: "fba_or_fbm", q: "Fulfillment method? (FBA, FBM, or hybrid?)", default: "FBA" },
+      { key: "ppc_budget", q: "Monthly Amazon PPC budget?" },
+      { key: "asin_count", q: "How many ASINs are listed?" },
+      { key: "brand_registry", q: "Enrolled in Amazon Brand Registry?", default: "yes" },
+    ],
+    taskTemplate: [
+      { title: "Optimize Amazon listings", description: "Rewrite titles, bullet points, and A+ content for all ASINs using keyword research.", priority: "critical", estimated_hours: 6 },
+      { title: "Restructure PPC campaigns", description: "Audit and rebuild PPC campaigns: auto/manual separation, negative keywords, bid optimization.", priority: "critical", estimated_hours: 4 },
+      { title: "Set up FBA replenishment alerts", description: "Create inventory monitoring with reorder triggers based on velocity and lead time.", priority: "high", estimated_hours: 2 },
+      { title: "Build review generation strategy", description: "Implement Amazon Vine, Request a Review automation, and insert card program.", priority: "high", estimated_hours: 2 },
+    ],
+    kpis: ["amazon_revenue_monthly", "acos_pct", "organic_rank_top_keywords", "review_count", "review_rating_avg", "fba_inventory_health"],
+  },
+
+  customer_experience: {
+    description:
+      "Customer service, returns processing, voice of customer programs, and NPS tracking for gummy brand.",
+    baseline: [
+      "Customer support workflow (email, chat, social)",
+      "Returns and refund policy and processing",
+      "Voice of customer feedback collection",
+      "NPS and CSAT tracking",
+      "FAQ and help center content",
+      "Complaint resolution SLAs",
+      "Customer feedback loop to product team",
+    ],
+    questions: [
+      { key: "support_channels", q: "Active support channels? (Email, chat, phone, social?)" },
+      { key: "support_volume", q: "Monthly support ticket volume?" },
+      { key: "nps", q: "Do you track NPS currently? What's the score?" },
+      { key: "return_rate", q: "What's the current return/refund rate?" },
+    ],
+    taskTemplate: [
+      { title: "Create support playbook", description: "Document response templates, escalation paths, and resolution guidelines.", priority: "critical", estimated_hours: 4 },
+      { title: "Implement NPS tracking", description: "Set up post-purchase NPS surveys and track score over time.", priority: "high", estimated_hours: 2 },
+      { title: "Build feedback-to-product loop", description: "Create process to funnel customer feedback into product and quality improvements.", priority: "high", estimated_hours: 2 },
+      { title: "Optimize returns process", description: "Streamline returns/refunds with clear policy, fast processing, and root cause tracking.", priority: "medium", estimated_hours: 2 },
+    ],
+    kpis: ["nps_score", "csat_score", "avg_response_time_hours", "first_contact_resolution_pct", "return_rate_pct"],
+  },
+
+  data_analytics: {
+    description:
+      "Business intelligence, dashboards, advanced analytics, data engineering, and consumer insights for CPG operations.",
+    baseline: [
+      "BI dashboard suite (revenue, inventory, marketing, operations)",
+      "Data pipeline architecture (Shopify, Amazon, GA4, Supabase)",
+      "Customer segmentation and cohort analysis",
+      "Demand forecasting models",
+      "A/B testing infrastructure",
+      "Data warehouse and ETL processes",
+      "Reporting cadence and distribution",
+    ],
+    questions: [
+      { key: "data_sources", q: "Primary data sources? (Shopify, Amazon, GA4, Notion, Supabase)" },
+      { key: "bi_tool", q: "BI/dashboard tool? (Custom ops dashboard, Looker, Metabase?)", default: "Custom ops dashboard" },
+      { key: "data_literacy", q: "Team data literacy level? Who consumes dashboards?" },
+      { key: "forecasting", q: "Any demand forecasting in place?" },
+    ],
+    taskTemplate: [
+      { title: "Audit data pipeline health", description: "Verify all data sources (Shopify, Amazon, GA4) are flowing correctly and on schedule.", priority: "critical", estimated_hours: 3 },
+      { title: "Build executive KPI dashboard", description: "Create unified dashboard with revenue, inventory, marketing, and operational KPIs.", priority: "critical", estimated_hours: 6 },
+      { title: "Implement customer cohort analysis", description: "Build cohort analysis for DTC customers: acquisition, retention, LTV by channel.", priority: "high", estimated_hours: 4 },
+      { title: "Create demand forecast model", description: "Build statistical demand forecasting using historical sales, seasonality, and trends.", priority: "high", estimated_hours: 4 },
+    ],
+    kpis: ["dashboard_adoption_rate", "data_freshness_hours", "forecast_accuracy_pct", "report_delivery_on_time_pct"],
+  },
+
+  it: {
+    description:
+      "Engineering, cloud infrastructure, cybersecurity, and vendor tech management for the USA Gummies tech stack.",
+    baseline: [
+      "Application architecture (Next.js, Vercel, Supabase)",
+      "API integrations (Shopify, Amazon SP-API, GA4, Notion)",
+      "Cloud infrastructure management (Vercel, Supabase, Upstash)",
+      "Security and access control",
+      "Deployment and CI/CD pipeline",
+      "SaaS vendor management",
+      "Monitoring and alerting",
+      "Disaster recovery and backups",
+    ],
+    questions: [
+      { key: "hosting", q: "Hosting platform? (Vercel Hobby plan confirmed)", default: "Vercel Hobby" },
+      { key: "security", q: "Security measures in place? (2FA, access controls, audit logs)" },
+      { key: "monitoring", q: "Application monitoring tools? (Vercel analytics, custom?)" },
+      { key: "backup", q: "Database backup strategy?" },
+    ],
+    taskTemplate: [
+      { title: "Security audit", description: "Review access controls, API key management, env var security, and auth flows.", priority: "critical", estimated_hours: 4 },
+      { title: "Document tech stack architecture", description: "Create architecture diagram covering all services, APIs, data flows, and integrations.", priority: "high", estimated_hours: 3 },
+      { title: "Set up monitoring and alerting", description: "Implement uptime monitoring, error tracking, and performance alerting.", priority: "high", estimated_hours: 3 },
+      { title: "Create disaster recovery plan", description: "Document backup procedures, recovery steps, and RTO/RPO targets.", priority: "medium", estimated_hours: 2 },
+    ],
+    kpis: ["uptime_pct", "deploy_success_rate", "security_incidents", "api_error_rate", "page_load_time_ms"],
+  },
+
+  retail_execution: {
+    description:
+      "Field sales coverage, merchandising audits, store-level data capture, and in-store demos for retail gummy placement.",
+    baseline: [
+      "Field rep coverage map",
+      "Merchandising audit checklist",
+      "Store-level sales data collection",
+      "In-store demo execution playbook",
+      "Retail compliance tracking",
+      "Competitor shelf audit",
+      "Route planning and territory management",
+    ],
+    questions: [
+      { key: "field_reps", q: "Any field sales reps or brokers? How many?" },
+      { key: "retail_accounts", q: "How many retail locations carry the product?" },
+      { key: "audit_frequency", q: "How often are store audits conducted?" },
+      { key: "demo_program", q: "Active in-store sampling/demo program?" },
+    ],
+    taskTemplate: [
+      { title: "Build store coverage map", description: "Map all retail locations carrying product with field rep assignments and visit frequency.", priority: "critical", estimated_hours: 3 },
+      { title: "Create merchandising audit checklist", description: "Standardize what reps check: shelf placement, pricing, signage, out-of-stocks, competitor activity.", priority: "high", estimated_hours: 2 },
+      { title: "Design demo execution playbook", description: "Document setup, staffing, sampling, engagement, and data capture for in-store demos.", priority: "high", estimated_hours: 3 },
+      { title: "Implement store-level reporting", description: "Create mobile-friendly form for field reps to capture visit data and photos.", priority: "medium", estimated_hours: 3 },
+    ],
+    kpis: ["stores_visited_per_week", "out_of_stock_rate", "demo_roi", "shelf_compliance_pct", "field_rep_productivity"],
+  },
+
+  corporate_affairs: {
+    description:
+      "Public relations, government affairs, CSR, and internal communications for USA Gummies brand.",
+    baseline: [
+      "Media relations and press kit",
+      "Government and regulatory affairs tracking",
+      "Corporate social responsibility programs",
+      "Internal communications cadence",
+      "Crisis communications plan",
+      "Community engagement strategy",
+    ],
+    questions: [
+      { key: "pr_agency", q: "Do you work with a PR agency or handle in-house?" },
+      { key: "media_coverage", q: "Any media coverage to date? Publications?" },
+      { key: "csr", q: "Any CSR or community initiatives planned?" },
+      { key: "crisis_plan", q: "Is there a crisis communications plan?" },
+    ],
+    taskTemplate: [
+      { title: "Build press kit", description: "Create media kit with brand story, founder bio, product images, fact sheet, and press releases.", priority: "high", estimated_hours: 4 },
+      { title: "Create crisis communications plan", description: "Document response protocols for product recalls, negative press, social media crises.", priority: "high", estimated_hours: 3 },
+      { title: "Launch CSR initiative", description: "Design a community or sustainability program aligned with brand values.", priority: "medium", estimated_hours: 2 },
+      { title: "Set up media monitoring", description: "Track brand mentions, industry news, and competitor press coverage.", priority: "medium", estimated_hours: 1 },
+    ],
+    kpis: ["media_mentions_monthly", "press_coverage_reach", "brand_sentiment_score", "csr_impact_metrics"],
+  },
+
+  brand_studio: {
+    description:
+      "In-house creative agency, content production, brand partnerships, and media distribution for gummy brand.",
+    baseline: [
+      "Creative asset library (photo, video, design)",
+      "Content production workflow",
+      "Brand partnership pipeline",
+      "Media distribution strategy",
+      "Creative brief process",
+      "Asset management and DAM",
+      "Brand consistency guidelines",
+    ],
+    questions: [
+      { key: "creative_tools", q: "Creative tools in use? (Canva, Adobe, Figma?)" },
+      { key: "content_types", q: "Primary content types? (Product photo, lifestyle, video, UGC?)" },
+      { key: "partnerships", q: "Any active brand partnerships or collaborations?" },
+      { key: "distribution", q: "Content distribution channels? (Social, blog, email, PR?)" },
+    ],
+    taskTemplate: [
+      { title: "Build creative asset library", description: "Organize all brand assets: product shots, lifestyle images, videos, logos, templates.", priority: "critical", estimated_hours: 4 },
+      { title: "Create content production SOP", description: "Document workflow from brief to publish: concepting, production, review, distribution.", priority: "high", estimated_hours: 3 },
+      { title: "Launch brand partnership program", description: "Identify and pitch complementary brands for co-marketing and collaboration.", priority: "high", estimated_hours: 4 },
+      { title: "Set up DAM system", description: "Implement digital asset management for organized access to all creative files.", priority: "medium", estimated_hours: 2 },
+    ],
+    kpis: ["content_pieces_produced", "asset_utilization_rate", "partnership_revenue", "brand_consistency_score"],
+  },
+
+  research_lab: {
+    description:
+      "Consumer testing, product sensory evaluation, market research, and competitive analysis for gummy products.",
+    baseline: [
+      "Consumer testing panels",
+      "Sensory evaluation protocols",
+      "Market research studies",
+      "Competitive product analysis",
+      "Trend monitoring and forecasting",
+      "Concept testing framework",
+      "Consumer insight reports",
+    ],
+    questions: [
+      { key: "testing_panels", q: "Do you have consumer testing panels set up?" },
+      { key: "sensory", q: "Is there a sensory evaluation process for new products?" },
+      { key: "competitive_intel", q: "How do you track competitors? (Manual, tools, reports?)" },
+      { key: "research_budget", q: "Annual market research budget?" },
+    ],
+    taskTemplate: [
+      { title: "Build consumer testing panel", description: "Recruit a panel of target consumers for product testing and feedback.", priority: "high", estimated_hours: 4 },
+      { title: "Create sensory evaluation protocol", description: "Standardize taste test methodology: blind testing, scoring rubric, documentation.", priority: "high", estimated_hours: 3 },
+      { title: "Launch competitive analysis program", description: "Set up systematic tracking of competitor products, pricing, and marketing.", priority: "high", estimated_hours: 3 },
+      { title: "Design concept testing framework", description: "Create process to test new product concepts with consumers before development.", priority: "medium", estimated_hours: 2 },
+    ],
+    kpis: ["consumer_tests_conducted", "concept_test_success_rate", "competitive_reports_published", "insight_action_rate"],
+  },
 };
 
 /**
@@ -536,11 +950,26 @@ export type ActivePlaybookSummary = {
 };
 
 const PLAYBOOK_TRIGGERS: Record<string, string[]> = {
-  finance: ["finance", "cash flow", "margin", "cogs", "burn rate", "runway"],
-  operations: ["operations", "production", "fulfillment", "quality", "returns"],
-  sales_and_growth: ["sales", "growth", "pipeline", "wholesale", "pricing", "conversion"],
-  supply_chain: ["supply chain", "inventory", "supplier", "lead time", "stockout"],
-  executive: ["strategy", "investor", "risk", "okr", "hiring", "board"],
+  finance: ["finance", "cash flow", "margin", "cogs", "burn rate", "runway", "accounting", "bookkeeping"],
+  operations: ["operations", "production", "manufacturing", "co-packer", "packaging"],
+  sales_and_growth: ["sales", "pipeline", "wholesale", "pricing", "distributor", "b2b"],
+  supply_chain: ["supply chain", "inventory", "supplier", "lead time", "stockout", "procurement", "logistics"],
+  executive: ["strategy", "investor", "risk", "okr", "board", "leadership", "ceo"],
+  legal: ["legal", "contract", "trademark", "fda", "compliance", "insurance", "ip"],
+  people: ["ai agent", "agent performance", "workforce automation", "ai training", "agent deployment"],
+  product: ["product", "r&d", "flavor", "formulation", "sku", "new product", "packaging innovation"],
+  quality: ["quality", "food safety", "haccp", "lab testing", "qa", "qc", "shelf life"],
+  trade_marketing: ["trade marketing", "planogram", "shelf", "in-store", "category management", "merchandising"],
+  marketing: ["marketing", "brand", "content", "social media", "influencer", "pr", "growth marketing"],
+  ecommerce: ["ecommerce", "shopify", "dtc", "conversion rate", "email marketing", "subscription", "loyalty"],
+  amazon: ["amazon", "asin", "ppc", "fba", "seller central", "a+ content", "brand registry"],
+  customer_experience: ["customer service", "support", "nps", "csat", "returns", "complaints", "feedback"],
+  data_analytics: ["analytics", "dashboard", "bi", "data", "forecast", "segmentation", "cohort"],
+  it: ["engineering", "infrastructure", "cybersecurity", "devops", "tech stack", "api", "deployment"],
+  retail_execution: ["retail", "field sales", "merchandising", "store audit", "demo", "in-store"],
+  corporate_affairs: ["public relations", "pr", "government affairs", "csr", "internal comms", "crisis"],
+  brand_studio: ["creative", "content production", "brand partnership", "media", "design", "photography"],
+  research_lab: ["consumer testing", "sensory", "market research", "competitive analysis", "focus group"],
 };
 
 function toTitleCase(value: string): string {
@@ -684,17 +1113,64 @@ export async function getPlaybookWithFallback(
 /**
  * Extract just the department name from a user goal like "get finance under control"
  */
+/**
+ * Operating Pillars — maps departments to strategic pillars
+ */
+export const OPERATING_PILLARS: Record<string, { name: string; departments: string[] }> = {
+  build_the_product: {
+    name: "Build the Product",
+    departments: ["product", "quality", "operations", "research_lab"],
+  },
+  move_the_product: {
+    name: "Move the Product",
+    departments: ["supply_chain", "retail_execution"],
+  },
+  sell_the_product: {
+    name: "Sell the Product",
+    departments: ["sales_and_growth", "trade_marketing", "amazon"],
+  },
+  grow_the_brand: {
+    name: "Grow the Brand",
+    departments: ["marketing", "ecommerce", "brand_studio", "customer_experience"],
+  },
+  control_the_business: {
+    name: "Control the Business",
+    departments: ["finance", "legal", "data_analytics", "it", "corporate_affairs", "executive", "people"],
+  },
+};
+
+/**
+ * Extract department name from user text. Checks more specific terms first
+ * to avoid false positives (e.g. "amazon" before "sales").
+ */
 export function detectDepartment(text: string): string | null {
   const lower = text.toLowerCase();
-  const departmentKeywords: Record<string, string[]> = {
-    finance: ["finance", "financial", "accounting", "bookkeeping", "quickbooks", "accounts payable", "accounts receivable", "budg"],
-    operations: ["operations", "ops", "production", "manufacturing", "shipping", "fulfillment"],
-    sales_and_growth: ["sales", "growth", "revenue", "pipeline", "b2b", "wholesale", "dtc", "marketing"],
-    supply_chain: ["supply chain", "sourcing", "procurement", "inventory", "supplier", "vendor", "logistics"],
-    executive: ["executive", "strategy", "strategic", "okr", "investor", "board", "leadership"],
-  };
 
-  for (const [dept, keywords] of Object.entries(departmentKeywords)) {
+  // Ordered from most specific to least — prevents "marketing" matching before "trade_marketing"
+  const departmentKeywords: [string, string[]][] = [
+    ["trade_marketing", ["trade marketing", "planogram", "category management", "in-store promotion", "retailer marketing"]],
+    ["amazon", ["amazon", "seller central", "asin", "fba", "fbm", "brand registry", "a+ content"]],
+    ["ecommerce", ["ecommerce", "e-commerce", "shopify store", "dtc", "direct to consumer", "conversion rate optim", "email marketing", "subscription"]],
+    ["customer_experience", ["customer service", "customer support", "nps", "csat", "voice of customer", "customer experience"]],
+    ["retail_execution", ["field sales", "merchandising audit", "store audit", "in-store demo", "retail execution"]],
+    ["brand_studio", ["brand studio", "creative agency", "content production", "brand partnership", "media company"]],
+    ["research_lab", ["consumer testing", "sensory evaluation", "focus group", "market research", "research lab"]],
+    ["corporate_affairs", ["public relations", "government affairs", "csr", "corporate social", "crisis communication", "corporate affairs"]],
+    ["data_analytics", ["business intelligence", "analytics", "data engineering", "consumer insights", "data analytics", "dashboard"]],
+    ["people", ["ai agent", "agent performance", "workforce automation", "ai training", "ai systems admin"]],
+    ["quality", ["quality assurance", "food safety", "haccp", "lab testing", "qc ", "qa ", "quality control"]],
+    ["product", ["product development", "r&d", "new product", "ingredient standard", "packaging innovation", "product portfolio", "sku rationalization"]],
+    ["legal", ["legal", "contract", "trademark", "intellectual property", "fda compliance", "insurance", "corporate governance"]],
+    ["it", ["engineering", "infrastructure", "cybersecurity", "tech stack", "deployment", "cloud ops", "information technology"]],
+    ["marketing", ["marketing", "brand market", "growth market", "influencer", "social media", "content strategy"]],
+    ["finance", ["finance", "financial", "accounting", "bookkeeping", "quickbooks", "accounts payable", "accounts receivable", "budg", "cash flow", "cogs"]],
+    ["operations", ["operations", "ops", "production", "manufacturing", "co-pack", "fulfillment", "shipping"]],
+    ["sales_and_growth", ["sales", "growth", "revenue", "pipeline", "b2b", "wholesale"]],
+    ["supply_chain", ["supply chain", "sourcing", "procurement", "inventory", "supplier", "vendor", "logistics"]],
+    ["executive", ["executive", "strategy", "strategic", "okr", "investor", "board", "leadership", "ceo"]],
+  ];
+
+  for (const [dept, keywords] of departmentKeywords) {
     for (const keyword of keywords) {
       if (lower.includes(keyword)) return dept;
     }
