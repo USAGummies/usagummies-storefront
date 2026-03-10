@@ -44,7 +44,7 @@ import { getTeamMembers, getVendors, buildTeamContext } from "@/lib/ops/abra-tea
 import { getActiveSignals, buildSignalsContext } from "@/lib/ops/abra-operational-signals";
 import {
   getAvailableActions,
-  proposeAction,
+  proposeAndMaybeExecute,
   type AbraAction,
 } from "@/lib/ops/abra-actions";
 import {
@@ -1281,14 +1281,14 @@ export async function POST(req: Request) {
     const actionNotices: string[] = [];
     for (const directive of parsedActions.actions.slice(0, 3)) {
       try {
-        const status = await proposeAction(directive.action);
-        if (status.startsWith("executed:")) {
+        const outcome = await proposeAndMaybeExecute(directive.action);
+        if (outcome.auto_executed) {
           actionNotices.push(
-            `Done: executed action \`${directive.action.action_type}\` (${status.replace("executed:", "")}).`,
+            `Done: auto-executed \`${directive.action.action_type}\` (${outcome.approval_id}).`,
           );
         } else {
           actionNotices.push(
-            `Queued for approval: \`${directive.action.action_type}\` (${status.replace("queued:", "")}).`,
+            `Queued for approval: \`${directive.action.action_type}\` (${outcome.approval_id}).`,
           );
         }
       } catch (error) {

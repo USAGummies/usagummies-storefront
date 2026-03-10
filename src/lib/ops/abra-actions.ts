@@ -11,6 +11,7 @@ export type AbraAction = {
   risk_level: "low" | "medium" | "high" | "critical";
   params: Record<string, unknown>;
   requires_approval: boolean;
+  confidence?: number;
 };
 
 export type ActionResult = {
@@ -22,11 +23,53 @@ export type ActionResult = {
 type ApprovalRow = {
   id: string;
   status: string;
+  action_type?: string | null;
+  created_at?: string | null;
   batch_group?: string | null;
   decision_reasoning?: string | null;
   resolved_payload?: unknown;
   proposed_payload: unknown;
+  auto_executed?: boolean | null;
 };
+
+export type AutoExecPolicy = {
+  action_type: string;
+  max_risk_level: "low";
+  min_confidence: number;
+  daily_limit: number;
+  enabled: boolean;
+};
+
+export const AUTO_EXEC_POLICIES: AutoExecPolicy[] = [
+  {
+    action_type: "create_brain_entry",
+    max_risk_level: "low",
+    min_confidence: 0.7,
+    daily_limit: 50,
+    enabled: true,
+  },
+  {
+    action_type: "acknowledge_signal",
+    max_risk_level: "low",
+    min_confidence: 0.8,
+    daily_limit: 20,
+    enabled: true,
+  },
+  {
+    action_type: "send_slack",
+    max_risk_level: "low",
+    min_confidence: 0.85,
+    daily_limit: 10,
+    enabled: true,
+  },
+  {
+    action_type: "create_task",
+    max_risk_level: "low",
+    min_confidence: 0.8,
+    daily_limit: 10,
+    enabled: true,
+  },
+];
 
 function getSupabaseEnv() {
   const baseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -335,7 +378,7 @@ const ACTION_HANDLERS: Record<
 
 async function fetchApproval(approvalId: string): Promise<ApprovalRow | null> {
   const rows = (await sbFetch(
-    `/rest/v1/approvals?id=eq.${approvalId}&select=id,status,batch_group,decision_reasoning,resolved_payload,proposed_payload&limit=1`,
+    `/rest/v1/approvals?id=eq.${approvalId}&select=id,status,action_type,created_at,batch_group,decision_reasoning,resolved_payload,proposed_payload,auto_executed&limit=1`,
   )) as ApprovalRow[];
   return rows[0] || null;
 }
@@ -360,6 +403,70 @@ async function claimPendingApproval(
 
   if (!rows[0]?.id) return null;
   return { claimId, approval: rows[0] };
+}
+
+function parseApprovalId(status: string): string {
+  const cleaned = (status || "").trim();
+  if (!cleaned) return "";
+  const idx = cleaned.indexOf(":");
+  return idx >= 0 ? cleaned.slice(idx + 1) : cleaned;
+}
+
+async function updateAutoExecTracking(params: {
+  approvalId: string;
+  autoExecuted: boolean;
+  result?: ActionResult;
+}): Promise<void> {
+  try {
+    await sbFetch(`/rest/v1/approvals?id=eq.${params.approvalId}`, {
+      method: "PATCH",
+      headers: {
+        Prefer: "return=minimal",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        auto_approved: params.autoExecuted,
+        auto_executed: params.autoExecuted,
+        executed_at: params.autoExecuted ? new Date().toISOString() : null,
+        execution_result: params.result
+          ? {
+              success: params.result.success,
+              message: params.result.message,
+              data: params.result.data || null,
+            }
+          : null,
+      }),
+    });
+  } catch {
+    // best-effort tracking update
+  }
+}
+
+async function writeAutoExecBrainEntry(action: AbraAction, result: ActionResult): Promise<void> {
+  try {
+    await sbFetch("/rest/v1/open_brain_entries", {
+      method: "POST",
+      headers: {
+        Prefer: "return=minimal",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        source_type: "agent",
+        source_ref: "auto-exec",
+        entry_type: "system_log",
+        title: `Auto-executed: ${action.description}`,
+        raw_text: JSON.stringify({ action, result }),
+        summary_text: result.message.slice(0, 500),
+        category: "system_log",
+        department: action.department || "operations",
+        confidence: "high",
+        priority: "normal",
+        processed: true,
+      }),
+    });
+  } catch {
+    // best-effort brain write
+  }
 }
 
 async function markApprovalResolved(params: {
@@ -438,6 +545,10 @@ export async function proposeAction(action: AbraAction): Promise<string> {
       proposed_payload: {
         ...action,
         original_action_type: action.action_type,
+        confidence:
+          typeof action.confidence === "number"
+            ? Math.max(0, Math.min(1, action.confidence))
+            : 0.5,
       },
       confidence: "medium",
       risk_level: action.risk_level,
@@ -451,12 +562,68 @@ export async function proposeAction(action: AbraAction): Promise<string> {
   const approvalId = rows[0]?.id;
   if (!approvalId) throw new Error("Failed to create approval");
 
-  if (!action.requires_approval && action.risk_level === "low") {
-    const result = await executeAction(approvalId);
-    return result.success ? `executed:${approvalId}` : `queued:${approvalId}`;
+  return `queued:${approvalId}`;
+}
+
+export async function canAutoExecute(action: AbraAction): Promise<boolean> {
+  const policy = AUTO_EXEC_POLICIES.find((item) => item.action_type === action.action_type);
+  if (!policy || !policy.enabled) return false;
+  if (policy.max_risk_level !== "low" || action.risk_level !== "low") return false;
+
+  const confidence =
+    typeof action.confidence === "number"
+      ? Math.max(0, Math.min(1, action.confidence))
+      : 0.5;
+  if (confidence < policy.min_confidence) return false;
+
+  try {
+    const dayStart = new Date();
+    dayStart.setHours(0, 0, 0, 0);
+    const rows = (await sbFetch(
+      `/rest/v1/approvals?auto_executed=eq.true&created_at=gte.${encodeURIComponent(dayStart.toISOString())}&select=id,proposed_payload&limit=1000`,
+    )) as Array<{ id: string; proposed_payload?: unknown }>;
+
+    const count = (Array.isArray(rows) ? rows : []).filter((row) => {
+      if (!row.proposed_payload || typeof row.proposed_payload !== "object") return false;
+      const payload = row.proposed_payload as Record<string, unknown>;
+      const original = String(payload.original_action_type || payload.action_type || "");
+      return original === action.action_type;
+    }).length;
+
+    return count < policy.daily_limit;
+  } catch {
+    return false;
+  }
+}
+
+export async function proposeAndMaybeExecute(action: AbraAction): Promise<{
+  approval_id: string;
+  auto_executed: boolean;
+  result?: ActionResult;
+}> {
+  const status = await proposeAction(action);
+  const approvalId = parseApprovalId(status);
+  if (!approvalId) {
+    throw new Error("Failed to derive approval id");
   }
 
-  return `queued:${approvalId}`;
+  const eligible = await canAutoExecute(action);
+  if (!eligible) {
+    return { approval_id: approvalId, auto_executed: false };
+  }
+
+  const result = await executeAction(approvalId);
+  const autoExecuted = !!result.success;
+  await updateAutoExecTracking({ approvalId, autoExecuted, result });
+  if (autoExecuted) {
+    await writeAutoExecBrainEntry(action, result);
+  }
+
+  return {
+    approval_id: approvalId,
+    auto_executed: autoExecuted,
+    ...(result ? { result } : {}),
+  };
 }
 
 export async function executeAction(approvalId: string): Promise<ActionResult> {

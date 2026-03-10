@@ -1,5 +1,5 @@
 import { emitSignal } from "@/lib/ops/abra-operational-signals";
-import { proposeAction } from "@/lib/ops/abra-actions";
+import { proposeAndMaybeExecute } from "@/lib/ops/abra-actions";
 import { recordKPI } from "@/lib/ops/abra-kpi-recorder";
 
 type NotionPage = {
@@ -358,23 +358,24 @@ export async function checkDealHealth(): Promise<{
     if (!email) continue;
 
     try {
-      const proposalId = await proposeAction({
+      const proposal = await proposeAndMaybeExecute({
         action_type: "send_email",
         title: `Follow up: ${deal.company_name}`,
         description: `Follow up with ${row?.contact_name || "contact"} at ${deal.company_name}`,
         department: "sales_and_growth",
         risk_level: "low",
         requires_approval: true,
+        confidence: 0.7,
         params: {
           to: email,
           subject: `Following up on USA Gummies proposal`,
           body:
             `Hi ${row?.contact_name || "there"},\n\n` +
             `Quick follow-up on our conversation with USA Gummies. ` +
-            `Happy to answer questions and align next steps this week.\n\nBest,\nBen`,
+          `Happy to answer questions and align next steps this week.\n\nBest,\nBen`,
         },
       });
-      if (proposalId) proposalsCreated += 1;
+      if (proposal.approval_id) proposalsCreated += 1;
     } catch {
       // best-effort proposal
     }

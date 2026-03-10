@@ -1,6 +1,6 @@
 import { fetchOrderItems, fetchOrders, fetchFBAInventory, isAmazonConfigured } from "@/lib/amazon/sp-api";
 import { emitSignal } from "@/lib/ops/abra-operational-signals";
-import { proposeAction } from "@/lib/ops/abra-actions";
+import { proposeAndMaybeExecute } from "@/lib/ops/abra-actions";
 import { recordKPI } from "@/lib/ops/abra-kpi-recorder";
 
 export type InventoryForecast = {
@@ -333,13 +333,14 @@ export async function checkAndAlertReorders(): Promise<{
 
     if (item.urgency === "critical") {
       try {
-        const result = await proposeAction({
+        const result = await proposeAndMaybeExecute({
           action_type: "create_task",
           title: `Reorder ${item.product_name}`,
           description: `Reorder ${item.product_name}: ${Math.ceil(item.suggested_reorder_qty)} units`,
           department: "supply_chain",
           risk_level: "low",
           requires_approval: true,
+          confidence: 0.8,
           params: {
             title: `Reorder ${item.product_name}: ${Math.ceil(item.suggested_reorder_qty)} units`,
             description: `SKU: ${item.sku}. Stockout estimate: ${stockoutText}. Suggested quantity: ${Math.ceil(item.suggested_reorder_qty)} units.`,
@@ -347,7 +348,7 @@ export async function checkAndAlertReorders(): Promise<{
             task_type: "inventory_reorder",
           },
         });
-        if (result) proposalsCreated += 1;
+        if (result.approval_id) proposalsCreated += 1;
       } catch {
         // best-effort proposal creation
       }

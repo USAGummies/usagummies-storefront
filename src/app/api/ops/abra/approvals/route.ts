@@ -18,6 +18,10 @@ type ApprovalRow = {
   decision_reasoning: string | null;
   decided_at: string | null;
   requested_at: string;
+  created_at?: string | null;
+  auto_executed?: boolean | null;
+  auto_approved?: boolean | null;
+  executed_at?: string | null;
 };
 
 function getSupabaseEnv() {
@@ -91,7 +95,7 @@ export async function GET(req: Request) {
 
   try {
     const rows = (await sbFetch(
-      `/rest/v1/approvals?select=id,requesting_agent_id,action_type,summary,risk_level,permission_tier,status,proposed_payload,resolved_payload,decision,decision_reasoning,decided_at,requested_at&order=requested_at.desc&limit=50${statusFilter}`,
+      `/rest/v1/approvals?select=id,requesting_agent_id,action_type,summary,risk_level,permission_tier,status,proposed_payload,resolved_payload,decision,decision_reasoning,decided_at,requested_at,created_at,auto_executed,auto_approved,executed_at&order=requested_at.desc&limit=50${statusFilter}`,
     )) as ApprovalRow[];
 
     return NextResponse.json({

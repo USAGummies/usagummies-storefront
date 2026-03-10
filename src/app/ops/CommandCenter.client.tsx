@@ -38,6 +38,8 @@ type ApprovalItem = {
   summary: string;
   requested_at: string;
   action_type: string;
+  auto_executed?: boolean | null;
+  executed_at?: string | null;
 };
 
 type HealthResponse = {
@@ -62,6 +64,12 @@ type FeedHealthResponse = {
     disabled: number;
     unresolved_dead_letters: number;
   };
+};
+
+type AutoExecSummary = {
+  total: number;
+  byAction: Record<string, number>;
+  limits: Record<string, number>;
 };
 
 function fmtDollar(value: number): string {
@@ -150,15 +158,26 @@ export function CommandCenter() {
   const [approvals, setApprovals] = useState<ApprovalItem[]>([]);
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [feedHealth, setFeedHealth] = useState<FeedHealthResponse | null>(null);
+  const [autoExecSummary, setAutoExecSummary] = useState<AutoExecSummary>({
+    total: 0,
+    byAction: {},
+    limits: {
+      create_brain_entry: 50,
+      acknowledge_signal: 20,
+      send_slack: 10,
+      create_task: 10,
+    },
+  });
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [pulseRes, signalsRes, approvalsRes, healthRes, feedRes] = await Promise.all([
+      const [pulseRes, signalsRes, approvalsRes, autoRes, healthRes, feedRes] = await Promise.all([
         fetch("/api/ops/abra/pulse", { cache: "no-store" }),
         fetch("/api/ops/abra/operational-signals?limit=5", { cache: "no-store" }),
         fetch("/api/ops/abra/approvals?status=pending", { cache: "no-store" }),
+        fetch("/api/ops/abra/approvals?status=all", { cache: "no-store" }),
         fetch("/api/ops/abra/health", { cache: "no-store" }),
         fetch("/api/ops/abra/feed-health", { cache: "no-store" }),
       ]);
@@ -166,20 +185,43 @@ export function CommandCenter() {
       if (!pulseRes.ok) throw new Error("Failed to load pulse");
       if (!signalsRes.ok) throw new Error("Failed to load signals");
       if (!approvalsRes.ok) throw new Error("Failed to load approvals");
+      if (!autoRes.ok) throw new Error("Failed to load auto-execution summary");
       if (!healthRes.ok) throw new Error("Failed to load system health");
       if (!feedRes.ok) throw new Error("Failed to load feed health");
 
       const pulseData = (await pulseRes.json()) as PulseData;
       const signalsData = (await signalsRes.json()) as { signals: SignalItem[] };
       const approvalsData = (await approvalsRes.json()) as { approvals: ApprovalItem[] };
+      const autoData = (await autoRes.json()) as { approvals: ApprovalItem[] };
       const healthData = (await healthRes.json()) as HealthResponse;
       const feedData = (await feedRes.json()) as FeedHealthResponse;
+
+      const dayStart = new Date();
+      dayStart.setHours(0, 0, 0, 0);
+      const autoRows = (Array.isArray(autoData.approvals) ? autoData.approvals : []).filter(
+        (approval) => {
+          if (!approval.auto_executed) return false;
+          const timestamp = approval.executed_at || approval.requested_at;
+          const ts = timestamp ? new Date(timestamp).getTime() : Number.NaN;
+          return Number.isFinite(ts) && ts >= dayStart.getTime();
+        },
+      );
+      const byAction: Record<string, number> = {};
+      for (const row of autoRows) {
+        const key = row.action_type || "other";
+        byAction[key] = (byAction[key] || 0) + 1;
+      }
 
       setPulse(pulseData);
       setSignals(Array.isArray(signalsData.signals) ? signalsData.signals : []);
       setApprovals(Array.isArray(approvalsData.approvals) ? approvalsData.approvals : []);
       setHealth(healthData);
       setFeedHealth(feedData);
+      setAutoExecSummary((prev) => ({
+        ...prev,
+        total: autoRows.length,
+        byAction,
+      }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load command center");
     } finally {
@@ -331,6 +373,38 @@ export function CommandCenter() {
               ))}
             </div>
           )}
+        </section>
+
+        <section
+          style={{
+            background: CARD,
+            border: `1px solid ${BORDER}`,
+            borderRadius: 12,
+            padding: "14px 16px",
+          }}
+        >
+          <div style={{ fontSize: 14, color: NAVY, fontWeight: 800, marginBottom: 10 }}>
+            Auto-Executed Today: {autoExecSummary.total} actions
+          </div>
+          {autoExecSummary.total === 0 ? (
+            <div style={{ color: TEXT_DIM, fontSize: 13 }}>
+              No low-risk actions auto-executed yet today.
+            </div>
+          ) : (
+            <div style={{ display: "grid", gap: 6 }}>
+              {Object.entries(autoExecSummary.byAction).map(([action, count]) => (
+                <div key={action} style={{ fontSize: 13, color: NAVY }}>
+                  <strong>{count}×</strong> {action}
+                </div>
+              ))}
+            </div>
+          )}
+          <div style={{ marginTop: 10, fontSize: 12, color: TEXT_DIM }}>
+            Daily limit: brain {autoExecSummary.byAction.create_brain_entry || 0}/{autoExecSummary.limits.create_brain_entry},
+            {" "}signal {autoExecSummary.byAction.acknowledge_signal || 0}/{autoExecSummary.limits.acknowledge_signal},
+            {" "}slack {autoExecSummary.byAction.send_slack || 0}/{autoExecSummary.limits.send_slack},
+            {" "}task {autoExecSummary.byAction.create_task || 0}/{autoExecSummary.limits.create_task}
+          </div>
         </section>
       </div>
 
