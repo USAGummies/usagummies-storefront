@@ -24,6 +24,35 @@ export const maxDuration = 30;
 const SIGNING_SECRET = process.env.SLACK_SIGNING_SECRET || "";
 const BOT_TOKEN = process.env.SLACK_BOT_TOKEN || "";
 
+/** Slack section block text limit is 3000 chars. Split into multiple blocks if needed. */
+const SLACK_BLOCK_TEXT_LIMIT = 3000;
+
+function buildSlackBlocks(fullText: string): Array<{ type: string; text: { type: string; text: string } }> {
+  if (fullText.length <= SLACK_BLOCK_TEXT_LIMIT) {
+    return [{ type: "section", text: { type: "mrkdwn", text: fullText } }];
+  }
+
+  // Split on paragraph boundaries, falling back to hard truncation
+  const blocks: Array<{ type: string; text: { type: string; text: string } }> = [];
+  let remaining = fullText;
+  while (remaining.length > 0) {
+    if (remaining.length <= SLACK_BLOCK_TEXT_LIMIT) {
+      blocks.push({ type: "section", text: { type: "mrkdwn", text: remaining } });
+      break;
+    }
+    // Find last newline before limit
+    let splitIdx = remaining.lastIndexOf("\n", SLACK_BLOCK_TEXT_LIMIT);
+    if (splitIdx < SLACK_BLOCK_TEXT_LIMIT * 0.3) {
+      // No good paragraph break — split at last space
+      splitIdx = remaining.lastIndexOf(" ", SLACK_BLOCK_TEXT_LIMIT);
+    }
+    if (splitIdx <= 0) splitIdx = SLACK_BLOCK_TEXT_LIMIT;
+    blocks.push({ type: "section", text: { type: "mrkdwn", text: remaining.slice(0, splitIdx) } });
+    remaining = remaining.slice(splitIdx).trimStart();
+  }
+  return blocks;
+}
+
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
 function verifySlackSignature(
@@ -133,6 +162,7 @@ async function postThreadReply(
       : "";
 
   try {
+    const fullText = `🧠 *Abra*\n\n${text}${sourceText}`;
     const res = await fetch("https://slack.com/api/chat.postMessage", {
       method: "POST",
       headers: {
@@ -142,15 +172,7 @@ async function postThreadReply(
       body: JSON.stringify({
         channel: channelId,
         thread_ts: threadTs,
-        blocks: [
-          {
-            type: "section",
-            text: {
-              type: "mrkdwn",
-              text: `🧠 *Abra*\n\n${text}${sourceText}`,
-            },
-          },
-        ],
+        blocks: buildSlackBlocks(fullText),
         text: `🧠 Abra: ${text.slice(0, 200)}`,
       }),
       signal: AbortSignal.timeout(10000),
@@ -167,21 +189,17 @@ async function callAbraChat(message: string, history?: ChatMessage[]): Promise<{
   reply: string;
   sources: Array<{ title: string; source_table: string }>;
 }> {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : "http://localhost:3000";
-
-  // Use internal fetch — this bypasses auth since we already verified Slack signature
-  // We need to call the insights endpoint instead (which is lighter) or handle auth
-  // For now, we use the Abra brain directly via Supabase + Claude
-
   const openaiKey = process.env.OPENAI_API_KEY;
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!openaiKey || !anthropicKey || !supabaseUrl || !serviceKey) {
-    return { reply: "⚠️ Abra is not fully configured. Missing API keys.", sources: [] };
+  if (!openaiKey || !supabaseUrl || !serviceKey) {
+    return { reply: "⚠️ Abra is not fully configured. Missing API keys (need OPENAI_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY).", sources: [] };
+  }
+
+  if (!anthropicKey && !openaiKey) {
+    return { reply: "⚠️ Abra has no LLM provider configured. Need ANTHROPIC_API_KEY or OPENAI_API_KEY.", sources: [] };
   }
 
   // 1. Generate embedding
@@ -241,7 +259,7 @@ async function callAbraChat(message: string, history?: ChatMessage[]): Promise<{
     return { reply: "No relevant data found in the brain for your question.", sources: [] };
   }
 
-  // 3. Build context and ask Claude
+  // 3. Build context and ask LLM (try Anthropic Claude first, fall back to OpenAI)
   const context = results
     .map(
       (r) =>
@@ -249,46 +267,93 @@ async function callAbraChat(message: string, history?: ChatMessage[]): Promise<{
     )
     .join("\n\n");
 
-  const claudeModel = process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-latest";
-  const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": anthropicKey,
-      "anthropic-version": "2023-06-01",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: claudeModel,
-      max_tokens: 600,
-      temperature: 0.2,
-      system:
-        "You are Abra, the AI operations assistant for USA Gummies. Answer using the provided context from emails and business data. Be concise and actionable. Format for Slack (use *bold*, _italic_, and bullet lists). Cite sources briefly.",
-      messages: [
-        // Include thread history for multi-turn context
-        ...(history && history.length > 0
-          ? history.map((m) => ({ role: m.role, content: m.content }))
-          : []),
-        {
-          role: "user" as const,
-          content: `Question: ${message}\n\nContext from brain:\n${context}`,
-        },
-      ],
-    }),
-    signal: AbortSignal.timeout(25000),
-  });
+  const systemPrompt =
+    "You are Abra, the AI operations assistant for USA Gummies. Answer using the provided context from emails and business data. Be concise and actionable. Format for Slack (use *bold*, _italic_, and bullet lists). Cite sources briefly.";
 
-  if (!claudeRes.ok) {
-    return { reply: "⚠️ Abra reasoning failed. Try again later.", sources: [] };
+  const userContent = `Question: ${message}\n\nContext from brain:\n${context}`;
+
+  let reply = "";
+
+  // Try Anthropic Claude first (10s timeout — leaves room for OpenAI fallback within 30s maxDuration)
+  if (anthropicKey) {
+    try {
+      const claudeModel = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514";
+      const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "x-api-key": anthropicKey,
+          "anthropic-version": "2023-06-01",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: claudeModel,
+          max_tokens: 600,
+          temperature: 0.2,
+          system: systemPrompt,
+          messages: [
+            ...(history && history.length > 0
+              ? history.map((m) => ({ role: m.role, content: m.content }))
+              : []),
+            { role: "user" as const, content: userContent },
+          ],
+        }),
+        signal: AbortSignal.timeout(10000),
+      });
+
+      if (claudeRes.ok) {
+        const claudeData = (await claudeRes.json()) as {
+          content?: Array<{ text?: string }>;
+        };
+        reply =
+          claudeData.content
+            ?.map((item) => item.text || "")
+            .join("\n")
+            .trim() || "";
+      }
+    } catch {
+      // Claude failed — will try OpenAI below
+    }
   }
 
-  const claudeData = (await claudeRes.json()) as {
-    content?: Array<{ text?: string }>;
-  };
-  const reply =
-    claudeData.content
-      ?.map((item) => item.text || "")
-      .join("\n")
-      .trim() || "No response generated.";
+  // Fall back to OpenAI if Claude didn't produce a reply
+  if (!reply && openaiKey) {
+    try {
+      const openaiModel = process.env.OPENAI_CHAT_MODEL || "gpt-4o-mini";
+      const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${openaiKey}`,
+        },
+        body: JSON.stringify({
+          model: openaiModel,
+          max_tokens: 600,
+          temperature: 0.2,
+          messages: [
+            { role: "system" as const, content: systemPrompt },
+            ...(history && history.length > 0
+              ? history.map((m) => ({ role: m.role, content: m.content }))
+              : []),
+            { role: "user" as const, content: userContent },
+          ],
+        }),
+        signal: AbortSignal.timeout(15000),
+      });
+
+      if (openaiRes.ok) {
+        const openaiData = (await openaiRes.json()) as {
+          choices?: Array<{ message?: { content?: string } }>;
+        };
+        reply = openaiData.choices?.[0]?.message?.content?.trim() || "";
+      }
+    } catch {
+      // OpenAI also failed
+    }
+  }
+
+  if (!reply) {
+    return { reply: "⚠️ Abra reasoning failed. Both LLM providers returned errors. Try again later.", sources: [] };
+  }
 
   const sources = results.map((r) => ({
     title: r.title || "(untitled)",
@@ -308,20 +373,13 @@ async function postToSlack(
       ? `\n\n_Sources: ${sources.map((s) => `${s.source_table === "email" ? "📧" : "🧠"} ${s.title}`).join(" · ")}_`
       : "";
 
+  const fullText = `🧠 *Abra*\n\n${text}${sourceText}`;
   await fetch(responseUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       response_type: "in_channel",
-      blocks: [
-        {
-          type: "section",
-          text: {
-            type: "mrkdwn",
-            text: `🧠 *Abra*\n\n${text}${sourceText}`,
-          },
-        },
-      ],
+      blocks: buildSlackBlocks(fullText),
     }),
     signal: AbortSignal.timeout(10000),
   });
@@ -343,7 +401,6 @@ export async function POST(req: Request) {
   const params = new URLSearchParams(bodyText);
   const text = params.get("text") || "";
   const responseUrl = params.get("response_url") || "";
-  const userId = params.get("user_id") || "";
   const channelId = params.get("channel_id") || "";
   // thread_ts is present when slash command is invoked within a thread
   const threadTs = params.get("thread_ts") || "";
