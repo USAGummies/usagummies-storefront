@@ -1,0 +1,703 @@
+/**
+ * /api/ops/abra/session — Meeting & session management
+ *
+ * POST: Start session { department?, initiative_id?, session_type }
+ * GET: Fetch sessions ?department=finance&status=active
+ * PATCH: Update session { id, notes?, action_items?, decisions? }
+ * DELETE: End session { id } — saves to brain, creates tasks, completes
+ *
+ * Session types: meeting, review, teaching, research, planning
+ */
+
+import { NextResponse } from "next/server";
+import { auth } from "@/lib/auth/config";
+import {
+  canUseSupabase,
+  markSupabaseFailure,
+  markSupabaseSuccess,
+} from "@/lib/ops/supabase-resilience";
+import { logAICost, extractClaudeUsage } from "@/lib/ops/abra-cost-tracker";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const maxDuration = 30;
+
+const DEFAULT_CLAUDE_MODEL =
+  process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-latest";
+
+const VALID_SESSION_TYPES = [
+  "meeting",
+  "review",
+  "teaching",
+  "research",
+  "planning",
+] as const;
+
+type Session = {
+  id: string;
+  department: string | null;
+  initiative_id: string | null;
+  session_type: string;
+  title: string | null;
+  agenda: unknown[];
+  notes: unknown[];
+  action_items: unknown[];
+  decisions: unknown[];
+  open_questions: unknown[];
+  user_email: string;
+  status: string;
+  started_at: string;
+  ended_at: string | null;
+  created_at: string;
+};
+
+function getSupabaseEnv() {
+  const baseUrl =
+    process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!baseUrl || !serviceKey) {
+    throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
+  }
+  return { baseUrl, serviceKey };
+}
+
+async function sbFetch(path: string, init: RequestInit = {}) {
+  const { baseUrl, serviceKey } = getSupabaseEnv();
+  const headers = new Headers(init.headers || {});
+  headers.set("apikey", serviceKey);
+  headers.set("Authorization", `Bearer ${serviceKey}`);
+  if (!headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  const res = await fetch(`${baseUrl}${path}`, {
+    ...init,
+    headers,
+    cache: "no-store",
+    signal: init.signal || AbortSignal.timeout(15000),
+  });
+
+  const text = await res.text();
+  let json: unknown = null;
+  if (text) {
+    try {
+      json = JSON.parse(text);
+    } catch {
+      json = text;
+    }
+  }
+  if (!res.ok) {
+    throw new Error(
+      `Supabase ${init.method || "GET"} ${path} failed (${res.status}): ${typeof json === "string" ? json : JSON.stringify(json)}`,
+    );
+  }
+  return json;
+}
+
+function isSupabaseRelatedError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /supabase|rest\/v1|service_role|SUPABASE/i.test(message);
+}
+
+/**
+ * Auto-generate agenda from open items for a department
+ */
+async function buildAgenda(
+  department: string | null,
+  initiativeId: string | null,
+): Promise<string[]> {
+  const agenda: string[] = [];
+
+  try {
+    // 1. Open initiative questions
+    if (initiativeId) {
+      const initiatives = (await sbFetch(
+        `/rest/v1/abra_initiatives?id=eq.${initiativeId}&select=title,goal,status,questions,answers`,
+      )) as Array<{
+        title: string;
+        goal: string;
+        status: string;
+        questions: Array<{ key: string; q: string }>;
+        answers: Record<string, string>;
+      }>;
+
+      if (initiatives.length > 0) {
+        const init = initiatives[0];
+        agenda.push(`Review initiative: ${init.title || init.goal}`);
+
+        // Count unanswered questions
+        const unanswered = (init.questions || []).filter(
+          (q) => !init.answers?.[q.key],
+        );
+        if (unanswered.length > 0) {
+          agenda.push(
+            `Answer ${unanswered.length} open question${unanswered.length > 1 ? "s" : ""} for initiative`,
+          );
+        }
+      }
+    } else if (department) {
+      // Get active initiatives for department
+      const initiatives = (await sbFetch(
+        `/rest/v1/abra_initiatives?department=eq.${department}&status=not.in.(completed,paused)&select=title,status&limit=5`,
+      )) as Array<{ title: string; status: string }>;
+
+      if (initiatives.length > 0) {
+        agenda.push(
+          `Review ${initiatives.length} active initiative${initiatives.length > 1 ? "s" : ""}`,
+        );
+        for (const init of initiatives.slice(0, 3)) {
+          agenda.push(`  → ${init.title} (${init.status})`);
+        }
+      }
+    }
+
+    // 2. Unanswered questions for department
+    if (department) {
+      const questions = (await sbFetch(
+        `/rest/v1/abra_unanswered_questions?department=eq.${department}&status=eq.open&select=question&limit=5&order=created_at.desc`,
+      )) as Array<{ question: string }>;
+
+      if (questions.length > 0) {
+        agenda.push(
+          `Address ${questions.length} unanswered question${questions.length > 1 ? "s" : ""}`,
+        );
+      }
+    }
+
+    // 3. Recent corrections to review
+    if (department) {
+      const corrections = (await sbFetch(
+        `/rest/v1/abra_corrections?department=eq.${department}&active=eq.true&select=correction&limit=3&order=created_at.desc`,
+      )) as Array<{ correction: string }>;
+
+      if (corrections.length > 0) {
+        agenda.push(`Review ${corrections.length} recent correction${corrections.length > 1 ? "s" : ""}`);
+      }
+    }
+  } catch {
+    // Best-effort agenda building — don't fail if some queries error
+  }
+
+  // Always add standard items
+  if (agenda.length === 0) {
+    agenda.push("Review current priorities");
+    agenda.push("Discuss blockers and needs");
+  }
+  agenda.push("Action items and next steps");
+
+  return agenda;
+}
+
+/**
+ * Generate session title using Claude
+ */
+async function generateSessionTitle(
+  sessionType: string,
+  department: string | null,
+  agenda: string[],
+): Promise<string> {
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  if (!anthropicKey) {
+    return `${department || "General"} ${sessionType}`;
+  }
+
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": anthropicKey,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: DEFAULT_CLAUDE_MODEL,
+        max_tokens: 40,
+        temperature: 0.1,
+        system:
+          "Return ONLY a short title (3-7 words) for a business meeting/session. No quotes, no explanation.",
+        messages: [
+          {
+            role: "user",
+            content: `Type: ${sessionType}\nDepartment: ${department || "general"}\nAgenda: ${agenda.slice(0, 3).join(", ")}`,
+          },
+        ],
+      }),
+      signal: AbortSignal.timeout(10000),
+    });
+
+    const data = await res.json();
+    const usage = extractClaudeUsage(data as Record<string, unknown>);
+    if (usage) {
+      void logAICost({
+        model: DEFAULT_CLAUDE_MODEL,
+        provider: "anthropic",
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        endpoint: "session/title",
+        department: department || undefined,
+      });
+    }
+
+    const content = Array.isArray(data?.content) ? data.content : [];
+    const text = content
+      .map((item: Record<string, unknown>) =>
+        item && "text" in item ? String(item.text || "") : "",
+      )
+      .join("")
+      .trim();
+    return text || `${department || "General"} ${sessionType}`;
+  } catch {
+    return `${department || "General"} ${sessionType}`;
+  }
+}
+
+/**
+ * Save session summary to brain as a knowledge entry
+ */
+async function saveSessionToBrain(session: Session): Promise<void> {
+  const notes = Array.isArray(session.notes) ? session.notes : [];
+  const decisions = Array.isArray(session.decisions) ? session.decisions : [];
+  const actionItems = Array.isArray(session.action_items)
+    ? session.action_items
+    : [];
+
+  if (notes.length === 0 && decisions.length === 0) return;
+
+  const summaryParts = [
+    `Session: ${session.title || session.session_type}`,
+    session.department ? `Department: ${session.department}` : "",
+    notes.length > 0
+      ? `Notes:\n${notes.map((n) => `- ${typeof n === "string" ? n : JSON.stringify(n)}`).join("\n")}`
+      : "",
+    decisions.length > 0
+      ? `Decisions:\n${decisions.map((d) => `- ${typeof d === "string" ? d : JSON.stringify(d)}`).join("\n")}`
+      : "",
+    actionItems.length > 0
+      ? `Action Items:\n${actionItems.map((a) => `- ${typeof a === "string" ? a : JSON.stringify(a)}`).join("\n")}`
+      : "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+
+  // Build embedding for the summary
+  const openaiKey = process.env.OPENAI_API_KEY;
+  if (!openaiKey) return;
+
+  try {
+    const embRes = await fetch("https://api.openai.com/v1/embeddings", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${openaiKey}`,
+      },
+      body: JSON.stringify({
+        model: "text-embedding-3-small",
+        input: summaryParts.slice(0, 2000),
+        dimensions: 1536,
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+
+    if (!embRes.ok) return;
+
+    const embData = await embRes.json();
+    const embedding = embData?.data?.[0]?.embedding;
+    if (!Array.isArray(embedding)) return;
+
+    // Log embedding cost
+    const tokens = embData?.usage?.total_tokens || 0;
+    void logAICost({
+      model: "text-embedding-3-small",
+      provider: "openai",
+      inputTokens: tokens,
+      outputTokens: 0,
+      endpoint: "session/embed",
+    });
+
+    // Insert brain entry
+    await sbFetch("/rest/v1/brain", {
+      method: "POST",
+      headers: {
+        Prefer: "return=minimal",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        title: `Session: ${session.title || session.session_type} (${new Date().toISOString().split("T")[0]})`,
+        raw_text: summaryParts,
+        summary_text: summaryParts.slice(0, 500),
+        category: "session_notes",
+        department: session.department,
+        embedding,
+        metadata: {
+          session_id: session.id,
+          session_type: session.session_type,
+          entry_type: "session_summary",
+          decisions_count: decisions.length,
+          action_items_count: actionItems.length,
+        },
+      }),
+    });
+  } catch {
+    // Best-effort — don't fail session end
+  }
+}
+
+// ─── POST: Start new session ───
+async function handlePost(req: Request) {
+  const userSession = await auth();
+  if (!userSession?.user?.email) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  let payload: {
+    department?: unknown;
+    initiative_id?: unknown;
+    session_type?: unknown;
+  } = {};
+  try {
+    payload = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const sessionType =
+    typeof payload.session_type === "string"
+      ? payload.session_type.trim().toLowerCase()
+      : "meeting";
+
+  if (
+    !VALID_SESSION_TYPES.includes(
+      sessionType as (typeof VALID_SESSION_TYPES)[number],
+    )
+  ) {
+    return NextResponse.json(
+      {
+        error: `Invalid session_type. Must be one of: ${VALID_SESSION_TYPES.join(", ")}`,
+      },
+      { status: 400 },
+    );
+  }
+
+  const department =
+    typeof payload.department === "string"
+      ? payload.department.trim().toLowerCase()
+      : null;
+  const initiativeId =
+    typeof payload.initiative_id === "string"
+      ? payload.initiative_id.trim()
+      : null;
+
+  try {
+    const circuitCheck = await canUseSupabase();
+    if (!circuitCheck.allowed) {
+      return NextResponse.json(
+        { error: "Brain temporarily unavailable" },
+        { status: 503 },
+      );
+    }
+
+    // Build agenda from open items
+    const agenda = await buildAgenda(department, initiativeId);
+
+    // Generate title
+    const title = await generateSessionTitle(sessionType, department, agenda);
+
+    // Create session
+    const rows = (await sbFetch("/rest/v1/abra_sessions", {
+      method: "POST",
+      headers: {
+        Prefer: "return=representation",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        department,
+        initiative_id: initiativeId,
+        session_type: sessionType,
+        title,
+        agenda,
+        notes: [],
+        action_items: [],
+        decisions: [],
+        open_questions: [],
+        user_email: userSession.user.email,
+        status: "active",
+        started_at: new Date().toISOString(),
+      }),
+    })) as Session[];
+
+    await markSupabaseSuccess();
+
+    const created = rows[0];
+    if (!created?.id) {
+      throw new Error("Failed to create session");
+    }
+
+    return NextResponse.json({
+      id: created.id,
+      title: created.title,
+      session_type: created.session_type,
+      department: created.department,
+      initiative_id: created.initiative_id,
+      agenda: created.agenda,
+      status: created.status,
+      started_at: created.started_at,
+    });
+  } catch (error) {
+    if (isSupabaseRelatedError(error)) {
+      await markSupabaseFailure(error);
+    }
+    const message =
+      error instanceof Error ? error.message : "Session creation failed";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+// ─── GET: Fetch sessions ───
+async function handleGet(req: Request) {
+  const userSession = await auth();
+  if (!userSession?.user?.email) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const url = new URL(req.url);
+  const department = url.searchParams.get("department");
+  const status = url.searchParams.get("status");
+  const id = url.searchParams.get("id");
+
+  try {
+    const circuitCheck = await canUseSupabase();
+    if (!circuitCheck.allowed) {
+      return NextResponse.json(
+        { error: "Brain temporarily unavailable" },
+        { status: 503 },
+      );
+    }
+
+    let path = "/rest/v1/abra_sessions?select=*&order=created_at.desc";
+    if (id) path += `&id=eq.${id}`;
+    if (department) path += `&department=eq.${department}`;
+    if (status) {
+      if (status === "active") {
+        path += `&status=eq.active`;
+      } else {
+        path += `&status=eq.${status}`;
+      }
+    }
+    path += "&limit=20";
+
+    const results = (await sbFetch(path)) as Session[];
+    await markSupabaseSuccess();
+
+    return NextResponse.json({ sessions: results });
+  } catch (error) {
+    if (isSupabaseRelatedError(error)) {
+      await markSupabaseFailure(error);
+    }
+    const message =
+      error instanceof Error ? error.message : "Fetch failed";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+// ─── PATCH: Update session (notes, action items, decisions) ───
+async function handlePatch(req: Request) {
+  const userSession = await auth();
+  if (!userSession?.user?.email) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  let payload: {
+    id?: unknown;
+    notes?: unknown;
+    action_items?: unknown;
+    decisions?: unknown;
+    open_questions?: unknown;
+  } = {};
+  try {
+    payload = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const id = typeof payload.id === "string" ? payload.id.trim() : "";
+  if (!id) {
+    return NextResponse.json({ error: "id is required" }, { status: 400 });
+  }
+
+  try {
+    const circuitCheck = await canUseSupabase();
+    if (!circuitCheck.allowed) {
+      return NextResponse.json(
+        { error: "Brain temporarily unavailable" },
+        { status: 503 },
+      );
+    }
+
+    // Fetch existing session
+    const existing = (await sbFetch(
+      `/rest/v1/abra_sessions?id=eq.${id}&select=*`,
+    )) as Session[];
+    if (existing.length === 0) {
+      return NextResponse.json(
+        { error: "Session not found" },
+        { status: 404 },
+      );
+    }
+
+    const session = existing[0];
+    if (session.status !== "active") {
+      return NextResponse.json(
+        { error: "Session is not active" },
+        { status: 400 },
+      );
+    }
+
+    const updates: Record<string, unknown> = {};
+
+    // Append notes (array merge)
+    if (Array.isArray(payload.notes)) {
+      const currentNotes = Array.isArray(session.notes) ? session.notes : [];
+      updates.notes = [...currentNotes, ...payload.notes];
+    }
+
+    // Append action items
+    if (Array.isArray(payload.action_items)) {
+      const current = Array.isArray(session.action_items)
+        ? session.action_items
+        : [];
+      updates.action_items = [...current, ...payload.action_items];
+    }
+
+    // Append decisions
+    if (Array.isArray(payload.decisions)) {
+      const current = Array.isArray(session.decisions)
+        ? session.decisions
+        : [];
+      updates.decisions = [...current, ...payload.decisions];
+    }
+
+    // Append open questions
+    if (Array.isArray(payload.open_questions)) {
+      const current = Array.isArray(session.open_questions)
+        ? session.open_questions
+        : [];
+      updates.open_questions = [...current, ...payload.open_questions];
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ session });
+    }
+
+    const updated = (await sbFetch(`/rest/v1/abra_sessions?id=eq.${id}`, {
+      method: "PATCH",
+      headers: {
+        Prefer: "return=representation",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(updates),
+    })) as Session[];
+
+    await markSupabaseSuccess();
+
+    return NextResponse.json({ session: updated[0] || session });
+  } catch (error) {
+    if (isSupabaseRelatedError(error)) {
+      await markSupabaseFailure(error);
+    }
+    const message =
+      error instanceof Error ? error.message : "Update failed";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+// ─── DELETE: End session (saves to brain, completes) ───
+async function handleDelete(req: Request) {
+  const userSession = await auth();
+  if (!userSession?.user?.email) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  let payload: { id?: unknown } = {};
+  try {
+    payload = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const id = typeof payload.id === "string" ? payload.id.trim() : "";
+  if (!id) {
+    return NextResponse.json({ error: "id is required" }, { status: 400 });
+  }
+
+  try {
+    const circuitCheck = await canUseSupabase();
+    if (!circuitCheck.allowed) {
+      return NextResponse.json(
+        { error: "Brain temporarily unavailable" },
+        { status: 503 },
+      );
+    }
+
+    // Fetch session
+    const existing = (await sbFetch(
+      `/rest/v1/abra_sessions?id=eq.${id}&select=*`,
+    )) as Session[];
+    if (existing.length === 0) {
+      return NextResponse.json(
+        { error: "Session not found" },
+        { status: 404 },
+      );
+    }
+
+    const session = existing[0];
+
+    // 1. Save session notes + decisions to brain
+    await saveSessionToBrain(session);
+
+    // 2. Update session status to completed
+    const now = new Date().toISOString();
+    await sbFetch(`/rest/v1/abra_sessions?id=eq.${id}`, {
+      method: "PATCH",
+      headers: {
+        Prefer: "return=minimal",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        status: "completed",
+        ended_at: now,
+      }),
+    });
+
+    await markSupabaseSuccess();
+
+    return NextResponse.json({
+      status: "completed",
+      session_id: id,
+      saved_to_brain: true,
+      ended_at: now,
+    });
+  } catch (error) {
+    if (isSupabaseRelatedError(error)) {
+      await markSupabaseFailure(error);
+    }
+    const message =
+      error instanceof Error ? error.message : "End session failed";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+export async function POST(req: Request) {
+  return handlePost(req);
+}
+
+export async function GET(req: Request) {
+  return handleGet(req);
+}
+
+export async function PATCH(req: Request) {
+  return handlePatch(req);
+}
+
+export async function DELETE(req: Request) {
+  return handleDelete(req);
+}

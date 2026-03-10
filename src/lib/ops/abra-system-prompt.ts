@@ -25,11 +25,38 @@ export type AbraDepartment = {
   key_context?: string | null;
 };
 
+export type AbraInitiativeContext = {
+  id: string;
+  department: string;
+  title: string | null;
+  goal: string;
+  status: string;
+  open_question_count: number;
+};
+
+export type AbraSessionContext = {
+  id: string;
+  title: string | null;
+  session_type: string;
+  department: string | null;
+  agenda: string[];
+};
+
+export type AbraCostContext = {
+  total: number;
+  budget: number;
+  remaining: number;
+  pctUsed: number;
+};
+
 export type AbraPromptContext = {
   format?: "slack" | "web";
   corrections?: AbraCorrection[];
   departments?: AbraDepartment[];
   currentDate?: string;
+  activeInitiatives?: AbraInitiativeContext[];
+  activeSession?: AbraSessionContext | null;
+  costSummary?: AbraCostContext | null;
 };
 
 export function buildAbraSystemPrompt(ctx: AbraPromptContext = {}): string {
@@ -99,7 +126,47 @@ These are the ONLY current team members. Do NOT reference anyone else as team un
     sections.push(`DEPARTMENTS:\n${deptLines}`);
   }
 
-  // 7. Formatting rules
+  // 7. Active Initiatives (dynamic)
+  if (ctx.activeInitiatives && ctx.activeInitiatives.length > 0) {
+    const initLines = ctx.activeInitiatives
+      .slice(0, 5)
+      .map(
+        (i) =>
+          `• [${i.department}] ${i.title || i.goal} — status: ${i.status}${i.open_question_count > 0 ? ` (${i.open_question_count} questions pending)` : ""}`,
+      )
+      .join("\n");
+    sections.push(
+      `ACTIVE INITIATIVES:\n${initLines}\nIf the user asks about an initiative or department, reference the active work above. You can suggest "let's continue working on [initiative]" when relevant.`,
+    );
+  }
+
+  // 8. Active Session (dynamic)
+  if (ctx.activeSession) {
+    const agendaText = ctx.activeSession.agenda.length > 0
+      ? ctx.activeSession.agenda.map((a) => `  - ${a}`).join("\n")
+      : "  (no agenda items)";
+    sections.push(
+      `ACTIVE SESSION: "${ctx.activeSession.title || ctx.activeSession.session_type}" (${ctx.activeSession.session_type})\nDepartment: ${ctx.activeSession.department || "general"}\nAgenda:\n${agendaText}\nYou are in a meeting/session. Help the user work through the agenda items. Track decisions and action items.`,
+    );
+  }
+
+  // 9. Cost Awareness (dynamic)
+  if (ctx.costSummary) {
+    const c = ctx.costSummary;
+    const warningLevel =
+      c.pctUsed >= 95
+        ? "CRITICAL"
+        : c.pctUsed >= 80
+          ? "HIGH"
+          : c.pctUsed >= 50
+            ? "moderate"
+            : "normal";
+    sections.push(
+      `AI SPEND: $${c.total.toFixed(2)} / $${c.budget} this month (${c.pctUsed}% used, $${c.remaining.toFixed(2)} remaining). Spend level: ${warningLevel}.${warningLevel === "CRITICAL" ? " Use shorter responses and avoid research calls." : ""}${warningLevel === "HIGH" ? " Be mindful of token usage." : ""}`,
+    );
+  }
+
+  // 10. Formatting rules
   if (format === "slack") {
     sections.push(
       `FORMAT: Respond formatted for Slack. Use *bold* for emphasis, _italic_ for asides, and bullet lists. Keep responses concise (under 500 words unless the question demands more). Cite sources as [brain:Title (Xd ago)] or [email:Subject (Xd ago)].`,

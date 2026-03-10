@@ -20,12 +20,16 @@ import {
   type TemporalSearchRow,
   type AbraCorrection,
   type AbraDepartment,
+  type AbraInitiativeContext,
+  type AbraCostContext,
 } from "@/lib/ops/abra-system-prompt";
 import {
   detectQuestions,
   computeConfidence,
   shouldAskQuestions,
 } from "@/lib/ops/abra-question-detector";
+import { detectDepartment } from "@/lib/ops/department-playbooks";
+import { logAICost, extractClaudeUsage, getMonthlySpend } from "@/lib/ops/abra-cost-tracker";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -109,6 +113,79 @@ function sanitizeHistory(history: unknown): ChatMessage[] {
     })
     .filter((item) => item.content.length > 0)
     .slice(-12);
+}
+
+// ─── Intent Detection (keyword-based, not LLM) ───
+const INITIATIVE_TRIGGERS =
+  /\b(get .+ under control|let'?s work on|build .+ structure|set up .+ department|organize .+ department|establish .+ process)\b/i;
+const SESSION_TRIGGERS =
+  /\b(let'?s (have a |)meet|start a (meeting|session|review)|review .+ department|how'?s .+ doing|check in on)\b/i;
+const COST_TRIGGERS =
+  /\b(ai spend|ai cost|how much .+ spend|budget|monthly spend|cost report)\b/i;
+
+type DetectedIntent =
+  | { type: "initiative"; department: string | null; goal: string }
+  | { type: "session"; department: string | null; sessionType: string }
+  | { type: "cost" }
+  | { type: "chat" };
+
+function detectIntent(message: string): DetectedIntent {
+  if (COST_TRIGGERS.test(message)) {
+    return { type: "cost" };
+  }
+  if (INITIATIVE_TRIGGERS.test(message)) {
+    const department = detectDepartment(message);
+    return { type: "initiative", department, goal: message };
+  }
+  if (SESSION_TRIGGERS.test(message)) {
+    const department = detectDepartment(message);
+    const sessionType = /review/i.test(message) ? "review" : "meeting";
+    return { type: "session", department, sessionType };
+  }
+  return { type: "chat" };
+}
+
+async function fetchActiveInitiatives(): Promise<AbraInitiativeContext[]> {
+  try {
+    const rows = (await sbFetch(
+      "/rest/v1/abra_initiatives?status=not.in.(completed,paused)&select=id,department,title,goal,status,questions,answers&order=created_at.desc&limit=5",
+    )) as Array<{
+      id: string;
+      department: string;
+      title: string | null;
+      goal: string;
+      status: string;
+      questions: Array<{ key: string }>;
+      answers: Record<string, string>;
+    }>;
+
+    return rows.map((r) => ({
+      id: r.id,
+      department: r.department,
+      title: r.title,
+      goal: r.goal,
+      status: r.status,
+      open_question_count: (r.questions || []).filter(
+        (q) => !r.answers?.[q.key],
+      ).length,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+async function fetchCostSummary(): Promise<AbraCostContext | null> {
+  try {
+    const spend = await getMonthlySpend();
+    return {
+      total: spend.total,
+      budget: spend.budget,
+      remaining: spend.remaining,
+      pctUsed: spend.pctUsed,
+    };
+  } catch {
+    return null;
+  }
 }
 
 async function buildEmbedding(query: string): Promise<number[]> {
@@ -204,6 +281,8 @@ async function generateClaudeReply(input: {
   results: TemporalSearchRow[];
   corrections: AbraCorrection[];
   departments: AbraDepartment[];
+  activeInitiatives?: AbraInitiativeContext[];
+  costSummary?: AbraCostContext | null;
 }) {
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) {
@@ -214,6 +293,8 @@ async function generateClaudeReply(input: {
     format: "web",
     corrections: input.corrections,
     departments: input.departments,
+    activeInitiatives: input.activeInitiatives,
+    costSummary: input.costSummary,
   });
 
   const historyText = buildConversation(input.history);
@@ -264,6 +345,18 @@ async function generateClaudeReply(input: {
     throw new Error(
       `Claude API failed (${res.status}): ${text.slice(0, 300)}`,
     );
+  }
+
+  // Log cost
+  const usage = extractClaudeUsage(payload);
+  if (usage) {
+    void logAICost({
+      model: DEFAULT_CLAUDE_MODEL,
+      provider: "anthropic",
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+      endpoint: "chat",
+    });
   }
 
   const content = Array.isArray(payload.content)
@@ -326,6 +419,134 @@ export async function POST(req: Request) {
       );
     }
 
+    // ─── Intent Detection ───
+    const intent = detectIntent(message);
+
+    // Handle cost query shortcut
+    if (intent.type === "cost") {
+      const spend = await getMonthlySpend();
+      const costReply = `**AI Spend Report (${new Date().toISOString().slice(0, 7)})**\n\n` +
+        `• Total: **$${spend.total.toFixed(2)}** / $${spend.budget}\n` +
+        `• Remaining: $${spend.remaining.toFixed(2)} (${spend.pctUsed}% used)\n` +
+        `• API calls: ${spend.callCount}\n` +
+        (Object.keys(spend.byEndpoint).length > 0
+          ? `• By endpoint: ${Object.entries(spend.byEndpoint).map(([k, v]) => `${k}: $${(Number(v) || 0).toFixed(2)}`).join(", ")}\n`
+          : "") +
+        (Object.keys(spend.byProvider).length > 0
+          ? `• By provider: ${Object.entries(spend.byProvider).map(([k, v]) => `${k}: $${(Number(v) || 0).toFixed(2)}`).join(", ")}`
+          : "");
+
+      return NextResponse.json({
+        reply: costReply,
+        confidence: 1,
+        sources: [],
+        intent: "cost",
+      });
+    }
+
+    // Handle initiative trigger — redirect to initiative flow
+    if (intent.type === "initiative") {
+      const host =
+        process.env.NEXTAUTH_URL ||
+        (process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : "http://localhost:3000");
+      const cookie = req.headers.get("cookie") || "";
+
+      try {
+        const initRes = await fetch(`${host}/api/ops/abra/initiative`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Cookie: cookie,
+          },
+          body: JSON.stringify({
+            department: intent.department,
+            goal: intent.goal,
+          }),
+          signal: AbortSignal.timeout(28000),
+        });
+
+        if (initRes.ok) {
+          const initData = await initRes.json();
+          const questions = Array.isArray(initData.questions)
+            ? initData.questions
+            : [];
+          const qList = questions
+            .slice(0, 5)
+            .map(
+              (q: { q: string; default?: string; options?: string[] }, i: number) =>
+                `${i + 1}. ${q.q}${q.default ? ` (default: ${q.default})` : ""}${q.options ? ` [${q.options.join(", ")}]` : ""}`,
+            )
+            .join("\n");
+
+          const initReply =
+            `I've started a new **${initData.department}** initiative: **${initData.title}**\n\n` +
+            `I've done some research and identified the baseline requirements. Now I need to ask you some questions to customize the plan:\n\n${qList}\n\n` +
+            `You can answer these questions here, or I can use the defaults and generate a plan right away.`;
+
+          return NextResponse.json({
+            reply: initReply,
+            confidence: 1,
+            sources: [],
+            intent: "initiative",
+            initiative_id: initData.id,
+          });
+        }
+      } catch {
+        // Fall through to normal chat if initiative creation fails
+      }
+    }
+
+    // Handle session trigger
+    if (intent.type === "session") {
+      const host =
+        process.env.NEXTAUTH_URL ||
+        (process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : "http://localhost:3000");
+      const cookie = req.headers.get("cookie") || "";
+
+      try {
+        const sessRes = await fetch(`${host}/api/ops/abra/session`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Cookie: cookie,
+          },
+          body: JSON.stringify({
+            department: intent.department,
+            session_type: intent.sessionType,
+          }),
+          signal: AbortSignal.timeout(15000),
+        });
+
+        if (sessRes.ok) {
+          const sessData = await sessRes.json();
+          const agenda = Array.isArray(sessData.agenda) ? sessData.agenda : [];
+          const agendaList = agenda
+            .map((a: string, i: number) => `${i + 1}. ${a}`)
+            .join("\n");
+
+          const sessReply =
+            `**${sessData.title}** — ${sessData.session_type} started\n\n` +
+            `**Agenda:**\n${agendaList}\n\n` +
+            `Let's work through these items. What would you like to start with?`;
+
+          return NextResponse.json({
+            reply: sessReply,
+            confidence: 1,
+            sources: [],
+            intent: "session",
+            session_id: sessData.id,
+          });
+        }
+      } catch {
+        // Fall through to normal chat
+      }
+    }
+
+    // ─── Normal RAG Chat Flow ───
     // Temporal search
     const embedding = await buildEmbedding(message);
     const results = (await sbFetch("/rest/v1/rpc/search_temporal", {
@@ -339,11 +560,14 @@ export async function POST(req: Request) {
 
     await markSupabaseSuccess();
 
-    // Fetch corrections + departments
-    const [corrections, departments] = await Promise.all([
-      fetchCorrections(),
-      fetchDepartments(),
-    ]);
+    // Fetch corrections + departments + initiatives + cost (parallel)
+    const [corrections, departments, activeInitiatives, costSummary] =
+      await Promise.all([
+        fetchCorrections(),
+        fetchDepartments(),
+        fetchActiveInitiatives(),
+        fetchCostSummary(),
+      ]);
 
     const confidence = computeConfidence(results.slice(0, DEFAULT_MATCH_COUNT));
 
@@ -353,6 +577,8 @@ export async function POST(req: Request) {
       results: results.slice(0, DEFAULT_MATCH_COUNT),
       corrections,
       departments,
+      activeInitiatives,
+      costSummary,
     });
 
     // Log unanswered questions
