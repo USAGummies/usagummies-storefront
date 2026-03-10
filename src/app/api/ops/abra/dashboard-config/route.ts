@@ -27,6 +27,22 @@ const VALID_DEPARTMENTS = [
   "executive",
 ];
 
+type DashboardWidget = {
+  id: string;
+  [key: string]: unknown;
+};
+
+type DashboardConfig = {
+  widgets?: DashboardWidget[];
+  [key: string]: unknown;
+};
+
+type DashboardChanges = {
+  add_widget?: DashboardWidget;
+  remove_widget?: string;
+  reorder?: string[];
+};
+
 function getSupabaseEnv() {
   const baseUrl =
     process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -157,10 +173,7 @@ export async function POST(req: Request) {
 
   let body: {
     department?: string;
-    dashboard_config?: Record<string, unknown>;
-    current_priorities?: string[];
-    long_term_goals?: string[];
-    short_term_goals?: string[];
+    changes?: DashboardChanges;
   };
 
   try {
@@ -179,23 +192,17 @@ export async function POST(req: Request) {
     );
   }
 
-  // Build update payload — only include provided fields
-  const updateFields: Record<string, unknown> = {};
-  if (body.dashboard_config !== undefined)
-    updateFields.dashboard_config = body.dashboard_config;
-  if (body.current_priorities !== undefined)
-    updateFields.current_priorities = body.current_priorities;
-  if (body.long_term_goals !== undefined)
-    updateFields.long_term_goals = body.long_term_goals;
-  if (body.short_term_goals !== undefined)
-    updateFields.short_term_goals = body.short_term_goals;
-
-  if (Object.keys(updateFields).length === 0) {
+  const changes = body.changes;
+  if (!changes || typeof changes !== "object") {
     return NextResponse.json(
-      {
-        error:
-          "At least one field required: dashboard_config, current_priorities, long_term_goals, short_term_goals",
-      },
+      { error: "changes is required" },
+      { status: 400 },
+    );
+  }
+
+  if (!changes.add_widget && !changes.remove_widget && !changes.reorder) {
+    return NextResponse.json(
+      { error: "changes must include add_widget, remove_widget, or reorder" },
       { status: 400 },
     );
   }
@@ -209,17 +216,75 @@ export async function POST(req: Request) {
       );
     }
 
-    const updated = await sbFetch(
-      `/rest/v1/abra_departments?name=eq.${department}`,
-      {
-        method: "PATCH",
-        headers: {
-          Prefer: "return=representation",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(updateFields),
-      },
+    const existingRows = (await sbFetch(
+      `/rest/v1/abra_departments?name=eq.${department}&select=name,dashboard_config&limit=1`,
+    )) as Array<{ name: string; dashboard_config: DashboardConfig | null }>;
+
+    const existing = existingRows[0];
+    if (!existing) {
+      return NextResponse.json(
+        { error: `Department "${department}" not found` },
+        { status: 404 },
+      );
+    }
+
+    const currentConfig: DashboardConfig = (
+      existing.dashboard_config &&
+      typeof existing.dashboard_config === "object" &&
+      !Array.isArray(existing.dashboard_config)
+    )
+      ? { ...existing.dashboard_config }
+      : {};
+
+    const currentWidgets = Array.isArray(currentConfig.widgets)
+      ? [...currentConfig.widgets]
+      : [];
+    const widgetById = new Map<string, DashboardWidget>(
+      currentWidgets
+        .filter((w) => w && typeof w.id === "string" && w.id.trim().length > 0)
+        .map((w) => [w.id, w]),
     );
+
+    if (changes.add_widget) {
+      if (!changes.add_widget.id || typeof changes.add_widget.id !== "string") {
+        return NextResponse.json(
+          { error: "changes.add_widget.id is required" },
+          { status: 400 },
+        );
+      }
+      widgetById.set(changes.add_widget.id, changes.add_widget);
+    }
+
+    if (changes.remove_widget) {
+      widgetById.delete(changes.remove_widget);
+    }
+
+    let nextWidgets = Array.from(widgetById.values());
+    if (Array.isArray(changes.reorder) && changes.reorder.length > 0) {
+      const order = new Map(changes.reorder.map((id, idx) => [id, idx]));
+      nextWidgets = nextWidgets.sort((a, b) => {
+        const aOrder = order.has(a.id) ? order.get(a.id)! : Number.MAX_SAFE_INTEGER;
+        const bOrder = order.has(b.id) ? order.get(b.id)! : Number.MAX_SAFE_INTEGER;
+        if (aOrder === bOrder) return a.id.localeCompare(b.id);
+        return aOrder - bOrder;
+      });
+    }
+
+    const nextConfig: DashboardConfig = {
+      ...currentConfig,
+      widgets: nextWidgets,
+    };
+
+    const updated = await sbFetch(`/rest/v1/abra_departments?name=eq.${department}`, {
+      method: "PATCH",
+      headers: {
+        Prefer: "return=representation",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        dashboard_config: nextConfig,
+      }),
+    });
 
     await markSupabaseSuccess();
 
@@ -234,9 +299,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       department: row.name,
       dashboard_config: row.dashboard_config || {},
-      current_priorities: row.current_priorities || [],
-      long_term_goals: row.long_term_goals || [],
-      short_term_goals: row.short_term_goals || [],
+      applied_changes: changes,
       updated_by: session.user.email,
     });
   } catch (error) {
