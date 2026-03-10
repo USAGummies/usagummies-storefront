@@ -1,7 +1,8 @@
-import { getMonthlySpend, logAICost } from "@/lib/ops/abra-cost-tracker";
+import { getMonthlySpend, getPreferredClaudeModel } from "@/lib/ops/abra-cost-tracker";
 import { detectAnomalies } from "@/lib/ops/abra-anomaly-detection";
 import { getActiveSignals } from "@/lib/ops/abra-operational-signals";
-import { checkInitiativeHealth } from "@/lib/ops/abra-initiative-health";
+import { generateRevenueForecast } from "@/lib/ops/abra-forecasting";
+import { analyzeInventory } from "@/lib/ops/abra-inventory-forecast";
 import { notify } from "@/lib/ops/notify";
 
 type MetricSnapshot = {
@@ -89,146 +90,183 @@ async function getPendingApprovalsCount(): Promise<number> {
   return Array.isArray(rows) ? rows.length : 0;
 }
 
-async function getTodaySessionCount(): Promise<number> {
-  const now = new Date();
-  const start = new Date(now);
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(start);
-  end.setDate(end.getDate() + 1);
-  const rows = (await sbFetch(
-    `/rest/v1/abra_sessions?started_at=gte.${encodeURIComponent(start.toISOString())}&started_at=lt.${encodeURIComponent(end.toISOString())}&select=id&limit=200`,
-  )) as Array<{ id: string }>;
-  return Array.isArray(rows) ? rows.length : 0;
-}
-
 export async function generateMorningBrief(): Promise<string> {
-  const [
-    signalsRes,
-    anomaliesRes,
-    healthRes,
-    approvalsRes,
-    spendRes,
-    sessionsTodayRes,
-  ] = await Promise.allSettled([
-    getActiveSignals({ limit: 20 }),
-    detectAnomalies(),
-    checkInitiativeHealth(),
-    getPendingApprovalsCount(),
-    getMonthlySpend(),
-    getTodaySessionCount(),
-  ]);
-  const [
-    shopifyRevenueRes,
-    shopifyOrdersRes,
-    amazonRevenueRes,
-    amazonOrdersRes,
-    sessionsRes,
-  ] = await Promise.allSettled([
-    getMetricSnapshot("daily_revenue_shopify"),
-    getMetricSnapshot("daily_orders_shopify"),
-    getMetricSnapshot("daily_revenue_amazon"),
-    getMetricSnapshot("daily_orders_amazon"),
-    getMetricSnapshot("daily_sessions"),
-  ]);
-
-  const signals =
-    signalsRes.status === "fulfilled" && Array.isArray(signalsRes.value)
-      ? signalsRes.value
-      : [];
-  const anomalies =
-    anomaliesRes.status === "fulfilled" && Array.isArray(anomaliesRes.value)
-      ? anomaliesRes.value
-      : [];
-  const health =
-    healthRes.status === "fulfilled" && Array.isArray(healthRes.value)
-      ? healthRes.value
-      : [];
-  const approvals =
-    approvalsRes.status === "fulfilled" ? Number(approvalsRes.value || 0) : 0;
-  const spend =
-    spendRes.status === "fulfilled"
-      ? spendRes.value
-      : { total: 0, budget: 1000, pctUsed: 0 };
-  const todaySessions =
-    sessionsTodayRes.status === "fulfilled"
-      ? Number(sessionsTodayRes.value || 0)
-      : 0;
-  const shopifyRevenue =
-    shopifyRevenueRes.status === "fulfilled" ? shopifyRevenueRes.value : null;
-  const shopifyOrders =
-    shopifyOrdersRes.status === "fulfilled" ? shopifyOrdersRes.value : null;
-  const amazonRevenue =
-    amazonRevenueRes.status === "fulfilled" ? amazonRevenueRes.value : null;
-  const amazonOrders =
-    amazonOrdersRes.status === "fulfilled" ? amazonOrdersRes.value : null;
-  const sessions =
-    sessionsRes.status === "fulfilled" ? sessionsRes.value : null;
-
-  const stale = health.filter((item) => item.health !== "healthy");
-  const signalLines = signals.slice(0, 5).map((signal) => {
-    const icon =
-      signal.severity === "critical"
-        ? "🔴"
-        : signal.severity === "warning"
-          ? "🟡"
-          : "🔵";
-    return `• ${icon} ${signal.title}`;
-  });
-
-  const dateLabel = new Date().toLocaleDateString("en-US", {
+  const date = new Date();
+  const dateLabel = date.toLocaleDateString("en-US", {
+    weekday: "long",
     month: "long",
     day: "numeric",
     year: "numeric",
   });
+  const lines: string[] = [`🌅 *ABRA MORNING BRIEF — ${dateLabel}*`, ""];
 
-  const lines: string[] = [];
-  lines.push(`☀️ *Good morning, Ben. Here's your Abra brief for ${dateLabel}.*`);
-  lines.push("");
-  lines.push("📊 *Yesterday's Numbers*");
-  lines.push(
-    `• Shopify: $${shopifyRevenue?.current.toFixed(2) || "0.00"} revenue (${Math.round(shopifyOrders?.current || 0)} orders) — ${arrow(shopifyRevenue?.pctVsAvg || 0)} ${Math.abs(shopifyRevenue?.pctVsAvg || 0).toFixed(1)}% vs 7-day avg`,
-  );
-  lines.push(
-    `• Amazon: $${amazonRevenue?.current.toFixed(2) || "0.00"} revenue (${Math.round(amazonOrders?.current || 0)} orders) — ${arrow(amazonRevenue?.pctVsAvg || 0)} ${Math.abs(amazonRevenue?.pctVsAvg || 0).toFixed(1)}% vs 7-day avg`,
-  );
-  lines.push(
-    `• Traffic: ${Math.round(sessions?.current || 0)} sessions — ${arrow(sessions?.pctVsAvg || 0)} ${Math.abs(sessions?.pctVsAvg || 0).toFixed(1)}% vs 7-day avg`,
-  );
+  try {
+    const [
+      shopifyRevenue,
+      amazonRevenue,
+      shopifyOrders,
+      amazonOrders,
+      sessions,
+    ] = await Promise.all([
+      getMetricSnapshot("daily_revenue_shopify"),
+      getMetricSnapshot("daily_revenue_amazon"),
+      getMetricSnapshot("daily_orders_shopify"),
+      getMetricSnapshot("daily_orders_amazon"),
+      getMetricSnapshot("daily_sessions"),
+    ]);
+    const revenueTotal =
+      Number(shopifyRevenue?.current || 0) + Number(amazonRevenue?.current || 0);
+    const ordersTotal =
+      Number(shopifyOrders?.current || 0) + Number(amazonOrders?.current || 0);
+    const revenueVsAvg =
+      Number(shopifyRevenue?.pctVsAvg || 0) + Number(amazonRevenue?.pctVsAvg || 0);
+    const ordersVsAvg =
+      Number(shopifyOrders?.pctVsAvg || 0) + Number(amazonOrders?.pctVsAvg || 0);
+    const aov = ordersTotal > 0 ? revenueTotal / ordersTotal : 0;
 
-  lines.push("");
-  lines.push(`⚠️ *Signals (${signalLines.length} active)*`);
-  if (signalLines.length === 0) {
-    lines.push("• No new overnight signals.");
-  } else {
-    lines.push(...signalLines);
+    lines.push("📊 *Yesterday's Scorecard*");
+    lines.push(
+      `• Revenue — Shopify $${Number(shopifyRevenue?.current || 0).toFixed(2)} (${arrow(shopifyRevenue?.pctVsAvg || 0)}${Math.abs(shopifyRevenue?.pctVsAvg || 0).toFixed(1)}%), Amazon $${Number(amazonRevenue?.current || 0).toFixed(2)} (${arrow(amazonRevenue?.pctVsAvg || 0)}${Math.abs(amazonRevenue?.pctVsAvg || 0).toFixed(1)}%), Total $${revenueTotal.toFixed(2)} (${arrow(revenueVsAvg)}${Math.abs(revenueVsAvg).toFixed(1)}%)`,
+    );
+    lines.push(
+      `• Orders — Shopify ${Math.round(shopifyOrders?.current || 0)}, Amazon ${Math.round(amazonOrders?.current || 0)}, Total ${Math.round(ordersTotal)} (${arrow(ordersVsAvg)}${Math.abs(ordersVsAvg).toFixed(1)}%)`,
+    );
+    lines.push(
+      `• Sessions ${Math.round(sessions?.current || 0)} (${arrow(sessions?.pctVsAvg || 0)}${Math.abs(sessions?.pctVsAvg || 0).toFixed(1)}%), AOV $${aov.toFixed(2)}`,
+    );
+    lines.push("");
+  } catch {
+    // Skip scorecard if metric reads fail
   }
 
-  lines.push("");
-  lines.push("📋 *Action Items*");
-  lines.push(`• ${approvals} pending approvals`);
-  lines.push(`• ${stale.length} stale initiatives`);
-  lines.push(`• ${anomalies.length} metric anomalies detected`);
-  lines.push(`• ${todaySessions} sessions scheduled/started today`);
+  try {
+    const anomalies = await detectAnomalies();
+    const top = anomalies.slice(0, 3);
+    lines.push("🚨 *Anomalies Detected*");
+    if (top.length === 0) {
+      lines.push("• No major anomalies vs baseline.");
+    } else {
+      for (const anomaly of top) {
+        const icon =
+          anomaly.severity === "critical"
+            ? "🔴"
+            : anomaly.severity === "warning"
+              ? "🟡"
+              : "🔵";
+        const metric = anomaly.metric.replace(/^daily_/, "").replace(/_/g, " ");
+        lines.push(
+          `• ${icon} ${metric}: ${anomaly.direction === "spike" ? "+" : "-"}${Math.abs(anomaly.deviation_pct).toFixed(1)}% vs avg`,
+        );
+      }
+    }
+    lines.push("");
+  } catch {
+    // Skip anomaly section
+  }
 
-  lines.push("");
-  lines.push(
-    `💰 *AI Budget*: $${spend.total.toFixed(2)} / $${spend.budget.toFixed(2)} (${spend.pctUsed.toFixed(1)}%)`,
-  );
-  lines.push("");
-  lines.push("Reply here or in /ops/abra to take action.");
+  try {
+    const signals = await getActiveSignals({ limit: 5 });
+    lines.push("⚠️ *Active Signals*");
+    if (signals.length === 0) {
+      lines.push("• No unacknowledged signals.");
+    } else {
+      for (const signal of signals.slice(0, 5)) {
+        const icon =
+          signal.severity === "critical"
+            ? "🔴"
+            : signal.severity === "warning"
+              ? "🟡"
+              : "🔵";
+        lines.push(`• ${icon} ${signal.title}`);
+      }
+    }
+    lines.push("");
+  } catch {
+    // Skip active signals section
+  }
 
-  return lines.join("\n");
+  try {
+    const forecasts = await generateRevenueForecast({
+      days_ahead: 7,
+      channel: "total",
+    });
+    const total = forecasts[0];
+    if (total) {
+      const projected = total.points.reduce((sum, point) => sum + point.predicted, 0);
+      const spreadAvg =
+        total.points.reduce((sum, point) => sum + (point.upper_bound - point.lower_bound), 0) /
+        Math.max(total.points.length, 1);
+      lines.push("📈 *Forecast Preview*");
+      lines.push(
+        `• Next 7 days projected: $${projected.toFixed(0)} (±$${(spreadAvg / 2).toFixed(0)})`,
+      );
+      lines.push(
+        `• Trend: ${total.trend} at ${total.growth_rate_pct >= 0 ? "+" : ""}${total.growth_rate_pct.toFixed(1)}% annualized`,
+      );
+      lines.push("");
+    }
+  } catch {
+    // Skip forecast section
+  }
+
+  try {
+    const inventory = await analyzeInventory();
+    const watch = inventory
+      .filter((item) => item.channel === "total" && item.urgency !== "ok")
+      .slice(0, 3);
+    lines.push("📦 *Inventory Watch*");
+    if (watch.length === 0) {
+      lines.push("• No urgent stockout risk detected.");
+    } else {
+      for (const item of watch) {
+        const icon = item.urgency === "critical" ? "🔴" : "🟡";
+        const daysText = Number.isFinite(item.days_until_stockout)
+          ? `~${item.days_until_stockout} days`
+          : "unknown";
+        lines.push(
+          `• ${icon} ${item.product_name}: ${item.current_stock} units left, ${daysText} to stockout`,
+        );
+      }
+    }
+    lines.push("");
+  } catch {
+    // Skip inventory watch section
+  }
+
+  try {
+    const pendingApprovals = await getPendingApprovalsCount();
+    lines.push("⏳ *Pending Actions*");
+    lines.push(`• ${pendingApprovals} approvals pending your review`);
+    lines.push("");
+  } catch {
+    // Skip pending actions section
+  }
+
+  try {
+    const [spend, preferredModel] = await Promise.all([
+      getMonthlySpend(),
+      getPreferredClaudeModel(
+        process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-latest",
+      ),
+    ]);
+    lines.push("💰 *AI Budget*");
+    lines.push(
+      `• AI spend: $${spend.total.toFixed(2)} / $${spend.budget.toFixed(2)} (${spend.pctUsed.toFixed(1)}%)`,
+    );
+    lines.push(`• Model governor: ${preferredModel}`);
+    lines.push("");
+  } catch {
+    // Skip budget section
+  }
+
+  const dashboardBase = process.env.NEXTAUTH_URL || "https://usagummies.com";
+  lines.push(`Reply in Slack: \`/abra <question>\` | Dashboard: ${dashboardBase}/ops`);
+
+  const text = lines.join("\n");
+  return text.length > 1990 ? `${text.slice(0, 1987)}...` : text;
 }
 
 export async function sendMorningBrief(): Promise<void> {
   const brief = await generateMorningBrief();
   await notify({ channel: "daily", text: brief });
-  void logAICost({
-    model: process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-latest",
-    provider: "anthropic",
-    inputTokens: 0,
-    outputTokens: 0,
-    endpoint: "morning-brief",
-    department: "executive",
-  });
 }
