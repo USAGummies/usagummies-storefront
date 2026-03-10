@@ -28,6 +28,7 @@ import {
   YAxis,
   Tooltip,
   ReferenceLine,
+  ReferenceDot,
 } from "recharts";
 import {
   useAlerts,
@@ -111,6 +112,17 @@ type ChartRow = {
   daily_aov: number;
 };
 
+type AnomalyRecord = {
+  date: string;
+  metric: string;
+  direction: "spike" | "drop";
+  severity: "info" | "warning" | "critical";
+  z_score: number;
+  deviation_pct: number;
+  current_value: number;
+  expected_value: number;
+};
+
 function pvaColor(pva: PlanVsActual): string {
   return STATUS_COLORS[pva.status];
 }
@@ -134,6 +146,22 @@ function pctDelta(current: number, baseline: number): number {
 function fmtDelta(value: number): string {
   const sign = value > 0 ? "+" : "";
   return `${sign}${value.toFixed(1)}% vs 7d avg`;
+}
+
+function anomalyColor(severity: AnomalyRecord["severity"]): string {
+  if (severity === "critical") return RED;
+  if (severity === "warning") return "#f59e0b";
+  return "#2563eb";
+}
+
+function anomalyIcon(anomaly: AnomalyRecord): string {
+  const sev = anomaly.severity === "critical" ? "🔴" : anomaly.severity === "warning" ? "🟡" : "🔵";
+  const dir = anomaly.direction === "spike" ? "▲" : "▼";
+  return `${sev}${dir}`;
+}
+
+function metricShort(metric: string): string {
+  return metric.replace("daily_", "").replaceAll("_", " ");
 }
 
 function formatDayLabel(date: string): string {
@@ -335,6 +363,10 @@ export function KpisView() {
   const [kpiHistory, setKpiHistory] = useState<KpiHistoryResponse | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  const [anomalies, setAnomalies] = useState<AnomalyRecord[]>([]);
+  const [anomaliesLoading, setAnomaliesLoading] = useState(false);
+  const [anomaliesError, setAnomaliesError] = useState<string | null>(null);
+  const [expandedAnomalyKey, setExpandedAnomalyKey] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -387,6 +419,27 @@ export function KpisView() {
   useEffect(() => {
     void fetchKpiHistory();
   }, [fetchKpiHistory]);
+
+  const fetchAnomalyHistory = useCallback(async () => {
+    setAnomaliesLoading(true);
+    setAnomaliesError(null);
+    try {
+      const res = await fetch("/api/ops/abra/anomaly-history?days=30", {
+        cache: "no-store",
+      });
+      const data = (await res.json()) as { anomalies?: AnomalyRecord[]; error?: string };
+      if (!res.ok) throw new Error(data.error || "Failed to load anomalies");
+      setAnomalies(Array.isArray(data.anomalies) ? data.anomalies : []);
+    } catch (err) {
+      setAnomaliesError(err instanceof Error ? err.message : "Failed to load anomalies");
+    } finally {
+      setAnomaliesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchAnomalyHistory();
+  }, [fetchAnomalyHistory]);
 
   const {
     data: alerts,
@@ -510,7 +563,8 @@ export function KpisView() {
     { label: "Audit", timestamp: audit?.lastFetched },
   ];
 
-  const anyLoading = alertsLoading || auditLoading || dashLoading || balLoading || historyLoading;
+  const anyLoading =
+    alertsLoading || auditLoading || dashLoading || balLoading || historyLoading || anomaliesLoading;
 
   const chartRows = useMemo(() => buildChartRows(kpiHistory), [kpiHistory]);
   const latestChart = chartRows[chartRows.length - 1] || null;
@@ -542,6 +596,23 @@ export function KpisView() {
   }, [latestChart?.daily_aov, previous7Rows, chartRows]);
 
   const chartHeight = isMobile ? 250 : 300;
+  const revenueAnomalies = useMemo(
+    () =>
+      anomalies.filter(
+        (row) =>
+          row.metric === "daily_revenue_shopify" || row.metric === "daily_revenue_amazon",
+      ),
+    [anomalies],
+  );
+  const ordersAnomalies = useMemo(
+    () =>
+      anomalies.filter(
+        (row) =>
+          row.metric === "daily_orders_shopify" || row.metric === "daily_orders_amazon",
+      ),
+    [anomalies],
+  );
+  const timelineAnomalies = useMemo(() => anomalies.slice(0, 30), [anomalies]);
 
   // Alert actions (preserved from original)
   async function recordAlertAction(
@@ -589,6 +660,7 @@ export function KpisView() {
     refreshAudit();
     refreshDash();
     void fetchKpiHistory();
+    void fetchAnomalyHistory();
   }
 
   return (
@@ -723,6 +795,30 @@ export function KpisView() {
                     />
                     <Line type="monotone" dataKey="daily_revenue_shopify" stroke={NAVY} strokeWidth={2} dot={false} name="Shopify" />
                     <Line type="monotone" dataKey="daily_revenue_amazon" stroke={RED} strokeWidth={2} dot={false} name="Amazon" />
+                    {revenueAnomalies.map((anomaly, index) => {
+                      const row = chartRows.find((item) => item.date === anomaly.date);
+                      if (!row) return null;
+                      const y =
+                        anomaly.metric === "daily_revenue_amazon"
+                          ? row.daily_revenue_amazon
+                          : row.daily_revenue_shopify;
+                      return (
+                        <ReferenceDot
+                          key={`${anomaly.metric}:${anomaly.date}:${index}`}
+                          x={row.dayLabel}
+                          y={y}
+                          r={anomaly.severity === "critical" ? 6 : 5}
+                          fill={anomalyColor(anomaly.severity)}
+                          stroke="#fff"
+                          strokeWidth={2}
+                          label={
+                            anomaly.severity === "critical"
+                              ? { value: "!", position: "center", fill: "#fff", fontSize: 9, fontWeight: 700 }
+                              : undefined
+                          }
+                        />
+                      );
+                    })}
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
@@ -749,6 +845,30 @@ export function KpisView() {
                     />
                     <Bar dataKey="daily_orders_shopify" stackId="orders" fill={NAVY} radius={[2, 2, 0, 0]} />
                     <Bar dataKey="daily_orders_amazon" stackId="orders" fill={RED} radius={[2, 2, 0, 0]} />
+                    {ordersAnomalies.map((anomaly, index) => {
+                      const row = chartRows.find((item) => item.date === anomaly.date);
+                      if (!row) return null;
+                      const y =
+                        anomaly.metric === "daily_orders_amazon"
+                          ? row.daily_orders_amazon
+                          : row.daily_orders_shopify;
+                      return (
+                        <ReferenceDot
+                          key={`${anomaly.metric}:${anomaly.date}:${index}`}
+                          x={row.dayLabel}
+                          y={y}
+                          r={anomaly.severity === "critical" ? 6 : 5}
+                          fill={anomalyColor(anomaly.severity)}
+                          stroke="#fff"
+                          strokeWidth={2}
+                          label={
+                            anomaly.severity === "critical"
+                              ? { value: "!", position: "center", fill: "#fff", fontSize: 9, fontWeight: 700 }
+                              : undefined
+                          }
+                        />
+                      );
+                    })}
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -798,6 +918,73 @@ export function KpisView() {
                 </ResponsiveContainer>
               </div>
             </LiveMetricCard>
+          </div>
+        )}
+      </div>
+
+      <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px", marginBottom: 14 }}>
+        <div style={{ fontWeight: 700, color: NAVY, marginBottom: 10 }}>Anomaly Log — Last 30 Days</div>
+        {anomaliesError ? (
+          <div style={{ color: RED, fontSize: 13 }}>{anomaliesError}</div>
+        ) : timelineAnomalies.length === 0 ? (
+          <div style={{ color: TEXT_DIM, fontSize: 13 }}>
+            {anomaliesLoading ? "Detecting anomalies..." : "No anomalies detected in the selected period."}
+          </div>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", minWidth: 640, borderCollapse: "collapse" }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: "left", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Date</th>
+                  <th style={{ textAlign: "left", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Metric</th>
+                  <th style={{ textAlign: "left", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Type</th>
+                  <th style={{ textAlign: "left", fontSize: 11, color: TEXT_DIM, paddingBottom: 8 }}>Deviation</th>
+                </tr>
+              </thead>
+              <tbody>
+                {timelineAnomalies.map((anomaly, index) => {
+                  const key = `${anomaly.metric}:${anomaly.date}:${index}`;
+                  const expanded = expandedAnomalyKey === key;
+                  return [
+                      <tr key={`${key}:row`}>
+                        <td
+                          style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 0", color: NAVY, fontSize: 12, cursor: "pointer" }}
+                          onClick={() => setExpandedAnomalyKey(expanded ? null : key)}
+                        >
+                          {formatDayLabel(anomaly.date)}
+                        </td>
+                        <td
+                          style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 0", color: NAVY, fontSize: 12, cursor: "pointer", textTransform: "capitalize" }}
+                          onClick={() => setExpandedAnomalyKey(expanded ? null : key)}
+                        >
+                          {metricShort(anomaly.metric)}
+                        </td>
+                        <td
+                          style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 0", color: anomalyColor(anomaly.severity), fontSize: 12, cursor: "pointer", fontWeight: 700 }}
+                          onClick={() => setExpandedAnomalyKey(expanded ? null : key)}
+                        >
+                          {anomalyIcon(anomaly)}
+                        </td>
+                        <td
+                          style={{ borderTop: `1px solid ${BORDER}`, padding: "8px 0", color: NAVY, fontSize: 12, cursor: "pointer" }}
+                          onClick={() => setExpandedAnomalyKey(expanded ? null : key)}
+                        >
+                          {anomaly.deviation_pct > 0 ? "+" : ""}
+                          {anomaly.deviation_pct.toFixed(1)}% (z={anomaly.z_score.toFixed(2)})
+                        </td>
+                      </tr>,
+                      expanded ? (
+                        <tr key={`${key}:detail`}>
+                          <td colSpan={4} style={{ padding: "0 0 10px", color: TEXT_DIM, fontSize: 12 }}>
+                            Expected: {anomaly.expected_value.toLocaleString("en-US")} · Current:{" "}
+                            {anomaly.current_value.toLocaleString("en-US")}
+                          </td>
+                        </tr>
+                      ) : null,
+                    ];
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
