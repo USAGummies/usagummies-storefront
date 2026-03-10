@@ -17,6 +17,10 @@ import {
   markSupabaseSuccess,
 } from "@/lib/ops/supabase-resilience";
 import { logAICost, extractClaudeUsage } from "@/lib/ops/abra-cost-tracker";
+import {
+  createMeetingNotesPage,
+  notionPageUrlFromId,
+} from "@/lib/ops/abra-notion-write";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -860,12 +864,52 @@ async function handleEndSession(req: Request) {
 
     await markSupabaseSuccess();
 
+    // Fire-and-forget Notion sync for meeting notes.
+    void createMeetingNotesPage({
+      title: sessionToClose.title || `${sessionToClose.department || "general"} session`,
+      department: sessionToClose.department || "general",
+      notes: Array.isArray(sessionToClose.notes) ? sessionToClose.notes : [],
+      decisions: Array.isArray(sessionToClose.decisions)
+        ? sessionToClose.decisions
+        : [],
+      action_items: Array.isArray(sessionToClose.action_items)
+        ? sessionToClose.action_items
+        : [],
+      started_at: sessionToClose.started_at,
+      ended_at: now,
+    })
+      .then(async (pageId) => {
+        if (!pageId) return;
+        const pageUrl = notionPageUrlFromId(pageId);
+        const scratchpad = Array.isArray(sessionToClose.scratchpad)
+          ? [...sessionToClose.scratchpad]
+          : [];
+        scratchpad.push({
+          key: "notion_page_url",
+          value: pageUrl,
+          reasoning: "Session synced to Notion meeting notes.",
+          timestamp: new Date().toISOString(),
+        });
+        await sbFetch(`/rest/v1/abra_sessions?id=eq.${id}`, {
+          method: "PATCH",
+          headers: {
+            Prefer: "return=minimal",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            scratchpad,
+          }),
+        });
+      })
+      .catch(() => {});
+
     return NextResponse.json({
       status: "completed",
       session_id: id,
       saved_to_brain: true,
       tasks_created: taskResult.createdCount,
       tasks_table: taskResult.table,
+      notion_sync: "scheduled",
       ended_at: now,
     });
   } catch (error) {

@@ -22,6 +22,10 @@ import {
 } from "@/lib/ops/department-playbooks";
 import { logAICost, extractClaudeUsage } from "@/lib/ops/abra-cost-tracker";
 import { notify } from "@/lib/ops/notify";
+import {
+  createNotionPage,
+  notionPageUrlFromId,
+} from "@/lib/ops/abra-notion-write";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -507,6 +511,108 @@ async function notifyDependencyStatusChange(
   });
 }
 
+async function syncInitiativeToNotion(
+  initiative: Initiative,
+): Promise<{ pageId: string; pageUrl: string } | null> {
+  const parentId =
+    process.env.NOTION_INITIATIVES_DB_ID ||
+    process.env.NOTION_INITIATIVE_DB_ID;
+  if (!parentId) return null;
+
+  const title = initiative.title || initiative.goal || "Initiative";
+  const tasks = Array.isArray(initiative.tasks) ? initiative.tasks : [];
+  const kpis = Array.isArray(initiative.kpis) ? initiative.kpis : [];
+  const findings = Array.isArray(initiative.research_findings)
+    ? initiative.research_findings
+    : [];
+
+  const taskLines =
+    tasks.length > 0
+      ? tasks
+          .slice(0, 30)
+          .map((task) => {
+            if (typeof task === "string") return `- ${task}`;
+            if (task && typeof task === "object") {
+              const row = task as Record<string, unknown>;
+              const taskTitle =
+                typeof row.title === "string" ? row.title : "Untitled task";
+              const priority =
+                typeof row.priority === "string" ? row.priority : "normal";
+              return `- ${taskTitle} (priority: ${priority})`;
+            }
+            return `- ${String(task)}`;
+          })
+          .join("\n")
+      : "- None";
+
+  const kpiLines =
+    kpis.length > 0
+      ? kpis
+          .slice(0, 20)
+          .map((kpi) => {
+            if (typeof kpi === "string") return `- ${kpi}`;
+            if (kpi && typeof kpi === "object") {
+              const row = kpi as Record<string, unknown>;
+              const metric =
+                typeof row.metric === "string" ? row.metric : "KPI";
+              const target =
+                typeof row.target === "string" ? row.target : "TBD";
+              return `- ${metric}: ${target}`;
+            }
+            return `- ${String(kpi)}`;
+          })
+          .join("\n")
+      : "- None";
+
+  const findingLines =
+    findings.length > 0
+      ? findings
+          .slice(0, 20)
+          .map((finding) => {
+            if (typeof finding === "string") return `- ${finding}`;
+            if (finding && typeof finding === "object") {
+              const row = finding as Record<string, unknown>;
+              const summary =
+                typeof row.summary === "string"
+                  ? row.summary
+                  : JSON.stringify(row);
+              return `- ${summary}`;
+            }
+            return `- ${String(finding)}`;
+          })
+          .join("\n")
+      : "- None";
+
+  const content = [
+    `# Initiative Plan`,
+    `## Title`,
+    `- ${title}`,
+    `## Department`,
+    `- ${initiative.department}`,
+    `## Goal`,
+    `- ${initiative.goal}`,
+    `## Status`,
+    `- ${initiative.status}`,
+    `## Tasks`,
+    taskLines,
+    `## KPI Targets`,
+    kpiLines,
+    `## Research Findings`,
+    findingLines,
+  ].join("\n");
+
+  const pageId = await createNotionPage({
+    parent_id: parentId,
+    title,
+    content,
+  });
+  if (!pageId) return null;
+  return {
+    pageId,
+    pageUrl: notionPageUrlFromId(pageId),
+  };
+}
+
 // ─── POST: Create new initiative ───
 async function handlePost(req: Request) {
   const session = await auth();
@@ -905,6 +1011,37 @@ async function handlePatch(req: Request) {
         updatedInitiative,
         updatedInitiative.status,
       ).catch(() => {});
+    }
+    if (
+      initiative.status !== "approved" &&
+      updatedInitiative.status === "approved"
+    ) {
+      void syncInitiativeToNotion(updatedInitiative)
+        .then(async (syncResult) => {
+          if (!syncResult) return;
+          const existingCustomRequirements = Array.isArray(
+            updatedInitiative.custom_requirements,
+          )
+            ? [...updatedInitiative.custom_requirements]
+            : [];
+          existingCustomRequirements.push({
+            type: "notion_sync",
+            page_id: syncResult.pageId,
+            page_url: syncResult.pageUrl,
+            synced_at: new Date().toISOString(),
+          });
+          await sbFetch(`/rest/v1/abra_initiatives?id=eq.${id}`, {
+            method: "PATCH",
+            headers: {
+              Prefer: "return=minimal",
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              custom_requirements: existingCustomRequirements,
+            }),
+          });
+        })
+        .catch(() => {});
     }
     const dependencyViews = await buildDependencyViews([updatedInitiative]);
     const enrichedInitiative = {
