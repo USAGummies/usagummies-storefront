@@ -1,0 +1,186 @@
+/**
+ * Abra Dynamic System Prompt Builder
+ *
+ * Builds a ~700-token context-aware system prompt with:
+ * 1. Identity — who Abra is and what USA Gummies does
+ * 2. Temporal Rules — always prefer recent data, cite ages
+ * 3. Confidence & Questions — ask instead of guessing
+ * 4. Team Context — who does what
+ * 5. Corrections — pinned overrides from users (dynamic)
+ * 6. Departments — org structure with owners (dynamic)
+ * 7. Formatting — Slack or web
+ */
+
+export type AbraCorrection = {
+  original_claim: string;
+  correction: string;
+  corrected_by: string;
+  department?: string | null;
+};
+
+export type AbraDepartment = {
+  name: string;
+  owner_name: string;
+  description: string;
+  key_context?: string | null;
+};
+
+export type AbraPromptContext = {
+  format?: "slack" | "web";
+  corrections?: AbraCorrection[];
+  departments?: AbraDepartment[];
+  currentDate?: string;
+};
+
+export function buildAbraSystemPrompt(ctx: AbraPromptContext = {}): string {
+  const format = ctx.format || "slack";
+  const today = ctx.currentDate || new Date().toISOString().split("T")[0];
+
+  const sections: string[] = [];
+
+  // 1. Identity
+  sections.push(
+    `You are Abra, the AI operations assistant for USA Gummies — a dye-free gummy candy company based in the United States. Today is ${today}. You help the team make decisions by searching business data (emails, brain records, Notion syncs) and presenting actionable insights.`,
+  );
+
+  // 2. Temporal Rules (CRITICAL — fixes the 10K vs 50K problem)
+  sections.push(
+    `TEMPORAL RULES (CRITICAL — always follow):
+• Every source has a "days_ago" field. ALWAYS check it before citing any source.
+• When sources CONFLICT, ALWAYS prefer the most recent source. Older information is likely outdated.
+• If the best sources are 30+ days old, WARN the user: "Note: my best sources are X days old — this may not reflect current status."
+• NEVER cite information that is 90+ days old without explicitly noting its age.
+• When citing, ALWAYS include the age: [brain:Title (Xd ago)] or [email:Subject (Xd ago)].
+• Production numbers, deal status, inventory counts, and team assignments change frequently — always use the newest data.
+• If you see data from different time periods (e.g., a "10,000 unit run" from 6 months ago and a "50,000 unit run" from last week), the recent one is almost certainly the current reality.`,
+  );
+
+  // 3. Confidence & Questions
+  sections.push(
+    `CONFIDENCE & ASKING QUESTIONS:
+• If your confidence in an answer is low (sources are old, sparse, or conflicting), ASK the user instead of guessing.
+• Phrase as: "I found X from [source, Yd ago], but I'm not confident this is current. Can you confirm?"
+• If sources conflict within 2 weeks of each other, present both and ask which is correct.
+• If you don't have relevant data at all, say so clearly: "I don't have information about this in my brain. Can someone teach me?"
+• NEVER fabricate data, team members, tools, or processes. Only cite what's in the provided context.`,
+  );
+
+  // 4. Team Context
+  sections.push(
+    `TEAM (current as of ${today}):
+• Ben Stutman — CEO & Founder. Makes all strategic decisions. Leads sales & growth.
+• Andrew Slater — Operations Manager. Manages production runs, supply chain, vendor relationships (including Powers Confections in Spokane, WA).
+• Rene Gonzalez — Finance Lead. Handles accounting, bookkeeping, cash flow, financial reporting.
+These are the ONLY current team members. Do NOT reference anyone else as team unless the data explicitly says otherwise.`,
+  );
+
+  // 5. Pinned Corrections (dynamic)
+  if (ctx.corrections && ctx.corrections.length > 0) {
+    const correctionLines = ctx.corrections
+      .slice(0, 10)
+      .map(
+        (c, i) =>
+          `${i + 1}. WRONG: "${c.original_claim}" → CORRECT: "${c.correction}" (corrected by ${c.corrected_by})`,
+      )
+      .join("\n");
+    sections.push(
+      `PINNED CORRECTIONS (always override other sources):\n${correctionLines}`,
+    );
+  }
+
+  // 6. Departments (dynamic)
+  if (ctx.departments && ctx.departments.length > 0) {
+    const deptLines = ctx.departments
+      .map(
+        (d) =>
+          `• ${d.name}: ${d.owner_name} — ${d.description}${d.key_context ? ` Key context: ${d.key_context}` : ""}`,
+      )
+      .join("\n");
+    sections.push(`DEPARTMENTS:\n${deptLines}`);
+  }
+
+  // 7. Formatting rules
+  if (format === "slack") {
+    sections.push(
+      `FORMAT: Respond formatted for Slack. Use *bold* for emphasis, _italic_ for asides, and bullet lists. Keep responses concise (under 500 words unless the question demands more). Cite sources as [brain:Title (Xd ago)] or [email:Subject (Xd ago)].`,
+    );
+  } else {
+    sections.push(
+      `FORMAT: Be concise and actionable. Use markdown formatting. Keep responses under 500 words unless the question demands more. Cite sources as [brain:Title (Xd ago)] or [email:Subject (Xd ago)].`,
+    );
+  }
+
+  return sections.join("\n\n");
+}
+
+/**
+ * Build the context string from temporal search results.
+ * Includes days_ago and updated_at so the LLM can reason about recency.
+ */
+export type TemporalSearchRow = {
+  id: string;
+  source_table: "brain" | "email";
+  title: string | null;
+  raw_text: string | null;
+  summary_text: string | null;
+  category: string | null;
+  department: string | null;
+  similarity: number;
+  temporal_score: number;
+  days_ago: number;
+  created_at: string;
+  updated_at: string;
+  metadata: Record<string, unknown> | null;
+};
+
+const MAX_CONTEXT_CHARS = 2500;
+
+export function buildTemporalContext(results: TemporalSearchRow[]): string {
+  if (!results.length) return "No relevant records found in the brain.";
+
+  return results
+    .map((row, idx) => {
+      const title = row.title || "(untitled)";
+      const source = row.source_table;
+      const sim = typeof row.similarity === "number" ? row.similarity.toFixed(3) : "0.000";
+      const tScore =
+        typeof row.temporal_score === "number"
+          ? row.temporal_score.toFixed(3)
+          : "0.000";
+      const daysAgo = typeof row.days_ago === "number" ? row.days_ago : "?";
+      const text = (row.raw_text || row.summary_text || "").slice(
+        0,
+        MAX_CONTEXT_CHARS,
+      );
+      const entryType =
+        row.metadata && typeof row.metadata.entry_type === "string"
+          ? row.metadata.entry_type
+          : "";
+      const priority =
+        row.metadata && typeof row.metadata.priority === "string"
+          ? row.metadata.priority
+          : "";
+      const confidence =
+        row.metadata && typeof row.metadata.confidence === "string"
+          ? row.metadata.confidence
+          : "";
+
+      const header = [
+        `Source ${idx + 1}`,
+        `[${source}] ${title}`,
+        `${daysAgo} days ago`,
+        `similarity: ${sim}`,
+        `temporal_score: ${tScore}`,
+        entryType ? `type: ${entryType}` : "",
+        priority ? `priority: ${priority}` : "",
+        confidence ? `confidence: ${confidence}` : "",
+        row.category ? `category: ${row.category}` : "",
+        row.department ? `dept: ${row.department}` : "",
+      ]
+        .filter(Boolean)
+        .join(" | ");
+
+      return `${header}\nContent: ${text || "(empty)"}`;
+    })
+    .join("\n\n---\n\n");
+}

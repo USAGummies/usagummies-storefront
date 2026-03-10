@@ -1,3 +1,12 @@
+/**
+ * POST /api/ops/abra/chat — Web chat endpoint for Abra
+ *
+ * Body: { message: string, history?: ChatMessage[] }
+ * Returns: { reply: string, sources: [...], confidence: number }
+ *
+ * Uses temporal search + dynamic system prompt for accurate, recency-aware answers.
+ */
+
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/config";
 import {
@@ -5,43 +14,41 @@ import {
   markSupabaseFailure,
   markSupabaseSuccess,
 } from "@/lib/ops/supabase-resilience";
+import {
+  buildAbraSystemPrompt,
+  buildTemporalContext,
+  type TemporalSearchRow,
+  type AbraCorrection,
+  type AbraDepartment,
+} from "@/lib/ops/abra-system-prompt";
+import {
+  detectQuestions,
+  computeConfidence,
+  shouldAskQuestions,
+} from "@/lib/ops/abra-question-detector";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
-const EMBEDDING_MODEL = "text-embedding-3-small";
-const EMBEDDING_DIMENSIONS = 1536;
 const DEFAULT_MATCH_COUNT = 8;
-const MAX_CONTEXT_CHARS = 3000;
-const DEFAULT_CLAUDE_MODEL = process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-latest";
+const DEFAULT_CLAUDE_MODEL =
+  process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-latest";
 
 type ChatMessage = {
   role: "user" | "assistant";
   content: string;
 };
 
-type UnifiedSearchRow = {
-  id: string;
-  source_table: "brain" | "email";
-  title: string | null;
-  raw_text: string | null;
-  summary_text: string | null;
-  category: string | null;
-  department: string | null;
-  similarity: number;
-  created_at: string;
-  metadata: Record<string, unknown> | null;
-};
-
 function getSupabaseEnv() {
-  const baseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const baseUrl =
+    process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
   if (!baseUrl || !serviceKey) {
-    throw new Error("Missing SUPABASE_URL/NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
+    throw new Error(
+      "Missing SUPABASE_URL/NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY",
+    );
   }
-
   return { baseUrl, serviceKey };
 }
 
@@ -70,7 +77,9 @@ async function sbFetch(path: string, init: RequestInit = {}) {
   }
 
   if (!res.ok) {
-    throw new Error(`Supabase ${init.method || "GET"} ${path} failed (${res.status}): ${typeof json === "string" ? json : JSON.stringify(json)}`);
+    throw new Error(
+      `Supabase ${init.method || "GET"} ${path} failed (${res.status}): ${typeof json === "string" ? json : JSON.stringify(json)}`,
+    );
   }
 
   return json;
@@ -85,12 +94,17 @@ function sanitizeHistory(history: unknown): ChatMessage[] {
   if (!Array.isArray(history)) return [];
 
   return history
-    .filter((item): item is Record<string, unknown> => !!item && typeof item === "object")
+    .filter(
+      (item): item is Record<string, unknown> =>
+        !!item && typeof item === "object",
+    )
     .map((item): ChatMessage => {
-      const role: ChatMessage["role"] = item.role === "assistant" ? "assistant" : "user";
+      const role: ChatMessage["role"] =
+        item.role === "assistant" ? "assistant" : "user";
       return {
         role,
-        content: typeof item.content === "string" ? item.content.trim() : "",
+        content:
+          typeof item.content === "string" ? item.content.trim() : "",
       };
     })
     .filter((item) => item.content.length > 0)
@@ -110,16 +124,18 @@ async function buildEmbedding(query: string): Promise<number[]> {
       Authorization: `Bearer ${openaiKey}`,
     },
     body: JSON.stringify({
-      model: EMBEDDING_MODEL,
+      model: "text-embedding-3-small",
       input: query,
-      dimensions: EMBEDDING_DIMENSIONS,
+      dimensions: 1536,
     }),
     signal: AbortSignal.timeout(15000),
   });
 
   if (!embeddingRes.ok) {
     const errorText = await embeddingRes.text().catch(() => "");
-    throw new Error(`Embedding generation failed (${embeddingRes.status}): ${errorText.slice(0, 200)}`);
+    throw new Error(
+      `Embedding generation failed (${embeddingRes.status}): ${errorText.slice(0, 200)}`,
+    );
   }
 
   const data = await embeddingRes.json();
@@ -131,28 +147,47 @@ async function buildEmbedding(query: string): Promise<number[]> {
   return embedding as number[];
 }
 
-function buildContext(results: UnifiedSearchRow[]): string {
-  if (!results.length) return "No relevant records found.";
+async function fetchCorrections(): Promise<AbraCorrection[]> {
+  try {
+    return (await sbFetch(
+      "/rest/v1/abra_corrections?active=eq.true&order=created_at.desc&limit=10&select=original_claim,correction,corrected_by,department",
+    )) as AbraCorrection[];
+  } catch {
+    return [];
+  }
+}
 
-  return results
-    .map((row, idx) => {
-      const title = row.title || "(untitled)";
-      const source = row.source_table;
-      const similarity = typeof row.similarity === "number" ? row.similarity.toFixed(3) : "0.000";
-      const text = (row.raw_text || row.summary_text || "").slice(0, MAX_CONTEXT_CHARS);
-      const metadata = row.metadata ? JSON.stringify(row.metadata) : "{}";
-      return [
-        `Source ${idx + 1}`,
-        `Table: ${source}`,
-        `Title: ${title}`,
-        `Similarity: ${similarity}`,
-        `Category: ${row.category || "n/a"} | Department: ${row.department || "n/a"}`,
-        `Metadata: ${metadata}`,
-        `Content:`,
-        text || "(empty)",
-      ].join("\n");
-    })
-    .join("\n\n---\n\n");
+async function fetchDepartments(): Promise<AbraDepartment[]> {
+  try {
+    return (await sbFetch(
+      "/rest/v1/abra_departments?select=name,owner_name,description,key_context&order=name",
+    )) as AbraDepartment[];
+  } catch {
+    return [];
+  }
+}
+
+async function logUnansweredQuestion(
+  question: string,
+  askedBy: string,
+  context: string,
+) {
+  try {
+    await sbFetch("/rest/v1/abra_unanswered_questions", {
+      method: "POST",
+      headers: {
+        Prefer: "return=minimal",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        question,
+        asked_by: askedBy,
+        context: context.slice(0, 500),
+      }),
+    });
+  } catch {
+    // Best-effort
+  }
 }
 
 function buildConversation(history: ChatMessage[]): string {
@@ -166,27 +201,34 @@ function buildConversation(history: ChatMessage[]): string {
 async function generateClaudeReply(input: {
   message: string;
   history: ChatMessage[];
-  results: UnifiedSearchRow[];
+  results: TemporalSearchRow[];
+  corrections: AbraCorrection[];
+  departments: AbraDepartment[];
 }) {
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) {
     throw new Error("ANTHROPIC_API_KEY not configured");
   }
 
-  const system = [
-    "You are Abra, the AI operations assistant for USA Gummies.",
-    "Answer using only the provided business context (emails + open brain records).",
-    "Be concise, actionable, and specific with dates/numbers when available.",
-    "If context is insufficient, say what is missing instead of guessing.",
-    "Include short source citations like [brain:Title] or [email:Subject].",
-  ].join(" ");
+  const systemPrompt = buildAbraSystemPrompt({
+    format: "web",
+    corrections: input.corrections,
+    departments: input.departments,
+  });
 
   const historyText = buildConversation(input.history);
-  const contextText = buildContext(input.results);
+  const contextText = buildTemporalContext(input.results);
+  const confidence = computeConfidence(input.results);
+
+  const confidenceHint =
+    shouldAskQuestions(confidence, input.results)
+      ? "\n\nIMPORTANT: Your confidence for this query is LOW. Consider asking the user to confirm or provide more information rather than guessing."
+      : "";
+
   const userPrompt = [
     historyText ? `Recent conversation:\n${historyText}` : "",
     `User question:\n${input.message}`,
-    `Retrieved context:\n${contextText}`,
+    `Retrieved context:\n${contextText}${confidenceHint}`,
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -202,7 +244,7 @@ async function generateClaudeReply(input: {
       model: DEFAULT_CLAUDE_MODEL,
       max_tokens: 900,
       temperature: 0.2,
-      system,
+      system: systemPrompt,
       messages: [{ role: "user", content: userPrompt }],
     }),
     signal: AbortSignal.timeout(30000),
@@ -219,12 +261,20 @@ async function generateClaudeReply(input: {
   }
 
   if (!res.ok) {
-    throw new Error(`Claude API failed (${res.status}): ${text.slice(0, 300)}`);
+    throw new Error(
+      `Claude API failed (${res.status}): ${text.slice(0, 300)}`,
+    );
   }
 
-  const content = Array.isArray(payload.content) ? payload.content : [];
+  const content = Array.isArray(payload.content)
+    ? payload.content
+    : [];
   const reply = content
-    .map((item) => (item && typeof item === "object" && "text" in item ? String(item.text || "") : ""))
+    .map((item) =>
+      item && typeof item === "object" && "text" in item
+        ? String(item.text || "")
+        : "",
+    )
     .join("\n")
     .trim();
 
@@ -245,12 +295,19 @@ export async function POST(req: Request) {
   try {
     payload = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid JSON payload" },
+      { status: 400 },
+    );
   }
 
-  const message = typeof payload.message === "string" ? payload.message.trim() : "";
+  const message =
+    typeof payload.message === "string" ? payload.message.trim() : "";
   if (!message) {
-    return NextResponse.json({ error: "message is required" }, { status: 400 });
+    return NextResponse.json(
+      { error: "message is required" },
+      { status: 400 },
+    );
   }
 
   const history = sanitizeHistory(payload.history);
@@ -260,7 +317,8 @@ export async function POST(req: Request) {
     if (!circuitCheck.allowed) {
       return NextResponse.json(
         {
-          error: "Supabase dependency is temporarily unavailable (circuit open)",
+          error:
+            "Supabase dependency is temporarily unavailable (circuit open)",
           circuitOpen: true,
           cooldownUntil: circuitCheck.state.cooldownUntil,
         },
@@ -268,31 +326,60 @@ export async function POST(req: Request) {
       );
     }
 
+    // Temporal search
     const embedding = await buildEmbedding(message);
-    const results = (await sbFetch("/rest/v1/rpc/search_unified", {
+    const results = (await sbFetch("/rest/v1/rpc/search_temporal", {
       method: "POST",
       body: JSON.stringify({
         query_embedding: embedding,
         match_count: DEFAULT_MATCH_COUNT,
         filter_tables: ["brain", "email"],
       }),
-    })) as UnifiedSearchRow[];
+    })) as TemporalSearchRow[];
 
     await markSupabaseSuccess();
+
+    // Fetch corrections + departments
+    const [corrections, departments] = await Promise.all([
+      fetchCorrections(),
+      fetchDepartments(),
+    ]);
+
+    const confidence = computeConfidence(results.slice(0, DEFAULT_MATCH_COUNT));
 
     const reply = await generateClaudeReply({
       message,
       history,
       results: results.slice(0, DEFAULT_MATCH_COUNT),
+      corrections,
+      departments,
     });
+
+    // Log unanswered questions
+    const detectedQuestions = detectQuestions(reply);
+    if (
+      detectedQuestions.length > 0 ||
+      shouldAskQuestions(confidence, results.slice(0, DEFAULT_MATCH_COUNT))
+    ) {
+      for (const q of detectedQuestions.slice(0, 3)) {
+        await logUnansweredQuestion(
+          q,
+          session.user.email,
+          `Original question: ${message}`,
+        );
+      }
+    }
 
     return NextResponse.json({
       reply,
+      confidence,
       sources: results.slice(0, DEFAULT_MATCH_COUNT).map((row) => ({
         id: row.id,
         source_table: row.source_table,
         title: row.title || "(untitled)",
         similarity: row.similarity,
+        temporal_score: row.temporal_score,
+        days_ago: row.days_ago,
         category: row.category,
         department: row.department,
         metadata: row.metadata || {},
@@ -303,7 +390,8 @@ export async function POST(req: Request) {
       await markSupabaseFailure(error);
     }
 
-    const message = error instanceof Error ? error.message : "Unknown error";
+    const message =
+      error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

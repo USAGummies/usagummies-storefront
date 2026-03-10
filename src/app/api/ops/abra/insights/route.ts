@@ -1,12 +1,10 @@
 /**
  * POST /api/ops/abra/insights — Quick brain insights for dashboard cards
  *
- * Accepts a topic string, queries brain for relevant context, and returns
- * Claude-generated insight bullets. Designed for embedding into dashboard
- * cards across multiple pages (KPIs, Supply Chain, Wholesale, etc.)
+ * Uses temporal search so insights reflect current state, not stale data.
  *
  * Body: { topic: string, maxResults?: number }
- * Returns: { insights: string[], sources: { title: string, source_table: string }[] }
+ * Returns: { insights: string[], sources: { title: string, source_table: string, days_ago: number }[] }
  */
 
 import { NextResponse } from "next/server";
@@ -16,6 +14,7 @@ import {
   markSupabaseFailure,
   markSupabaseSuccess,
 } from "@/lib/ops/supabase-resilience";
+import type { TemporalSearchRow } from "@/lib/ops/abra-system-prompt";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -92,7 +91,9 @@ async function buildEmbedding(text: string): Promise<number[]> {
 
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
-    throw new Error(`Embedding failed (${res.status}): ${errText.slice(0, 200)}`);
+    throw new Error(
+      `Embedding failed (${res.status}): ${errText.slice(0, 200)}`,
+    );
   }
 
   const data = await res.json();
@@ -116,9 +117,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const topic = typeof payload.topic === "string" ? payload.topic.trim() : "";
+  const topic =
+    typeof payload.topic === "string" ? payload.topic.trim() : "";
   if (!topic) {
-    return NextResponse.json({ error: "topic is required" }, { status: 400 });
+    return NextResponse.json(
+      { error: "topic is required" },
+      { status: 400 },
+    );
   }
 
   const matchCount = Math.min(
@@ -130,43 +135,50 @@ export async function POST(req: Request) {
     const circuitCheck = await canUseSupabase();
     if (!circuitCheck.allowed) {
       return NextResponse.json(
-        { error: "Brain temporarily unavailable", insights: [], sources: [] },
+        {
+          error: "Brain temporarily unavailable",
+          insights: [],
+          sources: [],
+        },
         { status: 503 },
       );
     }
 
     const embedding = await buildEmbedding(topic);
-    const results = (await sbFetch("/rest/v1/rpc/search_unified", {
+
+    // Use temporal search for recency-aware results
+    const results = (await sbFetch("/rest/v1/rpc/search_temporal", {
       method: "POST",
       body: JSON.stringify({
         query_embedding: embedding,
         match_count: matchCount,
         filter_tables: ["brain", "email"],
       }),
-    })) as Array<{
-      title: string | null;
-      raw_text: string | null;
-      summary_text: string | null;
-      source_table: string;
-    }>;
+    })) as TemporalSearchRow[];
 
     await markSupabaseSuccess();
 
     if (results.length === 0) {
-      return NextResponse.json({ insights: ["No relevant data found in brain."], sources: [] });
+      return NextResponse.json({
+        insights: ["No relevant data found in brain."],
+        sources: [],
+      });
     }
 
+    // Include temporal info in context so LLM prioritizes recent data
     const context = results
       .slice(0, matchCount)
       .map(
         (r) =>
-          `[${r.source_table}] ${r.title || "(untitled)"}: ${(r.raw_text || r.summary_text || "").slice(0, 400)}`,
+          `[${r.source_table}] ${r.title || "(untitled)"} (${r.days_ago}d ago, score: ${typeof r.temporal_score === "number" ? r.temporal_score.toFixed(2) : "?"}): ${(r.raw_text || r.summary_text || "").slice(0, 400)}`,
       )
       .join("\n\n");
 
-    // Ask Claude for concise insights
     const anthropicKey = process.env.ANTHROPIC_API_KEY;
-    if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY not configured");
+    if (!anthropicKey)
+      throw new Error("ANTHROPIC_API_KEY not configured");
+
+    const today = new Date().toISOString().split("T")[0];
 
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -179,12 +191,11 @@ export async function POST(req: Request) {
         model: DEFAULT_CLAUDE_MODEL,
         max_tokens: 500,
         temperature: 0.15,
-        system:
-          "You are Abra, the AI ops assistant for USA Gummies. Return ONLY a JSON array of 3-5 concise insight strings (each 1 sentence, <100 chars). Focus on actionable intelligence. No markdown fences.",
+        system: `You are Abra, the AI ops assistant for USA Gummies (dye-free gummy candy company). Today is ${today}. Return ONLY a JSON array of 3-5 concise insight strings (each 1 sentence, <100 chars). Focus on actionable intelligence from the MOST RECENT sources. If a source is 30+ days old, note that. No markdown fences.`,
         messages: [
           {
             role: "user",
-            content: `Topic: ${topic}\n\nContext from brain:\n${context}\n\nReturn JSON array of insight strings only.`,
+            content: `Topic: ${topic}\n\nContext from brain (sorted by temporal relevance):\n${context}\n\nReturn JSON array of insight strings only.`,
           },
         ],
       }),
@@ -193,7 +204,9 @@ export async function POST(req: Request) {
 
     const text = await res.text();
     if (!res.ok) {
-      throw new Error(`Claude failed (${res.status}): ${text.slice(0, 200)}`);
+      throw new Error(
+        `Claude failed (${res.status}): ${text.slice(0, 200)}`,
+      );
     }
 
     let claudePayload: Record<string, unknown> = {};
@@ -203,7 +216,9 @@ export async function POST(req: Request) {
       throw new Error("Failed to parse Claude response");
     }
 
-    const content = Array.isArray(claudePayload.content) ? claudePayload.content : [];
+    const content = Array.isArray(claudePayload.content)
+      ? claudePayload.content
+      : [];
     const reply = content
       .map((item) =>
         item && typeof item === "object" && "text" in item
@@ -228,6 +243,7 @@ export async function POST(req: Request) {
     const sources = results.slice(0, matchCount).map((r) => ({
       title: r.title || "(untitled)",
       source_table: r.source_table,
+      days_ago: r.days_ago,
     }));
 
     return NextResponse.json({ insights, sources });
@@ -235,7 +251,11 @@ export async function POST(req: Request) {
     if (isSupabaseRelatedError(error)) {
       await markSupabaseFailure(error);
     }
-    const message = error instanceof Error ? error.message : "Insights failed";
-    return NextResponse.json({ error: message, insights: [], sources: [] }, { status: 500 });
+    const message =
+      error instanceof Error ? error.message : "Insights failed";
+    return NextResponse.json(
+      { error: message, insights: [], sources: [] },
+      { status: 500 },
+    );
   }
 }
