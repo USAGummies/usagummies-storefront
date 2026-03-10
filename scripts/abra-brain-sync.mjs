@@ -25,6 +25,7 @@ const DISPATCH = {
   ABRA6: { script: "abra-notion-sync.mjs", args: ["--db", "cash"] },
   ABRA7: { script: "abra-notion-sync.mjs", args: ["--db", "repackers"] },
   ABRA8: { script: "abra-notion-sync.mjs", args: ["--db", "agent_run_log"] },
+  ABRA9: { script: "abra-auto-teach.mjs", args: [] },
 };
 
 function main() {

@@ -15,6 +15,7 @@ import {
   markSupabaseFailure,
   markSupabaseSuccess,
 } from "@/lib/ops/supabase-resilience";
+import { supersedeStaleEntries } from "@/lib/ops/abra-fact-lifecycle";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -195,10 +196,21 @@ export async function POST(req: Request) {
 
     await markSupabaseSuccess();
 
+    // 3. Supersede stale brain entries that conflict with this correction
+    const sourceRef = `correction-${correctionId || Date.now()}`;
+    const superseded = await supersedeStaleEntries({
+      correctionEmbedding: embedding,
+      correctionBrainEntrySourceRef: sourceRef,
+      correctionId: correctionId || "unknown",
+      originalClaim: originalClaim,
+    });
+
     return NextResponse.json({
       success: true,
       id: correctionId,
-      message: `Correction stored. Abra will prioritize this over conflicting older data.`,
+      supersededCount: superseded.supersededCount,
+      supersededIds: superseded.supersededIds,
+      message: `Correction stored. ${superseded.supersededCount > 0 ? `${superseded.supersededCount} conflicting entries superseded.` : ""}Abra will prioritize this over conflicting older data.`,
     });
   } catch (error) {
     if (isSupabaseRelatedError(error)) {

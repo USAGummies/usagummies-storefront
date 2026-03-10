@@ -57,6 +57,8 @@ export type AbraPromptContext = {
   activeInitiatives?: AbraInitiativeContext[];
   activeSession?: AbraSessionContext | null;
   costSummary?: AbraCostContext | null;
+  teamContext?: string;
+  signalsContext?: string;
 };
 
 export function buildAbraSystemPrompt(ctx: AbraPromptContext = {}): string {
@@ -92,14 +94,23 @@ export function buildAbraSystemPrompt(ctx: AbraPromptContext = {}): string {
 • NEVER fabricate data, team members, tools, or processes. Only cite what's in the provided context.`,
   );
 
-  // 4. Team Context
-  sections.push(
-    `TEAM (current as of ${today}):
+  // 4. Team Context (dynamic from directory, or hardcoded fallback)
+  if (ctx.teamContext) {
+    sections.push(ctx.teamContext);
+  } else {
+    sections.push(
+      `TEAM (current as of ${today}):
 • Ben Stutman — CEO & Founder. Makes all strategic decisions. Leads sales & growth.
 • Andrew Slater — Operations Manager. Manages production runs, supply chain, vendor relationships (including Powers Confections in Spokane, WA).
 • Rene Gonzalez — Finance Lead. Handles accounting, bookkeeping, cash flow, financial reporting.
 These are the ONLY current team members. Do NOT reference anyone else as team unless the data explicitly says otherwise.`,
-  );
+    );
+  }
+
+  // 4b. Operational Signals (dynamic — surfaced from email parsing / system alerts)
+  if (ctx.signalsContext) {
+    sections.push(ctx.signalsContext);
+  }
 
   // 5. Pinned Corrections (dynamic)
   if (ctx.corrections && ctx.corrections.length > 0) {
