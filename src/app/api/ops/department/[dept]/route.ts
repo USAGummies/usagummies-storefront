@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/config";
+import { isAuthorized } from "@/lib/ops/abra-auth";
 import {
   canUseSupabase,
   markSupabaseFailure,
@@ -165,8 +166,7 @@ export async function GET(
   _req: Request,
   { params }: { params: Promise<{ dept: string }> },
 ) {
-  const session = await auth();
-  if (!session?.user?.email) {
+  if (!(await isAuthorized(_req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
