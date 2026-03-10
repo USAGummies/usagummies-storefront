@@ -34,6 +34,7 @@ import {
   extractClaudeUsage,
   getMonthlySpend,
   getPreferredClaudeModel,
+  checkBudgetAndAlert,
 } from "@/lib/ops/abra-cost-tracker";
 import {
   getMarginAnalysis,
@@ -400,6 +401,8 @@ async function fetchCostSummary(): Promise<AbraCostContext | null> {
       budget: spend.budget,
       remaining: spend.remaining,
       pctUsed: spend.pctUsed,
+      byProvider: spend.byProvider,
+      byEndpoint: spend.byEndpoint,
     };
   } catch {
     return null;
@@ -739,7 +742,15 @@ async function generateClaudeReply(input: {
   teamContext?: string;
   signalsContext?: string;
   availableActions?: string[];
-}): Promise<{ reply: string; modelUsed: string }> {
+  detectedDepartment?: string | null;
+}): Promise<{
+  reply: string;
+  modelUsed: string;
+  confidence: number;
+  sources: Array<never>;
+  usage: { inputTokens: number; outputTokens: number };
+  earlyExit?: boolean;
+}> {
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) {
     throw new Error("ANTHROPIC_API_KEY not configured");
@@ -765,6 +776,18 @@ async function generateClaudeReply(input: {
   const historyText = buildConversation(input.history);
   const contextText = buildTieredContext(input.tieredResults);
   const confidence = computeConfidence(input.tieredResults.all);
+  const normalizedConfidence = confidence / 100;
+  if (normalizedConfidence < 0.2 && input.tieredResults.all.length < 2) {
+    return {
+      reply:
+        "I don't have enough information to answer that confidently. Could you teach me? Use the format: `teach: [topic] - [what I should know]`",
+      sources: [],
+      confidence,
+      modelUsed: selectedModel,
+      usage: { inputTokens: 0, outputTokens: 0 },
+      earlyExit: true,
+    };
+  }
 
   const confidenceHint =
     shouldAskQuestions(confidence, input.tieredResults.all)
@@ -779,6 +802,7 @@ async function generateClaudeReply(input: {
     .filter(Boolean)
     .join("\n\n");
 
+  const maxTokens = selectedModel.includes("haiku") ? 500 : 900;
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -788,7 +812,7 @@ async function generateClaudeReply(input: {
     },
     body: JSON.stringify({
       model: selectedModel,
-      max_tokens: 900,
+      max_tokens: maxTokens,
       temperature: 0.2,
       system: `${systemPrompt}${actionInstructions}`,
       messages: [{ role: "user", content: userPrompt }],
@@ -821,7 +845,9 @@ async function generateClaudeReply(input: {
       inputTokens: usage.inputTokens,
       outputTokens: usage.outputTokens,
       endpoint: "chat",
+      department: input.detectedDepartment || undefined,
     });
+    void checkBudgetAndAlert().catch(() => {});
   }
 
   const content = Array.isArray(payload.content)
@@ -840,7 +866,13 @@ async function generateClaudeReply(input: {
     throw new Error("Claude returned an empty response");
   }
 
-  return { reply, modelUsed: selectedModel };
+  return {
+    reply,
+    modelUsed: selectedModel,
+    confidence,
+    sources: [],
+    usage: usage || { inputTokens: 0, outputTokens: 0 },
+  };
 }
 
 export async function POST(req: Request) {
@@ -1262,7 +1294,6 @@ export async function POST(req: Request) {
     const teamContext = buildTeamContext(teamMembers, vendors, today);
     const signalsContext = buildSignalsContext(signals);
 
-    const confidence = computeConfidence(tieredResults.all);
     const availableActions = getAvailableActions();
 
     const claudeResult = await generateClaudeReply({
@@ -1278,37 +1309,55 @@ export async function POST(req: Request) {
       teamContext,
       signalsContext,
       availableActions,
+      detectedDepartment: messageDepartment,
     });
-    const parsedActions = parseActionDirectives(claudeResult.reply);
     const actionNotices: string[] = [];
-    for (const directive of parsedActions.actions.slice(0, 3)) {
-      try {
-        const outcome = await proposeAndMaybeExecute(directive.action);
-        if (outcome.auto_executed) {
+    let baseReply = claudeResult.reply;
+    if (!claudeResult.earlyExit) {
+      const parsedActions = parseActionDirectives(claudeResult.reply);
+      baseReply = parsedActions.cleanReply || claudeResult.reply;
+      for (const directive of parsedActions.actions.slice(0, 3)) {
+        try {
+          const outcome = await proposeAndMaybeExecute(directive.action);
+          if (outcome.auto_executed) {
+            actionNotices.push(
+              `Done: auto-executed \`${directive.action.action_type}\` (${outcome.approval_id}).`,
+            );
+          } else {
+            actionNotices.push(
+              `Queued for approval: \`${directive.action.action_type}\` (${outcome.approval_id}).`,
+            );
+          }
+        } catch (error) {
           actionNotices.push(
-            `Done: auto-executed \`${directive.action.action_type}\` (${outcome.approval_id}).`,
-          );
-        } else {
-          actionNotices.push(
-            `Queued for approval: \`${directive.action.action_type}\` (${outcome.approval_id}).`,
+            `Failed to queue action \`${directive.action.action_type}\`: ${error instanceof Error ? error.message : "unknown error"}`,
           );
         }
-      } catch (error) {
-        actionNotices.push(
-          `Failed to queue action \`${directive.action.action_type}\`: ${error instanceof Error ? error.message : "unknown error"}`,
-        );
       }
     }
 
     const reply = [
-      parsedActions.cleanReply || claudeResult.reply,
+      baseReply,
       actionNotices.length > 0 ? actionNotices.join("\n") : "",
     ]
       .filter(Boolean)
       .join("\n\n");
 
+    const seenIds = new Set<string>();
+    const uniqueSources = tieredResults.all.filter((row) => {
+      const sourceKey =
+        row.id ||
+        `${row.source_table}:${row.title || ""}:${(row.summary_text || row.raw_text || "").slice(0, 50)}`;
+      if (seenIds.has(sourceKey)) return false;
+      seenIds.add(sourceKey);
+      return true;
+    });
+
+    const responseSources = claudeResult.earlyExit ? [] : uniqueSources;
+    const confidence = claudeResult.confidence;
+
     // Log answer provenance (best-effort, non-blocking)
-    const provenance = extractProvenance(tieredResults.all);
+    const provenance = extractProvenance(responseSources);
     void logAnswer({
       question: message,
       answer: reply,
@@ -1354,7 +1403,7 @@ export async function POST(req: Request) {
       confidence,
       thread_id: threadId,
       tierCounts: tieredResults.tierCounts,
-      sources: tieredResults.all.map((row) => ({
+      sources: responseSources.map((row) => ({
         id: row.id,
         source_table: row.source_table,
         title: row.title || "(untitled)",

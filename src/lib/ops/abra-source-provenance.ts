@@ -208,7 +208,7 @@ export function extractProvenance(
   source_tables: string[];
   memory_tiers_used: string[];
 } {
-  const source_ids = results.map((r) => r.id);
+  const source_ids = [...new Set(results.map((r) => r.id).filter(Boolean))];
   const source_tables = [...new Set(results.map((r) => r.source_table))];
   const memory_tiers_used = [
     ...new Set(results.map((r) => r.memory_tier || "cold")),

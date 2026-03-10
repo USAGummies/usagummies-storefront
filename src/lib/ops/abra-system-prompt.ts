@@ -49,6 +49,8 @@ export type AbraCostContext = {
   budget: number;
   remaining: number;
   pctUsed: number;
+  byProvider?: Record<string, number>;
+  byEndpoint?: Record<string, number>;
 };
 
 export type AbraPromptContext = {
@@ -196,9 +198,29 @@ These are the ONLY current team members. Do NOT reference anyone else as team un
           : c.pctUsed >= 50
             ? "moderate"
             : "normal";
-    sections.push(
-      `AI SPEND: $${c.total.toFixed(2)} / $${c.budget} this month (${c.pctUsed}% used, $${c.remaining.toFixed(2)} remaining). Spend level: ${warningLevel}.${warningLevel === "CRITICAL" ? " Use shorter responses and avoid research calls." : ""}${warningLevel === "HIGH" ? " Be mindful of token usage." : ""}`,
-    );
+    const providerBreakdown = c.byProvider
+      ? Object.entries(c.byProvider)
+          .filter(([, value]) => Number(value) > 0)
+          .map(([provider, value]) => `${provider} $${Number(value).toFixed(2)}`)
+          .join(", ")
+      : "";
+    const endpointBreakdown = c.byEndpoint
+      ? Object.entries(c.byEndpoint)
+          .filter(([, value]) => Number(value) > 0)
+          .map(([endpoint, value]) => `${endpoint} $${Number(value).toFixed(2)}`)
+          .join(", ")
+      : "";
+
+    const costLines = [
+      "## AI Cost This Month",
+      `- Total: $${c.total.toFixed(2)} / $${c.budget} budget (${c.pctUsed}% used, $${c.remaining.toFixed(2)} remaining).`,
+      providerBreakdown ? `- By provider: ${providerBreakdown}` : "",
+      endpointBreakdown ? `- By endpoint: ${endpointBreakdown}` : "",
+      `Spend level: ${warningLevel}.${warningLevel === "CRITICAL" ? " Use shorter responses and avoid research calls." : ""}${warningLevel === "HIGH" ? " Be mindful of token usage." : ""}`,
+    ]
+      .filter(Boolean)
+      .join("\n");
+    sections.push(costLines);
   }
 
   // 9b. Financial context (dynamic, finance-only)
