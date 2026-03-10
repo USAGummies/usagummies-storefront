@@ -1,14 +1,17 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ResponsiveContainer,
   LineChart,
   Line,
+  ComposedChart,
+  Area,
   CartesianGrid,
   XAxis,
   YAxis,
   Tooltip,
+  Legend,
 } from "recharts";
 import { Wallet, Flame, CalendarClock, AlertTriangle, Timer, Brain } from "lucide-react";
 import { useForecastData, fmtDollar } from "@/lib/ops/use-war-room-data";
@@ -49,6 +52,23 @@ type ProjectionPoint = {
   closingBalance: number;
   receivables?: Receivable[];
   payables?: Payable[];
+};
+
+type RevenueForecastPoint = {
+  date: string;
+  predicted: number;
+  lower_bound: number;
+  upper_bound: number;
+  channel: "shopify" | "amazon" | "total";
+};
+
+type RevenueForecastResult = {
+  channel: "shopify" | "amazon" | "total";
+  points: RevenueForecastPoint[];
+  trend: "growing" | "flat" | "declining";
+  growth_rate_pct: number;
+  confidence: "high" | "medium" | "low";
+  data_points_used: number;
 };
 
 function HeaderCard({
@@ -96,6 +116,12 @@ export function ForecastView() {
   const [brain, setBrain] = useState<{ insights: string[]; sources: { title: string; source_table: string }[] } | null>(null);
   const [brainLoading, setBrainLoading] = useState(false);
   const [brainError, setBrainError] = useState<string | null>(null);
+  const [revenueForecast, setRevenueForecast] = useState<RevenueForecastResult[]>([]);
+  const [revenueActualRows, setRevenueActualRows] = useState<
+    Array<{ date: string; shopify_actual: number; amazon_actual: number; total_actual: number }>
+  >([]);
+  const [revenueForecastLoading, setRevenueForecastLoading] = useState(true);
+  const [revenueForecastError, setRevenueForecastError] = useState<string | null>(null);
 
   const fetchBrainInsights = useCallback(async () => {
     setBrainLoading(true);
@@ -118,6 +144,88 @@ export function ForecastView() {
 
   const points = (forecast?.projections?.["90d"] || []) as unknown as ProjectionPoint[];
   const points30 = (forecast?.projections?.["30d"] || []) as unknown as ProjectionPoint[];
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadRevenueForecast() {
+      setRevenueForecastLoading(true);
+      setRevenueForecastError(null);
+      try {
+        const [forecastRes, actualRes] = await Promise.all([
+          fetch("/api/ops/abra/forecast?days=30&channel=all", { cache: "no-store" }),
+          fetch(
+            "/api/ops/abra/kpi-history?metrics=daily_revenue_shopify,daily_revenue_amazon&days=35",
+            { cache: "no-store" },
+          ),
+        ]);
+
+        if (!forecastRes.ok) {
+          const data = (await forecastRes.json().catch(() => ({}))) as { error?: string };
+          throw new Error(data.error || "Failed to load revenue forecast");
+        }
+        if (!actualRes.ok) {
+          const data = (await actualRes.json().catch(() => ({}))) as { error?: string };
+          throw new Error(data.error || "Failed to load revenue history");
+        }
+
+        const forecastData = (await forecastRes.json()) as { forecasts?: RevenueForecastResult[] };
+        const actualData = (await actualRes.json()) as {
+          metrics?: Record<string, Array<{ date: string; value: number }>>;
+        };
+
+        const forecastRows = Array.isArray(forecastData.forecasts) ? forecastData.forecasts : [];
+        const shopify = actualData?.metrics?.daily_revenue_shopify || [];
+        const amazon = actualData?.metrics?.daily_revenue_amazon || [];
+        const byDate = new Map<string, { shopify_actual: number; amazon_actual: number; total_actual: number }>();
+
+        for (const row of shopify) {
+          byDate.set(row.date, {
+            shopify_actual: Number(row.value || 0),
+            amazon_actual: byDate.get(row.date)?.amazon_actual || 0,
+            total_actual:
+              Number(row.value || 0) + (byDate.get(row.date)?.amazon_actual || 0),
+          });
+        }
+        for (const row of amazon) {
+          const current = byDate.get(row.date) || {
+            shopify_actual: 0,
+            amazon_actual: 0,
+            total_actual: 0,
+          };
+          byDate.set(row.date, {
+            shopify_actual: current.shopify_actual,
+            amazon_actual: Number(row.value || 0),
+            total_actual: current.shopify_actual + Number(row.value || 0),
+          });
+        }
+
+        if (!cancelled) {
+          setRevenueForecast(forecastRows);
+          setRevenueActualRows(
+            [...byDate.entries()]
+              .sort((a, b) => a[0].localeCompare(b[0]))
+              .map(([date, values]) => ({ date, ...values })),
+          );
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setRevenueForecastError(
+            err instanceof Error ? err.message : "Failed to load revenue forecast",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setRevenueForecastLoading(false);
+        }
+      }
+    }
+
+    void loadRevenueForecast();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const monthlyBurn = useMemo(() => {
     if (points30.length === 0) return 0;
@@ -158,6 +266,94 @@ export function ForecastView() {
       pessimistic,
     };
   });
+
+  const forecastByChannel = useMemo(() => {
+    const map = new Map<string, RevenueForecastResult>();
+    for (const item of revenueForecast) {
+      map.set(item.channel, item);
+    }
+    return map;
+  }, [revenueForecast]);
+
+  const totalForecast = forecastByChannel.get("total") || null;
+  const annualizedGrowth = totalForecast?.growth_rate_pct || 0;
+  const growthArrow = annualizedGrowth > 0 ? "▲" : annualizedGrowth < 0 ? "▼" : "•";
+  const projected30dRevenue = useMemo(() => {
+    if (!totalForecast) return 0;
+    return totalForecast.points.reduce((sum, point) => sum + Number(point.predicted || 0), 0);
+  }, [totalForecast]);
+  const projectedSpread = useMemo(() => {
+    if (!totalForecast || totalForecast.points.length === 0) return 0;
+    const avgBand =
+      totalForecast.points.reduce(
+        (sum, point) => sum + (Number(point.upper_bound || 0) - Number(point.lower_bound || 0)),
+        0,
+      ) / totalForecast.points.length;
+    return avgBand / 2;
+  }, [totalForecast]);
+
+  const revenueForecastChartRows = useMemo(() => {
+    const shopifyPoints = forecastByChannel.get("shopify")?.points || [];
+    const amazonPoints = forecastByChannel.get("amazon")?.points || [];
+    const totalPoints = forecastByChannel.get("total")?.points || [];
+
+    const byDate = new Map<
+      string,
+      {
+        date: string;
+        label: string;
+        shopify_predicted: number | null;
+        amazon_predicted: number | null;
+        total_predicted: number | null;
+        shopify_actual: number | null;
+        amazon_actual: number | null;
+        total_actual: number | null;
+        upper_bound: number | null;
+        lower_bound: number | null;
+      }
+    >();
+
+    function ensure(date: string) {
+      if (!byDate.has(date)) {
+        byDate.set(date, {
+          date,
+          label: date.slice(5),
+          shopify_predicted: null,
+          amazon_predicted: null,
+          total_predicted: null,
+          shopify_actual: null,
+          amazon_actual: null,
+          total_actual: null,
+          upper_bound: null,
+          lower_bound: null,
+        });
+      }
+      return byDate.get(date)!;
+    }
+
+    for (const row of shopifyPoints) {
+      const item = ensure(row.date);
+      item.shopify_predicted = row.predicted;
+    }
+    for (const row of amazonPoints) {
+      const item = ensure(row.date);
+      item.amazon_predicted = row.predicted;
+    }
+    for (const row of totalPoints) {
+      const item = ensure(row.date);
+      item.total_predicted = row.predicted;
+      item.upper_bound = row.upper_bound;
+      item.lower_bound = row.lower_bound;
+    }
+    for (const row of revenueActualRows) {
+      const item = ensure(row.date);
+      item.shopify_actual = row.shopify_actual;
+      item.amazon_actual = row.amazon_actual;
+      item.total_actual = row.total_actual;
+    }
+
+    return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+  }, [forecastByChannel, revenueActualRows]);
 
   const freshnessItems = [{ label: "Forecast", timestamp: forecast?.generatedAt }];
 
@@ -244,6 +440,187 @@ export function ForecastView() {
           {error}
         </div>
       ) : null}
+
+      <div
+        style={{
+          background: CARD,
+          border: `1px solid ${BORDER}`,
+          borderRadius: 12,
+          padding: "14px",
+          marginBottom: 14,
+        }}
+      >
+        <div style={{ fontWeight: 700, color: NAVY, marginBottom: 10 }}>
+          Revenue Forecast
+        </div>
+        <div style={{ fontSize: 12, color: TEXT_DIM, marginBottom: 10 }}>
+          30-day projection with confidence interval and channel breakouts.
+        </div>
+        {revenueForecastError ? (
+          <div
+            style={{
+              border: `1px solid ${RED}33`,
+              background: `${RED}0a`,
+              borderRadius: 10,
+              padding: "9px 12px",
+              marginBottom: 10,
+              color: RED,
+              fontSize: 13,
+              fontWeight: 600,
+            }}
+          >
+            {revenueForecastError}
+          </div>
+        ) : null}
+        {revenueForecastLoading && revenueForecastChartRows.length === 0 ? (
+          <SkeletonChart height={300} />
+        ) : (
+          <div style={{ width: "100%", height: 300 }}>
+            <ResponsiveContainer>
+              <ComposedChart data={revenueForecastChartRows}>
+                <CartesianGrid strokeDasharray="3 3" stroke={BORDER} />
+                <XAxis dataKey="label" tick={{ fontSize: 11, fill: TEXT_DIM }} />
+                <YAxis tick={{ fontSize: 11, fill: TEXT_DIM }} />
+                <Tooltip
+                  formatter={(v: number | string | undefined) => fmtDollar(Number(v || 0))}
+                  labelFormatter={(label) => `Date: ${label}`}
+                />
+                <Legend />
+                <Area
+                  type="monotone"
+                  dataKey="upper_bound"
+                  stroke="none"
+                  fill={GOLD}
+                  fillOpacity={0.16}
+                  name="80% CI Upper"
+                  connectNulls
+                />
+                <Area
+                  type="monotone"
+                  dataKey="lower_bound"
+                  stroke="none"
+                  fill={CARD}
+                  fillOpacity={1}
+                  name="80% CI Lower"
+                  legendType="none"
+                  connectNulls
+                />
+                <Line
+                  type="monotone"
+                  dataKey="shopify_predicted"
+                  stroke={NAVY}
+                  strokeWidth={2}
+                  dot={false}
+                  strokeDasharray="6 4"
+                  name="Shopify (Predicted)"
+                  connectNulls
+                />
+                <Line
+                  type="monotone"
+                  dataKey="amazon_predicted"
+                  stroke={RED}
+                  strokeWidth={2}
+                  dot={false}
+                  strokeDasharray="6 4"
+                  name="Amazon (Predicted)"
+                  connectNulls
+                />
+                <Line
+                  type="monotone"
+                  dataKey="total_predicted"
+                  stroke={GOLD}
+                  strokeWidth={2.1}
+                  dot={false}
+                  strokeDasharray="6 4"
+                  name="Total (Predicted)"
+                  connectNulls
+                />
+                <Line
+                  type="monotone"
+                  dataKey="shopify_actual"
+                  stroke={NAVY}
+                  strokeWidth={2}
+                  dot={false}
+                  name="Shopify (Actual)"
+                  connectNulls
+                />
+                <Line
+                  type="monotone"
+                  dataKey="amazon_actual"
+                  stroke={RED}
+                  strokeWidth={2}
+                  dot={false}
+                  name="Amazon (Actual)"
+                  connectNulls
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+            gap: 10,
+            marginTop: 12,
+          }}
+        >
+          <div
+            style={{
+              background: BG,
+              border: `1px solid ${BORDER}`,
+              borderRadius: 10,
+              padding: "10px 12px",
+            }}
+          >
+            <div style={{ fontSize: 11, color: TEXT_DIM, fontWeight: 700, textTransform: "uppercase" }}>
+              30-Day Projected Revenue
+            </div>
+            <div style={{ color: NAVY, fontSize: 24, fontWeight: 800, marginTop: 4 }}>
+              {fmtDollar(projected30dRevenue)}
+            </div>
+            <div style={{ fontSize: 12, color: TEXT_DIM, marginTop: 3 }}>
+              ± {fmtDollar(projectedSpread)} average confidence spread/day
+            </div>
+          </div>
+          <div
+            style={{
+              background: BG,
+              border: `1px solid ${BORDER}`,
+              borderRadius: 10,
+              padding: "10px 12px",
+            }}
+          >
+            <div style={{ fontSize: 11, color: TEXT_DIM, fontWeight: 700, textTransform: "uppercase" }}>
+              Annualized Growth Rate
+            </div>
+            <div style={{ color: NAVY, fontSize: 24, fontWeight: 800, marginTop: 4 }}>
+              {growthArrow} {Math.abs(annualizedGrowth).toFixed(1)}%
+            </div>
+            <div style={{ fontSize: 12, color: TEXT_DIM, marginTop: 3 }}>
+              Trend: {totalForecast?.trend || "flat"}
+            </div>
+          </div>
+          <div
+            style={{
+              background: BG,
+              border: `1px solid ${BORDER}`,
+              borderRadius: 10,
+              padding: "10px 12px",
+            }}
+          >
+            <div style={{ fontSize: 11, color: TEXT_DIM, fontWeight: 700, textTransform: "uppercase" }}>
+              Confidence Level
+            </div>
+            <div style={{ color: NAVY, fontSize: 24, fontWeight: 800, marginTop: 4, textTransform: "capitalize" }}>
+              {totalForecast?.confidence || "low"}
+            </div>
+            <div style={{ fontSize: 12, color: TEXT_DIM, marginTop: 3 }}>
+              Data points: {totalForecast?.data_points_used || 0}
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Awaiting data banner — Plaid not connected */}
       {!loading && !forecast?.currentBalance && points.length === 0 ? (
