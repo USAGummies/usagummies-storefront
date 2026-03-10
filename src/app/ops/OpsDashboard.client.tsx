@@ -72,6 +72,14 @@ type AbraSource = {
   similarity: number;
 };
 
+type EmailSignalBucket = {
+  signal_type: string;
+  count: number;
+  critical: number;
+  warning: number;
+  info: number;
+};
+
 function average(nums: number[]): number {
   if (nums.length === 0) return 0;
   return nums.reduce((sum, n) => sum + n, 0) / nums.length;
@@ -197,6 +205,9 @@ export function OpsDashboard() {
   const [abraSources, setAbraSources] = useState<AbraSource[]>([]);
   const [abraLoading, setAbraLoading] = useState<boolean>(false);
   const [abraError, setAbraError] = useState<string | null>(null);
+  const [emailSignals, setEmailSignals] = useState<EmailSignalBucket[]>([]);
+  const [emailSignalsTotal, setEmailSignalsTotal] = useState(0);
+  const [emailSignalsLoading, setEmailSignalsLoading] = useState(false);
 
   const fetchAbraInsights = useCallback(async () => {
     setAbraLoading(true);
@@ -228,9 +239,35 @@ export function OpsDashboard() {
     }
   }, []);
 
+  const fetchEmailSignals = useCallback(async () => {
+    setEmailSignalsLoading(true);
+    try {
+      const res = await fetch("/api/ops/abra/email-signals", { cache: "no-store" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          typeof data?.error === "string"
+            ? data.error
+            : `HTTP ${res.status}`,
+        );
+      }
+      const buckets = Array.isArray(data?.by_type)
+        ? (data.by_type as EmailSignalBucket[])
+        : [];
+      setEmailSignals(buckets);
+      setEmailSignalsTotal(Number(data?.total || 0));
+    } catch {
+      setEmailSignals([]);
+      setEmailSignalsTotal(0);
+    } finally {
+      setEmailSignalsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     void fetchAbraInsights();
-  }, [fetchAbraInsights]);
+    void fetchEmailSignals();
+  }, [fetchAbraInsights, fetchEmailSignals]);
 
   const month = getCurrentProFormaMonth();
   const planRevenue = month ? cumulativeThrough(TOTAL_REVENUE, month) : null;
@@ -744,6 +781,46 @@ export function OpsDashboard() {
                   <div style={{ color: NAVY, fontSize: 13, fontWeight: 700 }}>{alert.title}</div>
                   <div style={{ fontSize: 12, color: TEXT_DIM }}>{alert.message}</div>
                 </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px", marginBottom: 14 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
+          <div style={{ fontWeight: 700, color: NAVY }}>Email Signals (7d)</div>
+          <div style={{ fontSize: 12, color: TEXT_DIM }}>
+            {emailSignalsTotal.toLocaleString("en-US")} total
+          </div>
+        </div>
+
+        {emailSignalsLoading ? (
+          <div style={{ fontSize: 13, color: TEXT_DIM }}>Loading email signals...</div>
+        ) : emailSignals.length === 0 ? (
+          <div style={{ fontSize: 13, color: TEXT_DIM }}>No recent email-derived signals.</div>
+        ) : (
+          <div style={{ display: "grid", gap: 8 }}>
+            {emailSignals.slice(0, 8).map((bucket) => (
+              <div
+                key={bucket.signal_type}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1.5fr auto auto auto auto",
+                  gap: 10,
+                  alignItems: "center",
+                  borderTop: `1px solid ${BORDER}`,
+                  paddingTop: 8,
+                  fontSize: 12,
+                }}
+              >
+                <div style={{ color: NAVY, fontWeight: 700 }}>
+                  {bucket.signal_type.replace(/_/g, " ")}
+                </div>
+                <div style={{ color: TEXT_DIM }}>Total {bucket.count}</div>
+                <div style={{ color: RED }}>Critical {bucket.critical}</div>
+                <div style={{ color: GOLD }}>Warn {bucket.warning}</div>
+                <div style={{ color: "#16a34a" }}>Info {bucket.info}</div>
               </div>
             ))}
           </div>

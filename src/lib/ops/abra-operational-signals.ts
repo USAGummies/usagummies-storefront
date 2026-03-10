@@ -262,5 +262,81 @@ export function extractEmailSignals(params: {
     });
   }
 
+  // Payment and invoice mentions
+  if (
+    /\b(invoice|payment due|past due|remittance|wire transfer|net\s?\d+)\b/.test(
+      text,
+    )
+  ) {
+    const amountMatch = text.match(/(?:\$|usd\s?)(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/i);
+    const amount = amountMatch ? Number(amountMatch[1].replace(/,/g, "")) : null;
+    const pastDue = /\b(past due|overdue|late payment)\b/.test(text);
+    signals.push({
+      signal_type: "payment_invoice",
+      source: "email",
+      title: pastDue
+        ? "Past-due payment signal"
+        : "Invoice/payment discussion detected",
+      detail: `From: ${params.from}. Subject: ${params.subject}`,
+      severity: pastDue ? "critical" : "warning",
+      department: "finance",
+      metadata: { from: params.from, amount },
+    });
+  }
+
+  // Supplier updates
+  if (
+    /\b(price increase|lead time|out of stock|discontinue|new product|allocation|minimum order)\b/.test(
+      text,
+    )
+  ) {
+    const isCritical = /\b(out of stock|discontinue|allocation)\b/.test(text);
+    signals.push({
+      signal_type: "supplier_update",
+      source: "email",
+      title: isCritical
+        ? "Critical supplier update"
+        : "Supplier update detected",
+      detail: `From: ${params.from}. Subject: ${params.subject}`,
+      severity: isCritical ? "critical" : "warning",
+      department: "supply_chain",
+      metadata: { from: params.from },
+    });
+  }
+
+  // Regulatory mentions
+  if (
+    /\b(fda|compliance|recall|warning letter|inspection|labeling violation)\b/.test(
+      text,
+    )
+  ) {
+    signals.push({
+      signal_type: "regulatory",
+      source: "email",
+      title: "Regulatory/compliance mention detected",
+      detail: `From: ${params.from}. Subject: ${params.subject}`,
+      severity: "critical",
+      department: "operations",
+      metadata: { from: params.from },
+    });
+  }
+
+  // Partnership and channel opportunities
+  if (
+    /\b(partnership|collaboration|distribute|carry your product|retail placement|co-brand)\b/.test(
+      text,
+    )
+  ) {
+    signals.push({
+      signal_type: "partnership_opportunity",
+      source: "email",
+      title: "Partnership opportunity detected",
+      detail: `From: ${params.from}. Subject: ${params.subject}`,
+      severity: "info",
+      department: "sales_and_growth",
+      metadata: { from: params.from },
+    });
+  }
+
   return signals;
 }
