@@ -1,12 +1,11 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 import {
   AlertTriangle,
   Mail,
   CheckCircle2,
-  Clock3,
   Target,
   TrendingUp,
   DollarSign,
@@ -16,6 +15,20 @@ import {
   ChevronUp,
   Brain,
 } from "lucide-react";
+import {
+  ResponsiveContainer,
+  ComposedChart,
+  Area,
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ReferenceLine,
+} from "recharts";
 import {
   useAlerts,
   useAuditStatus,
@@ -41,7 +54,6 @@ import {
   MILESTONES,
   LOAN,
   TOTAL_OPEX,
-  INVENTORY_AT_COST,
   AMORTIZATION_SCHEDULE,
   getCurrentProFormaMonth,
   getMonthsThrough,
@@ -50,6 +62,7 @@ import {
 } from "@/lib/ops/pro-forma";
 import { StalenessBadge } from "@/app/ops/components/StalenessBadge";
 import { RefreshButton } from "@/app/ops/components/RefreshButton";
+import { SkeletonChart } from "@/app/ops/components/Skeleton";
 import {
   NAVY,
   RED,
@@ -67,6 +80,36 @@ import {
 type PriorityFilter = "all" | "critical" | "warning" | "info";
 
 const GREEN = "#16a34a";
+const CHART_MOBILE_BREAKPOINT = 768;
+const KPI_METRICS = [
+  "daily_revenue_shopify",
+  "daily_revenue_amazon",
+  "daily_orders_shopify",
+  "daily_orders_amazon",
+  "daily_sessions",
+  "daily_pageviews",
+  "daily_aov",
+] as const;
+
+type MetricPoint = { date: string; value: number };
+type KpiHistoryResponse = {
+  metrics: Record<string, MetricPoint[]>;
+  range: { start: string; end: string; days: number };
+};
+
+type ChartRow = {
+  date: string;
+  dayLabel: string;
+  daily_revenue_shopify: number;
+  daily_revenue_amazon: number;
+  daily_revenue_total: number;
+  daily_orders_shopify: number;
+  daily_orders_amazon: number;
+  daily_orders_total: number;
+  daily_sessions: number;
+  daily_pageviews: number;
+  daily_aov: number;
+};
 
 function pvaColor(pva: PlanVsActual): string {
   return STATUS_COLORS[pva.status];
@@ -76,6 +119,68 @@ function statusLabel(pva: PlanVsActual): string {
   if (pva.status === "no-data") return "—";
   const sign = pva.variancePct >= 0 ? "+" : "";
   return `${sign}${(pva.variancePct * 100).toFixed(1)}%`;
+}
+
+function avg(values: number[]): number {
+  if (values.length === 0) return 0;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function pctDelta(current: number, baseline: number): number {
+  if (baseline === 0) return current === 0 ? 0 : 100;
+  return ((current - baseline) / Math.abs(baseline)) * 100;
+}
+
+function fmtDelta(value: number): string {
+  const sign = value > 0 ? "+" : "";
+  return `${sign}${value.toFixed(1)}% vs 7d avg`;
+}
+
+function formatDayLabel(date: string): string {
+  const parsed = new Date(`${date}T00:00:00`);
+  return parsed.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function buildChartRows(history: KpiHistoryResponse | null): ChartRow[] {
+  if (!history) return [];
+
+  const dateSet = new Set<string>();
+  for (const metric of KPI_METRICS) {
+    for (const point of history.metrics?.[metric] || []) {
+      dateSet.add(point.date);
+    }
+  }
+
+  const sortedDates = [...dateSet].sort((a, b) => a.localeCompare(b));
+  return sortedDates.map((date) => {
+    const getMetric = (name: string): number => {
+      const points = history.metrics?.[name] || [];
+      const point = points.find((item) => item.date === date);
+      return Number(point?.value || 0);
+    };
+
+    const revenueShopify = getMetric("daily_revenue_shopify");
+    const revenueAmazon = getMetric("daily_revenue_amazon");
+    const ordersShopify = getMetric("daily_orders_shopify");
+    const ordersAmazon = getMetric("daily_orders_amazon");
+    const sessions = getMetric("daily_sessions");
+    const pageviews = getMetric("daily_pageviews");
+    const aov = getMetric("daily_aov");
+
+    return {
+      date,
+      dayLabel: formatDayLabel(date),
+      daily_revenue_shopify: revenueShopify,
+      daily_revenue_amazon: revenueAmazon,
+      daily_revenue_total: revenueShopify + revenueAmazon,
+      daily_orders_shopify: ordersShopify,
+      daily_orders_amazon: ordersAmazon,
+      daily_orders_total: ordersShopify + ordersAmazon,
+      daily_sessions: sessions,
+      daily_pageviews: pageviews,
+      daily_aov: aov,
+    };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -190,6 +295,31 @@ function MilestoneRow({
   );
 }
 
+function LiveMetricCard({
+  title,
+  subtitle,
+  children,
+  staleDate,
+}: {
+  title: string;
+  subtitle: string;
+  children: React.ReactNode;
+  staleDate: string | null;
+}) {
+  return (
+    <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 8 }}>
+        <div>
+          <div style={{ fontSize: 14, color: NAVY, fontWeight: 800 }}>{title}</div>
+          <div style={{ marginTop: 3, fontSize: 12, color: TEXT_DIM }}>{subtitle}</div>
+        </div>
+        <StalenessBadge items={[{ label: "Latest", timestamp: staleDate }]} />
+      </div>
+      {children}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Main View
 // ---------------------------------------------------------------------------
@@ -202,6 +332,17 @@ export function KpisView() {
   const [brain, setBrain] = useState<{ insights: string[]; sources: { title: string; source_table: string }[] } | null>(null);
   const [brainLoading, setBrainLoading] = useState(false);
   const [brainError, setBrainError] = useState<string | null>(null);
+  const [kpiHistory, setKpiHistory] = useState<KpiHistoryResponse | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < CHART_MOBILE_BREAKPOINT);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   const fetchBrainInsights = useCallback(async () => {
     setBrainLoading(true);
@@ -221,6 +362,31 @@ export function KpisView() {
       setBrainLoading(false);
     }
   }, []);
+
+  const fetchKpiHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    setHistoryError(null);
+    try {
+      const params = new URLSearchParams({
+        days: "30",
+        metrics: KPI_METRICS.join(","),
+      });
+      const res = await fetch(`/api/ops/abra/kpi-history?${params.toString()}`, {
+        cache: "no-store",
+      });
+      const data = (await res.json()) as KpiHistoryResponse & { error?: string };
+      if (!res.ok) throw new Error(data.error || "Failed to load KPI history");
+      setKpiHistory(data);
+    } catch (err) {
+      setHistoryError(err instanceof Error ? err.message : "Failed to load KPI history");
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchKpiHistory();
+  }, [fetchKpiHistory]);
 
   const {
     data: alerts,
@@ -344,7 +510,38 @@ export function KpisView() {
     { label: "Audit", timestamp: audit?.lastFetched },
   ];
 
-  const anyLoading = alertsLoading || auditLoading || dashLoading || balLoading;
+  const anyLoading = alertsLoading || auditLoading || dashLoading || balLoading || historyLoading;
+
+  const chartRows = useMemo(() => buildChartRows(kpiHistory), [kpiHistory]);
+  const latestChart = chartRows[chartRows.length - 1] || null;
+  const previous7Rows = chartRows.slice(Math.max(chartRows.length - 8, 0), chartRows.length - 1);
+
+  const revenueMeta = useMemo(() => {
+    const current = latestChart?.daily_revenue_total || 0;
+    const baseline = avg(previous7Rows.map((row) => row.daily_revenue_total));
+    return { current, delta: pctDelta(current, baseline) };
+  }, [latestChart?.daily_revenue_total, previous7Rows]);
+
+  const ordersMeta = useMemo(() => {
+    const current = latestChart?.daily_orders_total || 0;
+    const baseline = avg(previous7Rows.map((row) => row.daily_orders_total));
+    return { current, delta: pctDelta(current, baseline) };
+  }, [latestChart?.daily_orders_total, previous7Rows]);
+
+  const trafficMeta = useMemo(() => {
+    const current = latestChart?.daily_sessions || 0;
+    const baseline = avg(previous7Rows.map((row) => row.daily_sessions));
+    return { current, delta: pctDelta(current, baseline) };
+  }, [latestChart?.daily_sessions, previous7Rows]);
+
+  const aovMeta = useMemo(() => {
+    const current = latestChart?.daily_aov || 0;
+    const baseline = avg(previous7Rows.map((row) => row.daily_aov));
+    const avg30 = avg(chartRows.map((row) => row.daily_aov));
+    return { current, delta: pctDelta(current, baseline), avg30 };
+  }, [latestChart?.daily_aov, previous7Rows, chartRows]);
+
+  const chartHeight = isMobile ? 250 : 300;
 
   // Alert actions (preserved from original)
   async function recordAlertAction(
@@ -391,6 +588,7 @@ export function KpisView() {
     refreshAlerts();
     refreshAudit();
     refreshDash();
+    void fetchKpiHistory();
   }
 
   return (
@@ -469,6 +667,140 @@ export function KpisView() {
           {actionMsg}
         </div>
       )}
+
+      {/* ── Live Metrics ───────────────────────────────────────────── */}
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 11, color: GOLD, fontWeight: 700, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+          Live Metrics (Last 30 Days)
+        </div>
+
+        {historyError ? (
+          <div style={{ border: `1px solid ${RED}33`, background: `${RED}0a`, color: RED, borderRadius: 10, padding: "10px 12px", marginBottom: 10, fontSize: 13 }}>
+            {historyError}
+          </div>
+        ) : null}
+
+        {historyLoading && chartRows.length === 0 ? (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 10 }}>
+            <SkeletonChart height={chartHeight} />
+            <SkeletonChart height={chartHeight} />
+            <SkeletonChart height={chartHeight} />
+            <SkeletonChart height={chartHeight} />
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 10 }}>
+            <LiveMetricCard
+              title="Revenue — Last 30 Days"
+              subtitle={`${fmtDollar(revenueMeta.current)} today • ${fmtDelta(revenueMeta.delta)}`}
+              staleDate={latestChart?.date || null}
+            >
+              <div style={{ width: "100%", height: chartHeight }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={chartRows}>
+                    <CartesianGrid stroke={BORDER} vertical={false} />
+                    <XAxis dataKey="dayLabel" tick={{ fontSize: 11, fill: TEXT_DIM }} />
+                    <YAxis tick={{ fontSize: 11, fill: TEXT_DIM }} tickFormatter={(value) => `$${Number(value).toLocaleString("en-US")}`} />
+                    <Tooltip
+                      formatter={(value, key) => {
+                        const numericValue = Number(value || 0);
+                        const keyName = String(key || "");
+                        const label =
+                          keyName === "daily_revenue_shopify"
+                            ? "Shopify"
+                            : keyName === "daily_revenue_amazon"
+                              ? "Amazon"
+                              : "Total";
+                        return [fmtDollar(numericValue), label];
+                      }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="daily_revenue_total"
+                      fill={GOLD}
+                      fillOpacity={0.12}
+                      stroke="none"
+                      name="Total"
+                    />
+                    <Line type="monotone" dataKey="daily_revenue_shopify" stroke={NAVY} strokeWidth={2} dot={false} name="Shopify" />
+                    <Line type="monotone" dataKey="daily_revenue_amazon" stroke={RED} strokeWidth={2} dot={false} name="Amazon" />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+            </LiveMetricCard>
+
+            <LiveMetricCard
+              title="Orders — Last 30 Days"
+              subtitle={`${Math.round(ordersMeta.current).toLocaleString("en-US")} today • ${fmtDelta(ordersMeta.delta)}`}
+              staleDate={latestChart?.date || null}
+            >
+              <div style={{ width: "100%", height: chartHeight }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartRows}>
+                    <CartesianGrid stroke={BORDER} vertical={false} />
+                    <XAxis dataKey="dayLabel" tick={{ fontSize: 11, fill: TEXT_DIM }} />
+                    <YAxis tick={{ fontSize: 11, fill: TEXT_DIM }} />
+                    <Tooltip
+                      formatter={(value, key) => {
+                        const numericValue = Number(value || 0);
+                        const keyName = String(key || "");
+                        const label = keyName === "daily_orders_shopify" ? "Shopify" : "Amazon";
+                        return [Math.round(numericValue), label];
+                      }}
+                    />
+                    <Bar dataKey="daily_orders_shopify" stackId="orders" fill={NAVY} radius={[2, 2, 0, 0]} />
+                    <Bar dataKey="daily_orders_amazon" stackId="orders" fill={RED} radius={[2, 2, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </LiveMetricCard>
+
+            <LiveMetricCard
+              title="Traffic & Engagement"
+              subtitle={`${Math.round(trafficMeta.current).toLocaleString("en-US")} sessions today • ${fmtDelta(trafficMeta.delta)}`}
+              staleDate={latestChart?.date || null}
+            >
+              <div style={{ width: "100%", height: chartHeight }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={chartRows}>
+                    <CartesianGrid stroke={BORDER} vertical={false} />
+                    <XAxis dataKey="dayLabel" tick={{ fontSize: 11, fill: TEXT_DIM }} />
+                    <YAxis tick={{ fontSize: 11, fill: TEXT_DIM }} />
+                    <Tooltip
+                      formatter={(value, key) => {
+                        const numericValue = Number(value || 0);
+                        const keyName = String(key || "");
+                        const label = keyName === "daily_sessions" ? "Sessions" : "Pageviews";
+                        return [Math.round(numericValue).toLocaleString("en-US"), label];
+                      }}
+                    />
+                    <Line type="monotone" dataKey="daily_sessions" stroke={NAVY} strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="daily_pageviews" stroke={GOLD} strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </LiveMetricCard>
+
+            <LiveMetricCard
+              title="AOV Trend — Last 30 Days"
+              subtitle={`${fmtDollar(aovMeta.current)} today • ${fmtDelta(aovMeta.delta)}`}
+              staleDate={latestChart?.date || null}
+            >
+              <div style={{ width: "100%", height: chartHeight }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={chartRows}>
+                    <CartesianGrid stroke={BORDER} vertical={false} />
+                    <XAxis dataKey="dayLabel" tick={{ fontSize: 11, fill: TEXT_DIM }} />
+                    <YAxis tick={{ fontSize: 11, fill: TEXT_DIM }} tickFormatter={(value) => `$${Number(value).toFixed(0)}`} />
+                    <Tooltip formatter={(value) => [fmtDollar(Number(value || 0)), "AOV"]} />
+                    <ReferenceLine y={aovMeta.avg30} stroke={TEXT_DIM} strokeDasharray="4 4" />
+                    <Line type="monotone" dataKey="daily_aov" stroke={GOLD} strokeWidth={2.5} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </LiveMetricCard>
+          </div>
+        )}
+      </div>
 
       {/* ── Top KPI Cards ─────────────────────────────────────────── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10, marginBottom: 14 }}>
