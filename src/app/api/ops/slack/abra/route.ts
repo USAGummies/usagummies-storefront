@@ -30,11 +30,13 @@ import { after } from "next/server";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import {
   buildAbraSystemPrompt,
-  buildTemporalContext,
-  type TemporalSearchRow,
   type AbraCorrection,
   type AbraDepartment,
 } from "@/lib/ops/abra-system-prompt";
+import { searchTiered, buildTieredContext, type TieredSearchResult } from "@/lib/ops/abra-memory-tiers";
+import { logAnswer, extractProvenance } from "@/lib/ops/abra-source-provenance";
+import { getActiveSignals, buildSignalsContext } from "@/lib/ops/abra-operational-signals";
+import { extractClaudeUsage, getMonthlySpend, logAICost } from "@/lib/ops/abra-cost-tracker";
 import {
   detectQuestions,
   computeConfidence,
@@ -586,6 +588,72 @@ async function handleTeachCommand(
 }
 
 // ---------------------------------------------------------------------------
+// Subcommand: cost
+// ---------------------------------------------------------------------------
+async function handleCostCommand(): Promise<string> {
+  try {
+    const spend = await getMonthlySpend();
+    const month = new Date().toISOString().slice(0, 7);
+    return `**AI Spend Report (${month})**\n\n` +
+      `• Total: $${spend.total.toFixed(2)}\n` +
+      `• Budget: $${spend.budget.toFixed(2)}\n` +
+      `• Remaining: $${spend.remaining.toFixed(2)}\n` +
+      `• Usage: ${spend.pctUsed}%\n` +
+      `• Calls: ${spend.callCount.toLocaleString("en-US")}`;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return `❌ Failed to fetch cost summary: ${message.slice(0, 200)}`;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Subcommand: initiative
+// ---------------------------------------------------------------------------
+async function handleInitiativeCommand(
+  initiativeText: string,
+  userEmail: string,
+): Promise<string> {
+  const match = initiativeText.match(
+    /^(finance|operations|sales_and_growth|supply_chain|executive)\s+(.+)$/i,
+  );
+  if (!match) {
+    return "❌ Invalid format. Try: `/abra initiative: finance Improve gross margin by 3% this quarter`";
+  }
+
+  const department = match[1].toLowerCase();
+  const goal = match[2].trim();
+  if (!goal) {
+    return "❌ Initiative goal is required.";
+  }
+
+  try {
+    const rows = (await sbFetch("/rest/v1/abra_initiatives", {
+      method: "POST",
+      headers: {
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify({
+        department,
+        title: goal.slice(0, 120),
+        goal,
+        status: "researching",
+        approved_by: userEmail,
+      }),
+    })) as Array<{ id: string; department: string; title: string; status: string }>;
+
+    const created = rows[0];
+    if (!created?.id) {
+      return "❌ Initiative creation returned no record.";
+    }
+
+    return `✅ Initiative created.\n• Department: ${created.department}\n• Title: ${created.title}\n• Status: ${created.status}\n• ID: ${created.id.slice(0, 8)}…`;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return `❌ Failed to create initiative: ${message.slice(0, 200)}`;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Core RAG pipeline with temporal awareness
 // ---------------------------------------------------------------------------
 async function callAbraChat(
@@ -648,58 +716,50 @@ async function callAbraChat(
     // Embedding failed — will degrade
   }
 
-  // --------------- Step 2: Temporal search (with graceful degradation) ---------------
-  let results: TemporalSearchRow[] = [];
+  // --------------- Step 2: Tiered search (with graceful degradation) ---------------
+  let tieredResults: TieredSearchResult = {
+    hot: [],
+    warm: [],
+    cold: [],
+    all: [],
+    tierCounts: { hot: 0, warm: 0, cold: 0 },
+  };
 
   if (embedding) {
     try {
-      const searchRes = await fetchWithRetry(
-        `${supabaseUrl}/rest/v1/rpc/search_temporal`,
-        {
-          method: "POST",
-          headers: {
-            apikey: serviceKey,
-            Authorization: `Bearer ${serviceKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            query_embedding: embedding,
-            match_count: 8,
-            filter_tables: ["brain", "email"],
-          }),
-          cache: "no-store",
-        },
-        { timeoutMs: 12000, maxRetries: 1 },
-      );
-
-      if (searchRes.ok) {
-        results = await searchRes.json();
-      }
+      tieredResults = await searchTiered({
+        embedding,
+        matchCount: 8,
+        filterTables: ["brain", "email"],
+      });
     } catch {
       // Brain search failed — degrade to general knowledge
     }
   }
 
-  // --------------- Step 3: Fetch corrections + departments for prompt ---------------
-  const [corrections, departments] = await Promise.all([
+  // --------------- Step 3: Fetch corrections + departments + active signals ---------------
+  const [corrections, departments, activeSignals] = await Promise.all([
     fetchCorrections(),
     fetchDepartments(),
+    getActiveSignals({ limit: 8 }),
   ]);
 
   // --------------- Step 4: Build dynamic system prompt + context ---------------
+  const signalsContext = buildSignalsContext(activeSignals);
   const systemPrompt = buildAbraSystemPrompt({
     format: "slack",
     corrections,
     departments,
+    signalsContext,
   });
 
   let context = "";
   let degraded = false;
   let confidence = 0;
 
-  if (results.length > 0) {
-    context = buildTemporalContext(results);
-    confidence = computeConfidence(results);
+  if (tieredResults.all.length > 0) {
+    context = buildTieredContext(tieredResults);
+    confidence = computeConfidence(tieredResults.all);
   } else {
     degraded = true;
     context =
@@ -708,7 +768,7 @@ async function callAbraChat(
 
   // Add confidence hint to prompt
   const confidenceHint =
-    !degraded && shouldAskQuestions(confidence, results)
+    !degraded && shouldAskQuestions(confidence, tieredResults.all)
       ? "\n\nIMPORTANT: Your confidence for this query is LOW. Consider asking the user to confirm or provide more information rather than guessing."
       : "";
 
@@ -721,6 +781,9 @@ async function callAbraChat(
       : [];
 
   let reply = "";
+  let modelUsed = "";
+  let inputTokens = 0;
+  let outputTokens = 0;
 
   // --------------- Step 5: LLM call — Claude first, OpenAI fallback ---------------
   if (anthropicKey) {
@@ -752,13 +815,31 @@ async function callAbraChat(
 
       if (claudeRes.ok) {
         const claudeData = (await claudeRes.json()) as {
+          usage?: Record<string, unknown>;
           content?: Array<{ text?: string }>;
         };
+        const usage = extractClaudeUsage(
+          claudeData as unknown as Record<string, unknown>,
+        );
+        if (usage) {
+          inputTokens = usage.inputTokens;
+          outputTokens = usage.outputTokens;
+          void logAICost({
+            model: claudeModel,
+            provider: "anthropic",
+            inputTokens: usage.inputTokens,
+            outputTokens: usage.outputTokens,
+            endpoint: "/api/ops/slack/abra",
+          });
+        }
         reply =
           claudeData.content
             ?.map((item) => item.text || "")
             .join("\n")
             .trim() || "";
+        if (reply) {
+          modelUsed = claudeModel;
+        }
       }
     } catch {
       // Claude failed — try OpenAI
@@ -792,9 +873,24 @@ async function callAbraChat(
 
       if (openaiRes.ok) {
         const openaiData = (await openaiRes.json()) as {
+          usage?: {
+            prompt_tokens?: number;
+            completion_tokens?: number;
+          };
           choices?: Array<{ message?: { content?: string } }>;
         };
         reply = openaiData.choices?.[0]?.message?.content?.trim() || "";
+        if (reply) {
+          modelUsed = openaiModel;
+          inputTokens =
+            typeof openaiData.usage?.prompt_tokens === "number"
+              ? openaiData.usage.prompt_tokens
+              : 0;
+          outputTokens =
+            typeof openaiData.usage?.completion_tokens === "number"
+              ? openaiData.usage.completion_tokens
+              : 0;
+        }
       }
     } catch {
       // OpenAI also failed
@@ -820,7 +916,7 @@ async function callAbraChat(
   // --------------- Step 6: Log questions if confidence is low ---------------
   if (!degraded && reply) {
     const detectedQuestions = detectQuestions(reply);
-    if (detectedQuestions.length > 0 || shouldAskQuestions(confidence, results)) {
+    if (detectedQuestions.length > 0 || shouldAskQuestions(confidence, tieredResults.all)) {
       for (const q of detectedQuestions.slice(0, 3)) {
         await logUnansweredQuestion(
           q,
@@ -831,11 +927,29 @@ async function callAbraChat(
     }
   }
 
-  const sources = results.slice(0, 8).map((r) => ({
+  const sources = tieredResults.all.slice(0, 8).map((r) => ({
     title: r.title || "(untitled)",
     source_table: r.source_table,
     days_ago: r.days_ago,
   }));
+
+  if (!degraded && tieredResults.all.length > 0) {
+    const provenance = extractProvenance(tieredResults.all.slice(0, 8));
+    void logAnswer({
+      question: message,
+      answer: reply,
+      source_ids: provenance.source_ids,
+      source_tables: provenance.source_tables,
+      memory_tiers_used: provenance.memory_tiers_used,
+      confidence,
+      department: null,
+      asked_by: userName || "slack-user",
+      channel: "slack",
+      model_used: modelUsed || "unknown",
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+    });
+  }
 
   return { reply, sources };
 }
@@ -880,10 +994,39 @@ export async function POST(req: Request) {
 
   // Check for subcommands
   const trimmedText = text.trim();
+  const helpMatch = /^help$/i.test(trimmedText);
+  const statusMatch = /^status$/i.test(trimmedText);
   const correctMatch = trimmedText.match(/^correct:\s*(.+)$/is);
   const teachMatch = trimmedText.match(/^teach:\s*(.+)$/is);
+  const initiativeMatch = trimmedText.match(/^initiative:\s*(.+)$/is);
+  const costMatch = /^cost(?:\s+report)?$/i.test(trimmedText);
+  const answerMatch = trimmedText.match(/^answer:\s*(.+)$/is);
+  const searchMatch = trimmedText.match(/^search:\s*(.+)$/is);
 
-  if (correctMatch || teachMatch) {
+  if (helpMatch) {
+    return NextResponse.json({
+      response_type: "ephemeral",
+      text:
+        "Usage:\n" +
+        "• `/abra <question>` — Ask Abra anything\n" +
+        "• `/abra answer: <question>` — Alias for question mode\n" +
+        "• `/abra search: <query>` — Search-focused answer\n" +
+        "• `/abra correct: X but actually Y` — Correct wrong info\n" +
+        "• `/abra teach: [dept] content` — Teach Abra new knowledge\n" +
+        "• `/abra initiative: <department> <goal>` — Create initiative\n" +
+        "• `/abra cost` — Show monthly AI spend\n" +
+        "• `/abra status` — Check service status",
+    });
+  }
+
+  if (statusMatch) {
+    return NextResponse.json({
+      response_type: "ephemeral",
+      text: `🧠 Abra status: online${BOT_TOKEN ? " | thread-enabled" : " | no-bot-token"}${SIGNING_SECRET ? " | signature-check:on" : " | signature-check:off"}`,
+    });
+  }
+
+  if (correctMatch || teachMatch || initiativeMatch || costMatch) {
     // Subcommands run inline (fast enough for 3s Slack timeout)
     after(async () => {
       try {
@@ -893,8 +1036,12 @@ export async function POST(req: Request) {
             correctMatch[1],
             userName,
           );
-        } else {
+        } else if (teachMatch) {
           reply = await handleTeachCommand(teachMatch![1], userName);
+        } else if (initiativeMatch) {
+          reply = await handleInitiativeCommand(initiativeMatch[1], userName);
+        } else {
+          reply = await handleCostCommand();
         }
 
         const fullText = `🧠 *Abra*\n\n${reply}`;
@@ -921,7 +1068,13 @@ export async function POST(req: Request) {
       }
     });
 
-    const label = correctMatch ? "storing correction" : "learning";
+    const label = correctMatch
+      ? "storing correction"
+      : teachMatch
+        ? "learning"
+        : initiativeMatch
+          ? "creating initiative"
+          : "fetching cost summary";
     return NextResponse.json({
       response_type: "ephemeral",
       text: `🧠 Abra is ${label}...`,
@@ -929,6 +1082,7 @@ export async function POST(req: Request) {
   }
 
   // Normal RAG query
+  const queryText = answerMatch?.[1] || searchMatch?.[1] || text;
   after(async () => {
     try {
       let history: ChatMessage[] = [];
@@ -937,7 +1091,7 @@ export async function POST(req: Request) {
       }
 
       const { reply, sources } = await callAbraChat(
-        text,
+        queryText,
         history,
         userName,
       );
@@ -957,7 +1111,7 @@ export async function POST(req: Request) {
       const errorMsg =
         err instanceof Error ? err.message : "Unknown error";
       await alertOps(
-        `Unhandled error for question "${text.slice(0, 100)}": ${errorMsg}`,
+        `Unhandled error for question "${queryText.slice(0, 100)}": ${errorMsg}`,
       );
       await postToSlack(
         responseUrl,
@@ -969,6 +1123,6 @@ export async function POST(req: Request) {
 
   return NextResponse.json({
     response_type: "ephemeral",
-    text: `🧠 Abra is thinking about: _${text}_`,
+    text: `🧠 Abra is thinking about: _${queryText}_`,
   });
 }
