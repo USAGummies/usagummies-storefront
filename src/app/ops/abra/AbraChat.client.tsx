@@ -51,6 +51,13 @@ type CostSummary = {
   pctUsed: number;
 };
 
+type SessionState = {
+  id: string;
+  title: string | null;
+  agenda: string[];
+  status: string;
+};
+
 // ─── Constants ───
 
 const QUICK_ACTIONS = [
@@ -217,55 +224,89 @@ function InitiativePanel({
 
 function SessionBanner({
   sessionId,
+  title,
+  agenda,
   onEnd,
 }: {
   sessionId: string;
+  title: string | null;
+  agenda: string[];
   onEnd: () => void;
 }) {
   return (
     <div
       style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
+        display: "grid",
+        gap: 8,
         border: `1px solid ${GOLD}`,
         borderRadius: 10,
         background: "rgba(199,160,98,0.08)",
         padding: "8px 12px",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: "50%",
+              background: "#22c55e",
+              animation: "pulse 2s infinite",
+            }}
+          />
+          <span style={{ fontSize: 12, fontWeight: 600, color: NAVY }}>
+            Session Active
+          </span>
+          <span style={{ fontSize: 11, color: SURFACE_TEXT_DIM }}>
+            ID: {sessionId.slice(0, 8)}…
+          </span>
+        </div>
+        <button
+          onClick={onEnd}
           style={{
-            width: 8,
-            height: 8,
-            borderRadius: "50%",
-            background: "#22c55e",
-            animation: "pulse 2s infinite",
+            border: `1px solid ${RED}`,
+            background: "rgba(199,54,44,0.06)",
+            color: RED,
+            borderRadius: 8,
+            fontSize: 11,
+            fontWeight: 600,
+            padding: "4px 10px",
+            cursor: "pointer",
           }}
-        />
-        <span style={{ fontSize: 12, fontWeight: 600, color: NAVY }}>
-          Session Active
-        </span>
-        <span style={{ fontSize: 11, color: SURFACE_TEXT_DIM }}>
-          ID: {sessionId.slice(0, 8)}…
-        </span>
+        >
+          End Meeting
+        </button>
       </div>
-      <button
-        onClick={onEnd}
-        style={{
-          border: `1px solid ${RED}`,
-          background: "rgba(199,54,44,0.06)",
-          color: RED,
-          borderRadius: 8,
-          fontSize: 11,
-          fontWeight: 600,
-          padding: "4px 10px",
-          cursor: "pointer",
-        }}
-      >
-        End Session
-      </button>
+
+      {title && (
+        <div style={{ fontSize: 12, color: NAVY, fontWeight: 600 }}>
+          {title}
+        </div>
+      )}
+
+      {agenda.length > 0 && (
+        <div style={{ display: "grid", gap: 4 }}>
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              color: SURFACE_TEXT_DIM,
+              textTransform: "uppercase",
+              letterSpacing: "0.04em",
+            }}
+          >
+            Agenda
+          </div>
+          <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 2 }}>
+            {agenda.slice(0, 6).map((item, idx) => (
+              <li key={`${idx}-${item}`} style={{ fontSize: 12, color: NAVY }}>
+                {item}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
@@ -389,6 +430,8 @@ export function AbraChat() {
   const [initiatives, setInitiatives] = useState<Initiative[]>([]);
   const [costSummary, setCostSummary] = useState<CostSummary | null>(null);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [activeSessionTitle, setActiveSessionTitle] = useState<string | null>(null);
+  const [activeSessionAgenda, setActiveSessionAgenda] = useState<string[]>([]);
   const listRef = useRef<HTMLDivElement>(null);
 
   const historyPayload = useMemo(
@@ -428,6 +471,50 @@ export function AbraChat() {
     }
   }, []);
 
+  const refreshActiveSession = useCallback(
+    async (sessionId?: string) => {
+      try {
+        const query = sessionId
+          ? `?id=${encodeURIComponent(sessionId)}`
+          : "?status=active";
+        const res = await fetch(`/api/ops/abra/session${query}`, {
+          cache: "no-store",
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const rows = Array.isArray(data?.sessions)
+          ? (data.sessions as SessionState[])
+          : [];
+        const active = sessionId
+          ? rows.find((row) => row.id === sessionId)
+          : rows.find((row) => row.status === "active");
+
+        if (!active) {
+          setActiveSessionId(null);
+          setActiveSessionTitle(null);
+          setActiveSessionAgenda([]);
+          return;
+        }
+
+        setActiveSessionId(active.id);
+        setActiveSessionTitle(
+          typeof active.title === "string" ? active.title : null,
+        );
+        setActiveSessionAgenda(
+          Array.isArray(active.agenda)
+            ? active.agenda.filter(
+                (item): item is string =>
+                  typeof item === "string" && item.trim().length > 0,
+              )
+            : [],
+        );
+      } catch {
+        // Best-effort
+      }
+    },
+    [],
+  );
+
   // Auto-scroll
   useEffect(() => {
     const node = listRef.current;
@@ -441,13 +528,25 @@ export function AbraChat() {
       try {
         const [initRes] = await Promise.all([
           fetch("/api/ops/abra/initiative?status=active").then((r) =>
-            r.ok ? r.json() : [],
+            r.ok ? r.json() : null,
           ),
         ]);
 
-        if (Array.isArray(initRes)) {
+        const initRows = Array.isArray(initRes?.initiatives)
+          ? (initRes.initiatives as Array<{
+              id: string;
+              department: string;
+              title: string | null;
+              goal: string;
+              status: string;
+              questions?: Array<{ key: string }>;
+              answers?: Record<string, string>;
+            }>)
+          : [];
+
+        if (initRows.length > 0) {
           setInitiatives(
-            initRes.map(
+            initRows.map(
               (r: {
                 id: string;
                 department: string;
@@ -468,16 +567,19 @@ export function AbraChat() {
               }),
             ),
           );
+        } else {
+          setInitiatives([]);
         }
 
       } catch {
         // Best-effort
       }
+      await refreshActiveSession();
       await refreshCostSummary();
     }
 
     void loadContext();
-  }, [refreshCostSummary]);
+  }, [refreshCostSummary, refreshActiveSession]);
 
   const sendMessage = useCallback(
     async (text: string) => {
@@ -532,6 +634,7 @@ export function AbraChat() {
         // Track session
         if (data?.session_id) {
           setActiveSessionId(data.session_id);
+          void refreshActiveSession(data.session_id);
         }
         if (data?.initiative_id) {
           // Refresh initiatives
@@ -541,9 +644,9 @@ export function AbraChat() {
             );
             if (initRes.ok) {
               const initData = await initRes.json();
-              if (Array.isArray(initData)) {
+              if (Array.isArray(initData?.initiatives)) {
                 setInitiatives(
-                  initData.map(
+                  initData.initiatives.map(
                     (r: {
                       id: string;
                       department: string;
@@ -564,6 +667,8 @@ export function AbraChat() {
                     }),
                   ),
                 );
+              } else {
+                setInitiatives([]);
               }
             }
           } catch {
@@ -578,7 +683,7 @@ export function AbraChat() {
         setPending(false);
       }
     },
-    [pending, historyPayload, refreshCostSummary],
+    [pending, historyPayload, refreshActiveSession, refreshCostSummary],
   );
 
   async function onSubmit(event: FormEvent) {
@@ -586,11 +691,39 @@ export function AbraChat() {
     await sendMessage(input);
   }
 
-  function handleEndSession() {
+  async function handleEndSession() {
     if (!activeSessionId) return;
-    // Send end session message
-    void sendMessage("End the current session and save notes.");
-    setActiveSessionId(null);
+    try {
+      const res = await fetch("/api/ops/abra/session?action=end", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: activeSessionId }),
+      });
+      if (!res.ok) {
+        throw new Error("Failed to end session");
+      }
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: makeId(),
+          role: "assistant",
+          content: "Meeting ended. Notes were saved and action items were queued as tasks.",
+          intent: "session",
+        },
+      ]);
+      setActiveSessionId(null);
+      setActiveSessionTitle(null);
+      setActiveSessionAgenda([]);
+      await refreshCostSummary();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to end session");
+    }
+  }
+
+  function handleStartSession() {
+    if (activeSessionId) return;
+    void sendMessage("Start a meeting");
   }
 
   function handleInitiativeSelect(init: Initiative) {
@@ -719,7 +852,9 @@ export function AbraChat() {
           {activeSessionId && (
             <SessionBanner
               sessionId={activeSessionId}
-              onEnd={handleEndSession}
+              title={activeSessionTitle}
+              agenda={activeSessionAgenda}
+              onEnd={() => void handleEndSession()}
             />
           )}
 
@@ -917,6 +1052,53 @@ export function AbraChat() {
                 Abra is thinking…
               </div>
             )}
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              flexWrap: "wrap",
+            }}
+          >
+            <button
+              type="button"
+              onClick={handleStartSession}
+              disabled={pending || !!activeSessionId}
+              style={{
+                border: `1px solid ${NAVY}`,
+                background: activeSessionId ? "rgba(27,42,74,0.08)" : NAVY,
+                color: activeSessionId ? NAVY : "#fff",
+                borderRadius: 8,
+                padding: "6px 10px",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor:
+                  pending || !!activeSessionId ? "default" : "pointer",
+                opacity: pending || !!activeSessionId ? 0.65 : 1,
+              }}
+            >
+              Start meeting
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleEndSession()}
+              disabled={pending || !activeSessionId}
+              style={{
+                border: `1px solid ${RED}`,
+                background: activeSessionId ? "rgba(199,54,44,0.08)" : "transparent",
+                color: RED,
+                borderRadius: 8,
+                padding: "6px 10px",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor:
+                  pending || !activeSessionId ? "default" : "pointer",
+                opacity: pending || !activeSessionId ? 0.65 : 1,
+              }}
+            >
+              End meeting
+            </button>
           </div>
 
           {/* Input Form */}

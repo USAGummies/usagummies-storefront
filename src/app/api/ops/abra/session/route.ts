@@ -33,6 +33,13 @@ const VALID_SESSION_TYPES = [
   "planning",
 ] as const;
 
+type ScratchpadEntry = {
+  key: string;
+  value: unknown;
+  reasoning?: string;
+  timestamp: string;
+};
+
 type Session = {
   id: string;
   department: string | null;
@@ -44,6 +51,7 @@ type Session = {
   action_items: unknown[];
   decisions: unknown[];
   open_questions: unknown[];
+  scratchpad: ScratchpadEntry[];
   user_email: string;
   status: string;
   started_at: string;
@@ -260,6 +268,7 @@ async function saveSessionToBrain(session: Session): Promise<void> {
   const actionItems = Array.isArray(session.action_items)
     ? session.action_items
     : [];
+  const scratchpad = Array.isArray(session.scratchpad) ? session.scratchpad : [];
 
   if (notes.length === 0 && decisions.length === 0) return;
 
@@ -274,6 +283,9 @@ async function saveSessionToBrain(session: Session): Promise<void> {
       : "",
     actionItems.length > 0
       ? `Action Items:\n${actionItems.map((a) => `- ${typeof a === "string" ? a : JSON.stringify(a)}`).join("\n")}`
+      : "",
+    scratchpad.length > 0
+      ? `Reasoning Notes:\n${scratchpad.map((s) => `- [${s.key}] ${typeof s.value === "string" ? s.value : JSON.stringify(s.value)}${s.reasoning ? ` (reasoning: ${s.reasoning})` : ""}`).join("\n")}`
       : "",
   ]
     .filter(Boolean)
@@ -315,30 +327,138 @@ async function saveSessionToBrain(session: Session): Promise<void> {
     });
 
     // Insert brain entry
-    await sbFetch("/rest/v1/brain", {
+    await sbFetch("/rest/v1/open_brain_entries", {
       method: "POST",
       headers: {
         Prefer: "return=minimal",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
+        source_type: "session",
+        source_ref: session.id,
+        entry_type: "session_summary",
         title: `Session: ${session.title || session.session_type} (${new Date().toISOString().split("T")[0]})`,
         raw_text: summaryParts,
         summary_text: summaryParts.slice(0, 500),
         category: "session_notes",
         department: session.department,
+        confidence: "medium",
+        priority: "normal",
+        processed: true,
         embedding,
-        metadata: {
-          session_id: session.id,
-          session_type: session.session_type,
-          entry_type: "session_summary",
-          decisions_count: decisions.length,
-          action_items_count: actionItems.length,
-        },
       }),
     });
   } catch {
     // Best-effort — don't fail session end
+  }
+}
+
+function normalizeActionItems(actionItems: unknown[]): Array<{
+  title: string;
+  description?: string;
+  priority: "critical" | "high" | "normal" | "low";
+}> {
+  const normalized: Array<{
+    title: string;
+    description?: string;
+    priority: "critical" | "high" | "normal" | "low";
+  }> = [];
+
+  for (const item of actionItems) {
+    if (typeof item === "string" && item.trim()) {
+      normalized.push({
+        title: item.trim().slice(0, 160),
+        description: item.trim().slice(0, 1000),
+        priority: "high",
+      });
+      continue;
+    }
+    if (item && typeof item === "object") {
+      const row = item as Record<string, unknown>;
+      const title = typeof row.title === "string"
+        ? row.title.trim()
+        : typeof row.task === "string"
+          ? row.task.trim()
+          : "";
+      if (!title) continue;
+      const priorityRaw =
+        typeof row.priority === "string" ? row.priority.toLowerCase() : "normal";
+      const priority: "critical" | "high" | "normal" | "low" =
+        priorityRaw === "critical" ||
+        priorityRaw === "high" ||
+        priorityRaw === "normal" ||
+        priorityRaw === "low"
+          ? priorityRaw
+          : "normal";
+      normalized.push({
+        title: title.slice(0, 160),
+        description:
+          typeof row.description === "string"
+            ? row.description.slice(0, 1000)
+            : undefined,
+        priority,
+      });
+    }
+  }
+  return normalized;
+}
+
+async function createTasksFromActionItems(
+  session: Session,
+): Promise<{ createdCount: number; table: "abra_tasks" | "tasks" | null }> {
+  const actionItems = Array.isArray(session.action_items)
+    ? session.action_items
+    : [];
+  const tasks = normalizeActionItems(actionItems);
+  if (tasks.length === 0) return { createdCount: 0, table: null };
+
+  const payloadForAbraTasks = tasks.map((task) => ({
+    department: session.department,
+    session_id: session.id,
+    title: task.title,
+    description: task.description || null,
+    priority: task.priority,
+    status: "pending",
+    source: "session_action_item",
+  }));
+
+  try {
+    await sbFetch("/rest/v1/abra_tasks", {
+      method: "POST",
+      headers: {
+        Prefer: "return=minimal",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payloadForAbraTasks),
+    });
+    return { createdCount: payloadForAbraTasks.length, table: "abra_tasks" };
+  } catch {
+    // Fallback to legacy core tasks table.
+  }
+
+  const payloadForLegacyTasks = tasks.map((task) => ({
+    task_type: "analysis",
+    title: task.title,
+    description:
+      task.description ||
+      `Action item from session ${session.title || session.id} (${session.department || "general"}).`,
+    priority: task.priority,
+    status: "pending",
+    input_ref: `session:${session.id}`,
+  }));
+
+  try {
+    await sbFetch("/rest/v1/tasks", {
+      method: "POST",
+      headers: {
+        Prefer: "return=minimal",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payloadForLegacyTasks),
+    });
+    return { createdCount: payloadForLegacyTasks.length, table: "tasks" };
+  } catch {
+    return { createdCount: 0, table: null };
   }
 }
 
@@ -419,6 +539,7 @@ async function handlePost(req: Request) {
         action_items: [],
         decisions: [],
         open_questions: [],
+        scratchpad: [],
         user_email: userSession.user.email,
         status: "active",
         started_at: new Date().toISOString(),
@@ -512,6 +633,7 @@ async function handlePatch(req: Request) {
     action_items?: unknown;
     decisions?: unknown;
     open_questions?: unknown;
+    scratchpad_entry?: unknown;
   } = {};
   try {
     payload = await req.json();
@@ -584,6 +706,31 @@ async function handlePatch(req: Request) {
       updates.open_questions = [...current, ...payload.open_questions];
     }
 
+    // Scratchpad entry — multi-turn reasoning working memory
+    // Allows Abra to store intermediate reasoning, hypotheses, and partial conclusions
+    if (payload.scratchpad_entry && typeof payload.scratchpad_entry === "object") {
+      const entry = payload.scratchpad_entry as Record<string, unknown>;
+      const currentScratchpad = Array.isArray(session.scratchpad)
+        ? [...session.scratchpad]
+        : [];
+      const newEntry: ScratchpadEntry = {
+        key: String(entry.key || `scratch_${currentScratchpad.length}`),
+        value: entry.value ?? null,
+        reasoning: typeof entry.reasoning === "string" ? entry.reasoning : undefined,
+        timestamp: new Date().toISOString(),
+      };
+      // Upsert: replace if key already exists, otherwise append
+      const existingIdx = currentScratchpad.findIndex(
+        (s) => s.key === newEntry.key,
+      );
+      if (existingIdx >= 0) {
+        currentScratchpad[existingIdx] = newEntry;
+      } else {
+        currentScratchpad.push(newEntry);
+      }
+      updates.scratchpad = currentScratchpad;
+    }
+
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ session });
     }
@@ -610,14 +757,19 @@ async function handlePatch(req: Request) {
   }
 }
 
-// ─── DELETE: End session (saves to brain, completes) ───
-async function handleDelete(req: Request) {
+// ─── END SESSION: Save + task creation + complete ───
+async function handleEndSession(req: Request) {
   const userSession = await auth();
   if (!userSession?.user?.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let payload: { id?: unknown } = {};
+  let payload: {
+    id?: unknown;
+    notes?: unknown;
+    action_items?: unknown;
+    decisions?: unknown;
+  } = {};
   try {
     payload = await req.json();
   } catch {
@@ -651,10 +803,48 @@ async function handleDelete(req: Request) {
 
     const session = existing[0];
 
-    // 1. Save session notes + decisions to brain
-    await saveSessionToBrain(session);
+    const finalUpdates: Record<string, unknown> = {};
+    if (Array.isArray(payload.notes)) {
+      finalUpdates.notes = [
+        ...(Array.isArray(session.notes) ? session.notes : []),
+        ...payload.notes,
+      ];
+    }
+    if (Array.isArray(payload.action_items)) {
+      finalUpdates.action_items = [
+        ...(Array.isArray(session.action_items) ? session.action_items : []),
+        ...payload.action_items,
+      ];
+    }
+    if (Array.isArray(payload.decisions)) {
+      finalUpdates.decisions = [
+        ...(Array.isArray(session.decisions) ? session.decisions : []),
+        ...payload.decisions,
+      ];
+    }
 
-    // 2. Update session status to completed
+    let sessionToClose: Session = session;
+    if (Object.keys(finalUpdates).length > 0) {
+      const merged = (await sbFetch(`/rest/v1/abra_sessions?id=eq.${id}`, {
+        method: "PATCH",
+        headers: {
+          Prefer: "return=representation",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(finalUpdates),
+      })) as Session[];
+      if (merged[0]) {
+        sessionToClose = merged[0];
+      }
+    }
+
+    // 1. Save full session notes + decisions summary to brain.
+    await saveSessionToBrain(sessionToClose);
+
+    // 2. Create tasks from action items.
+    const taskResult = await createTasksFromActionItems(sessionToClose);
+
+    // 3. Mark session completed.
     const now = new Date().toISOString();
     await sbFetch(`/rest/v1/abra_sessions?id=eq.${id}`, {
       method: "PATCH",
@@ -674,6 +864,8 @@ async function handleDelete(req: Request) {
       status: "completed",
       session_id: id,
       saved_to_brain: true,
+      tasks_created: taskResult.createdCount,
+      tasks_table: taskResult.table,
       ended_at: now,
     });
   } catch (error) {
@@ -687,6 +879,11 @@ async function handleDelete(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const url = new URL(req.url);
+  const action = url.searchParams.get("action");
+  if (action === "end") {
+    return handleEndSession(req);
+  }
   return handlePost(req);
 }
 
@@ -699,5 +896,5 @@ export async function PATCH(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  return handleDelete(req);
+  return handleEndSession(req);
 }
