@@ -1,0 +1,468 @@
+import { notify } from "@/lib/ops/notify";
+import { sendOpsEmail } from "@/lib/ops/email";
+import { createNotionPage, updateNotionPage } from "@/lib/ops/abra-notion-write";
+
+export type AbraAction = {
+  action_type: string;
+  title: string;
+  description: string;
+  department: string;
+  risk_level: "low" | "medium" | "high" | "critical";
+  params: Record<string, unknown>;
+  requires_approval: boolean;
+};
+
+export type ActionResult = {
+  success: boolean;
+  message: string;
+  data?: unknown;
+};
+
+type ApprovalRow = {
+  id: string;
+  status: string;
+  proposed_payload: unknown;
+};
+
+function getSupabaseEnv() {
+  const baseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!baseUrl || !serviceKey) throw new Error("Missing Supabase credentials");
+  return { baseUrl, serviceKey };
+}
+
+async function sbFetch(path: string, init: RequestInit = {}): Promise<unknown> {
+  const { baseUrl, serviceKey } = getSupabaseEnv();
+  const headers = new Headers(init.headers || {});
+  headers.set("apikey", serviceKey);
+  headers.set("Authorization", `Bearer ${serviceKey}`);
+  if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+
+  const res = await fetch(`${baseUrl}${path}`, {
+    ...init,
+    headers,
+    cache: "no-store",
+    signal: init.signal || AbortSignal.timeout(15000),
+  });
+
+  const text = await res.text();
+  let json: unknown = null;
+  if (text) {
+    try {
+      json = JSON.parse(text);
+    } catch {
+      json = text;
+    }
+  }
+
+  if (!res.ok) {
+    throw new Error(
+      `Supabase ${init.method || "GET"} ${path} failed (${res.status}): ${typeof json === "string" ? json : JSON.stringify(json)}`,
+    );
+  }
+  return json;
+}
+
+async function resolveAbraAgentId(): Promise<string> {
+  const rows = (await sbFetch(
+    "/rest/v1/agents?select=id,agent_name&limit=100",
+  )) as Array<{ id: string; agent_name?: string }>;
+  const existing = rows.find(
+    (row) => (row.agent_name || "").toLowerCase() === "abra",
+  );
+  if (existing?.id) return existing.id;
+
+  const created = (await sbFetch("/rest/v1/agents", {
+    method: "POST",
+    headers: {
+      Prefer: "return=representation",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      agent_name: "abra",
+      department: "executive",
+      level: "orchestrator",
+      status: "deployed",
+    }),
+  })) as Array<{ id: string }>;
+
+  if (!created[0]?.id) {
+    throw new Error("Could not resolve abra agent id");
+  }
+  return created[0].id;
+}
+
+async function resolveSystemUserId(): Promise<string | null> {
+  const preferredEmail = process.env.ABRA_OWNER_EMAIL || "ben@usagummies.com";
+  const specific = (await sbFetch(
+    `/rest/v1/users?select=id&email=eq.${encodeURIComponent(preferredEmail)}&limit=1`,
+  )) as Array<{ id: string }>;
+  if (specific[0]?.id) return specific[0].id;
+
+  const anyRows = (await sbFetch("/rest/v1/users?select=id&limit=1")) as Array<{
+    id: string;
+  }>;
+  return anyRows[0]?.id || null;
+}
+
+function mapApprovalActionType(actionType: string): string {
+  if (actionType === "send_email") return "send_email";
+  if (actionType === "send_slack") return "escalation";
+  if (actionType === "update_notion") return "data_mutation";
+  if (actionType === "create_task") return "data_mutation";
+  if (actionType === "create_brain_entry") return "data_mutation";
+  return "other";
+}
+
+function permissionTierForRisk(level: AbraAction["risk_level"]): number {
+  if (level === "critical") return 3;
+  if (level === "high") return 3;
+  if (level === "medium") return 2;
+  return 1;
+}
+
+async function handleSendSlack(
+  params: Record<string, unknown>,
+): Promise<ActionResult> {
+  const channel = String(params.channel || "alerts");
+  const message = String(params.message || "");
+  if (!message) {
+    return { success: false, message: "Missing Slack message" };
+  }
+  const allowedChannel =
+    channel === "daily" || channel === "pipeline" || channel === "alerts"
+      ? channel
+      : "alerts";
+  await notify({ channel: allowedChannel, text: message });
+  return { success: true, message: `Sent to Slack ${allowedChannel}` };
+}
+
+async function handleSendEmail(
+  params: Record<string, unknown>,
+): Promise<ActionResult> {
+  const to = String(params.to || "");
+  const subject = String(params.subject || "Abra action");
+  const body = String(params.body || params.html || params.message || "");
+  if (!to || !body) {
+    return { success: false, message: "Missing email recipient or body" };
+  }
+  await sendOpsEmail({ to, subject, body });
+  return { success: true, message: `Email sent to ${to}` };
+}
+
+async function handleCreateTask(
+  params: Record<string, unknown>,
+): Promise<ActionResult> {
+  const title = String(params.title || "").trim();
+  if (!title) return { success: false, message: "Task title is required" };
+
+  const description = String(params.description || "");
+  const priorityRaw = String(params.priority || "normal").toLowerCase();
+  const priority =
+    priorityRaw === "critical" ||
+    priorityRaw === "high" ||
+    priorityRaw === "normal" ||
+    priorityRaw === "low"
+      ? priorityRaw
+      : "normal";
+  const taskType = String(params.task_type || "notification");
+
+  const abraAgentId = await resolveAbraAgentId();
+  const rows = (await sbFetch("/rest/v1/tasks", {
+    method: "POST",
+    headers: {
+      Prefer: "return=representation",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      created_by_agent_id: abraAgentId,
+      assigned_to_agent_id: abraAgentId,
+      task_type: taskType,
+      title,
+      description,
+      priority,
+      status: "pending",
+    }),
+  })) as Array<{ id: string }>;
+
+  return {
+    success: true,
+    message: "Task created",
+    data: { task_id: rows[0]?.id || null },
+  };
+}
+
+async function handleUpdateNotion(
+  params: Record<string, unknown>,
+): Promise<ActionResult> {
+  const pageId = typeof params.page_id === "string" ? params.page_id : "";
+  const content = typeof params.content === "string" ? params.content : undefined;
+  const properties =
+    params.properties && typeof params.properties === "object"
+      ? (params.properties as Record<string, unknown>)
+      : undefined;
+
+  if (pageId) {
+    const ok = await updateNotionPage({
+      page_id: pageId,
+      ...(properties ? { properties } : {}),
+      ...(content ? { content } : {}),
+    });
+    return {
+      success: ok,
+      message: ok ? "Updated Notion page" : "Failed to update Notion page",
+    };
+  }
+
+  const parentId =
+    typeof params.parent_id === "string"
+      ? params.parent_id
+      : process.env.NOTION_MEETING_NOTES_DB || "";
+  const title = String(params.title || "Abra Update");
+  if (!parentId) {
+    return { success: false, message: "Notion parent_id is required" };
+  }
+
+  const created = await createNotionPage({
+    parent_id: parentId,
+    title,
+    ...(content ? { content } : {}),
+    ...(properties ? { properties } : {}),
+  });
+  return {
+    success: !!created,
+    message: created ? "Created Notion page" : "Failed to create Notion page",
+    data: { page_id: created || null },
+  };
+}
+
+async function handleCreateBrainEntry(
+  params: Record<string, unknown>,
+): Promise<ActionResult> {
+  const title = String(params.title || "Action log");
+  const text = String(params.text || params.content || "");
+  if (!text) return { success: false, message: "Brain entry text is required" };
+
+  const rows = (await sbFetch("/rest/v1/open_brain_entries", {
+    method: "POST",
+    headers: {
+      Prefer: "return=representation",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      source_type: "agent",
+      source_ref: "abra_action",
+      entry_type: "system_log",
+      title,
+      raw_text: text,
+      summary_text: text.slice(0, 500),
+      category: "system_log",
+      department: "executive",
+      confidence: "medium",
+      priority: "normal",
+      processed: true,
+    }),
+  })) as Array<{ id: string }>;
+
+  return {
+    success: true,
+    message: "Brain entry created",
+    data: { entry_id: rows[0]?.id || null },
+  };
+}
+
+async function handleAcknowledgeSignal(
+  params: Record<string, unknown>,
+): Promise<ActionResult> {
+  const signalId = String(params.signal_id || "");
+  if (!signalId) return { success: false, message: "signal_id is required" };
+
+  await sbFetch(`/rest/v1/abra_operational_signals?id=eq.${signalId}`, {
+    method: "PATCH",
+    headers: {
+      Prefer: "return=minimal",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      acknowledged: true,
+      acknowledged_by: "abra",
+      status: "acknowledged",
+    }),
+  });
+
+  return { success: true, message: `Signal ${signalId} acknowledged` };
+}
+
+async function handlePauseInitiative(
+  params: Record<string, unknown>,
+): Promise<ActionResult> {
+  const initiativeId = String(params.initiative_id || "");
+  if (!initiativeId) {
+    return { success: false, message: "initiative_id is required" };
+  }
+
+  await sbFetch(`/rest/v1/abra_initiatives?id=eq.${initiativeId}`, {
+    method: "PATCH",
+    headers: {
+      Prefer: "return=minimal",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      status: "paused",
+      updated_at: new Date().toISOString(),
+    }),
+  });
+
+  return { success: true, message: `Initiative ${initiativeId} paused` };
+}
+
+const ACTION_HANDLERS: Record<
+  string,
+  (params: Record<string, unknown>) => Promise<ActionResult>
+> = {
+  send_slack: handleSendSlack,
+  send_email: handleSendEmail,
+  create_task: handleCreateTask,
+  update_notion: handleUpdateNotion,
+  create_brain_entry: handleCreateBrainEntry,
+  acknowledge_signal: handleAcknowledgeSignal,
+  pause_initiative: handlePauseInitiative,
+};
+
+async function fetchApproval(approvalId: string): Promise<ApprovalRow | null> {
+  const rows = (await sbFetch(
+    `/rest/v1/approvals?id=eq.${approvalId}&select=id,status,proposed_payload&limit=1`,
+  )) as ApprovalRow[];
+  return rows[0] || null;
+}
+
+async function markApprovalResolved(params: {
+  approvalId: string;
+  status: "approved" | "denied";
+  reasoning: string;
+  resultPayload?: unknown;
+}): Promise<void> {
+  const decidedBy = await resolveSystemUserId();
+  if (!decidedBy) return;
+
+  await sbFetch(`/rest/v1/approvals?id=eq.${params.approvalId}`, {
+    method: "PATCH",
+    headers: {
+      Prefer: "return=minimal",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      status: params.status,
+      decision: params.status,
+      decision_reasoning: params.reasoning,
+      decided_by_user_id: decidedBy,
+      decided_at: new Date().toISOString(),
+      ...(params.resultPayload ? { resolved_payload: params.resultPayload } : {}),
+    }),
+  });
+}
+
+function parseActionPayload(input: unknown): AbraAction | null {
+  if (!input || typeof input !== "object") return null;
+  const row = input as Record<string, unknown>;
+  const action_type = String(row.action_type || "").trim();
+  if (!action_type) return null;
+
+  return {
+    action_type,
+    title: String(row.title || action_type),
+    description: String(row.description || row.summary || action_type),
+    department: String(row.department || "executive"),
+    risk_level:
+      row.risk_level === "critical" ||
+      row.risk_level === "high" ||
+      row.risk_level === "medium" ||
+      row.risk_level === "low"
+        ? row.risk_level
+        : "medium",
+    params:
+      row.params && typeof row.params === "object"
+        ? (row.params as Record<string, unknown>)
+        : {},
+    requires_approval: row.requires_approval !== false,
+  };
+}
+
+export async function proposeAction(action: AbraAction): Promise<string> {
+  const abraAgentId = await resolveAbraAgentId();
+  const mappedType = mapApprovalActionType(action.action_type);
+
+  const rows = (await sbFetch("/rest/v1/approvals", {
+    method: "POST",
+    headers: {
+      Prefer: "return=representation",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      requesting_agent_id: abraAgentId,
+      action_type: mappedType,
+      summary: action.description || action.title,
+      proposed_payload: {
+        ...action,
+        original_action_type: action.action_type,
+      },
+      confidence: "medium",
+      risk_level: action.risk_level,
+      permission_tier: permissionTierForRisk(action.risk_level),
+      status: "pending",
+      requested_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    }),
+  })) as Array<{ id: string }>;
+
+  const approvalId = rows[0]?.id;
+  if (!approvalId) throw new Error("Failed to create approval");
+
+  if (!action.requires_approval && action.risk_level === "low") {
+    const result = await executeAction(approvalId);
+    return result.success ? `executed:${approvalId}` : `queued:${approvalId}`;
+  }
+
+  return `queued:${approvalId}`;
+}
+
+export async function executeAction(approvalId: string): Promise<ActionResult> {
+  const approval = await fetchApproval(approvalId);
+  if (!approval) {
+    return { success: false, message: "Approval not found" };
+  }
+  if (approval.status !== "pending") {
+    return { success: false, message: `Approval is ${approval.status}` };
+  }
+
+  const action = parseActionPayload(approval.proposed_payload);
+  if (!action) {
+    return { success: false, message: "Invalid action payload" };
+  }
+
+  const handler = ACTION_HANDLERS[action.action_type];
+  if (!handler) {
+    return { success: false, message: `No handler for ${action.action_type}` };
+  }
+
+  const result = await handler(action.params || {});
+  if (result.success) {
+    await markApprovalResolved({
+      approvalId,
+      status: "approved",
+      reasoning: "Executed by Abra action engine",
+      resultPayload: result.data || { message: result.message },
+    });
+  } else {
+    await markApprovalResolved({
+      approvalId,
+      status: "denied",
+      reasoning: result.message,
+    });
+  }
+  return result;
+}
+
+export function getAvailableActions(): string[] {
+  return Object.keys(ACTION_HANDLERS);
+}

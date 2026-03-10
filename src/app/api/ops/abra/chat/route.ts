@@ -37,6 +37,11 @@ import { searchTiered, buildTieredContext, type TieredSearchResult } from "@/lib
 import { logAnswer, extractProvenance } from "@/lib/ops/abra-source-provenance";
 import { getTeamMembers, getVendors, buildTeamContext } from "@/lib/ops/abra-team-directory";
 import { getActiveSignals, buildSignalsContext } from "@/lib/ops/abra-operational-signals";
+import {
+  getAvailableActions,
+  proposeAction,
+  type AbraAction,
+} from "@/lib/ops/abra-actions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,6 +54,11 @@ const DEFAULT_CLAUDE_MODEL =
 type ChatMessage = {
   role: "user" | "assistant";
   content: string;
+};
+
+type ActionDirective = {
+  action: AbraAction;
+  raw: string;
 };
 
 function getSupabaseEnv() {
@@ -120,6 +130,74 @@ function sanitizeHistory(history: unknown): ChatMessage[] {
     })
     .filter((item) => item.content.length > 0)
     .slice(-12);
+}
+
+function normalizeActionDirective(raw: unknown): AbraAction | null {
+  if (!raw || typeof raw !== "object") return null;
+  const obj = raw as Record<string, unknown>;
+  const actionType =
+    typeof obj.action_type === "string" ? obj.action_type.trim() : "";
+  if (!actionType) return null;
+
+  const risk =
+    obj.risk_level === "low" ||
+    obj.risk_level === "medium" ||
+    obj.risk_level === "high" ||
+    obj.risk_level === "critical"
+      ? obj.risk_level
+      : "medium";
+
+  return {
+    action_type: actionType,
+    title:
+      typeof obj.title === "string" && obj.title.trim()
+        ? obj.title.trim()
+        : actionType,
+    description:
+      typeof obj.description === "string" && obj.description.trim()
+        ? obj.description.trim()
+        : `Requested action: ${actionType}`,
+    department:
+      typeof obj.department === "string" && obj.department.trim()
+        ? obj.department.trim()
+        : "executive",
+    risk_level: risk,
+    params:
+      obj.params && typeof obj.params === "object" && !Array.isArray(obj.params)
+        ? (obj.params as Record<string, unknown>)
+        : {},
+    requires_approval: obj.requires_approval !== false,
+  };
+}
+
+function parseActionDirectives(reply: string): {
+  actions: ActionDirective[];
+  cleanReply: string;
+} {
+  const pattern = /<action>\s*([\s\S]*?)\s*<\/action>/gi;
+  const actions: ActionDirective[] = [];
+  let cleanReply = reply;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(reply)) !== null) {
+    const block = match[0];
+    const payloadRaw = match[1]?.trim() || "";
+    try {
+      const parsed = JSON.parse(payloadRaw) as unknown;
+      const action = normalizeActionDirective(parsed);
+      if (action) {
+        actions.push({ action, raw: block });
+      }
+    } catch {
+      // Ignore malformed blocks and keep response usable.
+    }
+  }
+
+  for (const directive of actions) {
+    cleanReply = cleanReply.replace(directive.raw, "").trim();
+  }
+
+  return { actions, cleanReply: cleanReply.trim() };
 }
 
 // ─── Intent Detection (keyword-based, not LLM) ───
@@ -410,6 +488,7 @@ async function generateClaudeReply(input: {
   costSummary?: AbraCostContext | null;
   teamContext?: string;
   signalsContext?: string;
+  availableActions?: string[];
 }): Promise<{ reply: string; modelUsed: string }> {
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) {
@@ -426,6 +505,10 @@ async function generateClaudeReply(input: {
     teamContext: input.teamContext,
     signalsContext: input.signalsContext,
   });
+  const actionInstructions =
+    input.availableActions && input.availableActions.length > 0
+      ? `\n\nAvailable actions: ${input.availableActions.join(", ")}.\nIf action is needed, append exactly one block like:\n<action>{"action_type":"send_slack","title":"...","description":"...","department":"executive","risk_level":"low","requires_approval":true,"params":{"channel":"alerts","message":"..."}}</action>`
+      : "";
 
   const historyText = buildConversation(input.history);
   const contextText = buildTieredContext(input.tieredResults);
@@ -455,7 +538,7 @@ async function generateClaudeReply(input: {
       model: selectedModel,
       max_tokens: 900,
       temperature: 0.2,
-      system: systemPrompt,
+      system: `${systemPrompt}${actionInstructions}`,
       messages: [{ role: "user", content: userPrompt }],
     }),
     signal: AbortSignal.timeout(30000),
@@ -833,6 +916,7 @@ export async function POST(req: Request) {
     const signalsContext = buildSignalsContext(signals);
 
     const confidence = computeConfidence(tieredResults.all);
+    const availableActions = getAvailableActions();
 
     const claudeResult = await generateClaudeReply({
       message,
@@ -844,8 +928,35 @@ export async function POST(req: Request) {
       costSummary,
       teamContext,
       signalsContext,
+      availableActions,
     });
-    const reply = claudeResult.reply;
+    const parsedActions = parseActionDirectives(claudeResult.reply);
+    const actionNotices: string[] = [];
+    for (const directive of parsedActions.actions.slice(0, 3)) {
+      try {
+        const status = await proposeAction(directive.action);
+        if (status.startsWith("executed:")) {
+          actionNotices.push(
+            `Done: executed action \`${directive.action.action_type}\` (${status.replace("executed:", "")}).`,
+          );
+        } else {
+          actionNotices.push(
+            `Queued for approval: \`${directive.action.action_type}\` (${status.replace("queued:", "")}).`,
+          );
+        }
+      } catch (error) {
+        actionNotices.push(
+          `Failed to queue action \`${directive.action.action_type}\`: ${error instanceof Error ? error.message : "unknown error"}`,
+        );
+      }
+    }
+
+    const reply = [
+      parsedActions.cleanReply || claudeResult.reply,
+      actionNotices.length > 0 ? actionNotices.join("\n") : "",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
 
     // Log answer provenance (best-effort, non-blocking)
     const provenance = extractProvenance(tieredResults.all);
@@ -893,6 +1004,7 @@ export async function POST(req: Request) {
         memory_tier: row.memory_tier,
         metadata: row.metadata || {},
       })),
+      actions: actionNotices,
     });
   } catch (error) {
     if (isSupabaseRelatedError(error)) {
