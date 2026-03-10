@@ -20,12 +20,13 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/config";
 
-/** Routes that handle their own authentication (QStash signature, API key, etc.) */
+/** Routes that handle their own authentication (QStash signature, API key, CRON_SECRET, etc.) */
 const SELF_AUTHENTICATED_PREFIXES = [
   "/api/ops/scheduler/master",
   "/api/ops/engine/",
   "/api/ops/notify",
   "/api/ops/slack/",
+  "/api/ops/abra/", // All Abra routes use isAuthorized() from abra-auth.ts (session + CRON_SECRET)
 ];
 
 function isSelfAuthenticated(pathname: string): boolean {
