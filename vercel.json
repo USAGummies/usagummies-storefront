@@ -1,5 +1,4 @@
 {
-  "$comment": "Vercel Hobby supports one cron. Keep /api/ops/scheduler/master here and trigger /api/ops/abra/digest?type=weekly via QStash or external scheduler.",
   "crons": [
     {
       "path": "/api/ops/scheduler/master",
