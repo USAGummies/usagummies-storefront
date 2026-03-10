@@ -58,6 +58,7 @@ export type AbraPromptContext = {
   activeSession?: AbraSessionContext | null;
   costSummary?: AbraCostContext | null;
   financialContext?: string | null;
+  competitorContext?: string | null;
   teamContext?: string;
   signalsContext?: string;
 };
@@ -181,6 +182,13 @@ These are the ONLY current team members. Do NOT reference anyone else as team un
   // 9b. Financial context (dynamic, finance-only)
   if (ctx.financialContext) {
     sections.push(`FINANCIAL CONTEXT (real data only):\n${ctx.financialContext}`);
+  }
+
+  // 9c. Competitive intelligence context
+  if (ctx.competitorContext) {
+    sections.push(
+      `COMPETITIVE CONTEXT (sales_and_growth playbook):\n${ctx.competitorContext}`,
+    );
   }
 
   // 10. Formatting rules

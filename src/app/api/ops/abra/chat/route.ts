@@ -429,6 +429,134 @@ async function fetchFinancialContext(): Promise<string | null> {
   }
 }
 
+type CompetitorIntelRow = {
+  competitor_name: string;
+  data_type: string;
+  title: string;
+  detail: string | null;
+  created_at: string;
+};
+
+const KNOWN_COMPETITORS = [
+  "haribo",
+  "trolli",
+  "albanese",
+  "sour patch",
+  "black forest",
+  "welch",
+  "smartsweets",
+  "yumearth",
+  "skittles",
+];
+
+function isCompetitorQuestion(message: string): boolean {
+  return /\b(competitor|competition|compete|vs\.?|pricing|promo|promotion|market share|positioning)\b/i.test(
+    message,
+  );
+}
+
+function extractCompetitorHint(message: string): string | null {
+  const lower = message.toLowerCase();
+  for (const name of KNOWN_COMPETITORS) {
+    if (lower.includes(name)) return name;
+  }
+  const vsMatch = lower.match(/\bvs\.?\s+([a-z0-9][a-z0-9\s-]{1,40})/i);
+  if (vsMatch?.[1]) return vsMatch[1].trim();
+  const compMatch = lower.match(/\bcompetitor\s+([a-z0-9][a-z0-9\s-]{1,40})/i);
+  if (compMatch?.[1]) return compMatch[1].trim();
+  return null;
+}
+
+function inferCompetitorDataType(message: string): string {
+  const lower = message.toLowerCase();
+  if (/\b(price|priced|pricing|\$|cost|cheaper|expensive)\b/.test(lower)) {
+    return "pricing";
+  }
+  if (/\b(promo|promotion|discount|coupon|sale|deal)\b/.test(lower)) {
+    return "promotion";
+  }
+  if (/\b(review|rating|stars?|feedback)\b/.test(lower)) {
+    return "review";
+  }
+  if (/\b(launch|flavor|sku|pack|size|ingredient|formula|product)\b/.test(lower)) {
+    return "product";
+  }
+  return "market_position";
+}
+
+function shouldCaptureCompetitorIntel(message: string): boolean {
+  if (!isCompetitorQuestion(message)) return false;
+  if (message.trim().length < 20) return false;
+  return /\b(saw|heard|noticed|offering|launched|running|selling|priced|discount|promo|review)\b/i.test(
+    message,
+  );
+}
+
+async function captureCompetitorIntelFromChat(params: {
+  message: string;
+  userEmail: string;
+  threadId: string;
+}) {
+  if (!shouldCaptureCompetitorIntel(params.message)) return;
+  const competitorName = extractCompetitorHint(params.message);
+  if (!competitorName) return;
+
+  const title =
+    params.message.length > 120
+      ? `${params.message.slice(0, 117)}...`
+      : params.message;
+
+  await sbFetch("/rest/v1/abra_competitor_intel", {
+    method: "POST",
+    headers: {
+      Prefer: "return=minimal",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      competitor_name: competitorName,
+      data_type: inferCompetitorDataType(params.message),
+      title,
+      detail: params.message,
+      source: "manual",
+      metadata: {
+        captured_from_chat: true,
+        thread_id: params.threadId,
+      },
+      department: "sales_and_growth",
+      created_by: params.userEmail,
+    }),
+  });
+}
+
+async function fetchCompetitorContext(message: string): Promise<string | null> {
+  try {
+    const hint = extractCompetitorHint(message);
+    const params = new URLSearchParams({
+      select: "competitor_name,data_type,title,detail,created_at",
+      order: "created_at.desc",
+      limit: "8",
+    });
+    if (hint) {
+      const cleaned = hint.replace(/\*/g, "");
+      params.set("competitor_name", `ilike.*${cleaned}*`);
+    }
+
+    const rows = (await sbFetch(
+      `/rest/v1/abra_competitor_intel?${params.toString()}`,
+    )) as CompetitorIntelRow[];
+    if (!Array.isArray(rows) || rows.length === 0) return null;
+
+    const lines = rows.slice(0, 6).map((row, idx) => {
+      const detail = row.detail ? ` — ${row.detail.slice(0, 160)}` : "";
+      return `${idx + 1}. ${row.competitor_name} [${row.data_type}] ${row.title}${detail}`;
+    });
+
+    return `Recent competitor intelligence:\n${lines.join("\n")}\nUse this context in sales_and_growth recommendations and competitor comparisons.`;
+  } catch {
+    return null;
+  }
+}
+
 async function buildEmbedding(query: string): Promise<number[]> {
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) {
@@ -561,6 +689,7 @@ async function generateClaudeReply(input: {
   activeInitiatives?: AbraInitiativeContext[];
   costSummary?: AbraCostContext | null;
   financialContext?: string | null;
+  competitorContext?: string | null;
   teamContext?: string;
   signalsContext?: string;
   availableActions?: string[];
@@ -578,6 +707,7 @@ async function generateClaudeReply(input: {
     activeInitiatives: input.activeInitiatives,
     costSummary: input.costSummary,
     financialContext: input.financialContext,
+    competitorContext: input.competitorContext,
     teamContext: input.teamContext,
     signalsContext: input.signalsContext,
   });
@@ -699,6 +829,7 @@ export async function POST(req: Request) {
     requestedThreadId && isUuidLike(requestedThreadId)
       ? requestedThreadId
       : makeThreadId();
+  const messageDepartment = detectDepartment(message);
 
   try {
     const circuitCheck = await canUseSupabase();
@@ -713,6 +844,11 @@ export async function POST(req: Request) {
         { status: 503 },
       );
     }
+    void captureCompetitorIntelFromChat({
+      message,
+      userEmail: session.user.email,
+      threadId,
+    }).catch(() => {});
 
     let effectiveHistory = history;
     if (isUuidLike(threadId)) {
@@ -761,7 +897,7 @@ export async function POST(req: Request) {
 
     // If there is an active initiative in question phase and this message looks
     // like answers, auto-route to initiative PATCH flow.
-    const initiativeDepartmentHint = detectDepartment(message);
+    const initiativeDepartmentHint = messageDepartment;
     const activeAskingInitiative = await fetchAskingInitiative(
       initiativeDepartmentHint,
     );
@@ -1059,6 +1195,10 @@ export async function POST(req: Request) {
     const financialContext = isFinanceQuestion(message)
       ? await fetchFinancialContext()
       : null;
+    const competitorContext =
+      isCompetitorQuestion(message) || messageDepartment === "sales_and_growth"
+        ? await fetchCompetitorContext(message)
+        : null;
 
     // Build dynamic context strings for system prompt
     const today = new Date().toISOString().split("T")[0];
@@ -1077,6 +1217,7 @@ export async function POST(req: Request) {
       activeInitiatives,
       costSummary,
       financialContext,
+      competitorContext,
       teamContext,
       signalsContext,
       availableActions,
@@ -1118,7 +1259,7 @@ export async function POST(req: Request) {
       source_tables: provenance.source_tables,
       confidence,
       memory_tiers_used: provenance.memory_tiers_used,
-      department: detectDepartment(message),
+      department: messageDepartment,
       asked_by: session.user.email,
       channel: "web",
       model_used: claudeResult.modelUsed,
