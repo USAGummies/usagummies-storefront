@@ -8,6 +8,7 @@
  */
 
 import { NextResponse } from "next/server";
+import { createHash } from "node:crypto";
 import { auth } from "@/lib/auth/config";
 import {
   canUseSupabase,
@@ -485,6 +486,19 @@ function inferCompetitorDataType(message: string): string {
   return "market_position";
 }
 
+function buildCompetitorDedupeKey(params: {
+  competitorName: string;
+  dataType: string;
+  message: string;
+}): string {
+  const canonical = [
+    params.competitorName.toLowerCase(),
+    params.dataType.toLowerCase(),
+    params.message.trim().toLowerCase(),
+  ].join("|");
+  return createHash("sha256").update(canonical).digest("hex");
+}
+
 function shouldCaptureCompetitorIntel(message: string): boolean {
   if (!isCompetitorQuestion(message)) return false;
   if (message.trim().length < 20) return false;
@@ -506,27 +520,57 @@ async function captureCompetitorIntelFromChat(params: {
     params.message.length > 120
       ? `${params.message.slice(0, 117)}...`
       : params.message;
-
-  await sbFetch("/rest/v1/abra_competitor_intel", {
-    method: "POST",
-    headers: {
-      Prefer: "return=minimal",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      competitor_name: competitorName,
-      data_type: inferCompetitorDataType(params.message),
-      title,
-      detail: params.message,
-      source: "manual",
-      metadata: {
-        captured_from_chat: true,
-        thread_id: params.threadId,
-      },
-      department: "sales_and_growth",
-      created_by: params.userEmail,
-    }),
+  const dataType = inferCompetitorDataType(params.message);
+  const dedupeKey = buildCompetitorDedupeKey({
+    competitorName,
+    dataType,
+    message: params.message,
   });
+
+  try {
+    await sbFetch("/rest/v1/abra_competitor_intel?on_conflict=dedupe_key", {
+      method: "POST",
+      headers: {
+        Prefer: "resolution=merge-duplicates,return=minimal",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        competitor_name: competitorName,
+        data_type: dataType,
+        title,
+        detail: params.message,
+        source: "manual",
+        metadata: {
+          captured_from_chat: true,
+          thread_id: params.threadId,
+        },
+        dedupe_key: dedupeKey,
+        department: "sales_and_growth",
+        created_by: params.userEmail,
+      }),
+    });
+  } catch {
+    await sbFetch("/rest/v1/abra_competitor_intel", {
+      method: "POST",
+      headers: {
+        Prefer: "return=minimal",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        competitor_name: competitorName,
+        data_type: dataType,
+        title,
+        detail: params.message,
+        source: "manual",
+        metadata: {
+          captured_from_chat: true,
+          thread_id: params.threadId,
+        },
+        department: "sales_and_growth",
+        created_by: params.userEmail,
+      }),
+    });
+  }
 }
 
 async function fetchCompetitorContext(message: string): Promise<string | null> {

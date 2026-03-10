@@ -6,6 +6,7 @@ import { emitSignal } from "@/lib/ops/abra-operational-signals";
 import { autoManageInitiatives } from "@/lib/ops/abra-initiative-health";
 import { sendMorningBrief } from "@/lib/ops/abra-morning-brief";
 import { readState, writeState } from "@/lib/ops/state";
+import { notify } from "@/lib/ops/notify";
 import {
   sendWeeklyDigest,
   sendMonthlyReport,
@@ -107,6 +108,27 @@ async function runStep<T>(name: string, fn: () => Promise<T>): Promise<StepOutco
   }
 }
 
+function formatStepSummary(step: StepOutcome): string {
+  return `• ${step.name}: ${step.ok ? "ok" : `failed (${step.error || "unknown"})`} in ${step.duration_ms}ms`;
+}
+
+async function notifySchedulerFailure(params: {
+  runId: string;
+  errors: Array<{ step: string; error: string }>;
+  outcomes: StepOutcome[];
+}) {
+  if (!params.errors.length) return;
+  const text =
+    `🚨 *Abra Scheduler Failure* (run ${params.runId})\n` +
+    params.errors
+      .slice(0, 5)
+      .map((row) => `• ${row.step}: ${row.error}`)
+      .join("\n") +
+    `\n\nStep summary:\n${params.outcomes.map(formatStepSummary).join("\n")}`;
+
+  await notify({ channel: "alerts", text });
+}
+
 export async function POST(req: Request) {
   if (!isAuthorizedCron(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -193,6 +215,13 @@ export async function POST(req: Request) {
     const errors = outcomes
       .filter((step) => !step.ok)
       .map((step) => ({ step: step.name, error: step.error || "unknown error" }));
+    if (errors.length > 0) {
+      void notifySchedulerFailure({
+        runId: lock.run_id,
+        errors,
+        outcomes,
+      }).catch(() => {});
+    }
 
     return NextResponse.json(
       {
@@ -206,6 +235,12 @@ export async function POST(req: Request) {
       { status: errors.length > 0 ? 207 : 200 },
     );
   } catch (error) {
+    void notify({
+      channel: "alerts",
+      text:
+        `🚨 *Abra Scheduler Fatal Error* (run ${lock.run_id})\n` +
+        `• ${error instanceof Error ? error.message : "Scheduler cycle failed"}`,
+    }).catch(() => {});
     return NextResponse.json(
       {
         error:

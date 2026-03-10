@@ -1,4 +1,5 @@
 import { notify } from "@/lib/ops/notify";
+import { randomUUID } from "node:crypto";
 import { sendOpsEmail } from "@/lib/ops/email";
 import { createNotionPage, updateNotionPage } from "@/lib/ops/abra-notion-write";
 
@@ -21,6 +22,9 @@ export type ActionResult = {
 type ApprovalRow = {
   id: string;
   status: string;
+  batch_group?: string | null;
+  decision_reasoning?: string | null;
+  resolved_payload?: unknown;
   proposed_payload: unknown;
 };
 
@@ -331,21 +335,50 @@ const ACTION_HANDLERS: Record<
 
 async function fetchApproval(approvalId: string): Promise<ApprovalRow | null> {
   const rows = (await sbFetch(
-    `/rest/v1/approvals?id=eq.${approvalId}&select=id,status,proposed_payload&limit=1`,
+    `/rest/v1/approvals?id=eq.${approvalId}&select=id,status,batch_group,decision_reasoning,resolved_payload,proposed_payload&limit=1`,
   )) as ApprovalRow[];
   return rows[0] || null;
+}
+
+async function claimPendingApproval(
+  approvalId: string,
+): Promise<{ claimId: string; approval: ApprovalRow } | null> {
+  const claimId = randomUUID();
+  const rows = (await sbFetch(
+    `/rest/v1/approvals?id=eq.${approvalId}&status=eq.pending&batch_group=is.null`,
+    {
+      method: "PATCH",
+      headers: {
+        Prefer: "return=representation",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        batch_group: claimId,
+      }),
+    },
+  )) as ApprovalRow[];
+
+  if (!rows[0]?.id) return null;
+  return { claimId, approval: rows[0] };
 }
 
 async function markApprovalResolved(params: {
   approvalId: string;
   status: "approved" | "denied";
   reasoning: string;
+  claimId?: string;
   resultPayload?: unknown;
 }): Promise<void> {
   const decidedBy = await resolveSystemUserId();
   if (!decidedBy) return;
 
-  await sbFetch(`/rest/v1/approvals?id=eq.${params.approvalId}`, {
+  const claimFilter = params.claimId
+    ? `&batch_group=eq.${encodeURIComponent(params.claimId)}`
+    : "";
+
+  await sbFetch(
+    `/rest/v1/approvals?id=eq.${params.approvalId}&status=eq.pending${claimFilter}`,
+    {
     method: "PATCH",
     headers: {
       Prefer: "return=minimal",
@@ -427,40 +460,81 @@ export async function proposeAction(action: AbraAction): Promise<string> {
 }
 
 export async function executeAction(approvalId: string): Promise<ActionResult> {
-  const approval = await fetchApproval(approvalId);
-  if (!approval) {
-    return { success: false, message: "Approval not found" };
-  }
-  if (approval.status !== "pending") {
-    return { success: false, message: `Approval is ${approval.status}` };
+  const claimed = await claimPendingApproval(approvalId);
+  if (!claimed) {
+    const current = await fetchApproval(approvalId);
+    if (!current) {
+      return { success: false, message: "Approval not found" };
+    }
+    if (current.status === "approved") {
+      return {
+        success: true,
+        message: "Approval already executed",
+        data: current.resolved_payload || {},
+      };
+    }
+    if (current.status === "pending" && current.batch_group) {
+      return {
+        success: false,
+        message: "Approval is currently being executed",
+      };
+    }
+    return { success: false, message: `Approval is ${current.status}` };
   }
 
-  const action = parseActionPayload(approval.proposed_payload);
+  const action = parseActionPayload(claimed.approval.proposed_payload);
   if (!action) {
+    await markApprovalResolved({
+      approvalId,
+      status: "denied",
+      reasoning: "Invalid action payload",
+      claimId: claimed.claimId,
+    });
     return { success: false, message: "Invalid action payload" };
   }
 
   const handler = ACTION_HANDLERS[action.action_type];
   if (!handler) {
-    return { success: false, message: `No handler for ${action.action_type}` };
-  }
-
-  const result = await handler(action.params || {});
-  if (result.success) {
-    await markApprovalResolved({
-      approvalId,
-      status: "approved",
-      reasoning: "Executed by Abra action engine",
-      resultPayload: result.data || { message: result.message },
-    });
-  } else {
     await markApprovalResolved({
       approvalId,
       status: "denied",
-      reasoning: result.message,
+      reasoning: `No handler for ${action.action_type}`,
+      claimId: claimed.claimId,
     });
+    return { success: false, message: `No handler for ${action.action_type}` };
   }
-  return result;
+
+  try {
+    const result = await handler(action.params || {});
+    if (result.success) {
+      await markApprovalResolved({
+        approvalId,
+        status: "approved",
+        reasoning: "Executed by Abra action engine",
+        claimId: claimed.claimId,
+        resultPayload: result.data || { message: result.message },
+      });
+    } else {
+      await markApprovalResolved({
+        approvalId,
+        status: "denied",
+        reasoning: result.message,
+        claimId: claimed.claimId,
+      });
+    }
+    return result;
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Action handler failed";
+    await markApprovalResolved({
+      approvalId,
+      status: "denied",
+      reasoning: message,
+      claimId: claimed.claimId,
+      resultPayload: { error: message },
+    });
+    return { success: false, message };
+  }
 }
 
 export function getAvailableActions(): string[] {

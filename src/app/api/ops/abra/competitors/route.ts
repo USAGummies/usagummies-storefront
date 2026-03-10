@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createHash } from "node:crypto";
 import { auth } from "@/lib/auth/config";
 
 export const runtime = "nodejs";
@@ -67,6 +68,21 @@ async function sbFetch(path: string, init: RequestInit = {}): Promise<unknown> {
 
 function asText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function buildCompetitorDedupeKey(params: {
+  competitorName: string;
+  dataType: string;
+  title: string;
+  detail: string;
+}): string {
+  const canonical = [
+    params.competitorName.toLowerCase(),
+    params.dataType.toLowerCase(),
+    params.title.toLowerCase(),
+    params.detail.toLowerCase(),
+  ].join("|");
+  return createHash("sha256").update(canonical).digest("hex");
 }
 
 export async function GET(req: Request) {
@@ -156,10 +172,18 @@ export async function POST(req: Request) {
       : {};
 
   try {
-    const inserted = (await sbFetch("/rest/v1/abra_competitor_intel", {
+    const dedupeKey = buildCompetitorDedupeKey({
+      competitorName,
+      dataType,
+      title,
+      detail,
+    });
+    const inserted = (await sbFetch(
+      "/rest/v1/abra_competitor_intel?on_conflict=dedupe_key",
+      {
       method: "POST",
       headers: {
-        Prefer: "return=representation",
+        Prefer: "resolution=merge-duplicates,return=representation",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -170,6 +194,7 @@ export async function POST(req: Request) {
         source,
         source_url: sourceUrl || null,
         metadata,
+        dedupe_key: dedupeKey,
         department,
         created_by: session.user.email,
       }),
@@ -179,10 +204,42 @@ export async function POST(req: Request) {
       { entry: Array.isArray(inserted) ? inserted[0] || null : null },
       { status: 201 },
     );
-  } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to create competitor intel entry" },
-      { status: 500 },
-    );
+  } catch {
+    // Fallback insert path for environments without dedupe migration applied yet.
+    try {
+      const inserted = (await sbFetch("/rest/v1/abra_competitor_intel", {
+        method: "POST",
+        headers: {
+          Prefer: "return=representation",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          competitor_name: competitorName,
+          data_type: dataType,
+          title,
+          detail: detail || null,
+          source,
+          source_url: sourceUrl || null,
+          metadata,
+          department,
+          created_by: session.user.email,
+        }),
+      })) as Array<Record<string, unknown>>;
+
+      return NextResponse.json(
+        { entry: Array.isArray(inserted) ? inserted[0] || null : null },
+        { status: 201 },
+      );
+    } catch (fallbackError) {
+      return NextResponse.json(
+        {
+          error:
+            fallbackError instanceof Error
+              ? fallbackError.message
+              : "Failed to create competitor intel entry",
+        },
+        { status: 500 },
+      );
+    }
   }
 }
