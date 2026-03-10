@@ -762,6 +762,27 @@ export async function handleGA4TrafficFeed(): Promise<FeedResult> {
   }
 }
 
+export async function handleEmailFetchFeed(): Promise<FeedResult> {
+  const feedKey = "email_fetch";
+  try {
+    const { runEmailFetch } = await import("@/lib/ops/abra-email-fetch");
+    const result = await runEmailFetch({ count: 50 });
+    return {
+      feed_key: feedKey,
+      success: true,
+      entriesCreated: result.inserted,
+      ...(result.note ? { error: result.note } : {}),
+    };
+  } catch (error) {
+    return {
+      feed_key: feedKey,
+      success: false,
+      entriesCreated: 0,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
 /**
  * Placeholder feed handler — inventory alerts and operational signal emit.
  * TODO: Replace env-sample ingestion with live inventory feed.
@@ -923,6 +944,7 @@ export async function runFeed(feedKey: string): Promise<FeedResult> {
     shopify_products: handleShopifyProductsFeed,
     shopify_inventory: handleShopifyInventoryFeed,
     ga4_traffic: handleGA4TrafficFeed,
+    email_fetch: handleEmailFetchFeed,
     inventory_alerts: handleInventoryAlertsFeed,
   };
 
