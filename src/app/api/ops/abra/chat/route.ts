@@ -58,6 +58,7 @@ export const maxDuration = 30;
 const DEFAULT_MATCH_COUNT = 8;
 const DEFAULT_CLAUDE_MODEL =
   process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-latest";
+const MAX_MESSAGE_LENGTH = 4000;
 
 type ChatMessage = {
   role: "user" | "assistant" | "system";
@@ -814,10 +815,20 @@ export async function POST(req: Request) {
   }
 
   const message =
-    typeof payload.message === "string" ? payload.message.trim() : "";
+    typeof payload.message === "string"
+      ? payload.message.replaceAll("\0", "").trim()
+      : "";
   if (!message) {
     return NextResponse.json(
       { error: "message is required" },
+      { status: 400 },
+    );
+  }
+  if (message.length > MAX_MESSAGE_LENGTH) {
+    return NextResponse.json(
+      {
+        error: `message exceeds max length (${MAX_MESSAGE_LENGTH} chars)`,
+      },
       { status: 400 },
     );
   }

@@ -102,24 +102,67 @@ async function getTodaySessionCount(): Promise<number> {
 }
 
 export async function generateMorningBrief(): Promise<string> {
-  const [signals, anomalies, health, approvals, spend, todaySessions] =
-    await Promise.all([
-      getActiveSignals({ limit: 20 }),
-      detectAnomalies(),
-      checkInitiativeHealth(),
-      getPendingApprovalsCount(),
-      getMonthlySpend(),
-      getTodaySessionCount(),
-    ]);
+  const [
+    signalsRes,
+    anomaliesRes,
+    healthRes,
+    approvalsRes,
+    spendRes,
+    sessionsTodayRes,
+  ] = await Promise.allSettled([
+    getActiveSignals({ limit: 20 }),
+    detectAnomalies(),
+    checkInitiativeHealth(),
+    getPendingApprovalsCount(),
+    getMonthlySpend(),
+    getTodaySessionCount(),
+  ]);
+  const [
+    shopifyRevenueRes,
+    shopifyOrdersRes,
+    amazonRevenueRes,
+    amazonOrdersRes,
+    sessionsRes,
+  ] = await Promise.allSettled([
+    getMetricSnapshot("daily_revenue_shopify"),
+    getMetricSnapshot("daily_orders_shopify"),
+    getMetricSnapshot("daily_revenue_amazon"),
+    getMetricSnapshot("daily_orders_amazon"),
+    getMetricSnapshot("daily_sessions"),
+  ]);
 
-  const [shopifyRevenue, shopifyOrders, amazonRevenue, amazonOrders, sessions] =
-    await Promise.all([
-      getMetricSnapshot("daily_revenue_shopify"),
-      getMetricSnapshot("daily_orders_shopify"),
-      getMetricSnapshot("daily_revenue_amazon"),
-      getMetricSnapshot("daily_orders_amazon"),
-      getMetricSnapshot("daily_sessions"),
-    ]);
+  const signals =
+    signalsRes.status === "fulfilled" && Array.isArray(signalsRes.value)
+      ? signalsRes.value
+      : [];
+  const anomalies =
+    anomaliesRes.status === "fulfilled" && Array.isArray(anomaliesRes.value)
+      ? anomaliesRes.value
+      : [];
+  const health =
+    healthRes.status === "fulfilled" && Array.isArray(healthRes.value)
+      ? healthRes.value
+      : [];
+  const approvals =
+    approvalsRes.status === "fulfilled" ? Number(approvalsRes.value || 0) : 0;
+  const spend =
+    spendRes.status === "fulfilled"
+      ? spendRes.value
+      : { total: 0, budget: 1000, pctUsed: 0 };
+  const todaySessions =
+    sessionsTodayRes.status === "fulfilled"
+      ? Number(sessionsTodayRes.value || 0)
+      : 0;
+  const shopifyRevenue =
+    shopifyRevenueRes.status === "fulfilled" ? shopifyRevenueRes.value : null;
+  const shopifyOrders =
+    shopifyOrdersRes.status === "fulfilled" ? shopifyOrdersRes.value : null;
+  const amazonRevenue =
+    amazonRevenueRes.status === "fulfilled" ? amazonRevenueRes.value : null;
+  const amazonOrders =
+    amazonOrdersRes.status === "fulfilled" ? amazonOrdersRes.value : null;
+  const sessions =
+    sessionsRes.status === "fulfilled" ? sessionsRes.value : null;
 
   const stale = health.filter((item) => item.health !== "healthy");
   const signalLines = signals.slice(0, 5).map((signal) => {

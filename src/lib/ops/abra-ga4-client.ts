@@ -1,4 +1,6 @@
 import { google } from "googleapis";
+import fs from "node:fs";
+import path from "node:path";
 
 export type GA4Report = {
   sessions: number;
@@ -16,11 +18,34 @@ function asNumber(value: unknown): number {
 }
 
 function parseServiceAccountJson(): Record<string, unknown> {
-  const raw = process.env.GA4_SERVICE_ACCOUNT_JSON;
-  if (!raw) {
-    throw new Error("GA4_SERVICE_ACCOUNT_JSON not set");
+  const inline = process.env.GA4_SERVICE_ACCOUNT_JSON;
+  if (inline) {
+    try {
+      return JSON.parse(inline) as Record<string, unknown>;
+    } catch {
+      throw new Error("GA4_SERVICE_ACCOUNT_JSON is not valid JSON");
+    }
   }
-  return JSON.parse(raw) as Record<string, unknown>;
+
+  const configuredPath = process.env.GA4_SERVICE_ACCOUNT_PATH;
+  const defaultPath = path.join(
+    process.env.HOME || "/Users/ben",
+    ".config/usa-gummies-mcp/ga4-service-account.json",
+  );
+  const credentialPath = configuredPath || defaultPath;
+
+  if (!fs.existsSync(credentialPath)) {
+    throw new Error(
+      `GA4 credentials missing. Set GA4_SERVICE_ACCOUNT_JSON or provide file at ${credentialPath}`,
+    );
+  }
+
+  try {
+    const text = fs.readFileSync(credentialPath, "utf8");
+    return JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    throw new Error(`Failed to parse GA4 service account file at ${credentialPath}`);
+  }
 }
 
 function getPropertyId(propertyId?: string): string {
