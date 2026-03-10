@@ -32,13 +32,6 @@ export type FeedResult = {
   error?: string;
 };
 
-type InventorySnapshotRow = {
-  sku: string;
-  on_hand: number;
-  reorder_point: number;
-  location?: string;
-};
-
 function getSupabaseEnv() {
   const baseUrl =
     process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -239,8 +232,11 @@ async function writeBrainEntry(params: {
 export async function runShopifyOrdersFeed(): Promise<FeedResult> {
   const feedKey = "shopify_orders";
   try {
-    const shopifyDomain = process.env.SHOPIFY_STORE_DOMAIN;
-    const shopifyToken = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
+    const shopifyDomain =
+      process.env.SHOPIFY_STORE || process.env.SHOPIFY_STORE_DOMAIN;
+    const shopifyToken =
+      process.env.SHOPIFY_ADMIN_TOKEN || process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
+    const shopifyVersion = process.env.SHOPIFY_API_VERSION || "2024-10";
     if (!shopifyDomain || !shopifyToken) {
       return {
         feed_key: feedKey,
@@ -251,7 +247,7 @@ export async function runShopifyOrdersFeed(): Promise<FeedResult> {
     }
 
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const url = `https://${shopifyDomain}/admin/api/2024-10/orders.json?status=any&created_at_min=${since}&limit=50`;
+    const url = `https://${shopifyDomain}/admin/api/${shopifyVersion}/orders.json?status=any&created_at_min=${since}&limit=250`;
     const res = await fetch(url, {
       headers: {
         "X-Shopify-Access-Token": shopifyToken,
@@ -270,18 +266,37 @@ export async function runShopifyOrdersFeed(): Promise<FeedResult> {
     }
 
     const data = await res.json();
-    const orders = data.orders || [];
+    const orders = Array.isArray(data.orders)
+      ? (data.orders as Array<{
+          id?: number;
+          name?: string;
+          total_price?: string;
+          customer?: { id?: number; orders_count?: number | string };
+          line_items?: Array<{ quantity?: number }>;
+        }>)
+      : [];
     if (orders.length === 0) {
       return { feed_key: feedKey, success: true, entriesCreated: 0 };
     }
 
-    const totalRevenue = orders.reduce(
-      (sum: number, order: { total_price: string }) =>
-        sum + parseFloat(order.total_price || "0"),
-      0,
+    const totalRevenue = orders.reduce((sum, order) => {
+      return sum + parseFloat(order.total_price || "0");
+    }, 0);
+    const largeOrders = orders.filter(
+      (order) => parseFloat(order.total_price || "0") > 100,
     );
+    let newCustomers = 0;
+    let returningCustomers = 0;
+    for (const order of orders) {
+      const count = Number(order.customer?.orders_count || 0);
+      if (Number.isFinite(count) && count > 1) {
+        returningCustomers += 1;
+      } else {
+        newCustomers += 1;
+      }
+    }
     const date = new Date().toISOString().split("T")[0];
-    const summary = `Shopify DTC Orders (${date}): ${orders.length} orders, $${totalRevenue.toFixed(2)} total revenue. Average order: $${(totalRevenue / orders.length).toFixed(2)}.`;
+    const summary = `Shopify DTC Orders (${date}): ${orders.length} orders, $${totalRevenue.toFixed(2)} total revenue. Average order: $${(totalRevenue / orders.length).toFixed(2)}. Customers: ${newCustomers} new, ${returningCustomers} returning. Large orders (>$100): ${largeOrders.length}.`;
     const saved = await writeBrainEntry({
       sourceRef: `shopify-orders-${date}`,
       title: `Shopify Orders Summary — ${date}`,
@@ -289,6 +304,23 @@ export async function runShopifyOrdersFeed(): Promise<FeedResult> {
       category: "sales_data",
       department: "sales_and_growth",
     });
+
+    for (const order of largeOrders.slice(0, 25)) {
+      const amount = parseFloat(order.total_price || "0");
+      void emitSignal({
+        signal_type: "large_order",
+        source: "shopify",
+        title: `Large Shopify order: $${amount.toFixed(2)}`,
+        detail: `Order ${order.name || order.id || "unknown"} exceeded $100`,
+        severity: amount >= 300 ? "warning" : "info",
+        department: "sales_and_growth",
+        metadata: {
+          order_id: order.id || null,
+          order_name: order.name || null,
+          amount,
+        },
+      });
+    }
 
     return { feed_key: feedKey, success: true, entriesCreated: saved ? 1 : 0 };
   } catch (error) {
@@ -380,24 +412,88 @@ export async function handleFaireOrdersFeed(): Promise<FeedResult> {
 export async function handleShopifyProductsFeed(): Promise<FeedResult> {
   const feedKey = "shopify_products";
   try {
-    const sample = parseJsonEnv<Array<{ sku: string; title: string }>>(
-      "ABRA_SHOPIFY_PRODUCTS_SAMPLE_JSON",
-      [],
-    );
-    if (!Array.isArray(sample) || sample.length === 0) {
+    const store = process.env.SHOPIFY_STORE || process.env.SHOPIFY_STORE_DOMAIN;
+    const token =
+      process.env.SHOPIFY_ADMIN_TOKEN || process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
+    const version = process.env.SHOPIFY_API_VERSION || "2024-10";
+    if (!store || !token) {
+      return {
+        feed_key: feedKey,
+        success: false,
+        entriesCreated: 0,
+        error: "Missing Shopify creds",
+      };
+    }
+
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const url = `https://${store}/admin/api/${version}/products.json?updated_at_min=${encodeURIComponent(since)}&limit=250`;
+    const res = await fetch(url, {
+      headers: {
+        "X-Shopify-Access-Token": token,
+        "Content-Type": "application/json",
+      },
+      signal: AbortSignal.timeout(15000),
+    });
+
+    if (!res.ok) {
+      throw new Error(`Shopify products ${res.status}: ${await res.text()}`);
+    }
+
+    const data = await res.json();
+    const products = Array.isArray(data?.products)
+      ? (data.products as Array<{
+          id?: number;
+          title?: string;
+          product_type?: string;
+          status?: string;
+          variants?: Array<{
+            price?: string;
+            inventory_quantity?: number;
+          }>;
+        }>)
+      : [];
+
+    if (products.length === 0) {
       return { feed_key: feedKey, success: true, entriesCreated: 0 };
     }
 
-    const summary = `Shopify catalog snapshot: ${sample.length} product records captured.`;
-    const date = new Date().toISOString().split("T")[0];
-    const saved = await writeBrainEntry({
-      sourceRef: `shopify-products-${date}`,
-      title: `Shopify Product Sync — ${date}`,
-      rawText: summary,
-      category: "operational",
-      department: "operations",
-    });
-    return { feed_key: feedKey, success: true, entriesCreated: saved ? 1 : 0 };
+    let created = 0;
+    for (const product of products) {
+      const variants = Array.isArray(product.variants) ? product.variants : [];
+      const totalInventory = variants.reduce(
+        (sum, variant) => sum + Number(variant.inventory_quantity || 0),
+        0,
+      );
+      const firstPrice = variants[0]?.price || "?";
+      const text = `Product update: "${product.title || "Untitled"}" (${product.product_type || "uncategorized"}). ${variants.length} variants. Total inventory: ${totalInventory}. Status: ${product.status || "unknown"}. Price range: $${firstPrice}.`;
+
+      const saved = await writeBrainEntry({
+        sourceRef: `shopify-product-${product.id || "unknown"}-${new Date().toISOString().split("T")[0]}`,
+        title: `Shopify Product Update — ${product.title || product.id || "Unknown"}`,
+        rawText: text,
+        category: "product_update",
+        department: "operations",
+      });
+      if (saved) created += 1;
+
+      if ((product.status || "").toLowerCase() === "active" && totalInventory < 100) {
+        void emitSignal({
+          signal_type: "inventory_alert",
+          source: "shopify",
+          title: `Low inventory: ${product.title || product.id || "Unknown product"}`,
+          detail: `Only ${totalInventory} units remaining across ${variants.length} variants`,
+          severity: totalInventory < 25 ? "critical" : "warning",
+          department: "supply_chain",
+          metadata: {
+            product_id: product.id || null,
+            title: product.title || null,
+            inventory: totalInventory,
+          },
+        });
+      }
+    }
+
+    return { feed_key: feedKey, success: true, entriesCreated: created };
   } catch (error) {
     return {
       feed_key: feedKey,
@@ -448,30 +544,87 @@ export async function handleGA4TrafficFeed(): Promise<FeedResult> {
  * TODO: Replace env-sample ingestion with live inventory feed.
  */
 export async function handleInventoryAlertsFeed(): Promise<FeedResult> {
+  return handleShopifyInventoryFeed();
+}
+
+/**
+ * Shopify inventory monitor feed.
+ */
+export async function handleShopifyInventoryFeed(): Promise<FeedResult> {
   const feedKey = "inventory_alerts";
   try {
-    const snapshot = parseJsonEnv<InventorySnapshotRow[]>(
-      "ABRA_INVENTORY_SNAPSHOT_JSON",
-      [],
-    );
+    const store = process.env.SHOPIFY_STORE || process.env.SHOPIFY_STORE_DOMAIN;
+    const token =
+      process.env.SHOPIFY_ADMIN_TOKEN || process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
+    const version = process.env.SHOPIFY_API_VERSION || "2024-10";
+    if (!store || !token) {
+      return {
+        feed_key: feedKey,
+        success: false,
+        entriesCreated: 0,
+        error: "Missing Shopify creds",
+      };
+    }
 
-    if (!Array.isArray(snapshot) || snapshot.length === 0) {
+    const url = `https://${store}/admin/api/${version}/products.json?status=active&limit=250`;
+    const res = await fetch(url, {
+      headers: {
+        "X-Shopify-Access-Token": token,
+        "Content-Type": "application/json",
+      },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) {
+      throw new Error(`Shopify inventory ${res.status}: ${await res.text()}`);
+    }
+
+    const data = await res.json();
+    const products = Array.isArray(data?.products)
+      ? (data.products as Array<{
+          id?: number;
+          title?: string;
+          variants?: Array<{ sku?: string; inventory_quantity?: number }>;
+        }>)
+      : [];
+
+    if (products.length === 0) {
       return { feed_key: feedKey, success: true, entriesCreated: 0 };
     }
 
-    const lowStock = snapshot.filter(
-      (row) => row.on_hand <= row.reorder_point,
-    );
+    const safetyStock = 75;
+    const criticalStock = 20;
+    const lowStock = products
+      .map((product) => {
+        const variants = Array.isArray(product.variants) ? product.variants : [];
+        const onHand = variants.reduce(
+          (sum, variant) => sum + Number(variant.inventory_quantity || 0),
+          0,
+        );
+        return {
+          sku: variants[0]?.sku || String(product.id || "unknown"),
+          on_hand: onHand,
+          reorder_point: safetyStock,
+          location: "shopify",
+          title: product.title || "Unknown product",
+          product_id: product.id || null,
+          variant_count: variants.length,
+        };
+      })
+      .filter((row) => row.on_hand <= row.reorder_point);
+
     for (const item of lowStock.slice(0, 10)) {
       void emitSignal({
         signal_type: "inventory_alert",
-        source: "inventory_feed",
-        title: `Low stock: ${item.sku}`,
-        detail: `${item.sku} on-hand ${item.on_hand} is below reorder point ${item.reorder_point}`,
-        severity: item.on_hand <= Math.max(0, item.reorder_point * 0.5) ? "critical" : "warning",
+        source: "shopify",
+        title: `Low stock: ${item.title}`,
+        detail: `${item.sku} on-hand ${item.on_hand} is below safety stock ${item.reorder_point}`,
+        severity: item.on_hand <= criticalStock ? "critical" : "warning",
         department: "supply_chain",
         metadata: {
           sku: item.sku,
+          product_id: item.product_id,
+          title: item.title,
+          variant_count: item.variant_count,
           on_hand: item.on_hand,
           reorder_point: item.reorder_point,
           location: item.location || null,
@@ -486,8 +639,8 @@ export async function handleInventoryAlertsFeed(): Promise<FeedResult> {
     const summary = `Inventory alerts: ${lowStock.length} SKUs below reorder point (${lowStock.map((item) => item.sku).join(", ")}).`;
     const date = new Date().toISOString().split("T")[0];
     const saved = await writeBrainEntry({
-      sourceRef: `inventory-alerts-${date}`,
-      title: `Inventory Alert Summary — ${date}`,
+      sourceRef: `shopify-inventory-${date}`,
+      title: `Shopify Inventory Summary — ${date}`,
       rawText: summary,
       category: "operational",
       department: "supply_chain",
@@ -544,6 +697,7 @@ export async function runFeed(feedKey: string): Promise<FeedResult> {
     amazon_orders: handleAmazonOrdersFeed,
     faire_orders: handleFaireOrdersFeed,
     shopify_products: handleShopifyProductsFeed,
+    shopify_inventory: handleShopifyInventoryFeed,
     ga4_traffic: handleGA4TrafficFeed,
     inventory_alerts: handleInventoryAlertsFeed,
   };
