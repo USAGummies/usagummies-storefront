@@ -5,6 +5,11 @@ import {
   ResponsiveContainer,
   LineChart,
   Line,
+  ComposedChart,
+  Area,
+  PieChart,
+  Pie,
+  Cell,
   CartesianGrid,
   XAxis,
   YAxis,
@@ -35,6 +40,32 @@ import {
   SURFACE_BORDER as BORDER,
   SURFACE_TEXT_DIM as TEXT_DIM,
 } from "@/app/ops/tokens";
+
+type RevenueByChannel = {
+  channels: {
+    shopify: { revenue: number; orders: number; aov: number; trend: Array<{ date: string; value: number }> };
+    amazon: { revenue: number; orders: number; aov: number; trend: Array<{ date: string; value: number }> };
+    faire: { revenue: number; orders: number; aov: number; trend: Array<{ date: string; value: number }> };
+  };
+  total: { revenue: number; orders: number; aov: number };
+  period: { start: string; end: string; days: number };
+};
+
+type MarginViewResponse = {
+  margins?: {
+    estimated_cogs_per_unit: number;
+    estimated_gross_margin_pct: number;
+    revenue: number;
+    estimated_cogs: number;
+    estimated_gross_profit: number;
+  };
+};
+
+const CHANNEL_COLORS = {
+  shopify: NAVY,
+  amazon: RED,
+  faire: GOLD,
+} as const;
 
 function formatDelta(current: number | null, previous: number | null, opts?: { inverse?: boolean }) {
   if (current == null || previous == null || previous === 0) {
@@ -105,6 +136,10 @@ export function FinanceView() {
   const { data: dashboard } = useDashboardData();
   const { data: amzProfit, loading: amzLoading } = useAmazonProfitability();
   const [prevPnl, setPrevPnl] = useState<PnLReport | null>(null);
+  const [channelData, setChannelData] = useState<RevenueByChannel | null>(null);
+  const [channelLoading, setChannelLoading] = useState(false);
+  const [channelError, setChannelError] = useState<string | null>(null);
+  const [marginSnapshot, setMarginSnapshot] = useState<MarginViewResponse["margins"] | null>(null);
   const ap = amzProfit?.profitability;
 
   useEffect(() => {
@@ -120,6 +155,42 @@ export function FinanceView() {
       .catch(() => {
         if (!cancelled) setPrevPnl(null);
       });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadRevenueByChannel() {
+      setChannelLoading(true);
+      setChannelError(null);
+      try {
+        const [channelRes, marginRes] = await Promise.all([
+          fetch("/api/ops/abra/revenue-by-channel?days=30", { cache: "no-store" }),
+          fetch("/api/ops/abra/finance?view=margins", { cache: "no-store" }),
+        ]);
+
+        const channelJson = (await channelRes.json().catch(() => ({}))) as RevenueByChannel & { error?: string };
+        const marginJson = (await marginRes.json().catch(() => ({}))) as MarginViewResponse & { error?: string };
+
+        if (!channelRes.ok) throw new Error(channelJson.error || "Failed to load channel revenue");
+        if (!cancelled) {
+          setChannelData(channelJson);
+          setMarginSnapshot(marginJson.margins || null);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setChannelError(error instanceof Error ? error.message : "Failed to load channel revenue");
+          setChannelData(null);
+        }
+      } finally {
+        if (!cancelled) setChannelLoading(false);
+      }
+    }
+
+    void loadRevenueByChannel();
     return () => {
       cancelled = true;
     };
@@ -184,6 +255,40 @@ export function FinanceView() {
     },
   ];
 
+  const channelPie = useMemo(() => {
+    if (!channelData) return [];
+    return [
+      { name: "Shopify", key: "shopify", value: channelData.channels.shopify.revenue },
+      { name: "Amazon", key: "amazon", value: channelData.channels.amazon.revenue },
+      { name: "Faire/Wholesale", key: "faire", value: channelData.channels.faire.revenue },
+    ];
+  }, [channelData]);
+
+  const channelTrendRows = useMemo(() => {
+    if (!channelData) return [];
+    const dateSet = new Set<string>();
+    for (const trend of channelData.channels.shopify.trend) dateSet.add(trend.date);
+    for (const trend of channelData.channels.amazon.trend) dateSet.add(trend.date);
+    for (const trend of channelData.channels.faire.trend) dateSet.add(trend.date);
+
+    const sorted = [...dateSet].sort((a, b) => a.localeCompare(b));
+    return sorted.map((date) => {
+      const shopify =
+        channelData.channels.shopify.trend.find((point) => point.date === date)?.value || 0;
+      const amazon =
+        channelData.channels.amazon.trend.find((point) => point.date === date)?.value || 0;
+      const faire =
+        channelData.channels.faire.trend.find((point) => point.date === date)?.value || 0;
+      return {
+        date,
+        day: new Date(`${date}T00:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        shopify,
+        amazon,
+        faire,
+      };
+    });
+  }, [channelData]);
+
   return (
     <div style={{ background: BG, minHeight: "100vh", paddingBottom: 20 }}>
       <div style={{ marginBottom: 16 }}>
@@ -224,6 +329,167 @@ export function FinanceView() {
           <PlaidConnectButton onSuccess={() => window.location.reload()} />
         </div>
       ) : null}
+
+      {channelError ? (
+        <div
+          style={{
+            border: `1px solid ${RED}33`,
+            background: `${RED}0f`,
+            color: RED,
+            borderRadius: 10,
+            padding: "10px 12px",
+            marginBottom: 12,
+            fontSize: 13,
+            fontWeight: 700,
+          }}
+        >
+          {channelError}
+        </div>
+      ) : null}
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1.2fr 1fr",
+          gap: 12,
+          marginBottom: 12,
+        }}
+      >
+        <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px" }}>
+          <div style={{ fontWeight: 700, color: NAVY, marginBottom: 10 }}>Revenue by Channel (30d)</div>
+          {channelLoading && !channelData ? (
+            <SkeletonChart height={260} />
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 8, alignItems: "center" }}>
+              <div style={{ width: "100%", height: 220 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={channelPie}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={78}
+                      innerRadius={40}
+                      paddingAngle={2}
+                    >
+                      {channelPie.map((entry) => (
+                        <Cell
+                          key={entry.key}
+                          fill={
+                            entry.key === "shopify"
+                              ? CHANNEL_COLORS.shopify
+                              : entry.key === "amazon"
+                                ? CHANNEL_COLORS.amazon
+                                : CHANNEL_COLORS.faire
+                          }
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => fmtDollar(Number(value || 0))} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div style={{ display: "grid", gap: 8 }}>
+                {channelPie.map((row) => {
+                  const pct =
+                    channelData && channelData.total.revenue > 0
+                      ? (row.value / channelData.total.revenue) * 100
+                      : 0;
+                  return (
+                    <div key={row.key} style={{ border: `1px solid ${BORDER}`, borderRadius: 10, padding: "8px 10px", background: BG }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ color: NAVY, fontSize: 13, fontWeight: 700 }}>
+                          {row.name}
+                        </span>
+                        <span style={{ color: TEXT_DIM, fontSize: 12 }}>{pct.toFixed(1)}%</span>
+                      </div>
+                      <div style={{ marginTop: 4, color: NAVY, fontSize: 15, fontWeight: 800 }}>
+                        {fmtDollar(row.value)}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: "grid", gap: 10 }}>
+          <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px" }}>
+            <div style={{ fontWeight: 700, color: NAVY, marginBottom: 10 }}>Margin Snapshot</div>
+            <div style={{ display: "grid", gap: 8 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                <span style={{ color: TEXT_DIM }}>Gross margin</span>
+                <span style={{ color: NAVY, fontWeight: 700 }}>
+                  {marginSnapshot ? `${marginSnapshot.estimated_gross_margin_pct.toFixed(1)}%` : "—"}
+                </span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                <span style={{ color: TEXT_DIM }}>COGS per unit</span>
+                <span style={{ color: NAVY, fontWeight: 700 }}>
+                  {marginSnapshot ? fmtDollarExact(marginSnapshot.estimated_cogs_per_unit) : "—"}
+                </span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                <span style={{ color: TEXT_DIM }}>Estimated gross profit</span>
+                <span style={{ color: NAVY, fontWeight: 700 }}>
+                  {marginSnapshot ? fmtDollar(marginSnapshot.estimated_gross_profit) : "—"}
+                </span>
+              </div>
+              <div style={{ borderTop: `1px solid ${BORDER}`, paddingTop: 8, fontSize: 12, color: TEXT_DIM }}>
+                Revenue base: {marginSnapshot ? fmtDollar(marginSnapshot.revenue) : "—"}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px" }}>
+            <div style={{ fontWeight: 700, color: NAVY, marginBottom: 10 }}>Cash Position</div>
+            <div style={{ display: "grid", gap: 8 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                <span style={{ color: TEXT_DIM }}>Current cash</span>
+                <span style={{ color: NAVY, fontWeight: 700 }}>
+                  {balances?.totalCash != null ? fmtDollar(balances.totalCash) : "—"}
+                </span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                <span style={{ color: TEXT_DIM }}>Burn rate (daily)</span>
+                <span style={{ color: burnRate != null && burnRate > 0 ? RED : NAVY, fontWeight: 700 }}>
+                  {burnRate != null ? fmtDollar(burnRate) : "—"}
+                </span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                <span style={{ color: TEXT_DIM }}>Runway estimate</span>
+                <span style={{ color: NAVY, fontWeight: 700 }}>
+                  {forecast?.runway != null ? `${forecast.runway} days` : "—"}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px", marginBottom: 14 }}>
+        <div style={{ fontWeight: 700, color: NAVY, marginBottom: 10 }}>Channel Revenue Trend (30d)</div>
+        {channelLoading && !channelData ? (
+          <SkeletonChart height={280} />
+        ) : (
+          <div style={{ width: "100%", height: 280 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={channelTrendRows}>
+                <CartesianGrid stroke={BORDER} vertical={false} />
+                <XAxis dataKey="day" tick={{ fontSize: 11, fill: TEXT_DIM }} />
+                <YAxis tick={{ fontSize: 11, fill: TEXT_DIM }} tickFormatter={(v) => `$${Number(v).toLocaleString("en-US")}`} />
+                <Tooltip formatter={(value, key) => [fmtDollar(Number(value || 0)), String(key)]} />
+                <Area type="monotone" dataKey="shopify" stackId="revenue" stroke={CHANNEL_COLORS.shopify} fill={CHANNEL_COLORS.shopify} fillOpacity={0.18} />
+                <Area type="monotone" dataKey="amazon" stackId="revenue" stroke={CHANNEL_COLORS.amazon} fill={CHANNEL_COLORS.amazon} fillOpacity={0.18} />
+                <Area type="monotone" dataKey="faire" stackId="revenue" stroke={CHANNEL_COLORS.faire} fill={CHANNEL_COLORS.faire} fillOpacity={0.18} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </div>
 
       <div
         style={{
