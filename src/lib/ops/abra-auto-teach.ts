@@ -7,6 +7,7 @@
 
 import { emitSignal } from "@/lib/ops/abra-operational-signals";
 import { recordKPI } from "@/lib/ops/abra-kpi-recorder";
+import { notify } from "@/lib/ops/notify";
 
 export type AutoTeachFeed = {
   id: string;
@@ -24,6 +25,7 @@ export type AutoTeachFeed = {
   last_status?: string | null;
   last_error?: string | null;
   error_count?: number;
+  consecutive_failures?: number;
 };
 
 export type FeedResult = {
@@ -31,6 +33,18 @@ export type FeedResult = {
   success: boolean;
   entriesCreated: number;
   error?: string;
+};
+
+export type DeadLetter = {
+  id: string;
+  feed_key: string;
+  error_message: string | null;
+  error_stack: string | null;
+  feed_snapshot: Record<string, unknown> | null;
+  retry_count: number;
+  resolved: boolean;
+  resolved_at: string | null;
+  created_at: string;
 };
 
 function getSupabaseEnv() {
@@ -124,6 +138,13 @@ function inferCadence(scheduleRaw: string): "hourly" | "daily" | "weekly" {
     return "weekly";
   }
   return "daily";
+}
+
+function isNotConfiguredMessage(message: string | undefined): boolean {
+  if (!message) return false;
+  return /not configured|missing .*creds?|credentials not configured|skipping/i.test(
+    message,
+  );
 }
 
 function isFeedDue(feed: AutoTeachFeed): boolean {
@@ -231,7 +252,7 @@ export async function runShopifyOrdersFeed(): Promise<FeedResult> {
     if (!shopifyDomain || !shopifyToken) {
       return {
         feed_key: feedKey,
-        success: false,
+        success: true,
         entriesCreated: 0,
         error: "Shopify not configured",
       };
@@ -362,9 +383,17 @@ export async function runShopifyOrdersFeed(): Promise<FeedResult> {
 export async function handleAmazonOrdersFeed(): Promise<FeedResult> {
   const feedKey = "amazon_orders";
   try {
-    const { fetchAmazonOrderStats, fetchOrders } = await import(
+    const { fetchAmazonOrderStats, fetchOrders, isAmazonConfigured } = await import(
       "@/lib/amazon/sp-api"
     );
+    if (!isAmazonConfigured()) {
+      return {
+        feed_key: feedKey,
+        success: true,
+        entriesCreated: 0,
+        error: "Amazon not configured",
+      };
+    }
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const now = new Date().toISOString();
 
@@ -475,7 +504,17 @@ export async function handleAmazonOrdersFeed(): Promise<FeedResult> {
 export async function handleAmazonInventoryFeed(): Promise<FeedResult> {
   const feedKey = "amazon_inventory";
   try {
-    const { fetchFBAInventory } = await import("@/lib/amazon/sp-api");
+    const { fetchFBAInventory, isAmazonConfigured } = await import(
+      "@/lib/amazon/sp-api"
+    );
+    if (!isAmazonConfigured()) {
+      return {
+        feed_key: feedKey,
+        success: true,
+        entriesCreated: 0,
+        error: "Amazon not configured",
+      };
+    }
     const result = await fetchFBAInventory();
     const items = Array.isArray(result.items)
       ? (result.items as Array<{
@@ -613,7 +652,7 @@ export async function handleShopifyProductsFeed(): Promise<FeedResult> {
     if (!store || !token) {
       return {
         feed_key: feedKey,
-        success: false,
+        success: true,
         entriesCreated: 0,
         error: "Missing Shopify creds",
       };
@@ -705,6 +744,17 @@ export async function handleShopifyProductsFeed(): Promise<FeedResult> {
 export async function handleGA4TrafficFeed(): Promise<FeedResult> {
   const feedKey = "ga4_traffic";
   try {
+    if (
+      !process.env.GA4_SERVICE_ACCOUNT_JSON &&
+      !process.env.GA4_SERVICE_ACCOUNT_PATH
+    ) {
+      return {
+        feed_key: feedKey,
+        success: true,
+        entriesCreated: 0,
+        error: "GA4 not configured",
+      };
+    }
     const { fetchGA4Report } = await import("@/lib/ops/abra-ga4-client");
     const report = await fetchGA4Report({
       startDate: "yesterday",
@@ -819,7 +869,7 @@ export async function handleShopifyInventoryFeed(): Promise<FeedResult> {
     if (!store || !token) {
       return {
         feed_key: feedKey,
-        success: false,
+        success: true,
         entriesCreated: 0,
         error: "Missing Shopify creds",
       };
@@ -915,31 +965,135 @@ export async function handleShopifyInventoryFeed(): Promise<FeedResult> {
   }
 }
 
-async function patchFeedStatus(
-  table: "abra_auto_teach_feeds" | "abra_knowledge_feeds",
-  feedKey: string,
-  result: FeedResult,
-): Promise<boolean> {
+async function getFeedState(feedKey: string): Promise<{
+  id: string;
+  feed_key: string;
+  is_active: boolean;
+  consecutive_failures: number;
+} | null> {
   try {
-    const body =
-      table === "abra_auto_teach_feeds"
-        ? {
-            last_run_at: new Date().toISOString(),
-            error_count: result.success ? 0 : 1,
-          }
-        : {
-            last_run_at: new Date().toISOString(),
-            last_status: result.success ? "success" : "error",
-            last_error: result.error || null,
-          };
+    const rows = (await sbFetch(
+      `/rest/v1/abra_auto_teach_feeds?feed_key=eq.${feedKey}&select=id,feed_key,is_active,consecutive_failures&limit=1`,
+    )) as Array<{
+      id: string;
+      feed_key: string;
+      is_active: boolean;
+      consecutive_failures: number | null;
+    }>;
+    const row = rows?.[0];
+    if (!row) return null;
+    return {
+      id: row.id,
+      feed_key: row.feed_key,
+      is_active: !!row.is_active,
+      consecutive_failures: Number(row.consecutive_failures || 0),
+    };
+  } catch {
+    return null;
+  }
+}
 
-    await sbFetch(`/rest/v1/${table}?feed_key=eq.${feedKey}`, {
+async function patchAutoTeachFeedStatus(params: {
+  feedKey: string;
+  result: FeedResult;
+  consecutiveFailures: number;
+  disableFeed: boolean;
+}): Promise<boolean> {
+  try {
+    await sbFetch(`/rest/v1/abra_auto_teach_feeds?feed_key=eq.${params.feedKey}`, {
       method: "PATCH",
       headers: {
         Prefer: "return=minimal",
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        last_run_at: new Date().toISOString(),
+        error_count: params.result.success ? 0 : 1,
+        last_status: params.result.success ? "success" : "error",
+        last_error: params.result.error || null,
+        consecutive_failures: params.consecutiveFailures,
+        ...(params.disableFeed ? { is_active: false } : {}),
+      }),
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function patchLegacyFeedStatus(
+  feedKey: string,
+  result: FeedResult,
+): Promise<boolean> {
+  try {
+    await sbFetch(`/rest/v1/abra_knowledge_feeds?feed_key=eq.${feedKey}`, {
+      method: "PATCH",
+      headers: {
+        Prefer: "return=minimal",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        last_run_at: new Date().toISOString(),
+        last_status: result.success ? "success" : "error",
+        last_error: result.error || null,
+      }),
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function writeDeadLetter(
+  feedKey: string,
+  error: string,
+  stack?: string,
+  snapshot?: Record<string, unknown>,
+): Promise<void> {
+  try {
+    await sbFetch("/rest/v1/abra_feed_dead_letters", {
+      method: "POST",
+      headers: {
+        Prefer: "return=minimal",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify([
+        {
+          feed_key: feedKey,
+          error_message: error.slice(0, 1000),
+          error_stack: stack ? stack.slice(0, 2000) : null,
+          feed_snapshot: snapshot || null,
+        },
+      ]),
+    });
+  } catch {
+    // best-effort
+  }
+}
+
+export async function getUnresolvedDeadLetters(): Promise<DeadLetter[]> {
+  try {
+    const rows = (await sbFetch(
+      "/rest/v1/abra_feed_dead_letters?resolved=eq.false&select=id,feed_key,error_message,error_stack,feed_snapshot,retry_count,resolved,resolved_at,created_at&order=created_at.desc&limit=100",
+    )) as DeadLetter[];
+    return Array.isArray(rows) ? rows : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function resolveDeadLetter(id: string): Promise<boolean> {
+  try {
+    await sbFetch(`/rest/v1/abra_feed_dead_letters?id=eq.${id}`, {
+      method: "PATCH",
+      headers: {
+        Prefer: "return=minimal",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        resolved: true,
+        resolved_at: new Date().toISOString(),
+      }),
     });
     return true;
   } catch {
@@ -971,15 +1125,25 @@ async function updateIntHealth(
   error?: string,
 ): Promise<void> {
   try {
+    const notConfigured = isNotConfiguredMessage(error);
+    const connectionStatus = notConfigured
+      ? "not_configured"
+      : success
+        ? "connected"
+        : "error";
     const payload = {
       system_name: systemName,
-      connection_status: success ? "connected" : "error",
-      ...(success
+      connection_status: connectionStatus,
+      ...(connectionStatus === "connected"
         ? {
             last_success_at: new Date().toISOString(),
             error_summary: null,
             retry_count: 0,
           }
+        : connectionStatus === "not_configured"
+          ? {
+              error_summary: error || "Integration not configured",
+            }
         : {
             last_error_at: new Date().toISOString(),
             error_summary: (error || "Unknown feed failure").slice(0, 500),
@@ -1026,10 +1190,40 @@ export async function runFeed(feedKey: string): Promise<FeedResult> {
   }
 
   const result = await handler();
-  const updatedV2 = await patchFeedStatus("abra_auto_teach_feeds", feedKey, result);
+  const state = await getFeedState(feedKey);
+  const shouldCountFailure = !result.success && !isNotConfiguredMessage(result.error);
+  const consecutiveFailures = shouldCountFailure
+    ? (state?.consecutive_failures || 0) + 1
+    : 0;
+  const disableFeed = shouldCountFailure && consecutiveFailures >= 5;
+
+  const updatedV2 = await patchAutoTeachFeedStatus({
+    feedKey,
+    result,
+    consecutiveFailures,
+    disableFeed,
+  });
   if (!updatedV2) {
-    void patchFeedStatus("abra_knowledge_feeds", feedKey, result);
+    void patchLegacyFeedStatus(feedKey, result);
   }
+
+  if (!result.success) {
+    const errorText = result.error || "Unknown feed failure";
+    await writeDeadLetter(feedKey, errorText, undefined, {
+      result,
+      consecutive_failures: consecutiveFailures,
+      disabled: disableFeed,
+    });
+  }
+
+  if (disableFeed && state?.is_active !== false) {
+    const errorText = result.error || "Unknown feed failure";
+    void notify({
+      channel: "alerts",
+      text: `🚨 Feed ${feedKey} disabled after ${consecutiveFailures} consecutive failures: ${errorText}`,
+    });
+  }
+
   const systemName = integrationSystemForFeed(feedKey);
   if (systemName) {
     void updateIntHealth(systemName, result.success, result.error);
