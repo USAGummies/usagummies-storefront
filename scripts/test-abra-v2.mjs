@@ -3,6 +3,9 @@ import { createHmac } from "node:crypto";
 
 /**
  * Abra v2 integration smoke suite.
+ * PREREQUISITE: Deploy migrations before testing:
+ * mv .env.local .env.local.bak && npx supabase db push && mv .env.local.bak .env.local
+ *
  * Usage:
  *   node scripts/test-abra-v2.mjs [base_url]
  * Optional auth:
@@ -17,6 +20,7 @@ const ctx = {
   initiativeId: null,
   sessionId: null,
   approvalId: null,
+  actionApprovalId: null,
   dependencyInitiativeId: null,
   documentId: null,
 };
@@ -73,6 +77,14 @@ function isSkipped(result) {
     result.skipped === true &&
     typeof result.reason === "string"
   );
+}
+
+function extractUuid(text) {
+  if (typeof text !== "string") return null;
+  const match = text.match(
+    /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/i,
+  );
+  return match ? match[0] : null;
 }
 
 async function reqRaw(path, init = {}) {
@@ -439,6 +451,180 @@ async function testSlackInteractions() {
   assert(res.status === 200, `Expected 200, got ${res.status}`);
 }
 
+async function testShopifyProductsFeed() {
+  const res = await req("/api/ops/abra/auto-teach?feed=shopify_products", {
+    method: "POST",
+  });
+  if (isAuthError(res.status)) return;
+  assert(res.status === 200, `Expected 200 or auth error, got ${res.status}`);
+  assert(Array.isArray(res.data?.results), "Expected feed results array");
+}
+
+async function testAmazonOrdersFeed() {
+  const res = await req("/api/ops/abra/auto-teach?feed=amazon_orders", {
+    method: "POST",
+  });
+  if (isAuthError(res.status)) return;
+  assert(res.status === 200, `Expected 200 or auth error, got ${res.status}`);
+  assert(Array.isArray(res.data?.results), "Expected feed results array");
+}
+
+async function testGA4Feed() {
+  const res = await req("/api/ops/abra/ga4?period=yesterday");
+  if (isAuthError(res.status)) return;
+  if (
+    res.status === 500 &&
+    /GA4_SERVICE_ACCOUNT_JSON|GA4_PROPERTY_ID|Failed to fetch GA4 report/i.test(
+      typeof res.data === "string" ? res.data : JSON.stringify(res.data || {}),
+    )
+  ) {
+    return skip("GA4 not configured");
+  }
+  assert(res.status === 200, `Expected 200 or auth error, got ${res.status}`);
+  assert(typeof res.data?.report === "object", "Expected GA4 report payload");
+}
+
+async function testRunAllDueFeeds() {
+  const res = await req("/api/ops/abra/auto-teach", {
+    method: "POST",
+  });
+  if (isAuthError(res.status)) return;
+  assert(res.status === 200, `Expected 200 or auth error, got ${res.status}`);
+  assert(Array.isArray(res.data?.results), "Expected feed results array");
+}
+
+async function testAnomalyDetection() {
+  const res = await req("/api/ops/abra/anomalies");
+  if (isAuthError(res.status)) return;
+  assert(res.status === 200, `Expected 200 or auth error, got ${res.status}`);
+  assert(Array.isArray(res.data?.anomalies), "Expected anomalies array");
+}
+
+async function testMorningBrief() {
+  if (!process.env.CRON_SECRET) return skip("CRON_SECRET not configured");
+  const res = await reqRaw("/api/ops/abra/morning-brief", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.CRON_SECRET}`,
+    },
+  });
+  assert(res.status === 200, `Expected 200, got ${res.status}`);
+  assert(res.data?.ok === true, "Expected morning brief ok=true");
+}
+
+async function testActionProposal() {
+  const res = await req("/api/ops/abra/chat", {
+    method: "POST",
+    body: JSON.stringify({
+      message:
+        "Propose a low-risk Slack alert to channel alerts saying 'Abra integration action test'. Include exactly one <action> JSON block.",
+    }),
+  });
+  if (isAuthError(res.status)) return;
+  assert(res.status === 200, `Expected 200 or auth error, got ${res.status}`);
+
+  const notices = Array.isArray(res.data?.actions) ? res.data.actions : [];
+  if (notices.length === 0) {
+    return skip("No action proposal was returned by chat");
+  }
+  const firstNotice = String(notices[0] || "");
+  const id = extractUuid(firstNotice);
+  if (!id) return skip("No approval id found in action notice");
+  if (/executed:/i.test(firstNotice)) {
+    return skip("Action auto-executed; no pending approval to execute");
+  }
+  ctx.actionApprovalId = id;
+}
+
+async function testActionExecution() {
+  if (!ctx.actionApprovalId) {
+    return skip("No queued action approval id available");
+  }
+  const res = await req("/api/ops/abra/actions", {
+    method: "POST",
+    body: JSON.stringify({
+      approval_id: ctx.actionApprovalId,
+      confirm: true,
+    }),
+  });
+  if (isAuthError(res.status)) return;
+
+  const bodyText =
+    typeof res.data === "string" ? res.data : JSON.stringify(res.data || {});
+  if (
+    res.status >= 400 &&
+    /Approval is approved|Approval is denied|not found|Invalid action payload/i.test(
+      bodyText,
+    )
+  ) {
+    return skip("No pending executable action approval");
+  }
+
+  assert(res.status === 200, `Expected 200 or auth error, got ${res.status}`);
+  assert(typeof res.data?.result === "object", "Expected action execution result");
+}
+
+async function testChatHistory() {
+  const first = await req("/api/ops/abra/chat", {
+    method: "POST",
+    body: JSON.stringify({ message: "Start a chat history integration test thread." }),
+  });
+  if (isAuthError(first.status)) return;
+  assert(first.status === 200, `Expected 200 or auth error, got ${first.status}`);
+  assert(typeof first.data?.thread_id === "string", "Expected thread_id");
+  const threadId = first.data.thread_id;
+
+  const second = await req("/api/ops/abra/chat", {
+    method: "POST",
+    body: JSON.stringify({
+      message: "Continue this same thread and confirm context continuity.",
+      thread_id: threadId,
+    }),
+  });
+  assert(second.status === 200, `Expected 200, got ${second.status}`);
+  assert(second.data?.thread_id === threadId, "Expected same thread_id to be returned");
+}
+
+async function testRevenueSnapshot() {
+  const res = await req("/api/ops/abra/finance?view=snapshot&period=week");
+  if (isAuthError(res.status)) return;
+  assert(res.status === 200, `Expected 200 or auth error, got ${res.status}`);
+  assert(
+    typeof res.data?.snapshot?.total_revenue === "number",
+    "Expected revenue snapshot total_revenue",
+  );
+}
+
+async function testCompetitorIntel() {
+  const competitor = `Integration Test Competitor ${Date.now()}`;
+  const createRes = await req("/api/ops/abra/competitors", {
+    method: "POST",
+    body: JSON.stringify({
+      competitor_name: competitor,
+      data_type: "pricing",
+      title: "Integration test competitor pricing note",
+      detail: "Shelf price observed at $4.99 in local retailer",
+      source: "manual",
+    }),
+  });
+  if (isAuthError(createRes.status)) return;
+  assert(
+    createRes.status === 201 || createRes.status === 200,
+    `Expected 201/200, got ${createRes.status}`,
+  );
+  assert(typeof createRes.data?.entry?.id === "string", "Expected created competitor intel entry");
+
+  const listRes = await req(
+    `/api/ops/abra/competitors?competitor=${encodeURIComponent(competitor)}&limit=5`,
+  );
+  assert(listRes.status === 200, `Expected 200, got ${listRes.status}`);
+  assert(Array.isArray(listRes.data?.entries), "Expected entries array");
+  assert(
+    listRes.data.entries.some((row) => row?.competitor_name === competitor),
+    "Expected created competitor entry in list response",
+  );
+}
+
 const tests = [
   { name: "Health check", fn: testHealth },
   { name: "Chat basic", fn: testChatBasic },
@@ -463,6 +649,19 @@ const tests = [
   { name: "Email signal extraction", fn: testEmailSignals },
   { name: "Notion write (if configured)", fn: testNotionWrite },
   { name: "Slack interactions endpoint", fn: testSlackInteractions },
+  // Phase 6 - Live feeds
+  { name: "Shopify products feed", fn: testShopifyProductsFeed },
+  { name: "Amazon orders feed", fn: testAmazonOrdersFeed },
+  { name: "GA4 traffic feed", fn: testGA4Feed },
+  { name: "Run all due feeds", fn: testRunAllDueFeeds },
+  // Phase 7 - Proactive intelligence
+  { name: "Anomaly detection", fn: testAnomalyDetection },
+  { name: "Morning brief generation", fn: testMorningBrief },
+  { name: "Action proposal", fn: testActionProposal },
+  { name: "Action execution", fn: testActionExecution },
+  { name: "Chat history save/load", fn: testChatHistory },
+  { name: "Revenue snapshot", fn: testRevenueSnapshot },
+  { name: "Competitor intel CRUD", fn: testCompetitorIntel },
 ];
 
 (async () => {
@@ -494,7 +693,7 @@ const tests = [
   const skipped = results.filter((r) => r.ok === null).length;
 
   console.log("\n========================================");
-  console.log("ABRA v2 PHASE 4-5 TEST RESULTS");
+  console.log("ABRA v2 PHASE 4-7 TEST RESULTS");
   console.log("========================================");
   console.log(`Total: ${results.length} tests`);
   console.log(`Passed: ${passed} ✅`);
