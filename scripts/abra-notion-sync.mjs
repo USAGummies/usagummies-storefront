@@ -84,6 +84,13 @@ const DATABASES = {
     department: "finance",
     entryType: "finding",
   },
+  agent_run_log: {
+    id: "30d4c0c42c2e81b0914ee534e56e2351",
+    name: "Agent Run Log",
+    category: "operational",
+    department: "operations",
+    entryType: "summary",
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -91,11 +98,12 @@ const DATABASES = {
 // ---------------------------------------------------------------------------
 
 function parseArgs(argv) {
-  const args = { db: "all", max: Infinity, dryRun: false };
+  const args = { db: "all", max: Infinity, dryRun: false, fetchContent: true };
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--db" && argv[i + 1]) args.db = argv[++i];
     if (argv[i] === "--max" && argv[i + 1]) args.max = parseInt(argv[++i], 10);
     if (argv[i] === "--dry-run") args.dryRun = true;
+    if (argv[i] === "--no-content") args.fetchContent = false;
   }
   return args;
 }
@@ -203,10 +211,153 @@ function getTitle(page) {
 }
 
 // ---------------------------------------------------------------------------
+// Notion page-content extraction (blocks API)
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract plain text from a Notion rich_text array.
+ */
+function richTextToPlain(richTextArr) {
+  if (!Array.isArray(richTextArr)) return "";
+  return richTextArr.map((rt) => rt.plain_text || "").join("");
+}
+
+/**
+ * Extract text from a single Notion block.
+ * Handles: paragraph, headings, lists, to_do, toggle, callout, quote, code,
+ *          table_row, divider, bookmark, embed, link_preview, equation.
+ */
+function blockToText(block) {
+  const t = block.type;
+  if (!t) return "";
+
+  const data = block[t];
+  if (!data) return "";
+
+  // Text-bearing blocks
+  if (
+    [
+      "paragraph",
+      "heading_1",
+      "heading_2",
+      "heading_3",
+      "bulleted_list_item",
+      "numbered_list_item",
+      "to_do",
+      "toggle",
+      "callout",
+      "quote",
+    ].includes(t)
+  ) {
+    let text = richTextToPlain(data.rich_text);
+    if (t === "heading_1") text = `# ${text}`;
+    else if (t === "heading_2") text = `## ${text}`;
+    else if (t === "heading_3") text = `### ${text}`;
+    else if (t === "bulleted_list_item") text = `• ${text}`;
+    else if (t === "numbered_list_item") text = `- ${text}`;
+    else if (t === "to_do") text = `[${data.checked ? "x" : " "}] ${text}`;
+    else if (t === "callout") {
+      const icon = data.icon?.emoji || "ℹ️";
+      text = `${icon} ${text}`;
+    }
+    return text;
+  }
+
+  if (t === "code") {
+    const code = richTextToPlain(data.rich_text);
+    const lang = data.language || "";
+    return `\`\`\`${lang}\n${code}\n\`\`\``;
+  }
+
+  if (t === "equation") return data.expression || "";
+
+  if (t === "table_row") {
+    const cells = (data.cells || []).map((cell) => richTextToPlain(cell));
+    return cells.join(" | ");
+  }
+
+  if (t === "divider") return "---";
+
+  if (t === "bookmark") return data.url || "";
+  if (t === "embed") return data.url || "";
+  if (t === "link_preview") return data.url || "";
+
+  if (t === "image") {
+    const caption = richTextToPlain(data.caption);
+    return caption ? `[Image: ${caption}]` : "[Image]";
+  }
+
+  if (t === "file" || t === "pdf" || t === "video" || t === "audio") {
+    const caption = richTextToPlain(data.caption);
+    return caption ? `[${t}: ${caption}]` : `[${t}]`;
+  }
+
+  // child_page, child_database — just note them
+  if (t === "child_page") return `[Sub-page: ${data.title || ""}]`;
+  if (t === "child_database") return `[Sub-database: ${data.title || ""}]`;
+
+  return "";
+}
+
+/**
+ * Fetch all blocks (children) of a Notion page.
+ * Follows pagination and recurses into blocks with children (max depth 2).
+ * Returns plain-text string of all block content.
+ */
+async function fetchPageContent(pageId, depth = 0, maxDepth = 2) {
+  const MAX_CONTENT_LENGTH = 30_000; // cap content to prevent bloat
+  const lines = [];
+  let startCursor = null;
+  let totalLength = 0;
+
+  try {
+    do {
+      const queryParams = startCursor ? `?start_cursor=${startCursor}&page_size=100` : "?page_size=100";
+      const res = await notion(`/blocks/${toNotionId(pageId)}/children${queryParams}`);
+      const blocks = res.results || [];
+
+      for (const block of blocks) {
+        if (totalLength >= MAX_CONTENT_LENGTH) break;
+
+        const text = blockToText(block);
+        if (text) {
+          lines.push(text);
+          totalLength += text.length;
+        }
+
+        // Recurse into blocks with children (toggles, callouts, columns, etc.)
+        if (block.has_children && depth < maxDepth) {
+          await new Promise((r) => setTimeout(r, NOTION_RATE_DELAY_MS));
+          const childText = await fetchPageContent(block.id, depth + 1, maxDepth);
+          if (childText) {
+            // Indent child content
+            const indented = childText
+              .split("\n")
+              .map((l) => "  " + l)
+              .join("\n");
+            lines.push(indented);
+            totalLength += indented.length;
+          }
+        }
+      }
+
+      startCursor = res.has_more ? res.next_cursor : null;
+      if (totalLength >= MAX_CONTENT_LENGTH) break;
+      if (startCursor) await new Promise((r) => setTimeout(r, NOTION_RATE_DELAY_MS));
+    } while (startCursor);
+  } catch (err) {
+    // Some pages may have restricted access — log and continue
+    console.warn(`    ⚠ Could not fetch blocks for ${pageId}: ${err.message}`);
+  }
+
+  return lines.join("\n").slice(0, MAX_CONTENT_LENGTH);
+}
+
+// ---------------------------------------------------------------------------
 // Transform Notion page → open_brain_entries record
 // ---------------------------------------------------------------------------
 
-function notionPageToRecord(page, dbConfig) {
+function notionPageToRecord(page, dbConfig, pageContent = "") {
   const title = getTitle(page);
   const pageId = page.id.replace(/-/g, "");
   const sourceRef = `notion:${dbConfig.id}:${pageId}`;
@@ -221,6 +372,13 @@ function notionPageToRecord(page, dbConfig) {
     if (value) {
       lines.push(`${name}: ${value}`);
     }
+  }
+
+  // Append page body content (from blocks API) if available
+  if (pageContent) {
+    lines.push(""); // blank separator
+    lines.push("--- Page Content ---");
+    lines.push(pageContent);
   }
 
   const rawText = lines.join("\n");
@@ -348,9 +506,23 @@ async function syncDatabase(dbKey, dbConfig, args) {
   let skipped = 0;
   let latestEditTime = lastSync || null;
 
+  const shouldFetchContent = args.fetchContent !== false;
+  if (shouldFetchContent) {
+    console.log(`  Page content extraction: ENABLED`);
+  }
+
   for (const page of pages) {
     try {
-      const record = notionPageToRecord(page, dbConfig);
+      // Fetch page body content (blocks) if enabled
+      let pageContent = "";
+      if (shouldFetchContent) {
+        pageContent = await fetchPageContent(page.id);
+        if (pageContent) {
+          console.log(`    📄 Fetched ${pageContent.length} chars of page content`);
+        }
+      }
+
+      const record = notionPageToRecord(page, dbConfig, pageContent);
       const editTime = page.last_edited_time;
 
       // Track latest edit time for cursor
@@ -421,6 +593,7 @@ async function main() {
   console.log(`  Target: ${args.db}`);
   console.log(`  Max per DB: ${args.max === Infinity ? "all" : args.max}`);
   console.log(`  Dry run: ${args.dryRun}`);
+  console.log(`  Page content: ${args.fetchContent ? "ON" : "OFF"}`);
 
   const dbKeys = args.db === "all" ? Object.keys(DATABASES) : [args.db];
 

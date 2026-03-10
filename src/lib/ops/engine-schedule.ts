@@ -189,6 +189,8 @@ export const ENGINE_REGISTRY: EngineConfig[] = [
       { key: "ABRA4", name: "Notion SKU Sync", schedule: "Weekly Mon 06:20" },
       { key: "ABRA5", name: "Notion Performance Sync", schedule: "Daily 22:00" },
       { key: "ABRA6", name: "Notion Finance Sync", schedule: "Daily 22:05" },
+      { key: "ABRA7", name: "Notion Repacker Sync", schedule: "Weekly Wed 06:20" },
+      { key: "ABRA8", name: "Notion Agent Run Log Sync", schedule: "Daily 22:10" },
     ],
   },
 ];

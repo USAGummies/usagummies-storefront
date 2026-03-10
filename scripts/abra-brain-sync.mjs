@@ -23,6 +23,8 @@ const DISPATCH = {
   ABRA4: { script: "abra-notion-sync.mjs", args: ["--db", "skus"] },
   ABRA5: { script: "abra-notion-sync.mjs", args: ["--db", "performance"] },
   ABRA6: { script: "abra-notion-sync.mjs", args: ["--db", "cash"] },
+  ABRA7: { script: "abra-notion-sync.mjs", args: ["--db", "repackers"] },
+  ABRA8: { script: "abra-notion-sync.mjs", args: ["--db", "agent_run_log"] },
 };
 
 function main() {
