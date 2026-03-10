@@ -879,6 +879,32 @@ export async function handleInventoryForecastFeed(): Promise<FeedResult> {
   }
 }
 
+export async function handlePipelineHealthFeed(): Promise<FeedResult> {
+  const feedKey = "pipeline_health";
+  try {
+    const { syncNotionDeals, checkDealHealth } = await import(
+      "@/lib/ops/abra-pipeline-intelligence"
+    );
+    await syncNotionDeals();
+    const result = await checkDealHealth();
+    return {
+      feed_key: feedKey,
+      success: true,
+      entriesCreated: result.signals_emitted,
+      ...(result.proposals_created > 0
+        ? { error: `proposals_created=${result.proposals_created}` }
+        : {}),
+    };
+  } catch (error) {
+    return {
+      feed_key: feedKey,
+      success: false,
+      entriesCreated: 0,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
 /**
  * Shopify inventory monitor feed.
  */
@@ -1201,6 +1227,7 @@ export async function runFeed(feedKey: string): Promise<FeedResult> {
     email_fetch: handleEmailFetchFeed,
     inventory_alerts: handleInventoryAlertsFeed,
     inventory_forecast: handleInventoryForecastFeed,
+    pipeline_health: handlePipelineHealthFeed,
   };
 
   const handler = handlers[feedKey];
