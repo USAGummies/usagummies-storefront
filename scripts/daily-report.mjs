@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+// LEGACY: This script is being replaced by Abra's morning brief system.
+// See: src/lib/ops/abra-morning-brief.ts + /api/ops/abra/morning-brief
+// The Abra version pulls from brain entries + anomaly detection for richer context.
 
 /**
  * USA Gummies — Daily Analytics Report
