@@ -1,16 +1,25 @@
 /**
  * POST /api/ops/slack/abra — Slack slash command webhook for /abra
  *
- * Slack sends form-urlencoded payload. We:
+ * Self-healing RAG pipeline:
  * 1. Verify Slack request signature
  * 2. Immediately respond with "thinking..." (ephemeral)
- * 3. In the background:
+ * 3. In the background (via Next.js after()):
  *    a. If thread_ts present + SLACK_BOT_TOKEN available, fetch thread history for multi-turn context
- *    b. Embed → search brain → Claude with thread history
+ *    b. Embed → search brain → LLM with thread history (retry + fallback at every step)
  *    c. Post reply (threaded if thread_ts, else via response_url)
  *
- * Env: SLACK_SIGNING_SECRET (from Slack app config)
- *       SLACK_BOT_TOKEN (optional — enables thread history + threaded replies)
+ * Resilience:
+ * - Retry with exponential backoff on transient failures (429, 5xx, timeouts)
+ * - Dual LLM provider: Claude first, OpenAI gpt-4o-mini fallback
+ * - Graceful degradation: if brain search fails, answer with LLM general knowledge
+ * - Slack block splitting for responses > 3000 chars
+ * - Error diagnostics posted to user, never silent failures
+ * - Ops alerts via Slack webhook on repeated failures
+ *
+ * Env: SLACK_SIGNING_SECRET, SLACK_BOT_TOKEN (optional),
+ *       OPENAI_API_KEY, ANTHROPIC_API_KEY (optional),
+ *       SUPABASE_URL / NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
  */
 
 import { NextResponse } from "next/server";
@@ -24,7 +33,44 @@ export const maxDuration = 30;
 const SIGNING_SECRET = process.env.SLACK_SIGNING_SECRET || "";
 const BOT_TOKEN = process.env.SLACK_BOT_TOKEN || "";
 
-/** Slack section block text limit is 3000 chars. Split into multiple blocks if needed. */
+// ---------------------------------------------------------------------------
+// Resilience: retry with exponential backoff
+// ---------------------------------------------------------------------------
+async function fetchWithRetry(
+  url: string,
+  init: RequestInit,
+  { maxRetries = 2, baseDelayMs = 400, timeoutMs = 10000 }: { maxRetries?: number; baseDelayMs?: number; timeoutMs?: number } = {},
+): Promise<Response> {
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const res = await fetch(url, {
+        ...init,
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      // Retry on transient errors (429 rate limit, 5xx server errors)
+      if (res.status === 429 || res.status >= 500) {
+        if (attempt < maxRetries) {
+          const delay = Math.min(baseDelayMs * Math.pow(2, attempt), 3000);
+          await new Promise((r) => setTimeout(r, delay));
+          continue;
+        }
+      }
+      return res;
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      if (attempt < maxRetries) {
+        const delay = Math.min(baseDelayMs * Math.pow(2, attempt), 3000);
+        await new Promise((r) => setTimeout(r, delay));
+      }
+    }
+  }
+  throw lastError || new Error("fetchWithRetry: all attempts failed");
+}
+
+// ---------------------------------------------------------------------------
+// Slack block builder — respects 3000-char section text limit
+// ---------------------------------------------------------------------------
 const SLACK_BLOCK_TEXT_LIMIT = 3000;
 
 function buildSlackBlocks(fullText: string): Array<{ type: string; text: { type: string; text: string } }> {
@@ -32,7 +78,6 @@ function buildSlackBlocks(fullText: string): Array<{ type: string; text: { type:
     return [{ type: "section", text: { type: "mrkdwn", text: fullText } }];
   }
 
-  // Split on paragraph boundaries, falling back to hard truncation
   const blocks: Array<{ type: string; text: { type: string; text: string } }> = [];
   let remaining = fullText;
   while (remaining.length > 0) {
@@ -40,10 +85,8 @@ function buildSlackBlocks(fullText: string): Array<{ type: string; text: { type:
       blocks.push({ type: "section", text: { type: "mrkdwn", text: remaining } });
       break;
     }
-    // Find last newline before limit
     let splitIdx = remaining.lastIndexOf("\n", SLACK_BLOCK_TEXT_LIMIT);
     if (splitIdx < SLACK_BLOCK_TEXT_LIMIT * 0.3) {
-      // No good paragraph break — split at last space
       splitIdx = remaining.lastIndexOf(" ", SLACK_BLOCK_TEXT_LIMIT);
     }
     if (splitIdx <= 0) splitIdx = SLACK_BLOCK_TEXT_LIMIT;
@@ -53,16 +96,20 @@ function buildSlackBlocks(fullText: string): Array<{ type: string; text: { type:
   return blocks;
 }
 
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
+// ---------------------------------------------------------------------------
+// Slack signature verification
+// ---------------------------------------------------------------------------
 function verifySlackSignature(
   body: string,
   timestamp: string | null,
   signature: string | null,
 ): boolean {
   if (!SIGNING_SECRET || !timestamp || !signature) return false;
-
-  // Reject requests older than 5 minutes
   const nowSec = Math.floor(Date.now() / 1000);
   if (Math.abs(nowSec - parseInt(timestamp, 10)) > 300) return false;
 
@@ -82,11 +129,9 @@ function verifySlackSignature(
   }
 }
 
-/**
- * Fetch thread replies from Slack to build multi-turn context.
- * Returns messages in chronological order, mapped to ChatMessage format.
- * Bot messages (from Abra) → "assistant", user messages → "user".
- */
+// ---------------------------------------------------------------------------
+// Thread history (multi-turn context)
+// ---------------------------------------------------------------------------
 async function fetchThreadHistory(
   channelId: string,
   threadTs: string,
@@ -119,35 +164,26 @@ async function fetchThreadHistory(
 
     if (!data.ok || !data.messages) return [];
 
-    // Skip the parent message (first in array) — we only want replies
-    // Map: bot messages → assistant, human messages → user
     const history: ChatMessage[] = [];
     for (const msg of data.messages.slice(1)) {
-      // Skip system subtypes
       if (msg.subtype && msg.subtype !== "bot_message") continue;
-
       const isBot = Boolean(msg.bot_id);
-      // Strip Abra prefix from bot messages
       const content = isBot
         ? msg.text.replace(/^🧠\s*\*Abra\*\s*\n\n?/i, "").trim()
         : msg.text.trim();
-
       if (!content) continue;
       history.push({ role: isBot ? "assistant" : "user", content });
     }
 
-    // Keep last 6 exchanges to stay within context limits
     return history.slice(-12);
   } catch {
-    // Thread fetch failure is non-critical — continue without history
     return [];
   }
 }
 
-/**
- * Post a message to a Slack channel/thread using chat.postMessage.
- * Requires BOT_TOKEN. Falls back to response_url if unavailable.
- */
+// ---------------------------------------------------------------------------
+// Post reply to Slack thread (via chat.postMessage)
+// ---------------------------------------------------------------------------
 async function postThreadReply(
   channelId: string,
   threadTs: string,
@@ -163,7 +199,7 @@ async function postThreadReply(
 
   try {
     const fullText = `🧠 *Abra*\n\n${text}${sourceText}`;
-    const res = await fetch("https://slack.com/api/chat.postMessage", {
+    const res = await fetchWithRetry("https://slack.com/api/chat.postMessage", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${BOT_TOKEN}`,
@@ -175,15 +211,64 @@ async function postThreadReply(
         blocks: buildSlackBlocks(fullText),
         text: `🧠 Abra: ${text.slice(0, 200)}`,
       }),
-      signal: AbortSignal.timeout(10000),
-    });
+    }, { timeoutMs: 10000, maxRetries: 1 });
 
-    const data = (await res.json()) as { ok: boolean };
+    const data = (await res.json()) as { ok: boolean; error?: string };
     return data.ok;
   } catch {
     return false;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Post reply via Slack response_url (with retry)
+// ---------------------------------------------------------------------------
+async function postToSlack(
+  responseUrl: string,
+  text: string,
+  sources: Array<{ title: string; source_table: string }>,
+) {
+  const sourceText =
+    sources.length > 0
+      ? `\n\n_Sources: ${sources.map((s) => `${s.source_table === "email" ? "📧" : "🧠"} ${s.title}`).join(" · ")}_`
+      : "";
+
+  const fullText = `🧠 *Abra*\n\n${text}${sourceText}`;
+  await fetchWithRetry(responseUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      response_type: "in_channel",
+      blocks: buildSlackBlocks(fullText),
+    }),
+  }, { timeoutMs: 10000, maxRetries: 2 });
+}
+
+// ---------------------------------------------------------------------------
+// Ops alert — notify Slack ops channel on critical failures
+// ---------------------------------------------------------------------------
+async function alertOps(message: string) {
+  const opsWebhook = process.env.SLACK_SUPPORT_WEBHOOK_URL;
+  if (!opsWebhook) return;
+  try {
+    await fetch(opsWebhook, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: `[ALERTS] 🧠 Abra Error: ${message}`,
+      }),
+      signal: AbortSignal.timeout(5000),
+    });
+  } catch {
+    // Best-effort — don't throw on alert failure
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Core RAG pipeline with self-healing
+// ---------------------------------------------------------------------------
+const SYSTEM_PROMPT =
+  "You are Abra, the AI operations assistant for USA Gummies. Answer using the provided context from emails and business data. Be concise and actionable. Format for Slack (use *bold*, _italic_, and bullet lists). Cite sources briefly.";
 
 async function callAbraChat(message: string, history?: ChatMessage[]): Promise<{
   reply: string;
@@ -195,90 +280,101 @@ async function callAbraChat(message: string, history?: ChatMessage[]): Promise<{
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!openaiKey || !supabaseUrl || !serviceKey) {
-    return { reply: "⚠️ Abra is not fully configured. Missing API keys (need OPENAI_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY).", sources: [] };
+    const missing = [
+      !openaiKey && "OPENAI_API_KEY",
+      !supabaseUrl && "SUPABASE_URL",
+      !serviceKey && "SUPABASE_SERVICE_ROLE_KEY",
+    ].filter(Boolean).join(", ");
+    await alertOps(`Missing env vars: ${missing}`);
+    return { reply: `⚠️ Abra is not fully configured (missing: ${missing}). Ping Ben to fix.`, sources: [] };
   }
 
-  if (!anthropicKey && !openaiKey) {
-    return { reply: "⚠️ Abra has no LLM provider configured. Need ANTHROPIC_API_KEY or OPENAI_API_KEY.", sources: [] };
+  // --------------- Step 1: Generate embedding (with retry) ---------------
+  let embedding: number[] | null = null;
+  try {
+    const embedRes = await fetchWithRetry("https://api.openai.com/v1/embeddings", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${openaiKey}`,
+      },
+      body: JSON.stringify({
+        model: "text-embedding-3-small",
+        input: message,
+        dimensions: 1536,
+      }),
+    }, { timeoutMs: 12000, maxRetries: 2 });
+
+    if (embedRes.ok) {
+      const embedData = await embedRes.json();
+      const vec = embedData?.data?.[0]?.embedding;
+      if (Array.isArray(vec) && vec.length === 1536) {
+        embedding = vec;
+      }
+    }
+  } catch {
+    // Embedding failed after retries — will degrade to no-context LLM
   }
 
-  // 1. Generate embedding
-  const embedRes = await fetch("https://api.openai.com/v1/embeddings", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${openaiKey}`,
-    },
-    body: JSON.stringify({
-      model: "text-embedding-3-small",
-      input: message,
-      dimensions: 1536,
-    }),
-    signal: AbortSignal.timeout(15000),
-  });
-
-  if (!embedRes.ok) {
-    return { reply: "⚠️ Failed to process your question (embedding error).", sources: [] };
-  }
-
-  const embedData = await embedRes.json();
-  const embedding = embedData?.data?.[0]?.embedding;
-  if (!Array.isArray(embedding)) {
-    return { reply: "⚠️ Failed to generate query embedding.", sources: [] };
-  }
-
-  // 2. Search brain
-  const searchRes = await fetch(`${supabaseUrl}/rest/v1/rpc/search_unified`, {
-    method: "POST",
-    headers: {
-      apikey: serviceKey,
-      Authorization: `Bearer ${serviceKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      query_embedding: embedding,
-      match_count: 6,
-      filter_tables: ["brain", "email"],
-    }),
-    cache: "no-store",
-    signal: AbortSignal.timeout(15000),
-  });
-
-  if (!searchRes.ok) {
-    return { reply: "⚠️ Brain search failed. Try again later.", sources: [] };
-  }
-
-  const results = (await searchRes.json()) as Array<{
+  // --------------- Step 2: Search brain (with retry + graceful degradation) ---------------
+  let results: Array<{
     title: string | null;
     raw_text: string | null;
     summary_text: string | null;
     source_table: string;
-  }>;
+  }> = [];
 
-  if (results.length === 0) {
-    return { reply: "No relevant data found in the brain for your question.", sources: [] };
+  if (embedding) {
+    try {
+      const searchRes = await fetchWithRetry(`${supabaseUrl}/rest/v1/rpc/search_unified`, {
+        method: "POST",
+        headers: {
+          apikey: serviceKey,
+          Authorization: `Bearer ${serviceKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          query_embedding: embedding,
+          match_count: 6,
+          filter_tables: ["brain", "email"],
+        }),
+        cache: "no-store",
+      }, { timeoutMs: 12000, maxRetries: 1 });
+
+      if (searchRes.ok) {
+        results = await searchRes.json();
+      }
+    } catch {
+      // Brain search failed — degrade to general knowledge
+    }
   }
 
-  // 3. Build context and ask LLM (try Anthropic Claude first, fall back to OpenAI)
-  const context = results
-    .map(
-      (r) =>
-        `[${r.source_table}] ${r.title || "(untitled)"}: ${(r.raw_text || r.summary_text || "").slice(0, 2000)}`,
-    )
-    .join("\n\n");
+  // --------------- Step 3: Build context and ask LLM ---------------
+  let context = "";
+  let degraded = false;
 
-  const systemPrompt =
-    "You are Abra, the AI operations assistant for USA Gummies. Answer using the provided context from emails and business data. Be concise and actionable. Format for Slack (use *bold*, _italic_, and bullet lists). Cite sources briefly.";
+  if (results.length > 0) {
+    context = results
+      .map(
+        (r) =>
+          `[${r.source_table}] ${r.title || "(untitled)"}: ${(r.raw_text || r.summary_text || "").slice(0, 2000)}`,
+      )
+      .join("\n\n");
+  } else {
+    // Graceful degradation — answer without brain context
+    degraded = true;
+    context = "(No brain context available — embedding or search failed. Answer based on your general knowledge about USA Gummies, a gummy candy company.)";
+  }
 
   const userContent = `Question: ${message}\n\nContext from brain:\n${context}`;
 
   let reply = "";
 
-  // Try Anthropic Claude first (10s timeout — leaves room for OpenAI fallback within 30s maxDuration)
+  // Try Anthropic Claude first (8s timeout — leaves room for OpenAI fallback within 30s budget)
   if (anthropicKey) {
     try {
       const claudeModel = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514";
-      const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
+      const claudeRes = await fetchWithRetry("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
           "x-api-key": anthropicKey,
@@ -289,7 +385,7 @@ async function callAbraChat(message: string, history?: ChatMessage[]): Promise<{
           model: claudeModel,
           max_tokens: 600,
           temperature: 0.2,
-          system: systemPrompt,
+          system: SYSTEM_PROMPT,
           messages: [
             ...(history && history.length > 0
               ? history.map((m) => ({ role: m.role, content: m.content }))
@@ -297,8 +393,7 @@ async function callAbraChat(message: string, history?: ChatMessage[]): Promise<{
             { role: "user" as const, content: userContent },
           ],
         }),
-        signal: AbortSignal.timeout(10000),
-      });
+      }, { timeoutMs: 8000, maxRetries: 0 }); // No retry on Claude — fail fast to OpenAI
 
       if (claudeRes.ok) {
         const claudeData = (await claudeRes.json()) as {
@@ -319,7 +414,7 @@ async function callAbraChat(message: string, history?: ChatMessage[]): Promise<{
   if (!reply && openaiKey) {
     try {
       const openaiModel = process.env.OPENAI_CHAT_MODEL || "gpt-4o-mini";
-      const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+      const openaiRes = await fetchWithRetry("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -330,15 +425,14 @@ async function callAbraChat(message: string, history?: ChatMessage[]): Promise<{
           max_tokens: 600,
           temperature: 0.2,
           messages: [
-            { role: "system" as const, content: systemPrompt },
+            { role: "system" as const, content: SYSTEM_PROMPT },
             ...(history && history.length > 0
               ? history.map((m) => ({ role: m.role, content: m.content }))
               : []),
             { role: "user" as const, content: userContent },
           ],
         }),
-        signal: AbortSignal.timeout(15000),
-      });
+      }, { timeoutMs: 15000, maxRetries: 1 });
 
       if (openaiRes.ok) {
         const openaiData = (await openaiRes.json()) as {
@@ -352,7 +446,13 @@ async function callAbraChat(message: string, history?: ChatMessage[]): Promise<{
   }
 
   if (!reply) {
-    return { reply: "⚠️ Abra reasoning failed. Both LLM providers returned errors. Try again later.", sources: [] };
+    await alertOps("Both Claude and OpenAI failed to generate a response. Check API keys and billing.");
+    return { reply: "⚠️ Abra is temporarily unable to reason. Both AI providers failed. The ops team has been notified.", sources: [] };
+  }
+
+  // Add degradation notice if we answered without brain context
+  if (degraded) {
+    reply = reply + "\n\n_⚠️ Note: This answer was generated without access to the business brain. Results may be less specific._";
   }
 
   const sources = results.map((r) => ({
@@ -363,28 +463,9 @@ async function callAbraChat(message: string, history?: ChatMessage[]): Promise<{
   return { reply, sources };
 }
 
-async function postToSlack(
-  responseUrl: string,
-  text: string,
-  sources: Array<{ title: string; source_table: string }>,
-) {
-  const sourceText =
-    sources.length > 0
-      ? `\n\n_Sources: ${sources.map((s) => `${s.source_table === "email" ? "📧" : "🧠"} ${s.title}`).join(" · ")}_`
-      : "";
-
-  const fullText = `🧠 *Abra*\n\n${text}${sourceText}`;
-  await fetch(responseUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      response_type: "in_channel",
-      blocks: buildSlackBlocks(fullText),
-    }),
-    signal: AbortSignal.timeout(10000),
-  });
-}
-
+// ---------------------------------------------------------------------------
+// POST handler
+// ---------------------------------------------------------------------------
 export async function POST(req: Request) {
   const bodyText = await req.text();
   const timestamp = req.headers.get("x-slack-request-timestamp");
@@ -397,12 +478,10 @@ export async function POST(req: Request) {
     }
   }
 
-  // Parse form-urlencoded payload
   const params = new URLSearchParams(bodyText);
   const text = params.get("text") || "";
   const responseUrl = params.get("response_url") || "";
   const channelId = params.get("channel_id") || "";
-  // thread_ts is present when slash command is invoked within a thread
   const threadTs = params.get("thread_ts") || "";
 
   if (!text.trim()) {
@@ -420,11 +499,10 @@ export async function POST(req: Request) {
   }
 
   // Immediately respond with "thinking" (Slack requires response within 3s)
-  // Use Next.js after() to run background work — Vercel keeps the function
-  // alive after the response is sent until the callback completes or maxDuration.
+  // Next.js after() guarantees Vercel keeps the function alive for background work.
   after(async () => {
     try {
-      // Fetch thread history for multi-turn context (if in a thread + bot token available)
+      // Fetch thread history for multi-turn context
       let history: ChatMessage[] = [];
       if (threadTs && channelId && BOT_TOKEN) {
         history = await fetchThreadHistory(channelId, threadTs);
@@ -432,20 +510,25 @@ export async function POST(req: Request) {
 
       const { reply, sources } = await callAbraChat(text, history);
 
-      // If in a thread and bot token available, reply in thread
+      // Try threaded reply first, fall back to response_url
       if (threadTs && channelId) {
         const threaded = await postThreadReply(channelId, threadTs, reply, sources);
-        if (threaded) return; // Successfully posted in thread
+        if (threaded) return;
       }
 
-      // Fallback: post via response_url
       await postToSlack(responseUrl, reply, sources);
     } catch (err) {
-      const errorMsg =
-        err instanceof Error ? err.message : "Unknown error";
-      await postToSlack(responseUrl, `⚠️ Abra encountered an error: ${errorMsg}`, []).catch(
-        () => {},
-      );
+      const errorMsg = err instanceof Error ? err.message : "Unknown error";
+
+      // Alert ops on unexpected errors
+      await alertOps(`Unhandled error for question "${text.slice(0, 100)}": ${errorMsg}`);
+
+      // Always try to tell the user something went wrong
+      await postToSlack(
+        responseUrl,
+        `⚠️ Abra encountered an unexpected error. The ops team has been notified and this will be fixed.\n\n_Error: ${errorMsg.slice(0, 200)}_`,
+        [],
+      ).catch(() => {});
     }
   });
 
