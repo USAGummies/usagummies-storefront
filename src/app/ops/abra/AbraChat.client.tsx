@@ -400,6 +400,34 @@ export function AbraChat() {
     [messages],
   );
 
+  const refreshCostSummary = useCallback(async () => {
+    try {
+      const res = await fetch("/api/ops/abra/cost", { cache: "no-store" });
+      if (!res.ok) return;
+      const data = (await res.json()) as Partial<CostSummary>;
+      if (typeof data.total !== "number" || typeof data.budget !== "number") return;
+
+      const pctUsed =
+        typeof data.pctUsed === "number"
+          ? data.pctUsed
+          : data.budget > 0
+            ? (data.total / data.budget) * 100
+            : 0;
+
+      setCostSummary({
+        total: data.total,
+        budget: data.budget,
+        remaining:
+          typeof data.remaining === "number"
+            ? data.remaining
+            : data.budget - data.total,
+        pctUsed: Math.round(pctUsed),
+      });
+    } catch {
+      // Best-effort
+    }
+  }, []);
+
   // Auto-scroll
   useEffect(() => {
     const node = listRef.current;
@@ -442,46 +470,14 @@ export function AbraChat() {
           );
         }
 
-        // Extract cost from the reply text (hacky but avoids a separate endpoint)
-        // We don't actually send this — we use a dedicated cost fetch instead
       } catch {
         // Best-effort
       }
-
-      // Fetch cost separately via a lighter approach
-      try {
-        const costRes = await fetch("/api/ops/abra/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: "cost report", history: [] }),
-        });
-        if (costRes.ok) {
-          const data = await costRes.json();
-          // Parse cost from the structured response
-          if (data.intent === "cost" && typeof data.reply === "string") {
-            const totalMatch = data.reply.match(/Total:\s*\*?\*?\$?([\d.]+)/);
-            const budgetMatch = data.reply.match(/\$[\d.]+\s*\/\s*\$([\d,]+)/);
-            const pctMatch = data.reply.match(/([\d.]+)%\s*used/);
-            if (totalMatch) {
-              const total = parseFloat(totalMatch[1]);
-              const budget = budgetMatch ? parseFloat(budgetMatch[1].replace(",", "")) : 1000;
-              const pctUsed = pctMatch ? parseFloat(pctMatch[1]) : (total / budget) * 100;
-              setCostSummary({
-                total,
-                budget,
-                remaining: budget - total,
-                pctUsed: Math.round(pctUsed),
-              });
-            }
-          }
-        }
-      } catch {
-        // Best-effort
-      }
+      await refreshCostSummary();
     }
 
     void loadContext();
-  }, []);
+  }, [refreshCostSummary]);
 
   const sendMessage = useCallback(
     async (text: string) => {
@@ -575,38 +571,14 @@ export function AbraChat() {
           }
         }
 
-        // Update cost after any message
-        if (data?.intent === "cost") {
-          const totalMatch = (data.reply as string).match(
-            /Total:\s*\*?\*?\$?([\d.]+)/,
-          );
-          const budgetMatch = (data.reply as string).match(
-            /\$[\d.]+\s*\/\s*\$([\d,]+)/,
-          );
-          const pctMatch = (data.reply as string).match(/([\d.]+)%\s*used/);
-          if (totalMatch) {
-            const total = parseFloat(totalMatch[1]);
-            const budget = budgetMatch
-              ? parseFloat(budgetMatch[1].replace(",", ""))
-              : 1000;
-            const pctUsed = pctMatch
-              ? parseFloat(pctMatch[1])
-              : (total / budget) * 100;
-            setCostSummary({
-              total,
-              budget,
-              remaining: budget - total,
-              pctUsed: Math.round(pctUsed),
-            });
-          }
-        }
+        void refreshCostSummary();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Request failed");
       } finally {
         setPending(false);
       }
     },
-    [pending, historyPayload],
+    [pending, historyPayload, refreshCostSummary],
   );
 
   async function onSubmit(event: FormEvent) {

@@ -1,16 +1,3 @@
-/**
- * GET /api/ops/department/[dept] — Full department state
- *
- * Returns complete operational context for a department:
- * - Department metadata (owner, description, goals)
- * - Active initiatives with task progress
- * - Open questions
- * - Recent corrections
- * - KPIs
- * - AI spend for department
- * - Dashboard config
- */
-
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/config";
 import {
@@ -18,6 +5,7 @@ import {
   markSupabaseFailure,
   markSupabaseSuccess,
 } from "@/lib/ops/supabase-resilience";
+import { getSpendByDepartment } from "@/lib/ops/abra-cost-tracker";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,11 +16,10 @@ const VALID_DEPARTMENTS = [
   "sales_and_growth",
   "supply_chain",
   "executive",
-];
+] as const;
 
 function getSupabaseEnv() {
-  const baseUrl =
-    process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const baseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!baseUrl || !serviceKey) {
     throw new Error("Missing Supabase credentials");
@@ -51,7 +38,7 @@ async function sbFetch(path: string, init: RequestInit = {}) {
     ...init,
     headers,
     cache: "no-store",
-    signal: init.signal || AbortSignal.timeout(10000),
+    signal: init.signal || AbortSignal.timeout(12000),
   });
 
   const text = await res.text();
@@ -65,12 +52,14 @@ async function sbFetch(path: string, init: RequestInit = {}) {
   }
 
   if (!res.ok) {
-    throw new Error(
-      `Supabase ${init.method || "GET"} ${path} failed (${res.status}): ${typeof json === "string" ? json : JSON.stringify(json)}`,
-    );
+    throw new Error(`Supabase ${init.method || "GET"} ${path} failed (${res.status}): ${typeof json === "string" ? json : JSON.stringify(json)}`);
   }
 
   return json;
+}
+
+function settledValue<T>(result: PromiseSettledResult<T>, fallback: T): T {
+  return result.status === "fulfilled" ? result.value : fallback;
 }
 
 export async function GET(
@@ -83,12 +72,9 @@ export async function GET(
   }
 
   const { dept } = await params;
-
-  if (!VALID_DEPARTMENTS.includes(dept)) {
+  if (!VALID_DEPARTMENTS.includes(dept as (typeof VALID_DEPARTMENTS)[number])) {
     return NextResponse.json(
-      {
-        error: `Invalid department: ${dept}. Valid: ${VALID_DEPARTMENTS.join(", ")}`,
-      },
+      { error: `Invalid department: ${dept}` },
       { status: 400 },
     );
   }
@@ -102,122 +88,59 @@ export async function GET(
       );
     }
 
-    // Fetch all department data in parallel
     const [
-      departmentRows,
-      initiativeRows,
-      questionRows,
-      correctionRows,
-      costRows,
-    ] = await Promise.all([
-      // Department metadata
-      sbFetch(
-        `/rest/v1/abra_departments?name=eq.${dept}&select=name,owner_name,description,key_context,dashboard_config,current_priorities,long_term_goals,short_term_goals&limit=1`,
-      ).catch(() => []),
-
-      // Active initiatives
-      sbFetch(
-        `/rest/v1/abra_initiatives?department=eq.${dept}&status=not.in.(completed,paused)&select=id,title,goal,status,questions,answers,tasks,kpis,created_at&order=created_at.desc&limit=10`,
-      ).catch(() => []),
-
-      // Open questions
-      sbFetch(
-        `/rest/v1/abra_unanswered_questions?department=eq.${dept}&answered=eq.false&select=id,question,asked_by,context,created_at&order=created_at.desc&limit=10`,
-      ).catch(() => []),
-
-      // Recent corrections
-      sbFetch(
-        `/rest/v1/abra_corrections?department=eq.${dept}&active=eq.true&select=id,original_claim,correction,corrected_by,created_at&order=created_at.desc&limit=5`,
-      ).catch(() => []),
-
-      // AI spend this month
-      sbFetch("/rest/v1/rpc/get_monthly_ai_spend", {
-        method: "POST",
-        body: JSON.stringify({}),
-      }).catch(() => []),
+      departmentResult,
+      initiativesResult,
+      questionsResult,
+      correctionsResult,
+      kpisResult,
+      teamResult,
+      dashboardConfigResult,
+      spendByDeptResult,
+    ] = await Promise.allSettled([
+      sbFetch(`/rest/v1/abra_departments?name=eq.${dept}&select=name,owner_name,description,key_context,current_priorities,long_term_goals,short_term_goals,dashboard_config&limit=1`),
+      sbFetch(`/rest/v1/abra_initiatives?department=eq.${dept}&status=not.in.(completed,paused)&select=id,title,goal,status,questions,answers,tasks,kpis,created_at,updated_at&order=created_at.desc&limit=20`),
+      sbFetch(`/rest/v1/abra_unanswered_questions?department=eq.${dept}&answered=eq.false&select=id,question,asked_by,context,created_at&order=created_at.desc&limit=20`),
+      sbFetch(`/rest/v1/abra_corrections?department=eq.${dept}&active=eq.true&select=id,original_claim,correction,corrected_by,created_at&order=created_at.desc&limit=20`),
+      sbFetch(`/rest/v1/open_brain_entries?department=eq.${dept}&entry_type=eq.kpi&select=id,title,summary_text,raw_text,priority,created_at&order=created_at.desc&limit=20`),
+      sbFetch(`/rest/v1/abra_team?department=eq.${dept}&select=id,name,role,email,responsibilities,key_context&order=name.asc&limit=100`),
+      sbFetch(`/rest/v1/abra_departments?name=eq.${dept}&select=dashboard_config&limit=1`),
+      getSpendByDepartment(),
     ]);
+
+    const departmentRows = settledValue(departmentResult, [] as Array<Record<string, unknown>>);
+    const initiatives = settledValue(initiativesResult, [] as Array<Record<string, unknown>>);
+    const openQuestions = settledValue(questionsResult, [] as Array<Record<string, unknown>>);
+    const recentCorrections = settledValue(correctionsResult, [] as Array<Record<string, unknown>>);
+    const kpis = settledValue(kpisResult, [] as Array<Record<string, unknown>>);
+    const teamMembers = settledValue(teamResult, [] as Array<Record<string, unknown>>);
+    const dashboardRows = settledValue(dashboardConfigResult, [] as Array<Record<string, unknown>>);
+    const spendByDept = settledValue(spendByDeptResult, {} as Record<string, number>);
+
+    const department = Array.isArray(departmentRows) ? departmentRows[0] || null : null;
+    const dashboardConfig = Array.isArray(dashboardRows) ? dashboardRows[0]?.dashboard_config || {} : {};
+    const deptSpend = Number(spendByDept[dept] || 0);
 
     await markSupabaseSuccess();
 
-    const departmentMeta = Array.isArray(departmentRows)
-      ? departmentRows[0] || null
-      : null;
-
-    const initiatives = (
-      Array.isArray(initiativeRows) ? initiativeRows : []
-    ).map(
-      (init: {
-        id: string;
-        title: string | null;
-        goal: string;
-        status: string;
-        questions: Array<{ key: string }> | null;
-        answers: Record<string, string> | null;
-        tasks: Array<{ title: string; status: string }> | null;
-        kpis: Array<{ metric: string; target: string }> | null;
-        created_at: string;
-      }) => {
-        const questions = init.questions || [];
-        const answers = init.answers || {};
-        const tasks = init.tasks || [];
-        const completedTasks = tasks.filter(
-          (t) => t.status === "completed",
-        ).length;
-
-        return {
-          id: init.id,
-          title: init.title,
-          goal: init.goal,
-          status: init.status,
-          open_questions: questions.filter((q) => !answers[q.key]).length,
-          total_questions: questions.length,
-          task_progress: {
-            completed: completedTasks,
-            total: tasks.length,
-          },
-          kpis: init.kpis,
-          created_at: init.created_at,
-        };
-      },
-    );
-
-    // Extract department cost from monthly spend (cost_log has department column)
-    const monthlyCostData = Array.isArray(costRows) ? costRows : [];
-    const deptCost = monthlyCostData.find(
-      (c: { department?: string }) => c.department === dept,
-    );
-
     return NextResponse.json({
-      department: departmentMeta
-        ? {
-            name: departmentMeta.name,
-            owner: departmentMeta.owner_name,
-            description: departmentMeta.description,
-            key_context: departmentMeta.key_context,
-            current_priorities: departmentMeta.current_priorities || [],
-            long_term_goals: departmentMeta.long_term_goals || [],
-            short_term_goals: departmentMeta.short_term_goals || [],
-            dashboard_config: departmentMeta.dashboard_config || {},
-          }
-        : { name: dept, owner: null, description: null },
+      department,
       initiatives,
-      open_questions: Array.isArray(questionRows) ? questionRows : [],
-      recent_corrections: Array.isArray(correctionRows)
-        ? correctionRows
-        : [],
-      ai_spend: deptCost
-        ? {
-            this_month: Number(deptCost.total_cost || 0),
-            calls: Number(deptCost.call_count || 0),
-          }
-        : { this_month: 0, calls: 0 },
+      open_questions: openQuestions,
+      recent_corrections: recentCorrections,
+      kpis,
+      ai_spend: {
+        this_month: Math.round(deptSpend * 100) / 100,
+      },
+      team_members: teamMembers,
+      dashboard_config: dashboardConfig,
+      generated_at: new Date().toISOString(),
     });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : String(error);
-    if (/supabase|rest\/v1/i.test(message)) {
-      await markSupabaseFailure(error);
-    }
-    return NextResponse.json({ error: message }, { status: 500 });
+    await markSupabaseFailure(error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to fetch department state" },
+      { status: 500 },
+    );
   }
 }

@@ -47,6 +47,52 @@ async function sbInsert(
   });
 }
 
+function monthRange(targetMonth?: string): { startIso: string; endIso: string } {
+  const [yearStr, monthStr] = (targetMonth || new Date().toISOString().slice(0, 7)).split("-");
+  const year = Number(yearStr);
+  const monthIndex = Number(monthStr) - 1;
+
+  const start = new Date(Date.UTC(year, monthIndex, 1, 0, 0, 0));
+  const end = new Date(Date.UTC(year, monthIndex + 1, 1, 0, 0, 0));
+
+  return {
+    startIso: start.toISOString(),
+    endIso: end.toISOString(),
+  };
+}
+
+async function fetchMonthlyCostRows(
+  targetMonth?: string,
+): Promise<Array<{ department: string | null; model: string; estimated_cost_usd: number }>> {
+  const env = getSupabaseEnv();
+  if (!env) return [];
+
+  const { startIso, endIso } = monthRange(targetMonth);
+  const path = `/rest/v1/abra_cost_log?select=department,model,estimated_cost_usd&created_at=gte.${encodeURIComponent(startIso)}&created_at=lt.${encodeURIComponent(endIso)}&limit=5000`;
+  const res = await fetch(`${env.baseUrl}${path}`, {
+    method: "GET",
+    headers: {
+      apikey: env.serviceKey,
+      Authorization: `Bearer ${env.serviceKey}`,
+      "Content-Type": "application/json",
+    },
+    cache: "no-store",
+    signal: AbortSignal.timeout(8000),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Cost row fetch failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+
+  const rows = (await res.json()) as Array<{
+    department: string | null;
+    model: string;
+    estimated_cost_usd: number;
+  }>;
+  return Array.isArray(rows) ? rows : [];
+}
+
 /**
  * Estimate cost in USD for a given model and token counts.
  */
@@ -201,6 +247,46 @@ export async function getMonthlySpend(
       byProvider: {},
       byEndpoint: {},
     };
+  }
+}
+
+export async function getSpendByDepartment(
+  targetMonth?: string,
+): Promise<Record<string, number>> {
+  try {
+    const rows = await fetchMonthlyCostRows(targetMonth);
+    const grouped: Record<string, number> = {};
+
+    for (const row of rows) {
+      const key = (row.department || "unassigned").trim() || "unassigned";
+      grouped[key] = (grouped[key] || 0) + Number(row.estimated_cost_usd || 0);
+    }
+
+    return Object.fromEntries(
+      Object.entries(grouped).map(([k, v]) => [k, Math.round(v * 100) / 100]),
+    );
+  } catch {
+    return {};
+  }
+}
+
+export async function getSpendByModel(
+  targetMonth?: string,
+): Promise<Record<string, number>> {
+  try {
+    const rows = await fetchMonthlyCostRows(targetMonth);
+    const grouped: Record<string, number> = {};
+
+    for (const row of rows) {
+      const key = (row.model || "unknown").trim() || "unknown";
+      grouped[key] = (grouped[key] || 0) + Number(row.estimated_cost_usd || 0);
+    }
+
+    return Object.fromEntries(
+      Object.entries(grouped).map(([k, v]) => [k, Math.round(v * 100) / 100]),
+    );
+  } catch {
+    return {};
   }
 }
 
