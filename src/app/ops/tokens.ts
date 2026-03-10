@@ -10,6 +10,7 @@ export const TEXT_DIM = "rgba(255,255,255,0.45)";
 export const TEXT_MED = "rgba(255,255,255,0.65)";
 export const CARD_BG = "rgba(255,255,255,0.03)";
 export const CARD_BORDER = "rgba(255,255,255,0.06)";
+export const MOBILE_BREAKPOINT = 768;
 
 // Light-surface variants used by command pages.
 export const SURFACE_CARD = "#ffffff";

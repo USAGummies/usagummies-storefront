@@ -5,6 +5,7 @@ import { AlertTriangle, CheckCircle2, Clock3, RefreshCw, XCircle } from "lucide-
 import { RefreshButton } from "@/app/ops/components/RefreshButton";
 import { SkeletonTable } from "@/app/ops/components/Skeleton";
 import { StalenessBadge } from "@/app/ops/components/StalenessBadge";
+import { useIsMobile } from "@/app/ops/hooks";
 import {
   NAVY,
   RED,
@@ -141,6 +142,7 @@ function MetricCard({
 }
 
 export function CommandCenter() {
+  const isMobile = useIsMobile();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pulse, setPulse] = useState<PulseData | null>(null);
@@ -253,7 +255,9 @@ export function CommandCenter() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+          gridTemplateColumns: isMobile
+            ? "repeat(2, minmax(0, 1fr))"
+            : "repeat(4, minmax(0, 1fr))",
           gap: 10,
           marginBottom: 12,
         }}
@@ -333,7 +337,7 @@ export function CommandCenter() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "1fr 1fr",
+          gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
           gap: 12,
         }}
       >

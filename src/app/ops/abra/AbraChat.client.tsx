@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useIsMobile } from "@/app/ops/hooks";
 import {
   NAVY,
   GOLD,
@@ -427,6 +428,7 @@ function SourcePill({ source, messageId }: { source: Source; messageId: string }
 // ─── Main Component ───
 
 export function AbraChat() {
+  const isMobile = useIsMobile();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [pending, setPending] = useState(false);
@@ -949,7 +951,9 @@ export function AbraChat() {
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
+                    gridTemplateColumns: isMobile
+                      ? "repeat(2, minmax(0, 1fr))"
+                      : "repeat(auto-fill, minmax(180px, 1fr))",
                     gap: 8,
                   }}
                 >
@@ -1028,7 +1032,7 @@ export function AbraChat() {
                   {/* Message bubble */}
                   <div
                     style={{
-                      maxWidth: "90%",
+                      maxWidth: isMobile ? "100%" : "80%",
                       borderRadius: 12,
                       border: isUser
                         ? `1px solid ${GOLD}`
@@ -1193,6 +1197,7 @@ export function AbraChat() {
               padding: 12,
               display: "flex",
               gap: 8,
+              flexDirection: isMobile ? "column" : "row",
             }}
           >
             <input
@@ -1209,6 +1214,7 @@ export function AbraChat() {
                 borderRadius: 10,
                 padding: "10px 12px",
                 fontSize: 14,
+                minHeight: 48,
                 outline: "none",
               }}
               disabled={pending}
@@ -1221,8 +1227,9 @@ export function AbraChat() {
                 background: NAVY,
                 color: "#fff",
                 borderRadius: 10,
-                padding: "0 14px",
+                padding: isMobile ? "10px 14px" : "0 14px",
                 fontSize: 13,
+                minHeight: 48,
                 cursor:
                   pending || !input.trim() ? "default" : "pointer",
                 opacity: pending || !input.trim() ? 0.7 : 1,

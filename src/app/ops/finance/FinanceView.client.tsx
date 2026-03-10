@@ -28,6 +28,7 @@ import {
   fmtDollar,
   fmtDollarExact,
 } from "@/lib/ops/use-war-room-data";
+import { useIsMobile } from "@/app/ops/hooks";
 import { PlaidConnectButton } from "./PlaidConnectButton.client";
 import { StalenessBadge } from "@/app/ops/components/StalenessBadge";
 import { SkeletonChart, SkeletonTable } from "@/app/ops/components/Skeleton";
@@ -129,6 +130,7 @@ function HeaderCard({
 }
 
 export function FinanceView() {
+  const isMobile = useIsMobile();
   const { data: pnl, loading: pnlLoading, error: pnlError } = usePnLData();
   const { data: balances, loading: balLoading, error: balError } = useBalancesData();
   const { data: tx, loading: txLoading, error: txError } = useTransactions(30);
@@ -350,7 +352,7 @@ export function FinanceView() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "1.2fr 1fr",
+          gridTemplateColumns: isMobile ? "1fr" : "1.2fr 1fr",
           gap: 12,
           marginBottom: 12,
         }}
@@ -360,8 +362,15 @@ export function FinanceView() {
           {channelLoading && !channelData ? (
             <SkeletonChart height={260} />
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 8, alignItems: "center" }}>
-              <div style={{ width: "100%", height: 220 }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: isMobile ? "1fr" : "220px 1fr",
+                gap: 8,
+                alignItems: "center",
+              }}
+            >
+              <div style={{ width: "100%", height: isMobile ? 190 : 220 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
@@ -370,8 +379,8 @@ export function FinanceView() {
                       nameKey="name"
                       cx="50%"
                       cy="50%"
-                      outerRadius={78}
-                      innerRadius={40}
+                      outerRadius={isMobile ? 62 : 78}
+                      innerRadius={isMobile ? 30 : 40}
                       paddingAngle={2}
                     >
                       {channelPie.map((entry) => (
@@ -522,7 +531,7 @@ export function FinanceView() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "1.7fr 1fr",
+          gridTemplateColumns: isMobile ? "1fr" : "1.7fr 1fr",
           gap: 12,
           marginBottom: 14,
         }}
@@ -714,7 +723,7 @@ export function FinanceView() {
             </div>
 
             {/* Two-column: Unit Economics Waterfall + Breakeven */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12, marginBottom: 12 }}>
               {/* Waterfall */}
               <div>
                 <div style={{ fontSize: 12, fontWeight: 700, color: NAVY, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>
@@ -868,7 +877,7 @@ export function FinanceView() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "1.7fr 1fr",
+          gridTemplateColumns: isMobile ? "1fr" : "1.7fr 1fr",
           gap: 12,
           marginBottom: 14,
         }}

@@ -4,6 +4,7 @@ import { useSession, signOut } from "next-auth/react";
 import { usePathname, useRouter } from "next/navigation";
 import { SessionProvider } from "next-auth/react";
 import { ReactNode, useEffect, useState } from "react";
+import { useIsMobile } from "@/app/ops/hooks";
 import {
   NAVY,
   RED,
@@ -66,7 +67,15 @@ const NAV_SECTIONS: NavSection[] = [
   },
 ];
 
-function OpsNav() {
+function OpsNav({
+  isMobile,
+  mobileNavOpen,
+  onClose,
+}: {
+  isMobile: boolean;
+  mobileNavOpen: boolean;
+  onClose: () => void;
+}) {
   const { data: session } = useSession();
   const pathname = usePathname();
   const router = useRouter();
@@ -111,17 +120,25 @@ function OpsNav() {
   return (
     <nav
       style={{
-        width: collapsed ? 60 : 240,
-        minHeight: "100vh",
+        width: isMobile ? 260 : collapsed ? 60 : 240,
+        minHeight: isMobile ? "100%" : "100vh",
         background: SIDEBAR_BG,
         borderRight: `1px solid ${SIDEBAR_BORDER}`,
         display: "flex",
         flexDirection: "column",
-        transition: "width 0.2s ease",
+        transition: "transform 0.2s ease, width 0.2s ease",
         flexShrink: 0,
-        position: "sticky",
+        position: isMobile ? "fixed" : "sticky",
         top: 0,
-        alignSelf: "flex-start",
+        left: isMobile ? 0 : undefined,
+        bottom: isMobile ? 0 : undefined,
+        alignSelf: isMobile ? undefined : "flex-start",
+        zIndex: isMobile ? 1000 : 2,
+        transform: isMobile
+          ? mobileNavOpen
+            ? "translateX(0)"
+            : "translateX(-100%)"
+          : "none",
       }}
     >
       {/* ── Logo ──────────────────────────────────────── */}
@@ -159,20 +176,38 @@ function OpsNav() {
             </div>
           </div>
         )}
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          style={{
-            background: "none",
-            border: "none",
-            color: TEXT_DIM,
-            cursor: "pointer",
-            fontSize: 14,
-            padding: 4,
-          }}
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          {collapsed ? "\u25B6" : "\u25C0"}
-        </button>
+        {isMobile ? (
+          <button
+            onClick={onClose}
+            style={{
+              background: "none",
+              border: "none",
+              color: TEXT_DIM,
+              cursor: "pointer",
+              fontSize: 20,
+              padding: 2,
+              lineHeight: 1,
+            }}
+            aria-label="Close sidebar"
+          >
+            ×
+          </button>
+        ) : (
+          <button
+            onClick={() => setCollapsed(!collapsed)}
+            style={{
+              background: "none",
+              border: "none",
+              color: TEXT_DIM,
+              cursor: "pointer",
+              fontSize: 14,
+              padding: 4,
+            }}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            {collapsed ? "\u25B6" : "\u25C0"}
+          </button>
+        )}
       </div>
 
       {/* ── Nav Sections ──────────────────────────────── */}
@@ -221,7 +256,10 @@ function OpsNav() {
                 return (
                   <button
                     key={item.href}
-                    onClick={() => router.push(item.href)}
+                    onClick={() => {
+                      router.push(item.href);
+                      if (isMobile) onClose();
+                    }}
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -319,6 +357,24 @@ function OpsNav() {
 
 function OpsContent({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const isMobile = useIsMobile();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isMobile) {
+      setMobileNavOpen(false);
+    }
+  }, [isMobile]);
+
+  const currentPageLabel = (() => {
+    const flat = NAV_SECTIONS.flatMap((section) => section.items);
+    const exact = flat.find((item) => item.href === pathname);
+    if (exact) return exact.label;
+    const prefix = flat.find(
+      (item) => item.href !== "/ops" && pathname.startsWith(item.href),
+    );
+    return prefix?.label || "Command Center";
+  })();
 
   if (pathname === "/ops/login") {
     return <>{children}</>;
@@ -326,11 +382,65 @@ function OpsContent({ children }: { children: ReactNode }) {
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: BG_CREAM }}>
-      <OpsNav />
+      {isMobile ? (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 48,
+            background: SIDEBAR_BG,
+            borderBottom: `1px solid ${SIDEBAR_BORDER}`,
+            zIndex: 999,
+            display: "flex",
+            alignItems: "center",
+            padding: "0 12px",
+            gap: 10,
+          }}
+        >
+          <button
+            onClick={() => setMobileNavOpen((open) => !open)}
+            style={{
+              border: "none",
+              background: "transparent",
+              color: "#fff",
+              fontSize: 22,
+              cursor: "pointer",
+              lineHeight: 1,
+              padding: 0,
+            }}
+            aria-label="Toggle navigation"
+          >
+            ☰
+          </button>
+          <span style={{ color: GOLD, fontSize: 13, fontWeight: 700 }}>
+            {currentPageLabel}
+          </span>
+        </div>
+      ) : null}
+
+      {isMobile && mobileNavOpen ? (
+        <div
+          onClick={() => setMobileNavOpen(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.45)",
+            zIndex: 998,
+          }}
+        />
+      ) : null}
+
+      <OpsNav
+        isMobile={isMobile}
+        mobileNavOpen={mobileNavOpen}
+        onClose={() => setMobileNavOpen(false)}
+      />
       <main
         style={{
           flex: 1,
-          padding: "28px 36px",
+          padding: isMobile ? "64px 14px 16px" : "28px 36px",
           color: NAVY,
           fontFamily: "var(--font-sans), system-ui, sans-serif",
           overflowX: "hidden",

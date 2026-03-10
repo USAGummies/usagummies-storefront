@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useIsMobile } from "@/app/ops/hooks";
 import {
   NAVY,
   RED,
@@ -88,6 +89,7 @@ function buildDetail(form: FormState): string {
 }
 
 export function CompetitorsView() {
+  const isMobile = useIsMobile();
   const router = useRouter();
   const [entries, setEntries] = useState<CompetitorEntry[]>([]);
   const [loading, setLoading] = useState(false);
@@ -196,7 +198,7 @@ export function CompetitorsView() {
 
   return (
     <div style={{ background: BG, minHeight: "100vh", paddingBottom: 20 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, gap: 10 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, gap: 10, flexWrap: "wrap" }}>
         <div>
           <h1 style={{ margin: 0, fontSize: 30, color: NAVY, letterSpacing: "-0.02em" }}>Competitive Intelligence</h1>
           <div style={{ marginTop: 4, fontSize: 13, color: TEXT_DIM }}>
@@ -229,7 +231,7 @@ export function CompetitorsView() {
       {loading ? (
         <div style={{ color: TEXT_DIM, fontSize: 13 }}>Loading competitors...</div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 10 }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(280px, 1fr))", gap: 10 }}>
           {sortedEntries.map((entry) => {
             const metadata = entry.metadata || {};
             const website = asText(metadata.website) || entry.source_url || "";
@@ -302,8 +304,18 @@ export function CompetitorsView() {
       )}
 
       {modalOpen ? (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(15,22,40,0.55)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 12 }}>
-          <div style={{ width: "min(700px, 100%)", maxHeight: "95vh", overflowY: "auto", background: CARD, border: `1px solid ${BORDER}`, borderRadius: 14, padding: "16px" }}>
+        <div style={{ position: "fixed", inset: 0, background: "rgba(15,22,40,0.55)", zIndex: 1000, display: "flex", alignItems: isMobile ? "stretch" : "center", justifyContent: "center", padding: isMobile ? 0 : 12 }}>
+          <div
+            style={{
+              width: isMobile ? "100%" : "min(700px, 100%)",
+              maxHeight: isMobile ? "100vh" : "95vh",
+              overflowY: "auto",
+              background: CARD,
+              border: isMobile ? "none" : `1px solid ${BORDER}`,
+              borderRadius: isMobile ? 0 : 14,
+              padding: "16px",
+            }}
+          >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <div style={{ fontSize: 18, color: NAVY, fontWeight: 800 }}>
                 {form.id ? "Edit Competitor" : "Add Competitor"}

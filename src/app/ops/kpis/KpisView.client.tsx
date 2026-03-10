@@ -64,6 +64,7 @@ import {
 import { StalenessBadge } from "@/app/ops/components/StalenessBadge";
 import { RefreshButton } from "@/app/ops/components/RefreshButton";
 import { SkeletonChart } from "@/app/ops/components/Skeleton";
+import { useIsMobile } from "@/app/ops/hooks";
 import {
   NAVY,
   RED,
@@ -81,7 +82,6 @@ import {
 type PriorityFilter = "all" | "critical" | "warning" | "info";
 
 const GREEN = "#16a34a";
-const CHART_MOBILE_BREAKPOINT = 768;
 const KPI_METRICS = [
   "daily_revenue_shopify",
   "daily_revenue_amazon",
@@ -353,6 +353,7 @@ function LiveMetricCard({
 // ---------------------------------------------------------------------------
 
 export function KpisView() {
+  const isMobile = useIsMobile();
   const { data: session } = useSession();
   const [filter, setFilter] = useState<PriorityFilter>("all");
   const [actionMsg, setActionMsg] = useState<string | null>(null);
@@ -367,14 +368,6 @@ export function KpisView() {
   const [anomaliesLoading, setAnomaliesLoading] = useState(false);
   const [anomaliesError, setAnomaliesError] = useState<string | null>(null);
   const [expandedAnomalyKey, setExpandedAnomalyKey] = useState<string | null>(null);
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < CHART_MOBILE_BREAKPOINT);
-    check();
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
-  }, []);
 
   const fetchBrainInsights = useCallback(async () => {
     setBrainLoading(true);
@@ -753,14 +746,30 @@ export function KpisView() {
         ) : null}
 
         {historyLoading && chartRows.length === 0 ? (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 10 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: isMobile
+                ? "1fr"
+                : "repeat(auto-fit, minmax(320px, 1fr))",
+              gap: 10,
+            }}
+          >
             <SkeletonChart height={chartHeight} />
             <SkeletonChart height={chartHeight} />
             <SkeletonChart height={chartHeight} />
             <SkeletonChart height={chartHeight} />
           </div>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 10 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: isMobile
+                ? "1fr"
+                : "repeat(auto-fit, minmax(320px, 1fr))",
+              gap: 10,
+            }}
+          >
             <LiveMetricCard
               title="Revenue — Last 30 Days"
               subtitle={`${fmtDollar(revenueMeta.current)} today • ${fmtDelta(revenueMeta.delta)}`}
