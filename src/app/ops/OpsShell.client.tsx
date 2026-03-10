@@ -48,6 +48,11 @@ const NAV_SECTIONS: NavSection[] = [
     title: "OPERATIONS",
     collapsible: true,
     items: [
+      { href: "/ops/departments/executive", label: "Executive Dept", icon: "\u{1F451}", roles: ["admin", "employee", "investor", "partner", "banker"] },
+      { href: "/ops/departments/operations", label: "Operations Dept", icon: "\u2699\uFE0F", roles: ["admin", "employee", "investor", "partner"] },
+      { href: "/ops/departments/finance", label: "Finance Dept", icon: "\u{1F4B8}", roles: ["admin", "employee", "investor", "partner", "banker"] },
+      { href: "/ops/departments/sales_and_growth", label: "Sales & Growth Dept", icon: "\u{1F4C8}", roles: ["admin", "employee", "investor", "partner"] },
+      { href: "/ops/departments/supply_chain", label: "Supply Chain Dept", icon: "\u{1F4E6}", roles: ["admin", "employee", "investor", "partner", "banker"] },
       { href: "/ops/agents", label: "Agents", icon: "\u{1F916}", roles: ["admin", "employee", "investor", "partner"] },
       { href: "/ops/inbox", label: "Inbox", icon: "\u{1F4E8}", roles: ["admin", "employee"] },
       { href: "/ops/logs", label: "Logs", icon: "\u{1F4DD}", roles: ["admin", "employee", "investor", "partner"] },
