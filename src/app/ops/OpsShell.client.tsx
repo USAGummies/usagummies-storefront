@@ -3,7 +3,7 @@
 import { useSession, signOut } from "next-auth/react";
 import { usePathname, useRouter } from "next/navigation";
 import { SessionProvider } from "next-auth/react";
-import { ReactNode, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import {
   NAVY,
   RED,
@@ -20,6 +20,7 @@ type NavItem = {
   label: string;
   icon: string;
   roles: string[];
+  badge?: "pendingApprovals";
 };
 
 type NavSection = {
@@ -36,6 +37,7 @@ const NAV_SECTIONS: NavSection[] = [
       { href: "/ops", label: "Command Center", icon: "\u{1F3DB}\uFE0F", roles: ["admin", "employee", "investor", "partner", "banker"] },
       { href: "/ops/channels", label: "Revenue by Channel", icon: "\u{1F4CA}", roles: ["admin", "employee", "investor", "partner", "banker"] },
       { href: "/ops/permissions", label: "Permission Queue", icon: "\u{1F6E1}\uFE0F", roles: ["admin", "employee"] },
+      { href: "/ops/approvals", label: "Approvals", icon: "\u2705", roles: ["admin", "employee"], badge: "pendingApprovals" },
       { href: "/ops/finance", label: "P&L / Finance", icon: "\u{1F4B5}", roles: ["admin", "investor", "partner", "banker"] },
       { href: "/ops/forecast", label: "Cash Forecast", icon: "\u{1F52E}", roles: ["admin", "investor", "partner", "banker"] },
       { href: "/ops/pipeline", label: "Pipeline & Deals", icon: "\u{1F30E}", roles: ["admin", "employee", "investor", "partner"] },
@@ -68,8 +70,41 @@ function OpsNav() {
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [opsOpen, setOpsOpen] = useState(false);
+  const [pendingApprovals, setPendingApprovals] = useState(0);
 
   const role = session?.user?.role || "employee";
+
+  useEffect(() => {
+    let cancelled = false;
+    let timer: ReturnType<typeof setInterval> | null = null;
+
+    async function loadBadge() {
+      try {
+        const res = await fetch("/api/ops/abra/approvals?status=pending", {
+          cache: "no-store",
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        const count = typeof data?.count === "number" ? data.count : 0;
+        setPendingApprovals(Math.max(0, count));
+      } catch {
+        // Best-effort
+      }
+    }
+
+    if (role === "admin" || role === "employee") {
+      void loadBadge();
+      timer = setInterval(() => {
+        void loadBadge();
+      }, 60000);
+    }
+
+    return () => {
+      cancelled = true;
+      if (timer) clearInterval(timer);
+    };
+  }, [role]);
 
   return (
     <nav
@@ -179,6 +214,8 @@ function OpsNav() {
               {/* Items */}
               {(isExpanded || collapsed) && visibleItems.map((item) => {
                 const active = pathname === item.href || (item.href !== "/ops" && pathname.startsWith(item.href));
+                const badgeCount =
+                  item.badge === "pendingApprovals" ? pendingApprovals : 0;
                 return (
                   <button
                     key={item.href}
@@ -206,9 +243,33 @@ function OpsNav() {
                       textAlign: "left",
                       fontFamily: "inherit",
                     }}
-                  >
+                    >
                     <span style={{ fontSize: 15 }}>{item.icon}</span>
-                    {!collapsed && item.label}
+                    {!collapsed && (
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                        <span>{item.label}</span>
+                        {badgeCount > 0 ? (
+                          <span
+                            style={{
+                              minWidth: 18,
+                              height: 18,
+                              borderRadius: 999,
+                              background: RED,
+                              color: "#fff",
+                              fontSize: 10,
+                              fontWeight: 700,
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              padding: "0 5px",
+                              lineHeight: 1,
+                            }}
+                          >
+                            {badgeCount > 99 ? "99+" : badgeCount}
+                          </span>
+                        ) : null}
+                      </span>
+                    )}
                   </button>
                 );
               })}
