@@ -27,6 +27,7 @@ const SELF_AUTHENTICATED_PREFIXES = [
   "/api/ops/notify",
   "/api/ops/slack/",
   "/api/ops/abra/", // All Abra routes use isAuthorized() from abra-auth.ts (session + CRON_SECRET)
+  "/api/ops/department/", // Department API uses isAuthorized() (session + CRON_SECRET)
 ];
 
 function isSelfAuthenticated(pathname: string): boolean {
