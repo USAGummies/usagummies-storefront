@@ -141,17 +141,31 @@ async function sbFetch(path: string, init: RequestInit = {}) {
 // ---------------------------------------------------------------------------
 const SLACK_BLOCK_TEXT_LIMIT = 3000;
 
+type SlackSectionBlock = {
+  type: "section";
+  text: { type: "mrkdwn"; text: string };
+};
+
+type SlackActionsBlock = {
+  type: "actions";
+  elements: Array<{
+    type: "button";
+    text: { type: "plain_text"; text: string; emoji?: boolean };
+    action_id: string;
+    value: string;
+  }>;
+};
+
+type SlackBlock = SlackSectionBlock | SlackActionsBlock;
+
 function buildSlackBlocks(
   fullText: string,
-): Array<{ type: string; text: { type: string; text: string } }> {
+): SlackSectionBlock[] {
   if (fullText.length <= SLACK_BLOCK_TEXT_LIMIT) {
     return [{ type: "section", text: { type: "mrkdwn", text: fullText } }];
   }
 
-  const blocks: Array<{
-    type: string;
-    text: { type: string; text: string };
-  }> = [];
+  const blocks: SlackSectionBlock[] = [];
   let remaining = fullText;
   while (remaining.length > 0) {
     if (remaining.length <= SLACK_BLOCK_TEXT_LIMIT) {
@@ -173,6 +187,26 @@ function buildSlackBlocks(
     remaining = remaining.slice(splitIdx).trimStart();
   }
   return blocks;
+}
+
+function buildFeedbackBlock(answerLogId: string): SlackActionsBlock {
+  return {
+    type: "actions",
+    elements: [
+      {
+        type: "button",
+        text: { type: "plain_text", text: "👍 Helpful", emoji: true },
+        action_id: "feedback_positive",
+        value: answerLogId,
+      },
+      {
+        type: "button",
+        text: { type: "plain_text", text: "👎 Not helpful", emoji: true },
+        action_id: "feedback_negative",
+        value: answerLogId,
+      },
+    ],
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -268,6 +302,7 @@ async function postThreadReply(
   threadTs: string,
   text: string,
   sources: Array<{ title: string; source_table: string; days_ago?: number }>,
+  answerLogId?: string | null,
 ): Promise<boolean> {
   if (!BOT_TOKEN) return false;
 
@@ -278,6 +313,10 @@ async function postThreadReply(
 
   try {
     const fullText = `🧠 *Abra*\n\n${text}${sourceText}`;
+    const blocks: SlackBlock[] = [...buildSlackBlocks(fullText)];
+    if (answerLogId) {
+      blocks.push(buildFeedbackBlock(answerLogId));
+    }
     const res = await fetchWithRetry(
       "https://slack.com/api/chat.postMessage",
       {
@@ -289,7 +328,7 @@ async function postThreadReply(
         body: JSON.stringify({
           channel: channelId,
           thread_ts: threadTs,
-          blocks: buildSlackBlocks(fullText),
+          blocks,
           text: `🧠 Abra: ${text.slice(0, 200)}`,
         }),
       },
@@ -310,6 +349,7 @@ async function postToSlack(
   responseUrl: string,
   text: string,
   sources: Array<{ title: string; source_table: string; days_ago?: number }>,
+  answerLogId?: string | null,
 ) {
   const sourceText =
     sources.length > 0
@@ -317,6 +357,10 @@ async function postToSlack(
       : "";
 
   const fullText = `🧠 *Abra*\n\n${text}${sourceText}`;
+  const blocks: SlackBlock[] = [...buildSlackBlocks(fullText)];
+  if (answerLogId) {
+    blocks.push(buildFeedbackBlock(answerLogId));
+  }
   await fetchWithRetry(
     responseUrl,
     {
@@ -324,7 +368,7 @@ async function postToSlack(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         response_type: "in_channel",
-        blocks: buildSlackBlocks(fullText),
+        blocks,
       }),
     },
     { timeoutMs: 10000, maxRetries: 2 },
@@ -663,6 +707,7 @@ async function callAbraChat(
 ): Promise<{
   reply: string;
   sources: Array<{ title: string; source_table: string; days_ago?: number }>;
+  answerLogId: string | null;
 }> {
   const openaiKey = process.env.OPENAI_API_KEY;
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
@@ -682,6 +727,7 @@ async function callAbraChat(
     return {
       reply: `⚠️ Abra is not fully configured (missing: ${missing}). Ping Ben to fix.`,
       sources: [],
+      answerLogId: null,
     };
   }
 
@@ -784,6 +830,7 @@ async function callAbraChat(
   let modelUsed = "";
   let inputTokens = 0;
   let outputTokens = 0;
+  let answerLogId: string | null = null;
 
   // --------------- Step 5: LLM call — Claude first, OpenAI fallback ---------------
   if (anthropicKey) {
@@ -905,6 +952,7 @@ async function callAbraChat(
       reply:
         "⚠️ Abra is temporarily unable to reason. Both AI providers failed. The ops team has been notified.",
       sources: [],
+      answerLogId: null,
     };
   }
 
@@ -935,7 +983,7 @@ async function callAbraChat(
 
   if (!degraded && tieredResults.all.length > 0) {
     const provenance = extractProvenance(tieredResults.all.slice(0, 8));
-    void logAnswer({
+    answerLogId = await logAnswer({
       question: message,
       answer: reply,
       source_ids: provenance.source_ids,
@@ -951,7 +999,7 @@ async function callAbraChat(
     });
   }
 
-  return { reply, sources };
+  return { reply, sources, answerLogId };
 }
 
 // ---------------------------------------------------------------------------
@@ -1090,7 +1138,7 @@ export async function POST(req: Request) {
         history = await fetchThreadHistory(channelId, threadTs);
       }
 
-      const { reply, sources } = await callAbraChat(
+      const { reply, sources, answerLogId } = await callAbraChat(
         queryText,
         history,
         userName,
@@ -1102,11 +1150,12 @@ export async function POST(req: Request) {
           threadTs,
           reply,
           sources,
+          answerLogId,
         );
         if (threaded) return;
       }
 
-      await postToSlack(responseUrl, reply, sources);
+      await postToSlack(responseUrl, reply, sources, answerLogId);
     } catch (err) {
       const errorMsg =
         err instanceof Error ? err.message : "Unknown error";
@@ -1117,6 +1166,7 @@ export async function POST(req: Request) {
         responseUrl,
         `⚠️ Abra encountered an unexpected error. The ops team has been notified.\n\n_Error: ${errorMsg.slice(0, 200)}_`,
         [],
+        null,
       ).catch(() => {});
     }
   });

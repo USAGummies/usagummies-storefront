@@ -27,6 +27,8 @@ export type NotifyChannel = "alerts" | "pipeline" | "daily";
 export type NotifyOpts = {
   channel: NotifyChannel;
   text: string;
+  /** Optional Slack Block Kit payload */
+  blocks?: unknown[];
   /** Send SMS via Twilio as well (for critical alerts) */
   sms?: boolean;
   /** Phone numbers to SMS (defaults to Ben's numbers) */
@@ -45,7 +47,11 @@ const SLACK_WEBHOOK_MAP: Record<NotifyChannel, string | undefined> = {
   daily: process.env.SLACK_WEBHOOK_DAILY || SLACK_FALLBACK_WEBHOOK,
 };
 
-async function sendSlack(channel: NotifyChannel, text: string): Promise<boolean> {
+async function sendSlack(
+  channel: NotifyChannel,
+  text: string,
+  blocks?: unknown[],
+): Promise<boolean> {
   const webhookUrl = SLACK_WEBHOOK_MAP[channel];
   if (!webhookUrl) {
     console.warn(`[notify] No Slack webhook configured for channel: ${channel}`);
@@ -57,10 +63,14 @@ async function sendSlack(channel: NotifyChannel, text: string): Promise<boolean>
   const prefixedText = isFallback ? `[${channel.toUpperCase()}] ${text}` : text;
 
   try {
+    const payload: Record<string, unknown> = { text: prefixedText };
+    if (Array.isArray(blocks) && blocks.length > 0) {
+      payload.blocks = blocks;
+    }
     const res = await fetch(webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: prefixedText }),
+      body: JSON.stringify(payload),
       signal: AbortSignal.timeout(10000),
     });
     return res.ok;
@@ -160,11 +170,11 @@ async function sendIMessageLocal(text: string): Promise<boolean> {
  * Optionally sends SMS for critical alerts.
  */
 export async function notify(opts: NotifyOpts): Promise<{ slack: boolean; sms?: boolean; imessage?: boolean }> {
-  const { channel, text, sms, smsRecipients } = opts;
+  const { channel, text, blocks, sms, smsRecipients } = opts;
   const result: { slack: boolean; sms?: boolean; imessage?: boolean } = { slack: false };
 
   // Try Slack first
-  result.slack = await sendSlack(channel, text);
+  result.slack = await sendSlack(channel, text, blocks);
 
   // If Slack failed and we're on laptop, try iMessage
   if (!result.slack && !isCloud()) {

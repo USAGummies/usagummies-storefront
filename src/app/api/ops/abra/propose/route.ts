@@ -20,6 +20,7 @@ import {
   markSupabaseFailure,
   markSupabaseSuccess,
 } from "@/lib/ops/supabase-resilience";
+import { notify } from "@/lib/ops/notify";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -203,6 +204,44 @@ export async function POST(req: Request) {
     }
 
     await markSupabaseSuccess();
+
+    void notify({
+      channel: "alerts",
+      text: `📝 Abra approval request: ${description}`,
+      blocks: [
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text:
+              `📝 *Abra Approval Request*\n` +
+              `*Action:* ${actionType}\n` +
+              `*Summary:* ${description}\n` +
+              `*Risk:* ${riskLevel} | *Confidence:* ${confidenceToLabel(confidence)}\n` +
+              `*Approval ID:* ${created.id}`,
+          },
+        },
+        {
+          type: "actions",
+          elements: [
+            {
+              type: "button",
+              text: { type: "plain_text", text: "✅ Approve" },
+              style: "primary",
+              action_id: "approve_action",
+              value: created.id,
+            },
+            {
+              type: "button",
+              text: { type: "plain_text", text: "❌ Reject" },
+              style: "danger",
+              action_id: "reject_action",
+              value: created.id,
+            },
+          ],
+        },
+      ],
+    }).catch(() => {});
 
     return NextResponse.json({
       approval_id: created.id,
