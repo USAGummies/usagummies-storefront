@@ -49,6 +49,7 @@ import {
   proposeAndMaybeExecute,
   type AbraAction,
 } from "@/lib/ops/abra-actions";
+import { analyzePipeline } from "@/lib/ops/abra-pipeline-intelligence";
 import {
   buildConversationContext,
   saveMessage,
@@ -223,16 +224,22 @@ const SESSION_TRIGGERS =
   /\b(let'?s (have a |)meet|start a (meeting|session|review)|review .+ department|how'?s .+ doing|check in on)\b/i;
 const COST_TRIGGERS =
   /\b(ai spend|ai cost|how much .+ spend|budget|monthly spend|cost report)\b/i;
+const PIPELINE_TRIGGERS =
+  /\b(sales pipeline|pipeline health|pipeline status|b2b pipeline|b2b deals?|wholesale deals?)\b/i;
 
 type DetectedIntent =
   | { type: "initiative"; department: string | null; goal: string }
   | { type: "session"; department: string | null; sessionType: string }
   | { type: "cost" }
+  | { type: "pipeline" }
   | { type: "chat" };
 
 function detectIntent(message: string): DetectedIntent {
   if (COST_TRIGGERS.test(message)) {
     return { type: "cost" };
+  }
+  if (PIPELINE_TRIGGERS.test(message)) {
+    return { type: "pipeline" };
   }
   if (INITIATIVE_TRIGGERS.test(message)) {
     const department = detectDepartment(message);
@@ -981,6 +988,53 @@ export async function POST(req: Request) {
         confidence: 1,
         sources: [],
         intent: "cost",
+        thread_id: threadId,
+      });
+    }
+
+    if (intent.type === "pipeline") {
+      const summary = await analyzePipeline();
+      const stageLines = Object.entries(summary.deals_by_stage || {})
+        .sort((a, b) => b[1].value - a[1].value)
+        .slice(0, 6)
+        .map(([stage, data]) => {
+          const label = stage.replaceAll("_", " ");
+          return `• ${label}: ${data.count} deals ($${data.value.toFixed(2)})`;
+        })
+        .join("\n");
+
+      const atRiskLine =
+        summary.at_risk_deals.length > 0
+          ? summary.at_risk_deals
+              .slice(0, 3)
+              .map((deal) => `${deal.company_name} (${deal.stage}, ${deal.days_in_stage}d)`)
+              .join("; ")
+          : "None";
+
+      const pipelineReply = [
+        "**Sales Pipeline Snapshot**",
+        `• Total pipeline value: **$${summary.total_pipeline_value.toFixed(2)}**`,
+        `• Win rate (30d): ${summary.win_rate_30d.toFixed(1)}%`,
+        `• Avg deal cycle: ${summary.avg_deal_cycle_days.toFixed(1)} days`,
+        stageLines ? `\n**By stage**\n${stageLines}` : "",
+        `\n**At-risk deals**\n${atRiskLine}`,
+      ]
+        .filter(Boolean)
+        .join("\n");
+
+      queueChatHistory({
+        threadId,
+        userEmail: actorEmail,
+        userMessage: message,
+        assistantMessage: pipelineReply,
+        metadata: { intent: "pipeline" },
+      });
+
+      return NextResponse.json({
+        reply: pipelineReply,
+        confidence: 1,
+        sources: [],
+        intent: "pipeline",
         thread_id: threadId,
       });
     }
