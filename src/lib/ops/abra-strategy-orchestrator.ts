@@ -189,39 +189,43 @@ async function callDepartmentResearch(
     department: string;
   },
 ): Promise<ResearchResult> {
-  const headers = new Headers({
-    "Content-Type": "application/json",
-  });
-  if (params.cookieHeader) headers.set("Cookie", params.cookieHeader);
-  const cronSecret = (process.env.CRON_SECRET || "").trim();
-  if (cronSecret) headers.set("Authorization", `Bearer ${cronSecret}`);
+  try {
+    const headers = new Headers({
+      "Content-Type": "application/json",
+    });
+    if (params.cookieHeader) headers.set("Cookie", params.cookieHeader);
+    const cronSecret = (process.env.CRON_SECRET || "").trim();
+    if (cronSecret) headers.set("Authorization", `Bearer ${cronSecret}`);
 
-  const res = await fetch(`${params.host}/api/ops/abra/research`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      query: `${params.objective}`,
-      department: params.department,
-      context:
-        "Cross-department strategy orchestration: focus on practical execution, dependencies, KPIs, and strict spend controls.",
-    }),
-    signal: AbortSignal.timeout(RESEARCH_TIMEOUT_MS),
-  });
+    const res = await fetch(`${params.host}/api/ops/abra/research`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        query: `${params.objective}`,
+        department: params.department,
+        context:
+          "Cross-department strategy orchestration: focus on practical execution, dependencies, KPIs, and strict spend controls.",
+      }),
+      signal: AbortSignal.timeout(RESEARCH_TIMEOUT_MS),
+    });
 
-  if (!res.ok) {
+    if (!res.ok) {
+      return { findings: [], baseline_requirements: [], recommendations: [] };
+    }
+
+    const data = (await res.json()) as Partial<ResearchResult>;
+    return {
+      findings: Array.isArray(data.findings) ? data.findings : [],
+      baseline_requirements: Array.isArray(data.baseline_requirements)
+        ? data.baseline_requirements
+        : [],
+      recommendations: Array.isArray(data.recommendations)
+        ? data.recommendations
+        : [],
+    };
+  } catch {
     return { findings: [], baseline_requirements: [], recommendations: [] };
   }
-
-  const data = (await res.json()) as Partial<ResearchResult>;
-  return {
-    findings: Array.isArray(data.findings) ? data.findings : [],
-    baseline_requirements: Array.isArray(data.baseline_requirements)
-      ? data.baseline_requirements
-      : [],
-    recommendations: Array.isArray(data.recommendations)
-      ? data.recommendations
-      : [],
-  };
 }
 
 function extractTextContent(payload: Record<string, unknown>): string {
