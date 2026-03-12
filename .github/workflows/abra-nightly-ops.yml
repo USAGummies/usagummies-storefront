@@ -1,0 +1,51 @@
+name: Abra Nightly Ops
+
+on:
+  schedule:
+    # 06:15 America/Los_Angeles (13:15 UTC during PDT)
+    - cron: "15 13 * * *"
+  workflow_dispatch:
+
+jobs:
+  nightly-verification:
+    runs-on: ubuntu-latest
+    env:
+      ABRA_BASE_URL: ${{ secrets.ABRA_BASE_URL }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SLACK_SUPPORT_WEBHOOK_URL: ${{ secrets.SLACK_SUPPORT_WEBHOOK_URL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Run release gate
+        run: node scripts/verify-production-release.mjs "${ABRA_BASE_URL:-https://www.usagummies.com}"
+
+      - name: Run training questions pack
+        if: always()
+        run: node scripts/abra-training-curriculum.mjs --questions-only --send-slack
+
+      - name: Notify on failure
+        if: failure() && env.SLACK_SUPPORT_WEBHOOK_URL != ''
+        run: |
+          payload=$(cat <<'JSON'
+          {
+            "text": "🚨 Abra Nightly Ops failed on main. Review GitHub Actions run and readiness artifacts."
+          }
+          JSON
+          )
+          curl -sS -X POST "$SLACK_SUPPORT_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "$payload"
