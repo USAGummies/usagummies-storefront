@@ -28,6 +28,18 @@ type DealRow = {
   updated_at: string;
 };
 
+type NotionDeal = {
+  pageId: string;
+  company_name: string;
+  contact_name: string | null;
+  contact_email: string | null;
+  stage: string;
+  status: string;
+  value: number;
+  notes: string | null;
+  updated_at: string;
+};
+
 export type DealInsight = {
   deal_id: string;
   company_name: string;
@@ -214,7 +226,7 @@ async function queryNotionDatabase(databaseId: string): Promise<NotionPage[]> {
   return all;
 }
 
-function parseNotionDeal(page: NotionPage) {
+function parseNotionDeal(page: NotionPage): NotionDeal {
   const props = page.properties || {};
   const company = extractText(
     (props as Record<string, unknown>)["Business Name"] ||
@@ -264,9 +276,45 @@ function parseNotionDeal(page: NotionPage) {
   };
 }
 
+async function loadNotionDealsFallback(): Promise<DealRow[]> {
+  const notionKey = process.env.NOTION_API_KEY;
+  const b2bDb = process.env.NOTION_B2B_PROSPECTS_DB;
+  const distDb = process.env.NOTION_DISTRIBUTOR_PROSPECTS_DB;
+  if (!notionKey || (!b2bDb && !distDb)) return [];
+
+  const pages = [
+    ...(b2bDb ? await queryNotionDatabase(b2bDb) : []),
+    ...(distDb ? await queryNotionDatabase(distDb) : []),
+  ];
+  if (pages.length === 0) return [];
+
+  return pages.map(parseNotionDeal).map((deal) => ({
+    id: `notion:${deal.pageId}`,
+    company_name: deal.company_name,
+    contact_name: deal.contact_name,
+    contact_email: deal.contact_email,
+    status: deal.status,
+    value: deal.value,
+    stage: deal.stage,
+    notes: deal.notes,
+    created_at: deal.updated_at,
+    updated_at: deal.updated_at,
+  }));
+}
+
 export async function analyzePipeline(): Promise<PipelineSummary> {
-  const activeDeals = await fetchDeals("active");
-  const allDeals = await fetchDeals("all");
+  let activeDeals = await fetchDeals("active");
+  let allDeals = await fetchDeals("all");
+  if (activeDeals.length === 0 && allDeals.length === 0) {
+    const fallbackDeals = await loadNotionDealsFallback();
+    if (fallbackDeals.length > 0) {
+      allDeals = fallbackDeals;
+      activeDeals = fallbackDeals.filter((deal) => {
+        const status = (deal.status || "").toLowerCase();
+        return status !== "closed_won" && status !== "closed_lost";
+      });
+    }
+  }
 
   const insights = activeDeals.map(toInsight);
   const dealsByStage: Record<string, { count: number; value: number }> = {};
@@ -424,9 +472,18 @@ export async function syncNotionDeals(): Promise<{
   if (pages.length === 0) return { synced: 0, new: 0, updated: 0 };
 
   const notionDeals = pages.map(parseNotionDeal);
-  const existingRows = (await sbFetch(
-    "/rest/v1/abra_deals?select=id,company_name,contact_name,contact_email,status,value,stage,notes,created_at,updated_at&limit=5000",
-  )) as DealRow[];
+  let existingRows: DealRow[] = [];
+  try {
+    existingRows = (await sbFetch(
+      "/rest/v1/abra_deals?select=id,company_name,contact_name,contact_email,status,value,stage,notes,created_at,updated_at&limit=5000",
+    )) as DealRow[];
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("abra_deals") && message.includes("(404)")) {
+      return { synced: notionDeals.length, new: 0, updated: 0 };
+    }
+    throw error;
+  }
   const existingByCompany = new Map(
     (Array.isArray(existingRows) ? existingRows : []).map((row) => [
       (row.company_name || "").toLowerCase(),
