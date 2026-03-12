@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/config";
 import { isCronAuthorized } from "@/lib/ops/abra-auth";
-import { sendMonthlyReport, sendWeeklyDigest } from "@/lib/ops/abra-weekly-digest";
+import {
+  generateWeeklyDigestPreview,
+  sendMonthlyReport,
+  sendWeeklyDigest,
+} from "@/lib/ops/abra-weekly-digest";
 import { notify } from "@/lib/ops/notify";
 
 export const runtime = "nodejs";
@@ -57,18 +61,34 @@ async function sbFetch(path: string, init: RequestInit = {}) {
   return json;
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   const session = await auth();
   if (!session?.user?.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
+    const type = (new URL(req.url).searchParams.get("type") || "latest").toLowerCase();
+    if (type === "weekly") {
+      const preview = await generateWeeklyDigestPreview();
+      return NextResponse.json({
+        type: "weekly",
+        preview,
+      });
+    }
+
     const rows = (await sbFetch(
       "/rest/v1/open_brain_entries?source_ref=eq.weekly-digest&category=eq.report&select=id,title,raw_text,summary_text,created_at&order=created_at.desc&limit=1",
     )) as DigestRow[];
 
-    return NextResponse.json({ digest: rows[0] || null });
+    return NextResponse.json({
+      type: "latest",
+      digest: rows[0] || null,
+      fallback_message:
+        rows.length > 0
+          ? null
+          : "No feed data available yet — run feeds first.",
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to load weekly digest";
     console.error("[abra-digest] GET failed:", message);

@@ -12,6 +12,48 @@ type MetricSnapshot = {
   pctVsAvg: number;
 };
 
+export type MorningBriefPayload = {
+  generated_at: string;
+  feed_data_available: boolean;
+  fallback_message: string | null;
+  revenue: {
+    shopify: MetricSnapshot | null;
+    amazon: MetricSnapshot | null;
+    total_current: number;
+    total_delta_pct: number;
+  };
+  traffic: {
+    sessions: MetricSnapshot | null;
+  };
+  initiatives: {
+    active_count: number;
+    by_department: Record<string, number>;
+  };
+  open_action_items: {
+    pending_approvals: number;
+    pending_tasks: number;
+    total_open: number;
+  };
+  anomalies: {
+    count: number;
+    items: Array<{
+      metric: string;
+      direction: "spike" | "drop";
+      deviation_pct: number;
+      severity: "info" | "warning" | "critical";
+    }>;
+  };
+  signals: {
+    count: number;
+    items: Array<{
+      id: string;
+      title: string;
+      severity: "info" | "warning" | "critical";
+      department: string | null;
+    }>;
+  };
+};
+
 function getSupabaseEnv() {
   const baseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -88,6 +130,121 @@ async function getPendingApprovalsCount(): Promise<number> {
     "/rest/v1/approvals?status=eq.pending&select=id&limit=200",
   )) as Array<{ id: string }>;
   return Array.isArray(rows) ? rows.length : 0;
+}
+
+async function getActiveInitiativesSummary(): Promise<{
+  active_count: number;
+  by_department: Record<string, number>;
+}> {
+  const rows = (await sbFetch(
+    "/rest/v1/abra_initiatives?status=not.in.(completed,paused)&select=department,status&limit=500",
+  )) as Array<{ department?: string | null }>;
+  const byDepartment: Record<string, number> = {};
+  for (const row of rows || []) {
+    const department = (row?.department || "unknown").toString();
+    byDepartment[department] = (byDepartment[department] || 0) + 1;
+  }
+  return {
+    active_count: Array.isArray(rows) ? rows.length : 0,
+    by_department: byDepartment,
+  };
+}
+
+async function getPendingTaskCount(): Promise<number> {
+  const [abraTasks, legacyTasks] = await Promise.allSettled([
+    sbFetch(
+      "/rest/v1/abra_tasks?status=in.(pending,in_progress)&select=id&limit=1000",
+    ) as Promise<Array<{ id: string }>>,
+    sbFetch(
+      "/rest/v1/tasks?status=in.(pending,in_progress)&select=id&limit=1000",
+    ) as Promise<Array<{ id: string }>>,
+  ]);
+  const abrCount =
+    abraTasks.status === "fulfilled" && Array.isArray(abraTasks.value)
+      ? abraTasks.value.length
+      : 0;
+  const legacyCount =
+    legacyTasks.status === "fulfilled" && Array.isArray(legacyTasks.value)
+      ? legacyTasks.value.length
+      : 0;
+  return abrCount + legacyCount;
+}
+
+export async function generateMorningBriefPayload(): Promise<MorningBriefPayload> {
+  const [
+    shopifyRevenue,
+    amazonRevenue,
+    sessions,
+    anomalies,
+    signals,
+    initiatives,
+    pendingApprovals,
+    pendingTasks,
+  ] = await Promise.all([
+    getMetricSnapshot("daily_revenue_shopify"),
+    getMetricSnapshot("daily_revenue_amazon"),
+    getMetricSnapshot("daily_sessions"),
+    detectAnomalies().catch(() => []),
+    getActiveSignals({ limit: 10 }).catch(() => []),
+    getActiveInitiativesSummary().catch(() => ({
+      active_count: 0,
+      by_department: {},
+    })),
+    getPendingApprovalsCount().catch(() => 0),
+    getPendingTaskCount().catch(() => 0),
+  ]);
+
+  const revenueTotal =
+    Number(shopifyRevenue?.current || 0) + Number(amazonRevenue?.current || 0);
+  const revenueDelta =
+    Number(shopifyRevenue?.pctVsAvg || 0) + Number(amazonRevenue?.pctVsAvg || 0);
+  const hasFeedData = Boolean(
+    shopifyRevenue ||
+      amazonRevenue ||
+      sessions ||
+      (Array.isArray(signals) && signals.length > 0),
+  );
+
+  return {
+    generated_at: new Date().toISOString(),
+    feed_data_available: hasFeedData,
+    fallback_message: hasFeedData
+      ? null
+      : "No feed data available yet — run feeds first.",
+    revenue: {
+      shopify: shopifyRevenue,
+      amazon: amazonRevenue,
+      total_current: revenueTotal,
+      total_delta_pct: revenueDelta,
+    },
+    traffic: {
+      sessions,
+    },
+    initiatives,
+    open_action_items: {
+      pending_approvals: pendingApprovals,
+      pending_tasks: pendingTasks,
+      total_open: pendingApprovals + pendingTasks,
+    },
+    anomalies: {
+      count: Array.isArray(anomalies) ? anomalies.length : 0,
+      items: (Array.isArray(anomalies) ? anomalies : []).slice(0, 10).map((item) => ({
+        metric: item.metric,
+        direction: item.direction,
+        deviation_pct: item.deviation_pct,
+        severity: item.severity,
+      })),
+    },
+    signals: {
+      count: Array.isArray(signals) ? signals.length : 0,
+      items: (Array.isArray(signals) ? signals : []).slice(0, 10).map((signal) => ({
+        id: signal.id,
+        title: signal.title,
+        severity: signal.severity,
+        department: signal.department,
+      })),
+    },
+  };
 }
 
 export async function generateMorningBrief(): Promise<string> {

@@ -40,6 +40,35 @@ type Initiative30DaySummary = {
   completed: number;
 };
 
+export type WeeklyDigestPreview = {
+  generated_at: string;
+  feed_data_available: boolean;
+  fallback_message: string | null;
+  comparisons: {
+    revenue_total: { this_week: number; last_week: number; wow_pct: number };
+    orders_total: { this_week: number; last_week: number; wow_pct: number };
+    sessions_total: { this_week: number; last_week: number; wow_pct: number };
+    aov: { this_week: number; last_week: number; wow_pct: number };
+  };
+  channels: {
+    shopify_revenue: { this_week: number; last_week: number; wow_pct: number };
+    amazon_revenue: { this_week: number; last_week: number; wow_pct: number };
+  };
+  active_initiatives: {
+    total: number;
+    by_department: Record<string, number>;
+  };
+  open_action_items: {
+    pending_approvals: number;
+    pending_tasks: number;
+    total_open: number;
+  };
+  signals: {
+    count: number;
+    severity_counts: { critical: number; warning: number; info: number };
+  };
+};
+
 function getSupabaseEnv() {
   const baseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -217,6 +246,165 @@ async function sumMetricWindow(
 function safePctDelta(current: number, base: number): number {
   if (!base) return 0;
   return ((current - base) / Math.abs(base)) * 100;
+}
+
+async function getOpenActionItemsSummary(): Promise<{
+  pending_approvals: number;
+  pending_tasks: number;
+  total_open: number;
+}> {
+  const [approvalRows, abrTasks, legacyTasks] = await Promise.allSettled([
+    sbFetch("/rest/v1/approvals?status=eq.pending&select=id&limit=1000") as Promise<
+      Array<{ id: string }>
+    >,
+    sbFetch("/rest/v1/abra_tasks?status=in.(pending,in_progress)&select=id&limit=1000") as Promise<
+      Array<{ id: string }>
+    >,
+    sbFetch("/rest/v1/tasks?status=in.(pending,in_progress)&select=id&limit=1000") as Promise<
+      Array<{ id: string }>
+    >,
+  ]);
+
+  const pendingApprovals =
+    approvalRows.status === "fulfilled" && Array.isArray(approvalRows.value)
+      ? approvalRows.value.length
+      : 0;
+  const pendingTasksA =
+    abrTasks.status === "fulfilled" && Array.isArray(abrTasks.value)
+      ? abrTasks.value.length
+      : 0;
+  const pendingTasksB =
+    legacyTasks.status === "fulfilled" && Array.isArray(legacyTasks.value)
+      ? legacyTasks.value.length
+      : 0;
+  const pendingTasks = pendingTasksA + pendingTasksB;
+  return {
+    pending_approvals: pendingApprovals,
+    pending_tasks: pendingTasks,
+    total_open: pendingApprovals + pendingTasks,
+  };
+}
+
+async function getActiveInitiativesSummary(): Promise<{
+  total: number;
+  by_department: Record<string, number>;
+}> {
+  const rows = (await sbFetch(
+    "/rest/v1/abra_initiatives?status=not.in.(completed,paused)&select=department&limit=1000",
+  )) as Array<{ department?: string | null }>;
+  const byDepartment: Record<string, number> = {};
+  for (const row of rows || []) {
+    const department = (row?.department || "unknown").toString();
+    byDepartment[department] = (byDepartment[department] || 0) + 1;
+  }
+  return {
+    total: Array.isArray(rows) ? rows.length : 0,
+    by_department: byDepartment,
+  };
+}
+
+export async function generateWeeklyDigestPreview(): Promise<WeeklyDigestPreview> {
+  const [
+    thisWeekRevenueShopify,
+    lastWeekRevenueShopify,
+    thisWeekRevenueAmazon,
+    lastWeekRevenueAmazon,
+    thisWeekOrdersShopify,
+    lastWeekOrdersShopify,
+    thisWeekOrdersAmazon,
+    lastWeekOrdersAmazon,
+    thisWeekSessions,
+    lastWeekSessions,
+    activeSignals,
+    activeInitiatives,
+    openActionItems,
+  ] = await Promise.all([
+    sumMetricWindow("daily_revenue_shopify", 7, 0),
+    sumMetricWindow("daily_revenue_shopify", 14, 7),
+    sumMetricWindow("daily_revenue_amazon", 7, 0),
+    sumMetricWindow("daily_revenue_amazon", 14, 7),
+    sumMetricWindow("daily_orders_shopify", 7, 0),
+    sumMetricWindow("daily_orders_shopify", 14, 7),
+    sumMetricWindow("daily_orders_amazon", 7, 0),
+    sumMetricWindow("daily_orders_amazon", 14, 7),
+    sumMetricWindow("daily_sessions", 7, 0),
+    sumMetricWindow("daily_sessions", 14, 7),
+    getActiveSignals({ limit: 200 }).catch(() => []),
+    getActiveInitiativesSummary().catch(() => ({ total: 0, by_department: {} })),
+    getOpenActionItemsSummary().catch(() => ({
+      pending_approvals: 0,
+      pending_tasks: 0,
+      total_open: 0,
+    })),
+  ]);
+
+  const totalThisWeekRevenue = thisWeekRevenueShopify + thisWeekRevenueAmazon;
+  const totalLastWeekRevenue = lastWeekRevenueShopify + lastWeekRevenueAmazon;
+  const totalThisWeekOrders = thisWeekOrdersShopify + thisWeekOrdersAmazon;
+  const totalLastWeekOrders = lastWeekOrdersShopify + lastWeekOrdersAmazon;
+  const aovThisWeek =
+    totalThisWeekOrders > 0 ? totalThisWeekRevenue / totalThisWeekOrders : 0;
+  const aovLastWeek =
+    totalLastWeekOrders > 0 ? totalLastWeekRevenue / totalLastWeekOrders : 0;
+
+  const hasFeedData =
+    totalThisWeekRevenue > 0 ||
+    totalThisWeekOrders > 0 ||
+    thisWeekSessions > 0;
+
+  const severityCounts = {
+    critical: activeSignals.filter((signal) => signal.severity === "critical").length,
+    warning: activeSignals.filter((signal) => signal.severity === "warning").length,
+    info: activeSignals.filter((signal) => signal.severity === "info").length,
+  };
+
+  return {
+    generated_at: new Date().toISOString(),
+    feed_data_available: hasFeedData,
+    fallback_message: hasFeedData
+      ? null
+      : "No feed data available yet — run feeds first.",
+    comparisons: {
+      revenue_total: {
+        this_week: totalThisWeekRevenue,
+        last_week: totalLastWeekRevenue,
+        wow_pct: safePctDelta(totalThisWeekRevenue, totalLastWeekRevenue),
+      },
+      orders_total: {
+        this_week: totalThisWeekOrders,
+        last_week: totalLastWeekOrders,
+        wow_pct: safePctDelta(totalThisWeekOrders, totalLastWeekOrders),
+      },
+      sessions_total: {
+        this_week: thisWeekSessions,
+        last_week: lastWeekSessions,
+        wow_pct: safePctDelta(thisWeekSessions, lastWeekSessions),
+      },
+      aov: {
+        this_week: aovThisWeek,
+        last_week: aovLastWeek,
+        wow_pct: safePctDelta(aovThisWeek, aovLastWeek),
+      },
+    },
+    channels: {
+      shopify_revenue: {
+        this_week: thisWeekRevenueShopify,
+        last_week: lastWeekRevenueShopify,
+        wow_pct: safePctDelta(thisWeekRevenueShopify, lastWeekRevenueShopify),
+      },
+      amazon_revenue: {
+        this_week: thisWeekRevenueAmazon,
+        last_week: lastWeekRevenueAmazon,
+        wow_pct: safePctDelta(thisWeekRevenueAmazon, lastWeekRevenueAmazon),
+      },
+    },
+    active_initiatives: activeInitiatives,
+    open_action_items: openActionItems,
+    signals: {
+      count: activeSignals.length,
+      severity_counts: severityCounts,
+    },
+  };
 }
 
 async function runClaudeDigestText(
