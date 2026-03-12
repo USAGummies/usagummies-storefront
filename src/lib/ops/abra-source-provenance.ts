@@ -31,6 +31,13 @@ export type AnswerLogRow = AnswerLogEntry & {
   created_at: string;
 };
 
+function normalizeConfidence(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  // abra_answer_log.confidence is NUMERIC(4,3), max absolute value < 10
+  const clamped = Math.max(0, Math.min(9.999, value));
+  return Number(clamped.toFixed(3));
+}
+
 function getSupabaseEnv() {
   const baseUrl =
     process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -96,7 +103,7 @@ export async function logAnswer(entry: AnswerLogEntry): Promise<string | null> {
         answer: entry.answer.slice(0, 5000),
         source_ids: entry.source_ids,
         source_tables: entry.source_tables,
-        confidence: entry.confidence,
+        confidence: normalizeConfidence(entry.confidence),
         memory_tiers_used: entry.memory_tiers_used,
         department: entry.department,
         asked_by: entry.asked_by,

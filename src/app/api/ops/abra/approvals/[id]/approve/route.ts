@@ -5,6 +5,12 @@ import { executeAction } from "@/lib/ops/abra-actions";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+function isUuidLike(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
+}
+
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -17,6 +23,9 @@ export async function POST(
   const approvalId = (id || "").trim();
   if (!approvalId) {
     return NextResponse.json({ error: "Approval id is required" }, { status: 400 });
+  }
+  if (!isUuidLike(approvalId)) {
+    return NextResponse.json({ error: "Approval id must be a valid UUID" }, { status: 400 });
   }
 
   try {

@@ -5,6 +5,12 @@ import { executeAction, getAvailableActions } from "@/lib/ops/abra-actions";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+function isUuidLike(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
+}
+
 export async function GET(req: Request) {
   if (!(await isAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -32,6 +38,9 @@ export async function POST(req: Request) {
   const confirm = payload.confirm === true;
   if (!approvalId) {
     return NextResponse.json({ error: "approval_id is required" }, { status: 400 });
+  }
+  if (!isUuidLike(approvalId)) {
+    return NextResponse.json({ error: "approval_id must be a valid UUID" }, { status: 400 });
   }
   if (!confirm) {
     return NextResponse.json({ error: "confirm must be true" }, { status: 400 });

@@ -6,14 +6,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
-function isConfigError(message?: string): boolean {
-  return /not configured|missing .*creds?|credentials/i.test(message || "");
-}
-
-function toStatus(success: boolean, error?: string): number {
+function toStatus(success: boolean): number {
   if (success) return 200;
-  if (isConfigError(error)) return 424;
-  return 502;
+  return 424;
 }
 
 export async function POST(req: Request) {
@@ -21,16 +16,28 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const result = await runFeed("faire_orders");
-  return NextResponse.json(
-    {
-      feed: "faire",
-      status: result.success ? "ok" : "error",
-      entriesCreated: result.entriesCreated,
-      result,
-    },
-    { status: toStatus(result.success, result.error) },
-  );
+  try {
+    const result = await runFeed("faire_orders");
+    return NextResponse.json(
+      {
+        feed: "faire",
+        status: result.success ? "ok" : "error",
+        entriesCreated: result.entriesCreated,
+        result,
+      },
+      { status: toStatus(result.success) },
+    );
+  } catch (error) {
+    return NextResponse.json(
+      {
+        feed: "faire",
+        status: "error",
+        entriesCreated: 0,
+        error: error instanceof Error ? error.message : "Faire feed failed",
+      },
+      { status: 424 },
+    );
+  }
 }
 
 export async function GET(req: Request) {

@@ -5,25 +5,34 @@ import { runFeed, type FeedResult } from "@/lib/ops/abra-auto-teach";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
-
-function isConfigError(message?: string): boolean {
-  return /not configured|missing .*creds?|credentials/i.test(message || "");
-}
+const FEED_TIMEOUT_MS = 12000;
 
 function toStatus(results: FeedResult[]): number {
   if (results.every((result) => result.success)) return 200;
-  const errors = results
-    .filter((result) => !result.success)
-    .map((result) => result.error || "");
-  if (errors.length > 0 && errors.every((error) => isConfigError(error))) {
-    return 424;
-  }
-  return 502;
+  return 424;
+}
+
+function runFeedWithTimeout(feedKey: string): Promise<FeedResult> {
+  return Promise.race<FeedResult>([
+    runFeed(feedKey),
+    new Promise((resolve) => {
+      setTimeout(() => {
+        resolve({
+          feed_key: feedKey,
+          success: false,
+          entriesCreated: 0,
+          error: `Timed out after ${Math.round(FEED_TIMEOUT_MS / 1000)}s`,
+        });
+      }, FEED_TIMEOUT_MS);
+    }),
+  ]);
 }
 
 async function runAmazonFeeds(): Promise<FeedResult[]> {
-  const orders = await runFeed("amazon_orders");
-  const inventory = await runFeed("amazon_inventory");
+  const [orders, inventory] = await Promise.all([
+    runFeedWithTimeout("amazon_orders"),
+    runFeedWithTimeout("amazon_inventory"),
+  ]);
   return [orders, inventory];
 }
 
@@ -32,21 +41,33 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const results = await runAmazonFeeds();
-  const entriesCreated = results.reduce(
-    (sum, result) => sum + Number(result.entriesCreated || 0),
-    0,
-  );
+  try {
+    const results = await runAmazonFeeds();
+    const entriesCreated = results.reduce(
+      (sum, result) => sum + Number(result.entriesCreated || 0),
+      0,
+    );
 
-  return NextResponse.json(
-    {
-      feed: "amazon",
-      status: results.every((result) => result.success) ? "ok" : "error",
-      entriesCreated,
-      results,
-    },
-    { status: toStatus(results) },
-  );
+    return NextResponse.json(
+      {
+        feed: "amazon",
+        status: results.every((result) => result.success) ? "ok" : "error",
+        entriesCreated,
+        results,
+      },
+      { status: toStatus(results) },
+    );
+  } catch (error) {
+    return NextResponse.json(
+      {
+        feed: "amazon",
+        status: "error",
+        entriesCreated: 0,
+        error: error instanceof Error ? error.message : "Amazon feed failed",
+      },
+      { status: 424 },
+    );
+  }
 }
 
 export async function GET(req: Request) {

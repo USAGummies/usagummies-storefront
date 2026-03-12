@@ -47,6 +47,34 @@ export type DeadLetter = {
   created_at: string;
 };
 
+const ALLOWED_BRAIN_CATEGORIES = new Set([
+  "market_intel",
+  "financial",
+  "operational",
+  "regulatory",
+  "customer_insight",
+  "deal_data",
+  "email_triage",
+  "competitive",
+  "research",
+  "field_note",
+  "system_log",
+  "teaching",
+  "general",
+  "company_info",
+  "product_info",
+  "supply_chain",
+  "sales",
+  "founder",
+  "culture",
+]);
+
+function normalizeBrainCategory(category: string): string {
+  const normalized = String(category || "").trim().toLowerCase();
+  if (ALLOWED_BRAIN_CATEGORIES.has(normalized)) return normalized;
+  return "general";
+}
+
 function getSupabaseEnv() {
   const baseUrl =
     process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -213,13 +241,13 @@ async function writeBrainEntry(params: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        source_type: "auto_feed",
+        source_type: "api",
         source_ref: params.sourceRef,
         entry_type: "teaching",
         title: params.title,
         raw_text: params.rawText,
         summary_text: params.rawText.slice(0, 500),
-        category: params.category,
+        category: normalizeBrainCategory(params.category),
         department: params.department,
         confidence: "medium",
         priority: "normal",
@@ -313,7 +341,7 @@ export async function runShopifyOrdersFeed(): Promise<FeedResult> {
       sourceRef: `shopify-orders-${date}`,
       title: `Shopify Orders Summary — ${date}`,
       rawText: summary,
-      category: "sales_data",
+      category: "sales",
       department: "sales_and_growth",
     });
 
@@ -414,7 +442,7 @@ export async function handleAmazonOrdersFeed(): Promise<FeedResult> {
         sourceRef: `amazon-orders-${new Date().toISOString().split("T")[0]}`,
         title: `Amazon Orders Summary — ${new Date().toISOString().split("T")[0]}`,
         rawText: text,
-        category: "amazon_orders",
+        category: "sales",
         department: "sales_and_growth",
       });
       void updateIntHealth("amazon", true);
@@ -439,7 +467,7 @@ export async function handleAmazonOrdersFeed(): Promise<FeedResult> {
       sourceRef: `amazon-orders-${date}`,
       title: `Amazon Orders Summary — ${date}`,
       rawText: summary,
-      category: "amazon_orders",
+      category: "sales",
       department: "sales_and_growth",
     });
 
@@ -560,7 +588,7 @@ export async function handleAmazonInventoryFeed(): Promise<FeedResult> {
       sourceRef: `amazon-inventory-${new Date().toISOString().split("T")[0]}`,
       title: `Amazon FBA Inventory Snapshot — ${new Date().toISOString().split("T")[0]}`,
       rawText: text,
-      category: "inventory_snapshot",
+      category: "supply_chain",
       department: "supply_chain",
     });
 
@@ -624,7 +652,7 @@ export async function handleFaireOrdersFeed(): Promise<FeedResult> {
       sourceRef: `faire-orders-${date}`,
       title: `Faire Orders Trend — ${date}`,
       rawText: summary,
-      category: "sales_data",
+      category: "sales",
       department: "sales_and_growth",
     });
     return { feed_key: feedKey, success: true, entriesCreated: saved ? 1 : 0 };
@@ -704,7 +732,7 @@ export async function handleShopifyProductsFeed(): Promise<FeedResult> {
         sourceRef: `shopify-product-${product.id || "unknown"}-${new Date().toISOString().split("T")[0]}`,
         title: `Shopify Product Update — ${product.title || product.id || "Unknown"}`,
         rawText: text,
-        category: "product_update",
+        category: "product_info",
         department: "operations",
       });
       if (saved) created += 1;
@@ -777,7 +805,7 @@ export async function handleGA4TrafficFeed(): Promise<FeedResult> {
       sourceRef: `ga4-traffic-${date}`,
       title: `GA4 Traffic Summary — ${date}`,
       rawText: summary,
-      category: "traffic_data",
+      category: "market_intel",
       department: "sales_and_growth",
     });
 
