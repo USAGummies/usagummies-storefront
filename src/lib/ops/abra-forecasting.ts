@@ -25,6 +25,15 @@ type SeriesPoint = {
   value: number;
 };
 
+const METRIC_ALIASES: Record<string, string[]> = {
+  daily_revenue_shopify: ["shopify_revenue_daily"],
+  daily_revenue_amazon: ["amazon_revenue_daily"],
+  daily_orders_shopify: ["shopify_orders_daily"],
+  daily_orders_amazon: ["amazon_orders_daily"],
+  daily_sessions: ["ga4_sessions_daily"],
+  conversion_rate: ["ga4_conversion_rate"],
+};
+
 function getSupabaseEnv() {
   const baseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -170,6 +179,20 @@ function classifyConfidence(points: number): "high" | "medium" | "low" {
   return "low";
 }
 
+function nonZeroPoints(series: SeriesPoint[]): number {
+  return series.reduce((count, point) => (Math.abs(point.value) > 0.0001 ? count + 1 : count), 0);
+}
+
+function metricCandidates(metricName: string): string[] {
+  const normalized = String(metricName || "").trim().toLowerCase();
+  if (!normalized) return [];
+  const direct = METRIC_ALIASES[normalized] || [];
+  const reverse = Object.entries(METRIC_ALIASES)
+    .filter(([, aliases]) => aliases.includes(normalized))
+    .map(([name]) => name);
+  return Array.from(new Set([normalized, ...direct, ...reverse]));
+}
+
 async function fetchMetricSeries(metricName: string, daysBack: number): Promise<SeriesPoint[]> {
   const since = dateDaysAgo(daysBack);
   const rows = (await sbFetch(
@@ -189,6 +212,30 @@ async function fetchMetricSeries(metricName: string, daysBack: number): Promise<
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([date, value]) => ({ date, value }));
   return denseSeries(list, daysBack);
+}
+
+async function fetchMetricSeriesCompatible(
+  metricName: string,
+  daysBack: number,
+): Promise<SeriesPoint[]> {
+  const candidates = metricCandidates(metricName);
+  if (candidates.length === 0) return [];
+
+  const candidateSeries = await Promise.all(
+    candidates.map((candidate) => fetchMetricSeries(candidate, daysBack)),
+  );
+
+  let bestSeries = candidateSeries[0] || [];
+  let bestScore = nonZeroPoints(bestSeries);
+  for (let i = 1; i < candidateSeries.length; i += 1) {
+    const series = candidateSeries[i] || [];
+    const score = nonZeroPoints(series);
+    if (score > bestScore) {
+      bestSeries = series;
+      bestScore = score;
+    }
+  }
+  return bestSeries;
 }
 
 function forecastFromSeries(params: {
@@ -266,7 +313,28 @@ export async function getHistoricalMetric(
   metric_name: string,
   days_back: number,
 ): Promise<Array<{ date: string; value: number }>> {
-  return fetchMetricSeries(metric_name, Math.min(Math.max(days_back, 1), 365));
+  return fetchMetricSeriesCompatible(
+    metric_name,
+    Math.min(Math.max(days_back, 1), 365),
+  );
+}
+
+export async function generateMetricForecast(opts: {
+  metric_name: string;
+  days_ahead?: number;
+}): Promise<ForecastResult> {
+  const daysAhead = Math.min(Math.max(Math.floor(opts.days_ahead || 30), 1), 90);
+  const normalizedMetric = String(opts.metric_name || "").trim().toLowerCase();
+  if (!normalizedMetric) {
+    throw new Error("metric_name is required");
+  }
+
+  const history = await fetchMetricSeriesCompatible(normalizedMetric, 90);
+  return forecastFromSeries({
+    channel: normalizedMetric,
+    history,
+    daysAhead,
+  });
 }
 
 export async function generateRevenueForecast(opts?: {
@@ -278,8 +346,8 @@ export async function generateRevenueForecast(opts?: {
   const historyDays = 90;
 
   const [shopifyHistory, amazonHistory] = await Promise.all([
-    fetchMetricSeries("daily_revenue_shopify", historyDays),
-    fetchMetricSeries("daily_revenue_amazon", historyDays),
+    fetchMetricSeriesCompatible("daily_revenue_shopify", historyDays),
+    fetchMetricSeriesCompatible("daily_revenue_amazon", historyDays),
   ]);
 
   const totalHistory = shopifyHistory.map((row, idx) => ({

@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { isAuthorized } from "@/lib/ops/abra-auth";
-import { generateRevenueForecast } from "@/lib/ops/abra-forecasting";
+import {
+  generateMetricForecast,
+  generateRevenueForecast,
+} from "@/lib/ops/abra-forecasting";
 import { notify } from "@/lib/ops/notify";
 
 export const runtime = "nodejs";
@@ -24,8 +27,24 @@ export async function GET(req: Request) {
 
   try {
     const url = new URL(req.url);
-    const days = parseDays(url.searchParams.get("days"));
+    const metric = (url.searchParams.get("metric") || "").trim();
+    const days = parseDays(
+      url.searchParams.get("horizon") || url.searchParams.get("days"),
+    );
     const channel = parseChannel(url.searchParams.get("channel"));
+
+    if (metric) {
+      const forecast = await generateMetricForecast({
+        metric_name: metric,
+        days_ahead: days,
+      });
+      return NextResponse.json({
+        forecast,
+        forecasts: [forecast],
+        generated_at: new Date().toISOString(),
+      });
+    }
+
     const forecasts = await generateRevenueForecast({
       days_ahead: days,
       channel,

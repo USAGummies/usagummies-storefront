@@ -201,6 +201,49 @@ function buildDailyMetrics(dayIndex, totalDays, date) {
       metric_group: "sales",
       source_system: "calculated",
     },
+    // Canonical metric names used by Abra dashboards and models.
+    {
+      metric_name: "daily_revenue_shopify",
+      value: shopifyRevenue,
+      department: "sales_and_growth",
+      metric_group: "sales",
+      source_system: "shopify",
+    },
+    {
+      metric_name: "daily_revenue_amazon",
+      value: amazonRevenue,
+      department: "amazon",
+      metric_group: "sales",
+      source_system: "amazon",
+    },
+    {
+      metric_name: "daily_orders_shopify",
+      value: shopifyOrders,
+      department: "ecommerce",
+      metric_group: "sales",
+      source_system: "shopify",
+    },
+    {
+      metric_name: "daily_orders_amazon",
+      value: amazonOrders,
+      department: "amazon",
+      metric_group: "sales",
+      source_system: "amazon",
+    },
+    {
+      metric_name: "daily_sessions",
+      value: ga4Sessions,
+      department: "marketing",
+      metric_group: "sales",
+      source_system: "calculated",
+    },
+    {
+      metric_name: "conversion_rate",
+      value: ga4ConversionRate,
+      department: "ecommerce",
+      metric_group: "sales",
+      source_system: "calculated",
+    },
   ];
 }
 

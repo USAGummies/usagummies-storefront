@@ -28,6 +28,15 @@ type KpiRow = {
   captured_for_date: string;
 };
 
+const METRIC_ALIASES: Record<string, string[]> = {
+  daily_revenue_shopify: ["shopify_revenue_daily"],
+  daily_revenue_amazon: ["amazon_revenue_daily"],
+  daily_orders_shopify: ["shopify_orders_daily"],
+  daily_orders_amazon: ["amazon_orders_daily"],
+  daily_sessions: ["ga4_sessions_daily"],
+  conversion_rate: ["ga4_conversion_rate"],
+};
+
 function getSupabaseEnv() {
   const baseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -82,7 +91,17 @@ function daysAgoIso(days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
-async function fetchKpiMetric(metricName: string, days = 30): Promise<number> {
+function metricCandidates(metricName: string): string[] {
+  const normalized = String(metricName || "").trim().toLowerCase();
+  if (!normalized) return [];
+  const direct = METRIC_ALIASES[normalized] || [];
+  const reverse = Object.entries(METRIC_ALIASES)
+    .filter(([, aliases]) => aliases.includes(normalized))
+    .map(([name]) => name);
+  return Array.from(new Set([normalized, ...direct, ...reverse]));
+}
+
+async function fetchKpiMetricExact(metricName: string, days = 30): Promise<number> {
   const since = daysAgoIso(days);
   const rows = (await sbFetch(
     `/rest/v1/kpi_timeseries?metric_name=eq.${encodeURIComponent(metricName)}&window_type=eq.daily&captured_for_date=gte.${since}&select=value,captured_for_date&limit=5000`,
@@ -92,13 +111,39 @@ async function fetchKpiMetric(metricName: string, days = 30): Promise<number> {
   );
 }
 
-async function fetchLatestKpiMetric(metricName: string, days = 90): Promise<number | null> {
+async function fetchKpiMetric(metricName: string, days = 30): Promise<number> {
+  const candidates = metricCandidates(metricName);
+  if (candidates.length === 0) return 0;
+  const totals = await Promise.all(
+    candidates.map((candidate) => fetchKpiMetricExact(candidate, days)),
+  );
+  return totals.reduce((best, value) =>
+    Math.abs(value) > Math.abs(best) ? value : best, 0,
+  );
+}
+
+async function fetchLatestKpiMetricExact(metricName: string, days = 90): Promise<number | null> {
   const since = daysAgoIso(days);
   const rows = (await sbFetch(
     `/rest/v1/kpi_timeseries?metric_name=eq.${encodeURIComponent(metricName)}&captured_for_date=gte.${since}&select=value,captured_for_date&order=captured_for_date.desc&limit=1`,
   )) as KpiRow[];
   if (!Array.isArray(rows) || !rows[0]) return null;
   return toNumber(rows[0].value);
+}
+
+async function fetchLatestKpiMetric(metricName: string, days = 90): Promise<number | null> {
+  const candidates = metricCandidates(metricName);
+  if (candidates.length === 0) return null;
+
+  let latest: number | null = null;
+  for (const candidate of candidates) {
+    const value = await fetchLatestKpiMetricExact(candidate, days);
+    if (value !== null && Number.isFinite(value)) {
+      latest = value;
+      break;
+    }
+  }
+  return latest;
 }
 
 async function fetchFaireMetrics(): Promise<{ revenue: number; orders: number }> {
@@ -169,7 +214,8 @@ function computeChannelMetrics(params: {
   };
 }
 
-export async function generateAttributionReport(): Promise<AttributionReport> {
+export async function generateAttributionReport(periodDays = 30): Promise<AttributionReport> {
+  const days = Math.min(Math.max(Math.floor(periodDays || 30), 7), 180);
   const [
     shopifyRevenue,
     shopifyOrders,
@@ -180,10 +226,10 @@ export async function generateAttributionReport(): Promise<AttributionReport> {
     shopifyAdSpend,
     amazonAdSpend,
   ] = await Promise.all([
-    fetchKpiMetric("daily_revenue_shopify", 30),
-    fetchKpiMetric("daily_orders_shopify", 30),
-    fetchKpiMetric("daily_revenue_amazon", 30),
-    fetchKpiMetric("daily_orders_amazon", 30),
+    fetchKpiMetric("daily_revenue_shopify", days),
+    fetchKpiMetric("daily_orders_shopify", days),
+    fetchKpiMetric("daily_revenue_amazon", days),
+    fetchKpiMetric("daily_orders_amazon", days),
     fetchFaireMetrics(),
     fetchWholesaleMetrics(),
     fetchLatestKpiMetric("monthly_ad_spend_shopify", 90),
@@ -241,7 +287,7 @@ export async function generateAttributionReport(): Promise<AttributionReport> {
       : 0;
 
   const end = new Date().toISOString().slice(0, 10);
-  const start = daysAgoIso(30);
+  const start = daysAgoIso(days);
 
   return {
     channels,
