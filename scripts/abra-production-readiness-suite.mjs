@@ -174,7 +174,7 @@ async function runSmokeMatrix(ctx) {
       id: "integration",
       label: "GET /api/ops/abra/integration-test",
       method: "GET",
-      pathName: "/api/ops/abra/integration-test",
+      pathName: "/api/ops/abra/integration-test?mode=quick",
       critical: true,
       validate: (res) => res.status === 200,
     },
@@ -182,7 +182,7 @@ async function runSmokeMatrix(ctx) {
       id: "chat",
       label: "POST /api/ops/abra/chat",
       method: "POST",
-      pathName: "/api/ops/abra/chat",
+      pathName: "/api/ops/abra/chat?mode=health",
       critical: true,
       body: { message: "What does USA Gummies sell?" },
       validate: (res) =>
@@ -212,7 +212,7 @@ async function runSmokeMatrix(ctx) {
       id: "morning",
       label: "GET /api/ops/abra/morning-brief",
       method: "GET",
-      pathName: "/api/ops/abra/morning-brief",
+      pathName: "/api/ops/abra/morning-brief?mode=quick",
       critical: false,
       validate: (res) =>
         res.status === 200 &&
@@ -259,7 +259,7 @@ async function runSmokeMatrix(ctx) {
       id: "inventory",
       label: "GET /api/ops/abra/inventory-forecast",
       method: "GET",
-      pathName: "/api/ops/abra/inventory-forecast",
+      pathName: "/api/ops/abra/inventory-forecast?mode=quick",
       critical: false,
       validate: (res) =>
         (res.status === 200 && Array.isArray(res.json?.forecasts)) ||

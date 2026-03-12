@@ -14,6 +14,7 @@
     "verify:env": "node scripts/verify-env.mjs",
     "verify:net": "node scripts/verify-network.mjs",
     "verify:production-smoke": "node scripts/production-smoke.mjs",
+    "verify:production-smoke-live": "node scripts/production-smoke-test.mjs",
     "verify:abra-readiness": "node scripts/abra-production-readiness-suite.mjs",
     "audit:prod-readiness": "node scripts/production-readiness-audit.mjs",
     "release:gate": "node scripts/verify-production-release.mjs",

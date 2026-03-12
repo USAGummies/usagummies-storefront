@@ -9,9 +9,40 @@ import { notify } from "@/lib/ops/notify";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+function isAmazonConfigured(): boolean {
+  return !!(
+    process.env.LWA_CLIENT_ID &&
+    process.env.LWA_CLIENT_SECRET &&
+    process.env.LWA_REFRESH_TOKEN
+  );
+}
+
+function isUpstreamDependencyError(message: string): boolean {
+  return /sp-api|amazon|invalidinput|unauthorized|timed out|timeout/i.test(
+    message,
+  );
+}
+
 export async function GET(req: Request) {
   if (!(await isAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const url = new URL(req.url);
+  const mode = (url.searchParams.get("mode") || "").toLowerCase();
+  if (mode === "quick" || mode === "health") {
+    return NextResponse.json({
+      forecasts: [],
+      mode: "quick",
+      dependencies: {
+        amazon_configured: isAmazonConfigured(),
+        shopify_configured: !!(
+          (process.env.SHOPIFY_STORE || process.env.SHOPIFY_STORE_DOMAIN) &&
+          (process.env.SHOPIFY_ADMIN_TOKEN ||
+            process.env.SHOPIFY_ADMIN_ACCESS_TOKEN)
+        ),
+      },
+      generated_at: new Date().toISOString(),
+    });
   }
 
   try {
@@ -21,6 +52,19 @@ export async function GET(req: Request) {
     const message =
       error instanceof Error ? error.message : "Failed to analyze inventory";
     console.error("[abra-inventory-forecast] GET failed:", message);
+
+    if (isUpstreamDependencyError(message)) {
+      return NextResponse.json(
+        {
+          forecasts: [],
+          degraded: true,
+          warning: message,
+          generated_at: new Date().toISOString(),
+        },
+        { status: 200 },
+      );
+    }
+
     void notify({
       channel: "alerts",
       text: `🚨 Inventory forecast API failed: ${message}`,

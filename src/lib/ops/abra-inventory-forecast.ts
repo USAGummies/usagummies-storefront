@@ -1,4 +1,10 @@
-import { fetchOrderItems, fetchOrders, fetchFBAInventory, isAmazonConfigured } from "@/lib/amazon/sp-api";
+import {
+  fetchOrderItems,
+  fetchOrders,
+  fetchFBAInventory,
+  isAmazonConfigured,
+  nowMinusBuffer,
+} from "@/lib/amazon/sp-api";
 import { emitSignal } from "@/lib/ops/abra-operational-signals";
 import { proposeAndMaybeExecute } from "@/lib/ops/abra-actions";
 import { recordKPI } from "@/lib/ops/abra-kpi-recorder";
@@ -64,6 +70,15 @@ async function sbFetch(path: string, init: RequestInit = {}): Promise<unknown> {
 
 function round2(value: number): number {
   return Math.round((Number(value) || 0) * 100) / 100;
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, fallback: T): Promise<T> {
+  return Promise.race<T>([
+    promise,
+    new Promise((resolve) => {
+      setTimeout(() => resolve(fallback), timeoutMs);
+    }),
+  ]);
 }
 
 function getShopifyConfig() {
@@ -154,7 +169,12 @@ async function fetchShopifySellRate(): Promise<Map<string, number>> {
 
 async function fetchAmazonInventoryRows(): Promise<StockRow[]> {
   if (!isAmazonConfigured()) return [];
-  const inv = await fetchFBAInventory();
+  const inv = await withTimeout(fetchFBAInventory(), 8000, {
+    items: [],
+    error: "timed out",
+    errorAt: new Date().toISOString(),
+    lastSuccessfulFetch: null,
+  });
   const rows: StockRow[] = [];
   for (const item of inv.items || []) {
     const sku = String(item.sellerSku || item.fnSku || item.asin || "").trim();
@@ -171,9 +191,14 @@ async function fetchAmazonInventoryRows(): Promise<StockRow[]> {
 
 async function fetchAmazonSellRate(): Promise<Map<string, number>> {
   if (!isAmazonConfigured()) return new Map();
-  const end = new Date().toISOString();
+  const end = nowMinusBuffer();
   const start = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
-  const orders = await fetchOrders(start, end);
+  let orders: Awaited<ReturnType<typeof fetchOrders>> = [];
+  try {
+    orders = await withTimeout(fetchOrders(start, end), 9000, []);
+  } catch {
+    orders = [];
+  }
   const unitsBySku = new Map<string, number>();
 
   for (const order of orders.slice(0, 40)) {

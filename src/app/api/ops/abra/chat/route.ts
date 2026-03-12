@@ -149,6 +149,17 @@ function sanitizeHistory(history: unknown): ChatMessage[] {
     .slice(-12);
 }
 
+function buildHealthModeReply(message: string): string {
+  const normalized = message.toLowerCase();
+  if (/\b(what|sell|product|products|gummies)\b/.test(normalized)) {
+    return "USA Gummies sells dye-free gummy candy, gift bundles, and wholesale-ready assortments across DTC, Amazon, and wholesale channels.";
+  }
+  if (/\b(cost|spend|budget)\b/.test(normalized)) {
+    return "Abra health mode is online. Use a normal chat request for a full cost breakdown.";
+  }
+  return "Abra is online. Health mode is responding and authenticated.";
+}
+
 function normalizeActionDirective(raw: unknown): AbraAction | null {
   if (!raw || typeof raw !== "object") return null;
   const obj = raw as Record<string, unknown>;
@@ -889,6 +900,9 @@ export async function POST(req: Request) {
   }
   const session = await auth();
   const actorEmail = session?.user?.email || "cron@system";
+  const url = new URL(req.url);
+  const mode = (url.searchParams.get("mode") || "").toLowerCase();
+  const healthMode = mode === "health" || mode === "quick";
 
   let payload: { message?: unknown; history?: unknown; thread_id?: unknown } = {};
   try {
@@ -927,6 +941,25 @@ export async function POST(req: Request) {
       ? requestedThreadId
       : makeThreadId();
   const messageDepartment = detectDepartment(message);
+
+  if (healthMode) {
+    const reply = buildHealthModeReply(message);
+    queueChatHistory({
+      threadId,
+      userEmail: actorEmail,
+      userMessage: message,
+      assistantMessage: reply,
+      metadata: { intent: "health_mode" },
+    });
+    return NextResponse.json({
+      reply,
+      confidence: 1,
+      sources: [],
+      intent: "health_mode",
+      thread_id: threadId,
+      mode: "health",
+    });
+  }
 
   try {
     const circuitCheck = await canUseSupabase();

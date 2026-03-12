@@ -200,6 +200,26 @@ export async function fetchOrders(
   createdAfter: string,
   createdBefore: string,
 ): Promise<AmazonOrder[]> {
+  const bufferedNow = nowMinusBuffer();
+  const bufferedNowMs = new Date(bufferedNow).getTime();
+
+  let safeAfter = createdAfter;
+  let safeBefore = createdBefore;
+  const requestedBeforeMs = new Date(createdBefore).getTime();
+  if (Number.isFinite(requestedBeforeMs) && requestedBeforeMs > bufferedNowMs) {
+    safeBefore = bufferedNow;
+  }
+
+  const safeAfterMs = new Date(safeAfter).getTime();
+  const safeBeforeMs = new Date(safeBefore).getTime();
+  if (
+    Number.isFinite(safeAfterMs) &&
+    Number.isFinite(safeBeforeMs) &&
+    safeAfterMs >= safeBeforeMs
+  ) {
+    safeAfter = new Date(safeBeforeMs - 60 * 60 * 1000).toISOString();
+  }
+
   const allOrders: AmazonOrder[] = [];
   let nextToken: string | undefined;
 
@@ -208,8 +228,8 @@ export async function fetchOrders(
       ? { NextToken: nextToken }
       : {
           MarketplaceIds: MARKETPLACE_ID(),
-          CreatedAfter: createdAfter,
-          CreatedBefore: createdBefore,
+          CreatedAfter: safeAfter,
+          CreatedBefore: safeBefore,
         };
 
     const res = await spApiGet<OrdersResponse>("/orders/v0/orders", params);
@@ -304,9 +324,9 @@ export async function testAmazonConnection(): Promise<{
 
   let ordersOk = false;
   try {
-    const now = new Date();
-    const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    await fetchOrders(dayAgo.toISOString(), now.toISOString());
+    const now = nowMinusBuffer();
+    const dayAgo = new Date(new Date(now).getTime() - 24 * 60 * 60 * 1000);
+    await fetchOrders(dayAgo.toISOString(), now);
     ordersOk = true;
   } catch (error) {
     errors.push(

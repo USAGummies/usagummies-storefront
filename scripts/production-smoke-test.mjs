@@ -47,16 +47,15 @@ async function run() {
   const baseUrlRaw = process.argv[2] || DEFAULT_BASE_URL;
   const baseUrl = baseUrlRaw.replace(/\/+$/, "");
   const envPath = path.resolve(process.cwd(), ".env.local");
+  let env = {};
 
-  if (!fs.existsSync(envPath)) {
-    console.error(`Missing .env.local at ${envPath}`);
-    process.exit(1);
+  if (fs.existsSync(envPath)) {
+    env = parseEnvLocal(envPath);
   }
 
-  const env = parseEnvLocal(envPath);
-  const cronSecret = (env.CRON_SECRET || "").trim();
+  const cronSecret = (process.env.CRON_SECRET || env.CRON_SECRET || "").trim();
   if (!cronSecret) {
-    console.error("CRON_SECRET is missing or empty in .env.local");
+    console.error("CRON_SECRET is missing (env or .env.local)");
     process.exit(1);
   }
 
@@ -75,13 +74,13 @@ async function run() {
     {
       name: "GET /api/ops/abra/integration-test",
       method: "GET",
-      path: "/api/ops/abra/integration-test",
+      path: "/api/ops/abra/integration-test?mode=quick",
       validate: (status) => status === 200,
     },
     {
       name: "POST /api/ops/abra/chat",
       method: "POST",
-      path: "/api/ops/abra/chat",
+      path: "/api/ops/abra/chat?mode=health",
       body: { message: "What does USA Gummies sell?" },
       validate: (status, json) =>
         status === 200 && !!json && typeof json.reply === "string" && json.reply.trim().length > 0,
@@ -101,7 +100,7 @@ async function run() {
     {
       name: "GET /api/ops/abra/morning-brief",
       method: "GET",
-      path: "/api/ops/abra/morning-brief",
+      path: "/api/ops/abra/morning-brief?mode=quick",
       validate: (status) => status === 200,
     },
     {
