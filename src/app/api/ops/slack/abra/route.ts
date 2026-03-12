@@ -230,6 +230,40 @@ function buildFeedbackBlock(answerLogId: string): SlackActionsBlock {
 // ---------------------------------------------------------------------------
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
+const INITIATIVE_TRIGGERS =
+  /\b(get .+ under control|let'?s work on|build .+ structure|set up .+ department|organize .+ department|establish .+ process)\b/i;
+const SESSION_TRIGGERS =
+  /\b(let'?s (have a |)meet|start a (meeting|session|review)|review .+ department|how'?s .+ doing|check in on)\b/i;
+const COST_TRIGGERS =
+  /\b(ai spend|ai cost|how much .+ spend|budget|monthly spend|cost report)\b/i;
+
+type DetectedIntent =
+  | { type: "initiative"; department: string | null; goal: string }
+  | { type: "session"; department: string | null; sessionType: "meeting" | "review" }
+  | { type: "cost" }
+  | { type: "chat" };
+
+function detectIntent(message: string): DetectedIntent {
+  if (COST_TRIGGERS.test(message)) {
+    return { type: "cost" };
+  }
+  if (INITIATIVE_TRIGGERS.test(message)) {
+    return {
+      type: "initiative",
+      department: detectDepartment(message),
+      goal: message,
+    };
+  }
+  if (SESSION_TRIGGERS.test(message)) {
+    return {
+      type: "session",
+      department: detectDepartment(message),
+      sessionType: /review/i.test(message) ? "review" : "meeting",
+    };
+  }
+  return { type: "chat" };
+}
+
 // ---------------------------------------------------------------------------
 // Slack signature verification
 // ---------------------------------------------------------------------------
@@ -741,6 +775,73 @@ async function handleInitiativeCommand(
   }
 }
 
+async function handleSessionIntentCommand(params: {
+  department: string | null;
+  sessionType: "meeting" | "review";
+  goalText: string;
+}): Promise<string> {
+  const cronSecret = process.env.CRON_SECRET?.trim();
+  if (!cronSecret) {
+    return "❌ CRON_SECRET is not configured; cannot start session from Slack intent yet.";
+  }
+
+  const host =
+    process.env.NEXTAUTH_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
+  const department = params.department || "executive";
+
+  const res = await fetchWithRetry(
+    `${host}/api/ops/abra/session`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${cronSecret}`,
+      },
+      body: JSON.stringify({
+        department,
+        session_type: params.sessionType,
+      }),
+    },
+    { timeoutMs: 15000, maxRetries: 1 },
+  );
+
+  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!res.ok) {
+    const errorText =
+      typeof data.error === "string"
+        ? data.error
+        : `HTTP ${res.status}`;
+    return `❌ Failed to start session: ${errorText}`;
+  }
+
+  const agenda = Array.isArray(data.agenda)
+    ? data.agenda
+        .slice(0, 5)
+        .map((item, idx) => `${idx + 1}. ${String(item)}`)
+        .join("\n")
+    : "";
+  const title =
+    typeof data.title === "string" && data.title.trim()
+      ? data.title
+      : `${department} ${params.sessionType}`;
+  const sessionId =
+    typeof data.id === "string" && data.id
+      ? data.id
+      : "unknown";
+
+  return [
+    `✅ Session started: *${title}*`,
+    `Department: ${department}`,
+    `Type: ${params.sessionType}`,
+    agenda ? `Agenda:\n${agenda}` : "",
+    `Session ID: ${sessionId}`,
+    `Trigger: "${params.goalText}"`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
 // ---------------------------------------------------------------------------
 // Core RAG pipeline with temporal awareness
 // ---------------------------------------------------------------------------
@@ -1103,6 +1204,23 @@ export async function POST(req: Request) {
   const costMatch = /^cost(?:\s+report)?$/i.test(trimmedText);
   const answerMatch = trimmedText.match(/^answer:\s*(.+)$/is);
   const searchMatch = trimmedText.match(/^search:\s*(.+)$/is);
+  const intent =
+    answerMatch || searchMatch ? ({ type: "chat" } as const) : detectIntent(trimmedText);
+  const inferredInitiativeText =
+    !initiativeMatch &&
+    intent.type === "initiative" &&
+    intent.department
+      ? `${intent.department} ${intent.goal}`
+      : null;
+  const inferredSessionIntent =
+    intent.type === "session"
+      ? {
+          department: intent.department,
+          sessionType: intent.sessionType,
+          goalText: trimmedText,
+        }
+      : null;
+  const inferredCostIntent = !costMatch && intent.type === "cost";
 
   if (helpMatch) {
     return NextResponse.json({
@@ -1129,7 +1247,15 @@ export async function POST(req: Request) {
     });
   }
 
-  if (correctMatch || teachMatch || initiativeMatch || costMatch) {
+  if (
+    correctMatch ||
+    teachMatch ||
+    initiativeMatch ||
+    costMatch ||
+    inferredInitiativeText ||
+    inferredSessionIntent ||
+    inferredCostIntent
+  ) {
     // Subcommands run inline (fast enough for 3s Slack timeout)
     after(async () => {
       try {
@@ -1143,6 +1269,10 @@ export async function POST(req: Request) {
           reply = await handleTeachCommand(teachMatch![1], userName);
         } else if (initiativeMatch) {
           reply = await handleInitiativeCommand(initiativeMatch[1], userName);
+        } else if (inferredInitiativeText) {
+          reply = await handleInitiativeCommand(inferredInitiativeText, userName);
+        } else if (inferredSessionIntent) {
+          reply = await handleSessionIntentCommand(inferredSessionIntent);
         } else {
           reply = await handleCostCommand();
         }
@@ -1175,8 +1305,10 @@ export async function POST(req: Request) {
       ? "storing correction"
       : teachMatch
         ? "learning"
-        : initiativeMatch
+        : initiativeMatch || inferredInitiativeText
           ? "creating initiative"
+          : inferredSessionIntent
+            ? "starting session"
           : "fetching cost summary";
     return NextResponse.json({
       response_type: "ephemeral",
