@@ -91,8 +91,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id as string;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        token.role = (user as any).role as UserRole;
+        token.role = ((user as { role?: UserRole }).role || "employee") as UserRole;
       }
       return token;
     },

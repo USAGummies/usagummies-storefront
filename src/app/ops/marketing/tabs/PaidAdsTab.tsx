@@ -6,7 +6,7 @@ import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Toolti
 import { useAdsData, fmtDollar } from "@/lib/ops/use-war-room-data";
 import type { AdsData } from "@/lib/ops/use-war-room-data";
 import { RefreshButton } from "@/app/ops/components/RefreshButton";
-import { SkeletonChart, SkeletonTable } from "@/app/ops/components/Skeleton";
+import { SkeletonTable } from "@/app/ops/components/Skeleton";
 import {
   NAVY,
   RED,

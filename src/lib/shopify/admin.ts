@@ -294,7 +294,7 @@ export async function registerWebhook(
 // Generate unique discount code strings
 // ---------------------------------------------------------------------------
 
-export function generateSubscriptionDiscountCode(email: string): string {
+export function generateSubscriptionDiscountCode(_email: string): string {
   const prefix = "SUB";
   const suffix = Array.from(crypto.getRandomValues(new Uint8Array(4)))
     .map((b) => b.toString(36).toUpperCase())
@@ -303,7 +303,7 @@ export function generateSubscriptionDiscountCode(email: string): string {
   return `${prefix}-${suffix}`;
 }
 
-export function generateLoyaltyDiscountCode(email: string, tier: number): string {
+export function generateLoyaltyDiscountCode(_email: string, tier: number): string {
   const prefix = tier >= 250 ? "REWARD3" : "REWARD1";
   const suffix = Array.from(crypto.getRandomValues(new Uint8Array(4)))
     .map((b) => b.toString(36).toUpperCase())

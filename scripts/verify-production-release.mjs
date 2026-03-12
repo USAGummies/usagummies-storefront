@@ -6,6 +6,12 @@ const checks = [
   { name: "build", cmd: "npm", args: ["run", "build"] },
   { name: "production smoke", cmd: "npm", args: ["run", "verify:production-smoke"] },
   {
+    name: "abra readiness suite",
+    cmd: "npm",
+    args: ["run", "verify:abra-readiness"],
+    blocking: false,
+  },
+  {
     name: "production readiness audit",
     cmd: "npm",
     args: ["run", "audit:prod-readiness"],

@@ -10,10 +10,8 @@
 import { streamText, tool } from "ai";
 import { openai } from "@ai-sdk/openai";
 // Zod v4's z.object({}) produces JSON Schema type:"None" which OpenAI rejects.
-// The zod/v3 compat layer generates correct type:"object". We cast to bridge
-// the type gap between zod/v3 runtime types and the ai SDK's zod v4 typedefs.
+// The zod/v3 compat layer generates correct type:"object", so we use it here.
 import { z as _z } from "zod/v3";
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const z = _z as any;
 import {
   queryDatabase,
@@ -33,7 +31,6 @@ import {
   isPlaidConfigured,
   isPlaidConnected,
   getBalances as getPlaidBalances,
-  getTransactions as getPlaidTransactions,
 } from "@/lib/finance/plaid";
 import {
   isShopifyPaymentsConfigured,
@@ -41,7 +38,6 @@ import {
 } from "@/lib/finance/shopify-payments";
 import {
   isAmazonConfigured as isAmazonFinConfigured,
-  fetchFinancialEventGroups,
 } from "@/lib/amazon/sp-api";
 import type { CacheEnvelope } from "@/lib/amazon/types";
 

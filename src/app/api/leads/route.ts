@@ -11,8 +11,7 @@ type LeadPayload = {
   interest?: string;
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function json(data: any, status = 200) {
+function json(data: unknown, status = 200) {
   return new NextResponse(JSON.stringify(data), {
     status,
     headers: { "Content-Type": "application/json" },

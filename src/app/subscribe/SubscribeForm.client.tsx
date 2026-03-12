@@ -5,7 +5,6 @@ import Image from "next/image";
 import {
   SUBSCRIPTION_FREQUENCIES,
   subscriptionPricingForQty,
-  perBagForQty,
   totalForQty,
   BASE_PRICE,
 } from "@/lib/bundles/pricing";
@@ -33,9 +32,8 @@ export function SubscribeForm() {
 
   const pricing = useMemo(() => {
     const sub = subscriptionPricingForQty(qty);
-    const bundlePerBag = perBagForQty(qty);
     const bundleTotal = totalForQty(qty);
-    return { ...sub, bundlePerBag, bundleTotal };
+    return { ...sub, bundleTotal };
   }, [qty]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -128,7 +126,6 @@ export function SubscribeForm() {
         <div className="mt-3 grid gap-3 sm:grid-cols-3">
           {QTY_OPTIONS.map((q) => {
             const sub = subscriptionPricingForQty(q);
-            const bundlePerBag = perBagForQty(q);
             const retailTotal = (BASE_PRICE * q).toFixed(2);
             const isSelected = qty === q;
             const badge = q === 5 ? "Most Popular" : q === 12 ? "Best Value" : null;

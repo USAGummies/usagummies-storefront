@@ -226,8 +226,8 @@ export async function readEmail(messageId: string): Promise<EmailMessage | null>
       name: string;
       value: string;
     }>;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { text, html } = extractTextBody(res.data.payload as any);
+    const payload = (res.data.payload || {}) as Parameters<typeof extractTextBody>[0];
+    const { text, html } = extractTextBody(payload);
 
     return {
       id: messageId,

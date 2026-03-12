@@ -39,19 +39,6 @@ export function ManageSubscription() {
   const [editing, setEditing] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
-  // Read email/token from URL params on mount
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const e = params.get("email") || "";
-    const t = params.get("token") || "";
-    if (e) setEmail(e);
-    if (t) setToken(t);
-    if (e && t) {
-      lookupSubscription(e, t);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const lookupSubscription = useCallback(async (lookupEmail: string, lookupToken: string) => {
     setLoading(true);
     setErrorMsg("");
@@ -78,6 +65,18 @@ export function ManageSubscription() {
       setLoading(false);
     }
   }, []);
+
+  // Read email/token from URL params on mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const e = params.get("email") || "";
+    const t = params.get("token") || "";
+    if (e) setEmail(e);
+    if (t) setToken(t);
+    if (e && t) {
+      lookupSubscription(e, t);
+    }
+  }, [lookupSubscription]);
 
   const handleLookup = (e: React.FormEvent) => {
     e.preventDefault();

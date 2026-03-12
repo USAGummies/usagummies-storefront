@@ -67,7 +67,8 @@ export async function GET(req: Request) {
   }
 
   // Omit token from response
-  const { token: _token, ...safe } = sub;
+  const safe = { ...sub };
+  delete (safe as Partial<Subscription>).token;
   return json({ ok: true, subscription: safe });
 }
 
@@ -159,6 +160,7 @@ export async function PATCH(req: Request) {
 
   await kv.set(kvKey(email), sub);
 
-  const { token: _token, ...safe } = sub;
+  const safe = { ...sub };
+  delete (safe as Partial<Subscription>).token;
   return json({ ok: true, subscription: safe });
 }

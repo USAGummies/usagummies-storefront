@@ -63,20 +63,25 @@ function toNotionId(raw: string): string {
   return `${clean.slice(0, 8)}-${clean.slice(8, 12)}-${clean.slice(12, 16)}-${clean.slice(16, 20)}-${clean.slice(20)}`;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function extractPlainText(prop: any): string {
-  if (!prop) return "";
-  if (prop.type === "title" && Array.isArray(prop.title)) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return prop.title.map((t: any) => t.plain_text || "").join("");
+function extractPlainText(prop: unknown): string {
+  if (!prop || typeof prop !== "object") return "";
+  const field = prop as {
+    type?: string;
+    title?: Array<{ plain_text?: string }>;
+    rich_text?: Array<{ plain_text?: string }>;
+    email?: string;
+    select?: { name?: string };
+    checkbox?: boolean;
+  };
+  if (field.type === "title" && Array.isArray(field.title)) {
+    return field.title.map((t) => t.plain_text || "").join("");
   }
-  if (prop.type === "rich_text" && Array.isArray(prop.rich_text)) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return prop.rich_text.map((t: any) => t.plain_text || "").join("");
+  if (field.type === "rich_text" && Array.isArray(field.rich_text)) {
+    return field.rich_text.map((t) => t.plain_text || "").join("");
   }
-  if (prop.type === "email") return prop.email || "";
-  if (prop.type === "select") return prop.select?.name || "";
-  if (prop.type === "checkbox") return prop.checkbox ? "true" : "false";
+  if (field.type === "email") return field.email || "";
+  if (field.type === "select") return field.select?.name || "";
+  if (field.type === "checkbox") return field.checkbox ? "true" : "false";
   return "";
 }
 

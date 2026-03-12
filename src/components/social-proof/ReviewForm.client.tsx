@@ -20,6 +20,7 @@ export function ReviewForm({ onSuccess, onCancel }: ReviewFormProps) {
   const [error, setError] = React.useState("");
   const [success, setSuccess] = React.useState(false);
   const fileRef = React.useRef<HTMLInputElement>(null);
+  const previewsRef = React.useRef<string[]>([]);
 
   const handlePhotos = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []).slice(0, 3 - photos.length);
@@ -46,10 +47,13 @@ export function ReviewForm({ onSuccess, onCancel }: ReviewFormProps) {
   };
 
   React.useEffect(() => {
+    previewsRef.current = previews;
+  }, [previews]);
+
+  React.useEffect(() => {
     return () => {
-      previews.forEach((url) => URL.revokeObjectURL(url));
+      previewsRef.current.forEach((url) => URL.revokeObjectURL(url));
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
