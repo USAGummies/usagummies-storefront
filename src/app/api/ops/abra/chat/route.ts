@@ -1091,6 +1091,7 @@ export async function POST(req: Request) {
       const strategy = await buildCrossDepartmentStrategy({
         objective: intent.objective,
         topic: intent.department,
+        depth: "quick",
         host,
         cookieHeader: cookie,
         actorEmail,
@@ -1125,6 +1126,8 @@ export async function POST(req: Request) {
 
       const strategyReply = [
         `**Cross-Department Strategy Ready**`,
+        `_Mode: quick (chat-safe). For full deep research run /api/ops/abra/strategy?mode=deep with the same objective._`,
+        "",
         strategy.summary,
         "",
         `**Department Execution Matrix**`,

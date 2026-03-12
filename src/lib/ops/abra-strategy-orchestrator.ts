@@ -29,6 +29,7 @@ type ExternalAction = {
 };
 
 export type CrossDepartmentStrategy = {
+  depth: StrategyDepth;
   topic: string;
   objective: string;
   summary: string;
@@ -50,6 +51,7 @@ export type CrossDepartmentStrategy = {
 type StrategyParams = {
   objective: string;
   topic?: string | null;
+  depth?: StrategyDepth | null;
   host: string;
   cookieHeader?: string;
   actorEmail?: string | null;
@@ -63,8 +65,29 @@ type StrategyProfile = {
 
 const DEFAULT_CLAUDE_MODEL =
   process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514";
-const RESEARCH_TIMEOUT_MS = 12000;
-const STRATEGY_SYNTH_TIMEOUT_MS = 20000;
+export type StrategyDepth = "quick" | "deep";
+
+type StrategyRuntimeBudget = {
+  researchTimeoutMs: number;
+  synthTimeoutMs: number;
+  maxTokens: number;
+  founderContextLimit: number;
+};
+
+const STRATEGY_BUDGETS: Record<StrategyDepth, StrategyRuntimeBudget> = {
+  quick: {
+    researchTimeoutMs: 12000,
+    synthTimeoutMs: 20000,
+    maxTokens: 1400,
+    founderContextLimit: 8,
+  },
+  deep: {
+    researchTimeoutMs: 28000,
+    synthTimeoutMs: 90000,
+    maxTokens: 2800,
+    founderContextLimit: 20,
+  },
+};
 
 const PROFILE_AMAZON_ADS: StrategyProfile = {
   key: "amazon_ad_strategy",
@@ -187,6 +210,7 @@ async function callDepartmentResearch(
     cookieHeader?: string;
     objective: string;
     department: string;
+    timeoutMs: number;
   },
 ): Promise<ResearchResult> {
   try {
@@ -206,7 +230,7 @@ async function callDepartmentResearch(
         context:
           "Cross-department strategy orchestration: focus on practical execution, dependencies, KPIs, and strict spend controls.",
       }),
-      signal: AbortSignal.timeout(RESEARCH_TIMEOUT_MS),
+      signal: AbortSignal.timeout(params.timeoutMs),
     });
 
     if (!res.ok) {
@@ -253,6 +277,7 @@ function normalizeExternalActions(actions: ExternalAction[]): ExternalAction[] {
 }
 
 function fallbackStrategy(params: {
+  depth: StrategyDepth;
   objective: string;
   profile: StrategyProfile;
   sourceSummary: Array<{ department: string; findings: number; recommendations: number }>;
@@ -265,6 +290,7 @@ function fallbackStrategy(params: {
   }));
 
   return {
+    depth: params.depth,
     topic: params.profile.key,
     objective: params.objective,
     summary:
@@ -309,6 +335,8 @@ function fallbackStrategy(params: {
 }
 
 async function synthesizeStrategy(input: {
+  depth: StrategyDepth;
+  budget: StrategyRuntimeBudget;
   objective: string;
   profile: StrategyProfile;
   topicHint: string | null;
@@ -403,12 +431,12 @@ async function synthesizeStrategy(input: {
     },
     body: JSON.stringify({
       model: DEFAULT_CLAUDE_MODEL,
-      max_tokens: 1400,
+      max_tokens: input.budget.maxTokens,
       temperature: 0.2,
       system: systemPrompt,
       messages: [{ role: "user", content: userPrompt }],
     }),
-    signal: AbortSignal.timeout(STRATEGY_SYNTH_TIMEOUT_MS),
+    signal: AbortSignal.timeout(input.budget.synthTimeoutMs),
   });
 
   const text = await res.text();
@@ -459,6 +487,7 @@ async function synthesizeStrategy(input: {
     : [];
 
   return {
+    depth: input.depth,
     topic: String(parsed.topic || input.profile.key),
     objective: String(parsed.objective || input.objective),
     summary:
@@ -534,6 +563,8 @@ export async function buildCrossDepartmentStrategy(
     throw new Error("objective is required");
   }
 
+  const depth: StrategyDepth = params.depth === "quick" ? "quick" : "deep";
+  const budget = STRATEGY_BUDGETS[depth];
   const topicHint = params.topic || detectDepartment(objective);
   const profile = chooseProfile(objective, topicHint);
 
@@ -544,6 +575,7 @@ export async function buildCrossDepartmentStrategy(
         cookieHeader: params.cookieHeader,
         objective,
         department,
+        timeoutMs: budget.researchTimeoutMs,
       });
       return [department, result] as const;
     }),
@@ -557,7 +589,7 @@ export async function buildCrossDepartmentStrategy(
 
   const [founderContext, revenueMonth, revenueWeek, margin, spend] =
     await Promise.all([
-      fetchFounderPolicyContext(8).catch(() => []),
+      fetchFounderPolicyContext(budget.founderContextLimit).catch(() => []),
       getRevenueSnapshot("month").catch(() => ({
         period: "unknown",
         shopify_revenue: 0,
@@ -597,6 +629,8 @@ export async function buildCrossDepartmentStrategy(
   let strategy: CrossDepartmentStrategy;
   try {
     strategy = await synthesizeStrategy({
+      depth,
+      budget,
       objective,
       profile,
       topicHint,
@@ -608,7 +642,7 @@ export async function buildCrossDepartmentStrategy(
       spend,
     });
   } catch {
-    strategy = fallbackStrategy({ objective, profile, sourceSummary });
+    strategy = fallbackStrategy({ depth, objective, profile, sourceSummary });
   }
 
   await storeStrategyInBrain(strategy).catch(() => {});

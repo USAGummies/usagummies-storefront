@@ -118,7 +118,7 @@ async function run() {
     {
       name: "POST /api/ops/abra/strategy",
       method: "POST",
-      path: "/api/ops/abra/strategy",
+      path: "/api/ops/abra/strategy?mode=quick",
       body: {
         objective:
           "Build an Amazon ads strategy with cross-department research, finance controls, and KPI stop-loss gates.",

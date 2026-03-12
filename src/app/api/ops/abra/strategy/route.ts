@@ -1,18 +1,30 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/config";
 import { isAuthorized } from "@/lib/ops/abra-auth";
-import { buildCrossDepartmentStrategy } from "@/lib/ops/abra-strategy-orchestrator";
+import {
+  buildCrossDepartmentStrategy,
+  type StrategyDepth,
+} from "@/lib/ops/abra-strategy-orchestrator";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 300;
+
+function normalizeDepth(value: unknown): StrategyDepth {
+  return value === "quick" ? "quick" : "deep";
+}
 
 export async function POST(req: Request) {
   if (!(await isAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let payload: { objective?: unknown; topic?: unknown } = {};
+  let payload: {
+    objective?: unknown;
+    topic?: unknown;
+    mode?: unknown;
+    depth?: unknown;
+  } = {};
   try {
     payload = await req.json();
   } catch {
@@ -22,6 +34,8 @@ export async function POST(req: Request) {
   const objective =
     typeof payload.objective === "string" ? payload.objective.trim() : "";
   const topic = typeof payload.topic === "string" ? payload.topic.trim() : null;
+  const queryMode = new URL(req.url).searchParams.get("mode");
+  const depth = normalizeDepth(payload.depth ?? payload.mode ?? queryMode);
   if (!objective) {
     return NextResponse.json({ error: "objective is required" }, { status: 400 });
   }
@@ -38,12 +52,14 @@ export async function POST(req: Request) {
     const strategy = await buildCrossDepartmentStrategy({
       objective,
       topic,
+      depth,
       host,
       cookieHeader,
       actorEmail: session?.user?.email || null,
     });
 
     return NextResponse.json({
+      mode: strategy.depth,
       strategy,
       approval_policy:
         "External submissions require explicit approval. Auto-execution is disabled by default.",
