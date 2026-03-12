@@ -54,6 +54,7 @@ import {
   buildConversationContext,
   saveMessage,
 } from "@/lib/ops/abra-chat-history";
+import { buildCrossDepartmentStrategy } from "@/lib/ops/abra-strategy-orchestrator";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -237,12 +238,15 @@ const COST_TRIGGERS =
   /\b(ai spend|ai cost|how much .+ spend|budget|monthly spend|cost report)\b/i;
 const PIPELINE_TRIGGERS =
   /\b(sales pipeline|pipeline health|pipeline status|b2b pipeline|b2b deals?|wholesale deals?)\b/i;
+const STRATEGY_TRIGGERS =
+  /\b(strategy|strategic plan|financial plan|budget plan|amazon ad strategy|amazon ads strategy|ppc strategy|campaign strategy)\b/i;
 
 type DetectedIntent =
   | { type: "initiative"; department: string | null; goal: string }
   | { type: "session"; department: string | null; sessionType: string }
   | { type: "cost" }
   | { type: "pipeline" }
+  | { type: "strategy"; objective: string; department: string | null }
   | { type: "chat" };
 
 function detectIntent(message: string): DetectedIntent {
@@ -251,6 +255,10 @@ function detectIntent(message: string): DetectedIntent {
   }
   if (PIPELINE_TRIGGERS.test(message)) {
     return { type: "pipeline" };
+  }
+  if (STRATEGY_TRIGGERS.test(message)) {
+    const department = detectDepartment(message);
+    return { type: "strategy", objective: message, department };
   }
   if (INITIATIVE_TRIGGERS.test(message)) {
     const department = detectDepartment(message);
@@ -1068,6 +1076,92 @@ export async function POST(req: Request) {
         confidence: 1,
         sources: [],
         intent: "pipeline",
+        thread_id: threadId,
+      });
+    }
+
+    if (intent.type === "strategy") {
+      const host =
+        process.env.NEXTAUTH_URL ||
+        (process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : "http://localhost:3000");
+      const cookie = req.headers.get("cookie") || "";
+
+      const strategy = await buildCrossDepartmentStrategy({
+        objective: intent.objective,
+        topic: intent.department,
+        host,
+        cookieHeader: cookie,
+        actorEmail,
+      });
+
+      const deptLines = strategy.departments
+        .slice(0, 8)
+        .map((dept) => `• ${dept.department}: ${dept.actions.slice(0, 2).join(" | ")}`)
+        .join("\n");
+      const financialLines = strategy.financial_controls
+        .slice(0, 5)
+        .map((line) => `• ${line}`)
+        .join("\n");
+      const kpiLines = strategy.kpi_guardrails
+        .slice(0, 5)
+        .map((line) => `• ${line}`)
+        .join("\n");
+      const gateLines = strategy.decision_gates
+        .slice(0, 5)
+        .map((line) => `• ${line}`)
+        .join("\n");
+      const externalActionLines =
+        strategy.external_actions.length > 0
+          ? strategy.external_actions
+              .slice(0, 5)
+              .map(
+                (action) =>
+                  `• ${action.title} [${action.department}] — approval required`,
+              )
+              .join("\n")
+          : "• No external actions proposed.";
+
+      const strategyReply = [
+        `**Cross-Department Strategy Ready**`,
+        strategy.summary,
+        "",
+        `**Department Execution Matrix**`,
+        deptLines || "• Department matrix unavailable.",
+        "",
+        `**Financial Controls**`,
+        financialLines || "• Financial controls unavailable.",
+        "",
+        `**KPI Guardrails**`,
+        kpiLines || "• KPI guardrails unavailable.",
+        "",
+        `**Decision Gates**`,
+        gateLines || "• Decision gates unavailable.",
+        "",
+        `**External Actions (Permission-First)**`,
+        externalActionLines,
+      ].join("\n");
+
+      queueChatHistory({
+        threadId,
+        userEmail: actorEmail,
+        userMessage: message,
+        assistantMessage: strategyReply,
+        metadata: {
+          intent: "strategy",
+          topic: strategy.topic,
+          confidence: strategy.confidence,
+          external_actions: strategy.external_actions.length,
+        },
+      });
+
+      return NextResponse.json({
+        reply: strategyReply,
+        confidence: strategy.confidence,
+        sources: [],
+        intent: "strategy",
+        strategy,
         thread_id: threadId,
       });
     }
