@@ -3,7 +3,7 @@
  *
  * POST: Start session { department?, initiative_id?, session_type }
  * GET: Fetch sessions ?department=finance&status=active
- * PATCH: Update session { id, notes?, action_items?, decisions? }
+ * PATCH: Update session { id, notes?, action_items?, decisions?, status? }
  * DELETE: End session { id } — saves to brain, creates tasks, completes
  *
  * Session types: meeting, review, teaching, research, planning
@@ -177,7 +177,24 @@ async function buildAgenda(
       }
     }
 
-    // 3. Recent corrections to review
+    // 3. Active tasks for department
+    if (department) {
+      try {
+        const activeTasks = (await sbFetch(
+          `/rest/v1/abra_tasks?department=eq.${department}&status=in.(pending,in_progress)&select=id&limit=20`,
+        )) as Array<{ id: string }>;
+
+        if (activeTasks.length > 0) {
+          agenda.push(
+            `Review ${activeTasks.length} active task${activeTasks.length > 1 ? "s" : ""}`,
+          );
+        }
+      } catch {
+        // Best-effort only — some environments may still use legacy task tables.
+      }
+    }
+
+    // 4. Recent corrections to review
     if (department) {
       const corrections = (await sbFetch(
         `/rest/v1/abra_corrections?department=eq.${department}&active=eq.true&select=correction&limit=3&order=created_at.desc`,
@@ -638,6 +655,7 @@ async function handlePatch(req: Request) {
     decisions?: unknown;
     open_questions?: unknown;
     scratchpad_entry?: unknown;
+    status?: unknown;
   } = {};
   try {
     payload = await req.json();
@@ -648,6 +666,19 @@ async function handlePatch(req: Request) {
   const id = typeof payload.id === "string" ? payload.id.trim() : "";
   if (!id) {
     return NextResponse.json({ error: "id is required" }, { status: 400 });
+  }
+
+  const status =
+    typeof payload.status === "string"
+      ? payload.status.trim().toLowerCase()
+      : "";
+  if (status === "completed") {
+    return handleEndSession(req, {
+      id,
+      notes: payload.notes,
+      action_items: payload.action_items,
+      decisions: payload.decisions,
+    });
   }
 
   try {
@@ -762,7 +793,15 @@ async function handlePatch(req: Request) {
 }
 
 // ─── END SESSION: Save + task creation + complete ───
-async function handleEndSession(req: Request) {
+async function handleEndSession(
+  req: Request,
+  presetPayload?: {
+    id?: unknown;
+    notes?: unknown;
+    action_items?: unknown;
+    decisions?: unknown;
+  },
+) {
   if (!(await isAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -772,11 +811,13 @@ async function handleEndSession(req: Request) {
     notes?: unknown;
     action_items?: unknown;
     decisions?: unknown;
-  } = {};
-  try {
-    payload = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  } = presetPayload || {};
+  if (!presetPayload) {
+    try {
+      payload = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    }
   }
 
   const id = typeof payload.id === "string" ? payload.id.trim() : "";
