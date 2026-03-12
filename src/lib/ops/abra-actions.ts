@@ -60,7 +60,7 @@ export const AUTO_EXEC_POLICIES: AutoExecPolicy[] = [
     max_risk_level: "low",
     min_confidence: 0.85,
     daily_limit: 10,
-    enabled: true,
+    enabled: false,
   },
   {
     action_type: "create_task",
@@ -70,6 +70,16 @@ export const AUTO_EXEC_POLICIES: AutoExecPolicy[] = [
     enabled: true,
   },
 ];
+
+const EXTERNAL_SUBMISSION_ACTIONS = new Set([
+  "send_email",
+  "send_slack",
+  "update_notion",
+]);
+
+export function requiresExplicitPermission(actionType: string): boolean {
+  return EXTERNAL_SUBMISSION_ACTIONS.has(String(actionType || "").trim().toLowerCase());
+}
 
 function getSupabaseEnv() {
   const baseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -566,6 +576,8 @@ export async function proposeAction(action: AbraAction): Promise<string> {
 }
 
 export async function canAutoExecute(action: AbraAction): Promise<boolean> {
+  if (requiresExplicitPermission(action.action_type)) return false;
+
   const policy = AUTO_EXEC_POLICIES.find((item) => item.action_type === action.action_type);
   if (!policy || !policy.enabled) return false;
   if (policy.max_risk_level !== "low" || action.risk_level !== "low") return false;

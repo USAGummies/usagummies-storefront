@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { isAuthorized } from "@/lib/ops/abra-auth";
-import { proposeAction, proposeAndMaybeExecute, type AbraAction } from "@/lib/ops/abra-actions";
+import {
+  proposeAction,
+  proposeAndMaybeExecute,
+  requiresExplicitPermission,
+  type AbraAction,
+} from "@/lib/ops/abra-actions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -86,7 +91,7 @@ export async function POST(req: Request) {
   const confidence = Number.isFinite(confidenceRaw)
     ? Math.max(0, Math.min(1, confidenceRaw))
     : 0.8;
-  const autoExecute = payload.auto_execute === true;
+  const autoExecuteRequested = payload.auto_execute === true;
   const requestedRisk = parseRisk(payload.risk_level);
 
   if (!actionTypeRaw) {
@@ -107,9 +112,12 @@ export async function POST(req: Request) {
     department,
     risk_level: mapped.risk || requestedRisk,
     params: mapped.params,
-    requires_approval: !autoExecute,
+    requires_approval: true,
     confidence,
   };
+
+  const permissionRequired = requiresExplicitPermission(action.action_type);
+  const autoExecute = autoExecuteRequested && !permissionRequired;
 
   try {
     if (autoExecute) {
@@ -119,6 +127,7 @@ export async function POST(req: Request) {
           ok: true,
           approval_id: result.approval_id,
           auto_executed: result.auto_executed,
+          permission_required: false,
           result: result.result || null,
         },
         { status: 200 },
@@ -133,6 +142,10 @@ export async function POST(req: Request) {
         approval_id: approvalId,
         status: "pending",
         auto_executed: false,
+        permission_required: permissionRequired,
+        ...(permissionRequired && autoExecuteRequested
+          ? { note: "External submissions require explicit approval." }
+          : {}),
       },
       { status: 200 },
     );

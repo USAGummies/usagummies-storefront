@@ -21,6 +21,7 @@
     "abra:baseline:lock": "node scripts/abra-baseline-lock.mjs",
     "abra:train": "node scripts/abra-training-curriculum.mjs",
     "abra:train:questions": "node scripts/abra-training-curriculum.mjs --questions-only --send-slack",
+    "abra:train:ingest-answers": "node scripts/abra-training-answer-ingest.mjs",
     "screenshots": "playwright test tests/screenshots.spec.ts",
     "playwright:install": "playwright install",
     "gmail:auth": "node scripts/gmail.mjs auth",

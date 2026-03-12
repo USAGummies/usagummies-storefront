@@ -415,6 +415,21 @@ function questionsMarkdown(questions) {
   return lines.join("\n");
 }
 
+function buildAnswerTemplate(questions) {
+  return {
+    generated_at: new Date().toISOString(),
+    curriculum_version: CURRICULUM_VERSION,
+    instructions:
+      "Fill each answer string. Keep answers concrete and operational. Leave unanswered items as empty strings.",
+    questions: questions.map((q, idx) => ({
+      id: `q${String(idx + 1).padStart(3, "0")}`,
+      department: q.department,
+      question: q.text,
+      answer: "",
+    })),
+  };
+}
+
 async function main() {
   const questionsOnly = argHas("--questions-only");
   const sendSlackFlag = argHas("--send-slack");
@@ -495,6 +510,15 @@ async function main() {
     `abra-training-questions-${stamp}.md`,
   );
   fs.writeFileSync(questionPath, `${questionsMarkdown(questions)}\n`, "utf8");
+  const answerTemplatePath = path.resolve(
+    OUTPUT_DIR,
+    `abra-training-answers-template-${stamp}.json`,
+  );
+  fs.writeFileSync(
+    answerTemplatePath,
+    `${JSON.stringify(buildAnswerTemplate(questions), null, 2)}\n`,
+    "utf8",
+  );
 
   const summary =
     `[abra-training] curriculum=${CURRICULUM_VERSION} ` +
@@ -502,6 +526,7 @@ async function main() {
     `questions=${questions.length}`;
   console.log(summary);
   console.log(`[abra-training] questions file: ${questionPath}`);
+  console.log(`[abra-training] answer template: ${answerTemplatePath}`);
 
   if (sendSlackFlag) {
     const topQuestions = questions.slice(0, 10).map((q) => `• (${q.department}) ${q.text}`);
