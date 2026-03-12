@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth/config";
 import { isAuthorized } from "@/lib/ops/abra-auth";
 import {
   canUseSupabase,

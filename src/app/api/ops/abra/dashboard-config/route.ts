@@ -16,17 +16,16 @@ import {
   markSupabaseFailure,
   markSupabaseSuccess,
 } from "@/lib/ops/supabase-resilience";
+import { OPERATING_PILLARS } from "@/lib/ops/department-playbooks";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const VALID_DEPARTMENTS = [
-  "finance",
-  "operations",
-  "sales_and_growth",
-  "supply_chain",
-  "executive",
-];
+const VALID_DEPARTMENTS = Array.from(
+  new Set(
+    Object.values(OPERATING_PILLARS).flatMap((pillar) => pillar.departments),
+  ),
+).sort((a, b) => a.localeCompare(b));
 
 type DashboardWidget = {
   id: string;
@@ -43,6 +42,10 @@ type DashboardChanges = {
   remove_widget?: string;
   reorder?: string[];
 };
+
+function normalizeDepartmentName(value: string): string {
+  return value.trim().toLowerCase().replace(/[\s-]+/g, "_");
+}
 
 function getSupabaseEnv() {
   const baseUrl =
@@ -97,7 +100,8 @@ export async function GET(req: Request) {
   }
 
   const url = new URL(req.url);
-  const department = url.searchParams.get("department");
+  const departmentRaw = url.searchParams.get("department");
+  const department = departmentRaw ? normalizeDepartmentName(departmentRaw) : "";
 
   if (!department || !VALID_DEPARTMENTS.includes(department)) {
     return NextResponse.json(
@@ -182,7 +186,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const department = body.department;
+  const departmentRaw = typeof body.department === "string" ? body.department : "";
+  const department = departmentRaw ? normalizeDepartmentName(departmentRaw) : "";
   if (!department || !VALID_DEPARTMENTS.includes(department)) {
     return NextResponse.json(
       {
