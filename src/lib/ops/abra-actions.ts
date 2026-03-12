@@ -40,6 +40,10 @@ export type AutoExecPolicy = {
   enabled: boolean;
 };
 
+function isAutoExecutionGloballyEnabled(): boolean {
+  return String(process.env.ABRA_AUTO_EXEC_ENABLED || "").trim().toLowerCase() === "true";
+}
+
 export const AUTO_EXEC_POLICIES: AutoExecPolicy[] = [
   {
     action_type: "create_brain_entry",
@@ -576,6 +580,7 @@ export async function proposeAction(action: AbraAction): Promise<string> {
 }
 
 export async function canAutoExecute(action: AbraAction): Promise<boolean> {
+  if (!isAutoExecutionGloballyEnabled()) return false;
   if (requiresExplicitPermission(action.action_type)) return false;
 
   const policy = AUTO_EXEC_POLICIES.find((item) => item.action_type === action.action_type);

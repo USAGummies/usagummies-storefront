@@ -10,6 +10,10 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+function isAutoExecutionEnabled(): boolean {
+  return String(process.env.ABRA_AUTO_EXEC_ENABLED || "").trim().toLowerCase() === "true";
+}
+
 type ProposePayload = {
   department?: unknown;
   action_type?: unknown;
@@ -117,7 +121,9 @@ export async function POST(req: Request) {
   };
 
   const permissionRequired = requiresExplicitPermission(action.action_type);
-  const autoExecute = autoExecuteRequested && !permissionRequired;
+  const autoExecutionEnabled = isAutoExecutionEnabled();
+  const autoExecute =
+    autoExecuteRequested && autoExecutionEnabled && !permissionRequired;
 
   try {
     if (autoExecute) {
@@ -143,9 +149,11 @@ export async function POST(req: Request) {
         status: "pending",
         auto_executed: false,
         permission_required: permissionRequired,
-        ...(permissionRequired && autoExecuteRequested
-          ? { note: "External submissions require explicit approval." }
-          : {}),
+        ...(!autoExecutionEnabled && autoExecuteRequested
+          ? { note: "Auto-execution is globally disabled by policy." }
+          : permissionRequired && autoExecuteRequested
+            ? { note: "External submissions require explicit approval." }
+            : {}),
       },
       { status: 200 },
     );
