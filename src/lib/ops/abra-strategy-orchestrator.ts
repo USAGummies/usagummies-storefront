@@ -63,6 +63,8 @@ type StrategyProfile = {
 
 const DEFAULT_CLAUDE_MODEL =
   process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514";
+const RESEARCH_TIMEOUT_MS = 12000;
+const STRATEGY_SYNTH_TIMEOUT_MS = 20000;
 
 const PROFILE_AMAZON_ADS: StrategyProfile = {
   key: "amazon_ad_strategy",
@@ -203,7 +205,7 @@ async function callDepartmentResearch(
       context:
         "Cross-department strategy orchestration: focus on practical execution, dependencies, KPIs, and strict spend controls.",
     }),
-    signal: AbortSignal.timeout(30000),
+    signal: AbortSignal.timeout(RESEARCH_TIMEOUT_MS),
   });
 
   if (!res.ok) {
@@ -397,12 +399,12 @@ async function synthesizeStrategy(input: {
     },
     body: JSON.stringify({
       model: DEFAULT_CLAUDE_MODEL,
-      max_tokens: 2200,
+      max_tokens: 1400,
       temperature: 0.2,
       system: systemPrompt,
       messages: [{ role: "user", content: userPrompt }],
     }),
-    signal: AbortSignal.timeout(45000),
+    signal: AbortSignal.timeout(STRATEGY_SYNTH_TIMEOUT_MS),
   });
 
   const text = await res.text();

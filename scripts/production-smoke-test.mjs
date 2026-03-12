@@ -115,6 +115,21 @@ async function run() {
       path: "/api/ops/abra/pipeline",
       validate: (status) => status === 200,
     },
+    {
+      name: "POST /api/ops/abra/strategy",
+      method: "POST",
+      path: "/api/ops/abra/strategy",
+      body: {
+        objective:
+          "Build an Amazon ads strategy with cross-department research, finance controls, and KPI stop-loss gates.",
+      },
+      validate: (status, json) =>
+        status === 200 &&
+        !!json &&
+        typeof json === "object" &&
+        typeof json.strategy?.summary === "string" &&
+        json.strategy.summary.trim().length > 0,
+    },
   ];
 
   let failures = 0;
