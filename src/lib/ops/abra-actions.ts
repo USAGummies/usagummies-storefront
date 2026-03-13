@@ -496,6 +496,59 @@ async function handleRecordTransaction(
   };
 }
 
+async function handleCorrectClaim(
+  params: Record<string, unknown>,
+): Promise<ActionResult> {
+  const originalClaim = String(params.original_claim || params.wrong || "");
+  const correction = String(params.correction || params.correct || params.right || "");
+  const correctedBy = String(params.corrected_by || "user");
+  const department = typeof params.department === "string" ? params.department : "executive";
+
+  if (!originalClaim || !correction) {
+    return {
+      success: false,
+      message: "Both original_claim and correction are required",
+    };
+  }
+
+  // Store as a pinned brain entry with correction + pinned tags
+  const text = `CORRECTION: "${originalClaim}" is WRONG. The correct information is: "${correction}". Corrected by ${correctedBy} on ${new Date().toISOString().split("T")[0]}.`;
+
+  const rows = (await sbFetch("/rest/v1/open_brain_entries", {
+    method: "POST",
+    headers: {
+      Prefer: "return=representation",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      source_type: "agent",
+      source_ref: "abra_correction",
+      entry_type: "correction",
+      title: `Correction: ${originalClaim.slice(0, 80)}`,
+      raw_text: text,
+      summary_text: text.slice(0, 500),
+      category: "correction",
+      department,
+      confidence: "verified",
+      priority: "critical",
+      processed: true,
+      tags: ["correction", "pinned"],
+    }),
+  })) as Array<{ id: string }>;
+
+  // Also notify on Slack so the team knows a correction was logged
+  await notify({
+    channel: "alerts",
+    text: `📌 *Correction Logged*\n• Wrong: "${originalClaim.slice(0, 100)}"\n• Correct: "${correction.slice(0, 100)}"\n• By: ${correctedBy}`,
+  }).catch(() => {});
+
+  return {
+    success: true,
+    message: `Correction pinned: "${originalClaim.slice(0, 60)}..." → "${correction.slice(0, 60)}..."`,
+    data: { entry_id: rows[0]?.id || null },
+  };
+}
+
 const ACTION_HANDLERS: Record<
   string,
   (params: Record<string, unknown>) => Promise<ActionResult>
@@ -509,6 +562,7 @@ const ACTION_HANDLERS: Record<
   pause_initiative: handlePauseInitiative,
   create_notion_page: handleCreateNotionPage,
   record_transaction: handleRecordTransaction,
+  correct_claim: handleCorrectClaim,
 };
 
 async function fetchApproval(approvalId: string): Promise<ApprovalRow | null> {

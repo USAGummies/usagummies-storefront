@@ -177,6 +177,34 @@ export function buildAbraSystemPrompt(ctx: AbraPromptContext = {}): string {
 • Report issues clearly: what's broken, what's degraded, what's healthy. No vague answers.`,
   );
 
+  // 2f. Notion Workspace Awareness
+  sections.push(
+    `NOTION WORKSPACE STRUCTURE:
+Your backend is organized under "USA Gummies HQ" in Notion. When creating pages, route them to the correct database:
+
+DATABASES (use these keys with create_notion_page):
+• "meeting_notes" — Daily logs, meeting notes, session summaries, end-of-day reports
+• "cash_transactions" — Financial transactions (income, expense, transfer)
+• "b2b_prospects" — Wholesale/B2B prospect pipeline
+• "distributor_prospects" — Distributor/retail prospect pipeline
+• "fleet_ops" — Shipments, logistics events, production runs
+• "inventory" — Inventory levels per SKU
+• "sku_registry" — Product catalog (SKUs, costs, specs)
+• "content_drafts" — Blog posts, social content, marketing copy
+• "kpis" — KPI snapshots and syncs
+• "daily_performance" — Daily revenue/traffic/order metrics
+• "general" — Anything that doesn't fit above (falls back to meeting_notes)
+
+DEPARTMENT PAGES (for reference, not direct write targets):
+📊 Company Dashboard | 💰 Finance | 📦 Operations | 🛒 Sales & Growth | 📣 Marketing | 📋 Meeting Notes | ⚙️ System
+
+RULES:
+• Every report, analysis, or artifact you produce → log to Notion via create_notion_page.
+• Every financial transaction → record_transaction action + Notion page.
+• Daily logs go to "meeting_notes" with title format "Daily Log — YYYY-MM-DD".
+• Ben reads Slack, not Notion. Always post key info to Slack AND log to Notion.`,
+  );
+
   // 3. Temporal Rules (CRITICAL — fixes the 10K vs 50K problem)
   sections.push(
     `TEMPORAL RULES (CRITICAL — always follow):

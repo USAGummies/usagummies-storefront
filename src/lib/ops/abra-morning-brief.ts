@@ -4,6 +4,8 @@ import { getActiveSignals } from "@/lib/ops/abra-operational-signals";
 import { generateRevenueForecast } from "@/lib/ops/abra-forecasting";
 import { analyzeInventory } from "@/lib/ops/abra-inventory-forecast";
 import { notify } from "@/lib/ops/notify";
+import { createNotionPage } from "@/lib/ops/abra-notion-write";
+import { readState } from "@/lib/ops/state";
 
 type MetricSnapshot = {
   metric: string;
@@ -400,13 +402,37 @@ export async function generateMorningBrief(): Promise<string> {
   }
 
   try {
+    const cashPos = await readState("cash-position", null) as {
+      balance?: number;
+      monthlyIncome?: number;
+      monthlyExpenses?: number;
+      monthlyNet?: number;
+      lastUpdated?: string;
+    } | null;
+    if (cashPos && typeof cashPos.balance === "number") {
+      lines.push("💰 *Cash Position*");
+      lines.push(`• Balance: $${cashPos.balance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+      if (typeof cashPos.monthlyIncome === "number") {
+        lines.push(`• MTD: +$${cashPos.monthlyIncome.toFixed(2)} income, -$${Math.abs(cashPos.monthlyExpenses || 0).toFixed(2)} expenses, net $${(cashPos.monthlyNet || 0).toFixed(2)}`);
+      }
+      if (cashPos.lastUpdated) {
+        const age = Math.round((Date.now() - new Date(cashPos.lastUpdated).getTime()) / 86400000);
+        if (age > 3) lines.push(`• ⚠️ Data is ${age} days old — upload latest BofA CSV`);
+      }
+      lines.push("");
+    }
+  } catch {
+    // Skip cash position section
+  }
+
+  try {
     const [spend, preferredModel] = await Promise.all([
       getMonthlySpend(),
       getPreferredClaudeModel(
         process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514",
       ),
     ]);
-    lines.push("💰 *AI Budget*");
+    lines.push("🤖 *AI Budget*");
     lines.push(
       `• AI spend: $${spend.total.toFixed(2)} / $${spend.budget.toFixed(2)} (${spend.pctUsed.toFixed(1)}%)`,
     );
@@ -426,4 +452,157 @@ export async function generateMorningBrief(): Promise<string> {
 export async function sendMorningBrief(): Promise<void> {
   const brief = await generateMorningBrief();
   await notify({ channel: "daily", text: brief });
+}
+
+// ── End-of-Day Summary ──────────────────────────────────────────────────
+// Creates a Notion daily log page and sends a Slack summary at end of day.
+
+export async function sendEndOfDaySummary(): Promise<void> {
+  const date = new Date();
+  const dateLabel = date.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+  const dateShort = date.toISOString().split("T")[0];
+
+  const lines: string[] = [];
+  const notionLines: string[] = [`# Daily Log — ${dateLabel}`, ""];
+
+  // Revenue scorecard
+  try {
+    const [shopRev, amzRev, shopOrd, amzOrd] = await Promise.all([
+      getMetricSnapshot("daily_revenue_shopify"),
+      getMetricSnapshot("daily_revenue_amazon"),
+      getMetricSnapshot("daily_orders_shopify"),
+      getMetricSnapshot("daily_orders_amazon"),
+    ]);
+    const totalRev = Number(shopRev?.current || 0) + Number(amzRev?.current || 0);
+    const totalOrd = Number(shopOrd?.current || 0) + Number(amzOrd?.current || 0);
+
+    const revSection = [
+      "## Revenue",
+      `- Shopify: $${Number(shopRev?.current || 0).toFixed(2)} (${Math.round(shopOrd?.current || 0)} orders)`,
+      `- Amazon: $${Number(amzRev?.current || 0).toFixed(2)} (${Math.round(amzOrd?.current || 0)} orders)`,
+      `- Total: $${totalRev.toFixed(2)} (${Math.round(totalOrd)} orders)`,
+      "",
+    ];
+    notionLines.push(...revSection);
+    lines.push(`📊 Revenue: $${totalRev.toFixed(2)} (${Math.round(totalOrd)} orders) — Shopify $${Number(shopRev?.current || 0).toFixed(2)}, Amazon $${Number(amzRev?.current || 0).toFixed(2)}`);
+  } catch {
+    lines.push("📊 Revenue data unavailable");
+    notionLines.push("## Revenue", "- Data unavailable", "");
+  }
+
+  // Signals and activity
+  try {
+    const signals = await getActiveSignals({ limit: 10 });
+    const criticalSignals = signals.filter((s) => s.severity === "critical");
+    const warningSignals = signals.filter((s) => s.severity === "warning");
+
+    notionLines.push("## Signals");
+    if (signals.length === 0) {
+      notionLines.push("- No active signals", "");
+    } else {
+      for (const s of signals.slice(0, 10)) {
+        const icon = s.severity === "critical" ? "🔴" : s.severity === "warning" ? "🟡" : "🔵";
+        notionLines.push(`- ${icon} ${s.title}`);
+      }
+      notionLines.push("");
+    }
+    lines.push(`⚠️ Signals: ${criticalSignals.length} critical, ${warningSignals.length} warning, ${signals.length} total`);
+  } catch {
+    notionLines.push("## Signals", "- Data unavailable", "");
+  }
+
+  // Brain entries created today
+  try {
+    const todayEntries = await sbFetch(
+      `/rest/v1/open_brain_entries?created_at=gte.${dateShort}T00:00:00Z&select=id,title,category&limit=50`,
+    ) as Array<{ id: string; title?: string; category?: string }>;
+    const count = Array.isArray(todayEntries) ? todayEntries.length : 0;
+    notionLines.push("## Brain Activity");
+    notionLines.push(`- ${count} entries created today`);
+    if (count > 0) {
+      const byCat: Record<string, number> = {};
+      for (const e of todayEntries) {
+        const cat = e.category || "other";
+        byCat[cat] = (byCat[cat] || 0) + 1;
+      }
+      for (const [cat, n] of Object.entries(byCat)) {
+        notionLines.push(`  - ${cat}: ${n}`);
+      }
+    }
+    notionLines.push("");
+    lines.push(`🧠 Brain: ${count} entries created today`);
+  } catch {
+    notionLines.push("## Brain Activity", "- Data unavailable", "");
+  }
+
+  // Email activity
+  try {
+    const todayEmails = await sbFetch(
+      `/rest/v1/email_events?received_at=gte.${dateShort}T00:00:00Z&select=id,subject,category,priority,action_required&limit=50`,
+    ) as Array<{ id: string; subject?: string; category?: string; priority?: string; action_required?: boolean }>;
+    const emailCount = Array.isArray(todayEmails) ? todayEmails.length : 0;
+    const actionRequired = todayEmails.filter((e) => e.action_required);
+    notionLines.push("## Emails Processed");
+    notionLines.push(`- ${emailCount} emails fetched`);
+    if (actionRequired.length > 0) {
+      notionLines.push(`- ${actionRequired.length} requiring action:`);
+      for (const e of actionRequired.slice(0, 5)) {
+        notionLines.push(`  - ${e.subject || "No subject"} (${e.priority || "normal"})`);
+      }
+    }
+    notionLines.push("");
+    lines.push(`📧 Emails: ${emailCount} processed, ${actionRequired.length} need action`);
+  } catch {
+    notionLines.push("## Emails Processed", "- Data unavailable", "");
+  }
+
+  // Pending items
+  try {
+    const [approvals, tasks] = await Promise.all([
+      getPendingApprovalsCount().catch(() => 0),
+      getPendingTaskCount().catch(() => 0),
+    ]);
+    notionLines.push("## Pending Items");
+    notionLines.push(`- ${approvals} approvals pending`);
+    notionLines.push(`- ${tasks} tasks open`);
+    notionLines.push("");
+    lines.push(`⏳ Pending: ${approvals} approvals, ${tasks} tasks`);
+  } catch {
+    // skip
+  }
+
+  // Create Notion page
+  const meetingNotesDbId = process.env.NOTION_MEETING_NOTES_DB_ID || process.env.NOTION_MEETING_DB_ID;
+  let notionUrl = "";
+  if (meetingNotesDbId) {
+    try {
+      const pageId = await createNotionPage({
+        parent_id: meetingNotesDbId,
+        title: `Daily Log — ${dateLabel}`,
+        content: notionLines.join("\n"),
+      });
+      if (pageId) {
+        notionUrl = `https://notion.so/${pageId.replace(/-/g, "")}`;
+      }
+    } catch {
+      // Notion write failed — still send Slack
+    }
+  }
+
+  // Send Slack summary
+  const slackText = [
+    `🌙 *ABRA END-OF-DAY — ${dateLabel}*`,
+    "",
+    ...lines,
+    "",
+    notionUrl ? `📝 Full log: ${notionUrl}` : "",
+    `Dashboard: ${process.env.NEXTAUTH_URL || "https://usagummies.com"}/ops`,
+  ].filter(Boolean).join("\n");
+
+  await notify({ channel: "daily", text: slackText });
 }

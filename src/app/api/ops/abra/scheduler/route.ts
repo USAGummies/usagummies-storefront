@@ -5,7 +5,7 @@ import { runAllDueFeeds, runFeed } from "@/lib/ops/abra-auto-teach";
 import { detectAnomalies } from "@/lib/ops/abra-anomaly-detection";
 import { emitSignal } from "@/lib/ops/abra-operational-signals";
 import { autoManageInitiatives } from "@/lib/ops/abra-initiative-health";
-import { sendMorningBrief } from "@/lib/ops/abra-morning-brief";
+import { sendMorningBrief, sendEndOfDaySummary } from "@/lib/ops/abra-morning-brief";
 import { appendStateArray, readState, writeState } from "@/lib/ops/state";
 import { notify } from "@/lib/ops/notify";
 import {
@@ -25,7 +25,12 @@ function getPTNow(): Date {
 
 function inMorningWindow(date: Date): boolean {
   const hour = date.getHours();
-  return hour >= 6 && hour < 10;
+  return hour >= 5 && hour < 10; // 5am to catch Vercel cron at 1pm UTC (5am PT)
+}
+
+function inEveningWindow(date: Date): boolean {
+  const hour = date.getHours();
+  return hour >= 20 && hour < 22; // 8-10pm PT for end-of-day summary
 }
 
 type SchedulerLock = {
@@ -242,6 +247,10 @@ export async function POST(req: Request) {
       const briefStep = await runStep("morning_brief", sendMorningBrief);
       outcomes.push(briefStep);
       notificationData.morning_brief = briefStep.ok;
+    }
+    if (inEveningWindow(nowPT)) {
+      const eodStep = await runStep("end_of_day_summary", sendEndOfDaySummary);
+      outcomes.push(eodStep);
     }
     if (nowPT.getDay() === 1) {
       const weeklyStep = await runStep("weekly_digest", sendWeeklyDigest);
