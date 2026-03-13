@@ -41,7 +41,9 @@ export type AutoExecPolicy = {
 };
 
 function isAutoExecutionGloballyEnabled(): boolean {
-  return String(process.env.ABRA_AUTO_EXEC_ENABLED || "").trim().toLowerCase() === "true";
+  const raw = String(process.env.ABRA_AUTO_EXEC_ENABLED || "").trim().toLowerCase();
+  if (!raw) return true;
+  return !["0", "false", "off", "no"].includes(raw);
 }
 
 export const AUTO_EXEC_POLICIES: AutoExecPolicy[] = [

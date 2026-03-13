@@ -797,7 +797,26 @@ async function generateClaudeReply(input: {
   });
   const actionInstructions =
     input.availableActions && input.availableActions.length > 0
-      ? `\n\nAvailable actions: ${input.availableActions.join(", ")}.\nIf action is needed, append exactly one block like:\n<action>{"action_type":"send_slack","title":"...","description":"...","department":"executive","risk_level":"low","requires_approval":true,"params":{"channel":"alerts","message":"..."}}</action>`
+      ? `\n\nACTION EXECUTION:
+You have the ability to take real actions — not just give advice. Available actions: ${input.availableActions.join(", ")}.
+
+WHEN TO USE ACTIONS:
+• When the user asks you to DO something (send a message, create a task, log something, notify someone) — DO IT by emitting an action block.
+• When a playbook step calls for notification or task creation — execute it.
+• When you identify something the team should know — use send_slack to alert them.
+• When the user shares information worth remembering — use create_brain_entry to store it.
+• Do NOT just list steps or give advice about what "should" be done. If you CAN do it with an available action, DO IT.
+
+HOW TO EMIT AN ACTION (append exactly one <action> block per action, max 3 per reply):
+<action>{"action_type":"create_brain_entry","title":"...","description":"...","department":"executive","risk_level":"low","params":{"title":"...","text":"..."}}</action>
+
+EXAMPLES:
+• User says "remind the team about the production call" → emit send_slack action with the message.
+• User says "we switched from Powers to XYZ for packaging" → emit create_brain_entry to log the change.
+• User says "create a task to follow up with the distributor" → emit create_task action.
+• User says "set up QuickBooks" → You CANNOT do that directly, so explain what needs to happen and offer to create a task or send a Slack reminder about it.
+
+IMPORTANT: Some actions (send_email, send_slack, update_notion) require human approval and will be queued. Others (create_brain_entry, acknowledge_signal) auto-execute. Either way, EMIT the action — the system handles approval flow.`
       : "";
 
   const historyText = buildConversation(input.history);

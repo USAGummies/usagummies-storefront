@@ -11,7 +11,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth/config";
+import { isAuthorized } from "@/lib/ops/abra-auth";
 import { runFeed, runAllDueFeeds } from "@/lib/ops/abra-auto-teach";
 
 export const runtime = "nodejs";
@@ -19,14 +19,8 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export async function POST(req: Request) {
-  const session = await auth();
-  if (!session?.user?.email) {
-    // Also allow internal calls via cron secret
-    const cronSecret = process.env.CRON_SECRET;
-    const authHeader = req.headers.get("authorization");
-    if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  if (!(await isAuthorized(req))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const url = new URL(req.url);
