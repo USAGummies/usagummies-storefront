@@ -23,7 +23,8 @@ function parseServiceAccountJson(): Record<string, unknown> {
     try {
       return JSON.parse(inline) as Record<string, unknown>;
     } catch {
-      throw new Error("GA4_SERVICE_ACCOUNT_JSON is not valid JSON");
+      // Multiline JSON in env vars is common — fall through to file path
+      console.warn("[ga4] GA4_SERVICE_ACCOUNT_JSON is not valid JSON, trying file path fallback");
     }
   }
 

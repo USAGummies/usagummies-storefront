@@ -532,9 +532,8 @@ export async function handleAmazonOrdersFeed(): Promise<FeedResult> {
 export async function handleAmazonInventoryFeed(): Promise<FeedResult> {
   const feedKey = "amazon_inventory";
   try {
-    const { fetchFBAInventory, isAmazonConfigured } = await import(
-      "@/lib/amazon/sp-api"
-    );
+    const { fetchFBAInventory, fetchAmazonOrderStats, isAmazonConfigured } =
+      await import("@/lib/amazon/sp-api");
     if (!isAmazonConfigured()) {
       return {
         feed_key: feedKey,
@@ -544,6 +543,47 @@ export async function handleAmazonInventoryFeed(): Promise<FeedResult> {
       };
     }
     const result = await fetchFBAInventory();
+
+    // If FBA Inventory API returned a 403 (missing role), fall back to Orders API
+    const is403 = result.error && /403|Forbidden|lacks.*role/i.test(result.error);
+    if (is403) {
+      console.warn("[amazon_inventory] FBA Inventory API 403 — falling back to Orders API");
+      try {
+        const stats = await fetchAmazonOrderStats(30);
+        const today = new Date().toISOString().split("T")[0];
+        const text = [
+          `Amazon Order-Based Inventory Intel (${today}):`,
+          `${stats.totalOrders} orders, ${stats.totalUnits} units, $${stats.totalRevenue.toFixed(2)} revenue over ${stats.periodDays} days.`,
+          `Daily velocity: ${stats.dailyVelocity.toFixed(1)} units/day. FBA: ${stats.fbaOrders}, FBM: ${stats.fbmOrders}.`,
+          stats.monthlyBreakdown.map(m => `${m.month}: ${m.orders} orders, ${m.units} units, $${m.revenue.toFixed(2)}`).join(". "),
+        ].join(" ");
+
+        const saved = await writeBrainEntry({
+          sourceRef: `amazon-order-stats-${today}`,
+          title: `Amazon Order Stats (Orders API fallback) — ${today}`,
+          rawText: text,
+          category: "supply_chain",
+          department: "supply_chain",
+        });
+
+        void updateIntHealth("amazon", true, "FBA Inventory API 403 — using Orders API fallback");
+        return {
+          feed_key: feedKey,
+          success: true,
+          entriesCreated: saved ? 1 : 0,
+          error: "FBA Inventory API 403 — used Orders API fallback successfully",
+        };
+      } catch (fallbackErr) {
+        void updateIntHealth("amazon", false, `Orders API fallback also failed: ${fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr)}`);
+        return {
+          feed_key: feedKey,
+          success: false,
+          entriesCreated: 0,
+          error: `FBA Inventory 403 + Orders fallback failed: ${fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr)}`,
+        };
+      }
+    }
+
     const items = Array.isArray(result.items)
       ? (result.items as Array<{
           asin?: string;
