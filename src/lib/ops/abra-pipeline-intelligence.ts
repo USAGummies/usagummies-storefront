@@ -175,7 +175,7 @@ async function fetchDeals(filterClosed: "active" | "all"): Promise<DealRow[]> {
     filterClosed === "active" ? "&status=not.in.(closed_won,closed_lost)" : "";
   try {
     const rows = (await sbFetch(
-      `/rest/v1/abra_deals?select=id,company_name,contact_name,contact_email,status,value,stage,notes,created_at,updated_at&order=updated_at.desc&limit=5000${statusFilter}`,
+      `/rest/v1/abra_deals?select=id,company_name,contact_name,contact_email,status,value,stage,notes,created_at,updated_at&order=value.desc,updated_at.desc&limit=5000${statusFilter}`,
     )) as DealRow[];
     return Array.isArray(rows) ? rows : [];
   } catch {
@@ -364,7 +364,7 @@ export async function analyzePipeline(): Promise<PipelineSummary> {
         { count: data.count, value: Math.round(data.value * 100) / 100 },
       ]),
     ),
-    all_active_deals: insights.slice(0, 50),
+    all_active_deals: insights.slice(0, 200),
     at_risk_deals: atRiskDeals.slice(0, 25),
     stale_deals: staleDeals.slice(0, 50),
     hot_deals: hotDeals.slice(0, 25),
