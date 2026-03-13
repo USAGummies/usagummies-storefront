@@ -93,9 +93,12 @@ export async function recordKPI(params: {
     params.date ||
     new Date().toISOString().slice(0, 10);
 
+  // Delete ALL existing rows for this metric+date regardless of entity_ref.
+  // This prevents duplicates when different code paths use different entity_ref
+  // values (e.g. "shopify" vs "global") for the same logical metric.
   try {
     await sbFetch(
-      `/rest/v1/kpi_timeseries?metric_name=eq.${encodeURIComponent(params.metric_name)}&entity_ref=eq.${encodeURIComponent(params.entity_ref || "global")}&captured_for_date=eq.${capturedForDate}&window_type=eq.daily`,
+      `/rest/v1/kpi_timeseries?metric_name=eq.${encodeURIComponent(params.metric_name)}&captured_for_date=eq.${capturedForDate}&window_type=eq.daily`,
       {
         method: "DELETE",
         headers: { Prefer: "return=minimal" },
