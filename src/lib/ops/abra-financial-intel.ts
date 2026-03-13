@@ -206,6 +206,64 @@ export async function getMarginAnalysis(): Promise<MarginAnalysis> {
   };
 }
 
+/**
+ * Calendar-month revenue snapshot. Unlike getRevenueSnapshot("month") which
+ * uses a rolling 30-day window, this returns exact calendar-month figures
+ * (e.g. March 1–today for the current month).
+ */
+export async function getCalendarMonthRevenue(): Promise<{
+  month: string;
+  shopify_revenue: number;
+  amazon_revenue: number;
+  total_revenue: number;
+  shopify_orders: number;
+  amazon_orders: number;
+  total_orders: number;
+  avg_order_value: number;
+  days_with_data: number;
+}> {
+  const now = new Date();
+  const monthStr = now.toISOString().slice(0, 7); // e.g. "2026-03"
+  const firstOfMonth = `${monthStr}-01`;
+  const metrics = [...REVENUE_METRICS, ...ORDER_METRICS];
+  const metricFilter = encodeURIComponent(`(${metrics.join(",")})`);
+
+  const rows = (await sbFetch(
+    `/rest/v1/kpi_timeseries?window_type=eq.daily&metric_name=in.${metricFilter}&captured_for_date=gte.${firstOfMonth}&select=metric_name,value,captured_for_date&order=captured_for_date.desc&limit=500`,
+  )) as KPIValueRow[];
+
+  const safeRows = Array.isArray(rows) ? rows : [];
+  const allDates = new Set(safeRows.map((r) => r.captured_for_date));
+
+  const shopifyRevenue = safeRows
+    .filter((r) => r.metric_name === "daily_revenue_shopify")
+    .reduce((s, r) => s + toNumber(r.value), 0);
+  const amazonRevenue = safeRows
+    .filter((r) => r.metric_name === "daily_revenue_amazon")
+    .reduce((s, r) => s + toNumber(r.value), 0);
+  const shopifyOrders = safeRows
+    .filter((r) => r.metric_name === "daily_orders_shopify")
+    .reduce((s, r) => s + toNumber(r.value), 0);
+  const amazonOrders = safeRows
+    .filter((r) => r.metric_name === "daily_orders_amazon")
+    .reduce((s, r) => s + toNumber(r.value), 0);
+
+  const totalRevenue = shopifyRevenue + amazonRevenue;
+  const totalOrders = shopifyOrders + amazonOrders;
+
+  return {
+    month: monthStr,
+    shopify_revenue: round2(shopifyRevenue),
+    amazon_revenue: round2(amazonRevenue),
+    total_revenue: round2(totalRevenue),
+    shopify_orders: Math.round(shopifyOrders),
+    amazon_orders: Math.round(amazonOrders),
+    total_orders: Math.round(totalOrders),
+    avg_order_value: totalOrders > 0 ? round2(totalRevenue / totalOrders) : 0,
+    days_with_data: allDates.size,
+  };
+}
+
 export async function getRevenueTimeline(
   days: number,
 ): Promise<Array<{ date: string; revenue: number; channel: string }>> {

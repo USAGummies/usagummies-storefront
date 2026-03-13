@@ -37,6 +37,7 @@ import {
   checkBudgetAndAlert,
 } from "@/lib/ops/abra-cost-tracker";
 import {
+  getCalendarMonthRevenue,
   getMarginAnalysis,
   getRevenueSnapshot,
 } from "@/lib/ops/abra-financial-intel";
@@ -515,16 +516,14 @@ async function fetchLiveBusinessSnapshot(): Promise<string | null> {
 
 async function fetchFinancialContext(): Promise<string | null> {
   try {
-    const [monthSnapshot, weekSnapshot, margins] = await Promise.all([
-      getRevenueSnapshot("month"),
+    const [calMonth, weekSnapshot] = await Promise.all([
+      getCalendarMonthRevenue(),
       getRevenueSnapshot("week"),
-      getMarginAnalysis(),
     ]);
 
     const lines = [
-      `Current month revenue: Shopify $${monthSnapshot.shopify_revenue.toFixed(2)}, Amazon $${monthSnapshot.amazon_revenue.toFixed(2)}, total $${monthSnapshot.total_revenue.toFixed(2)} (${monthSnapshot.order_count} orders, AOV $${monthSnapshot.avg_order_value.toFixed(2)}, ${monthSnapshot.vs_prior_period_pct >= 0 ? "+" : ""}${monthSnapshot.vs_prior_period_pct.toFixed(2)}% vs prior period).`,
+      `${calMonth.month} calendar month revenue (${calMonth.days_with_data} days of data): Shopify $${calMonth.shopify_revenue.toFixed(2)} (${calMonth.shopify_orders} orders), Amazon $${calMonth.amazon_revenue.toFixed(2)} (${calMonth.amazon_orders} orders), TOTAL $${calMonth.total_revenue.toFixed(2)} (${calMonth.total_orders} orders, AOV $${calMonth.avg_order_value.toFixed(2)}).`,
       `Last 7 days revenue: total $${weekSnapshot.total_revenue.toFixed(2)} (${weekSnapshot.order_count} orders, AOV $${weekSnapshot.avg_order_value.toFixed(2)}).`,
-      `Estimated gross margin: ${margins.estimated_gross_margin_pct.toFixed(2)}% with estimated COGS per unit $${margins.estimated_cogs_per_unit.toFixed(2)} (estimated gross profit $${margins.estimated_gross_profit.toFixed(2)} on revenue $${margins.revenue.toFixed(2)}).`,
     ];
 
     return lines.join("\n");
