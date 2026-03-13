@@ -238,7 +238,7 @@ const SESSION_TRIGGERS =
 const COST_TRIGGERS =
   /\b(ai spend|ai cost|how much .+ spend|budget|monthly spend|cost report)\b/i;
 const PIPELINE_TRIGGERS =
-  /\b(sales pipeline|pipeline health|pipeline status|b2b pipeline|b2b deals?|wholesale deals?)\b/i;
+  /\b(sales pipeline|pipeline health|pipeline status|b2b pipeline|b2b deals?|wholesale deals?|pipeline deals?|active deals?|deal(s| ) (status|details|breakdown)|show .+ pipeline|what deals|which deals|which companies .+ pipeline|who .+ in .+ pipeline|pipeline summary|deal pipeline)\b/i;
 const STRATEGY_TRIGGERS =
   /\b(strategy|strategic plan|financial plan|budget plan|amazon ad strategy|amazon ads strategy|ppc strategy|campaign strategy)\b/i;
 const DIAGNOSTICS_TRIGGERS =
@@ -1149,33 +1149,57 @@ export async function POST(req: Request) {
 
     if (intent.type === "pipeline") {
       const summary = await analyzePipeline();
-      const stageLines = Object.entries(summary.deals_by_stage || {})
-        .sort((a, b) => b[1].value - a[1].value)
-        .slice(0, 6)
-        .map(([stage, data]) => {
+      const allDeals = summary.all_active_deals || [];
+
+      // Group deals by stage WITH company names
+      const stageMap = new Map<string, typeof allDeals>();
+      for (const deal of allDeals) {
+        const stage = deal.stage || "unknown";
+        if (!stageMap.has(stage)) stageMap.set(stage, []);
+        stageMap.get(stage)!.push(deal);
+      }
+
+      const stageLines = Array.from(stageMap.entries())
+        .sort((a, b) => {
+          const valA = a[1].reduce((s, d) => s + d.value, 0);
+          const valB = b[1].reduce((s, d) => s + d.value, 0);
+          return valB - valA;
+        })
+        .slice(0, 8)
+        .map(([stage, deals]) => {
           const label = stage.replaceAll("_", " ");
-          return `• ${label}: ${data.count} deals ($${data.value.toFixed(2)})`;
+          const totalValue = deals.reduce((s, d) => s + d.value, 0);
+          const dealList = deals
+            .slice(0, 5)
+            .map((d) => `  → ${d.company_name}: $${d.value.toFixed(2)} (${d.days_in_stage}d in stage)`)
+            .join("\n");
+          return `• **${label}**: ${deals.length} deal${deals.length !== 1 ? "s" : ""} ($${totalValue.toFixed(2)})\n${dealList}`;
         })
         .join("\n");
 
       const atRiskLine =
         summary.at_risk_deals.length > 0
           ? summary.at_risk_deals
-              .slice(0, 3)
-              .map((deal) => `${deal.company_name} (${deal.stage}, ${deal.days_in_stage}d)`)
-              .join("; ")
+              .slice(0, 5)
+              .map((deal) => `  → ${deal.company_name}: $${deal.value.toFixed(2)} (${deal.stage}, ${deal.days_in_stage}d stale)`)
+              .join("\n")
           : "None";
 
-      const pipelineReply = [
-        "**Sales Pipeline Snapshot**",
-        `• Total pipeline value: **$${summary.total_pipeline_value.toFixed(2)}**`,
-        `• Win rate (30d): ${summary.win_rate_30d.toFixed(1)}%`,
-        `• Avg deal cycle: ${summary.avg_deal_cycle_days.toFixed(1)} days`,
-        stageLines ? `\n**By stage**\n${stageLines}` : "",
-        `\n**At-risk deals**\n${atRiskLine}`,
-      ]
-        .filter(Boolean)
-        .join("\n");
+      const noDeals = allDeals.length === 0;
+      const pipelineReply = noDeals
+        ? "**Sales Pipeline Snapshot**\n\nNo active deals found in the pipeline. Deals are tracked in the B2B Prospects and Distributor Prospects databases in Notion, and synced to Supabase."
+        : [
+            "**Sales Pipeline Snapshot**",
+            `• Total pipeline value: **$${summary.total_pipeline_value.toFixed(2)}**`,
+            `• Active deals: **${allDeals.length}**`,
+            `• Win rate (30d): ${summary.win_rate_30d.toFixed(1)}%`,
+            `• Avg deal cycle: ${summary.avg_deal_cycle_days.toFixed(1)} days`,
+            stageLines ? `\n**Deals by stage**\n${stageLines}` : "",
+            `\n**At-risk deals**\n${atRiskLine}`,
+            `\n_All data sourced from Notion B2B/Distributor databases and Supabase deal records._`,
+          ]
+            .filter(Boolean)
+            .join("\n");
 
       queueChatHistory({
         threadId,

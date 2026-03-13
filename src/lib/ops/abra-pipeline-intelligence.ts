@@ -54,6 +54,8 @@ export type DealInsight = {
 export type PipelineSummary = {
   total_pipeline_value: number;
   deals_by_stage: Record<string, { count: number; value: number }>;
+  /** All active deal insights (for detailed per-deal reporting) */
+  all_active_deals: DealInsight[];
   at_risk_deals: DealInsight[];
   stale_deals: DealInsight[];
   hot_deals: DealInsight[];
@@ -362,6 +364,7 @@ export async function analyzePipeline(): Promise<PipelineSummary> {
         { count: data.count, value: Math.round(data.value * 100) / 100 },
       ]),
     ),
+    all_active_deals: insights.slice(0, 50),
     at_risk_deals: atRiskDeals.slice(0, 25),
     stale_deals: staleDeals.slice(0, 50),
     hot_deals: hotDeals.slice(0, 25),

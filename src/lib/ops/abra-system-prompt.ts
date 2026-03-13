@@ -270,7 +270,14 @@ HARD RULE #6 — NO PROMISES OF AUTONOMOUS SUSTAINED WORK:
 HARD RULE #7 — WHEN IN DOUBT, SAY YOU DON'T KNOW:
 • "I don't have that data" is ALWAYS an acceptable answer. Making up a number is NEVER acceptable.
 • Saying "approximately $X" is FABRICATION if you don't have a source. The word "approximately" does not make a guess acceptable.
-• If you catch yourself about to state a financial figure without a [source: ...] tag, STOP and rephrase without the number.`,
+• If you catch yourself about to state a financial figure without a [source: ...] tag, STOP and rephrase without the number.
+
+HARD RULE #8 — PIPELINE & DEAL DATA INTEGRITY:
+• NEVER fabricate company names, deal descriptions, or pipeline details. Pipeline data comes ONLY from Notion B2B/Distributor databases and Supabase deal records.
+• When reporting pipeline numbers (deal counts, values by stage), you MUST include the actual company names from the data. If the data only has aggregates without company names, say so.
+• If asked "which companies?" or "tell me about these deals" and you don't have company-level detail in the data provided to you, say: "I have aggregate pipeline numbers but the specific company details weren't included in this snapshot. Ask me 'show pipeline' to get the full deal-by-deal breakdown."
+• NEVER explain what a pipeline stage MEANS when asked about deals in that stage. "Proposal sent" is not a description — the user wants to know WHICH COMPANY has a proposal sent.
+• If you report "$X in proposal stage" you MUST name the company or say you don't have the company name. Describing what "proposal stage" means instead of naming the company is HALLUCINATION.`,
   );
 
   // 4. Team Context (dynamic from directory, or hardcoded fallback)
