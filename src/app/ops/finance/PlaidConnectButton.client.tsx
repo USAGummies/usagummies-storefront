@@ -131,6 +131,21 @@ export function PlaidConnectButton({ onSuccess }: PlaidConnectButtonProps) {
     }
   }, [linkToken, ready, loading, open]);
 
+  // Timeout: if we have a link token but Plaid SDK never becomes ready, show an error
+  useEffect(() => {
+    if (!linkToken || ready) return;
+    const timer = setTimeout(() => {
+      if (!ready) {
+        setError(
+          "Plaid SDK failed to load. Your browser may be blocking cdn.plaid.com. " +
+          "Try disabling content blockers or using a different browser."
+        );
+        setLoading(false);
+      }
+    }, 8000);
+    return () => clearTimeout(timer);
+  }, [linkToken, ready]);
+
   if (connected) {
     return (
       <div
@@ -203,7 +218,13 @@ export function PlaidConnectButton({ onSuccess }: PlaidConnectButtonProps) {
           opacity: loading ? 0.7 : 1,
         }}
       >
-        {loading ? "Connecting..." : "Connect Bank via Plaid"}
+        {loading
+          ? linkToken
+            ? ready
+              ? "Opening Plaid..."
+              : "Loading Plaid SDK..."
+            : "Fetching token..."
+          : "Connect Bank via Plaid"}
       </button>
     </div>
   );
