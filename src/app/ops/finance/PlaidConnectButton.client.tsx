@@ -7,6 +7,8 @@ import { NAVY, GOLD } from "@/app/ops/tokens";
 
 type PlaidConnectButtonProps = {
   onSuccess?: () => void;
+  /** When true, shows "Reconnect" instead of "Connect" (bank was previously linked) */
+  reconnect?: boolean;
 };
 
 /**
@@ -30,7 +32,7 @@ function getRedirectUri(): string {
   return window.location.origin + window.location.pathname;
 }
 
-export function PlaidConnectButton({ onSuccess }: PlaidConnectButtonProps) {
+export function PlaidConnectButton({ onSuccess, reconnect }: PlaidConnectButtonProps) {
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -188,10 +190,12 @@ export function PlaidConnectButton({ onSuccess }: PlaidConnectButtonProps) {
         <Landmark size={18} color={NAVY} />
         <div>
           <div style={{ fontSize: 13, fontWeight: 700, color: NAVY }}>
-            Connect Your Bank Account
+            {reconnect ? "Reconnect Bank Account" : "Connect Your Bank Account"}
           </div>
           <div style={{ fontSize: 12, color: "rgba(27,42,74,0.6)" }}>
-            Link your Bank of America account via Plaid to see live cash position, transactions, and P&L actuals.
+            {reconnect
+              ? "Re-link your Bank of America account via Plaid to update permissions or switch accounts."
+              : "Link your Bank of America account via Plaid to see live cash position, transactions, and P&L actuals."}
           </div>
         </div>
       </div>
@@ -224,7 +228,9 @@ export function PlaidConnectButton({ onSuccess }: PlaidConnectButtonProps) {
               ? "Opening Plaid..."
               : "Loading Plaid SDK..."
             : "Fetching token..."
-          : "Connect Bank via Plaid"}
+          : reconnect
+            ? "Reconnect via Plaid"
+            : "Connect Bank via Plaid"}
       </button>
     </div>
   );

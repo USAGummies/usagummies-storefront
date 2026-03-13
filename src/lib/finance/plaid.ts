@@ -82,7 +82,7 @@ export async function createLinkToken(redirectUri?: string): Promise<string> {
   const body: Record<string, unknown> = {
     user: { client_user_id: "usagummies-ops" },
     client_name: "USA Gummies Ops",
-    products: ["auth", "transactions"],
+    products: ["auth", "transactions", "identity"],
     country_codes: ["US"],
     language: "en",
     webhook: webhookUrl,

@@ -6,6 +6,7 @@
 
 import { NextResponse } from "next/server";
 import { exchangePublicToken, isPlaidConfigured } from "@/lib/finance/plaid";
+import { writeState } from "@/lib/ops/state";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,6 +24,9 @@ export async function POST(req: Request) {
     if (!publicToken) {
       return NextResponse.json({ error: "publicToken required" }, { status: 400 });
     }
+
+    // Clear stale balance cache before exchanging (forces fresh pull from new bank)
+    await writeState("plaid-balance-cache", null);
 
     const result = await exchangePublicToken(publicToken);
     return NextResponse.json({

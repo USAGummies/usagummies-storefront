@@ -325,10 +325,13 @@ export function FinanceView() {
         </div>
       ) : null}
 
-      {/* Plaid connect — show when bank is not linked as live source */}
-      {!balLoading && (balances as Record<string, unknown>)?.cashSource !== "plaid-live" ? (
+      {/* Plaid connect — always show so user can connect or reconnect bank */}
+      {!balLoading ? (
         <div style={{ marginBottom: 12 }}>
-          <PlaidConnectButton onSuccess={() => window.location.reload()} />
+          <PlaidConnectButton
+            onSuccess={() => window.location.reload()}
+            reconnect={(balances as Record<string, unknown>)?.cashSource === "plaid-live"}
+          />
         </div>
       ) : null}
 
