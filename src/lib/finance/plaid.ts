@@ -74,20 +74,27 @@ type LinkTokenResponse = {
   request_id: string;
 };
 
-export async function createLinkToken(): Promise<string> {
+export async function createLinkToken(redirectUri?: string): Promise<string> {
   const webhookUrl =
     process.env.PLAID_WEBHOOK_URL ||
     `${process.env.NEXT_PUBLIC_BASE_URL || "https://usagummies.com"}/api/ops/plaid/webhook`;
 
-  const response = await plaidPost<LinkTokenResponse>("/link/token/create", {
+  const body: Record<string, unknown> = {
     user: { client_user_id: "usagummies-ops" },
     client_name: "USA Gummies Ops",
     products: ["auth"],
     country_codes: ["US"],
     language: "en",
     webhook: webhookUrl,
-  });
+  };
 
+  // redirect_uri is required for OAuth-based institutions (e.g. Bank of America)
+  // Must match one of the Allowed redirect URIs in the Plaid dashboard
+  if (redirectUri) {
+    body.redirect_uri = redirectUri;
+  }
+
+  const response = await plaidPost<LinkTokenResponse>("/link/token/create", body);
   return response.link_token;
 }
 

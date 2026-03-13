@@ -9,19 +9,77 @@ type PlaidConnectButtonProps = {
   onSuccess?: () => void;
 };
 
+/**
+ * Detects if the current page URL contains Plaid OAuth redirect params.
+ * After a user authenticates with an OAuth bank (e.g. Bank of America),
+ * Plaid redirects back to our page with `oauth_state_id` in the query string.
+ */
+function getOAuthRedirectUri(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  const params = new URLSearchParams(window.location.search);
+  if (params.has("oauth_state_id")) {
+    // Return the full URL (origin + pathname + search) as receivedRedirectUri
+    return window.location.href;
+  }
+  return undefined;
+}
+
+/** Returns the base redirect URI (no query params) for link token creation */
+function getRedirectUri(): string {
+  if (typeof window === "undefined") return "https://www.usagummies.com/ops/finance";
+  return window.location.origin + window.location.pathname;
+}
+
 export function PlaidConnectButton({ onSuccess }: PlaidConnectButtonProps) {
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
   const openedRef = useRef(false);
+  const [receivedRedirectUri, setReceivedRedirectUri] = useState<
+    string | undefined
+  >(undefined);
+
+  // On mount, check if we're returning from an OAuth redirect
+  useEffect(() => {
+    const oauthUri = getOAuthRedirectUri();
+    if (oauthUri) {
+      setReceivedRedirectUri(oauthUri);
+      // Auto-fetch a new link token to complete the OAuth flow
+      // The link token must be created with the same redirect_uri (without query params)
+      setLoading(true);
+      openedRef.current = false;
+      fetch("/api/ops/plaid/link-token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ redirectUri: getRedirectUri() }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.linkToken) {
+            setLinkToken(data.linkToken);
+          } else {
+            setError(data.error || "Failed to resume OAuth flow");
+            setLoading(false);
+          }
+        })
+        .catch(() => {
+          setError("Failed to resume OAuth flow");
+          setLoading(false);
+        });
+    }
+  }, []);
 
   const fetchLinkToken = useCallback(async () => {
     setLoading(true);
     setError(null);
     openedRef.current = false;
     try {
-      const res = await fetch("/api/ops/plaid/link-token", { method: "POST" });
+      const res = await fetch("/api/ops/plaid/link-token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ redirectUri: getRedirectUri() }),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to get link token");
       setLinkToken(data.linkToken);
@@ -42,6 +100,10 @@ export function PlaidConnectButton({ onSuccess }: PlaidConnectButtonProps) {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Token exchange failed");
         setConnected(true);
+        // Clean up OAuth params from URL
+        if (typeof window !== "undefined" && window.location.search.includes("oauth_state_id")) {
+          window.history.replaceState({}, "", window.location.pathname);
+        }
         onSuccess?.();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to connect bank");
@@ -53,10 +115,12 @@ export function PlaidConnectButton({ onSuccess }: PlaidConnectButtonProps) {
   );
 
   // Link-token flow: env is encoded in the token, no env prop needed
+  // receivedRedirectUri is set when returning from OAuth bank redirect
   const { open, ready } = usePlaidLink({
     token: linkToken,
     onSuccess: onPlaidSuccess,
     onExit: () => setLoading(false),
+    receivedRedirectUri: receivedRedirectUri,
   });
 
   // Auto-open Plaid Link once token is ready (useEffect avoids calling open() during render)

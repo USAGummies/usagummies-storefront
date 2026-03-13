@@ -10,7 +10,7 @@ import { createLinkToken, isPlaidConfigured, getPlaidEnv } from "@/lib/finance/p
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST() {
+export async function POST(request: Request) {
   if (!isPlaidConfigured()) {
     return NextResponse.json(
       { error: "Plaid not configured. Set PLAID_CLIENT_ID and PLAID_SECRET." },
@@ -19,7 +19,15 @@ export async function POST() {
   }
 
   try {
-    const linkToken = await createLinkToken();
+    let redirectUri: string | undefined;
+    try {
+      const body = await request.json();
+      redirectUri = body.redirectUri;
+    } catch {
+      // No body is fine — redirectUri stays undefined
+    }
+
+    const linkToken = await createLinkToken(redirectUri);
     return NextResponse.json({ linkToken, env: getPlaidEnv() });
   } catch (err) {
     console.error("[plaid] Link token creation failed:", err);
