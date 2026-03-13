@@ -193,12 +193,19 @@ async function fetchFoundBalance(): Promise<UnifiedBalances["found"]> {
     0,
   );
 
-  const fourteenDaysAgo = new Date();
-  fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
-  const transactions = await getTransactions(
-    fourteenDaysAgo.toISOString().slice(0, 10),
-    new Date().toISOString().slice(0, 10),
-  );
+  // Transactions may fail if Plaid product isn't enabled or initial sync
+  // isn't complete — don't let it break the balance fetch
+  let transactions: Awaited<ReturnType<typeof getTransactions>> = [];
+  try {
+    const fourteenDaysAgo = new Date();
+    fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+    transactions = await getTransactions(
+      fourteenDaysAgo.toISOString().slice(0, 10),
+      new Date().toISOString().slice(0, 10),
+    );
+  } catch (err) {
+    console.warn("[plaid] Transaction fetch in balances failed (non-fatal):", err instanceof Error ? err.message : err);
+  }
 
   return {
     balance,

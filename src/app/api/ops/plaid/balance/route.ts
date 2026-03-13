@@ -51,9 +51,14 @@ export async function GET() {
     const startDate = thirtyDaysAgo.toISOString().slice(0, 10);
     const endDate = new Date().toISOString().slice(0, 10);
 
+    // Fetch balances (critical) and transactions (best-effort — may not be
+    // ready yet if Plaid hasn't completed initial sync)
     const [accounts, transactions] = await Promise.all([
       getBalances(),
-      getTransactions(startDate, endDate),
+      getTransactions(startDate, endDate).catch((err) => {
+        console.warn("[plaid] Transaction fetch failed (may still be syncing):", err instanceof Error ? err.message : err);
+        return [] as PlaidTransaction[];
+      }),
     ]);
 
     const result: PlaidBalanceCache = {
