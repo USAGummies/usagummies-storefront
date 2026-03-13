@@ -55,6 +55,7 @@ import {
   saveMessage,
 } from "@/lib/ops/abra-chat-history";
 import { buildCrossDepartmentStrategy } from "@/lib/ops/abra-strategy-orchestrator";
+import { getSystemHealth } from "@/lib/ops/abra-health-monitor";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -240,6 +241,8 @@ const PIPELINE_TRIGGERS =
   /\b(sales pipeline|pipeline health|pipeline status|b2b pipeline|b2b deals?|wholesale deals?)\b/i;
 const STRATEGY_TRIGGERS =
   /\b(strategy|strategic plan|financial plan|budget plan|amazon ad strategy|amazon ads strategy|ppc strategy|campaign strategy)\b/i;
+const DIAGNOSTICS_TRIGGERS =
+  /\b(diagnos|self.?check|what'?s broken|are you (working|ok|healthy)|system health|feed status|check yourself|run diagnostics)\b/i;
 
 type DetectedIntent =
   | { type: "initiative"; department: string | null; goal: string }
@@ -247,9 +250,13 @@ type DetectedIntent =
   | { type: "cost" }
   | { type: "pipeline" }
   | { type: "strategy"; objective: string; department: string | null }
+  | { type: "diagnostics" }
   | { type: "chat" };
 
 function detectIntent(message: string): DetectedIntent {
+  if (DIAGNOSTICS_TRIGGERS.test(message)) {
+    return { type: "diagnostics" };
+  }
   if (COST_TRIGGERS.test(message)) {
     return { type: "cost" };
   }
@@ -889,9 +896,15 @@ EXAMPLES:
 • "remind the team about the production call" → emit send_slack action
 • "we switched from Powers to XYZ for packaging" → emit create_brain_entry
 • "create a task to follow up with the distributor" → emit create_task
+• "save this as a report" → emit create_notion_page with database "meeting_notes"
+• "log this to the pipeline" → emit create_notion_page with database "b2b_prospects"
+• "record the $500 payment to Powers" → emit record_transaction with type "expense", amount 500, vendor "Powers Confections"
+• "create a P&L breakdown" → create the table in your response AND emit create_notion_page to persist it
 • "set up QuickBooks" → This is OUTSIDE your actions, so explain what's needed and offer to create_task or send_slack about it.
 
-Some actions auto-execute (create_brain_entry, acknowledge_signal). Others queue for approval (send_email, send_slack). Either way — EMIT the action block.`
+DATABASE KEYS for create_notion_page: meeting_notes, b2b_prospects, distributor_prospects, daily_performance, fleet_ops, inventory, sku_registry, cash_transactions, content_drafts, kpis, general
+
+Some actions auto-execute (create_brain_entry, acknowledge_signal, create_notion_page, record_transaction, create_task). Others queue for approval (send_email, send_slack). Either way — EMIT the action block.`
       : "";
 
   const historyText = buildConversation(input.history);
@@ -924,7 +937,7 @@ Some actions auto-execute (create_brain_entry, acknowledge_signal). Others queue
     .filter(Boolean)
     .join("\n\n");
 
-  const maxTokens = selectedModel.includes("haiku") ? 1200 : 2500;
+  const maxTokens = selectedModel.includes("haiku") ? 2000 : 4000;
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -1171,6 +1184,70 @@ export async function POST(req: Request) {
         confidence: 1,
         sources: [],
         intent: "pipeline",
+        thread_id: threadId,
+      });
+    }
+
+    if (intent.type === "diagnostics") {
+      let healthReport: string;
+      try {
+        const health = await getSystemHealth();
+        const integrationLines = health.integrations.length > 0
+          ? health.integrations
+              .map((i) => `| ${i.system_name} | ${i.connection_status} | ${i.last_success_at?.slice(0, 16) || "never"} | ${i.error_summary || "—"} |`)
+              .join("\n")
+          : "| No integrations tracked | — | — | — |";
+
+        const feedLines = health.feeds.feeds.length > 0
+          ? health.feeds.feeds
+              .map((f) => `| ${f.feed_key} | ${f.is_active ? "active" : "disabled"} | ${f.last_run_at?.slice(0, 16) || "never"} | ${f.last_status || "—"} | ${f.consecutive_failures} |`)
+              .join("\n")
+          : "| No feeds configured | — | — | — | — |";
+
+        const deadLetterLines = health.feeds.dead_letters.length > 0
+          ? health.feeds.dead_letters
+              .slice(0, 5)
+              .map((d) => `• ${d.feed_key}: ${d.error_message || "unknown error"} (${d.created_at?.slice(0, 16) || "?"})`)
+              .join("\n")
+          : "None";
+
+        healthReport = [
+          "**Abra System Diagnostics**",
+          "",
+          "**Integrations**",
+          "| System | Status | Last Success | Error |",
+          "|--------|--------|-------------|-------|",
+          integrationLines,
+          "",
+          "**Auto-Teach Feeds**",
+          `| Feed | Status | Last Run | Result | Failures |`,
+          `|------|--------|----------|--------|----------|`,
+          feedLines,
+          "",
+          `**Summary**: ${health.uptime.healthy} healthy, ${health.uptime.degraded} degraded, ${health.uptime.down} down`,
+          `• Total feeds: ${health.feeds.total_feeds} (${health.feeds.active} active, ${health.feeds.disabled} disabled)`,
+          `• Unresolved dead letters: ${health.feeds.unresolved_dead_letters}`,
+          "",
+          health.feeds.dead_letters.length > 0 ? `**Dead Letters**\n${deadLetterLines}` : "",
+          "",
+          `_Last checked: ${health.last_checked}_`,
+        ].filter(Boolean).join("\n");
+      } catch (err) {
+        healthReport = `**Abra System Diagnostics**\n\nFailed to retrieve health data: ${err instanceof Error ? err.message : "unknown error"}`;
+      }
+
+      queueChatHistory({
+        threadId,
+        userEmail: actorEmail,
+        userMessage: message,
+        assistantMessage: healthReport,
+        metadata: { intent: "diagnostics" },
+      });
+      return NextResponse.json({
+        reply: healthReport,
+        confidence: 1,
+        sources: [],
+        intent: "diagnostics",
         thread_id: threadId,
       });
     }

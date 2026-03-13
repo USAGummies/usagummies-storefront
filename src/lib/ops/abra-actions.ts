@@ -2,6 +2,22 @@ import { notify } from "@/lib/ops/notify";
 import { randomUUID } from "node:crypto";
 import { sendOpsEmail } from "@/lib/ops/email";
 import { createNotionPage, updateNotionPage } from "@/lib/ops/abra-notion-write";
+import { DB } from "@/lib/notion/client";
+
+/** Map friendly database keys → Notion database IDs for create_notion_page action */
+const NOTION_DB_MAP: Record<string, string> = {
+  meeting_notes: process.env.NOTION_MEETING_NOTES_DB_ID || process.env.NOTION_MEETING_DB_ID || "",
+  b2b_prospects: process.env.NOTION_B2B_PROSPECTS_DB || "",
+  distributor_prospects: process.env.NOTION_DISTRIBUTOR_PROSPECTS_DB || "",
+  daily_performance: DB.DAILY_PERFORMANCE,
+  fleet_ops: DB.FLEET_OPS_LOG,
+  inventory: DB.INVENTORY,
+  sku_registry: DB.SKU_REGISTRY,
+  cash_transactions: DB.CASH_TRANSACTIONS,
+  content_drafts: DB.CONTENT_DRAFTS,
+  kpis: process.env.NOTION_KPI_DB || "",
+  general: process.env.NOTION_MEETING_NOTES_DB_ID || process.env.NOTION_MEETING_DB_ID || "",
+};
 
 export type AbraAction = {
   action_type: string;
@@ -73,6 +89,20 @@ export const AUTO_EXEC_POLICIES: AutoExecPolicy[] = [
     max_risk_level: "low",
     min_confidence: 0.8,
     daily_limit: 10,
+    enabled: true,
+  },
+  {
+    action_type: "create_notion_page",
+    max_risk_level: "low",
+    min_confidence: 0.7,
+    daily_limit: 25,
+    enabled: true,
+  },
+  {
+    action_type: "record_transaction",
+    max_risk_level: "low",
+    min_confidence: 0.8,
+    daily_limit: 50,
     enabled: true,
   },
 ];
@@ -379,6 +409,93 @@ async function handlePauseInitiative(
   return { success: true, message: `Initiative ${initiativeId} paused` };
 }
 
+function resolveNotionDb(key: string): string {
+  const normalized = (key || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+  return NOTION_DB_MAP[normalized] || NOTION_DB_MAP.general || "";
+}
+
+function notionUrlFromId(pageId: string): string {
+  return `https://www.notion.so/${pageId.replace(/-/g, "")}`;
+}
+
+async function handleCreateNotionPage(
+  params: Record<string, unknown>,
+): Promise<ActionResult> {
+  const dbKey = String(params.database || params.db || "general");
+  const title = String(params.title || "Abra Report");
+  const content = typeof params.content === "string" ? params.content : undefined;
+  const properties =
+    params.properties && typeof params.properties === "object"
+      ? (params.properties as Record<string, unknown>)
+      : undefined;
+
+  const parentId = resolveNotionDb(dbKey);
+  if (!parentId) {
+    return { success: false, message: `No Notion database found for key "${dbKey}". Available: ${Object.keys(NOTION_DB_MAP).join(", ")}` };
+  }
+
+  const pageId = await createNotionPage({
+    parent_id: parentId,
+    title,
+    ...(content ? { content } : {}),
+    ...(properties ? { properties } : {}),
+  });
+
+  if (!pageId) {
+    return { success: false, message: "Failed to create Notion page" };
+  }
+
+  const url = notionUrlFromId(pageId);
+  return {
+    success: true,
+    message: `Created Notion page: [${title}](${url})`,
+    data: { page_id: pageId, url },
+  };
+}
+
+async function handleRecordTransaction(
+  params: Record<string, unknown>,
+): Promise<ActionResult> {
+  const description = String(params.description || params.title || "Transaction");
+  const amount = typeof params.amount === "number" ? params.amount : parseFloat(String(params.amount || "0"));
+  const txType = String(params.type || "expense");
+  const category = String(params.category || "general");
+  const vendor = typeof params.vendor === "string" ? params.vendor : undefined;
+  const dateStr = typeof params.date === "string" ? params.date : new Date().toISOString().split("T")[0];
+
+  const parentId = NOTION_DB_MAP.cash_transactions;
+  if (!parentId) {
+    return { success: false, message: "Cash Transactions database not configured" };
+  }
+
+  const properties: Record<string, unknown> = {
+    Amount: { number: amount },
+    Type: { select: { name: txType } },
+    Category: { select: { name: category } },
+    Date: { date: { start: dateStr } },
+  };
+  if (vendor) {
+    properties.Vendor = { rich_text: [{ text: { content: vendor.slice(0, 200) } }] };
+  }
+
+  const pageId = await createNotionPage({
+    parent_id: parentId,
+    title: description,
+    properties,
+  });
+
+  if (!pageId) {
+    return { success: false, message: "Failed to record transaction" };
+  }
+
+  const url = notionUrlFromId(pageId);
+  return {
+    success: true,
+    message: `Recorded ${txType}: $${amount.toFixed(2)} — ${description} [View](${url})`,
+    data: { page_id: pageId, url, amount, type: txType },
+  };
+}
+
 const ACTION_HANDLERS: Record<
   string,
   (params: Record<string, unknown>) => Promise<ActionResult>
@@ -390,6 +507,8 @@ const ACTION_HANDLERS: Record<
   create_brain_entry: handleCreateBrainEntry,
   acknowledge_signal: handleAcknowledgeSignal,
   pause_initiative: handlePauseInitiative,
+  create_notion_page: handleCreateNotionPage,
+  record_transaction: handleRecordTransaction,
 };
 
 async function fetchApproval(approvalId: string): Promise<ApprovalRow | null> {
