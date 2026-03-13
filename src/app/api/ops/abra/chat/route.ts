@@ -238,7 +238,7 @@ const SESSION_TRIGGERS =
 const COST_TRIGGERS =
   /\b(ai spend|ai cost|how much .+ spend|budget|monthly spend|cost report)\b/i;
 const PIPELINE_TRIGGERS =
-  /\b(sales pipeline|pipeline health|pipeline status|b2b pipeline|b2b deals?|wholesale deals?|pipeline deals?|active deals?|deal(s| ) (status|details|breakdown)|show .+ pipeline|what deals|which deals|which companies .+ pipeline|who .+ in .+ pipeline|pipeline summary|deal pipeline)\b/i;
+  /\b(sales pipeline|pipeline health|pipeline status|b2b pipeline|b2b deals?|wholesale deals?|pipeline deals?|active deals?|deal(s| ) (status|details|breakdown)|show .+ pipeline|what deals|which deals|which companies .+ pipeline|who .+ in .+ pipeline|pipeline summary|deal pipeline|b2b prospects?|top .+ deals?|prospects? by .+ value|biggest deals?|largest deals?|deal value)\b/i;
 const STRATEGY_TRIGGERS =
   /\b(strategy|strategic plan|financial plan|budget plan|amazon ad strategy|amazon ads strategy|ppc strategy|campaign strategy)\b/i;
 const DIAGNOSTICS_TRIGGERS =

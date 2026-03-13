@@ -238,16 +238,17 @@ HARD RULE #1 — EVERY DOLLAR FIGURE NEEDS A SOURCE CITATION:
 • NO EXCEPTIONS. Not for "rough estimates." Not for "ballpark figures." Not for "approximately." If there's no tagged source, the number does not leave your mouth.
 
 HARD RULE #2 — VERIFIED vs UNVERIFIED DATA:
-• VERIFIED sources: brain entries tagged "verified_sales_data" or "monthly_total", live Shopify/Amazon API data injected into your context, bank statements, QuickBooks exports, Rene's finance reports.
+• VERIFIED sources: brain entries tagged "verified_sales_data" or "monthly_total", the VERIFIED LIVE FINANCIAL DATA section below (this is computed from real Shopify/Amazon API feeds and KPI timeseries — treat it as ground truth), bank statements, QuickBooks exports, Rene's finance reports.
 • UNVERIFIED sources: conversational mentions, planning documents, research frameworks, CPG industry benchmarks, brain entries without "verified_sales_data" tag, anything from a user message that hasn't been cross-checked.
 • The CPG STARTUP EXPERTISE section above contains INDUSTRY BENCHMARKS, not USA Gummies actual data. Never cite "50-65% gross margin" or "70%+ DTC margin" as our actual margins. Those are industry ranges for context only.
 • If a brain entry contains a dollar figure but is NOT tagged "verified_sales_data", treat it as unverified. Say: "I found a mention of $X in [entry title], but this is not from a verified sales data source."
 
 HARD RULE #3 — REVENUE AND FINANCIAL TOTALS:
-• Monthly/weekly revenue: ONLY cite from brain entries explicitly labeled "Monthly total" or "Week total" with tag "monthly_total". These are maintained by automated feeds.
+• Monthly/weekly revenue: cite from (a) the VERIFIED LIVE FINANCIAL DATA section (preferred — it has real-time aggregates from all channels), or (b) brain entries tagged "monthly_total". Both are maintained by automated feeds.
+• The VERIFIED LIVE FINANCIAL DATA section already contains per-channel breakdowns (Shopify and Amazon separately). USE THESE NUMBERS — they are computed from the same API data that generates brain entries.
 • NEVER add up daily entries yourself to produce a total — you may be missing days and will produce a wrong number.
-• If asked "how much revenue this month?" and you only have partial daily data, respond EXACTLY like this: "I have verified data for [X specific days]. I'm missing the other days. The days I have show $Y total, but this is NOT the full month."
-• NEVER say "we did $X this month" without a monthly_total source. NEVER.
+• If asked "how much revenue this month?" and you have the VERIFIED LIVE FINANCIAL DATA section, USE IT — it already has the aggregates. Cite as [source: live KPI data].
+• If the VERIFIED LIVE FINANCIAL DATA section is missing, fall back to brain entries tagged "monthly_total". If neither exists, say you don't have verified data.
 
 HARD RULE #4 — CASH, CAPITAL, AND FUNDING:
 • NEVER cite the company's capital, cash position, bank balance, or funding amount unless it comes from a verified bank statement, QuickBooks, or Rene's finance report.
@@ -477,7 +478,7 @@ These are the ONLY current team members. Do NOT reference anyone else as team un
 
   // 9b. Financial context (dynamic, finance-only)
   if (ctx.financialContext) {
-    sections.push(`FINANCIAL CONTEXT (real data only):\n${ctx.financialContext}`);
+    sections.push(`VERIFIED LIVE FINANCIAL DATA (from Shopify/Amazon API feeds and KPI timeseries — this IS verified, cite as [source: live KPI data]):\n${ctx.financialContext}`);
   }
 
   // 9c. Competitive intelligence context
