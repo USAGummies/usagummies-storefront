@@ -41,7 +41,7 @@ import {
   getMarginAnalysis,
   getRevenueSnapshot,
 } from "@/lib/ops/abra-financial-intel";
-import { searchTiered, buildTieredContext, type TieredSearchResult } from "@/lib/ops/abra-memory-tiers";
+import { searchTiered, searchWithTemporalAwareness, buildTieredContext, type TieredSearchResult } from "@/lib/ops/abra-memory-tiers";
 import { logAnswer, extractProvenance } from "@/lib/ops/abra-source-provenance";
 import { getTeamMembers, getVendors, buildTeamContext } from "@/lib/ops/abra-team-directory";
 import { getActiveSignals, buildSignalsContext } from "@/lib/ops/abra-operational-signals";
@@ -1646,9 +1646,10 @@ export async function POST(req: Request) {
     }
 
     // ─── Normal RAG Chat Flow ───
-    // Tiered memory search (hot/warm/cold with fallback)
+    // Tiered memory search (hot/warm/cold with fallback) + date-aware retrieval
     const embedding = await buildEmbedding(message);
-    const tieredResults = await searchTiered({
+    const { results: tieredResults, temporalRange } = await searchWithTemporalAwareness({
+      message,
       embedding,
       matchCount: DEFAULT_MATCH_COUNT,
       filterTables: ["brain", "email"],
@@ -1681,6 +1682,12 @@ export async function POST(req: Request) {
 
     const availableActions = getAvailableActions();
 
+    // If temporal range was detected, augment the message with date context
+    const temporalHint = temporalRange
+      ? `\n[TEMPORAL CONTEXT: User is asking about "${temporalRange.label}" which resolves to ${temporalRange.start}${temporalRange.start !== temporalRange.end ? ` through ${temporalRange.end}` : ""}. Date-matched brain entries (if any) are included in the HOT tier of retrieved context below.]`
+      : "";
+    const augmentedLiveSnapshot = [liveSnapshot, temporalHint].filter(Boolean).join("\n") || null;
+
     const claudeResult = await generateClaudeReply({
       message,
       history: effectiveHistory,
@@ -1695,7 +1702,7 @@ export async function POST(req: Request) {
       signalsContext,
       availableActions,
       detectedDepartment: messageDepartment,
-      liveSnapshot,
+      liveSnapshot: augmentedLiveSnapshot,
     });
     const actionNotices: string[] = [];
     let baseReply = claudeResult.reply;

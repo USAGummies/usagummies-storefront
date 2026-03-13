@@ -11,6 +11,7 @@
  */
 
 import type { TemporalSearchRow } from "@/lib/ops/abra-system-prompt";
+import { resolveTemporalDates, type TemporalRange } from "@/lib/ops/abra-temporal-resolver";
 
 export type TieredSearchRow = TemporalSearchRow & {
   memory_tier: "hot" | "warm" | "cold";
@@ -188,6 +189,131 @@ export function buildTieredContext(results: TieredSearchResult): string {
   }
 
   return sections.join("\n");
+}
+
+/**
+ * Fetch brain entries by date range (direct SQL, no embedding needed).
+ * Used to supplement semantic search when temporal references are detected.
+ * Returns results tagged as HOT tier since they're date-exact matches.
+ */
+async function fetchEntriesByDateRange(
+  startDate: string,
+  endDate: string,
+  limit = 10,
+): Promise<TieredSearchRow[]> {
+  const env = getSupabaseEnv();
+  if (!env) return [];
+
+  const startTs = `${startDate}T00:00:00Z`;
+  const endTs = `${endDate}T23:59:59Z`;
+
+  const res = await fetch(
+    `${env.baseUrl}/rest/v1/open_brain_entries?` +
+    `created_at=gte.${encodeURIComponent(startTs)}&` +
+    `created_at=lte.${encodeURIComponent(endTs)}&` +
+    `superseded_by=is.null&` +
+    `select=id,title,raw_text,summary_text,category,entry_type,tags,created_at,updated_at&` +
+    `order=created_at.desc&limit=${limit}`,
+    {
+      headers: {
+        apikey: env.serviceKey,
+        Authorization: `Bearer ${env.serviceKey}`,
+        "Content-Type": "application/json",
+      },
+      cache: "no-store",
+      signal: AbortSignal.timeout(10000),
+    },
+  );
+
+  if (!res.ok) return [];
+  const rows = await res.json() as Array<{
+    id: string;
+    title?: string;
+    raw_text?: string;
+    summary_text?: string;
+    category?: string;
+    entry_type?: string;
+    tags?: string[];
+    created_at?: string;
+    updated_at?: string;
+  }>;
+
+  if (!Array.isArray(rows)) return [];
+
+  return rows.map((row) => ({
+    id: row.id,
+    source_table: "brain" as const,
+    title: row.title || "(untitled)",
+    raw_text: row.raw_text || "",
+    summary_text: row.summary_text || "",
+    category: row.category || null,
+    department: null,
+    similarity: 1.0,         // perfect match by date
+    temporal_score: 1.0,     // date-exact is max temporal relevance
+    days_ago: 0,             // treat as maximally recent for display
+    created_at: row.created_at || new Date().toISOString(),
+    updated_at: row.updated_at || new Date().toISOString(),
+    metadata: {
+      entry_type: row.entry_type || "finding",
+      tags: row.tags || [],
+      date_matched: true,    // flag so LLM knows this is a date-exact hit
+    },
+    memory_tier: "hot" as const,
+  }));
+}
+
+/**
+ * Enhanced search that combines semantic search with date-based retrieval.
+ * If the user message contains temporal references ("yesterday", "last Tuesday"),
+ * we run a parallel date-range query and merge results into the HOT tier.
+ */
+export async function searchWithTemporalAwareness(params: {
+  message: string;
+  embedding: number[];
+  matchCount?: number;
+  filterTables?: string[];
+}): Promise<{ results: TieredSearchResult; temporalRange: TemporalRange | null }> {
+  const temporalRange = resolveTemporalDates(params.message);
+
+  // Always run semantic search
+  const semanticPromise = searchTiered({
+    embedding: params.embedding,
+    matchCount: params.matchCount,
+    filterTables: params.filterTables,
+  });
+
+  // If temporal reference detected, also run date-based query
+  const datePromise = temporalRange
+    ? fetchEntriesByDateRange(temporalRange.start, temporalRange.end, 8)
+    : Promise.resolve([] as TieredSearchRow[]);
+
+  const [semanticResults, dateResults] = await Promise.all([semanticPromise, datePromise]);
+
+  if (dateResults.length === 0) {
+    return { results: semanticResults, temporalRange };
+  }
+
+  // Merge: deduplicate by ID, date-matched entries go to HOT tier at the top
+  const existingIds = new Set(semanticResults.all.map((r) => r.id));
+  const newDateResults = dateResults.filter((r) => !existingIds.has(r.id));
+
+  const mergedHot = [...newDateResults, ...semanticResults.hot];
+  const mergedAll = [...newDateResults, ...semanticResults.all];
+
+  return {
+    results: {
+      hot: mergedHot,
+      warm: semanticResults.warm,
+      cold: semanticResults.cold,
+      all: mergedAll,
+      tierCounts: {
+        hot: mergedHot.length,
+        warm: semanticResults.warm.length,
+        cold: semanticResults.cold.length,
+      },
+    },
+    temporalRange,
+  };
 }
 
 function formatRow(row: TieredSearchRow): string {

@@ -105,6 +105,13 @@ export const AUTO_EXEC_POLICIES: AutoExecPolicy[] = [
     daily_limit: 50,
     enabled: true,
   },
+  {
+    action_type: "correct_claim",
+    max_risk_level: "low",
+    min_confidence: 0.9,
+    daily_limit: 10,
+    enabled: true,
+  },
 ];
 
 const EXTERNAL_SUBMISSION_ACTIONS = new Set([
