@@ -3,6 +3,7 @@
  *
  * Connects to Found.com banking via Plaid Link for real-time balance
  * and transaction data. Found has no direct API, so Plaid is the bridge.
+ * Uses Production secret for both development and production environments.
  *
  * Flow:
  *   1. createLinkToken() → frontend shows Plaid Link UI
