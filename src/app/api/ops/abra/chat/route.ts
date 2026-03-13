@@ -521,13 +521,20 @@ async function fetchFinancialContext(): Promise<string | null> {
       getRevenueSnapshot("week"),
     ]);
 
+    // Guard: if both sources return zero data, treat as unavailable
+    if (calMonth.days_with_data === 0 && weekSnapshot.order_count === 0) {
+      console.log("[abra] Financial context: both KPI sources returned zero data");
+      return null;
+    }
+
     const lines = [
       `${calMonth.month} calendar month revenue (${calMonth.days_with_data} days of data): Shopify $${calMonth.shopify_revenue.toFixed(2)} (${calMonth.shopify_orders} orders), Amazon $${calMonth.amazon_revenue.toFixed(2)} (${calMonth.amazon_orders} orders), TOTAL $${calMonth.total_revenue.toFixed(2)} (${calMonth.total_orders} orders, AOV $${calMonth.avg_order_value.toFixed(2)}).`,
       `Last 7 days revenue: total $${weekSnapshot.total_revenue.toFixed(2)} (${weekSnapshot.order_count} orders, AOV $${weekSnapshot.avg_order_value.toFixed(2)}).`,
     ];
 
     return lines.join("\n");
-  } catch {
+  } catch (err) {
+    console.error("[abra] Financial context fetch failed:", err instanceof Error ? err.message : err);
     return null;
   }
 }
@@ -1647,15 +1654,25 @@ export async function POST(req: Request) {
 
     // ─── Normal RAG Chat Flow ───
     // Tiered memory search (hot/warm/cold with fallback) + date-aware retrieval
-    const embedding = await buildEmbedding(message);
-    const { results: tieredResults, temporalRange } = await searchWithTemporalAwareness({
-      message,
-      embedding,
-      matchCount: DEFAULT_MATCH_COUNT,
-      filterTables: ["brain", "email"],
-    });
-
-    await markSupabaseSuccess();
+    // Graceful degradation: if embedding fails, continue with empty context + live data
+    let tieredResults: TieredSearchResult = { hot: [], warm: [], cold: [], all: [], tierCounts: { hot: 0, warm: 0, cold: 0 } };
+    let temporalRange: import("@/lib/ops/abra-temporal-resolver").TemporalRange | null = null;
+    let embeddingFailed = false;
+    try {
+      const embedding = await buildEmbedding(message);
+      const searchResult = await searchWithTemporalAwareness({
+        message,
+        embedding,
+        matchCount: DEFAULT_MATCH_COUNT,
+        filterTables: ["brain", "email"],
+      });
+      tieredResults = searchResult.results;
+      temporalRange = searchResult.temporalRange;
+      await markSupabaseSuccess();
+    } catch (embErr) {
+      console.error("[abra] Embedding/search failed, continuing with live data only:", embErr instanceof Error ? embErr.message : embErr);
+      embeddingFailed = true;
+    }
 
     // Fetch corrections + departments + initiatives + cost + team + signals + live data (parallel)
     const [corrections, departments, activeInitiatives, costSummary, teamMembers, vendors, signals, liveSnapshot, financialContext] =
@@ -1686,7 +1703,13 @@ export async function POST(req: Request) {
     const temporalHint = temporalRange
       ? `\n[TEMPORAL CONTEXT: User is asking about "${temporalRange.label}" which resolves to ${temporalRange.start}${temporalRange.start !== temporalRange.end ? ` through ${temporalRange.end}` : ""}. Date-matched brain entries (if any) are included in the HOT tier of retrieved context below.]`
       : "";
-    const augmentedLiveSnapshot = [liveSnapshot, temporalHint].filter(Boolean).join("\n") || null;
+    // Build data availability status so Claude knows what feeds are up/down
+    const dataStatus: string[] = [];
+    if (embeddingFailed) dataStatus.push("🔴 Brain memory search: FAILED (embedding service down — no brain/email context available)");
+    if (!liveSnapshot) dataStatus.push("⚠️ Live Shopify/email snapshot: UNAVAILABLE (API timeout or not configured)");
+    if (!financialContext) dataStatus.push("⚠️ Financial KPI data: UNAVAILABLE (no KPI timeseries data returned)");
+    const dataStatusLine = dataStatus.length > 0 ? `\n[DATA FEED STATUS: ${dataStatus.join("; ")}. Do NOT invent numbers for unavailable feeds. If brain search failed, tell the user your memory is temporarily unavailable.]` : "";
+    const augmentedLiveSnapshot = [liveSnapshot, temporalHint, dataStatusLine].filter(Boolean).join("\n") || null;
 
     const claudeResult = await generateClaudeReply({
       message,

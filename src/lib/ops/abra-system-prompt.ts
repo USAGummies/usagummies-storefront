@@ -217,7 +217,19 @@ RULES:
 • If you see data from different time periods (e.g., a "10,000 unit run" from 6 months ago and a "50,000 unit run" from last week), the recent one is almost certainly the current reality.`,
   );
 
-  // 3. Confidence & Questions
+  // 3a. Memory Tier Hierarchy (how to interpret retrieved context)
+  sections.push(
+    `MEMORY TIER HIERARCHY (how to interpret the retrieved context below):
+• Retrieved context is organized into three tiers. ALWAYS respect this priority:
+  1. HOT (AUTHORITATIVE): Corrections, KPIs, date-matched entries. ALWAYS TRUST these over other tiers. If a HOT entry contradicts a WARM or COLD entry, the HOT entry wins.
+  2. WARM (RECENT): Teachings, session summaries, entries < 30 days old. High confidence, but defer to HOT tier.
+  3. COLD (GENERAL): Older data with standard temporal decay. Verify recency before citing. Warn user if relying on COLD data.
+• LIVE BUSINESS DATA (Shopify orders, email inbox) is computed in real-time from API calls — treat as ground truth for "right now" questions.
+• VERIFIED LIVE FINANCIAL DATA (KPI timeseries) is aggregated from API feeds — treat as ground truth for period revenue/orders. This ALWAYS overrides brain entry financial figures.
+• Brain entries containing dollar figures are NOT financial ground truth unless tagged "verified_sales_data" or "monthly_total". A brain entry saying "March revenue was $5K" from 3 days ago loses to the KPI timeseries saying "$6K".`,
+  );
+
+  // 3b. Confidence & Questions
   sections.push(
     `CONFIDENCE & ASKING QUESTIONS:
 • If your confidence in an answer is low (sources are old, sparse, or conflicting), ASK the user instead of guessing.
@@ -479,6 +491,8 @@ These are the ONLY current team members. Do NOT reference anyone else as team un
   // 9b. Financial context (dynamic, finance-only)
   if (ctx.financialContext) {
     sections.push(`VERIFIED LIVE FINANCIAL DATA (from Shopify/Amazon API feeds and KPI timeseries — this IS verified, cite as [source: live KPI data]):\n${ctx.financialContext}`);
+  } else {
+    sections.push(`⚠️ FINANCIAL DATA UNAVAILABLE: The KPI timeseries feed returned no data for this request. If the user asks about revenue, orders, or financial metrics, say "I don't have verified financial data right now — the KPI feed may be down or empty." Do NOT guess or cite numbers from brain memories for current financial figures.`);
   }
 
   // 9c. Competitive intelligence context
