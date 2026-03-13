@@ -904,7 +904,12 @@ EXAMPLES:
 
 DATABASE KEYS for create_notion_page: meeting_notes, b2b_prospects, distributor_prospects, daily_performance, fleet_ops, inventory, sku_registry, cash_transactions, content_drafts, kpis, general
 
-Some actions auto-execute (create_brain_entry, acknowledge_signal, create_notion_page, record_transaction, create_task). Others queue for approval (send_email, send_slack). Either way — EMIT the action block.`
+Some actions auto-execute (create_brain_entry, acknowledge_signal, create_notion_page, record_transaction, create_task). Others queue for approval (send_email, send_slack). Either way — EMIT the action block.
+
+FINANCIAL INTEGRITY REMINDER (applies to EVERY response):
+• Every dollar figure you state MUST have a [source: ...] citation. No exceptions.
+• If the user corrects a number, STOP, acknowledge the error, ask for the right figure. Never defend wrong data.
+• "I don't have verified data for that" is always acceptable. A wrong number is never acceptable.`
       : "";
 
   const historyText = buildConversation(input.history);
