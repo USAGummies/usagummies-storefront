@@ -436,9 +436,74 @@ async function fetchCostSummary(): Promise<AbraCostContext | null> {
 }
 
 function isFinanceQuestion(message: string): boolean {
-  return /\b(finance|financial|revenue|margin|cogs|gross profit|profitability|aov|cash flow|budget)\b/i.test(
+  return /\b(finance|financial|revenue|margin|cogs|gross profit|profitability|aov|cash flow|budget|money|sales|orders|income|expenses|spending|p&l|profit|loss)\b/i.test(
     message,
   );
+}
+
+/**
+ * Fetch a real-time snapshot of today's business activity.
+ * Runs on EVERY chat to ensure Abra always has current data.
+ * Lightweight — only fetches summary counts, not full payloads.
+ */
+async function fetchLiveBusinessSnapshot(): Promise<string | null> {
+  const lines: string[] = [];
+  const today = new Date().toISOString().split("T")[0];
+
+  // 1. Shopify orders (last 24h) — lightweight REST call
+  try {
+    const shopifyDomain = process.env.SHOPIFY_STORE || process.env.SHOPIFY_STORE_DOMAIN;
+    const shopifyToken = process.env.SHOPIFY_ADMIN_TOKEN || process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
+    const shopifyVersion = process.env.SHOPIFY_API_VERSION || "2024-10";
+    if (shopifyDomain && shopifyToken) {
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const url = `https://${shopifyDomain}/admin/api/${shopifyVersion}/orders.json?status=any&created_at_min=${since}&limit=250`;
+      const res = await fetch(url, {
+        headers: { "X-Shopify-Access-Token": shopifyToken, "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const orders = Array.isArray(data.orders) ? data.orders as Array<{ name?: string; total_price?: string; created_at?: string; financial_status?: string; fulfillment_status?: string | null; customer?: { first_name?: string; last_name?: string }; line_items?: Array<{ title?: string; quantity?: number }> }> : [];
+        if (orders.length > 0) {
+          const totalRev = orders.reduce((s, o) => s + parseFloat(o.total_price || "0"), 0);
+          const unfulfilled = orders.filter(o => !o.fulfillment_status || o.fulfillment_status === "null").length;
+          lines.push(`LIVE SHOPIFY (last 24h, as of ${today}): ${orders.length} orders, $${totalRev.toFixed(2)} revenue, ${unfulfilled} unfulfilled.`);
+          // Show most recent 5 orders
+          const recent = orders.slice(0, 5);
+          for (const o of recent) {
+            const items = (o.line_items || []).map(li => `${li.quantity}x ${li.title}`).join(", ");
+            const custName = [o.customer?.first_name, o.customer?.last_name].filter(Boolean).join(" ") || "Guest";
+            lines.push(`  • ${o.name}: $${o.total_price} from ${custName} — ${items} (${o.financial_status || "pending"}, ${o.fulfillment_status || "unfulfilled"})`);
+          }
+          if (orders.length > 5) lines.push(`  ... and ${orders.length - 5} more orders.`);
+        } else {
+          lines.push(`LIVE SHOPIFY (last 24h): No orders.`);
+        }
+      }
+    }
+  } catch { /* non-fatal */ }
+
+  // 2. Recent emails (last 5 inbox subjects) — lightweight metadata only
+  try {
+    const gmailUser = process.env.GMAIL_USER || process.env.GMAIL_SENDER;
+    const gmailClientId = process.env.GMAIL_CLIENT_ID;
+    const gmailRefreshToken = process.env.GMAIL_REFRESH_TOKEN;
+    if (gmailUser && gmailClientId && gmailRefreshToken) {
+      // Dynamic import to avoid loading googleapis on every request
+      const { listEmails } = await import("@/lib/ops/gmail-reader");
+      const envelopes = await listEmails({ count: 8, folder: "INBOX" });
+      if (envelopes.length > 0) {
+        lines.push(`LIVE INBOX (${envelopes.length} most recent):`);
+        for (const e of envelopes.slice(0, 8)) {
+          const age = e.date ? `${Math.round((Date.now() - new Date(e.date).getTime()) / 3600000)}h ago` : "";
+          lines.push(`  • From: ${e.from} — "${e.subject}" (${age})`);
+        }
+      }
+    }
+  } catch { /* non-fatal */ }
+
+  return lines.length > 0 ? lines.join("\n") : null;
 }
 
 async function fetchFinancialContext(): Promise<string | null> {
@@ -769,6 +834,7 @@ async function generateClaudeReply(input: {
   signalsContext?: string;
   availableActions?: string[];
   detectedDepartment?: string | null;
+  liveSnapshot?: string | null;
 }): Promise<{
   reply: string;
   modelUsed: string;
@@ -797,26 +863,35 @@ async function generateClaudeReply(input: {
   });
   const actionInstructions =
     input.availableActions && input.availableActions.length > 0
-      ? `\n\nACTION EXECUTION:
-You have the ability to take real actions — not just give advice. Available actions: ${input.availableActions.join(", ")}.
+      ? `\n\nACTION EXECUTION SYSTEM (YOU MUST USE THIS):
+You have REAL action capabilities. Available actions: ${input.availableActions.join(", ")}.
 
-WHEN TO USE ACTIONS:
-• When the user asks you to DO something (send a message, create a task, log something, notify someone) — DO IT by emitting an action block.
-• When a playbook step calls for notification or task creation — execute it.
-• When you identify something the team should know — use send_slack to alert them.
-• When the user shares information worth remembering — use create_brain_entry to store it.
-• Do NOT just list steps or give advice about what "should" be done. If you CAN do it with an available action, DO IT.
+BANNED PHRASES — NEVER say any of these:
+• "I can't directly handle..."
+• "I can't execute tasks..."
+• "I don't have the ability to..."
+• "I'm not able to..."
+• "You should..." (when you could DO it instead)
+• "Consider doing..." (when you could DO it instead)
+• "I recommend..." followed by a list of steps the user should do themselves
+Instead: USE your actions. If the user asks you to do something and you have an action for it, DO IT.
 
-HOW TO EMIT AN ACTION (append exactly one <action> block per action, max 3 per reply):
+WHEN TO EMIT ACTIONS:
+• User asks you to DO something (send, create, log, notify, remind, track, store) → EMIT the action.
+• You learn new information about the business → create_brain_entry to remember it.
+• A playbook step needs execution → execute it via action, don't just list it.
+• Something important happened → send_slack to alert the team.
+
+FORMAT (append <action> JSON blocks, max 3 per reply):
 <action>{"action_type":"create_brain_entry","title":"...","description":"...","department":"executive","risk_level":"low","params":{"title":"...","text":"..."}}</action>
 
 EXAMPLES:
-• User says "remind the team about the production call" → emit send_slack action with the message.
-• User says "we switched from Powers to XYZ for packaging" → emit create_brain_entry to log the change.
-• User says "create a task to follow up with the distributor" → emit create_task action.
-• User says "set up QuickBooks" → You CANNOT do that directly, so explain what needs to happen and offer to create a task or send a Slack reminder about it.
+• "remind the team about the production call" → emit send_slack action
+• "we switched from Powers to XYZ for packaging" → emit create_brain_entry
+• "create a task to follow up with the distributor" → emit create_task
+• "set up QuickBooks" → This is OUTSIDE your actions, so explain what's needed and offer to create_task or send_slack about it.
 
-IMPORTANT: Some actions (send_email, send_slack, update_notion) require human approval and will be queued. Others (create_brain_entry, acknowledge_signal) auto-execute. Either way, EMIT the action — the system handles approval flow.`
+Some actions auto-execute (create_brain_entry, acknowledge_signal). Others queue for approval (send_email, send_slack). Either way — EMIT the action block.`
       : "";
 
   const historyText = buildConversation(input.history);
@@ -841,6 +916,7 @@ IMPORTANT: Some actions (send_email, send_slack, update_notion) require human ap
       : "";
 
   const userPrompt = [
+    input.liveSnapshot ? `LIVE BUSINESS DATA (real-time, as of right now):\n${input.liveSnapshot}` : "",
     historyText ? `Recent conversation:\n${historyText}` : "",
     `User question:\n${input.message}`,
     `Retrieved context:\n${contextText}${confidenceHint}`,
@@ -848,7 +924,7 @@ IMPORTANT: Some actions (send_email, send_slack, update_notion) require human ap
     .filter(Boolean)
     .join("\n\n");
 
-  const maxTokens = selectedModel.includes("haiku") ? 500 : 900;
+  const maxTokens = selectedModel.includes("haiku") ? 1200 : 2500;
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -860,7 +936,7 @@ IMPORTANT: Some actions (send_email, send_slack, update_notion) require human ap
       model: selectedModel,
       max_tokens: maxTokens,
       temperature: 0.2,
-      system: `${systemPrompt}${actionInstructions}`,
+      system: `${actionInstructions}\n\n${systemPrompt}`,
       messages: [{ role: "user", content: userPrompt }],
     }),
     signal: AbortSignal.timeout(30000),
@@ -1474,8 +1550,8 @@ export async function POST(req: Request) {
 
     await markSupabaseSuccess();
 
-    // Fetch corrections + departments + initiatives + cost + team + signals (parallel)
-    const [corrections, departments, activeInitiatives, costSummary, teamMembers, vendors, signals] =
+    // Fetch corrections + departments + initiatives + cost + team + signals + live data (parallel)
+    const [corrections, departments, activeInitiatives, costSummary, teamMembers, vendors, signals, liveSnapshot, financialContext] =
       await Promise.all([
         fetchCorrections(),
         fetchDepartments(),
@@ -1484,10 +1560,9 @@ export async function POST(req: Request) {
         getTeamMembers(),
         getVendors(),
         getActiveSignals({ limit: 5 }),
+        fetchLiveBusinessSnapshot(),
+        fetchFinancialContext(),
       ]);
-    const financialContext = isFinanceQuestion(message)
-      ? await fetchFinancialContext()
-      : null;
     const competitorContext =
       isCompetitorQuestion(message) || messageDepartment === "sales_and_growth"
         ? await fetchCompetitorContext(message)
@@ -1514,6 +1589,7 @@ export async function POST(req: Request) {
       signalsContext,
       availableActions,
       detectedDepartment: messageDepartment,
+      liveSnapshot,
     });
     const actionNotices: string[] = [];
     let baseReply = claudeResult.reply;
