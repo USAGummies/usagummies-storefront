@@ -180,6 +180,37 @@ export async function GET(req: NextRequest) {
     await appendStateArray("run-ledger", dispatched, 10000);
   }
 
+  // Always dispatch the Abra scheduler for feeds, anomaly detection, morning brief, etc.
+  let abraSchedulerOk = false;
+  try {
+    const abraUrl = `${baseUrl}/api/ops/abra/scheduler`;
+    const cronSecret = process.env.CRON_SECRET;
+    if (qstash) {
+      await qstash.publishJSON({
+        url: abraUrl,
+        body: { triggeredBy: "master-scheduler" },
+        headers: cronSecret ? { authorization: `Bearer ${cronSecret}` } : {},
+        retries: 2,
+        timeout: "5m",
+      });
+      abraSchedulerOk = true;
+    } else {
+      // Direct fetch fallback (dev mode)
+      const res = await fetch(abraUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(cronSecret ? { authorization: `Bearer ${cronSecret}` } : {}),
+        },
+        body: JSON.stringify({ triggeredBy: "master-scheduler" }),
+        signal: AbortSignal.timeout(15000),
+      });
+      abraSchedulerOk = res.ok;
+    }
+  } catch (e) {
+    console.error("[scheduler] Abra scheduler dispatch failed:", e);
+  }
+
   // Integration/feed health check and alerting (best-effort).
   try {
     const { checkAndAlertHealth } = await import("@/lib/ops/abra-health-monitor");
@@ -236,6 +267,7 @@ export async function GET(req: NextRequest) {
     etTime: `${nowET.getHours().toString().padStart(2, "0")}:${nowET.getMinutes().toString().padStart(2, "0")}`,
     totalDue: dueAgents.length,
     dispatched: dispatched.length,
+    abraSchedulerDispatched: abraSchedulerOk,
     auditWarm,
     integrationSLA: integrationSLA
       ? {

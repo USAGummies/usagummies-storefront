@@ -71,10 +71,10 @@ function getGmailClient() {
     return _gmail;
   }
 
-  // Option 2: OAuth2 refresh token
-  const clientId = process.env.GMAIL_OAUTH_CLIENT_ID;
-  const clientSecret = process.env.GMAIL_OAUTH_CLIENT_SECRET;
-  const refreshToken = process.env.GMAIL_OAUTH_REFRESH_TOKEN;
+  // Option 2: OAuth2 refresh token (accept both GMAIL_OAUTH_* and GCP_GMAIL_OAUTH_* naming)
+  const clientId = process.env.GMAIL_OAUTH_CLIENT_ID || process.env.GCP_GMAIL_OAUTH_CLIENT_ID;
+  const clientSecret = process.env.GMAIL_OAUTH_CLIENT_SECRET || process.env.GCP_GMAIL_OAUTH_CLIENT_SECRET;
+  const refreshToken = process.env.GMAIL_OAUTH_REFRESH_TOKEN || process.env.GCP_GMAIL_OAUTH_REFRESH_TOKEN;
 
   if (clientId && clientSecret && refreshToken) {
     const oauth2 = new google.auth.OAuth2(clientId, clientSecret);
@@ -84,7 +84,7 @@ function getGmailClient() {
   }
 
   throw new Error(
-    "Gmail API not configured. Set GMAIL_SERVICE_ACCOUNT_JSON or GMAIL_OAUTH_* env vars."
+    "Gmail API not configured. Set GMAIL_SERVICE_ACCOUNT_JSON, or set GMAIL_OAUTH_CLIENT_ID + GMAIL_OAUTH_CLIENT_SECRET + GMAIL_OAUTH_REFRESH_TOKEN."
   );
 }
 
