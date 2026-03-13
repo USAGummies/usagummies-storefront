@@ -26,8 +26,8 @@ const PLAID_ENV = () => (process.env.PLAID_ENV || "sandbox") as "sandbox" | "dev
 
 function plaidBaseUrl(): string {
   const env = PLAID_ENV();
-  if (env === "production") return "https://production.plaid.com";
-  if (env === "development") return "https://development.plaid.com";
+  // Plaid "development" env uses the production API endpoint (not a separate host)
+  if (env === "production" || env === "development") return "https://production.plaid.com";
   return "https://sandbox.plaid.com";
 }
 
@@ -82,7 +82,7 @@ export async function createLinkToken(): Promise<string> {
   const response = await plaidPost<LinkTokenResponse>("/link/token/create", {
     user: { client_user_id: "usagummies-ops" },
     client_name: "USA Gummies Ops",
-    products: ["transactions"],
+    products: ["auth"],
     country_codes: ["US"],
     language: "en",
     webhook: webhookUrl,
