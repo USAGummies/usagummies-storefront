@@ -937,7 +937,7 @@ Some actions auto-execute (create_brain_entry, acknowledge_signal, create_notion
     .filter(Boolean)
     .join("\n\n");
 
-  const maxTokens = selectedModel.includes("haiku") ? 2000 : 4000;
+  const maxTokens = selectedModel.includes("haiku") ? 3000 : 6000;
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
