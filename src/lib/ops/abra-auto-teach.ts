@@ -267,6 +267,93 @@ async function writeBrainEntry(params: {
 }
 
 /**
+ * Update the running monthly total brain entry for a given channel.
+ * This ensures Abra always has an accurate, verified monthly total
+ * instead of having to sum daily snapshots (which may have gaps).
+ */
+async function updateMonthlyTotal(params: {
+  channel: "shopify" | "amazon";
+  month: string; // YYYY-MM
+  dayRevenue: number;
+  dayOrders: number;
+  dayUnits?: number;
+}): Promise<void> {
+  try {
+    const sourceRef = `${params.channel}-monthly-total-${params.month}`;
+    const channelLabel = params.channel === "shopify" ? "Shopify" : "Amazon";
+
+    // Fetch existing monthly total entry
+    const existing = await sbFetch(
+      `/rest/v1/open_brain_entries?source_ref=eq.${encodeURIComponent(sourceRef)}&select=raw_text`,
+    );
+
+    let prevRevenue = 0;
+    let prevOrders = 0;
+    let prevUnits = 0;
+
+    if (Array.isArray(existing) && existing.length > 0) {
+      // Parse existing totals from the raw text
+      const text = existing[0].raw_text || "";
+      const revMatch = text.match(/\$([0-9,.]+)\s+total revenue/);
+      const ordMatch = text.match(/(\d+)\s+orders/);
+      const unitMatch = text.match(/(\d+)\s+total units/);
+      if (revMatch) prevRevenue = parseFloat(revMatch[1].replace(",", ""));
+      if (ordMatch) prevOrders = parseInt(ordMatch[1], 10);
+      if (unitMatch) prevUnits = parseInt(unitMatch[1], 10);
+    }
+
+    const newRevenue = prevRevenue + params.dayRevenue;
+    const newOrders = prevOrders + params.dayOrders;
+    const newUnits = prevUnits + (params.dayUnits || 0);
+
+    const summary = `${channelLabel} Monthly Total — ${params.month}: ${newOrders} orders, $${newRevenue.toFixed(2)} total revenue, ${newUnits} total units sold. Average order: $${newOrders > 0 ? (newRevenue / newOrders).toFixed(2) : "0.00"}. This is VERIFIED data from the ${channelLabel} API, updated incrementally by the daily feed.`;
+
+    // Delete existing then re-create (upsert)
+    try {
+      await sbFetch(
+        `/rest/v1/open_brain_entries?source_ref=eq.${encodeURIComponent(sourceRef)}`,
+        { method: "DELETE", headers: { Prefer: "return=minimal" } },
+      );
+    } catch {
+      /* may not exist */
+    }
+
+    const embedding = await buildEmbedding(
+      `${channelLabel} Monthly Revenue Total — ${params.month}\n${summary}`,
+    );
+
+    await sbFetch("/rest/v1/open_brain_entries", {
+      method: "POST",
+      headers: { Prefer: "return=minimal", "Content-Type": "application/json" },
+      body: JSON.stringify({
+        source_type: "api",
+        source_ref: sourceRef,
+        entry_type: "teaching",
+        title: `${channelLabel} Monthly Revenue Total — ${params.month}`,
+        raw_text: summary,
+        summary_text: summary.slice(0, 500),
+        category: "sales",
+        department: "sales_and_growth",
+        confidence: "high",
+        priority: "important",
+        processed: true,
+        embedding,
+        tags: ["verified_sales_data", "monthly_total", params.channel],
+      }),
+    });
+
+    console.log(
+      `[auto-teach] Updated ${channelLabel} monthly total for ${params.month}: ${newOrders} orders, $${newRevenue.toFixed(2)}`,
+    );
+  } catch (error) {
+    console.error(
+      "[auto-teach] Failed to update monthly total:",
+      error instanceof Error ? error.message : error,
+    );
+  }
+}
+
+/**
  * Run the Shopify orders feed — summarizes recent orders.
  */
 export async function runShopifyOrdersFeed(): Promise<FeedResult> {
@@ -343,6 +430,24 @@ export async function runShopifyOrdersFeed(): Promise<FeedResult> {
       rawText: summary,
       category: "sales",
       department: "sales_and_growth",
+    });
+
+    // Update running monthly total so Abra always has accurate cumulative data
+    const totalUnits = orders.reduce(
+      (sum, o) =>
+        sum +
+        (o.line_items || []).reduce(
+          (s: number, li: { quantity?: number }) => s + (li.quantity || 0),
+          0,
+        ),
+      0,
+    );
+    void updateMonthlyTotal({
+      channel: "shopify",
+      month: date.slice(0, 7),
+      dayRevenue: totalRevenue,
+      dayOrders: orders.length,
+      dayUnits: totalUnits,
     });
 
     for (const order of largeOrders.slice(0, 25)) {
@@ -469,6 +574,20 @@ export async function handleAmazonOrdersFeed(): Promise<FeedResult> {
       rawText: summary,
       category: "sales",
       department: "sales_and_growth",
+    });
+
+    // Update running monthly total so Abra always has accurate cumulative data
+    const totalUnits = orders.reduce(
+      (sum, o) =>
+        sum + (o.NumberOfItemsShipped || 0) + (o.NumberOfItemsUnshipped || 0),
+      0,
+    );
+    void updateMonthlyTotal({
+      channel: "amazon",
+      month: date.slice(0, 7),
+      dayRevenue: revenue,
+      dayOrders: orders.length,
+      dayUnits: totalUnits,
     });
 
     for (const order of orders) {
