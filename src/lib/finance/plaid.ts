@@ -1,8 +1,8 @@
 /**
  * Plaid Integration — USA Gummies
  *
- * Connects to Found.com banking via Plaid Link for real-time balance
- * and transaction data. Found has no direct API, so Plaid is the bridge.
+ * Connects to Bank of America via Plaid Link for real-time balance
+ * and transaction data. Plaid is the bridge to the bank's data.
  * Uses Production secret for both development and production environments.
  *
  * Flow:
@@ -129,7 +129,7 @@ export async function exchangePublicToken(publicToken: string): Promise<{
       body: JSON.stringify({
         item_id: response.item_id,
         access_token: response.access_token,
-        institution_name: "Found",
+        institution_name: "Bank of America",
         connected_at: connectedAt,
         status: "active",
       }),

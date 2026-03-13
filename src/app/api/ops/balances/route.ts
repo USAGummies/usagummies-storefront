@@ -2,11 +2,11 @@
  * GET/POST /api/ops/balances — Unified cash position across accounts.
  *
  * GET:
- *  - Plaid (Found), Shopify, Amazon balances
+ *  - Plaid (Bank of America), Shopify, Amazon balances
  *  - Supports manual cash override fallback when Plaid is non-production
  *
  * POST:
- *  - Store manual Found.com cash override: { balance, note }
+ *  - Store manual Bank of America cash override: { balance, note }
  */
 
 import { NextResponse } from "next/server";
@@ -99,7 +99,7 @@ export async function GET(req: Request) {
   const plaidIsLive = isPlaidLiveEnv() && plaidFound !== null;
   let found: UnifiedBalances["found"] = null;
   let cashSource: BalancesResponse["cashSource"] = "none";
-  let cashSourceLabel = "No Found.com source";
+  let cashSourceLabel = "No Bank of America source";
 
   if (plaidIsLive) {
     found = plaidFound;

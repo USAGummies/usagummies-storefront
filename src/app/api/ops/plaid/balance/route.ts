@@ -1,7 +1,7 @@
 /**
  * GET /api/ops/plaid/balance — Fetch Plaid balance and recent transactions
  *
- * Returns current balance + last 30 days of transactions from Found.com.
+ * Returns current balance + last 30 days of transactions from Bank of America.
  */
 
 import { NextResponse } from "next/server";

@@ -1,5 +1,5 @@
 /**
- * GET /api/ops/transactions — Recent bank transactions from Plaid (Found.com)
+ * GET /api/ops/transactions — Recent bank transactions from Plaid (Bank of America)
  *
  * Returns recent transactions with spending analysis for the Finance page.
  * Includes category breakdown, daily spending trend, and large transaction alerts.

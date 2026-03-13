@@ -11,6 +11,7 @@ type PlaidConnectButtonProps = {
 
 export function PlaidConnectButton({ onSuccess }: PlaidConnectButtonProps) {
   const [linkToken, setLinkToken] = useState<string | null>(null);
+  const [plaidEnv, setPlaidEnv] = useState<string>("development");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
@@ -23,6 +24,7 @@ export function PlaidConnectButton({ onSuccess }: PlaidConnectButtonProps) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to get link token");
       setLinkToken(data.linkToken);
+      if (data.env) setPlaidEnv(data.env);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to initialize Plaid");
       setLoading(false);
@@ -52,6 +54,7 @@ export function PlaidConnectButton({ onSuccess }: PlaidConnectButtonProps) {
 
   const { open, ready } = usePlaidLink({
     token: linkToken,
+    env: plaidEnv as "sandbox" | "development" | "production",
     onSuccess: onPlaidSuccess,
     onExit: () => setLoading(false),
   });
@@ -106,7 +109,7 @@ export function PlaidConnectButton({ onSuccess }: PlaidConnectButtonProps) {
             Connect Your Bank Account
           </div>
           <div style={{ fontSize: 12, color: "rgba(27,42,74,0.6)" }}>
-            Link your Found.com account via Plaid to see live cash position, transactions, and P&L actuals.
+            Link your Bank of America account via Plaid to see live cash position, transactions, and P&L actuals.
           </div>
         </div>
       </div>

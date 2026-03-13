@@ -66,7 +66,7 @@ CONTEXT:
 - Amazon fees include referral fee (~15%) and FBA fulfillment fee
 - FBA inventory "days of supply" = fulfillable units / (7-day avg units sold per day)
 - Daily Performance Reports DB in Notion has historical daily snapshots
-- Cash is tracked across Found.com (banking via Plaid), Shopify Payments, and Amazon Settlements
+- Cash is tracked across Bank of America (banking via Plaid), Shopify Payments, and Amazon Settlements
 - B2B pipeline is tracked in Notion with stages: Lead → Contacted → Interested → Negotiation → Proposal Sent → Closed Won/Lost
 - Communications come from Email (Gmail), Slack, B2B pipeline notes, Shopify customers, Amazon buyers
 
@@ -289,7 +289,7 @@ const tools = {
       if (!cashPosition) {
         return {
           message:
-            "No cash data available. Upload a Found.com CSV export via the Finance section to populate.",
+            "No cash data available. Upload a Bank of America CSV export via the Finance section to populate.",
         };
       }
       return cashPosition;
@@ -298,7 +298,7 @@ const tools = {
 
   getBalances: tool({
     description:
-      "Get unified cash position across all bank accounts and payment platforms. Returns balances from Found.com (Plaid), Shopify Payments, and Amazon Settlements, plus total cash available.",
+      "Get unified cash position across all bank accounts and payment platforms. Returns balances from Bank of America (Plaid), Shopify Payments, and Amazon Settlements, plus total cash available.",
     parameters: z.object({}),
     execute: async () => {
       try {

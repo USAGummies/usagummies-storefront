@@ -195,7 +195,7 @@ export function SettingsView() {
             }
 
             await fetch("/api/ops/balances?force=1", { cache: "no-store" }).catch(() => null);
-            setBankingNotice("Found.com connected successfully.");
+            setBankingNotice("Bank of America connected successfully.");
             await refresh();
           } catch (err) {
             setBankingNotice(err instanceof Error ? err.message : "Plaid token exchange failed");
@@ -440,7 +440,7 @@ export function SettingsView() {
               </strong>
             </div>
             <div>
-              Found.com link:{" "}
+              Bank of America link:{" "}
               <strong style={{ color: data?.banking.plaidConnected ? "#4ade80" : "#fbbf24" }}>
                 {data?.banking.plaidConnected ? "Connected" : "Not connected"}
               </strong>
@@ -474,7 +474,7 @@ export function SettingsView() {
                   fontFamily: "inherit",
                 }}
               >
-                {connectingBank ? "Connecting..." : data?.banking.plaidConnected ? "Reconnect Found.com" : "Connect Found.com"}
+                {connectingBank ? "Connecting..." : data?.banking.plaidConnected ? "Reconnect Bank of America" : "Connect Bank of America"}
               </button>
             </div>
             {bankingNotice ? (

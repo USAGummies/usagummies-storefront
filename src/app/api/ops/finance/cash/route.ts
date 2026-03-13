@@ -21,7 +21,7 @@ export async function GET() {
     return NextResponse.json(
       {
         message:
-          "No cash data available. Upload a Found.com CSV export to populate.",
+          "No cash data available. Upload a Bank of America CSV export to populate.",
       },
       { status: 200 },
     );

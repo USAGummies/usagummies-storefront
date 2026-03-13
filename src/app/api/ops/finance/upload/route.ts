@@ -1,7 +1,7 @@
 /**
- * POST /api/ops/finance/upload — CSV upload for Found.com bank transactions.
+ * POST /api/ops/finance/upload — CSV upload for Bank of America bank transactions.
  *
- * Parses Found.com CSV export (Date, Name, Amount), auto-categorizes,
+ * Parses Bank of America CSV export (Date, Name, Amount), auto-categorizes,
  * deduplicates against existing Notion records, and writes to the
  * Cash & Transactions database.
  *
@@ -24,7 +24,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // ---------------------------------------------------------------------------
-// CSV parser for Found.com export format
+// CSV parser for Bank of America export format
 // ---------------------------------------------------------------------------
 
 function categorize(
