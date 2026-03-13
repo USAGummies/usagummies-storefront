@@ -236,6 +236,8 @@ const SESSION_TRIGGERS =
   /\b(let'?s (have a |)meet|start a (meeting|session|review)|review .+ department|how'?s .+ doing|check in on)\b/i;
 const COST_TRIGGERS =
   /\b(ai spend|ai cost|how much .+ spend|budget|monthly spend|cost report)\b/i;
+const REFRESH_QUERY_TRIGGERS =
+  /\b(today|latest|current|up to date|up-to-date|incoming|right now|refresh)\b/i;
 
 type DetectedIntent =
   | { type: "initiative"; department: string | null; goal: string }
@@ -700,6 +702,128 @@ async function handleCostCommand(): Promise<string> {
   }
 }
 
+function resolveInternalHost(): string {
+  if (process.env.NEXTAUTH_URL) {
+    return process.env.NEXTAUTH_URL.replace(/\/+$/, "");
+  }
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  return "https://www.usagummies.com";
+}
+
+type RefreshRunResult = {
+  attempted: boolean;
+  ok: boolean;
+  emailFetchOk: boolean;
+  autoTeachOk: boolean;
+  reason: string;
+};
+
+async function runKnowledgeRefresh(reason: string): Promise<RefreshRunResult> {
+  const cronSecret = (process.env.CRON_SECRET || "").trim();
+  if (!cronSecret) {
+    return {
+      attempted: false,
+      ok: false,
+      emailFetchOk: false,
+      autoTeachOk: false,
+      reason: "CRON_SECRET is not configured",
+    };
+  }
+
+  const host = resolveInternalHost();
+  const headers = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${cronSecret}`,
+  };
+
+  let emailFetchOk = false;
+  let autoTeachOk = false;
+
+  try {
+    const res = await fetchWithRetry(
+      `${host}/api/ops/abra/email-fetch`,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ limit: 50 }),
+      },
+      { timeoutMs: 30000, maxRetries: 1 },
+    );
+    emailFetchOk = res.ok;
+  } catch {
+    emailFetchOk = false;
+  }
+
+  try {
+    const res = await fetchWithRetry(
+      `${host}/api/ops/abra/auto-teach`,
+      {
+        method: "POST",
+        headers,
+      },
+      { timeoutMs: 35000, maxRetries: 1 },
+    );
+    autoTeachOk = res.ok;
+  } catch {
+    autoTeachOk = false;
+  }
+
+  return {
+    attempted: true,
+    ok: emailFetchOk || autoTeachOk,
+    emailFetchOk,
+    autoTeachOk,
+    reason,
+  };
+}
+
+function formatFreshnessNote(
+  freshestDays: number | null,
+  refresh: RefreshRunResult,
+): string {
+  const ageText =
+    freshestDays == null
+      ? "I could not determine a recent source age"
+      : `latest source age is ~${freshestDays.toFixed(1)} day(s)`;
+
+  if (!refresh.attempted) {
+    return `⚠️ Data freshness: ${ageText}. I could not auto-refresh (${refresh.reason}). Run \`/abra refresh\` after cron auth is configured.`;
+  }
+
+  if (refresh.ok) {
+    return `🔄 Data freshness: ${ageText}. I detected stale context and started a refresh now (email-fetch: ${refresh.emailFetchOk ? "ok" : "failed"}, auto-teach: ${refresh.autoTeachOk ? "ok" : "failed"}).`;
+  }
+
+  return `⚠️ Data freshness: ${ageText}. I attempted refresh but both jobs failed.`;
+}
+
+function freshestSourceAgeDays(
+  sources: Array<{ days_ago?: number }>,
+): number | null {
+  const values = sources
+    .map((source) =>
+      typeof source.days_ago === "number" && Number.isFinite(source.days_ago)
+        ? source.days_ago
+        : null,
+    )
+    .filter((value): value is number => value != null);
+  if (values.length === 0) return null;
+  return Math.min(...values);
+}
+
+async function handleRefreshCommand(): Promise<string> {
+  const refresh = await runKnowledgeRefresh("manual_slack_refresh");
+  if (!refresh.attempted) {
+    return `❌ Refresh not started: ${refresh.reason}`;
+  }
+  if (!refresh.ok) {
+    return "❌ Refresh attempted, but both email-fetch and auto-teach failed.";
+  }
+  return `✅ Refresh started.\n• Email fetch: ${refresh.emailFetchOk ? "ok" : "failed"}\n• Auto-teach: ${refresh.autoTeachOk ? "ok" : "failed"}`;
+}
+
 function parseInitiativeInput(
   initiativeText: string,
 ): { department: string | null; goal: string } {
@@ -842,6 +966,78 @@ async function handleSessionIntentCommand(params: {
     .join("\n");
 }
 
+async function callAbraChatViaInternalApi(
+  message: string,
+  history?: ChatMessage[],
+): Promise<{
+  reply: string;
+  sources: Array<{ title: string; source_table: string; days_ago?: number }>;
+  answerLogId: string | null;
+} | null> {
+  const cronSecret = (process.env.CRON_SECRET || "").trim();
+  if (!cronSecret) return null;
+
+  const host = resolveInternalHost();
+
+  try {
+    const res = await fetchWithRetry(
+      `${host}/api/ops/abra/chat`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${cronSecret}`,
+        },
+        body: JSON.stringify({
+          message,
+          history: history || [],
+        }),
+      },
+      { timeoutMs: 45000, maxRetries: 0 },
+    );
+
+    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    if (!res.ok) return null;
+
+    const reply =
+      typeof data.reply === "string" && data.reply.trim()
+        ? data.reply.trim()
+        : "";
+    if (!reply) return null;
+
+    const sources = Array.isArray(data.sources)
+      ? data.sources
+          .map((item) => {
+            if (!item || typeof item !== "object") return null;
+            const row = item as Record<string, unknown>;
+            const sourceTable =
+              row.source_table === "email" ? "email" : "brain";
+            const title =
+              typeof row.title === "string" && row.title.trim()
+                ? row.title.trim()
+                : "(untitled)";
+            const daysAgo =
+              typeof row.days_ago === "number" && Number.isFinite(row.days_ago)
+                ? row.days_ago
+                : undefined;
+            return { title, source_table: sourceTable, days_ago: daysAgo };
+          })
+          .filter(
+            (value): value is { title: string; source_table: string; days_ago: number | undefined } =>
+              !!value,
+          )
+      : [];
+
+    return {
+      reply,
+      sources,
+      answerLogId: null,
+    };
+  } catch {
+    return null;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Core RAG pipeline with temporal awareness
 // ---------------------------------------------------------------------------
@@ -854,6 +1050,9 @@ async function callAbraChat(
   sources: Array<{ title: string; source_table: string; days_ago?: number }>;
   answerLogId: string | null;
 }> {
+  const proxied = await callAbraChatViaInternalApi(message, history);
+  if (proxied) return proxied;
+
   const openaiKey = process.env.OPENAI_API_KEY;
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   const supabaseUrl =
@@ -1181,7 +1380,8 @@ export async function POST(req: Request) {
         "• `/abra <question>` — Ask Abra anything\n" +
         "• `/abra correct: X but actually Y` — Correct wrong info\n" +
         "• `/abra teach: [dept] content` — Teach Abra new knowledge\n" +
-        "• `/abra initiative: <department> <goal>` — Create initiative\n\n" +
+        "• `/abra initiative: <department> <goal>` — Create initiative\n" +
+        "• `/abra refresh` — Refresh latest email + teaching feeds\n\n" +
         "Departments (20) grouped by operating pillar:\n" +
         DEPARTMENT_HELP_TEXT,
     });
@@ -1201,6 +1401,7 @@ export async function POST(req: Request) {
   const correctMatch = trimmedText.match(/^correct:\s*(.+)$/is);
   const teachMatch = trimmedText.match(/^teach:\s*(.+)$/is);
   const initiativeMatch = trimmedText.match(/^initiative:\s*(.+)$/is);
+  const refreshMatch = /^refresh(?:\s+(?:now|data|brain))?$/i.test(trimmedText);
   const costMatch = /^cost(?:\s+report)?$/i.test(trimmedText);
   const answerMatch = trimmedText.match(/^answer:\s*(.+)$/is);
   const searchMatch = trimmedText.match(/^search:\s*(.+)$/is);
@@ -1233,6 +1434,7 @@ export async function POST(req: Request) {
         "• `/abra correct: X but actually Y` — Correct wrong info\n" +
         "• `/abra teach: [dept] content` — Teach Abra new knowledge\n" +
         "• `/abra initiative: <department> <goal>` — Create initiative\n" +
+        "• `/abra refresh` — Refresh latest email + teaching feeds\n" +
         "• `/abra cost` — Show monthly AI spend\n" +
         "• `/abra status` — Check service status\n\n" +
         "Departments (20) grouped by operating pillar:\n" +
@@ -1251,6 +1453,7 @@ export async function POST(req: Request) {
     correctMatch ||
     teachMatch ||
     initiativeMatch ||
+    refreshMatch ||
     costMatch ||
     inferredInitiativeText ||
     inferredSessionIntent ||
@@ -1269,6 +1472,8 @@ export async function POST(req: Request) {
           reply = await handleTeachCommand(teachMatch![1], userName);
         } else if (initiativeMatch) {
           reply = await handleInitiativeCommand(initiativeMatch[1], userName);
+        } else if (refreshMatch) {
+          reply = await handleRefreshCommand();
         } else if (inferredInitiativeText) {
           reply = await handleInitiativeCommand(inferredInitiativeText, userName);
         } else if (inferredSessionIntent) {
@@ -1307,6 +1512,8 @@ export async function POST(req: Request) {
         ? "learning"
         : initiativeMatch || inferredInitiativeText
           ? "creating initiative"
+          : refreshMatch
+            ? "refreshing data"
           : inferredSessionIntent
             ? "starting session"
           : "fetching cost summary";

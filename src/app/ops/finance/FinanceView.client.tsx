@@ -325,8 +325,8 @@ export function FinanceView() {
         </div>
       ) : null}
 
-      {/* Plaid connect / awaiting data */}
-      {!pnlLoading && !balLoading && !pnl?.revenue.total && !balances?.totalCash ? (
+      {/* Plaid connect — show when bank is not linked as live source */}
+      {!balLoading && (balances as Record<string, unknown>)?.cashSource !== "plaid-live" ? (
         <div style={{ marginBottom: 12 }}>
           <PlaidConnectButton onSuccess={() => window.location.reload()} />
         </div>
