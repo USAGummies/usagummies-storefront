@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { usePlaidLink } from "react-plaid-link";
 import { Landmark } from "lucide-react";
 import { NAVY, GOLD } from "@/app/ops/tokens";
@@ -11,20 +11,20 @@ type PlaidConnectButtonProps = {
 
 export function PlaidConnectButton({ onSuccess }: PlaidConnectButtonProps) {
   const [linkToken, setLinkToken] = useState<string | null>(null);
-  const [plaidEnv, setPlaidEnv] = useState<string>("development");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
+  const openedRef = useRef(false);
 
   const fetchLinkToken = useCallback(async () => {
     setLoading(true);
     setError(null);
+    openedRef.current = false;
     try {
       const res = await fetch("/api/ops/plaid/link-token", { method: "POST" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to get link token");
       setLinkToken(data.linkToken);
-      if (data.env) setPlaidEnv(data.env);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to initialize Plaid");
       setLoading(false);
@@ -52,17 +52,20 @@ export function PlaidConnectButton({ onSuccess }: PlaidConnectButtonProps) {
     [onSuccess],
   );
 
+  // Link-token flow: env is encoded in the token, no env prop needed
   const { open, ready } = usePlaidLink({
     token: linkToken,
-    env: plaidEnv as "sandbox" | "development" | "production",
     onSuccess: onPlaidSuccess,
     onExit: () => setLoading(false),
   });
 
-  // Auto-open Plaid Link once token is ready
-  if (linkToken && ready && loading) {
-    open();
-  }
+  // Auto-open Plaid Link once token is ready (useEffect avoids calling open() during render)
+  useEffect(() => {
+    if (linkToken && ready && loading && !openedRef.current) {
+      openedRef.current = true;
+      open();
+    }
+  }, [linkToken, ready, loading, open]);
 
   if (connected) {
     return (
