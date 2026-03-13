@@ -57,3 +57,5 @@ node_modules/
 # artifacts (do not commit)
 output/
 tmp/
+.next_build_stale_*
+.claude/worktrees/
