@@ -163,12 +163,29 @@ function buildHealthModeReply(message: string): string {
   return "Abra is online. Health mode is responding and authenticated.";
 }
 
+/** Known action types — reject anything not in this set to prevent prompt-injected novel action types */
+const KNOWN_ACTION_TYPES = new Set([
+  "create_brain_entry",
+  "acknowledge_signal",
+  "send_slack",
+  "create_task",
+  "create_notion_page",
+  "record_transaction",
+  "correct_claim",
+  "send_email",
+  "update_notion",
+  "pause_initiative",
+]);
+
 function normalizeActionDirective(raw: unknown): AbraAction | null {
   if (!raw || typeof raw !== "object") return null;
   const obj = raw as Record<string, unknown>;
   const actionType =
-    typeof obj.action_type === "string" ? obj.action_type.trim() : "";
+    typeof obj.action_type === "string" ? obj.action_type.trim().toLowerCase() : "";
   if (!actionType) return null;
+
+  // Reject unknown action types — prevents prompt injection of novel actions
+  if (!KNOWN_ACTION_TYPES.has(actionType)) return null;
 
   const rawRisk =
     obj.risk_level === "low" ||
@@ -191,20 +208,25 @@ function normalizeActionDirective(raw: unknown): AbraAction | null {
     ? "medium"
     : rawRisk;
 
+  // Truncate all string fields to prevent context-stuffing
+  const title =
+    typeof obj.title === "string" && obj.title.trim()
+      ? obj.title.trim().slice(0, 200)
+      : actionType;
+  const description =
+    typeof obj.description === "string" && obj.description.trim()
+      ? obj.description.trim().slice(0, 500)
+      : `Requested action: ${actionType}`;
+  const department =
+    typeof obj.department === "string" && obj.department.trim()
+      ? obj.department.trim().slice(0, 50)
+      : "executive";
+
   return {
     action_type: actionType,
-    title:
-      typeof obj.title === "string" && obj.title.trim()
-        ? obj.title.trim()
-        : actionType,
-    description:
-      typeof obj.description === "string" && obj.description.trim()
-        ? obj.description.trim()
-        : `Requested action: ${actionType}`,
-    department:
-      typeof obj.department === "string" && obj.department.trim()
-        ? obj.department.trim()
-        : "executive",
+    title,
+    description,
+    department,
     risk_level: risk,
     params:
       obj.params && typeof obj.params === "object" && !Array.isArray(obj.params)
