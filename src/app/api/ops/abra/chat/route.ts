@@ -1793,6 +1793,7 @@ export async function POST(req: Request) {
     if (supabaseCircuitOpen) dataStatus.push("🔴 Supabase circuit OPEN: All brain memory, corrections, departments, initiatives, signals, and team data unavailable. Only live Shopify/email feeds and KPI timeseries are active.");
     else if (embeddingFailed) dataStatus.push("🔴 Brain memory search: FAILED (embedding service down — no brain/email context available)");
     if (!liveSnapshot) dataStatus.push("⚠️ Live Shopify/email snapshot: UNAVAILABLE (API timeout or not configured)");
+    else if (!liveSnapshot.includes("LIVE INBOX")) dataStatus.push("⚠️ Email inbox feed: UNAVAILABLE (Gmail not configured or auth failed). You CANNOT see or check emails. If asked about emails, tell the user you don't have email access right now and ask them to paste the relevant content.");
     if (!financialContext) dataStatus.push("⚠️ Financial KPI data: UNAVAILABLE (no KPI timeseries data returned)");
     const dataStatusLine = dataStatus.length > 0 ? `\n[DATA FEED STATUS: ${dataStatus.join("; ")}. Do NOT invent numbers for unavailable feeds. If brain search failed, tell the user your memory is temporarily unavailable.]` : "";
     const augmentedLiveSnapshot = [liveSnapshot, temporalHint, dataStatusLine].filter(Boolean).join("\n") || null;

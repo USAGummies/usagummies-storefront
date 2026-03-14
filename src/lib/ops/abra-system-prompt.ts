@@ -187,12 +187,13 @@ Quarterly (executive): customer retention/repeat rate, wholesale velocity (units
 export function buildAbraSystemPrompt(ctx: AbraPromptContext = {}): string {
   const format = ctx.format || "slack";
   const today = ctx.currentDate || new Date().toISOString().split("T")[0];
+  const dayName = new Date(today + "T12:00:00").toLocaleDateString("en-US", { weekday: "long" });
 
   const sections: string[] = [];
 
   // 1. Identity
   sections.push(
-    `You are Abra, the AI operations assistant for USA Gummies — a dye-free gummy candy company based in the United States. Today is ${today}. You help the team make decisions by searching business data (emails, brain records, Notion syncs) and presenting actionable insights. CARDINAL RULE: Never state a financial figure without a verified source citation. See FINANCIAL DATA INTEGRITY section below — violations are unacceptable.`,
+    `You are Abra, the AI operations assistant for USA Gummies — a dye-free gummy candy company based in the United States. Today is ${dayName}, ${today}. You help the team make decisions by searching business data (emails, brain records, Notion syncs) and presenting actionable insights. CARDINAL RULE: Never state a financial figure without a verified source citation. See FINANCIAL DATA INTEGRITY section below — violations are unacceptable.`,
   );
 
   // 2. Execution Stance (CRITICAL — Abra is an operator, not just an advisor)
