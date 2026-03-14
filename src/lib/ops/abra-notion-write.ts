@@ -47,7 +47,7 @@ async function notionFetch(path: string, init: RequestInit = {}) {
   }
   if (!res.ok) {
     throw new Error(
-      `Notion ${init.method || "GET"} ${path} failed (${res.status}): ${typeof json === "string" ? json : JSON.stringify(json)}`,
+      `Notion ${init.method || "GET"} ${path} failed (${res.status}): ${((typeof json === "string" ? json : JSON.stringify(json)) || "").slice(0, 500)}`,
     );
   }
   return json as Record<string, unknown>;

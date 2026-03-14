@@ -51,7 +51,7 @@ async function sbFetch(path: string, init: RequestInit = {}): Promise<unknown> {
   }
   if (!res.ok) {
     throw new Error(
-      `Supabase ${init.method || "GET"} ${path} failed (${res.status}): ${typeof json === "string" ? json : JSON.stringify(json)}`,
+      `Supabase ${init.method || "GET"} ${path} failed (${res.status}): ${((typeof json === "string" ? json : JSON.stringify(json)) || "").slice(0, 500)}`,
     );
   }
   return json;

@@ -101,7 +101,7 @@ async function sbFetch(path: string, init: RequestInit = {}) {
   }
   if (!res.ok) {
     throw new Error(
-      `Supabase ${init.method || "GET"} ${path} failed (${res.status}): ${typeof json === "string" ? json : JSON.stringify(json)}`,
+      `Supabase ${init.method || "GET"} ${path} failed (${res.status}): ${((typeof json === "string" ? json : JSON.stringify(json)) || "").slice(0, 500)}`,
     );
   }
   return json;
@@ -723,36 +723,36 @@ async function handlePatch(req: Request) {
     const MAX_ARRAY_ITEMS = 200;
     const MAX_NEW_ITEMS_PER_REQUEST = 50;
 
-    // Append notes (array merge)
+    // Append notes (array merge — pre-truncate existing to bound memory)
     if (Array.isArray(payload.notes)) {
-      const currentNotes = Array.isArray(session.notes) ? session.notes : [];
+      const currentNotes = (Array.isArray(session.notes) ? session.notes : []).slice(-MAX_ARRAY_ITEMS);
       const newNotes = payload.notes.slice(0, MAX_NEW_ITEMS_PER_REQUEST);
       updates.notes = [...currentNotes, ...newNotes].slice(-MAX_ARRAY_ITEMS);
     }
 
     // Append action items
     if (Array.isArray(payload.action_items)) {
-      const current = Array.isArray(session.action_items)
+      const current = (Array.isArray(session.action_items)
         ? session.action_items
-        : [];
+        : []).slice(-MAX_ARRAY_ITEMS);
       const newItems = payload.action_items.slice(0, MAX_NEW_ITEMS_PER_REQUEST);
       updates.action_items = [...current, ...newItems].slice(-MAX_ARRAY_ITEMS);
     }
 
     // Append decisions
     if (Array.isArray(payload.decisions)) {
-      const current = Array.isArray(session.decisions)
+      const current = (Array.isArray(session.decisions)
         ? session.decisions
-        : [];
+        : []).slice(-MAX_ARRAY_ITEMS);
       const newItems = payload.decisions.slice(0, MAX_NEW_ITEMS_PER_REQUEST);
       updates.decisions = [...current, ...newItems].slice(-MAX_ARRAY_ITEMS);
     }
 
     // Append open questions
     if (Array.isArray(payload.open_questions)) {
-      const current = Array.isArray(session.open_questions)
+      const current = (Array.isArray(session.open_questions)
         ? session.open_questions
-        : [];
+        : []).slice(-MAX_ARRAY_ITEMS);
       const newItems = payload.open_questions.slice(0, MAX_NEW_ITEMS_PER_REQUEST);
       updates.open_questions = [...current, ...newItems].slice(-MAX_ARRAY_ITEMS);
     }
