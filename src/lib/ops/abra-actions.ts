@@ -95,15 +95,15 @@ export const AUTO_EXEC_POLICIES: AutoExecPolicy[] = [
   {
     action_type: "create_notion_page",
     max_risk_level: "low",
-    min_confidence: 0.7,
-    daily_limit: 25,
+    min_confidence: 0.8,
+    daily_limit: 10,
     enabled: true,
   },
   {
     action_type: "record_transaction",
     max_risk_level: "low",
-    min_confidence: 0.85,
-    daily_limit: 50,
+    min_confidence: 0.9,
+    daily_limit: 10,
     enabled: true,
     max_amount: 500, // Safety cap: transactions > $500 require human approval
   },
@@ -437,7 +437,9 @@ async function handlePauseInitiative(
 
 function resolveNotionDb(key: string): string {
   const normalized = (key || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
-  return NOTION_DB_MAP[normalized] || NOTION_DB_MAP.general || "";
+  // Only fall back to "general" if the caller explicitly requested it — unknown keys return empty
+  // so the handler can report the error with available keys rather than silently misrouting
+  return NOTION_DB_MAP[normalized] || "";
 }
 
 function notionUrlFromId(pageId: string): string {
