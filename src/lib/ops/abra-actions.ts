@@ -1626,3 +1626,183 @@ export async function executeAction(approvalId: string): Promise<ActionResult> {
 export function getAvailableActions(): string[] {
   return Object.keys(ACTION_HANDLERS);
 }
+
+// ─── Shared Action Parsing Utilities ───────────────────────────────────────
+// These are used by the web chat route AND Slack routes to parse/execute actions.
+
+export type ActionDirective = {
+  action: AbraAction;
+  raw: string;
+};
+
+/** Known action types — reject anything not in this set to prevent prompt-injected novel action types */
+export const KNOWN_ACTION_TYPES = new Set([
+  "create_brain_entry",
+  "acknowledge_signal",
+  "send_slack",
+  "create_task",
+  "create_notion_page",
+  "record_transaction",
+  "correct_claim",
+  "send_email",
+  "update_notion",
+  "pause_initiative",
+  "log_production_run",
+  "record_vendor_quote",
+  "run_scenario",
+  "read_email",
+  "search_email",
+]);
+
+export function normalizeActionDirective(raw: unknown): AbraAction | null {
+  if (!raw || typeof raw !== "object") return null;
+  const obj = raw as Record<string, unknown>;
+  const actionType =
+    typeof obj.action_type === "string" ? obj.action_type.trim().toLowerCase() : "";
+  if (!actionType) return null;
+
+  // Reject unknown action types — prevents prompt injection of novel actions
+  if (!KNOWN_ACTION_TYPES.has(actionType)) return null;
+
+  const rawRisk =
+    obj.risk_level === "low" ||
+    obj.risk_level === "medium" ||
+    obj.risk_level === "high" ||
+    obj.risk_level === "critical"
+      ? obj.risk_level
+      : "medium";
+
+  // Defense-in-depth: financial and correction actions are NEVER "low" risk,
+  // regardless of what Claude labels them.
+  const ELEVATED_RISK_ACTIONS = new Set([
+    "record_transaction",
+    "correct_claim",
+    "send_email",
+    "send_slack",
+  ]);
+  const risk = ELEVATED_RISK_ACTIONS.has(actionType) && rawRisk === "low"
+    ? "medium"
+    : rawRisk;
+
+  // Truncate all string fields to prevent context-stuffing
+  const title =
+    typeof obj.title === "string" && obj.title.trim()
+      ? obj.title.trim().slice(0, 200)
+      : actionType;
+  const description =
+    typeof obj.description === "string" && obj.description.trim()
+      ? obj.description.trim().slice(0, 500)
+      : `Requested action: ${actionType}`;
+  const department =
+    typeof obj.department === "string" && obj.department.trim()
+      ? obj.department.trim().slice(0, 50)
+      : "executive";
+
+  return {
+    action_type: actionType,
+    title,
+    description,
+    department,
+    risk_level: risk,
+    params:
+      obj.params && typeof obj.params === "object" && !Array.isArray(obj.params)
+        ? (obj.params as Record<string, unknown>)
+        : {},
+    requires_approval: obj.requires_approval !== false,
+  };
+}
+
+export function parseActionDirectives(reply: string): {
+  actions: ActionDirective[];
+  cleanReply: string;
+} {
+  const pattern = /<action>\s*([\s\S]*?)\s*<\/action>/gi;
+  const actions: ActionDirective[] = [];
+  let cleanReply = reply;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(reply)) !== null) {
+    const block = match[0];
+    const payloadRaw = match[1]?.trim() || "";
+    try {
+      const parsed = JSON.parse(payloadRaw) as unknown;
+      const action = normalizeActionDirective(parsed);
+      if (action) {
+        actions.push({ action, raw: block });
+      }
+    } catch {
+      // Ignore malformed blocks and keep response usable.
+    }
+  }
+
+  for (const directive of actions) {
+    cleanReply = cleanReply.replace(directive.raw, "").trim();
+  }
+
+  return { actions, cleanReply: cleanReply.trim() };
+}
+
+/** Strip <action>...</action> blocks from text for user-facing display */
+export function stripActionBlocks(text: string): string {
+  return text.replace(/<action>\s*[\s\S]*?\s*<\/action>/gi, "").trim();
+}
+
+/**
+ * Build the action instruction text for Claude's system prompt.
+ * Used by web chat, Slack slash command, and Slack events processor.
+ */
+export function buildActionInstructions(availableActions: string[]): string {
+  if (!availableActions || availableActions.length === 0) return "";
+  return `\n\nACTION EXECUTION SYSTEM (YOU MUST USE THIS):
+You have REAL action capabilities. Available actions: ${availableActions.join(", ")}.
+
+BANNED PHRASES — NEVER say any of these:
+• "I can't directly handle..."
+• "I can't execute tasks..."
+• "I don't have the ability to..."
+• "I'm not able to..."
+• "You should..." (when you could DO it instead)
+• "Consider doing..." (when you could DO it instead)
+• "I recommend..." followed by a list of steps the user should do themselves
+Instead: USE your actions. If the user asks you to do something and you have an action for it, DO IT.
+
+WHEN TO EMIT ACTIONS:
+• User asks you to DO something (send, create, log, notify, remind, track, store) → EMIT the action.
+• You learn new information about the business → create_brain_entry to remember it.
+• A playbook step needs execution → execute it via action, don't just list it.
+• Something important happened → send_slack to alert the team.
+
+FORMAT (append <action> JSON blocks, max 3 per reply):
+<action>{"action_type":"create_brain_entry","title":"...","description":"...","department":"executive","risk_level":"low","params":{"title":"...","text":"..."}}</action>
+
+EXAMPLES:
+• "remind the team about the production call" → emit send_slack action
+• "we switched from Powers to XYZ for packaging" → emit create_brain_entry
+• "create a task to follow up with the distributor" → emit create_task
+• "save this as a report" → emit create_notion_page with database "meeting_notes"
+• "log this to the pipeline" → emit create_notion_page with database "b2b_prospects"
+• "record the $500 payment to Powers" → emit record_transaction with type "expense", amount 500, vendor "Powers Confections"
+• "we did a production run at Powers, 10,000 units, total cost $13,500" → emit log_production_run
+• "Powers quoted us $1.20/unit for gummy base" → emit record_vendor_quote
+• "what if ingredient costs go up 15%?" → emit run_scenario
+• "did you see the email from Rene?" → emit read_email with the message_id from inbox.
+• "find emails about the Powers invoice" → emit search_email with query "Powers invoice"
+
+DATABASE KEYS for create_notion_page: meeting_notes, b2b_prospects, distributor_prospects, daily_performance, fleet_ops, inventory, sku_registry, cash_transactions, content_drafts, kpis, general
+
+ACTION EXECUTION TIERS:
+• AUTO-EXECUTE (low-risk, informational): create_brain_entry, acknowledge_signal, create_notion_page, create_task — these execute immediately.
+• AUTO-EXECUTE (low-risk, read-only): read_email, search_email — auto-execute IMMEDIATELY.
+• AUTO-EXECUTE (low-risk, operational data): log_production_run, record_vendor_quote — auto-execute when emitted.
+• AUTO-EXECUTE (stateless computation): run_scenario — computes hypotheticals. Auto-execute when emitted.
+• AUTO-EXECUTE WITH CAPS (financial): record_transaction — auto-executes ONLY if amount ≤ $500.
+• ALWAYS QUEUED (requires human approval): send_email, send_slack, correct_claim — NEVER auto-execute.
+
+⚠️ ACTION SAFETY RULES:
+1. record_transaction — ONLY emit with amounts the USER explicitly stated. NEVER estimate amounts.
+2. correct_claim — ALWAYS confirm exact wording with user. Corrections permanently override data.
+3. log_production_run — ONLY emit with cost figures from VERIFIED sources. NEVER estimate production costs.
+4. run_scenario — Label EVERY output "⚠️ HYPOTHETICAL SCENARIO — not a forecast."
+5. create_brain_entry — Make titles factual and specific. NEVER store unverified dollar figures.
+6. GENERAL: If unsure whether to emit an action, DON'T. Ask the user first.`;
+}

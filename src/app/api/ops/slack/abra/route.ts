@@ -46,6 +46,13 @@ import {
   computeConfidence,
   shouldAskQuestions,
 } from "@/lib/ops/abra-question-detector";
+import {
+  getAvailableActions,
+  parseActionDirectives,
+  proposeAndMaybeExecute,
+  buildActionInstructions,
+  stripActionBlocks,
+} from "@/lib/ops/abra-actions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -1137,13 +1144,15 @@ async function callAbraChat(
 
   // --------------- Step 4: Build dynamic system prompt + context ---------------
   const signalsContext = buildSignalsContext(activeSignals);
+  const availableActions = getAvailableActions();
+  const actionInstructions = buildActionInstructions(availableActions);
   const systemPrompt = buildAbraSystemPrompt({
     format: "slack",
     corrections,
     departments,
     conversationDepartment: messageDepartment,
     signalsContext,
-  });
+  }) + actionInstructions;
 
   let context = "";
   let degraded = false;
@@ -1194,7 +1203,7 @@ async function callAbraChat(
           },
           body: JSON.stringify({
             model: claudeModel,
-            max_tokens: 800,
+            max_tokens: 1200,
             temperature: 0.2,
             system: systemPrompt,
             messages: [
@@ -1203,7 +1212,7 @@ async function callAbraChat(
             ],
           }),
         },
-        { timeoutMs: 10000, maxRetries: 0 },
+        { timeoutMs: 15000, maxRetries: 0 },
       );
 
       if (claudeRes.ok) {
@@ -1300,6 +1309,21 @@ async function callAbraChat(
       sources: [],
       answerLogId: null,
     };
+  }
+
+  // Parse and execute any action directives from the LLM response
+  const parsedActions = parseActionDirectives(reply);
+  reply = parsedActions.cleanReply || reply;
+
+  for (const directive of parsedActions.actions.slice(0, 3)) {
+    try {
+      await proposeAndMaybeExecute(directive.action);
+    } catch (actionErr) {
+      console.error(
+        `[slack/abra] action ${directive.action.action_type} failed:`,
+        actionErr instanceof Error ? actionErr.message : actionErr,
+      );
+    }
   }
 
   if (degraded) {

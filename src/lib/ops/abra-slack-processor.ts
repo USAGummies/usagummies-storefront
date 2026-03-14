@@ -9,6 +9,13 @@ import {
 } from "@/lib/ops/abra-cost-tracker";
 import { notify } from "@/lib/ops/notify";
 import { saveMessage } from "@/lib/ops/abra-chat-history";
+import {
+  getAvailableActions,
+  parseActionDirectives,
+  proposeAndMaybeExecute,
+  buildActionInstructions,
+  stripActionBlocks,
+} from "@/lib/ops/abra-actions";
 
 export type SlackMessageContext = {
   text: string;
@@ -323,13 +330,15 @@ async function generateAnswer(params: {
     getMonthlySpend(),
   ]);
   const signalsContext = buildSignalsContext(signals);
+  const availableActions = getAvailableActions();
+  const actionInstructions = buildActionInstructions(availableActions);
   const systemPrompt = buildAbraSystemPrompt({
     format: "slack",
     corrections,
     departments,
     costSummary,
     signalsContext,
-  });
+  }) + actionInstructions;
   const context = buildTieredContext(tiered);
   const model = await getPreferredClaudeModel(DEFAULT_MODEL);
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
@@ -345,7 +354,7 @@ async function generateAnswer(params: {
     },
     body: JSON.stringify({
       model,
-      max_tokens: 700,
+      max_tokens: 1200,
       temperature: 0.2,
       system: systemPrompt,
       messages: [{ role: "user", content: userPrompt }],
@@ -368,11 +377,25 @@ async function generateAnswer(params: {
     throw new Error(`Claude API failed (${res.status}): ${text.slice(0, 250)}`);
   }
 
-  const reply = (payload.content || [])
+  let reply = (payload.content || [])
     .map((item) => String(item?.text || ""))
     .join("\n")
     .trim();
   if (!reply) throw new Error("Claude returned empty reply");
+
+  // Parse and execute any action directives from the reply
+  const parsedActions = parseActionDirectives(reply);
+  reply = parsedActions.cleanReply || reply;
+  for (const directive of parsedActions.actions.slice(0, 3)) {
+    try {
+      await proposeAndMaybeExecute(directive.action);
+    } catch (actionErr) {
+      console.error(
+        `[abra-slack-processor] action ${directive.action.action_type} failed:`,
+        actionErr instanceof Error ? actionErr.message : actionErr,
+      );
+    }
+  }
 
   const usage = extractClaudeUsage(payload as Record<string, unknown>);
   if (usage) {

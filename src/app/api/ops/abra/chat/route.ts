@@ -48,7 +48,11 @@ import { getActiveSignals, buildSignalsContext } from "@/lib/ops/abra-operationa
 import {
   getAvailableActions,
   proposeAndMaybeExecute,
+  parseActionDirectives,
+  normalizeActionDirective,
+  KNOWN_ACTION_TYPES,
   type AbraAction,
+  type ActionDirective,
 } from "@/lib/ops/abra-actions";
 import { analyzePipeline } from "@/lib/ops/abra-pipeline-intelligence";
 import {
@@ -70,11 +74,6 @@ const MAX_MESSAGE_LENGTH = 4000;
 type ChatMessage = {
   role: "user" | "assistant" | "system";
   content: string;
-};
-
-type ActionDirective = {
-  action: AbraAction;
-  raw: string;
 };
 
 function getSupabaseEnv() {
@@ -161,114 +160,6 @@ function buildHealthModeReply(message: string): string {
     return "Abra health mode is online. Use a normal chat request for a full cost breakdown.";
   }
   return "Abra is online. Health mode is responding and authenticated.";
-}
-
-/** Known action types — reject anything not in this set to prevent prompt-injected novel action types */
-const KNOWN_ACTION_TYPES = new Set([
-  "create_brain_entry",
-  "acknowledge_signal",
-  "send_slack",
-  "create_task",
-  "create_notion_page",
-  "record_transaction",
-  "correct_claim",
-  "send_email",
-  "update_notion",
-  "pause_initiative",
-  "log_production_run",
-  "record_vendor_quote",
-  "run_scenario",
-  "read_email",
-  "search_email",
-]);
-
-function normalizeActionDirective(raw: unknown): AbraAction | null {
-  if (!raw || typeof raw !== "object") return null;
-  const obj = raw as Record<string, unknown>;
-  const actionType =
-    typeof obj.action_type === "string" ? obj.action_type.trim().toLowerCase() : "";
-  if (!actionType) return null;
-
-  // Reject unknown action types — prevents prompt injection of novel actions
-  if (!KNOWN_ACTION_TYPES.has(actionType)) return null;
-
-  const rawRisk =
-    obj.risk_level === "low" ||
-    obj.risk_level === "medium" ||
-    obj.risk_level === "high" ||
-    obj.risk_level === "critical"
-      ? obj.risk_level
-      : "medium";
-
-  // Defense-in-depth: financial and correction actions from chat are NEVER "low" risk,
-  // regardless of what Claude labels them. This prevents auto-execution even if
-  // confidence checks were somehow bypassed.
-  const ELEVATED_RISK_ACTIONS = new Set([
-    "record_transaction",
-    "correct_claim",
-    "send_email",
-    "send_slack",
-  ]);
-  const risk = ELEVATED_RISK_ACTIONS.has(actionType) && rawRisk === "low"
-    ? "medium"
-    : rawRisk;
-
-  // Truncate all string fields to prevent context-stuffing
-  const title =
-    typeof obj.title === "string" && obj.title.trim()
-      ? obj.title.trim().slice(0, 200)
-      : actionType;
-  const description =
-    typeof obj.description === "string" && obj.description.trim()
-      ? obj.description.trim().slice(0, 500)
-      : `Requested action: ${actionType}`;
-  const department =
-    typeof obj.department === "string" && obj.department.trim()
-      ? obj.department.trim().slice(0, 50)
-      : "executive";
-
-  return {
-    action_type: actionType,
-    title,
-    description,
-    department,
-    risk_level: risk,
-    params:
-      obj.params && typeof obj.params === "object" && !Array.isArray(obj.params)
-        ? (obj.params as Record<string, unknown>)
-        : {},
-    requires_approval: obj.requires_approval !== false,
-  };
-}
-
-function parseActionDirectives(reply: string): {
-  actions: ActionDirective[];
-  cleanReply: string;
-} {
-  const pattern = /<action>\s*([\s\S]*?)\s*<\/action>/gi;
-  const actions: ActionDirective[] = [];
-  let cleanReply = reply;
-  let match: RegExpExecArray | null;
-
-  while ((match = pattern.exec(reply)) !== null) {
-    const block = match[0];
-    const payloadRaw = match[1]?.trim() || "";
-    try {
-      const parsed = JSON.parse(payloadRaw) as unknown;
-      const action = normalizeActionDirective(parsed);
-      if (action) {
-        actions.push({ action, raw: block });
-      }
-    } catch {
-      // Ignore malformed blocks and keep response usable.
-    }
-  }
-
-  for (const directive of actions) {
-    cleanReply = cleanReply.replace(directive.raw, "").trim();
-  }
-
-  return { actions, cleanReply: cleanReply.trim() };
 }
 
 // ─── Intent Detection (keyword-based, not LLM) ───
