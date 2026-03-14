@@ -555,7 +555,7 @@ export async function seedFinancialBrainEntries(): Promise<{ inserted: number; s
         summary_text: seed.text.slice(0, 500),
         category: seed.category,
         department: "finance",
-        confidence: "verified",
+        confidence: "high",
         priority: "critical",
         processed: true,
         tags: seed.tags,
