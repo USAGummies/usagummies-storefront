@@ -107,7 +107,7 @@ export async function GET(req: Request) {
 
   try {
     const rows = (await sbFetch(
-      `/rest/v1/abra_departments?name=eq.${department}&select=name,dashboard_config&limit=1`,
+      `/rest/v1/abra_departments?name=eq.${encodeURIComponent(department)}&select=name,dashboard_config&limit=1`,
     )) as Array<{ name: string; dashboard_config: DashboardConfig | null }>;
 
     const dashboardConfig = rows[0]?.dashboard_config || {};
@@ -174,7 +174,7 @@ export async function POST(req: Request) {
 
   try {
     const rows = (await sbFetch(
-      `/rest/v1/abra_departments?name=eq.${department}&select=name,dashboard_config&limit=1`,
+      `/rest/v1/abra_departments?name=eq.${encodeURIComponent(department)}&select=name,dashboard_config&limit=1`,
     )) as Array<{ name: string; dashboard_config: DashboardConfig | null }>;
 
     const row = rows[0];
@@ -215,7 +215,7 @@ export async function POST(req: Request) {
     };
 
     const updated = (await sbFetch(
-      `/rest/v1/abra_departments?name=eq.${department}`,
+      `/rest/v1/abra_departments?name=eq.${encodeURIComponent(department)}`,
       {
         method: "PATCH",
         headers: {

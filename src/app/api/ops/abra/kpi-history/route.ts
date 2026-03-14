@@ -79,7 +79,7 @@ function parseMetrics(value: string | null): string[] {
   if (!value) return [...DEFAULT_METRICS];
   const requested = value
     .split(",")
-    .map((item) => item.trim())
+    .map((item) => item.trim().replace(/[^a-zA-Z0-9_]/g, ""))
     .filter(Boolean);
   if (requested.length === 0) return [...DEFAULT_METRICS];
   return requested.slice(0, 25);
@@ -104,7 +104,7 @@ export async function GET(req: Request) {
     const metricFilter = encodeURIComponent(`(${metrics.join(",")})`);
 
     const rows = (await sbFetch(
-      `/rest/v1/kpi_timeseries?window_type=eq.daily&metric_name=in.${metricFilter}&captured_for_date=gte.${start}&select=metric_name,value,captured_for_date&order=captured_for_date.asc&limit=5000`,
+      `/rest/v1/kpi_timeseries?window_type=eq.daily&metric_name=in.${metricFilter}&captured_for_date=gte.${encodeURIComponent(start)}&select=metric_name,value,captured_for_date&order=captured_for_date.asc&limit=5000`,
     )) as KpiRow[];
 
     const grouped: Record<string, Array<{ date: string; value: number }>> = {};

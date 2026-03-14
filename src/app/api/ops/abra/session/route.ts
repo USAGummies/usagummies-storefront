@@ -125,7 +125,7 @@ async function buildAgenda(
     // 1. Open initiative questions
     if (initiativeId) {
       const initiatives = (await sbFetch(
-        `/rest/v1/abra_initiatives?id=eq.${initiativeId}&select=title,goal,status,questions,answers`,
+        `/rest/v1/abra_initiatives?id=eq.${encodeURIComponent(initiativeId)}&select=title,goal,status,questions,answers`,
       )) as Array<{
         title: string;
         goal: string;
@@ -151,7 +151,7 @@ async function buildAgenda(
     } else if (department) {
       // Get active initiatives for department
       const initiatives = (await sbFetch(
-        `/rest/v1/abra_initiatives?department=eq.${department}&status=not.in.(completed,paused)&select=title,status&limit=5`,
+        `/rest/v1/abra_initiatives?department=eq.${encodeURIComponent(department)}&status=not.in.(completed,paused)&select=title,status&limit=5`,
       )) as Array<{ title: string; status: string }>;
 
       if (initiatives.length > 0) {
@@ -167,7 +167,7 @@ async function buildAgenda(
     // 2. Unanswered questions for department
     if (department) {
       const questions = (await sbFetch(
-        `/rest/v1/abra_unanswered_questions?department=eq.${department}&status=eq.open&select=question&limit=5&order=created_at.desc`,
+        `/rest/v1/abra_unanswered_questions?department=eq.${encodeURIComponent(department)}&status=eq.open&select=question&limit=5&order=created_at.desc`,
       )) as Array<{ question: string }>;
 
       if (questions.length > 0) {
@@ -181,7 +181,7 @@ async function buildAgenda(
     if (department) {
       try {
         const activeTasks = (await sbFetch(
-          `/rest/v1/abra_tasks?department=eq.${department}&status=in.(pending,in_progress)&select=id&limit=20`,
+          `/rest/v1/abra_tasks?department=eq.${encodeURIComponent(department)}&status=in.(pending,in_progress)&select=id&limit=20`,
         )) as Array<{ id: string }>;
 
         if (activeTasks.length > 0) {
@@ -197,7 +197,7 @@ async function buildAgenda(
     // 4. Recent corrections to review
     if (department) {
       const corrections = (await sbFetch(
-        `/rest/v1/abra_corrections?department=eq.${department}&active=eq.true&select=correction&limit=3&order=created_at.desc`,
+        `/rest/v1/abra_corrections?department=eq.${encodeURIComponent(department)}&active=eq.true&select=correction&limit=3&order=created_at.desc`,
       )) as Array<{ correction: string }>;
 
       if (corrections.length > 0) {
@@ -525,10 +525,12 @@ async function handlePost(req: Request) {
     typeof payload.department === "string"
       ? payload.department.trim().toLowerCase()
       : null;
-  const initiativeId =
+  const initiativeIdRaw =
     typeof payload.initiative_id === "string"
       ? payload.initiative_id.trim()
       : null;
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const initiativeId = initiativeIdRaw && UUID_RE.test(initiativeIdRaw) ? initiativeIdRaw : null;
 
   try {
     const circuitCheck = await canUseSupabase();

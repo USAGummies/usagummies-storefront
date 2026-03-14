@@ -359,7 +359,7 @@ async function fetchAskingInitiative(
     let path =
       "/rest/v1/abra_initiatives?status=eq.asking_questions&select=id,department,title,questions,answers&order=updated_at.desc&limit=5";
     if (department) {
-      path += `&department=eq.${department}`;
+      path += `&department=eq.${encodeURIComponent(department)}`;
     }
 
     const rows = (await sbFetch(path)) as Array<{
@@ -725,8 +725,10 @@ async function fetchCompetitorContext(message: string): Promise<string | null> {
       limit: "8",
     });
     if (hint) {
-      const cleaned = hint.replace(/\*/g, "");
-      params.set("competitor_name", `ilike.*${cleaned}*`);
+      const cleaned = hint.replace(/[*%().,]/g, "").slice(0, 200);
+      if (cleaned) {
+        params.set("competitor_name", `ilike.*${encodeURIComponent(cleaned)}*`);
+      }
     }
 
     const rows = (await sbFetch(

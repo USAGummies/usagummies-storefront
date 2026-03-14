@@ -122,7 +122,7 @@ export async function GET(req: Request) {
     }
 
     const rows = (await sbFetch(
-      `/rest/v1/abra_departments?name=eq.${department}&select=name,dashboard_config,current_priorities,long_term_goals,short_term_goals&limit=1`,
+      `/rest/v1/abra_departments?name=eq.${encodeURIComponent(department)}&select=name,dashboard_config,current_priorities,long_term_goals,short_term_goals&limit=1`,
     )) as Array<{
       name: string;
       dashboard_config: Record<string, unknown> | null;
@@ -222,7 +222,7 @@ export async function POST(req: Request) {
     }
 
     const existingRows = (await sbFetch(
-      `/rest/v1/abra_departments?name=eq.${department}&select=name,dashboard_config&limit=1`,
+      `/rest/v1/abra_departments?name=eq.${encodeURIComponent(department)}&select=name,dashboard_config&limit=1`,
     )) as Array<{ name: string; dashboard_config: DashboardConfig | null }>;
 
     const existing = existingRows[0];
@@ -280,7 +280,7 @@ export async function POST(req: Request) {
       widgets: nextWidgets,
     };
 
-    const updated = await sbFetch(`/rest/v1/abra_departments?name=eq.${department}`, {
+    const updated = await sbFetch(`/rest/v1/abra_departments?name=eq.${encodeURIComponent(department)}`, {
       method: "PATCH",
       headers: {
         Prefer: "return=representation",
