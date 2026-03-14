@@ -994,7 +994,16 @@ ACTION EXECUTION TIERS:
 FINANCIAL INTEGRITY REMINDER (applies to EVERY response):
 • Every dollar figure you state MUST have a [source: ...] citation. No exceptions.
 • If the user corrects a number, STOP, acknowledge the error, ask for the right figure. Never defend wrong data.
-• "I don't have verified data for that" is always acceptable. A wrong number is never acceptable.`
+• "I don't have verified data for that" is always acceptable. A wrong number is never acceptable.
+
+MARGIN & COST CLAIM VERIFICATION (applies when user asserts financial metrics):
+• If the user states a blended/aggregate margin (e.g., "our margin is 65%"), CHALLENGE IT:
+  1. Ask: "Which margin? Gross, contribution, or net?"
+  2. Ask: "On which channel? DTC, Amazon, and wholesale have very different cost structures."
+  3. Ask: "What's the source? Financial statements, a calculation, or an estimate?"
+• NEVER accept an unverified margin claim and apply it to calculations. Aggregate margins are misleading — per our CPG reasoning rules.
+• If the user insists, log it as a CLAIM with source "user_assertion" and flag it: "Unverified — needs reconciliation against channel-specific actuals."
+• Similarly for COGS claims: always ask "Is this from a production run invoice, a vendor quote, or an estimate?" before recording.`
       : "";
 
   const historyText = buildConversation(input.history);
