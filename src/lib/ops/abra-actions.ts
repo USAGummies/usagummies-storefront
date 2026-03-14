@@ -665,7 +665,7 @@ const ACTION_HANDLERS: Record<
 
 async function fetchApproval(approvalId: string): Promise<ApprovalRow | null> {
   const rows = (await sbFetch(
-    `/rest/v1/approvals?id=eq.${approvalId}&select=id,status,action_type,created_at,batch_group,decision_reasoning,resolved_payload,proposed_payload,auto_executed&limit=1`,
+    `/rest/v1/approvals?id=eq.${encodeURIComponent(approvalId)}&select=id,status,action_type,created_at,batch_group,decision_reasoning,resolved_payload,proposed_payload,auto_executed&limit=1`,
   )) as ApprovalRow[];
   return rows[0] || null;
 }
@@ -675,7 +675,7 @@ async function claimPendingApproval(
 ): Promise<{ claimId: string; approval: ApprovalRow } | null> {
   const claimId = randomUUID();
   const rows = (await sbFetch(
-    `/rest/v1/approvals?id=eq.${approvalId}&status=eq.pending&batch_group=is.null`,
+    `/rest/v1/approvals?id=eq.${encodeURIComponent(approvalId)}&status=eq.pending&batch_group=is.null`,
     {
       method: "PATCH",
       headers: {
@@ -705,7 +705,7 @@ async function updateAutoExecTracking(params: {
   result?: ActionResult;
 }): Promise<void> {
   try {
-    await sbFetch(`/rest/v1/approvals?id=eq.${params.approvalId}`, {
+    await sbFetch(`/rest/v1/approvals?id=eq.${encodeURIComponent(params.approvalId)}`, {
       method: "PATCH",
       headers: {
         Prefer: "return=minimal",
@@ -771,7 +771,7 @@ async function markApprovalResolved(params: {
     : "";
 
   await sbFetch(
-    `/rest/v1/approvals?id=eq.${params.approvalId}&status=eq.pending${claimFilter}`,
+    `/rest/v1/approvals?id=eq.${encodeURIComponent(params.approvalId)}&status=eq.pending${claimFilter}`,
     {
     method: "PATCH",
     headers: {
@@ -925,6 +925,9 @@ export async function proposeAndMaybeExecute(action: AbraAction): Promise<{
 }
 
 export async function executeAction(approvalId: string): Promise<ActionResult> {
+  if (!UUID_RE.test(approvalId)) {
+    return { success: false, message: "Invalid approval ID format" };
+  }
   const claimed = await claimPendingApproval(approvalId);
   if (!claimed) {
     const current = await fetchApproval(approvalId);
