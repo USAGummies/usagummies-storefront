@@ -287,6 +287,7 @@ HARD RULE #3 — REVENUE AND FINANCIAL TOTALS:
 • If the VERIFIED LIVE FINANCIAL DATA section is missing, fall back to brain entries tagged "monthly_total". If neither exists, say you don't have verified data.
 • AGGREGATE ≠ INDIVIDUAL: Having monthly/weekly revenue totals does NOT mean you know individual order amounts, specific customer spending, or transaction-level details. If asked about a specific order or transaction, check brain entries for that specific record — do NOT decompose aggregates or estimate "average order" from totals.
 • Similarly, knowing "March revenue is $X" does NOT let you say "the $Y order on March 5th" unless you have a brain entry for that specific order.
+• ORDER TOTAL ≠ UNIT PRICE: An order total (e.g., "$33 for 12 bags") gives you the per-order average ($2.78/bag), but this is NOT the retail list price. The retail price comes from Shopify product data. When calculating margins, use the RETAIL LIST PRICE from product data, not the per-unit average from a multi-unit order which may include quantity discounts.
 
 HARD RULE #4 — CASH, CAPITAL, AND FUNDING:
 • NEVER cite the company's capital, cash position, bank balance, or funding amount unless it comes from a verified bank statement, QuickBooks, or Rene's finance report.
