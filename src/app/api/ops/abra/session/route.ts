@@ -617,14 +617,17 @@ async function handleGet(req: Request) {
     }
 
     let path = "/rest/v1/abra_sessions?select=*&order=created_at.desc";
-    if (id) path += `&id=eq.${id}`;
-    if (department) path += `&department=eq.${department}`;
-    if (status) {
-      if (status === "active") {
-        path += `&status=eq.active`;
-      } else {
-        path += `&status=eq.${status}`;
+    if (id) {
+      // Validate UUID format to prevent PostgREST filter manipulation
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+        return NextResponse.json({ error: "id must be a valid UUID" }, { status: 400 });
       }
+      path += `&id=eq.${id}`;
+    }
+    if (department) path += `&department=eq.${encodeURIComponent(department.slice(0, 50))}`;
+    if (status) {
+      const safeStatus = status.replace(/[^a-z_]/gi, "").slice(0, 20);
+      path += `&status=eq.${safeStatus}`;
     }
     path += "&limit=20";
 
@@ -666,6 +669,9 @@ async function handlePatch(req: Request) {
   const id = typeof payload.id === "string" ? payload.id.trim() : "";
   if (!id) {
     return NextResponse.json({ error: "id is required" }, { status: 400 });
+  }
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    return NextResponse.json({ error: "id must be a valid UUID" }, { status: 400 });
   }
 
   const status =
@@ -711,10 +717,15 @@ async function handlePatch(req: Request) {
 
     const updates: Record<string, unknown> = {};
 
+    // Max items per array to prevent unbounded growth
+    const MAX_ARRAY_ITEMS = 200;
+    const MAX_NEW_ITEMS_PER_REQUEST = 50;
+
     // Append notes (array merge)
     if (Array.isArray(payload.notes)) {
       const currentNotes = Array.isArray(session.notes) ? session.notes : [];
-      updates.notes = [...currentNotes, ...payload.notes];
+      const newNotes = payload.notes.slice(0, MAX_NEW_ITEMS_PER_REQUEST);
+      updates.notes = [...currentNotes, ...newNotes].slice(-MAX_ARRAY_ITEMS);
     }
 
     // Append action items
@@ -722,7 +733,8 @@ async function handlePatch(req: Request) {
       const current = Array.isArray(session.action_items)
         ? session.action_items
         : [];
-      updates.action_items = [...current, ...payload.action_items];
+      const newItems = payload.action_items.slice(0, MAX_NEW_ITEMS_PER_REQUEST);
+      updates.action_items = [...current, ...newItems].slice(-MAX_ARRAY_ITEMS);
     }
 
     // Append decisions
@@ -730,7 +742,8 @@ async function handlePatch(req: Request) {
       const current = Array.isArray(session.decisions)
         ? session.decisions
         : [];
-      updates.decisions = [...current, ...payload.decisions];
+      const newItems = payload.decisions.slice(0, MAX_NEW_ITEMS_PER_REQUEST);
+      updates.decisions = [...current, ...newItems].slice(-MAX_ARRAY_ITEMS);
     }
 
     // Append open questions
@@ -738,7 +751,8 @@ async function handlePatch(req: Request) {
       const current = Array.isArray(session.open_questions)
         ? session.open_questions
         : [];
-      updates.open_questions = [...current, ...payload.open_questions];
+      const newItems = payload.open_questions.slice(0, MAX_NEW_ITEMS_PER_REQUEST);
+      updates.open_questions = [...current, ...newItems].slice(-MAX_ARRAY_ITEMS);
     }
 
     // Scratchpad entry — multi-turn reasoning working memory

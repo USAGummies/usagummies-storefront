@@ -173,6 +173,17 @@ export async function POST(req: Request) {
   }
 }
 
+// Fields that can be updated via PATCH — prevents arbitrary column writes
+const TEAM_UPDATABLE_FIELDS = new Set([
+  "name", "role", "department", "email", "phone", "notes",
+  "status", "responsibilities", "start_date",
+]);
+const VENDOR_UPDATABLE_FIELDS = new Set([
+  "name", "vendor_type", "contact_name", "contact_email", "contact_phone",
+  "notes", "status", "terms", "payment_terms",
+]);
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function PATCH(req: Request) {
   const session = await auth();
   if (!session?.user?.email) {
@@ -187,16 +198,31 @@ export async function PATCH(req: Request) {
   }
 
   const type = payload.type as string;
-  const id = payload.id as string;
+  const id = typeof payload.id === "string" ? payload.id.trim() : "";
   if (!id) {
     return NextResponse.json({ error: "id is required" }, { status: 400 });
   }
+  if (!UUID_RE.test(id)) {
+    return NextResponse.json({ error: "id must be a valid UUID" }, { status: 400 });
+  }
 
   try {
-    const table = type === "vendor" ? "abra_vendors" : "abra_team";
-    const { type: _type, id: _id, ...updates } = payload;
-    void _type;
-    void _id;
+    const isVendor = type === "vendor";
+    const table = isVendor ? "abra_vendors" : "abra_team";
+    const allowedFields = isVendor ? VENDOR_UPDATABLE_FIELDS : TEAM_UPDATABLE_FIELDS;
+
+    // Only allow known fields — reject unknown columns
+    const updates: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(payload)) {
+      if (key === "type" || key === "id") continue;
+      if (!allowedFields.has(key)) continue;
+      // Cap string values
+      updates[key] = typeof value === "string" ? value.slice(0, 1000) : value;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
+    }
 
     await sbFetch(`/rest/v1/${table}?id=eq.${id}`, {
       method: "PATCH",
