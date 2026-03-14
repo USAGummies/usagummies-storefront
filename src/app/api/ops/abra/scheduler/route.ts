@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
+import { Client } from "@upstash/qstash";
 import { isCronAuthorized } from "@/lib/ops/abra-auth";
 import { runAllDueFeeds, runFeed } from "@/lib/ops/abra-auto-teach";
 import { detectAnomalies } from "@/lib/ops/abra-anomaly-detection";
@@ -247,6 +248,43 @@ export async function POST(req: Request) {
       const briefStep = await runStep("morning_brief", sendMorningBrief);
       outcomes.push(briefStep);
       notificationData.morning_brief = briefStep.ok;
+
+      // Schedule evening callback via QStash — Vercel Hobby only has 1 daily cron,
+      // so we self-schedule for the EOD summary window (~8pm PT = ~4am UTC next day,
+      // but we compute the exact delay from now to 8pm PT today).
+      const scheduleStep = await runStep("schedule_evening", async () => {
+        const qstashToken = process.env.QSTASH_TOKEN;
+        if (!qstashToken) return "no_qstash";
+
+        const baseUrl = process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : process.env.NEXTAUTH_URL || "https://www.usagummies.com";
+        const cronSecret = process.env.CRON_SECRET;
+
+        // Compute seconds until 8pm PT today
+        const targetHour = 20; // 8pm PT
+        const ptNow = getPTNow();
+        const targetTime = new Date(ptNow);
+        targetTime.setHours(targetHour, 0, 0, 0);
+        const delaySeconds = Math.max(
+          60, // minimum 1 minute
+          Math.floor((targetTime.getTime() - ptNow.getTime()) / 1000),
+        );
+
+        if (delaySeconds > 18 * 3600) return "too_far_away"; // sanity: >18h is wrong
+
+        const qstash = new Client({ token: qstashToken });
+        const res = await qstash.publishJSON({
+          url: `${baseUrl}/api/ops/abra/scheduler`,
+          body: { triggeredBy: "evening-callback" },
+          headers: cronSecret ? { authorization: `Bearer ${cronSecret}` } : {},
+          delay: delaySeconds,
+          retries: 2,
+        });
+        const msgId = "messageId" in res ? res.messageId : "batch";
+        return `scheduled_in_${Math.round(delaySeconds / 3600)}h (msgId: ${msgId})`;
+      });
+      outcomes.push(scheduleStep);
     }
     if (inEveningWindow(nowPT)) {
       const eodStep = await runStep("end_of_day_summary", sendEndOfDaySummary);

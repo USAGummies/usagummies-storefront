@@ -170,13 +170,26 @@ function normalizeActionDirective(raw: unknown): AbraAction | null {
     typeof obj.action_type === "string" ? obj.action_type.trim() : "";
   if (!actionType) return null;
 
-  const risk =
+  const rawRisk =
     obj.risk_level === "low" ||
     obj.risk_level === "medium" ||
     obj.risk_level === "high" ||
     obj.risk_level === "critical"
       ? obj.risk_level
       : "medium";
+
+  // Defense-in-depth: financial and correction actions from chat are NEVER "low" risk,
+  // regardless of what Claude labels them. This prevents auto-execution even if
+  // confidence checks were somehow bypassed.
+  const ELEVATED_RISK_ACTIONS = new Set([
+    "record_transaction",
+    "correct_claim",
+    "send_email",
+    "send_slack",
+  ]);
+  const risk = ELEVATED_RISK_ACTIONS.has(actionType) && rawRisk === "low"
+    ? "medium"
+    : rawRisk;
 
   return {
     action_type: actionType,
@@ -911,7 +924,30 @@ EXAMPLES:
 
 DATABASE KEYS for create_notion_page: meeting_notes, b2b_prospects, distributor_prospects, daily_performance, fleet_ops, inventory, sku_registry, cash_transactions, content_drafts, kpis, general
 
-Some actions auto-execute (create_brain_entry, acknowledge_signal, create_notion_page, record_transaction, create_task, correct_claim). Others queue for approval (send_email, send_slack). Either way — EMIT the action block.
+ACTION EXECUTION TIERS:
+• AUTO-EXECUTE (low-risk, informational): create_brain_entry, acknowledge_signal, create_notion_page, create_task — these execute immediately when emitted.
+• AUTO-EXECUTE WITH CAPS (financial): record_transaction — auto-executes ONLY if amount ≤ $500. Larger amounts queue for approval.
+• ALWAYS QUEUED (requires human approval): send_email, send_slack, correct_claim — these NEVER auto-execute.
+
+⚠️ ACTION SAFETY RULES (CRITICAL — violations create bad data):
+
+1. record_transaction — VERIFY BEFORE EMITTING:
+   • ONLY emit with amounts the USER explicitly stated or that come from VERIFIED data sources.
+   • NEVER compute or estimate a transaction amount yourself. If the user says "record the Powers payment" but doesn't say the amount, ASK: "How much was the payment?"
+   • NEVER emit record_transaction based on numbers you found in brain entries unless they're tagged "verified_sales_data".
+   • The amount field has a hard safety limit of $100,000. Anything above is rejected as likely hallucination.
+
+2. correct_claim — CONFIRM BEFORE EMITTING:
+   • Corrections go to the HOT memory tier and PERMANENTLY OVERRIDE all other data. This is the most powerful write operation you have.
+   • ALWAYS confirm the exact wording with the user before emitting: "I'll log this correction: [original] → [corrected]. Is that exactly right?"
+   • NEVER emit correct_claim based on your own inference. Only the USER can tell you something is wrong.
+   • If the user says "that's wrong" but doesn't give the correct figure, ASK for it. Do NOT guess the correction.
+
+3. create_brain_entry — USE ACCURATE TITLES:
+   • The title becomes searchable memory. Make it factual and specific, not vague.
+   • NEVER create brain entries with dollar figures in them unless the source is verified. Brain entries with wrong numbers pollute future searches.
+
+4. GENERAL: If you're unsure whether to emit an action, DON'T. Ask the user first. A missed action is recoverable; a wrong action creates bad data.
 
 FINANCIAL INTEGRITY REMINDER (applies to EVERY response):
 • Every dollar figure you state MUST have a [source: ...] citation. No exceptions.
