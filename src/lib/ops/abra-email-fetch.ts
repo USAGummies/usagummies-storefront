@@ -120,41 +120,7 @@ function summarize(subject: string, body: string): string {
   return `${truncated}...`;
 }
 
-// ---------------------------------------------------------------------------
-// VIP Senders — always action_required, with category/priority overrides.
-// Emails from these addresses bypass keyword classification and get priority
-// routing. Add team members, key vendors, and critical contacts here.
-// ---------------------------------------------------------------------------
-type VipOverride = {
-  name: string;
-  category: EmailCategory;
-  priority: EmailPriority;
-  suggestedAction: string;
-};
-
-const VIP_SENDERS: Record<string, VipOverride> = {
-  "gonz1rene@outlook.com": {
-    name: "Renny Gonzalez",
-    category: "finance",
-    priority: "important",
-    suggestedAction: "Respond to Renny — finance team member",
-  },
-  "ben@usagummies.com": {
-    name: "Ben Stutman",
-    category: "noise", // Ben's own emails don't need action
-    priority: "informational",
-    suggestedAction: "Internal — no action needed",
-  },
-  "benjamin.stutman@gmail.com": {
-    name: "Ben Stutman (personal)",
-    category: "noise",
-    priority: "informational",
-    suggestedAction: "Internal — no action needed",
-  },
-  // Add more VIPs as needed:
-  // "vendor@copacker.com": { name: "Co-Packer", category: "production", priority: "important", suggestedAction: "Review co-packer communication" },
-  // "andrew@partner.com": { name: "Andrew", category: "sales", priority: "important", suggestedAction: "Respond to Andrew" },
-};
+import { getVipSender } from "@/lib/ops/abra-vip-senders";
 
 function classifyEmail(params: {
   from: string;
@@ -170,10 +136,10 @@ function classifyEmail(params: {
   const text = `${params.from} ${params.subject} ${params.body.slice(0, 800)}`.toLowerCase();
 
   // ------- VIP sender fast-path -------
-  const vip = VIP_SENDERS[senderEmail];
+  const vip = getVipSender(senderEmail);
   if (vip) {
     // Ben's own emails → skip action. Everyone else → action required.
-    const isSelf = vip.category === "noise" && vip.priority === "informational";
+    const isSelf = vip.relationship === "self";
     return {
       category: vip.category,
       priority: vip.priority,

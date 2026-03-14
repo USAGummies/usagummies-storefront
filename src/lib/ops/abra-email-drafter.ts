@@ -21,6 +21,7 @@ import {
   extractClaudeUsage,
   getPreferredClaudeModel,
 } from "@/lib/ops/abra-cost-tracker";
+import { getVipSender } from "@/lib/ops/abra-vip-senders";
 
 export type EmailDraftResult = {
   processed: number;
@@ -98,13 +99,27 @@ function buildDraftingPrompt(params: {
   emailBody: string;
   category: string;
   brainContext: string;
+  vipContext: string | null;
+  senderRelationship: string | null;
 }): string {
+  const vipBlock = params.vipContext
+    ? `\nSENDER CONTEXT (IMPORTANT — this person is known to us):\nRelationship: ${params.senderRelationship || "known contact"}\n${params.vipContext}\n`
+    : "";
+
+  const toneRule = params.senderRelationship === "team"
+    ? "- This is an INTERNAL team member. Write casually, like a Slack message or quick text. No formal greetings or sign-offs needed. Get straight to the point."
+    : params.senderRelationship === "vendor"
+    ? "- This is a known vendor/supplier. Be direct and professional but warm."
+    : params.senderRelationship === "investor"
+    ? "- This is an investor. Be professional, transparent, and proactive with updates."
+    : "- Write as Ben. Friendly, professional, concise.";
+
   return `You are drafting an email reply on behalf of Ben Stutman, CEO of USA Gummies (a dye-free gummy candy company).
 
 SENDER: ${params.senderName} <${params.senderEmail}>
 SUBJECT: ${params.subject}
 CATEGORY: ${params.category}
-
+${vipBlock}
 EMAIL BODY (truncated):
 ${params.emailBody.slice(0, 3000)}
 
@@ -112,11 +127,12 @@ BRAIN CONTEXT (what we know about this sender/topic):
 ${params.brainContext.slice(0, 2000)}
 
 DRAFTING RULES:
-- Write as Ben. Friendly, professional, concise.
+${toneRule}
 - Sales inquiries → express interest, suggest a call, do NOT commit to pricing or terms.
 - Vendor communications → acknowledge, confirm receipt, ask clarifying questions if needed.
 - Customer issues → empathize, propose resolution, offer to follow up.
 - Finance (invoices/payments) → acknowledge receipt, confirm timeline for processing.
+- If the sender asks for data/reports → confirm you'll provide it and ask about preferred format or deadline.
 - NEVER commit to specific pricing, delivery dates, contract terms, or payment amounts.
 - ALWAYS include a [NOTE FOR BEN] section at the end flagging items that need human judgment.
 - Keep the reply under 200 words.
@@ -150,7 +166,8 @@ async function draftReplyForEmail(email: EmailRow): Promise<{
   });
   const brainContext = buildTieredContext(tieredResults);
 
-  // 3. Call Claude to draft the reply
+  // 3. Call Claude to draft the reply (with VIP context if available)
+  const vip = getVipSender(email.sender_email);
   const model = await getPreferredClaudeModel("claude-sonnet-4-20250514");
   const prompt = buildDraftingPrompt({
     senderName,
@@ -159,6 +176,8 @@ async function draftReplyForEmail(email: EmailRow): Promise<{
     emailBody: body,
     category: email.category || "general",
     brainContext,
+    vipContext: vip?.draftingContext || null,
+    senderRelationship: vip?.relationship || null,
   });
 
   const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
