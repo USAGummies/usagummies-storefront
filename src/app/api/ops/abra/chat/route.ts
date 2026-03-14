@@ -272,7 +272,7 @@ const INITIATIVE_TRIGGERS =
 const SESSION_TRIGGERS =
   /\b(let'?s (have a |)meet|start a (meeting|session|review)|review .+ department|how'?s .+ doing|check in on)\b/i;
 const COST_TRIGGERS =
-  /\b(ai spend|ai cost|how much .+ spend|budget|monthly spend|cost report)\b/i;
+  /\b(ai spend|ai cost|how much (?:(?:am i|are we|is abra|does abra|do we) )?spend(?:ing)? on ai|abra(?:'s|'s) (?:monthly )?(?:cost|spend|budget)|monthly ai spend|ai cost report)\b/i;
 const PIPELINE_TRIGGERS =
   /\b(sales pipeline|pipeline health|pipeline status|b2b pipeline|b2b deals?|wholesale deals?|pipeline deals?|active deals?|deal(s| ) (status|details|breakdown)|show .+ pipeline|what deals|which deals|which companies .+ pipeline|who .+ in .+ pipeline|pipeline summary|deal pipeline|b2b prospects?|top .+ deals?|prospects? by .+ value|biggest deals?|largest deals?|deal value)\b/i;
 const STRATEGY_TRIGGERS =
