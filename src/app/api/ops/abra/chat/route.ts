@@ -178,6 +178,8 @@ const KNOWN_ACTION_TYPES = new Set([
   "log_production_run",
   "record_vendor_quote",
   "run_scenario",
+  "read_email",
+  "search_email",
 ]);
 
 function normalizeActionDirective(raw: unknown): AbraAction | null {
@@ -538,12 +540,13 @@ async function fetchLiveBusinessSnapshot(): Promise<string | null> {
     if ((gmailUser || gmailClientId) && gmailClientId && gmailRefreshToken) {
       // Dynamic import to avoid loading googleapis on every request
       const { listEmails } = await import("@/lib/ops/gmail-reader");
-      const envelopes = await listEmails({ count: 8, folder: "INBOX" });
+      const envelopes = await listEmails({ count: 10, folder: "INBOX" });
       if (envelopes.length > 0) {
-        lines.push(`LIVE INBOX (${envelopes.length} most recent):`);
-        for (const e of envelopes.slice(0, 8)) {
+        lines.push(`LIVE INBOX (${envelopes.length} most recent — you CAN read full emails via the read_email action):`);
+        for (const e of envelopes.slice(0, 10)) {
           const age = e.date ? `${Math.round((Date.now() - new Date(e.date).getTime()) / 3600000)}h ago` : "";
-          lines.push(`  • From: ${e.from} — "${e.subject}" (${age})`);
+          const snippet = e.snippet ? ` — ${e.snippet.slice(0, 120)}${e.snippet.length > 120 ? "..." : ""}` : "";
+          lines.push(`  • [${e.id}] From: ${e.from} — "${e.subject}" (${age})${snippet}`);
         }
       }
     }
@@ -950,12 +953,17 @@ EXAMPLES:
 • "we did a production run at Powers, 10,000 units, total cost $13,500" → emit log_production_run with manufacturer, run_date, total_units_ordered, total_cost
 • "Powers quoted us $1.20/unit for gummy base" → emit record_vendor_quote with vendor, item_description, quoted_price, price_type "per_unit"
 • "what if ingredient costs go up 15%?" → emit run_scenario with scenario_name, base_values (from latest production data), adjustments [{variable: "ingredient_cost", change_pct: 15}]
+• "did you see the email from Rene?" → You can see subjects in LIVE INBOX. To read the full email, emit read_email with the message_id from the inbox listing.
+• "what did Rene say in that email?" → emit read_email with message_id from LIVE INBOX to get the full body, then summarize.
+• "find emails about the Powers invoice" → emit search_email with query "Powers invoice" to search Gmail.
+• "check if we got the Faire order confirmation" → emit search_email with query "from:faire.com order confirmation"
 • "set up QuickBooks" → This is OUTSIDE your actions, so explain what's needed and offer to create_task or send_slack about it.
 
 DATABASE KEYS for create_notion_page: meeting_notes, b2b_prospects, distributor_prospects, daily_performance, fleet_ops, inventory, sku_registry, cash_transactions, content_drafts, kpis, general
 
 ACTION EXECUTION TIERS:
 • AUTO-EXECUTE (low-risk, informational): create_brain_entry, acknowledge_signal, create_notion_page, create_task — these execute immediately when emitted.
+• AUTO-EXECUTE (low-risk, read-only): read_email, search_email — these only READ data, never modify anything. Auto-execute IMMEDIATELY when emitted. When a user asks about an email, DO NOT ask permission — just read it.
 • AUTO-EXECUTE (low-risk, operational data): log_production_run, record_vendor_quote — these log operational data. Auto-execute when emitted.
 • AUTO-EXECUTE (stateless computation): run_scenario — computes hypotheticals without changing financial state. Auto-execute when emitted.
 • AUTO-EXECUTE WITH CAPS (financial): record_transaction — auto-executes ONLY if amount ≤ $500. Larger amounts queue for approval.
@@ -1819,13 +1827,22 @@ export async function POST(req: Request) {
     if (!claudeResult.earlyExit) {
       const parsedActions = parseActionDirectives(claudeResult.reply);
       baseReply = parsedActions.cleanReply || claudeResult.reply;
+      // Separate read-only data actions (email) from write actions
+      const READ_ONLY_ACTIONS = new Set(["read_email", "search_email"]);
+      const readOnlyResults: string[] = [];
+
       for (const directive of parsedActions.actions.slice(0, 3)) {
         try {
           const outcome = await proposeAndMaybeExecute(directive.action);
           if (outcome.auto_executed) {
-            actionNotices.push(
-              `Done: auto-executed \`${directive.action.action_type}\` (${outcome.approval_id}).`,
-            );
+            if (READ_ONLY_ACTIONS.has(directive.action.action_type) && outcome.result?.success && outcome.result.message) {
+              // For read-only actions, surface the full result content so the user sees it
+              readOnlyResults.push(outcome.result.message);
+            } else {
+              actionNotices.push(
+                `Done: auto-executed \`${directive.action.action_type}\` (${outcome.approval_id}).`,
+              );
+            }
           } else {
             actionNotices.push(
               `Queued for approval: \`${directive.action.action_type}\` (${outcome.approval_id}).`,
@@ -1836,6 +1853,31 @@ export async function POST(req: Request) {
             `Failed to queue action \`${directive.action.action_type}\`: ${error instanceof Error ? error.message : "unknown error"}`,
           );
         }
+      }
+
+      // If we got email content back, do a follow-up Claude call with the data injected
+      if (readOnlyResults.length > 0) {
+        const emailContext = readOnlyResults.join("\n\n");
+        const followUpResult = await generateClaudeReply({
+          message: `The user asked: "${message}"\n\nHere is the email content I just retrieved:\n\n${emailContext}\n\nNow answer the user's original question using this email content. Be specific and actionable.`,
+          history: effectiveHistory,
+          tieredResults,
+          corrections,
+          departments,
+          activeInitiatives,
+          costSummary,
+          financialContext,
+          competitorContext,
+          teamContext,
+          signalsContext,
+          availableActions,
+          detectedDepartment: messageDepartment,
+          liveSnapshot: augmentedLiveSnapshot,
+        });
+        baseReply = followUpResult.reply;
+        // Strip any action directives from the follow-up (don't double-execute)
+        const followUpParsed = parseActionDirectives(baseReply);
+        baseReply = followUpParsed.cleanReply || baseReply;
       }
     }
 

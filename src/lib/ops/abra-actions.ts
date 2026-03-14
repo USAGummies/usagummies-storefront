@@ -136,6 +136,20 @@ export const AUTO_EXEC_POLICIES: AutoExecPolicy[] = [
     daily_limit: 10,
     enabled: true,
   },
+  {
+    action_type: "read_email",
+    max_risk_level: "low",
+    min_confidence: 0.7,
+    daily_limit: 50,
+    enabled: true, // Read-only — no risk
+  },
+  {
+    action_type: "search_email",
+    max_risk_level: "low",
+    min_confidence: 0.7,
+    daily_limit: 30,
+    enabled: true, // Read-only — no risk
+  },
 ];
 
 const EXTERNAL_SUBMISSION_ACTIONS = new Set([
@@ -1129,6 +1143,79 @@ async function handleRunScenario(
   };
 }
 
+// ---------------------------------------------------------------------------
+// Email Actions — read_email and search_email
+// ---------------------------------------------------------------------------
+
+async function handleReadEmail(params: Record<string, unknown>): Promise<ActionResult> {
+  const messageId = typeof params.message_id === "string" ? params.message_id.trim() : "";
+  if (!messageId) {
+    return { success: false, message: "message_id is required. Use the message ID from the LIVE INBOX feed (e.g., '1234abcd5678efgh')." };
+  }
+
+  try {
+    const { readEmail } = await import("@/lib/ops/gmail-reader");
+    const email = await readEmail(messageId);
+    if (!email) {
+      return { success: false, message: `Could not read email with ID ${messageId}. It may have been deleted or the ID is invalid.` };
+    }
+
+    // Truncate very long email bodies to avoid blowing up context
+    const maxBodyLen = 3000;
+    const body = email.body.length > maxBodyLen
+      ? email.body.slice(0, maxBodyLen) + `\n\n[... truncated — full email is ${email.body.length} chars]`
+      : email.body;
+
+    return {
+      success: true,
+      message: `Email from ${email.from} — "${email.subject}" (${email.date}):\n\n${body}`,
+      data: {
+        id: email.id,
+        threadId: email.threadId,
+        from: email.from,
+        to: email.to,
+        subject: email.subject,
+        date: email.date,
+        body_length: email.body.length,
+      },
+    };
+  } catch (err) {
+    return { success: false, message: `Failed to read email: ${err instanceof Error ? err.message : String(err)}` };
+  }
+}
+
+async function handleSearchEmail(params: Record<string, unknown>): Promise<ActionResult> {
+  const query = typeof params.query === "string" ? params.query.trim() : "";
+  if (!query) {
+    return { success: false, message: "query is required. Use Gmail search syntax (e.g., 'from:rene subject:invoice', 'after:2026/03/01 powers confections')." };
+  }
+  const count = typeof params.count === "number" ? Math.min(params.count, 10) : 5;
+
+  try {
+    const { searchEmails } = await import("@/lib/ops/gmail-reader");
+    const emails = await searchEmails(query, count);
+    if (emails.length === 0) {
+      return { success: true, message: `No emails found matching "${query}".` };
+    }
+
+    const maxBodyPerEmail = 1500;
+    const summaries = emails.map((e, i) => {
+      const body = e.body.length > maxBodyPerEmail
+        ? e.body.slice(0, maxBodyPerEmail) + `\n[... truncated — ${e.body.length} chars total]`
+        : e.body;
+      return `--- Email ${i + 1} of ${emails.length} ---\nFrom: ${e.from}\nTo: ${e.to}\nSubject: ${e.subject}\nDate: ${e.date}\nID: ${e.id}\n\n${body}`;
+    });
+
+    return {
+      success: true,
+      message: `Found ${emails.length} email(s) matching "${query}":\n\n${summaries.join("\n\n")}`,
+      data: { count: emails.length, query },
+    };
+  } catch (err) {
+    return { success: false, message: `Failed to search emails: ${err instanceof Error ? err.message : String(err)}` };
+  }
+}
+
 const ACTION_HANDLERS: Record<
   string,
   (params: Record<string, unknown>) => Promise<ActionResult>
@@ -1146,6 +1233,8 @@ const ACTION_HANDLERS: Record<
   log_production_run: handleLogProductionRun,
   record_vendor_quote: handleRecordVendorQuote,
   run_scenario: handleRunScenario,
+  read_email: handleReadEmail,
+  search_email: handleSearchEmail,
 };
 
 async function fetchApproval(approvalId: string): Promise<ApprovalRow | null> {
