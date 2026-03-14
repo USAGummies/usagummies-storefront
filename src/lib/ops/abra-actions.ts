@@ -669,39 +669,61 @@ async function handleCorrectClaim(
     };
   }
 
-  // Store as a pinned brain entry with correction + pinned tags
   const text = `CORRECTION: "${originalClaim}" is WRONG. The correct information is: "${correction}". Corrected by ${correctedBy} on ${new Date().toISOString().split("T")[0]}.`;
 
-  const rows = (await sbFetch("/rest/v1/open_brain_entries", {
+  // 1. Write to abra_corrections table (this is what the chat/session routes read)
+  const correctionRows = (await sbFetch("/rest/v1/abra_corrections", {
     method: "POST",
     headers: {
       Prefer: "return=representation",
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      source_type: "agent",
-      source_ref: "abra_correction",
-      entry_type: "correction",
-      title: `Correction: ${originalClaim.slice(0, 80)}`,
-      raw_text: text,
-      summary_text: text.slice(0, 500),
-      category: "correction",
+      corrected_by: correctedBy,
+      original_claim: originalClaim,
+      correction,
       department,
-      confidence: "verified",
-      priority: "critical",
-      processed: true,
-      tags: ["correction", "pinned"],
+      active: true,
     }),
   })) as Array<{ id: string }>;
 
-  const entryId = rows[0]?.id;
+  const correctionId = correctionRows[0]?.id;
 
-  // Embed the correction so it surfaces in semantic search (HOT tier)
-  if (entryId) {
-    embedBrainEntry(entryId, text);
+  // 2. Also write to open_brain_entries so it surfaces in semantic search (HOT tier)
+  let brainEntryId: string | null = null;
+  try {
+    const brainRows = (await sbFetch("/rest/v1/open_brain_entries", {
+      method: "POST",
+      headers: {
+        Prefer: "return=representation",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        source_type: "agent",
+        source_ref: "abra_correction",
+        entry_type: "correction",
+        title: `Correction: ${originalClaim.slice(0, 80)}`,
+        raw_text: text,
+        summary_text: text.slice(0, 500),
+        category: "correction",
+        department,
+        confidence: "verified",
+        priority: "critical",
+        processed: true,
+        tags: ["correction", "pinned"],
+      }),
+    })) as Array<{ id: string }>;
+
+    brainEntryId = brainRows[0]?.id || null;
+    if (brainEntryId) {
+      embedBrainEntry(brainEntryId, text);
+    }
+  } catch {
+    // Brain entry is supplementary — correction table is the source of truth
+    console.error("[abra-actions] Failed to write correction to brain entries (will still work via abra_corrections table)");
   }
 
-  // Also notify on Slack so the team knows a correction was logged
+  // 3. Notify on Slack so the team knows a correction was logged
   await notify({
     channel: "alerts",
     text: `📌 *Correction Logged*\n• Wrong: "${originalClaim.slice(0, 100)}"\n• Correct: "${correction.slice(0, 100)}"\n• By: ${correctedBy}`,
@@ -710,7 +732,7 @@ async function handleCorrectClaim(
   return {
     success: true,
     message: `Correction pinned: "${originalClaim.slice(0, 60)}..." → "${correction.slice(0, 60)}..."`,
-    data: { entry_id: entryId || null },
+    data: { correction_id: correctionId || null, brain_entry_id: brainEntryId },
   };
 }
 
