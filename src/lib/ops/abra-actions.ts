@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { sendOpsEmail } from "@/lib/ops/email";
 import { createNotionPage, updateNotionPage } from "@/lib/ops/abra-notion-write";
 import { DB } from "@/lib/notion/client";
+import { generateEmbedding } from "@/lib/ops/abra-embeddings";
 
 /** Map friendly database keys → Notion database IDs for create_notion_page action */
 const NOTION_DB_MAP: Record<string, string> = {
@@ -163,6 +164,32 @@ async function sbFetch(path: string, init: RequestInit = {}): Promise<unknown> {
     );
   }
   return json;
+}
+
+/**
+ * Fire-and-forget: generate an embedding for a brain entry and store it.
+ * Called after creating entries via actions so they're findable by semantic search.
+ * Failures are logged but never block the action response.
+ */
+function embedBrainEntry(entryId: string, text: string): void {
+  (async () => {
+    try {
+      const embedding = await generateEmbedding(text.slice(0, 8000));
+      await sbFetch(
+        `/rest/v1/open_brain_entries?id=eq.${encodeURIComponent(entryId)}`,
+        {
+          method: "PATCH",
+          headers: {
+            Prefer: "return=minimal",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ embedding }),
+        },
+      );
+    } catch (err) {
+      console.error(`[abra-actions] Failed to embed brain entry ${entryId}:`, err);
+    }
+  })();
 }
 
 async function resolveAbraAgentId(): Promise<string> {
@@ -379,10 +406,15 @@ async function handleCreateBrainEntry(
     }),
   })) as Array<{ id: string }>;
 
+  const entryId = rows[0]?.id;
+  if (entryId) {
+    embedBrainEntry(entryId, `${title}: ${text}`);
+  }
+
   return {
     success: true,
     message: "Brain entry created",
-    data: { entry_id: rows[0]?.id || null },
+    data: { entry_id: entryId || null },
   };
 }
 
@@ -662,6 +694,13 @@ async function handleCorrectClaim(
     }),
   })) as Array<{ id: string }>;
 
+  const entryId = rows[0]?.id;
+
+  // Embed the correction so it surfaces in semantic search (HOT tier)
+  if (entryId) {
+    embedBrainEntry(entryId, text);
+  }
+
   // Also notify on Slack so the team knows a correction was logged
   await notify({
     channel: "alerts",
@@ -671,7 +710,7 @@ async function handleCorrectClaim(
   return {
     success: true,
     message: `Correction pinned: "${originalClaim.slice(0, 60)}..." → "${correction.slice(0, 60)}..."`,
-    data: { entry_id: rows[0]?.id || null },
+    data: { entry_id: entryId || null },
   };
 }
 
