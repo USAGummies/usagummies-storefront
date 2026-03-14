@@ -54,19 +54,20 @@ export type AutoExecPolicy = {
   min_confidence: number;
   daily_limit: number;
   enabled: boolean;
+  max_amount?: number; // For financial actions: auto-exec only if amount <= this cap
 };
 
 function isAutoExecutionGloballyEnabled(): boolean {
   const raw = String(process.env.ABRA_AUTO_EXEC_ENABLED || "").trim().toLowerCase();
-  if (!raw) return true;
-  return !["0", "false", "off", "no"].includes(raw);
+  if (!raw) return false; // Default OFF — auto-execution must be explicitly opted into via env var
+  return ["1", "true", "on", "yes"].includes(raw);
 }
 
 export const AUTO_EXEC_POLICIES: AutoExecPolicy[] = [
   {
     action_type: "create_brain_entry",
     max_risk_level: "low",
-    min_confidence: 0.7,
+    min_confidence: 0.85,
     daily_limit: 50,
     enabled: true,
   },
@@ -101,16 +102,17 @@ export const AUTO_EXEC_POLICIES: AutoExecPolicy[] = [
   {
     action_type: "record_transaction",
     max_risk_level: "low",
-    min_confidence: 0.8,
+    min_confidence: 0.85,
     daily_limit: 50,
     enabled: true,
+    max_amount: 500, // Safety cap: transactions > $500 require human approval
   },
   {
     action_type: "correct_claim",
     max_risk_level: "low",
-    min_confidence: 0.9,
+    min_confidence: 0.95,
     daily_limit: 10,
-    enabled: true,
+    enabled: false, // DISABLED: corrections go to HOT tier and override all other data. Too dangerous to auto-execute.
   },
 ];
 
@@ -460,12 +462,24 @@ async function handleCreateNotionPage(
   };
 }
 
+const VALID_TX_TYPES = new Set(["income", "expense", "transfer", "refund", "cogs", "tax", "shipping"]);
+const MAX_TX_AMOUNT = 100_000; // Hard safety limit — anything higher is likely a hallucination
+
 async function handleRecordTransaction(
   params: Record<string, unknown>,
 ): Promise<ActionResult> {
   const description = String(params.description || params.title || "Transaction");
   const amount = typeof params.amount === "number" ? params.amount : parseFloat(String(params.amount || "0"));
-  const txType = String(params.type || "expense");
+
+  if (isNaN(amount) || amount === 0) {
+    return { success: false, message: "Transaction amount must be a non-zero number" };
+  }
+  if (Math.abs(amount) > MAX_TX_AMOUNT) {
+    return { success: false, message: `Transaction amount $${Math.abs(amount).toFixed(2)} exceeds safety limit of $${MAX_TX_AMOUNT.toLocaleString()}. Record this manually.` };
+  }
+
+  const txTypeRaw = String(params.type || "expense").toLowerCase().trim();
+  const txType = VALID_TX_TYPES.has(txTypeRaw) ? txTypeRaw : "expense";
   const category = String(params.category || "general");
   const vendor = typeof params.vendor === "string" ? params.vendor : undefined;
   const dateStr = typeof params.date === "string" ? params.date : new Date().toISOString().split("T")[0];
@@ -774,6 +788,14 @@ export async function canAutoExecute(action: AbraAction): Promise<boolean> {
       ? Math.max(0, Math.min(1, action.confidence))
       : 0.5;
   if (confidence < policy.min_confidence) return false;
+
+  // Amount cap for financial actions (e.g. record_transaction)
+  if (typeof policy.max_amount === "number" && action.params) {
+    const amount = typeof action.params.amount === "number"
+      ? Math.abs(action.params.amount)
+      : Math.abs(parseFloat(String(action.params.amount || "0")));
+    if (amount > policy.max_amount) return false;
+  }
 
   try {
     const dayStart = new Date();

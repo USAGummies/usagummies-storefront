@@ -10,11 +10,11 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** Match abra-actions.ts: default to true (enabled) unless explicitly disabled */
+/** Match abra-actions.ts: default to OFF — auto-execution must be explicitly opted into */
 function isAutoExecutionEnabled(): boolean {
   const raw = String(process.env.ABRA_AUTO_EXEC_ENABLED || "").trim().toLowerCase();
-  if (!raw) return true;
-  return !["0", "false", "off", "no"].includes(raw);
+  if (!raw) return false;
+  return ["1", "true", "on", "yes"].includes(raw);
 }
 
 type ProposePayload = {

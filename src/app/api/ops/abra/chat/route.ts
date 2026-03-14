@@ -1090,17 +1090,12 @@ export async function POST(req: Request) {
   }
 
   try {
+    // Circuit breaker check — if Supabase is down, we'll skip memory search
+    // but still serve the chat with live data feeds (graceful degradation)
     const circuitCheck = await canUseSupabase();
-    if (!circuitCheck.allowed) {
-      return NextResponse.json(
-        {
-          error:
-            "Supabase dependency is temporarily unavailable (circuit open)",
-          circuitOpen: true,
-          cooldownUntil: circuitCheck.state.cooldownUntil,
-        },
-        { status: 503 },
-      );
+    const supabaseCircuitOpen = !circuitCheck.allowed;
+    if (supabaseCircuitOpen) {
+      console.log("[abra] Supabase circuit open — will skip memory search, continuing with live data only");
     }
     void captureCompetitorIntelFromChat({
       message,
@@ -1654,38 +1649,41 @@ export async function POST(req: Request) {
 
     // ─── Normal RAG Chat Flow ───
     // Tiered memory search (hot/warm/cold with fallback) + date-aware retrieval
-    // Graceful degradation: if embedding fails, continue with empty context + live data
+    // Graceful degradation: if embedding fails OR circuit is open, continue with empty context + live data
     let tieredResults: TieredSearchResult = { hot: [], warm: [], cold: [], all: [], tierCounts: { hot: 0, warm: 0, cold: 0 } };
     let temporalRange: import("@/lib/ops/abra-temporal-resolver").TemporalRange | null = null;
-    let embeddingFailed = false;
-    try {
-      const embedding = await buildEmbedding(message);
-      const searchResult = await searchWithTemporalAwareness({
-        message,
-        embedding,
-        matchCount: DEFAULT_MATCH_COUNT,
-        filterTables: ["brain", "email"],
-      });
-      tieredResults = searchResult.results;
-      temporalRange = searchResult.temporalRange;
-      await markSupabaseSuccess();
-    } catch (embErr) {
-      console.error("[abra] Embedding/search failed, continuing with live data only:", embErr instanceof Error ? embErr.message : embErr);
-      embeddingFailed = true;
+    let embeddingFailed = supabaseCircuitOpen; // If circuit is open, skip embedding entirely
+    if (!supabaseCircuitOpen) {
+      try {
+        const embedding = await buildEmbedding(message);
+        const searchResult = await searchWithTemporalAwareness({
+          message,
+          embedding,
+          matchCount: DEFAULT_MATCH_COUNT,
+          filterTables: ["brain", "email"],
+        });
+        tieredResults = searchResult.results;
+        temporalRange = searchResult.temporalRange;
+        await markSupabaseSuccess();
+      } catch (embErr) {
+        console.error("[abra] Embedding/search failed, continuing with live data only:", embErr instanceof Error ? embErr.message : embErr);
+        embeddingFailed = true;
+      }
     }
 
     // Fetch corrections + departments + initiatives + cost + team + signals + live data (parallel)
+    // When Supabase circuit is open, skip Supabase-dependent fetches to avoid 15s timeouts
     const [corrections, departments, activeInitiatives, costSummary, teamMembers, vendors, signals, liveSnapshot, financialContext] =
       await Promise.all([
-        fetchCorrections(),
-        fetchDepartments(),
-        fetchActiveInitiatives(),
-        fetchCostSummary(),
-        getTeamMembers(),
-        getVendors(),
-        getActiveSignals({ limit: 5 }),
-        fetchLiveBusinessSnapshot(),
-        fetchFinancialContext(),
+        supabaseCircuitOpen ? Promise.resolve([] as Awaited<ReturnType<typeof fetchCorrections>>) : fetchCorrections(),
+        supabaseCircuitOpen ? Promise.resolve([] as Awaited<ReturnType<typeof fetchDepartments>>) : fetchDepartments(),
+        supabaseCircuitOpen ? Promise.resolve([] as Awaited<ReturnType<typeof fetchActiveInitiatives>>) : fetchActiveInitiatives(),
+        supabaseCircuitOpen ? Promise.resolve(null as Awaited<ReturnType<typeof fetchCostSummary>>) : fetchCostSummary(),
+        supabaseCircuitOpen ? Promise.resolve([] as Awaited<ReturnType<typeof getTeamMembers>>) : getTeamMembers(),
+        supabaseCircuitOpen ? Promise.resolve([] as Awaited<ReturnType<typeof getVendors>>) : getVendors(),
+        supabaseCircuitOpen ? Promise.resolve([] as Awaited<ReturnType<typeof getActiveSignals>>) : getActiveSignals({ limit: 5 }),
+        fetchLiveBusinessSnapshot(), // Always fetch — uses Shopify/email APIs, not Supabase
+        fetchFinancialContext(),      // Always fetch — uses KPI timeseries, not Supabase
       ]);
     const competitorContext =
       isCompetitorQuestion(message) || messageDepartment === "sales_and_growth"
@@ -1705,7 +1703,8 @@ export async function POST(req: Request) {
       : "";
     // Build data availability status so Claude knows what feeds are up/down
     const dataStatus: string[] = [];
-    if (embeddingFailed) dataStatus.push("🔴 Brain memory search: FAILED (embedding service down — no brain/email context available)");
+    if (supabaseCircuitOpen) dataStatus.push("🔴 Supabase circuit OPEN: All brain memory, corrections, departments, initiatives, signals, and team data unavailable. Only live Shopify/email feeds and KPI timeseries are active.");
+    else if (embeddingFailed) dataStatus.push("🔴 Brain memory search: FAILED (embedding service down — no brain/email context available)");
     if (!liveSnapshot) dataStatus.push("⚠️ Live Shopify/email snapshot: UNAVAILABLE (API timeout or not configured)");
     if (!financialContext) dataStatus.push("⚠️ Financial KPI data: UNAVAILABLE (no KPI timeseries data returned)");
     const dataStatusLine = dataStatus.length > 0 ? `\n[DATA FEED STATUS: ${dataStatus.join("; ")}. Do NOT invent numbers for unavailable feeds. If brain search failed, tell the user your memory is temporarily unavailable.]` : "";
