@@ -33,6 +33,12 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const VALID_STATUSES = new Set([
+  "researching", "planning", "asking_questions", "approved",
+  "executing", "paused", "completed",
+]);
+
 const DEFAULT_CLAUDE_MODEL =
   process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514";
 const ALL_DEPARTMENTS = Array.from(
@@ -384,7 +390,7 @@ async function addDependencies(
   if (!deps.length) return;
 
   const rows = deps
-    .filter((dep) => dep.depends_on_id !== initiativeId)
+    .filter((dep) => dep.depends_on_id !== initiativeId && UUID_RE.test(dep.depends_on_id))
     .map((dep) => ({
       initiative_id: initiativeId,
       depends_on_id: dep.depends_on_id,
@@ -405,6 +411,7 @@ async function addDependencies(
 
 async function removeDependency(initiativeId: string, dependencyId: string): Promise<void> {
   if (!initiativeId || !dependencyId) return;
+  if (!UUID_RE.test(initiativeId) || !UUID_RE.test(dependencyId)) return;
   await sbFetch(
     `/rest/v1/abra_initiative_dependencies?id=eq.${dependencyId}&initiative_id=eq.${initiativeId}`,
     { method: "DELETE", headers: { Prefer: "return=minimal" } },
@@ -640,7 +647,7 @@ async function handlePost(req: Request) {
   }
 
   const goalRaw =
-    typeof payload.goal === "string" ? payload.goal.trim() : "";
+    typeof payload.goal === "string" ? payload.goal.trim().slice(0, 2000) : "";
   if (!goalRaw) {
     return NextResponse.json(
       { error: "goal is required" },
@@ -826,10 +833,13 @@ async function handleGet(req: Request) {
 
     let path = "/rest/v1/abra_initiatives?select=*&order=created_at.desc";
     if (id) {
+      if (!UUID_RE.test(id)) {
+        return NextResponse.json({ error: "id must be a valid UUID" }, { status: 400 });
+      }
       path += `&id=eq.${id}`;
     }
     if (department) {
-      path += `&department=eq.${department}`;
+      path += `&department=eq.${encodeURIComponent(department)}`;
     } else if (pillar) {
       const departmentsInPillar = OPERATING_PILLARS[pillar].departments;
       path += `&department=in.${inClause(departmentsInPillar)}`;
@@ -837,8 +847,8 @@ async function handleGet(req: Request) {
     if (status) {
       if (status === "active") {
         path += `&status=not.in.(completed,paused)`;
-      } else {
-        path += `&status=eq.${status}`;
+      } else if (VALID_STATUSES.has(status)) {
+        path += `&status=eq.${encodeURIComponent(status)}`;
       }
     }
     path += "&limit=20";
@@ -892,6 +902,12 @@ async function handlePatch(req: Request) {
   if (!id) {
     return NextResponse.json(
       { error: "id is required" },
+      { status: 400 },
+    );
+  }
+  if (!UUID_RE.test(id)) {
+    return NextResponse.json(
+      { error: "id must be a valid UUID" },
       { status: 400 },
     );
   }
@@ -981,7 +997,7 @@ async function handlePatch(req: Request) {
           ? dep.depends_on_id.trim()
           : "";
       const relationshipType = normalizeRelationship(dep.relationship_type);
-      if (dependsOnId) {
+      if (dependsOnId && UUID_RE.test(dependsOnId)) {
         await addDependencies(id, [
           {
             depends_on_id: dependsOnId,
@@ -1000,7 +1016,7 @@ async function handlePatch(req: Request) {
         : typeof payload.remove_dependency === "string"
           ? payload.remove_dependency
           : "";
-    if (removeDependencyId) {
+    if (removeDependencyId && UUID_RE.test(removeDependencyId)) {
       await removeDependency(id, removeDependencyId);
     }
 

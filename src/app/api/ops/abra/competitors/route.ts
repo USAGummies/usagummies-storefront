@@ -115,8 +115,11 @@ export async function GET(req: Request) {
     });
 
     if (competitor) {
-      const cleaned = competitor.replace(/\*/g, "");
-      params.set("competitor_name", `ilike.*${cleaned}*`);
+      // Strip PostgREST special chars and encode for safe ilike pattern
+      const cleaned = competitor.replace(/[*%().,]/g, "").slice(0, 200);
+      if (cleaned) {
+        params.set("competitor_name", `ilike.*${encodeURIComponent(cleaned)}*`);
+      }
     }
     if (dataType) {
       params.set("data_type", `eq.${dataType}`);
@@ -148,13 +151,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 });
   }
 
-  const competitorName = asText(body.competitor_name);
-  const dataType = asText(body.data_type);
-  const title = asText(body.title);
-  const detail = asText(body.detail);
-  const source = asText(body.source) || "manual";
-  const sourceUrl = asText(body.source_url);
-  const department = asText(body.department) || "sales_and_growth";
+  const competitorName = asText(body.competitor_name).slice(0, 200);
+  const dataType = asText(body.data_type).slice(0, 50);
+  const title = asText(body.title).slice(0, 500);
+  const detail = asText(body.detail).slice(0, 5000);
+  const source = (asText(body.source) || "manual").slice(0, 200);
+  const sourceUrl = asText(body.source_url).slice(0, 2000);
+  const department = (asText(body.department) || "sales_and_growth").slice(0, 50);
 
   if (!competitorName || !dataType || !title) {
     return NextResponse.json(
@@ -261,15 +264,19 @@ export async function PATCH(req: Request) {
   if (!id) {
     return NextResponse.json({ error: "id is required" }, { status: 400 });
   }
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!UUID_RE.test(id)) {
+    return NextResponse.json({ error: "id must be a valid UUID" }, { status: 400 });
+  }
 
   const payload: Record<string, unknown> = {};
-  const competitorName = asText(body.competitor_name);
-  const dataType = asText(body.data_type);
-  const title = asText(body.title);
-  const detail = asText(body.detail);
-  const source = asText(body.source);
-  const sourceUrl = asText(body.source_url);
-  const department = asText(body.department);
+  const competitorName = asText(body.competitor_name).slice(0, 200);
+  const dataType = asText(body.data_type).slice(0, 50);
+  const title = asText(body.title).slice(0, 500);
+  const detail = asText(body.detail).slice(0, 5000);
+  const source = asText(body.source).slice(0, 200);
+  const sourceUrl = asText(body.source_url).slice(0, 2000);
+  const department = asText(body.department).slice(0, 50);
 
   if (competitorName) payload.competitor_name = competitorName;
   if (dataType) {
@@ -328,9 +335,13 @@ export async function DELETE(req: Request) {
   if (!id) {
     return NextResponse.json({ error: "id is required" }, { status: 400 });
   }
+  const UUID_RE_DEL = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!UUID_RE_DEL.test(id)) {
+    return NextResponse.json({ error: "id must be a valid UUID" }, { status: 400 });
+  }
 
   try {
-    await sbFetch(`/rest/v1/abra_competitor_intel?id=eq.${encodeURIComponent(id)}`, {
+    await sbFetch(`/rest/v1/abra_competitor_intel?id=eq.${id}`, {
       method: "DELETE",
       headers: {
         Prefer: "return=minimal",

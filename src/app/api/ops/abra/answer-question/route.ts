@@ -123,11 +123,19 @@ export async function POST(req: Request) {
       ? payload.question_id.trim()
       : "";
   const answer =
-    typeof payload.answer === "string" ? payload.answer.trim() : "";
+    typeof payload.answer === "string" ? payload.answer.trim().slice(0, 10000) : "";
 
   if (!questionId || !answer) {
     return NextResponse.json(
       { error: "question_id and answer are required" },
+      { status: 400 },
+    );
+  }
+
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!UUID_RE.test(questionId)) {
+    return NextResponse.json(
+      { error: "question_id must be a valid UUID" },
       { status: 400 },
     );
   }

@@ -86,12 +86,15 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const status = (url.searchParams.get("status") || "pending").toLowerCase();
+  const VALID_APPROVAL_STATUSES = new Set(["pending", "approved", "denied", "rejected"]);
   const statusFilter =
     status === "all"
       ? ""
       : status === "rejected"
         ? "&status=eq.denied"
-        : `&status=eq.${status}`;
+        : VALID_APPROVAL_STATUSES.has(status)
+          ? `&status=eq.${encodeURIComponent(status)}`
+          : "";
 
   try {
     const rows = (await sbFetch(
@@ -139,6 +142,11 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "id is required" }, { status: 400 });
   }
 
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!UUID_RE.test(id)) {
+    return NextResponse.json({ error: "id must be a valid UUID" }, { status: 400 });
+  }
+
   if (!["approved", "rejected"].includes(decisionRaw)) {
     return NextResponse.json(
       { error: "decision must be approved or rejected" },
@@ -167,7 +175,7 @@ export async function PATCH(req: Request) {
       decision: mappedDecision,
       decided_at: new Date().toISOString(),
       decision_reasoning:
-        typeof payload.comment === "string" ? payload.comment : null,
+        typeof payload.comment === "string" ? payload.comment.slice(0, 2000) : null,
       decided_by_user_id: deciderUserId,
     };
 
