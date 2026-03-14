@@ -563,6 +563,32 @@ async function handleRecordTransaction(
     return { success: false, message: `Transaction date ${dateStr} is more than 1 year in the future — likely incorrect` };
   }
 
+  // Deduplication: check if an identical transaction was already recorded in the last 10 minutes
+  // (same amount, type, and description substring — catches LLM retry/re-emit)
+  try {
+    const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    const dedupeRows = (await sbFetch(
+      `/rest/v1/approvals?auto_executed=eq.true&created_at=gte.${encodeURIComponent(tenMinAgo)}&select=id,proposed_payload&limit=50`,
+    )) as Array<{ id: string; proposed_payload?: unknown }>;
+
+    const isDuplicate = (Array.isArray(dedupeRows) ? dedupeRows : []).some((row) => {
+      if (!row.proposed_payload || typeof row.proposed_payload !== "object") return false;
+      const payload = row.proposed_payload as Record<string, unknown>;
+      const origType = String(payload.original_action_type || payload.action_type || "");
+      if (origType !== "record_transaction") return false;
+      const p = (payload.params && typeof payload.params === "object" ? payload.params : payload) as Record<string, unknown>;
+      const prevAmount = typeof p.amount === "number" ? p.amount : parseFloat(String(p.amount || "0"));
+      const prevDesc = String(p.description || p.title || "").toLowerCase();
+      return Math.abs(prevAmount - amount) < 0.01 && prevDesc === description.toLowerCase();
+    });
+
+    if (isDuplicate) {
+      return { success: false, message: `Duplicate transaction detected: $${amount.toFixed(2)} "${description}" was already recorded in the last 10 minutes. Skipping to prevent double-entry.` };
+    }
+  } catch {
+    // Deduplication is best-effort — proceed if check fails
+  }
+
   const parentId = NOTION_DB_MAP.cash_transactions;
   if (!parentId) {
     return { success: false, message: "Cash Transactions database not configured" };
@@ -926,6 +952,38 @@ export async function proposeAndMaybeExecute(action: AbraAction): Promise<{
   };
 }
 
+/**
+ * Unclaim stale approvals that got stuck — if a batch_group was set (claimed)
+ * but the approval was never resolved within STALE_CLAIM_TTL_MS, clear the
+ * batch_group so it can be retried. This handles the case where the handler
+ * succeeds but markApprovalResolved fails (network error, timeout, etc.)
+ */
+const STALE_CLAIM_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+async function unclaimIfStale(approvalId: string, approval: ApprovalRow): Promise<boolean> {
+  if (approval.status !== "pending" || !approval.batch_group) return false;
+  if (!approval.created_at) return false;
+
+  // Check if the claim is old enough to be considered stale
+  const claimedAt = new Date(approval.created_at).getTime();
+  const now = Date.now();
+  if (now - claimedAt < STALE_CLAIM_TTL_MS) return false;
+
+  try {
+    await sbFetch(
+      `/rest/v1/approvals?id=eq.${encodeURIComponent(approvalId)}&status=eq.pending&batch_group=eq.${encodeURIComponent(approval.batch_group)}`,
+      {
+        method: "PATCH",
+        headers: { Prefer: "return=minimal", "Content-Type": "application/json" },
+        body: JSON.stringify({ batch_group: null }),
+      },
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function executeAction(approvalId: string): Promise<ActionResult> {
   if (!UUID_RE.test(approvalId)) {
     return { success: false, message: "Invalid approval ID format" };
@@ -944,6 +1002,18 @@ export async function executeAction(approvalId: string): Promise<ActionResult> {
       };
     }
     if (current.status === "pending" && current.batch_group) {
+      // Try to unclaim if stale (handler succeeded but markResolved failed)
+      const unclaimed = await unclaimIfStale(approvalId, current);
+      if (unclaimed) {
+        // Retry claim after unclaiming
+        const retryClaim = await claimPendingApproval(approvalId);
+        if (!retryClaim) {
+          return { success: false, message: "Approval could not be reclaimed after stale unclaim" };
+        }
+        // Fall through to execution below by reassigning — but we can't reassign const.
+        // Instead, recurse once (safe because unclaim already happened, won't loop).
+        return executeAction(approvalId);
+      }
       return {
         success: false,
         message: "Approval is currently being executed",
