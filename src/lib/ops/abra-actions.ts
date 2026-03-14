@@ -378,12 +378,34 @@ async function handleUpdateNotion(
   };
 }
 
+const VALID_BRAIN_CATEGORIES = new Set([
+  "market_intel", "financial", "operational", "regulatory",
+  "customer_insight", "deal_data", "email_triage",
+  "competitive", "research", "field_note", "system_log",
+  "teaching", "general", "company_info", "product_info",
+  "supply_chain", "sales", "founder", "culture", "correction",
+]);
+
+const VALID_BRAIN_ENTRY_TYPES = new Set([
+  "finding", "research", "field_note", "summary",
+  "alert", "system_log", "correction", "teaching",
+  "kpi", "session_summary", "auto_teach",
+]);
+
 async function handleCreateBrainEntry(
   params: Record<string, unknown>,
 ): Promise<ActionResult> {
   const title = sanitizeTitle(String(params.title || "Action log"));
   const text = sanitizeText(String(params.text || params.content || ""));
   if (!text) return { success: false, message: "Brain entry text is required" };
+
+  // Respect LLM-specified category/department/entry_type if valid, else default
+  const rawCategory = typeof params.category === "string" ? params.category.toLowerCase() : "";
+  const category = VALID_BRAIN_CATEGORIES.has(rawCategory) ? rawCategory : "system_log";
+  const rawEntryType = typeof params.entry_type === "string" ? params.entry_type.toLowerCase() : "";
+  const entryType = VALID_BRAIN_ENTRY_TYPES.has(rawEntryType) ? rawEntryType : "system_log";
+  const department = typeof params.department === "string" ? params.department.slice(0, 50) : "executive";
+  const tagsParam = Array.isArray(params.tags) ? params.tags.filter((t): t is string => typeof t === "string").slice(0, 10) : undefined;
 
   const rows = (await sbFetch("/rest/v1/open_brain_entries", {
     method: "POST",
@@ -394,15 +416,16 @@ async function handleCreateBrainEntry(
     body: JSON.stringify({
       source_type: "agent",
       source_ref: "abra_action",
-      entry_type: "system_log",
+      entry_type: entryType,
       title,
       raw_text: text,
       summary_text: text.slice(0, 500),
-      category: "system_log",
-      department: "executive",
+      category,
+      department,
       confidence: "medium",
       priority: "normal",
       processed: true,
+      ...(tagsParam ? { tags: tagsParam } : {}),
     }),
   })) as Array<{ id: string }>;
 
