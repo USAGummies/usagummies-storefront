@@ -115,6 +115,27 @@ export const AUTO_EXEC_POLICIES: AutoExecPolicy[] = [
     daily_limit: 10,
     enabled: false, // DISABLED: corrections go to HOT tier and override all other data. Too dangerous to auto-execute.
   },
+  {
+    action_type: "log_production_run",
+    max_risk_level: "low",
+    min_confidence: 0.85,
+    daily_limit: 5,
+    enabled: true,
+  },
+  {
+    action_type: "record_vendor_quote",
+    max_risk_level: "low",
+    min_confidence: 0.85,
+    daily_limit: 10,
+    enabled: true,
+  },
+  {
+    action_type: "run_scenario",
+    max_risk_level: "low",
+    min_confidence: 0.8,
+    daily_limit: 10,
+    enabled: true,
+  },
 ];
 
 const EXTERNAL_SUBMISSION_ACTIONS = new Set([
@@ -384,6 +405,7 @@ const VALID_BRAIN_CATEGORIES = new Set([
   "competitive", "research", "field_note", "system_log",
   "teaching", "general", "company_info", "product_info",
   "supply_chain", "sales", "founder", "culture", "correction",
+  "production_run", "vendor_quote", "scenario_analysis",
 ]);
 
 const VALID_BRAIN_ENTRY_TYPES = new Set([
@@ -759,6 +781,354 @@ async function handleCorrectClaim(
   };
 }
 
+// ─── CPG OPERATIONS HANDLERS ────────────────────────────────────────────
+
+function toStringArrayLocal(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((item) => typeof item === "string" ? item.trim() : String(item || "").trim()).filter(Boolean);
+  }
+  if (typeof value === "string") {
+    return value.split(",").map((s) => s.trim()).filter(Boolean);
+  }
+  return [];
+}
+
+const MAX_PRODUCTION_COST = 500_000; // Safety limit for production run total cost
+
+async function handleLogProductionRun(
+  params: Record<string, unknown>,
+): Promise<ActionResult> {
+  const manufacturer = typeof params.manufacturer === "string" ? params.manufacturer.trim() : "";
+  if (!manufacturer) return { success: false, message: "manufacturer is required" };
+
+  const runDateRaw = typeof params.run_date === "string" ? params.run_date : "";
+  if (!isValidDateString(runDateRaw)) return { success: false, message: "run_date must be a valid date (YYYY-MM-DD)" };
+
+  const skusProduced = toStringArrayLocal(params.skus_produced);
+  const totalUnitsOrdered = typeof params.total_units_ordered === "number"
+    ? params.total_units_ordered
+    : parseInt(String(params.total_units_ordered || "0"), 10);
+  if (!totalUnitsOrdered || totalUnitsOrdered <= 0) {
+    return { success: false, message: "total_units_ordered must be a positive number" };
+  }
+
+  const totalUnitsReceived = typeof params.total_units_received === "number"
+    ? params.total_units_received
+    : (typeof params.total_units_received === "string" && params.total_units_received
+        ? parseInt(params.total_units_received, 10)
+        : totalUnitsOrdered); // Default to ordered if not specified
+
+  const totalCost = typeof params.total_cost === "number"
+    ? params.total_cost
+    : parseFloat(String(params.total_cost || "0"));
+  if (isNaN(totalCost) || totalCost <= 0) {
+    return { success: false, message: "total_cost must be a positive number" };
+  }
+  if (totalCost > MAX_PRODUCTION_COST) {
+    return { success: false, message: `Total cost $${totalCost.toLocaleString()} exceeds safety limit of $${MAX_PRODUCTION_COST.toLocaleString()}. Record this manually.` };
+  }
+
+  const yieldRate = totalUnitsReceived / totalUnitsOrdered;
+  const costPerUnit = totalCost / totalUnitsReceived;
+  const notes = typeof params.notes === "string" ? params.notes.slice(0, 2000) : "";
+
+  const title = `Production Run — ${manufacturer} — ${runDateRaw}`;
+  const text = [
+    `Production run at ${manufacturer} on ${runDateRaw}.`,
+    `SKUs: ${skusProduced.length > 0 ? skusProduced.join(", ") : "not specified"}.`,
+    `Units ordered: ${totalUnitsOrdered.toLocaleString()}, received: ${totalUnitsReceived.toLocaleString()} (yield: ${(yieldRate * 100).toFixed(1)}%).`,
+    `Total cost: $${totalCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}. Cost per unit: $${costPerUnit.toFixed(4)}.`,
+    notes ? `Notes: ${notes}` : "",
+  ].filter(Boolean).join(" ");
+
+  const metadata = {
+    manufacturer,
+    run_date: runDateRaw,
+    skus_produced: skusProduced,
+    total_units_ordered: totalUnitsOrdered,
+    total_units_received: totalUnitsReceived,
+    yield_rate: parseFloat(yieldRate.toFixed(4)),
+    total_cost: totalCost,
+    cost_per_unit: parseFloat(costPerUnit.toFixed(4)),
+    cost_stage: "hard", // Logged by user = confirmed cost
+  };
+
+  const rows = (await sbFetch("/rest/v1/open_brain_entries", {
+    method: "POST",
+    headers: { Prefer: "return=representation", "Content-Type": "application/json" },
+    body: JSON.stringify({
+      source_type: "agent",
+      source_ref: "abra_production_run",
+      entry_type: "finding",
+      title,
+      raw_text: text,
+      summary_text: text.slice(0, 500),
+      category: "production_run",
+      department: "operations",
+      confidence: "high",
+      priority: "normal",
+      processed: true,
+      tags: ["production", "cogs", "manufacturing"],
+      metadata,
+    }),
+  })) as Array<{ id: string }>;
+
+  const entryId = rows[0]?.id;
+  if (entryId) {
+    embedBrainEntry(entryId, `${title}: ${text}`);
+  }
+
+  return {
+    success: true,
+    message: `Production run logged: ${manufacturer} on ${runDateRaw} — ${totalUnitsReceived.toLocaleString()} units at $${costPerUnit.toFixed(4)}/unit (yield: ${(yieldRate * 100).toFixed(1)}%)`,
+    data: {
+      entry_id: entryId || null,
+      cost_per_unit: parseFloat(costPerUnit.toFixed(4)),
+      yield_rate: parseFloat(yieldRate.toFixed(4)),
+      total_cost: totalCost,
+    },
+  };
+}
+
+async function handleRecordVendorQuote(
+  params: Record<string, unknown>,
+): Promise<ActionResult> {
+  const vendor = typeof params.vendor === "string" ? params.vendor.trim() : "";
+  if (!vendor) return { success: false, message: "vendor is required" };
+
+  const itemDescription = typeof params.item_description === "string" ? params.item_description.trim() : "";
+  if (!itemDescription) return { success: false, message: "item_description is required" };
+
+  const quotedPrice = typeof params.quoted_price === "number"
+    ? params.quoted_price
+    : parseFloat(String(params.quoted_price || "0"));
+  if (isNaN(quotedPrice) || quotedPrice <= 0) {
+    return { success: false, message: "quoted_price must be a positive number" };
+  }
+
+  const priceType = String(params.price_type || "per_unit").toLowerCase();
+  if (priceType !== "total" && priceType !== "per_unit") {
+    return { success: false, message: "price_type must be 'total' or 'per_unit'" };
+  }
+
+  const quantity = typeof params.quantity === "number"
+    ? params.quantity
+    : (typeof params.quantity === "string" ? parseFloat(params.quantity) : undefined);
+  const unit = typeof params.unit === "string" ? params.unit.trim() : "units";
+  const validUntil = typeof params.valid_until === "string" && isValidDateString(params.valid_until)
+    ? params.valid_until : undefined;
+  const notes = typeof params.notes === "string" ? params.notes.slice(0, 2000) : "";
+
+  // Calculate per-unit price if total and quantity given
+  let perUnitPrice: number | undefined;
+  if (priceType === "total" && quantity && quantity > 0) {
+    perUnitPrice = quotedPrice / quantity;
+  } else if (priceType === "per_unit") {
+    perUnitPrice = quotedPrice;
+  }
+
+  const title = `Vendor Quote — ${vendor} — ${itemDescription}`;
+  const text = [
+    `Quote from ${vendor} for ${itemDescription}.`,
+    priceType === "total"
+      ? `Total price: $${quotedPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}${quantity ? ` for ${quantity.toLocaleString()} ${unit}` : ""}.`
+      : `Price: $${quotedPrice.toFixed(4)} per ${unit}.`,
+    perUnitPrice && priceType === "total" ? `Per-unit: $${perUnitPrice.toFixed(4)}/${unit}.` : "",
+    quantity ? `Quantity: ${quantity.toLocaleString()} ${unit}.` : "",
+    validUntil ? `Valid until: ${validUntil}.` : "",
+    notes ? `Notes: ${notes}` : "",
+    "COGS Stage: QUOTE (Stage 1 of 5 — this is a projected cost, not a hard number).",
+  ].filter(Boolean).join(" ");
+
+  const metadata = {
+    vendor,
+    item_description: itemDescription,
+    quoted_price: quotedPrice,
+    price_type: priceType,
+    per_unit_price: perUnitPrice ? parseFloat(perUnitPrice.toFixed(4)) : null,
+    quantity: quantity || null,
+    unit,
+    valid_until: validUntil || null,
+    cogs_stage: "quote",
+  };
+
+  const rows = (await sbFetch("/rest/v1/open_brain_entries", {
+    method: "POST",
+    headers: { Prefer: "return=representation", "Content-Type": "application/json" },
+    body: JSON.stringify({
+      source_type: "agent",
+      source_ref: "abra_vendor_quote",
+      entry_type: "finding",
+      title,
+      raw_text: text,
+      summary_text: text.slice(0, 500),
+      category: "vendor_quote",
+      department: "operations",
+      confidence: "medium",
+      priority: "normal",
+      processed: true,
+      tags: ["vendor", "quote", "cogs", "supply_chain"],
+      metadata,
+    }),
+  })) as Array<{ id: string }>;
+
+  const entryId = rows[0]?.id;
+  if (entryId) {
+    embedBrainEntry(entryId, `${title}: ${text}`);
+  }
+
+  return {
+    success: true,
+    message: `Vendor quote logged: ${vendor} — ${itemDescription} at ${
+      perUnitPrice ? `$${perUnitPrice.toFixed(4)}/${unit}` : `$${quotedPrice.toLocaleString()} ${priceType}`
+    }${validUntil ? ` (valid until ${validUntil})` : ""}. COGS stage: QUOTE (projected).`,
+    data: {
+      entry_id: entryId || null,
+      per_unit_price: perUnitPrice ? parseFloat(perUnitPrice.toFixed(4)) : null,
+      vendor,
+      cogs_stage: "quote",
+    },
+  };
+}
+
+async function handleRunScenario(
+  params: Record<string, unknown>,
+): Promise<ActionResult> {
+  const scenarioName = typeof params.scenario_name === "string" ? params.scenario_name.trim() : "";
+  if (!scenarioName) return { success: false, message: "scenario_name is required" };
+
+  const baseValues = params.base_values as Record<string, unknown> | undefined;
+  if (!baseValues || typeof baseValues !== "object") {
+    return { success: false, message: "base_values is required (object with revenue, cogs_per_unit, units)" };
+  }
+
+  const revenue = typeof baseValues.revenue === "number" ? baseValues.revenue : parseFloat(String(baseValues.revenue || "0"));
+  const cogsPerUnit = typeof baseValues.cogs_per_unit === "number" ? baseValues.cogs_per_unit : parseFloat(String(baseValues.cogs_per_unit || "0"));
+  const units = typeof baseValues.units === "number" ? baseValues.units : parseInt(String(baseValues.units || "0"), 10);
+  const channel = typeof baseValues.channel === "string" ? baseValues.channel : "all";
+
+  if (revenue <= 0 && units <= 0) {
+    return { success: false, message: "base_values must include positive revenue or units" };
+  }
+
+  const adjustments = Array.isArray(params.adjustments) ? params.adjustments : [];
+  if (adjustments.length === 0) {
+    return { success: false, message: "At least one adjustment is required for scenario analysis" };
+  }
+
+  // Compute base metrics
+  const baseTotalCogs = cogsPerUnit * units;
+  const baseGrossMargin = revenue > 0 ? ((revenue - baseTotalCogs) / revenue) * 100 : 0;
+  const baseContribution = revenue - baseTotalCogs; // Simplified; channel fees would be subtracted in full model
+
+  // Compute each scenario variant
+  const scenarios: Array<{
+    label: string;
+    variable: string;
+    change_pct: number;
+    revenue: number;
+    total_cogs: number;
+    gross_margin_pct: number;
+    contribution: number;
+  }> = [];
+
+  for (const adj of adjustments) {
+    if (!adj || typeof adj !== "object") continue;
+    const adjObj = adj as Record<string, unknown>;
+    const variable = String(adjObj.variable || "unknown");
+    const changePct = typeof adjObj.change_pct === "number" ? adjObj.change_pct : parseFloat(String(adjObj.change_pct || "0"));
+    const label = typeof adjObj.label === "string" ? adjObj.label : `${variable} ${changePct > 0 ? "+" : ""}${changePct}%`;
+
+    let adjRevenue = revenue;
+    let adjCogs = cogsPerUnit;
+    let adjUnits = units;
+
+    // Apply adjustment based on variable type
+    const varLower = variable.toLowerCase();
+    if (varLower.includes("cost") || varLower.includes("cogs") || varLower.includes("ingredient")) {
+      adjCogs = cogsPerUnit * (1 + changePct / 100);
+    } else if (varLower.includes("price") || varLower.includes("revenue")) {
+      adjRevenue = revenue * (1 + changePct / 100);
+    } else if (varLower.includes("volume") || varLower.includes("demand") || varLower.includes("unit")) {
+      adjUnits = Math.round(units * (1 + changePct / 100));
+      adjRevenue = (revenue / units) * adjUnits; // Scale revenue proportionally
+    } else {
+      // Default: treat as cost adjustment
+      adjCogs = cogsPerUnit * (1 + changePct / 100);
+    }
+
+    const adjTotalCogs = adjCogs * adjUnits;
+    const adjGrossMargin = adjRevenue > 0 ? ((adjRevenue - adjTotalCogs) / adjRevenue) * 100 : 0;
+
+    scenarios.push({
+      label,
+      variable,
+      change_pct: changePct,
+      revenue: parseFloat(adjRevenue.toFixed(2)),
+      total_cogs: parseFloat(adjTotalCogs.toFixed(2)),
+      gross_margin_pct: parseFloat(adjGrossMargin.toFixed(1)),
+      contribution: parseFloat((adjRevenue - adjTotalCogs).toFixed(2)),
+    });
+  }
+
+  // Build comparison table as text
+  const notes = typeof params.notes === "string" ? params.notes.slice(0, 2000) : "";
+  const lines = [
+    `⚠️ HYPOTHETICAL SCENARIO ANALYSIS — NOT A FORECAST`,
+    `Scenario: ${scenarioName} | Channel: ${channel}`,
+    ``,
+    `BASE CASE: Revenue $${revenue.toLocaleString()}, COGS/unit $${cogsPerUnit.toFixed(4)}, Units ${units.toLocaleString()}, Gross Margin ${baseGrossMargin.toFixed(1)}%, Contribution $${baseContribution.toLocaleString()}`,
+    ``,
+    ...scenarios.map((s) =>
+      `${s.label}: Revenue $${s.revenue.toLocaleString()}, Total COGS $${s.total_cogs.toLocaleString()}, Gross Margin ${s.gross_margin_pct}%, Contribution $${s.contribution.toLocaleString()} (${s.contribution >= baseContribution ? "+" : ""}$${(s.contribution - baseContribution).toLocaleString()} vs base)`
+    ),
+    notes ? `\nNotes: ${notes}` : "",
+  ].filter(Boolean).join("\n");
+
+  const title = `Scenario Analysis — ${scenarioName}`;
+
+  // Log to brain for future reference
+  const rows = (await sbFetch("/rest/v1/open_brain_entries", {
+    method: "POST",
+    headers: { Prefer: "return=representation", "Content-Type": "application/json" },
+    body: JSON.stringify({
+      source_type: "agent",
+      source_ref: "abra_scenario",
+      entry_type: "finding",
+      title,
+      raw_text: lines,
+      summary_text: lines.slice(0, 500),
+      category: "scenario_analysis",
+      department: "executive",
+      confidence: "medium",
+      priority: "normal",
+      processed: true,
+      tags: ["scenario", "analysis", "planning"],
+      metadata: {
+        scenario_name: scenarioName,
+        channel,
+        base_values: { revenue, cogs_per_unit: cogsPerUnit, units },
+        scenarios,
+      },
+    }),
+  })) as Array<{ id: string }>;
+
+  const entryId = rows[0]?.id;
+  if (entryId) {
+    embedBrainEntry(entryId, `${title}: ${lines}`);
+  }
+
+  return {
+    success: true,
+    message: lines,
+    data: {
+      entry_id: entryId || null,
+      base: { revenue, cogs_per_unit: cogsPerUnit, units, gross_margin_pct: parseFloat(baseGrossMargin.toFixed(1)), contribution: parseFloat(baseContribution.toFixed(2)) },
+      scenarios,
+    },
+  };
+}
+
 const ACTION_HANDLERS: Record<
   string,
   (params: Record<string, unknown>) => Promise<ActionResult>
@@ -773,6 +1143,9 @@ const ACTION_HANDLERS: Record<
   create_notion_page: handleCreateNotionPage,
   record_transaction: handleRecordTransaction,
   correct_claim: handleCorrectClaim,
+  log_production_run: handleLogProductionRun,
+  record_vendor_quote: handleRecordVendorQuote,
+  run_scenario: handleRunScenario,
 };
 
 async function fetchApproval(approvalId: string): Promise<ApprovalRow | null> {

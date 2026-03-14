@@ -175,6 +175,9 @@ const KNOWN_ACTION_TYPES = new Set([
   "send_email",
   "update_notion",
   "pause_initiative",
+  "log_production_run",
+  "record_vendor_quote",
+  "run_scenario",
 ]);
 
 function normalizeActionDirective(raw: unknown): AbraAction | null {
@@ -944,12 +947,17 @@ EXAMPLES:
 • "record the $500 payment to Powers" → emit record_transaction with type "expense", amount 500, vendor "Powers Confections"
 • "create a P&L breakdown" → create the table in your response AND emit create_notion_page to persist it
 • "those numbers are wrong, it was actually $X" → emit correct_claim with original_claim and correction
+• "we did a production run at Powers, 10,000 units, total cost $13,500" → emit log_production_run with manufacturer, run_date, total_units_ordered, total_cost
+• "Powers quoted us $1.20/unit for gummy base" → emit record_vendor_quote with vendor, item_description, quoted_price, price_type "per_unit"
+• "what if ingredient costs go up 15%?" → emit run_scenario with scenario_name, base_values (from latest production data), adjustments [{variable: "ingredient_cost", change_pct: 15}]
 • "set up QuickBooks" → This is OUTSIDE your actions, so explain what's needed and offer to create_task or send_slack about it.
 
 DATABASE KEYS for create_notion_page: meeting_notes, b2b_prospects, distributor_prospects, daily_performance, fleet_ops, inventory, sku_registry, cash_transactions, content_drafts, kpis, general
 
 ACTION EXECUTION TIERS:
 • AUTO-EXECUTE (low-risk, informational): create_brain_entry, acknowledge_signal, create_notion_page, create_task — these execute immediately when emitted.
+• AUTO-EXECUTE (low-risk, operational data): log_production_run, record_vendor_quote — these log operational data. Auto-execute when emitted.
+• AUTO-EXECUTE (stateless computation): run_scenario — computes hypotheticals without changing financial state. Auto-execute when emitted.
 • AUTO-EXECUTE WITH CAPS (financial): record_transaction — auto-executes ONLY if amount ≤ $500. Larger amounts queue for approval.
 • ALWAYS QUEUED (requires human approval): send_email, send_slack, correct_claim — these NEVER auto-execute.
 
@@ -966,6 +974,16 @@ ACTION EXECUTION TIERS:
    • ALWAYS confirm the exact wording with the user before emitting: "I'll log this correction: [original] → [corrected]. Is that exactly right?"
    • NEVER emit correct_claim based on your own inference. Only the USER can tell you something is wrong.
    • If the user says "that's wrong" but doesn't give the correct figure, ASK for it. Do NOT guess the correction.
+
+3. log_production_run — VERIFY BEFORE EMITTING:
+   • ONLY emit with cost figures the USER explicitly stated or from VERIFIED invoices/receipts.
+   • NEVER estimate production costs. If the user says "we did a run at Powers" but doesn't mention the cost, ASK.
+   • The total_cost field has a safety limit of $500,000. Anything above is rejected.
+
+4. run_scenario — LABEL OUTPUTS CLEARLY:
+   • EVERY scenario output MUST be labeled "⚠️ HYPOTHETICAL SCENARIO — not a forecast."
+   • Use real base values when available (latest production run COGS, actual pricing, real volume). State which inputs are real data and which are assumptions.
+   • NEVER present scenario outputs as projections or forecasts.
 
 3. create_brain_entry — USE ACCURATE TITLES:
    • The title becomes searchable memory. Make it factual and specific, not vague.

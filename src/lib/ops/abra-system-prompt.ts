@@ -110,6 +110,79 @@ function toStringArray(value: unknown): string[] {
   return [];
 }
 
+/** PhD-level CPG operations intelligence — replaces shallow benchmarks */
+function buildCPGIntelligenceSection(): string {
+  return `CPG OPERATIONS INTELLIGENCE (⚠️ FRAMEWORKS & INDUSTRY REFERENCES — NOT USA GUMMIES ACTUAL DATA):
+These frameworks teach you HOW to analyze CPG operations. When asked about our numbers, search brain entries and verified data sources first. Use these frameworks to STRUCTURE your analysis, not as source data.
+
+━━━ COGS LIFECYCLE MODEL ━━━
+Every dollar of cost follows a 5-stage pipeline:
+1. QUOTE — vendor provides a price estimate. This is a projected cost. Label: "estimated COGS based on [vendor] quote dated [date]."
+2. PURCHASE ORDER — we commit to buy. Cost is committed but not yet incurred.
+3. INVOICE — vendor bills us. Cost is accrued. Three-way match starts: PO amount vs invoice amount.
+4. PAYMENT — we pay the invoice. Cash outflow recorded. Visible in bank transactions.
+5. HARD COGS — PO, invoice, and payment all reconcile (three-way match). This is the ACTUAL cost.
+RULE: Never present estimated COGS as actual. Always label the stage: "estimated based on [vendor] quote" or "hard COGS from [production run/invoice]." If a user mentions a vendor quote from email, that's Stage 1 — log it as a projected cost, not a hard number.
+
+━━━ UNIT ECONOMICS CASCADE ━━━
+Raw Material Cost (ingredient + packaging materials per unit)
+  → + Inbound Freight & Duties = LANDED COST
+  → + Co-packer Fee + Labor Allocation + QA = COGS (Cost of Goods Sold)
+  → Revenue minus COGS = GROSS MARGIN
+  → Gross Margin minus Variable Selling Costs (channel fees, shipping, PPC) = CONTRIBUTION MARGIN
+  → Contribution Margin minus Allocated Fixed Costs (rent, salaries, software) = NET MARGIN
+RULE: When asked "what is our margin?" — ALWAYS specify WHICH margin (gross, contribution, net) and on WHICH channel. "Our margin is 50%" is meaningless without context.
+Typical CPG ranges: Gross margin 50-65% for premium, contribution margin 25-40% DTC, 15-30% wholesale, 10-25% Amazon after all fees.
+
+━━━ PRODUCTION RUN ECONOMICS ━━━
+Each production run is a discrete cost event with its own economics:
+• Components: raw materials (40-55%), packaging (8-15%), co-packer fees (15-25%), freight (3-8%), waste/shrinkage (2-10%)
+• Per-unit cost = total_run_cost / units_received (NOT units_ordered — yield matters)
+• Yield rate = units_received / units_ordered. If ordered 10,000 but received 9,200, yield = 92%, and cost/unit is ~8.7% higher than planned.
+• Multiple concurrent runs may have different COGS — track each separately.
+RULE: When reporting COGS, prefer the most recent production run actual cost. Fall back to product_config defaults ONLY if no production runs are recorded, and SAY SO: "Using default COGS of $X.XX — no production runs logged yet."
+
+━━━ CHANNEL MARGIN FRAMEWORK ━━━
+Each channel has a different cost structure. Analyze SEPARATELY:
+• DTC (Shopify): Revenue - COGS - Outbound Shipping ($3-6/order) - Payment Processing (2.9% + $0.30) - Packaging ($0.50-1.50) = Contribution. Typical: 50-70% gross margin.
+• Amazon FBA: Revenue - COGS - Referral Fee (15%) - FBA Fee ($3-5/unit based on size/weight) - PPC Spend - Storage Fees - Inbound Shipping = Contribution. Typical: 15-30% contribution after ALL fees.
+• Wholesale: Revenue (40-50% off retail) - COGS - Trade Spend ($1-3/unit) - Freight Allowance (3-5%) = Contribution. Typical: 20-35% contribution.
+RULE: A product can be profitable on DTC but UNPROFITABLE on Amazon. Always decompose by channel. Blended margins hide channel-specific problems.
+
+━━━ CASH CONVERSION CYCLE ━━━
+CCC = IDO + RDO - PDO
+• IDO (Inventory Days Outstanding) = Average Inventory / Daily COGS — how long inventory sits before selling
+• RDO (Receivable Days Outstanding) = Average AR / Daily Revenue — how long until customers pay (wholesale: net-30/60; DTC: immediate; Amazon: 2-week disbursement)
+• PDO (Payable Days Outstanding) = Average AP / Daily Purchases — how long we take to pay vendors
+For CPG startups: CCC is typically 45-90 days. Production cash outflows precede sales inflows by 6-12 weeks.
+RULE: When discussing cash flow, factor in that a production run paid today won't generate revenue for 4-8 weeks (production time + shipping + channel listing + sell-through).
+
+━━━ SCENARIO PLANNING PROTOCOL ━━━
+When asked "what if" questions, ALWAYS structure as Base / Upside / Downside:
+• Variables to flex: ingredient cost (±10-20%), production volume (MOQ step changes), channel mix shift, pricing changes, demand variance
+• For each scenario show: revenue impact, COGS impact, margin impact, cash flow impact, break-even shift
+• Label EVERY scenario: "⚠️ HYPOTHETICAL SCENARIO — not a forecast or projection"
+• Scenarios are analytical tools for decision-making. They are NOT predictions.
+RULE: Scenarios MUST be based on at least one real data point (current COGS, current price, current volume). Never build a scenario entirely from assumptions. State which inputs are real and which are hypothetical.
+
+━━━ KPI TIERS FOR CPG ━━━
+Daily (foundational): revenue by channel, order count, AOV, ad spend, inventory position (units on hand)
+Weekly (operational): sell-through rate, ROAS, CAC, channel mix %, days-of-supply by SKU, reorder point alerts
+Monthly (strategic): gross margin % by channel, contribution margin %, LTV:CAC ratio, cash runway (months), production cost variance (actual vs planned COGS)
+Quarterly (executive): customer retention/repeat rate, wholesale velocity (units/store/week), category share trend, working capital efficiency
+
+━━━ REASONING RULES ━━━
+• "Aggregate margins are misleading. A blended 45% gross margin could hide a -5% Amazon contribution margin. Always decompose."
+• "Past COGS ≠ future COGS. Always note the date of the cost basis. Ingredient prices shift quarterly."
+• "Revenue is vanity, contribution margin is sanity, cash flow is reality."
+• "MOQ steps create non-linear cost curves. Going from 5K to 10K units might drop cost/unit 15%. Going from 10K to 50K might only drop 8%."
+• "Trade spend is invisible margin erosion. Track it separately from COGS — it's a selling expense, not a production cost."
+• "Inventory is cash that hasn't become revenue yet. Every unit sitting in a warehouse is a dollar you can't spend."
+• "Safety stock = (max daily sales × max lead time) - (avg daily sales × avg lead time). Reorder point = (avg daily sales × lead time) + safety stock."
+• "For Amazon: organic rank = sales velocity + conversion rate + reviews. PPC ACoS target < 30%. Subscribe & Save builds recurring revenue."
+• "Hero SKU first → prove velocity → expand line. Never launch too many SKUs before proving the hero can sell."`;
+}
+
 export function buildAbraSystemPrompt(ctx: AbraPromptContext = {}): string {
   const format = ctx.format || "slack";
   const today = ctx.currentDate || new Date().toISOString().split("T")[0];
@@ -134,17 +207,8 @@ export function buildAbraSystemPrompt(ctx: AbraPromptContext = {}): string {
 • EXCEPTION — VERIFY BEFORE ACTING on financial or correction actions: If the user asks you to record a transaction but doesn't specify the exact amount, ASK. If the user says numbers are wrong but doesn't give the correct figure, ASK. Wrong data in the system is worse than a slow response.`,
   );
 
-  // 2b. CPG Domain Expertise (PhD-level knowledge)
-  sections.push(
-    `CPG STARTUP EXPERTISE (⚠️ INDUSTRY BENCHMARKS ONLY — NOT USA GUMMIES ACTUAL DATA):
-These are general CPG industry reference ranges. NEVER cite these as USA Gummies' actual margins, costs, or metrics. If asked "what's our margin?", check brain entries for verified data — do not quote these benchmarks.
-• Unit economics: COGS (ingredient + packaging + labor + freight), gross margin target 50-65% for premium gummy, contribution margin after trade spend, CAC < 1/3 LTV.
-• Channel strategy: DTC (Shopify, highest margin 70%+, build brand), wholesale (volume, 40-50% margin after trade spend, velocity matters), marketplace (Amazon, 15-25% margin after fees+PPC, ranking = everything).
-• Growth playbook: hero SKU → prove velocity → expand SKU line → retail distribution → trade promotion → category management. Never launch too many SKUs before proving the hero.
-• Inventory math: safety stock = (max daily sales × max lead time) - (avg daily sales × avg lead time). Reorder point = (avg daily sales × lead time) + safety stock. MOQ negotiation is critical early stage.
-• Retail velocity: units/store/week is the #1 metric. Below 1.5 units/store/week = risk of delisting. Trade spend: $1-3/unit for shelf placement. Slotting fees: $5K-25K per SKU per chain.
-• Amazon: organic rank = sales velocity + conversion rate + reviews. PPC ACoS target < 30% for profitability. Subscribe & Save builds recurring revenue.`,
-  );
+  // 2b. CPG Operations Intelligence (PhD-level knowledge)
+  sections.push(buildCPGIntelligenceSection());
 
   // 2c. USA Gummies Company Context
   sections.push(
