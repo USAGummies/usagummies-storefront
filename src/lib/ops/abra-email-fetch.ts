@@ -120,6 +120,42 @@ function summarize(subject: string, body: string): string {
   return `${truncated}...`;
 }
 
+// ---------------------------------------------------------------------------
+// VIP Senders — always action_required, with category/priority overrides.
+// Emails from these addresses bypass keyword classification and get priority
+// routing. Add team members, key vendors, and critical contacts here.
+// ---------------------------------------------------------------------------
+type VipOverride = {
+  name: string;
+  category: EmailCategory;
+  priority: EmailPriority;
+  suggestedAction: string;
+};
+
+const VIP_SENDERS: Record<string, VipOverride> = {
+  "gonz1rene@outlook.com": {
+    name: "Renny Gonzalez",
+    category: "finance",
+    priority: "important",
+    suggestedAction: "Respond to Renny — finance team member",
+  },
+  "ben@usagummies.com": {
+    name: "Ben Stutman",
+    category: "noise", // Ben's own emails don't need action
+    priority: "informational",
+    suggestedAction: "Internal — no action needed",
+  },
+  "benjamin.stutman@gmail.com": {
+    name: "Ben Stutman (personal)",
+    category: "noise",
+    priority: "informational",
+    suggestedAction: "Internal — no action needed",
+  },
+  // Add more VIPs as needed:
+  // "vendor@copacker.com": { name: "Co-Packer", category: "production", priority: "important", suggestedAction: "Review co-packer communication" },
+  // "andrew@partner.com": { name: "Andrew", category: "sales", priority: "important", suggestedAction: "Respond to Andrew" },
+};
+
 function classifyEmail(params: {
   from: string;
   subject: string;
@@ -130,8 +166,23 @@ function classifyEmail(params: {
   actionRequired: boolean;
   suggestedAction: string | null;
 } {
+  const senderEmail = parseSenderEmail(params.from);
   const text = `${params.from} ${params.subject} ${params.body.slice(0, 800)}`.toLowerCase();
 
+  // ------- VIP sender fast-path -------
+  const vip = VIP_SENDERS[senderEmail];
+  if (vip) {
+    // Ben's own emails → skip action. Everyone else → action required.
+    const isSelf = vip.category === "noise" && vip.priority === "informational";
+    return {
+      category: vip.category,
+      priority: vip.priority,
+      actionRequired: !isSelf,
+      suggestedAction: isSelf ? null : vip.suggestedAction,
+    };
+  }
+
+  // ------- Keyword-based category classification -------
   let category: EmailCategory = "noise";
   if (/\b(faire|wholesale|buyer|distributor|retailer|broker|outreach|lead)\b/.test(text)) {
     category = "sales";
@@ -139,7 +190,11 @@ function classifyEmail(params: {
     category = "marketplace";
   } else if (/\b(shopify|dtc|direct to consumer|ecommerce|checkout)\b/.test(text)) {
     category = "retail";
-  } else if (/\b(invoice|payment|wire|ach|tax|bookkeep|quickbooks|stripe)\b/.test(text)) {
+  } else if (
+    /\b(invoice|payment|wire|ach|tax|bookkeep|quickbooks|stripe|loan|agreement|contract|promissory|receivable|payable|ledger|journal|accrual|debit|credit|balance sheet|p&l|profit.?loss|revenue|expense|reimburse|deposit|escrow|lien|collateral|amortiz|depreciat|accounts?\s+payable|accounts?\s+receivable|net\s+terms)\b/.test(
+      text,
+    )
+  ) {
     category = "finance";
   } else if (/\b(refund|return|complaint|support|customer|review)\b/.test(text)) {
     category = "customer";
@@ -151,25 +206,33 @@ function classifyEmail(params: {
     category = "compliance";
   }
 
+  // ------- Priority classification -------
   let priority: EmailPriority = "informational";
   if (/\b(urgent|asap|critical|immediate|emergency)\b/.test(text)) {
     priority = "critical";
-  } else if (/\b(order|quote|pricing|payment|wholesale|distributor)\b/.test(text)) {
+  } else if (/\b(order|quote|pricing|payment|wholesale|distributor|loan|agreement|contract)\b/.test(text)) {
     priority = "important";
   } else if (/\b(newsletter|unsubscribe|promo|marketing|noreply|no-reply)\b/.test(text)) {
     priority = "noise";
   }
 
+  // ------- Action-required detection (broadened) -------
   const actionRequired =
-    /\b(action required|please respond|reply needed|follow up|confirm|approve)\b/.test(
+    /\b(action required|please respond|reply needed|follow[- ]?up|confirm|approve|sign|review|your\s+signature|please\s+(?:review|sign|confirm|approve|send|provide|complete))\b/.test(
       text,
-    ) || priority === "critical";
+    ) ||
+    priority === "critical" ||
+    // Attachment-only emails from non-noise categories likely need attention
+    (params.body.trim().length < 50 && category !== "noise" && priority !== "noise");
 
   let suggestedAction: string | null = null;
   if (actionRequired) {
     if (category === "sales") suggestedAction = "Review and respond to sales thread";
     else if (category === "customer") suggestedAction = "Address customer issue";
     else if (category === "finance") suggestedAction = "Review financial request";
+    else if (category === "production") suggestedAction = "Review production/supply chain update";
+    else if (category === "regulatory" || category === "compliance")
+      suggestedAction = "Review regulatory/compliance item";
     else suggestedAction = "Review and respond";
   }
 
