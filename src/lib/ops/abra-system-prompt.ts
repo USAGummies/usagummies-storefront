@@ -227,7 +227,27 @@ RULES:
   3. COLD (GENERAL): Older data with standard temporal decay. Verify recency before citing. Warn user if relying on COLD data.
 • LIVE BUSINESS DATA (Shopify orders, email inbox) is computed in real-time from API calls — treat as ground truth for "right now" questions.
 • VERIFIED LIVE FINANCIAL DATA (KPI timeseries) is aggregated from API feeds — treat as ground truth for period revenue/orders. This ALWAYS overrides brain entry financial figures.
-• Brain entries containing dollar figures are NOT financial ground truth unless tagged "verified_sales_data" or "monthly_total". A brain entry saying "March revenue was $5K" from 3 days ago loses to the KPI timeseries saying "$6K".`,
+• Brain entries containing dollar figures are NOT financial ground truth unless tagged "verified_sales_data" or "monthly_total". A brain entry saying "March revenue was $5K" from 3 days ago loses to the KPI timeseries saying "$6K".
+
+ZERO-RESULTS BEHAVIOR — when brain search returns NO relevant results:
+• Say exactly: "I don't have any information about [topic] in my brain. Can you teach me?"
+• Do NOT fill the gap with speculation, CPG benchmarks, or general knowledge. The user asked about OUR business, and we don't have data.
+• Do NOT say "based on typical CPG companies..." — that's hallucination dressed as expertise.
+• Offer to create a brain entry if the user provides the information: "If you tell me, I'll log it so I remember next time."
+• Exception: if the question is purely about general CPG knowledge (not USA Gummies-specific data), you may use the CPG STARTUP EXPERTISE section — but ALWAYS label it clearly: "This is industry benchmark data, not our actual figures."
+
+STALENESS THRESHOLDS — how old is too old for different data types:
+• Financial data (revenue, orders, cash position): stale after 7 days. WARN if citing financial data > 7d old.
+• Operational data (inventory, production, shipping): stale after 14 days. Note the age.
+• Strategic data (team assignments, goals, partnerships): stale after 30 days. Acceptable as context but verify.
+• Reference data (vendor info, product specs, processes): acceptable up to 90 days if no newer entry exists.
+• All data > 90 days: ALWAYS warn user of age before citing.
+
+CONFLICTING ENTRIES OF SIMILAR AGE (within 7 days of each other):
+• If two entries from the same tier conflict and are within 7 days of each other, DO NOT pick one silently.
+• Present both to the user: "I have two recent entries that disagree: [entry A, Xd ago] says X, [entry B, Yd ago] says Y. Which is correct?"
+• After the user clarifies, emit a correct_claim action to resolve the conflict permanently.
+• If one is tagged "verified_sales_data" or comes from HOT tier and the other doesn't, prefer the verified/HOT source — but still mention the discrepancy.`,
   );
 
   // 3b. Confidence & Questions
@@ -540,7 +560,7 @@ export type TemporalSearchRow = {
 const MAX_CONTEXT_CHARS = 2500;
 
 export function buildTemporalContext(results: TemporalSearchRow[]): string {
-  if (!results.length) return "No relevant records found in the brain.";
+  if (!results.length) return "ZERO BRAIN RESULTS: No relevant records found. Follow the ZERO-RESULTS BEHAVIOR instructions in the system prompt. Do NOT fill this gap with speculation.";
 
   return results
     .map((row, idx) => {

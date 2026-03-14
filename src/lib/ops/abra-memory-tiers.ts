@@ -163,7 +163,7 @@ function categorizeTieredResults(rows: TieredSearchRow[]): TieredSearchResult {
  * cold results include standard temporal warnings.
  */
 export function buildTieredContext(results: TieredSearchResult): string {
-  if (results.all.length === 0) return "No relevant records found in the brain.";
+  if (results.all.length === 0) return "ZERO BRAIN RESULTS: No relevant records found. Follow the ZERO-RESULTS BEHAVIOR instructions in the system prompt. Do NOT fill this gap with speculation.";
 
   const sections: string[] = [];
 
