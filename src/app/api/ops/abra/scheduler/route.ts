@@ -7,6 +7,9 @@ import { detectAnomalies } from "@/lib/ops/abra-anomaly-detection";
 import { emitSignal } from "@/lib/ops/abra-operational-signals";
 import { autoManageInitiatives } from "@/lib/ops/abra-initiative-health";
 import { sendMorningBrief, sendEndOfDaySummary } from "@/lib/ops/abra-morning-brief";
+import { runEmailFetch } from "@/lib/ops/abra-email-fetch";
+import { generateActionableEmailDrafts } from "@/lib/ops/abra-email-drafter";
+import { processFinancialBrainEntries } from "@/lib/ops/abra-financial-processor";
 import { appendStateArray, readState, writeState } from "@/lib/ops/state";
 import { notify } from "@/lib/ops/notify";
 import {
@@ -210,6 +213,21 @@ export async function POST(req: Request) {
       };
     });
     outcomes.push(feedsStep);
+
+    const emailFetchStep = await runStep("email_fetch", async () =>
+      runEmailFetch({ count: 50 }),
+    );
+    outcomes.push(emailFetchStep);
+
+    const emailDraftsStep = await runStep("email_drafts", async () =>
+      generateActionableEmailDrafts({ limit: 10 }),
+    );
+    outcomes.push(emailDraftsStep);
+
+    const financialStep = await runStep("financial_process", async () =>
+      processFinancialBrainEntries({ limit: 10 }),
+    );
+    outcomes.push(financialStep);
 
     const anomaliesStep = await runStep("anomalies", async () => {
       const anomalies = await detectAnomalies();

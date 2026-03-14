@@ -156,6 +156,7 @@ const EXTERNAL_SUBMISSION_ACTIONS = new Set([
   "send_email",
   "send_slack",
   "update_notion",
+  "draft_email_reply",
 ]);
 
 export function requiresExplicitPermission(actionType: string): boolean {
@@ -271,6 +272,7 @@ async function resolveSystemUserId(): Promise<string | null> {
 
 function mapApprovalActionType(actionType: string): string {
   if (actionType === "send_email") return "send_email";
+  if (actionType === "draft_email_reply") return "auto_reply";
   if (actionType === "send_slack") return "escalation";
   if (actionType === "update_notion") return "data_mutation";
   if (actionType === "create_task") return "data_mutation";
@@ -321,6 +323,46 @@ async function handleSendEmail(
 
   await sendOpsEmail({ to, subject, body });
   return { success: true, message: `Email sent to ${to}` };
+}
+
+async function handleDraftEmailReply(
+  params: Record<string, unknown>,
+): Promise<ActionResult> {
+  const to = String(params.to || "").toLowerCase().trim();
+  const subject = sanitizeTitle(String(params.subject || "Re: (no subject)"));
+  const body = sanitizeText(String(params.body || ""), 10000);
+  const sourceEmailId = typeof params.source_email_id === "string" ? params.source_email_id : null;
+
+  if (!to || !body) {
+    return { success: false, message: "Missing email recipient or body for draft reply" };
+  }
+
+  if (!isAllowedEmailRecipient(to)) {
+    return {
+      success: false,
+      message: `Email recipient "${to}" is not in the allowed list. Only @usagummies.com and pre-approved addresses are permitted.`,
+    };
+  }
+
+  await sendOpsEmail({ to, subject, body });
+
+  // Update source email's draft_status to 'sent' if we have a reference
+  if (sourceEmailId) {
+    try {
+      await sbFetch(
+        `/rest/v1/email_events?id=eq.${encodeURIComponent(sourceEmailId)}`,
+        {
+          method: "PATCH",
+          headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({ draft_status: "sent" }),
+        },
+      );
+    } catch (err) {
+      console.error(`[abra-actions] Failed to update draft_status for ${sourceEmailId}:`, err);
+    }
+  }
+
+  return { success: true, message: `Draft reply sent to ${to} (${subject})` };
 }
 
 async function handleCreateTask(
@@ -1222,6 +1264,7 @@ const ACTION_HANDLERS: Record<
 > = {
   send_slack: handleSendSlack,
   send_email: handleSendEmail,
+  draft_email_reply: handleDraftEmailReply,
   create_task: handleCreateTask,
   update_notion: handleUpdateNotion,
   create_brain_entry: handleCreateBrainEntry,
@@ -1652,6 +1695,7 @@ export const KNOWN_ACTION_TYPES = new Set([
   "run_scenario",
   "read_email",
   "search_email",
+  "draft_email_reply",
 ]);
 
 export function normalizeActionDirective(raw: unknown): AbraAction | null {
@@ -1679,6 +1723,7 @@ export function normalizeActionDirective(raw: unknown): AbraAction | null {
     "correct_claim",
     "send_email",
     "send_slack",
+    "draft_email_reply",
   ]);
   const risk = ELEVATED_RISK_ACTIONS.has(actionType) && rawRisk === "low"
     ? "medium"

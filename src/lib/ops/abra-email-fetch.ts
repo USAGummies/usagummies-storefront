@@ -278,6 +278,7 @@ export async function runEmailFetch(params?: {
         priority: classified.priority,
         action_required: classified.actionRequired,
         suggested_action: classified.suggestedAction,
+        draft_status: classified.actionRequired ? "pending_draft" : null,
         status: "new",
       };
 
