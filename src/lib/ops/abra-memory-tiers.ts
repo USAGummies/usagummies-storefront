@@ -332,6 +332,14 @@ function formatRow(row: TieredSearchRow): string {
     MAX_CONTEXT_CHARS,
   );
   const tier = row.memory_tier.toUpperCase();
+  const tags =
+    row.metadata && Array.isArray(row.metadata.tags) && row.metadata.tags.length > 0
+      ? (row.metadata.tags as string[]).join(", ")
+      : "";
+  const entryType =
+    row.metadata && typeof row.metadata.entry_type === "string"
+      ? row.metadata.entry_type
+      : "";
 
   const header = [
     `[${tier}]`,
@@ -339,6 +347,8 @@ function formatRow(row: TieredSearchRow): string {
     `${daysAgo}d ago`,
     `sim: ${sim}`,
     `score: ${tScore}`,
+    entryType ? `type: ${entryType}` : "",
+    tags ? `tags: [${tags}]` : "",
   ]
     .filter(Boolean)
     .join(" | ");

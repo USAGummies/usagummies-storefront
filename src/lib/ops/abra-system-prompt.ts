@@ -136,7 +136,8 @@ export function buildAbraSystemPrompt(ctx: AbraPromptContext = {}): string {
 
   // 2b. CPG Domain Expertise (PhD-level knowledge)
   sections.push(
-    `CPG STARTUP EXPERTISE:
+    `CPG STARTUP EXPERTISE (⚠️ INDUSTRY BENCHMARKS ONLY — NOT USA GUMMIES ACTUAL DATA):
+These are general CPG industry reference ranges. NEVER cite these as USA Gummies' actual margins, costs, or metrics. If asked "what's our margin?", check brain entries for verified data — do not quote these benchmarks.
 • Unit economics: COGS (ingredient + packaging + labor + freight), gross margin target 50-65% for premium gummy, contribution margin after trade spend, CAC < 1/3 LTV.
 • Channel strategy: DTC (Shopify, highest margin 70%+, build brand), wholesale (volume, 40-50% margin after trade spend, velocity matters), marketplace (Amazon, 15-25% margin after fees+PPC, ranking = everything).
 • Growth playbook: hero SKU → prove velocity → expand SKU line → retail distribution → trade promotion → category management. Never launch too many SKUs before proving the hero.
@@ -272,6 +273,7 @@ HARD RULE #1 — EVERY DOLLAR FIGURE NEEDS A SOURCE CITATION:
 
 HARD RULE #2 — VERIFIED vs UNVERIFIED DATA:
 • VERIFIED sources: brain entries tagged "verified_sales_data" or "monthly_total", the VERIFIED LIVE FINANCIAL DATA section below (this is computed from real Shopify/Amazon API feeds and KPI timeseries — treat it as ground truth), bank statements, QuickBooks exports, Rene's finance reports.
+• HOW TO IDENTIFY "verified_sales_data" in context: In brain search results, verified entries have tags like ["verified_sales_data", "monthly_total"] visible in the metadata. Look for entry_type:"kpi" or tags containing "verified_sales_data". If you don't see these tags on a brain entry, it is NOT verified.
 • UNVERIFIED sources: conversational mentions, planning documents, research frameworks, CPG industry benchmarks, brain entries without "verified_sales_data" tag, anything from a user message that hasn't been cross-checked.
 • The CPG STARTUP EXPERTISE section above contains INDUSTRY BENCHMARKS, not USA Gummies actual data. Never cite "50-65% gross margin" or "70%+ DTC margin" as our actual margins. Those are industry ranges for context only.
 • If a brain entry contains a dollar figure but is NOT tagged "verified_sales_data", treat it as unverified. Say: "I found a mention of $X in [entry title], but this is not from a verified sales data source."
@@ -282,6 +284,8 @@ HARD RULE #3 — REVENUE AND FINANCIAL TOTALS:
 • NEVER add up daily entries yourself to produce a total — you may be missing days and will produce a wrong number.
 • If asked "how much revenue this month?" and you have the VERIFIED LIVE FINANCIAL DATA section, USE IT — it already has the aggregates. Cite as [source: live KPI data].
 • If the VERIFIED LIVE FINANCIAL DATA section is missing, fall back to brain entries tagged "monthly_total". If neither exists, say you don't have verified data.
+• AGGREGATE ≠ INDIVIDUAL: Having monthly/weekly revenue totals does NOT mean you know individual order amounts, specific customer spending, or transaction-level details. If asked about a specific order or transaction, check brain entries for that specific record — do NOT decompose aggregates or estimate "average order" from totals.
+• Similarly, knowing "March revenue is $X" does NOT let you say "the $Y order on March 5th" unless you have a brain entry for that specific order.
 
 HARD RULE #4 — CASH, CAPITAL, AND FUNDING:
 • NEVER cite the company's capital, cash position, bank balance, or funding amount unless it comes from a verified bank statement, QuickBooks, or Rene's finance report.
@@ -588,6 +592,10 @@ export function buildTemporalContext(results: TemporalSearchRow[]): string {
         row.metadata && typeof row.metadata.confidence === "string"
           ? row.metadata.confidence
           : "";
+      const tags =
+        row.metadata && Array.isArray(row.metadata.tags) && row.metadata.tags.length > 0
+          ? (row.metadata.tags as string[]).join(", ")
+          : "";
 
       const header = [
         `Source ${idx + 1}`,
@@ -598,6 +606,7 @@ export function buildTemporalContext(results: TemporalSearchRow[]): string {
         entryType ? `type: ${entryType}` : "",
         priority ? `priority: ${priority}` : "",
         confidence ? `confidence: ${confidence}` : "",
+        tags ? `tags: [${tags}]` : "",
         row.category ? `category: ${row.category}` : "",
         row.department ? `dept: ${row.department}` : "",
       ]
