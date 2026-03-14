@@ -127,12 +127,12 @@ export async function POST(req: Request) {
 
   const originalClaim =
     typeof payload.original_claim === "string"
-      ? payload.original_claim.trim()
+      ? payload.original_claim.trim().slice(0, 2000)
       : "";
   const correction =
-    typeof payload.correction === "string" ? payload.correction.trim() : "";
+    typeof payload.correction === "string" ? payload.correction.trim().slice(0, 2000) : "";
   const department =
-    typeof payload.department === "string" ? payload.department.trim() : null;
+    typeof payload.department === "string" ? payload.department.trim().slice(0, 50) : null;
 
   if (!originalClaim || !correction) {
     return NextResponse.json(

@@ -21,6 +21,8 @@ export const maxDuration = 25;
 
 const ALLOWED_TABLES = new Set(["open_brain_entries", "email_events"]);
 const ALLOWED_ACTIONS = new Set(["insert", "update"]);
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const MAX_FIELD_LENGTH = 50000; // cap any single string field
 const EMBEDDING_MODEL = "text-embedding-3-small";
 const EMBEDDING_DIMENSIONS = 1536;
 const ADMIN_EMAILS = new Set([
@@ -160,6 +162,15 @@ export async function POST(req: Request) {
   if (!reason) {
     return NextResponse.json({ error: "reason is required" }, { status: 400 });
   }
+  if (reason.length > 1000) {
+    return NextResponse.json({ error: "reason must be under 1000 characters" }, { status: 400 });
+  }
+
+  // Cap all string values in data to prevent context-stuffing
+  const cappedData: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(data)) {
+    cappedData[key] = typeof value === "string" ? value.slice(0, MAX_FIELD_LENGTH) : value;
+  }
 
   try {
     const circuitCheck = await canUseSupabase();
@@ -175,14 +186,14 @@ export async function POST(req: Request) {
     if (action === "insert") {
       // Generate embedding for new entries
       const embeddingText =
-        (typeof data.title === "string" ? data.title + ". " : "") +
-        (typeof data.raw_text === "string"
-          ? data.raw_text
-          : typeof data.summary_text === "string"
-            ? data.summary_text
+        (typeof cappedData.title === "string" ? cappedData.title + ". " : "") +
+        (typeof cappedData.raw_text === "string"
+          ? cappedData.raw_text
+          : typeof cappedData.summary_text === "string"
+            ? cappedData.summary_text
             : "");
 
-      const insertData: Record<string, unknown> = { ...data };
+      const insertData: Record<string, unknown> = { ...cappedData };
 
       if (embeddingText.trim().length > 0) {
         const embedding = await buildEmbedding(embeddingText.slice(0, 8000));
@@ -200,16 +211,22 @@ export async function POST(req: Request) {
 
       resultId = rows[0]?.id || null;
     } else if (action === "update") {
-      // Update requires an id field
-      const id = typeof data.id === "string" ? data.id : null;
+      // Update requires a valid UUID id field
+      const id = typeof cappedData.id === "string" ? cappedData.id.trim() : "";
       if (!id) {
         return NextResponse.json(
           { error: "data.id is required for update action" },
           { status: 400 },
         );
       }
+      if (!UUID_RE.test(id)) {
+        return NextResponse.json(
+          { error: "data.id must be a valid UUID" },
+          { status: 400 },
+        );
+      }
 
-      const updateData: Record<string, unknown> = { ...data };
+      const updateData: Record<string, unknown> = { ...cappedData };
       delete updateData.id; // Don't include id in PATCH body
 
       const rows = (await sbFetch(`/rest/v1/${table}?id=eq.${id}`, {

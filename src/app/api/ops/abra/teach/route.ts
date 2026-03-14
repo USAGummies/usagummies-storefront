@@ -125,12 +125,12 @@ export async function POST(req: Request) {
   }
 
   const department =
-    typeof payload.department === "string" ? payload.department.trim().toLowerCase() : "";
+    typeof payload.department === "string" ? payload.department.trim().toLowerCase().slice(0, 50) : "";
   const content =
-    typeof payload.content === "string" ? payload.content.trim() : "";
+    typeof payload.content === "string" ? payload.content.trim().slice(0, 10000) : "";
   const title =
     typeof payload.title === "string"
-      ? payload.title.trim()
+      ? payload.title.trim().slice(0, 200)
       : `Teaching: ${department || "general"} — ${content.slice(0, 60)}`;
 
   if (!content) {

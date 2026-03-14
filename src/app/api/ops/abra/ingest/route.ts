@@ -354,6 +354,10 @@ export async function DELETE(req: Request) {
   if (!documentId) {
     return NextResponse.json({ error: "document_id is required" }, { status: 400 });
   }
+  // Validate UUID format to prevent PostgREST filter injection via LIKE pattern
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(documentId)) {
+    return NextResponse.json({ error: "document_id must be a valid UUID" }, { status: 400 });
+  }
 
   try {
     const likePattern = encodeURIComponent(`document:${documentId}:%`);

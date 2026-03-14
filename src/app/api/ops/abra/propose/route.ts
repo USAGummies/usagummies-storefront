@@ -138,9 +138,9 @@ export async function POST(req: Request) {
   }
 
   const actionType =
-    typeof payload.action_type === "string" ? payload.action_type.trim() : "";
+    typeof payload.action_type === "string" ? payload.action_type.trim().slice(0, 100) : "";
   const description =
-    typeof payload.description === "string" ? payload.description.trim() : "";
+    typeof payload.description === "string" ? payload.description.trim().slice(0, 500) : "";
   const details =
     payload.details && typeof payload.details === "object" && !Array.isArray(payload.details)
       ? (payload.details as Record<string, unknown>)
@@ -185,7 +185,7 @@ export async function POST(req: Request) {
         requesting_agent_id: abraAgentId,
         action_type: actionType,
         summary: description,
-        supporting_data: JSON.stringify(details),
+        supporting_data: JSON.stringify(details).slice(0, 5000),
         confidence: confidenceToLabel(confidence),
         risk_level: riskLevel,
         permission_tier: permissionTier,
