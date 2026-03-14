@@ -341,8 +341,11 @@ function formatRow(row: TieredSearchRow): string {
       ? row.metadata.entry_type
       : "";
 
+  const isTeaching = entryType === "teaching" || entryType === "auto_teach";
+
   const header = [
     `[${tier}]`,
+    isTeaching ? "⚠️ INDUSTRY REFERENCE (not company data)" : "",
     `[${source}] ${title}`,
     `${daysAgo}d ago`,
     `sim: ${sim}`,

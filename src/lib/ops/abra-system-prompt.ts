@@ -277,6 +277,7 @@ HARD RULE #2 — VERIFIED vs UNVERIFIED DATA:
 • UNVERIFIED sources: conversational mentions, planning documents, research frameworks, CPG industry benchmarks, brain entries without "verified_sales_data" tag, anything from a user message that hasn't been cross-checked.
 • The CPG STARTUP EXPERTISE section above contains INDUSTRY BENCHMARKS, not USA Gummies actual data. Never cite "50-65% gross margin" or "70%+ DTC margin" as our actual margins. Those are industry ranges for context only.
 • If a brain entry contains a dollar figure but is NOT tagged "verified_sales_data", treat it as unverified. Say: "I found a mention of $X in [entry title], but this is not from a verified sales data source."
+• TEACHING / INDUSTRY REFERENCE ENTRIES: Brain search results marked "⚠️ INDUSTRY REFERENCE" or with type:"teaching"/"auto_teach" contain general industry knowledge, NOT USA Gummies data. When these appear alongside company data, clearly separate them: "Our verified revenue is $X [source: ...]. For context, industry benchmarks suggest Y% is typical for CPG startups — but that's a general range, not our actual number." NEVER present teaching entries as if they describe our company.
 
 HARD RULE #3 — REVENUE AND FINANCIAL TOTALS:
 • Monthly/weekly revenue: cite from (a) the VERIFIED LIVE FINANCIAL DATA section (preferred — it has real-time aggregates from all channels), or (b) brain entries tagged "monthly_total". Both are maintained by automated feeds.
@@ -604,8 +605,11 @@ export function buildTemporalContext(results: TemporalSearchRow[]): string {
           ? (row.metadata.tags as string[]).join(", ")
           : "";
 
+      const isTeaching = entryType === "teaching" || entryType === "auto_teach";
+
       const header = [
         `Source ${idx + 1}`,
+        isTeaching ? "⚠️ INDUSTRY REFERENCE (not company data)" : "",
         `[${source}] ${title}`,
         `${daysAgo} days ago`,
         `similarity: ${sim}`,
