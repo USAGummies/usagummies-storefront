@@ -227,7 +227,7 @@ async function handleSendSlack(
   params: Record<string, unknown>,
 ): Promise<ActionResult> {
   const channel = String(params.channel || "alerts");
-  const message = String(params.message || "");
+  const message = sanitizeText(String(params.message || ""), 3000); // Slack block limit is ~3000 chars
   if (!message) {
     return { success: false, message: "Missing Slack message" };
   }
@@ -242,12 +242,21 @@ async function handleSendSlack(
 async function handleSendEmail(
   params: Record<string, unknown>,
 ): Promise<ActionResult> {
-  const to = String(params.to || "");
-  const subject = String(params.subject || "Abra action");
-  const body = String(params.body || params.html || params.message || "");
+  const to = String(params.to || "").toLowerCase().trim();
+  const subject = sanitizeTitle(String(params.subject || "Abra action"));
+  const body = sanitizeText(String(params.body || params.html || params.message || ""), 10000);
   if (!to || !body) {
     return { success: false, message: "Missing email recipient or body" };
   }
+
+  // Safety: only send to known/allowed recipients
+  if (!isAllowedEmailRecipient(to)) {
+    return {
+      success: false,
+      message: `Email recipient "${to}" is not in the allowed list. Only @usagummies.com and pre-approved addresses are permitted.`,
+    };
+  }
+
   await sendOpsEmail({ to, subject, body });
   return { success: true, message: `Email sent to ${to}` };
 }
@@ -255,10 +264,10 @@ async function handleSendEmail(
 async function handleCreateTask(
   params: Record<string, unknown>,
 ): Promise<ActionResult> {
-  const title = String(params.title || "").trim();
+  const title = sanitizeTitle(String(params.title || ""));
   if (!title) return { success: false, message: "Task title is required" };
 
-  const description = String(params.description || "");
+  const description = sanitizeText(String(params.description || ""));
   const priorityRaw = String(params.priority || "normal").toLowerCase();
   const priority =
     priorityRaw === "critical" ||
@@ -297,12 +306,16 @@ async function handleCreateTask(
 async function handleUpdateNotion(
   params: Record<string, unknown>,
 ): Promise<ActionResult> {
-  const pageId = typeof params.page_id === "string" ? params.page_id : "";
-  const content = typeof params.content === "string" ? params.content : undefined;
+  const pageId = typeof params.page_id === "string" ? params.page_id.replace(/-/g, "") : "";
+  const content = typeof params.content === "string" ? sanitizeText(params.content, 10000) : undefined;
   const properties =
     params.properties && typeof params.properties === "object"
       ? (params.properties as Record<string, unknown>)
       : undefined;
+
+  if (pageId && !/^[0-9a-f]{32}$/i.test(pageId)) {
+    return { success: false, message: "page_id must be a valid Notion page ID (32 hex characters)" };
+  }
 
   if (pageId) {
     const ok = await updateNotionPage({
@@ -320,7 +333,7 @@ async function handleUpdateNotion(
     typeof params.parent_id === "string"
       ? params.parent_id
       : process.env.NOTION_MEETING_NOTES_DB || "";
-  const title = String(params.title || "Abra Update");
+  const title = sanitizeTitle(String(params.title || "Abra Update"));
   if (!parentId) {
     return { success: false, message: "Notion parent_id is required" };
   }
@@ -341,8 +354,8 @@ async function handleUpdateNotion(
 async function handleCreateBrainEntry(
   params: Record<string, unknown>,
 ): Promise<ActionResult> {
-  const title = String(params.title || "Action log");
-  const text = String(params.text || params.content || "");
+  const title = sanitizeTitle(String(params.title || "Action log"));
+  const text = sanitizeText(String(params.text || params.content || ""));
   if (!text) return { success: false, message: "Brain entry text is required" };
 
   const rows = (await sbFetch("/rest/v1/open_brain_entries", {
@@ -378,6 +391,7 @@ async function handleAcknowledgeSignal(
 ): Promise<ActionResult> {
   const signalId = String(params.signal_id || "");
   if (!signalId) return { success: false, message: "signal_id is required" };
+  if (!isValidUUID(signalId)) return { success: false, message: "signal_id must be a valid UUID" };
 
   await sbFetch(`/rest/v1/abra_operational_signals?id=eq.${signalId}`, {
     method: "PATCH",
@@ -401,6 +415,9 @@ async function handlePauseInitiative(
   const initiativeId = String(params.initiative_id || "");
   if (!initiativeId) {
     return { success: false, message: "initiative_id is required" };
+  }
+  if (!isValidUUID(initiativeId)) {
+    return { success: false, message: "initiative_id must be a valid UUID" };
   }
 
   await sbFetch(`/rest/v1/abra_initiatives?id=eq.${initiativeId}`, {
@@ -431,8 +448,8 @@ async function handleCreateNotionPage(
   params: Record<string, unknown>,
 ): Promise<ActionResult> {
   const dbKey = String(params.database || params.db || "general");
-  const title = String(params.title || "Abra Report");
-  const content = typeof params.content === "string" ? params.content : undefined;
+  const title = sanitizeTitle(String(params.title || "Abra Report"));
+  const content = typeof params.content === "string" ? sanitizeText(params.content, 10000) : undefined;
   const properties =
     params.properties && typeof params.properties === "object"
       ? (params.properties as Record<string, unknown>)
@@ -462,13 +479,64 @@ async function handleCreateNotionPage(
   };
 }
 
+// ── Input validation helpers ────────────────────────────────────────────────
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isValidUUID(value: string): boolean {
+  return UUID_RE.test(value);
+}
+
+/** Max content length for text fields to prevent context-stuffing attacks */
+const MAX_TEXT_LENGTH = 5000;
+const MAX_TITLE_LENGTH = 200;
+
+function sanitizeText(value: string, maxLen = MAX_TEXT_LENGTH): string {
+  return value.slice(0, maxLen).trim();
+}
+
+function sanitizeTitle(value: string): string {
+  return value.slice(0, MAX_TITLE_LENGTH).trim();
+}
+
+/** Validate ISO date string (YYYY-MM-DD) */
+function isValidDateString(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const d = new Date(value + "T00:00:00Z");
+  return !isNaN(d.getTime());
+}
+
+/**
+ * Email allowlist — only these domains can receive automated emails from Abra.
+ * This prevents Claude from being tricked into sending emails to arbitrary addresses.
+ */
+const ALLOWED_EMAIL_DOMAINS = new Set([
+  "usagummies.com",
+  "gmail.com", // Ben's personal
+]);
+
+/** Additional allowed specific addresses (for known contacts) */
+const ALLOWED_EMAIL_ADDRESSES = new Set([
+  "ben@usagummies.com",
+  "benjamin.stutman@gmail.com",
+]);
+
+function isAllowedEmailRecipient(email: string): boolean {
+  const normalized = email.toLowerCase().trim();
+  if (ALLOWED_EMAIL_ADDRESSES.has(normalized)) return true;
+  const domain = normalized.split("@")[1];
+  return domain ? ALLOWED_EMAIL_DOMAINS.has(domain) : false;
+}
+
+// ── Transaction validation ──────────────────────────────────────────────────
+
 const VALID_TX_TYPES = new Set(["income", "expense", "transfer", "refund", "cogs", "tax", "shipping"]);
 const MAX_TX_AMOUNT = 100_000; // Hard safety limit — anything higher is likely a hallucination
 
 async function handleRecordTransaction(
   params: Record<string, unknown>,
 ): Promise<ActionResult> {
-  const description = String(params.description || params.title || "Transaction");
+  const description = sanitizeTitle(String(params.description || params.title || "Transaction"));
   const amount = typeof params.amount === "number" ? params.amount : parseFloat(String(params.amount || "0"));
 
   if (isNaN(amount) || amount === 0) {
@@ -481,8 +549,17 @@ async function handleRecordTransaction(
   const txTypeRaw = String(params.type || "expense").toLowerCase().trim();
   const txType = VALID_TX_TYPES.has(txTypeRaw) ? txTypeRaw : "expense";
   const category = String(params.category || "general");
-  const vendor = typeof params.vendor === "string" ? params.vendor : undefined;
-  const dateStr = typeof params.date === "string" ? params.date : new Date().toISOString().split("T")[0];
+  const vendor = typeof params.vendor === "string" ? params.vendor.slice(0, 200) : undefined;
+  const dateStrRaw = typeof params.date === "string" ? params.date : new Date().toISOString().split("T")[0];
+  const dateStr = isValidDateString(dateStrRaw) ? dateStrRaw : new Date().toISOString().split("T")[0];
+
+  // Reject dates more than 1 year in the future (likely hallucinated)
+  const txDate = new Date(dateStr + "T00:00:00Z");
+  const oneYearFromNow = new Date();
+  oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
+  if (txDate > oneYearFromNow) {
+    return { success: false, message: `Transaction date ${dateStr} is more than 1 year in the future — likely incorrect` };
+  }
 
   const parentId = NOTION_DB_MAP.cash_transactions;
   if (!parentId) {
@@ -520,10 +597,10 @@ async function handleRecordTransaction(
 async function handleCorrectClaim(
   params: Record<string, unknown>,
 ): Promise<ActionResult> {
-  const originalClaim = String(params.original_claim || params.wrong || "");
-  const correction = String(params.correction || params.correct || params.right || "");
-  const correctedBy = String(params.corrected_by || "user");
-  const department = typeof params.department === "string" ? params.department : "executive";
+  const originalClaim = sanitizeText(String(params.original_claim || params.wrong || ""), 1000);
+  const correction = sanitizeText(String(params.correction || params.correct || params.right || ""), 1000);
+  const correctedBy = sanitizeTitle(String(params.corrected_by || "user"));
+  const department = typeof params.department === "string" ? params.department.slice(0, 50) : "executive";
 
   if (!originalClaim || !correction) {
     return {
