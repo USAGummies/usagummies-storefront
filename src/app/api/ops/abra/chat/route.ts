@@ -532,10 +532,10 @@ async function fetchLiveBusinessSnapshot(): Promise<string | null> {
 
   // 2. Recent emails (last 5 inbox subjects) — lightweight metadata only
   try {
-    const gmailUser = process.env.GMAIL_USER || process.env.GMAIL_SENDER;
-    const gmailClientId = process.env.GMAIL_CLIENT_ID;
-    const gmailRefreshToken = process.env.GMAIL_REFRESH_TOKEN;
-    if (gmailUser && gmailClientId && gmailRefreshToken) {
+    const gmailUser = process.env.GMAIL_USER || process.env.GMAIL_SENDER || process.env.SMTP_USER;
+    const gmailClientId = process.env.GMAIL_CLIENT_ID || process.env.GMAIL_OAUTH_CLIENT_ID || process.env.GCP_GMAIL_OAUTH_CLIENT_ID;
+    const gmailRefreshToken = process.env.GMAIL_REFRESH_TOKEN || process.env.GMAIL_OAUTH_REFRESH_TOKEN || process.env.GCP_GMAIL_OAUTH_REFRESH_TOKEN;
+    if ((gmailUser || gmailClientId) && gmailClientId && gmailRefreshToken) {
       // Dynamic import to avoid loading googleapis on every request
       const { listEmails } = await import("@/lib/ops/gmail-reader");
       const envelopes = await listEmails({ count: 8, folder: "INBOX" });
