@@ -1,7 +1,7 @@
 import { notify } from "@/lib/ops/notify";
 import { randomUUID } from "node:crypto";
 import { sendOpsEmail } from "@/lib/ops/email";
-import { createNotionPage, updateNotionPage } from "@/lib/ops/abra-notion-write";
+import { createNotionPage, updateNotionPage, queryLedgerSummary } from "@/lib/ops/abra-notion-write";
 import { DB } from "@/lib/notion/client";
 import { generateEmbedding } from "@/lib/ops/abra-embeddings";
 
@@ -149,6 +149,13 @@ export const AUTO_EXEC_POLICIES: AutoExecPolicy[] = [
     min_confidence: 0.7,
     daily_limit: 30,
     enabled: true, // Read-only — no risk
+  },
+  {
+    action_type: "query_ledger",
+    max_risk_level: "low",
+    min_confidence: 0.5,
+    daily_limit: 50,
+    enabled: true, // Read-only — queries Notion ledger for financial data
   },
 ];
 
@@ -727,14 +734,58 @@ async function handleRecordTransaction(
     return { success: false, message: "Cash Transactions database not configured" };
   }
 
+  // ── Derive enhanced accounting fields ──
+  const CATEGORY_TO_ACCOUNT: Record<string, string> = {
+    cogs: "5000 - Cost of Goods Sold",
+    shipping_expense: "5200 - Shipping & Fulfillment",
+    selling_expense: "5300 - Selling Expenses",
+    sga: "6300 - Software & Subscriptions",
+    marketing: "6100 - Advertising & Marketing",
+    professional_services: "6600 - Professional Services",
+    capital_expenditure: "1500 - Equipment & Assets",
+    contra_revenue: "4900 - Returns & Refunds",
+    income: "4000 - Product Sales Revenue",
+    transfer: "1000 - Found Checking *6445",
+    general: "6900 - Other Operating Expenses",
+    refund: "4900 - Returns & Refunds",
+    tax: "8100 - Income Tax Expense",
+    shipping: "5200 - Shipping & Fulfillment",
+  };
+  const accountCode = typeof params.account_code === "string"
+    ? params.account_code
+    : (CATEGORY_TO_ACCOUNT[category] || CATEGORY_TO_ACCOUNT[txTypeRaw] || "6900 - Other Operating Expenses");
+
+  const txDateObj = new Date(dateStr + "T00:00:00Z");
+  const fiscalYear = String(txDateObj.getUTCFullYear());
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const fiscalMonth = MONTHS[txDateObj.getUTCMonth()];
+
+  const paymentMethod = typeof params.payment_method === "string" ? params.payment_method : undefined;
+  const statusVal = typeof params.status === "string" ? params.status : "Needs Review";
+  const taxDeductible = typeof params.tax_deductible === "boolean" ? params.tax_deductible : (txType !== "transfer" && txType !== "income");
+  const notes = typeof params.notes === "string" ? params.notes.slice(0, 500) : undefined;
+  const source = typeof params.source === "string" ? params.source : "Abra Auto-Extract";
+
   const properties: Record<string, unknown> = {
     Amount: { number: amount },
     Type: { select: { name: txType } },
     Category: { select: { name: category } },
     Date: { date: { start: dateStr } },
+    "Account Code": { select: { name: accountCode } },
+    "Fiscal Year": { select: { name: fiscalYear } },
+    "Fiscal Month": { select: { name: fiscalMonth } },
+    Status: { select: { name: statusVal } },
+    "Tax Deductible": { checkbox: taxDeductible },
+    Source: { select: { name: source.slice(0, 100) } },
   };
   if (vendor) {
     properties.Vendor = { rich_text: [{ text: { content: vendor.slice(0, 200) } }] };
+  }
+  if (paymentMethod) {
+    properties["Payment Method"] = { select: { name: paymentMethod } };
+  }
+  if (notes) {
+    properties.Notes = { rich_text: [{ text: { content: notes } }] };
   }
 
   const pageId = await createNotionPage({
@@ -753,6 +804,60 @@ async function handleRecordTransaction(
     message: `Recorded ${txType}: $${amount.toFixed(2)} — ${description} [View](${url})`,
     data: { page_id: pageId, url, amount, type: txType },
   };
+}
+
+async function handleQueryLedger(
+  params: Record<string, unknown>,
+): Promise<ActionResult> {
+  const fiscalYear = typeof params.fiscal_year === "string" ? params.fiscal_year : undefined;
+  const category = typeof params.category === "string" ? params.category : undefined;
+  const accountCode = typeof params.account_code === "string" ? params.account_code : undefined;
+
+  try {
+    const result = await queryLedgerSummary({ fiscalYear, category, accountCode });
+
+    if (result.transactions.length === 0) {
+      return { success: true, message: "No transactions found matching those filters.", data: result.summary };
+    }
+
+    const { summary } = result;
+    const lines: string[] = [
+      `**Ledger Query Results** (${summary.transactionCount} transactions)`,
+      ``,
+      `**Totals:**`,
+      `- Total Income: $${summary.totalIncome.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+      `- Total COGS: $${summary.totalCOGS.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+      `- Total OpEx: $${summary.totalExpenses.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+      `- Total All Spend (COGS+OpEx): $${summary.totalAllSpend.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+      `- Owner Investment / Capital: $${summary.totalOwnerInvestment.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+      `- Net Income (Revenue - Spend): $${summary.netIncome.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+      ``,
+      `**By Category:**`,
+    ];
+    for (const [cat, amt] of Object.entries(summary.byCategory).sort((a, b) => b[1] - a[1])) {
+      lines.push(`- ${cat}: $${amt.toLocaleString("en-US", { minimumFractionDigits: 2 })}`);
+    }
+    lines.push(``, `**By Account Code:**`);
+    for (const [code, amt] of Object.entries(summary.byAccountCode).sort((a, b) => b[1] - a[1])) {
+      lines.push(`- ${code}: $${amt.toLocaleString("en-US", { minimumFractionDigits: 2 })}`);
+    }
+    lines.push(``, `**By Fiscal Year:**`);
+    for (const [yr, amt] of Object.entries(summary.byFiscalYear).sort()) {
+      lines.push(`- ${yr}: $${amt.toLocaleString("en-US", { minimumFractionDigits: 2 })}`);
+    }
+    lines.push(``, `Notion ledger: https://www.notion.so/6325d16870024b83876b9e591b3d2d9c`);
+
+    return {
+      success: true,
+      message: lines.join("\n"),
+      data: summary,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Failed to query ledger: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
 }
 
 async function handleCorrectClaim(
@@ -1272,6 +1377,7 @@ const ACTION_HANDLERS: Record<
   pause_initiative: handlePauseInitiative,
   create_notion_page: handleCreateNotionPage,
   record_transaction: handleRecordTransaction,
+  query_ledger: handleQueryLedger,
   correct_claim: handleCorrectClaim,
   log_production_run: handleLogProductionRun,
   record_vendor_quote: handleRecordVendorQuote,
@@ -1686,6 +1792,7 @@ export const KNOWN_ACTION_TYPES = new Set([
   "create_task",
   "create_notion_page",
   "record_transaction",
+  "query_ledger",
   "correct_claim",
   "send_email",
   "update_notion",
@@ -1827,6 +1934,8 @@ EXAMPLES:
 • "save this as a report" → emit create_notion_page with database "meeting_notes"
 • "log this to the pipeline" → emit create_notion_page with database "b2b_prospects"
 • "record the $500 payment to Powers" → emit record_transaction with type "expense", amount 500, vendor "Powers Confections"
+• "what are our total expenses?" → emit query_ledger to pull real numbers from the Notion ledger. NEVER guess financial totals from memory.
+• "send Rene the expense report" → FIRST emit query_ledger to get real totals, THEN draft the reply with actual numbers.
 • "we did a production run at Powers, 10,000 units, total cost $13,500" → emit log_production_run
 • "Powers quoted us $1.20/unit for gummy base" → emit record_vendor_quote
 • "what if ingredient costs go up 15%?" → emit run_scenario
@@ -1837,7 +1946,7 @@ DATABASE KEYS for create_notion_page: meeting_notes, b2b_prospects, distributor_
 
 ACTION EXECUTION TIERS:
 • AUTO-EXECUTE (low-risk, informational): create_brain_entry, acknowledge_signal, create_notion_page, create_task — these execute immediately.
-• AUTO-EXECUTE (low-risk, read-only): read_email, search_email — auto-execute IMMEDIATELY.
+• AUTO-EXECUTE (low-risk, read-only): read_email, search_email, query_ledger — auto-execute IMMEDIATELY.
 • AUTO-EXECUTE (low-risk, operational data): log_production_run, record_vendor_quote — auto-execute when emitted.
 • AUTO-EXECUTE (stateless computation): run_scenario — computes hypotheticals. Auto-execute when emitted.
 • AUTO-EXECUTE WITH CAPS (financial): record_transaction — auto-executes ONLY if amount ≤ $500.

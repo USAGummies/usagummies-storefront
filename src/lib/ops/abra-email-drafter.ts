@@ -132,7 +132,7 @@ ${toneRule}
 - Vendor communications → acknowledge, confirm receipt, ask clarifying questions if needed.
 - Customer issues → empathize, propose resolution, offer to follow up.
 - Finance (invoices/payments) → acknowledge receipt, confirm timeline for processing.
-- If the sender asks for data/reports → confirm you'll provide it and ask about preferred format or deadline.
+- If the sender asks for financial data, expenses, reports, or bookkeeping → DELIVER THE DATA. Share this Notion ledger link: https://www.notion.so/6325d16870024b83876b9e591b3d2d9c — explain they can filter by date, category, vendor, or fiscal year, and export to CSV/Excel from Notion. Do NOT ask clarifying questions unless the request is genuinely ambiguous. Be the accountant, not a secretary.
 - NEVER commit to specific pricing, delivery dates, contract terms, or payment amounts.
 - ALWAYS include a [NOTE FOR BEN] section at the end flagging items that need human judgment.
 - Keep the reply under 200 words.

@@ -1,5 +1,6 @@
 import "server-only";
 import { getNotionApiKey, getNotionCredential } from "@/lib/notion/credentials";
+import { DB } from "@/lib/notion/client";
 
 const NOTION_VERSION = "2022-06-28";
 const NOTION_API_KEY = () => getNotionApiKey();
@@ -361,4 +362,217 @@ export async function syncKPIsToNotion(department: string): Promise<void> {
 
 export function notionPageUrlFromId(pageId: string): string {
   return notionUrlFromId(pageId);
+}
+
+/**
+ * Query a Notion database with optional filters.
+ * Returns an array of page objects with their properties.
+ */
+export async function queryNotionDatabase(params: {
+  database_id: string;
+  filter?: Record<string, unknown>;
+  sorts?: Array<Record<string, unknown>>;
+  page_size?: number;
+}): Promise<Array<Record<string, unknown>>> {
+  if (!NOTION_API_KEY()) return [];
+
+  const dbId = toNotionId(params.database_id);
+  const body: Record<string, unknown> = {
+    page_size: Math.min(params.page_size || 100, 100),
+  };
+  if (params.filter) body.filter = params.filter;
+  if (params.sorts) body.sorts = params.sorts;
+
+  const allResults: Array<Record<string, unknown>> = [];
+  let hasMore = true;
+  let startCursor: string | undefined;
+
+  while (hasMore && allResults.length < 500) {
+    if (startCursor) body.start_cursor = startCursor;
+
+    const res = await notionFetch(`/databases/${dbId}/query`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+
+    const results = Array.isArray(res?.results) ? res.results as Array<Record<string, unknown>> : [];
+    allResults.push(...results);
+    hasMore = res?.has_more === true;
+    startCursor = typeof res?.next_cursor === "string" ? res.next_cursor : undefined;
+  }
+
+  return allResults;
+}
+
+/**
+ * Extract a readable value from a Notion property object.
+ */
+function extractPropertyValue(prop: Record<string, unknown>): unknown {
+  const type = prop.type as string;
+  switch (type) {
+    case "title": {
+      const arr = prop.title as Array<Record<string, unknown>> | undefined;
+      return arr?.map(t => (t.plain_text || (t.text as Record<string, unknown>)?.content || "")).join("") || "";
+    }
+    case "rich_text": {
+      const arr = prop.rich_text as Array<Record<string, unknown>> | undefined;
+      return arr?.map(t => (t.plain_text || (t.text as Record<string, unknown>)?.content || "")).join("") || "";
+    }
+    case "number":
+      return prop.number;
+    case "select":
+      return (prop.select as Record<string, unknown> | null)?.name || null;
+    case "multi_select":
+      return (prop.multi_select as Array<Record<string, unknown>>)?.map(s => s.name) || [];
+    case "date":
+      return (prop.date as Record<string, unknown> | null)?.start || null;
+    case "checkbox":
+      return prop.checkbox;
+    default:
+      return null;
+  }
+}
+
+/**
+ * Query the Cash & Transactions ledger and return summarized data.
+ * Used by Abra to answer financial questions with real data.
+ */
+export async function queryLedgerSummary(params?: {
+  fiscalYear?: string;
+  category?: string;
+  accountCode?: string;
+}): Promise<{
+  transactions: Array<{
+    name: string;
+    amount: number;
+    category: string | null;
+    accountCode: string | null;
+    vendor: string | null;
+    date: string | null;
+    fiscalYear: string | null;
+    fiscalMonth: string | null;
+    status: string | null;
+    taxDeductible: boolean | null;
+  }>;
+  summary: {
+    totalExpenses: number;
+    totalIncome: number;
+    totalCOGS: number;
+    totalAllSpend: number;
+    totalOwnerInvestment: number;
+    netIncome: number;
+    byCategory: Record<string, number>;
+    byAccountCode: Record<string, number>;
+    byFiscalYear: Record<string, number>;
+    transactionCount: number;
+  };
+}> {
+  const cashTxDb = DB.CASH_TRANSACTIONS;
+  if (!cashTxDb) return { transactions: [], summary: { totalExpenses: 0, totalIncome: 0, totalCOGS: 0, totalAllSpend: 0, totalOwnerInvestment: 0, netIncome: 0, byCategory: {}, byAccountCode: {}, byFiscalYear: {}, transactionCount: 0 } };
+
+  // Build filter
+  const conditions: Array<Record<string, unknown>> = [];
+  if (params?.fiscalYear) {
+    conditions.push({ property: "Fiscal Year", select: { equals: params.fiscalYear } });
+  }
+  if (params?.category) {
+    conditions.push({ property: "Category", select: { equals: params.category } });
+  }
+  if (params?.accountCode) {
+    conditions.push({ property: "Account Code", select: { equals: params.accountCode } });
+  }
+
+  const filter = conditions.length > 1
+    ? { and: conditions }
+    : conditions.length === 1
+    ? conditions[0]
+    : undefined;
+
+  const pages = await queryNotionDatabase({
+    database_id: cashTxDb,
+    filter,
+    sorts: [{ property: "Date", direction: "ascending" }],
+  });
+
+  const transactions: Array<{
+    name: string;
+    amount: number;
+    category: string | null;
+    accountCode: string | null;
+    vendor: string | null;
+    date: string | null;
+    fiscalYear: string | null;
+    fiscalMonth: string | null;
+    status: string | null;
+    taxDeductible: boolean | null;
+  }> = [];
+
+  let totalExpenses = 0;
+  let totalIncome = 0;
+  let totalCOGS = 0;
+  let totalOwnerInvestment = 0;
+  const byCategory: Record<string, number> = {};
+  const byAccountCode: Record<string, number> = {};
+  const byFiscalYear: Record<string, number> = {};
+
+  for (const page of pages) {
+    const props = page.properties as Record<string, Record<string, unknown>> | undefined;
+    if (!props) continue;
+
+    const name = extractPropertyValue(props.Name || {}) as string || "";
+    const amount = extractPropertyValue(props.Amount || {}) as number || 0;
+    const category = extractPropertyValue(props.Category || {}) as string | null;
+    const accountCode = extractPropertyValue(props["Account Code"] || {}) as string | null;
+    const vendor = extractPropertyValue(props.Vendor || {}) as string | null;
+    const date = extractPropertyValue(props.Date || {}) as string | null;
+    const fiscalYear = extractPropertyValue(props["Fiscal Year"] || {}) as string | null;
+    const fiscalMonth = extractPropertyValue(props["Fiscal Month"] || {}) as string | null;
+    const status = extractPropertyValue(props.Status || {}) as string | null;
+    const taxDeductible = extractPropertyValue(props["Tax Deductible"] || {}) as boolean | null;
+    const txType = extractPropertyValue(props.Type || {}) as string | null;
+
+    transactions.push({ name, amount, category, accountCode, vendor, date, fiscalYear, fiscalMonth, status, taxDeductible });
+
+    const absAmount = Math.abs(amount);
+    const txLower = (txType || "").toLowerCase();
+    const catLower = (category || "").toLowerCase();
+    const isTransfer = catLower === "transfer" || txLower === "transfer";
+    const isRefund = catLower === "refund" || txLower === "refund";
+    const isCOGS = txLower === "cogs" || catLower === "cogs" || (accountCode?.startsWith("5") && !accountCode?.startsWith("50"));
+    const isIncome = catLower === "income" || txLower === "income" || (accountCode?.startsWith("41"));
+
+    if (isTransfer) {
+      // Owner investments / capital injections — NOT revenue
+      totalOwnerInvestment += absAmount;
+    } else if (isRefund) {
+      // Refunds excluded from P&L totals (net against revenue separately)
+    } else if (isIncome) {
+      totalIncome += absAmount;
+    } else if (isCOGS) {
+      totalCOGS += absAmount;
+    } else if (catLower === "expense" || txLower === "expense" || accountCode?.startsWith("6") || accountCode?.startsWith("7")) {
+      totalExpenses += absAmount;
+    }
+
+    if (category) byCategory[category] = (byCategory[category] || 0) + absAmount;
+    if (accountCode) byAccountCode[accountCode] = (byAccountCode[accountCode] || 0) + absAmount;
+    if (fiscalYear) byFiscalYear[fiscalYear] = (byFiscalYear[fiscalYear] || 0) + absAmount;
+  }
+
+  const totalAllSpend = Math.round((totalExpenses + totalCOGS) * 100) / 100;
+  return {
+    transactions,
+    summary: {
+      totalExpenses: Math.round(totalExpenses * 100) / 100,
+      totalIncome: Math.round(totalIncome * 100) / 100,
+      totalCOGS: Math.round(totalCOGS * 100) / 100,
+      totalAllSpend,
+      totalOwnerInvestment: Math.round(totalOwnerInvestment * 100) / 100,
+      netIncome: Math.round((totalIncome - totalAllSpend) * 100) / 100,
+      byCategory,
+      byAccountCode,
+      byFiscalYear,
+      transactionCount: transactions.length,
+    },
+  };
 }

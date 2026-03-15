@@ -55,6 +55,7 @@ import {
   type ActionDirective,
 } from "@/lib/ops/abra-actions";
 import { analyzePipeline } from "@/lib/ops/abra-pipeline-intelligence";
+import { queryLedgerSummary } from "@/lib/ops/abra-notion-write";
 import {
   buildConversationContext,
   saveMessage,
@@ -471,6 +472,77 @@ async function fetchFinancialContext(): Promise<string | null> {
   }
 }
 
+/**
+ * Fetch verified Notion ledger data for financial questions.
+ * Returns P&L summary from the actual Cash & Transactions database — Layer 3 (bank deposits).
+ * This is the authoritative financial source, NOT brain memory entries.
+ */
+async function fetchLedgerContext(message: string): Promise<string | null> {
+  try {
+    // Detect which fiscal year the user is asking about
+    const currentYear = new Date().getFullYear().toString();
+    const yearMatch = message.match(/\b(20\d{2})\b/);
+    const requestedYear = yearMatch ? yearMatch[1] : null;
+
+    // Fetch both current year and requested year (if different)
+    const yearsToFetch = new Set<string>([currentYear]);
+    if (requestedYear) yearsToFetch.add(requestedYear);
+
+    const results: string[] = [];
+    results.push("VERIFIED NOTION LEDGER DATA (Layer 3: Bank Deposits — these are NET deposits, not gross revenue):");
+    results.push("Source: Notion Cash & Transactions database (https://www.notion.so/6325d16870024b83876b9e591b3d2d9c)");
+
+    for (const year of yearsToFetch) {
+      const ledger = await queryLedgerSummary({ fiscalYear: `FY${year}` });
+      if (ledger.summary.transactionCount === 0) continue;
+
+      const s = ledger.summary;
+      results.push(`\nFY${year} (${s.transactionCount} transactions):`);
+      results.push(`  Revenue (bank deposits): $${s.totalIncome.toFixed(2)}`);
+      results.push(`  COGS: $${s.totalCOGS.toFixed(2)}`);
+      results.push(`  Operating Expenses: $${s.totalExpenses.toFixed(2)}`);
+      results.push(`  Total Spend (COGS + OpEx): $${s.totalAllSpend.toFixed(2)}`);
+      results.push(`  Net Income: $${s.netIncome.toFixed(2)}`);
+      if (s.totalOwnerInvestment > 0) {
+        results.push(`  Owner Investment/Transfers: $${s.totalOwnerInvestment.toFixed(2)}`);
+      }
+
+      // Top categories
+      const sortedCats = Object.entries(s.byCategory)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 10);
+      if (sortedCats.length > 0) {
+        results.push("  By Category:");
+        for (const [cat, amt] of sortedCats) {
+          results.push(`    ${cat}: $${amt.toFixed(2)}`);
+        }
+      }
+
+      // Top vendors (from transaction detail)
+      const vendorTotals: Record<string, number> = {};
+      for (const tx of ledger.transactions) {
+        if (tx.vendor && tx.fiscalYear === `FY${year}`) {
+          vendorTotals[tx.vendor] = (vendorTotals[tx.vendor] || 0) + Math.abs(tx.amount);
+        }
+      }
+      const sortedVendors = Object.entries(vendorTotals)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 8);
+      if (sortedVendors.length > 0) {
+        results.push("  Top Vendors:");
+        for (const [vendor, amt] of sortedVendors) {
+          results.push(`    ${vendor}: $${amt.toFixed(2)}`);
+        }
+      }
+    }
+
+    return results.length > 2 ? results.join("\n") : null;
+  } catch (err) {
+    console.error("[abra] Ledger context fetch failed:", err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
 type CompetitorIntelRow = {
   competitor_name: string;
   data_type: string;
@@ -776,6 +848,7 @@ async function generateClaudeReply(input: {
   activeInitiatives?: AbraInitiativeContext[];
   costSummary?: AbraCostContext | null;
   financialContext?: string | null;
+  ledgerContext?: string | null;
   competitorContext?: string | null;
   teamContext?: string;
   signalsContext?: string;
@@ -928,6 +1001,7 @@ MARGIN & COST CLAIM VERIFICATION (applies when user asserts financial metrics):
 
   const userPrompt = [
     input.liveSnapshot ? `LIVE BUSINESS DATA (real-time, as of right now):\n${input.liveSnapshot}` : "",
+    input.ledgerContext ? `\n${input.ledgerContext}` : "",
     historyText ? `Recent conversation:\n${historyText}` : "",
     `User question:\n${input.message}`,
     `Retrieved context:\n${contextText}${confidenceHint}`,
@@ -1676,6 +1750,14 @@ export async function POST(req: Request) {
         ? await fetchCompetitorContext(message)
         : null;
 
+    // Fetch verified ledger data for financial questions (Notion Cash & Transactions DB)
+    const ledgerContext = isFinanceQuestion(message)
+      ? await fetchLedgerContext(message).catch((err) => {
+          console.error("[abra] Ledger fetch failed:", err instanceof Error ? err.message : err);
+          return null;
+        })
+      : null;
+
     // Build dynamic context strings for system prompt
     const today = new Date().toISOString().split("T")[0];
     const teamContext = buildTeamContext(teamMembers, vendors, today);
@@ -1706,6 +1788,7 @@ export async function POST(req: Request) {
       activeInitiatives,
       costSummary,
       financialContext,
+      ledgerContext,
       competitorContext,
       teamContext,
       signalsContext,
@@ -1718,12 +1801,16 @@ export async function POST(req: Request) {
     if (!claudeResult.earlyExit) {
       const parsedActions = parseActionDirectives(claudeResult.reply);
       baseReply = parsedActions.cleanReply || claudeResult.reply;
-      // Separate read-only data actions (email) from write actions
-      const READ_ONLY_ACTIONS = new Set(["read_email", "search_email"]);
+      // Separate read-only data actions from write actions — these auto-execute and feed results back
+      const READ_ONLY_ACTIONS = new Set(["read_email", "search_email", "query_ledger"]);
       const readOnlyResults: string[] = [];
 
       for (const directive of parsedActions.actions.slice(0, 3)) {
         try {
+          // Force read-only actions to low risk so auto-exec policies match
+          if (READ_ONLY_ACTIONS.has(directive.action.action_type)) {
+            directive.action.risk_level = "low";
+          }
           const outcome = await proposeAndMaybeExecute(directive.action);
           if (outcome.auto_executed) {
             if (READ_ONLY_ACTIONS.has(directive.action.action_type) && outcome.result?.success && outcome.result.message) {
@@ -1746,11 +1833,11 @@ export async function POST(req: Request) {
         }
       }
 
-      // If we got email content back, do a follow-up Claude call with the data injected
+      // If we got read-only data back (email, ledger), do a follow-up Claude call with real data injected
       if (readOnlyResults.length > 0) {
-        const emailContext = readOnlyResults.join("\n\n");
+        const dataContext = readOnlyResults.join("\n\n");
         const followUpResult = await generateClaudeReply({
-          message: `The user asked: "${message}"\n\nHere is the email content I just retrieved:\n\n${emailContext}\n\nNow answer the user's original question using this email content. Be specific and actionable.`,
+          message: `The user asked: "${message}"\n\nHere is the data I just retrieved from our systems:\n\n${dataContext}\n\nNow answer the user's original question using this REAL data. Use exact numbers from the data — never estimate or guess. Be specific and actionable.`,
           history: effectiveHistory,
           tieredResults,
           corrections,
@@ -1758,6 +1845,7 @@ export async function POST(req: Request) {
           activeInitiatives,
           costSummary,
           financialContext,
+          ledgerContext,
           competitorContext,
           teamContext,
           signalsContext,
