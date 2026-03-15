@@ -83,14 +83,20 @@ export async function GET() {
           ? (row.proposed_payload as Record<string, unknown>)
           : {};
 
+      // Email fields are nested under payload.params (from proposeAction)
+      const params =
+        payload.params && typeof payload.params === "object"
+          ? (payload.params as Record<string, unknown>)
+          : payload;
+
       return {
         id: row.id,
         status: row.status,
-        to: (payload.to as string) || "Unknown",
-        subject: (payload.subject as string) || "(No subject)",
-        body: (payload.body as string) || "",
-        noteForBen: (payload.note_for_ben as string) || null,
-        sourceEmailId: (payload.source_email_id as string) || null,
+        to: (params.to as string) || "Unknown",
+        subject: (params.subject as string) || "(No subject)",
+        body: (params.body as string) || "",
+        noteForBen: (params.note_for_ben as string) || null,
+        sourceEmailId: (params.source_email_id as string) || null,
         confidence: row.confidence,
         riskLevel: row.risk_level,
         summary: row.summary,
