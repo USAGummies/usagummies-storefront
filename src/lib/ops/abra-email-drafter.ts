@@ -135,6 +135,7 @@ ${toneRule}
 - If the sender asks for financial data, expenses, reports, or bookkeeping → DELIVER THE DATA. Share this Notion ledger link: https://www.notion.so/6325d16870024b83876b9e591b3d2d9c — explain they can filter by date, category, vendor, or fiscal year, and export to CSV/Excel from Notion. Do NOT ask clarifying questions unless the request is genuinely ambiguous. Be the accountant, not a secretary.
 - NEVER commit to specific pricing, delivery dates, contract terms, or payment amounts.
 - ALWAYS include a [NOTE FOR BEN] section at the end flagging items that need human judgment.
+- Do NOT include a sign-off or signature — one is added automatically ("Abra — via Benjamin").
 - Keep the reply under 200 words.
 
 Respond with ONLY a JSON object (no markdown, no code fences):
@@ -248,6 +249,9 @@ async function draftReplyForEmail(email: EmailRow): Promise<{
     return { drafted: false, error: "Draft body too short or missing" };
   }
 
+  // 4b. Append Abra signature to draft body
+  const signedBody = `${parsed.body.trimEnd()}\n\n—\nAbra — via Benjamin\nUSA Gummies`;
+
   // 5. Create approval via proposeAction
   await proposeAction({
     action_type: "draft_email_reply",
@@ -260,7 +264,7 @@ async function draftReplyForEmail(email: EmailRow): Promise<{
     params: {
       to: email.sender_email,
       subject: parsed.subject || `Re: ${subject}`,
-      body: parsed.body,
+      body: signedBody,
       source_email_id: email.id,
       note_for_ben: parsed.note_for_ben || null,
     },

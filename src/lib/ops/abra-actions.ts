@@ -315,7 +315,7 @@ async function handleSendEmail(
 ): Promise<ActionResult> {
   const to = String(params.to || "").toLowerCase().trim();
   const subject = sanitizeTitle(String(params.subject || "Abra action"));
-  const body = sanitizeText(String(params.body || params.html || params.message || ""), 10000);
+  let body = sanitizeText(String(params.body || params.html || params.message || ""), 10000);
   if (!to || !body) {
     return { success: false, message: "Missing email recipient or body" };
   }
@@ -328,7 +328,12 @@ async function handleSendEmail(
     };
   }
 
-  await sendOpsEmail({ to, subject, body });
+  // Ensure Abra signature on all outgoing emails
+  if (!body.includes("Abra — via Benjamin")) {
+    body = `${body.trimEnd()}\n\n—\nAbra — via Benjamin\nUSA Gummies`;
+  }
+
+  await sendOpsEmail({ to, subject, body, from: "Abra via Benjamin <ben@usagummies.com>" });
   return { success: true, message: `Email sent to ${to}` };
 }
 
@@ -337,7 +342,7 @@ async function handleDraftEmailReply(
 ): Promise<ActionResult> {
   const to = String(params.to || "").toLowerCase().trim();
   const subject = sanitizeTitle(String(params.subject || "Re: (no subject)"));
-  const body = sanitizeText(String(params.body || ""), 10000);
+  let body = sanitizeText(String(params.body || ""), 10000);
   const sourceEmailId = typeof params.source_email_id === "string" ? params.source_email_id : null;
 
   if (!to || !body) {
@@ -351,7 +356,12 @@ async function handleDraftEmailReply(
     };
   }
 
-  await sendOpsEmail({ to, subject, body });
+  // Ensure Abra signature is present
+  if (!body.includes("Abra — via Benjamin")) {
+    body = `${body.trimEnd()}\n\n—\nAbra — via Benjamin\nUSA Gummies`;
+  }
+
+  await sendOpsEmail({ to, subject, body, from: "Abra via Benjamin <ben@usagummies.com>" });
 
   // Update source email's draft_status to 'sent' if we have a reference
   if (sourceEmailId) {
