@@ -478,6 +478,12 @@ async function fetchFinancialContext(): Promise<string | null> {
  * This is the authoritative financial source, NOT brain memory entries.
  */
 async function fetchLedgerContext(message: string): Promise<string | null> {
+  // 5s timeout — Notion pagination over 400+ transactions can be slow
+  const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000));
+  return Promise.race([fetchLedgerContextInner(message), timeout]);
+}
+
+async function fetchLedgerContextInner(message: string): Promise<string | null> {
   try {
     // Detect which fiscal year the user is asking about
     const currentYear = new Date().getFullYear().toString();
@@ -1733,7 +1739,7 @@ export async function POST(req: Request) {
 
     // Fetch corrections + departments + initiatives + cost + team + signals + live data (parallel)
     // When Supabase circuit is open, skip Supabase-dependent fetches to avoid 15s timeouts
-    const [corrections, departments, activeInitiatives, costSummary, teamMembers, vendors, signals, liveSnapshot, financialContext] =
+    const [corrections, departments, activeInitiatives, costSummary, teamMembers, vendors, signals, liveSnapshot, financialContext, ledgerContext] =
       await Promise.all([
         supabaseCircuitOpen ? Promise.resolve([] as Awaited<ReturnType<typeof fetchCorrections>>) : fetchCorrections(),
         supabaseCircuitOpen ? Promise.resolve([] as Awaited<ReturnType<typeof fetchDepartments>>) : fetchDepartments(),
@@ -1744,19 +1750,18 @@ export async function POST(req: Request) {
         supabaseCircuitOpen ? Promise.resolve([] as Awaited<ReturnType<typeof getActiveSignals>>) : getActiveSignals({ limit: 5 }),
         fetchLiveBusinessSnapshot(), // Always fetch — uses Shopify/email APIs, not Supabase
         fetchFinancialContext(),      // Always fetch — uses KPI timeseries, not Supabase
+        // Fetch verified ledger data for financial questions (Notion Cash & Transactions DB)
+        isFinanceQuestion(message)
+          ? fetchLedgerContext(message).catch((err) => {
+              console.error("[abra] Ledger fetch failed:", err instanceof Error ? err.message : err);
+              return null;
+            })
+          : Promise.resolve(null),
       ]);
     const competitorContext =
       isCompetitorQuestion(message) || messageDepartment === "sales_and_growth"
         ? await fetchCompetitorContext(message)
         : null;
-
-    // Fetch verified ledger data for financial questions (Notion Cash & Transactions DB)
-    const ledgerContext = isFinanceQuestion(message)
-      ? await fetchLedgerContext(message).catch((err) => {
-          console.error("[abra] Ledger fetch failed:", err instanceof Error ? err.message : err);
-          return null;
-        })
-      : null;
 
     // Build dynamic context strings for system prompt
     const today = new Date().toISOString().split("T")[0];
