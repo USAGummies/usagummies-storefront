@@ -8,6 +8,7 @@
  */
 
 import { NextResponse } from "next/server";
+import { kv } from "@vercel/kv";
 import { createHash } from "node:crypto";
 import { auth } from "@/lib/auth/config";
 import { isAuthorized } from "@/lib/ops/abra-auth";
@@ -499,7 +500,17 @@ async function fetchLedgerContextInner(message: string): Promise<string | null> 
     results.push("Source: Notion Cash & Transactions database (https://www.notion.so/6325d16870024b83876b9e591b3d2d9c)");
 
     for (const year of yearsToFetch) {
-      const ledger = await queryLedgerSummary({ fiscalYear: `FY${year}` });
+      // Check KV cache first (1-hour TTL) — Notion pagination over 400+ rows is slow
+      const cacheKey = `abra:ledger:FY${year}`;
+      type LedgerSummary = Awaited<ReturnType<typeof queryLedgerSummary>>;
+      let ledger: LedgerSummary | null = null;
+      try {
+        ledger = await kv.get<LedgerSummary>(cacheKey);
+      } catch { /* KV unavailable — fall through to Notion */ }
+      if (!ledger) {
+        ledger = await queryLedgerSummary({ fiscalYear: `FY${year}` });
+        try { await kv.set(cacheKey, ledger, { ex: 3600 }); } catch { /* KV write failed — non-critical */ }
+      }
       if (ledger.summary.transactionCount === 0) continue;
 
       const s = ledger.summary;
