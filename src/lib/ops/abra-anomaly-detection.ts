@@ -170,3 +170,162 @@ export async function detectAnomalies(): Promise<Anomaly[]> {
     (a, b) => Math.abs(b.z_score) - Math.abs(a.z_score),
   );
 }
+
+/**
+ * Enhance anomaly detections with LLM-powered root cause analysis.
+ * Falls back to basic anomalies if LLM is unavailable.
+ */
+export async function analyzeAnomaliesWithLLM(): Promise<
+  Array<Anomaly & { root_cause_hypothesis: string; recommended_action: string }>
+> {
+  const anomalies = await detectAnomalies();
+  if (anomalies.length === 0) return [];
+
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  if (!anthropicKey) {
+    return anomalies.map((a) => ({
+      ...a,
+      root_cause_hypothesis: "LLM analysis unavailable",
+      recommended_action: a.context,
+    }));
+  }
+
+  // Load versioned prompt with fallback
+  const FALLBACK_PROMPT = `You are a CPG analytics expert for USA Gummies, a vitamin gummy company selling on Shopify and Amazon.
+
+Given detected metric anomalies, provide root cause analysis. For each anomaly:
+1. Generate 1-2 plausible root cause hypotheses based on the metric, direction, and magnitude
+2. Recommend a specific action Ben (the founder) should take
+
+Consider common CPG causes: seasonal demand, ad spend changes, competitor actions, supply disruptions, pricing changes, Amazon algorithm shifts, website issues, inventory stockouts.
+
+Respond in JSON format:
+[
+  {
+    "metric": "metric_name",
+    "root_cause_hypothesis": "Most likely explanation in 1-2 sentences",
+    "recommended_action": "Specific action to take"
+  }
+]
+
+Be concise. Focus on actionable insights, not speculation.`;
+
+  let systemPrompt = FALLBACK_PROMPT;
+  try {
+    const { getActivePrompt } = await import("@/lib/ops/auto-research-runner");
+    const versioned = await getActivePrompt("anomaly_detector");
+    if (versioned?.prompt_text) {
+      systemPrompt = versioned.prompt_text;
+    }
+  } catch {
+    // fallback
+  }
+
+  try {
+    const { getPreferredClaudeModel } = await import("@/lib/ops/abra-cost-tracker");
+    const model = await getPreferredClaudeModel(
+      process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6-20260315",
+    );
+
+    const anomalyData = anomalies.map((a) => ({
+      metric: a.metric,
+      direction: a.direction,
+      deviation_pct: Math.round(a.deviation_pct * 10) / 10,
+      z_score: Math.round(a.z_score * 100) / 100,
+      severity: a.severity,
+      current_value: a.current_value,
+      expected_value: Math.round(a.expected_value * 100) / 100,
+    }));
+
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": anthropicKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 1024,
+        temperature: 0.2,
+        system: systemPrompt,
+        messages: [
+          {
+            role: "user",
+            content: `Analyze these detected anomalies:\n${JSON.stringify(anomalyData, null, 2)}`,
+          },
+        ],
+      }),
+      signal: AbortSignal.timeout(30000),
+    });
+
+    if (!res.ok) {
+      return anomalies.map((a) => ({
+        ...a,
+        root_cause_hypothesis: "Analysis unavailable",
+        recommended_action: a.context,
+      }));
+    }
+
+    const data = (await res.json()) as {
+      content: Array<{ type: string; text?: string }>;
+      usage?: { input_tokens: number; output_tokens: number };
+    };
+
+    // Log cost
+    try {
+      const { logAICost } = await import("@/lib/ops/abra-cost-tracker");
+      if (data.usage) {
+        await logAICost({
+          model,
+          provider: "anthropic",
+          inputTokens: data.usage.input_tokens,
+          outputTokens: data.usage.output_tokens,
+          endpoint: "anomaly-analysis",
+          department: "operations",
+        });
+      }
+    } catch {
+      // best-effort
+    }
+
+    const text = data.content
+      ?.filter((block) => block.type === "text")
+      .map((block) => block.text || "")
+      .join("");
+
+    // Parse JSON response
+    let analyses: Array<{
+      metric: string;
+      root_cause_hypothesis: string;
+      recommended_action: string;
+    }> = [];
+    try {
+      const jsonMatch = text.match(/\[[\s\S]*\]/);
+      if (jsonMatch) {
+        analyses = JSON.parse(jsonMatch[0]);
+      }
+    } catch {
+      // Parse failed — return basic anomalies
+    }
+
+    const analysisByMetric = new Map(
+      analyses.map((a) => [a.metric, a]),
+    );
+
+    return anomalies.map((a) => {
+      const analysis = analysisByMetric.get(a.metric);
+      return {
+        ...a,
+        root_cause_hypothesis: analysis?.root_cause_hypothesis || "Analysis unavailable",
+        recommended_action: analysis?.recommended_action || a.context,
+      };
+    });
+  } catch {
+    return anomalies.map((a) => ({
+      ...a,
+      root_cause_hypothesis: "Analysis unavailable",
+      recommended_action: a.context,
+    }));
+  }
+}

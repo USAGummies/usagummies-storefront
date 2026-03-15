@@ -38,6 +38,7 @@ import {
   log as sharedLog,
 } from "./lib/usa-gummies-shared.mjs";
 
+import { callLLM, parseLLMJson, loadVersionedPrompt } from "./lib/llm.mjs";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -361,6 +362,43 @@ async function runSC2() {
 
   log(`SC2 — Done: ${totalSKUs} SKUs — ${accelerating} accelerating, ${decelerating} decelerating`);
   return engine.succeed("SC2", { totalSKUs, accelerating, decelerating });
+}
+
+// ── LLM: Demand Forecast ────────────────────────────────────────────────────
+
+async function generateDemandForecast(data) {
+  const fallbackSystemPrompt =
+    "You are a supply chain demand planner for USA Gummies (CPG gummy bears). " +
+    "Given SKU velocity data and inventory levels, provide: (1) demand forecast for next " +
+    "30/60/90 days per SKU, (2) reorder recommendations with quantities, (3) seasonal " +
+    "adjustments (America 250 events, summer, holidays), (4) risk assessment for stockouts. " +
+    "Output JSON: {forecasts: [{sku, demand_30d, demand_60d, demand_90d, reorder_qty, risk_level}], " +
+    "seasonal_notes: string, overall_risk: string}";
+
+  let systemPrompt;
+  try {
+    systemPrompt = await loadVersionedPrompt("supply_demand_forecast");
+  } catch (_) {
+    systemPrompt = fallbackSystemPrompt;
+  }
+
+  const userMessage =
+    `SKU Velocity Data:\n${JSON.stringify(data.skuVelocity, null, 2)}\n\n` +
+    `Inventory Snapshot:\n${JSON.stringify(data.inventorySnapshot, null, 2)}\n\n` +
+    `Seasonal Factors:\n${JSON.stringify(data.seasonalFactors, null, 2)}`;
+
+  try {
+    const raw = await callLLM({
+      systemPrompt,
+      userMessage,
+      temperature: 0.2,
+      maxTokens: 1200,
+    });
+    return parseLLMJson(raw);
+  } catch (err) {
+    log(`generateDemandForecast failed: ${err.message}`);
+    return null;
+  }
 }
 
 // ── SC3: Reorder Point Calculator ────────────────────────────────────────────

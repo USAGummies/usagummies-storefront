@@ -64,7 +64,7 @@ type StrategyProfile = {
 };
 
 const DEFAULT_CLAUDE_MODEL =
-  process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514";
+  process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6-20260315";
 export type StrategyDepth = "quick" | "deep";
 
 type StrategyRuntimeBudget = {
@@ -377,7 +377,7 @@ async function synthesizeStrategy(input: {
       ? input.founderContext.join("\n")
       : "No founder policy notes found.";
 
-  const systemPrompt = [
+  let systemPrompt = [
     "You are Abra Strategy Orchestrator for USA Gummies.",
     "Produce a cross-department strategy with strict financial controls and permission-first external actions.",
     "External actions MUST require approval.",
@@ -398,7 +398,7 @@ async function synthesizeStrategy(input: {
     "}",
   ].join("\n");
 
-  const userPrompt = [
+  let userPrompt = [
     `Objective: ${input.objective}`,
     `Topic profile: ${input.profile.key} (${input.profile.label})`,
     `Detected department hint: ${input.topicHint || "none"}`,
@@ -421,6 +421,40 @@ async function synthesizeStrategy(input: {
     "- Require cross-department dependencies and clear gating.",
     "- Every external action requires approval before execution.",
   ].join("\n");
+
+  // --- Versioned prompt loading (auto-research) ---
+  try {
+    const { getActivePrompt } = await import("@/lib/ops/auto-research-runner");
+    const versioned = await getActivePrompt("strategy_orchestrator");
+    if (versioned?.prompt_text) {
+      const replacePlaceholders = (template: string) =>
+        template
+          .replace(/\{\{?OBJECTIVE\}?\}/g, input.objective)
+          .replace(/\{\{?PROFILE_KEY\}?\}/g, input.profile.key)
+          .replace(/\{\{?PROFILE_LABEL\}?\}/g, input.profile.label)
+          .replace(/\{\{?TOPIC_HINT\}?\}/g, input.topicHint || "none")
+          .replace(/\{\{?DEPARTMENTS_IN_SCOPE\}?\}/g, input.profile.departments.join(", "))
+          .replace(/\{\{?FOUNDER_CONTEXT\}?\}/g, founderContextText)
+          .replace(/\{\{?REVENUE_MONTH\}?\}/g, JSON.stringify(input.revenueMonth))
+          .replace(/\{\{?REVENUE_WEEK\}?\}/g, JSON.stringify(input.revenueWeek))
+          .replace(/\{\{?MARGIN_SNAPSHOT\}?\}/g, JSON.stringify(input.margin))
+          .replace(/\{\{?SPEND_SNAPSHOT\}?\}/g, JSON.stringify(input.spend))
+          .replace(/\{\{?RESEARCH_CONTEXT\}?\}/g, researchContext);
+
+      // The versioned prompt may contain system and user sections
+      // separated by "---USER---"
+      const parts = versioned.prompt_text.split(/---USER---/i);
+      if (parts.length >= 2) {
+        systemPrompt = replacePlaceholders(parts[0].trim());
+        userPrompt = replacePlaceholders(parts[1].trim());
+      } else {
+        // Single block — treat as system prompt replacement
+        systemPrompt = replacePlaceholders(versioned.prompt_text);
+      }
+    }
+  } catch {
+    // Fallback to hardcoded prompts above
+  }
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",

@@ -456,6 +456,183 @@ export async function checkDealHealth(): Promise<{
   return { signals_emitted: signalsEmitted, proposals_created: proposalsCreated };
 }
 
+/**
+ * LLM-powered pipeline analysis: generates personalized follow-up strategies
+ * and deal momentum assessments for each at-risk or stale deal.
+ * Falls back to rule-based recommendations if LLM unavailable.
+ */
+export async function generateLLMDealInsights(
+  summary?: PipelineSummary,
+): Promise<{
+  deal_strategies: Array<{
+    deal_id: string;
+    company_name: string;
+    follow_up_message: string;
+    momentum_assessment: string;
+    risk_factors: string[];
+    next_action: string;
+  }>;
+  pipeline_narrative: string;
+}> {
+  const pipeline = summary || (await analyzePipeline());
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+
+  if (!anthropicKey || pipeline.all_active_deals.length === 0) {
+    return {
+      deal_strategies: [],
+      pipeline_narrative: `Pipeline: $${pipeline.total_pipeline_value.toLocaleString()} across ${pipeline.all_active_deals.length} deals. ${pipeline.at_risk_deals.length} at risk.`,
+    };
+  }
+
+  const FALLBACK_PROMPT = `You are the B2B sales strategist for USA Gummies, a CPG vitamin gummy company.
+
+Given the current pipeline data, generate:
+1. A brief pipeline narrative (2-3 sentences summarizing health, momentum, and priorities)
+2. For each at-risk or stale deal, a personalized follow-up strategy
+
+For each deal strategy, provide:
+- follow_up_message: A personalized 2-3 sentence email body Ben can send (casual but professional)
+- momentum_assessment: One sentence on whether this deal is gaining or losing momentum
+- risk_factors: Array of 1-3 specific risk factors
+- next_action: The single most important next step
+
+Respond in JSON:
+{
+  "pipeline_narrative": "...",
+  "deal_strategies": [
+    {
+      "deal_id": "...",
+      "company_name": "...",
+      "follow_up_message": "...",
+      "momentum_assessment": "...",
+      "risk_factors": ["..."],
+      "next_action": "..."
+    }
+  ]
+}
+
+Rules:
+- Never fabricate deal details not in the data
+- Keep follow-ups warm and founder-appropriate (not corporate/salesy)
+- Reference specific deal context (stage, days, value) in assessments
+- Max 10 deal strategies (prioritize highest value and highest risk)`;
+
+  let systemPrompt = FALLBACK_PROMPT;
+  try {
+    const { getActivePrompt } = await import("@/lib/ops/auto-research-runner");
+    const versioned = await getActivePrompt("pipeline_intel");
+    if (versioned?.prompt_text) {
+      systemPrompt = versioned.prompt_text;
+    }
+  } catch {
+    // fallback
+  }
+
+  try {
+    const { getPreferredClaudeModel } = await import("@/lib/ops/abra-cost-tracker");
+    const model = await getPreferredClaudeModel(
+      process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6-20260315",
+    );
+
+    const dealsForAnalysis = [
+      ...pipeline.at_risk_deals,
+      ...pipeline.stale_deals.filter(
+        (d) => !pipeline.at_risk_deals.some((ar) => ar.deal_id === d.deal_id),
+      ),
+      ...pipeline.hot_deals,
+    ].slice(0, 15);
+
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": anthropicKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 2048,
+        temperature: 0.3,
+        system: systemPrompt,
+        messages: [
+          {
+            role: "user",
+            content: `Analyze this pipeline:\n\nSummary: $${pipeline.total_pipeline_value} total, ${pipeline.all_active_deals.length} active deals, ${pipeline.at_risk_deals.length} at risk, win rate ${pipeline.win_rate_30d}%, avg cycle ${pipeline.avg_deal_cycle_days} days\n\nDeals to analyze:\n${JSON.stringify(dealsForAnalysis, null, 2)}`,
+          },
+        ],
+      }),
+      signal: AbortSignal.timeout(30000),
+    });
+
+    if (!res.ok) {
+      return {
+        deal_strategies: [],
+        pipeline_narrative: `Pipeline: $${pipeline.total_pipeline_value.toLocaleString()} across ${pipeline.all_active_deals.length} deals.`,
+      };
+    }
+
+    const data = (await res.json()) as {
+      content: Array<{ type: string; text?: string }>;
+      usage?: { input_tokens: number; output_tokens: number };
+    };
+
+    // Log cost
+    try {
+      const { logAICost } = await import("@/lib/ops/abra-cost-tracker");
+      if (data.usage) {
+        await logAICost({
+          model,
+          provider: "anthropic",
+          inputTokens: data.usage.input_tokens,
+          outputTokens: data.usage.output_tokens,
+          endpoint: "pipeline-intelligence",
+          department: "sales_and_growth",
+        });
+      }
+    } catch {
+      // best-effort
+    }
+
+    const text = data.content
+      ?.filter((block) => block.type === "text")
+      .map((block) => block.text || "")
+      .join("");
+
+    try {
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]) as {
+          pipeline_narrative: string;
+          deal_strategies: Array<{
+            deal_id: string;
+            company_name: string;
+            follow_up_message: string;
+            momentum_assessment: string;
+            risk_factors: string[];
+            next_action: string;
+          }>;
+        };
+        return {
+          pipeline_narrative: parsed.pipeline_narrative || "",
+          deal_strategies: Array.isArray(parsed.deal_strategies) ? parsed.deal_strategies : [],
+        };
+      }
+    } catch {
+      // parse failed
+    }
+
+    return {
+      deal_strategies: [],
+      pipeline_narrative: `Pipeline: $${pipeline.total_pipeline_value.toLocaleString()} across ${pipeline.all_active_deals.length} deals.`,
+    };
+  } catch {
+    return {
+      deal_strategies: [],
+      pipeline_narrative: `Pipeline: $${pipeline.total_pipeline_value.toLocaleString()} across ${pipeline.all_active_deals.length} deals.`,
+    };
+  }
+}
+
 export async function syncNotionDeals(): Promise<{
   synced: number;
   new: number;

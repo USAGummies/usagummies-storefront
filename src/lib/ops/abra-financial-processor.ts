@@ -196,8 +196,24 @@ async function processFinancialEntry(entry: BrainRow): Promise<{
   }
 
   // Call Claude to extract transactions
-  const model = await getPreferredClaudeModel("claude-sonnet-4-20250514");
-  const prompt = EXTRACTION_PROMPT.replace("{DOCUMENT}", text.slice(0, 6000));
+  const model = await getPreferredClaudeModel("claude-sonnet-4-6-20260315");
+
+  // Try loading versioned prompt from auto-research, fall back to hardcoded
+  let promptTemplate = EXTRACTION_PROMPT;
+  try {
+    const { getActivePrompt } = await import("@/lib/ops/auto-research-runner");
+    const versioned = await getActivePrompt("financial_processor");
+    if (versioned?.prompt_text) {
+      promptTemplate = versioned.prompt_text;
+    }
+  } catch {
+    // Fallback to hardcoded — zero-downtime
+  }
+
+  const prompt = promptTemplate.replace(
+    /\{\{?DOCUMENT\}?\}/g,
+    text.slice(0, 6000),
+  );
 
   const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",

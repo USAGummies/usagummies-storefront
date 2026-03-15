@@ -22,6 +22,7 @@ import {
   getPreferredClaudeModel,
 } from "@/lib/ops/abra-cost-tracker";
 import { getVipSender } from "@/lib/ops/abra-vip-senders";
+import { getActivePrompt } from "@/lib/ops/auto-research-runner";
 
 export type EmailDraftResult = {
   processed: number;
@@ -92,7 +93,32 @@ function getAnthropicKey(): string {
   return key;
 }
 
-function buildDraftingPrompt(params: {
+// Cache the Supabase prompt for 5 minutes to avoid per-email fetches
+let _cachedPrompt: { text: string; version: number; fetchedAt: number } | null = null;
+const PROMPT_CACHE_TTL_MS = 5 * 60 * 1000;
+
+async function getVersionedPrompt(): Promise<{ text: string; version: number } | null> {
+  if (_cachedPrompt && Date.now() - _cachedPrompt.fetchedAt < PROMPT_CACHE_TTL_MS) {
+    return { text: _cachedPrompt.text, version: _cachedPrompt.version };
+  }
+
+  try {
+    const result = await getActivePrompt("email_drafter");
+    if (result) {
+      _cachedPrompt = {
+        text: result.prompt_text,
+        version: result.version,
+        fetchedAt: Date.now(),
+      };
+      return { text: result.prompt_text, version: result.version };
+    }
+  } catch (err) {
+    console.warn("[email-drafter] Could not load versioned prompt, using hardcoded fallback:", err instanceof Error ? err.message : err);
+  }
+  return null;
+}
+
+async function buildDraftingPrompt(params: {
   senderName: string;
   senderEmail: string;
   subject: string;
@@ -101,7 +127,7 @@ function buildDraftingPrompt(params: {
   brainContext: string;
   vipContext: string | null;
   senderRelationship: string | null;
-}): string {
+}): Promise<string> {
   const vipBlock = params.vipContext
     ? `\nSENDER CONTEXT (IMPORTANT — this person is known to us):\nRelationship: ${params.senderRelationship || "known contact"}\n${params.vipContext}\n`
     : "";
@@ -114,6 +140,22 @@ function buildDraftingPrompt(params: {
     ? "- This is an investor. Be professional, transparent, and proactive with updates."
     : "- Write as Ben. Friendly, professional, concise.";
 
+  // Try loading versioned prompt from Supabase (auto-research managed)
+  const versioned = await getVersionedPrompt();
+  if (versioned) {
+    let prompt = versioned.text;
+    prompt = prompt.replace(/\{\{SENDER_NAME\}\}/g, params.senderName);
+    prompt = prompt.replace(/\{\{SENDER_EMAIL\}\}/g, params.senderEmail);
+    prompt = prompt.replace(/\{\{SUBJECT\}\}/g, params.subject);
+    prompt = prompt.replace(/\{\{CATEGORY\}\}/g, params.category);
+    prompt = prompt.replace(/\{\{VIP_BLOCK\}\}/g, vipBlock);
+    prompt = prompt.replace(/\{\{EMAIL_BODY\}\}/g, params.emailBody.slice(0, 3000));
+    prompt = prompt.replace(/\{\{BRAIN_CONTEXT\}\}/g, params.brainContext.slice(0, 2000));
+    prompt = prompt.replace(/\{\{TONE_RULE\}\}/g, toneRule);
+    return prompt;
+  }
+
+  // Hardcoded fallback — always works even if Supabase is down
   return `You are drafting an email reply on behalf of Ben Stutman, CEO of USA Gummies (a dye-free gummy candy company).
 
 SENDER: ${params.senderName} <${params.senderEmail}>
@@ -169,8 +211,8 @@ async function draftReplyForEmail(email: EmailRow): Promise<{
 
   // 3. Call Claude to draft the reply (with VIP context if available)
   const vip = getVipSender(email.sender_email);
-  const model = await getPreferredClaudeModel("claude-sonnet-4-20250514");
-  const prompt = buildDraftingPrompt({
+  const model = await getPreferredClaudeModel("claude-sonnet-4-6-20260315");
+  const prompt = await buildDraftingPrompt({
     senderName,
     senderEmail: email.sender_email,
     subject,

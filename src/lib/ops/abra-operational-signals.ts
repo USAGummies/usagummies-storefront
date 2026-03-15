@@ -340,3 +340,141 @@ export function extractEmailSignals(params: {
 
   return signals;
 }
+
+/**
+ * LLM-powered signal extraction from email content.
+ * Provides semantic understanding beyond regex pattern matching.
+ * Falls back to rule-based extractEmailSignals() if LLM unavailable.
+ */
+export async function extractEmailSignalsWithLLM(params: {
+  subject: string;
+  body: string;
+  from: string;
+  department?: string;
+}): Promise<Array<Omit<OperationalSignal, "acknowledged" | "acknowledged_by">>> {
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  if (!anthropicKey) {
+    return extractEmailSignals(params);
+  }
+
+  const FALLBACK_PROMPT = `You are an operational signal detector for USA Gummies, a CPG vitamin gummy company.
+
+Analyze the email below and extract operational signals. For each signal, determine:
+- signal_type: one of "large_order", "complaint", "urgent_request", "payment_invoice", "supplier_update", "regulatory", "partnership_opportunity", "competitor_intel", "logistics_issue"
+- title: brief descriptive title (under 80 chars)
+- detail: 1-sentence explanation
+- severity: "info" | "warning" | "critical"
+- department: "sales_and_growth" | "operations" | "finance" | "supply_chain" | null
+
+Respond in JSON array format:
+[{ "signal_type": "...", "title": "...", "detail": "...", "severity": "...", "department": "..." }]
+
+Rules:
+- Only extract genuine signals, not routine correspondence
+- A single email can have 0-3 signals
+- "critical" = requires same-day action
+- "warning" = requires attention within 48 hours
+- "info" = good to know, no immediate action
+- Empty array [] if no signals detected
+- Consider context: quantities > 500 units are notable, dollar amounts > $5000 are significant`;
+
+  let systemPrompt = FALLBACK_PROMPT;
+  try {
+    const { getActivePrompt } = await import("@/lib/ops/auto-research-runner");
+    const versioned = await getActivePrompt("operational_signals");
+    if (versioned?.prompt_text) {
+      systemPrompt = versioned.prompt_text;
+    }
+  } catch {
+    // fallback
+  }
+
+  try {
+    const { getPreferredClaudeModel } = await import("@/lib/ops/abra-cost-tracker");
+    const model = await getPreferredClaudeModel(
+      process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6-20260315",
+    );
+
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": anthropicKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 512,
+        temperature: 0.1,
+        system: systemPrompt,
+        messages: [
+          {
+            role: "user",
+            content: `From: ${params.from}\nSubject: ${params.subject}\n\n${params.body.slice(0, 3000)}`,
+          },
+        ],
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+
+    if (!res.ok) {
+      return extractEmailSignals(params);
+    }
+
+    const data = (await res.json()) as {
+      content: Array<{ type: string; text?: string }>;
+      usage?: { input_tokens: number; output_tokens: number };
+    };
+
+    // Log cost
+    try {
+      const { logAICost } = await import("@/lib/ops/abra-cost-tracker");
+      if (data.usage) {
+        await logAICost({
+          model,
+          provider: "anthropic",
+          inputTokens: data.usage.input_tokens,
+          outputTokens: data.usage.output_tokens,
+          endpoint: "signal-extraction",
+          department: "operations",
+        });
+      }
+    } catch {
+      // best-effort
+    }
+
+    const text = data.content
+      ?.filter((block) => block.type === "text")
+      .map((block) => block.text || "")
+      .join("");
+
+    try {
+      const jsonMatch = text.match(/\[[\s\S]*\]/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]) as Array<{
+          signal_type: string;
+          title: string;
+          detail: string;
+          severity: "info" | "warning" | "critical";
+          department: string | null;
+        }>;
+
+        return parsed.map((s) => ({
+          signal_type: s.signal_type || "unknown",
+          source: "email",
+          title: s.title || "Signal detected",
+          detail: s.detail || `From: ${params.from}`,
+          severity: s.severity || "info",
+          department: s.department || params.department || null,
+          metadata: { from: params.from, llm_extracted: true },
+        }));
+      }
+    } catch {
+      // parse failed
+    }
+
+    return extractEmailSignals(params);
+  } catch {
+    return extractEmailSignals(params);
+  }
+}

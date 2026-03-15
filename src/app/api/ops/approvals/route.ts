@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { auth } from "@/lib/auth/config";
+import { sendOpsEmail } from "@/lib/ops/email";
 import { readState, writeState } from "@/lib/ops/state";
 import {
   canUseSupabase,
@@ -91,6 +92,46 @@ type DeployExecutionResult = {
   noChanges?: boolean;
   error?: string;
 };
+
+type EmailExecutionResult = {
+  kind: "email_send_v1";
+  ok: boolean;
+  to?: string;
+  subject?: string;
+  error?: string;
+};
+
+function isAutoReplyPayload(
+  actionType: string,
+  payload: unknown,
+): payload is { params?: { to?: string; subject?: string; body?: string }; to?: string; subject?: string; body?: string } {
+  if (actionType !== "auto_reply") return false;
+  if (!payload || typeof payload !== "object") return false;
+  const data = payload as Record<string, unknown>;
+  // Email fields can be at top level or nested under params
+  const params = (data.params && typeof data.params === "object" ? data.params : data) as Record<string, unknown>;
+  return typeof params.to === "string" && typeof params.subject === "string" && typeof params.body === "string";
+}
+
+async function executeEmailSend(payload: Record<string, unknown>): Promise<EmailExecutionResult> {
+  const params = (payload.params && typeof payload.params === "object"
+    ? payload.params
+    : payload) as Record<string, unknown>;
+
+  const to = params.to as string;
+  const subject = params.subject as string;
+  const body = params.body as string;
+
+  const result = await sendOpsEmail({ to, subject, body });
+
+  return {
+    kind: "email_send_v1",
+    ok: result.ok,
+    to,
+    subject,
+    error: result.ok ? undefined : result.message,
+  };
+}
 
 function isSupabaseRelatedError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
@@ -521,6 +562,8 @@ export async function POST(req: NextRequest) {
     }
 
     let execution: DeployExecutionResult | null = null;
+    let emailExecution: EmailExecutionResult | null = null;
+
     if (decision === "approved" && isDeployPayload(approval.proposed_payload)) {
       execution = executeDeployPayload(approval.proposed_payload);
 
@@ -536,6 +579,21 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    if (decision === "approved" && isAutoReplyPayload(approval.action_type, approval.proposed_payload)) {
+      emailExecution = await executeEmailSend(approval.proposed_payload as Record<string, unknown>);
+
+      await sbFetch(`/rest/v1/approvals?id=eq.${approval.id}`, {
+        method: "PATCH",
+        headers: {
+          Prefer: "return=minimal",
+        },
+        body: JSON.stringify({
+          resolved_payload: emailExecution,
+          updated_at: new Date().toISOString(),
+        }),
+      });
+    }
+
     await markSupabaseSuccess();
 
     return NextResponse.json({
@@ -545,6 +603,7 @@ export async function POST(req: NextRequest) {
       decisionLogId,
       decidedAt: now,
       execution,
+      emailExecution,
     });
   } catch (error) {
     if (isSupabaseRelatedError(error)) {

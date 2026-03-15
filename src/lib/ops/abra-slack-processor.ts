@@ -31,7 +31,7 @@ type SearchSource = {
   days_ago?: number;
 };
 
-const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514";
+const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6-20260315";
 
 function getSupabaseEnv() {
   const baseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -332,13 +332,29 @@ async function generateAnswer(params: {
   const signalsContext = buildSignalsContext(signals);
   const availableActions = getAvailableActions();
   const actionInstructions = buildActionInstructions(availableActions);
-  const systemPrompt = buildAbraSystemPrompt({
+  let systemPrompt = buildAbraSystemPrompt({
     format: "slack",
     corrections,
     departments,
     costSummary,
     signalsContext,
   }) + actionInstructions;
+
+  // --- Versioned prompt loading (auto-research) ---
+  try {
+    const { getActivePrompt } = await import("@/lib/ops/auto-research-runner");
+    const versioned = await getActivePrompt("slack_processor");
+    if (versioned?.prompt_text) {
+      // Replace placeholders in versioned prompt with runtime values
+      systemPrompt = versioned.prompt_text
+        .replace(/\{\{?SIGNALS_CONTEXT\}?\}/g, signalsContext)
+        .replace(/\{\{?ACTION_INSTRUCTIONS\}?\}/g, actionInstructions)
+        .replace(/\{\{?COST_SUMMARY\}?\}/g, JSON.stringify(costSummary));
+    }
+  } catch {
+    // Fallback to hardcoded prompt above
+  }
+
   const context = buildTieredContext(tiered);
   const model = await getPreferredClaudeModel(DEFAULT_MODEL);
   const anthropicKey = process.env.ANTHROPIC_API_KEY;

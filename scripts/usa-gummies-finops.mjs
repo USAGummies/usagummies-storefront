@@ -56,6 +56,7 @@ import {
 
 import { parseFoundCSV, categorizeTransaction, detectPayoutSource, VENDOR_PATTERNS } from "./lib/found-csv-parser.mjs";
 import { scanForInvoices, extractDueDate } from "./lib/invoice-extractor.mjs";
+import { callLLM, parseLLMJson, loadVersionedPrompt } from "./lib/llm.mjs";
 
 // ── Schedule Plan ────────────────────────────────────────────────────────────
 
@@ -623,6 +624,41 @@ async function runF3_RevenueReconciler(opts = {}) {
   }
 }
 
+// ── LLM: Transaction Classifier ─────────────────────────────────────────────
+
+async function classifyTransactionWithLLM({ description, amount, date, existingCategories }) {
+  const fallbackSystemPrompt =
+    "You are a bookkeeper for USA Gummies, a CPG gummy bear company. " +
+    "Classify this bank transaction into one of the provided categories. " +
+    "Output JSON: {category: string, confidence: number, reasoning: string}. " +
+    "Categories are: Revenue-Shopify, Revenue-Amazon, Revenue-Faire, Revenue-B2B, " +
+    "Production, Packaging, Shipping, Legal, Marketing, SaaS, Compliance, Tax, Transfer, Other.";
+
+  let systemPrompt;
+  try {
+    systemPrompt = await loadVersionedPrompt("finops_reconciler");
+  } catch (_) {
+    systemPrompt = fallbackSystemPrompt;
+  }
+
+  const userMessage =
+    `Transaction: "${description}"\nAmount: $${amount}\nDate: ${date}\n` +
+    `Existing categories in use: ${(existingCategories || []).join(", ")}`;
+
+  try {
+    const raw = await callLLM({
+      systemPrompt,
+      userMessage,
+      temperature: 0.1,
+      maxTokens: 200,
+    });
+    return parseLLMJson(raw);
+  } catch (err) {
+    engine.log(`classifyTransactionWithLLM failed: ${err.message}`);
+    return null;
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // F4 — Expense Categorizer
 // Auto-categorizes uncategorized withdrawals based on vendor matching.
@@ -1137,6 +1173,46 @@ async function runF8_CashFlowCalculator(opts = {}) {
   }
 }
 
+// ── LLM: Cash Flow Narrative ────────────────────────────────────────────────
+
+async function generateCashFlowNarrative(data) {
+  const fallbackSystemPrompt =
+    "You are a CFO-level cash flow analyst for a small CPG company (USA Gummies). " +
+    "Given the cash position data, provide: (1) current cash health assessment (healthy/watchful/critical), " +
+    "(2) 30-day outlook narrative, (3) key risk factors, (4) specific recommendations to improve cash position. " +
+    "Be direct and actionable. Output JSON: {health_status: string, narrative: string, " +
+    "risk_factors: string[], recommendations: string[], runway_assessment: string}";
+
+  let systemPrompt;
+  try {
+    systemPrompt = await loadVersionedPrompt("finops_cashflow");
+  } catch (_) {
+    systemPrompt = fallbackSystemPrompt;
+  }
+
+  const userMessage =
+    `Current balance: $${data.balance}\n` +
+    `Projected 7-day: $${data.projected7d}\n` +
+    `Projected 14-day: $${data.projected14d}\n` +
+    `Projected 30-day: $${data.projected30d}\n` +
+    `Avg daily inflow: $${data.avgDailyInflow}\n` +
+    `Avg daily outflow: $${data.avgDailyOutflow}\n` +
+    `Below safety threshold: ${data.belowSafety ? "YES" : "NO"}`;
+
+  try {
+    const raw = await callLLM({
+      systemPrompt,
+      userMessage,
+      temperature: 0.2,
+      maxTokens: 800,
+    });
+    return parseLLMJson(raw);
+  } catch (err) {
+    engine.log(`generateCashFlowNarrative failed: ${err.message}`);
+    return null;
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // F9 — P&L Generator
 // Weekly: compiles Profit & Loss from all categorized transactions.
@@ -1268,6 +1344,52 @@ async function runF9_PLGenerator(opts = {}) {
   } catch (err) {
     engine.log(`F9 error: ${err.message}`);
     return { status: "failed", errors: [...errors, err.message] };
+  }
+}
+
+// ── LLM: P&L Commentary ────────────────────────────────────────────────────
+
+async function generatePLCommentary(data) {
+  const fallbackSystemPrompt =
+    "You are a CPG financial analyst writing a weekly P&L commentary for USA Gummies founders. " +
+    "Analyze the numbers and provide: (1) one-line health assessment, (2) margin analysis vs " +
+    "industry benchmarks (CPG gross margins typically 40-60%), (3) notable line items, " +
+    "(4) specific cost reduction opportunities, (5) revenue growth recommendations. " +
+    "Be concise and data-driven. Output JSON: {health_assessment: string, margin_analysis: string, " +
+    "notable_items: string[], cost_opportunities: string[], revenue_recommendations: string[]}";
+
+  let systemPrompt;
+  try {
+    systemPrompt = await loadVersionedPrompt("finops_pnl");
+  } catch (_) {
+    systemPrompt = fallbackSystemPrompt;
+  }
+
+  const breakdownStr = data.breakdown
+    ? Object.entries(data.breakdown).map(([k, v]) => `  ${k}: $${v}`).join("\n")
+    : "N/A";
+
+  const userMessage =
+    `Week: ${data.weekStart} to ${data.weekEnd}\n` +
+    `Total Revenue: $${data.totalRevenue}\n` +
+    `COGS: $${data.cogs}\n` +
+    `Gross Profit: $${data.grossProfit} (${(data.grossMargin * 100).toFixed(1)}%)\n` +
+    `OpEx: $${data.opex}\n` +
+    `Net Income: $${data.netIncome} (${(data.netMargin * 100).toFixed(1)}%)\n` +
+    `Breakdown:\n${breakdownStr}\n` +
+    `vs Previous Week: ${data.vsPrevious ? JSON.stringify(data.vsPrevious) : "N/A"}`;
+
+  try {
+    const raw = await callLLM({
+      systemPrompt,
+      userMessage,
+      temperature: 0.2,
+      maxTokens: 1024,
+    });
+    return parseLLMJson(raw);
+  } catch (err) {
+    engine.log(`generatePLCommentary failed: ${err.message}`);
+    return null;
   }
 }
 

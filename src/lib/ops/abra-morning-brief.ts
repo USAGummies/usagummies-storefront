@@ -429,7 +429,7 @@ export async function generateMorningBrief(): Promise<string> {
     const [spend, preferredModel] = await Promise.all([
       getMonthlySpend(),
       getPreferredClaudeModel(
-        process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514",
+        process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6-20260315",
       ),
     ]);
     lines.push("🤖 *AI Budget*");
@@ -449,8 +449,128 @@ export async function generateMorningBrief(): Promise<string> {
   return text.length > 1990 ? `${text.slice(0, 1987)}...` : text;
 }
 
+export async function generateLLMMorningBrief(): Promise<string> {
+  const payload = await generateMorningBriefPayload();
+  const date = new Date();
+  const dateLabel = date.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+
+  // Load versioned prompt with fallback
+  const FALLBACK_PROMPT = `You are the executive briefing analyst for USA Gummies, a CPG company selling vitamin gummies on Shopify and Amazon.
+
+Given the operational data below, write a concise morning brief for the founder (Ben). Structure:
+1. **Lead with the headline** — the single most important thing Ben needs to know today (1 sentence)
+2. **Scorecard** — yesterday's revenue, orders, sessions with vs-average context (2-3 bullet points)
+3. **Action items** — what needs Ben's attention today, ranked by urgency (numbered list)
+4. **Signals & anomalies** — any operational warnings or opportunities detected (bullet points, skip if none)
+5. **Forecast** — brief forward-looking statement if data available
+
+Rules:
+- Be specific with numbers, never vague
+- Flag anything that deviated >15% from average
+- Keep total length under 300 words
+- Use Slack formatting (*bold*, bullet points)
+- Start with an emoji that reflects the day's tone (🚀 great, ✅ normal, ⚠️ needs attention, 🚨 critical)`;
+
+  let systemPrompt = FALLBACK_PROMPT;
+  try {
+    const { getActivePrompt } = await import("@/lib/ops/auto-research-runner");
+    const versioned = await getActivePrompt("morning_brief");
+    if (versioned?.prompt_text) {
+      systemPrompt = versioned.prompt_text;
+    }
+  } catch {
+    // fallback to hardcoded
+  }
+
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  if (!anthropicKey) {
+    // No API key — fall back to rule-based brief
+    return generateMorningBrief();
+  }
+
+  try {
+    const model = await getPreferredClaudeModel(
+      process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6-20260315",
+    );
+
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": anthropicKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 1024,
+        temperature: 0.3,
+        system: systemPrompt,
+        messages: [
+          {
+            role: "user",
+            content: `Generate the morning brief for ${dateLabel}.\n\nOperational data:\n${JSON.stringify(payload, null, 2)}`,
+          },
+        ],
+      }),
+      signal: AbortSignal.timeout(30000),
+    });
+
+    if (!res.ok) {
+      console.error(`[morning-brief] LLM call failed (${res.status})`);
+      return generateMorningBrief();
+    }
+
+    const data = (await res.json()) as {
+      content: Array<{ type: string; text?: string }>;
+      usage?: { input_tokens: number; output_tokens: number };
+    };
+
+    // Log cost (best-effort)
+    try {
+      const { logAICost } = await import("@/lib/ops/abra-cost-tracker");
+      if (data.usage) {
+        await logAICost({
+          model,
+          provider: "anthropic",
+          inputTokens: data.usage.input_tokens,
+          outputTokens: data.usage.output_tokens,
+          endpoint: "morning-brief",
+          department: "operations",
+        });
+      }
+    } catch {
+      // best-effort
+    }
+
+    const text = data.content
+      ?.filter((block) => block.type === "text")
+      .map((block) => block.text || "")
+      .join("\n");
+
+    if (!text) {
+      return generateMorningBrief();
+    }
+
+    // Prepend header and append footer
+    const header = `🌅 *ABRA MORNING BRIEF — ${dateLabel}*\n\n`;
+    const dashboardBase = process.env.NEXTAUTH_URL || "https://usagummies.com";
+    const footer = `\n\nReply in Slack: \`/abra <question>\` | Dashboard: ${dashboardBase}/ops`;
+
+    const fullText = header + text + footer;
+    return fullText.length > 1990 ? fullText.slice(0, 1987) + "..." : fullText;
+  } catch (error) {
+    console.error("[morning-brief] LLM synthesis failed:", error instanceof Error ? error.message : error);
+    return generateMorningBrief();
+  }
+}
+
 export async function sendMorningBrief(): Promise<void> {
-  const brief = await generateMorningBrief();
+  const brief = await generateLLMMorningBrief();
   await notify({ channel: "daily", text: brief });
 }
 

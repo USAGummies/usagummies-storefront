@@ -39,6 +39,7 @@ import {
   log as sharedLog,
 } from "./lib/usa-gummies-shared.mjs";
 
+import { callLLM, parseLLMJson, loadVersionedPrompt } from "./lib/llm.mjs";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -345,6 +346,36 @@ async function runS1() {
   return engine.succeed("S1", { gaps: opportunities.length, organicPages: organicPages.length, topGap: opportunities[0]?.keyword || "none" });
 }
 
+// ── LLM: SEO Keyword Analyzer ────────────────────────────────────────────────
+
+const SEO_KEYWORD_ANALYZER_FALLBACK = `You are an SEO strategist for USA Gummies, a dye-free American-made gummy bear brand. Given organic traffic data and keyword gaps, produce: (1) top 5 keyword opportunities ranked by search potential and brand fit, (2) content angle recommendation for each, (3) estimated difficulty level (Easy/Medium/Hard), (4) internal linking suggestions. Output JSON: {keyword_analysis: [{keyword, angle, difficulty, linking_suggestions, priority_score}], overall_strategy: string}`;
+
+async function analyzeSEOKeywordsWithLLM(data) {
+  const { organicPages, opportunities, existingPosts } = data || {};
+  try {
+    const versionedPrompt = await loadVersionedPrompt("seo_keyword_analyzer");
+    const systemPrompt = versionedPrompt || SEO_KEYWORD_ANALYZER_FALLBACK;
+
+    const userMessage = JSON.stringify({
+      organic_pages: (organicPages || []).slice(0, 50),
+      keyword_gaps: (opportunities || []).slice(0, 30),
+      existing_blog_posts: (existingPosts || []).slice(0, 40),
+    });
+
+    const raw = await callLLM({
+      system: systemPrompt,
+      user: userMessage,
+      temperature: 0.3,
+      maxTokens: 1024,
+    });
+
+    return parseLLMJson(raw);
+  } catch (err) {
+    log(`analyzeSEOKeywordsWithLLM failed: ${err.message}`);
+    return null;
+  }
+}
+
 // ── S2: Content Gap Analyzer ─────────────────────────────────────────────────
 
 async function runS2() {
@@ -384,6 +415,34 @@ async function runS2() {
   safeJsonWrite(SERP_CACHE_FILE, serpCache);
   log(`S2 — Done: ${analyzed} keywords analyzed`);
   return engine.succeed("S2", { analyzed });
+}
+
+// ── LLM: SEO Content Brief Generator ─────────────────────────────────────────
+
+const SEO_CONTENT_GAP_FALLBACK = `You are a content strategist for USA Gummies. Create a detailed blog post brief for the given keyword. Include: title options (3), meta description, H2 outline (5-8 sections), key points per section, CTA placement, internal link targets. Focus on the brand's strengths: dye-free, Made-in-USA, America 250. Output JSON: {titles: string[], meta_description: string, outline: [{heading, key_points: string[], word_count_target: number}], cta_strategy: string}`;
+
+async function generateSEOContentBrief(keyword, serpData) {
+  try {
+    const versionedPrompt = await loadVersionedPrompt("seo_content_gap");
+    const systemPrompt = versionedPrompt || SEO_CONTENT_GAP_FALLBACK;
+
+    const userMessage = JSON.stringify({
+      target_keyword: keyword,
+      serp_analysis: serpData || {},
+    });
+
+    const raw = await callLLM({
+      system: systemPrompt,
+      user: userMessage,
+      temperature: 0.4,
+      maxTokens: 1500,
+    });
+
+    return parseLLMJson(raw);
+  } catch (err) {
+    log(`generateSEOContentBrief failed: ${err.message}`);
+    return null;
+  }
 }
 
 // ── S3: Blog Post Drafter ────────────────────────────────────────────────────

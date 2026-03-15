@@ -685,6 +685,65 @@ function isAllowedEmailRecipient(email: string): boolean {
 const VALID_TX_TYPES = new Set(["income", "expense", "transfer", "refund", "cogs", "tax", "shipping"]);
 const MAX_TX_AMOUNT = 100_000; // Hard safety limit — anything higher is likely a hallucination
 
+// ── Vendor-aware account code classifier ─────────────────────────────────────
+// Matches vendor name and description keywords to the standard Chart of Accounts.
+// Falls back to the category-based mapping if no vendor rule matches.
+function classifyAccountCode(
+  vendor: string,
+  description: string,
+  categoryKey: string,
+  categoryMap: Record<string, string>,
+): string {
+  const v = vendor.toLowerCase();
+  const d = description.toLowerCase();
+  const combined = `${d} ${v}`;
+
+  // Transfers (internal Found pocket moves, owner funding)
+  if (/social media to primary|primary to social media|pocket.to.pocket/.test(combined)) return "1000 - Found Checking *6445";
+  if (/mastercard debit|owner.*(invest|fund|transfer)|personal fund/.test(combined)) return "1000 - Found Checking *6445";
+  if (/bank account \d+/.test(combined)) return "1000 - Found Checking *6445";
+
+  // Revenue shortcuts
+  if (categoryKey === "income" || categoryKey === "Income") {
+    if (/amazon/.test(combined)) return "4200 - Product Sales (Amazon)";
+    if (/wholesale|b2b|distributor/.test(combined)) return "4300 - Product Sales (Wholesale)";
+    if (/balance bonus|interest|cashback|cash back|referral bonus|found plus/.test(combined)) return "4900 - Other Income";
+    return "4100 - Product Sales (DTC)";
+  }
+  // Revenue by name pattern
+  if (/usa gummies|squarespace paym|shopify.*payout/.test(combined)) return "4100 - Product Sales (DTC)";
+  if (/referral bonus|cash back|found plus|balance bonus/.test(combined)) return "4900 - Other Income";
+
+  // COGS
+  if (/dutch valley|co.?pack|manufacturing|production run|ashford valley/.test(combined)) return "5300 - Co-Packing/Manufacturing";
+  if (/ingredient|flavoring|coloring|gummy base|energinut/.test(combined)) return "5100 - Ingredients";
+  if (/packaging|pouch|label|film|box(?:es)?|zebra\s?pack|ninjaprinthouse/.test(combined) && !/pirate/.test(combined)) return "5200 - Packaging";
+  if (/resale|purchased for resale/.test(combined)) return "5400 - Items Purchased for Resale";
+
+  // Contractors
+  if (/hunter of design|treadstone|troy burkhart|hawk design|contractor/.test(combined)) return "6100 - Contractor Services";
+
+  // Advertising
+  if (/facebook|meta|google ads|rumble|blip|tiktok|zeely|billboard|advertis|marketing|promo/.test(combined)) return "6200 - Advertising & Marketing";
+
+  // Software (expanded)
+  if (/anthropic|openai|chatgpt|shopify|slack|squarespace|invideo|apollo|cratejoy|cloudflare|n8n|midjourney|ownerrez|apple sub|amazon seller|x corp|twitter|saas|subscription|software|google \*svcs|google.*workspace|workspace_|brave\.com|deevid/.test(combined)) return "6300 - Software & Subscriptions";
+
+  // Specific OpEx
+  if (/t-mobile|t.mobile|cell phone|mobile service/.test(combined)) return "6400 - Cell Phone Service";
+  if (/company sage|attorney|legal|trademark|gs1|barcode|lowe graham|wyoming/.test(combined)) return "6500 - Legal Services";
+  if (/pirate ship|usps|u\.s\. post office|shipping label|postage|fedex|ups\b/.test(combined)) return "6600 - Postage & Shipping";
+  if (/geico|insurance/.test(combined)) return "6700 - Insurance";
+  if (/fuel|shell|exxon|maverik|pilot|gas station|vehicle/.test(combined)) return "6800 - Vehicle Expenses";
+  if (/hotel|lodging|hampton|quality inn|trade show|highlander/.test(combined)) return "6900 - Business Travel & Lodging";
+  if (/meal|restaurant|dining|client meeting|sport clips/.test(combined)) return "7000 - Business Meals";
+  if (/wire.*(fee|transfer)|processing fee|bank fee|stripe fee|payment processing/.test(combined)) return "7100 - Bank & Processing Fees";
+  if (/income tax|tax payment|irs/.test(combined)) return "8100 - Income Tax Expense";
+
+  // Fallback to category map
+  return categoryMap[categoryKey] || "7200 - Other Services";
+}
+
 async function handleRecordTransaction(
   params: Record<string, unknown>,
 ): Promise<ActionResult> {
@@ -746,24 +805,33 @@ async function handleRecordTransaction(
 
   // ── Derive enhanced accounting fields ──
   const CATEGORY_TO_ACCOUNT: Record<string, string> = {
-    cogs: "5000 - Cost of Goods Sold",
-    shipping_expense: "5200 - Shipping & Fulfillment",
-    selling_expense: "5300 - Selling Expenses",
+    cogs: "5300 - Co-Packing/Manufacturing",
+    ingredients: "5100 - Ingredients",
+    packaging: "5200 - Packaging",
+    resale: "5400 - Items Purchased for Resale",
+    shipping_expense: "6600 - Postage & Shipping",
+    selling_expense: "7100 - Bank & Processing Fees",
     sga: "6300 - Software & Subscriptions",
-    marketing: "6100 - Advertising & Marketing",
-    professional_services: "6600 - Professional Services",
+    marketing: "6200 - Advertising & Marketing",
+    professional_services: "6500 - Legal Services",
     capital_expenditure: "1500 - Equipment & Assets",
     contra_revenue: "4900 - Returns & Refunds",
-    income: "4000 - Product Sales Revenue",
+    income: "4100 - Product Sales (DTC)",
     transfer: "1000 - Found Checking *6445",
-    general: "6900 - Other Operating Expenses",
+    general: "7200 - Other Services",
     refund: "4900 - Returns & Refunds",
     tax: "8100 - Income Tax Expense",
-    shipping: "5200 - Shipping & Fulfillment",
+    shipping: "6600 - Postage & Shipping",
+    contractor: "6100 - Contractor Services",
+    travel: "6900 - Business Travel & Lodging",
+    meals: "7000 - Business Meals",
+    insurance: "6700 - Insurance",
+    vehicle: "6800 - Vehicle Expenses",
+    phone: "6400 - Cell Phone Service",
   };
   const accountCode = typeof params.account_code === "string"
     ? params.account_code
-    : (CATEGORY_TO_ACCOUNT[category] || CATEGORY_TO_ACCOUNT[txTypeRaw] || "6900 - Other Operating Expenses");
+    : classifyAccountCode(vendor || "", description, category || txTypeRaw, CATEGORY_TO_ACCOUNT);
 
   const txDateObj = new Date(dateStr + "T00:00:00Z");
   const fiscalYear = String(txDateObj.getUTCFullYear());

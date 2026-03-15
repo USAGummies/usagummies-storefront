@@ -414,7 +414,7 @@ async function runClaudeDigestText(
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) return "Claude summary unavailable (missing ANTHROPIC_API_KEY).";
   const model = await getPreferredClaudeModel(
-    process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514",
+    process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6-20260315",
   );
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -545,70 +545,113 @@ export async function generateWeeklyDigest(): Promise<string> {
     .filter((item) => item.channel === "total" && item.urgency !== "ok")
     .slice(0, 5);
 
-  const summaryPrompt = [
+  // Runtime data blocks for prompt injection
+  const revenueData = JSON.stringify({
+    this_week: totalThisWeekRevenue,
+    last_week: totalLastWeekRevenue,
+    delta_pct: safePctDelta(totalThisWeekRevenue, totalLastWeekRevenue),
+  });
+  const pipelineData = JSON.stringify({
+    total_pipeline_value: pipeline.total_pipeline_value,
+    at_risk_count: pipeline.at_risk_deals.length,
+    win_rate_30d: pipeline.win_rate_30d,
+  });
+  const signalsData = JSON.stringify(
+    activeSignals.slice(0, 8).map((signal) => ({
+      severity: signal.severity,
+      title: signal.title,
+    })),
+  );
+  const inventoryData = JSON.stringify(
+    inventoryWatch.map((item) => ({
+      sku: item.sku,
+      urgency: item.urgency,
+      days_until_stockout: item.days_until_stockout,
+    })),
+  );
+  const revenueSummaryData = JSON.stringify({
+    total_this_week: totalThisWeekRevenue,
+    total_last_week: totalLastWeekRevenue,
+    sessions_this_week: thisWeekSessions,
+    sessions_last_week: lastWeekSessions,
+  });
+  const attributionData = JSON.stringify(attribution.channels);
+  const forecastData = JSON.stringify({
+    trend: forecastTotal?.trend || "flat",
+    growth_rate_pct: forecastTotal?.growth_rate_pct || 0,
+    projected_7d: forecast7dRevenue,
+  });
+  const fullPipelineData = JSON.stringify(pipeline);
+  const fullInventoryData = JSON.stringify(inventoryWatch);
+  const healthData = JSON.stringify({
+    active_feeds: health.feeds.active,
+    disabled_feeds: health.feeds.disabled,
+    unresolved_dead_letters: health.feeds.unresolved_dead_letters,
+    down_integrations: health.uptime.down,
+  });
+  const spendData = JSON.stringify(spend);
+
+  let summaryPrompt = [
     "Given the following weekly business data for USA Gummies (DTC gummy vitamin brand),",
     "write a 3-sentence executive summary highlighting the most important trends and risks:",
-    `Revenue: ${JSON.stringify({
-      this_week: totalThisWeekRevenue,
-      last_week: totalLastWeekRevenue,
-      delta_pct: safePctDelta(totalThisWeekRevenue, totalLastWeekRevenue),
-    })}`,
-    `Pipeline: ${JSON.stringify({
-      total_pipeline_value: pipeline.total_pipeline_value,
-      at_risk_count: pipeline.at_risk_deals.length,
-      win_rate_30d: pipeline.win_rate_30d,
-    })}`,
-    `Signals: ${JSON.stringify(
-      activeSignals.slice(0, 8).map((signal) => ({
-        severity: signal.severity,
-        title: signal.title,
-      })),
-    )}`,
-    `Inventory: ${JSON.stringify(
-      inventoryWatch.map((item) => ({
-        sku: item.sku,
-        urgency: item.urgency,
-        days_until_stockout: item.days_until_stockout,
-      })),
-    )}`,
+    `Revenue: ${revenueData}`,
+    `Pipeline: ${pipelineData}`,
+    `Signals: ${signalsData}`,
+    `Inventory: ${inventoryData}`,
   ].join("\n");
+
+  let prioritiesPrompt = [
+    "You are Abra, operations strategist for USA Gummies.",
+    "Given this weekly snapshot, return 3-5 priorities for this week as a numbered list.",
+    "Each item must include a short rationale after a dash.",
+    `Revenue summary: ${revenueSummaryData}`,
+    `Attribution: ${attributionData}`,
+    `Forecast: ${forecastData}`,
+    `Pipeline: ${fullPipelineData}`,
+    `Inventory: ${fullInventoryData}`,
+    `Signals: ${signalsData}`,
+    `Health: ${healthData}`,
+    `AI spend: ${spendData}`,
+  ].join("\n");
+
+  // --- Versioned prompt loading (auto-research) ---
+  try {
+    const { getActivePrompt } = await import("@/lib/ops/auto-research-runner");
+    const versioned = await getActivePrompt("weekly_digest");
+    if (versioned?.prompt_text) {
+      const replacePlaceholders = (template: string) =>
+        template
+          .replace(/\{\{?REVENUE_DATA\}?\}/g, revenueData)
+          .replace(/\{\{?PIPELINE_DATA\}?\}/g, pipelineData)
+          .replace(/\{\{?SIGNALS_DATA\}?\}/g, signalsData)
+          .replace(/\{\{?INVENTORY_DATA\}?\}/g, inventoryData)
+          .replace(/\{\{?REVENUE_SUMMARY_DATA\}?\}/g, revenueSummaryData)
+          .replace(/\{\{?ATTRIBUTION_DATA\}?\}/g, attributionData)
+          .replace(/\{\{?FORECAST_DATA\}?\}/g, forecastData)
+          .replace(/\{\{?FULL_PIPELINE_DATA\}?\}/g, fullPipelineData)
+          .replace(/\{\{?FULL_INVENTORY_DATA\}?\}/g, fullInventoryData)
+          .replace(/\{\{?HEALTH_DATA\}?\}/g, healthData)
+          .replace(/\{\{?SPEND_DATA\}?\}/g, spendData);
+
+      // The versioned prompt may contain both summary and priorities sections
+      // separated by "---PRIORITIES---"
+      const parts = versioned.prompt_text.split(/---PRIORITIES---/i);
+      if (parts.length >= 2) {
+        summaryPrompt = replacePlaceholders(parts[0].trim());
+        prioritiesPrompt = replacePlaceholders(parts[1].trim());
+      } else {
+        // Single prompt — apply to summary only
+        summaryPrompt = replacePlaceholders(versioned.prompt_text);
+      }
+    }
+  } catch {
+    // Fallback to hardcoded prompts above
+  }
+
   const executiveSummary = await runClaudeDigestText(
     summaryPrompt,
     "digest/weekly-summary",
   );
-
-  const prioritiesPrompt = [
-    "You are Abra, operations strategist for USA Gummies.",
-    "Given this weekly snapshot, return 3-5 priorities for this week as a numbered list.",
-    "Each item must include a short rationale after a dash.",
-    `Revenue summary: ${JSON.stringify({
-      total_this_week: totalThisWeekRevenue,
-      total_last_week: totalLastWeekRevenue,
-      sessions_this_week: thisWeekSessions,
-      sessions_last_week: lastWeekSessions,
-    })}`,
-    `Attribution: ${JSON.stringify(attribution.channels)}`,
-    `Forecast: ${JSON.stringify({
-      trend: forecastTotal?.trend || "flat",
-      growth_rate_pct: forecastTotal?.growth_rate_pct || 0,
-      projected_7d: forecast7dRevenue,
-    })}`,
-    `Pipeline: ${JSON.stringify(pipeline)}`,
-    `Inventory: ${JSON.stringify(inventoryWatch)}`,
-    `Signals: ${JSON.stringify(
-      activeSignals.slice(0, 8).map((signal) => ({
-        severity: signal.severity,
-        title: signal.title,
-      })),
-    )}`,
-    `Health: ${JSON.stringify({
-      active_feeds: health.feeds.active,
-      disabled_feeds: health.feeds.disabled,
-      unresolved_dead_letters: health.feeds.unresolved_dead_letters,
-      down_integrations: health.uptime.down,
-    })}`,
-    `AI spend: ${JSON.stringify(spend)}`,
-  ].join("\n");
   const prioritiesText = await runClaudeDigestText(
     prioritiesPrompt,
     "digest/weekly-priorities",

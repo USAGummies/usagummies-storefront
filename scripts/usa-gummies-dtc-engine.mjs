@@ -41,6 +41,7 @@ import {
   log as sharedLog,
 } from "./lib/usa-gummies-shared.mjs";
 
+import { callLLM, parseLLMJson, loadVersionedPrompt } from "./lib/llm.mjs";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -431,6 +432,39 @@ async function runD1() {
   return engine.succeed("D1", { newCustomers, existingCustomers, totalOrders: dtcOrders.length });
 }
 
+// ── LLM: Post-Purchase Email Personalizer ────────────────────────────────────
+
+const DTC_POST_PURCHASE_FALLBACK = `You are writing a post-purchase email for USA Gummies. The brand voice is warm, patriotic, appreciative. Personalize based on what they bought and their journey stage. For Day 3: thank + usage tips. For Day 7: review request + refer a friend. For Day 14: reorder nudge. For Day 30: loyalty appreciation. Keep under 150 words. Output JSON: {subject: string, body: string}`;
+
+async function personalizePostPurchaseEmail(params) {
+  const { firstName, products, orderTotal, stage, loyaltyTier, source } = params || {};
+  try {
+    const versionedPrompt = await loadVersionedPrompt("dtc_post_purchase");
+    const systemPrompt = versionedPrompt || DTC_POST_PURCHASE_FALLBACK;
+
+    const userMessage = JSON.stringify({
+      first_name: firstName || "Friend",
+      products: products || [],
+      order_total: orderTotal,
+      stage: stage || "day_3",
+      loyalty_tier: loyaltyTier || "new",
+      source: source || "shopify",
+    });
+
+    const raw = await callLLM({
+      system: systemPrompt,
+      user: userMessage,
+      temperature: 0.4,
+      maxTokens: 600,
+    });
+
+    return parseLLMJson(raw);
+  } catch (err) {
+    log(`personalizePostPurchaseEmail failed: ${err.message}`);
+    return null;
+  }
+}
+
 // ── D2: Post-Purchase Sequence Manager ───────────────────────────────────────
 
 async function runD2() {
@@ -560,6 +594,38 @@ async function runD4() {
 
   log(`D4 — ${totalCodes} referral codes created, ${totalRedeemed} redeemed, $${totalRevenue.toFixed(2)} revenue`);
   return engine.succeed("D4", { totalCodes, totalRedeemed, totalRevenue });
+}
+
+// ── LLM: Cart Recovery Email Generator ───────────────────────────────────────
+
+const DTC_CART_RECOVERY_FALLBACK = `You are writing a cart abandonment recovery email for USA Gummies. Be warm and helpful, not salesy. Reference the specific products they left behind. Include a soft incentive if cart > $30. Keep under 120 words. Benjamin's voice. Output JSON: {subject: string, body: string}`;
+
+async function generateCartRecoveryEmail(params) {
+  const { firstName, products, cartTotal, source, lastVisitDate } = params || {};
+  try {
+    const versionedPrompt = await loadVersionedPrompt("dtc_cart_recovery");
+    const systemPrompt = versionedPrompt || DTC_CART_RECOVERY_FALLBACK;
+
+    const userMessage = JSON.stringify({
+      first_name: firstName || "Friend",
+      products: products || [],
+      cart_total: cartTotal,
+      source: source || "shopify",
+      last_visit_date: lastVisitDate || new Date().toISOString().split("T")[0],
+    });
+
+    const raw = await callLLM({
+      system: systemPrompt,
+      user: userMessage,
+      temperature: 0.5,
+      maxTokens: 500,
+    });
+
+    return parseLLMJson(raw);
+  } catch (err) {
+    log(`generateCartRecoveryEmail failed: ${err.message}`);
+    return null;
+  }
 }
 
 // ── D5: Reorder Predictor ────────────────────────────────────────────────────

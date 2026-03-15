@@ -29,6 +29,7 @@ import {
   fetchWithTimeout,
   textBen,
 } from "./lib/usa-gummies-shared.mjs";
+import { callLLM, loadVersionedPrompt, parseLLMJson } from "./lib/llm.mjs";
 
 const HOME = process.env.HOME || "/Users/ben";
 const CONFIG_DIR = path.join(HOME, ".config/usa-gummies-mcp");
@@ -258,6 +259,88 @@ async function generateReply(text) {
 
   const json = await res.json();
   return json?.choices?.[0]?.message?.content?.trim() || "Thanks for reaching out to USA Gummies! 🇺🇸";
+}
+
+// ── Claude-powered reply generation ─────────────────────────────────────────
+
+const SOCIAL_ENGAGEMENT_FALLBACK_PROMPT =
+  "You are USA Gummies' social media voice. Respond to this social media mention. " +
+  "Rules: (1) Keep under 200 characters, (2) Be friendly, patriotic, and health-conscious, " +
+  "(3) Never attack competitors, (4) Never be political, (5) Use one emoji, " +
+  "(6) Reference dye-free or Made-in-USA when natural, (7) If asked a question, answer it helpfully. " +
+  "Match the platform tone: X/Twitter is casual and witty, Truth Social is more patriotic.";
+
+async function generateReplyWithClaude(text, platform, mentionContext) {
+  try {
+    const versionedPrompt = await loadVersionedPrompt("social_engagement");
+    const system = versionedPrompt || SOCIAL_ENGAGEMENT_FALLBACK_PROMPT;
+
+    const contextLines = [];
+    if (platform) contextLines.push(`Platform: ${platform === "x" ? "X/Twitter" : "Truth Social"}`);
+    if (mentionContext?.followerCount != null) contextLines.push(`Author followers: ${mentionContext.followerCount}`);
+    if (mentionContext?.isVerified) contextLines.push("Author is verified");
+
+    const userMessage =
+      `Write a short reply to this social media mention:\n"${text}"` +
+      (contextLines.length ? `\n\nContext:\n${contextLines.join("\n")}` : "");
+
+    const reply = await callLLM({
+      system,
+      user: userMessage,
+      temperature: 0.6,
+      maxTokens: 100,
+    });
+
+    if (reply) return reply.trim();
+  } catch (err) {
+    log(`generateReplyWithClaude error: ${err?.message || err}`);
+  }
+
+  // Fall back to existing OpenAI-based generator
+  return generateReply(text);
+}
+
+// ── LLM-powered engagement analysis ─────────────────────────────────────────
+
+const SOCIAL_ANALYSIS_FALLBACK_PROMPT =
+  "You are a social media analyst for USA Gummies. Analyze these recent mentions and provide: " +
+  "(1) overall sentiment breakdown, (2) trending topics/themes, (3) opportunities for engagement, " +
+  "(4) potential PR risks to flag. Output JSON: " +
+  '{sentiment_breakdown: {positive: number, neutral: number, negative: number}, ' +
+  "trending_topics: string[], engagement_opportunities: string[], risk_flags: string[]}";
+
+async function analyzeEngagementWithLLM(mentionQueue) {
+  if (!mentionQueue || mentionQueue.length === 0) return null;
+
+  try {
+    const versionedPrompt = await loadVersionedPrompt("social_analysis");
+    const system = versionedPrompt || SOCIAL_ANALYSIS_FALLBACK_PROMPT;
+
+    const mentionSummaries = mentionQueue.slice(0, 50).map((m) => ({
+      platform: m.platform,
+      text: (m.text || "").slice(0, 300),
+      sentiment: m.sentiment || "unknown",
+    }));
+
+    const userMessage =
+      `Analyze these ${mentionSummaries.length} recent social media mentions for USA Gummies:\n\n` +
+      JSON.stringify(mentionSummaries, null, 2);
+
+    const raw = await callLLM({
+      system,
+      user: userMessage,
+      temperature: 0.3,
+      maxTokens: 600,
+    });
+
+    if (!raw) return null;
+
+    const parsed = parseLLMJson(raw);
+    return parsed || null;
+  } catch (err) {
+    log(`analyzeEngagementWithLLM error: ${err?.message || err}`);
+    return null;
+  }
 }
 
 // ── SOC3: Social Performance Tracker ────────────────────────────────────────

@@ -1191,7 +1191,7 @@ async function callAbraChat(
   if (anthropicKey) {
     try {
       const claudeModel =
-        process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514";
+        process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6-20260315";
       const claudeRes = await fetchWithRetry(
         "https://api.anthropic.com/v1/messages",
         {

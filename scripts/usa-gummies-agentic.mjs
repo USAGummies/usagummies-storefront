@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import dns from "node:dns/promises";
 import { execSync, spawnSync } from "node:child_process";
+import { callLLM, parseLLMJson, loadVersionedPrompt } from "./lib/llm.mjs";
 
 const HOME = process.env.HOME || "/Users/ben";
 const PROJECT_ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
@@ -3001,6 +3002,35 @@ function buildSendIntentNote(notesNow, email, subject) {
   return `${notesNow}\n[send-intent] ${nowETTimestamp()} ET: prepared initial outreach to ${email} (${subject}).`.trim();
 }
 
+async function personalizeOutreachEmail({ firstName, businessName, businessType, state, city, notes, prospectType, templateKey }) {
+  const FALLBACK_SYSTEM = `You are Benjamin Stutman, founder of USA Gummies, writing a cold outreach email. Personalize this template for the specific prospect while keeping the core value props. Key product: dye-free, Made-in-USA gummy bears (7.5 oz bags). Key angles: America's 250th birthday (2026), dye ban compliance, clean-label trend. Keep the same tone and length as the template. Output JSON: {subject: string, body: string}`;
+  try {
+    const versionedPrompt = await loadVersionedPrompt("b2b_outreach").catch(() => null);
+    const systemPrompt = versionedPrompt || FALLBACK_SYSTEM;
+    const userMessage = [
+      `Prospect: ${firstName || "there"} at ${businessName || "their business"}`,
+      businessType ? `Business type: ${businessType}` : null,
+      state ? `Location: ${city ? city + ", " : ""}${state}` : null,
+      prospectType ? `Prospect type: ${prospectType}` : null,
+      notes ? `Notes: ${notes}` : null,
+      templateKey ? `Template key to personalize: ${templateKey}` : null,
+    ].filter(Boolean).join("\n");
+
+    const raw = await callLLM({
+      system: systemPrompt,
+      user: userMessage,
+      temperature: 0.4,
+      maxTokens: 800,
+    });
+    const parsed = parseLLMJson(raw);
+    if (parsed && parsed.subject && parsed.body) return parsed;
+    return null;
+  } catch (err) {
+    console.error(`[personalizeOutreachEmail] LLM failed for ${businessName}: ${err.message}`);
+    return null;
+  }
+}
+
 async function runB2BEmailSender(limit = 25, dryRun = false) {
   const requested = Math.max(0, Number(limit || 0));
   const sentTodayBefore = sumAgentSendsForDate("agent3", todayET());
@@ -4379,6 +4409,82 @@ function classifyReply(envelope, body) {
   return "OTHER";
 }
 
+/**
+ * LLM-powered reply classifier — enhanced version of classifyReply().
+ * Falls back to the rule-based classifyReply() if the LLM call fails.
+ */
+async function classifyReplyWithLLM(envelope, body) {
+  const fallbackCategory = classifyReply(envelope, body);
+
+  const FALLBACK_PROMPT = `You are an email reply classifier for USA Gummies, a B2B gummy candy company.
+
+Classify the incoming email into exactly ONE category:
+- INTERESTED: The sender wants to learn more, requests samples, pricing, sell sheets, or a call.
+- NOT_INTERESTED: The sender declines, says no thanks, asks to stop emailing, or passes.
+- BOUNCE: Delivery failure, undeliverable, postmaster notice, or mail system auto-reply.
+- FAIRE_ORDER: Related to a Faire.com wholesale order.
+- QUESTION: The sender has a specific question but hasn't expressed clear interest or disinterest.
+- UNSUBSCRIBE: Explicit request to be removed from the mailing list.
+- OTHER: Anything that doesn't fit the above categories.
+
+Also assess:
+- sentiment: "positive", "neutral", or "negative"
+- urgency: "high" (needs response today), "medium" (within a few days), or "low" (no rush)
+- key_topics: array of 1-4 short topic strings extracted from the email (e.g. ["pricing", "samples", "timeline"])
+- confidence: a number from 0.0 to 1.0 indicating your confidence in the classification
+
+Respond with ONLY a JSON object, no other text:
+{"category": "...", "sentiment": "...", "urgency": "...", "key_topics": [...], "confidence": 0.0}`;
+
+  try {
+    const systemPrompt = (await loadVersionedPrompt("b2b_reply_classifier")) || FALLBACK_PROMPT;
+
+    const subject = envelope?.subject || "";
+    const from = envelope?.from || "";
+    const bodySnippet = (body || "").slice(0, 3000);
+
+    const userMessage = `Classify this email reply:
+
+Subject: ${subject}
+From: ${from}
+
+Body:
+${bodySnippet}`;
+
+    const raw = await callLLM({
+      system: systemPrompt,
+      user: userMessage,
+      maxTokens: 256,
+      temperature: 0.1,
+    });
+
+    if (!raw) {
+      return { category: fallbackCategory, sentiment: "neutral", urgency: "medium", key_topics: [], confidence: 0.5 };
+    }
+
+    const parsed = parseLLMJson(raw);
+    if (!parsed || !parsed.category) {
+      return { category: fallbackCategory, sentiment: "neutral", urgency: "medium", key_topics: [], confidence: 0.5 };
+    }
+
+    const validCategories = ["INTERESTED", "NOT_INTERESTED", "BOUNCE", "FAIRE_ORDER", "QUESTION", "UNSUBSCRIBE", "OTHER"];
+    const category = validCategories.includes(parsed.category) ? parsed.category : fallbackCategory;
+    const validSentiments = ["positive", "neutral", "negative"];
+    const sentiment = validSentiments.includes(parsed.sentiment) ? parsed.sentiment : "neutral";
+    const validUrgency = ["high", "medium", "low"];
+    const urgency = validUrgency.includes(parsed.urgency) ? parsed.urgency : "medium";
+    const key_topics = Array.isArray(parsed.key_topics) ? parsed.key_topics.slice(0, 4).map(String) : [];
+    const confidence = typeof parsed.confidence === "number" && parsed.confidence >= 0 && parsed.confidence <= 1
+      ? parsed.confidence
+      : 0.7;
+
+    return { category, sentiment, urgency, key_topics, confidence };
+  } catch (err) {
+    console.error("[classifyReplyWithLLM] Error, falling back to rule-based:", err.message || err);
+    return { category: fallbackCategory, sentiment: "neutral", urgency: "medium", key_topics: [], confidence: 0.5 };
+  }
+}
+
 function extractSenderEmail(text) {
   const m = String(text || "").match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
   return m ? normalizeEmail(m[0]) : "";
@@ -4471,6 +4577,78 @@ function buildReplyDraft(category, firstName, accountName) {
       "Benjamin",
     ].join("\n"),
   };
+}
+
+/**
+ * LLM-powered reply draft builder — enhanced version of buildReplyDraft().
+ * Generates a personalized reply based on actual email content.
+ * Falls back to the template-based buildReplyDraft() if the LLM call fails.
+ */
+async function buildReplyDraftWithLLM({ category, firstName, accountName, prospectType, emailSubject, emailBody, sentiment, key_topics }) {
+  const fallbackDraft = buildReplyDraft(category, firstName, accountName);
+
+  const FALLBACK_PROMPT = `You are Benjamin Stutman, founder of USA Gummies, a growing American gummy candy brand.
+
+Write a short, personalized email reply to a B2B prospect or partner. Your tone is:
+- Friendly and warm, but professional
+- Not pushy — never hard-sell
+- Founder voice — you're a real person, not a sales bot
+- Concise — keep it under 6 sentences in the body
+
+You will receive the classification of the original email, the sender's name, their company, the original email subject and body, and extracted topics.
+
+Generate a reply that:
+1. References something specific from their email to show you read it
+2. Matches the appropriate tone for the category (grateful for interest, graceful for rejection, helpful for questions)
+3. Ends with a clear but soft next step when appropriate
+4. Signs off as "Benjamin"
+
+Respond with ONLY a JSON object:
+{"subject": "Re: ...", "body": "Hi ...\\n\\n...\\n\\nBest,\\nBenjamin"}`;
+
+  try {
+    const systemPrompt = (await loadVersionedPrompt("b2b_reply_drafter")) || FALLBACK_PROMPT;
+
+    const bodySnippet = (emailBody || "").slice(0, 2000);
+    const topicsStr = Array.isArray(key_topics) && key_topics.length > 0 ? key_topics.join(", ") : "none identified";
+
+    const userMessage = `Draft a reply for this email:
+
+Category: ${category || "OTHER"}
+Sentiment: ${sentiment || "neutral"}
+Prospect type: ${prospectType || "unknown"}
+Sender first name: ${firstName || "there"}
+Account/company: ${accountName || "their team"}
+Key topics: ${topicsStr}
+
+Original subject: ${emailSubject || "(no subject)"}
+Original body:
+${bodySnippet}`;
+
+    const raw = await callLLM({
+      system: systemPrompt,
+      user: userMessage,
+      maxTokens: 512,
+      temperature: 0.4,
+    });
+
+    if (!raw) {
+      return fallbackDraft;
+    }
+
+    const parsed = parseLLMJson(raw);
+    if (!parsed || !parsed.subject || !parsed.body) {
+      return fallbackDraft;
+    }
+
+    return {
+      subject: String(parsed.subject).slice(0, 200),
+      body: String(parsed.body),
+    };
+  } catch (err) {
+    console.error("[buildReplyDraftWithLLM] Error, falling back to template:", err.message || err);
+    return fallbackDraft;
+  }
 }
 
 async function findProspectByEmail(email) {
@@ -4922,6 +5100,47 @@ async function runRevenueAttributionForecastAgent() {
     b2bReplyRatePct: Number((b2bReplyRate * 100).toFixed(1)),
     distReplyRatePct: Number((distReplyRate * 100).toFixed(1)),
   };
+}
+
+/**
+ * Generate an LLM-powered narrative for the revenue attribution forecast.
+ * Called by runRevenueAttributionForecastAgent with its traction/projection data.
+ * Returns { narrative, confidence_level, key_risks, recommendations } or null on failure.
+ */
+async function generateLLMForecastNarrative(data) {
+  const FALLBACK_SYSTEM = "You are a CPG revenue analyst. Given B2B outreach funnel data, write a concise revenue attribution forecast with: (1) current momentum assessment, (2) 30-day revenue projection with confidence range, (3) key risks to forecast, (4) specific recommendations to improve conversion rates. Use actual numbers. Be direct and actionable.";
+
+  try {
+    const versionedPrompt = await loadVersionedPrompt("b2b_forecaster");
+    const systemPrompt = versionedPrompt || FALLBACK_SYSTEM;
+
+    const userMessage = `Here is the current B2B outreach funnel data:\n\n${JSON.stringify(data, null, 2)}\n\nProvide your analysis as JSON with this exact structure:\n{\n  "narrative": "string — 2-3 paragraph forecast narrative with actual numbers",\n  "confidence_level": "high | medium | low",\n  "key_risks": ["risk1", "risk2", ...],\n  "recommendations": ["rec1", "rec2", ...]\n}`;
+
+    const raw = await callLLM({
+      system: systemPrompt,
+      user: userMessage,
+      temperature: 0.3,
+      maxTokens: 1024,
+    });
+
+    if (!raw) return null;
+
+    const parsed = parseLLMJson(raw);
+    if (!parsed || !parsed.narrative) {
+      console.warn("[generateLLMForecastNarrative] Could not parse LLM response");
+      return null;
+    }
+
+    return {
+      narrative: String(parsed.narrative),
+      confidence_level: String(parsed.confidence_level || "medium"),
+      key_risks: Array.isArray(parsed.key_risks) ? parsed.key_risks.map(String) : [],
+      recommendations: Array.isArray(parsed.recommendations) ? parsed.recommendations.map(String) : [],
+    };
+  } catch (err) {
+    console.error("[generateLLMForecastNarrative] Error:", err.message || err);
+    return null;
+  }
 }
 
 function clampNumber(value, min, max) {
@@ -5458,6 +5677,60 @@ async function runDealProgressionTracker(dryRun = false) {
   return { interested: rows.length, stale: nudgeCandidates.length, queued };
 }
 
+/**
+ * Generate an LLM-powered personalized nudge message for a stale B2B deal.
+ * Called by runDealProgressionTracker for prospects who expressed interest but went quiet.
+ * Returns { subject, body } or null on failure.
+ */
+async function generateLLMDealNudge(params) {
+  const { firstName, businessName, email, prospectType, ageDays, previousInteraction, notes } = params;
+  const FALLBACK_SYSTEM = "You are writing a follow-up nudge for a B2B prospect who previously expressed interest but hasn't responded. Write a natural, conversational email from Benjamin (founder of USA Gummies). Reference their specific context. Keep it under 100 words. Don't be pushy.";
+
+  try {
+    const versionedPrompt = await loadVersionedPrompt("b2b_deal_nudge");
+    const systemPrompt = versionedPrompt || FALLBACK_SYSTEM;
+
+    const userMessage = `Write a follow-up nudge email for this prospect:
+
+First Name: ${firstName || "there"}
+Business: ${businessName || "Unknown"}
+Email: ${email || ""}
+Type: ${prospectType || "B2B"}
+Days since last interaction: ${ageDays || "unknown"}
+Previous interaction: ${previousInteraction || "Expressed interest"}
+Notes: ${notes || "None"}
+
+Output JSON with this exact structure:
+{
+  "subject": "short, natural email subject line",
+  "body": "email body text under 100 words, conversational tone, from Benjamin"
+}`;
+
+    const raw = await callLLM({
+      system: systemPrompt,
+      user: userMessage,
+      temperature: 0.5,
+      maxTokens: 1024,
+    });
+
+    if (!raw) return null;
+
+    const parsed = parseLLMJson(raw);
+    if (!parsed || !parsed.subject || !parsed.body) {
+      console.warn("[generateLLMDealNudge] Could not parse LLM response");
+      return null;
+    }
+
+    return {
+      subject: String(parsed.subject),
+      body: String(parsed.body),
+    };
+  } catch (err) {
+    console.error("[generateLLMDealNudge] Error:", err.message || err);
+    return null;
+  }
+}
+
 async function runPricingQuoteGenerator(dryRun = false) {
   const b2bRows = await queryDatabaseAll(IDS.b2bProspects, {
     and: [
@@ -5691,6 +5964,97 @@ async function runWinLossAnalyzer() {
   });
 
   return { b2bLosses: lostB2B.length, distLosses: lostDist.length, topStates, topTypes };
+}
+
+/**
+ * Generate LLM-powered win/loss insights from B2B and distributor loss data.
+ * Called by runWinLossAnalyzer with aggregated loss patterns.
+ * Returns { insights_narrative, top_loss_reasons, recommendations, segments_to_avoid } or null on failure.
+ */
+async function generateLLMWinLossInsights(data) {
+  const { lostB2B, lostDist, stateCount, typeCount, bounceCount, notInterestedCount, period } = data;
+  const FALLBACK_SYSTEM = "You are a B2B sales analyst. Analyze these win/loss patterns and provide: (1) primary loss reasons by segment, (2) geographic patterns worth noting, (3) business type patterns, (4) specific tactical recommendations to reduce losses. Be data-driven and specific.";
+
+  try {
+    const versionedPrompt = await loadVersionedPrompt("b2b_win_loss_analyzer");
+    const systemPrompt = versionedPrompt || FALLBACK_SYSTEM;
+
+    const summary = {
+      period,
+      b2b_losses: lostB2B.length,
+      distributor_losses: lostDist.length,
+      bounce_count: bounceCount,
+      not_interested_count: notInterestedCount,
+      top_states: Object.entries(stateCount || {}).sort((a, b) => b[1] - a[1]).slice(0, 10),
+      top_business_types: Object.entries(typeCount || {}).sort((a, b) => b[1] - a[1]).slice(0, 10),
+      sample_b2b_losses: (lostB2B || []).slice(0, 15).map((r) => ({
+        business: r.properties?.["Business Name"]?.title?.[0]?.plain_text || "",
+        state: r.properties?.State?.select?.name || r.properties?.State?.rich_text?.[0]?.plain_text || "",
+        type: r.properties?.["Business Type"]?.select?.name || "",
+        status: r.properties?.Status?.select?.name || "",
+      })),
+      sample_dist_losses: (lostDist || []).slice(0, 15).map((r) => ({
+        business: r.properties?.["Business Name"]?.title?.[0]?.plain_text || "",
+        state: r.properties?.State?.select?.name || r.properties?.State?.rich_text?.[0]?.plain_text || "",
+        status: r.properties?.Status?.select?.name || "",
+      })),
+    };
+
+    const userMessage = `Analyze these B2B and distributor loss patterns:\n\n${JSON.stringify(summary, null, 2)}\n\nProvide your analysis as JSON with this exact structure:\n{\n  "insights_narrative": "string — 2-3 paragraph analysis with specific numbers and patterns",\n  "top_loss_reasons": ["reason1", "reason2", ...],\n  "recommendations": ["rec1", "rec2", ...],\n  "segments_to_avoid": ["segment1", "segment2", ...]\n}`;
+
+    const raw = await callLLM({
+      system: systemPrompt,
+      user: userMessage,
+      temperature: 0.3,
+      maxTokens: 1024,
+    });
+
+    if (!raw) return null;
+
+    const parsed = parseLLMJson(raw);
+    if (!parsed || !parsed.insights_narrative) {
+      console.warn("[generateLLMWinLossInsights] Could not parse LLM response");
+      return null;
+    }
+
+    return {
+      insights_narrative: String(parsed.insights_narrative),
+      top_loss_reasons: Array.isArray(parsed.top_loss_reasons) ? parsed.top_loss_reasons.map(String) : [],
+      recommendations: Array.isArray(parsed.recommendations) ? parsed.recommendations.map(String) : [],
+      segments_to_avoid: Array.isArray(parsed.segments_to_avoid) ? parsed.segments_to_avoid.map(String) : [],
+    };
+  } catch (err) {
+    console.error("[generateLLMWinLossInsights] Error:", err.message || err);
+    return null;
+  }
+}
+
+async function personalizeReengagementEmail({ firstName, businessName, prospectType, lastContactDate, previousOutcomeStatus, notes }) {
+  const FALLBACK_SYSTEM = `You are Benjamin Stutman, founder of USA Gummies. Write a re-engagement email to a prospect who previously wasn't interested. Reference their specific situation if known. Keep it warm, low-pressure, and under 120 words. Mention any new developments (expanded retail, America 250, dye ban momentum). Output JSON: {subject: string, body: string}`;
+  try {
+    const versionedPrompt = await loadVersionedPrompt("b2b_reengagement").catch(() => null);
+    const systemPrompt = versionedPrompt || FALLBACK_SYSTEM;
+    const userMessage = [
+      `Prospect: ${firstName || "there"} at ${businessName || "their business"}`,
+      prospectType ? `Prospect type: ${prospectType}` : null,
+      lastContactDate ? `Last contact: ${lastContactDate}` : null,
+      previousOutcomeStatus ? `Previous outcome: ${previousOutcomeStatus}` : null,
+      notes ? `Notes: ${notes}` : null,
+    ].filter(Boolean).join("\n");
+
+    const raw = await callLLM({
+      system: systemPrompt,
+      user: userMessage,
+      temperature: 0.5,
+      maxTokens: 800,
+    });
+    const parsed = parseLLMJson(raw);
+    if (parsed && parsed.subject && parsed.body) return parsed;
+    return null;
+  } catch (err) {
+    console.error(`[personalizeReengagementEmail] LLM failed for ${businessName}: ${err.message}`);
+    return null;
+  }
 }
 
 async function runReengagementCampaigner(dryRun = false) {
