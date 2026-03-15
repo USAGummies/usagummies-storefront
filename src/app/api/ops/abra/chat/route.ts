@@ -479,8 +479,8 @@ async function fetchFinancialContext(): Promise<string | null> {
  * This is the authoritative financial source, NOT brain memory entries.
  */
 async function fetchLedgerContext(message: string): Promise<string | null> {
-  // 5s timeout — Notion pagination over 400+ transactions can be slow
-  const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000));
+  // 3s timeout — Notion pagination is slow; KV cache handles repeat queries
+  const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000));
   return Promise.race([fetchLedgerContextInner(message), timeout]);
 }
 

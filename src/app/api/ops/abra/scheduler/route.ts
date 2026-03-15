@@ -10,6 +10,8 @@ import { sendMorningBrief, sendEndOfDaySummary } from "@/lib/ops/abra-morning-br
 import { runEmailFetch } from "@/lib/ops/abra-email-fetch";
 import { generateActionableEmailDrafts } from "@/lib/ops/abra-email-drafter";
 import { processFinancialBrainEntries } from "@/lib/ops/abra-financial-processor";
+import { queryLedgerSummary } from "@/lib/ops/abra-notion-write";
+import { kv } from "@vercel/kv";
 import { appendStateArray, readState, writeState } from "@/lib/ops/state";
 import { notify } from "@/lib/ops/notify";
 import {
@@ -228,6 +230,18 @@ export async function POST(req: Request) {
       processFinancialBrainEntries({ limit: 10 }),
     );
     outcomes.push(financialStep);
+
+    // Pre-warm ledger cache for financial queries (avoids Notion pagination in real-time chat)
+    const ledgerCacheStep = await runStep("ledger_cache", async () => {
+      const currentYear = new Date().getFullYear();
+      const years = [currentYear.toString(), (currentYear - 1).toString()];
+      for (const year of years) {
+        const ledger = await queryLedgerSummary({ fiscalYear: `FY${year}` });
+        await kv.set(`abra:ledger:FY${year}`, ledger, { ex: 3600 });
+      }
+      return { cached: years };
+    });
+    outcomes.push(ledgerCacheStep);
 
     const anomaliesStep = await runStep("anomalies", async () => {
       const anomalies = await detectAnomalies();
