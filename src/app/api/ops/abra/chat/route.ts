@@ -59,6 +59,7 @@ import {
 import { analyzePipeline } from "@/lib/ops/abra-pipeline-intelligence";
 import { queryLedgerSummary } from "@/lib/ops/abra-notion-write";
 import { EMAIL_EXTRACTION_SKILL } from "@/lib/ops/abra-skill-email-data-extraction";
+import { DEAL_CALCULATOR_SKILL, calculateDeal, type ChannelType } from "@/lib/ops/abra-skill-deal-calculator";
 import {
   buildConversationContext,
   saveMessage,
@@ -176,7 +177,7 @@ const COST_TRIGGERS =
 const PIPELINE_TRIGGERS =
   /\b(sales pipeline|pipeline health|pipeline status|b2b pipeline|b2b deals?|wholesale deals?|pipeline deals?|active deals?|deal(s| ) (status|details|breakdown)|show .+ pipeline|what deals|which deals|which companies .+ pipeline|who .+ in .+ pipeline|pipeline summary|deal pipeline|b2b prospects?|top .+ deals?|prospects? by .+ value|biggest deals?|largest deals?|deal value)\b/i;
 const STRATEGY_TRIGGERS =
-  /\b(strategy|strategic plan|financial plan|budget plan|amazon ad strategy|amazon ads strategy|ppc strategy|campaign strategy)\b/i;
+  /\b(create .+ strategy|develop .+ strategy|build .+ strategy|strategic plan|financial plan|budget plan|let'?s (plan|strategize)|design .+ plan)\b/i;
 const DIAGNOSTICS_TRIGGERS =
   /\b(diagnos|self.?check|what'?s broken|are you (working|ok|healthy)|system health|feed status|check yourself|run diagnostics)\b/i;
 
@@ -386,6 +387,12 @@ function isFinanceQuestion(message: string): boolean {
 
 function needsEmailExtractionSkill(message: string): boolean {
   return /\b(email|gmail|inbox|supplier|vendor|quote|invoice|freight|cogs|cost.*(per|unit|pound)|albanese|belmark|powers|dutch valley|bill thurner|greg kroetch|extract.*data|pull.*from.*email|find.*in.*email|check.*email|read.*email|production cost|packing fee|film cost)\b/i.test(
+    message,
+  );
+}
+
+function needsDealCalculatorSkill(message: string): boolean {
+  return /\b(deal|margin|pricing|wholesale price|price per unit|profit(ability)?|calculate.*deal|evaluate.*deal|should we take|quote.*price|how much.*make|unit economics|break.?even|channel.*comparison|faire.*margin|wholesale.*margin|distribution.*margin|negotiate.*price)\b/i.test(
     message,
   );
 }
@@ -1063,7 +1070,7 @@ MARGIN & COST CLAIM VERIFICATION (applies when user asserts financial metrics):
       model: selectedModel,
       max_tokens: maxTokens,
       temperature: 0.2,
-      system: `${actionInstructions}\n\n${systemPrompt}${needsEmailExtractionSkill(input.message) ? `\n\n${EMAIL_EXTRACTION_SKILL.prompt}` : ""}`,
+      system: `${actionInstructions}\n\n${systemPrompt}${needsEmailExtractionSkill(input.message) ? `\n\n${EMAIL_EXTRACTION_SKILL.prompt}` : ""}${needsDealCalculatorSkill(input.message) ? `\n\n${DEAL_CALCULATOR_SKILL.prompt}` : ""}`,
       messages: [{ role: "user", content: userPrompt }],
     }),
     signal: llmAbort.signal,
@@ -1932,11 +1939,44 @@ export async function POST(req: Request) {
       const parsedActions = parseActionDirectives(claudeResult.reply);
       baseReply = parsedActions.cleanReply || claudeResult.reply;
       // Separate read-only data actions from write actions — these auto-execute and feed results back
-      const READ_ONLY_ACTIONS = new Set(["read_email", "search_email", "query_ledger"]);
+      const READ_ONLY_ACTIONS = new Set(["read_email", "search_email", "query_ledger", "calculate_deal"]);
       const readOnlyResults: string[] = [];
 
       for (const directive of parsedActions.actions.slice(0, 3)) {
         try {
+          // Handle calculate_deal inline — pure computation, no side effects
+          if (directive.action.action_type === "calculate_deal") {
+            const p = (directive.action.params || directive.action) as Record<string, unknown>;
+            const channelMap: Record<string, ChannelType> = {
+              dtc: "dtc", shopify: "dtc", amazon: "amazon", fba: "amazon",
+              wholesale: "wholesale_direct", wholesale_direct: "wholesale_direct",
+              faire: "faire", broker: "wholesale_broker", wholesale_broker: "wholesale_broker",
+            };
+            const ch = channelMap[String(p.channel || "wholesale_direct").toLowerCase()] || "wholesale_direct";
+            const result = calculateDeal({
+              customerName: String(p.customer || p.customerName || "Unknown"),
+              channel: ch,
+              units: Number(p.units) || 100,
+              pricePerUnit: p.price_per_unit != null ? Number(p.price_per_unit) : undefined,
+            });
+            readOnlyResults.push(
+              `## Deal Calculator Result\n` +
+              `**Customer:** ${result.customerName} | **Channel:** ${result.channel}\n` +
+              `**Units:** ${result.units} @ $${result.pricePerUnit}/unit\n\n` +
+              `| Metric | Value |\n|--------|-------|\n` +
+              `| Gross Revenue | $${result.grossRevenue.toFixed(2)} |\n` +
+              `| Channel Fees | $${result.channelFees.toFixed(2)} |\n` +
+              `| Net Revenue | $${result.netRevenue.toFixed(2)} |\n` +
+              `| Total COGS | $${result.totalCogs.toFixed(2)} |\n` +
+              `| **Gross Profit** | **$${result.grossProfit.toFixed(2)}** |\n` +
+              `| **Margin** | **${result.grossMarginPct.toFixed(1)}%** |\n` +
+              `| Profit/Unit | $${result.contributionPerUnit.toFixed(2)} |\n\n` +
+              `**Recommendation:** ${result.recommendation}\n\n` +
+              `**Channel Comparison:**\n` +
+              result.comparison.map(c => `- ${c.channel}: ${c.marginPct.toFixed(1)}% margin, $${c.profitPerUnit.toFixed(2)}/unit`).join("\n")
+            );
+            continue;
+          }
           // Force read-only actions to low risk so auto-exec policies match
           if (READ_ONLY_ACTIONS.has(directive.action.action_type)) {
             directive.action.risk_level = "low";

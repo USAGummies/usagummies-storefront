@@ -1878,6 +1878,7 @@ export const KNOWN_ACTION_TYPES = new Set([
   "read_email",
   "search_email",
   "draft_email_reply",
+  "calculate_deal",
 ]);
 
 export function normalizeActionDirective(raw: unknown): AbraAction | null {

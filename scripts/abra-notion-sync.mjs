@@ -354,11 +354,35 @@ async function fetchPageContent(pageId, depth = 0, maxDepth = 2) {
 }
 
 // ---------------------------------------------------------------------------
+// Quality gate — reject scrape debris from prospect databases
+// ---------------------------------------------------------------------------
+
+const JUNK_PROSPECT_PATTERNS = [
+  /\.(com|org|edu|net|co|de|ie|nz|shop|ca|io)\s/i,  // "site.com Description"
+  /›/,                                                 // Google breadcrumb arrows
+  /&(amp|apos|quot|lt|gt|#x[0-9a-f]+);/i,            // HTML entities
+  /\b(healthline|tmz|usatoday|dictionary|wikipedia|yelp|tripadvisor|youtube|reddit|craigslist|indeed|zillow|pinterest|tiktok)\b/i,
+];
+
+function isJunkProspect(title, dbConfig) {
+  // Only filter prospect databases
+  if (!["B2B Prospects", "Distributor Prospects"].includes(dbConfig.name)) return false;
+  if (!title || title.length < 3) return true;                // Fragments
+  if (title.length > 100 && title.includes(" ")) return true; // Scraped search results (long + spaces)
+  return JUNK_PROSPECT_PATTERNS.some((re) => re.test(title));
+}
+
+// ---------------------------------------------------------------------------
 // Transform Notion page → open_brain_entries record
 // ---------------------------------------------------------------------------
 
 function notionPageToRecord(page, dbConfig, pageContent = "") {
   const title = getTitle(page);
+
+  // Skip junk prospect records
+  if (isJunkProspect(title, dbConfig)) {
+    return null; // caller should skip
+  }
   const pageId = page.id.replace(/-/g, "");
   const sourceRef = `notion:${dbConfig.id}:${pageId}`;
 
@@ -523,6 +547,10 @@ async function syncDatabase(dbKey, dbConfig, args) {
       }
 
       const record = notionPageToRecord(page, dbConfig, pageContent);
+      if (!record) {
+        skipped++;
+        continue; // Quality gate rejected this record
+      }
       const editTime = page.last_edited_time;
 
       // Track latest edit time for cursor
