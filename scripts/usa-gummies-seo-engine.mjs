@@ -325,6 +325,18 @@ async function runS1() {
   opportunities.sort((a, b) => b.gapScore - a.gapScore);
   keywordCache.lastScan = todayET();
   keywordCache.topOpportunities = opportunities.slice(0, 10);
+
+  // LLM-powered analysis for deeper keyword insights
+  const llmAnalysis = await analyzeSEOKeywordsWithLLM({
+    organicPages: organicPages.slice(0, 20),
+    opportunities: opportunities.slice(0, 15),
+    existingPosts: blogPosts.slice(0, 30).map((p) => ({ slug: p.slug, title: p.title })),
+  });
+  if (llmAnalysis) {
+    keywordCache.llmAnalysis = llmAnalysis;
+    keywordCache.llmAnalysisDate = todayET();
+  }
+
   safeJsonWrite(KEYWORD_CACHE_FILE, keywordCache);
 
   // Write top opportunities to Notion
@@ -398,15 +410,17 @@ async function runS2() {
     // Cache check — don't re-analyze within 7 days
     if (serpCache[kw] && daysSince(serpCache[kw].lastChecked) < 7) continue;
 
-    // Note: In production this would use a SERP API or web search
-    // For now, we record the analysis recommendation
+    // Generate LLM-powered content brief for this keyword gap
+    const llmBrief = await generateSEOContentBrief(kw, serpCache[kw] || {});
+
     serpCache[kw] = {
       keyword: kw,
       lastChecked: todayET(),
-      recommendation: `Write a comprehensive post targeting "${kw}". Include: definition, health implications, alternatives, USA Gummies positioning.`,
-      suggestedTitle: `${kw.split(" ").map((w) => w[0].toUpperCase() + w.slice(1)).join(" ")}: What You Need to Know`,
+      recommendation: llmBrief?.cta_strategy || `Write a comprehensive post targeting "${kw}". Include: definition, health implications, alternatives, USA Gummies positioning.`,
+      suggestedTitle: llmBrief?.titles?.[0] || `${kw.split(" ").map((w) => w[0].toUpperCase() + w.slice(1)).join(" ")}: What You Need to Know`,
       suggestedSlug: kw.replace(/\s+/g, "-").toLowerCase(),
       priority: opp.gapScore > 80 ? "High" : "Medium",
+      llmBrief: llmBrief || null,
     };
     analyzed++;
     log(`S2 — Analyzed gap: "${kw}" (score: ${opp.gapScore})`);

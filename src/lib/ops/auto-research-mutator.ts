@@ -596,7 +596,7 @@ export async function generateMutation(params: {
   }
 
   // 4. Generate mutation via Claude
-  const model = await getPreferredClaudeModel("claude-sonnet-4-20250514");
+  const model = await getPreferredClaudeModel("claude-sonnet-4-6");
   const mutationPrompt = buildMutationPrompt({
     targetKey: target_key,
     currentPrompt: activeVersion.prompt_text,

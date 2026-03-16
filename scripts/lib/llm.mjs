@@ -23,7 +23,7 @@
  *   });
  */
 
-const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514";
+const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
 
@@ -172,10 +172,11 @@ async function logCost(model, inputTokens, outputTokens) {
 
   // Approximate pricing per million tokens
   const pricing = {
+    "claude-sonnet-4-6": { input: 3.0, output: 15.0 },
     "claude-sonnet-4-20250514": { input: 3.0, output: 15.0 },
     "claude-3-5-haiku-latest": { input: 0.8, output: 4.0 },
   };
-  const p = pricing[model] || pricing["claude-sonnet-4-20250514"];
+  const p = pricing[model] || pricing["claude-sonnet-4-6"];
   const cost =
     (inputTokens / 1_000_000) * p.input +
     (outputTokens / 1_000_000) * p.output;

@@ -524,8 +524,21 @@ async function runD2() {
     const tpl = EMAIL_TEMPLATES[action.template];
     if (!tpl) continue;
 
-    const subject = renderTemplate(tpl.subject, vars);
-    const body = renderTemplate(tpl.body, vars);
+    // Try LLM personalization, fall back to template
+    let subject = renderTemplate(tpl.subject, vars);
+    let body = renderTemplate(tpl.body, vars);
+    const llmEmail = await personalizePostPurchaseEmail({
+      firstName: fn,
+      products: customer.products || [],
+      orderTotal: customer.orderTotal,
+      stage: action.stage.toLowerCase().replace(" ", "_"),
+      loyaltyTier: customer.loyaltyTier || "new",
+      source: customer.source || "shopify",
+    });
+    if (llmEmail && llmEmail.subject && llmEmail.body) {
+      subject = llmEmail.subject;
+      body = llmEmail.body;
+    }
 
     if (DRY_RUN) {
       log(`D2 [DRY] Would send ${action.type} to ${email} (${fn})`);

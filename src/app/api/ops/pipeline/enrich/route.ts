@@ -23,7 +23,7 @@ export const maxDuration = 30;
 const EMBEDDING_MODEL = "text-embedding-3-small";
 const EMBEDDING_DIMENSIONS = 1536;
 const DEFAULT_CLAUDE_MODEL =
-  process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514";
+  process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
 
 type DealInput = {
   id: string;

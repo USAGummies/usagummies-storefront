@@ -73,7 +73,7 @@ export const maxDuration = 60;
 
 const DEFAULT_MATCH_COUNT = 8;
 const DEFAULT_CLAUDE_MODEL =
-  process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514";
+  process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
 const MAX_MESSAGE_LENGTH = 4000;
 
 type ChatMessage = {
@@ -1261,7 +1261,7 @@ export async function POST(req: Request) {
             method: "POST",
             headers: { "x-api-key": anthropicKey, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
             body: JSON.stringify({
-              model: "claude-sonnet-4-20250514",
+              model: "claude-sonnet-4-6",
               max_tokens: 400,
               temperature: 0.2,
               messages: [{ role: "user", content: costPrompt }],
@@ -1279,7 +1279,7 @@ export async function POST(req: Request) {
               void logAICost?.({
                 endpoint: "abra-chat-cost",
                 provider: "anthropic",
-                model: "claude-sonnet-4-20250514",
+                model: "claude-sonnet-4-6",
                 inputTokens: llmData.usage?.input_tokens || 0,
                 outputTokens: llmData.usage?.output_tokens || 0,
               }).catch(() => {});
@@ -1368,7 +1368,7 @@ export async function POST(req: Request) {
             method: "POST",
             headers: { "x-api-key": anthropicKey, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
             body: JSON.stringify({
-              model: "claude-sonnet-4-20250514",
+              model: "claude-sonnet-4-6",
               max_tokens: 600,
               temperature: 0.2,
               messages: [{ role: "user", content: pipelinePrompt }],
@@ -1386,7 +1386,7 @@ export async function POST(req: Request) {
               void logAICost?.({
                 endpoint: "abra-chat-pipeline",
                 provider: "anthropic",
-                model: "claude-sonnet-4-20250514",
+                model: "claude-sonnet-4-6",
                 inputTokens: llmData.usage?.input_tokens || 0,
                 outputTokens: llmData.usage?.output_tokens || 0,
               }).catch(() => {});

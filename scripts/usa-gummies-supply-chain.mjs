@@ -389,8 +389,8 @@ async function generateDemandForecast(data) {
 
   try {
     const raw = await callLLM({
-      systemPrompt,
-      userMessage,
+      system: systemPrompt || fallbackSystemPrompt,
+      user: userMessage,
       temperature: 0.2,
       maxTokens: 1200,
     });
@@ -436,16 +436,25 @@ async function runSC3() {
 
   safeJsonWrite(INVENTORY_SNAPSHOT_FILE, { ...safeJsonRead(INVENTORY_SNAPSHOT_FILE, {}), skus: snapshot.skus });
 
+  // Generate LLM demand forecast for enhanced reorder insights
+  const llmForecast = await generateDemandForecast({
+    skuVelocity: velocity.skus,
+    inventorySnapshot: snapshot.skus,
+    seasonalFactors: { america250: true, month: new Date().getMonth() + 1 },
+  });
+
   // Alert Ben for critical reorder points
   if (alerts.length > 0 && !DRY_RUN) {
     const msg = alerts.slice(0, 5).map((a) =>
       `🔄 ${a.product}: ${a.currentStock} left, reorder point ${a.reorderPoint}, ~${a.daysUntilStockout} days to stockout`
     ).join("\n");
-    textBen(`📋 Reorder Alerts — ${todayLongET()}\n\n${msg}`);
+    const llmNote = llmForecast?.overall_risk ? `\n\nAI Risk Assessment: ${llmForecast.overall_risk}` : "";
+    const seasonalNote = llmForecast?.seasonal_notes ? `\nSeasonal: ${llmForecast.seasonal_notes}` : "";
+    textBen(`📋 Reorder Alerts — ${todayLongET()}\n\n${msg}${llmNote}${seasonalNote}`);
   }
 
   log(`SC3 — Done: ${alerts.length} SKUs at/below reorder point`);
-  return engine.succeed("SC3", { alerts: alerts.length });
+  return engine.succeed("SC3", { alerts: alerts.length, llmForecast: !!llmForecast });
 }
 
 // ── SC4: Production Scheduler ────────────────────────────────────────────────

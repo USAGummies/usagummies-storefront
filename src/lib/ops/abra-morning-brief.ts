@@ -465,7 +465,7 @@ export async function generateMorningBrief(): Promise<string> {
     const [spend, preferredModel] = await Promise.all([
       getMonthlySpend(),
       getPreferredClaudeModel(
-        process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514",
+        process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6",
       ),
     ]);
     lines.push("🤖 *AI Budget*");
@@ -531,7 +531,7 @@ Rules:
 
   try {
     const model = await getPreferredClaudeModel(
-      process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514",
+      process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6",
     );
 
     const res = await fetch("https://api.anthropic.com/v1/messages", {

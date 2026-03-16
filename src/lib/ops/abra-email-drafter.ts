@@ -211,7 +211,7 @@ async function draftReplyForEmail(email: EmailRow): Promise<{
 
   // 3. Call Claude to draft the reply (with VIP context if available)
   const vip = getVipSender(email.sender_email);
-  const model = await getPreferredClaudeModel("claude-sonnet-4-20250514");
+  const model = await getPreferredClaudeModel("claude-sonnet-4-6");
   const prompt = await buildDraftingPrompt({
     senderName,
     senderEmail: email.sender_email,

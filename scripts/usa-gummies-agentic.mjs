@@ -3133,13 +3133,25 @@ async function runB2BEmailSender(limit = 25, dryRun = false) {
     const contactName = getPlainText(getPropByName(freshRow, "Contact Name"));
     const business = getPlainText(getPropByName(freshRow, "Business Name"));
     const firstName = getFirstName(contactName);
+    const businessType = freshRow.properties?.["Business Type"]?.select?.name || "";
+    const state = getPlainText(getPropByName(freshRow, "State"));
+    const city = getPlainText(getPropByName(freshRow, "City"));
 
-    const subject = TEMPLATE_LIBRARY.b2bInitial.subject;
+    // Try LLM personalization, fall back to template
+    let subject = TEMPLATE_LIBRARY.b2bInitial.subject;
     let body = renderTemplate(TEMPLATE_LIBRARY.b2bInitial.body, {
       "First Name": firstName,
       "Business Name": business,
     });
-    if (!contactName) body = body.replace("Hi there,", "Hi there,");
+    const llmEmail = await personalizeOutreachEmail({
+      firstName, businessName: business, businessType, state, city,
+      notes: notesNow?.slice(0, 300), prospectType: "B2B", templateKey: "b2bInitial",
+    });
+    if (llmEmail) {
+      subject = llmEmail.subject;
+      body = llmEmail.body;
+    }
+    if (!contactName && !llmEmail) body = body.replace("Hi there,", "Hi there,");
 
     if (!dryRun) {
       const intentNote = buildSendIntentNote(notesNow, email, subject);
@@ -4279,8 +4291,18 @@ async function runFollowUpAgent(dryRun = false) {
     const contactName = getPlainText(getPropByName(row, "Contact Name"));
     const firstName = getFirstName(contactName);
     const company = getPlainText(getPropByName(row, "Business Name", "Company Name"));
-    const draftSubject = TEMPLATE_LIBRARY.b2bFollowUp.subject;
-    const draftBody = renderTemplate(TEMPLATE_LIBRARY.b2bFollowUp.body, { "First Name": firstName });
+
+    // Try LLM personalization for follow-up
+    let draftSubject = TEMPLATE_LIBRARY.b2bFollowUp.subject;
+    let draftBody = renderTemplate(TEMPLATE_LIBRARY.b2bFollowUp.body, { "First Name": firstName });
+    const llmFollowUp = await personalizeOutreachEmail({
+      firstName, businessName: company, prospectType: "B2B", templateKey: "b2bFollowUp",
+      notes: (getPlainText(getPropByName(row, "Notes")) || "").slice(0, 300),
+    });
+    if (llmFollowUp) {
+      draftSubject = llmFollowUp.subject;
+      draftBody = llmFollowUp.body;
+    }
 
     if (dryRun) {
       queuedB2B += 1;
@@ -4315,8 +4337,18 @@ async function runFollowUpAgent(dryRun = false) {
     const contactName = getPlainText(getPropByName(row, "Contact Name", "Primary Contact Name"));
     const firstName = getFirstName(contactName);
     const company = getPlainText(getPropByName(row, "Company Name"));
-    const draftSubject = TEMPLATE_LIBRARY.distributorFollowUp.subject;
-    const draftBody = renderTemplate(TEMPLATE_LIBRARY.distributorFollowUp.body, { "First Name": firstName });
+
+    // Try LLM personalization for distributor follow-up
+    let draftSubject = TEMPLATE_LIBRARY.distributorFollowUp.subject;
+    let draftBody = renderTemplate(TEMPLATE_LIBRARY.distributorFollowUp.body, { "First Name": firstName });
+    const llmFollowUp = await personalizeOutreachEmail({
+      firstName, businessName: company, prospectType: "Distributor", templateKey: "distributorFollowUp",
+      notes: (getPlainText(getPropByName(row, "Notes")) || "").slice(0, 300),
+    });
+    if (llmFollowUp) {
+      draftSubject = llmFollowUp.subject;
+      draftBody = llmFollowUp.body;
+    }
 
     if (dryRun) {
       queuedDist += 1;
@@ -4425,6 +4457,7 @@ Classify the incoming email into exactly ONE category:
 - FAIRE_ORDER: Related to a Faire.com wholesale order.
 - QUESTION: The sender has a specific question but hasn't expressed clear interest or disinterest.
 - UNSUBSCRIBE: Explicit request to be removed from the mailing list.
+- ABRA_COMMAND: The sender explicitly addresses "Abra" in the email body and asks Abra to do something (e.g. "Hey Abra, can you...", "Abra, please update...", "Dear Abra"). The email contains a task or instruction directed at the AI assistant.
 - OTHER: Anything that doesn't fit the above categories.
 
 Also assess:
@@ -4432,6 +4465,8 @@ Also assess:
 - urgency: "high" (needs response today), "medium" (within a few days), or "low" (no rush)
 - key_topics: array of 1-4 short topic strings extracted from the email (e.g. ["pricing", "samples", "timeline"])
 - confidence: a number from 0.0 to 1.0 indicating your confidence in the classification
+- If category is ABRA_COMMAND, also include:
+  - abra_task: a clear, concise summary of what Abra is being asked to do (e.g. "separate the name column in the cash transactions Notion database")
 
 Respond with ONLY a JSON object, no other text:
 {"category": "...", "sentiment": "...", "urgency": "...", "key_topics": [...], "confidence": 0.0}`;
@@ -4467,7 +4502,7 @@ ${bodySnippet}`;
       return { category: fallbackCategory, sentiment: "neutral", urgency: "medium", key_topics: [], confidence: 0.5 };
     }
 
-    const validCategories = ["INTERESTED", "NOT_INTERESTED", "BOUNCE", "FAIRE_ORDER", "QUESTION", "UNSUBSCRIBE", "OTHER"];
+    const validCategories = ["INTERESTED", "NOT_INTERESTED", "BOUNCE", "FAIRE_ORDER", "QUESTION", "UNSUBSCRIBE", "ABRA_COMMAND", "OTHER"];
     const category = validCategories.includes(parsed.category) ? parsed.category : fallbackCategory;
     const validSentiments = ["positive", "neutral", "negative"];
     const sentiment = validSentiments.includes(parsed.sentiment) ? parsed.sentiment : "neutral";
@@ -4477,8 +4512,11 @@ ${bodySnippet}`;
     const confidence = typeof parsed.confidence === "number" && parsed.confidence >= 0 && parsed.confidence <= 1
       ? parsed.confidence
       : 0.7;
+    const abra_task = category === "ABRA_COMMAND" && typeof parsed.abra_task === "string"
+      ? parsed.abra_task
+      : null;
 
-    return { category, sentiment, urgency, key_topics, confidence };
+    return { category, sentiment, urgency, key_topics, confidence, abra_task };
   } catch (err) {
     console.error("[classifyReplyWithLLM] Error, falling back to rule-based:", err.message || err);
     return { category: fallbackCategory, sentiment: "neutral", urgency: "medium", key_topics: [], confidence: 0.5 };
@@ -4488,6 +4526,88 @@ ${bodySnippet}`;
 function extractSenderEmail(text) {
   const m = String(text || "").match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
   return m ? normalizeEmail(m[0]) : "";
+}
+
+function extractSenderName(fromField) {
+  const s = String(fromField || "").trim();
+  // "John Doe <john@example.com>" → "John Doe"
+  const nameMatch = s.match(/^([^<]+)</);
+  if (nameMatch) return nameMatch[1].trim().replace(/^"|"$/g, "");
+  // No angle brackets — might just be an email
+  return "";
+}
+
+/**
+ * Post an Abra command from an email to Slack for Ben's approval.
+ * When Ben approves, the command gets routed to the Abra chat API.
+ */
+async function postAbraCommandToSlack({ senderName, senderEmail, subject, task, emailId, bodySnippet }) {
+  const ABRA_COMMAND_CHANNEL = "C0ALS6W7VB4";
+  const botToken = process.env.SLACK_BOT_TOKEN;
+  if (!botToken) {
+    log(`[abra-command] No SLACK_BOT_TOKEN — command from ${senderName} not posted: ${task}`);
+    return;
+  }
+
+  // Write to Supabase command queue for the approval executor
+  const commandId = `cmd-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (supabaseUrl && serviceKey) {
+    try {
+      await fetch(`${supabaseUrl}/rest/v1/abra_email_commands`, {
+        method: "POST",
+        headers: {
+          apikey: serviceKey,
+          Authorization: `Bearer ${serviceKey}`,
+          "Content-Type": "application/json",
+          Prefer: "return=minimal",
+        },
+        body: JSON.stringify({
+          id: commandId,
+          status: "pending_approval",
+          sender_name: senderName,
+          sender_email: senderEmail,
+          subject,
+          task,
+          email_id: String(emailId || ""),
+          body_snippet: (bodySnippet || "").slice(0, 2000),
+        }),
+        signal: AbortSignal.timeout(10000),
+      });
+    } catch (err) {
+      log(`[abra-command] Supabase insert failed: ${err.message}`);
+    }
+  } else {
+    log(`[abra-command] No Supabase credentials — command ${commandId} not persisted`);
+  }
+
+  // Post to Slack via Bot Token + chat.postMessage (targets specific channel)
+  const slackText = `📨 *Abra Command Received*\n*From:* ${senderName} (${senderEmail})\n*Subject:* ${subject}\n*Task:* ${task}\n*Command ID:* \`${commandId}\`\n\n_Reply with:_ \`abra approve ${commandId}\` _or_ \`abra deny ${commandId}\``;
+
+  try {
+    const res = await fetch("https://slack.com/api/chat.postMessage", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${botToken}`,
+      },
+      body: JSON.stringify({
+        channel: ABRA_COMMAND_CHANNEL,
+        text: slackText,
+        mrkdwn: true,
+      }),
+      signal: AbortSignal.timeout(10000),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      log(`[abra-command] Slack API error: ${data.error}`);
+    } else {
+      log(`[abra-command] Posted to Slack channel ${ABRA_COMMAND_CHANNEL}: ${task} (from ${senderName})`);
+    }
+  } catch (err) {
+    log(`[abra-command] Slack post failed: ${err.message}`);
+  }
 }
 
 function extractBouncedRecipientEmail(text) {
@@ -4707,6 +4827,7 @@ async function runInboxMonitor(options = {}) {
   let fairOrders = 0;
   let other = 0;
   let attentionQueued = 0;
+  let abraCommands = 0;
   const errors = [];
 
   for (const env of envelopes) {
@@ -4723,15 +4844,36 @@ async function runInboxMonitor(options = {}) {
       continue;
     }
 
-    const category = classifyReply(env, body);
+    // LLM-powered classification with rule-based fallback
+    const llmResult = await classifyReplyWithLLM(env, body);
+    const category = llmResult.category;
     const senderEmail = extractSenderEmail(body) || extractSenderEmail(env.from);
     const bouncedRecipientEmail = category === "BOUNCE" ? extractBouncedRecipientEmail(body) : "";
     const lookupEmail = bouncedRecipientEmail || senderEmail;
-    const summary = `${env.subject} | ${category}`;
+    const sentimentTag = llmResult.sentiment && llmResult.sentiment !== "neutral" ? ` [${llmResult.sentiment}]` : "";
+    const urgencyTag = llmResult.urgency === "high" ? " ⚡" : "";
+    const topicsTag = llmResult.key_topics?.length ? ` (${llmResult.key_topics.join(", ")})` : "";
+    const summary = `${env.subject} | ${category}${sentimentTag}${urgencyTag}${topicsTag}`;
 
     if (senderEmail && isSystemMailbox(senderEmail) && category !== "BOUNCE") {
       systemFiltered += 1;
       processedIds.add(env.id);
+      continue;
+    }
+
+    // Handle ABRA_COMMAND — someone addressed Abra in their email
+    if (category === "ABRA_COMMAND" && llmResult.abra_task) {
+      const senderName = extractSenderName(env.from) || senderEmail || "Unknown";
+      await postAbraCommandToSlack({
+        senderName,
+        senderEmail: senderEmail || "",
+        subject: env.subject || "(no subject)",
+        task: llmResult.abra_task,
+        emailId: env.id,
+        bodySnippet: (body || "").slice(0, 500),
+      });
+      processedIds.add(env.id);
+      abraCommands += 1;
       continue;
     }
 
@@ -4846,7 +4988,7 @@ async function runInboxMonitor(options = {}) {
     emailsSent: 0,
     errors: errors.join(" | "),
     status,
-    notes: `Mode: ${backfill ? "backfill" : "standard"}; scanned: ${scanned}; matched_replies: ${processedProspectReplies}; unmatched: ${unmatched}; unmatched_bounces: ${unmatchedBounces}; system_filtered: ${systemFiltered}; interested: ${interested}; not interested: ${notInterested}; bounced: ${bounced}; fair orders: ${fairOrders}; other: ${other}; reply_attention_queued: ${attentionQueued}; replies are drafted only and never auto-sent.`,
+    notes: `Mode: ${backfill ? "backfill" : "standard"}; scanned: ${scanned}; matched_replies: ${processedProspectReplies}; unmatched: ${unmatched}; unmatched_bounces: ${unmatchedBounces}; system_filtered: ${systemFiltered}; interested: ${interested}; not interested: ${notInterested}; bounced: ${bounced}; fair orders: ${fairOrders}; other: ${other}; reply_attention_queued: ${attentionQueued}; abra_commands: ${abraCommands}; replies are drafted only and never auto-sent.`,
   });
 
   return {
@@ -5058,6 +5200,15 @@ async function runRevenueAttributionForecastAgent() {
   const projectedDistContracts30 = Math.round(projectedDistInterested30 * distCloseRateFromInterested);
 
   const title = `${todayLongET()} — Revenue Attribution Forecast`;
+
+  // Generate LLM narrative for the forecast
+  const llmForecast = await generateLLMForecastNarrative({
+    traction, leadsCultivatedToday, b2bSentToday, distSentToday, followUpsToday, repliesToday,
+    projectedB2BSends30, projectedB2BInterested30, projectedB2BOrders30,
+    projectedDistSends30, projectedDistInterested30, projectedDistContracts30,
+    b2bReplyRate, distReplyRate, b2bCloseRateFromInterested, distCloseRateFromInterested,
+  });
+
   const blocks = [
     blockHeading("Current Funnel Attribution"),
     blockParagraph(`B2B outreach base: ${traction.b2b.outreachBase}`),
@@ -5077,11 +5228,23 @@ async function runRevenueAttributionForecastAgent() {
     blockParagraph(`Distributor sends forecast (floor): ${projectedDistSends30}`),
     blockParagraph(`Distributor interested forecast: ${projectedDistInterested30}`),
     blockParagraph(`Distributor contracts forecast: ${projectedDistContracts30}`),
-    blockHeading("Assumptions"),
-    blockParagraph(`B2B reply rate assumption: ${(b2bReplyRate * 100).toFixed(1)}%; close-from-interested assumption: ${(b2bCloseRateFromInterested * 100).toFixed(1)}%`),
-    blockParagraph(`Distributor reply rate assumption: ${(distReplyRate * 100).toFixed(1)}%; close-from-interested assumption: ${(distCloseRateFromInterested * 100).toFixed(1)}%`),
-    blockParagraph("Forecast is floor-based and should improve as reply and close rates increase."),
   ];
+
+  if (llmForecast) {
+    blocks.push(blockHeading("AI Forecast Analysis"));
+    blocks.push(blockParagraph(llmForecast.narrative));
+    if (llmForecast.recommendations?.length) {
+      blocks.push(blockHeading("Recommendations"));
+      for (const rec of llmForecast.recommendations) blocks.push(blockParagraph(`• ${rec}`));
+    }
+  } else {
+    blocks.push(
+      blockHeading("Assumptions"),
+      blockParagraph(`B2B reply rate assumption: ${(b2bReplyRate * 100).toFixed(1)}%; close-from-interested assumption: ${(b2bCloseRateFromInterested * 100).toFixed(1)}%`),
+      blockParagraph(`Distributor reply rate assumption: ${(distReplyRate * 100).toFixed(1)}%; close-from-interested assumption: ${(distCloseRateFromInterested * 100).toFixed(1)}%`),
+      blockParagraph("Forecast is floor-based and should improve as reply and close rates increase."),
+    );
+  }
 
   await createPageInDb(IDS.dailyReports, buildProperties(IDS.dailyReports, { Name: title }), blocks);
   await logRun({
@@ -5635,13 +5798,25 @@ async function runDealProgressionTracker(dryRun = false) {
     const age = daysSince(replyDate);
     if (age < 2) continue; // not stale yet
     const isDistributor = !row.properties?.["Business Name"];
-    const name = getPlainText(row.properties?.["Contact Name"]) || getPlainText(row.properties?.["Business Name"]) || getPlainText(row.properties?.["Company Name"]) || "there";
+    const businessName = getPlainText(row.properties?.["Business Name"]) || getPlainText(row.properties?.["Company Name"]) || "";
+    const name = getPlainText(row.properties?.["Contact Name"]) || businessName || "there";
     const firstName = getFirstName(name);
+    const notes = getPlainText(row.properties?.Notes) || "";
     const templateKey = isDistributor ? "distributorNudge" : "b2bNudge";
     const template = TEMPLATE_LIBRARY[templateKey];
     if (!template) continue;
-    const subject = template.subject;
-    const body = renderTemplate(template.body, { "First Name": firstName, email: "marketing@usagummies.com", phone: "435-896-7765" });
+
+    // Try LLM personalization, fall back to template
+    let subject = template.subject;
+    let body = renderTemplate(template.body, { "First Name": firstName, email: "marketing@usagummies.com", phone: "435-896-7765" });
+    const llmNudge = await generateLLMDealNudge({
+      firstName, businessName, email, prospectType: isDistributor ? "Distributor" : "B2B",
+      ageDays: age, previousInteraction: "Expressed interest", notes: notes.slice(0, 300),
+    });
+    if (llmNudge) {
+      subject = llmNudge.subject;
+      body = llmNudge.body;
+    }
     nudgeCandidates.push({ row, email, firstName, subject, body, isDistributor, ageDays: age, pageId: row.id });
   }
 
@@ -5941,16 +6116,43 @@ async function runWinLossAnalyzer() {
   const topTypes = Object.entries(typeCount).sort((a, b) => b[1] - a[1]).slice(0, 5);
 
   const title = `${todayLongET()} — Win/Loss Analysis`;
+
+  // Generate LLM insights (falls back to basic if LLM unavailable)
+  const llmInsights = await generateLLMWinLossInsights({
+    lostB2B, lostDist, stateCount, typeCount, bounceCount, notInterestedCount,
+    period: `${sevenDaysAgo} to ${todayET()}`,
+  });
+
   const blocks = [
     blockHeading("Weekly Win/Loss Summary"),
     blockParagraph(`Period: ${sevenDaysAgo} to ${todayET()}`),
     blockParagraph(`B2B losses: ${lostB2B.length} (${notInterestedCount.b2b} not interested, ${bounceCount.b2b} bounced)`),
     blockParagraph(`Distributor losses: ${lostDist.length} (${notInterestedCount.dist} not interested, ${bounceCount.dist} bounced)`),
-    blockHeading("Loss Patterns — Top States"),
-    ...(topStates.length ? topStates.map(([s, c]) => blockParagraph(`${s}: ${c}`)) : [blockParagraph("No patterns detected.")]),
-    blockHeading("Loss Patterns — Top Business Types"),
-    ...(topTypes.length ? topTypes.map(([t, c]) => blockParagraph(`${t}: ${c}`)) : [blockParagraph("N/A")]),
   ];
+
+  if (llmInsights) {
+    blocks.push(blockHeading("AI Analysis"));
+    blocks.push(blockParagraph(llmInsights.insights_narrative));
+    if (llmInsights.top_loss_reasons?.length) {
+      blocks.push(blockHeading("Top Loss Reasons"));
+      for (const reason of llmInsights.top_loss_reasons) blocks.push(blockParagraph(`• ${reason}`));
+    }
+    if (llmInsights.recommendations?.length) {
+      blocks.push(blockHeading("Recommendations"));
+      for (const rec of llmInsights.recommendations) blocks.push(blockParagraph(`• ${rec}`));
+    }
+    if (llmInsights.segments_to_avoid?.length) {
+      blocks.push(blockHeading("Segments to Deprioritize"));
+      for (const seg of llmInsights.segments_to_avoid) blocks.push(blockParagraph(`• ${seg}`));
+    }
+  } else {
+    blocks.push(
+      blockHeading("Loss Patterns — Top States"),
+      ...(topStates.length ? topStates.map(([s, c]) => blockParagraph(`${s}: ${c}`)) : [blockParagraph("No patterns detected.")]),
+      blockHeading("Loss Patterns — Top Business Types"),
+      ...(topTypes.length ? topTypes.map(([t, c]) => blockParagraph(`${t}: ${c}`)) : [blockParagraph("N/A")]),
+    );
+  }
 
   await createPageInDb(IDS.dailyReports, buildProperties(IDS.dailyReports, { Name: title }), blocks);
 
@@ -6081,7 +6283,22 @@ async function runReengagementCampaigner(dryRun = false) {
   const MAX_DAILY = 5;
   for (const c of candidates.slice(0, MAX_DAILY)) {
     const template = TEMPLATE_LIBRARY.b2bReengagement;
-    const body = renderTemplate(template.body, { "First Name": c.firstName, email: "marketing@usagummies.com", phone: "435-896-7765" });
+    let subject = template.subject;
+    let body = renderTemplate(template.body, { "First Name": c.firstName, email: "marketing@usagummies.com", phone: "435-896-7765" });
+
+    // Try LLM personalization
+    const llmEmail = await personalizeReengagementEmail({
+      firstName: c.firstName,
+      businessName: getPlainText(c.row.properties?.["Business Name"]) || "",
+      prospectType: "B2B",
+      lastContactDate: c.row.properties?.["Date First Contacted"]?.date?.start || "",
+      previousOutcomeStatus: "Not Interested",
+      notes: (getPlainText(c.row.properties?.Notes) || "").slice(0, 300),
+    });
+    if (llmEmail) {
+      subject = llmEmail.subject;
+      body = llmEmail.body;
+    }
 
     if (dryRun) {
       log(`[A27 DRY-RUN] Would queue re-engagement for ${c.email}`);
@@ -6093,7 +6310,7 @@ async function runReengagementCampaigner(dryRun = false) {
       email: c.email,
       name: c.firstName,
       reason: `re-engagement: not-interested >60d ago (attempt ${c.reCount + 1}/2)`,
-      draftSubject: template.subject,
+      draftSubject: subject,
       draftBody: body,
       source: "agent27",
       queuedAt: nowETTimestamp(),

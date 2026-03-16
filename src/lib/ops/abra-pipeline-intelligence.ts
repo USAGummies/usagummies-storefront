@@ -531,7 +531,7 @@ Rules:
   try {
     const { getPreferredClaudeModel } = await import("@/lib/ops/abra-cost-tracker");
     const model = await getPreferredClaudeModel(
-      process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514",
+      process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6",
     );
 
     const dealsForAnalysis = [

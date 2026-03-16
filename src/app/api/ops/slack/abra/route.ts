@@ -1191,7 +1191,7 @@ async function callAbraChat(
   if (anthropicKey) {
     try {
       const claudeModel =
-        process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514";
+        process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
       const claudeRes = await fetchWithRetry(
         "https://api.anthropic.com/v1/messages",
         {
@@ -1373,6 +1373,137 @@ async function callAbraChat(
 }
 
 // ---------------------------------------------------------------------------
+// Email-to-Abra command approval
+// ---------------------------------------------------------------------------
+
+async function postToSlackResponse(responseUrl: string, text: string) {
+  if (!responseUrl) return;
+  await fetch(responseUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      response_type: "in_channel",
+      text,
+    }),
+    signal: AbortSignal.timeout(10000),
+  }).catch(() => {});
+}
+
+async function handleAbraCommandDecision(
+  commandId: string,
+  decision: "approved" | "denied",
+  responseUrl: string,
+) {
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceKey) {
+    await postToSlackResponse(responseUrl, `❌ Supabase not configured — cannot process commands.`);
+    return;
+  }
+
+  // Fetch the command from Supabase
+  const fetchRes = await fetch(
+    `${supabaseUrl}/rest/v1/abra_email_commands?id=eq.${encodeURIComponent(commandId)}&select=*&limit=1`,
+    {
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+        "Content-Type": "application/json",
+      },
+    },
+  );
+  if (!fetchRes.ok) {
+    await postToSlackResponse(responseUrl, `❌ Failed to fetch command ${commandId}.`);
+    return;
+  }
+  const rows = (await fetchRes.json()) as Array<{
+    id: string;
+    status: string;
+    task: string;
+    sender_name: string;
+    sender_email: string;
+    subject: string;
+    body_snippet?: string;
+  }>;
+  const entry = rows[0];
+  if (!entry) {
+    await postToSlackResponse(responseUrl, `❌ Command ${commandId} not found.`);
+    return;
+  }
+  if (entry.status !== "pending_approval") {
+    await postToSlackResponse(responseUrl, `⚠️ Command ${commandId} already ${entry.status}.`);
+    return;
+  }
+
+  // Update status in Supabase
+  const updateStatus = async (status: string, resultText?: string) => {
+    const body: Record<string, unknown> = { status, updated_at: new Date().toISOString() };
+    if (status !== "pending_approval") body.decided_at = new Date().toISOString();
+    if (resultText) body.result_text = resultText.slice(0, 5000);
+    await fetch(`${supabaseUrl}/rest/v1/abra_email_commands?id=eq.${encodeURIComponent(commandId)}`, {
+      method: "PATCH",
+      headers: {
+        apikey: serviceKey!,
+        Authorization: `Bearer ${serviceKey}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify(body),
+    }).catch(() => {});
+  };
+
+  if (decision === "denied") {
+    await updateStatus("denied");
+    await postToSlackResponse(responseUrl, `❌ Denied command from ${entry.sender_name}: ${entry.task}`);
+    return;
+  }
+
+  // Approved — execute via Abra chat API
+  await updateStatus("approved");
+  await postToSlackResponse(responseUrl, `✅ Approved. Executing: ${entry.task}`);
+
+  const host =
+    process.env.NEXTAUTH_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:4000");
+  const authToken = process.env.CRON_SECRET?.trim() || "";
+
+  try {
+    const chatRes = await fetch(`${host}/api/ops/abra/chat`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${authToken}`,
+      },
+      body: JSON.stringify({
+        message: `[EMAIL COMMAND from ${entry.sender_name} (${entry.sender_email})]\nSubject: ${entry.subject}\nTask: ${entry.task}\n\nPlease execute this task. Context from the email:\n${entry.body_snippet || "(no additional context)"}`,
+      }),
+      signal: AbortSignal.timeout(55000),
+    });
+
+    if (!chatRes.ok) {
+      const errText = await chatRes.text().catch(() => "");
+      await updateStatus("execution_failed", errText.slice(0, 500));
+      await postToSlackResponse(responseUrl, `❌ Abra execution failed (${chatRes.status}): ${errText.slice(0, 200)}`);
+      return;
+    }
+
+    const result = await chatRes.json() as { reply?: string; actions?: unknown[] };
+    await updateStatus("executed", result.reply);
+
+    const replySnippet = (result.reply || "").slice(0, 1500);
+    await postToSlackResponse(
+      responseUrl,
+      `✅ *Command executed for ${entry.sender_name}*\n*Task:* ${entry.task}\n\n${replySnippet}`,
+    );
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Unknown";
+    await updateStatus("execution_failed", msg);
+    await postToSlackResponse(responseUrl, `❌ Execution error: ${msg.slice(0, 200)}`);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // POST handler
 // ---------------------------------------------------------------------------
 export async function POST(req: Request) {
@@ -1405,6 +1536,8 @@ export async function POST(req: Request) {
         "• `/abra correct: X but actually Y` — Correct wrong info\n" +
         "• `/abra teach: [dept] content` — Teach Abra new knowledge\n" +
         "• `/abra initiative: <department> <goal>` — Create initiative\n" +
+        "• `/abra approve <cmd-id>` — Approve an email command\n" +
+        "• `/abra deny <cmd-id>` — Deny an email command\n" +
         "• `/abra refresh` — Refresh latest email + teaching feeds\n\n" +
         "Departments (20) grouped by operating pillar:\n" +
         DEPARTMENT_HELP_TEXT,
@@ -1429,6 +1562,29 @@ export async function POST(req: Request) {
   const costMatch = /^cost(?:\s+report)?$/i.test(trimmedText);
   const answerMatch = trimmedText.match(/^answer:\s*(.+)$/is);
   const searchMatch = trimmedText.match(/^search:\s*(.+)$/is);
+  const approveMatch = trimmedText.match(/^approve\s+(cmd-[\w-]+)$/i);
+  const denyMatch = trimmedText.match(/^deny\s+(cmd-[\w-]+)$/i);
+
+  // Handle approve/deny for email-to-Abra commands
+  if (approveMatch || denyMatch) {
+    const commandId = (approveMatch || denyMatch)?.[1] || "";
+    const decision = approveMatch ? "approved" : "denied";
+
+    // Respond immediately
+    after(async () => {
+      try {
+        await handleAbraCommandDecision(commandId, decision, responseUrl);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Unknown error";
+        await postToSlackResponse(responseUrl, `❌ Failed to process ${decision}: ${msg.slice(0, 200)}`);
+      }
+    });
+
+    return NextResponse.json({
+      response_type: "in_channel",
+      text: `Processing ${decision} for ${commandId}...`,
+    });
+  }
   const intent =
     answerMatch || searchMatch ? ({ type: "chat" } as const) : detectIntent(trimmedText);
   const inferredInitiativeText =

@@ -354,13 +354,22 @@ async function trackPerformance() {
   const totalPending = (state.mentionQueue || []).filter((m) => !m.responded).length;
   const totalResponded = (state.mentionQueue || []).filter((m) => m.responded).length;
 
+  // LLM engagement analysis for deeper insights
+  const allMentions = state.mentionQueue || [];
+  const llmInsights = allMentions.length > 0
+    ? await analyzeEngagementWithLLM(allMentions.slice(-50))
+    : null;
+  if (llmInsights) {
+    state.lastEngagementAnalysis = { ...llmInsights, date: today };
+  }
+
   state.lastRun.SOC3 = new Date().toISOString();
   saveState(state);
 
-  log(`SOC3 performance: responses today=${responsesTodayCount}, pending=${totalPending}, total responded=${totalResponded}`);
+  log(`SOC3 performance: responses today=${responsesTodayCount}, pending=${totalPending}, total responded=${totalResponded}${llmInsights ? `, llm_insights=yes` : ""}`);
   return {
     processed: 1,
-    notes: `responses_today=${responsesTodayCount} pending=${totalPending} responded=${totalResponded}`,
+    notes: `responses_today=${responsesTodayCount} pending=${totalPending} responded=${totalResponded}${llmInsights ? ` trending=${(llmInsights.trending_topics || []).join(",")}` : ""}`,
   };
 }
 
