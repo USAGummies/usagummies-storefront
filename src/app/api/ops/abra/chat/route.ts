@@ -66,7 +66,7 @@ import { getSystemHealth } from "@/lib/ops/abra-health-monitor";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 const DEFAULT_MATCH_COUNT = 8;
 const DEFAULT_CLAUDE_MODEL =
@@ -1178,7 +1178,7 @@ export async function POST(req: Request) {
 
   // Vercel Hobby plan kills functions at 60s — use AbortController to cancel
   // in-flight work at 45s so we have time to return a graceful response.
-  const DEADLINE_MS = 45_000;
+  const DEADLINE_MS = 50_000;
   const deadlineController = new AbortController();
   const deadlineTimer = setTimeout(() => deadlineController.abort(), DEADLINE_MS);
   const startMs = Date.now();
