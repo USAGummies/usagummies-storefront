@@ -196,7 +196,7 @@ async function processFinancialEntry(entry: BrainRow): Promise<{
   }
 
   // Call Claude to extract transactions
-  const model = await getPreferredClaudeModel("claude-sonnet-4-6-20260315");
+  const model = await getPreferredClaudeModel("claude-sonnet-4-20250514");
 
   // Try loading versioned prompt from auto-research, fall back to hardcoded
   let promptTemplate = EXTRACTION_PROMPT;

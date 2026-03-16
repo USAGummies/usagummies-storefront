@@ -70,7 +70,7 @@ export const maxDuration = 30;
 
 const DEFAULT_MATCH_COUNT = 8;
 const DEFAULT_CLAUDE_MODEL =
-  process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6-20260315";
+  process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514";
 const MAX_MESSAGE_LENGTH = 4000;
 
 type ChatMessage = {

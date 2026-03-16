@@ -29,7 +29,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 const DEFAULT_CLAUDE_MODEL =
-  process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6-20260315";
+  process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514";
 
 function getSupabaseEnv() {
   const baseUrl =

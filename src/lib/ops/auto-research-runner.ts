@@ -1080,7 +1080,7 @@ export async function runAutoResearchEval(params: {
   }
 
   // 4. Get model preferences
-  const genModel = await getPreferredClaudeModel("claude-sonnet-4-6-20260315");
+  const genModel = await getPreferredClaudeModel("claude-sonnet-4-20250514");
   const judgeModel = "claude-3-5-haiku-latest";
 
   const runResults: EvalRunResult["runs"] = [];

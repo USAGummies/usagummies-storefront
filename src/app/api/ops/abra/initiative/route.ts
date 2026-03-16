@@ -40,7 +40,7 @@ const VALID_STATUSES = new Set([
 ]);
 
 const DEFAULT_CLAUDE_MODEL =
-  process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6-20260315";
+  process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514";
 const ALL_DEPARTMENTS = Array.from(
   new Set(
     Object.values(OPERATING_PILLARS).flatMap((pillar) => pillar.departments),

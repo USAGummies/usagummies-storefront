@@ -64,7 +64,7 @@ type StrategyProfile = {
 };
 
 const DEFAULT_CLAUDE_MODEL =
-  process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6-20260315";
+  process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514";
 export type StrategyDepth = "quick" | "deep";
 
 type StrategyRuntimeBudget = {
