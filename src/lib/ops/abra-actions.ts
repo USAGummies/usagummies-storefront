@@ -592,6 +592,102 @@ function resolveNotionDb(key: string): string {
   return NOTION_DB_MAP[normalized] || "";
 }
 
+// ─── READ-ONLY NOTION QUERY (for tool_use) ─────────────────────────────
+export async function queryNotionDatabase(
+  databaseKey: string,
+  filterText?: string,
+): Promise<ActionResult> {
+  const dbId = resolveNotionDb(databaseKey);
+  if (!dbId) {
+    return { success: false, message: `Unknown database: "${databaseKey}". Available: ${Object.keys(NOTION_DB_MAP).join(", ")}` };
+  }
+
+  const notionToken = process.env.NOTION_API_KEY || process.env.NOTION_TOKEN || "";
+  if (!notionToken) {
+    return { success: false, message: "No Notion API key configured" };
+  }
+
+  try {
+    const body: Record<string, unknown> = { page_size: 20 };
+    if (filterText) {
+      body.filter = {
+        property: "Name",
+        title: { contains: filterText },
+      };
+    }
+
+    const res = await fetch(`https://api.notion.com/v1/databases/${dbId}/query`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${notionToken}`,
+        "Notion-Version": "2022-06-28",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(15000),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      return { success: false, message: `Notion query failed (${res.status}): ${errText.slice(0, 300)}` };
+    }
+
+    const data = await res.json();
+    const results = (data.results || []).slice(0, 20);
+
+    // Also get database schema
+    const schemaRes = await fetch(`https://api.notion.com/v1/databases/${dbId}`, {
+      headers: {
+        Authorization: `Bearer ${notionToken}`,
+        "Notion-Version": "2022-06-28",
+      },
+      signal: AbortSignal.timeout(10000),
+    });
+
+    let schema = "";
+    if (schemaRes.ok) {
+      const schemaData = await schemaRes.json();
+      const props = Object.entries(schemaData.properties || {}).map(
+        ([name, prop]: [string, unknown]) => `${name} (${(prop as { type: string }).type})`,
+      );
+      schema = `Database columns: ${props.join(", ")}`;
+    }
+
+    // Summarize results
+    const summaries = results.map((page: Record<string, unknown>) => {
+      const pageProps = (page.properties || {}) as Record<string, Record<string, unknown>>;
+      const titleProp = pageProps.Name || pageProps.Title ||
+        Object.values(pageProps).find((p) => p.type === "title");
+      const titleArr = titleProp?.title as Array<{ plain_text: string }> | undefined;
+      const title = titleArr?.[0]?.plain_text || "(untitled)";
+      const id = page.id;
+      return {
+        id,
+        title,
+        properties: Object.fromEntries(
+          Object.entries(pageProps).slice(0, 10).map(([k, v]) => {
+            if (v.type === "title") return [k, (v.title as Array<{ plain_text: string }>)?.[0]?.plain_text || ""];
+            if (v.type === "rich_text") return [k, (v.rich_text as Array<{ plain_text: string }>)?.[0]?.plain_text || ""];
+            if (v.type === "number") return [k, v.number];
+            if (v.type === "select") return [k, (v.select as { name: string } | null)?.name || ""];
+            if (v.type === "date") return [k, (v.date as { start: string } | null)?.start || ""];
+            if (v.type === "checkbox") return [k, v.checkbox];
+            return [k, `(${v.type})`];
+          }),
+        ),
+      };
+    });
+
+    return {
+      success: true,
+      message: `Found ${results.length} results in ${databaseKey}. ${schema}`,
+      data: { schema, results: summaries, total: data.results?.length || 0 },
+    };
+  } catch (err) {
+    return { success: false, message: `Query failed: ${err instanceof Error ? err.message : String(err)}` };
+  }
+}
+
 function notionUrlFromId(pageId: string): string {
   return `https://www.notion.so/${pageId.replace(/-/g, "")}`;
 }
@@ -2038,3 +2134,14 @@ ACTION EXECUTION TIERS:
 5. create_brain_entry — Make titles factual and specific. NEVER store unverified dollar figures.
 6. GENERAL: If unsure whether to emit an action, DON'T. Ask the user first.`;
 }
+
+// ─── NAMED EXPORTS FOR TOOL_USE (route.ts executeToolCall) ──────────────
+export {
+  handleUpdateNotion as execUpdateNotion,
+  handleCreateNotionPage as execCreateNotionPage,
+  handleSendSlack as execSendSlack,
+  handleCreateBrainEntry as execCreateBrainEntry,
+  handleQueryLedger as execQueryLedger,
+  handleSendEmail as execSendEmail,
+  handleCreateTask as execCreateTask,
+};

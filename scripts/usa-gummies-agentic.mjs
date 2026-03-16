@@ -4538,10 +4538,135 @@ function extractSenderName(fromField) {
 }
 
 /**
+ * Normalize an email subject for thread grouping — strip Re:/Fwd: prefixes, lowercase.
+ */
+function normalizeSubjectForThread(subject) {
+  return String(subject || "")
+    .replace(/^(re|fwd?|fw)\s*:\s*/gi, "")
+    .replace(/^(re|fwd?|fw)\s*:\s*/gi, "") // double pass for "Re: Fwd: ..."
+    .trim()
+    .toLowerCase();
+}
+
+/**
+ * Resolve an existing email thread or create a new one in Supabase.
+ * Groups by normalized subject + sender email (since IMAP doesn't provide Gmail thread IDs).
+ */
+async function resolveOrCreateThread({ gmailThreadId, senderEmail, senderName, subject }) {
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceKey) return null;
+
+  const headers = {
+    apikey: serviceKey,
+    Authorization: `Bearer ${serviceKey}`,
+    "Content-Type": "application/json",
+  };
+
+  const subjectNormalized = normalizeSubjectForThread(subject);
+
+  // Check for existing thread by gmail_thread_id first, then by subject+sender
+  const lookupQueries = [];
+  if (gmailThreadId) {
+    lookupQueries.push(
+      `gmail_thread_id=eq.${encodeURIComponent(gmailThreadId)}&select=id,message_count&limit=1`
+    );
+  }
+  if (subjectNormalized) {
+    lookupQueries.push(
+      `subject_normalized=eq.${encodeURIComponent(subjectNormalized)}&sender_email=eq.${encodeURIComponent(senderEmail)}&status=in.(active,waiting_reply)&order=last_message_at.desc&select=id,message_count&limit=1`
+    );
+  }
+
+  for (const query of lookupQueries) {
+    try {
+      const res = await fetch(
+        `${supabaseUrl}/rest/v1/abra_email_threads?${query}`,
+        { headers, signal: AbortSignal.timeout(5000) },
+      );
+      if (res.ok) {
+        const existing = await res.json();
+        if (existing.length > 0) {
+          const threadId = existing[0].id;
+          const newCount = (existing[0].message_count || 1) + 1;
+          await fetch(
+            `${supabaseUrl}/rest/v1/abra_email_threads?id=eq.${encodeURIComponent(threadId)}`,
+            {
+              method: "PATCH",
+              headers: { ...headers, Prefer: "return=minimal" },
+              body: JSON.stringify({
+                message_count: newCount,
+                last_message_at: new Date().toISOString(),
+                status: "active",
+                updated_at: new Date().toISOString(),
+              }),
+              signal: AbortSignal.timeout(5000),
+            },
+          );
+          log(`[abra-thread] Existing thread ${threadId} updated (${newCount} messages)`);
+          return threadId;
+        }
+      }
+    } catch (err) {
+      log(`[abra-thread] Thread lookup failed: ${err.message}`);
+    }
+  }
+
+  // Create new thread
+  const threadId = `thread-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  try {
+    const res = await fetch(`${supabaseUrl}/rest/v1/abra_email_threads`, {
+      method: "POST",
+      headers: { ...headers, Prefer: "return=minimal" },
+      body: JSON.stringify({
+        id: threadId,
+        gmail_thread_id: gmailThreadId || null,
+        sender_email: senderEmail,
+        sender_name: senderName,
+        subject,
+        subject_normalized: subjectNormalized,
+        status: "active",
+        message_count: 1,
+      }),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (res.ok) {
+      log(`[abra-thread] New thread created: ${threadId}`);
+      return threadId;
+    } else {
+      log(`[abra-thread] Thread creation returned ${res.status}`);
+    }
+  } catch (err) {
+    log(`[abra-thread] Thread creation failed: ${err.message}`);
+  }
+  return null;
+}
+
+/**
  * Post an Abra command from an email to Slack for Ben's approval.
  * When Ben approves, the command gets routed to the Abra chat API.
  */
-async function postAbraCommandToSlack({ senderName, senderEmail, subject, task, emailId, bodySnippet }) {
+async function triageEmail({ from, subject, snippet, emailId, labels }) {
+  const host = process.env.NEXTAUTH_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:4000");
+  const cronSecret = process.env.CRON_SECRET || "";
+
+  try {
+    await fetch(`${host}/api/ops/abra/triage`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${cronSecret}`,
+      },
+      body: JSON.stringify({ from, subject, snippet, emailId, labels }),
+      signal: AbortSignal.timeout(5000),
+    });
+    log(`[email-triage] Sent for triage: ${subject} from ${from}`);
+  } catch (err) {
+    log(`[email-triage] Triage call failed: ${err.message}`);
+  }
+}
+
+async function postAbraCommandToSlack({ senderName, senderEmail, subject, task, emailId, bodySnippet, gmailThreadId }) {
   const ABRA_COMMAND_CHANNEL = "C0ALS6W7VB4";
   const botToken = process.env.SLACK_BOT_TOKEN;
   if (!botToken) {
@@ -4574,6 +4699,14 @@ async function postAbraCommandToSlack({ senderName, senderEmail, subject, task, 
     }
   }
 
+  // Resolve or create email thread for multi-turn tracking
+  const threadId = await resolveOrCreateThread({
+    gmailThreadId: gmailThreadId || null,
+    senderEmail: senderEmail || "",
+    senderName: senderName || "",
+    subject: subject || "",
+  });
+
   // Write to Supabase command queue for the approval executor
   const commandId = `cmd-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   let dbInserted = false;
@@ -4596,6 +4729,8 @@ async function postAbraCommandToSlack({ senderName, senderEmail, subject, task, 
           task,
           email_id: String(emailId || ""),
           body_snippet: (bodySnippet || "").slice(0, 2000),
+          thread_id: threadId || null,
+          gmail_thread_id: gmailThreadId || null,
         }),
         signal: AbortSignal.timeout(10000),
       });
@@ -4617,7 +4752,8 @@ async function postAbraCommandToSlack({ senderName, senderEmail, subject, task, 
   }
 
   // Post to Slack via Bot Token + chat.postMessage (targets specific channel)
-  const slackText = `📨 *Abra Command Received*\n*From:* ${senderName} (${senderEmail})\n*Subject:* ${subject}\n*Task:* ${task}\n*Command ID:* \`${commandId}\`\n\n_Reply with:_ \`/abra approve ${commandId}\` _or_ \`/abra deny ${commandId}\``;
+  const threadTag = threadId ? `\n*Thread:* \`${threadId}\`` : "";
+  const slackText = `📨 *Abra Command Received*\n*From:* ${senderName} (${senderEmail})\n*Subject:* ${subject}\n*Task:* ${task}\n*Command ID:* \`${commandId}\`${threadTag}\n\n_Reply with:_ \`/abra approve ${commandId}\` _or_ \`/abra deny ${commandId}\``;
 
   try {
     const res = await fetch("https://slack.com/api/chat.postMessage", {
@@ -4641,6 +4777,37 @@ async function postAbraCommandToSlack({ senderName, senderEmail, subject, task, 
     }
   } catch (err) {
     log(`[abra-command] Slack post failed: ${err.message}`);
+  }
+
+  // Also notify via SMS if Twilio is configured
+  const twilioSid = process.env.TWILIO_ACCOUNT_SID;
+  const twilioToken = process.env.TWILIO_AUTH_TOKEN;
+  const twilioFrom = process.env.TWILIO_PHONE_NUMBER;
+  const ownerPhone = process.env.ABRA_OWNER_PHONE || "+14358967765";
+
+  if (twilioSid && twilioToken && twilioFrom) {
+    try {
+      const smsBody = `Abra Command from ${senderName}:\n${task.slice(0, 120)}\n\nReply: approve ${commandId}\nOr: deny ${commandId}`;
+      await fetch(
+        `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Basic ${Buffer.from(`${twilioSid}:${twilioToken}`).toString("base64")}`,
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: new URLSearchParams({
+            To: ownerPhone,
+            From: twilioFrom,
+            Body: smsBody,
+          }).toString(),
+          signal: AbortSignal.timeout(10000),
+        },
+      );
+      log(`[abra-command] SMS notification sent to ${ownerPhone}`);
+    } catch (err) {
+      log(`[abra-command] SMS notification failed: ${err.message}`);
+    }
   }
 }
 
@@ -4910,6 +5077,15 @@ async function runInboxMonitor(options = {}) {
       abraCommands += 1;
       continue;
     }
+
+    // Proactive triage — send every non-command, non-system email for Abra triage
+    triageEmail({
+      from: env.from || "",
+      subject: env.subject || "(no subject)",
+      snippet: (body || "").slice(0, 500),
+      emailId: env.id,
+      labels: [],
+    }).catch(() => {}); // fire-and-forget, don't block the loop
 
     if (lookupEmail) {
       const match = await findProspectByEmail(lookupEmail);

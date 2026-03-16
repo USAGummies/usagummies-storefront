@@ -52,7 +52,14 @@ import {
   proposeAndMaybeExecute,
   buildActionInstructions,
   stripActionBlocks,
+  execUpdateNotion,
+  execCreateNotionPage,
+  execSendSlack,
+  execCreateBrainEntry,
+  execQueryLedger,
+  queryNotionDatabase,
 } from "@/lib/ops/abra-actions";
+import type { ActionResult } from "@/lib/ops/abra-actions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -1403,6 +1410,8 @@ type EmailCommandRow = {
   draft_reply_subject?: string;
   draft_reply_body?: string;
   execution_summary?: string;
+  thread_id?: string;
+  gmail_thread_id?: string;
 };
 
 function sbHeaders() {
@@ -1485,7 +1494,192 @@ async function postToSlackChannel(channelId: string, text: string) {
   }).catch(() => {});
 }
 
+// ---------------------------------------------------------------------------
+// Thread context for multi-turn email conversations
+// ---------------------------------------------------------------------------
+async function fetchThreadContext(threadId: string): Promise<string> {
+  try {
+    const rows = (await fetch(
+      `${sbUrl()}/rest/v1/abra_email_commands?thread_id=eq.${encodeURIComponent(threadId)}&order=created_at.asc&select=task,execution_summary,sender_name,created_at&limit=10`,
+      { headers: sbHeaders(), signal: AbortSignal.timeout(10000) },
+    ).then((r) => r.json())) as Array<{
+      task: string;
+      execution_summary?: string;
+      sender_name: string;
+      created_at: string;
+    }>;
+
+    if (rows.length <= 1) return "";
+
+    return (
+      "\n\nPREVIOUS MESSAGES IN THIS THREAD:\n" +
+      rows
+        .slice(0, -1)
+        .map(
+          (r, i) =>
+            `[${i + 1}] ${r.sender_name}: ${r.task}${r.execution_summary ? `\n   Result: ${r.execution_summary}` : ""}`,
+        )
+        .join("\n")
+    );
+  } catch {
+    return "";
+  }
+}
+
+async function fetchEmailThreadHistory(threadId: string): Promise<string> {
+  try {
+    const rows = (await fetch(
+      `${sbUrl()}/rest/v1/abra_email_commands?thread_id=eq.${encodeURIComponent(threadId)}&order=created_at.asc&select=id,task,execution_summary,sender_name,status,created_at&limit=20`,
+      { headers: sbHeaders(), signal: AbortSignal.timeout(10000) },
+    ).then((r) => r.json())) as Array<{
+      id: string;
+      task: string;
+      execution_summary?: string;
+      sender_name: string;
+      status: string;
+      created_at: string;
+    }>;
+
+    if (rows.length === 0) return "No commands found in this thread.";
+
+    const lines = rows.map((r, i) => {
+      const statusEmoji =
+        r.status === "completed"
+          ? "\u2705"
+          : r.status === "denied"
+            ? "\u274c"
+            : r.status === "execution_failed"
+              ? "\u26a0\ufe0f"
+              : "\u23f3";
+      return (
+        `${statusEmoji} *[${i + 1}]* \`${r.id}\`\n` +
+        `   *From:* ${r.sender_name} | *Status:* ${r.status}\n` +
+        `   *Task:* ${r.task.slice(0, 200)}` +
+        (r.execution_summary
+          ? `\n   *Result:* ${r.execution_summary.slice(0, 300)}`
+          : "")
+      );
+    });
+
+    return lines.join("\n\n");
+  } catch {
+    return "Failed to fetch thread history.";
+  }
+}
+
 const ABRA_COMMAND_CHANNEL = "C0ALS6W7VB4"; // #abra-control
+
+// ---------------------------------------------------------------------------
+// Tool definitions for Claude tool_use (maps to abra-actions.ts handlers)
+// ---------------------------------------------------------------------------
+const ABRA_TOOLS = [
+  {
+    name: "query_notion_database",
+    description: "Query a Notion database to understand current structure and data. Use this BEFORE making changes.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        database_key: { type: "string", description: "Database key: meeting_notes, b2b_prospects, distributor_prospects, daily_performance, fleet_ops, inventory, sku_registry, cash_transactions, content_drafts, kpis" },
+        filter_text: { type: "string", description: "Optional text to filter results" },
+      },
+      required: ["database_key"],
+    },
+  },
+  {
+    name: "update_notion_page",
+    description: "Update an existing Notion page's properties or content",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        page_id: { type: "string", description: "32-char hex Notion page ID" },
+        properties: { type: "object", description: "Notion property updates" },
+        content: { type: "string", description: "New page content (replaces existing)" },
+      },
+      required: ["page_id"],
+    },
+  },
+  {
+    name: "create_notion_page",
+    description: "Create a new page in a Notion database",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        database: { type: "string", description: "Database key" },
+        title: { type: "string" },
+        properties: { type: "object" },
+        content: { type: "string" },
+      },
+      required: ["database", "title"],
+    },
+  },
+  {
+    name: "query_ledger",
+    description: "Query the financial ledger for transaction data",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        fiscal_year: { type: "string" },
+        category: { type: "string" },
+        account_code: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "send_slack_message",
+    description: "Send a message to a Slack channel (alerts, pipeline, or daily)",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        channel: { type: "string", enum: ["alerts", "pipeline", "daily"] },
+        message: { type: "string" },
+      },
+      required: ["message"],
+    },
+  },
+  {
+    name: "create_brain_entry",
+    description: "Store knowledge in Abra's brain for future reference",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        title: { type: "string" },
+        text: { type: "string" },
+        category: { type: "string" },
+        department: { type: "string" },
+      },
+      required: ["title", "text"],
+    },
+  },
+];
+
+async function executeToolCall(
+  toolName: string,
+  input: Record<string, unknown>,
+): Promise<ActionResult> {
+  try {
+    switch (toolName) {
+      case "query_notion_database":
+        return await queryNotionDatabase(
+          String(input.database_key || ""),
+          typeof input.filter_text === "string" ? input.filter_text : undefined,
+        );
+      case "update_notion_page":
+        return await execUpdateNotion(input);
+      case "create_notion_page":
+        return await execCreateNotionPage(input);
+      case "query_ledger":
+        return await execQueryLedger(input);
+      case "send_slack_message":
+        return await execSendSlack(input);
+      case "create_brain_entry":
+        return await execCreateBrainEntry(input);
+      default:
+        return { success: false, message: `Unknown tool: ${toolName}` };
+    }
+  } catch (err) {
+    return { success: false, message: `Tool error: ${err instanceof Error ? err.message : String(err)}` };
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Phase 1: Approve → Execute task via LLM → Draft reply → await send approval
@@ -1536,78 +1730,127 @@ async function handleAbraCommandDecision(
   }
 
   try {
-    // Call Claude directly — the task is already approved, no approval queue needed
-    const llmRes = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": anthropicKey,
-        "anthropic-version": "2023-06-01",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6",
-        max_tokens: 2048,
-        system: `You are Abra, the AI operations assistant for USA Gummies. Ben (the founder) has approved an email command from an external person.
+    // ── Tool_use loop: Claude can actually execute actions via tools ──
+    const systemPrompt = `You are Abra, the AI operations assistant for USA Gummies. Ben (the founder) has approved an email command from an external person.
 
-Your job:
-1. ANALYZE the task and write a clear summary of what was done (Ben or Abra may have already completed it) or what still needs to be done.
-2. DRAFT a professional reply email to the sender confirming the outcome.
+You have tools to query and modify Notion databases, send Slack messages, create tasks, and more. Use them to ACTUALLY EXECUTE the requested task.
 
-Context: You do not have direct access to Notion, databases, or external APIs in this call. Ben handles the actual execution. Your role is to summarize the work and draft the reply.
+WORKFLOW:
+1. First, use query_notion_database to understand the current state
+2. Then use the appropriate tool(s) to make the changes
+3. Finally, provide an execution_summary and draft_reply
 
-Respond in this exact JSON format:
+After completing all tool calls, respond with this JSON:
 {
-  "execution_summary": "What was done or needs to be done (1-3 sentences, be specific)",
+  "execution_summary": "What was actually done (reference specific changes made)",
   "draft_reply_subject": "Re: <original subject>",
-  "draft_reply_body": "The email body to send to the sender. Professional, friendly, concise. Sign off as Ben. Do NOT mention Abra or AI."
+  "draft_reply_body": "Email body to sender confirming what was done. Professional, friendly, concise. Sign off as Ben. Do NOT mention Abra or AI."
 }
 
-IMPORTANT: Respond ONLY with valid JSON. No markdown fences, no extra text. Never fabricate actions you did not take.`,
-        messages: [{
-          role: "user",
-          content: `Email command approved by Ben. Summarize and draft reply.
+IMPORTANT: Actually execute the task using tools. Do not just describe what should be done.`;
+
+    // Fetch conversation history if this command is part of a thread
+    const threadContext = entry.thread_id ? await fetchThreadContext(entry.thread_id) : "";
+
+    const messages: Array<{ role: string; content: unknown }> = [{
+      role: "user",
+      content: `Email command approved by Ben. Execute the task.
 
 FROM: ${entry.sender_name} (${entry.sender_email})
 SUBJECT: ${entry.subject}
 TASK: ${entry.task}
-EMAIL CONTEXT: ${entry.body_snippet || "(no additional context)"}
+EMAIL CONTEXT: ${entry.body_snippet || "(no additional context)"}${threadContext}`,
+    }];
 
-Ben has already handled or is handling the actual task execution. Write the summary and draft a reply to confirm completion.`,
-        }],
-      }),
-      signal: AbortSignal.timeout(30000),
-    });
+    const toolCallLog: string[] = [];
+    let finalResponse = "";
+    const MAX_TOOL_ROUNDS = 8;
 
-    if (!llmRes.ok) {
-      const errText = await llmRes.text().catch(() => "");
-      throw new Error(`LLM API ${llmRes.status}: ${errText.slice(0, 200)}`);
+    for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+      const llmRes = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "x-api-key": anthropicKey,
+          "anthropic-version": "2023-06-01",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6",
+          max_tokens: 4096,
+          system: systemPrompt,
+          tools: ABRA_TOOLS,
+          messages,
+        }),
+        signal: AbortSignal.timeout(45000),
+      });
+
+      if (!llmRes.ok) {
+        const errText = await llmRes.text().catch(() => "");
+        throw new Error(`LLM API ${llmRes.status}: ${errText.slice(0, 200)}`);
+      }
+
+      const llmData = await llmRes.json();
+      const content = llmData.content || [];
+
+      // Add assistant response to messages
+      messages.push({ role: "assistant", content });
+
+      // Check if there are tool_use blocks
+      const toolUses = content.filter((b: { type: string }) => b.type === "tool_use");
+      const textBlocks = content.filter((b: { type: string }) => b.type === "text");
+
+      if (toolUses.length === 0) {
+        // No tool calls — this is the final response
+        finalResponse = textBlocks.map((b: { text: string }) => b.text).join("\n");
+        break;
+      }
+
+      // Execute each tool call
+      const toolResults: Array<{ type: "tool_result"; tool_use_id: string; content: string }> = [];
+      for (const toolUse of toolUses) {
+        const result = await executeToolCall(toolUse.name, toolUse.input || {});
+        toolCallLog.push(`${toolUse.name}: ${result.success ? "✅" : "❌"} ${result.message.slice(0, 200)}`);
+        toolResults.push({
+          type: "tool_result",
+          tool_use_id: toolUse.id,
+          content: JSON.stringify(result),
+        });
+      }
+
+      // Add tool results to messages
+      messages.push({ role: "user", content: toolResults });
+
+      // If this was the last round and stop_reason is end_turn, capture text
+      if (llmData.stop_reason === "end_turn") {
+        finalResponse = textBlocks.map((b: { text: string }) => b.text).join("\n");
+        break;
+      }
     }
 
-    const llmData = (await llmRes.json()) as {
-      content: Array<{ type: string; text: string }>;
-    };
-    const rawText = llmData.content?.[0]?.text || "";
-
-    // Parse LLM response
+    // Parse the final response (should be JSON with execution_summary + draft)
     let parsed: { execution_summary: string; draft_reply_subject: string; draft_reply_body: string };
     try {
-      parsed = JSON.parse(rawText.trim());
+      parsed = JSON.parse(finalResponse.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim());
     } catch {
-      // If JSON parsing fails, use raw text as summary and generate simple reply
       parsed = {
-        execution_summary: rawText.slice(0, 1000),
+        execution_summary: finalResponse.slice(0, 1000) || toolCallLog.join("\n"),
         draft_reply_subject: `Re: ${entry.subject}`,
         draft_reply_body: `Hi ${entry.sender_name},\n\nYour request has been processed: ${entry.task}\n\nBest,\nBen`,
       };
     }
 
+    // Prepend tool execution log to summary
+    const fullSummary = toolCallLog.length > 0
+      ? `Tool actions:\n${toolCallLog.join("\n")}\n\nSummary: ${parsed.execution_summary}`
+      : parsed.execution_summary;
+
     // Store draft reply + execution summary, move to draft_reply_pending
     await updateCommand(commandId, {
       status: "draft_reply_pending",
-      execution_summary: (parsed.execution_summary || "").slice(0, 5000),
+      execution_summary: fullSummary.slice(0, 5000),
       draft_reply_subject: (parsed.draft_reply_subject || `Re: ${entry.subject}`).slice(0, 500),
       draft_reply_body: (parsed.draft_reply_body || "").slice(0, 10000),
-      result_text: (parsed.execution_summary || "").slice(0, 5000),
+      result_text: fullSummary.slice(0, 5000),
     });
 
     // Post to Slack: show what was done + draft reply for approval
@@ -1616,7 +1859,7 @@ Ben has already handled or is handling the actual task execution. Write the summ
       ABRA_COMMAND_CHANNEL,
       `✅ *Task executed for ${entry.sender_name}*\n` +
       `*Task:* ${entry.task}\n` +
-      `*What was done:* ${parsed.execution_summary}\n\n` +
+      `*What was done:* ${fullSummary.slice(0, 1000)}\n\n` +
       `📧 *Draft reply to ${entry.sender_email}:*\n` +
       `> *Subject:* ${parsed.draft_reply_subject}\n` +
       `> ${draftPreview.split("\n").join("\n> ")}\n\n` +
@@ -1701,6 +1944,18 @@ async function handleSendReply(commandId: string, responseUrl: string) {
       ABRA_COMMAND_CHANNEL,
       `📧 *Reply sent to ${entry.sender_name}* (${entry.sender_email})\n*Subject:* ${entry.draft_reply_subject}\n*Command:* ${commandId} — completed`,
     );
+
+    // Fire-and-forget: auto-evaluate the completed command
+    const evalHost = process.env.NEXTAUTH_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:4000");
+    fetch(`${evalHost}/api/ops/abra/eval-command`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.CRON_SECRET?.trim() || ""}`,
+      },
+      body: JSON.stringify({ commandId }),
+      signal: AbortSignal.timeout(5000),
+    }).catch(() => {});
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown";
     await updateCommand(commandId, { status: "execution_failed", result_text: `Send reply failed: ${msg}` });
@@ -1745,6 +2000,8 @@ export async function POST(req: Request) {
         "• `/abra deny <cmd-id>` — Deny an email command\n" +
         "• `/abra sendreply <cmd-id>` — Send the draft reply email\n" +
         "• `/abra commands` — List pending email commands\n" +
+        "• `/abra triage [N]` — Show recent email triage summary\n" +
+        "• `/abra thread <cmd-id|thread-id>` — Show email thread history\n" +
         "• `/abra refresh` — Refresh latest email + teaching feeds\n\n" +
         "Departments (20) grouped by operating pillar:\n" +
         DEPARTMENT_HELP_TEXT,
@@ -1772,7 +2029,254 @@ export async function POST(req: Request) {
   const approveMatch = trimmedText.match(/^approve\s+(cmd-[\w-]+)$/i);
   const denyMatch = trimmedText.match(/^deny\s+(cmd-[\w-]+)$/i);
   const sendReplyMatch = trimmedText.match(/^sendreply\s+(cmd-[\w-]+)$/i);
+  const threadMatch = trimmedText.match(/^thread\s+(cmd-[\w-]+|thread-[\w-]+)$/i);
   const commandsMatch = /^commands$/i.test(trimmedText);
+  const triageMatch = /^triage(?:\s+(\d+))?$/i.exec(trimmedText);
+  const rateMatch = trimmedText.match(/^rate\s+(cmd-[\w-]+)\s+([1-5])(?:\s+(.+))?$/i);
+  const scoresMatch = /^scores$/i.test(trimmedText);
+
+  // Handle /abra rate <cmd-id> <1-5> [feedback] — rate a command execution
+  if (rateMatch) {
+    const rateCommandId = rateMatch[1];
+    const humanRating = parseInt(rateMatch[2], 10);
+    const humanFeedback = rateMatch[3]?.trim() || null;
+    after(async () => {
+      try {
+        if (!sbUrl() || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+          await postToSlackResponse(responseUrl, `❌ Supabase not configured.`);
+          return;
+        }
+        // Check if eval already exists for this command
+        const existingRes = await fetch(
+          `${sbUrl()}/rest/v1/abra_command_evals?command_id=eq.${encodeURIComponent(rateCommandId)}&limit=1&select=id`,
+          { headers: sbHeaders(), signal: AbortSignal.timeout(10000) },
+        );
+        const existing = existingRes.ok ? await existingRes.json() : [];
+        if (existing.length > 0) {
+          // Update existing eval with human rating
+          await fetch(
+            `${sbUrl()}/rest/v1/abra_command_evals?id=eq.${encodeURIComponent(existing[0].id)}`,
+            {
+              method: "PATCH",
+              headers: { ...sbHeaders(), Prefer: "return=minimal" },
+              body: JSON.stringify({ human_rating: humanRating, human_feedback: humanFeedback }),
+              signal: AbortSignal.timeout(10000),
+            },
+          );
+        } else {
+          // Create new eval with just the human rating
+          await fetch(`${sbUrl()}/rest/v1/abra_command_evals`, {
+            method: "POST",
+            headers: { ...sbHeaders(), Prefer: "return=minimal" },
+            body: JSON.stringify({
+              command_id: rateCommandId,
+              human_rating: humanRating,
+              human_feedback: humanFeedback,
+            }),
+            signal: AbortSignal.timeout(10000),
+          });
+        }
+        const stars = "\u2605".repeat(humanRating) + "\u2606".repeat(5 - humanRating);
+        await postToSlackResponse(responseUrl, `\u2705 Rated ${rateCommandId}: ${stars}${humanFeedback ? `\nFeedback: ${humanFeedback}` : ""}`);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Unknown";
+        await postToSlackResponse(responseUrl, `\u274C Error rating command: ${msg.slice(0, 200)}`);
+      }
+    });
+    return NextResponse.json({ response_type: "ephemeral", text: `Rating ${rateCommandId}...` });
+  }
+
+  // Handle /abra scores — show eval summary
+  if (scoresMatch) {
+    after(async () => {
+      try {
+        if (!sbUrl() || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+          await postToSlackResponse(responseUrl, `\u274C Supabase not configured.`);
+          return;
+        }
+        const res = await fetch(
+          `${sbUrl()}/rest/v1/abra_command_evals?order=created_at.desc&limit=20&select=task_understanding,execution_quality,reply_quality,overall_score,human_rating,created_at`,
+          { headers: sbHeaders(), signal: AbortSignal.timeout(10000) },
+        );
+        if (!res.ok) {
+          await postToSlackResponse(responseUrl, `\u274C Failed to fetch evals.`);
+          return;
+        }
+        const evals = (await res.json()) as Array<{
+          task_understanding: number | null;
+          execution_quality: number | null;
+          reply_quality: number | null;
+          overall_score: number | null;
+          human_rating: number | null;
+          created_at: string;
+        }>;
+        if (evals.length === 0) {
+          await postToSlackResponse(responseUrl, `No command evaluations yet.`);
+          return;
+        }
+        const avg = (arr: number[]) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+        const taskScores = evals.filter((e) => e.task_understanding != null).map((e) => e.task_understanding!);
+        const execScores = evals.filter((e) => e.execution_quality != null).map((e) => e.execution_quality!);
+        const replyScores = evals.filter((e) => e.reply_quality != null).map((e) => e.reply_quality!);
+        const overallScores = evals.filter((e) => e.overall_score != null).map((e) => e.overall_score!);
+        const humanRatings = evals.filter((e) => e.human_rating != null).map((e) => e.human_rating!);
+
+        // Trend: compare first half vs second half
+        const half = Math.floor(overallScores.length / 2);
+        const recentHalf = overallScores.slice(0, half);
+        const olderHalf = overallScores.slice(half);
+        let trend = "\u2192 Stable";
+        if (recentHalf.length > 0 && olderHalf.length > 0) {
+          const diff = avg(recentHalf) - avg(olderHalf);
+          if (diff > 0.05) trend = "\uD83D\uDCC8 Improving";
+          else if (diff < -0.05) trend = "\uD83D\uDCC9 Declining";
+        }
+
+        const pct = (v: number) => `${(v * 100).toFixed(0)}%`;
+        const text =
+          `\uD83D\uDCCA *Abra Command Eval Scores* (last ${evals.length} evals)\n\n` +
+          `\u2022 *Task Understanding:* ${pct(avg(taskScores))} (${taskScores.length} scored)\n` +
+          `\u2022 *Execution Quality:* ${pct(avg(execScores))} (${execScores.length} scored)\n` +
+          `\u2022 *Reply Quality:* ${pct(avg(replyScores))} (${replyScores.length} scored)\n` +
+          `\u2022 *Overall:* ${pct(avg(overallScores))} (${overallScores.length} scored)\n` +
+          (humanRatings.length > 0 ? `\u2022 *Human Avg:* ${avg(humanRatings).toFixed(1)}/5 (${humanRatings.length} ratings)\n` : "") +
+          `\n*Trend:* ${trend}`;
+        await postToSlackResponse(responseUrl, text);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Unknown";
+        await postToSlackResponse(responseUrl, `\u274C Error fetching scores: ${msg.slice(0, 200)}`);
+      }
+    });
+    return NextResponse.json({ response_type: "ephemeral", text: "Fetching eval scores..." });
+  }
+
+  // Handle /abra triage [N] — show recent email triage summary
+  if (triageMatch) {
+    const triageLimit = Math.min(parseInt(triageMatch[1] || "20", 10), 50);
+    after(async () => {
+      try {
+        if (!sbUrl() || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+          await postToSlackResponse(responseUrl, `\u274c Supabase not configured \u2014 cannot fetch triage data.`);
+          return;
+        }
+        const triageRes = await fetch(
+          `${sbUrl()}/rest/v1/abra_email_triage?order=created_at.desc&limit=${triageLimit}&select=id,email_id,sender,subject,category,summary,suggested_action,auto_handled,created_at`,
+          { headers: sbHeaders(), signal: AbortSignal.timeout(10000) },
+        );
+        if (!triageRes.ok) {
+          await postToSlackResponse(responseUrl, `\u274c Failed to fetch triage data (${triageRes.status}).`);
+          return;
+        }
+        const triageRows = (await triageRes.json()) as Array<{
+          id: string;
+          email_id: string;
+          sender: string;
+          subject: string;
+          category: string;
+          summary: string;
+          suggested_action: string | null;
+          auto_handled: boolean;
+          created_at: string;
+        }>;
+        if (triageRows.length === 0) {
+          await postToSlackResponse(responseUrl, `No email triage results found.`);
+          return;
+        }
+
+        // Group by category
+        const grouped: Record<string, typeof triageRows> = {};
+        for (const r of triageRows) {
+          if (!grouped[r.category]) grouped[r.category] = [];
+          grouped[r.category].push(r);
+        }
+
+        const categoryEmojis: Record<string, string> = {
+          urgent: "\u{1F6A8}",
+          action_needed: "\u{1F4CB}",
+          informational: "\u{2139}\u{FE0F}",
+          routine: "\u{1F504}",
+          spam: "\u{1F6AB}",
+        };
+        const categoryOrder = ["urgent", "action_needed", "informational", "routine", "spam"];
+
+        let triageText = `*Email Triage Summary (last ${triageRows.length}):*\n`;
+        for (const cat of categoryOrder) {
+          const items = grouped[cat];
+          if (!items || items.length === 0) continue;
+          const emoji = categoryEmojis[cat] || "\u{1F4E7}";
+          triageText += `\n${emoji} *${cat.toUpperCase().replace("_", " ")}* (${items.length}):\n`;
+          for (const item of items.slice(0, 5)) {
+            const senderShort = item.sender.length > 40 ? item.sender.slice(0, 37) + "..." : item.sender;
+            triageText += `  \u2022 *${item.subject.slice(0, 60)}* \u2014 ${senderShort}\n    ${item.summary || "No summary"}\n`;
+            if (item.suggested_action) {
+              triageText += `    _Action: ${item.suggested_action}_\n`;
+            }
+          }
+          if (items.length > 5) {
+            triageText += `  _...and ${items.length - 5} more_\n`;
+          }
+        }
+
+        await postToSlackResponse(responseUrl, triageText);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Unknown";
+        await postToSlackResponse(responseUrl, `\u274c Error: ${msg.slice(0, 200)}`);
+      }
+    });
+    return NextResponse.json({ response_type: "ephemeral", text: "Fetching email triage summary..." });
+  }
+
+  // Handle /abra thread <id> — show conversation history for a thread
+  if (threadMatch) {
+    const lookupId = threadMatch[1];
+    after(async () => {
+      try {
+        if (!sbUrl() || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+          await postToSlackResponse(responseUrl, `\u274c Supabase not configured.`);
+          return;
+        }
+
+        let threadId = lookupId;
+
+        // If a cmd-id was given, resolve it to its thread_id
+        if (lookupId.startsWith("cmd-")) {
+          const cmd = await fetchCommand(lookupId);
+          if (!cmd) {
+            await postToSlackResponse(responseUrl, `\u274c Command ${lookupId} not found.`);
+            return;
+          }
+          if (!cmd.thread_id) {
+            await postToSlackResponse(
+              responseUrl,
+              `\u26a0\ufe0f Command ${lookupId} is not linked to a thread (pre-thread-tracking command).`,
+            );
+            return;
+          }
+          threadId = cmd.thread_id;
+        }
+
+        // Fetch thread metadata
+        const threadRes = await fetch(
+          `${sbUrl()}/rest/v1/abra_email_threads?id=eq.${encodeURIComponent(threadId)}&select=*&limit=1`,
+          { headers: sbHeaders(), signal: AbortSignal.timeout(10000) },
+        );
+        const threads = threadRes.ok ? ((await threadRes.json()) as Array<Record<string, unknown>>) : [];
+        const threadMeta = threads[0];
+
+        const history = await fetchEmailThreadHistory(threadId);
+
+        const header = threadMeta
+          ? `\ud83e\uddf5 *Thread:* \`${threadId}\`\n*Subject:* ${threadMeta.subject || "(unknown)"}\n*From:* ${threadMeta.sender_name} (${threadMeta.sender_email})\n*Messages:* ${threadMeta.message_count || "?"} | *Status:* ${threadMeta.status}\n\n`
+          : `\ud83e\uddf5 *Thread:* \`${threadId}\`\n\n`;
+
+        await postToSlackResponse(responseUrl, header + history);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Unknown";
+        await postToSlackResponse(responseUrl, `\u274c Error: ${msg.slice(0, 200)}`);
+      }
+    });
+    return NextResponse.json({ response_type: "ephemeral", text: `Fetching thread history for ${lookupId}...` });
+  }
 
   // Handle /abra commands — list pending email commands
   if (commandsMatch) {
@@ -1884,8 +2388,11 @@ export async function POST(req: Request) {
         "• `/abra correct: X but actually Y` — Correct wrong info\n" +
         "• `/abra teach: [dept] content` — Teach Abra new knowledge\n" +
         "• `/abra initiative: <department> <goal>` — Create initiative\n" +
+        "• `/abra thread <cmd-id|thread-id>` — Show email thread history\n" +
         "• `/abra refresh` — Refresh latest email + teaching feeds\n" +
         "• `/abra cost` — Show monthly AI spend\n" +
+        "• `/abra rate <cmd-id> <1-5> [feedback]` — Rate a command execution\n" +
+        "• `/abra scores` — Show eval score summary\n" +
         "• `/abra status` — Check service status\n\n" +
         "Departments (20) grouped by operating pillar:\n" +
         DEPARTMENT_HELP_TEXT,
