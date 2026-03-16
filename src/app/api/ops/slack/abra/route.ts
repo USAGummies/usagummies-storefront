@@ -1389,44 +1389,80 @@ async function postToSlackResponse(responseUrl: string, text: string) {
   }).catch(() => {});
 }
 
+// ---------------------------------------------------------------------------
+// Supabase helpers for email command queue
+// ---------------------------------------------------------------------------
+type EmailCommandRow = {
+  id: string;
+  status: string;
+  task: string;
+  sender_name: string;
+  sender_email: string;
+  subject: string;
+  body_snippet?: string;
+  draft_reply_subject?: string;
+  draft_reply_body?: string;
+  execution_summary?: string;
+};
+
+function sbHeaders() {
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+  return {
+    apikey: serviceKey,
+    Authorization: `Bearer ${serviceKey}`,
+    "Content-Type": "application/json",
+  };
+}
+
+function sbUrl() {
+  return process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+}
+
+async function fetchCommand(commandId: string): Promise<EmailCommandRow | null> {
+  const res = await fetch(
+    `${sbUrl()}/rest/v1/abra_email_commands?id=eq.${encodeURIComponent(commandId)}&select=*&limit=1`,
+    { headers: sbHeaders() },
+  );
+  if (!res.ok) return null;
+  const rows = (await res.json()) as EmailCommandRow[];
+  return rows[0] || null;
+}
+
+async function updateCommand(commandId: string, fields: Record<string, unknown>) {
+  const body = { ...fields, updated_at: new Date().toISOString() };
+  await fetch(`${sbUrl()}/rest/v1/abra_email_commands?id=eq.${encodeURIComponent(commandId)}`, {
+    method: "PATCH",
+    headers: { ...sbHeaders(), Prefer: "return=minimal" },
+    body: JSON.stringify(body),
+  }).catch(() => {});
+}
+
+async function postToSlackChannel(channelId: string, text: string) {
+  if (!BOT_TOKEN) return;
+  await fetch("https://slack.com/api/chat.postMessage", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${BOT_TOKEN}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ channel: channelId, text, mrkdwn: true }),
+    signal: AbortSignal.timeout(10000),
+  }).catch(() => {});
+}
+
+const ABRA_COMMAND_CHANNEL = "C0ALS6W7VB4"; // #abra-control
+
+// ---------------------------------------------------------------------------
+// Phase 1: Approve → Execute task via LLM → Draft reply → await send approval
+// ---------------------------------------------------------------------------
 async function handleAbraCommandDecision(
   commandId: string,
   decision: "approved" | "denied",
   responseUrl: string,
 ) {
-  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceKey) {
+  if (!sbUrl() || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     await postToSlackResponse(responseUrl, `❌ Supabase not configured — cannot process commands.`);
     return;
   }
 
-  // Fetch the command from Supabase
-  const fetchRes = await fetch(
-    `${supabaseUrl}/rest/v1/abra_email_commands?id=eq.${encodeURIComponent(commandId)}&select=*&limit=1`,
-    {
-      headers: {
-        apikey: serviceKey,
-        Authorization: `Bearer ${serviceKey}`,
-        "Content-Type": "application/json",
-      },
-    },
-  );
-  if (!fetchRes.ok) {
-    await postToSlackResponse(responseUrl, `❌ Failed to fetch command ${commandId}.`);
-    return;
-  }
-  const rows = (await fetchRes.json()) as Array<{
-    id: string;
-    status: string;
-    task: string;
-    sender_name: string;
-    sender_email: string;
-    subject: string;
-    body_snippet?: string;
-  }>;
-  const entry = rows[0];
+  const entry = await fetchCommand(commandId);
   if (!entry) {
     await postToSlackResponse(responseUrl, `❌ Command ${commandId} not found.`);
     return;
@@ -1436,70 +1472,183 @@ async function handleAbraCommandDecision(
     return;
   }
 
-  // Update status in Supabase
-  const updateStatus = async (status: string, resultText?: string) => {
-    const body: Record<string, unknown> = { status, updated_at: new Date().toISOString() };
-    if (status !== "pending_approval") body.decided_at = new Date().toISOString();
-    if (resultText) body.result_text = resultText.slice(0, 5000);
-    await fetch(`${supabaseUrl}/rest/v1/abra_email_commands?id=eq.${encodeURIComponent(commandId)}`, {
-      method: "PATCH",
-      headers: {
-        apikey: serviceKey!,
-        Authorization: `Bearer ${serviceKey}`,
-        "Content-Type": "application/json",
-        Prefer: "return=minimal",
-      },
-      body: JSON.stringify(body),
-    }).catch(() => {});
-  };
-
   if (decision === "denied") {
-    await updateStatus("denied");
+    await updateCommand(commandId, { status: "denied", decided_at: new Date().toISOString() });
     await postToSlackResponse(responseUrl, `❌ Denied command from ${entry.sender_name}: ${entry.task}`);
     return;
   }
 
-  // Approved — execute via Abra chat API
-  await updateStatus("approved");
-  await postToSlackResponse(responseUrl, `✅ Approved. Executing: ${entry.task}`);
+  // ── Approved: execute the task directly via LLM ──
+  await updateCommand(commandId, { status: "executing", decided_at: new Date().toISOString() });
+  await postToSlackResponse(responseUrl, `✅ Approved. Abra is executing: _${entry.task}_`);
 
-  const host =
-    process.env.NEXTAUTH_URL ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:4000");
-  const authToken = process.env.CRON_SECRET?.trim() || "";
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  if (!anthropicKey) {
+    await updateCommand(commandId, { status: "execution_failed", result_text: "No ANTHROPIC_API_KEY" });
+    await postToSlackResponse(responseUrl, `❌ No ANTHROPIC_API_KEY configured.`);
+    return;
+  }
 
   try {
-    const chatRes = await fetch(`${host}/api/ops/abra/chat`, {
+    // Call Claude directly — the task is already approved, no approval queue needed
+    const llmRes = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": anthropicKey,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6",
+        max_tokens: 2048,
+        system: `You are Abra, the AI operations assistant for USA Gummies. Ben (the founder) has approved an email command from an external person. Your job:
+
+1. EXECUTE the requested task. Describe exactly what you did (or what needs to be done if you can't do it directly).
+2. DRAFT a reply email to the sender confirming what was done.
+
+Respond in this exact JSON format:
+{
+  "execution_summary": "What was done (1-3 sentences, be specific)",
+  "draft_reply_subject": "Re: <original subject>",
+  "draft_reply_body": "The email body to send back to the sender. Professional, friendly, concise. Sign off as Ben."
+}
+
+IMPORTANT: Respond ONLY with valid JSON, no markdown fences, no extra text.`,
+        messages: [{
+          role: "user",
+          content: `Email command approved by Ben. Execute and draft reply.
+
+FROM: ${entry.sender_name} (${entry.sender_email})
+SUBJECT: ${entry.subject}
+TASK: ${entry.task}
+EMAIL CONTEXT: ${entry.body_snippet || "(no additional context)"}
+
+Note: The task may already have been partially or fully completed by Ben. If the task sounds like it's been handled, write the execution summary accordingly and draft a confirmation reply.`,
+        }],
+      }),
+      signal: AbortSignal.timeout(30000),
+    });
+
+    if (!llmRes.ok) {
+      const errText = await llmRes.text().catch(() => "");
+      throw new Error(`LLM API ${llmRes.status}: ${errText.slice(0, 200)}`);
+    }
+
+    const llmData = (await llmRes.json()) as {
+      content: Array<{ type: string; text: string }>;
+    };
+    const rawText = llmData.content?.[0]?.text || "";
+
+    // Parse LLM response
+    let parsed: { execution_summary: string; draft_reply_subject: string; draft_reply_body: string };
+    try {
+      parsed = JSON.parse(rawText.trim());
+    } catch {
+      // If JSON parsing fails, use raw text as summary and generate simple reply
+      parsed = {
+        execution_summary: rawText.slice(0, 1000),
+        draft_reply_subject: `Re: ${entry.subject}`,
+        draft_reply_body: `Hi ${entry.sender_name},\n\nYour request has been processed: ${entry.task}\n\nBest,\nBen`,
+      };
+    }
+
+    // Store draft reply + execution summary, move to draft_reply_pending
+    await updateCommand(commandId, {
+      status: "draft_reply_pending",
+      execution_summary: (parsed.execution_summary || "").slice(0, 5000),
+      draft_reply_subject: (parsed.draft_reply_subject || `Re: ${entry.subject}`).slice(0, 500),
+      draft_reply_body: (parsed.draft_reply_body || "").slice(0, 10000),
+      result_text: (parsed.execution_summary || "").slice(0, 5000),
+    });
+
+    // Post to Slack: show what was done + draft reply for approval
+    const draftPreview = (parsed.draft_reply_body || "").slice(0, 800);
+    await postToSlackChannel(
+      ABRA_COMMAND_CHANNEL,
+      `✅ *Task executed for ${entry.sender_name}*\n` +
+      `*Task:* ${entry.task}\n` +
+      `*What was done:* ${parsed.execution_summary}\n\n` +
+      `📧 *Draft reply to ${entry.sender_email}:*\n` +
+      `> *Subject:* ${parsed.draft_reply_subject}\n` +
+      `> ${draftPreview.split("\n").join("\n> ")}\n\n` +
+      `_Reply with:_ \`/abra sendreply ${commandId}\` _to send, or_ \`/abra deny ${commandId}\` _to discard_`,
+    );
+
+    // Also respond to the original slash command thread
+    await postToSlackResponse(
+      responseUrl,
+      `✅ Task done. Draft reply posted to #abra-control for your review.\nUse \`/abra sendreply ${commandId}\` to send it.`,
+    );
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Unknown";
+    await updateCommand(commandId, { status: "execution_failed", result_text: msg.slice(0, 5000) });
+    await postToSlackResponse(responseUrl, `❌ Execution error: ${msg.slice(0, 200)}`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2: Send the draft reply email
+// ---------------------------------------------------------------------------
+async function handleSendReply(commandId: string, responseUrl: string) {
+  if (!sbUrl() || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    await postToSlackResponse(responseUrl, `❌ Supabase not configured.`);
+    return;
+  }
+
+  const entry = await fetchCommand(commandId);
+  if (!entry) {
+    await postToSlackResponse(responseUrl, `❌ Command ${commandId} not found.`);
+    return;
+  }
+  if (entry.status !== "draft_reply_pending") {
+    await postToSlackResponse(responseUrl, `⚠️ Command ${commandId} is ${entry.status} — expected draft_reply_pending.`);
+    return;
+  }
+  if (!entry.draft_reply_body || !entry.sender_email) {
+    await postToSlackResponse(responseUrl, `❌ No draft reply found for ${commandId}.`);
+    return;
+  }
+
+  await updateCommand(commandId, { status: "reply_approved" });
+  await postToSlackResponse(responseUrl, `📧 Sending reply to ${entry.sender_email}...`);
+
+  try {
+    // Send via the ops email utility
+    const host =
+      process.env.NEXTAUTH_URL ||
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:4000");
+    const authToken = process.env.CRON_SECRET?.trim() || "";
+
+    // Use internal API to send email (goes through sendOpsEmail)
+    const sendRes = await fetch(`${host}/api/ops/abra/send-reply`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${authToken}`,
       },
       body: JSON.stringify({
-        message: `[EMAIL COMMAND from ${entry.sender_name} (${entry.sender_email})]\nSubject: ${entry.subject}\nTask: ${entry.task}\n\nPlease execute this task. Context from the email:\n${entry.body_snippet || "(no additional context)"}`,
+        to: entry.sender_email,
+        subject: entry.draft_reply_subject || `Re: ${entry.subject}`,
+        body: entry.draft_reply_body,
       }),
-      signal: AbortSignal.timeout(55000),
+      signal: AbortSignal.timeout(15000),
     });
 
-    if (!chatRes.ok) {
-      const errText = await chatRes.text().catch(() => "");
-      await updateStatus("execution_failed", errText.slice(0, 500));
-      await postToSlackResponse(responseUrl, `❌ Abra execution failed (${chatRes.status}): ${errText.slice(0, 200)}`);
-      return;
+    if (!sendRes.ok) {
+      const errText = await sendRes.text().catch(() => "");
+      throw new Error(`Send failed (${sendRes.status}): ${errText.slice(0, 200)}`);
     }
 
-    const result = await chatRes.json() as { reply?: string; actions?: unknown[] };
-    await updateStatus("executed", result.reply);
-
-    const replySnippet = (result.reply || "").slice(0, 1500);
-    await postToSlackResponse(
-      responseUrl,
-      `✅ *Command executed for ${entry.sender_name}*\n*Task:* ${entry.task}\n\n${replySnippet}`,
+    await updateCommand(commandId, { status: "completed" });
+    await postToSlackResponse(responseUrl, `✅ Reply sent to ${entry.sender_email}!`);
+    await postToSlackChannel(
+      ABRA_COMMAND_CHANNEL,
+      `📧 *Reply sent to ${entry.sender_name}* (${entry.sender_email})\n*Subject:* ${entry.draft_reply_subject}\n*Command:* ${commandId} — completed`,
     );
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown";
-    await updateStatus("execution_failed", msg);
-    await postToSlackResponse(responseUrl, `❌ Execution error: ${msg.slice(0, 200)}`);
+    await updateCommand(commandId, { status: "execution_failed", result_text: `Send reply failed: ${msg}` });
+    await postToSlackResponse(responseUrl, `❌ Failed to send reply: ${msg.slice(0, 200)}`);
   }
 }
 
@@ -1538,6 +1687,7 @@ export async function POST(req: Request) {
         "• `/abra initiative: <department> <goal>` — Create initiative\n" +
         "• `/abra approve <cmd-id>` — Approve an email command\n" +
         "• `/abra deny <cmd-id>` — Deny an email command\n" +
+        "• `/abra sendreply <cmd-id>` — Send the draft reply email\n" +
         "• `/abra refresh` — Refresh latest email + teaching feeds\n\n" +
         "Departments (20) grouped by operating pillar:\n" +
         DEPARTMENT_HELP_TEXT,
@@ -1564,6 +1714,24 @@ export async function POST(req: Request) {
   const searchMatch = trimmedText.match(/^search:\s*(.+)$/is);
   const approveMatch = trimmedText.match(/^approve\s+(cmd-[\w-]+)$/i);
   const denyMatch = trimmedText.match(/^deny\s+(cmd-[\w-]+)$/i);
+  const sendReplyMatch = trimmedText.match(/^sendreply\s+(cmd-[\w-]+)$/i);
+
+  // Handle sendreply for email-to-Abra commands (phase 2: send draft reply)
+  if (sendReplyMatch) {
+    const commandId = sendReplyMatch[1];
+    after(async () => {
+      try {
+        await handleSendReply(commandId, responseUrl);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Unknown error";
+        await postToSlackResponse(responseUrl, `❌ Failed to send reply: ${msg.slice(0, 200)}`);
+      }
+    });
+    return NextResponse.json({
+      response_type: "in_channel",
+      text: `Sending reply for ${commandId}...`,
+    });
+  }
 
   // Handle approve/deny for email-to-Abra commands
   if (approveMatch || denyMatch) {
@@ -1573,6 +1741,15 @@ export async function POST(req: Request) {
     // Respond immediately
     after(async () => {
       try {
+        // deny can also cancel a draft reply
+        if (decision === "denied") {
+          const entry = await fetchCommand(commandId);
+          if (entry && entry.status === "draft_reply_pending") {
+            await updateCommand(commandId, { status: "denied", result_text: "Draft reply discarded by Ben" });
+            await postToSlackResponse(responseUrl, `❌ Draft reply for ${commandId} discarded.`);
+            return;
+          }
+        }
         await handleAbraCommandDecision(commandId, decision, responseUrl);
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Unknown error";

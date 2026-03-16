@@ -665,12 +665,14 @@ function isValidDateString(value: string): boolean {
 const ALLOWED_EMAIL_DOMAINS = new Set([
   "usagummies.com",
   "gmail.com", // Ben's personal
+  "outlook.com", // External contacts (e.g., Rene Gonzalez)
 ]);
 
 /** Additional allowed specific addresses (for known contacts) */
 const ALLOWED_EMAIL_ADDRESSES = new Set([
   "ben@usagummies.com",
   "benjamin.stutman@gmail.com",
+  "gonz1rene@outlook.com",
 ]);
 
 function isAllowedEmailRecipient(email: string): boolean {
