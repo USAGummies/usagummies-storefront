@@ -872,6 +872,7 @@ async function generateClaudeReply(input: {
   availableActions?: string[];
   detectedDepartment?: string | null;
   liveSnapshot?: string | null;
+  deadlineSignal?: AbortSignal;
 }): Promise<{
   reply: string;
   modelUsed: string;
@@ -1027,6 +1028,11 @@ MARGIN & COST CLAIM VERIFICATION (applies when user asserts financial metrics):
     .join("\n\n");
 
   const maxTokens = selectedModel.includes("haiku") ? 3000 : 6000;
+  // Combine per-call timeout with global deadline signal (if provided)
+  const localTimeout = AbortSignal.timeout(25000);
+  const combinedSignal = input.deadlineSignal
+    ? AbortSignal.any([localTimeout, input.deadlineSignal])
+    : localTimeout;
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -1041,7 +1047,7 @@ MARGIN & COST CLAIM VERIFICATION (applies when user asserts financial metrics):
       system: `${actionInstructions}\n\n${systemPrompt}`,
       messages: [{ role: "user", content: userPrompt }],
     }),
-    signal: AbortSignal.timeout(25000),
+    signal: combinedSignal,
   });
 
   const text = await res.text();
@@ -1898,6 +1904,7 @@ export async function POST(req: Request) {
       availableActions,
       detectedDepartment: messageDepartment,
       liveSnapshot: augmentedLiveSnapshot,
+      deadlineSignal: deadlineController.signal,
     });
     const actionNotices: string[] = [];
     let baseReply = claudeResult.reply;
@@ -1956,6 +1963,7 @@ export async function POST(req: Request) {
           availableActions,
           detectedDepartment: messageDepartment,
           liveSnapshot: augmentedLiveSnapshot,
+          deadlineSignal: deadlineController.signal,
         });
         baseReply = followUpResult.reply;
         // Strip any action directives from the follow-up (don't double-execute)
