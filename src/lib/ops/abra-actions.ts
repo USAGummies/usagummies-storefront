@@ -496,9 +496,9 @@ async function handleCreateBrainEntry(
 
   // Respect LLM-specified category/department/entry_type if valid, else default
   const rawCategory = typeof params.category === "string" ? params.category.toLowerCase() : "";
-  const category = VALID_BRAIN_CATEGORIES.has(rawCategory) ? rawCategory : "system_log";
+  const category = VALID_BRAIN_CATEGORIES.has(rawCategory) ? rawCategory : "general";
   const rawEntryType = typeof params.entry_type === "string" ? params.entry_type.toLowerCase() : "";
-  const entryType = VALID_BRAIN_ENTRY_TYPES.has(rawEntryType) ? rawEntryType : "system_log";
+  const entryType = VALID_BRAIN_ENTRY_TYPES.has(rawEntryType) ? rawEntryType : "finding";
   const department = typeof params.department === "string" ? params.department.slice(0, 50) : "executive";
   const tagsParam = Array.isArray(params.tags) ? params.tags.filter((t): t is string => typeof t === "string").slice(0, 10) : undefined;
 
@@ -1531,29 +1531,26 @@ async function updateAutoExecTracking(params: {
 }
 
 async function writeAutoExecBrainEntry(action: AbraAction, result: ActionResult): Promise<void> {
+  // Auto-exec audit entries go to decision_log, NOT the semantic brain.
+  // Writing system_log to open_brain_entries pollutes vector search with noise.
   try {
-    await sbFetch("/rest/v1/open_brain_entries", {
+    await sbFetch("/rest/v1/decision_log", {
       method: "POST",
       headers: {
         Prefer: "return=minimal",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        source_type: "agent",
-        source_ref: "auto-exec",
-        entry_type: "system_log",
-        title: `Auto-executed: ${action.description}`,
-        raw_text: JSON.stringify({ action, result }),
-        summary_text: result.message.slice(0, 500),
-        category: "system_log",
-        department: action.department || "operations",
-        confidence: "high",
-        priority: "normal",
-        processed: true,
+        action_proposed: `Auto-executed: ${action.description}`,
+        action_pattern: action.action_type,
+        supporting_data: { action, result },
+        decision: "auto_approved",
+        reasoning: "Auto-executed within policy limits",
+        decided_by: "system",
       }),
     });
   } catch {
-    // best-effort brain write
+    // best-effort audit write
   }
 }
 

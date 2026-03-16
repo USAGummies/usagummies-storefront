@@ -24,6 +24,8 @@ if (!CRON_SECRET) {
 }
 
 const SCHEDULES = [
+  // Master scheduler — 5-min polling (Vercel Hobby cron only fires 1x/day, this is the real heartbeat)
+  { name: "master-scheduler", url: `${BASE_URL}/api/ops/scheduler/master`, cron: "*/5 * * * *", method: "GET" },
   { name: "abra-morning-brief", url: `${BASE_URL}/api/ops/abra/morning-brief`, cron: "15 14 * * *", method: "POST" },
   { name: "abra-feed-shopify-orders", url: `${BASE_URL}/api/ops/abra/auto-teach?feed=shopify_orders`, cron: "0 13 * * *", method: "POST" },
   { name: "abra-feed-amazon-orders", url: `${BASE_URL}/api/ops/abra/auto-teach?feed=amazon_orders`, cron: "10 13 * * *", method: "POST" },
@@ -112,24 +114,21 @@ async function deleteSchedule(id) {
 }
 
 async function createSchedule(schedule) {
-  const payload = {
-    destination: schedule.url,
-    cron: schedule.cron,
-    method: schedule.method || "GET",
+  // QStash v2: destination URL goes in the path, headers use Upstash-* prefixes
+  const encodedUrl = encodeURIComponent(schedule.url);
+  return qstash(`/schedules/${encodedUrl}`, {
+    method: "POST",
     headers: {
-      Authorization: `Bearer ${CRON_SECRET}`,
-      "Content-Type": "application/json",
+      "Upstash-Cron": schedule.cron,
+      "Upstash-Method": schedule.method || "GET",
+      "Upstash-Forward-Authorization": `Bearer ${CRON_SECRET}`,
+      "Upstash-Forward-Content-Type": "application/json",
       "x-abra-schedule-name": schedule.name,
     },
     body: JSON.stringify({
       schedule: schedule.name,
       source: "setup-qstash-schedules",
     }),
-  };
-
-  return qstash("/schedules", {
-    method: "POST",
-    body: JSON.stringify(payload),
   });
 }
 
@@ -158,7 +157,7 @@ async function main() {
   const stale = existing.filter((item) => {
     const name = scheduleNameFromItem(item);
     const destination = destinationFromItem(item);
-    if (name && name.startsWith("abra-")) return !expectedNames.has(name);
+    if (name && (name.startsWith("abra-") || name === "master-scheduler")) return !expectedNames.has(name);
     if (name === "abra-daily-automation") return true;
     return destination.includes("/api/ops/abra/");
   });

@@ -1021,6 +1021,18 @@ export function createEngine(config) {
 
     // CLI
     parseArgs,
+
+    // Convenience helpers — used by SEO, DTC, Supply Chain, Social, Marketing engines
+    succeed(agentKey, summary) {
+      updateAgentStatus(agentKey, { lastStatus: "success", summary: JSON.stringify(summary) });
+      engineLog(`${agentKey} — ✓ ${JSON.stringify(summary)}`);
+      return { ok: true, ...summary };
+    },
+    fail(agentKey, error) {
+      updateAgentStatus(agentKey, { lastStatus: "error", summary: String(error) });
+      engineLog(`${agentKey} — ✗ ${error}`);
+      return { ok: false, error: String(error) };
+    },
   };
 }
 

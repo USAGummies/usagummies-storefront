@@ -995,7 +995,7 @@ if (cmd === "help" || !cmd) {
     await runAgentByName(target);
   }
 } else if (cmd === "status") {
-  const status = engine.getStatus();
+  const status = engine.loadSystemStatus();
   console.log(JSON.stringify(status, null, 2));
 } else {
   console.error(`Unknown command: ${cmd}. Try 'help'.`);
