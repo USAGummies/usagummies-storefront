@@ -448,13 +448,13 @@ async function fetchLiveBusinessSnapshot(): Promise<string | null> {
     if ((gmailUser || gmailClientId) && gmailClientId && gmailRefreshToken) {
       // Dynamic import to avoid loading googleapis on every request
       const { listEmails } = await import("@/lib/ops/gmail-reader");
-      const envelopes = await listEmails({ count: 10, folder: "INBOX" });
+      const envelopes = await listEmails({ count: 5, folder: "INBOX" });
       if (envelopes.length > 0) {
-        lines.push(`LIVE INBOX (${envelopes.length} most recent — you CAN read full emails via the read_email action):`);
-        for (const e of envelopes.slice(0, 10)) {
+        lines.push(`LIVE INBOX (${envelopes.length} recent — use read_email action for full content):`);
+        for (const e of envelopes.slice(0, 5)) {
           const age = e.date ? `${Math.round((Date.now() - new Date(e.date).getTime()) / 3600000)}h ago` : "";
-          const snippet = e.snippet ? ` — ${e.snippet.slice(0, 120)}${e.snippet.length > 120 ? "..." : ""}` : "";
-          lines.push(`  • [${e.id}] From: ${e.from} — "${e.subject}" (${age})${snippet}`);
+          const snippet = e.snippet ? ` — ${e.snippet.slice(0, 80)}` : "";
+          lines.push(`  • [${e.id}] ${e.from}: "${e.subject}" (${age})${snippet}`);
         }
       }
     }
@@ -888,6 +888,7 @@ async function generateClaudeReply(input: {
   detectedDepartment?: string | null;
   liveSnapshot?: string | null;
   deadlineSignal?: AbortSignal;
+  isFinanceRelated?: boolean;
 }): Promise<{
   reply: string;
   modelUsed: string;
@@ -913,9 +914,12 @@ async function generateClaudeReply(input: {
     competitorContext: input.competitorContext,
     teamContext: input.teamContext,
     signalsContext: input.signalsContext,
+    includeFinanceFramework: input.isFinanceRelated,
   });
+  // Only include full action instructions when the message likely needs actions
+  const messageNeedsActions = /\b(send|create|log|notify|remind|track|store|record|draft|email|slack|save|update|correct|calculate|run scenario)\b/i.test(input.message);
   const actionInstructions =
-    input.availableActions && input.availableActions.length > 0
+    messageNeedsActions && input.availableActions && input.availableActions.length > 0
       ? `\n\nACTION EXECUTION SYSTEM (YOU MUST USE THIS):
 You have REAL action capabilities. Available actions: ${input.availableActions.join(", ")}.
 
@@ -1932,6 +1936,7 @@ export async function POST(req: Request) {
       detectedDepartment: messageDepartment,
       liveSnapshot: augmentedLiveSnapshot,
       deadlineSignal: deadlineController.signal,
+      isFinanceRelated: isFinanceQuestion(message),
     });
     const actionNotices: string[] = [];
     let baseReply = claudeResult.reply;

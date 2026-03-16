@@ -169,21 +169,21 @@ export function buildTieredContext(results: TieredSearchResult): string {
 
   if (results.hot.length > 0) {
     sections.push("=== AUTHORITATIVE (corrections & KPIs — always trust) ===");
-    for (const row of results.hot) {
+    for (const row of results.hot.slice(0, 5)) {
       sections.push(formatRow(row));
     }
   }
 
   if (results.warm.length > 0) {
     sections.push("\n=== RECENT (teachings & sessions — high confidence) ===");
-    for (const row of results.warm) {
+    for (const row of results.warm.slice(0, 5)) {
       sections.push(formatRow(row));
     }
   }
 
   if (results.cold.length > 0) {
     sections.push("\n=== GENERAL (older data — verify recency before citing) ===");
-    for (const row of results.cold) {
+    for (const row of results.cold.slice(0, 3)) {
       sections.push(formatRow(row));
     }
   }
@@ -317,7 +317,7 @@ export async function searchWithTemporalAwareness(params: {
 }
 
 function formatRow(row: TieredSearchRow): string {
-  const MAX_CONTEXT_CHARS = 2500;
+  const MAX_CONTEXT_CHARS = 1200;
   const title = row.title || "(untitled)";
   const source = row.source_table;
   const sim =

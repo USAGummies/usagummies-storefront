@@ -73,6 +73,8 @@ export type AbraPromptContext = {
   competitorContext?: string | null;
   teamContext?: string;
   signalsContext?: string;
+  /** When true, include full CPG intelligence framework (~3K tokens). Default: false. */
+  includeFinanceFramework?: boolean;
 };
 
 function normalizeDepartmentName(value: string): string {
@@ -244,8 +246,10 @@ C. SIGNAL-TO-ACTION ESCALATION:
 • Regulatory/compliance signals → critical-priority task + Slack alert to Ben.`,
   );
 
-  // 2b. CPG Operations Intelligence (PhD-level knowledge)
-  sections.push(buildCPGIntelligenceSection());
+  // 2b. CPG Operations Intelligence (PhD-level knowledge) — only for finance/margin questions
+  if (ctx.includeFinanceFramework) {
+    sections.push(buildCPGIntelligenceSection());
+  }
 
   // 2c. USA Gummies Company Context
   sections.push(
