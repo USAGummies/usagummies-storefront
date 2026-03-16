@@ -1029,10 +1029,13 @@ MARGIN & COST CLAIM VERIFICATION (applies when user asserts financial metrics):
 
   const maxTokens = selectedModel.includes("haiku") ? 3000 : 6000;
   // Combine per-call timeout with global deadline signal (if provided)
-  const localTimeout = AbortSignal.timeout(25000);
-  const combinedSignal = input.deadlineSignal
-    ? AbortSignal.any([localTimeout, input.deadlineSignal])
-    : localTimeout;
+  // Use manual AbortController linkage for Node 18 compat (no AbortSignal.any)
+  const llmAbort = new AbortController();
+  const localTimer = setTimeout(() => llmAbort.abort(), 25000);
+  if (input.deadlineSignal) {
+    if (input.deadlineSignal.aborted) llmAbort.abort();
+    else input.deadlineSignal.addEventListener("abort", () => llmAbort.abort(), { once: true });
+  }
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -1047,8 +1050,9 @@ MARGIN & COST CLAIM VERIFICATION (applies when user asserts financial metrics):
       system: `${actionInstructions}\n\n${systemPrompt}`,
       messages: [{ role: "user", content: userPrompt }],
     }),
-    signal: combinedSignal,
+    signal: llmAbort.signal,
   });
+  clearTimeout(localTimer);
 
   const text = await res.text();
   let payload: Record<string, unknown> = {};
