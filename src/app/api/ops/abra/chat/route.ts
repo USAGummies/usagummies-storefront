@@ -1041,7 +1041,7 @@ MARGIN & COST CLAIM VERIFICATION (applies when user asserts financial metrics):
       system: `${actionInstructions}\n\n${systemPrompt}`,
       messages: [{ role: "user", content: userPrompt }],
     }),
-    signal: AbortSignal.timeout(30000),
+    signal: AbortSignal.timeout(25000),
   });
 
   const text = await res.text();
@@ -1166,8 +1166,9 @@ export async function POST(req: Request) {
     });
   }
 
-  // Vercel Hobby plan has 60s timeout — we race all work against a 55s deadline
-  const DEADLINE_MS = 55_000;
+  // Vercel Hobby plan has 60s timeout — we race all work against a 50s deadline
+  // (5s buffer is needed because Node timers fire late under heavy I/O)
+  const DEADLINE_MS = 50_000;
   const deadlinePromise = new Promise<NextResponse>((resolve) =>
     setTimeout(() => {
       resolve(NextResponse.json({
@@ -1182,6 +1183,7 @@ export async function POST(req: Request) {
   );
 
   const mainWork = (async (): Promise<NextResponse> => {
+  const startMs = Date.now();
   try {
     // Circuit breaker check — if Supabase is down, we'll skip memory search
     // but still serve the chat with live data feeds (graceful degradation)
@@ -1942,7 +1944,8 @@ export async function POST(req: Request) {
       }
 
       // If we got read-only data back (email, ledger), do a follow-up Claude call with real data injected
-      if (readOnlyResults.length > 0) {
+      // Skip if we're past 35s to avoid hitting the 50s deadline with a second LLM call
+      if (readOnlyResults.length > 0 && (Date.now() - startMs) < 35_000) {
         const dataContext = readOnlyResults.join("\n\n");
         const followUpResult = await generateClaudeReply({
           message: `The user asked: "${message}"\n\nHere is the data I just retrieved from our systems:\n\n${dataContext}\n\nNow answer the user's original question using this REAL data. Use exact numbers from the data — never estimate or guess. Be specific and actionable.`,
