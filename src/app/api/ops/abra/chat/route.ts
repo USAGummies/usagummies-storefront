@@ -58,6 +58,7 @@ import {
 } from "@/lib/ops/abra-actions";
 import { analyzePipeline } from "@/lib/ops/abra-pipeline-intelligence";
 import { queryLedgerSummary } from "@/lib/ops/abra-notion-write";
+import { EMAIL_EXTRACTION_SKILL } from "@/lib/ops/abra-skill-email-data-extraction";
 import {
   buildConversationContext,
   saveMessage,
@@ -379,6 +380,12 @@ async function fetchCostSummary(): Promise<AbraCostContext | null> {
 
 function isFinanceQuestion(message: string): boolean {
   return /\b(finance|financial|revenue|margin|cogs|gross profit|profitability|aov|cash flow|budget|money|sales|orders|income|expenses|spending|p&l|profit|loss)\b/i.test(
+    message,
+  );
+}
+
+function needsEmailExtractionSkill(message: string): boolean {
+  return /\b(email|gmail|inbox|supplier|vendor|quote|invoice|freight|cogs|cost.*(per|unit|pound)|albanese|belmark|powers|dutch valley|bill thurner|greg kroetch|extract.*data|pull.*from.*email|find.*in.*email|check.*email|read.*email|production cost|packing fee|film cost)\b/i.test(
     message,
   );
 }
@@ -1056,7 +1063,7 @@ MARGIN & COST CLAIM VERIFICATION (applies when user asserts financial metrics):
       model: selectedModel,
       max_tokens: maxTokens,
       temperature: 0.2,
-      system: `${actionInstructions}\n\n${systemPrompt}`,
+      system: `${actionInstructions}\n\n${systemPrompt}${needsEmailExtractionSkill(input.message) ? `\n\n${EMAIL_EXTRACTION_SKILL.prompt}` : ""}`,
       messages: [{ role: "user", content: userPrompt }],
     }),
     signal: llmAbort.signal,
