@@ -1166,23 +1166,11 @@ export async function POST(req: Request) {
     });
   }
 
-  // Vercel Hobby plan has 60s timeout — we race all work against a 50s deadline
-  // (5s buffer is needed because Node timers fire late under heavy I/O)
-  const DEADLINE_MS = 50_000;
-  const deadlinePromise = new Promise<NextResponse>((resolve) =>
-    setTimeout(() => {
-      resolve(NextResponse.json({
-        reply: "I'm still gathering data for your request, but I hit my response time limit. Could you try a more specific question, or ask me to focus on just one part of what you need?",
-        confidence: 0.3,
-        sources: [],
-        intent: "timeout",
-        thread_id: threadId,
-        timeout: true,
-      }));
-    }, DEADLINE_MS),
-  );
-
-  const mainWork = (async (): Promise<NextResponse> => {
+  // Vercel Hobby plan kills functions at 60s — use AbortController to cancel
+  // in-flight work at 45s so we have time to return a graceful response.
+  const DEADLINE_MS = 45_000;
+  const deadlineController = new AbortController();
+  const deadlineTimer = setTimeout(() => deadlineController.abort(), DEADLINE_MS);
   const startMs = Date.now();
   try {
     // Circuit breaker check — if Supabase is down, we'll skip memory search
@@ -1889,6 +1877,11 @@ export async function POST(req: Request) {
     const dataStatusLine = dataStatus.length > 0 ? `\n[DATA FEED STATUS: ${dataStatus.join("; ")}. Do NOT invent numbers for unavailable feeds. If brain search failed, tell the user your memory is temporarily unavailable.]` : "";
     const augmentedLiveSnapshot = [liveSnapshot, temporalHint, dataStatusLine].filter(Boolean).join("\n") || null;
 
+    // Check deadline before expensive LLM call
+    if (deadlineController.signal.aborted) {
+      throw new DOMException("Deadline exceeded", "AbortError");
+    }
+
     const claudeResult = await generateClaudeReply({
       message,
       history: effectiveHistory,
@@ -2033,6 +2026,7 @@ export async function POST(req: Request) {
       },
     });
 
+    clearTimeout(deadlineTimer);
     return NextResponse.json({
       reply,
       confidence,
@@ -2053,6 +2047,20 @@ export async function POST(req: Request) {
       actions: actionNotices,
     });
   } catch (error) {
+    clearTimeout(deadlineTimer);
+
+    // Check if this was our deadline abort
+    if (deadlineController.signal.aborted || (error instanceof Error && error.name === "AbortError")) {
+      return NextResponse.json({
+        reply: "I'm still gathering data for your request, but I hit my response time limit. Could you try a more specific question, or ask me to focus on just one part of what you need?",
+        confidence: 0.3,
+        sources: [],
+        intent: "timeout",
+        thread_id: threadId,
+        timeout: true,
+      });
+    }
+
     if (isSupabaseRelatedError(error)) {
       await markSupabaseFailure(error);
     }
@@ -2061,7 +2069,4 @@ export async function POST(req: Request) {
       error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 500 });
   }
-  })(); // end mainWork IIFE
-
-  return Promise.race([mainWork, deadlinePromise]);
 }
