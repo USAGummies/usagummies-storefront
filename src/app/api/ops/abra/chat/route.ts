@@ -1166,6 +1166,22 @@ export async function POST(req: Request) {
     });
   }
 
+  // Vercel Hobby plan has 60s timeout — we race all work against a 55s deadline
+  const DEADLINE_MS = 55_000;
+  const deadlinePromise = new Promise<NextResponse>((resolve) =>
+    setTimeout(() => {
+      resolve(NextResponse.json({
+        reply: "I'm still gathering data for your request, but I hit my response time limit. Could you try a more specific question, or ask me to focus on just one part of what you need?",
+        confidence: 0.3,
+        sources: [],
+        intent: "timeout",
+        thread_id: threadId,
+        timeout: true,
+      }));
+    }, DEADLINE_MS),
+  );
+
+  const mainWork = (async (): Promise<NextResponse> => {
   try {
     // Circuit breaker check — if Supabase is down, we'll skip memory search
     // but still serve the chat with live data feeds (graceful degradation)
@@ -1195,19 +1211,57 @@ export async function POST(req: Request) {
     // ─── Intent Detection ───
     const intent = detectIntent(message);
 
-    // Handle cost query shortcut
+    // Handle cost query with LLM synthesis
     if (intent.type === "cost") {
       const spend = await getMonthlySpend();
-      const costReply = `**AI Spend Report (${new Date().toISOString().slice(0, 7)})**\n\n` +
-        `• Total: **$${spend.total.toFixed(2)}** / $${spend.budget}\n` +
-        `• Remaining: $${spend.remaining.toFixed(2)} (${spend.pctUsed}% used)\n` +
-        `• API calls: ${spend.callCount}\n` +
+      const templateCostReply = `AI Spend Report (${new Date().toISOString().slice(0, 7)}):\n` +
+        `Total: $${spend.total.toFixed(2)} / $${spend.budget}\n` +
+        `Remaining: $${spend.remaining.toFixed(2)} (${spend.pctUsed}% used)\n` +
+        `API calls: ${spend.callCount}\n` +
         (Object.keys(spend.byEndpoint).length > 0
-          ? `• By endpoint: ${Object.entries(spend.byEndpoint).map(([k, v]) => `${k}: $${(Number(v) || 0).toFixed(2)}`).join(", ")}\n`
+          ? `By endpoint: ${Object.entries(spend.byEndpoint).map(([k, v]) => `${k}: $${(Number(v) || 0).toFixed(2)}`).join(", ")}\n`
           : "") +
         (Object.keys(spend.byProvider).length > 0
-          ? `• By provider: ${Object.entries(spend.byProvider).map(([k, v]) => `${k}: $${(Number(v) || 0).toFixed(2)}`).join(", ")}`
+          ? `By provider: ${Object.entries(spend.byProvider).map(([k, v]) => `${k}: $${(Number(v) || 0).toFixed(2)}`).join(", ")}`
           : "");
+
+      let costReply = templateCostReply;
+      try {
+        const anthropicKey = process.env.ANTHROPIC_API_KEY;
+        if (anthropicKey) {
+          const costPrompt = `You are Abra, the AI operations assistant for USA Gummies. The user asked about AI costs/spending. Here is the current cost data:\n\n${templateCostReply}\n\nProvide a concise analysis addressing: "${message}". Include the exact numbers, highlight if spend is on track or needs attention, and note which endpoints/providers are consuming the most. Keep it under 200 words. Format with markdown.`;
+          const llmRes = await fetch("https://api.anthropic.com/v1/messages", {
+            method: "POST",
+            headers: { "x-api-key": anthropicKey, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
+            body: JSON.stringify({
+              model: "claude-sonnet-4-20250514",
+              max_tokens: 400,
+              temperature: 0.2,
+              messages: [{ role: "user", content: costPrompt }],
+            }),
+            signal: AbortSignal.timeout(15_000),
+          });
+          if (llmRes.ok) {
+            const llmData = await llmRes.json() as { content?: Array<{ type: string; text?: string }>; usage?: { input_tokens?: number; output_tokens?: number } };
+            const llmText = (llmData.content || [])
+              .filter((b): b is { type: "text"; text: string } => b.type === "text" && typeof b.text === "string")
+              .map((b) => b.text)
+              .join("");
+            if (llmText.length > 20) {
+              costReply = llmText;
+              void logAICost?.({
+                endpoint: "abra-chat-cost",
+                provider: "anthropic",
+                model: "claude-sonnet-4-20250514",
+                inputTokens: llmData.usage?.input_tokens || 0,
+                outputTokens: llmData.usage?.output_tokens || 0,
+              }).catch(() => {});
+            }
+          }
+        }
+      } catch (err) {
+        console.error("[abra] Cost LLM synthesis failed, using template:", err instanceof Error ? err.message : err);
+      }
 
       queueChatHistory({
         threadId,
@@ -1218,7 +1272,7 @@ export async function POST(req: Request) {
       });
       return NextResponse.json({
         reply: costReply,
-        confidence: 1,
+        confidence: 0.95,
         sources: [],
         intent: "cost",
         thread_id: threadId,
@@ -1264,20 +1318,58 @@ export async function POST(req: Request) {
           : "None";
 
       const noDeals = allDeals.length === 0;
-      const pipelineReply = noDeals
-        ? "**Sales Pipeline Snapshot**\n\nNo active deals found in the pipeline. Deals are tracked in the B2B Prospects and Distributor Prospects databases in Notion, and synced to Supabase."
+      const templateReply = noDeals
+        ? "No active deals found in the pipeline."
         : [
-            "**Sales Pipeline Snapshot**",
-            `• Total pipeline value: **$${summary.total_pipeline_value.toFixed(2)}**`,
-            `• Active deals: **${allDeals.length}**`,
-            `• Win rate (30d): ${summary.win_rate_30d.toFixed(1)}%`,
-            `• Avg deal cycle: ${summary.avg_deal_cycle_days.toFixed(1)} days`,
-            stageLines ? `\n**Deals by stage**\n${stageLines}` : "",
-            `\n**At-risk deals**\n${atRiskLine}`,
-            `\n_All data sourced from Notion B2B/Distributor databases and Supabase deal records._`,
+            `Total pipeline value: $${summary.total_pipeline_value.toFixed(2)}`,
+            `Active deals: ${allDeals.length}`,
+            `Win rate (30d): ${summary.win_rate_30d.toFixed(1)}%`,
+            `Avg deal cycle: ${summary.avg_deal_cycle_days.toFixed(1)} days`,
+            stageLines ? `\nDeals by stage:\n${stageLines}` : "",
+            `\nAt-risk deals:\n${atRiskLine}`,
           ]
             .filter(Boolean)
             .join("\n");
+
+      // LLM synthesis: pass pipeline data + user question to Claude for intelligent analysis
+      let pipelineReply = templateReply;
+      try {
+        const anthropicKey = process.env.ANTHROPIC_API_KEY;
+        if (anthropicKey) {
+          const pipelinePrompt = `You are Abra, the AI operations assistant for USA Gummies. The user asked about the sales pipeline. Here is the current pipeline data:\n\n${templateReply}\n\nProvide a concise, executive-level analysis of this pipeline data. Address the user's specific question: "${message}". Highlight the most important insights: deal momentum, risk areas, and recommended next actions. Use specific numbers from the data. Keep it under 300 words. Format with markdown.`;
+          const llmRes = await fetch("https://api.anthropic.com/v1/messages", {
+            method: "POST",
+            headers: { "x-api-key": anthropicKey, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
+            body: JSON.stringify({
+              model: "claude-sonnet-4-20250514",
+              max_tokens: 600,
+              temperature: 0.2,
+              messages: [{ role: "user", content: pipelinePrompt }],
+            }),
+            signal: AbortSignal.timeout(15_000),
+          });
+          if (llmRes.ok) {
+            const llmData = await llmRes.json() as { content?: Array<{ type: string; text?: string }>; usage?: { input_tokens?: number; output_tokens?: number } };
+            const llmText = (llmData.content || [])
+              .filter((b): b is { type: "text"; text: string } => b.type === "text" && typeof b.text === "string")
+              .map((b) => b.text)
+              .join("");
+            if (llmText.length > 20) {
+              pipelineReply = llmText;
+              void logAICost?.({
+                endpoint: "abra-chat-pipeline",
+                provider: "anthropic",
+                model: "claude-sonnet-4-20250514",
+                inputTokens: llmData.usage?.input_tokens || 0,
+                outputTokens: llmData.usage?.output_tokens || 0,
+              }).catch(() => {});
+            }
+          }
+        }
+      } catch (err) {
+        console.error("[abra] Pipeline LLM synthesis failed, using template:", err instanceof Error ? err.message : err);
+        // Falls back to templateReply
+      }
 
       queueChatHistory({
         threadId,
@@ -1289,7 +1381,7 @@ export async function POST(req: Request) {
 
       return NextResponse.json({
         reply: pipelineReply,
-        confidence: 1,
+        confidence: 0.9,
         sources: [],
         intent: "pipeline",
         thread_id: threadId,
@@ -1966,4 +2058,7 @@ export async function POST(req: Request) {
       error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 500 });
   }
+  })(); // end mainWork IIFE
+
+  return Promise.race([mainWork, deadlinePromise]);
 }
