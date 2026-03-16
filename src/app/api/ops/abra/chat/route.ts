@@ -28,6 +28,7 @@ import {
   detectQuestions,
   computeConfidence,
   shouldAskQuestions,
+  type LiveDataContext,
 } from "@/lib/ops/abra-question-detector";
 import { detectDepartment, type PlaybookQuestion } from "@/lib/ops/department-playbooks";
 import {
@@ -998,7 +999,15 @@ MARGIN & COST CLAIM VERIFICATION (applies when user asserts financial metrics):
 
   const historyText = buildConversation(input.history);
   const contextText = buildTieredContext(input.tieredResults);
-  const confidence = computeConfidence(input.tieredResults.all);
+  // Build live data context so confidence reflects authoritative data sources
+  const liveDataCtx: LiveDataContext = {
+    hasLiveSnapshot: Boolean(input.liveSnapshot && input.liveSnapshot.length > 50),
+    hasFinancialContext: Boolean(input.financialContext && input.financialContext.length > 20),
+    hasLedgerContext: Boolean(input.ledgerContext && input.ledgerContext.length > 20),
+    hasCostSummary: Boolean(input.costSummary),
+    hasCompetitorContext: Boolean(input.competitorContext && input.competitorContext.length > 20),
+  };
+  const confidence = computeConfidence(input.tieredResults.all, liveDataCtx);
   const normalizedConfidence = confidence / 100;
   if (normalizedConfidence < 0.2 && input.tieredResults.all.length < 2) {
     return {

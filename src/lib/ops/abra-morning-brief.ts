@@ -6,6 +6,7 @@ import { analyzeInventory } from "@/lib/ops/abra-inventory-forecast";
 import { notify } from "@/lib/ops/notify";
 import { createNotionPage } from "@/lib/ops/abra-notion-write";
 import { readState } from "@/lib/ops/state";
+import { getDailyGoalSnapshot, formatGoalSlack } from "@/lib/ops/daily-goal-tracker";
 
 type MetricSnapshot = {
   metric: string;
@@ -54,6 +55,16 @@ export type MorningBriefPayload = {
       department: string | null;
     }>;
   };
+  goal_tracker: {
+    monthlyTarget: number;
+    dailyTarget: number;
+    mtdActual: number;
+    mtdTarget: number;
+    mtdPacePct: number;
+    status: string;
+    daysRemaining: number;
+    requiredDailyRate: number;
+  } | null;
 };
 
 function getSupabaseEnv() {
@@ -182,6 +193,7 @@ export async function generateMorningBriefPayload(): Promise<MorningBriefPayload
     initiatives,
     pendingApprovals,
     pendingTasks,
+    goalSnapshot,
   ] = await Promise.all([
     getMetricSnapshot("daily_revenue_shopify"),
     getMetricSnapshot("daily_revenue_amazon"),
@@ -194,6 +206,7 @@ export async function generateMorningBriefPayload(): Promise<MorningBriefPayload
     })),
     getPendingApprovalsCount().catch(() => 0),
     getPendingTaskCount().catch(() => 0),
+    getDailyGoalSnapshot().catch(() => null),
   ]);
 
   const revenueTotal =
@@ -246,6 +259,18 @@ export async function generateMorningBriefPayload(): Promise<MorningBriefPayload
         department: signal.department,
       })),
     },
+    goal_tracker: goalSnapshot
+      ? {
+          monthlyTarget: goalSnapshot.monthlyTarget,
+          dailyTarget: goalSnapshot.dailyTarget,
+          mtdActual: goalSnapshot.mtdActual,
+          mtdTarget: goalSnapshot.mtdTarget,
+          mtdPacePct: goalSnapshot.mtdPacePct,
+          status: goalSnapshot.status,
+          daysRemaining: goalSnapshot.daysRemaining,
+          requiredDailyRate: goalSnapshot.requiredDailyRate,
+        }
+      : null,
   };
 }
 
@@ -296,6 +321,17 @@ export async function generateMorningBrief(): Promise<string> {
     lines.push("");
   } catch {
     // Skip scorecard if metric reads fail
+  }
+
+  // Daily Goal Tracker
+  try {
+    const goalSnapshot = await getDailyGoalSnapshot();
+    if (goalSnapshot) {
+      lines.push(formatGoalSlack(goalSnapshot));
+      lines.push("");
+    }
+  } catch {
+    // Skip goal tracker section
   }
 
   try {

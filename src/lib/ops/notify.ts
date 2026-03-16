@@ -36,7 +36,52 @@ export type NotifyOpts = {
 };
 
 // ---------------------------------------------------------------------------
-// Slack Webhooks
+// Slack Bot Token + Channel ID (preferred — posts to specific channels)
+// ---------------------------------------------------------------------------
+
+const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
+
+const SLACK_CHANNEL_ID_MAP: Record<NotifyChannel, string | undefined> = {
+  alerts: process.env.SLACK_CHANNEL_ALERTS,
+  pipeline: process.env.SLACK_CHANNEL_PIPELINE,
+  daily: process.env.SLACK_CHANNEL_DAILY || "C0ALS6W7VB4",
+};
+
+async function sendSlackBot(
+  channelId: string,
+  text: string,
+  blocks?: unknown[],
+): Promise<boolean> {
+  if (!SLACK_BOT_TOKEN) return false;
+
+  try {
+    const payload: Record<string, unknown> = { channel: channelId, text };
+    if (Array.isArray(blocks) && blocks.length > 0) {
+      payload.blocks = blocks;
+    }
+    const res = await fetch("https://slack.com/api/chat.postMessage", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
+      },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(10000),
+    });
+    const data = (await res.json()) as { ok?: boolean; error?: string };
+    if (!data.ok) {
+      console.error(`[notify] Slack Bot API error: ${data.error}`);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error(`[notify] Slack Bot send failed:`, err);
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Slack Webhooks (fallback when no bot token or channel ID configured)
 // ---------------------------------------------------------------------------
 
 const SLACK_FALLBACK_WEBHOOK = process.env.SLACK_SUPPORT_WEBHOOK_URL;
@@ -47,7 +92,7 @@ const SLACK_WEBHOOK_MAP: Record<NotifyChannel, string | undefined> = {
   daily: process.env.SLACK_WEBHOOK_DAILY || SLACK_FALLBACK_WEBHOOK,
 };
 
-async function sendSlack(
+async function sendSlackWebhook(
   channel: NotifyChannel,
   text: string,
   blocks?: unknown[],
@@ -75,9 +120,23 @@ async function sendSlack(
     });
     return res.ok;
   } catch (err) {
-    console.error(`[notify] Slack send failed (${channel}):`, err);
+    console.error(`[notify] Slack webhook send failed (${channel}):`, err);
     return false;
   }
+}
+
+async function sendSlack(
+  channel: NotifyChannel,
+  text: string,
+  blocks?: unknown[],
+): Promise<boolean> {
+  // Prefer Bot Token + channel ID (posts to the exact channel)
+  const channelId = SLACK_CHANNEL_ID_MAP[channel];
+  if (SLACK_BOT_TOKEN && channelId) {
+    return sendSlackBot(channelId, text, blocks);
+  }
+  // Fall back to webhooks
+  return sendSlackWebhook(channel, text, blocks);
 }
 
 // ---------------------------------------------------------------------------
