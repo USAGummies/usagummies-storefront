@@ -10,6 +10,17 @@ import { sendOpsEmail } from "@/lib/ops/email";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 15;
+
+const ALLOWED_DOMAINS = new Set(["usagummies.com", "gmail.com", "outlook.com"]);
+const ALLOWED_ADDRESSES = new Set(["ben@usagummies.com", "benjamin.stutman@gmail.com", "gonz1rene@outlook.com"]);
+
+function isAllowedRecipient(email: string): boolean {
+  const normalized = email.toLowerCase().trim();
+  if (ALLOWED_ADDRESSES.has(normalized)) return true;
+  const domain = normalized.split("@")[1];
+  return domain ? ALLOWED_DOMAINS.has(domain) : false;
+}
 
 export async function POST(req: Request) {
   // Auth: check CRON_SECRET
@@ -30,10 +41,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Missing to or body" }, { status: 400 });
   }
 
-  // Ensure Abra signature
+  // Validate recipient against allowlist
+  if (!isAllowedRecipient(to)) {
+    return NextResponse.json(
+      { error: `Recipient "${to}" is not in the allowed list` },
+      { status: 403 },
+    );
+  }
+
+  // Ensure signature
   let emailBody = body;
-  if (!emailBody.includes("Abra — via Benjamin") && !emailBody.includes("Best,\nBen")) {
-    emailBody = `${emailBody.trimEnd()}\n\n—\nAbra — via Benjamin\nUSA Gummies`;
+  if (!emailBody.includes("Best,\nBen") && !emailBody.includes("Best,\r\nBen")) {
+    emailBody = `${emailBody.trimEnd()}\n\nBest,\nBen`;
   }
 
   try {

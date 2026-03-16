@@ -4549,13 +4549,37 @@ async function postAbraCommandToSlack({ senderName, senderEmail, subject, task, 
     return;
   }
 
-  // Write to Supabase command queue for the approval executor
-  const commandId = `cmd-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  // Dedup: check if this email_id was already submitted
+  if (emailId && supabaseUrl && serviceKey) {
+    try {
+      const dupRes = await fetch(
+        `${supabaseUrl}/rest/v1/abra_email_commands?email_id=eq.${encodeURIComponent(String(emailId))}&select=id&limit=1`,
+        {
+          headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+          signal: AbortSignal.timeout(5000),
+        },
+      );
+      if (dupRes.ok) {
+        const existing = await dupRes.json();
+        if (existing.length > 0) {
+          log(`[abra-command] Duplicate email_id ${emailId} — already submitted as ${existing[0].id}, skipping`);
+          return;
+        }
+      }
+    } catch (err) {
+      log(`[abra-command] Dedup check failed (proceeding): ${err.message}`);
+    }
+  }
+
+  // Write to Supabase command queue for the approval executor
+  const commandId = `cmd-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  let dbInserted = false;
   if (supabaseUrl && serviceKey) {
     try {
-      await fetch(`${supabaseUrl}/rest/v1/abra_email_commands`, {
+      const insertRes = await fetch(`${supabaseUrl}/rest/v1/abra_email_commands`, {
         method: "POST",
         headers: {
           apikey: serviceKey,
@@ -4575,6 +4599,10 @@ async function postAbraCommandToSlack({ senderName, senderEmail, subject, task, 
         }),
         signal: AbortSignal.timeout(10000),
       });
+      dbInserted = insertRes.ok;
+      if (!dbInserted) {
+        log(`[abra-command] Supabase insert returned ${insertRes.status}`);
+      }
     } catch (err) {
       log(`[abra-command] Supabase insert failed: ${err.message}`);
     }
@@ -4582,8 +4610,14 @@ async function postAbraCommandToSlack({ senderName, senderEmail, subject, task, 
     log(`[abra-command] No Supabase credentials — command ${commandId} not persisted`);
   }
 
+  // Only post to Slack if the DB row was created (prevents orphan commands)
+  if (!dbInserted) {
+    log(`[abra-command] Skipping Slack post — DB insert failed for ${commandId}`);
+    return;
+  }
+
   // Post to Slack via Bot Token + chat.postMessage (targets specific channel)
-  const slackText = `📨 *Abra Command Received*\n*From:* ${senderName} (${senderEmail})\n*Subject:* ${subject}\n*Task:* ${task}\n*Command ID:* \`${commandId}\`\n\n_Reply with:_ \`abra approve ${commandId}\` _or_ \`abra deny ${commandId}\``;
+  const slackText = `📨 *Abra Command Received*\n*From:* ${senderName} (${senderEmail})\n*Subject:* ${subject}\n*Task:* ${task}\n*Command ID:* \`${commandId}\`\n\n_Reply with:_ \`/abra approve ${commandId}\` _or_ \`/abra deny ${commandId}\``;
 
   try {
     const res = await fetch("https://slack.com/api/chat.postMessage", {

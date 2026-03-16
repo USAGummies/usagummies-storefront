@@ -1428,13 +1428,51 @@ async function fetchCommand(commandId: string): Promise<EmailCommandRow | null> 
   return rows[0] || null;
 }
 
-async function updateCommand(commandId: string, fields: Record<string, unknown>) {
+async function updateCommand(commandId: string, fields: Record<string, unknown>): Promise<boolean> {
   const body = { ...fields, updated_at: new Date().toISOString() };
-  await fetch(`${sbUrl()}/rest/v1/abra_email_commands?id=eq.${encodeURIComponent(commandId)}`, {
-    method: "PATCH",
-    headers: { ...sbHeaders(), Prefer: "return=minimal" },
-    body: JSON.stringify(body),
-  }).catch(() => {});
+  try {
+    const res = await fetch(`${sbUrl()}/rest/v1/abra_email_commands?id=eq.${encodeURIComponent(commandId)}`, {
+      method: "PATCH",
+      headers: { ...sbHeaders(), Prefer: "return=minimal" },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) {
+      console.error(`[abra-cmd] updateCommand ${commandId} failed: ${res.status}`);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error(`[abra-cmd] updateCommand ${commandId} error:`, err);
+    return false;
+  }
+}
+
+/** Atomic status transition — only updates if current status matches expectedStatus (prevents race conditions) */
+async function claimCommand(commandId: string, expectedStatus: string, newStatus: string, extraFields?: Record<string, unknown>): Promise<boolean> {
+  const body = { status: newStatus, updated_at: new Date().toISOString(), ...extraFields };
+  try {
+    const res = await fetch(
+      `${sbUrl()}/rest/v1/abra_email_commands?id=eq.${encodeURIComponent(commandId)}&status=eq.${encodeURIComponent(expectedStatus)}`,
+      {
+        method: "PATCH",
+        headers: { ...sbHeaders(), Prefer: "return=headers-only" },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(10000),
+      },
+    );
+    // PostgREST returns Content-Range header showing matched rows
+    const range = res.headers.get("content-range") || "";
+    const matched = range.includes("/0") ? 0 : 1; // "*/0" = no rows matched
+    if (!range) {
+      // Fallback: assume success if 2xx
+      return res.ok;
+    }
+    return matched > 0;
+  } catch (err) {
+    console.error(`[abra-cmd] claimCommand ${commandId} ${expectedStatus}→${newStatus} error:`, err);
+    return false;
+  }
 }
 
 async function postToSlackChannel(channelId: string, text: string) {
@@ -1473,13 +1511,21 @@ async function handleAbraCommandDecision(
   }
 
   if (decision === "denied") {
-    await updateCommand(commandId, { status: "denied", decided_at: new Date().toISOString() });
+    const claimed = await claimCommand(commandId, "pending_approval", "denied", { decided_at: new Date().toISOString() });
+    if (!claimed) {
+      await postToSlackResponse(responseUrl, `⚠️ Command ${commandId} was already claimed by another action.`);
+      return;
+    }
     await postToSlackResponse(responseUrl, `❌ Denied command from ${entry.sender_name}: ${entry.task}`);
     return;
   }
 
-  // ── Approved: execute the task directly via LLM ──
-  await updateCommand(commandId, { status: "executing", decided_at: new Date().toISOString() });
+  // ── Approved: atomically claim the command (prevents double-approve race) ──
+  const claimed = await claimCommand(commandId, "pending_approval", "executing", { decided_at: new Date().toISOString() });
+  if (!claimed) {
+    await postToSlackResponse(responseUrl, `⚠️ Command ${commandId} was already claimed — possible double-approve.`);
+    return;
+  }
   await postToSlackResponse(responseUrl, `✅ Approved. Abra is executing: _${entry.task}_`);
 
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
@@ -1501,29 +1547,32 @@ async function handleAbraCommandDecision(
       body: JSON.stringify({
         model: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6",
         max_tokens: 2048,
-        system: `You are Abra, the AI operations assistant for USA Gummies. Ben (the founder) has approved an email command from an external person. Your job:
+        system: `You are Abra, the AI operations assistant for USA Gummies. Ben (the founder) has approved an email command from an external person.
 
-1. EXECUTE the requested task. Describe exactly what you did (or what needs to be done if you can't do it directly).
-2. DRAFT a reply email to the sender confirming what was done.
+Your job:
+1. ANALYZE the task and write a clear summary of what was done (Ben or Abra may have already completed it) or what still needs to be done.
+2. DRAFT a professional reply email to the sender confirming the outcome.
+
+Context: You do not have direct access to Notion, databases, or external APIs in this call. Ben handles the actual execution. Your role is to summarize the work and draft the reply.
 
 Respond in this exact JSON format:
 {
-  "execution_summary": "What was done (1-3 sentences, be specific)",
+  "execution_summary": "What was done or needs to be done (1-3 sentences, be specific)",
   "draft_reply_subject": "Re: <original subject>",
-  "draft_reply_body": "The email body to send back to the sender. Professional, friendly, concise. Sign off as Ben."
+  "draft_reply_body": "The email body to send to the sender. Professional, friendly, concise. Sign off as Ben. Do NOT mention Abra or AI."
 }
 
-IMPORTANT: Respond ONLY with valid JSON, no markdown fences, no extra text.`,
+IMPORTANT: Respond ONLY with valid JSON. No markdown fences, no extra text. Never fabricate actions you did not take.`,
         messages: [{
           role: "user",
-          content: `Email command approved by Ben. Execute and draft reply.
+          content: `Email command approved by Ben. Summarize and draft reply.
 
 FROM: ${entry.sender_name} (${entry.sender_email})
 SUBJECT: ${entry.subject}
 TASK: ${entry.task}
 EMAIL CONTEXT: ${entry.body_snippet || "(no additional context)"}
 
-Note: The task may already have been partially or fully completed by Ben. If the task sounds like it's been handled, write the execution summary accordingly and draft a confirmation reply.`,
+Ben has already handled or is handling the actual task execution. Write the summary and draft a reply to confirm completion.`,
         }],
       }),
       signal: AbortSignal.timeout(30000),
@@ -1582,7 +1631,9 @@ Note: The task may already have been partially or fully completed by Ben. If the
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown";
     await updateCommand(commandId, { status: "execution_failed", result_text: msg.slice(0, 5000) });
+    // Post to both response_url AND channel (response_url may have expired)
     await postToSlackResponse(responseUrl, `❌ Execution error: ${msg.slice(0, 200)}`);
+    await postToSlackChannel(ABRA_COMMAND_CHANNEL, `❌ *Command ${commandId} failed*\n*Task:* ${entry.task}\n*Error:* ${msg.slice(0, 300)}`);
   }
 }
 
@@ -1609,7 +1660,12 @@ async function handleSendReply(commandId: string, responseUrl: string) {
     return;
   }
 
-  await updateCommand(commandId, { status: "reply_approved" });
+  // Atomically claim to prevent double-send
+  const claimed = await claimCommand(commandId, "draft_reply_pending", "reply_approved");
+  if (!claimed) {
+    await postToSlackResponse(responseUrl, `⚠️ Reply for ${commandId} was already claimed.`);
+    return;
+  }
   await postToSlackResponse(responseUrl, `📧 Sending reply to ${entry.sender_email}...`);
 
   try {
@@ -1688,6 +1744,7 @@ export async function POST(req: Request) {
         "• `/abra approve <cmd-id>` — Approve an email command\n" +
         "• `/abra deny <cmd-id>` — Deny an email command\n" +
         "• `/abra sendreply <cmd-id>` — Send the draft reply email\n" +
+        "• `/abra commands` — List pending email commands\n" +
         "• `/abra refresh` — Refresh latest email + teaching feeds\n\n" +
         "Departments (20) grouped by operating pillar:\n" +
         DEPARTMENT_HELP_TEXT,
@@ -1715,6 +1772,42 @@ export async function POST(req: Request) {
   const approveMatch = trimmedText.match(/^approve\s+(cmd-[\w-]+)$/i);
   const denyMatch = trimmedText.match(/^deny\s+(cmd-[\w-]+)$/i);
   const sendReplyMatch = trimmedText.match(/^sendreply\s+(cmd-[\w-]+)$/i);
+  const commandsMatch = /^commands$/i.test(trimmedText);
+
+  // Handle /abra commands — list pending email commands
+  if (commandsMatch) {
+    after(async () => {
+      try {
+        if (!sbUrl() || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+          await postToSlackResponse(responseUrl, `❌ Supabase not configured.`);
+          return;
+        }
+        const res = await fetch(
+          `${sbUrl()}/rest/v1/abra_email_commands?status=in.(pending_approval,executing,draft_reply_pending)&order=created_at.desc&limit=10&select=id,status,sender_name,task,created_at`,
+          { headers: sbHeaders(), signal: AbortSignal.timeout(10000) },
+        );
+        if (!res.ok) {
+          await postToSlackResponse(responseUrl, `❌ Failed to fetch commands.`);
+          return;
+        }
+        const cmds = (await res.json()) as Array<{ id: string; status: string; sender_name: string; task: string; created_at: string }>;
+        if (cmds.length === 0) {
+          await postToSlackResponse(responseUrl, `No pending email commands.`);
+          return;
+        }
+        const lines = cmds.map((c) => {
+          const statusEmoji = c.status === "pending_approval" ? "⏳" : c.status === "draft_reply_pending" ? "📧" : "⚙️";
+          const action = c.status === "pending_approval" ? `\`/abra approve ${c.id}\`` : c.status === "draft_reply_pending" ? `\`/abra sendreply ${c.id}\`` : "_processing..._";
+          return `${statusEmoji} \`${c.id}\` — *${c.sender_name}*: ${c.task.slice(0, 80)}\n  Status: ${c.status} | ${action}`;
+        });
+        await postToSlackResponse(responseUrl, `*Pending Email Commands (${cmds.length}):*\n\n${lines.join("\n\n")}`);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Unknown";
+        await postToSlackResponse(responseUrl, `❌ Error: ${msg.slice(0, 200)}`);
+      }
+    });
+    return NextResponse.json({ response_type: "ephemeral", text: "Fetching pending commands..." });
+  }
 
   // Handle sendreply for email-to-Abra commands (phase 2: send draft reply)
   if (sendReplyMatch) {
