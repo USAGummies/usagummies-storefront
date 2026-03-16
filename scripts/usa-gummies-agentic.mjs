@@ -4779,36 +4779,6 @@ async function postAbraCommandToSlack({ senderName, senderEmail, subject, task, 
     log(`[abra-command] Slack post failed: ${err.message}`);
   }
 
-  // Also notify via SMS if Twilio is configured
-  const twilioSid = process.env.TWILIO_ACCOUNT_SID;
-  const twilioToken = process.env.TWILIO_AUTH_TOKEN;
-  const twilioFrom = process.env.TWILIO_PHONE_NUMBER;
-  const ownerPhone = process.env.ABRA_OWNER_PHONE || "+14358967765";
-
-  if (twilioSid && twilioToken && twilioFrom) {
-    try {
-      const smsBody = `Abra Command from ${senderName}:\n${task.slice(0, 120)}\n\nReply: approve ${commandId}\nOr: deny ${commandId}`;
-      await fetch(
-        `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Basic ${Buffer.from(`${twilioSid}:${twilioToken}`).toString("base64")}`,
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-          body: new URLSearchParams({
-            To: ownerPhone,
-            From: twilioFrom,
-            Body: smsBody,
-          }).toString(),
-          signal: AbortSignal.timeout(10000),
-        },
-      );
-      log(`[abra-command] SMS notification sent to ${ownerPhone}`);
-    } catch (err) {
-      log(`[abra-command] SMS notification failed: ${err.message}`);
-    }
-  }
 }
 
 function extractBouncedRecipientEmail(text) {
