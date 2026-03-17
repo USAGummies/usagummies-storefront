@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { after } from "next/server";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { recordFeedback } from "@/lib/ops/abra-source-provenance";
+import { executeAction } from "@/lib/ops/abra-actions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -97,32 +98,39 @@ async function processApprovalAction(
   approvalId: string,
   decision: "approved" | "denied",
   actor: string,
-): Promise<boolean> {
+): Promise<{ ok: boolean; resultMsg?: string }> {
   const existing = (await sbFetch(
-    `/rest/v1/approvals?id=eq.${approvalId}&select=id,action_payload,proposed_payload&limit=1`,
+    `/rest/v1/approvals?id=eq.${approvalId}&select=id,status,action_payload,proposed_payload&limit=1`,
   )) as Array<Record<string, unknown>>;
-  if (!existing[0]) return false;
+  if (!existing[0]) return { ok: false, resultMsg: "Approval not found" };
 
-  const updatePayload: Record<string, unknown> = {
-    status: decision,
-    decision,
-    decided_at: new Date().toISOString(),
-    decision_reasoning: `Slack interaction by ${actor}`,
-  };
-  const actionPayload = existing[0].action_payload || existing[0].proposed_payload;
-  if (decision === "approved" && actionPayload) {
-    updatePayload.resolved_payload = actionPayload;
+  // Prevent double-processing
+  if (existing[0].status !== "pending") {
+    return { ok: false, resultMsg: `Already ${existing[0].status}` };
   }
 
-  await sbFetch(`/rest/v1/approvals?id=eq.${approvalId}`, {
-    method: "PATCH",
-    headers: {
-      Prefer: "return=minimal",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(updatePayload),
-  });
-  return true;
+  if (decision === "denied") {
+    await sbFetch(`/rest/v1/approvals?id=eq.${approvalId}`, {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal", "Content-Type": "application/json" },
+      body: JSON.stringify({
+        status: "denied",
+        decision: "denied",
+        decided_at: new Date().toISOString(),
+        decision_reasoning: `Rejected by ${actor} via Slack`,
+      }),
+    });
+    return { ok: true };
+  }
+
+  // Approved — execute the action
+  try {
+    const result = await executeAction(approvalId);
+    return { ok: result.success, resultMsg: result.message };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Execution failed";
+    return { ok: false, resultMsg: msg };
+  }
 }
 
 export async function POST(req: Request) {
@@ -184,18 +192,24 @@ export async function POST(req: Request) {
     const decision = actionId === "approve_action" ? "approved" : "denied";
     const responseUrl = payload.response_url || "";
     after(async () => {
-      const ok = await processApprovalAction(value, decision, actor).catch(() => false);
+      const result = await processApprovalAction(value, decision, actor).catch((err) => ({
+        ok: false,
+        resultMsg: err instanceof Error ? err.message : "Unknown error",
+      }));
       if (!responseUrl) return;
-      const text = ok
-        ? decision === "approved"
-          ? `✅ Approved by ${actor}`
-          : `❌ Rejected by ${actor}`
-        : `⚠️ Failed to process decision (${value})`;
+      let text: string;
+      if (result.ok) {
+        text = decision === "approved"
+          ? `✅ Approved & executed by ${actor}${result.resultMsg ? `\n${result.resultMsg}` : ""}`
+          : `❌ Rejected by ${actor}`;
+      } else {
+        text = `⚠️ ${result.resultMsg || `Failed to process decision (${value})`}`;
+      }
       await replaceSlackMessage(responseUrl, text);
     });
     return NextResponse.json({
       response_type: "ephemeral",
-      text: "Processing decision...",
+      text: decision === "approved" ? "⏳ Approving & executing..." : "⏳ Rejecting...",
     });
   }
 

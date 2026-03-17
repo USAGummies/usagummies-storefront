@@ -1851,7 +1851,7 @@ const DIRECT_EXEC_ACTIONS = new Set([
   "draft_email_reply",
 ]);
 
-/** Post pending approval to Slack so Ben can approve from his phone */
+/** Post pending approval to Slack with interactive buttons so Ben can approve from his phone */
 async function notifySlackPendingApproval(approvalId: string, action: AbraAction): Promise<void> {
   const botToken = process.env.SLACK_BOT_TOKEN;
   if (!botToken) return;
@@ -1860,16 +1860,44 @@ async function notifySlackPendingApproval(approvalId: string, action: AbraAction
   const riskEmoji = action.risk_level === "high" || action.risk_level === "critical"
     ? "\u{1F6A8}" : action.risk_level === "medium" ? "\u{26A0}\u{FE0F}" : "\u{1F4CB}";
   const tier = permissionTierForRisk(action.risk_level);
-  const shortId = approvalId.slice(0, 8);
+  const summary = (action.description || action.title || "").slice(0, 300);
 
-  const slackText = [
-    `${riskEmoji} *Abra Needs Approval* (Tier ${tier})`,
-    `*Action:* ${action.action_type}`,
-    `*Summary:* ${(action.description || action.title || "").slice(0, 300)}`,
-    `*Risk:* ${action.risk_level}`,
-    "",
-    `\`/abra approve ${shortId}\` or \`/abra deny ${shortId}\``,
-  ].join("\n");
+  const fallbackText = `${riskEmoji} Abra Needs Approval (Tier ${tier}) — ${action.action_type}: ${summary}`;
+
+  const blocks = [
+    {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `${riskEmoji} *Abra Needs Approval* (Tier ${tier})\n*Action:* \`${action.action_type}\`\n*Risk:* ${action.risk_level}\n*Summary:* ${summary}`,
+      },
+    },
+    {
+      type: "actions",
+      elements: [
+        {
+          type: "button",
+          text: { type: "plain_text", text: "Approve", emoji: true },
+          style: "primary",
+          action_id: "approve_action",
+          value: approvalId,
+          confirm: {
+            title: { type: "plain_text", text: "Approve this action?" },
+            text: { type: "mrkdwn", text: `*${action.action_type}*: ${summary}` },
+            confirm: { type: "plain_text", text: "Approve" },
+            deny: { type: "plain_text", text: "Cancel" },
+          },
+        },
+        {
+          type: "button",
+          text: { type: "plain_text", text: "Reject", emoji: true },
+          style: "danger",
+          action_id: "reject_action",
+          value: approvalId,
+        },
+      ],
+    },
+  ];
 
   try {
     await fetch("https://slack.com/api/chat.postMessage", {
@@ -1880,8 +1908,8 @@ async function notifySlackPendingApproval(approvalId: string, action: AbraAction
       },
       body: JSON.stringify({
         channel: ABRA_CONTROL,
-        text: slackText,
-        mrkdwn: true,
+        text: fallbackText,
+        blocks,
       }),
       signal: AbortSignal.timeout(10000),
     });
