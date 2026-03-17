@@ -115,6 +115,8 @@ export const STATE_KEYS = {
   "abra-model-governor": "abra-model-governor.json",
   "abra-scheduler-lock": "abra-scheduler-lock.json",
   "abra-vip-slack-threads": "abra-vip-slack-threads.json",
+  "abra-awaiting-reply-alerts": "abra-awaiting-reply-alerts.json",
+  "abra-stalled-deal-alerts": "abra-stalled-deal-alerts.json",
 
   // Logs (text, not JSON — stored as string)
   "engine-log": "agentic-engine.log",

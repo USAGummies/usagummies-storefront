@@ -12,15 +12,19 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 15;
 
-/** Only usagummies.com domain + explicit external addresses can receive Abra emails */
-const ALLOWED_DOMAINS = new Set(["usagummies.com"]);
-const ALLOWED_ADDRESSES = new Set(["ben@usagummies.com", "benjamin.stutman@gmail.com", "gonz1rene@outlook.com"]);
+/**
+ * Basic email safety check — this endpoint is already auth-gated by CRON_SECRET
+ * and all sends go through human approval (/abra sendreply <id>), so we only
+ * block obviously invalid recipients rather than maintaining a domain allowlist.
+ * This was previously a strict allowlist that blocked replies to external contacts (P0 bug).
+ */
+const BLOCKED_RECIPIENT_RE = /^(noreply|no-reply|donotreply|mailer-daemon|postmaster)@/i;
 
 function isAllowedRecipient(email: string): boolean {
   const normalized = email.toLowerCase().trim();
-  if (ALLOWED_ADDRESSES.has(normalized)) return true;
-  const domain = normalized.split("@")[1];
-  return domain ? ALLOWED_DOMAINS.has(domain) : false;
+  if (!normalized || !normalized.includes("@")) return false;
+  if (BLOCKED_RECIPIENT_RE.test(normalized)) return false;
+  return true;
 }
 
 export async function POST(req: Request) {

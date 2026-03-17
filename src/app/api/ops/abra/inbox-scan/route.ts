@@ -18,6 +18,7 @@ import { listEmails, readEmail } from "@/lib/ops/gmail-reader";
 import { detectAwaitingReplies, detectStalledDeals } from "@/lib/ops/abra-email-fetch";
 import { expireStaleApprovals } from "@/lib/ops/abra-actions";
 import { autoAcknowledgeStaleSignals } from "@/lib/ops/abra-operational-signals";
+import { readState, writeState } from "@/lib/ops/state";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -436,38 +437,65 @@ export async function POST(req: Request) {
     }
 
     // ---- Awaiting-reply detection (cross-reference sent vs inbox) ----
+    // Deduplication: track which threadIds we've already alerted about so we
+    // don't spam Slack on every 5-minute scan cycle.
     let awaitingAlerts = 0;
     try {
       const awaiting = await detectAwaitingReplies({ sentCount: 30, lookbackHours: 72 });
       const criticalAwaiting = awaiting.filter((a) => a.escalation === "critical" || a.escalation === "important");
 
       if (criticalAwaiting.length > 0) {
-        const botToken = process.env.SLACK_BOT_TOKEN;
-        const ABRA_COMMAND_CHANNEL = "C0ALS6W7VB4";
-        if (botToken) {
-          const lines = criticalAwaiting.map((a) => {
-            const emoji = a.escalation === "critical" ? "\u{1F6A8}" : "\u{26A0}\u{FE0F}";
-            return `${emoji} *${a.recipientName}* — _${a.subject}_ (sent ${a.hoursAgo}h ago)\n   ${a.reason}`;
-          });
-          const slackText = `\u{1F4EC} *Awaiting Reply Alert*\nThese outbound emails have no reply yet:\n\n${lines.join("\n\n")}`;
+        // Load previously-alerted threadIds from KV state
+        const alertedState = await readState("abra-awaiting-reply-alerts", {} as Record<string, number>).catch(() => ({} as Record<string, number>));
+        const alerted: Record<string, number> = alertedState;
 
-          try {
-            await fetch("https://slack.com/api/chat.postMessage", {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${botToken}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                channel: ABRA_COMMAND_CHANNEL,
-                text: slackText,
-                mrkdwn: true,
-              }),
-              signal: AbortSignal.timeout(10000),
+        // Filter out threads we've already alerted in the last 12 hours
+        const DEDUP_TTL_MS = 12 * 60 * 60 * 1000;
+        const now = Date.now();
+        const newAlerts = criticalAwaiting.filter((a) => {
+          if (!a.threadId) return true; // No threadId → always alert
+          const lastAlerted = alerted[a.threadId];
+          return !lastAlerted || now - lastAlerted > DEDUP_TTL_MS;
+        });
+
+        if (newAlerts.length > 0) {
+          const botToken = process.env.SLACK_BOT_TOKEN;
+          const ABRA_COMMAND_CHANNEL = "C0ALS6W7VB4";
+          if (botToken) {
+            const lines = newAlerts.map((a) => {
+              const emoji = a.escalation === "critical" ? "\u{1F6A8}" : "\u{26A0}\u{FE0F}";
+              return `${emoji} *${a.recipientName}* — _${a.subject}_ (sent ${a.hoursAgo}h ago)\n   ${a.reason}`;
             });
-            awaitingAlerts = criticalAwaiting.length;
-          } catch {
-            // Slack post is best-effort
+            const slackText = `\u{1F4EC} *Awaiting Reply Alert*\nThese outbound emails have no reply yet:\n\n${lines.join("\n\n")}`;
+
+            try {
+              await fetch("https://slack.com/api/chat.postMessage", {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${botToken}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  channel: ABRA_COMMAND_CHANNEL,
+                  text: slackText,
+                  mrkdwn: true,
+                }),
+                signal: AbortSignal.timeout(10000),
+              });
+              awaitingAlerts = newAlerts.length;
+
+              // Record alert timestamps for dedup
+              for (const a of newAlerts) {
+                if (a.threadId) alerted[a.threadId] = now;
+              }
+              // Prune entries older than 72h
+              for (const [tid, ts] of Object.entries(alerted)) {
+                if (now - ts > 72 * 60 * 60 * 1000) delete alerted[tid];
+              }
+              await writeState("abra-awaiting-reply-alerts", alerted).catch(() => {});
+            } catch {
+              // Slack post is best-effort
+            }
           }
         }
       }
@@ -475,39 +503,60 @@ export async function POST(req: Request) {
       // Awaiting-reply detection is best-effort
     }
 
-    // ---- Deal stall detection ----
+    // ---- Deal stall detection (with dedup) ----
     let stalledAlerts = 0;
     try {
       const stalled = await detectStalledDeals({ vipStallDays: 5, normalStallDays: 10 });
       const important = stalled.filter((d) => d.severity === "critical" || d.severity === "important");
 
       if (important.length > 0) {
-        const botToken = process.env.SLACK_BOT_TOKEN;
-        const ABRA_COMMAND_CHANNEL = "C0ALS6W7VB4";
-        if (botToken) {
-          const lines = important.map((d) => {
-            const emoji = d.severity === "critical" ? "\u{1F6A8}" : "\u{26A0}\u{FE0F}";
-            return `${emoji} *${d.leadName}* (${d.stage}) \u2014 ${d.daysSinceContact} days silent\n   ${d.reason}`;
-          });
-          const slackText = `\u{1F4C9} *Stalled Deal Alert*\nThese pipeline deals are going cold:\n\n${lines.join("\n\n")}`;
+        // Dedup: only alert once per lead per 24h
+        const stalledAlerted = await readState("abra-stalled-deal-alerts", {} as Record<string, number>).catch(() => ({} as Record<string, number>));
+        const now = Date.now();
+        const STALL_DEDUP_TTL_MS = 24 * 60 * 60 * 1000;
 
-          try {
-            await fetch("https://slack.com/api/chat.postMessage", {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${botToken}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                channel: ABRA_COMMAND_CHANNEL,
-                text: slackText,
-                mrkdwn: true,
-              }),
-              signal: AbortSignal.timeout(10000),
+        const newStalled = important.filter((d) => {
+          const key = d.email || d.leadName;
+          const last = stalledAlerted[key];
+          return !last || now - last > STALL_DEDUP_TTL_MS;
+        });
+
+        if (newStalled.length > 0) {
+          const botToken = process.env.SLACK_BOT_TOKEN;
+          const ABRA_COMMAND_CHANNEL = "C0ALS6W7VB4";
+          if (botToken) {
+            const lines = newStalled.map((d) => {
+              const emoji = d.severity === "critical" ? "\u{1F6A8}" : "\u{26A0}\u{FE0F}";
+              return `${emoji} *${d.leadName}* (${d.stage}) \u2014 ${d.daysSinceContact} days silent\n   ${d.reason}`;
             });
-            stalledAlerts = important.length;
-          } catch {
-            // Slack post is best-effort
+            const slackText = `\u{1F4C9} *Stalled Deal Alert*\nThese pipeline deals are going cold:\n\n${lines.join("\n\n")}`;
+
+            try {
+              await fetch("https://slack.com/api/chat.postMessage", {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${botToken}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  channel: ABRA_COMMAND_CHANNEL,
+                  text: slackText,
+                  mrkdwn: true,
+                }),
+                signal: AbortSignal.timeout(10000),
+              });
+              stalledAlerts = newStalled.length;
+
+              for (const d of newStalled) {
+                stalledAlerted[d.email || d.leadName] = now;
+              }
+              for (const [k, ts] of Object.entries(stalledAlerted)) {
+                if (now - ts > 72 * 60 * 60 * 1000) delete stalledAlerted[k];
+              }
+              await writeState("abra-stalled-deal-alerts", stalledAlerted).catch(() => {});
+            } catch {
+              // Slack post is best-effort
+            }
           }
         }
       }

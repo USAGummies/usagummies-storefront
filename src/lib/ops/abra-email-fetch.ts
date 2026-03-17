@@ -300,6 +300,35 @@ export async function detectAwaitingReplies(opts?: {
     // Build set of thread IDs that have inbox replies
     const repliedThreads = new Set(inboxEnvelopes.map((e) => e.threadId).filter(Boolean));
 
+    // Build map: threadId → most recent SENT timestamp
+    // If there are multiple sent items in a thread, only the NEWEST one
+    // should be considered as "awaiting reply". This prevents false positives
+    // when Ben replies to an ongoing thread (e.g., "Re: Re: ...").
+    const latestSentPerThread = new Map<string, { date: number; index: number }>();
+    for (let i = 0; i < sentEnvelopes.length; i++) {
+      const sent = sentEnvelopes[i];
+      if (!sent.threadId) continue;
+      const ts = Date.parse(sent.date);
+      if (!Number.isFinite(ts)) continue;
+      const existing = latestSentPerThread.get(sent.threadId);
+      if (!existing || ts > existing.date) {
+        latestSentPerThread.set(sent.threadId, { date: ts, index: i });
+      }
+    }
+
+    // Also check if the INBOX has messages NEWER than our sent message in the
+    // same thread — that means someone replied even if threadId matching is off.
+    const inboxThreadDates = new Map<string, number>();
+    for (const env of inboxEnvelopes) {
+      if (!env.threadId) continue;
+      const ts = Date.parse(env.date);
+      if (!Number.isFinite(ts)) continue;
+      const existing = inboxThreadDates.get(env.threadId);
+      if (!existing || ts > existing) {
+        inboxThreadDates.set(env.threadId, ts);
+      }
+    }
+
     const awaiting: Array<{
       threadId: string;
       recipientEmail: string;
@@ -311,13 +340,32 @@ export async function detectAwaitingReplies(opts?: {
       reason: string;
     }> = [];
 
-    for (const sent of sentEnvelopes) {
-      // Skip if we already have a reply in inbox
+    // Track already-processed threads to avoid duplicates from multiple sent items
+    const processedThreads = new Set<string>();
+
+    for (let i = 0; i < sentEnvelopes.length; i++) {
+      const sent = sentEnvelopes[i];
+
+      // Skip if we already have a reply in inbox for this thread
       if (sent.threadId && repliedThreads.has(sent.threadId)) continue;
 
       // Skip old emails
       const sentDate = Date.parse(sent.date);
       if (!Number.isFinite(sentDate) || sentDate < cutoff) continue;
+
+      // Only process the MOST RECENT sent item per thread
+      if (sent.threadId) {
+        if (processedThreads.has(sent.threadId)) continue;
+        const latest = latestSentPerThread.get(sent.threadId);
+        if (latest && latest.index !== i) continue; // Not the newest sent in this thread
+        processedThreads.add(sent.threadId);
+      }
+
+      // Check if inbox has a message newer than this sent — means they replied
+      if (sent.threadId) {
+        const newestInbox = inboxThreadDates.get(sent.threadId);
+        if (newestInbox && newestInbox > sentDate) continue;
+      }
 
       // Extract recipient
       const recipientEmail = parseSenderEmail(sent.to || "");

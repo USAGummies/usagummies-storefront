@@ -1005,6 +1005,7 @@ async function callAbraChatViaInternalApi(
         body: JSON.stringify({
           message,
           history: history || [],
+          channel: "slack",
         }),
       },
       { timeoutMs: 45000, maxRetries: 0 },
@@ -1042,10 +1043,17 @@ async function callAbraChatViaInternalApi(
           )
       : [];
 
+    const logId =
+      typeof data.answerLogId === "string" && data.answerLogId
+        ? data.answerLogId
+        : typeof data.answer_log_id === "string" && data.answer_log_id
+          ? data.answer_log_id
+          : null;
+
     return {
       reply,
       sources,
-      answerLogId: null,
+      answerLogId: logId,
     };
   } catch {
     return null;
@@ -1138,6 +1146,19 @@ async function callAbraChat(
       });
     } catch {
       // Brain search failed — degrade to general knowledge
+    }
+  }
+
+  // --------------- Step 2b: Auto-refresh if query asks about "today" / "latest" ---------------
+  let refreshNote = "";
+  if (REFRESH_QUERY_TRIGGERS.test(message)) {
+    const freshestDays = freshestSourceAgeDays(
+      tieredResults.all.map((r) => ({ days_ago: r.days_ago })),
+    );
+    // If data is stale (>0.5 days) or no results, trigger background refresh
+    if (freshestDays === null || freshestDays > 0.5) {
+      const refreshResult = await runKnowledgeRefresh("auto-refresh for time-sensitive query");
+      refreshNote = formatFreshnessNote(freshestDays, refreshResult);
     }
   }
 
@@ -1336,6 +1357,9 @@ async function callAbraChat(
   if (degraded) {
     reply +=
       "\n\n_⚠️ Note: This answer was generated without access to the business brain. Results may be less specific._";
+  }
+  if (refreshNote) {
+    reply += `\n\n_${refreshNote}_`;
   }
 
   // --------------- Step 6: Log questions if confidence is low ---------------
@@ -1977,8 +2001,16 @@ async function handleSendReply(commandId: string, responseUrl: string) {
     }).catch(() => {});
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown";
-    await updateCommand(commandId, { status: "execution_failed", result_text: `Send reply failed: ${msg}` });
-    await postToSlackResponse(responseUrl, `❌ Failed to send reply: ${msg.slice(0, 200)}`);
+    // Revert to draft_reply_pending so the operator can retry instead of
+    // leaving the draft stranded in a dead-end "execution_failed" state.
+    await updateCommand(commandId, {
+      status: "draft_reply_pending",
+      result_text: `Send attempt failed (reverted to pending): ${msg}`,
+    });
+    await postToSlackResponse(
+      responseUrl,
+      `❌ Failed to send reply: ${msg.slice(0, 200)}\n_Draft has been returned to pending — retry with_ \`/abra sendreply ${commandId}\``,
+    );
   }
 }
 

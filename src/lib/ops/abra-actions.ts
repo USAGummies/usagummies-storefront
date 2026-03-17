@@ -337,6 +337,12 @@ async function handleSendEmail(
   return { success: true, message: `Email sent to ${to}` };
 }
 
+/**
+ * draft_email_reply — stores a draft for human review, does NOT send immediately.
+ * The draft gets posted to #abra-control and the operator must run
+ * `/abra sendreply <cmd-id>` to actually dispatch it. This matches the system
+ * prompt contract: "drafts never auto-send."
+ */
 async function handleDraftEmailReply(
   params: Record<string, unknown>,
 ): Promise<ActionResult> {
@@ -344,42 +350,72 @@ async function handleDraftEmailReply(
   const subject = sanitizeTitle(String(params.subject || "Re: (no subject)"));
   let body = sanitizeText(String(params.body || ""), 10000);
   const sourceEmailId = typeof params.source_email_id === "string" ? params.source_email_id : null;
+  const senderName = String(params.sender_name || params.recipient_name || to.split("@")[0] || "Unknown");
 
   if (!to || !body) {
     return { success: false, message: "Missing email recipient or body for draft reply" };
   }
 
-  if (!isAllowedEmailRecipient(to)) {
-    return {
-      success: false,
-      message: `Email recipient "${to}" is not in the allowed list. Only @usagummies.com and pre-approved addresses are permitted.`,
-    };
-  }
-
   // Ensure Abra signature is present
-  if (!body.includes("Abra — via Benjamin")) {
-    body = `${body.trimEnd()}\n\n—\nAbra — via Benjamin\nUSA Gummies`;
+  if (!body.includes("Best,\nBen") && !body.includes("Abra — via Benjamin")) {
+    body = `${body.trimEnd()}\n\nBest,\nBen`;
   }
 
-  await sendOpsEmail({ to, subject, body, from: "Abra via Benjamin <ben@usagummies.com>" });
+  // Store draft in abra_email_commands for human approval instead of sending
+  try {
+    const commandId = `cmd-${randomUUID().slice(0, 8)}`;
+    await sbFetch("/rest/v1/abra_email_commands", {
+      method: "POST",
+      headers: { Prefer: "return=minimal", "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: commandId,
+        status: "draft_reply_pending",
+        sender_name: senderName,
+        sender_email: to,
+        subject,
+        task: `Draft reply to ${senderName}`,
+        draft_reply_subject: subject,
+        draft_reply_body: body,
+        body_snippet: body.slice(0, 500),
+        ...(sourceEmailId ? { gmail_thread_id: sourceEmailId } : {}),
+      }),
+    });
 
-  // Update source email's draft_status to 'sent' if we have a reference
-  if (sourceEmailId) {
-    try {
-      await sbFetch(
-        `/rest/v1/email_events?id=eq.${encodeURIComponent(sourceEmailId)}`,
-        {
-          method: "PATCH",
-          headers: { Prefer: "return=minimal" },
-          body: JSON.stringify({ draft_status: "sent" }),
-        },
-      );
-    } catch (err) {
-      console.error(`[abra-actions] Failed to update draft_status for ${sourceEmailId}:`, err);
+    // Notify Slack for review
+    await notify({
+      channel: "alerts",
+      text:
+        `📧 *Draft Reply Queued*\n` +
+        `*To:* ${to}\n*Subject:* ${subject}\n\n` +
+        `> ${body.slice(0, 300).split("\n").join("\n> ")}\n\n` +
+        `_Send with:_ \`/abra sendreply ${commandId}\` _or discard with:_ \`/abra deny ${commandId}\``,
+    });
+
+    // Update source email's draft_status if we have a reference
+    if (sourceEmailId) {
+      try {
+        await sbFetch(
+          `/rest/v1/email_events?id=eq.${encodeURIComponent(sourceEmailId)}`,
+          {
+            method: "PATCH",
+            headers: { Prefer: "return=minimal" },
+            body: JSON.stringify({ draft_status: "pending" }),
+          },
+        );
+      } catch (err) {
+        console.error(`[abra-actions] Failed to update draft_status for ${sourceEmailId}:`, err);
+      }
     }
-  }
 
-  return { success: true, message: `Draft reply sent to ${to} (${subject})` };
+    return {
+      success: true,
+      message: `Draft reply queued for review (${commandId}). Use /abra sendreply ${commandId} in Slack to send.`,
+      data: { command_id: commandId },
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Unknown error";
+    return { success: false, message: `Failed to queue draft reply: ${msg}` };
+  }
 }
 
 async function handleCreateTask(

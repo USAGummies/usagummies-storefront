@@ -55,7 +55,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    // Handle app_mention events
+    // Handle app_mention events — route through the full Abra pipeline
+    // instead of a raw LLM call (ensures memory, provenance, action gating,
+    // freshness, and cost tracking are all applied).
     if (event.type === "app_mention") {
       const text =
         event.text?.replace(/<@[A-Z0-9]+>/g, "").trim() || "";
@@ -66,39 +68,40 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: true });
       }
 
-      // Process in background
-      const anthropicKey = process.env.ANTHROPIC_API_KEY;
       const botToken = process.env.SLACK_BOT_TOKEN;
+      const cronSecret = (process.env.CRON_SECRET || "").trim();
 
-      if (anthropicKey && botToken) {
-        // Fire and forget — respond in thread
+      if (botToken && cronSecret) {
+        // Fire and forget — call the full Abra chat API and reply in thread
         (async () => {
           try {
-            const llmRes = await fetch(
-              "https://api.anthropic.com/v1/messages",
-              {
-                method: "POST",
-                headers: {
-                  "x-api-key": anthropicKey,
-                  "anthropic-version": "2023-06-01",
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  model:
-                    process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6",
-                  max_tokens: 1024,
-                  system:
-                    "You are Abra, the AI operations assistant for USA Gummies. You're responding to a Slack mention. Be concise, helpful, and professional. Use Slack markdown formatting.",
-                  messages: [{ role: "user", content: text }],
-                }),
-                signal: AbortSignal.timeout(30000),
+            const host =
+              process.env.NEXTAUTH_URL ||
+              (process.env.VERCEL_URL
+                ? `https://${process.env.VERCEL_URL}`
+                : "http://localhost:4000");
+
+            const chatRes = await fetch(`${host}/api/ops/abra/chat`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${cronSecret}`,
               },
-            );
+              body: JSON.stringify({
+                message: text,
+                history: [],
+                channel: "slack",
+              }),
+              signal: AbortSignal.timeout(45000),
+            });
 
-            if (!llmRes.ok) return;
+            if (!chatRes.ok) {
+              console.error(`[slack-monitor] Chat API returned ${chatRes.status}`);
+              return;
+            }
 
-            const data = await llmRes.json();
-            const reply = data.content?.[0]?.text || "";
+            const data = (await chatRes.json()) as { reply?: string };
+            const reply = typeof data.reply === "string" ? data.reply.trim() : "";
 
             if (reply) {
               await fetch("https://slack.com/api/chat.postMessage", {
