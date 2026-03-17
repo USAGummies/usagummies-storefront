@@ -41,10 +41,13 @@ export type NotifyOpts = {
 
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
 
+// All channels route to #abra-control (C0ALS6W7VB4) — the only Slack channel that exists.
+// When dedicated channels are created, update the env vars to split traffic.
+const ABRA_CONTROL_CHANNEL = "C0ALS6W7VB4";
 const SLACK_CHANNEL_ID_MAP: Record<NotifyChannel, string | undefined> = {
-  alerts: process.env.SLACK_CHANNEL_ALERTS,
-  pipeline: process.env.SLACK_CHANNEL_PIPELINE,
-  daily: process.env.SLACK_CHANNEL_DAILY || "C0ALS6W7VB4",
+  alerts: process.env.SLACK_CHANNEL_ALERTS || ABRA_CONTROL_CHANNEL,
+  pipeline: process.env.SLACK_CHANNEL_PIPELINE || ABRA_CONTROL_CHANNEL,
+  daily: process.env.SLACK_CHANNEL_DAILY || ABRA_CONTROL_CHANNEL,
 };
 
 async function sendSlackBot(

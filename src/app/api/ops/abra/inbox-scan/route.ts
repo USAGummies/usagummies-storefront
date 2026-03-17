@@ -20,6 +20,7 @@ import { expireStaleApprovals, queryNotionDatabase } from "@/lib/ops/abra-action
 import { autoAcknowledgeStaleSignals } from "@/lib/ops/abra-operational-signals";
 import { getVipSender, type VipSender } from "@/lib/ops/abra-vip-senders";
 import { readState, writeState } from "@/lib/ops/state";
+import { routeToDepartment, type Department } from "@/lib/ops/abra-departments";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -406,6 +407,7 @@ async function draftVipReply(params: {
   vip: VipSender;
   emailId: string;
   threadId: string;
+  department?: Department;
 }): Promise<boolean> {
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   const botToken = process.env.SLACK_BOT_TOKEN;
@@ -422,9 +424,10 @@ async function draftVipReply(params: {
     "Content-Type": "application/json",
   };
 
+  const deptContext = params.department?.systemContext || "";
   const systemPrompt = `You are drafting an email reply on behalf of Ben Stutman, founder of USA Gummies.
 
-SENDER CONTEXT: ${params.vip.draftingContext || `${params.vip.name} — ${params.vip.relationship}`}
+${deptContext ? `DEPARTMENT: ${params.department?.name}\n${deptContext}\n\n` : ""}SENDER CONTEXT: ${params.vip.draftingContext || `${params.vip.name} — ${params.vip.relationship}`}
 
 IMPORTANT: You have access to tools that can query USA Gummies' Notion databases.
 If the sender is asking for data, reports, lists, or information that might be in the company databases,
@@ -537,6 +540,7 @@ Respond with ONLY the email body text. No subject line, no "Dear X" unless appro
       },
       body: JSON.stringify({
         id: commandId,
+        email_id: params.emailId,
         status: "draft_reply_pending",
         sender_name: params.senderName,
         sender_email: params.senderEmail,
@@ -556,8 +560,9 @@ Respond with ONLY the email body text. No subject line, no "Dear X" unless appro
     const ABRA_COMMAND_CHANNEL = "C0ALS6W7VB4";
     const draftPreview =
       draft.length > 300 ? draft.slice(0, 297) + "..." : draft;
+    const deptLabel = params.department ? ` [${params.department.name}]` : "";
     const slackText =
-      `📧 *Auto-Draft Reply to ${params.senderName}*\n` +
+      `📧 *Draft Reply to ${params.senderName}*${deptLabel}\n` +
       `*Subject:* Re: ${params.subject}\n\n` +
       `> ${draftPreview.split("\n").join("\n> ")}\n\n` +
       `_Send:_ \`/abra sendreply ${commandId}\`  |  _Discard:_ \`/abra deny ${commandId}\``;
@@ -691,6 +696,13 @@ export async function POST(req: Request) {
           // Don't draft if Ben already replied in this thread
           !repliedThreadIds.has(envelope.threadId || "");
 
+        // Route to department for context-aware handling
+        const { department } = routeToDepartment(
+          senderEmail,
+          envelope.subject || "",
+          body.slice(0, 500),
+        );
+
         if (needsDraft && vip) {
           const drafted = await draftVipReply({
             senderName: parseSenderName(envelope.from),
@@ -700,6 +712,7 @@ export async function POST(req: Request) {
             vip,
             emailId: envelope.id,
             threadId: envelope.threadId || "",
+            department,
           });
           if (drafted) {
             commands++; // Count as a command since a draft was queued
@@ -805,6 +818,11 @@ export async function POST(req: Request) {
           const message = await readEmail(env.id);
           if (!message) continue;
 
+          const { department: catchupDept } = routeToDepartment(
+            email,
+            env.subject || "",
+            (message.body || "").slice(0, 500),
+          );
           const drafted = await draftVipReply({
             senderName: parseSenderName(env.from),
             senderEmail: email,
@@ -813,6 +831,7 @@ export async function POST(req: Request) {
             vip,
             emailId: env.id,
             threadId: env.threadId || "",
+            department: catchupDept,
           });
           if (drafted) commands++;
         }
