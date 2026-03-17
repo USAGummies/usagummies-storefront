@@ -114,6 +114,7 @@ export const STATE_KEYS = {
   "abra-notion-sync-cursor": "abra-notion-sync-cursor.json",
   "abra-model-governor": "abra-model-governor.json",
   "abra-scheduler-lock": "abra-scheduler-lock.json",
+  "abra-vip-slack-threads": "abra-vip-slack-threads.json",
 
   // Logs (text, not JSON — stored as string)
   "engine-log": "agentic-engine.log",

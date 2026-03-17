@@ -72,6 +72,13 @@ type AutoExecSummary = {
   limits: Record<string, number>;
 };
 
+type CostData = {
+  total: number;
+  budget: number;
+  pctUsed: number;
+  callCount: number;
+};
+
 function fmtDollar(value: number): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -158,6 +165,7 @@ export function CommandCenter() {
   const [approvals, setApprovals] = useState<ApprovalItem[]>([]);
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [feedHealth, setFeedHealth] = useState<FeedHealthResponse | null>(null);
+  const [costData, setCostData] = useState<CostData | null>(null);
   const [autoExecSummary, setAutoExecSummary] = useState<AutoExecSummary>({
     total: 0,
     byAction: {},
@@ -173,13 +181,14 @@ export function CommandCenter() {
     setLoading(true);
     setError(null);
     try {
-      const [pulseRes, signalsRes, approvalsRes, autoRes, healthRes, feedRes] = await Promise.all([
+      const [pulseRes, signalsRes, approvalsRes, autoRes, healthRes, feedRes, costRes] = await Promise.all([
         fetch("/api/ops/abra/pulse", { cache: "no-store" }),
         fetch("/api/ops/abra/operational-signals?limit=5", { cache: "no-store" }),
         fetch("/api/ops/abra/approvals?status=pending", { cache: "no-store" }),
         fetch("/api/ops/abra/approvals?status=all", { cache: "no-store" }),
         fetch("/api/ops/abra/health", { cache: "no-store" }),
         fetch("/api/ops/abra/feed-health", { cache: "no-store" }),
+        fetch("/api/ops/abra/cost", { cache: "no-store" }).catch(() => null),
       ]);
 
       if (!pulseRes.ok) throw new Error("Failed to load pulse");
@@ -195,6 +204,9 @@ export function CommandCenter() {
       const autoData = (await autoRes.json()) as { approvals: ApprovalItem[] };
       const healthData = (await healthRes.json()) as HealthResponse;
       const feedData = (await feedRes.json()) as FeedHealthResponse;
+      const costParsed = costRes && costRes.ok
+        ? ((await costRes.json()) as CostData)
+        : null;
 
       const dayStart = new Date();
       dayStart.setHours(0, 0, 0, 0);
@@ -217,6 +229,7 @@ export function CommandCenter() {
       setApprovals(Array.isArray(approvalsData.approvals) ? approvalsData.approvals : []);
       setHealth(healthData);
       setFeedHealth(feedData);
+      setCostData(costParsed);
       setAutoExecSummary((prev) => ({
         ...prev,
         total: autoRows.length,
@@ -411,7 +424,7 @@ export function CommandCenter() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+          gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr",
           gap: 12,
         }}
       >
@@ -478,6 +491,60 @@ export function CommandCenter() {
               ))}
             </div>
           </div>
+        </section>
+
+        <section
+          style={{
+            background: CARD,
+            border: `1px solid ${BORDER}`,
+            borderRadius: 12,
+            padding: "14px 16px",
+          }}
+        >
+          <div style={{ fontSize: 14, color: NAVY, fontWeight: 800, marginBottom: 10 }}>
+            AI Budget
+          </div>
+          {costData ? (
+            <div style={{ display: "grid", gap: 8 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: NAVY }}>
+                <span>Month spend</span>
+                <span style={{ fontWeight: 700 }}>{fmtDollar(costData.total)}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: NAVY }}>
+                <span>Budget</span>
+                <span style={{ fontWeight: 700 }}>{fmtDollar(costData.budget)}</span>
+              </div>
+              <div
+                style={{
+                  height: 8,
+                  borderRadius: 4,
+                  background: `${BORDER}`,
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    height: "100%",
+                    width: `${Math.min(costData.pctUsed, 100)}%`,
+                    borderRadius: 4,
+                    background:
+                      costData.pctUsed >= 95
+                        ? RED
+                        : costData.pctUsed >= 80
+                          ? GOLD
+                          : "#16a34a",
+                    transition: "width 0.3s ease",
+                  }}
+                />
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: TEXT_DIM }}>
+                <span>{costData.pctUsed.toFixed(1)}% used</span>
+                <span>{costData.callCount.toLocaleString()} calls</span>
+              </div>
+            </div>
+          ) : (
+            <div style={{ color: TEXT_DIM, fontSize: 13 }}>No cost data available.</div>
+          )}
         </section>
       </div>
     </div>

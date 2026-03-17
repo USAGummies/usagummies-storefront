@@ -3,6 +3,7 @@ import { detectAnomalies } from "@/lib/ops/abra-anomaly-detection";
 import { getActiveSignals } from "@/lib/ops/abra-operational-signals";
 import { generateRevenueForecast } from "@/lib/ops/abra-forecasting";
 import { analyzeInventory } from "@/lib/ops/abra-inventory-forecast";
+import { detectAwaitingReplies } from "@/lib/ops/abra-email-fetch";
 import { notify } from "@/lib/ops/notify";
 import { createNotionPage } from "@/lib/ops/abra-notion-write";
 import { readState } from "@/lib/ops/state";
@@ -378,6 +379,23 @@ export async function generateMorningBrief(): Promise<string> {
     lines.push("");
   } catch {
     // Skip active signals section
+  }
+
+  // Awaiting-Reply Section — unanswered outbound emails
+  try {
+    const awaiting = await detectAwaitingReplies({ sentCount: 30, lookbackHours: 72 });
+    const important = awaiting.filter((a) => a.escalation === "critical" || a.escalation === "important");
+    if (important.length > 0) {
+      lines.push("\u{1F4EC} *Awaiting Reply*");
+      for (const item of important.slice(0, 5)) {
+        const icon = item.escalation === "critical" ? "\u{1F6A8}" : "\u{26A0}\u{FE0F}";
+        lines.push(`• ${icon} *${item.recipientName}* — _${item.subject}_ (${item.hoursAgo}h ago)`);
+        if (item.reason) lines.push(`  ${item.reason}`);
+      }
+      lines.push("");
+    }
+  } catch {
+    // Skip awaiting-reply section
   }
 
   try {

@@ -12,7 +12,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 15;
 
-const ALLOWED_DOMAINS = new Set(["usagummies.com", "gmail.com", "outlook.com"]);
+/** Only usagummies.com domain + explicit external addresses can receive Abra emails */
+const ALLOWED_DOMAINS = new Set(["usagummies.com"]);
 const ALLOWED_ADDRESSES = new Set(["ben@usagummies.com", "benjamin.stutman@gmail.com", "gonz1rene@outlook.com"]);
 
 function isAllowedRecipient(email: string): boolean {

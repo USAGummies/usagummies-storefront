@@ -160,6 +160,46 @@ export async function acknowledgeSignal(
 }
 
 /**
+ * Auto-acknowledge stale info-level signals older than the given TTL.
+ * Run periodically to prevent signal pile-up in the Command Center.
+ */
+export async function autoAcknowledgeStaleSignals(
+  ttlHours = 48,
+): Promise<number> {
+  try {
+    const cutoff = new Date(
+      Date.now() - ttlHours * 60 * 60 * 1000,
+    ).toISOString();
+
+    const rows = (await sbFetch(
+      `/rest/v1/abra_operational_signals?acknowledged=eq.false&severity=eq.info&created_at=lt.${cutoff}&select=id`,
+      { method: "GET" },
+    )) as Array<{ id: string }> | null;
+
+    if (!rows || rows.length === 0) return 0;
+
+    await sbFetch(
+      `/rest/v1/abra_operational_signals?acknowledged=eq.false&severity=eq.info&created_at=lt.${cutoff}`,
+      {
+        method: "PATCH",
+        headers: {
+          Prefer: "return=minimal",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          acknowledged: true,
+          acknowledged_by: "auto-stale-cleanup",
+        }),
+      },
+    );
+
+    return rows.length;
+  } catch {
+    return 0;
+  }
+}
+
+/**
  * Build a signals section for the system prompt.
  * Only includes unacknowledged warnings/criticals.
  */
@@ -202,12 +242,35 @@ export function buildSignalsContext(
  * Extract signals from an email body (simple keyword-based detection).
  * Used by the email ingest agent.
  */
+/** Senders that should never generate operational signals */
+const NOISE_SENDERS_RE =
+  /^(noreply|no-reply|donotreply|do-not-reply|mailer-daemon|postmaster)@/i;
+const NOISE_DOMAINS = new Set([
+  "email.claude.com",
+  "accounts.google.com",
+  "noreply.github.com",
+  "notify.bugsnag.com",
+  "amazonses.com",
+  "sendgrid.net",
+  "mailchimp.com",
+  "email.mailgun.org",
+]);
+
+function isNoiseSender(from: string): boolean {
+  if (NOISE_SENDERS_RE.test(from)) return true;
+  const domain = from.split("@")[1]?.toLowerCase();
+  return domain ? NOISE_DOMAINS.has(domain) : false;
+}
+
 export function extractEmailSignals(params: {
   subject: string;
   body: string;
   from: string;
   department?: string;
 }): Array<Omit<OperationalSignal, "acknowledged" | "acknowledged_by">> {
+  // Skip noise senders entirely — no signals from automated/marketing senders
+  if (isNoiseSender(params.from)) return [];
+
   const signals: Array<
     Omit<OperationalSignal, "acknowledged" | "acknowledged_by">
   > = [];

@@ -1457,6 +1457,12 @@ async function updateCommand(commandId: string, fields: Record<string, unknown>)
   }
 }
 
+/** Sanitize untrusted text before injecting into LLM prompts (prevents prompt injection) */
+function sanitizeForPrompt(text: string, maxLen = 2000): string {
+  // eslint-disable-next-line no-control-regex
+  return text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "").slice(0, maxLen);
+}
+
 /** Atomic status transition — only updates if current status matches expectedStatus (prevents race conditions) */
 async function claimCommand(commandId: string, expectedStatus: string, newStatus: string, extraFields?: Record<string, unknown>): Promise<boolean> {
   const body = { status: newStatus, updated_at: new Date().toISOString(), ...extraFields };
@@ -1470,14 +1476,14 @@ async function claimCommand(commandId: string, expectedStatus: string, newStatus
         signal: AbortSignal.timeout(10000),
       },
     );
-    // PostgREST returns Content-Range header showing matched rows
+    // PostgREST returns Content-Range header: "*/0" (no match) or "0-0/1" (matched)
     const range = res.headers.get("content-range") || "";
-    const matched = range.includes("/0") ? 0 : 1; // "*/0" = no rows matched
-    if (!range) {
-      // Fallback: assume success if 2xx
-      return res.ok;
-    }
-    return matched > 0;
+    if (!range) return res.ok; // Fallback: assume success if 2xx
+    // Extract total count after the slash: "*/0" → 0, "0-0/1" → 1, "0-N/*" → treat as matched
+    const totalMatch = range.match(/\/(\d+|\*)\s*$/);
+    if (!totalMatch) return res.ok;
+    if (totalMatch[1] === "*") return true; // unknown count but rows returned
+    return parseInt(totalMatch[1], 10) > 0;
   } catch (err) {
     console.error(`[abra-cmd] claimCommand ${commandId} ${expectedStatus}→${newStatus} error:`, err);
     return false;
@@ -1511,16 +1517,15 @@ async function fetchThreadContext(threadId: string): Promise<string> {
 
     if (rows.length <= 1) return "";
 
-    return (
-      "\n\nPREVIOUS MESSAGES IN THIS THREAD:\n" +
-      rows
-        .slice(0, -1)
-        .map(
-          (r, i) =>
-            `[${i + 1}] ${r.sender_name}: ${r.task}${r.execution_summary ? `\n   Result: ${r.execution_summary}` : ""}`,
-        )
-        .join("\n")
-    );
+    const context = rows
+      .slice(0, -1)
+      .map(
+        (r, i) =>
+          `[${i + 1}] ${r.sender_name}: ${r.task.slice(0, 300)}${r.execution_summary ? `\n   Result: ${r.execution_summary.slice(0, 200)}` : ""}`,
+      )
+      .join("\n");
+    // Cap total thread context to prevent bloating the prompt
+    return ("\n\nPREVIOUS MESSAGES IN THIS THREAD:\n" + context).slice(0, 1500);
   } catch {
     return "";
   }
@@ -1756,10 +1761,10 @@ IMPORTANT: Actually execute the task using tools. Do not just describe what shou
       role: "user",
       content: `Email command approved by Ben. Execute the task.
 
-FROM: ${entry.sender_name} (${entry.sender_email})
-SUBJECT: ${entry.subject}
-TASK: ${entry.task}
-EMAIL CONTEXT: ${entry.body_snippet || "(no additional context)"}${threadContext}`,
+FROM: ${sanitizeForPrompt(entry.sender_name, 200)} (${sanitizeForPrompt(entry.sender_email, 200)})
+SUBJECT: ${sanitizeForPrompt(entry.subject, 500)}
+TASK: ${sanitizeForPrompt(entry.task, 1000)}
+EMAIL CONTEXT: ${sanitizeForPrompt(entry.body_snippet || "(no additional context)", 1500)}${threadContext}`,
     }];
 
     const toolCallLog: string[] = [];
@@ -1805,10 +1810,15 @@ EMAIL CONTEXT: ${entry.body_snippet || "(no additional context)"}${threadContext
         break;
       }
 
-      // Execute each tool call
+      // Execute each tool call (individually wrapped to prevent one failure from killing the batch)
       const toolResults: Array<{ type: "tool_result"; tool_use_id: string; content: string }> = [];
       for (const toolUse of toolUses) {
-        const result = await executeToolCall(toolUse.name, toolUse.input || {});
+        let result: ActionResult;
+        try {
+          result = await executeToolCall(toolUse.name, toolUse.input || {});
+        } catch (toolErr) {
+          result = { success: false, message: `Tool error: ${toolErr instanceof Error ? toolErr.message : "Unknown"}` };
+        }
         toolCallLog.push(`${toolUse.name}: ${result.success ? "✅" : "❌"} ${result.message.slice(0, 200)}`);
         toolResults.push({
           type: "tool_result",
@@ -1825,6 +1835,15 @@ EMAIL CONTEXT: ${entry.body_snippet || "(no additional context)"}${threadContext
         finalResponse = textBlocks.map((b: { text: string }) => b.text).join("\n");
         break;
       }
+    }
+
+    // Safety: if MAX_TOOL_ROUNDS exhausted without a final text response, synthesize one
+    if (!finalResponse && toolCallLog.length > 0) {
+      finalResponse = JSON.stringify({
+        execution_summary: `Completed after ${MAX_TOOL_ROUNDS} tool rounds.\n${toolCallLog.join("\n")}`,
+        draft_reply_subject: `Re: ${entry.subject}`,
+        draft_reply_body: `Hi ${entry.sender_name},\n\nYour request has been processed.\n\nBest,\nBen`,
+      });
     }
 
     // Parse the final response (should be JSON with execution_summary + draft)

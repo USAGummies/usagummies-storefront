@@ -119,7 +119,18 @@ export function PipelineView() {
 
   const leads = useMemo(() => {
     const rows = Object.values(pipeline?.stages || {}).flat();
-    return rows.map((lead) => ({
+
+    // Filter out junk leads: no name, no email, or names that look like page titles
+    const PAGE_TITLE_RE = /^(top \d+|best |find |how to |where to |\d+ best)/i;
+    const filtered = rows.filter((lead) => {
+      if (!lead.name || !lead.name.trim()) return false;
+      if (PAGE_TITLE_RE.test(lead.name.trim())) return false;
+      // Keep leads that have at least an email OR a deal value
+      if (!lead.email && !lead.dealValue) return false;
+      return true;
+    });
+
+    return filtered.map((lead) => ({
       ...lead,
       kanbanStage: mapToKanbanStage(lead.status || ""),
     }));

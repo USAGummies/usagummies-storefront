@@ -760,8 +760,6 @@ function isValidDateString(value: string): boolean {
  */
 const ALLOWED_EMAIL_DOMAINS = new Set([
   "usagummies.com",
-  "gmail.com", // Ben's personal
-  "outlook.com", // External contacts (e.g., Rene Gonzalez)
 ]);
 
 /** Additional allowed specific addresses (for known contacts) */
@@ -1790,19 +1788,126 @@ export async function canAutoExecute(action: AbraAction): Promise<boolean> {
   }
 }
 
+/** Read-only actions that never need approval — execute directly, no DB row */
+const DIRECT_EXEC_ACTIONS = new Set([
+  "read_email",
+  "search_email",
+  "query_ledger",
+]);
+
+/** Post pending approval to Slack so Ben can approve from his phone */
+async function notifySlackPendingApproval(approvalId: string, action: AbraAction): Promise<void> {
+  const botToken = process.env.SLACK_BOT_TOKEN;
+  if (!botToken) return;
+
+  const ABRA_CONTROL = "C0ALS6W7VB4";
+  const riskEmoji = action.risk_level === "high" || action.risk_level === "critical"
+    ? "\u{1F6A8}" : action.risk_level === "medium" ? "\u{26A0}\u{FE0F}" : "\u{1F4CB}";
+  const tier = permissionTierForRisk(action.risk_level);
+  const shortId = approvalId.slice(0, 8);
+
+  const slackText = [
+    `${riskEmoji} *Abra Needs Approval* (Tier ${tier})`,
+    `*Action:* ${action.action_type}`,
+    `*Summary:* ${(action.description || action.title || "").slice(0, 300)}`,
+    `*Risk:* ${action.risk_level}`,
+    "",
+    `\`/abra approve ${shortId}\` or \`/abra deny ${shortId}\``,
+  ].join("\n");
+
+  try {
+    await fetch("https://slack.com/api/chat.postMessage", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${botToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        channel: ABRA_CONTROL,
+        text: slackText,
+        mrkdwn: true,
+      }),
+      signal: AbortSignal.timeout(10000),
+    });
+  } catch {
+    // Slack notification is best-effort
+  }
+}
+
+/**
+ * Expire stale pending approvals older than the given TTL.
+ * Run at the start of each inbox-scan cycle to prevent approval pile-up.
+ */
+export async function expireStaleApprovals(ttlHours = 24): Promise<number> {
+  const env = getSupabaseEnv();
+  if (!env) return 0;
+
+  const cutoff = new Date(Date.now() - ttlHours * 60 * 60 * 1000).toISOString();
+
+  try {
+    const rows = (await sbFetch(
+      `/rest/v1/approvals?status=eq.pending&created_at=lt.${cutoff}&select=id`,
+      {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      },
+    )) as Array<{ id: string }> | null;
+
+    if (!rows || rows.length === 0) return 0;
+
+    await sbFetch(
+      `/rest/v1/approvals?status=eq.pending&created_at=lt.${cutoff}`,
+      {
+        method: "PATCH",
+        headers: { Prefer: "return=minimal", "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: "expired",
+          decision_reasoning: `Auto-expired: pending > ${ttlHours}h`,
+        }),
+      },
+    );
+
+    return rows.length;
+  } catch (err) {
+    console.error("[abra-actions] expireStaleApprovals error:", err);
+    return 0;
+  }
+}
+
 export async function proposeAndMaybeExecute(action: AbraAction): Promise<{
   approval_id: string;
   auto_executed: boolean;
   result?: ActionResult;
 }> {
+  // ── Fast path: read-only actions skip approval table entirely ──
+  if (DIRECT_EXEC_ACTIONS.has(action.action_type) && action.risk_level === "low") {
+    const handler = ACTION_HANDLERS[action.action_type];
+    if (handler) {
+      try {
+        const result = await handler(action.params || {});
+        return {
+          approval_id: `direct:${randomUUID()}`,
+          auto_executed: true,
+          result,
+        };
+      } catch {
+        // Fall through to normal approval flow on error
+      }
+    }
+  }
+
+  // ── Normal path: create approval row ──
   const status = await proposeAction(action);
   const approvalId = parseApprovalId(status);
   if (!approvalId) {
     throw new Error("Failed to derive approval id");
   }
 
+  // ── Check auto-execute eligibility ──
   const eligible = await canAutoExecute(action);
   if (!eligible) {
+    // Not auto-executable → notify Slack so Ben can approve from phone
+    await notifySlackPendingApproval(approvalId, action);
     return { approval_id: approvalId, auto_executed: false };
   }
 

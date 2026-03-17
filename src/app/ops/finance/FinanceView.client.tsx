@@ -430,10 +430,10 @@ export function FinanceView() {
 
         <div style={{ display: "grid", gap: 10 }}>
           <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px" }}>
-            <div style={{ fontWeight: 700, color: NAVY, marginBottom: 10 }}>Margin Snapshot</div>
+            <div style={{ fontWeight: 700, color: NAVY, marginBottom: 10 }}>Margin Snapshot <span style={{ fontSize: 10, fontWeight: 400, color: TEXT_DIM }}>(Shopify DTC only)</span></div>
             <div style={{ display: "grid", gap: 8 }}>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
-                <span style={{ color: TEXT_DIM }}>Gross margin</span>
+                <span style={{ color: TEXT_DIM }}>Gross margin (DTC)</span>
                 <span style={{ color: NAVY, fontWeight: 700 }}>
                   {marginSnapshot ? `${marginSnapshot.estimated_gross_margin_pct.toFixed(1)}%` : "—"}
                 </span>

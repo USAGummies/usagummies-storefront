@@ -162,6 +162,11 @@ function classifyEmail(params: {
     )
   ) {
     category = "finance";
+  } else if (
+    // Shipping receipts/labels → finance (bank reconciliation), not production noise
+    /\b(shipping\s+(?:receipt|label|confirmation|charge)|pirate\s*ship|shipstation|easypost|usps\s+(?:receipt|label)|ups\s+(?:receipt|charge)|fedex\s+(?:receipt|charge)|postage\s+(?:receipt|paid|charge))\b/.test(text)
+  ) {
+    category = "finance";
   } else if (/\b(refund|return|complaint|support|customer|review)\b/.test(text)) {
     category = "customer";
   } else if (/\b(production|manufactur|inventory|warehouse|fulfillment|3pl|repack)\b/.test(text)) {
@@ -195,8 +200,14 @@ function classifyEmail(params: {
   if (actionRequired) {
     if (category === "sales") suggestedAction = "Review and respond to sales thread";
     else if (category === "customer") suggestedAction = "Address customer issue";
-    else if (category === "finance") suggestedAction = "Review financial request";
-    else if (category === "production") suggestedAction = "Review production/supply chain update";
+    else if (category === "finance") {
+      // Differentiate shipping receipts from other finance emails
+      if (/\b(shipping|postage|pirate\s*ship|shipstation|label)\b/.test(text)) {
+        suggestedAction = "File for bank reconciliation — shipping/postage receipt";
+      } else {
+        suggestedAction = "Review financial request";
+      }
+    } else if (category === "production") suggestedAction = "Review production/supply chain update";
     else if (category === "regulatory" || category === "compliance")
       suggestedAction = "Review regulatory/compliance item";
     else suggestedAction = "Review and respond";
@@ -245,6 +256,124 @@ async function getExistingProviderIds(
   }
 
   return existing;
+}
+
+/**
+ * Detect outbound emails from Ben that haven't received a reply.
+ * Cross-references SENT mail against INBOX to find unanswered threads.
+ * Returns escalation overrides for emails where the recipient is a VIP/key contact.
+ */
+export async function detectAwaitingReplies(opts?: {
+  sentCount?: number;
+  lookbackHours?: number;
+}): Promise<
+  Array<{
+    threadId: string;
+    recipientEmail: string;
+    recipientName: string;
+    subject: string;
+    sentAt: string;
+    hoursAgo: number;
+    escalation: "critical" | "important" | "info";
+    reason: string;
+  }>
+> {
+  const sentCount = opts?.sentCount ?? 30;
+  const lookbackMs = (opts?.lookbackHours ?? 72) * 60 * 60 * 1000;
+  const cutoff = Date.now() - lookbackMs;
+
+  try {
+    // Fetch recent sent emails
+    const sentEnvelopes = await listEmails({
+      folder: "SENT",
+      count: sentCount,
+      unreadOnly: false,
+    });
+
+    // Fetch recent inbox emails to find which threads have replies
+    const inboxEnvelopes = await listEmails({
+      folder: "INBOX",
+      count: 100,
+      unreadOnly: false,
+    });
+
+    // Build set of thread IDs that have inbox replies
+    const repliedThreads = new Set(inboxEnvelopes.map((e) => e.threadId).filter(Boolean));
+
+    const awaiting: Array<{
+      threadId: string;
+      recipientEmail: string;
+      recipientName: string;
+      subject: string;
+      sentAt: string;
+      hoursAgo: number;
+      escalation: "critical" | "important" | "info";
+      reason: string;
+    }> = [];
+
+    for (const sent of sentEnvelopes) {
+      // Skip if we already have a reply in inbox
+      if (sent.threadId && repliedThreads.has(sent.threadId)) continue;
+
+      // Skip old emails
+      const sentDate = Date.parse(sent.date);
+      if (!Number.isFinite(sentDate) || sentDate < cutoff) continue;
+
+      // Extract recipient
+      const recipientEmail = parseSenderEmail(sent.to || "");
+      const recipientName = parseSenderName(sent.to || "");
+
+      // Skip self-emails and system addresses
+      if (
+        recipientEmail.includes("ben@usagummies.com") ||
+        recipientEmail.includes("benjamin.stutman@gmail.com") ||
+        recipientEmail.includes("noreply") ||
+        recipientEmail.includes("no-reply")
+      ) {
+        continue;
+      }
+
+      const hoursAgo = Math.round((Date.now() - sentDate) / (60 * 60 * 1000));
+
+      // Check if recipient is a VIP — VIP unanswered emails escalate faster
+      const vip = getVipSender(recipientEmail);
+      let escalation: "critical" | "important" | "info" = "info";
+      let reason = `Sent ${hoursAgo}h ago, no reply yet`;
+
+      if (vip && (vip.priority === "critical" || vip.priority === "important")) {
+        escalation = hoursAgo >= 24 ? "critical" : "important";
+        reason = `${vip.name} — sent ${hoursAgo}h ago, no reply. ${vip.suggestedAction}`;
+      } else if (hoursAgo >= 48) {
+        escalation = "important";
+        reason = `Sent ${hoursAgo}h ago to ${recipientName}, no reply — may need follow-up`;
+      }
+
+      // Only report important+ awaiting replies
+      if (escalation === "info" && hoursAgo < 24) continue;
+
+      awaiting.push({
+        threadId: sent.threadId || "",
+        recipientEmail,
+        recipientName,
+        subject: sent.subject || "(no subject)",
+        sentAt: sent.date,
+        hoursAgo,
+        escalation,
+        reason,
+      });
+    }
+
+    // Sort: critical first, then by hours descending
+    awaiting.sort((a, b) => {
+      const esc = { critical: 0, important: 1, info: 2 };
+      if (esc[a.escalation] !== esc[b.escalation]) return esc[a.escalation] - esc[b.escalation];
+      return b.hoursAgo - a.hoursAgo;
+    });
+
+    return awaiting;
+  } catch {
+    return [];
+  }
 }
 
 export async function runEmailFetch(params?: {
@@ -345,4 +474,150 @@ export async function runEmailFetch(params?: {
     }
     throw error;
   }
+}
+
+/**
+ * Detect stalled pipeline deals — leads that haven't had email activity
+ * within a threshold period. VIP contacts get shorter thresholds.
+ *
+ * Compares pipeline data (from /api/ops/abra/pipeline) against recent
+ * email activity to find deals going cold.
+ */
+export async function detectStalledDeals(opts?: {
+  vipStallDays?: number;
+  normalStallDays?: number;
+}): Promise<
+  Array<{
+    leadName: string;
+    email: string;
+    stage: string;
+    daysSinceContact: number;
+    isVip: boolean;
+    severity: "critical" | "important" | "info";
+    reason: string;
+  }>
+> {
+  const vipThreshold = opts?.vipStallDays ?? 5;
+  const normalThreshold = opts?.normalStallDays ?? 10;
+  const { getVipSender } = await import("@/lib/ops/abra-vip-senders");
+
+  // Fetch pipeline leads from Supabase or Notion via the pipeline API
+  const env = getSupabaseEnv();
+  if (!env) return [];
+
+  // Get deal email threads from the API
+  let threads: Array<{
+    contactEmail: string;
+    lastActivity: string;
+  }> = [];
+  try {
+    const baseUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : "http://localhost:4000";
+    const cronSecret = process.env.CRON_SECRET || "";
+    const res = await fetch(`${baseUrl}/api/ops/abra/pipeline?view=deal-emails`, {
+      headers: { Authorization: `Bearer ${cronSecret}` },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      threads = (data.threads || []).map(
+        (t: { contactEmail: string; lastMessageDate: string }) => ({
+          contactEmail: t.contactEmail.toLowerCase(),
+          lastActivity: t.lastMessageDate,
+        }),
+      );
+    }
+  } catch {
+    // Can't fetch deal emails — fall back to checking pipeline only
+  }
+
+  // Build email activity map
+  const activityMap = new Map<string, Date>();
+  for (const t of threads) {
+    activityMap.set(t.contactEmail, new Date(t.lastActivity));
+  }
+
+  // Check recent sent emails for additional activity signals
+  try {
+    const sentEmails = await listEmails({ folder: "SENT", count: 50, unreadOnly: false });
+    for (const env of sentEmails) {
+      const to = (env.to || "").toLowerCase();
+      const existing = activityMap.get(to);
+      const sentDate = new Date(env.date || "");
+      if (!existing || sentDate > existing) {
+        activityMap.set(to, sentDate);
+      }
+    }
+  } catch {
+    // Gmail unavailable
+  }
+
+  // Now check pipeline leads
+  const stalledDeals: Array<{
+    leadName: string;
+    email: string;
+    stage: string;
+    daysSinceContact: number;
+    isVip: boolean;
+    severity: "critical" | "important" | "info";
+    reason: string;
+  }> = [];
+
+  // Fetch pipeline data
+  try {
+    const baseUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : "http://localhost:4000";
+    const cronSecret = process.env.CRON_SECRET || "";
+    const res = await fetch(`${baseUrl}/api/ops/abra/pipeline`, {
+      headers: { Authorization: `Bearer ${cronSecret}` },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return stalledDeals;
+    const data = await res.json();
+    const leads = Object.values(data.stages || {}).flat() as Array<{
+      name: string;
+      email: string;
+      status: string;
+      lastContact: string;
+    }>;
+
+    const now = Date.now();
+    for (const lead of leads) {
+      if (!lead.email) continue;
+      const email = lead.email.toLowerCase();
+      const isVip = !!getVipSender(email);
+      const threshold = isVip ? vipThreshold : normalThreshold;
+
+      // Use email activity or lastContact from pipeline
+      const lastActivity = activityMap.get(email)
+        || (lead.lastContact ? new Date(lead.lastContact) : null);
+
+      if (!lastActivity) continue;
+
+      const daysSince = Math.floor((now - lastActivity.getTime()) / 86400000);
+      if (daysSince < threshold) continue;
+
+      // Skip closed/won/lost stages
+      const stage = (lead.status || "").toLowerCase();
+      if (stage.includes("closed") || stage.includes("won") || stage.includes("lost")) continue;
+
+      stalledDeals.push({
+        leadName: lead.name,
+        email: lead.email,
+        stage: lead.status,
+        daysSinceContact: daysSince,
+        isVip,
+        severity: isVip ? "critical" : daysSince > normalThreshold * 2 ? "important" : "info",
+        reason: isVip
+          ? `VIP deal stalled: no contact with ${lead.name} in ${daysSince} days`
+          : `Deal going cold: no contact with ${lead.name} in ${daysSince} days`,
+      });
+    }
+  } catch {
+    // Pipeline unavailable
+  }
+
+  return stalledDeals.sort((a, b) => b.daysSinceContact - a.daysSinceContact);
 }

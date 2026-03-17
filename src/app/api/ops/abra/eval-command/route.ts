@@ -12,6 +12,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
+function sanitize(text: string, maxLen = 1000): string {
+  // eslint-disable-next-line no-control-regex
+  return text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "").slice(0, maxLen);
+}
+
 function sbHeaders() {
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
   return {
@@ -88,18 +93,18 @@ IMPORTANT: Respond ONLY with valid JSON.`,
         messages: [{
           role: "user",
           content: `ORIGINAL REQUEST:
-From: ${cmd.sender_name} (${cmd.sender_email})
-Subject: ${cmd.subject}
-Task: ${cmd.task}
-Context: ${(cmd.body_snippet || "").slice(0, 500)}
+From: ${sanitize(cmd.sender_name || "")} (${sanitize(cmd.sender_email || "")})
+Subject: ${sanitize(cmd.subject || "")}
+Task: ${sanitize(cmd.task || "")}
+Context: ${sanitize((cmd.body_snippet || "").slice(0, 500))}
 
 EXECUTION RESULT:
-Summary: ${cmd.execution_summary || cmd.result_text || "(none)"}
+Summary: ${sanitize((cmd.execution_summary || cmd.result_text || "(none)").slice(0, 500))}
 Status: ${cmd.status}
 
 DRAFT REPLY:
-Subject: ${cmd.draft_reply_subject || "(none)"}
-Body: ${(cmd.draft_reply_body || "").slice(0, 500)}`,
+Subject: ${sanitize(cmd.draft_reply_subject || "(none)")}
+Body: ${sanitize((cmd.draft_reply_body || "").slice(0, 500))}`,
         }],
       }),
       signal: AbortSignal.timeout(15000),
@@ -125,6 +130,17 @@ Body: ${(cmd.draft_reply_body || "").slice(0, 500)}`,
     } catch {
       return NextResponse.json({ error: "Failed to parse eval response" }, { status: 500 });
     }
+
+    // Clamp all scores to [0.0, 1.0]
+    const clamp01 = (v: unknown): number => {
+      const n = typeof v === "number" ? v : parseFloat(String(v));
+      if (isNaN(n)) return 0;
+      return Math.max(0, Math.min(1, n));
+    };
+    scores.task_understanding = clamp01(scores.task_understanding);
+    scores.execution_quality = clamp01(scores.execution_quality);
+    scores.reply_quality = clamp01(scores.reply_quality);
+    scores.overall_score = clamp01(scores.overall_score);
 
     // Store eval
     await fetch(`${sbUrl()}/rest/v1/abra_command_evals`, {

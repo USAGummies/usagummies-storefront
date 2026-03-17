@@ -7,16 +7,43 @@
  * - Questions that Abra can answer proactively
  */
 import { NextResponse } from "next/server";
+import { createHmac } from "node:crypto";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST(req: Request) {
-  const body = await req.json();
+/** Verify Slack request signature (v0) to prevent spoofed webhooks */
+async function verifySlackSignature(req: Request, rawBody: string): Promise<boolean> {
+  const signingSecret = process.env.SLACK_SIGNING_SECRET;
+  if (!signingSecret) return false;
+  const timestamp = req.headers.get("x-slack-request-timestamp");
+  const signature = req.headers.get("x-slack-signature");
+  if (!timestamp || !signature) return false;
+  // Reject requests older than 5 minutes (replay protection)
+  if (Math.abs(Date.now() / 1000 - Number(timestamp)) > 300) return false;
+  const basestring = `v0:${timestamp}:${rawBody}`;
+  const computed = "v0=" + createHmac("sha256", signingSecret).update(basestring).digest("hex");
+  // Constant-time comparison
+  if (computed.length !== signature.length) return false;
+  let mismatch = 0;
+  for (let i = 0; i < computed.length; i++) {
+    mismatch |= computed.charCodeAt(i) ^ signature.charCodeAt(i);
+  }
+  return mismatch === 0;
+}
 
-  // Handle Slack URL verification challenge
+export async function POST(req: Request) {
+  const rawBody = await req.text();
+  const body = JSON.parse(rawBody);
+
+  // Handle Slack URL verification challenge (skip sig check — Slack sends this during setup)
   if (body.type === "url_verification") {
     return NextResponse.json({ challenge: body.challenge });
+  }
+
+  // Verify Slack signature for all other requests
+  if (!await verifySlackSignature(req, rawBody)) {
+    return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
   // Handle events

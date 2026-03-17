@@ -5,8 +5,7 @@
       "name": "next-dev",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
-      "port": 4000,
-      "autoPort": false
+      "port": 4000
     }
   ]
 }
