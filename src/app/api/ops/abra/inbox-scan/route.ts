@@ -556,16 +556,55 @@ Respond with ONLY the email body text. No subject line, no "Dear X" unless appro
 
     if (!storeRes.ok) return false;
 
-    // Post to Slack for review
+    // Post to Slack with interactive buttons for one-click approve/deny
     const ABRA_COMMAND_CHANNEL = "C0ALS6W7VB4";
     const draftPreview =
       draft.length > 300 ? draft.slice(0, 297) + "..." : draft;
     const deptLabel = params.department ? ` [${params.department.name}]` : "";
-    const slackText =
-      `📧 *Draft Reply to ${params.senderName}*${deptLabel}\n` +
-      `*Subject:* Re: ${params.subject}\n\n` +
-      `> ${draftPreview.split("\n").join("\n> ")}\n\n` +
-      `_Send:_ \`/abra sendreply ${commandId}\`  |  _Discard:_ \`/abra deny ${commandId}\``;
+    const fallbackText =
+      `📧 Draft Reply to ${params.senderName}${deptLabel} — Re: ${params.subject}`;
+
+    const blocks = [
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: `📧 *Draft Reply to ${params.senderName}*${deptLabel}\n*Subject:* Re: ${params.subject}`,
+        },
+      },
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: `> ${draftPreview.split("\n").join("\n> ")}`,
+        },
+      },
+      {
+        type: "actions",
+        elements: [
+          {
+            type: "button",
+            text: { type: "plain_text", text: "✅ Send Reply", emoji: true },
+            style: "primary",
+            action_id: "sendreply_action",
+            value: commandId,
+            confirm: {
+              title: { type: "plain_text", text: "Send this reply?" },
+              text: { type: "mrkdwn", text: `This will email *${params.senderName}* at ${params.senderEmail}` },
+              confirm: { type: "plain_text", text: "Send" },
+              deny: { type: "plain_text", text: "Cancel" },
+            },
+          },
+          {
+            type: "button",
+            text: { type: "plain_text", text: "❌ Discard", emoji: true },
+            style: "danger",
+            action_id: "deny_draft_action",
+            value: commandId,
+          },
+        ],
+      },
+    ];
 
     await fetch("https://slack.com/api/chat.postMessage", {
       method: "POST",
@@ -575,8 +614,8 @@ Respond with ONLY the email body text. No subject line, no "Dear X" unless appro
       },
       body: JSON.stringify({
         channel: ABRA_COMMAND_CHANNEL,
-        text: slackText,
-        mrkdwn: true,
+        text: fallbackText,
+        blocks,
       }),
       signal: AbortSignal.timeout(10000),
     });

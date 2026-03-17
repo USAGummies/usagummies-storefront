@@ -199,5 +199,125 @@ export async function POST(req: Request) {
     });
   }
 
+  // ── Email draft commands: send or discard via buttons ──
+  if (actionId === "sendreply_action" || actionId === "deny_draft_action") {
+    const commandId = value;
+    const responseUrl = payload.response_url || "";
+
+    after(async () => {
+      try {
+        if (actionId === "deny_draft_action") {
+          // Deny: just update status
+          await sbFetch(`/rest/v1/abra_email_commands?id=eq.${commandId}&status=eq.draft_reply_pending`, {
+            method: "PATCH",
+            headers: { Prefer: "return=minimal", "Content-Type": "application/json" },
+            body: JSON.stringify({ status: "denied" }),
+          });
+          if (responseUrl) {
+            await replaceSlackMessage(responseUrl, `❌ Draft discarded by ${actor}`);
+          }
+          return;
+        }
+
+        // Send: fetch the draft, then send it
+        const commands = (await sbFetch(
+          `/rest/v1/abra_email_commands?id=eq.${commandId}&status=eq.draft_reply_pending&select=*&limit=1`,
+        )) as Array<Record<string, unknown>>;
+
+        if (!commands[0]) {
+          if (responseUrl) {
+            await replaceSlackMessage(responseUrl, `⚠️ Draft ${commandId} not found or already processed`);
+          }
+          return;
+        }
+
+        const cmd = commands[0];
+
+        // Atomically claim it
+        const claimRes = await fetch(
+          `${getSupabaseEnv()?.baseUrl}/rest/v1/abra_email_commands?id=eq.${commandId}&status=eq.draft_reply_pending`,
+          {
+            method: "PATCH",
+            headers: {
+              apikey: getSupabaseEnv()!.serviceKey,
+              Authorization: `Bearer ${getSupabaseEnv()!.serviceKey}`,
+              "Content-Type": "application/json",
+              Prefer: "return=representation",
+            },
+            body: JSON.stringify({ status: "sending" }),
+            signal: AbortSignal.timeout(10000),
+          },
+        );
+        const claimed = claimRes.ok ? ((await claimRes.json()) as unknown[]) : [];
+        if (!Array.isArray(claimed) || claimed.length === 0) {
+          if (responseUrl) {
+            await replaceSlackMessage(responseUrl, `⚠️ Draft ${commandId} was already claimed — possible double-click`);
+          }
+          return;
+        }
+
+        // Send via internal API
+        const host = process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : process.env.NEXT_PUBLIC_SITE_URL || "https://www.usagummies.com";
+        const cronSecret = process.env.CRON_SECRET;
+
+        const sendRes = await fetch(`${host}/api/ops/abra/send-reply`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${cronSecret}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            commandId,
+            to: cmd.sender_email,
+            subject: cmd.draft_reply_subject || `Re: ${cmd.subject}`,
+            body: cmd.draft_reply_body,
+            threadId: cmd.gmail_thread_id || undefined,
+          }),
+          signal: AbortSignal.timeout(30000),
+        });
+
+        if (sendRes.ok) {
+          await sbFetch(`/rest/v1/abra_email_commands?id=eq.${commandId}`, {
+            method: "PATCH",
+            headers: { Prefer: "return=minimal", "Content-Type": "application/json" },
+            body: JSON.stringify({ status: "completed" }),
+          });
+          if (responseUrl) {
+            await replaceSlackMessage(
+              responseUrl,
+              `✅ Reply sent to ${cmd.sender_email} by ${actor}\n*Subject:* ${cmd.draft_reply_subject || cmd.subject}`,
+            );
+          }
+        } else {
+          // Revert to pending so they can retry
+          await sbFetch(`/rest/v1/abra_email_commands?id=eq.${commandId}`, {
+            method: "PATCH",
+            headers: { Prefer: "return=minimal", "Content-Type": "application/json" },
+            body: JSON.stringify({ status: "draft_reply_pending" }),
+          });
+          const errText = await sendRes.text().catch(() => "unknown error");
+          if (responseUrl) {
+            await replaceSlackMessage(
+              responseUrl,
+              `❌ Failed to send: ${errText.slice(0, 200)}\nDraft returned to pending — try again.`,
+            );
+          }
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Unknown error";
+        if (responseUrl) {
+          await replaceSlackMessage(responseUrl, `❌ Error: ${msg.slice(0, 200)}`);
+        }
+      }
+    });
+
+    return NextResponse.json({
+      response_type: "ephemeral",
+      text: actionId === "sendreply_action" ? "📤 Sending reply..." : "🗑️ Discarding draft...",
+    });
+  }
+
   return NextResponse.json({ ok: true });
 }
