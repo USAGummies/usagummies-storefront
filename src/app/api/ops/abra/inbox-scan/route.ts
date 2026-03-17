@@ -589,6 +589,58 @@ export async function POST(req: Request) {
       }
     }
 
+    // ---- VIP catch-up: scan recent READ emails from VIPs that don't have drafts yet ----
+    try {
+      const recentAll = await listEmails({
+        folder: "INBOX",
+        count: 20,
+        unreadOnly: false,
+      });
+      for (const env of recentAll) {
+        const email = parseSenderEmail(env.from);
+        const vip = getVipSender(email);
+        if (
+          !vip ||
+          vip.relationship === "self" ||
+          vip.category === "noise" ||
+          (vip.priority !== "critical" && vip.priority !== "important")
+        ) {
+          continue;
+        }
+        // Skip if we already have a command for this email
+        if (processed.has(env.id)) continue;
+        // Skip if we already processed it in the unread loop above
+        const alreadyHandled = envelopes.some((u) => u.id === env.id);
+        if (alreadyHandled) continue;
+
+        // Check if a draft already exists for this sender+subject
+        const existingRes = await fetch(
+          `${sbUrl()}/rest/v1/abra_email_commands?sender_email=eq.${encodeURIComponent(email)}&status=in.(draft_reply_pending,pending_approval,executing)&limit=1&select=id`,
+          { headers: sbHeaders(), signal: AbortSignal.timeout(5000) },
+        );
+        if (existingRes.ok) {
+          const existing = await existingRes.json();
+          if (Array.isArray(existing) && existing.length > 0) continue; // Already has a pending draft
+        }
+
+        const message = await readEmail(env.id);
+        if (!message) continue;
+
+        const drafted = await draftVipReply({
+          senderName: parseSenderName(env.from),
+          senderEmail: email,
+          subject: env.subject || "(no subject)",
+          body: message.body || "",
+          vip,
+          emailId: env.id,
+          threadId: env.threadId || "",
+        });
+        if (drafted) commands++;
+      }
+    } catch (err) {
+      console.error("[inbox-scan] VIP catch-up error:", err);
+    }
+
     // ---- Awaiting-reply detection (cross-reference sent vs inbox) ----
     // Deduplication: track which threadIds we've already alerted about so we
     // don't spam Slack on every 5-minute scan cycle.
