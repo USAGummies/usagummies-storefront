@@ -83,7 +83,9 @@ export const DEPARTMENTS: Record<DepartmentId, Department> = {
         status: "active",
         description:
           "Recurring monthly close: reconcile bank transactions, categorize expenses, " +
-          "prepare journal entries, generate P&L and balance sheet.",
+          "prepare journal entries, generate P&L and balance sheet. " +
+          "Monthly Close Checklist DB: 72dd43a214434a57b25fba87b51b00c0",
+        notionHub: "72dd43a214434a57b25fba87b51b00c0",
       },
       {
         id: "ws-ap-tracking",
@@ -91,29 +93,45 @@ export const DEPARTMENTS: Record<DepartmentId, Department> = {
         status: "active",
         description:
           "Track all vendor bills, payment terms, and payment status. " +
+          "AP Tracker DB: c0adc90330694fcbba761fd5ce5d9802. " +
           "Key vendors: Albanese (ingredients), Powers Confections (co-packing), " +
           "Lowe Graham Jones (legal/IP), Pirate Ship (shipping).",
+        notionHub: "c0adc90330694fcbba761fd5ce5d9802",
       },
     ],
     systemContext: `You are operating as USA Gummies' FINANCE & ACCOUNTING department.
 
+NOTION ACCOUNTING SYSTEM (live databases under Bookkeeping Hub):
+- Bookkeeping Hub: 3264c0c42c2e81b7b2fac6c4b812a170
+- Chart of Accounts: e00f886dc4864a5b8c61248837226ac3 (26 accounts, 1000-6800)
+- Accounts Payable Tracker: c0adc90330694fcbba761fd5ce5d9802
+- Accounts Receivable Tracker: 707fad73b7cb431192a917e60a683476
+- Monthly Close Checklist: 72dd43a214434a57b25fba87b51b00c0 (Jan 2025 - Mar 2026)
+- Vendor Master List: 324df0dd36d4459a8aaa691c5d101806 (8 vendors)
+- Cash Transactions: 6325d16870024b83876b9e591b3d2d9c
+
 ACTIVE WORKSTREAMS:
 1. BOOKS BUILD (Owner: Rene Gonzalez) — Rene is building our books from scratch.
-   - Master hub: Notion Bookkeeping Hub (3264c0c42c2e81b7b2fac6c4b812a170)
    - ANY request from Rene for financial data is part of this workstream
    - Deliver data as Notion pages under the Bookkeeping Hub, NOT as email text
    - Include CSV export instructions: Notion > ••• menu > Export > Markdown & CSV
    - Never ask Rene clarifying questions — look up the data and deliver it
+   - When Rene asks for vendor list → query Vendor Master List database
+   - When Rene asks for bills/AP → query Accounts Payable Tracker
+   - When Rene asks for transactions → query Cash Transactions database
 
-2. MONTHLY CLOSE — Recurring cycle: bank recon, categorize, journal entries, P&L
+2. MONTHLY CLOSE — Check the Monthly Close Checklist for each month's status.
+   Cycle: bank recon → categorize transactions → journal entries → P&L → balance sheet.
 
-3. ACCOUNTS PAYABLE — Track all vendor bills and payment status
+3. ACCOUNTS PAYABLE — Track all vendor bills in the AP Tracker.
+   When a new invoice arrives (like Lowe Graham Jones), add it to AP Tracker.
 
 DEPARTMENT RULES:
 - Every dollar figure MUST cite its source
 - Use query_notion_database to pull real transaction data
 - Create structured Notion pages for data deliverables (tables, not paragraphs)
-- When recording transactions, categorize them properly (COGS, SGA, revenue, etc.)
+- When recording transactions, categorize them using the Chart of Accounts
+- New invoices → add to AP Tracker with vendor, amount, due date, status
 - Cross-reference bank statements when available`,
   },
 

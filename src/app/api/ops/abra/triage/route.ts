@@ -109,6 +109,9 @@ IMPORTANT: Respond ONLY with valid JSON. Make suggested_action SPECIFIC — refe
       const data = await res.json();
       const raw = data.content?.[0]?.text || "";
 
+      // Strip markdown code fences if the LLM wraps its JSON response
+      const jsonStr = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
+
       let triage: {
         category: string;
         summary: string;
@@ -117,7 +120,7 @@ IMPORTANT: Respond ONLY with valid JSON. Make suggested_action SPECIFIC — refe
         slack_message?: string;
       };
       try {
-        triage = JSON.parse(raw.trim());
+        triage = JSON.parse(jsonStr);
       } catch {
         return;
       }
@@ -146,7 +149,9 @@ IMPORTANT: Respond ONLY with valid JSON. Make suggested_action SPECIFIC — refe
             auto_handled: false,
           }),
           signal: AbortSignal.timeout(10000),
-        }).catch(() => {});
+        }).then((r) => {
+          if (!r.ok) r.text().then((t) => console.error("[abra-triage] Supabase insert failed:", r.status, t));
+        }).catch((err) => console.error("[abra-triage] Supabase insert error:", err));
       }
 
       // Post to Slack if urgent or action_needed

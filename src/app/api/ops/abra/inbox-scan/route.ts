@@ -192,7 +192,9 @@ Respond with ONLY JSON:
 
     const data = await res.json();
     const raw = data.content?.[0]?.text || "";
-    const parsed = JSON.parse(raw.trim());
+    // Strip markdown code fences if the LLM wraps its JSON response
+    const jsonStr = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
+    const parsed = JSON.parse(jsonStr);
 
     const isAbra = parsed.category === "ABRA_COMMAND";
     return {
