@@ -10,6 +10,7 @@ import { sendMorningBrief, sendEndOfDaySummary } from "@/lib/ops/abra-morning-br
 import { runEmailFetch } from "@/lib/ops/abra-email-fetch";
 import { generateActionableEmailDrafts } from "@/lib/ops/abra-email-drafter";
 import { processFinancialBrainEntries } from "@/lib/ops/abra-financial-processor";
+import { learnFromSentMail } from "@/lib/ops/abra-sent-mail-learner";
 import { queryLedgerSummary } from "@/lib/ops/abra-notion-write";
 import { kv } from "@vercel/kv";
 import { appendStateArray, readState, writeState } from "@/lib/ops/state";
@@ -230,6 +231,14 @@ export async function POST(req: Request) {
       processFinancialBrainEntries({ limit: 10 }),
     );
     outcomes.push(financialStep);
+
+    // Learn from Ben's sent emails once per day (morning run only)
+    if (inMorningWindow(nowPT)) {
+      const sentMailStep = await runStep("sent_mail_learn", async () =>
+        learnFromSentMail({ count: 30, daysBack: 7 }),
+      );
+      outcomes.push(sentMailStep);
+    }
 
     // Pre-warm ledger cache for financial queries (avoids Notion pagination in real-time chat)
     const ledgerCacheStep = await runStep("ledger_cache", async () => {
