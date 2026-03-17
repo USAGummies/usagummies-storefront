@@ -362,7 +362,8 @@ async function saveSessionToBrain(session: Session): Promise<void> {
         title: `Session: ${session.title || session.session_type} (${new Date().toISOString().split("T")[0]})`,
         raw_text: summaryParts,
         summary_text: summaryParts.slice(0, 500),
-        category: "session_notes",
+        // Keep session summaries inside the existing category constraint.
+        category: "operational",
         department: session.department,
         confidence: "medium",
         priority: "normal",
@@ -370,8 +371,8 @@ async function saveSessionToBrain(session: Session): Promise<void> {
         embedding,
       }),
     });
-  } catch {
-    // Best-effort — don't fail session end
+  } catch (error) {
+    console.error("[abra/session] saveSessionToBrain failed:", error);
   }
 }
 
