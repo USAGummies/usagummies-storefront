@@ -433,7 +433,7 @@ export function FinanceView() {
             <div style={{ fontWeight: 700, color: NAVY, marginBottom: 10 }}>Margin Snapshot <span style={{ fontSize: 10, fontWeight: 400, color: TEXT_DIM }}>(Shopify DTC only)</span></div>
             <div style={{ display: "grid", gap: 8 }}>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
-                <span style={{ color: TEXT_DIM }}>Gross margin (DTC)</span>
+                <span style={{ color: TEXT_DIM }}>Shopify DTC Gross Margin</span>
                 <span style={{ color: NAVY, fontWeight: 700 }}>
                   {marginSnapshot ? `${marginSnapshot.estimated_gross_margin_pct.toFixed(1)}%` : "—"}
                 </span>
@@ -597,7 +597,7 @@ export function FinanceView() {
               </span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
-              <span style={{ color: TEXT_DIM }}>Gross margin</span>
+              <span style={{ color: TEXT_DIM }}>Blended Gross Margin <span style={{ fontSize: 10 }}>(all channels)</span></span>
               <span style={{ color: NAVY, fontWeight: 700 }}>
                 {pnl?.grossMargin != null ? `${pnl.grossMargin.toFixed(1)}%` : <span style={{ color: TEXT_DIM }}>—</span>}
               </span>
@@ -785,7 +785,7 @@ export function FinanceView() {
                       <span style={{ color: RED, fontWeight: 700 }}>{ap.breakeven.feePercentOfPrice}%</span>
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginTop: 4 }}>
-                      <span style={{ color: TEXT_DIM }}>Net margin</span>
+                      <span style={{ color: TEXT_DIM }}>Amazon Net Margin <span style={{ fontSize: 10 }}>(after all costs)</span></span>
                       <span style={{ color: ap.netMargin < 0 ? RED : "#16a34a", fontWeight: 700 }}>{ap.netMargin.toFixed(1)}%</span>
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginTop: 4 }}>

@@ -4,6 +4,7 @@ import { sendOpsEmail } from "@/lib/ops/email";
 import { createNotionPage, updateNotionPage, queryLedgerSummary } from "@/lib/ops/abra-notion-write";
 import { DB } from "@/lib/notion/client";
 import { generateEmbedding } from "@/lib/ops/abra-embeddings";
+import { emitEvent, type AbraEventType } from "@/lib/ops/abra-event-bus";
 
 /** Map friendly database keys → Notion database IDs for create_notion_page action */
 const NOTION_DB_MAP: Record<string, string> = {
@@ -1851,6 +1852,30 @@ const DIRECT_EXEC_ACTIONS = new Set([
   "draft_email_reply",
 ]);
 
+/** Map action types → event bus event types for cross-department cascades */
+const ACTION_EVENT_MAP: Partial<Record<string, AbraEventType>> = {
+  record_transaction: "transaction_recorded",
+  log_production_run: "production_run_logged",
+  record_vendor_quote: "vendor_quote_recorded",
+  correct_claim: "correction_logged",
+};
+
+/** After a successful action, emit an event for cross-department workflows */
+function emitPostActionEvent(action: AbraAction, result: ActionResult): void {
+  const eventType = ACTION_EVENT_MAP[action.action_type];
+  if (!eventType) return;
+
+  emitEvent({
+    type: eventType,
+    department: action.department || "executive",
+    timestamp: new Date().toISOString(),
+    data: { ...action.params, result_message: result.message },
+    sourceAction: action.action_type,
+  }).catch((err) => {
+    console.error("[abra-actions] Event bus emission failed:", err);
+  });
+}
+
 /** Post pending approval to Slack with interactive buttons so Ben can approve from his phone */
 async function notifySlackPendingApproval(approvalId: string, action: AbraAction): Promise<void> {
   const botToken = process.env.SLACK_BOT_TOKEN;
@@ -1970,6 +1995,10 @@ export async function proposeAndMaybeExecute(action: AbraAction): Promise<{
     if (handler) {
       try {
         const result = await handler(action.params || {});
+        // Fire event bus for cross-department cascades
+        if (result.success) {
+          void emitPostActionEvent(action, result);
+        }
         return {
           approval_id: `direct:${randomUUID()}`,
           auto_executed: true,
@@ -2112,6 +2141,8 @@ export async function executeAction(approvalId: string): Promise<ActionResult> {
         claimId: claimed.claimId,
         resultPayload: result.data || { message: result.message },
       });
+      // Fire event bus — cascade cross-department effects
+      void emitPostActionEvent(action, result);
     } else {
       await markApprovalResolved({
         approvalId,

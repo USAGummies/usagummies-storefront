@@ -3,6 +3,7 @@ import { after } from "next/server";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { recordFeedback } from "@/lib/ops/abra-source-provenance";
 import { executeAction } from "@/lib/ops/abra-actions";
+import { emitEvent } from "@/lib/ops/abra-event-bus";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -304,6 +305,18 @@ export async function POST(req: Request) {
               `✅ Reply sent to ${cmd.sender_email} by ${actor}\n*Subject:* ${cmd.draft_reply_subject || cmd.subject}`,
             );
           }
+          // Emit event for CRM tracking + cross-department cascades
+          void emitEvent({
+            type: "draft_reply_sent",
+            department: "executive",
+            timestamp: new Date().toISOString(),
+            data: {
+              command_id: commandId,
+              sender_email: cmd.sender_email,
+              subject: cmd.draft_reply_subject || cmd.subject,
+              sent_by: actor,
+            },
+          });
         } else {
           // Revert to pending so they can retry
           await sbFetch(`/rest/v1/abra_email_commands?id=eq.${commandId}`, {

@@ -117,16 +117,30 @@ export function PipelineView() {
     { label: "Deal Emails", timestamp: dealEmails?.generatedAt },
   ];
 
+  const [showRawScrapes, setShowRawScrapes] = useState(false);
+
   const leads = useMemo(() => {
     const rows = Object.values(pipeline?.stages || {}).flat();
 
-    // Filter out junk leads: no name, no email, or names that look like page titles
-    const PAGE_TITLE_RE = /^(top \d+|best |find |how to |where to |\d+ best)/i;
+    // Aggressive junk lead filter — removes fake leads that pollute the pipeline
+    const PAGE_TITLE_RE = /^(top \d+|best |find |how to |where to |\d+ best|\d+ most|list of |guide to |review of )/i;
+    const URL_NAME_RE = /^(https?:\/\/|www\.)|\.com(\/|$)|\.org(\/|$)|\.net(\/|$)/i;
+    const GENERIC_NAME_RE = /^(contact|lead|opportunity|inquiry|request|unknown|test|sample|n\/a|none)$/i;
+
     const filtered = rows.filter((lead) => {
-      if (!lead.name || !lead.name.trim()) return false;
-      if (PAGE_TITLE_RE.test(lead.name.trim())) return false;
-      // Keep leads that have at least an email OR a deal value
-      if (!lead.email && !lead.dealValue) return false;
+      const name = (lead.name || "").trim();
+      // Hard rejects
+      if (!name) return false;
+      if (PAGE_TITLE_RE.test(name)) return false;
+      if (URL_NAME_RE.test(name)) return false;
+      if (GENERIC_NAME_RE.test(name)) return false;
+      // Names > 8 words are likely article titles, not business names
+      if (name.split(/\s+/).length > 8) return false;
+
+      // Soft filter: Raw Scrape leads hidden by default (togglable)
+      const isRawScrape = !lead.email && !lead.dealValue;
+      if (isRawScrape && !showRawScrapes) return false;
+
       return true;
     });
 
@@ -134,7 +148,7 @@ export function PipelineView() {
       ...lead,
       kanbanStage: mapToKanbanStage(lead.status || ""),
     }));
-  }, [pipeline]);
+  }, [pipeline, showRawScrapes]);
 
   const emailByContact = useMemo(() => {
     const map = new Map<string, DealThread>();
@@ -372,6 +386,30 @@ export function PipelineView() {
           value={`${pipeline?.leadQuality?.qualified || 0} qualified`}
           sub={`${pipeline?.leadQuality?.rawScrape || 0} raw scrape`}
         />
+      </div>
+
+      {/* Toggle for showing/hiding raw scrape leads */}
+      <div style={{ marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ fontSize: 12, color: "#666" }}>
+          Showing {leads.length} leads
+          {!showRawScrapes && (pipeline?.leadQuality?.rawScrape || 0) > 0 && (
+            <span> ({pipeline?.leadQuality?.rawScrape || 0} raw scrapes hidden)</span>
+          )}
+        </span>
+        <button
+          onClick={() => setShowRawScrapes(!showRawScrapes)}
+          style={{
+            fontSize: 11,
+            padding: "3px 8px",
+            borderRadius: 4,
+            border: "1px solid #ddd",
+            background: showRawScrapes ? "#e8e8e8" : "transparent",
+            cursor: "pointer",
+            color: "#555",
+          }}
+        >
+          {showRawScrapes ? "Hide Raw Scrapes" : "Show All"}
+        </button>
       </div>
 
       <div style={{ marginBottom: 16 }}>
