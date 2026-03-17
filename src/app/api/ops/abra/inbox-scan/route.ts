@@ -18,6 +18,7 @@ import { listEmails, readEmail } from "@/lib/ops/gmail-reader";
 import { detectAwaitingReplies, detectStalledDeals } from "@/lib/ops/abra-email-fetch";
 import { expireStaleApprovals } from "@/lib/ops/abra-actions";
 import { autoAcknowledgeStaleSignals } from "@/lib/ops/abra-operational-signals";
+import { getVipSender, type VipSender } from "@/lib/ops/abra-vip-senders";
 import { readState, writeState } from "@/lib/ops/state";
 
 export const runtime = "nodejs";
@@ -339,6 +340,126 @@ async function triggerTriage(params: {
   }
 }
 
+/**
+ * For VIP/team emails that need a reply, proactively draft a response
+ * and queue it in #abra-control for Ben's approval.
+ */
+async function draftVipReply(params: {
+  senderName: string;
+  senderEmail: string;
+  subject: string;
+  body: string;
+  vip: VipSender;
+  emailId: string;
+  threadId: string;
+}): Promise<boolean> {
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  const botToken = process.env.SLACK_BOT_TOKEN;
+  if (!anthropicKey || !botToken) return false;
+
+  const sbUrl =
+    process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!sbUrl || !serviceKey) return false;
+
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": anthropicKey,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6",
+        max_tokens: 800,
+        system: `You are drafting an email reply on behalf of Ben Stutman, founder of USA Gummies.
+
+SENDER CONTEXT: ${params.vip.draftingContext || `${params.vip.name} — ${params.vip.relationship}`}
+
+RULES:
+- Write as Ben, not as "Abra" or an AI
+- Match the tone to the relationship (casual for team, professional for partners)
+- Be specific and helpful — reference details from their email
+- Keep it concise — no filler
+- Sign off with "Best,\\nBen" unless tone should be more casual
+- If you cannot write a useful reply (e.g., the email is purely informational with no question), respond with exactly: NO_REPLY_NEEDED
+
+Respond with ONLY the email body text. No subject line, no "Dear X" unless appropriate for the relationship.`,
+        messages: [
+          {
+            role: "user",
+            content: `FROM: ${params.senderName} <${params.senderEmail}>\nSUBJECT: ${params.subject}\n\nBODY:\n${sanitize(params.body, 2000)}`,
+          },
+        ],
+      }),
+      signal: AbortSignal.timeout(20000),
+    });
+
+    if (!res.ok) return false;
+    const data = await res.json();
+    const draft = data.content?.[0]?.text?.trim() || "";
+
+    if (!draft || draft === "NO_REPLY_NEEDED") return false;
+
+    // Store as draft command in Supabase
+    const commandId = `cmd-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const storeRes = await fetch(`${sbUrl}/rest/v1/abra_email_commands`, {
+      method: "POST",
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify({
+        id: commandId,
+        status: "draft_reply_pending",
+        sender_name: params.senderName,
+        sender_email: params.senderEmail,
+        subject: params.subject,
+        task: `Auto-drafted reply to ${params.senderName} (${params.vip.category})`,
+        draft_reply_subject: `Re: ${params.subject}`,
+        draft_reply_body: draft,
+        body_snippet: params.body.slice(0, 500),
+        gmail_thread_id: params.threadId || "",
+      }),
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!storeRes.ok) return false;
+
+    // Post to Slack for review
+    const ABRA_COMMAND_CHANNEL = "C0ALS6W7VB4";
+    const draftPreview =
+      draft.length > 300 ? draft.slice(0, 297) + "..." : draft;
+    const slackText =
+      `📧 *Auto-Draft Reply to ${params.senderName}*\n` +
+      `*Subject:* Re: ${params.subject}\n\n` +
+      `> ${draftPreview.split("\n").join("\n> ")}\n\n` +
+      `_Send:_ \`/abra sendreply ${commandId}\`  |  _Discard:_ \`/abra deny ${commandId}\``;
+
+    await fetch("https://slack.com/api/chat.postMessage", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${botToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        channel: ABRA_COMMAND_CHANNEL,
+        text: slackText,
+        mrkdwn: true,
+      }),
+      signal: AbortSignal.timeout(10000),
+    });
+
+    return true;
+  } catch (err) {
+    console.error("[inbox-scan] draftVipReply error:", err);
+    return false;
+  }
+}
+
 function isSystemMailbox(email: string): boolean {
   const system = [
     "mailer-daemon", "postmaster", "noreply", "no-reply", "donotreply",
@@ -425,14 +546,46 @@ export async function POST(req: Request) {
         });
         if (posted) commands++;
       } else {
-        // Triage non-command emails
-        await triggerTriage({
-          from: envelope.from || "",
-          subject: envelope.subject || "(no subject)",
-          snippet: body.slice(0, 500),
-          emailId: envelope.id,
-        });
-        triaged++;
+        // Check if sender is a VIP who needs a proactive reply draft
+        const vip = getVipSender(senderEmail);
+        const needsDraft =
+          vip &&
+          vip.relationship !== "self" &&
+          vip.category !== "noise" &&
+          (vip.priority === "critical" || vip.priority === "important");
+
+        if (needsDraft && vip) {
+          const drafted = await draftVipReply({
+            senderName: parseSenderName(envelope.from),
+            senderEmail,
+            subject: envelope.subject || "(no subject)",
+            body,
+            vip,
+            emailId: envelope.id,
+            threadId: envelope.threadId || "",
+          });
+          if (drafted) {
+            commands++; // Count as a command since a draft was queued
+          } else {
+            // Draft generation failed or not needed — fall back to triage
+            await triggerTriage({
+              from: envelope.from || "",
+              subject: envelope.subject || "(no subject)",
+              snippet: body.slice(0, 500),
+              emailId: envelope.id,
+            });
+            triaged++;
+          }
+        } else {
+          // Non-VIP: standard triage
+          await triggerTriage({
+            from: envelope.from || "",
+            subject: envelope.subject || "(no subject)",
+            snippet: body.slice(0, 500),
+            emailId: envelope.id,
+          });
+          triaged++;
+        }
       }
     }
 
