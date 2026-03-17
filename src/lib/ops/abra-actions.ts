@@ -10,6 +10,7 @@ const NOTION_DB_MAP: Record<string, string> = {
   meeting_notes: process.env.NOTION_MEETING_NOTES_DB_ID || process.env.NOTION_MEETING_DB_ID || "",
   b2b_prospects: process.env.NOTION_B2B_PROSPECTS_DB || "",
   distributor_prospects: process.env.NOTION_DISTRIBUTOR_PROSPECTS_DB || "",
+  repacker_list: process.env.NOTION_DB_REPACKER_LIST || "",
   daily_performance: DB.DAILY_PERFORMANCE,
   fleet_ops: DB.FLEET_OPS_LOG,
   inventory: DB.INVENTORY,

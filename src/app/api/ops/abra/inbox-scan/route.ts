@@ -16,7 +16,7 @@
 import { NextResponse } from "next/server";
 import { listEmails, readEmail } from "@/lib/ops/gmail-reader";
 import { detectAwaitingReplies, detectStalledDeals } from "@/lib/ops/abra-email-fetch";
-import { expireStaleApprovals } from "@/lib/ops/abra-actions";
+import { expireStaleApprovals, queryNotionDatabase } from "@/lib/ops/abra-actions";
 import { autoAcknowledgeStaleSignals } from "@/lib/ops/abra-operational-signals";
 import { getVipSender, type VipSender } from "@/lib/ops/abra-vip-senders";
 import { readState, writeState } from "@/lib/ops/state";
@@ -341,8 +341,62 @@ async function triggerTriage(params: {
 }
 
 /**
+ * Tools available to the VIP draft LLM — lets it look up real data
+ * from Notion databases before composing a reply.
+ */
+const VIP_DRAFT_TOOLS = [
+  {
+    name: "query_notion_database",
+    description:
+      "Query a Notion database to retrieve business data. Use this to look up vendor lists, " +
+      "B2B prospects, cash transactions, inventory, distributor contacts, etc. " +
+      "Available databases: b2b_prospects, distributor_prospects, repacker_list, " +
+      "cash_transactions, inventory, sku_registry, daily_performance, kpis.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        database: {
+          type: "string",
+          description:
+            "Database key to query (e.g. 'b2b_prospects', 'cash_transactions', 'repacker_list')",
+        },
+        filter_text: {
+          type: "string",
+          description: "Optional text to filter results by Name/Title field",
+        },
+      },
+      required: ["database"],
+    },
+  },
+];
+
+/** Execute a tool call from the VIP draft LLM */
+async function executeVipDraftTool(
+  toolName: string,
+  toolInput: Record<string, unknown>,
+): Promise<string> {
+  if (toolName === "query_notion_database") {
+    const db = String(toolInput.database || "");
+    const filter = toolInput.filter_text ? String(toolInput.filter_text) : undefined;
+    const result = await queryNotionDatabase(db, filter);
+    if (!result.success) return `Error: ${result.message}`;
+    // Return a compact JSON summary the LLM can use to compose the email
+    const data = result.data as { results?: unknown[]; schema?: string } | undefined;
+    return JSON.stringify(
+      { message: result.message, results: data?.results?.slice(0, 50) },
+      null,
+      0,
+    ).slice(0, 8000);
+  }
+  return `Unknown tool: ${toolName}`;
+}
+
+/**
  * For VIP/team emails that need a reply, proactively draft a response
  * and queue it in #abra-control for Ben's approval.
+ *
+ * Uses Anthropic tool_use API so the LLM can query Notion databases
+ * to include real data in the draft (e.g., vendor lists, financials).
  */
 async function draftVipReply(params: {
   senderName: string;
@@ -357,54 +411,123 @@ async function draftVipReply(params: {
   const botToken = process.env.SLACK_BOT_TOKEN;
   if (!anthropicKey || !botToken) return false;
 
-  const sbUrl =
+  const supabaseUrl =
     process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!sbUrl || !serviceKey) return false;
+  if (!supabaseUrl || !serviceKey) return false;
 
-  try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": anthropicKey,
-        "anthropic-version": "2023-06-01",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6",
-        max_tokens: 800,
-        system: `You are drafting an email reply on behalf of Ben Stutman, founder of USA Gummies.
+  const apiHeaders = {
+    "x-api-key": anthropicKey,
+    "anthropic-version": "2023-06-01",
+    "Content-Type": "application/json",
+  };
+
+  const systemPrompt = `You are drafting an email reply on behalf of Ben Stutman, founder of USA Gummies.
 
 SENDER CONTEXT: ${params.vip.draftingContext || `${params.vip.name} — ${params.vip.relationship}`}
+
+IMPORTANT: You have access to tools that can query USA Gummies' Notion databases.
+If the sender is asking for data, reports, lists, or information that might be in the company databases,
+USE THE TOOLS to look up the actual data and include it in your reply. Do NOT ask clarifying questions
+when you can look up the answer yourself. Deliver the data.
+
+Available databases you can query:
+- b2b_prospects: B2B wholesale leads and prospects
+- distributor_prospects: Distribution partners and prospects
+- repacker_list: Co-packers, repackers, and manufacturing partners
+- cash_transactions: Financial transactions and payments
+- inventory: Product inventory levels
+- sku_registry: Product SKUs and details
+- daily_performance: Daily sales and traffic metrics
+- kpis: Key performance indicators
 
 RULES:
 - Write as Ben, not as "Abra" or an AI
 - Match the tone to the relationship (casual for team, professional for partners)
-- Be specific and helpful — reference details from their email
+- Be specific and helpful — if they ask for data, LOOK IT UP and include it
 - Keep it concise — no filler
 - Sign off with "Best,\\nBen" unless tone should be more casual
 - If you cannot write a useful reply (e.g., the email is purely informational with no question), respond with exactly: NO_REPLY_NEEDED
 
-Respond with ONLY the email body text. No subject line, no "Dear X" unless appropriate for the relationship.`,
-        messages: [
-          {
-            role: "user",
-            content: `FROM: ${params.senderName} <${params.senderEmail}>\nSUBJECT: ${params.subject}\n\nBODY:\n${sanitize(params.body, 2000)}`,
-          },
-        ],
-      }),
-      signal: AbortSignal.timeout(20000),
-    });
+Respond with ONLY the email body text. No subject line, no "Dear X" unless appropriate for the relationship.`;
 
-    if (!res.ok) return false;
-    const data = await res.json();
-    const draft = data.content?.[0]?.text?.trim() || "";
+  try {
+    // Build conversation messages — supports up to 3 tool-use rounds
+    const messages: Array<{ role: string; content: unknown }> = [
+      {
+        role: "user",
+        content: `FROM: ${params.senderName} <${params.senderEmail}>\nSUBJECT: ${params.subject}\n\nBODY:\n${sanitize(params.body, 2000)}`,
+      },
+    ];
+
+    let draft = "";
+    const MAX_TOOL_ROUNDS = 3;
+
+    for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: apiHeaders,
+        body: JSON.stringify({
+          model: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6",
+          max_tokens: 2000,
+          system: systemPrompt,
+          tools: VIP_DRAFT_TOOLS,
+          messages,
+        }),
+        signal: AbortSignal.timeout(30000),
+      });
+
+      if (!res.ok) return false;
+      const data = await res.json();
+
+      // Check stop reason
+      if (data.stop_reason === "end_turn" || !data.content) {
+        // Extract text from final response
+        const textBlocks = (data.content || []).filter(
+          (b: { type: string }) => b.type === "text",
+        );
+        draft = textBlocks.map((b: { text: string }) => b.text).join("\n").trim();
+        break;
+      }
+
+      // Handle tool_use blocks
+      const toolUseBlocks = (data.content || []).filter(
+        (b: { type: string }) => b.type === "tool_use",
+      );
+
+      if (toolUseBlocks.length === 0) {
+        // No tools called — extract text
+        const textBlocks = (data.content || []).filter(
+          (b: { type: string }) => b.type === "text",
+        );
+        draft = textBlocks.map((b: { text: string }) => b.text).join("\n").trim();
+        break;
+      }
+
+      // Add assistant's response (with tool_use blocks) to messages
+      messages.push({ role: "assistant", content: data.content });
+
+      // Execute tool calls and add results
+      const toolResults = [];
+      for (const block of toolUseBlocks) {
+        const result = await executeVipDraftTool(
+          block.name,
+          block.input as Record<string, unknown>,
+        );
+        toolResults.push({
+          type: "tool_result",
+          tool_use_id: block.id,
+          content: result,
+        });
+      }
+      messages.push({ role: "user", content: toolResults });
+    }
 
     if (!draft || draft === "NO_REPLY_NEEDED") return false;
 
     // Store as draft command in Supabase
     const commandId = `cmd-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const storeRes = await fetch(`${sbUrl}/rest/v1/abra_email_commands`, {
+    const storeRes = await fetch(`${supabaseUrl}/rest/v1/abra_email_commands`, {
       method: "POST",
       headers: {
         apikey: serviceKey,
@@ -590,12 +713,17 @@ export async function POST(req: Request) {
     }
 
     // ---- VIP catch-up: scan recent READ emails from VIPs that don't have drafts yet ----
+    // DEDUP: Check by email_id (Gmail message ID) across ALL statuses, not just pending.
+    // This prevents re-drafting the same email after a draft is sent, denied, or expired.
     try {
       const recentAll = await listEmails({
         folder: "INBOX",
         count: 20,
         unreadOnly: false,
       });
+
+      // Collect all candidate email IDs for a single batch dedup query
+      const vipCandidates: typeof recentAll = [];
       for (const env of recentAll) {
         const email = parseSenderEmail(env.from);
         const vip = getVipSender(email);
@@ -607,35 +735,71 @@ export async function POST(req: Request) {
         ) {
           continue;
         }
-        // Skip if we already have a command for this email
+        // Skip if already in the unread loop's processed set
         if (processed.has(env.id)) continue;
-        // Skip if we already processed it in the unread loop above
+        // Skip if already handled in the unread loop above
         const alreadyHandled = envelopes.some((u) => u.id === env.id);
         if (alreadyHandled) continue;
+        vipCandidates.push(env);
+      }
 
-        // Check if a draft already exists for this sender+subject
-        const existingRes = await fetch(
-          `${sbUrl()}/rest/v1/abra_email_commands?sender_email=eq.${encodeURIComponent(email)}&status=in.(draft_reply_pending,pending_approval,executing)&limit=1&select=id`,
-          { headers: sbHeaders(), signal: AbortSignal.timeout(5000) },
-        );
-        if (existingRes.ok) {
-          const existing = await existingRes.json();
-          if (Array.isArray(existing) && existing.length > 0) continue; // Already has a pending draft
+      if (vipCandidates.length > 0) {
+        // Batch check: which email_ids already have ANY command (any status)?
+        const candidateIds = vipCandidates.map((e) => `"${e.id}"`).join(",");
+        const alreadyDraftedIds = new Set<string>();
+        try {
+          const checkRes = await fetch(
+            `${sbUrl()}/rest/v1/abra_email_commands?email_id=in.(${candidateIds})&select=email_id`,
+            { headers: sbHeaders(), signal: AbortSignal.timeout(10000) },
+          );
+          if (checkRes.ok) {
+            const rows = (await checkRes.json()) as Array<{ email_id: string }>;
+            for (const row of rows) {
+              if (row.email_id) alreadyDraftedIds.add(row.email_id);
+            }
+          }
+        } catch {
+          // Best-effort dedup
         }
 
-        const message = await readEmail(env.id);
-        if (!message) continue;
+        // Also check triage table
+        try {
+          const triageRes = await fetch(
+            `${sbUrl()}/rest/v1/abra_email_triage?email_id=in.(${candidateIds})&select=email_id`,
+            { headers: sbHeaders(), signal: AbortSignal.timeout(10000) },
+          );
+          if (triageRes.ok) {
+            const rows = (await triageRes.json()) as Array<{ email_id: string }>;
+            for (const row of rows) {
+              if (row.email_id) alreadyDraftedIds.add(row.email_id);
+            }
+          }
+        } catch {
+          // Best-effort
+        }
 
-        const drafted = await draftVipReply({
-          senderName: parseSenderName(env.from),
-          senderEmail: email,
-          subject: env.subject || "(no subject)",
-          body: message.body || "",
-          vip,
-          emailId: env.id,
-          threadId: env.threadId || "",
-        });
-        if (drafted) commands++;
+        for (const env of vipCandidates) {
+          // Skip if ANY command/triage already exists for this specific email
+          if (alreadyDraftedIds.has(env.id)) continue;
+
+          const email = parseSenderEmail(env.from);
+          const vip = getVipSender(email);
+          if (!vip) continue;
+
+          const message = await readEmail(env.id);
+          if (!message) continue;
+
+          const drafted = await draftVipReply({
+            senderName: parseSenderName(env.from),
+            senderEmail: email,
+            subject: env.subject || "(no subject)",
+            body: message.body || "",
+            vip,
+            emailId: env.id,
+            threadId: env.threadId || "",
+          });
+          if (drafted) commands++;
+        }
       }
     } catch (err) {
       console.error("[inbox-scan] VIP catch-up error:", err);
@@ -647,7 +811,11 @@ export async function POST(req: Request) {
     let awaitingAlerts = 0;
     try {
       const awaiting = await detectAwaitingReplies({ sentCount: 30, lookbackHours: 72 });
-      const criticalAwaiting = awaiting.filter((a) => a.escalation === "critical" || a.escalation === "important");
+      // Don't alert on emails sent less than 4 hours ago — give people time to reply
+      const MIN_AGE_HOURS = 4;
+      const criticalAwaiting = awaiting.filter(
+        (a) => (a.escalation === "critical" || a.escalation === "important") && a.hoursAgo >= MIN_AGE_HOURS,
+      );
 
       if (criticalAwaiting.length > 0) {
         // Load previously-alerted threadIds from KV state

@@ -116,8 +116,12 @@ export const VIP_SENDERS: Record<string, VipSender> = {
       "Rene Gonzalez is USA Gummies' finance person — handles bookkeeping, financial reporting, " +
       "cash management, and accounting. He's an internal team member, not an external contact. " +
       "Write casually and directly, like you're messaging a coworker. No need for formal business tone. " +
-      "If he asks for financial data/reports, confirm you'll get it to him and ask about format/deadline " +
-      "preferences. He has access to the ops dashboard and company financials.",
+      "IMPORTANT: When Rene asks for data (vendor lists, financial reports, transaction history, etc.), " +
+      "DO NOT ask him clarifying questions. Use the query_notion_database tool to look up the actual data " +
+      "and include it directly in the reply. He expects deliverables, not follow-up questions. " +
+      "Key databases: cash_transactions (financials), b2b_prospects (wholesale leads), " +
+      "distributor_prospects (distribution partners), repacker_list (co-packers/suppliers), " +
+      "inventory (stock levels).",
   },
   "ben@usagummies.com": {
     name: "Ben Stutman",

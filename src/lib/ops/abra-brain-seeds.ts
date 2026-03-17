@@ -148,6 +148,47 @@ COST LAYERS: When multiple production runs overlap in inventory, maintain a "cos
   },
 ];
 
+const AMAZON_ADS_SEEDS: BrainSeed[] = [
+  {
+    title: "Amazon PPC Campaign Structure — USA Gummies",
+    text: `USA Gummies Amazon Sponsored Products campaign structure as of March 17, 2026:
+ACTIVE CAMPAIGNS (3 campaigns, combined daily budget $55):
+1. USG-Auto-Discovery — Automatic targeting, $25/day budget, Dynamic bids up+down. Default bid $0.75. Top of search placement +50%, Product pages +25%. Purpose: keyword harvesting — discover converting search terms, then graduate winners to manual campaigns. Has 16 negative phrase-match keywords to block wasteful spend (vitamins, supplement, CBD, melatonin, THC, delta, weight loss, protein, keto, collagen, ashwagandha, probiotic, sugar free, vegan, organic, kids vitamins).
+2. USG-Manual-Exact — Manual exact-match keywords, $15/day budget, Dynamic bids up+down. Top of search +50%, Product pages +25%. Contains 25 exact-match keywords with competitive bids ($0.45–$3.07). Targets high-intent searches like "gummy bears," "dye free gummy bears," "natural gummy candy," "candy without artificial colors." Purpose: capture high-intent, proven-converting search terms with exact control.
+3. USG-Product-Targeting — Manual product targeting, $15/day budget, Dynamic bids up+down. Top of search +50%, Product pages +25%. Targets 1 category (Gummy Candies, $0.43 bid) and 5 competitor ASINs: Black Forest Organic (B06Y6485FQ, $1.62), Black Forest Juicy Burst (B01N39RV0A), Haribo Goldbears (B01LY311CG, $1.12), NERDS Gummy Clusters (B09M1NZ92V, $3.08), YumEarth Organic (bid $1.76). Purpose: conquest — show ads on competitor product pages and in category browse.
+PAUSED CAMPAIGNS (1):
+4. USG-Manual-Phrase — Paused on March 17, 2026. Was consuming most of the budget with worst ROAS. Phrase-match was too broad, capturing low-intent queries.
+ASIN: B0G1JK92TJ (USA Gummies Dye Free Gummy Bears)
+Seller ID: A16G27VYDSSEGO, Entity ID: ENTITYM75K6QB0JZKO
+BUDGET ALLOCATION: Pro-forma $6K March, $5K April, $4K May for Amazon PPC total. Daily budget ~$55/day = ~$1,700/month, well within allocation.`,
+    tags: ["amazon", "ppc", "campaigns", "advertising", "reference"],
+  },
+  {
+    title: "Amazon PPC Optimization Playbook",
+    text: `Weekly Amazon PPC optimization protocol for USA Gummies:
+DAILY CHECKS:
+• Total spend vs daily budget (are campaigns spending fully? Under-delivery = bids too low)
+• ACoS by campaign (target < 30% blended)
+• Any campaign paused or budget-capped early in the day
+WEEKLY OPTIMIZATION (every Monday):
+1. SEARCH TERM REPORT: Pull from USG-Auto-Discovery. Find terms with 3+ clicks and a sale → add as exact match to USG-Manual-Exact. Find terms with 10+ clicks and 0 sales → add as negative exact to Auto-Discovery.
+2. BID ADJUSTMENTS: For USG-Manual-Exact keywords — if ACoS > 35%, reduce bid 10-15%. If ACoS < 20% and impressions are low, increase bid 10-20% to capture more volume. Use Amazon's suggested bid range as a guide.
+3. PRODUCT TARGETING REVIEW: Check USG-Product-Targeting — which competitor ASINs are converting? Increase bids on winners, pause losers after 2 weeks of data.
+4. BUDGET REALLOCATION: Move budget from low-ROAS campaigns to high-ROAS. If Auto-Discovery is finding lots of winners, give it more budget temporarily.
+MONTHLY REVIEW:
+• Evaluate overall ACoS vs 30% target
+• Check TACoS (Total ACoS = ad spend / total revenue including organic). Target < 15%.
+• Assess if PPC is driving organic rank improvement (organic sales should grow over time as PPC boosts velocity)
+• Compare to pro-forma budget allocation ($6K Mar, $5K Apr, $4K May)
+KEY METRICS: ACoS (ad spend / ad revenue), ROAS (ad revenue / ad spend), TACoS (ad spend / total revenue), CPC (cost per click), CTR (click-through rate, target > 0.3%), Conversion Rate (target > 10% for exact match).
+BIDDING STRATEGIES:
+• Dynamic bids up+down: Amazon adjusts bid ±100% based on likelihood of conversion. Best for established campaigns with conversion data.
+• Fixed bids: Use for testing new keywords where you want predictable spend.
+• Placement adjustments: Top of search +50% is aggressive but effective — top of search has 2-3x higher conversion rate.`,
+    tags: ["amazon", "ppc", "optimization", "playbook", "reference"],
+  },
+];
+
 function getSupabaseEnv() {
   const baseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -175,7 +216,8 @@ export async function seedCPGBrainEntries(): Promise<{ created: number; skipped:
   let created = 0;
   let skipped = 0;
 
-  for (const seed of CPG_SEEDS) {
+  const ALL_SEEDS = [...CPG_SEEDS, ...AMAZON_ADS_SEEDS];
+  for (const seed of ALL_SEEDS) {
     // Check if entry already exists by title
     const existing = (await sbFetch(
       `/rest/v1/open_brain_entries?title=eq.${encodeURIComponent(seed.title)}&select=id&limit=1`,

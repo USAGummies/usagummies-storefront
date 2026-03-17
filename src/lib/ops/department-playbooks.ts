@@ -708,31 +708,35 @@ export const DEPARTMENT_PLAYBOOKS: Record<string, DepartmentPlaybook> = {
 
   amazon: {
     description:
-      "Amazon Seller Central account management, PPC, listing optimization, FBA logistics, reviews, and brand protection.",
+      "Amazon Seller Central account management, PPC advertising (3 active Sponsored Products campaigns + 1 paused), listing optimization, FBA logistics, reviews, and brand protection. ASIN: B0G1JK92TJ, Seller ID: A16G27VYDSSEGO.",
     baseline: [
       "Amazon account health monitoring",
-      "PPC campaign management (Sponsored Products, Brands, Display)",
+      "PPC campaign management — 3 active campaigns: USG-Auto-Discovery (auto, $25/day), USG-Manual-Exact (exact keywords, $15/day), USG-Product-Targeting (competitor ASINs + category, $15/day). USG-Manual-Phrase paused.",
+      "PPC weekly optimization: search term mining from auto→exact, negative keyword additions, bid adjustments, budget reallocation",
       "Listing optimization (titles, bullets, A+ content, backend keywords)",
       "FBA inventory management and replenishment",
       "Review generation and reputation management",
       "Brand Registry and brand protection",
-      "Competitor monitoring on Amazon",
-      "Amazon advertising reporting and ACOS optimization",
+      "Competitor monitoring on Amazon (Black Forest, Haribo, NERDS, YumEarth tracked in product targeting)",
+      "Amazon advertising reporting — ACoS target <30%, TACoS target <15%",
     ],
     questions: [
       { key: "seller_type", q: "Seller Central or Vendor Central?", default: "Seller Central" },
       { key: "fba_or_fbm", q: "Fulfillment method? (FBA, FBM, or hybrid?)", default: "FBA" },
-      { key: "ppc_budget", q: "Monthly Amazon PPC budget?" },
-      { key: "asin_count", q: "How many ASINs are listed?" },
+      { key: "ppc_budget", q: "Monthly Amazon PPC budget?", default: "$6K Mar, $5K Apr, $4K May (pro-forma)" },
+      { key: "asin_count", q: "How many ASINs are listed?", default: "1 (B0G1JK92TJ — Dye Free Gummy Bears)" },
       { key: "brand_registry", q: "Enrolled in Amazon Brand Registry?", default: "yes" },
     ],
     taskTemplate: [
+      { title: "Weekly PPC search term mining", description: "Pull search term report from USG-Auto-Discovery. Graduate 3+ click converters to USG-Manual-Exact. Add 10+ click non-converters as negative keywords.", priority: "critical", estimated_hours: 1 },
+      { title: "Weekly bid optimization", description: "Adjust bids on USG-Manual-Exact keywords: reduce 10-15% if ACoS >35%, increase 10-20% if ACoS <20% with low impressions. Review product targeting bids on USG-Product-Targeting.", priority: "critical", estimated_hours: 1 },
       { title: "Optimize Amazon listings", description: "Rewrite titles, bullet points, and A+ content for all ASINs using keyword research.", priority: "critical", estimated_hours: 6 },
-      { title: "Restructure PPC campaigns", description: "Audit and rebuild PPC campaigns: auto/manual separation, negative keywords, bid optimization.", priority: "critical", estimated_hours: 4 },
+      { title: "Monthly PPC budget review", description: "Compare actual spend to pro-forma allocation ($6K Mar, $5K Apr, $4K May). Reallocate between campaigns based on ROAS performance.", priority: "high", estimated_hours: 1 },
       { title: "Set up FBA replenishment alerts", description: "Create inventory monitoring with reorder triggers based on velocity and lead time.", priority: "high", estimated_hours: 2 },
       { title: "Build review generation strategy", description: "Implement Amazon Vine, Request a Review automation, and insert card program.", priority: "high", estimated_hours: 2 },
+      { title: "Competitor ASIN monitoring", description: "Check USG-Product-Targeting performance by competitor ASIN. Add new competitor ASINs, pause non-converters after 2 weeks.", priority: "medium", estimated_hours: 1 },
     ],
-    kpis: ["amazon_revenue_monthly", "acos_pct", "organic_rank_top_keywords", "review_count", "review_rating_avg", "fba_inventory_health"],
+    kpis: ["amazon_revenue_monthly", "acos_pct", "tacos_pct", "ppc_daily_spend", "ppc_roas", "organic_rank_top_keywords", "review_count", "review_rating_avg", "fba_inventory_health"],
   },
 
   customer_experience: {

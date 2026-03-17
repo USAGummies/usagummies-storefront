@@ -52,6 +52,7 @@ export type ListEmailsOpts = {
 // ---------------------------------------------------------------------------
 
 let _gmail: ReturnType<typeof google.gmail> | null = null;
+let _gmailSend: ReturnType<typeof google.gmail> | null = null;
 
 function getGmailClient() {
   if (_gmail) return _gmail;
@@ -86,6 +87,48 @@ function getGmailClient() {
   throw new Error(
     "Gmail API not configured. Set GMAIL_SERVICE_ACCOUNT_JSON, or set GMAIL_OAUTH_CLIENT_ID + GMAIL_OAUTH_CLIENT_SECRET + GMAIL_OAUTH_REFRESH_TOKEN."
   );
+}
+
+/**
+ * Get a Gmail client with send permission.
+ * Uses OAuth2 (scopes are baked into the refresh token) or service account
+ * with gmail.send scope. Returns null if not available.
+ */
+function getGmailSendClient(): ReturnType<typeof google.gmail> | null {
+  if (_gmailSend) return _gmailSend;
+
+  // OAuth2 refresh token — scopes are baked in from when the token was created.
+  // If the token was created with gmail.send scope, this will work.
+  const clientId = process.env.GMAIL_OAUTH_CLIENT_ID || process.env.GCP_GMAIL_OAUTH_CLIENT_ID;
+  const clientSecret = process.env.GMAIL_OAUTH_CLIENT_SECRET || process.env.GCP_GMAIL_OAUTH_CLIENT_SECRET;
+  const refreshToken = process.env.GMAIL_OAUTH_REFRESH_TOKEN || process.env.GCP_GMAIL_OAUTH_REFRESH_TOKEN;
+
+  if (clientId && clientSecret && refreshToken) {
+    const oauth2 = new google.auth.OAuth2(clientId, clientSecret);
+    oauth2.setCredentials({ refresh_token: refreshToken });
+    _gmailSend = google.gmail({ version: "v1", auth: oauth2 });
+    return _gmailSend;
+  }
+
+  // Service account with send scope
+  const saJson = process.env.GMAIL_SERVICE_ACCOUNT_JSON;
+  if (saJson) {
+    const creds = JSON.parse(saJson);
+    const auth = new google.auth.GoogleAuth({
+      credentials: creds,
+      scopes: [
+        "https://www.googleapis.com/auth/gmail.readonly",
+        "https://www.googleapis.com/auth/gmail.send",
+      ],
+      clientOptions: {
+        subject: "ben@usagummies.com",
+      },
+    });
+    _gmailSend = google.gmail({ version: "v1", auth });
+    return _gmailSend;
+  }
+
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -261,4 +304,64 @@ export async function searchEmails(
   }
 
   return messages;
+}
+
+// ---------------------------------------------------------------------------
+// Sending via Gmail API (saves to Sent folder automatically)
+// ---------------------------------------------------------------------------
+
+export type SendGmailOpts = {
+  to: string;
+  subject: string;
+  body: string;
+  from?: string;
+  cc?: string;
+  threadId?: string; // Gmail thread ID to reply in-thread
+};
+
+/**
+ * Build a raw RFC 2822 email message encoded as base64url for the Gmail API.
+ */
+function buildRawEmail(opts: SendGmailOpts): string {
+  const from = opts.from || "Ben Stutman <ben@usagummies.com>";
+  const lines = [
+    `From: ${from}`,
+    `To: ${opts.to}`,
+    ...(opts.cc ? [`Cc: ${opts.cc}`] : []),
+    `Subject: ${opts.subject}`,
+    "MIME-Version: 1.0",
+    "Content-Type: text/plain; charset=UTF-8",
+    "",
+    opts.body,
+  ];
+  const raw = lines.join("\r\n");
+  return Buffer.from(raw).toString("base64url");
+}
+
+/**
+ * Send an email via Gmail API. Automatically saves to Sent folder.
+ * Returns true on success, false if Gmail API send is unavailable or fails.
+ * Callers should fall back to SMTP on false.
+ */
+export async function sendViaGmailApi(opts: SendGmailOpts): Promise<boolean> {
+  const gmail = getGmailSendClient();
+  if (!gmail) return false;
+
+  try {
+    const raw = buildRawEmail(opts);
+    await gmail.users.messages.send({
+      userId: "me",
+      requestBody: {
+        raw,
+        ...(opts.threadId ? { threadId: opts.threadId } : {}),
+      },
+    });
+    return true;
+  } catch (err) {
+    console.error(
+      "[gmail-reader] sendViaGmailApi failed (will fall back to SMTP):",
+      err instanceof Error ? err.message : err,
+    );
+    return false;
+  }
 }

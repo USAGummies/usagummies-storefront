@@ -17,6 +17,7 @@
 import nodemailer from "nodemailer";
 import { readState, writeState } from "./state";
 import type { StateKey } from "./state-keys";
+import { sendViaGmailApi } from "./gmail-reader";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -219,18 +220,29 @@ export async function sendOpsEmail(opts: SendEmailOpts): Promise<SendEmailResult
     };
   }
 
-  // --- Send ---
+  // --- Send (prefer Gmail API → falls back to SMTP) ---
   try {
-    const transporter = getTransporter();
-    const mailOpts: nodemailer.SendMailOptions = {
-      from,
+    // Gmail API send: automatically saves to Sent folder
+    const sentViaApi = await sendViaGmailApi({
       to,
       subject,
-      text: body,
-    };
-    if (cc) mailOpts.cc = cc;
+      body,
+      from,
+      cc: cc || undefined,
+    });
 
-    await transporter.sendMail(mailOpts);
+    if (!sentViaApi) {
+      // Fall back to SMTP (doesn't save to Sent folder)
+      const transporter = getTransporter();
+      const mailOpts: nodemailer.SendMailOptions = {
+        from,
+        to,
+        subject,
+        text: body,
+      };
+      if (cc) mailOpts.cc = cc;
+      await transporter.sendMail(mailOpts);
+    }
 
     await logSend({
       timestamp: etTimestamp(),
@@ -239,7 +251,8 @@ export async function sendOpsEmail(opts: SendEmailOpts): Promise<SendEmailResult
       subject,
     });
 
-    return { ok: true, message: `SENT: "${subject}" to ${to}` };
+    const method = sentViaApi ? "Gmail API" : "SMTP";
+    return { ok: true, message: `SENT (${method}): "${subject}" to ${to}` };
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
 
