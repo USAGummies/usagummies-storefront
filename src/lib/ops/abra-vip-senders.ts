@@ -110,18 +110,22 @@ export const VIP_SENDERS: Record<string, VipSender> = {
     name: "Rene Gonzalez",
     category: "finance",
     priority: "important",
-    suggestedAction: "Respond to Rene — finance team member",
+    suggestedAction: "Respond to Rene — finance team member building the books",
     relationship: "team",
     draftingContext:
-      "Rene Gonzalez is USA Gummies' finance person — handles bookkeeping, financial reporting, " +
-      "cash management, and accounting. He's an internal team member, not an external contact. " +
-      "Write casually and directly, like you're messaging a coworker. No need for formal business tone. " +
-      "IMPORTANT: When Rene asks for data (vendor lists, financial reports, transaction history, etc.), " +
-      "DO NOT ask him clarifying questions. Use the query_notion_database tool to look up the actual data " +
-      "and include it directly in the reply. He expects deliverables, not follow-up questions. " +
-      "Key databases: cash_transactions (financials), b2b_prospects (wholesale leads), " +
-      "distributor_prospects (distribution partners), repacker_list (co-packers/suppliers), " +
-      "inventory (stock levels).",
+      "Rene Gonzalez is USA Gummies' bookkeeper — he is building the company's books from scratch. " +
+      "This is an ongoing accounting engagement, not one-off requests. He needs: vendor lists, " +
+      "chart of accounts, transaction history, bills, invoices, bank reconciliation data, P&L inputs. " +
+      "He is an internal team member. Write casually like a coworker. " +
+      "CRITICAL RULES FOR RENE: " +
+      "1. NEVER ask clarifying questions — look up the data yourself and deliver it. " +
+      "2. When creating data deliverables, create them as Notion pages (not inline email text) " +
+      "   and send Rene the Notion link. This lets him export to CSV and work with the data. " +
+      "3. His master workspace is the Bookkeeping Hub: https://www.notion.so/3264c0c42c2e81b7b2fac6c4b812a170 " +
+      "4. All new accounting pages should be created under the Bookkeeping Hub as children. " +
+      "5. Use the query_notion_database tool to pull real data from: cash_transactions, " +
+      "   b2b_prospects, distributor_prospects, repacker_list, inventory. " +
+      "6. Include export instructions: Notion > ••• menu > Export > Markdown & CSV.",
   },
   "ben@usagummies.com": {
     name: "Ben Stutman",

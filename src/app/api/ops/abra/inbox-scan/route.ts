@@ -614,6 +614,18 @@ export async function POST(req: Request) {
       unreadOnly: true,
     });
 
+    // Build a set of thread IDs Ben has already replied to (from Sent folder).
+    // This prevents Abra from drafting replies to conversations Ben already handled.
+    const repliedThreadIds = new Set<string>();
+    try {
+      const sentEmails = await listEmails({ folder: "SENT", count: 30, unreadOnly: false });
+      for (const sent of sentEmails) {
+        if (sent.threadId) repliedThreadIds.add(sent.threadId);
+      }
+    } catch {
+      // Sent mail check is best-effort
+    }
+
     if (envelopes.length === 0) {
       return NextResponse.json({ ok: true, scanned: 0, commands: 0, triaged: 0 });
     }
@@ -675,7 +687,9 @@ export async function POST(req: Request) {
           vip &&
           vip.relationship !== "self" &&
           vip.category !== "noise" &&
-          (vip.priority === "critical" || vip.priority === "important");
+          (vip.priority === "critical" || vip.priority === "important") &&
+          // Don't draft if Ben already replied in this thread
+          !repliedThreadIds.has(envelope.threadId || "");
 
         if (needsDraft && vip) {
           const drafted = await draftVipReply({
@@ -781,6 +795,8 @@ export async function POST(req: Request) {
         for (const env of vipCandidates) {
           // Skip if ANY command/triage already exists for this specific email
           if (alreadyDraftedIds.has(env.id)) continue;
+          // Skip if Ben already replied in this thread
+          if (env.threadId && repliedThreadIds.has(env.threadId)) continue;
 
           const email = parseSenderEmail(env.from);
           const vip = getVipSender(email);

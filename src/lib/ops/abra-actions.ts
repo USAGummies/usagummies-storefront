@@ -1825,11 +1825,30 @@ export async function canAutoExecute(action: AbraAction): Promise<boolean> {
   }
 }
 
-/** Read-only actions that never need approval — execute directly, no DB row */
+/**
+ * Actions that execute directly without approval — no DB row, no Slack notification.
+ * Only external-facing actions (send_email, send_slack) require human approval.
+ * Everything else is internal data operations that Abra should just do.
+ */
 const DIRECT_EXEC_ACTIONS = new Set([
+  // Read operations
   "read_email",
   "search_email",
   "query_ledger",
+  // Internal data writes — Abra learning, organizing, recording
+  "create_brain_entry",
+  "correct_claim",
+  "acknowledge_signal",
+  "create_task",
+  "update_notion",
+  "create_notion_page",
+  "record_transaction",
+  "log_production_run",
+  "record_vendor_quote",
+  "run_scenario",
+  "pause_initiative",
+  // Draft email replies go to Slack for review before sending — that IS the gate
+  "draft_email_reply",
 ]);
 
 /** Post pending approval to Slack so Ben can approve from his phone */
@@ -1916,8 +1935,9 @@ export async function proposeAndMaybeExecute(action: AbraAction): Promise<{
   auto_executed: boolean;
   result?: ActionResult;
 }> {
-  // ── Fast path: read-only actions skip approval table entirely ──
-  if (DIRECT_EXEC_ACTIONS.has(action.action_type) && action.risk_level === "low") {
+  // ── Fast path: internal actions skip approval table entirely ──
+  // Only send_email and send_slack (external-facing) need human approval.
+  if (DIRECT_EXEC_ACTIONS.has(action.action_type)) {
     const handler = ACTION_HANDLERS[action.action_type];
     if (handler) {
       try {
