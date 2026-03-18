@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import { KpisView } from "../kpis/KpisView.client";
+import { AlertsView } from "./AlertsView.client";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "KPIs & Milestones" };
+export const metadata: Metadata = { title: "Alerts — USA Gummies Ops" };
 
 export default function AlertsPage() {
-  return <KpisView />;
+  return <AlertsView />;
 }
