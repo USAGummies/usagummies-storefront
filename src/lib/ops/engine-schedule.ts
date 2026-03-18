@@ -155,6 +155,8 @@ export const ENGINE_REGISTRY: EngineConfig[] = [
       { key: "F9", name: "Weekly P&L Generator", schedule: "Weekly Sun 20:00" },
       { key: "F10", name: "Monthly Tax Prep", schedule: "Monthly 1st 09:00" },
       { key: "F11", name: "Self-Heal Monitor", schedule: "Every 30 min" },
+      { key: "F12", name: "Monthly Close Prep", schedule: "Monthly 3rd 09:00" },
+      { key: "F13", name: "Monthly P&L Statement", schedule: "Monthly 3rd 10:00" },
     ],
   },
   {

@@ -1,0 +1,14 @@
+channel,destination,utm_source,utm_medium,utm_campaign,utm_content,tracked_url
+google_business_profile,https://www.usagummies.com/shop,google_business_profile,organic_local,authority_takeover,gbp_profile,https://www.usagummies.com/shop?utm_source=google_business_profile&utm_medium=organic_local&utm_campaign=authority_takeover&utm_content=gbp_profile
+linkedin,https://www.usagummies.com/shop,linkedin,organic_social,parasite_seo_blitz,article_post,https://www.usagummies.com/shop?utm_source=linkedin&utm_medium=organic_social&utm_campaign=parasite_seo_blitz&utm_content=article_post
+medium,https://www.usagummies.com/shop,medium,organic_referral,parasite_seo_blitz,story,https://www.usagummies.com/shop?utm_source=medium&utm_medium=organic_referral&utm_campaign=parasite_seo_blitz&utm_content=story
+quora,https://www.usagummies.com/shop,quora,organic_referral,parasite_seo_blitz,answer,https://www.usagummies.com/shop?utm_source=quora&utm_medium=organic_referral&utm_campaign=parasite_seo_blitz&utm_content=answer
+reddit,https://www.usagummies.com/shop,reddit,organic_referral,parasite_seo_blitz,value_post,https://www.usagummies.com/shop?utm_source=reddit&utm_medium=organic_referral&utm_campaign=parasite_seo_blitz&utm_content=value_post
+pinterest,https://www.usagummies.com/shop,pinterest,organic_social,parasite_seo_blitz,idea_pin,https://www.usagummies.com/shop?utm_source=pinterest&utm_medium=organic_social&utm_campaign=parasite_seo_blitz&utm_content=idea_pin
+substack,https://www.usagummies.com/shop,substack,email,authority_takeover,dispatch,https://www.usagummies.com/shop?utm_source=substack&utm_medium=email&utm_campaign=authority_takeover&utm_content=dispatch
+youtube,https://www.usagummies.com/shop,youtube,organic_video,authority_takeover,short,https://www.usagummies.com/shop?utm_source=youtube&utm_medium=organic_video&utm_campaign=authority_takeover&utm_content=short
+influencer,https://www.usagummies.com/shop,influencer,affiliate,creator_seed,partner,https://www.usagummies.com/shop?utm_source=influencer&utm_medium=affiliate&utm_campaign=creator_seed&utm_content=partner
+press,https://www.usagummies.com/shop,press,earned_media,digital_pr_blast,release,https://www.usagummies.com/shop?utm_source=press&utm_medium=earned_media&utm_campaign=digital_pr_blast&utm_content=release
+directory,https://www.usagummies.com/shop,directory,organic_referral,citation_blast,listing,https://www.usagummies.com/shop?utm_source=directory&utm_medium=organic_referral&utm_campaign=citation_blast&utm_content=listing
+x,https://www.usagummies.com/shop,x,organic_social,authority_takeover,thread,https://www.usagummies.com/shop?utm_source=x&utm_medium=organic_social&utm_campaign=authority_takeover&utm_content=thread
+facebook,https://www.usagummies.com/shop,facebook,organic_social,authority_takeover,post,https://www.usagummies.com/shop?utm_source=facebook&utm_medium=organic_social&utm_campaign=authority_takeover&utm_content=post

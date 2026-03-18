@@ -1,0 +1,26 @@
+id,email,org,type,utm_content
+N50-001,aruiz@1800flowers.com,1-800-Flowers,partnership,1800flowers_aruiz
+N50-002,bmullen@1800flowers.com,1-800-Flowers,partnership,1800flowers_bmullen
+N50-003,clegene@1800flowers.com,1-800-Flowers,partnership,1800flowers_clegene
+N50-004,corporate@1800flowers.com,1-800-Flowers,partnership,1800flowers_corporate
+N50-005,dreilley@1800flowers.com,1-800-Flowers,partnership,1800flowers_dreilley
+N50-006,enterprisequalityassurance@1800flowers.com,1-800-Flowers,partnership,1800flowers_enterpriseqa
+N50-007,jliu@1800flowers.com,1-800-Flowers,partnership,1800flowers_jliu
+N50-008,mediainquiries@1800flowers.com,1-800-Flowers,media,1800flowers_media
+N50-009,newvendorinquires@1800flowers.com,1-800-Flowers,partnership,1800flowers_newvendor
+N50-010,nwagemann@1800flowers.com,1-800-Flowers,partnership,1800flowers_nwagemann
+N50-011,tzeigler@1800flowers.com,1-800-Flowers,partnership,1800flowers_tzeigler
+N50-012,customerservice@cheryls.com,Cheryl's Cookies,partnership,cheryls_customerservice
+N50-013,custservice@simplychocolate.com,Simply Chocolate,partnership,simplychocolate_custservice
+N50-014,partners@simplychocolate.com,Simply Chocolate,partnership,simplychocolate_partners
+N50-015,entcustserv@cdsfulfillment.com,CDS Fulfillment,partnership,cds_entcustserv
+N50-016,frbcustserv@cdsfulfillment.com,CDS Fulfillment,partnership,cds_frbcustserv
+N50-017,giftcardsupport@giftcards.com,Giftcards.com,partnership,giftcards_support
+N50-018,sales@giftbasket.com,GiftBasket.com,partnership,giftbasket_sales
+N50-019,support@businessinsider.com,Business Insider,media,businessinsider_support
+N50-020,inbounds@businessinsider.com,Business Insider,media,businessinsider_inbounds
+N50-021,support@entrepreneur.com,Entrepreneur,media,entrepreneur_support
+N50-022,tv@entrepreneur.com,Entrepreneur,media,entrepreneur_tv
+N50-023,webmaster@entrepreneur.com,Entrepreneur,media,entrepreneur_webmaster
+N50-024,webinars@bnpmedia.com,BNP Media,media,bnpmedia_webinars
+N50-025,help@mapquest.com,MapQuest,listing,mapquest_help

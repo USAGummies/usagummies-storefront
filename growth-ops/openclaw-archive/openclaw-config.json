@@ -1,0 +1,195 @@
+{
+  "meta": {
+    "lastTouchedVersion": "2026.2.17",
+    "lastTouchedAt": "2026-02-20T06:00:00.000Z"
+  },
+  "wizard": {
+    "lastRunAt": "2026-02-14T07:08:08.714Z",
+    "lastRunVersion": "2026.2.13",
+    "lastRunCommand": "doctor",
+    "lastRunMode": "local"
+  },
+  "models": {
+    "providers": {
+      "ollama": {
+        "baseUrl": "http://127.0.0.1:11434",
+        "apiKey": "ollama-local",
+        "api": "ollama",
+        "models": [
+          {
+            "id": "llama3.1:8b",
+            "name": "Llama 3.1 8B (Local)",
+            "reasoning": false,
+            "input": ["text"],
+            "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+            "contextWindow": 32768,
+            "maxTokens": 4096
+          },
+          {
+            "id": "qwen3:8b",
+            "name": "Qwen 3 8B (Local)",
+            "reasoning": false,
+            "input": ["text"],
+            "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+            "contextWindow": 32768,
+            "maxTokens": 4096
+          }
+        ]
+      },
+      "groq": {
+        "baseUrl": "https://api.groq.com/openai/v1",
+        "apiKey": "env:GROQ_API_KEY",
+        "api": "openai-completions",
+        "models": [
+          {
+            "id": "llama-3.1-8b-instant",
+            "name": "Llama 3.1 8B Instant (Groq)",
+            "reasoning": false,
+            "input": ["text"],
+            "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+            "contextWindow": 131072,
+            "maxTokens": 8192
+          },
+          {
+            "id": "openai/gpt-oss-20b",
+            "name": "GPT OSS 20B (Groq)",
+            "reasoning": false,
+            "input": ["text"],
+            "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+            "contextWindow": 131072,
+            "maxTokens": 8192
+          }
+        ]
+      },
+      "mistral": {
+        "baseUrl": "https://api.mistral.ai/v1",
+        "apiKey": "env:MISTRAL_API_KEY",
+        "api": "openai-completions",
+        "models": [
+          {
+            "id": "mistral-tiny-latest",
+            "name": "Mistral Tiny Latest",
+            "reasoning": false,
+            "input": ["text"],
+            "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+            "contextWindow": 131072,
+            "maxTokens": 8192
+          },
+          {
+            "id": "mistral-medium-latest",
+            "name": "Mistral Medium Latest",
+            "reasoning": false,
+            "input": ["text", "image"],
+            "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+            "contextWindow": 131072,
+            "maxTokens": 8192
+          }
+        ]
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "ollama/qwen3:8b",
+        "fallbacks": [
+          "ollama/llama3.1:8b",
+          "mistral/mistral-medium-latest",
+          "groq/llama-3.1-8b-instant"
+        ]
+      },
+      "timeoutSeconds": 600,
+      "heartbeat": {
+        "every": "60m",
+        "activeHours": {
+          "start": "00:00",
+          "end": "23:59"
+        }
+      },
+      "maxConcurrent": 2,
+      "subagents": {
+        "maxConcurrent": 1
+      }
+    },
+    "list": [
+      {
+        "id": "main"
+      },
+      {
+        "id": "w1-outreach",
+        "name": "W1 SEO Content Factory",
+        "workspace": "/Users/ben/.openclaw/workspace",
+        "agentDir": "/Users/ben/.openclaw/agents/w1-outreach/agent",
+        "model": "ollama/qwen3:8b"
+      },
+      {
+        "id": "w2-content",
+        "name": "W2 Amazon Optimizer",
+        "workspace": "/Users/ben/.openclaw/workspace",
+        "agentDir": "/Users/ben/.openclaw/agents/w2-content/agent",
+        "model": "ollama/qwen3:8b"
+      },
+      {
+        "id": "w3-media",
+        "name": "W3 Social Content Engine",
+        "workspace": "/Users/ben/.openclaw/workspace",
+        "agentDir": "/Users/ben/.openclaw/agents/w3-media/agent",
+        "model": "ollama/qwen3:8b"
+      },
+      {
+        "id": "w4-directory",
+        "name": "W4 Backlink Hunter",
+        "workspace": "/Users/ben/.openclaw/workspace",
+        "agentDir": "/Users/ben/.openclaw/agents/w4-directory/agent",
+        "model": "ollama/qwen3:8b"
+      },
+      {
+        "id": "w5-market",
+        "name": "W5 Competitive Intel Radar",
+        "workspace": "/Users/ben/.openclaw/workspace",
+        "agentDir": "/Users/ben/.openclaw/agents/w5-market/agent",
+        "model": "ollama/qwen3:8b"
+      },
+      {
+        "id": "w6-amz-gbp",
+        "name": "W6 Inbox Monitor",
+        "workspace": "/Users/ben/.openclaw/workspace",
+        "agentDir": "/Users/ben/.openclaw/agents/w6-amz-gbp/agent",
+        "model": "ollama/qwen3:8b"
+      },
+      {
+        "id": "w7-ops-qc",
+        "name": "W7 Ops Health Sentinel",
+        "workspace": "/Users/ben/.openclaw/workspace",
+        "agentDir": "/Users/ben/.openclaw/agents/w7-ops-qc/agent",
+        "model": "ollama/qwen3:8b"
+      },
+      {
+        "id": "w8-rescue",
+        "name": "W8 Smart Outreach",
+        "workspace": "/Users/ben/.openclaw/workspace",
+        "agentDir": "/Users/ben/.openclaw/agents/w8-rescue/agent",
+        "model": "ollama/qwen3:8b"
+      },
+      {
+        "id": "w13-faire",
+        "name": "W13 Faire Autopilot",
+        "workspace": "/Users/ben/.openclaw/workspace",
+        "agentDir": "/Users/ben/.openclaw/agents/w13-faire/agent",
+        "model": "ollama/qwen3:8b"
+      }
+    ]
+  },
+  "commands": {
+    "native": "auto",
+    "nativeSkills": "auto"
+  },
+  "gateway": {
+    "mode": "local",
+    "auth": {
+      "mode": "token",
+      "token": "5b85bd3026c39f36da3de594cd7450426354ef3888ef560a"
+    }
+  },
+  "memory": {}
+}

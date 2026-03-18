@@ -1,0 +1,602 @@
+{
+  "name": "W02 Email Classifier",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "id": "w02-trigger",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{($env.SUPABASE_URL || $env.NEXT_PUBLIC_SUPABASE_URL) + '/rest/v1/rpc/release_stale_email_classification_locks'}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{'Bearer ' + $env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"lock_timeout_minutes\": 15}"
+      },
+      "id": "w02-release-locks",
+      "name": "Release Stale Locks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{($env.SUPABASE_URL || $env.NEXT_PUBLIC_SUPABASE_URL) + '/rest/v1/rpc/claim_email_events_for_classification'}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{'Bearer ' + $env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"batch_size\": 5, \"worker_id\": \"w02-classifier\"}",
+        "options": {}
+      },
+      "id": "w02-claim",
+      "name": "Claim Batch",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Check if we got any emails in the batch\nconst items = $input.all();\nconst firstItem = items[0]?.json;\n// RPC returns array — if empty array or null, nothing to process\nif (!firstItem || (Array.isArray(firstItem) && firstItem.length === 0)) {\n  return [{ json: { _empty: true } }];\n}\n// If the response is an array at top level, split into individual items\nif (Array.isArray(firstItem)) {\n  return firstItem.map(row => ({ json: row }));\n}\n// Single object\nif (firstItem.id) {\n  return items;\n}\nreturn [{ json: { _empty: true } }];"
+      },
+      "id": "w02-parse-batch",
+      "name": "Parse Batch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "empty-check",
+              "leftValue": "={{ $json._empty }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notTrue"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "w02-if-has-emails",
+      "name": "IF Has Emails",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{'Bearer ' + $env.OPENAI_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'gpt-4o-mini', temperature: 0.1, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: 'You are an email classifier for USA Gummies, a CPG gummy supplement company. Classify the email and respond with ONLY valid JSON matching this schema: { \"category\": one of [\"production\",\"sales\",\"finance\",\"retail\",\"marketplace\",\"regulatory\",\"customer\",\"compliance\",\"noise\"], \"secondary_categories\": array of strings from same list, \"priority\": one of [\"critical\",\"important\",\"informational\",\"noise\"], \"classification_confidence\": one of [\"high\",\"medium\",\"low\"], \"summary\": string (max 200 chars), \"action_required\": boolean, \"suggested_action\": string or null, \"needs_human_review\": boolean, \"approval_trigger\": one of [\"distributor_response\",\"payment_issue\",\"production_decision\",\"external_response_draft\",\"commitment\"] or null, \"routed_agent_names\": array of agent names relevant to this email }' }, { role: 'user', content: 'From: ' + ($json.sender_name || '') + ' <' + ($json.sender_email || '') + '>\\nSubject: ' + ($json.subject || '') + '\\nDate: ' + ($json.received_at || '') + '\\n\\n' + (($json.raw_text || '').substring(0, 8000)) }] }) }}"
+      },
+      "id": "w02-classify",
+      "name": "AI Classify",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse AI classification response and normalize to live schema contracts\nconst VALID_CATEGORIES = ['production','sales','finance','retail','marketplace','regulatory','customer','compliance','noise'];\nconst VALID_PRIORITIES = ['critical','important','informational','noise'];\nconst VALID_CONFIDENCE = ['high','medium','low'];\nconst VALID_TRIGGERS = ['distributor_response','payment_issue','production_decision','external_response_draft','commitment',null];\nconst TRIGGER_NORMALIZE = {\n  regulatory_flag: 'external_response_draft',\n  inventory_reorder: 'production_decision',\n  pricing_change: 'commitment',\n  new_partnership: 'distributor_response',\n  legal_notice: 'external_response_draft',\n  none: null,\n};\nconst CONF_SCORE = { high: 0.9, medium: 0.6, low: 0.3 };\n\nconst emailData = $('IF Has Emails').item.json;\nconst emailId = emailData.id;\nlet parsed;\n\ntry {\n  const content = $json?.choices?.[0]?.message?.content || '{}';\n  parsed = JSON.parse(content);\n} catch (e) {\n  return [{\n    json: {\n      email_id: emailId,\n      ...emailData,\n      status: 'error',\n      classifier_error: 'JSON parse failed: ' + e.message,\n      needs_human_review: true,\n      classification_confidence: CONF_SCORE.low,\n      confidence_label: 'low',\n      classifying_worker_id: null,\n      classification_started_at: null,\n      _parse_ok: false,\n    }\n  }];\n}\n\nif (!VALID_CATEGORIES.includes(parsed.category)) parsed.category = 'noise';\nif (!VALID_PRIORITIES.includes(parsed.priority)) parsed.priority = 'informational';\nif (!VALID_CONFIDENCE.includes(parsed.classification_confidence)) parsed.classification_confidence = 'low';\nif (parsed.approval_trigger in TRIGGER_NORMALIZE) parsed.approval_trigger = TRIGGER_NORMALIZE[parsed.approval_trigger];\nif (!VALID_TRIGGERS.includes(parsed.approval_trigger)) parsed.approval_trigger = null;\nif (!Array.isArray(parsed.secondary_categories)) parsed.secondary_categories = [];\nif (!Array.isArray(parsed.routed_agent_names)) parsed.routed_agent_names = [];\n\nconst confidenceLabel = parsed.classification_confidence;\nconst confidenceScore = CONF_SCORE[confidenceLabel] ?? CONF_SCORE.low;\nconst needsReview = Boolean(parsed.needs_human_review) || confidenceLabel === 'low';\n\nreturn [{\n  json: {\n    email_id: emailId,\n    ...emailData,\n    ...parsed,\n    status: 'triaged',\n    needs_human_review: needsReview,\n    classification_confidence: confidenceScore,\n    confidence_label: confidenceLabel,\n    classifying_worker_id: null,\n    classification_started_at: null,\n    classifier_error: null,\n    _parse_ok: true,\n  }\n}];"
+      },
+      "id": "w02-validate",
+      "name": "Validate & Route",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{($env.SUPABASE_URL || $env.NEXT_PUBLIC_SUPABASE_URL) + '/rest/v1/email_events?id=eq.' + $json.email_id}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{'Bearer ' + $env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: $json.status, category: $json.category || null, secondary_categories: $json.secondary_categories || [], priority: $json.priority || null, classification_confidence: $json.classification_confidence ?? null, summary: ($json.summary || '').substring(0, 500), action_required: $json.action_required || false, suggested_action: $json.suggested_action || null, needs_human_review: $json.needs_human_review || false, classifying_worker_id: null, classification_started_at: null, classifier_error: $json.classifier_error || null }) }}"
+      },
+      "id": "w02-patch",
+      "name": "PATCH email_events",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1540,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "approval-check",
+              "leftValue": "={{ $json.approval_trigger }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            },
+            {
+              "id": "parse-ok-check",
+              "leftValue": "={{ $json._parse_ok }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "w02-if-approval",
+      "name": "IF Needs Approval",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1760,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Map classifier trigger to approvals contract fields\nconst TRIGGER_MAP = {\n  distributor_response: 'contact_distributor',\n  payment_issue: 'commit_funds',\n  production_decision: 'schedule_production',\n  external_response_draft: 'send_email',\n  commitment: 'commit_funds',\n  // Defensive mapping for legacy labels\n  regulatory_flag: 'send_email',\n  inventory_reorder: 'schedule_production',\n  pricing_change: 'commit_funds',\n  new_partnership: 'contact_distributor',\n  legal_notice: 'send_email',\n};\n\nconst trigger = $json.approval_trigger;\nconst actionType = TRIGGER_MAP[trigger] || 'other';\nconst priority = $json.priority || 'informational';\nconst riskLevel = priority === 'critical' ? 'critical' : (priority === 'important' ? 'medium' : 'low');\nconst confidenceLabel = $json.confidence_label || ($json.classification_confidence >= 0.8 ? 'high' : ($json.classification_confidence >= 0.5 ? 'medium' : 'low'));\nconst permissionTier = ['payment_issue', 'commitment', 'production_decision'].includes(trigger) ? 3 : 2;\n\nreturn [{\n  json: {\n    requesting_agent_id: '551b7a78-44be-473d-8207-aed5e7f3480e',\n    action_type: actionType,\n    target_entity_type: 'email_events',\n    target_entity_id: $json.email_id,\n    summary: ($json.summary || ('Review email: ' + ($json.subject || 'No subject'))).substring(0, 500),\n    supporting_data: JSON.stringify({\n      email_id: $json.email_id,\n      sender_email: $json.sender_email,\n      subject: $json.subject,\n      category: $json.category,\n      priority: $json.priority,\n      suggested_action: $json.suggested_action || null,\n    }),\n    confidence: confidenceLabel,\n    confidence_level: Number(($json.classification_confidence ?? 0.3).toFixed(2)),\n    risk_level: riskLevel,\n    risk_assessment: riskLevel,\n    permission_tier: permissionTier,\n    status: 'pending',\n    action_pattern: trigger || null,\n    action_proposed: ($json.suggested_action || $json.summary || '').substring(0, 500),\n    approval_trigger: trigger || null,\n  }\n}];"
+      },
+      "id": "w02-build-approval",
+      "name": "Build Approval",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1980,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{($env.SUPABASE_URL || $env.NEXT_PUBLIC_SUPABASE_URL) + '/rest/v1/approvals'}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{'Bearer ' + $env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}"
+      },
+      "id": "w02-create-approval",
+      "name": "Create Approval",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2200,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "regulatory-check",
+              "leftValue": "={{ $('Validate & Route').item.json.category }}",
+              "rightValue": "regulatory",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "w02-if-regulatory",
+      "name": "IF Regulatory",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1760,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.SLACK_ALERT_WEBHOOK_URL}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ text: '[ALERTS] :rotating_light: REGULATORY EMAIL DETECTED\\nFrom: ' + ($('Validate & Route').item.json.sender_email || 'unknown') + '\\nSubject: ' + ($('Validate & Route').item.json.subject || 'N/A') + '\\nSummary: ' + ($('Validate & Route').item.json.summary || 'N/A') + '\\nPriority: ' + ($('Validate & Route').item.json.priority || 'unknown') }) }}",
+        "options": {}
+      },
+      "id": "w02-slack-alert",
+      "name": "Slack Regulatory Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1980,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{($env.SUPABASE_URL || $env.NEXT_PUBLIC_SUPABASE_URL) + '/rest/v1/approvals?select=id&target_entity_type=eq.email_events&target_entity_id=eq.' + $json.target_entity_id + '&action_type=eq.' + $json.action_type + '&status=eq.pending&limit=1'}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{'Bearer ' + $env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "w02-check-existing-approval",
+      "name": "Check Existing Pending Approval",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2200,
+        -320
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "approval-missing-check",
+              "leftValue": "={{ Array.isArray($json) ? $json.length : 0 }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "w02-if-approval-missing",
+      "name": "IF Approval Missing",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2420,
+        -320
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Release Stale Locks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Release Stale Locks": {
+      "main": [
+        [
+          {
+            "node": "Claim Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim Batch": {
+      "main": [
+        [
+          {
+            "node": "Parse Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Batch": {
+      "main": [
+        [
+          {
+            "node": "IF Has Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Has Emails": {
+      "main": [
+        [
+          {
+            "node": "AI Classify",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "AI Classify": {
+      "main": [
+        [
+          {
+            "node": "Validate & Route",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate & Route": {
+      "main": [
+        [
+          {
+            "node": "PATCH email_events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PATCH email_events": {
+      "main": [
+        [
+          {
+            "node": "IF Needs Approval",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "IF Regulatory",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Needs Approval": {
+      "main": [
+        [
+          {
+            "node": "Build Approval",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Build Approval": {
+      "main": [
+        [
+          {
+            "node": "Check Existing Pending Approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Regulatory": {
+      "main": [
+        [
+          {
+            "node": "Slack Regulatory Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Check Existing Pending Approval": {
+      "main": [
+        [
+          {
+            "node": "IF Approval Missing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Approval Missing": {
+      "main": [
+        [
+          {
+            "node": "Create Approval",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "usa-gummies-abra"
+  },
+  "tags": [
+    {
+      "name": "abra-os"
+    }
+  ]
+}

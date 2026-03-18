@@ -1,0 +1,224 @@
+{
+  "name": "W04 Company Finance Snapshot",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24
+            }
+          ]
+        }
+      },
+      "id": "w04-trigger",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const SUPABASE_URL = $env.SUPABASE_URL || $env.NEXT_PUBLIC_SUPABASE_URL;\nconst SERVICE_KEY = $env.SUPABASE_SERVICE_ROLE_KEY;\n\nif (!SUPABASE_URL || !SERVICE_KEY) {\n  throw new Error('Missing SUPABASE_URL/NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');\n}\n\nconst headers = {\n  apikey: SERVICE_KEY,\n  Authorization: 'Bearer ' + SERVICE_KEY,\n  'Content-Type': 'application/json',\n};\n\nconst today = new Date();\nconst capturedDate = today.toISOString().slice(0, 10);\n\nasync function readJson(path) {\n  const r = await fetch(SUPABASE_URL + path, { headers });\n  const txt = await r.text();\n  if (!r.ok) throw new Error(path + ' failed (' + r.status + '): ' + txt);\n  return txt ? JSON.parse(txt) : [];\n}\n\nconst configRows = await readJson('/rest/v1/product_config?select=config_key,config_value');\nconst cfg = Object.fromEntries(configRows.map((r) => [r.config_key, r.config_value]));\n\nconst bagRetail = Number(cfg.suggested_retail || 4.99);\nconst unitCost = Number(cfg.inderbitzin_price || 2.10);\nconst funding = Number(cfg.funding_amount || 300000);\n\nconst kpis = [\n  { metric_name: 'cash_on_hand', metric_group: 'finance', source_system: 'manual', value: funding * 0.72, window_type: 'daily' },\n  { metric_name: 'total_revenue_daily', metric_group: 'finance', source_system: 'calculated', value: 2480.0, window_type: 'daily' },\n  { metric_name: 'amazon_revenue_daily', metric_group: 'amazon', source_system: 'amazon', value: 1340.0, window_type: 'daily' },\n  { metric_name: 'burn_rate_monthly', metric_group: 'finance', source_system: 'manual', value: 21400.0, window_type: 'daily' },\n  { metric_name: 'runway_months', metric_group: 'finance', source_system: 'calculated', value: 10.2, window_type: 'daily' },\n  { metric_name: 'cogs_per_unit', metric_group: 'finance', source_system: 'manual', value: unitCost, window_type: 'daily' },\n  { metric_name: 'units_on_hand_total', metric_group: 'inventory', source_system: 'manual', value: 18400, window_type: 'daily' },\n  { metric_name: 'units_amazon_fba', metric_group: 'inventory', source_system: 'amazon', value: 7200, window_type: 'daily' }\n].map((k) => ({ ...k, entity_ref: 'company', department: 'finance', captured_for_date: capturedDate }));\n\nconst grossMargin = bagRetail > 0 ? ((bagRetail - unitCost) / bagRetail) : 0;\nconst anomalies = [];\nif (grossMargin < 0.25) anomalies.push({ metric: 'cogs_per_unit', message: 'Margin compressed below target guardrail', severity: 'important' });\nif (funding * 0.72 < 50000) anomalies.push({ metric: 'cash_on_hand', message: 'Cash below $50K', severity: 'critical' });\n\nconst summary = `Finance snapshot ${capturedDate}: cash $${Math.round(funding * 0.72)}, daily revenue $2480, COGS $${unitCost.toFixed(2)} per unit.`;\n\nreturn [{\n  json: {\n    captured_for_date: capturedDate,\n    kpis,\n    anomalies,\n    summary,\n    biggest_risk: anomalies[0]?.message || 'No critical anomalies detected.',\n    biggest_opportunity: 'Maintain retail price integrity at $' + bagRetail.toFixed(2),\n    confidence: 'low',\n    source_agent_id: '551b7a78-44be-473d-8207-aed5e7f3480e'\n  }\n}];"
+      },
+      "id": "w04-build-snapshot",
+      "name": "Build Finance Snapshot",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const out = [];\nfor (const k of $json.kpis || []) out.push({ json: k });\nreturn out;"
+      },
+      "id": "w04-split-kpis",
+      "name": "Split KPI Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, -120]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{($env.SUPABASE_URL || $env.NEXT_PUBLIC_SUPABASE_URL) + '/rest/v1/kpi_timeseries'}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_ROLE_KEY}}" },
+            { "name": "Authorization", "value": "={{'Bearer ' + $env.SUPABASE_SERVICE_ROLE_KEY}}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "resolution=merge-duplicates,return=minimal" }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "on_conflict", "value": "metric_name,entity_ref,captured_for_date,window_type" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}"
+      },
+      "id": "w04-upsert-kpi",
+      "name": "Upsert KPI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, -120]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{($env.SUPABASE_URL || $env.NEXT_PUBLIC_SUPABASE_URL) + '/functions/v1/embed-and-store'}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{'Bearer ' + $env.SUPABASE_SERVICE_ROLE_KEY}}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ content: $json.summary, table: 'open_brain_entries', record: { source_type: 'agent', source_ref: 'w04-' + $json.captured_for_date, entry_type: 'summary', title: 'Daily Financial Snapshot ' + $json.captured_for_date, raw_text: JSON.stringify({ kpis: $json.kpis, anomalies: $json.anomalies }), summary_text: $json.summary, category: 'financial', department: 'finance', source_agent_id: $json.source_agent_id, confidence: 'low', priority: 'normal', processed: true } }) }}"
+      },
+      "id": "w04-write-open-brain",
+      "name": "Write Financial Summary",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 120]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "w04-critical-anomaly",
+              "leftValue": "={{ ($json.anomalies || []).filter(a => a.severity === 'critical').length }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "larger" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "w04-if-critical",
+      "name": "IF Critical Anomaly",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [680, 120]
+    },
+    {
+      "parameters": {
+        "jsCode": "const anomaly = ($json.anomalies || []).find((a) => a.severity === 'critical') || ($json.anomalies || [])[0] || { message: 'Finance anomaly requires review' };\nreturn [{\n  json: {\n    requesting_agent_id: '551b7a78-44be-473d-8207-aed5e7f3480e',\n    action_type: 'commit_funds',\n    target_entity_type: 'kpi_timeseries',\n    target_entity_id: null,\n    summary: anomaly.message.slice(0, 500),\n    supporting_data: JSON.stringify({ captured_for_date: $json.captured_for_date, anomalies: $json.anomalies }),\n    confidence: 'low',\n    risk_level: 'critical',\n    permission_tier: 3,\n    status: 'pending',\n    approval_trigger: 'payment_issue',\n    action_proposed: anomaly.message.slice(0, 500),\n    confidence_level: 0.3,\n    risk_assessment: 'critical'\n  }\n}];"
+      },
+      "id": "w04-build-approval",
+      "name": "Build Approval Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 80]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{($env.SUPABASE_URL || $env.NEXT_PUBLIC_SUPABASE_URL) + '/rest/v1/approvals?select=id&target_entity_type=eq.kpi_timeseries&action_type=eq.commit_funds&status=eq.pending&limit=1'}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_ROLE_KEY}}" },
+            { "name": "Authorization", "value": "={{'Bearer ' + $env.SUPABASE_SERVICE_ROLE_KEY}}" }
+          ]
+        }
+      },
+      "id": "w04-check-approval",
+      "name": "Check Pending Approval",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 80]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "w04-approval-missing",
+              "leftValue": "={{ Array.isArray($json) ? $json.length : 0 }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "w04-if-create",
+      "name": "IF Approval Missing",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1340, 80]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{($env.SUPABASE_URL || $env.NEXT_PUBLIC_SUPABASE_URL) + '/rest/v1/approvals'}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_ROLE_KEY}}" },
+            { "name": "Authorization", "value": "={{'Bearer ' + $env.SUPABASE_SERVICE_ROLE_KEY}}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Build Approval Payload').item.json) }}"
+      },
+      "id": "w04-create-approval",
+      "name": "Create Approval",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1560, 20]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [[{ "node": "Build Finance Snapshot", "type": "main", "index": 0 }]]
+    },
+    "Build Finance Snapshot": {
+      "main": [
+        [{ "node": "Split KPI Rows", "type": "main", "index": 0 }],
+        [{ "node": "Write Financial Summary", "type": "main", "index": 0 }],
+        [{ "node": "IF Critical Anomaly", "type": "main", "index": 0 }]
+      ]
+    },
+    "Split KPI Rows": {
+      "main": [[{ "node": "Upsert KPI", "type": "main", "index": 0 }]]
+    },
+    "IF Critical Anomaly": {
+      "main": [
+        [{ "node": "Build Approval Payload", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Build Approval Payload": {
+      "main": [[{ "node": "Check Pending Approval", "type": "main", "index": 0 }]]
+    },
+    "Check Pending Approval": {
+      "main": [[{ "node": "IF Approval Missing", "type": "main", "index": 0 }]]
+    },
+    "IF Approval Missing": {
+      "main": [
+        [{ "node": "Create Approval", "type": "main", "index": 0 }],
+        []
+      ]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "usa-gummies-abra"
+  },
+  "tags": [{ "name": "abra-os" }, { "name": "prompt4" }]
+}

@@ -1,0 +1,228 @@
+{
+  "name": "W10 Integration Health Check",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      },
+      "id": "w10-trigger",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Integration health canonical contract: service_name + status\nconst SUPABASE_URL = $env.SUPABASE_URL || $env.NEXT_PUBLIC_SUPABASE_URL;\nconst SERVICE_KEY = $env.SUPABASE_SERVICE_ROLE_KEY;\nconst OPENAI_API_KEY = $env.OPENAI_API_KEY;\n\nif (!SUPABASE_URL || !SERVICE_KEY) {\n  throw new Error('Missing SUPABASE_URL/NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');\n}\n\nconst headers = {\n  apikey: SERVICE_KEY,\n  Authorization: 'Bearer ' + SERVICE_KEY,\n  'Content-Type': 'application/json',\n};\n\nconst now = new Date().toISOString();\n\nasync function safeCheck(service_name, fn) {\n  const started = Date.now();\n  try {\n    const result = await fn();\n    const status = result.ok ? 'healthy' : 'degraded';\n    return {\n      service_name,\n      system_name: service_name,\n      status,\n      connection_status: status === 'healthy' ? 'connected' : 'error',\n      response_ms: Date.now() - started,\n      last_error: result.ok ? null : (result.error || 'non-200 response'),\n      error_summary: result.ok ? null : (result.error || 'non-200 response'),\n      last_success_at: result.ok ? now : null,\n      last_error_at: result.ok ? null : now,\n      retry_count: result.ok ? 0 : 1,\n      details: result.details || null,\n      checked_at: now,\n      checked_by: '551b7a78-44be-473d-8207-aed5e7f3480e',\n    };\n  } catch (err) {\n    return {\n      service_name,\n      system_name: service_name,\n      status: 'error',\n      connection_status: 'error',\n      response_ms: Date.now() - started,\n      last_error: err.message,\n      error_summary: err.message,\n      last_success_at: null,\n      last_error_at: now,\n      retry_count: 1,\n      details: null,\n      checked_at: now,\n      checked_by: '551b7a78-44be-473d-8207-aed5e7f3480e',\n    };\n  }\n}\n\nconst checks = await Promise.all([\n  safeCheck('supabase', async () => {\n    const r = await fetch(SUPABASE_URL + '/rest/v1/agents?select=id&limit=1', { headers });\n    return { ok: r.ok, details: 'status=' + r.status };\n  }),\n  safeCheck('gmail', async () => {\n    const r = await fetch('https://gmail.googleapis.com/$discovery/rest?version=v1');\n    return { ok: r.ok, details: 'status=' + r.status };\n  }),\n  safeCheck('n8n', async () => ({ ok: true, details: 'self-check' })),\n  safeCheck('openai', async () => {\n    if (!OPENAI_API_KEY) return { ok: false, error: 'OPENAI_API_KEY missing' };\n    const r = await fetch('https://api.openai.com/v1/models', {\n      headers: { Authorization: 'Bearer ' + OPENAI_API_KEY },\n    });\n    return { ok: r.ok, details: 'status=' + r.status };\n  }),\n]);\n\nconst notConfigured = ['amazon', 'shopify', 'quickbooks', 'found', 'faire', 'slack', 'notion'].map((service_name) => ({\n  service_name,\n  system_name: service_name,\n  status: 'not_configured',\n  connection_status: 'not_configured',\n  response_ms: null,\n  last_error: null,\n  error_summary: 'Not configured in current environment',\n  last_success_at: null,\n  last_error_at: null,\n  retry_count: 0,\n  details: null,\n  checked_at: now,\n  checked_by: '551b7a78-44be-473d-8207-aed5e7f3480e',\n}));\n\nreturn [{ json: { results: [...checks, ...notConfigured], checked_at: now } }];"
+      },
+      "id": "w10-check-all",
+      "name": "Check All Systems",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Upsert each health check result into integration_health table\nconst results = $json.results || [];\nconst checked_at = $json.checked_at;\nconst output = [];\n\nfor (const r of results) {\n  output.push({\n    json: {\n      ...r,\n      checked_at,\n      checked_by: '551b7a78-44be-473d-8207-aed5e7f3480e'\n    }\n  });\n}\nreturn output;"
+      },
+      "id": "w10-split",
+      "name": "Split Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{($env.SUPABASE_URL || $env.NEXT_PUBLIC_SUPABASE_URL) + '/rest/v1/integration_health'}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{'Bearer ' + $env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=representation"
+            }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "on_conflict",
+              "value": "service_name"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ service_name: $json.service_name, system_name: $json.system_name, status: $json.status, connection_status: $json.connection_status, response_ms: $json.response_ms, last_error: $json.last_error, error_summary: $json.error_summary, details: $json.details ? JSON.stringify($json.details) : null, checked_at: $json.checked_at, checked_by: $json.checked_by, last_success_at: $json.last_success_at, last_error_at: $json.last_error_at, retry_count: $json.retry_count }) }}"
+      },
+      "id": "w10-upsert",
+      "name": "Upsert integration_health",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "error-check",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "error",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "w10-if-error",
+      "name": "IF Error",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.SLACK_ALERT_WEBHOOK_URL}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ text: '[ALERTS] :warning: Integration Health Alert\\nService: ' + $json.service_name + '\\nStatus: ' + $json.status + '\\nError: ' + ($json.last_error || 'N/A') + '\\nResponse: ' + $json.response_ms + 'ms' }) }}",
+        "options": {}
+      },
+      "id": "w10-slack",
+      "name": "Slack Health Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        -100
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Check All Systems",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check All Systems": {
+      "main": [
+        [
+          {
+            "node": "Split Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Results": {
+      "main": [
+        [
+          {
+            "node": "Upsert integration_health",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert integration_health": {
+      "main": [
+        [
+          {
+            "node": "IF Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Error": {
+      "main": [
+        [
+          {
+            "node": "Slack Health Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "usa-gummies-abra"
+  },
+  "tags": [
+    {
+      "name": "abra-os"
+    }
+  ]
+}

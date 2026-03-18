@@ -1,0 +1,272 @@
+{
+  "name": "W01 Gmail Ingestion",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "id": "w01-trigger",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "returnAll": false,
+        "limit": 20,
+        "filters": {
+          "labelIds": [
+            "INBOX"
+          ],
+          "readStatus": "unread"
+        },
+        "options": {}
+      },
+      "id": "w01-gmail",
+      "name": "Gmail - Fetch New",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        220,
+        0
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "NEEDS_SETUP",
+          "name": "Gmail OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract and clean email fields for each item\nconst results = [];\nfor (const item of $input.all()) {\n  const d = item.json;\n  const senderRaw = d.from || d.sender || '';\n  const senderMatch = senderRaw.match(/^(.+?)\\s*<(.+?)>$/);\n  const sender_name = senderMatch ? senderMatch[1].replace(/\"/g,'').trim() : senderRaw;\n  const sender_email = senderMatch ? senderMatch[2].trim() : senderRaw;\n  const subject = (d.subject || '').substring(0, 500);\n  const raw_text = (d.textPlain || d.snippet || d.text || '').substring(0, 50000);\n  const provider_message_id = d.id || d.messageId || '';\n  const source_thread_id = d.threadId || '';\n  const received_at = d.internalDate\n    ? new Date(parseInt(d.internalDate)).toISOString()\n    : d.date ? new Date(d.date).toISOString() : new Date().toISOString();\n\n  results.push({\n    json: {\n      provider_message_id,\n      source_thread_id,\n      sender_name,\n      sender_email,\n      subject,\n      raw_text,\n      received_at,\n      status: 'new',\n      category: null,\n      priority: null\n    }\n  });\n}\nreturn results;"
+      },
+      "id": "w01-extract",
+      "name": "Extract & Clean",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Noise filter — skip known automated/marketing senders\nconst NOISE_PATTERNS = [\n  /noreply@/i, /no-reply@/i, /notifications?@/i,\n  /mailer-daemon@/i, /postmaster@/i,\n  /@.*\\.google\\.com$/i, /calendar-notification@/i,\n  /feedback@slack\\.com/i, /notify@twitter\\.com/i\n];\n\nconst results = [];\nfor (const item of $input.all()) {\n  const email = item.json.sender_email || '';\n  const isNoise = NOISE_PATTERNS.some(p => p.test(email));\n  if (!isNoise) {\n    results.push(item);\n  }\n}\nreturn results.length > 0 ? results : [{ json: { _skip: true } }];"
+      },
+      "id": "w01-noise",
+      "name": "Noise Filter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "skip-check",
+              "leftValue": "={{ $json._skip }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notTrue"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "w01-if-not-skip",
+      "name": "IF Has Emails",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{($env.SUPABASE_URL || $env.NEXT_PUBLIC_SUPABASE_URL) + '/rest/v1/email_events'}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{'Bearer ' + $env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=ignore-duplicates,return=representation"
+            }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "on_conflict",
+              "value": "provider_message_id"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ provider_message_id: $json.provider_message_id, source_thread_id: $json.source_thread_id, sender_name: $json.sender_name, sender_email: $json.sender_email, subject: $json.subject, raw_text: $json.raw_text, received_at: $json.received_at, status: $json.status }) }}"
+      },
+      "id": "w01-upsert",
+      "name": "Upsert email_events",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{($env.SUPABASE_URL || $env.NEXT_PUBLIC_SUPABASE_URL) + '/functions/v1/embed-and-store'}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{'Bearer ' + $env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ table: 'open_brain_entries', record: { source_type: 'email', source_ref: $json.provider_message_id, entry_type: 'finding', title: $json.subject || 'Email Ingested', raw_text: ($json.raw_text || '').substring(0, 50000), summary_text: ($json.raw_text || '').substring(0, 300), category: 'email_triage', department: 'systems', source_agent_id: '551b7a78-44be-473d-8207-aed5e7f3480e', confidence: 'medium', priority: 'normal', tags: ['email', 'ingested'] } }) }}"
+      },
+      "id": "w01-embed",
+      "name": "Embed to Open Brain",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        -100
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Gmail - Fetch New",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail - Fetch New": {
+      "main": [
+        [
+          {
+            "node": "Extract & Clean",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract & Clean": {
+      "main": [
+        [
+          {
+            "node": "Noise Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Noise Filter": {
+      "main": [
+        [
+          {
+            "node": "IF Has Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Has Emails": {
+      "main": [
+        [
+          {
+            "node": "Upsert email_events",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Upsert email_events": {
+      "main": [
+        [
+          {
+            "node": "Embed to Open Brain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "usa-gummies-abra"
+  },
+  "tags": [
+    {
+      "name": "abra-os"
+    }
+  ]
+}

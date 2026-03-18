@@ -58,4 +58,20 @@ node_modules/
 output/
 tmp/
 .next_build_stale_*
+.next_prev_*/
 .claude/worktrees/
+.claude/plans/
+.state/
+
+# temp data dumps
+notion-sales-*.json
+notion-sales-*.txt
+
+# build previews
+dashboard-preview.html
+
+# debug logs
+firebase-debug.log
+
+# binary files (track in Google Drive, not git)
+*.xlsx

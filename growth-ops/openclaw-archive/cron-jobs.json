@@ -1,0 +1,312 @@
+{
+  "version": 1,
+  "jobs": [
+    {
+      "id": "00325be1-c3bb-43be-82a8-680849191134",
+      "agentId": "main",
+      "name": "USA Gummies Nightly Check-in",
+      "enabled": true,
+      "createdAtMs": 1771053034013,
+      "updatedAtMs": 1771585200000,
+      "schedule": {
+        "kind": "cron",
+        "tz": "America/Los_Angeles",
+        "expr": "10 18 * * *"
+      },
+      "sessionTarget": "main",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "systemEvent",
+        "text": "HEARTBEAT: It's 9:10 PM ET (6:10 PM PT). Time for the USA Gummies nightly check-in. Please provide analytics data and approvals needed, as outlined in HEARTBEAT.md."
+      },
+      "state": {
+        "consecutiveErrors": 0,
+        "nextRunAtMs": 1771639800000
+      }
+    },
+    {
+      "id": "cca8b452-seo-content-factory",
+      "agentId": "w1-outreach",
+      "name": "W1 SEO Content Factory",
+      "enabled": true,
+      "createdAtMs": 1771585200000,
+      "updatedAtMs": 1771618645749,
+      "schedule": {
+        "kind": "cron",
+        "expr": "15 */4 * * *",
+        "tz": "America/Los_Angeles"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "HEARTBEAT: 📝 SEO CONTENT FACTORY. Read AGENTS.md section 'W1: SEO Content Factory'. Then read memory/seo_content_pipeline.md for keyword queue. Pick ONE keyword from the queue. Research with web_search. Write a 1000-1500 word MDX blog post. Save to /tmp/ and run bash scripts/create-blog-pr.sh. Log to Notion via bash scripts/notion-log.sh --db 30d4c0c42c2e8168b826d88344832be0. Update seo_content_pipeline.md. ONE post per cycle. STOP after logging.",
+        "thinking": "minimal",
+        "timeoutSeconds": 600
+      },
+      "delivery": {
+        "mode": "none",
+        "channel": "last"
+      },
+      "state": {
+        "consecutiveErrors": 0,
+        "nextRunAtMs": 1771632900000,
+        "lastRunAtMs": 1771618536115,
+        "lastStatus": "ok",
+        "lastDurationMs": 109634
+      }
+    },
+    {
+      "id": "457bff02-amazon-optimizer",
+      "agentId": "w2-content",
+      "name": "W2 Amazon Optimizer",
+      "enabled": true,
+      "createdAtMs": 1771585200000,
+      "updatedAtMs": 1771619881701,
+      "schedule": {
+        "kind": "cron",
+        "expr": "30 */6 * * *",
+        "tz": "America/Los_Angeles"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "HEARTBEAT: 📦 AMAZON OPTIMIZER. Read AGENTS.md section 'W2: Amazon Optimizer'. Then read memory/amazon_intel.md. Search Amazon for competitor gummy bear listings (Black Forest, SmartSweets, YumEarth, Haribo, Albanese). Extract prices, review counts, bullet points. Compare to our ASIN B0DSM8XQWH. Find keyword gaps. Write findings to memory/amazon_intel.md. Log to Notion via bash scripts/notion-log.sh --db 30d4c0c42c2e81ef862ec6c0036e3f51. STOP after logging.",
+        "thinking": "minimal",
+        "timeoutSeconds": 480
+      },
+      "delivery": {
+        "mode": "none",
+        "channel": "last"
+      },
+      "state": {
+        "consecutiveErrors": 1,
+        "nextRunAtMs": 1771641000000,
+        "lastRunAtMs": 1771619400417,
+        "lastStatus": "error",
+        "lastDurationMs": 481284,
+        "lastError": "Error: cron: job execution timed out"
+      }
+    },
+    {
+      "id": "ed6658a9-social-content",
+      "agentId": "w3-media",
+      "name": "W3 Social Content Engine",
+      "enabled": true,
+      "createdAtMs": 1771585200000,
+      "updatedAtMs": 1771585200000,
+      "schedule": {
+        "kind": "cron",
+        "expr": "45 */4 * * *",
+        "tz": "America/Los_Angeles"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "HEARTBEAT: 📱 SOCIAL CONTENT ENGINE. Read AGENTS.md section 'W3: Social Content Engine'. Read memory/social_post_log.md — if 3+ posts already today, STOP immediately. Otherwise create ONE social post following the day-of-week rotation. Post via bash scripts/social-post.sh --platform all --text 'YOUR POST'. Log to Notion via bash scripts/notion-log.sh --db 30d4c0c42c2e815b942afaf1a671d611. MAX 3 posts per day total. STOP after posting.",
+        "thinking": "minimal",
+        "timeoutSeconds": 360
+      },
+      "delivery": {
+        "mode": "none",
+        "channel": "last"
+      },
+      "state": {
+        "consecutiveErrors": 0,
+        "nextRunAtMs": 1771634700000
+      }
+    },
+    {
+      "id": "5612631f-backlink-hunter",
+      "agentId": "w4-directory",
+      "name": "W4 Backlink Hunter",
+      "enabled": true,
+      "createdAtMs": 1771585200000,
+      "updatedAtMs": 1771617765353,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 */6 * * *",
+        "tz": "America/Los_Angeles",
+        "staggerMs": 300000
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "HEARTBEAT: 🔗 BACKLINK HUNTER. Read AGENTS.md section 'W4: Backlink Hunter'. Read memory/backlink_opportunities.md. Pick ONE search query from the rotation list. Use web_search to find resource pages, guest post opportunities, or directories that could link to usagummies.com. For each result, extract contact info and assess quality. Log opportunities to memory/backlink_opportunities.md. If a HIGH-priority opportunity has clear email, send ONE pitch. Log to Notion via bash scripts/notion-log.sh --db 30d4c0c42c2e813e8216c1118a12ecf1. MAX 1 email per cycle. STOP after logging.",
+        "thinking": "minimal",
+        "timeoutSeconds": 480
+      },
+      "delivery": {
+        "mode": "none",
+        "channel": "last"
+      },
+      "state": {
+        "consecutiveErrors": 0,
+        "nextRunAtMs": 1771639336226,
+        "lastRunAtMs": 1771617736249,
+        "lastStatus": "ok",
+        "lastDurationMs": 29104
+      }
+    },
+    {
+      "id": "9d6c7f05-competitive-intel",
+      "agentId": "w5-market",
+      "name": "W5 Competitive Intel Radar",
+      "enabled": true,
+      "createdAtMs": 1771585200000,
+      "updatedAtMs": 1771618228505,
+      "schedule": {
+        "kind": "cron",
+        "expr": "10 */6 * * *",
+        "tz": "America/Los_Angeles"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "HEARTBEAT: 🔍 COMPETITIVE INTEL. Read AGENTS.md section 'W5: Competitive Intel Radar'. Read memory/competitor_battlecards.md. Pick ONE competitor to scan (rotate: Black Forest, SmartSweets, YumEarth, Haribo, Albanese, Zarbee's — pick whoever was scanned least recently). Search for news, Amazon listings, social activity. Write findings to memory/competitor_battlecards.md and memory/competitor_daily/YYYY-MM-DD.md. Log to Notion via bash scripts/notion-log.sh --db 30d4c0c42c2e81ef862ec6c0036e3f51. STOP after logging.",
+        "thinking": "minimal",
+        "timeoutSeconds": 480
+      },
+      "delivery": {
+        "mode": "none",
+        "channel": "last"
+      },
+      "state": {
+        "consecutiveErrors": 0,
+        "nextRunAtMs": 1771639800000,
+        "lastRunAtMs": 1771618200063,
+        "lastStatus": "ok",
+        "lastDurationMs": 28442
+      }
+    },
+    {
+      "id": "dd3be0c8-inbox-monitor",
+      "agentId": "w6-amz-gbp",
+      "name": "W6 Inbox Monitor",
+      "enabled": true,
+      "createdAtMs": 1771121479254,
+      "updatedAtMs": 1771613533146,
+      "schedule": {
+        "kind": "cron",
+        "expr": "52 */2 * * *",
+        "tz": "America/Los_Angeles"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "HEARTBEAT: 📬 INBOX MONITOR. Read AGENTS.md section 'W6: Inbox Monitor'. Run bash scripts/check-email.sh --folder INBOX --count 20. For bounces, log to memory/bounce_log.md. For REAL human replies, log to memory/inbox_monitor.md. DO NOT auto-reply. IGNORE spam/alerts/notifications. Log to Notion via bash scripts/notion-log.sh --db 30d4c0c42c2e81b0914ee534e56e2351. STOP after logging.",
+        "thinking": "minimal",
+        "timeoutSeconds": 480
+      },
+      "delivery": {
+        "mode": "none",
+        "channel": "last"
+      },
+      "state": {
+        "consecutiveErrors": 0,
+        "nextRunAtMs": 1771627920000,
+        "lastRunAtMs": 1771613520016,
+        "lastStatus": "ok",
+        "lastDurationMs": 13130
+      }
+    },
+    {
+      "id": "7f3d3b2a-ops-sentinel",
+      "agentId": "w7-ops-qc",
+      "name": "W7 Ops Health Sentinel",
+      "enabled": true,
+      "createdAtMs": 1771121592894,
+      "updatedAtMs": 1771617991681,
+      "schedule": {
+        "kind": "cron",
+        "expr": "6 */3 * * *",
+        "tz": "America/Los_Angeles"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "HEARTBEAT: Quick ops check. ONLY log to memory/failures_and_learnings.md if you find an error or blocker. Do NOT log if everything is OK. Stop.",
+        "thinking": "off",
+        "timeoutSeconds": 180
+      },
+      "delivery": {
+        "mode": "none",
+        "channel": "last"
+      },
+      "state": {
+        "consecutiveErrors": 0,
+        "nextRunAtMs": 1771628760000,
+        "lastRunAtMs": 1771617960059,
+        "lastStatus": "ok",
+        "lastDurationMs": 31622
+      }
+    },
+    {
+      "id": "242be65f-smart-outreach",
+      "agentId": "w8-rescue",
+      "name": "W8 Smart Outreach (2x/day)",
+      "enabled": true,
+      "createdAtMs": 1771585200000,
+      "updatedAtMs": 1771585200000,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 9,15 * * *",
+        "tz": "America/Los_Angeles"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "HEARTBEAT: 🎯 SMART OUTREACH. Read AGENTS.md section 'W8: Smart Outreach'. Read memory/outreach_queue.md for targets. Read memory/email_send_log.md — COUNT today's emails. If >= 2 emails sent today, STOP IMMEDIATELY. Otherwise pick the HIGHEST priority QUEUED target. Research them with web_search. Write a PERSONALIZED email (not a template). Send via bash scripts/send-email.sh. Update outreach_queue.md. Log to Notion via bash scripts/notion-log.sh --db 30d4c0c42c2e813e8216c1118a12ecf1. MAX 2 emails per DAY total. STOP after sending or if limit reached.",
+        "thinking": "minimal",
+        "timeoutSeconds": 600
+      },
+      "delivery": {
+        "mode": "none",
+        "channel": "last"
+      },
+      "state": {
+        "consecutiveErrors": 0,
+        "nextRunAtMs": 1771628400000
+      }
+    },
+    {
+      "id": "01200852-faire-autopilot",
+      "agentId": "w13-faire",
+      "name": "W13 Faire Autopilot",
+      "enabled": true,
+      "createdAtMs": 1771496390746,
+      "updatedAtMs": 1771621236693,
+      "schedule": {
+        "kind": "cron",
+        "expr": "47 */3 * * *",
+        "tz": "America/Los_Angeles"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "HEARTBEAT: 🛒 FAIRE AUTOPILOT. Read AGENTS.md section 'W13: Faire Autopilot'. Read memory/faire_autopilot.md. Check inbox for Faire notifications using bash scripts/check-email.sh --folder INBOX --count 10. If new Faire buyer messages, reply using templates. If no new messages, STOP. Log in memory/faire_autopilot.md. Log to Notion: bash scripts/notion-log.sh --db 30d4c0c42c2e81b0914ee534e56e2351 --title 'Faire Check' --status '✅ Success' --agent 'W13-Faire'.",
+        "thinking": "minimal",
+        "timeoutSeconds": 480
+      },
+      "delivery": {
+        "mode": "none",
+        "channel": "last"
+      },
+      "state": {
+        "consecutiveErrors": 0,
+        "nextRunAtMs": 1771631220000,
+        "lastRunAtMs": 1771620517587,
+        "lastStatus": "ok",
+        "lastDurationMs": 719106
+      }
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+category,platform,submission_url,notes,effort,priority,status
+PR Distribution,PRLog,https://www.prlog.org/,Free press release distribution,low,high,queued
+PR Distribution,OpenPR,https://www.openpr.com/,Free/low-cost PR posting,low,high,queued
+PR Distribution,PR.com,https://www.pr.com/press-release-service,Press release submission options,medium,medium,queued
+PR Distribution,1888PressRelease,https://www.1888pressrelease.com/,Submission with editorial review,medium,medium,queued
+Journalist Source,Qwoted,https://www.qwoted.com/,Founder/source pitches to journalists,medium,high,queued
+Journalist Source,SourceBottle,https://www.sourcebottle.com/,Free expert source queries,low,high,queued
+Journalist Source,Featured,https://featured.com/,Contribute expert quotes,low,high,queued
+Local Citation,Google Business Profile,https://www.google.com/business/,Primary local visibility surface,low,high,queued
+Local Citation,Bing Places,https://www.bingplaces.com/,Microsoft local listing,low,high,queued
+Local Citation,Apple Business Connect,https://businessconnect.apple.com/,Apple Maps listing and updates,medium,high,queued
+Local Citation,Yelp for Business,https://biz.yelp.com/,Claim and optimize listing,low,high,queued
+Local Citation,Yellow Pages,https://www.yellowpages.com/,Business listing discovery,low,medium,queued
+Local Citation,Manta,https://www.manta.com/,Business directory profile,low,medium,queued
+Local Citation,Hotfrog,https://www.hotfrog.com/add-your-business,Free business listing,low,medium,queued
+Local Citation,MapQuest Local,https://listings.mapquest.com/,Local business listing,low,medium,queued
+Local Citation,Chamber of Commerce,https://www.chamberofcommerce.com/,Business directory listing,low,medium,queued
+Business Profile,LinkedIn Company,https://www.linkedin.com/company/setup/new/,Authority profile and content distribution,low,high,queued
+Business Profile,YouTube Channel,https://www.youtube.com/account,Video search footprint,medium,high,queued
+Business Profile,Pinterest Business,https://www.pinterest.com/business/create/,Image search and evergreen referral,low,high,queued
+Business Profile,Substack,https://substack.com/,Newsletter and web archive pages,low,high,queued
+Business Profile,Medium Publication,https://medium.com/new-story,High-authority canonical syndication,low,high,queued
+Business Profile,Quora Space,https://www.quora.com/,Question-intent capture,low,high,queued
+Business Profile,Reddit Brand Profile,https://www.reddit.com/register/,Community-driven discovery,low,medium,queued
+Business Profile,Facebook Page,https://www.facebook.com/pages/create/,Social proof and reviews,low,high,queued
+Business Profile,X Profile,https://x.com/i/flow/signup,Real-time conversations,low,medium,queued
+Marketplace,Amazon Brand Store,https://sellercentral.amazon.com/,Authority and conversion for marketplace buyers,medium,high,queued
+Marketplace,Faire,https://www.faire.com/,Wholesale discovery channel,medium,high,queued
+Marketplace,Abound,https://www.abound.co/,Wholesale marketplace,medium,high,queued
+Marketplace,Tundra,https://www.tundra.com/,Wholesale marketplace,medium,medium,queued
+Marketplace,RangeMe,https://rangeme.com/,Retail buyer submissions,medium,high,queued
+Discovery,Product Hunt,https://www.producthunt.com/posts/new,Launch visibility and backlinks,low,medium,queued
+Discovery,Crunchbase,https://www.crunchbase.com/,Company profile authority,low,medium,queued
+Discovery,AboutUs,https://aboutus.com/,Brand profile citation,low,low,queued
+Discovery,F6S,https://www.f6s.com/,Founder/company visibility,low,low,queued
+Community,Indie Hackers,https://www.indiehackers.com/,Founder story + product updates,low,medium,queued
+Community,Hacker News Show HN,https://news.ycombinator.com/submit,Occasional launch visibility,low,low,queued
+Community,r/snackexchange,https://www.reddit.com/r/snackexchange/,Community participation (non-spam),medium,low,queued
+Community,r/Food,https://www.reddit.com/r/food/,Value posts only,medium,medium,queued
+Community,r/Entrepreneur,https://www.reddit.com/r/Entrepreneur/,Founder learnings and traffic,medium,medium,queued
+Community,Quora Topics,https://www.quora.com/topic/Candy,Answer high-intent questions,low,high,queued

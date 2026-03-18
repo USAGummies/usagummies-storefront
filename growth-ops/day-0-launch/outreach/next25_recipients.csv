@@ -1,0 +1,26 @@
+id,email,org,type,utm_content
+N25-001,advertise@entrepreneur.com,Entrepreneur,media,entrepreneur_advertise
+N25-002,apphelp@entrepreneur.com,Entrepreneur,media,entrepreneur_apphelp
+N25-003,bizdev@businessinsider.com,Business Insider,media,businessinsider_bizdev
+N25-004,bizdev@entrepreneur.com,Entrepreneur,media,entrepreneur_bizdev
+N25-005,books@entrepreneur.com,Entrepreneur,media,entrepreneur_books
+N25-006,brobins@entrepreneur.com,Entrepreneur,media,entrepreneur_brobins
+N25-007,corrections@businessinsider.com,Business Insider,media,businessinsider_corrections
+N25-008,corrections@forbes.com,Forbes,media,forbes_corrections
+N25-009,dlopenzina@forbes.com,Forbes,media,forbes_dlopenzina
+N25-010,events@entrepreneur.com,Entrepreneur,media,entrepreneur_events
+N25-011,feedback@forbes.com,Forbes,media,forbes_feedback
+N25-012,fixes@businessinsider.com,Business Insider,media,businessinsider_fixes
+N25-013,franchise@entrepreneur.com,Entrepreneur,media,entrepreneur_franchise
+N25-014,group-subscriptions@businessinsider.com,Business Insider,media,businessinsider_groupsub
+N25-015,jfeifer@entrepreneur.com,Entrepreneur,media,entrepreneur_jfeifer
+N25-016,membersupport@delish.com,Delish,media,delish_membersupport
+N25-017,permissions@forbes.com,Forbes,media,forbes_permissions
+N25-018,pressinquiries@entrepreneur.com,Entrepreneur,media,entrepreneur_press
+N25-019,pressinquiries@forbes.com,Forbes,media,forbes_press
+N25-020,questions@rangeme.com,RangeMe,listing,rangeme_questions
+N25-021,readers@forbes.com,Forbes,media,forbes_readers
+N25-022,reprints@forbes.com,Forbes,media,forbes_reprints
+N25-023,security@forbes.com,Forbes,media,forbes_security
+N25-024,staff@tastingtable.com,Tasting Table,media,tastingtable_staff
+N25-025,subscriptions@adweek.com,Adweek,media,adweek_subscriptions
