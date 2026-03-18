@@ -154,8 +154,8 @@ export async function getValidAccessToken(): Promise<string | null> {
 async function refreshAccessToken(
   tokens: QBOTokens,
 ): Promise<QBOTokens | null> {
-  const clientId = process.env.QBO_CLIENT_ID;
-  const clientSecret = process.env.QBO_CLIENT_SECRET;
+  const clientId = (process.env.QBO_CLIENT_ID ?? "").trim();
+  const clientSecret = (process.env.QBO_CLIENT_SECRET ?? "").trim();
 
   if (!clientId || !clientSecret) {
     console.error("[qbo-auth] Missing QBO_CLIENT_ID or QBO_CLIENT_SECRET");
@@ -229,8 +229,8 @@ export async function revokeTokens(): Promise<boolean> {
   const tokens = await loadTokens();
   if (!tokens) return true; // Already disconnected
 
-  const clientId = process.env.QBO_CLIENT_ID;
-  const clientSecret = process.env.QBO_CLIENT_SECRET;
+  const clientId = (process.env.QBO_CLIENT_ID ?? "").trim();
+  const clientSecret = (process.env.QBO_CLIENT_SECRET ?? "").trim();
 
   if (clientId && clientSecret) {
     const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString(

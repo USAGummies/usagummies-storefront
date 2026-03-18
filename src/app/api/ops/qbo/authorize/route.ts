@@ -12,8 +12,8 @@ export const dynamic = "force-dynamic";
  * GET /api/ops/qbo/authorize -> 302 redirect to Intuit consent screen
  */
 export async function GET() {
-  const clientId = process.env.QBO_CLIENT_ID;
-  const redirectUri = process.env.QBO_REDIRECT_URI;
+  const clientId = (process.env.QBO_CLIENT_ID ?? "").trim();
+  const redirectUri = (process.env.QBO_REDIRECT_URI ?? "").trim();
 
   if (!clientId) {
     return NextResponse.json(
