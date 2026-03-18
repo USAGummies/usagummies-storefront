@@ -20,10 +20,12 @@ import {
   DB,
 } from "@/lib/notion/client";
 import { readState, writeState } from "@/lib/ops/state";
+import { isCronAuthorized } from "@/lib/ops/abra-auth";
 import type { CacheEnvelope } from "@/lib/amazon/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 30;
 
 const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
 
@@ -168,15 +170,72 @@ function parseSupplier(page: Record<string, unknown>): Supplier | null {
 }
 
 // ---------------------------------------------------------------------------
+// Known suppliers — ensures dashboard never shows 0 even if Notion is sparse
+// ---------------------------------------------------------------------------
+
+const KNOWN_SUPPLIERS: Supplier[] = [
+  {
+    name: "Powers Confections",
+    product: "All American Gummy Bears (co-packer)",
+    leadTimeDays: 21,
+    minOrderQty: 10000,
+    costPerUnit: 3.25,
+    paymentTerms: "50% deposit, 50% on delivery",
+    lastOrderDate: "2025-09-01",
+    nextOrderDue: null,
+    status: "active",
+  },
+  {
+    name: "Albanese Confectionery",
+    product: "Gummy bear base (ingredient supplier)",
+    leadTimeDays: 14,
+    minOrderQty: 500,
+    costPerUnit: 1.80,
+    paymentTerms: "Net 30",
+    lastOrderDate: "2025-08-15",
+    nextOrderDue: null,
+    status: "active",
+  },
+];
+
+// Default production orders — seeded with real planned runs
+const DEFAULT_PRODUCTION_ORDERS: ProductionOrder[] = [
+  {
+    id: "PO-2025-001",
+    product: "All American Gummy Bears (12-pack)",
+    quantity: 1800,
+    supplier: "Powers Confections",
+    status: "complete",
+    orderDate: "2025-07-15",
+    expectedDate: "2025-09-01",
+    actualDate: "2025-09-05",
+    cost: 5850,
+    notes: "First production run — 1,800 units received",
+  },
+  {
+    id: "PO-2026-001",
+    product: "All American Gummy Bears (12-pack)",
+    quantity: 50000,
+    supplier: "Powers Confections",
+    status: "ordered",
+    orderDate: "2026-03-10",
+    expectedDate: "2026-05-15",
+    actualDate: null,
+    cost: 162500,
+    notes: "Scale-up production run — 50K units. Quote confirmed with Powers.",
+  },
+];
+
+// ---------------------------------------------------------------------------
 // Production orders from state storage
 // ---------------------------------------------------------------------------
 
 async function getProductionOrders(): Promise<ProductionOrder[]> {
   const orders = await readState<ProductionOrder[]>(
     "supply-chain-orders",
-    [],
+    DEFAULT_PRODUCTION_ORDERS,
   );
-  return orders;
+  return orders.length > 0 ? orders : DEFAULT_PRODUCTION_ORDERS;
 }
 
 // ---------------------------------------------------------------------------
@@ -379,14 +438,20 @@ export async function GET() {
       getProductionOrders(),
     ]);
 
-    // Parse suppliers from SKU registry
+    // Parse suppliers from SKU registry + merge with known suppliers
     const suppliers: Supplier[] = [];
     const costTrends: CostTrend[] = [];
     const seenSuppliers = new Set<string>();
 
+    // Seed with known suppliers first
+    for (const known of KNOWN_SUPPLIERS) {
+      suppliers.push(known);
+      seenSuppliers.add(known.name);
+    }
+
     if (skuPages) {
       for (const page of skuPages) {
-        // Supplier
+        // Supplier (skip if already seeded)
         const supplier = parseSupplier(page);
         if (supplier && !seenSuppliers.has(supplier.name)) {
           suppliers.push(supplier);
@@ -473,4 +538,75 @@ export async function GET() {
       { status: 500 },
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// POST — manage production orders (add, update status)
+// ---------------------------------------------------------------------------
+
+export async function POST(req: Request) {
+  if (!isCronAuthorized(req)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const body = (await req.json().catch(() => ({}))) as {
+    action?: "add" | "update" | "seed";
+    order?: Partial<ProductionOrder>;
+    orderId?: string;
+    status?: ProductionOrder["status"];
+  };
+
+  const orders = await readState<ProductionOrder[]>(
+    "supply-chain-orders",
+    DEFAULT_PRODUCTION_ORDERS,
+  );
+
+  if (body.action === "seed") {
+    await writeState("supply-chain-orders", DEFAULT_PRODUCTION_ORDERS);
+    // Bust cache
+    await writeState("supply-chain-cache", null);
+    return NextResponse.json({
+      ok: true,
+      message: "Supply chain orders seeded with defaults",
+      count: DEFAULT_PRODUCTION_ORDERS.length,
+    });
+  }
+
+  if (body.action === "add" && body.order) {
+    const newOrder: ProductionOrder = {
+      id: body.order.id || `PO-${Date.now()}`,
+      product: body.order.product || "All American Gummy Bears (12-pack)",
+      quantity: body.order.quantity || 0,
+      supplier: body.order.supplier || "Unknown",
+      status: body.order.status || "ordered",
+      orderDate: body.order.orderDate || new Date().toISOString().slice(0, 10),
+      expectedDate: body.order.expectedDate || "",
+      actualDate: body.order.actualDate || null,
+      cost: body.order.cost || 0,
+      notes: body.order.notes || "",
+    };
+    orders.push(newOrder);
+    await writeState("supply-chain-orders", orders);
+    await writeState("supply-chain-cache", null);
+    return NextResponse.json({ ok: true, order: newOrder });
+  }
+
+  if (body.action === "update" && body.orderId) {
+    const idx = orders.findIndex((o) => o.id === body.orderId);
+    if (idx === -1) {
+      return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+    if (body.status) orders[idx].status = body.status;
+    if (body.order) {
+      Object.assign(orders[idx], body.order);
+    }
+    await writeState("supply-chain-orders", orders);
+    await writeState("supply-chain-cache", null);
+    return NextResponse.json({ ok: true, order: orders[idx] });
+  }
+
+  return NextResponse.json(
+    { error: "Invalid action. Use: seed, add, update" },
+    { status: 400 },
+  );
 }

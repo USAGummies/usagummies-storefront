@@ -22,6 +22,7 @@ const ENGINE_SCRIPT_MAP: Record<string, string> = {
   finops: "usa-gummies-finops.mjs",
   social: "usa-gummies-social-engine.mjs",
   "abra-sync": "abra-brain-sync.mjs",
+  "marketing-autopost": "usa-gummies-marketing-autopost.mjs",
 };
 
 export type AgentResult = {
