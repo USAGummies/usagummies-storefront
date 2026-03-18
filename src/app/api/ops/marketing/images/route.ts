@@ -5,6 +5,7 @@ import { readState, writeState } from "@/lib/ops/state";
 import type { CacheEnvelope } from "@/lib/amazon/types";
 import { DB, NotionProp, createPage, queryDatabase, extractText, extractDate } from "@/lib/notion/client";
 import { generateImage, generateImageWithReference, isGeminiConfigured } from "@/lib/ai/gemini-image";
+import { validateRequest, ImageActionSchema } from "@/lib/ops/validation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -373,7 +374,9 @@ async function generateGeminiRefAction(body: UploadBody) {
 
 export async function POST(req: Request) {
   try {
-    const body = (await req.json()) as UploadBody;
+    const v = await validateRequest(req, ImageActionSchema);
+    if (!v.success) return v.response;
+    const body = v.data;
 
     if (body.action === "upload") {
       const result = await uploadAction(body);

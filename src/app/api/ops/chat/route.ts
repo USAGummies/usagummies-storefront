@@ -21,6 +21,7 @@ import {
   extractText,
 } from "@/lib/notion/client";
 import { readState } from "@/lib/ops/state";
+import { validateRequest, ChatRequestSchema } from "@/lib/ops/validation";
 import type { AmazonKPIs, CashPosition } from "@/lib/amazon/types";
 import { buildAmazonKPIs } from "@/lib/amazon/kpi-builder";
 import { getCachedKPIs } from "@/lib/amazon/cache";
@@ -548,7 +549,9 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { messages } = await req.json();
+    const v = await validateRequest(req, ChatRequestSchema);
+    if (!v.success) return v.response;
+    const { messages } = v.data;
 
     const result = streamText({
       model: openai("gpt-4o-mini"),

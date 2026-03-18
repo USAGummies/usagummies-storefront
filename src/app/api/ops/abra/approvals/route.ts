@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/config";
 import { isAuthorized } from "@/lib/ops/abra-auth";
+import { validateRequest, ApprovalDecisionSchema } from "@/lib/ops/validation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -122,38 +123,10 @@ export async function PATCH(req: Request) {
   }
   const session = await auth();
 
-  let payload: {
-    id?: unknown;
-    decision?: unknown;
-    comment?: unknown;
-  } = {};
+  const v = await validateRequest(req, ApprovalDecisionSchema);
+  if (!v.success) return v.response;
 
-  try {
-    payload = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  }
-
-  const id = typeof payload.id === "string" ? payload.id.trim() : "";
-  const decisionRaw =
-    typeof payload.decision === "string" ? payload.decision.trim().toLowerCase() : "";
-
-  if (!id) {
-    return NextResponse.json({ error: "id is required" }, { status: 400 });
-  }
-
-  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  if (!UUID_RE.test(id)) {
-    return NextResponse.json({ error: "id must be a valid UUID" }, { status: 400 });
-  }
-
-  if (!["approved", "rejected"].includes(decisionRaw)) {
-    return NextResponse.json(
-      { error: "decision must be approved or rejected" },
-      { status: 400 },
-    );
-  }
-
+  const { id, decision: decisionRaw, comment } = v.data;
   const mappedDecision = decisionRaw === "rejected" ? "denied" : "approved";
 
   try {
@@ -174,8 +147,7 @@ export async function PATCH(req: Request) {
       status: mappedDecision,
       decision: mappedDecision,
       decided_at: new Date().toISOString(),
-      decision_reasoning:
-        typeof payload.comment === "string" ? payload.comment.slice(0, 2000) : null,
+      decision_reasoning: comment || null,
       decided_by_user_id: deciderUserId,
     };
 

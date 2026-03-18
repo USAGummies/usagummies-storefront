@@ -10,6 +10,7 @@ import {
 import { getNotionApiKey } from "@/lib/notion/credentials";
 import { publishFileToGithub, isGithubPublishConfigured } from "@/lib/social/github-publisher";
 import { crossPost, generateSocialPosts } from "@/lib/social/cross-poster";
+import { validateRequest, ContentActionSchema } from "@/lib/ops/validation";
 
 type ActionBody = {
   action?: "approve" | "reject" | "edit" | "generate";
@@ -303,7 +304,9 @@ async function generateAction(body: ActionBody) {
 
 export async function POST(req: Request) {
   try {
-    const body = (await req.json()) as ActionBody;
+    const v = await validateRequest(req, ContentActionSchema);
+    if (!v.success) return v.response;
+    const body = v.data;
     const action = body.action;
 
     if (action === "approve") {

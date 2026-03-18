@@ -7,37 +7,18 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { notify } from "@/lib/ops/notify";
-import type { NotifyChannel } from "@/lib/ops/notify";
+import { validateRequest, NotifyRequestSchema } from "@/lib/ops/validation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const VALID_CHANNELS: NotifyChannel[] = ["alerts", "pipeline", "daily"];
-
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { channel, text, sms } = body as {
-      channel: NotifyChannel;
-      text: string;
-      sms?: boolean;
-    };
+    const v = await validateRequest(req, NotifyRequestSchema);
+    if (!v.success) return v.response;
+    const { channel, text, sms } = v.data;
 
-    if (!channel || !VALID_CHANNELS.includes(channel)) {
-      return NextResponse.json(
-        { error: `Invalid channel. Must be one of: ${VALID_CHANNELS.join(", ")}` },
-        { status: 400 }
-      );
-    }
-
-    if (!text?.trim()) {
-      return NextResponse.json(
-        { error: "text is required" },
-        { status: 400 }
-      );
-    }
-
-    const result = await notify({ channel, text: text.trim(), sms });
+    const result = await notify({ channel, text, sms });
 
     return NextResponse.json({
       ok: result.slack || result.sms || result.imessage || false,

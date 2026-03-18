@@ -14,6 +14,7 @@ import {
   markSupabaseFailure,
   markSupabaseSuccess,
 } from "@/lib/ops/supabase-resilience";
+import { validateRequest, WriteBackSchema } from "@/lib/ops/validation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -120,51 +121,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Forbidden: admin only" }, { status: 403 });
   }
 
-  // 2. Parse and validate
-  let payload: {
-    table?: unknown;
-    action?: unknown;
-    data?: unknown;
-    reason?: unknown;
-  } = {};
-  try {
-    payload = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  }
+  // 2. Parse and validate with Zod
+  const v = await validateRequest(req, WriteBackSchema);
+  if (!v.success) return v.response;
 
-  const table = typeof payload.table === "string" ? payload.table.trim() : "";
-  const action = typeof payload.action === "string" ? payload.action.trim() : "";
-  const data =
-    payload.data && typeof payload.data === "object" && !Array.isArray(payload.data)
-      ? (payload.data as Record<string, unknown>)
-      : null;
-  const reason = typeof payload.reason === "string" ? payload.reason.trim() : "";
-
-  if (!ALLOWED_TABLES.has(table)) {
-    return NextResponse.json(
-      { error: `Invalid table. Allowed: ${[...ALLOWED_TABLES].join(", ")}` },
-      { status: 400 },
-    );
-  }
-
-  if (!ALLOWED_ACTIONS.has(action)) {
-    return NextResponse.json(
-      { error: `Invalid action. Allowed: ${[...ALLOWED_ACTIONS].join(", ")}` },
-      { status: 400 },
-    );
-  }
-
-  if (!data) {
-    return NextResponse.json({ error: "data object is required" }, { status: 400 });
-  }
-
-  if (!reason) {
-    return NextResponse.json({ error: "reason is required" }, { status: 400 });
-  }
-  if (reason.length > 1000) {
-    return NextResponse.json({ error: "reason must be under 1000 characters" }, { status: 400 });
-  }
+  const { table, action, data, reason } = v.data;
 
   // Cap all string values in data to prevent context-stuffing
   const cappedData: Record<string, unknown> = {};

@@ -6,6 +6,11 @@ import { runAllDueFeeds, runFeed } from "@/lib/ops/abra-auto-teach";
 import { detectAnomalies } from "@/lib/ops/abra-anomaly-detection";
 import { emitSignal } from "@/lib/ops/abra-operational-signals";
 import { autoManageInitiatives } from "@/lib/ops/abra-initiative-health";
+import {
+  notifyCloseReady,
+  postCloseToNotion,
+  runMonthlyClose,
+} from "@/lib/ops/abra-monthly-close";
 import { sendMorningBrief, sendEndOfDaySummary } from "@/lib/ops/abra-morning-brief";
 import { runEmailFetch } from "@/lib/ops/abra-email-fetch";
 import { generateActionableEmailDrafts } from "@/lib/ops/abra-email-drafter";
@@ -251,6 +256,38 @@ export async function POST(req: Request) {
       return { cached: years };
     });
     outcomes.push(ledgerCacheStep);
+
+    const monthlyCloseStep = await runStep("monthly_close", async () => {
+      if (!inMorningWindow(nowPT) || nowPT.getDate() !== 3) {
+        return { skipped: true, reason: "not_due" };
+      }
+
+      const target = new Date(Date.UTC(nowPT.getFullYear(), nowPT.getMonth(), 0));
+      const targetMonth = target.getUTCMonth() + 1;
+      const targetYear = target.getUTCFullYear();
+      const targetKey = `${targetYear}-${String(targetMonth).padStart(2, "0")}`;
+      const lastRunKey = await readState<string | null>(
+        "abra-monthly-close-last-period" as never,
+        null,
+      );
+      if (lastRunKey === targetKey) {
+        return { skipped: true, reason: "already_ran", period: targetKey };
+      }
+
+      const report = await runMonthlyClose(targetMonth, targetYear);
+      const pageId = await postCloseToNotion(report);
+      await notifyCloseReady(report);
+      await writeState("abra-monthly-close-last-period" as never, targetKey);
+
+      return {
+        skipped: false,
+        period: targetKey,
+        status: report.status,
+        actionItems: report.actionItems.length,
+        pageId,
+      };
+    });
+    outcomes.push(monthlyCloseStep);
 
     const anomaliesStep = await runStep("anomalies", async () => {
       const anomalies = await detectAnomalies();

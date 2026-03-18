@@ -21,6 +21,7 @@ import {
   markSupabaseSuccess,
 } from "@/lib/ops/supabase-resilience";
 import { notify } from "@/lib/ops/notify";
+import { validateRequest, ProposeRequestSchema } from "@/lib/ops/validation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -124,42 +125,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let payload: {
-    action_type?: unknown;
-    description?: unknown;
-    details?: unknown;
-    confidence?: unknown;
-    risk_level?: unknown;
-  } = {};
-  try {
-    payload = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  }
+  const v = await validateRequest(req, ProposeRequestSchema);
+  if (!v.success) return v.response;
 
-  const actionType =
-    typeof payload.action_type === "string" ? payload.action_type.trim().slice(0, 100) : "";
-  const description =
-    typeof payload.description === "string" ? payload.description.trim().slice(0, 500) : "";
-  const details =
-    payload.details && typeof payload.details === "object" && !Array.isArray(payload.details)
-      ? (payload.details as Record<string, unknown>)
-      : {};
-  const confidence =
-    typeof payload.confidence === "number"
-      ? Math.max(0, Math.min(1, payload.confidence))
-      : 0.5;
-  const riskLevel =
-    typeof payload.risk_level === "string" && VALID_RISK_LEVELS.has(payload.risk_level)
-      ? (payload.risk_level as "low" | "medium" | "high")
-      : "medium";
-
-  if (!actionType) {
-    return NextResponse.json({ error: "action_type is required" }, { status: 400 });
-  }
-  if (!description) {
-    return NextResponse.json({ error: "description is required" }, { status: 400 });
-  }
+  const actionType = v.data.action_type;
+  const description = v.data.description;
+  const details = v.data.details;
+  const confidence = v.data.confidence;
+  const riskLevel = v.data.risk_level;
 
   try {
     const circuitCheck = await canUseSupabase();

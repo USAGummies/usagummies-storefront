@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { notifyPipeline } from "@/lib/ops/notify";
+import { validateRequest, WholesaleOrderSchema } from "@/lib/ops/validation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -60,16 +61,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Shopify Admin API not configured" }, { status: 500 });
   }
 
-  let body: OrderRequest;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  }
-
-  if (!body.customerEmail || !body.lineItems?.length) {
-    return NextResponse.json({ error: "Missing customerEmail or lineItems" }, { status: 400 });
-  }
+  const v = await validateRequest(req, WholesaleOrderSchema);
+  if (!v.success) return v.response;
+  const body = v.data;
 
   // Build draft order input
   const input: Record<string, unknown> = {

@@ -135,6 +135,11 @@ async function processApprovalAction(
 }
 
 export async function POST(req: Request) {
+  // Rate limit — generous tier (Slack retries aggressively)
+  const { checkRateLimit } = await import("@/lib/ops/rate-limit");
+  const rl = await checkRateLimit(req, "generous");
+  if (rl.limited) return rl.response!;
+
   const bodyText = await req.text();
   const timestamp = req.headers.get("x-slack-request-timestamp");
   const signature = req.headers.get("x-slack-signature");

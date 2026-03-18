@@ -1137,6 +1137,11 @@ MARGIN & COST CLAIM VERIFICATION (applies when user asserts financial metrics):
 }
 
 export async function POST(req: Request) {
+  // Rate limit — strict tier (AI costs money)
+  const { checkRateLimit } = await import("@/lib/ops/rate-limit");
+  const rl = await checkRateLimit(req, "strict");
+  if (rl.limited) return rl.response!;
+
   if (!(await isAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

@@ -14,6 +14,7 @@ import {
   markSupabaseFailure,
   markSupabaseSuccess,
 } from "@/lib/ops/supabase-resilience";
+import { validateRequest, AnswerQuestionSchema } from "@/lib/ops/validation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -111,34 +112,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let payload: { question_id?: unknown; answer?: unknown } = {};
-  try {
-    payload = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  }
+  const v = await validateRequest(req, AnswerQuestionSchema);
+  if (!v.success) return v.response;
 
-  const questionId =
-    typeof payload.question_id === "string"
-      ? payload.question_id.trim()
-      : "";
-  const answer =
-    typeof payload.answer === "string" ? payload.answer.trim().slice(0, 10000) : "";
-
-  if (!questionId || !answer) {
-    return NextResponse.json(
-      { error: "question_id and answer are required" },
-      { status: 400 },
-    );
-  }
-
-  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  if (!UUID_RE.test(questionId)) {
-    return NextResponse.json(
-      { error: "question_id must be a valid UUID" },
-      { status: 400 },
-    );
-  }
+  const { question_id: questionId, answer } = v.data;
 
   try {
     const circuitCheck = await canUseSupabase();

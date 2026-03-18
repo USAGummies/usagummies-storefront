@@ -5,6 +5,7 @@ import { generateMarketingImage, isGeminiConfigured } from "@/lib/ai/gemini-imag
 import { crossPost } from "@/lib/social/cross-poster";
 import { generateSocialPosts } from "@/lib/social/cross-poster";
 import { readState, writeState } from "@/lib/ops/state";
+import { validateRequest, AutoPostSchema } from "@/lib/ops/validation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -52,18 +53,13 @@ function sanitizeFileName(name: string): string {
 
 export async function POST(req: Request) {
   try {
-    const body = (await req.json()) as AutoPostBody;
-    const topic = (body.topic || "").trim();
-    if (!topic) {
-      return NextResponse.json({ error: "topic is required" }, { status: 400 });
-    }
+    const v = await validateRequest(req, AutoPostSchema);
+    if (!v.success) return v.response;
 
-    const platforms = body.platforms || ["x", "truth"];
-    const style = body.style || "social-post";
-    const dryRun = body.dryRun === true;
+    const { topic, platforms, style, dryRun } = v.data;
 
     // ── Step 1: Generate social copy ──────────────────────────────
-    const blogUrl = body.blogUrl || "https://usagummies.com";
+    const blogUrl = v.data.blogUrl || "https://usagummies.com";
     const posts = await generateSocialPosts({
       blogTitle: topic,
       description: `Marketing post about: ${topic}`,

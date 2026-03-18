@@ -17,6 +17,7 @@ import {
   markSupabaseSuccess,
 } from "@/lib/ops/supabase-resilience";
 import { supersedeStaleEntries } from "@/lib/ops/abra-fact-lifecycle";
+import { validateRequest, CorrectRequestSchema } from "@/lib/ops/validation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -114,32 +115,12 @@ export async function POST(req: Request) {
   }
   const session = await auth();
 
-  let payload: {
-    original_claim?: unknown;
-    correction?: unknown;
-    department?: unknown;
-  } = {};
-  try {
-    payload = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  }
+  const v = await validateRequest(req, CorrectRequestSchema);
+  if (!v.success) return v.response;
 
-  const originalClaim =
-    typeof payload.original_claim === "string"
-      ? payload.original_claim.trim().slice(0, 2000)
-      : "";
-  const correction =
-    typeof payload.correction === "string" ? payload.correction.trim().slice(0, 2000) : "";
-  const department =
-    typeof payload.department === "string" ? payload.department.trim().slice(0, 50) : null;
-
-  if (!originalClaim || !correction) {
-    return NextResponse.json(
-      { error: "original_claim and correction are required" },
-      { status: 400 },
-    );
-  }
+  const originalClaim = v.data.original_claim;
+  const correction = v.data.correction;
+  const department = v.data.department || null;
 
   try {
     const circuitCheck = await canUseSupabase();

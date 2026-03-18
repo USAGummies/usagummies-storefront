@@ -14,6 +14,7 @@ import {
   updateLastLogin,
 } from "./notion-user-adapter";
 import type { UserRole } from "./notion-user-adapter";
+import { logAuthEvent } from "@/lib/ops/auth-audit";
 
 declare module "next-auth" {
   interface User {
@@ -62,14 +63,36 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           const user = await findUserByEmail(email);
           if (!user) {
             console.error("[auth] No user found for:", email);
+            logAuthEvent({
+              event_type: "login_failure",
+              user_email: email,
+              metadata: { reason: "user_not_found" },
+            });
             return null;
           }
 
           const valid = await verifyPassword(password, user);
           if (!valid) {
             console.error("[auth] Invalid password for:", email);
+            logAuthEvent({
+              event_type: "login_failure",
+              user_email: email,
+              user_id: user.id,
+              metadata: { reason: "invalid_password" },
+            });
             return null;
           }
+
+          // Log successful login
+          logAuthEvent({
+            event_type:
+              user.id === "break-glass-admin"
+                ? "break_glass_used"
+                : "login_success",
+            user_email: user.email,
+            user_id: user.id,
+            user_role: user.role,
+          });
 
           // Fire-and-forget last login update
           updateLastLogin(user.id).catch(() => {});

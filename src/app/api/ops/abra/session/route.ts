@@ -980,6 +980,9 @@ async function handleEndSession(
 }
 
 export async function POST(req: Request) {
+  const { checkRateLimit } = await import("@/lib/ops/rate-limit");
+  const rl = await checkRateLimit(req, "standard");
+  if (rl.limited) return rl.response!;
   const url = new URL(req.url);
   const action = url.searchParams.get("action");
   if (action === "end") {
@@ -989,13 +992,22 @@ export async function POST(req: Request) {
 }
 
 export async function GET(req: Request) {
+  const { checkRateLimit } = await import("@/lib/ops/rate-limit");
+  const rl = await checkRateLimit(req, "standard");
+  if (rl.limited) return rl.response!;
   return handleGet(req);
 }
 
 export async function PATCH(req: Request) {
+  const { checkRateLimit } = await import("@/lib/ops/rate-limit");
+  const rl = await checkRateLimit(req, "standard");
+  if (rl.limited) return rl.response!;
   return handlePatch(req);
 }
 
 export async function DELETE(req: Request) {
+  const { checkRateLimit } = await import("@/lib/ops/rate-limit");
+  const rl = await checkRateLimit(req, "standard");
+  if (rl.limited) return rl.response!;
   return handleEndSession(req);
 }

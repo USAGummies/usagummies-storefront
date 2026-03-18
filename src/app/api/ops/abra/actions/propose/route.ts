@@ -6,6 +6,7 @@ import {
   requiresExplicitPermission,
   type AbraAction,
 } from "@/lib/ops/abra-actions";
+import { validateRequest, ActionsProposeSchema } from "@/lib/ops/validation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -74,42 +75,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let payload: ProposePayload = {};
-  try {
-    payload = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  }
+  const v = await validateRequest(req, ActionsProposeSchema);
+  if (!v.success) return v.response;
 
-  const department =
-    typeof payload.department === "string" && payload.department.trim()
-      ? payload.department.trim()
-      : "executive";
-  const actionTypeRaw =
-    typeof payload.action_type === "string" ? payload.action_type.trim() : "";
-  const title = typeof payload.title === "string" ? payload.title.trim() : "";
-  const description =
-    typeof payload.description === "string" ? payload.description.trim() : "";
-  const params =
-    payload.params && typeof payload.params === "object" && !Array.isArray(payload.params)
-      ? (payload.params as Record<string, unknown>)
-      : {};
-  const confidenceRaw = Number(payload.confidence ?? 0.8);
-  const confidence = Number.isFinite(confidenceRaw)
-    ? Math.max(0, Math.min(1, confidenceRaw))
-    : 0.8;
-  const autoExecuteRequested = payload.auto_execute === true;
-  const requestedRisk = parseRisk(payload.risk_level);
-
-  if (!actionTypeRaw) {
-    return NextResponse.json({ error: "action_type is required" }, { status: 400 });
-  }
-  if (!title) {
-    return NextResponse.json({ error: "title is required" }, { status: 400 });
-  }
-  if (!description) {
-    return NextResponse.json({ error: "description is required" }, { status: 400 });
-  }
+  const department = v.data.department;
+  const actionTypeRaw = v.data.action_type;
+  const title = v.data.title;
+  const description = v.data.description;
+  const params = v.data.params;
+  const confidence = v.data.confidence;
+  const autoExecuteRequested = v.data.auto_execute;
+  const requestedRisk = parseRisk(v.data.risk_level);
 
   const mapped = mapActionType(actionTypeRaw, title, description, params);
   const action: AbraAction = {

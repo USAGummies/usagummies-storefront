@@ -16,6 +16,7 @@ import {
   markSupabaseFailure,
   markSupabaseSuccess,
 } from "@/lib/ops/supabase-resilience";
+import { validateRequest, TeachRequestSchema } from "@/lib/ops/validation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -113,32 +114,13 @@ export async function POST(req: Request) {
   }
   const session = await auth();
 
-  let payload: {
-    department?: unknown;
-    content?: unknown;
-    title?: unknown;
-  } = {};
-  try {
-    payload = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  }
+  const v = await validateRequest(req, TeachRequestSchema);
+  if (!v.success) return v.response;
 
-  const department =
-    typeof payload.department === "string" ? payload.department.trim().toLowerCase().slice(0, 50) : "";
-  const content =
-    typeof payload.content === "string" ? payload.content.trim().slice(0, 10000) : "";
+  const department = v.data.department?.toLowerCase() || "";
+  const content = v.data.content;
   const title =
-    typeof payload.title === "string"
-      ? payload.title.trim().slice(0, 200)
-      : `Teaching: ${department || "general"} — ${content.slice(0, 60)}`;
-
-  if (!content) {
-    return NextResponse.json(
-      { error: "content is required" },
-      { status: 400 },
-    );
-  }
+    v.data.title || `Teaching: ${department || "general"} — ${content.slice(0, 60)}`;
 
   try {
     const circuitCheck = await canUseSupabase();

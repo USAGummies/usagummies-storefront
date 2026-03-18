@@ -1126,13 +1126,22 @@ async function handlePatch(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const { checkRateLimit } = await import("@/lib/ops/rate-limit");
+  const rl = await checkRateLimit(req, "strict");
+  if (rl.limited) return rl.response!;
   return handlePost(req);
 }
 
 export async function GET(req: Request) {
+  const { checkRateLimit } = await import("@/lib/ops/rate-limit");
+  const rl = await checkRateLimit(req, "strict");
+  if (rl.limited) return rl.response!;
   return handleGet(req);
 }
 
 export async function PATCH(req: Request) {
+  const { checkRateLimit } = await import("@/lib/ops/rate-limit");
+  const rl = await checkRateLimit(req, "strict");
+  if (rl.limited) return rl.response!;
   return handlePatch(req);
 }

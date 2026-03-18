@@ -5,6 +5,7 @@ import {
   getRevenueSnapshot,
   getRevenueTimeline,
 } from "@/lib/ops/abra-financial-intel";
+import { validateQuery, FinanceQuerySchema } from "@/lib/ops/validation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,11 +24,11 @@ export async function GET(req: Request) {
   }
 
   try {
-    const url = new URL(req.url);
-    const view = (url.searchParams.get("view") || "snapshot").toLowerCase();
+    const qv = validateQuery(req, FinanceQuerySchema);
+    if (!qv.success) return qv.response;
+    const { view, period, days } = qv.data;
 
     if (view === "snapshot") {
-      const period = parsePeriod(url.searchParams.get("period"));
       const snapshot = await getRevenueSnapshot(period);
       return NextResponse.json({ view, period, snapshot });
     }
@@ -38,8 +39,6 @@ export async function GET(req: Request) {
     }
 
     if (view === "timeline") {
-      const daysRaw = Number(url.searchParams.get("days") || 30);
-      const days = Number.isFinite(daysRaw) ? Math.min(Math.max(Math.floor(daysRaw), 1), 365) : 30;
       const timeline = await getRevenueTimeline(days);
       return NextResponse.json({ view, days, timeline });
     }

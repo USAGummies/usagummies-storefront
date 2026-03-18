@@ -4,6 +4,7 @@ import { PDFParse } from "pdf-parse";
 import * as XLSX from "xlsx";
 import { auth } from "@/lib/auth/config";
 import { generateEmbeddings } from "@/lib/ops/abra-embeddings";
+import { validateRequest, IngestDeleteSchema } from "@/lib/ops/validation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -342,22 +343,9 @@ export async function DELETE(req: Request) {
   const user = await requireUser();
   if ("error" in user) return user.error;
 
-  let body: { document_id?: unknown } = {};
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  }
-
-  const documentId =
-    typeof body.document_id === "string" ? body.document_id.trim() : "";
-  if (!documentId) {
-    return NextResponse.json({ error: "document_id is required" }, { status: 400 });
-  }
-  // Validate UUID format to prevent PostgREST filter injection via LIKE pattern
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(documentId)) {
-    return NextResponse.json({ error: "document_id must be a valid UUID" }, { status: 400 });
-  }
+  const v = await validateRequest(req, IngestDeleteSchema);
+  if (!v.success) return v.response;
+  const { document_id: documentId } = v.data;
 
   try {
     const likePattern = encodeURIComponent(`document:${documentId}:%`);
