@@ -157,6 +157,8 @@ export const ENGINE_REGISTRY: EngineConfig[] = [
       { key: "F11", name: "Self-Heal Monitor", schedule: "Every 30 min" },
       { key: "F12", name: "Monthly Close Prep", schedule: "Monthly 3rd 09:00" },
       { key: "F13", name: "Monthly P&L Statement", schedule: "Monthly 3rd 10:00" },
+      { key: "F14", name: "Auto-Categorize Transactions", schedule: "Daily 07:35" },
+      { key: "F15", name: "Revenue Reconciliation", schedule: "Monthly 5th 10:00" },
     ],
   },
   {
@@ -195,6 +197,9 @@ export const ENGINE_REGISTRY: EngineConfig[] = [
       { key: "ABRA8", name: "Notion Agent Run Log Sync", schedule: "Daily 22:10" },
       { key: "ABRA9", name: "Auto-Teach Knowledge Feeds", schedule: "Daily 06:30" },
       { key: "ABRA10", name: "Morning Brief", schedule: "Daily 07:45" },
+      { key: "ABRA11", name: "Proactive Alert Scanner", schedule: "Every 30 min" },
+      { key: "ABRA12", name: "Agent Health Monitor", schedule: "Daily 18:00" },
+      { key: "ABRA13", name: "Dead Letter Recovery", schedule: "Every 30 min" },
     ],
   },
 ];

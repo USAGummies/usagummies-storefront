@@ -102,6 +102,9 @@ export const STATE_KEYS = {
   "integration-sla-report": "integration-sla-report.json",
   "chaos-suite-report": "chaos-suite-report.json",
 
+  // AP/AR Aging
+  "ap-ar-cache": "ap-ar-cache.json",
+
   // Marketing auto-post
   "auto-post-log": "auto-post-log.json",
 
@@ -117,6 +120,17 @@ export const STATE_KEYS = {
   "abra-vip-slack-threads": "abra-vip-slack-threads.json",
   "abra-awaiting-reply-alerts": "abra-awaiting-reply-alerts.json",
   "abra-stalled-deal-alerts": "abra-stalled-deal-alerts.json",
+  "proactive-alert-dedup": "proactive-alert-dedup.json",
+
+  // Agent performance tracking
+  "agent-performance-runs": "agent-performance-runs.json",
+  "agent-performance-disabled": "agent-performance-disabled.json",
+
+  // Dead letter queue
+  "dead-letter-queue": "dead-letter-queue.json",
+
+  // Abra chat memory (per-user conversation history)
+  "abra-chat-histories": "abra-chat-histories.json",
 
   // Logs (text, not JSON — stored as string)
   "engine-log": "agentic-engine.log",

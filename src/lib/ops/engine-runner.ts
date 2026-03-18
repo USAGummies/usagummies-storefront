@@ -12,6 +12,14 @@
 
 import { spawn } from "child_process";
 import path from "path";
+import { ENGINE_REGISTRY } from "@/lib/ops/engine-schedule";
+import {
+  recordAgentRun,
+  isAgentDisabled,
+  shouldAutoDisable,
+  disableAgent,
+  type AgentRunRecord,
+} from "@/lib/ops/agent-performance";
 
 const ENGINE_SCRIPT_MAP: Record<string, string> = {
   b2b: "usa-gummies-agentic.mjs",
@@ -88,6 +96,75 @@ const INTERNAL_AGENTS: Record<string, Record<string, () => Promise<InternalAgent
         return { summary: "Morning brief posted to Slack" };
       };
     },
+    ABRA12: async () => {
+      return async () => {
+        const { getFailingAgents: getFailing } = await import("@/lib/ops/agent-performance");
+        const { notify } = await import("@/lib/ops/notify");
+        const failing = await getFailing();
+        if (failing.length === 0) {
+          return { summary: "Agent Health Monitor: all agents healthy" };
+        }
+        const lines = failing.map(
+          (a) =>
+            `  ${a.health.toUpperCase()} ${a.engineId}/${a.agentKey} (${a.agentName}) — ${a.last7Days.successRate}% success, ${a.consecutiveFailures} consecutive failures${a.disabled ? " [DISABLED]" : ""}`,
+        );
+        const text = [
+          `Agent Health Monitor — ${failing.length} agent(s) need attention:`,
+          ...lines,
+        ].join("\n");
+        await notify({ channel: "alerts", text });
+        return { summary: `Agent Health Monitor: ${failing.length} degraded/failing agents reported` };
+      };
+    },
+    ABRA11: async () => {
+      return async () => {
+        const baseUrl = process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : process.env.NEXTAUTH_URL || "https://www.usagummies.com";
+        const cronSecret = process.env.CRON_SECRET;
+        const res = await fetch(`${baseUrl}/api/ops/abra/proactive-alerts`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(cronSecret ? { Authorization: `Bearer ${cronSecret}` } : {}),
+          },
+          signal: AbortSignal.timeout(55_000),
+        });
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          throw new Error(`Proactive alert scan failed: ${res.status} ${text.slice(0, 200)}`);
+        }
+        const data = (await res.json()) as { alerts?: number; sent?: number; suppressed?: number };
+        return {
+          summary: `Proactive scan: ${data.alerts ?? 0} alerts, ${data.sent ?? 0} sent, ${data.suppressed ?? 0} suppressed`,
+        };
+      };
+    },
+    ABRA13: async () => {
+      return async () => {
+        const baseUrl = process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : process.env.NEXTAUTH_URL || "https://www.usagummies.com";
+        const cronSecret = process.env.CRON_SECRET;
+        const res = await fetch(`${baseUrl}/api/ops/abra/dead-letter`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(cronSecret ? { Authorization: `Bearer ${cronSecret}` } : {}),
+          },
+          body: JSON.stringify({ action: "retry" }),
+          signal: AbortSignal.timeout(90_000),
+        });
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          throw new Error(`Dead letter retry failed: ${res.status} ${text.slice(0, 200)}`);
+        }
+        const data = (await res.json()) as { retried?: number; recovered?: number; abandoned?: number };
+        return {
+          summary: `Dead letter recovery: ${data.retried ?? 0} retried, ${data.recovered ?? 0} recovered, ${data.abandoned ?? 0} abandoned`,
+        };
+      };
+    },
   },
   finops: {
     F9: async () => {
@@ -127,13 +204,247 @@ const INTERNAL_AGENTS: Record<string, Record<string, () => Promise<InternalAgent
         return { summary: `Monthly P&L posted: ${period.label}${notionPageId ? ` (Notion: ${notionPageId})` : ""}` };
       };
     },
+    F14: async () => {
+      const { bulkCategorize } = await import("@/lib/ops/transaction-categorizer");
+      const { queryNotionDatabase } = await import("@/lib/ops/abra-notion-write");
+      const { DB } = await import("@/lib/notion/client");
+      const { notify } = await import("@/lib/ops/notify");
+      return async () => {
+        // Fetch uncategorized transactions from Notion
+        const pages = await queryNotionDatabase({
+          database_id: DB.CASH_TRANSACTIONS,
+          filter: {
+            or: [
+              { property: "Account Code", rich_text: { is_empty: true } },
+              { property: "GL Code", rich_text: { is_empty: true } },
+            ],
+          },
+          sorts: [{ property: "Date", direction: "descending" }],
+          page_size: 50,
+        });
+
+        if (pages.length === 0) {
+          return { summary: "No uncategorized transactions found" };
+        }
+
+        // Extract transaction data from Notion pages
+        const txs = pages.map((page) => {
+          const p = page as Record<string, unknown>;
+          const props = p.properties as Record<string, unknown> | undefined;
+          return {
+            id: typeof p.id === "string" ? p.id : "",
+            description: f14Text(props, ["Name", "Description", "Transaction", "Memo"]),
+            amount: f14Number(props, ["Amount", "Net Amount", "Total", "Value"]),
+            counterparty: f14Text(props, ["Vendor", "Payee", "Merchant"]) || undefined,
+            date: f14Date(props, ["Date", "Transaction Date"]),
+          };
+        });
+
+        const results = await bulkCategorize(txs);
+        const high = results.filter((r) => r.result.confidence > 0.9);
+        const low = results.filter((r) => r.result.confidence <= 0.9);
+
+        // Auto-apply high-confidence results
+        let applied = 0;
+        const notionToken = process.env.NOTION_TOKEN || process.env.NOTION_API_KEY;
+        if (notionToken && high.length > 0) {
+          for (const item of high) {
+            if (!item.id) continue;
+            try {
+              const res = await fetch(`https://api.notion.com/v1/pages/${item.id}`, {
+                method: "PATCH",
+                headers: {
+                  Authorization: `Bearer ${notionToken}`,
+                  "Notion-Version": "2022-06-28",
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  properties: {
+                    "Account Code": {
+                      rich_text: [{ text: { content: item.result.account_code } }],
+                    },
+                    Category: {
+                      rich_text: [{ text: { content: item.result.category } }],
+                    },
+                  },
+                }),
+                signal: AbortSignal.timeout(10_000),
+              });
+              if (res.ok) applied++;
+            } catch {
+              // Continue with next
+            }
+          }
+        }
+
+        const summaryText = `Auto-categorized ${results.length} transactions: ${high.length} high-confidence (${applied} applied), ${low.length} need review`;
+        await notify({ channel: "daily", text: `[FinOps F14] ${summaryText}` });
+        return { summary: summaryText };
+      };
+    },
+    F15: async () => {
+      const mod = await import("@/lib/ops/revenue-reconciliation");
+      const { notify } = await import("@/lib/ops/notify");
+      return async () => {
+        const period = mod.buildReconciliationPeriod();
+        const report = await mod.generateReconciliationReport(period);
+        const text = mod.formatReconciliationAsText(report);
+        await notify({ channel: "daily", text: `Revenue Reconciliation — ${period.label}\n\n${text}` });
+        return { summary: `Reconciliation: ${period.label} — ${report.status} (variance ${report.totalVariance >= 0 ? "+" : ""}$${report.totalVariance.toFixed(2)})` };
+      };
+    },
   },
 };
+
+// ---------------------------------------------------------------------------
+// F14 Notion property helpers (scoped to avoid naming conflicts)
+// ---------------------------------------------------------------------------
+
+function f14Text(props: Record<string, unknown> | undefined, names: string[]): string {
+  if (!props) return "";
+  for (const name of names) {
+    const prop = props[name] as Record<string, unknown> | undefined;
+    if (!prop) continue;
+    if (Array.isArray(prop.title)) {
+      const text = (prop.title as Array<{ plain_text?: string }>).map((t) => t.plain_text || "").join("").trim();
+      if (text) return text;
+    }
+    if (Array.isArray(prop.rich_text)) {
+      const text = (prop.rich_text as Array<{ plain_text?: string }>).map((t) => t.plain_text || "").join("").trim();
+      if (text) return text;
+    }
+  }
+  return "";
+}
+
+function f14Number(props: Record<string, unknown> | undefined, names: string[]): number {
+  if (!props) return 0;
+  for (const name of names) {
+    const prop = props[name] as Record<string, unknown> | undefined;
+    if (!prop) continue;
+    if (typeof prop.number === "number") return prop.number;
+  }
+  return 0;
+}
+
+function f14Date(props: Record<string, unknown> | undefined, names: string[]): string {
+  if (!props) return "";
+  for (const name of names) {
+    const prop = props[name] as Record<string, unknown> | undefined;
+    if (!prop) continue;
+    if (prop.date && typeof prop.date === "object") {
+      const d = prop.date as { start?: string };
+      if (d.start) return d.start.slice(0, 10);
+    }
+  }
+  return "";
+}
+
+// ---------------------------------------------------------------------------
+// Helper: resolve agent name from registry
+// ---------------------------------------------------------------------------
+
+function resolveAgentName(engineId: string, agentKey: string): string {
+  for (const engine of ENGINE_REGISTRY) {
+    if (engine.id === engineId) {
+      const agent = engine.agents.find((a) => a.key === agentKey);
+      if (agent) return agent.name;
+    }
+  }
+  return `${engineId}/${agentKey}`;
+}
+
+// ---------------------------------------------------------------------------
+// Core runAgent with performance tracking
+// ---------------------------------------------------------------------------
 
 export async function runAgent(
   engineId: string,
   agentKey: string,
   timeoutMs = 270_000 // 4.5 min (leave buffer for Vercel's 5 min limit)
+): Promise<AgentResult> {
+  const agentName = resolveAgentName(engineId, agentKey);
+
+  // Check if agent is disabled (auto-disabled due to consecutive failures)
+  try {
+    const disabled = await isAgentDisabled(engineId, agentKey);
+    if (disabled) {
+      const skipRecord: AgentRunRecord = {
+        engineId,
+        agentKey,
+        agentName,
+        status: "skipped",
+        durationMs: 0,
+        timestamp: new Date().toISOString(),
+        error: "Agent is auto-disabled due to consecutive failures",
+      };
+      // Fire-and-forget: don't let recording failure block the skip
+      recordAgentRun(skipRecord).catch(() => {});
+      return {
+        status: "skipped",
+        summary: `Agent ${agentKey} is disabled — skipping`,
+        durationMs: 0,
+      };
+    }
+  } catch {
+    // If disable check fails, proceed with running the agent
+  }
+
+  // Execute the agent
+  const result = await runAgentCore(engineId, agentKey, timeoutMs);
+
+  // Record the run (fire-and-forget — never block on tracking)
+  try {
+    const runRecord: AgentRunRecord = {
+      engineId,
+      agentKey,
+      agentName,
+      status: result.status === "failed" ? "failed" : result.status === "skipped" ? "skipped" : "success",
+      durationMs: result.durationMs ?? 0,
+      timestamp: new Date().toISOString(),
+      error: result.status === "failed" ? result.summary?.slice(0, 500) : undefined,
+    };
+    recordAgentRun(runRecord).catch(() => {});
+
+    // Check if we should auto-disable after a failure
+    if (result.status === "failed") {
+      shouldAutoDisable(engineId, agentKey)
+        .then((should) => {
+          if (should) {
+            return disableAgent(
+              engineId,
+              agentKey,
+              `Auto-disabled: 5+ consecutive failures. Last error: ${result.summary?.slice(0, 200)}`,
+            );
+          }
+        })
+        .catch(() => {});
+
+      // Enqueue into dead letter queue for retry (lazy import to avoid circular dependency)
+      import("@/lib/ops/dead-letter-queue")
+        .then(({ enqueueFailedAgent }) =>
+          enqueueFailedAgent({
+            engineId,
+            agentKey,
+            agentName,
+            failedAt: new Date().toISOString(),
+            errorMessage: result.summary?.slice(0, 500) || "Unknown error",
+            maxRetries: 3,
+          }),
+        )
+        .catch(() => {});
+    }
+  } catch {
+    // Never let performance tracking interfere with agent execution
+  }
+
+  return result;
+}
+
+async function runAgentCore(
+  engineId: string,
+  agentKey: string,
+  timeoutMs: number,
 ): Promise<AgentResult> {
   // Check for internal API agents first
   const internalEngine = INTERNAL_AGENTS[engineId];

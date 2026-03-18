@@ -60,6 +60,13 @@ import {
   queryNotionDatabase,
 } from "@/lib/ops/abra-actions";
 import type { ActionResult } from "@/lib/ops/abra-actions";
+import {
+  recordMessage,
+  getRecentContext,
+  clearHistory,
+  formatMemoryForPrompt,
+  type ChatMemoryMessage,
+} from "@/lib/ops/abra-chat-memory";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -2037,6 +2044,7 @@ export async function POST(req: Request) {
   const channelId = params.get("channel_id") || "";
   const threadTs = params.get("thread_ts") || "";
   const userName = params.get("user_name") || "slack-user";
+  const userId = params.get("user_id") || "";
 
   if (!text.trim()) {
     return NextResponse.json({
@@ -2053,6 +2061,7 @@ export async function POST(req: Request) {
         "• `/abra commands` — List pending email commands\n" +
         "• `/abra triage [N]` — Show recent email triage summary\n" +
         "• `/abra thread <cmd-id|thread-id>` — Show email thread history\n" +
+        "• `/abra forget` — Clear your conversation memory\n" +
         "• `/abra refresh` — Refresh latest email + teaching feeds\n\n" +
         "Departments (20) grouped by operating pillar:\n" +
         DEPARTMENT_HELP_TEXT,
@@ -2085,6 +2094,7 @@ export async function POST(req: Request) {
   const triageMatch = /^triage(?:\s+(\d+))?$/i.exec(trimmedText);
   const rateMatch = trimmedText.match(/^rate\s+(cmd-[\w-]+)\s+([1-5])(?:\s+(.+))?$/i);
   const scoresMatch = /^scores$/i.test(trimmedText);
+  const forgetMatch = /^forget$/i.test(trimmedText);
 
   // Handle /abra rate <cmd-id> <1-5> [feedback] — rate a command execution
   if (rateMatch) {
@@ -2199,6 +2209,35 @@ export async function POST(req: Request) {
       }
     });
     return NextResponse.json({ response_type: "ephemeral", text: "Fetching eval scores..." });
+  }
+
+  // Handle /abra forget — clear conversation memory for this user
+  if (forgetMatch) {
+    if (!userId) {
+      return NextResponse.json({
+        response_type: "ephemeral",
+        text: "Could not determine your Slack user ID.",
+      });
+    }
+    after(async () => {
+      try {
+        await clearHistory(userId);
+        await postToSlackResponse(
+          responseUrl,
+          "🧠 Abra has cleared your conversation memory. Starting fresh!",
+        );
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Unknown error";
+        await postToSlackResponse(
+          responseUrl,
+          `❌ Failed to clear memory: ${msg.slice(0, 200)}`,
+        );
+      }
+    });
+    return NextResponse.json({
+      response_type: "ephemeral",
+      text: "🧠 Clearing conversation memory...",
+    });
   }
 
   // Handle /abra triage [N] — show recent email triage summary
@@ -2440,6 +2479,7 @@ export async function POST(req: Request) {
         "• `/abra teach: [dept] content` — Teach Abra new knowledge\n" +
         "• `/abra initiative: <department> <goal>` — Create initiative\n" +
         "• `/abra thread <cmd-id|thread-id>` — Show email thread history\n" +
+        "• `/abra forget` — Clear your conversation memory\n" +
         "• `/abra refresh` — Refresh latest email + teaching feeds\n" +
         "• `/abra cost` — Show monthly AI spend\n" +
         "• `/abra rate <cmd-id> <1-5> [feedback]` — Rate a command execution\n" +
@@ -2535,16 +2575,54 @@ export async function POST(req: Request) {
   const queryText = answerMatch?.[1] || searchMatch?.[1] || text;
   after(async () => {
     try {
+      // Record the user's message in persistent chat memory
+      if (userId) {
+        await recordMessage({
+          role: "user",
+          content: queryText,
+          timestamp: new Date().toISOString(),
+          slackUserId: userId,
+          slackChannelId: channelId || undefined,
+          slackThreadTs: threadTs || undefined,
+        }).catch(() => {}); // best-effort, don't block the flow
+      }
+
+      // Fetch in-thread history (same Slack thread context)
       let history: ChatMessage[] = [];
       if (threadTs && channelId && BOT_TOKEN) {
         history = await fetchThreadHistory(channelId, threadTs);
       }
 
+      // Fetch cross-thread memory and inject into context
+      let memoryContext = "";
+      if (userId) {
+        try {
+          const recentMemory = await getRecentContext(userId, 10);
+          memoryContext = formatMemoryForPrompt(recentMemory);
+        } catch {
+          // best-effort
+        }
+      }
+
       const { reply, sources, answerLogId } = await callAbraChat(
-        queryText,
+        memoryContext
+          ? `${queryText}\n\n---\n${memoryContext}`
+          : queryText,
         history,
         userName,
       );
+
+      // Record the assistant's response in persistent chat memory
+      if (userId) {
+        await recordMessage({
+          role: "assistant",
+          content: reply,
+          timestamp: new Date().toISOString(),
+          slackUserId: userId,
+          slackChannelId: channelId || undefined,
+          slackThreadTs: threadTs || undefined,
+        }).catch(() => {}); // best-effort
+      }
 
       if (threadTs && channelId) {
         const threaded = await postThreadReply(
