@@ -152,15 +152,15 @@ const AMAZON_ADS_SEEDS: BrainSeed[] = [
   {
     title: "Amazon PPC Campaign Structure — USA Gummies",
     text: `USA Gummies Amazon Sponsored Products campaign structure as of March 17, 2026:
-ACTIVE CAMPAIGNS (3 campaigns, combined daily budget $55):
-1. USG-Auto-Discovery — Automatic targeting, $25/day budget, Dynamic bids up+down. Default bid $0.75. Top of search placement +50%, Product pages +25%. Purpose: keyword harvesting — discover converting search terms, then graduate winners to manual campaigns. Has 16 negative phrase-match keywords to block wasteful spend (vitamins, supplement, CBD, melatonin, THC, delta, weight loss, protein, keto, collagen, ashwagandha, probiotic, sugar free, vegan, organic, kids vitamins).
+ACTIVE CAMPAIGNS (3 campaigns, combined daily budget $80):
+1. USG-Auto-Discovery — Automatic targeting, $40/day budget, Dynamic bids up+down. Default bid $0.75. Top of search placement +50%, Product pages +25%. Purpose: keyword harvesting — discover converting search terms, then graduate winners to manual campaigns. Has 16 negative phrase-match keywords to block wasteful spend (vitamins, supplement, CBD, melatonin, THC, delta, weight loss, protein, keto, collagen, ashwagandha, probiotic, sugar free, vegan, organic, kids vitamins).
 2. USG-Manual-Exact — Manual exact-match keywords, $15/day budget, Dynamic bids up+down. Top of search +50%, Product pages +25%. Contains 25 exact-match keywords with competitive bids ($0.45–$3.07). Targets high-intent searches like "gummy bears," "dye free gummy bears," "natural gummy candy," "candy without artificial colors." Purpose: capture high-intent, proven-converting search terms with exact control.
-3. USG-Product-Targeting — Manual product targeting, $15/day budget, Dynamic bids up+down. Top of search +50%, Product pages +25%. Targets 1 category (Gummy Candies, $0.43 bid) and 5 competitor ASINs: Black Forest Organic (B06Y6485FQ, $1.62), Black Forest Juicy Burst (B01N39RV0A), Haribo Goldbears (B01LY311CG, $1.12), NERDS Gummy Clusters (B09M1NZ92V, $3.08), YumEarth Organic (bid $1.76). Purpose: conquest — show ads on competitor product pages and in category browse.
+3. USG-Product-Targeting — Manual product targeting, $25/day budget, Dynamic bids up+down. Top of search +50%, Product pages +25%. Targets 1 category (Gummy Candies, $0.43 bid) and 5 competitor ASINs: Black Forest Organic (B06Y6485FQ, $1.62), Black Forest Juicy Burst (B01N39RV0A), Haribo Goldbears (B01LY311CG, $1.12), NERDS Gummy Clusters (B09M1NZ92V, $3.08), YumEarth Organic (bid $1.76). Purpose: conquest — show ads on competitor product pages and in category browse.
 PAUSED CAMPAIGNS (1):
 4. USG-Manual-Phrase — Paused on March 17, 2026. Was consuming most of the budget with worst ROAS. Phrase-match was too broad, capturing low-intent queries.
 ASIN: B0G1JK92TJ (USA Gummies Dye Free Gummy Bears)
 Seller ID: A16G27VYDSSEGO, Entity ID: ENTITYM75K6QB0JZKO
-BUDGET ALLOCATION: Pro-forma $6K March, $5K April, $4K May for Amazon PPC total. Daily budget ~$55/day = ~$1,700/month, well within allocation.`,
+BUDGET ALLOCATION: Pro-forma $6K March, $5K April, $4K May for Amazon PPC total. Daily budget ~$80/day = ~$2,400/month, well within allocation. Budgets increased Mar 18 to capture missed sales from "Out of budget" status.`,
     tags: ["amazon", "ppc", "campaigns", "advertising", "reference"],
   },
   {

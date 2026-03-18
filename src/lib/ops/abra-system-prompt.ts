@@ -183,7 +183,7 @@ Quarterly (executive): customer retention/repeat rate, wholesale velocity (units
 • "Inventory is cash that hasn't become revenue yet. Every unit sitting in a warehouse is a dollar you can't spend."
 • "Safety stock = (max daily sales × max lead time) - (avg daily sales × avg lead time). Reorder point = (avg daily sales × lead time) + safety stock."
 • "For Amazon: organic rank = sales velocity + conversion rate + reviews. PPC ACoS target < 30%, TACoS target < 15%. Subscribe & Save builds recurring revenue."
-• "Amazon PPC structure (as of Mar 2026): 3 active Sponsored Products campaigns — USG-Auto-Discovery ($25/day, auto targeting, keyword harvesting), USG-Manual-Exact ($15/day, 25 exact-match keywords, $0.45-$3.07 bids), USG-Product-Targeting ($15/day, 5 competitor ASINs + Gummy Candies category). USG-Manual-Phrase paused (worst ROAS). All use Dynamic bids up+down, Top of search +50%, Product pages +25%."
+• "Amazon PPC structure (as of Mar 18 2026): 3 active Sponsored Products campaigns — USG-Auto-Discovery ($40/day, auto targeting, keyword harvesting), USG-Manual-Exact ($15/day, 25 exact-match keywords, $0.45-$3.07 bids), USG-Product-Targeting ($25/day, 5 competitor ASINs + Gummy Candies category). USG-Manual-Phrase paused (worst ROAS). All use Dynamic bids up+down, Top of search +50%, Product pages +25%. Combined $80/day (~$2,400/mo)."
 • "Amazon PPC optimization cycle: Weekly — mine Auto search terms → graduate winners to Manual-Exact, negate losers. Adjust bids based on ACoS (reduce if >35%, increase if <20% with low impressions). Monthly — compare spend to pro-forma ($6K Mar, $5K Apr, $4K May), reallocate budgets by ROAS."
 • "Hero SKU first → prove velocity → expand line. Never launch too many SKUs before proving the hero can sell."`;
 }

@@ -6,28 +6,26 @@
  * the single source of truth for financial reporting in the ops dashboard
  * and for Abra's financial intelligence layer.
  *
- * PUZZLE_API_KEY must be set in Vercel env vars (and .env.local for local dev).
+ * Auth: OAuth 2.0 Bearer tokens, managed by puzzle-auth.ts
+ * Tokens are stored in Vercel KV and auto-refreshed.
  *
- * API docs: https://puzzle-api.readme.io/docs/welcome
- *
- * NOTE: The actual API paths below are best-guess based on standard accounting
- * API conventions. They may need adjustment once Ben has an account and we can
- * verify the exact endpoints against Puzzle's live API reference.
+ * API docs: https://puzzle-api.readme.io/reference/getting-started
+ * Production base: https://api.puzzle.io/rest/v0
+ * Sandbox base: https://staging.southparkdata.com/rest/v0
  */
+
+import { getValidAccessToken, isPuzzleConnected } from "./puzzle-auth";
 
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
 
-const PUZZLE_BASE_URL = "https://api.puzzle.io/v1";
+const PUZZLE_BASE_URL =
+  process.env.PUZZLE_API_BASE_URL || "https://api.puzzle.io/rest/v0";
 
-function getApiKey(): string {
-  return (process.env.PUZZLE_API_KEY || "").trim();
-}
-
-/** Check whether Puzzle credentials are configured. */
-export function isPuzzleConfigured(): boolean {
-  return !!getApiKey();
+/** Check whether Puzzle credentials are configured and tokens exist. */
+export async function isPuzzleConfigured(): Promise<boolean> {
+  return isPuzzleConnected();
 }
 
 // ---------------------------------------------------------------------------
@@ -151,8 +149,9 @@ async function puzzleFetch<T>(
   path: string,
   init?: RequestInit,
 ): Promise<T | null> {
-  const apiKey = getApiKey();
-  if (!apiKey) {
+  const accessToken = await getValidAccessToken();
+  if (!accessToken) {
+    console.warn("[puzzle] No valid access token — is Puzzle connected? Visit /api/ops/puzzle/authorize");
     return null;
   }
 
@@ -163,7 +162,7 @@ async function puzzleFetch<T>(
       ...init,
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Bearer ${accessToken}`,
         ...(init?.headers || {}),
       },
       signal: init?.signal ?? AbortSignal.timeout(20000),
@@ -186,25 +185,25 @@ async function puzzleFetch<T>(
 }
 
 // ---------------------------------------------------------------------------
-// Read functions (for dashboard)
+// Read functions — Financial Reports
 // ---------------------------------------------------------------------------
 
 /**
- * Fetch Profit & Loss report for a date range.
- * Dates should be YYYY-MM-DD strings.
+ * Fetch Income Statement (P&L) for a date range.
+ * Endpoint: GET /reports/income-statement
  */
 export async function getPuzzlePnL(
   startDate: string,
   endDate: string,
 ): Promise<PuzzlePnL | null> {
   return puzzleFetch<PuzzlePnL>(
-    `/reports/profit-and-loss?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`,
+    `/reports/income-statement?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`,
   );
 }
 
 /**
  * Fetch Balance Sheet as of a specific date.
- * Date should be YYYY-MM-DD string.
+ * Endpoint: GET /reports/balance-sheet
  */
 export async function getPuzzleBalanceSheet(
   asOfDate: string,
@@ -215,30 +214,50 @@ export async function getPuzzleBalanceSheet(
 }
 
 /**
- * Fetch Cash Flow Statement for a date range.
- * Dates should be YYYY-MM-DD strings.
+ * Fetch Cash Activity Statement for a date range.
+ * Endpoint: GET /reports/cash-activity
  */
 export async function getPuzzleCashFlow(
   startDate: string,
   endDate: string,
 ): Promise<PuzzleCashFlow | null> {
   return puzzleFetch<PuzzleCashFlow>(
-    `/reports/cash-flow?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`,
+    `/reports/cash-activity?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`,
   );
 }
 
 /**
+ * Fetch Vendor Spending Report.
+ * Endpoint: GET /reports/vendor-spending
+ */
+export async function getPuzzleVendorSpending(
+  startDate: string,
+  endDate: string,
+): Promise<unknown | null> {
+  return puzzleFetch(
+    `/reports/vendor-spending?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Read functions — Transactions
+// ---------------------------------------------------------------------------
+
+/**
  * List transactions with optional filters.
+ * Endpoint: GET /transactions
  */
 export async function getPuzzleTransactions(params: {
   startDate?: string;
   endDate?: string;
   limit?: number;
+  offset?: number;
 }): Promise<PuzzleTransactionList | null> {
   const qs = new URLSearchParams();
   if (params.startDate) qs.set("startDate", params.startDate);
   if (params.endDate) qs.set("endDate", params.endDate);
   if (params.limit) qs.set("limit", String(params.limit));
+  if (params.offset) qs.set("offset", String(params.offset));
 
   const query = qs.toString();
   return puzzleFetch<PuzzleTransactionList>(
@@ -247,18 +266,151 @@ export async function getPuzzleTransactions(params: {
 }
 
 /**
- * Fetch key financial metrics: burn rate, runway, cash position.
+ * Get a single transaction by ID.
+ * Endpoint: GET /transactions/:id
  */
-export async function getPuzzleMetrics(): Promise<PuzzleMetrics | null> {
-  return puzzleFetch<PuzzleMetrics>("/metrics");
+export async function getPuzzleTransaction(
+  transactionId: string,
+): Promise<PuzzleTransaction | null> {
+  return puzzleFetch<PuzzleTransaction>(
+    `/transactions/${encodeURIComponent(transactionId)}`,
+  );
 }
 
 /**
- * List all accounts in the chart of accounts.
+ * Get Puzzle transaction categories.
+ * Endpoint: GET /transactions/categories
+ */
+export async function getPuzzleCategories(): Promise<unknown[] | null> {
+  return puzzleFetch<unknown[]>("/transactions/categories");
+}
+
+// ---------------------------------------------------------------------------
+// Read functions — Metrics
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetch expense metrics.
+ * Endpoint: GET /metrics/expenses
+ */
+export async function getPuzzleExpenseMetrics(): Promise<unknown | null> {
+  return puzzleFetch("/metrics/expenses");
+}
+
+/**
+ * Fetch revenue metrics.
+ * Endpoint: GET /metrics/revenue
+ */
+export async function getPuzzleRevenueMetrics(): Promise<unknown | null> {
+  return puzzleFetch("/metrics/revenue");
+}
+
+/**
+ * Fetch spending metrics.
+ * Endpoint: GET /metrics/spending
+ */
+export async function getPuzzleSpendingMetrics(): Promise<unknown | null> {
+  return puzzleFetch("/metrics/spending");
+}
+
+/**
+ * Fetch combined key financial metrics (convenience wrapper).
+ */
+export async function getPuzzleMetrics(): Promise<PuzzleMetrics | null> {
+  // Puzzle doesn't have a single /metrics endpoint — we combine from sub-endpoints
+  const [expense, revenue] = await Promise.all([
+    getPuzzleExpenseMetrics(),
+    getPuzzleRevenueMetrics(),
+  ]);
+
+  if (!expense && !revenue) return null;
+
+  // Return raw data — caller can shape as needed
+  return {
+    cashPosition: 0,
+    burnRate: 0,
+    runway: 0,
+    accountsReceivable: 0,
+    accountsPayable: 0,
+    currency: "USD",
+    asOfDate: new Date().toISOString().split("T")[0],
+    ...(expense as Record<string, unknown>),
+    ...(revenue as Record<string, unknown>),
+  } as PuzzleMetrics;
+}
+
+// ---------------------------------------------------------------------------
+// Read functions — Accounts
+// ---------------------------------------------------------------------------
+
+/**
+ * List all financial accounts.
+ * Endpoint: GET /accounts
  */
 export async function getPuzzleAccounts(): Promise<PuzzleAccount[] | null> {
   const result = await puzzleFetch<{ accounts: PuzzleAccount[] }>("/accounts");
   return result?.accounts ?? null;
+}
+
+/**
+ * Get Chart of Accounts.
+ * Endpoint: GET /chart-of-accounts
+ */
+export async function getPuzzleChartOfAccounts(): Promise<unknown | null> {
+  return puzzleFetch("/chart-of-accounts");
+}
+
+/**
+ * Get financial account balances.
+ * Endpoint: GET /accounts/balances
+ */
+export async function getPuzzleAccountBalances(): Promise<unknown | null> {
+  return puzzleFetch("/accounts/balances");
+}
+
+// ---------------------------------------------------------------------------
+// Read functions — Other
+// ---------------------------------------------------------------------------
+
+/**
+ * Get companies (list companies the token has access to).
+ * Endpoint: GET /companies
+ */
+export async function getPuzzleCompanies(): Promise<unknown | null> {
+  return puzzleFetch("/companies");
+}
+
+/**
+ * Get current user info.
+ * Endpoint: GET /me
+ */
+export async function getPuzzleCurrentUser(): Promise<unknown | null> {
+  return puzzleFetch("/me");
+}
+
+/**
+ * Get vendors.
+ * Endpoint: GET /vendors
+ */
+export async function getPuzzleVendors(): Promise<unknown | null> {
+  return puzzleFetch("/vendors");
+}
+
+/**
+ * Get journal entries.
+ * Endpoint: GET /journal-entries
+ */
+export async function getPuzzleJournalEntries(params?: {
+  startDate?: string;
+  endDate?: string;
+  limit?: number;
+}): Promise<unknown | null> {
+  const qs = new URLSearchParams();
+  if (params?.startDate) qs.set("startDate", params.startDate);
+  if (params?.endDate) qs.set("endDate", params.endDate);
+  if (params?.limit) qs.set("limit", String(params.limit));
+  const query = qs.toString();
+  return puzzleFetch(`/journal-entries${query ? `?${query}` : ""}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -266,7 +418,8 @@ export async function getPuzzleAccounts(): Promise<PuzzleAccount[] | null> {
 // ---------------------------------------------------------------------------
 
 /**
- * Create a transaction / journal entry in Puzzle.
+ * Create transaction(s) in Puzzle.
+ * Endpoint: POST /transactions
  */
 export async function createPuzzleTransaction(
   params: PuzzleCreateTransactionParams,
@@ -284,7 +437,8 @@ export async function createPuzzleTransaction(
 }
 
 /**
- * Update a transaction's category.
+ * Update a transaction (e.g. categorize it).
+ * Endpoint: PATCH /transactions/:id
  */
 export async function categorizeTransaction(
   transactionId: string,
@@ -297,4 +451,23 @@ export async function categorizeTransaction(
       body: JSON.stringify({ categoryId }),
     },
   );
+}
+
+/**
+ * Create a journal entry.
+ * Endpoint: POST /journal-entries
+ */
+export async function createPuzzleJournalEntry(params: {
+  date: string;
+  memo: string;
+  lines: Array<{
+    accountId: string;
+    amount: number;
+    type: "debit" | "credit";
+  }>;
+}): Promise<unknown | null> {
+  return puzzleFetch("/journal-entries", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
 }

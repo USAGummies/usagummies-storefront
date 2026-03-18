@@ -711,7 +711,7 @@ export const DEPARTMENT_PLAYBOOKS: Record<string, DepartmentPlaybook> = {
       "Amazon Seller Central account management, PPC advertising (3 active Sponsored Products campaigns + 1 paused), listing optimization, FBA logistics, reviews, and brand protection. ASIN: B0G1JK92TJ, Seller ID: A16G27VYDSSEGO.",
     baseline: [
       "Amazon account health monitoring",
-      "PPC campaign management — 3 active campaigns: USG-Auto-Discovery (auto, $25/day), USG-Manual-Exact (exact keywords, $15/day), USG-Product-Targeting (competitor ASINs + category, $15/day). USG-Manual-Phrase paused.",
+      "PPC campaign management — 3 active campaigns: USG-Auto-Discovery (auto, $40/day), USG-Manual-Exact (exact keywords, $15/day), USG-Product-Targeting (competitor ASINs + category, $25/day). USG-Manual-Phrase paused. Combined $80/day (~$2,400/mo).",
       "PPC weekly optimization: search term mining from auto→exact, negative keyword additions, bid adjustments, budget reallocation",
       "Listing optimization (titles, bullets, A+ content, backend keywords)",
       "FBA inventory management and replenishment",
