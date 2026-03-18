@@ -108,6 +108,46 @@ function computeErrorHash(message: string, source: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// Stack / metadata sanitization — strip PII, file paths, secrets
+// ---------------------------------------------------------------------------
+
+const SENSITIVE_PATTERNS = [
+  /Bearer\s+[A-Za-z0-9\-._~+/]+=*/gi,       // Bearer tokens
+  /(?:api[_-]?key|token|secret|password|authorization)\s*[:=]\s*\S+/gi, // key=value secrets
+  /\/Users\/[^\s:]+/g,                         // macOS absolute paths
+  /\/home\/[^\s:]+/g,                          // Linux absolute paths
+  /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z]{2,}/gi, // email addresses
+];
+
+function sanitizeStack(raw: string | null): string | null {
+  if (!raw) return null;
+  let cleaned = raw;
+  for (const pattern of SENSITIVE_PATTERNS) {
+    cleaned = cleaned.replace(pattern, "[REDACTED]");
+  }
+  // Limit length to prevent bloated rows
+  return cleaned.slice(0, 2000);
+}
+
+function sanitizeMetadata(meta: Record<string, unknown>): Record<string, unknown> {
+  const safe: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(meta)) {
+    // Skip keys that look like they contain secrets
+    if (/token|secret|password|key|auth|credential/i.test(key)) {
+      safe[key] = "[REDACTED]";
+      continue;
+    }
+    // Stringify and truncate large values
+    if (typeof value === "string" && value.length > 500) {
+      safe[key] = value.slice(0, 500) + "...";
+    } else {
+      safe[key] = value;
+    }
+  }
+  return safe;
+}
+
+// ---------------------------------------------------------------------------
 // Buffer — collects errors for 5 seconds then flushes in batch
 // ---------------------------------------------------------------------------
 
@@ -242,11 +282,13 @@ export function trackError(
 ): void {
   const message =
     error instanceof Error ? error.message : String(error);
-  const stack =
+  const rawStack =
     error instanceof Error ? (error.stack ?? null) : null;
+  const stack = sanitizeStack(rawStack);
+  const safeMeta = sanitizeMetadata(metadata);
   const errorHash = computeErrorHash(message, source);
 
-  buffer.push({ error_hash: errorHash, message, stack, source, severity, metadata });
+  buffer.push({ error_hash: errorHash, message: message.slice(0, 500), stack, source, severity, metadata: safeMeta });
   scheduleFlush();
 }
 

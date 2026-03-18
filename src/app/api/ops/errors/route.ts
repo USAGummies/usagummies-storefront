@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isAuthorized } from "@/lib/ops/abra-auth";
 import {
   getRecentErrors,
   resolveError,
@@ -10,10 +11,14 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // ---------------------------------------------------------------------------
-// GET /api/ops/errors — list recent errors with optional filters
+// GET /api/ops/errors — list recent errors with optional filters (auth required)
 // ---------------------------------------------------------------------------
 
 export async function GET(req: NextRequest) {
+  if (!(await isAuthorized(req))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const params = req.nextUrl.searchParams;
     const includeStats = params.get("stats") === "1";
@@ -65,6 +70,10 @@ type PatchBody = {
 };
 
 export async function PATCH(req: NextRequest) {
+  if (!(await isAuthorized(req))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const body = (await req.json()) as PatchBody;
     const errorId = body.errorId?.trim();

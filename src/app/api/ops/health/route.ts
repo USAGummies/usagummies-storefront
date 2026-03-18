@@ -257,7 +257,20 @@ function isAuthorized(req: NextRequest): boolean {
 export async function GET(req: NextRequest) {
   const authorized = isAuthorized(req);
 
-  // Run all checks in parallel
+  // Unauthenticated callers get a cheap static liveness response — no live probes
+  if (!authorized) {
+    return NextResponse.json(
+      {
+        status: "ok",
+        timestamp: new Date().toISOString(),
+        uptime_s: Math.round((Date.now() - BOOT_TIME) / 1000),
+        version: "0.1.0",
+      },
+      { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } },
+    );
+  }
+
+  // Authenticated — run all checks in parallel
   const [
     shopifyStorefront,
     shopifyAdmin,
@@ -320,15 +333,7 @@ export async function GET(req: NextRequest) {
     status,
     timestamp: new Date().toISOString(),
     uptime_s: Math.round((Date.now() - BOOT_TIME) / 1000),
-    checks: authorized
-      ? checks
-      : // Strip error details for unauthenticated requests
-        Object.fromEntries(
-          Object.entries(checks).map(([key, val]) => [
-            key,
-            { status: val.status, latency_ms: val.latency_ms },
-          ]),
-        ),
+    checks,
     version: "0.1.0",
   };
 

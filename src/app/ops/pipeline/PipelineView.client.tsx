@@ -123,7 +123,7 @@ export function PipelineView() {
     const rows = Object.values(pipeline?.stages || {}).flat();
 
     // Aggressive junk lead filter — removes fake leads that pollute the pipeline
-    const PAGE_TITLE_RE = /^(top \d+|best |find |how to |where to |\d+ best|\d+ most|list of |guide to |review of )/i;
+    const PAGE_TITLE_RE = /^(top \d+|best \d+|find |how to |where to |\d+ best|\d+ most|list of |guide to |review of )/i;
     const URL_NAME_RE = /^(https?:\/\/|www\.)|\.com(\/|$)|\.org(\/|$)|\.net(\/|$)/i;
     const GENERIC_NAME_RE = /^(contact|lead|opportunity|inquiry|request|unknown|test|sample|n\/a|none)$/i;
 

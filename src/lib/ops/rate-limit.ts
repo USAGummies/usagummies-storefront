@@ -74,27 +74,28 @@ function getLimiters(): Record<string, import("@upstash/ratelimit").Ratelimit> |
 
 /**
  * Derive a stable client identifier from the request.
- * Priority: auth token hash > IP from headers > "anonymous"
+ *
+ * Uses only the leftmost IP from x-forwarded-for (set by Vercel's edge proxy
+ * and not spoofable behind their CDN). Falls back to cf-connecting-ip for
+ * Cloudflare-proxied requests, then x-real-ip. Authorization headers are
+ * intentionally NOT used — they are caller-controlled and trivially rotated.
  */
 function getIdentifier(req: Request): string {
-  // Prefer auth-based identity (hashed to avoid storing tokens in Redis)
-  const authHeader = req.headers.get("authorization");
-  if (authHeader) {
-    // Use first 16 chars of a simple hash — enough for rate limit bucketing
-    let hash = 0;
-    for (let i = 0; i < authHeader.length; i++) {
-      hash = ((hash << 5) - hash + authHeader.charCodeAt(i)) | 0;
-    }
-    return `auth:${hash.toString(36)}`;
+  // Vercel always sets x-forwarded-for with the real client IP as the
+  // leftmost entry. Behind Vercel's edge, this header is trustworthy.
+  const forwarded = req.headers.get("x-forwarded-for");
+  if (forwarded) {
+    const ip = forwarded.split(",")[0]?.trim();
+    if (ip) return `ip:${ip}`;
   }
 
-  // Fall back to IP
-  const forwarded = req.headers.get("x-forwarded-for");
-  const ip =
-    forwarded?.split(",")[0]?.trim() ||
-    req.headers.get("x-real-ip") ||
-    req.headers.get("cf-connecting-ip");
-  if (ip) return ip;
+  // Cloudflare-proxied fallback
+  const cfIp = req.headers.get("cf-connecting-ip");
+  if (cfIp) return `ip:${cfIp}`;
+
+  // Last resort — x-real-ip (set by some reverse proxies)
+  const realIp = req.headers.get("x-real-ip");
+  if (realIp) return `ip:${realIp}`;
 
   return "anonymous";
 }
