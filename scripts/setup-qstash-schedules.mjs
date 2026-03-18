@@ -23,20 +23,27 @@ if (!CRON_SECRET) {
   process.exit(1);
 }
 
+// QStash free tier: max 10 schedules. The master-scheduler dispatches all
+// engine agents via getDueAgents(), so individual feed schedules are NOT
+// needed — the master handles them. We keep only schedules for things
+// that need guaranteed timing independent of the engine scheduler.
 const SCHEDULES = [
-  // Master scheduler — 5-min polling (Vercel Hobby cron only fires 1x/day, this is the real heartbeat)
+  // Heartbeat: master scheduler every 5 min — dispatches ALL due agents
   { name: "master-scheduler", url: `${BASE_URL}/api/ops/scheduler/master`, cron: "*/5 * * * *", method: "GET" },
+  // Inbox scan every 5 min — core Abra loop (email triage, drafts, signals)
+  { name: "abra-inbox-scan", url: `${BASE_URL}/api/ops/abra/inbox-scan`, cron: "*/5 * * * *", method: "POST" },
+  // Morning brief at 7:15am PT (14:15 UTC)
   { name: "abra-morning-brief", url: `${BASE_URL}/api/ops/abra/morning-brief`, cron: "15 14 * * *", method: "POST" },
-  { name: "abra-feed-shopify-orders", url: `${BASE_URL}/api/ops/abra/auto-teach?feed=shopify_orders`, cron: "0 13 * * *", method: "POST" },
-  { name: "abra-feed-amazon-orders", url: `${BASE_URL}/api/ops/abra/auto-teach?feed=amazon_orders`, cron: "10 13 * * *", method: "POST" },
-  { name: "abra-feed-shopify-products", url: `${BASE_URL}/api/ops/abra/auto-teach?feed=shopify_products`, cron: "20 13 * * *", method: "POST" },
-  { name: "abra-feed-shopify-inventory", url: `${BASE_URL}/api/ops/abra/auto-teach?feed=shopify_inventory`, cron: "30 13 * * *", method: "POST" },
-  { name: "abra-feed-amazon-inventory", url: `${BASE_URL}/api/ops/abra/auto-teach?feed=amazon_inventory`, cron: "40 13 * * *", method: "POST" },
-  { name: "abra-feed-ga4-traffic", url: `${BASE_URL}/api/ops/abra/auto-teach?feed=ga4_traffic`, cron: "0 5 * * *", method: "POST" },
-  { name: "abra-feed-email-fetch", url: `${BASE_URL}/api/ops/abra/auto-teach?feed=email_fetch`, cron: "0 */4 * * *", method: "POST" },
-  { name: "abra-feed-faire-orders", url: `${BASE_URL}/api/ops/abra/auto-teach?feed=faire_orders`, cron: "0 14 * * *", method: "POST" },
-  { name: "abra-health-check", url: `${BASE_URL}/api/ops/abra/health`, cron: "0 19 * * *", method: "POST" },
-  { name: "abra-weekly-digest", url: `${BASE_URL}/api/ops/abra/digest?type=weekly`, cron: "0 15 * * 1", method: "GET" },
+  // Data feeds — staggered daily ingestion
+  { name: "abra-feed-shopify", url: `${BASE_URL}/api/ops/abra/auto-teach?feed=shopify_orders`, cron: "0 13 * * *", method: "POST" },
+  { name: "abra-feed-amazon", url: `${BASE_URL}/api/ops/abra/auto-teach?feed=amazon_orders`, cron: "10 13 * * *", method: "POST" },
+  { name: "abra-feed-inventory", url: `${BASE_URL}/api/ops/abra/auto-teach?feed=shopify_inventory`, cron: "30 13 * * *", method: "POST" },
+  { name: "abra-feed-ga4", url: `${BASE_URL}/api/ops/abra/auto-teach?feed=ga4_traffic`, cron: "0 5 * * *", method: "POST" },
+  { name: "abra-feed-email", url: `${BASE_URL}/api/ops/abra/auto-teach?feed=email_fetch`, cron: "0 */4 * * *", method: "POST" },
+  // Weekly digest Sunday 6pm PT (Monday 01:00 UTC)
+  { name: "abra-weekly-digest", url: `${BASE_URL}/api/ops/abra/weekly-digest`, cron: "0 1 * * 1", method: "POST" },
+  // Outcome tracking daily at 8pm PT (03:00 UTC next day)
+  { name: "abra-outcome-check", url: `${BASE_URL}/api/ops/abra/outcome-check`, cron: "0 3 * * *", method: "POST" },
 ];
 
 function parseJsonSafe(text) {
@@ -114,9 +121,8 @@ async function deleteSchedule(id) {
 }
 
 async function createSchedule(schedule) {
-  // QStash v2: destination URL goes in the path, headers use Upstash-* prefixes
-  const encodedUrl = encodeURIComponent(schedule.url);
-  return qstash(`/schedules/${encodedUrl}`, {
+  // QStash v2: raw destination URL in path (NOT encoded)
+  return qstash(`/schedules/${schedule.url}`, {
     method: "POST",
     headers: {
       "Upstash-Cron": schedule.cron,

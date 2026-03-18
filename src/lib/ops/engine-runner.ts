@@ -173,6 +173,51 @@ const INTERNAL_AGENTS: Record<string, Record<string, () => Promise<InternalAgent
         };
       };
     },
+    ABRA14: async () => {
+      return async () => {
+        const baseUrl = process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : process.env.NEXTAUTH_URL || "https://www.usagummies.com";
+        const cronSecret = process.env.CRON_SECRET;
+        const res = await fetch(`${baseUrl}/api/ops/abra/weekly-digest`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(cronSecret ? { Authorization: `Bearer ${cronSecret}` } : {}),
+          },
+          signal: AbortSignal.timeout(55_000),
+        });
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          throw new Error(`Weekly digest failed: ${res.status} ${text.slice(0, 200)}`);
+        }
+        return { summary: "Weekly digest posted to Slack" };
+      };
+    },
+    ABRA15: async () => {
+      return async () => {
+        const baseUrl = process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : process.env.NEXTAUTH_URL || "https://www.usagummies.com";
+        const cronSecret = process.env.CRON_SECRET;
+        const res = await fetch(`${baseUrl}/api/ops/abra/outcome-check`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(cronSecret ? { Authorization: `Bearer ${cronSecret}` } : {}),
+          },
+          signal: AbortSignal.timeout(55_000),
+        });
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          throw new Error(`Outcome check failed: ${res.status} ${text.slice(0, 200)}`);
+        }
+        const data = (await res.json()) as { checked?: number; updated?: number };
+        return {
+          summary: `Outcome Tracker: ${data.checked ?? 0} checked, ${data.updated ?? 0} updated`,
+        };
+      };
+    },
   },
   "revenue-intel": {
     R13: async () => {

@@ -2143,6 +2143,31 @@ export async function executeAction(approvalId: string): Promise<ActionResult> {
       });
       // Fire event bus — cascade cross-department effects
       void emitPostActionEvent(action, result);
+      // Track outcome for feedback loop (dynamic import to avoid circular deps)
+      import("@/lib/ops/abra-outcome-tracker")
+        .then(({ trackAction, isTrackableAction }) => {
+          if (isTrackableAction(action.action_type)) {
+            const target =
+              (action.params?.to as string) ||
+              (action.params?.email as string) ||
+              (action.params?.company as string) ||
+              (action.params?.company_name as string) ||
+              (action.params?.channel as string) ||
+              (action.params?.order_id as string) ||
+              action.title ||
+              "unknown";
+            return trackAction({
+              action_id: approvalId,
+              action_type: action.action_type,
+              target,
+              expected_outcome: action.description || `Successful ${action.action_type}`,
+              notes: `Department: ${action.department}, Risk: ${action.risk_level}`,
+            });
+          }
+        })
+        .catch(() => {
+          // Never let outcome tracking block action execution
+        });
     } else {
       await markApprovalResolved({
         approvalId,

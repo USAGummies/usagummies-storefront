@@ -129,6 +129,9 @@ export const STATE_KEYS = {
   // Dead letter queue
   "dead-letter-queue": "dead-letter-queue.json",
 
+  // Outcome tracking
+  "abra-action-outcomes": "abra-action-outcomes.json",
+
   // Abra chat memory (per-user conversation history)
   "abra-chat-histories": "abra-chat-histories.json",
 

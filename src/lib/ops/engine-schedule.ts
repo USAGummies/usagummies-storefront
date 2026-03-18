@@ -201,6 +201,8 @@ export const ENGINE_REGISTRY: EngineConfig[] = [
       { key: "ABRA11", name: "Proactive Alert Scanner", schedule: "Every 30 min" },
       { key: "ABRA12", name: "Agent Health Monitor", schedule: "Daily 18:00" },
       { key: "ABRA13", name: "Dead Letter Recovery", schedule: "Every 30 min" },
+      { key: "ABRA14", name: "Weekly Digest", schedule: "Weekly Sun 18:00" },
+      { key: "ABRA15", name: "Outcome Tracker", schedule: "Daily 20:00" },
     ],
   },
 ];

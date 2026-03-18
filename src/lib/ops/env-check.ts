@@ -301,6 +301,16 @@ const DEFINITIONS: IntegrationDefinition[] = [
     rotationEnv: "AIRTABLE_API_KEY_ROTATED_AT",
     staleAfterDays: 180,
   },
+  {
+    key: "puzzle",
+    name: "Puzzle Accounting",
+    owner: "Finance Ops",
+    runbookUrl: "/docs/investor-readiness/operational-readiness-brief.md",
+    priority: "p1",
+    groups: [["PUZZLE_API_KEY"]],
+    rotationEnv: "PUZZLE_API_KEY_ROTATED_AT",
+    staleAfterDays: 120,
+  },
 ];
 
 function priorityWeight(priority: IntegrationPriority): number {
