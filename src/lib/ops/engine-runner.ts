@@ -37,11 +37,110 @@ export type AgentResult = {
  * Run an agent by spawning its engine script as a child process.
  * Returns structured result with stdout/stderr captured.
  */
+// ---------------------------------------------------------------------------
+// Internal API agents — TypeScript modules called directly (no child process)
+// These handle jobs that live in src/ rather than scripts/
+// ---------------------------------------------------------------------------
+
+type InternalAgentFn = () => Promise<{ summary: string }>;
+
+async function runInternalAgent(fn: InternalAgentFn): Promise<AgentResult> {
+  const start = Date.now();
+  try {
+    const result = await fn();
+    return {
+      status: "success",
+      summary: result.summary,
+      durationMs: Date.now() - start,
+    };
+  } catch (err) {
+    return {
+      status: "failed",
+      summary: err instanceof Error ? err.message : String(err),
+      durationMs: Date.now() - start,
+    };
+  }
+}
+
+const INTERNAL_AGENTS: Record<string, Record<string, () => Promise<InternalAgentFn>>> = {
+  "abra-sync": {
+    ABRA10: async () => {
+      return async () => {
+        // Call the morning brief API endpoint internally
+        const baseUrl = process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : process.env.NEXTAUTH_URL || "https://www.usagummies.com";
+        const cronSecret = process.env.CRON_SECRET;
+        const res = await fetch(`${baseUrl}/api/ops/abra/morning-brief`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(cronSecret ? { Authorization: `Bearer ${cronSecret}` } : {}),
+          },
+          body: JSON.stringify({ triggeredBy: "scheduler" }),
+          signal: AbortSignal.timeout(30_000),
+        });
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          throw new Error(`Morning brief failed: ${res.status} ${text.slice(0, 200)}`);
+        }
+        return { summary: "Morning brief posted to Slack" };
+      };
+    },
+  },
+  finops: {
+    F9: async () => {
+      const mod = await import("@/lib/ops/abra-financial-statements");
+      const { notify } = await import("@/lib/ops/notify");
+      return async () => {
+        const period = mod.buildMonthlyStatementPeriod();
+        const statement = await mod.generatePnL(period);
+        const text = mod.formatPnLAsText(statement);
+        await notify({ channel: "daily", text: `Weekly P&L Update\n\n${text}` });
+        return { summary: `P&L generated: ${period.label} — Net ${statement.netOperatingIncome >= 0 ? "+" : ""}$${statement.netOperatingIncome.toFixed(2)}` };
+      };
+    },
+    F12: async () => {
+      const { runMonthlyClose } = await import("@/lib/finance/monthly-close");
+      return async () => {
+        const now = new Date();
+        // Close previous month (format: "YYYY-MM")
+        const prevMonth = now.getUTCMonth() === 0 ? 12 : now.getUTCMonth();
+        const prevYear = now.getUTCMonth() === 0 ? now.getUTCFullYear() - 1 : now.getUTCFullYear();
+        const period = `${prevYear}-${String(prevMonth).padStart(2, "0")}`;
+        const result = await runMonthlyClose(period, "abra-scheduler");
+        return { summary: `Monthly close: ${result.status} — ${result.notes?.length || 0} notes` };
+      };
+    },
+    F13: async () => {
+      const mod = await import("@/lib/ops/abra-financial-statements");
+      const { notify } = await import("@/lib/ops/notify");
+      return async () => {
+        const now = new Date();
+        const prevMonth = now.getUTCMonth() === 0 ? 12 : now.getUTCMonth();
+        const prevYear = now.getUTCMonth() === 0 ? now.getUTCFullYear() - 1 : now.getUTCFullYear();
+        const period = mod.buildMonthlyStatementPeriod(prevMonth, prevYear);
+        const { statement, notionPageId } = await mod.generateAndPostPnL(period);
+        const text = mod.formatPnLAsText(statement);
+        await notify({ channel: "daily", text: `Monthly P&L — ${period.label}\n\n${text}` });
+        return { summary: `Monthly P&L posted: ${period.label}${notionPageId ? ` (Notion: ${notionPageId})` : ""}` };
+      };
+    },
+  },
+};
+
 export async function runAgent(
   engineId: string,
   agentKey: string,
   timeoutMs = 270_000 // 4.5 min (leave buffer for Vercel's 5 min limit)
 ): Promise<AgentResult> {
+  // Check for internal API agents first
+  const internalEngine = INTERNAL_AGENTS[engineId];
+  if (internalEngine?.[agentKey]) {
+    const agentFactory = await internalEngine[agentKey]();
+    return runInternalAgent(agentFactory);
+  }
+
   const scriptName = ENGINE_SCRIPT_MAP[engineId];
   if (!scriptName) {
     return {
