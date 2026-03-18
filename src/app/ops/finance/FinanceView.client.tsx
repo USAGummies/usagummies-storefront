@@ -62,6 +62,40 @@ type MarginViewResponse = {
   };
 };
 
+type AgingBucket = "current" | "1-30" | "31-60" | "61-90" | "90+";
+
+type PayableItem = {
+  vendor: string;
+  amount: number;
+  dueDate: string;
+  bucket: AgingBucket;
+  overdue: boolean;
+};
+
+type ReceivableItem = {
+  customer: string;
+  amount: number;
+  dueDate: string;
+  bucket: AgingBucket;
+  overdue: boolean;
+};
+
+type AgingSummary = {
+  payables: { items: PayableItem[]; total: number; byBucket: Record<string, number>; overdueTotal: number };
+  receivables: { items: ReceivableItem[]; total: number; byBucket: Record<string, number>; overdueTotal: number };
+  netPosition: number;
+  generatedAt: string;
+};
+
+const BUCKET_LABELS: AgingBucket[] = ["current", "1-30", "31-60", "61-90", "90+"];
+const BUCKET_COLORS: Record<AgingBucket, string> = {
+  "current": "#16a34a",
+  "1-30": GOLD,
+  "31-60": "#f59e0b",
+  "61-90": "#ea580c",
+  "90+": RED,
+};
+
 const CHANNEL_COLORS = {
   shopify: NAVY,
   amazon: RED,
@@ -142,6 +176,8 @@ export function FinanceView() {
   const [channelLoading, setChannelLoading] = useState(false);
   const [channelError, setChannelError] = useState<string | null>(null);
   const [marginSnapshot, setMarginSnapshot] = useState<MarginViewResponse["margins"] | null>(null);
+  const [agingData, setAgingData] = useState<AgingSummary | null>(null);
+  const [agingLoading, setAgingLoading] = useState(false);
   const ap = amzProfit?.profitability;
 
   useEffect(() => {
@@ -193,6 +229,25 @@ export function FinanceView() {
     }
 
     void loadRevenueByChannel();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    setAgingLoading(true);
+    fetch("/api/ops/abra/ap-ar", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: AgingSummary | null) => {
+        if (!cancelled) setAgingData(data);
+      })
+      .catch(() => {
+        if (!cancelled) setAgingData(null);
+      })
+      .finally(() => {
+        if (!cancelled) setAgingLoading(false);
+      });
     return () => {
       cancelled = true;
     };
@@ -877,6 +932,144 @@ export function FinanceView() {
         </div>
       </div>
 
+      {/* AP/AR Aging Card */}
+      <div
+        style={{
+          background: CARD,
+          border: `1px solid ${BORDER}`,
+          borderRadius: 12,
+          padding: "14px",
+          marginBottom: 14,
+        }}
+      >
+        <div style={{ fontWeight: 700, color: NAVY, marginBottom: 10 }}>Accounts Payable / Receivable</div>
+        {agingLoading ? (
+          <SkeletonChart height={120} />
+        ) : !agingData ? (
+          <div style={{ fontSize: 13, color: TEXT_DIM, padding: "20px 0", textAlign: "center" }}>
+            No AP/AR data yet
+          </div>
+        ) : (
+          <>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+                gap: 14,
+                marginBottom: 14,
+              }}
+            >
+              {/* Payables Column */}
+              <div style={{ border: `1px solid ${BORDER}`, borderRadius: 10, background: BG, padding: "10px 12px" }}>
+                <div style={{ fontSize: 10, color: TEXT_DIM, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700, marginBottom: 6 }}>
+                  Payables (AP)
+                </div>
+                <div style={{ fontSize: 22, color: NAVY, fontWeight: 800 }}>
+                  {fmtDollar(agingData.payables.total)}
+                </div>
+                {agingData.payables.overdueTotal > 0 && (
+                  <div style={{ fontSize: 12, color: RED, fontWeight: 600, marginTop: 2 }}>
+                    {fmtDollar(agingData.payables.overdueTotal)} overdue
+                  </div>
+                )}
+                <div style={{ marginTop: 10 }}>
+                  {BUCKET_LABELS.map((bucket) => {
+                    const amount = agingData.payables.byBucket[bucket] || 0;
+                    const pct = agingData.payables.total > 0 ? (amount / agingData.payables.total) * 100 : 0;
+                    return (
+                      <div key={bucket} style={{ marginBottom: 4 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: TEXT_DIM, marginBottom: 2 }}>
+                          <span>{bucket}</span>
+                          <span style={{ fontWeight: 600, color: NAVY }}>{fmtDollar(amount)}</span>
+                        </div>
+                        <div style={{ background: `${BORDER}`, borderRadius: 3, height: 6, overflow: "hidden" }}>
+                          <div
+                            style={{
+                              width: `${pct}%`,
+                              height: "100%",
+                              background: BUCKET_COLORS[bucket],
+                              borderRadius: 3,
+                              transition: "width 0.3s ease",
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Receivables Column */}
+              <div style={{ border: `1px solid ${BORDER}`, borderRadius: 10, background: BG, padding: "10px 12px" }}>
+                <div style={{ fontSize: 10, color: TEXT_DIM, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700, marginBottom: 6 }}>
+                  Receivables (AR)
+                </div>
+                <div style={{ fontSize: 22, color: NAVY, fontWeight: 800 }}>
+                  {fmtDollar(agingData.receivables.total)}
+                </div>
+                {agingData.receivables.overdueTotal > 0 && (
+                  <div style={{ fontSize: 12, color: RED, fontWeight: 600, marginTop: 2 }}>
+                    {fmtDollar(agingData.receivables.overdueTotal)} overdue
+                  </div>
+                )}
+                <div style={{ marginTop: 10 }}>
+                  {BUCKET_LABELS.map((bucket) => {
+                    const amount = agingData.receivables.byBucket[bucket] || 0;
+                    const pct = agingData.receivables.total > 0 ? (amount / agingData.receivables.total) * 100 : 0;
+                    return (
+                      <div key={bucket} style={{ marginBottom: 4 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: TEXT_DIM, marginBottom: 2 }}>
+                          <span>{bucket}</span>
+                          <span style={{ fontWeight: 600, color: NAVY }}>{fmtDollar(amount)}</span>
+                        </div>
+                        <div style={{ background: `${BORDER}`, borderRadius: 3, height: 6, overflow: "hidden" }}>
+                          <div
+                            style={{
+                              width: `${pct}%`,
+                              height: "100%",
+                              background: BUCKET_COLORS[bucket],
+                              borderRadius: 3,
+                              transition: "width 0.3s ease",
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Net Position */}
+            <div
+              style={{
+                border: `1px solid ${BORDER}`,
+                borderRadius: 10,
+                background: BG,
+                padding: "8px 12px",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <div style={{ fontSize: 11, color: TEXT_DIM, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700 }}>
+                Net Position (AR − AP)
+              </div>
+              <div
+                style={{
+                  fontSize: 20,
+                  fontWeight: 800,
+                  color: agingData.netPosition >= 0 ? "#16a34a" : RED,
+                }}
+              >
+                {agingData.netPosition >= 0 ? "+" : ""}
+                {fmtDollar(Math.abs(agingData.netPosition))}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
       <div
         style={{
           display: "grid",
@@ -982,7 +1175,28 @@ export function FinanceView() {
         <div style={{ fontSize: 12, color: TEXT_DIM }}>Refreshing finance metrics...</div>
       ) : null}
 
-      <div style={{ marginTop: 10 }}>
+      <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <a
+          href="/ops/finance/reconciliation"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            border: `1px solid ${BORDER}`,
+            borderRadius: 999,
+            padding: "5px 12px",
+            fontSize: 11,
+            color: NAVY,
+            fontWeight: 700,
+            textTransform: "uppercase",
+            letterSpacing: "0.06em",
+            background: CARD,
+            textDecoration: "none",
+            cursor: "pointer",
+          }}
+        >
+          Revenue Reconciliation →
+        </a>
         <span
           style={{
             display: "inline-flex",

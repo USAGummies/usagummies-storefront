@@ -4,9 +4,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Activity,
   AlertTriangle,
+  Bell,
   CheckCircle2,
   ChevronRight,
   Clock3,
+  DollarSign,
+  Inbox,
   Play,
   ShieldCheck,
   XCircle,
@@ -92,6 +95,40 @@ type QuickActionResult = {
   loading: boolean;
   result: string | null;
   error: string | null;
+};
+
+type DeadLetterData = {
+  total: number;
+  counts: {
+    pending: number;
+    retrying: number;
+    recovered: number;
+    abandoned: number;
+  };
+};
+
+type ApArData = {
+  payables: { total: number; overdueTotal: number };
+  receivables: { total: number; overdueTotal: number };
+  netPosition: number;
+  generatedAt: string;
+};
+
+type AgentHealthData = {
+  reports: Array<{ health: string; disabled?: boolean }>;
+  total: number;
+  failing: number;
+  disabled: number;
+};
+
+type ProactiveAlertsData = {
+  ok: boolean;
+  recentAlerts: Array<{
+    dedupKey: string;
+    lastAlerted: string;
+    ageMinutes: number;
+  }>;
+  count: number;
 };
 
 // ---------------------------------------------------------------------------
@@ -251,6 +288,13 @@ export function CommandCenter() {
   // Quick actions state
   const [actionResults, setActionResults] = useState<Record<string, QuickActionResult>>({});
 
+  // Sprint B state
+  const [deadLetterPending, setDeadLetterPending] = useState<number | null>(null);
+  const [apArNet, setApArNet] = useState<number | null>(null);
+  const [apArOverdue, setApArOverdue] = useState<number | null>(null);
+  const [failingAgentCount, setFailingAgentCount] = useState<number | null>(null);
+  const [proactiveAlertCount, setProactiveAlertCount] = useState<number | null>(null);
+
   // Timestamps for staleness
   const [lastRefresh, setLastRefresh] = useState<string | null>(null);
 
@@ -264,6 +308,10 @@ export function CommandCenter() {
       fetch("/api/ops/approvals?status=pending", { cache: "no-store" }),
       fetch("/api/ops/dashboard", { cache: "no-store" }),
       fetch("/api/ops/errors?stats=1", { cache: "no-store" }),
+      fetch("/api/ops/abra/dead-letter", { cache: "no-store" }),
+      fetch("/api/ops/abra/ap-ar", { cache: "no-store" }),
+      fetch("/api/ops/agent-health?failing=1", { cache: "no-store" }),
+      fetch("/api/ops/abra/proactive-alerts", { cache: "no-store" }),
     ]);
 
     // Health
@@ -312,6 +360,60 @@ export function CommandCenter() {
       }
     } else {
       setErrorCount(null);
+    }
+
+    // Dead Letter Queue
+    if (results[4].status === "fulfilled" && results[4].value.ok) {
+      try {
+        const data = (await results[4].value.json()) as DeadLetterData;
+        setDeadLetterPending(data.counts?.pending ?? 0);
+      } catch {
+        setDeadLetterPending(null);
+      }
+    } else {
+      setDeadLetterPending(null);
+    }
+
+    // AP/AR
+    if (results[5].status === "fulfilled" && results[5].value.ok) {
+      try {
+        const data = (await results[5].value.json()) as ApArData;
+        setApArNet(data.netPosition ?? null);
+        const overdue =
+          (data.receivables?.overdueTotal ?? 0) +
+          (data.payables?.overdueTotal ?? 0);
+        setApArOverdue(overdue);
+      } catch {
+        setApArNet(null);
+        setApArOverdue(null);
+      }
+    } else {
+      setApArNet(null);
+      setApArOverdue(null);
+    }
+
+    // Agent Health
+    if (results[6].status === "fulfilled" && results[6].value.ok) {
+      try {
+        const data = (await results[6].value.json()) as AgentHealthData;
+        setFailingAgentCount(data.failing ?? data.reports?.length ?? 0);
+      } catch {
+        setFailingAgentCount(null);
+      }
+    } else {
+      setFailingAgentCount(null);
+    }
+
+    // Proactive Alerts
+    if (results[7].status === "fulfilled" && results[7].value.ok) {
+      try {
+        const data = (await results[7].value.json()) as ProactiveAlertsData;
+        setProactiveAlertCount(data.count ?? data.recentAlerts?.length ?? 0);
+      } catch {
+        setProactiveAlertCount(null);
+      }
+    } else {
+      setProactiveAlertCount(null);
     }
   }, []);
 
@@ -454,6 +556,30 @@ export function CommandCenter() {
       </div>
 
       {/* ================================================================= */}
+      {/* Proactive Alerts Badge                                            */}
+      {/* ================================================================= */}
+      {proactiveAlertCount !== null && proactiveAlertCount > 0 && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "10px 14px",
+            background: `${RED}0A`,
+            border: `1px solid ${RED}33`,
+            borderRadius: 8,
+            marginBottom: 12,
+          }}
+        >
+          <Bell size={16} color={RED} />
+          <span style={{ fontSize: 13, fontWeight: 700, color: RED }}>
+            {proactiveAlertCount} active alert{proactiveAlertCount !== 1 ? "s" : ""}
+          </span>
+          <span style={{ fontSize: 12, color: TEXT_DIM }}>in the last 24h</span>
+        </div>
+      )}
+
+      {/* ================================================================= */}
       {/* ROW 1: Status Cards                                               */}
       {/* ================================================================= */}
       <div
@@ -461,7 +587,7 @@ export function CommandCenter() {
           display: "grid",
           gridTemplateColumns: isMobile
             ? "repeat(2, minmax(0, 1fr))"
-            : "repeat(4, minmax(0, 1fr))",
+            : "repeat(3, minmax(0, 1fr))",
           gap: 10,
           marginBottom: 16,
         }}
@@ -541,6 +667,82 @@ export function CommandCenter() {
               <div style={{ fontSize: 12, color: TEXT_DIM, marginTop: 2 }}>
                 {errorCount && errorCount > 0 ? "Unresolved" : "All clear"}
               </div>
+            </StatusCard>
+
+            {/* Dead Letter Queue */}
+            <StatusCard
+              label="Dead Letter Queue"
+              accentColor={deadLetterPending && deadLetterPending > 0 ? RED : undefined}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Inbox
+                  size={18}
+                  color={deadLetterPending && deadLetterPending > 0 ? RED : TEXT_DIM}
+                />
+                <span
+                  style={{
+                    fontSize: 30,
+                    fontWeight: 800,
+                    color: deadLetterPending && deadLetterPending > 0 ? RED : NAVY,
+                  }}
+                >
+                  {deadLetterPending !== null ? deadLetterPending : "--"}
+                </span>
+              </div>
+              <div style={{ fontSize: 12, color: TEXT_DIM, marginTop: 2 }}>
+                {deadLetterPending && deadLetterPending > 0
+                  ? "Pending retries"
+                  : "Queue clear"}
+              </div>
+            </StatusCard>
+
+            {/* AP/AR Net Position */}
+            <StatusCard
+              label="AP/AR Net Position"
+              accentColor={
+                apArNet !== null
+                  ? apArNet >= 0
+                    ? "#16a34a"
+                    : RED
+                  : undefined
+              }
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <DollarSign
+                  size={18}
+                  color={
+                    apArNet !== null
+                      ? apArNet >= 0
+                        ? "#16a34a"
+                        : RED
+                      : TEXT_DIM
+                  }
+                />
+                <span
+                  style={{
+                    fontSize: 26,
+                    fontWeight: 800,
+                    color:
+                      apArNet !== null
+                        ? apArNet >= 0
+                          ? "#16a34a"
+                          : RED
+                        : NAVY,
+                  }}
+                >
+                  {apArNet !== null ? fmtDollar(apArNet) : "--"}
+                </span>
+              </div>
+              {apArOverdue !== null && apArOverdue > 0 && (
+                <div style={{ fontSize: 12, color: RED, fontWeight: 600, marginTop: 2 }}>
+                  {fmtDollar(apArOverdue)} overdue
+                </div>
+              )}
+              {(apArOverdue === null || apArOverdue === 0) && (
+                <div style={{ fontSize: 12, color: TEXT_DIM, marginTop: 2 }}>
+                  Receivables &minus; Payables
+                </div>
+              )}
             </StatusCard>
           </>
         )}
@@ -716,6 +918,50 @@ export function CommandCenter() {
               })}
             </div>
           )}
+
+          {/* Agent Health Summary */}
+          <div
+            style={{
+              marginTop: 12,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "8px 10px",
+              borderRadius: 6,
+              border: `1px solid ${
+                failingAgentCount && failingAgentCount > 0
+                  ? `${RED}44`
+                  : "#16a34a44"
+              }`,
+              background:
+                failingAgentCount && failingAgentCount > 0
+                  ? `${RED}08`
+                  : "#16a34a08",
+            }}
+          >
+            {failingAgentCount === null ? (
+              <>
+                <Activity size={14} color={TEXT_DIM} />
+                <span style={{ fontSize: 12, color: TEXT_DIM, fontWeight: 600 }}>
+                  Agent health unavailable
+                </span>
+              </>
+            ) : failingAgentCount > 0 ? (
+              <>
+                <AlertTriangle size={14} color={RED} />
+                <span style={{ fontSize: 12, color: RED, fontWeight: 700 }}>
+                  {failingAgentCount} failing agent{failingAgentCount !== 1 ? "s" : ""}
+                </span>
+              </>
+            ) : (
+              <>
+                <CheckCircle2 size={14} color="#16a34a" />
+                <span style={{ fontSize: 12, color: "#16a34a", fontWeight: 700 }}>
+                  All agents healthy
+                </span>
+              </>
+            )}
+          </div>
         </section>
 
         {/* Right: Quick Actions */}

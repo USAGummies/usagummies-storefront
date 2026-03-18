@@ -616,6 +616,7 @@ export type TransactionsData = {
 
 export type ForecastData = {
   currentBalance: number;
+  cashSource?: "plaid" | "estimated" | "none";
   projections: {
     "30d": Array<{
       date: string;

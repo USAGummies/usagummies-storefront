@@ -622,8 +622,8 @@ export function ForecastView() {
         </div>
       </div>
 
-      {/* Awaiting data banner — Plaid not connected */}
-      {!loading && !forecast?.currentBalance && points.length === 0 ? (
+      {/* Estimated cash banner — when Plaid not connected */}
+      {!loading && forecast?.cashSource === "estimated" ? (
         <div
           style={{
             border: `1px solid ${GOLD}55`,
@@ -636,9 +636,26 @@ export function ForecastView() {
             fontWeight: 600,
           }}
         >
-          <strong>Awaiting Data — Plaid API pending.</strong> Cash forecast requires bank account
-          connectivity via Plaid. Current balance, runway, burn rate, receivables, and payables will
-          populate once Plaid is integrated. All figures below will show $0 until then.
+          <strong>Estimated Cash Position</strong> — Projections are derived from Shopify + Amazon
+          revenue data and known operating costs. Connect a bank account via Plaid for exact cash
+          position and automatic transaction categorization.
+        </div>
+      ) : !loading && forecast?.cashSource === "none" && !forecast?.currentBalance && points.length === 0 ? (
+        <div
+          style={{
+            border: `1px solid ${GOLD}55`,
+            background: `${GOLD}12`,
+            color: NAVY,
+            borderRadius: 10,
+            padding: "12px 14px",
+            marginBottom: 12,
+            fontSize: 13,
+            fontWeight: 600,
+          }}
+        >
+          <strong>Limited Data</strong> — No bank connection or revenue data available to estimate
+          cash position. Connect a bank account via Plaid or ensure Shopify/Amazon API credentials
+          are configured for projected figures.
         </div>
       ) : null}
 
@@ -654,18 +671,19 @@ export function ForecastView() {
           icon={<Wallet size={16} />}
           label="Current Cash"
           value={fmtDollar(forecast?.currentBalance || 0)}
+          hint={forecast?.cashSource === "estimated" ? "Estimated (no bank connection)" : forecast?.cashSource === "plaid" ? "Live bank balance" : undefined}
         />
         <HeaderCard
           icon={<Timer size={16} />}
           label="Runway"
           value={`${forecast?.runway || 0} days`}
-          hint="Projected days until cash floor"
+          hint={forecast?.cashSource === "estimated" ? "Estimated from revenue data" : "Projected days until cash floor"}
         />
         <HeaderCard
           icon={<Flame size={16} />}
           label="Monthly Burn"
           value={fmtDollar(monthlyBurn)}
-          hint="30-day net outflow projection"
+          hint={forecast?.cashSource === "estimated" ? "Based on known costs" : "30-day net outflow projection"}
         />
         <HeaderCard
           icon={<CalendarClock size={16} />}

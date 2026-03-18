@@ -221,21 +221,52 @@ async function buildRecurringMonthlyFromCashTransactions(): Promise<MonthlyExpen
 
 function resolveCurrentBalance(
   cache: CacheEnvelope<UnifiedBalances | PlaidBalanceCache> | null,
-): number {
+): { balance: number; source: "plaid" | "none" } {
   const unified = cache?.data as UnifiedBalances | undefined;
-  if (typeof unified?.totalCash === "number") {
-    return unified.totalCash;
+  if (typeof unified?.totalCash === "number" && unified.totalCash > 0) {
+    return { balance: unified.totalCash, source: "plaid" };
   }
 
   const plaidOnly = cache?.data as PlaidBalanceCache | undefined;
   if (Array.isArray(plaidOnly?.accounts)) {
-    return plaidOnly.accounts.reduce((sum, account) => {
+    const total = plaidOnly.accounts.reduce((sum, account) => {
       const current = account.balances?.current ?? account.balances?.available ?? 0;
       return sum + (current || 0);
     }, 0);
+    if (total > 0) return { balance: total, source: "plaid" };
   }
 
-  return 0;
+  return { balance: 0, source: "none" };
+}
+
+/**
+ * When Plaid isn't connected, estimate a working cash position from
+ * recent revenue (Shopify + Amazon) minus estimated expenses.
+ * This gives a rough "accumulated cash from operations" figure.
+ */
+async function estimateCashFromRevenue(): Promise<number> {
+  try {
+    // Use Amazon KPIs for revenue velocity
+    const amazonKPIs = await getCachedKPIs<AmazonKPIs>();
+    const amazonDailyRevenue = amazonKPIs
+      ? (amazonKPIs.revenue.weekToDate || 0) / Math.max(new Date().getDay() || 7, 1)
+      : 0;
+
+    // Estimate Shopify daily revenue (typically ~30% of Amazon for this business)
+    const shopifyDailyEstimate = amazonDailyRevenue * 0.3;
+
+    // 30-day revenue estimate
+    const monthlyRevenue = (amazonDailyRevenue + shopifyDailyEstimate) * 30;
+
+    // Use a conservative 40% of monthly revenue as estimated cash on hand
+    // (accounts for COGS, fees, operating expenses already paid)
+    const estimatedCash = monthlyRevenue * 0.4;
+
+    return Math.round(estimatedCash * 100) / 100;
+  } catch (err) {
+    console.error("[forecast] Revenue-based cash estimate failed:", err);
+    return 0;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -455,12 +486,24 @@ export async function buildForecastReport(): Promise<ForecastReport> {
     return cached.data;
   }
 
-  // Get current balance from unified balances cache
+  // Get current balance from unified balances cache (Plaid / bank connection)
   const balancesCache = await readState<CacheEnvelope<UnifiedBalances | PlaidBalanceCache> | null>(
     "plaid-balance-cache",
     null,
   );
-  const currentBalance = resolveCurrentBalance(balancesCache);
+  const resolved = resolveCurrentBalance(balancesCache);
+
+  let currentBalance = resolved.balance;
+  let cashSource: "plaid" | "estimated" | "none" = resolved.source === "plaid" ? "plaid" : "none";
+
+  // If no Plaid balance, estimate from recent revenue data
+  if (currentBalance <= 0) {
+    const estimated = await estimateCashFromRevenue();
+    if (estimated > 0) {
+      currentBalance = estimated;
+      cashSource = "estimated";
+    }
+  }
 
   // Build receivables and payables
   const [receivables, payables] = await Promise.all([
@@ -515,8 +558,15 @@ export async function buildForecastReport(): Promise<ForecastReport> {
     alerts.push(`Runway alert: Only ${runway} days of cash remaining at current burn rate`);
   }
 
+  if (cashSource === "estimated") {
+    alerts.push(
+      "Cash position is estimated from recent revenue data. Connect a bank account via Plaid for exact figures.",
+    );
+  }
+
   const report: ForecastReport = {
     currentBalance,
+    cashSource,
     projections: {
       "30d": proj30,
       "60d": proj60,

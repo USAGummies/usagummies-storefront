@@ -166,6 +166,35 @@ const INTERNAL_AGENTS: Record<string, Record<string, () => Promise<InternalAgent
       };
     },
   },
+  "revenue-intel": {
+    R13: async () => {
+      return async () => {
+        const baseUrl = process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : process.env.NEXTAUTH_URL || "https://www.usagummies.com";
+        const cronSecret = process.env.CRON_SECRET;
+        const res = await fetch(`${baseUrl}/api/ops/abra/collect-kpis`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(cronSecret ? { Authorization: `Bearer ${cronSecret}` } : {}),
+          },
+          signal: AbortSignal.timeout(55_000),
+        });
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          throw new Error(`KPI collection failed: ${res.status} ${text.slice(0, 200)}`);
+        }
+        const data = (await res.json()) as { collected?: number; recorded?: number; collectionErrors?: string[] };
+        const errNote = data.collectionErrors?.length
+          ? ` (${data.collectionErrors.length} collection warnings)`
+          : "";
+        return {
+          summary: `Daily KPI Collector: ${data.collected ?? 0} metrics collected, ${data.recorded ?? 0} recorded${errNote}`,
+        };
+      };
+    },
+  },
   finops: {
     F9: async () => {
       const mod = await import("@/lib/ops/abra-financial-statements");

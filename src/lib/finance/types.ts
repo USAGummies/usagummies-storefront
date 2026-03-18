@@ -132,6 +132,7 @@ export type CashFlowProjection = {
 
 export type ForecastReport = {
   currentBalance: number;
+  cashSource: "plaid" | "estimated" | "none";
   projections: {
     "30d": CashFlowProjection[];
     "60d": CashFlowProjection[];

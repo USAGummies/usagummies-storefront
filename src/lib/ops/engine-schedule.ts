@@ -137,6 +137,7 @@ export const ENGINE_REGISTRY: EngineConfig[] = [
       { key: "R10", name: "Alert & Anomaly Detector", schedule: "Daily 21:35" },
       { key: "R11", name: "Executive Briefing Generator", schedule: "Weekly Sun 22:30" },
       { key: "R12", name: "Self-Heal Monitor", schedule: "Every 30 min" },
+      { key: "R13", name: "Daily KPI Collector", schedule: "Daily 22:00" },
     ],
   },
   {
