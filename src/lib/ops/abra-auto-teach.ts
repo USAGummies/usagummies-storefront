@@ -510,8 +510,7 @@ export async function runShopifyOrdersFeed(): Promise<FeedResult> {
 }
 
 /**
- * Placeholder feed handler — Amazon orders trend ingest.
- * TODO: Replace env-sample ingestion with SP-API integration.
+ * Amazon orders feed — ingests live order activity from SP-API.
  */
 export async function handleAmazonOrdersFeed(): Promise<FeedResult> {
   const feedKey = "amazon_orders";
@@ -774,8 +773,7 @@ export async function handleAmazonInventoryFeed(): Promise<FeedResult> {
 }
 
 /**
- * Placeholder feed handler — Faire wholesale orders ingest.
- * TODO: Replace env-sample ingestion with Faire API integration.
+ * Faire wholesale orders feed.
  */
 export async function handleFaireOrdersFeed(): Promise<FeedResult> {
   const feedKey = "faire_orders";
@@ -826,8 +824,7 @@ export async function handleFaireOrdersFeed(): Promise<FeedResult> {
 }
 
 /**
- * Placeholder feed handler — Shopify catalog sync.
- * TODO: Replace env-sample ingestion with Admin API product sync.
+ * Shopify catalog feed.
  */
 export async function handleShopifyProductsFeed(): Promise<FeedResult> {
   const feedKey = "shopify_products";
@@ -925,8 +922,7 @@ export async function handleShopifyProductsFeed(): Promise<FeedResult> {
 }
 
 /**
- * Placeholder feed handler — GA4 traffic trend sync.
- * TODO: Replace env-sample ingestion with GA4 Reporting API call.
+ * GA4 traffic trend feed.
  */
 export async function handleGA4TrafficFeed(): Promise<FeedResult> {
   const feedKey = "ga4_traffic";
@@ -1036,8 +1032,7 @@ export async function handleEmailFetchFeed(): Promise<FeedResult> {
 }
 
 /**
- * Placeholder feed handler — inventory alerts and operational signal emit.
- * TODO: Replace env-sample ingestion with live inventory feed.
+ * Inventory alert feed backed by the live Shopify inventory sync.
  */
 export async function handleInventoryAlertsFeed(): Promise<FeedResult> {
   return handleShopifyInventoryFeed();
@@ -1427,7 +1422,23 @@ export async function runFeed(feedKey: string): Promise<FeedResult> {
     };
   }
 
-  const result = await handler();
+  let result: FeedResult;
+  try {
+    result = await handler();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown feed error";
+    console.error(`[auto-teach] ${feedKey} threw unexpectedly: ${message}`);
+    result = {
+      feed_key: feedKey,
+      success: false,
+      entriesCreated: 0,
+      error: message,
+    };
+  }
+
+  console.log(
+    `[auto-teach] ${feedKey}: ${result.success ? "OK" : "FAILED"} (${result.entriesCreated} entries${result.error ? `, ${result.error}` : ""})`,
+  );
   const state = await getFeedState(feedKey);
   const shouldCountFailure = !result.success && !isNotConfiguredMessage(result.error);
   const consecutiveFailures = shouldCountFailure
@@ -1485,7 +1496,19 @@ export async function runAllDueFeeds(): Promise<FeedResult[]> {
 
   const results: FeedResult[] = [];
   for (const feed of dueFeeds) {
-    const result = await runFeed(feed.feed_key);
+    let result: FeedResult;
+    try {
+      result = await runFeed(feed.feed_key);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown feed error";
+      console.error(`[auto-teach] Fatal runner error for ${feed.feed_key}: ${message}`);
+      result = {
+        feed_key: feed.feed_key,
+        success: false,
+        entriesCreated: 0,
+        error: message,
+      };
+    }
     results.push(result);
     console.log(
       `[auto-teach] ${feed.feed_key}: ${result.success ? "OK" : "FAILED"} (${result.entriesCreated} entries)`,
