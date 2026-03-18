@@ -74,7 +74,15 @@ async function runInternalAgent(fn: InternalAgentFn): Promise<AgentResult> {
 const INTERNAL_AGENTS: Record<string, Record<string, () => Promise<InternalAgentFn>>> = {
   "abra-sync": {
     ABRA10: async () => {
+      const { expireStaleApprovals } = await import("@/lib/ops/abra-actions");
       return async () => {
+        // Expire stale approvals before generating the brief
+        let expired = 0;
+        try {
+          expired = await expireStaleApprovals(24);
+        } catch {
+          // non-fatal
+        }
         // Call the morning brief API endpoint internally
         const baseUrl = process.env.VERCEL_URL
           ? `https://${process.env.VERCEL_URL}`
@@ -93,7 +101,7 @@ const INTERNAL_AGENTS: Record<string, Record<string, () => Promise<InternalAgent
           const text = await res.text().catch(() => "");
           throw new Error(`Morning brief failed: ${res.status} ${text.slice(0, 200)}`);
         }
-        return { summary: "Morning brief posted to Slack" };
+        return { summary: `Morning brief posted to Slack. ${expired > 0 ? `${expired} stale approvals expired.` : ""}` };
       };
     },
     ABRA12: async () => {

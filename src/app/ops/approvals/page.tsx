@@ -17,8 +17,15 @@ type Approval = {
 };
 
 type StatusTab = "pending" | "approved" | "rejected" | "all";
+type TierFilter = "all" | 1 | 2 | 3;
 
 const TABS: StatusTab[] = ["pending", "approved", "rejected", "all"];
+const TIER_FILTERS: { label: string; value: TierFilter }[] = [
+  { label: "All Tiers", value: "all" },
+  { label: "Tier 1", value: 1 },
+  { label: "Tier 2", value: 2 },
+  { label: "Tier 3", value: 3 },
+];
 
 function riskClass(risk: Approval["risk_level"]) {
   switch (risk) {
@@ -46,12 +53,15 @@ function formatPayload(payload: unknown): string {
 
 export default function ApprovalsPage() {
   const [tab, setTab] = useState<StatusTab>("pending");
+  const [tierFilter, setTierFilter] = useState<TierFilter>("all");
   const [approvals, setApprovals] = useState<Approval[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [commentById, setCommentById] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   async function loadApprovals(nextTab: StatusTab) {
     setLoading(true);
@@ -69,6 +79,7 @@ export default function ApprovalsPage() {
       }
 
       setApprovals(Array.isArray(data?.approvals) ? data.approvals : []);
+      setSelected(new Set());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load approvals");
       setApprovals([]);
@@ -112,10 +123,61 @@ export default function ApprovalsPage() {
     }
   }
 
+  async function bulkDecide(decision: "approved" | "rejected") {
+    if (selected.size === 0) return;
+    setBulkBusy(true);
+    setError(null);
+    let failCount = 0;
+
+    for (const id of selected) {
+      try {
+        const res = await fetch("/api/ops/abra/approvals", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, decision, comment: "Bulk action from dashboard" }),
+        });
+        if (!res.ok) failCount++;
+      } catch {
+        failCount++;
+      }
+    }
+
+    if (failCount > 0) {
+      setError(`${failCount} of ${selected.size} bulk actions failed`);
+    }
+    setSelected(new Set());
+    await loadApprovals(tab);
+    setBulkBusy(false);
+  }
+
+  // Filter by tier
+  const filtered = useMemo(() => {
+    if (tierFilter === "all") return approvals;
+    return approvals.filter((a) => a.permission_tier === tierFilter);
+  }, [approvals, tierFilter]);
+
   const pendingCount = useMemo(
-    () => approvals.filter((approval) => approval.status === "pending").length,
-    [approvals],
+    () => filtered.filter((a) => a.status === "pending").length,
+    [filtered],
   );
+
+  const pendingFiltered = useMemo(
+    () => filtered.filter((a) => a.status === "pending"),
+    [filtered],
+  );
+
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function selectAllPending() {
+    setSelected(new Set(pendingFiltered.map((a) => a.id)));
+  }
 
   return (
     <div className="space-y-4">
@@ -126,6 +188,7 @@ export default function ApprovalsPage() {
         </p>
       </div>
 
+      {/* Status tabs */}
       <div className="flex flex-wrap gap-2">
         {TABS.map((statusTab) => (
           <button
@@ -143,6 +206,66 @@ export default function ApprovalsPage() {
         ))}
       </div>
 
+      {/* Tier filter */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tier:</span>
+        {TIER_FILTERS.map((tf) => (
+          <button
+            key={String(tf.value)}
+            type="button"
+            onClick={() => setTierFilter(tf.value)}
+            className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
+              tierFilter === tf.value
+                ? "border-indigo-600 bg-indigo-600 text-white"
+                : "border-slate-300 bg-white text-slate-600"
+            }`}
+          >
+            {tf.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Bulk actions */}
+      {tab === "pending" && pendingFiltered.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2">
+          <button
+            type="button"
+            onClick={selectAllPending}
+            className="rounded border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700"
+          >
+            Select All ({pendingFiltered.length})
+          </button>
+          {selected.size > 0 && (
+            <>
+              <span className="text-xs text-slate-500">{selected.size} selected</span>
+              <button
+                type="button"
+                disabled={bulkBusy}
+                onClick={() => void bulkDecide("approved")}
+                className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white disabled:opacity-60"
+              >
+                {bulkBusy ? "Processing..." : "Bulk Approve"}
+              </button>
+              <button
+                type="button"
+                disabled={bulkBusy}
+                onClick={() => void bulkDecide("rejected")}
+                className="rounded-lg bg-rose-600 px-3 py-1 text-xs font-semibold text-white disabled:opacity-60"
+              >
+                Bulk Reject
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelected(new Set())}
+                className="text-xs text-slate-500 underline"
+              >
+                Clear
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
       {error ? (
         <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
           {error}
@@ -152,42 +275,62 @@ export default function ApprovalsPage() {
       <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
         {loading
           ? "Loading approvals..."
-          : `Showing ${approvals.length} approval(s)${tab === "pending" ? ` (${pendingCount} pending)` : ""}`}
+          : `Showing ${filtered.length} approval(s)${tierFilter !== "all" ? ` (tier ${tierFilter})` : ""}${tab === "pending" ? ` — ${pendingCount} pending` : ""}`}
       </div>
 
-      {!loading && approvals.length === 0 ? (
+      {!loading && filtered.length === 0 ? (
         <div className="rounded-xl border border-slate-200 bg-white px-4 py-6 text-center text-slate-600">
-          No pending approvals 🎉
+          {tierFilter !== "all"
+            ? `No tier ${tierFilter} approvals in this view`
+            : "No pending approvals"}
         </div>
       ) : null}
 
       <div className="grid gap-3">
-        {approvals.map((approval) => {
+        {filtered.map((approval) => {
           const expanded = expandedId === approval.id;
           const busy = busyId === approval.id;
           const isPending = approval.status === "pending";
+          const isSelected = selected.has(approval.id);
 
           return (
-            <article key={approval.id} className="rounded-xl border border-slate-200 bg-white p-4">
+            <article
+              key={approval.id}
+              className={`rounded-xl border p-4 ${
+                isSelected
+                  ? "border-indigo-400 bg-indigo-50"
+                  : "border-slate-200 bg-white"
+              }`}
+            >
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="space-y-2">
-                  <div className="text-sm font-semibold text-slate-900">{approval.summary}</div>
-                  <div className="flex flex-wrap gap-2">
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
-                      agent {approval.requesting_agent_id || "unknown"}
-                    </span>
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${riskClass(approval.risk_level)}`}>
-                      risk {approval.risk_level || "unknown"}
-                    </span>
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
-                      tier {approval.permission_tier ?? "n/a"}
-                    </span>
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
-                      {approval.action_type}
-                    </span>
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
-                      {approval.status}
-                    </span>
+                <div className="flex items-start gap-3">
+                  {isPending && (
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleSelect(approval.id)}
+                      className="mt-1 h-4 w-4 rounded border-slate-300"
+                    />
+                  )}
+                  <div className="space-y-2">
+                    <div className="text-sm font-semibold text-slate-900">{approval.summary}</div>
+                    <div className="flex flex-wrap gap-2">
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
+                        agent {approval.requesting_agent_id || "unknown"}
+                      </span>
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${riskClass(approval.risk_level)}`}>
+                        risk {approval.risk_level || "unknown"}
+                      </span>
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
+                        tier {approval.permission_tier ?? "n/a"}
+                      </span>
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
+                        {approval.action_type}
+                      </span>
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
+                        {approval.status}
+                      </span>
+                    </div>
                   </div>
                 </div>
                 <div className="text-right text-xs text-slate-500">
