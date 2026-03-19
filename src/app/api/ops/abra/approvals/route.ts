@@ -151,7 +151,7 @@ export async function PATCH(req: Request) {
       decided_by_user_id: deciderUserId,
     };
 
-    const actionPayload = existingRow.action_payload || existingRow.proposed_payload;
+    const actionPayload = existingRow.proposed_payload;
     if (mappedDecision === "approved" && actionPayload) {
       updatePayload.resolved_payload = actionPayload;
     }

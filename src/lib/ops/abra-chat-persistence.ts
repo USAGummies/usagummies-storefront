@@ -98,12 +98,10 @@ export function queueChatHistory(params: {
         console.error("[abra/chat] KV dedupe write failed — summary count not persisted", err);
       }
     } catch (err) {
-      console.error("[abra/chat] Conversation summarization failed", err);
-      void notifyAlert(
-        `Abra memory write failure (conversation summarization): ${err instanceof Error ? err.message : String(err)}`,
-      ).catch((notifyErr) =>
-        console.error("[abra/chat] Failed to send summarization failure alert", notifyErr),
-      );
+      // Summarization failures are non-critical — log but don't Slack-alert.
+      // These happen when Claude returns malformed JSON or the LLM is overloaded.
+      // The conversation is still saved; only the summary is lost.
+      console.error("[abra/chat] Conversation summarization failed (non-critical):", err instanceof Error ? err.message : String(err));
     }
 
     void learnDecisionPatterns().catch((err) =>

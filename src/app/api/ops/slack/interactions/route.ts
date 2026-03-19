@@ -102,7 +102,7 @@ async function processApprovalAction(
   actor: string,
 ): Promise<{ ok: boolean; resultMsg?: string }> {
   const existing = (await sbFetch(
-    `/rest/v1/approvals?id=eq.${approvalId}&select=id,status,action_payload,proposed_payload&limit=1`,
+    `/rest/v1/approvals?id=eq.${approvalId}&select=id,status,proposed_payload&limit=1`,
   )) as Array<Record<string, unknown>>;
   if (!existing[0]) return { ok: false, resultMsg: "Approval not found" };
 

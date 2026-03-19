@@ -34,7 +34,7 @@ export type SystemHealth = {
   last_checked: string;
 };
 
-const INTEGRATION_ALERT_TTL_SECONDS = 30 * 60;
+const INTEGRATION_ALERT_TTL_SECONDS = 4 * 60 * 60; // 4 hours — prevent alert spam for persistent issues
 
 function slugifyKey(value: string): string {
   return value
@@ -49,10 +49,10 @@ function integrationAlertKey(systemName: string): string {
 }
 
 function integrationAlertFingerprint(integration: IntegrationStatus): string {
-  return JSON.stringify({
-    status: integration.connection_status,
-    error: (integration.error_summary || "unknown error").slice(0, 200),
-  });
+  // Use only system name + status for fingerprint stability.
+  // Previously included error_summary which changed across checks (different
+  // timeout durations, timestamps) causing the dedup to miss.
+  return `${slugifyKey(integration.system_name)}:${integration.connection_status}`;
 }
 
 function getSupabaseEnv() {
@@ -226,7 +226,9 @@ export async function checkAndAlertHealth(): Promise<void> {
       const previousFingerprint = await kv.get<string>(dedupKey);
       if (previousFingerprint === fingerprint) continue;
     } catch {
-      // KV unavailable — fail open and still send the alert.
+      // KV unavailable — fail CLOSED (skip alert) to prevent spam.
+      // Missing one alert is better than spamming every 5 minutes.
+      continue;
     }
 
     await notify({
@@ -237,7 +239,7 @@ export async function checkAndAlertHealth(): Promise<void> {
     try {
       await kv.set(dedupKey, fingerprint, { ex: INTEGRATION_ALERT_TTL_SECONDS });
     } catch {
-      // best-effort
+      // best-effort — if KV set fails, next check will also fail-closed, preventing spam
     }
   }
 
