@@ -789,8 +789,17 @@ async function callAbraChatViaInternalApi(
           : null;
 
     return { reply, sources, answerLogId };
-  } catch {
-    return null;
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    console.error("[abra-slack-responder] Chat API exception:", errMsg);
+    // Return a graceful error reply instead of null (which causes upstream failures)
+    return {
+      reply: errMsg.includes("abort") || errMsg.includes("timeout")
+        ? "I'm taking longer than expected to process that. Give me a moment and try again — if the message was large, try breaking it into smaller pieces."
+        : `I ran into a problem (${errMsg.slice(0, 100)}). Could you try again?`,
+      sources: [],
+      answerLogId: null,
+    };
   }
 }
 

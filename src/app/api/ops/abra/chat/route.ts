@@ -66,6 +66,8 @@ import {
   needsDealCalculatorSkill,
   isCompetitorQuestion,
 } from "@/lib/ops/abra-intent";
+import { getCapabilityContext, markSuccess as capMarkSuccess, markFailure as capMarkFailure } from "@/lib/ops/capability-registry";
+import { getFinanceTruthContext } from "@/lib/ops/finance-truth";
 import {
   isSupabaseRelatedError,
   fetchActiveInitiatives,
@@ -373,6 +375,7 @@ MARGIN & COST CLAIM VERIFICATION (applies when user asserts financial metrics):
   }
 
   if (!res.ok) {
+    void capMarkFailure("anthropic", `HTTP ${res.status}: ${text.slice(0, 100)}`).catch(() => {});
     throw new Error(
       `Claude API failed (${res.status}): ${text.slice(0, 300)}`,
     );
@@ -1451,7 +1454,7 @@ export async function POST(req: Request) {
 
     // Fetch corrections + departments + initiatives + cost + team + signals + live data (parallel)
     // When Supabase circuit is open, skip Supabase-dependent fetches to avoid 15s timeouts
-    const [corrections, departments, activeInitiatives, costSummary, teamMembers, vendors, signals, liveSnapshot, financialContext, ledgerCtx] =
+    const [corrections, departments, activeInitiatives, costSummary, teamMembers, vendors, signals, liveSnapshot, financialContext, ledgerCtx, financeTruth, capabilityStatus] =
       await Promise.all([
         supabaseCircuitOpen ? Promise.resolve([] as Awaited<ReturnType<typeof fetchCorrections>>) : fetchCorrections(),
         supabaseCircuitOpen ? Promise.resolve([] as Awaited<ReturnType<typeof fetchDepartments>>) : fetchDepartments(),
@@ -1469,6 +1472,15 @@ export async function POST(req: Request) {
               return null;
             })
           : Promise.resolve(null),
+        // Finance truth layer — verified figures, source hierarchy, COGS truth
+        isFinanceQuestion(message)
+          ? getFinanceTruthContext().catch((err) => {
+              console.error("[abra] Finance truth layer fetch failed:", err instanceof Error ? err.message : err);
+              return null as string | null;
+            })
+          : Promise.resolve(null as string | null),
+        // Capability registry — real-time integration health for context
+        getCapabilityContext().catch(() => null as string | null),
       ]);
     const competitorContext =
       isCompetitorQuestion(message) || messageDepartment === "sales_and_growth"
@@ -1496,7 +1508,13 @@ export async function POST(req: Request) {
     if (!liveSnapshot) dataStatus.push("⚠️ Live Shopify/email snapshot: UNAVAILABLE (API timeout or not configured)");
     else if (!liveSnapshot.includes("LIVE INBOX")) dataStatus.push("⚠️ Email inbox feed: UNAVAILABLE (Gmail not configured or auth failed). You CANNOT see or check emails. If asked about emails, tell the user you don't have email access right now and ask them to paste the relevant content.");
     if (!financialContext) dataStatus.push("⚠️ Financial KPI data: UNAVAILABLE (no KPI timeseries data returned)");
+    // Inject capability health so Claude knows what's up/down right now
+    if (capabilityStatus) dataStatus.push(`\n[INTEGRATION HEALTH: ${capabilityStatus}]`);
     const dataStatusLine = dataStatus.length > 0 ? `\n[DATA FEED STATUS: ${dataStatus.join("; ")}. Do NOT invent numbers for unavailable feeds. If brain search failed, tell the user your memory is temporarily unavailable.]` : "";
+    // Combine finance truth layer with existing financial context for finance questions
+    const enrichedFinancialContext = isFinanceConversation && financeTruth
+      ? [financialContext, financeTruth].filter(Boolean).join("\n\n")
+      : financialContext;
     const augmentedLiveSnapshot = [liveSnapshot, temporalHint, dataStatusLine].filter(Boolean).join("\n") || null;
 
     // Check deadline before expensive LLM call
@@ -1512,7 +1530,7 @@ export async function POST(req: Request) {
       departments,
       activeInitiatives,
       costSummary,
-      financialContext,
+      financialContext: enrichedFinancialContext,
       ledgerContext: ledgerCtx,
       competitorContext,
       teamContext,
@@ -1523,6 +1541,8 @@ export async function POST(req: Request) {
       deadlineSignal: deadlineController.signal,
       isFinanceRelated: isFinanceQuestion(message),
     });
+    // Track Anthropic API success in capability registry
+    void capMarkSuccess("anthropic").catch(() => {});
     const actionNotices: string[] = [];
     let baseReply = claudeResult.reply;
     if (!claudeResult.earlyExit) {
@@ -1542,7 +1562,7 @@ export async function POST(req: Request) {
           departments,
           activeInitiatives,
           costSummary,
-          financialContext,
+          financialContext: enrichedFinancialContext,
           ledgerContext: ledgerCtx,
           competitorContext,
           teamContext,

@@ -5,6 +5,7 @@ import { createNotionPage, updateNotionPage, queryLedgerSummary } from "@/lib/op
 import { DB } from "@/lib/notion/client";
 import { generateEmbedding } from "@/lib/ops/abra-embeddings";
 import { emitEvent, type AbraEventType } from "@/lib/ops/abra-event-bus";
+import { markSuccess as capMarkSuccess, markFailure as capMarkFailure } from "@/lib/ops/capability-registry";
 import { adminRequest } from "@/lib/shopify/admin";
 import {
   adjustInventory,
@@ -17,6 +18,14 @@ import {
   type ReconciliationPeriod,
 } from "@/lib/ops/revenue-reconciliation";
 import { runMonthlyClose } from "@/lib/finance/monthly-close";
+import {
+  canDirectExec as policyCanDirectExec,
+  canAutoExec as policyCanAutoExec,
+  requiresApproval as policyRequiresApproval,
+  getApprovalOwner,
+  clampRiskLevel,
+  type RiskLevel,
+} from "@/lib/ops/abra-policy";
 
 /** Map friendly database keys → Notion database IDs for create_notion_page action */
 const NOTION_DB_MAP: Record<string, string> = {
@@ -255,10 +264,12 @@ async function sbFetch(path: string, init: RequestInit = {}): Promise<unknown> {
   }
 
   if (!res.ok) {
+    void capMarkFailure("supabase", `${init.method || "GET"} ${path}: HTTP ${res.status}`).catch(() => {});
     throw new Error(
       `Supabase ${init.method || "GET"} ${path} failed (${res.status}): ${((typeof json === "string" ? json : JSON.stringify(json)) || "").slice(0, 500)}`,
     );
   }
+  void capMarkSuccess("supabase").catch(() => {});
   return json;
 }
 
@@ -391,8 +402,14 @@ async function handleSendEmail(
     body = `${body.trimEnd()}\n\n—\nAbra — via Benjamin\nUSA Gummies`;
   }
 
-  await sendOpsEmail({ to, subject, body, from: "Abra via Benjamin <ben@usagummies.com>" });
-  return { success: true, message: `Email sent to ${to}` };
+  try {
+    await sendOpsEmail({ to, subject, body, from: "Abra via Benjamin <ben@usagummies.com>" });
+    void capMarkSuccess("gmail").catch(() => {});
+    return { success: true, message: `Email sent to ${to}` };
+  } catch (err) {
+    void capMarkFailure("gmail", err instanceof Error ? err.message : "send failed").catch(() => {});
+    throw err;
+  }
 }
 
 type DraftOrderCreateResult = {
@@ -1067,23 +1084,30 @@ async function handleCreateNotionPage(
     return { success: false, message: `No Notion database found for key "${dbKey}". Available: ${Object.keys(NOTION_DB_MAP).join(", ")}` };
   }
 
-  const pageId = await createNotionPage({
-    parent_id: parentId,
-    title,
-    ...(content ? { content } : {}),
-    ...(properties ? { properties } : {}),
-  });
+  try {
+    const pageId = await createNotionPage({
+      parent_id: parentId,
+      title,
+      ...(content ? { content } : {}),
+      ...(properties ? { properties } : {}),
+    });
 
-  if (!pageId) {
-    return { success: false, message: "Failed to create Notion page" };
+    if (!pageId) {
+      void capMarkFailure("notion", "createNotionPage returned null").catch(() => {});
+      return { success: false, message: "Failed to create Notion page" };
+    }
+
+    void capMarkSuccess("notion").catch(() => {});
+    const url = notionUrlFromId(pageId);
+    return {
+      success: true,
+      message: `Created Notion page: [${title}](${url})`,
+      data: { page_id: pageId, url },
+    };
+  } catch (err) {
+    void capMarkFailure("notion", err instanceof Error ? err.message : "unknown").catch(() => {});
+    throw err;
   }
-
-  const url = notionUrlFromId(pageId);
-  return {
-    success: true,
-    message: `Created Notion page: [${title}](${url})`,
-    data: { page_id: pageId, url },
-  };
 }
 
 // ── Input validation helpers ────────────────────────────────────────────────
@@ -2169,6 +2193,7 @@ async function handleQueryQBO(params: Record<string, unknown>): Promise<ActionRe
         return { success: false, message: `Unknown query_type: ${queryType}. Use: accounts, categorization_rules, categorize, vendors, pnl, balance_sheet, purchases` };
     }
   } catch (err) {
+    void capMarkFailure("qbo", err instanceof Error ? err.message : "query failed").catch(() => {});
     return { success: false, message: `QBO query error: ${err instanceof Error ? err.message : String(err)}` };
   }
 }
@@ -2882,7 +2907,7 @@ function emitPostActionEvent(action: AbraAction, result: ActionResult): void {
 }
 
 /** Post pending approval to Slack with interactive buttons so Ben can approve from his phone */
-async function notifySlackPendingApproval(approvalId: string, action: AbraAction): Promise<void> {
+async function notifySlackPendingApproval(approvalId: string, action: AbraAction, owner?: string): Promise<void> {
   const botToken = process.env.SLACK_BOT_TOKEN;
   if (!botToken) return;
 
@@ -2891,8 +2916,11 @@ async function notifySlackPendingApproval(approvalId: string, action: AbraAction
     ? "\u{1F6A8}" : action.risk_level === "medium" ? "\u{26A0}\u{FE0F}" : "\u{1F4CB}";
   const tier = permissionTierForRisk(action.risk_level);
   const summary = (action.description || action.title || "").slice(0, 300);
+  const ownerTag = owner === "rene" ? " (assigned to Rene)"
+    : owner === "ben" ? " (assigned to Ben)"
+    : "";
   const previewLines: string[] = [
-    `${riskEmoji} *Abra Needs Approval* (Tier ${tier})`,
+    `${riskEmoji} *Abra Needs Approval* (Tier ${tier})${ownerTag}`,
     `*Action:* \`${action.action_type}\``,
     `*Risk:* ${action.risk_level}`,
     `*Summary:* ${summary}`,
@@ -3058,14 +3086,18 @@ export async function proposeAndMaybeExecute(action: AbraAction): Promise<{
   auto_executed: boolean;
   result?: ActionResult;
 }> {
-  // ── Fast path: internal actions skip approval table entirely ──
-  // Only send_email and send_slack (external-facing) need human approval.
-  if (DIRECT_EXEC_ACTIONS.has(action.action_type)) {
+  // Clamp risk level to policy floor (e.g., record_transaction can't be "low")
+  const clampedRisk = clampRiskLevel(action.action_type, action.risk_level as RiskLevel);
+  if (clampedRisk !== action.risk_level) {
+    action = { ...action, risk_level: clampedRisk };
+  }
+
+  // ── Tier 1: Direct exec (read-only) — no approval row, no audit log ──
+  if (policyCanDirectExec(action.action_type)) {
     const handler = ACTION_HANDLERS[action.action_type];
     if (handler) {
       try {
         const result = await handler(action.params || {});
-        // Fire event bus for cross-department cascades
         if (result.success) {
           void emitPostActionEvent(action, result);
         }
@@ -3080,18 +3112,41 @@ export async function proposeAndMaybeExecute(action: AbraAction): Promise<{
     }
   }
 
-  // ── Normal path: create approval row ──
+  // ── Tier 2: Auto-exec with audit — execute immediately, log to decision_log ──
+  if (policyCanAutoExec(action.action_type, action.risk_level as RiskLevel)) {
+    // Also check against the legacy DIRECT_EXEC_ACTIONS set for backward compat
+    const handler = ACTION_HANDLERS[action.action_type];
+    if (handler && !policyRequiresApproval(action.action_type, action.risk_level as RiskLevel, extractAmount(action.params))) {
+      try {
+        const result = await handler(action.params || {});
+        if (result.success) {
+          void emitPostActionEvent(action, result);
+          void writeAutoExecBrainEntry(action, result);
+        }
+        return {
+          approval_id: `auto:${randomUUID()}`,
+          auto_executed: true,
+          result,
+        };
+      } catch {
+        // Fall through to approval flow on error
+      }
+    }
+  }
+
+  // ── Tier 3: Approval required — create approval row, notify owner ──
   const status = await proposeAction(action);
   const approvalId = parseApprovalId(status);
   if (!approvalId) {
     throw new Error("Failed to derive approval id");
   }
 
-  // ── Check auto-execute eligibility ──
+  // Check auto-execute eligibility (legacy path — respects daily limits & global flag)
   const eligible = await canAutoExecute(action);
   if (!eligible) {
-    // Not auto-executable → notify Slack so Ben can approve from phone
-    await notifySlackPendingApproval(approvalId, action);
+    // Not auto-executable → notify the right owner via Slack
+    const owner = getApprovalOwner(action.action_type, action.risk_level as RiskLevel);
+    await notifySlackPendingApproval(approvalId, action, owner);
     return { approval_id: approvalId, auto_executed: false };
   }
 
@@ -3107,6 +3162,17 @@ export async function proposeAndMaybeExecute(action: AbraAction): Promise<{
     auto_executed: autoExecuted,
     ...(result ? { result } : {}),
   };
+}
+
+/** Extract a numeric amount from action params for policy cap checks */
+function extractAmount(params: Record<string, unknown>): number | undefined {
+  const raw = params.amount ?? params.total_cost ?? params.adjustment;
+  if (typeof raw === "number") return raw;
+  if (typeof raw === "string") {
+    const n = parseFloat(raw.replace(/[$,]/g, ""));
+    return Number.isFinite(n) ? n : undefined;
+  }
+  return undefined;
 }
 
 /**

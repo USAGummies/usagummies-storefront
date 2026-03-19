@@ -12,6 +12,7 @@
 
 import { kv } from "@vercel/kv";
 import { createHash } from "node:crypto";
+import { markSuccess as capMarkSuccess, markFailure as capMarkFailure } from "@/lib/ops/capability-registry";
 import {
   type AbraCorrection,
   type AbraDepartment,
@@ -272,6 +273,7 @@ export async function fetchLiveBusinessSnapshot(): Promise<string | null> {
         signal: AbortSignal.timeout(8000),
       });
       if (res.ok) {
+        void capMarkSuccess("shopify_admin").catch(() => {});
         const data = await res.json();
         const orders = Array.isArray(data.orders) ? data.orders as Array<{ name?: string; total_price?: string; created_at?: string; financial_status?: string; fulfillment_status?: string | null; customer?: { first_name?: string; last_name?: string }; line_items?: Array<{ title?: string; quantity?: number }> }> : [];
         if (orders.length > 0) {
@@ -289,9 +291,13 @@ export async function fetchLiveBusinessSnapshot(): Promise<string | null> {
         } else {
           lines.push(`LIVE SHOPIFY (last 24h): No orders.`);
         }
+      } else {
+        void capMarkFailure("shopify_admin", `HTTP ${res.status}`).catch(() => {});
       }
     }
-  } catch { /* non-fatal */ }
+  } catch (err) {
+    void capMarkFailure("shopify_admin", err instanceof Error ? err.message : "unknown").catch(() => {});
+  }
 
   // 2. Recent emails (last 5 inbox subjects) — lightweight metadata only
   try {
@@ -302,6 +308,7 @@ export async function fetchLiveBusinessSnapshot(): Promise<string | null> {
       // Dynamic import to avoid loading googleapis on every request
       const { listEmails } = await import("@/lib/ops/gmail-reader");
       const envelopes = await listEmails({ count: 5, folder: "INBOX" });
+      void capMarkSuccess("gmail").catch(() => {});
       if (envelopes.length > 0) {
         lines.push(`LIVE INBOX (${envelopes.length} recent — use read_email action for full content):`);
         for (const e of envelopes.slice(0, 5)) {
@@ -311,7 +318,9 @@ export async function fetchLiveBusinessSnapshot(): Promise<string | null> {
         }
       }
     }
-  } catch { /* non-fatal */ }
+  } catch (err) {
+    void capMarkFailure("gmail", err instanceof Error ? err.message : "unknown").catch(() => {});
+  }
 
   return lines.length > 0 ? lines.join("\n") : null;
 }
