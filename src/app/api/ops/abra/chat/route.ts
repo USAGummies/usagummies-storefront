@@ -188,7 +188,7 @@ const STRATEGY_TRIGGERS =
 const DIAGNOSTICS_TRIGGERS =
   /\b(diagnos|self.?check|what'?s broken|are you (working|ok|healthy)|system health|feed status|check yourself|run diagnostics)\b/i;
 const FINANCE_TRIGGERS =
-  /\b(chart of accounts|account balances?|qbo|quickbooks|bank balance|checking balance|credit card balance|p&l|profit.?(?:and|&).?loss|balance sheet|cash position|how much (?:do we have|is in|money)|financial (?:summary|snapshot|report|data)|account(?:s|ing) (?:summary|breakdown)|categoriz|investor loan|rene.?(?:s|'s|'s)? (?:money|loan|transfer|investment))\b/i;
+  /\b(chart of accounts|account balances?|qbo|quickbooks|bank balance|checking balance|credit card balance|p&l|profit.?(?:and|&).?loss|balance sheet|cash position|how much (?:do we have|is in|money)|financial (?:summary|snapshot|report|data)|account(?:s|ing) (?:summary|breakdown)|categoriz|investor loan|rene.?(?:s|'s|'s)? (?:money|loan|transfer|investment)|vendor(?:s| list)?|supplier(?:s)?|co.?pack|cogs|cost of goods|gross margin|expense(?:s| breakdown)|where .* money .* go|spending|purchases?|what (?:are|do) we (?:spend|pay)|who do we (?:pay|buy from))\b/i;
 
 type DetectedIntent =
   | { type: "initiative"; department: string | null; goal: string }
@@ -1580,13 +1580,75 @@ export async function POST(req: Request) {
         // Non-critical
       }
 
+      // Pull additional QBO data based on what the user is asking about
+      const qboBase = process.env.NEXT_PUBLIC_BASE_URL || "https://www.usagummies.com";
+      const wantsVendors = /vendor|supplier|co.?pack|who .* (pay|buy)|powers|albanese/i.test(message);
+      const wantsPnl = /p&l|profit.*loss|income.*statement|revenue.*expense|margin|cogs|cost of goods/i.test(message);
+      const wantsPurchases = /purchase|expense|spend|where .* money|what .* pay/i.test(message);
+      const wantsBalanceSheet = /balance sheet|assets|liabilities|equity|net worth/i.test(message);
+
+      const extraFetches = await Promise.allSettled([
+        wantsVendors
+          ? fetch(`${qboBase}/api/ops/qbo/query?type=vendors`, { signal: AbortSignal.timeout(8_000) }).then(r => r.ok ? r.json() : null)
+          : Promise.resolve(null),
+        wantsPnl
+          ? fetch(`${qboBase}/api/ops/qbo/query?type=pnl`, { signal: AbortSignal.timeout(8_000) }).then(r => r.ok ? r.json() : null)
+          : Promise.resolve(null),
+        wantsPurchases
+          ? fetch(`${qboBase}/api/ops/qbo/query?type=purchases&limit=25`, { signal: AbortSignal.timeout(8_000) }).then(r => r.ok ? r.json() : null)
+          : Promise.resolve(null),
+        wantsBalanceSheet
+          ? fetch(`${qboBase}/api/ops/qbo/query?type=balance_sheet`, { signal: AbortSignal.timeout(8_000) }).then(r => r.ok ? r.json() : null)
+          : Promise.resolve(null),
+      ]);
+
+      const vendorData = extraFetches[0].status === "fulfilled" ? extraFetches[0].value as Record<string, unknown> | null : null;
+      const pnlData = extraFetches[1].status === "fulfilled" ? extraFetches[1].value as Record<string, unknown> | null : null;
+      const purchaseData = extraFetches[2].status === "fulfilled" ? extraFetches[2].value as Record<string, unknown> | null : null;
+      const bsData = extraFetches[3].status === "fulfilled" ? extraFetches[3].value as Record<string, unknown> | null : null;
+
+      if (vendorData && Array.isArray((vendorData as { vendors?: unknown[] }).vendors)) {
+        const vendors = (vendorData as { vendors: Array<{ Name: string; Balance: number; Active: boolean; Email: string | null }> }).vendors.filter(v => v.Active);
+        if (vendors.length > 0) {
+          financeData += `\n\n**QBO Vendors (${vendors.length} active):**\n${vendors.map(v => `  • ${v.Name}${v.Email ? ` (${v.Email})` : ""}${v.Balance ? ` — balance: $${v.Balance.toFixed(2)}` : ""}`).join("\n")}`;
+        } else {
+          financeData += `\n\n**Vendors:** No vendor records found in QBO yet. Key vendors for USA Gummies include Powers Confections (co-packer), Albanese (ingredients), NinjaPrintHouse (packaging). These need to be set up in QuickBooks.`;
+        }
+      }
+
+      if (pnlData) {
+        const summary = (pnlData as { summary?: Record<string, unknown>; period?: { start: string; end: string } }).summary || {};
+        const period = (pnlData as { period?: { start: string; end: string } }).period;
+        const entries = Object.entries(summary).filter(([, v]) => v !== 0 && v !== "0.00");
+        if (entries.length > 0) {
+          financeData += `\n\n**P&L (${period?.start || "YTD"} to ${period?.end || "today"}):**\n${entries.map(([k, v]) => `  • ${k}: ${typeof v === "number" ? `$${v.toFixed(2)}` : v}`).join("\n")}`;
+        } else {
+          financeData += `\n\n**P&L:** No P&L data available. QBO transactions need to be categorized before a P&L can be generated. The bank feed may need syncing and reconciliation.`;
+        }
+      }
+
+      if (purchaseData && Array.isArray((purchaseData as { purchases?: unknown[] }).purchases)) {
+        const purchases = (purchaseData as { purchases: Array<{ Date: string; Amount: number; Vendor: string | null; Lines: Array<{ Description: string; Account: string }> }> }).purchases;
+        if (purchases.length > 0) {
+          financeData += `\n\n**Recent Purchases (${purchases.length}):**\n${purchases.slice(0, 15).map(p => `  • ${p.Date}: $${p.Amount.toFixed(2)} — ${p.Vendor || "Unknown"}${p.Lines?.[0]?.Account ? ` [${p.Lines[0].Account}]` : ""}`).join("\n")}`;
+        }
+      }
+
+      if (bsData) {
+        const summary = (bsData as { summary?: Record<string, unknown> }).summary || {};
+        const entries = Object.entries(summary).filter(([, v]) => v !== 0 && v !== "0.00");
+        if (entries.length > 0) {
+          financeData += `\n\n**Balance Sheet:**\n${entries.map(([k, v]) => `  • ${k}: ${typeof v === "number" ? `$${v.toFixed(2)}` : v}`).join("\n")}\n\nNote: Bank balances shown are QBO book balances, which may differ from actual bank balances.`;
+        }
+      }
+
       // LLM synthesis
       let financeReply = financeData;
       try {
         const anthropicKey = process.env.ANTHROPIC_API_KEY;
         if (anthropicKey) {
           const isCashQuestion = /\b(cash position|bank balance|checking balance|how much .*(in the bank|do we have|cash|money)|current balance|account balance|overdrawn|overdraft)\b/i.test(message);
-          const financePrompt = `You are Abra, the AI operations assistant for USA Gummies. The user asked a financial question. Here is QBO data:\n\n${financeData}${revenueContext}\n\nCRITICAL RULES:\n1. Any transfer from "Rene G. Gonzalez" or "Rene G Gonzalez Trust" is an INVESTOR LOAN (liability account ID 167), NEVER income. This is investor capital, not revenue.\n2. **MOST IMPORTANT RULE — READ THIS CAREFULLY:** The balances below are QBO BOOK BALANCES ONLY. QuickBooks book balances frequently diverge from actual bank balances when bank feed imports are behind, transactions are uncategorized, or reconciliation hasn't been done recently. ${isCashQuestion ? "The user is asking about cash/bank balances. You MUST lead your response with a prominent warning box like: '⚠️ **Important: These are QuickBooks book balances, not live bank balances.** QBO bank feeds may be behind — the actual bank balance could be significantly different. Please verify against your bank account directly before making any decisions based on these numbers.' Do NOT present QBO book balances as the actual cash position. Do NOT say 'the checking account is overdrawn' — say 'QBO books show X, but this may not reflect the actual bank balance.'" : "Label any balance figures as 'per QBO books' — never present them as definitive."}\n\nProvide a clear, helpful response to: "${message}"\n\nInclude specific account names, IDs, and balances where relevant. If the user asks about the Chart of Accounts, list the accounts organized by type. Keep it concise but complete. Format with markdown.`;
+          const financePrompt = `You are Abra, the AI operations assistant for USA Gummies (a CPG vitamin gummy company). The user asked a financial question. Here is QBO data:\n\n${financeData}${revenueContext}\n\nCRITICAL RULES:\n1. Any transfer from "Rene G. Gonzalez" or "Rene G Gonzalez Trust" is an INVESTOR LOAN (liability account ID 167), NEVER income. This is investor capital, not revenue.\n2. **MOST IMPORTANT RULE — READ THIS CAREFULLY:** The balances below are QBO BOOK BALANCES ONLY. QuickBooks book balances frequently diverge from actual bank balances when bank feed imports are behind, transactions are uncategorized, or reconciliation hasn't been done recently. ${isCashQuestion ? "The user is asking about cash/bank balances. You MUST lead your response with a prominent warning box like: '⚠️ **Important: These are QuickBooks book balances, not live bank balances.** QBO bank feeds may be behind — the actual bank balance could be significantly different. Please verify against your bank account directly before making any decisions based on these numbers.' Do NOT present QBO book balances as the actual cash position. Do NOT say 'the checking account is overdrawn' — say 'QBO books show X, but this may not reflect the actual bank balance.'" : "Label any balance figures as 'per QBO books' — never present them as definitive."}\n3. **WHEN DATA IS MISSING OR ALL ZEROS:** If the QBO data shows all $0.00 balances for categories like COGS, Expenses, or Income, do NOT present those zeros as fact. Instead explain honestly: "QBO doesn't have categorized data for this yet — the bank feed transactions haven't been fully imported and categorized. I'll flag this for Ben to get set up." Offer to note what needs to be configured.\n4. **KNOWN VENDORS (even if not in QBO yet):** Key USA Gummies vendors include Powers Confections (co-packer, Janesville WI), Albanese Confectionery (gummy base/ingredients), NinjaPrintHouse (packaging/labels), Pirate Ship (shipping), and various software (Shopify, Anthropic, Slack). If user asks about vendors and QBO has none, share this knowledge and note QBO vendor records need setup.\n5. **BE HONEST AND HELPFUL:** If you don't have the data to answer, say so clearly. Offer to flag it for configuration. Never make up numbers. Never present incomplete data as complete.\n\nProvide a clear, helpful response to: "${message}"\n\nInclude specific account names, IDs, and balances where relevant. If the user asks about the Chart of Accounts, list the accounts organized by type. Keep it concise but complete. Format with markdown.`;
           const llmRes = await fetch(
             "https://api.anthropic.com/v1/messages",
             {
@@ -1598,11 +1660,11 @@ export async function POST(req: Request) {
               },
               body: JSON.stringify({
                 model: "claude-sonnet-4-6",
-                max_tokens: 800,
+                max_tokens: 1200,
                 temperature: 0.2,
                 messages: [{ role: "user", content: financePrompt }],
               }),
-              signal: AbortSignal.timeout(15_000),
+              signal: AbortSignal.timeout(20_000),
             },
           );
           if (llmRes.ok) {

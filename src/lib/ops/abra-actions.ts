@@ -2095,8 +2095,78 @@ async function handleQueryQBO(params: Record<string, unknown>): Promise<ActionRe
           data: { accountId: null, suggestion: "Review manually or ask Ben" },
         };
       }
+      case "vendors": {
+        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=vendors`);
+        if (!res.ok) return { success: false, message: `QBO vendor query failed: ${res.status}` };
+        const data = (await res.json()) as { count: number; vendors: Array<{ Name: string; Balance: number; Active: boolean; Email: string | null; Phone: string | null }> };
+        if (data.count === 0) {
+          return { success: true, message: "No vendors found in QBO. Vendor records may not have been set up yet. Ask Ben to add vendors in QuickBooks, or I can note what needs to be configured." };
+        }
+        const active = data.vendors.filter(v => v.Active);
+        const lines = active.map(v => {
+          const contact = [v.Email, v.Phone].filter(Boolean).join(", ");
+          return `• ${v.Name}${v.Balance ? ` (balance: $${v.Balance.toFixed(2)})` : ""}${contact ? ` — ${contact}` : ""}`;
+        });
+        return {
+          success: true,
+          message: `QBO Vendors (${active.length} active):\n${lines.join("\n")}`,
+          data,
+        };
+      }
+      case "pnl": {
+        const start = typeof params.start === "string" ? params.start : undefined;
+        const end = typeof params.end === "string" ? params.end : undefined;
+        const qs = [start ? `start=${start}` : "", end ? `end=${end}` : ""].filter(Boolean).join("&");
+        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=pnl${qs ? `&${qs}` : ""}`);
+        if (!res.ok) return { success: false, message: `QBO P&L report failed: ${res.status}` };
+        const data = (await res.json()) as { period: { start: string; end: string }; summary: Record<string, string | number> };
+        const entries = Object.entries(data.summary);
+        if (entries.length === 0) {
+          return { success: true, message: `P&L report (${data.period.start} to ${data.period.end}): No data found. QBO transactions may not be categorized yet. The book balances need reconciliation before P&L data will be meaningful.` };
+        }
+        const lines = entries.map(([k, v]) => `• ${k}: ${typeof v === "number" ? `$${v.toFixed(2)}` : v}`);
+        return {
+          success: true,
+          message: `P&L Report (${data.period.start} to ${data.period.end}):\n${lines.join("\n")}\n\nNote: These figures reflect only what's been categorized in QBO. If bank feeds are behind, this may be incomplete.`,
+          data,
+        };
+      }
+      case "balance_sheet": {
+        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=balance_sheet`);
+        if (!res.ok) return { success: false, message: `QBO balance sheet failed: ${res.status}` };
+        const data = (await res.json()) as { asOf: string; summary: Record<string, string | number> };
+        const entries = Object.entries(data.summary);
+        if (entries.length === 0) {
+          return { success: true, message: `Balance sheet as of ${data.asOf}: No data found. QBO may need reconciliation.` };
+        }
+        const lines = entries.map(([k, v]) => `• ${k}: ${typeof v === "number" ? `$${v.toFixed(2)}` : v}`);
+        return {
+          success: true,
+          message: `Balance Sheet (as of ${data.asOf}):\n${lines.join("\n")}\n\nNote: These are QBO book values. Bank account balances may differ from actual bank balances if feeds are behind.`,
+          data,
+        };
+      }
+      case "purchases": {
+        const limit = typeof params.limit === "number" ? params.limit : 20;
+        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=purchases&limit=${limit}`);
+        if (!res.ok) return { success: false, message: `QBO purchases query failed: ${res.status}` };
+        const data = (await res.json()) as { count: number; purchases: Array<{ Date: string; Amount: number; Vendor: string | null; Note: string | null; Lines: Array<{ Description: string; Amount: number; Account: string }> }> };
+        if (data.count === 0) {
+          return { success: true, message: "No purchases found in QBO." };
+        }
+        const lines = data.purchases.slice(0, 25).map(p => {
+          const vendor = p.Vendor || "Unknown vendor";
+          const desc = p.Lines?.[0]?.Description || p.Note || "";
+          return `• ${p.Date}: $${p.Amount.toFixed(2)} — ${vendor}${desc ? ` (${desc.slice(0, 60)})` : ""}`;
+        });
+        return {
+          success: true,
+          message: `Recent QBO Purchases (${data.count}):\n${lines.join("\n")}`,
+          data,
+        };
+      }
       default:
-        return { success: false, message: `Unknown query_type: ${queryType}. Use: accounts, categorization_rules, categorize` };
+        return { success: false, message: `Unknown query_type: ${queryType}. Use: accounts, categorization_rules, categorize, vendors, pnl, balance_sheet, purchases` };
     }
   } catch (err) {
     return { success: false, message: `QBO query error: ${err instanceof Error ? err.message : String(err)}` };
