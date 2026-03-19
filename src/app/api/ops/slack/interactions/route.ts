@@ -119,6 +119,7 @@ async function processApprovalAction(
         status: "denied",
         decision: "denied",
         decided_at: new Date().toISOString(),
+        decided_by_user_id: actor,
         decision_reasoning: `Rejected by ${actor} via Slack`,
       }),
     });
