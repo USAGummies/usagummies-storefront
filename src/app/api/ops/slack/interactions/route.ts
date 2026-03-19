@@ -4,6 +4,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { recordFeedback } from "@/lib/ops/abra-source-provenance";
 import { executeAction } from "@/lib/ops/abra-actions";
 import { emitEvent } from "@/lib/ops/abra-event-bus";
+import { postSlackMessage } from "@/lib/ops/abra-slack-responder";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -161,6 +162,8 @@ export async function POST(req: Request) {
     actions?: Array<{ action_id?: string; value?: string }>;
     user?: { id?: string; username?: string; name?: string };
     response_url?: string;
+    channel?: { id?: string };
+    message?: { ts?: string; thread_ts?: string };
   } = {};
   try {
     payload = JSON.parse(payloadRaw);
@@ -176,6 +179,8 @@ export async function POST(req: Request) {
   const actionId = action.action_id || "";
   const value = action.value || "";
   const actor = payload.user?.username || payload.user?.name || payload.user?.id || "slack-user";
+  const channelId = payload.channel?.id || "";
+  const threadTs = payload.message?.thread_ts || payload.message?.ts || "";
 
   if (!actionId || !value) {
     return NextResponse.json({ ok: true });
@@ -212,6 +217,9 @@ export async function POST(req: Request) {
         text = `⚠️ ${result.resultMsg || `Failed to process decision (${value})`}`;
       }
       await replaceSlackMessage(responseUrl, text);
+      if (channelId && threadTs) {
+        await postSlackMessage(channelId, text, { threadTs }).catch(() => {});
+      }
     });
     return NextResponse.json({
       response_type: "ephemeral",

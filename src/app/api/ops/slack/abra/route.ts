@@ -67,6 +67,11 @@ import {
   formatMemoryForPrompt,
   type ChatMemoryMessage,
 } from "@/lib/ops/abra-chat-memory";
+import {
+  getThreadHistory as getSharedThreadHistory,
+  postSlackMessage as postSharedSlackMessage,
+  processAbraMessage,
+} from "@/lib/ops/abra-slack-responder";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -2590,7 +2595,7 @@ export async function POST(req: Request) {
       // Fetch in-thread history (same Slack thread context)
       let history: ChatMessage[] = [];
       if (threadTs && channelId && BOT_TOKEN) {
-        history = await fetchThreadHistory(channelId, threadTs);
+        history = await getSharedThreadHistory(channelId, threadTs);
       }
 
       // Fetch cross-thread memory and inject into context
@@ -2604,19 +2609,33 @@ export async function POST(req: Request) {
         }
       }
 
-      const { reply, sources, answerLogId } = await callAbraChat(
-        memoryContext
+      const result = await processAbraMessage({
+        text: memoryContext
           ? `${queryText}\n\n---\n${memoryContext}`
           : queryText,
-        history,
-        userName,
-      );
+        user: userId || userName || "slack-user",
+        displayName: userName || undefined,
+        channel: channelId || "slash",
+        ts: threadTs || `${Date.now() / 1000}`,
+        ...(threadTs ? { threadTs } : {}),
+        ...(history.length > 0 ? { history } : {}),
+        forceRespond: true,
+      });
+      if (!result.handled) {
+        await postToSlack(
+          responseUrl,
+          "⚠️ Abra did not handle that Slack message.",
+          [],
+          null,
+        );
+        return;
+      }
 
       // Record the assistant's response in persistent chat memory
       if (userId) {
         await recordMessage({
           role: "assistant",
-          content: reply,
+          content: result.reply,
           timestamp: new Date().toISOString(),
           slackUserId: userId,
           slackChannelId: channelId || undefined,
@@ -2625,17 +2644,20 @@ export async function POST(req: Request) {
       }
 
       if (threadTs && channelId) {
-        const threaded = await postThreadReply(
-          channelId,
+        const threaded = await postSharedSlackMessage(channelId, result.reply, {
           threadTs,
-          reply,
-          sources,
-          answerLogId,
-        );
+          sources: result.sources,
+          answerLogId: result.answerLogId,
+        });
         if (threaded) return;
       }
 
-      await postToSlack(responseUrl, reply, sources, answerLogId);
+      await postToSlack(
+        responseUrl,
+        result.reply,
+        result.sources,
+        result.answerLogId,
+      );
     } catch (err) {
       const errorMsg =
         err instanceof Error ? err.message : "Unknown error";
