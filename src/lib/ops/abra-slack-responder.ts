@@ -133,9 +133,28 @@ function normalizeWhitespace(value: string): string {
 }
 
 function looksLikeChartOfAccounts(text: string): boolean {
+  // Explicit header match — always a COA
   if (/(gl\s*account|account\s*type|sub\s*type)/i.test(text)) return true;
+
+  const lines = text.split(/\n/);
+
+  // 5+ lines that contain tab characters → structured data
+  const tabLines = lines.filter((l) => /\t/.test(l));
+  if (tabLines.length >= 5) return true;
+
+  // 5+ lines that each contain a 3–6 digit number → account rows
+  const numericLines = lines.filter((l) => /\b\d{3,6}\b/.test(l));
+  if (numericLines.length >= 5) return true;
+
+  // 5+ occurrences of standalone accounting type codes (A/L/E/I/C/P)
+  const typeCodes = text.match(/(?<![A-Za-z])[ALCIPE](?![A-Za-z])/g) || [];
+  if (typeCodes.length >= 5) return true;
+
+  // Legacy: period-terminated account numbers
   const accountHits = text.match(/\b\d{1,6}\./g) || [];
-  return accountHits.length >= 5 && /[ALCIPE]/.test(text);
+  if (accountHits.length >= 5 && /[ALCIPE]/.test(text)) return true;
+
+  return false;
 }
 
 function isDocumentResetCommand(text: string): boolean {
@@ -167,39 +186,116 @@ function requestedDocumentFormat(
 }
 
 function normalizeChartOfAccountsText(text: string): string {
-  return text
-    .replace(/\u00a0/g, " ")
-    .replace(/GL Account\s*Description\s*Account Type\s*Sub Type/gi, " ")
-    .replace(/GL Account\s+Description\s+Account Type\s+Sub Type/gi, " ")
-    .replace(/\r/g, "\n")
-    .replace(/\t+/g, " ")
-    .replace(/\n+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  return (
+    text
+      // Normalize non-breaking spaces
+      .replace(/\u00a0/g, " ")
+      // Normalize Windows line endings
+      .replace(/\r\n/g, "\n")
+      .replace(/\r/g, "\n")
+      // Strip header rows (they aren't data)
+      .replace(/GL\s*Account\s*Description\s*Account\s*Type\s*Sub\s*Type/gi, "")
+      // Convert tabs to pipe separators so column structure is preserved
+      .replace(/\t+/g, "|")
+      // Collapse multiple spaces within a line (but NOT across newlines)
+      .split("\n")
+      .map((line) => line.replace(/  +/g, " ").trim())
+      .filter((line) => line.length > 0)
+      .join("\n")
+  );
 }
 
 function parseChartOfAccountsRows(rawText: string): CoaRow[] {
   const normalized = normalizeChartOfAccountsText(rawText);
-  const pattern =
-    /(\d{1,6})\.\s*([^0-9]+?)([ALCIPE])(?:\s*([A-Z]))?(?=(?:\s*\d{1,6}\.)|$)/g;
   const rows = new Map<string, CoaRow>();
-  let match: RegExpExecArray | null;
 
-  while ((match = pattern.exec(normalized)) !== null) {
-    const accountNumber = match[1].trim();
-    const description = normalizeWhitespace(
-      match[2].replace(/\s*[|,;:-]+\s*$/g, ""),
+  // Accounting type code letters used by QBO
+  const TYPE_CODES = new Set(["A", "L", "E", "I", "C", "P"]);
+
+  for (const rawLine of normalized.split("\n")) {
+    const line = rawLine.trim();
+    if (!line) continue;
+
+    let accountNumber = "";
+    let description = "";
+    let accountType = "";
+    let subType = "";
+
+    // --- Strategy 1: pipe/tab-separated columns ---
+    // After normalizeChartOfAccountsText, tabs are already converted to "|"
+    if (line.includes("|")) {
+      const cols = line
+        .split("|")
+        .map((c) => c.trim())
+        .filter((c) => c.length > 0);
+      // Expected order: GL Account | Description | Account Type | Sub Type
+      // But be flexible — first col with a number = account number
+      const numIdx = cols.findIndex((c) => /^\d{2,6}$/.test(c));
+      if (numIdx !== -1) {
+        accountNumber = cols[numIdx];
+        description = cols[numIdx + 1] || "";
+        accountType = cols[numIdx + 2] || "";
+        subType = cols[numIdx + 3] || "";
+      } else {
+        // No clean numeric col; fall through to Strategy 2
+      }
+    }
+
+    // --- Strategy 2: line-start number, trailing type code ---
+    if (!accountNumber) {
+      // Match: optional-period-terminated number at line start
+      // then arbitrary text (description, may contain digits)
+      // then a standalone type-code letter at/near end of line
+      // then optional sub-type letter
+      const lineMatch = line.match(
+        /^(\d{2,6})\.?\s+(.+?)\s+([ALCIPE])\s*([A-Z])?$/,
+      );
+      if (lineMatch) {
+        accountNumber = lineMatch[1].trim();
+        description = lineMatch[2].trim();
+        accountType = lineMatch[3].trim();
+        subType = (lineMatch[4] || "").trim();
+      }
+    }
+
+    // --- Strategy 3: any number in the line + type code somewhere ---
+    if (!accountNumber) {
+      const numMatch = line.match(/\b(\d{2,6})\b/);
+      // Grab the last standalone type-code token in the line
+      const tokens = line.split(/\s+/);
+      const lastTypeIdx = tokens
+        .map((t, i) => (TYPE_CODES.has(t) ? i : -1))
+        .filter((i) => i !== -1)
+        .pop();
+      if (numMatch && lastTypeIdx !== undefined) {
+        accountNumber = numMatch[1];
+        accountType = tokens[lastTypeIdx];
+        subType =
+          lastTypeIdx + 1 < tokens.length &&
+          /^[A-Z]$/.test(tokens[lastTypeIdx + 1])
+            ? tokens[lastTypeIdx + 1]
+            : "";
+        // Description = everything between the account number and the type code
+        const numPos = line.indexOf(accountNumber);
+        const typePos = line.lastIndexOf(accountType);
+        description = normalizeWhitespace(
+          line.slice(numPos + accountNumber.length, typePos),
+        ).replace(/^[.\s]+/, "");
+      }
+    }
+
+    // Validate and deduplicate
+    accountNumber = accountNumber.trim();
+    description = normalizeWhitespace(
+      description.replace(/\s*[|,;:-]+\s*$/g, ""),
     );
-    const accountType = (match[3] || "").trim();
-    const subType = (match[4] || "").trim();
-    if (!accountNumber || !description || !accountType) continue;
+    accountType = accountType.trim();
+    subType = subType.trim();
 
-    const nextRow: CoaRow = {
-      accountNumber,
-      description,
-      accountType,
-      subType,
-    };
+    if (!accountNumber || !description || !accountType) continue;
+    if (!TYPE_CODES.has(accountType)) continue;
+
+    const nextRow: CoaRow = { accountNumber, description, accountType, subType };
     const existing = rows.get(accountNumber);
     if (!existing || nextRow.description.length > existing.description.length) {
       rows.set(accountNumber, nextRow);

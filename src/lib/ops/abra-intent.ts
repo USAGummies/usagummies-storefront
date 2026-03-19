@@ -36,9 +36,60 @@ export type DetectedIntent =
   | { type: "diagnostics" }
   | { type: "chat" };
 
+// ─── Data Paste Detection ───
+
+/**
+ * Returns true when the message is structured data being pasted (e.g. a chart
+ * of accounts, a tab-separated export, a multi-row table), not a question.
+ *
+ * Data pastes must NOT be routed to the finance fast-path even though they
+ * contain finance keywords like "account", "expense", "income".
+ */
+export function isDataPaste(message: string): boolean {
+  // Must be long enough to be pasted data (not a short question)
+  if (message.length < 1500) return false;
+
+  // Count structural indicators
+  const newlineCount = (message.match(/\n/g) || []).length;
+  const tabCount = (message.match(/\t/g) || []).length;
+
+  // Must have many lines or tab-separated columns
+  if (newlineCount < 10 && tabCount < 10) return false;
+
+  // Look for repeated numeric patterns (GL account numbers like 100015, 205010)
+  const numericPatterns = (message.match(/\b\d{5,7}\b/g) || []).length;
+
+  // Look for tab-separated or pipe-separated values (table rows)
+  const tsvRows = (message.match(/\S+\t\S+/g) || []).length;
+
+  // Look for header-like patterns common in exported data
+  const hasDataHeader = /\b(GL Account|Account Type|Account Number|Debit|Credit|Balance|Description|Category|Sub-?type)\b/i.test(message);
+
+  // Low ratio of question words vs. total length is a strong signal
+  const questionWords = (message.match(/\b(what|how|why|when|where|who|which|can you|could you|tell me|show me|explain|help|please)\b/gi) || []).length;
+  const isLowQuestionDensity = questionWords / message.length < 0.002; // fewer than 2 per 1000 chars
+
+  // Score-based: if multiple structural indicators fire, it's data
+  const score =
+    (numericPatterns >= 5 ? 2 : 0) +
+    (tsvRows >= 5 ? 2 : 0) +
+    (hasDataHeader ? 3 : 0) +
+    (tabCount >= 20 ? 2 : 0) +
+    (newlineCount >= 20 ? 1 : 0) +
+    (isLowQuestionDensity ? 1 : 0);
+
+  return score >= 4;
+}
+
 // ─── Core Intent Detection ───
 
 export function detectIntent(message: string): DetectedIntent {
+  // Check for data pastes FIRST — before any keyword triggers.
+  // A pasted chart of accounts contains "account", "expense", "income" etc.
+  // but is NOT a finance question and must NOT hit the QBO fast-path.
+  if (isDataPaste(message)) {
+    return { type: "chat" };
+  }
   if (DIAGNOSTICS_TRIGGERS.test(message)) {
     return { type: "diagnostics" };
   }
@@ -70,6 +121,15 @@ export function detectIntent(message: string): DetectedIntent {
 // ─── Supplementary Intent Checks ───
 
 export function isFinanceQuestion(message: string): boolean {
+  // Data pastes must never be treated as finance questions — they contain
+  // finance keywords in the data itself, not as user intent.
+  if (isDataPaste(message)) return false;
+
+  // Short directives like "option 2", "give me notion version", "build it",
+  // "download", "give me csv" are follow-up commands, not finance questions.
+  const isFollowUpCommand = /\b(option\s*\d|give me (the )?(notion|csv|excel|spreadsheet|download|export)|build it|compile it|finish it|finalize|download|export (it|this|that)|format (it|this|that))\b/i.test(message);
+  if (isFollowUpCommand) return false;
+
   return /\b(finance|financial|revenue|margin|cogs|gross profit|profitability|aov|cash flow|budget|money|sales|orders|income|expenses|spending|p&l|profit|loss|chart of accounts|qbo|quickbooks|balance sheet|bank balance|cash position|vendor|supplier|tax|1099|reconcil|depreciation|amortization|equity|liabilities|inventory|burn rate|runway|breakeven|capital|transaction|general ledger|trial balance|bookkeep)\b/i.test(
     message,
   );

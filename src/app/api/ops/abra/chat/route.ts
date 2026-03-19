@@ -198,7 +198,7 @@ async function generateClaudeReply(input: {
     includeFinanceFramework: input.isFinanceRelated,
   });
   // Only include full action instructions when the message likely needs actions
-  const messageNeedsActions = /\b(send|create|log|notify|remind|track|store|record|draft|email|slack|save|update|correct|calculate|run scenario)\b/i.test(input.message);
+  const messageNeedsActions = /\b(send|create|log|notify|remind|track|store|record|draft|email|slack|save|update|correct|calculate|run scenario|option|notion|build|compile|finish|finalize|download|export|format)\b/i.test(input.message);
   const actionInstructions =
     messageNeedsActions && input.availableActions && input.availableActions.length > 0
       ? `\n\nACTION EXECUTION SYSTEM (YOU MUST USE THIS):

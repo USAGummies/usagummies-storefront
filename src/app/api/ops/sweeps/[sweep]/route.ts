@@ -112,7 +112,17 @@ export async function POST(
       timestamp: new Date().toISOString(),
       error: message,
     });
-    await notifyAlert(`Sweep failed: ${sweep}\n${message}`).catch(() => {});
+    try {
+      const dedupKey = `abra:sweep:alert:${sweep}`;
+      const alreadyAlerted = await kv.get(dedupKey);
+      if (!alreadyAlerted) {
+        await notifyAlert(`Sweep failed: ${sweep}\n${message}`).catch(() => {});
+        await kv.set(dedupKey, "1", { ex: 1800 });
+      }
+    } catch {
+      // KV unavailable — send alert anyway to avoid silent failures
+      await notifyAlert(`Sweep failed: ${sweep}\n${message}`).catch(() => {});
+    }
     return NextResponse.json(
       { ok: false, sweep, durationMs, error: message },
       { status: 500 },
