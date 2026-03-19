@@ -1058,6 +1058,7 @@ export async function POST(req: Request) {
       let financeReply = financeData;
       try {
         const anthropicKey = process.env.ANTHROPIC_API_KEY;
+        console.log("[abra] Finance LLM synthesis: key present?", !!anthropicKey, "financeData length:", financeData.length);
         if (anthropicKey) {
           const isCashQuestion = /\b(cash position|bank balance|checking balance|how much .*(in the bank|do we have|cash|money)|current balance|account balance|overdrawn|overdraft)\b/i.test(message);
           const isReconciliationQuestion = /\b(reconcil|setup|configure|set up|get started|initial|onboard|clean up|organize)\b/i.test(message);
@@ -1101,7 +1102,12 @@ export async function POST(req: Request) {
                 inputTokens: llmData.usage?.input_tokens || 0,
                 outputTokens: llmData.usage?.output_tokens || 0,
               }).catch(() => {});
+            } else {
+              console.warn("[abra] Finance LLM returned short response:", llmText.length, "chars. First 200:", llmText.slice(0, 200));
             }
+          } else {
+            const errBody = await llmRes.text().catch(() => "");
+            console.error("[abra] Finance LLM API failed:", llmRes.status, errBody.slice(0, 300));
           }
         }
       } catch (err) {
