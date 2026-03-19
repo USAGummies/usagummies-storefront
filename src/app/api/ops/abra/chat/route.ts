@@ -857,7 +857,11 @@ export async function POST(req: Request) {
     }
 
     // ─── Finance Fast-Path ───
-    if (intent.type === "finance") {
+    // Only use fast-path for direct QBO data queries (balances, transactions, P&L).
+    // Complex analytical questions (readiness assessment, setup plan, COGS breakdown,
+    // margin analysis) go through the main Claude path which has brain context + corrections.
+    const isDirectQBOQuery = intent.type === "finance" && /\b(balance|transaction|p&l|profit.?loss|bank|checking|credit card|vendor list|recent (purchase|expense|payment))\b/i.test(message) && !/\b(assess|plan|priorit|missing|set up|setup|readiness|what.*(need|should|missing)|breakdown|analysis|margin|cogs)\b/i.test(message);
+    if (isDirectQBOQuery) {
       let financeData = "";
       try {
         // Fetch QBO accounts directly via our own API
