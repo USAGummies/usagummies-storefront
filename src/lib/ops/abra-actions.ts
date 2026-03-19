@@ -5,6 +5,7 @@ import { createNotionPage, updateNotionPage, queryLedgerSummary } from "@/lib/op
 import { DB } from "@/lib/notion/client";
 import { generateEmbedding } from "@/lib/ops/abra-embeddings";
 import { emitEvent, type AbraEventType } from "@/lib/ops/abra-event-bus";
+import { adminRequest } from "@/lib/shopify/admin";
 import {
   adjustInventory,
   createDiscountCode as createShopifyDiscountCode,
@@ -15,6 +16,7 @@ import {
   generateReconciliationReport,
   type ReconciliationPeriod,
 } from "@/lib/ops/revenue-reconciliation";
+import { runMonthlyClose } from "@/lib/finance/monthly-close";
 
 /** Map friendly database keys → Notion database IDs for create_notion_page action */
 const NOTION_DB_MAP: Record<string, string> = {
@@ -213,6 +215,8 @@ const EXTERNAL_SUBMISSION_ACTIONS = new Set([
   "send_slack",
   "update_notion",
   "draft_email_reply",
+  "start_workflow",
+  "resume_workflow",
 ]);
 
 export function requiresExplicitPermission(actionType: string): boolean {
@@ -369,12 +373,13 @@ async function handleSendEmail(
   const to = String(params.to || "").toLowerCase().trim();
   const subject = sanitizeTitle(String(params.subject || "Abra action"));
   let body = sanitizeText(String(params.body || params.html || params.message || ""), 10000);
+  const allowExternal = params.allow_external === true;
   if (!to || !body) {
     return { success: false, message: "Missing email recipient or body" };
   }
 
   // Safety: only send to known/allowed recipients
-  if (!isAllowedEmailRecipient(to)) {
+  if (!allowExternal && !isAllowedEmailRecipient(to)) {
     return {
       success: false,
       message: `Email recipient "${to}" is not in the allowed list. Only @usagummies.com and pre-approved addresses are permitted.`,
@@ -388,6 +393,271 @@ async function handleSendEmail(
 
   await sendOpsEmail({ to, subject, body, from: "Abra via Benjamin <ben@usagummies.com>" });
   return { success: true, message: `Email sent to ${to}` };
+}
+
+type DraftOrderCreateResult = {
+  draftOrderCreate: {
+    draftOrder: {
+      id: string;
+      name: string;
+      invoiceUrl: string | null;
+      totalPriceSet: {
+        shopMoney: { amount: string; currencyCode: string };
+      };
+      status: string;
+    } | null;
+    userErrors: Array<{ field: string[]; message: string }>;
+  };
+};
+
+const CREATE_WHOLESALE_DRAFT_ORDER = /* GraphQL */ `
+  mutation DraftOrderCreate($input: DraftOrderInput!) {
+    draftOrderCreate(input: $input) {
+      draftOrder {
+        id
+        name
+        invoiceUrl
+        totalPriceSet {
+          shopMoney {
+            amount
+            currencyCode
+          }
+        }
+        status
+      }
+      userErrors {
+        field
+        message
+      }
+    }
+  }
+`;
+
+async function handleCreateWholesaleDraftOrder(
+  params: Record<string, unknown>,
+): Promise<ActionResult> {
+  const customerName = sanitizeTitle(String(params.customer_name || params.customerName || ""));
+  const customerEmail = String(params.customer_email || params.customerEmail || "").trim().toLowerCase();
+  const companyName = sanitizeTitle(String(params.company_name || params.companyName || customerName));
+  const quantity = Number(params.quantity || 0);
+  const unitPrice = Number(params.unit_price || params.unitPrice || 0);
+  const note = sanitizeText(String(params.note || ""), 1000);
+  const productTitle = sanitizeTitle(String(params.product_title || params.productTitle || "Wholesale Line Item"));
+
+  if (!customerName || !customerEmail || quantity <= 0 || unitPrice < 0) {
+    return {
+      success: false,
+      message: "customer_name, customer_email, quantity, and unit_price are required for wholesale draft orders",
+    };
+  }
+
+  const result = await adminRequest<DraftOrderCreateResult>(CREATE_WHOLESALE_DRAFT_ORDER, {
+    input: {
+      email: customerEmail,
+      note: note || `Wholesale draft order for ${companyName}`,
+      tags: ["wholesale", "abra-workflow"],
+      lineItems: [
+        {
+          title: productTitle,
+          quantity,
+          originalUnitPrice: unitPrice,
+          requiresShipping: true,
+        },
+      ],
+    },
+  });
+
+  if (!result.ok || !result.data) {
+    return {
+      success: false,
+      message: result.error || "Shopify draft order creation failed",
+    };
+  }
+
+  const payload = result.data.draftOrderCreate;
+  if (payload.userErrors?.length) {
+    return {
+      success: false,
+      message: payload.userErrors.map((item) => item.message).join("; "),
+    };
+  }
+
+  const draftOrder = payload.draftOrder;
+  if (!draftOrder) {
+    return { success: false, message: "Shopify did not return a draft order" };
+  }
+
+  return {
+    success: true,
+    message: `Created Shopify draft order ${draftOrder.name} for ${companyName}.`,
+    data: {
+      id: draftOrder.id,
+      name: draftOrder.name,
+      invoiceUrl: draftOrder.invoiceUrl,
+      total: Number(draftOrder.totalPriceSet?.shopMoney?.amount || 0),
+      currency: draftOrder.totalPriceSet?.shopMoney?.currencyCode || "USD",
+      status: draftOrder.status,
+    },
+  };
+}
+
+type ProductCreateResult = {
+  productCreate: {
+    product: {
+      id: string;
+      title: string;
+      status: string;
+      onlineStorePreviewUrl: string | null;
+    } | null;
+    userErrors: Array<{ field: string[]; message: string }>;
+  };
+};
+
+const CREATE_SHOPIFY_PRODUCT_DRAFT = /* GraphQL */ `
+  mutation ProductCreate($product: ProductCreateInput!) {
+    productCreate(product: $product) {
+      product {
+        id
+        title
+        status
+        onlineStorePreviewUrl
+      }
+      userErrors {
+        field
+        message
+      }
+    }
+  }
+`;
+
+async function handleCreateShopifyProductDraft(
+  params: Record<string, unknown>,
+): Promise<ActionResult> {
+  const title = sanitizeTitle(String(params.title || ""));
+  const description = sanitizeText(String(params.description || ""), 5000);
+  const productType = sanitizeTitle(String(params.product_type || params.productType || "Candy"));
+  const tagsRaw = String(params.tags || "").trim();
+  const tags = tagsRaw
+    ? tagsRaw.split(",").map((item) => item.trim()).filter(Boolean)
+    : ["abra-launch"];
+
+  if (!title) {
+    return { success: false, message: "title is required to create a Shopify product draft" };
+  }
+
+  const result = await adminRequest<ProductCreateResult>(CREATE_SHOPIFY_PRODUCT_DRAFT, {
+    product: {
+      title,
+      descriptionHtml: description || undefined,
+      productType,
+      status: "DRAFT",
+      tags,
+      vendor: "USA Gummies",
+    },
+  });
+
+  if (!result.ok || !result.data) {
+    return {
+      success: false,
+      message: result.error || "Shopify product draft creation failed",
+    };
+  }
+
+  const payload = result.data.productCreate;
+  if (payload.userErrors?.length) {
+    return {
+      success: false,
+      message: payload.userErrors.map((item) => item.message).join("; "),
+    };
+  }
+
+  if (!payload.product) {
+    return { success: false, message: "Shopify did not return a product draft" };
+  }
+
+  return {
+    success: true,
+    message: `Created Shopify product draft ${payload.product.title}.`,
+    data: payload.product,
+  };
+}
+
+async function handleRunMonthlyClose(
+  params: Record<string, unknown>,
+): Promise<ActionResult> {
+  const period = String(params.period || "").trim();
+  if (!/^\d{4}-\d{2}$/.test(period)) {
+    return { success: false, message: "period must be YYYY-MM" };
+  }
+
+  try {
+    const report = await runMonthlyClose(period, "workflow");
+    return {
+      success: true,
+      message: `Monthly close completed for ${period}. Revenue $${report.pnl.revenue.total.toFixed(2)}, net income $${report.pnl.netIncome.toFixed(2)}.`,
+      data: { report },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Monthly close failed",
+    };
+  }
+}
+
+async function handleStartWorkflow(
+  params: Record<string, unknown>,
+): Promise<ActionResult> {
+  const workflowId = String(params.workflow_id || params.workflowId || "").trim();
+  const context =
+    params.context && typeof params.context === "object"
+      ? (params.context as Record<string, unknown>)
+      : {};
+  const startedBy = String(params.started_by || params.startedBy || "abra");
+
+  if (!workflowId) {
+    return { success: false, message: "workflow_id is required" };
+  }
+
+  try {
+    const { startWorkflow } = await import("@/lib/ops/workflow-engine");
+    const run = await startWorkflow(workflowId, context, startedBy);
+    return {
+      success: true,
+      message: `Started workflow ${workflowId} (${run.status}).`,
+      data: run,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to start workflow",
+    };
+  }
+}
+
+async function handleResumeWorkflow(
+  params: Record<string, unknown>,
+): Promise<ActionResult> {
+  const runId = String(params.run_id || params.runId || "").trim();
+  const decision = params.decision === "denied" ? "denied" : "approved";
+  if (!runId) {
+    return { success: false, message: "run_id is required" };
+  }
+
+  try {
+    const { resumeWorkflow } = await import("@/lib/ops/workflow-engine");
+    const run = await resumeWorkflow(runId, decision);
+    return {
+      success: true,
+      message: `Workflow ${run.workflow_id} is now ${run.status}.`,
+      data: run,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to resume workflow",
+    };
+  }
 }
 
 /**
@@ -2217,6 +2487,11 @@ const ACTION_HANDLERS: Record<
   create_shopify_discount: handleCreateShopifyDiscount,
   query_shopify_orders: handleQueryShopifyOrders,
   reconcile_transactions: handleReconcileTransactions,
+  create_wholesale_draft_order: handleCreateWholesaleDraftOrder,
+  create_shopify_product_draft: handleCreateShopifyProductDraft,
+  run_monthly_close: handleRunMonthlyClose,
+  start_workflow: handleStartWorkflow,
+  resume_workflow: handleResumeWorkflow,
 };
 
 async function fetchApproval(approvalId: string): Promise<ApprovalRow | null> {
@@ -2891,6 +3166,17 @@ export function getAvailableActions(): string[] {
   return Object.keys(ACTION_HANDLERS);
 }
 
+export async function executeActionByType(
+  actionType: string,
+  params: Record<string, unknown>,
+): Promise<ActionResult> {
+  const handler = ACTION_HANDLERS[actionType];
+  if (!handler) {
+    return { success: false, message: `No handler for ${actionType}` };
+  }
+  return handler(params);
+}
+
 // ─── Shared Action Parsing Utilities ───────────────────────────────────────
 // These are used by the web chat route AND Slack routes to parse/execute actions.
 
@@ -2926,6 +3212,8 @@ export const KNOWN_ACTION_TYPES = new Set([
   "create_shopify_discount",
   "query_shopify_orders",
   "reconcile_transactions",
+  "start_workflow",
+  "resume_workflow",
   "calculate_deal",
 ]);
 

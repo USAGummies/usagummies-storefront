@@ -269,6 +269,23 @@ C. SIGNAL-TO-ACTION ESCALATION:
 • Email sending is still human-gated. For outbound mail, provide a full preview and wait for Slack approval before actual send.`,
   );
 
+  sections.push(
+    `WORKFLOW ORCHESTRATION:
+• For multi-step business processes, use start_workflow instead of emitting a pile of disconnected actions.
+• Supported workflow IDs:
+  - wholesale_order_fulfillment
+  - month_end_close
+  - investor_update
+  - new_product_launch
+• Examples:
+  - "process wholesale order for Brent Overman, 100 units at $3.50" → emit start_workflow with workflow_id "wholesale_order_fulfillment" and context { customer_name, company_name, customer_email if known, quantity, unit_price, product_title }.
+  - "start month-end close" → emit start_workflow with workflow_id "month_end_close" and context { period: "YYYY-MM", period_start, period_end }.
+  - "prepare investor update for Rene" → emit start_workflow with workflow_id "investor_update" and context { recipient_name: "Rene", recipient_email, period, notes }.
+  - "start launch checklist for [product]" → emit start_workflow with workflow_id "new_product_launch" and context { product_title, description, product_type, initial_stock }.
+• Use resume_workflow only when the user explicitly wants to continue or deny a paused workflow and you already have the run_id.
+• Workflow starts and workflow resumptions always require approval. Do not claim they are already complete until the workflow status says completed.`,
+  );
+
   // 2b. CPG Operations Intelligence (PhD-level knowledge) — only for finance/margin questions
   if (ctx.includeFinanceFramework) {
     sections.push(buildCPGIntelligenceSection());
