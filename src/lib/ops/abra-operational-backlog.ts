@@ -135,7 +135,7 @@ function parseBacklogEntry(row: {
 export async function getActiveBacklog(): Promise<BacklogItem[]> {
   try {
     const rows = (await sbFetch(
-      `/rest/v1/open_brain_entries?category=eq.backlog&superseded_at=is.null&select=id,title,raw_text,created_at&order=created_at.desc&limit=100`,
+      `/rest/v1/open_brain_entries?tags=cs.%7Bbacklog%7D&superseded_at=is.null&select=id,title,raw_text,created_at&order=created_at.desc&limit=100`,
     )) as Array<{ id: string; title: string; raw_text: string; created_at: string }>;
 
     const items = rows
@@ -189,16 +189,16 @@ export async function createBacklogItem(item: {
     method: "POST",
     headers: { Prefer: "return=representation", "Content-Type": "application/json" },
     body: JSON.stringify({
-      source_type: "system",
+      source_type: "agent",
       source_ref: `backlog:${Date.now()}`,
-      entry_type: "decision",
+      entry_type: "summary",
       title: item.title,
       raw_text: JSON.stringify(data),
       summary_text: `[BACKLOG] ${item.priority.toUpperCase()} | ${item.owner} | ${item.title}`,
-      category: "backlog",
+      category: "operational",
       department: item.department,
       confidence: "high",
-      priority: item.priority === "critical" ? "urgent" : "normal",
+      priority: item.priority === "critical" ? "critical" : "normal",
       processed: true,
       tags: ["backlog", `owner:${item.owner}`, `dept:${item.department}`, item.priority],
       created_at: new Date().toISOString(),

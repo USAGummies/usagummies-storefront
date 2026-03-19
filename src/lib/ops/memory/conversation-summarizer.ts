@@ -94,12 +94,12 @@ function inferDepartment(messages: ConversationMessage[]): string {
 function categoryForDepartment(department: string): string {
   const normalized = department.toLowerCase();
   if (/\b(finance|accounting)\b/.test(normalized)) return "financial";
-  if (/\b(sales|growth|marketing|ecommerce|amazon|trade)\b/.test(normalized)) return "sales";
+  if (/\b(sales|growth|marketing|ecommerce|amazon|trade)\b/.test(normalized)) return "deal_data";
   if (/\b(supply|operations|retail|production|research)\b/.test(normalized)) return "operational";
-  if (/\b(founder|executive|legal|people|corporate)\b/.test(normalized)) return "founder";
+  if (/\b(founder|executive|legal|people|corporate)\b/.test(normalized)) return "operational";
   if (/\b(customer)\b/.test(normalized)) return "customer_insight";
-  if (/\b(data|it)\b/.test(normalized)) return "general";
-  return "general";
+  if (/\b(data|it)\b/.test(normalized)) return "system_log";
+  return "operational";
 }
 
 function slugify(value: string): string {
@@ -152,7 +152,7 @@ export async function summarizeConversation(
     },
     body: JSON.stringify({
       model: process.env.ANTHROPIC_MEMORY_MODEL || "claude-sonnet-4-6",
-      max_tokens: 300,
+      max_tokens: 800,
       temperature: 0.1,
       system: "You are a structured conversation summarizer for a business operating system. Return only valid JSON.",
       messages: [{ role: "user", content: prompt }],
@@ -173,10 +173,25 @@ export async function summarizeConversation(
   const text = payload.content?.map((part) => part.text || "").join("\n") || "";
   const rawJson = extractJsonObject(text);
   if (!rawJson) {
-    throw new Error("Conversation summarizer returned invalid JSON");
+    // Fallback: return a minimal summary instead of throwing
+    console.warn("[conversation-summarizer] Claude returned non-JSON response, using fallback summary. Raw:", text.slice(0, 200));
+    const fallbackTopic = normalized[0]?.content.slice(0, 100) || "Business conversation";
+    return {
+      participants: participants.filter(Boolean),
+      topic: fallbackTopic,
+      key_facts: [],
+      decisions_made: [],
+      action_items: [],
+      sentiment: "neutral",
+      follow_up_needed: false,
+      department: inferDepartment(normalized),
+      entity_mentions: [],
+      source_ref: options?.sourceRef || buildSourceRef(participants, normalized),
+      summary_text: `Conversation with ${participants.join(", ") || "unknown"} — summary extraction failed, raw content preserved.`,
+    };
   }
 
-  const parsed = JSON.parse(rawJson) as {
+  let parsed: {
     topic?: string;
     key_facts?: string[];
     decisions_made?: string[];
@@ -186,6 +201,24 @@ export async function summarizeConversation(
     entity_mentions?: Array<{ name?: string; type?: string }>;
     summary_text?: string;
   };
+  try {
+    parsed = JSON.parse(rawJson);
+  } catch {
+    console.warn("[conversation-summarizer] JSON.parse failed on extracted JSON, using fallback. Raw:", rawJson.slice(0, 200));
+    return {
+      participants: participants.filter(Boolean),
+      topic: normalized[0]?.content.slice(0, 100) || "Business conversation",
+      key_facts: [],
+      decisions_made: [],
+      action_items: [],
+      sentiment: "neutral",
+      follow_up_needed: false,
+      department: inferDepartment(normalized),
+      entity_mentions: [],
+      source_ref: options?.sourceRef || buildSourceRef(participants, normalized),
+      summary_text: `Conversation with ${participants.join(", ") || "unknown"} — malformed JSON in summary.`,
+    };
+  }
 
   void logAICost({
     model: payload.model || process.env.ANTHROPIC_MEMORY_MODEL || "claude-sonnet-4-6",
@@ -285,7 +318,7 @@ export async function storeConversationSummary(summary: ConversationSummary): Pr
     summary_text: summary.summary_text,
     category: categoryForDepartment(summary.department),
     department: summary.department,
-    entry_type: "session_summary",
+    entry_type: "summary",
     tags,
     embedding,
   };
