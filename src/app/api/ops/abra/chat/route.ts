@@ -7,7 +7,7 @@
  * Uses temporal search + dynamic system prompt for accurate, recency-aware answers.
  */
 
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { kv } from "@vercel/kv";
 import { createHash } from "node:crypto";
 import { auth } from "@/lib/auth/config";
@@ -62,10 +62,17 @@ import { EMAIL_EXTRACTION_SKILL } from "@/lib/ops/abra-skill-email-data-extracti
 import { DEAL_CALCULATOR_SKILL, calculateDeal, type ChannelType } from "@/lib/ops/abra-skill-deal-calculator";
 import {
   buildConversationContext,
+  getThreadHistory as getStoredThreadHistory,
   saveMessage,
 } from "@/lib/ops/abra-chat-history";
 import { buildCrossDepartmentStrategy } from "@/lib/ops/abra-strategy-orchestrator";
 import { getSystemHealth } from "@/lib/ops/abra-health-monitor";
+import {
+  summarizeConversation,
+  storeConversationSummary,
+} from "@/lib/ops/memory/conversation-summarizer";
+import { learnDecisionPatterns } from "@/lib/ops/memory/decision-patterns";
+import { captureOperationalPatterns } from "@/lib/ops/memory/operational-patterns";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -858,23 +865,61 @@ function queueChatHistory(params: {
   assistantMessage: string;
   modelUsed?: string;
   metadata?: Record<string, unknown>;
+  actorLabel?: string;
 }) {
   if (!isUuidLike(params.threadId)) return;
-  void saveMessage({
-    thread_id: params.threadId,
-    role: "user",
-    content: params.userMessage,
-    user_email: params.userEmail,
-  }).catch(() => {});
+  after(async () => {
+    try {
+      await saveMessage({
+        thread_id: params.threadId,
+        role: "user",
+        content: params.userMessage,
+        user_email: params.userEmail,
+      });
 
-  void saveMessage({
-    thread_id: params.threadId,
-    role: "assistant",
-    content: params.assistantMessage,
-    model_used: params.modelUsed,
-    metadata: params.metadata || {},
-    user_email: params.userEmail,
-  }).catch(() => {});
+      await saveMessage({
+        thread_id: params.threadId,
+        role: "assistant",
+        content: params.assistantMessage,
+        model_used: params.modelUsed,
+        metadata: params.metadata || {},
+        user_email: params.userEmail,
+      });
+
+      const history = await getStoredThreadHistory(params.threadId, 24);
+      if (history.length < 4) return;
+
+      const summaryCountKey = `abra:memory:summary-count:${params.threadId}`;
+      const messageCount = history.length;
+      try {
+        const lastCount = await kv.get<number>(summaryCountKey);
+        if (typeof lastCount === "number" && lastCount >= messageCount) return;
+      } catch {
+        // continue without KV dedupe if read fails
+      }
+
+      const summary = await summarizeConversation(
+        history.map((row) => ({
+          role: row.role,
+          content: row.content,
+          timestamp: row.created_at,
+        })),
+        [params.actorLabel || params.userEmail, "Abra"],
+        { sourceRef: `conversation-thread:${params.threadId}` },
+      );
+      await storeConversationSummary(summary);
+      try {
+        await kv.set(summaryCountKey, messageCount, { ex: 7 * 24 * 60 * 60 });
+      } catch {
+        // non-critical
+      }
+    } catch {
+      // Conversation summarization is best-effort.
+    }
+
+    void learnDecisionPatterns().catch(() => {});
+    void captureOperationalPatterns().catch(() => {});
+  });
 }
 
 async function generateClaudeReply(input: {
@@ -1157,7 +1202,12 @@ export async function POST(req: Request) {
   const mode = (url.searchParams.get("mode") || "").toLowerCase();
   const healthMode = mode === "health" || mode === "quick";
 
-  let payload: { message?: unknown; history?: unknown; thread_id?: unknown } = {};
+  let payload: {
+    message?: unknown;
+    history?: unknown;
+    thread_id?: unknown;
+    actor_label?: unknown;
+  } = {};
   try {
     payload = await req.json();
   } catch {
@@ -1193,6 +1243,10 @@ export async function POST(req: Request) {
     requestedThreadId && isUuidLike(requestedThreadId)
       ? requestedThreadId
       : makeThreadId();
+  const actorLabel =
+    typeof payload.actor_label === "string" && payload.actor_label.trim()
+      ? payload.actor_label.trim().slice(0, 120)
+      : actorEmail;
   const messageDepartment = detectDepartment(message);
 
   if (healthMode) {
@@ -1203,6 +1257,7 @@ export async function POST(req: Request) {
       userMessage: message,
       assistantMessage: reply,
       metadata: { intent: "health_mode" },
+      actorLabel,
     });
     return NextResponse.json({
       reply,
@@ -1307,6 +1362,7 @@ export async function POST(req: Request) {
         userMessage: message,
         assistantMessage: costReply,
         metadata: { intent: "cost" },
+        actorLabel,
       });
       return NextResponse.json({
         reply: costReply,
@@ -1844,6 +1900,7 @@ export async function POST(req: Request) {
                 intent: "initiative_answers",
                 initiative_id: updated.id || activeAskingInitiative.id,
               },
+              actorLabel,
             });
             return NextResponse.json({
               reply: approvedReply,
@@ -1884,6 +1941,7 @@ export async function POST(req: Request) {
               intent: "initiative_answers",
               initiative_id: updated?.id || activeAskingInitiative.id,
             },
+            actorLabel,
           });
           return NextResponse.json({
             reply: followupReply,
@@ -1950,6 +2008,7 @@ export async function POST(req: Request) {
               intent: "initiative",
               initiative_id: initData.id,
             },
+            actorLabel,
           });
           return NextResponse.json({
             reply: initReply,
@@ -2009,6 +2068,7 @@ export async function POST(req: Request) {
               intent: "session",
               session_id: sessData.id,
             },
+            actorLabel,
           });
           return NextResponse.json({
             reply: sessReply,
@@ -2278,6 +2338,7 @@ export async function POST(req: Request) {
         confidence,
         tier_counts: tieredResults.tierCounts,
       },
+      actorLabel,
     });
 
     clearTimeout(deadlineTimer);

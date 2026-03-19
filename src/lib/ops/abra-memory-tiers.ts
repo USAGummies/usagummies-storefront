@@ -3,8 +3,8 @@
  *
  * Three-tier search system:
  * - HOT:  Corrections + KPIs (2x boost) — always-correct authoritative data
- * - WARM: Teachings + recent sessions < 30 days (1.5x boost)
- * - COLD: Everything else with standard temporal decay
+ * - WARM: Teachings + recent sessions < 7 days (1.5x boost)
+ * - COLD: Operational summaries, older sessions, and everything else
  *
  * Uses the `search_temporal_tiered` RPC for efficient single-call retrieval.
  * Falls back to `search_temporal` if tiered RPC doesn't exist yet.
@@ -127,10 +127,13 @@ async function searchFallback(
       tier = "hot";
     } else if (
       entryType === "teaching" ||
-      entryType === "session_summary" ||
-      (row.days_ago !== undefined && row.days_ago <= 30)
+      (entryType === "session_summary" &&
+        row.days_ago !== undefined &&
+        row.days_ago <= 7)
     ) {
       tier = "warm";
+    } else if (entryType === "session_summary" && row.days_ago !== undefined && row.days_ago <= 30) {
+      tier = "cold";
     }
 
     return { ...row, memory_tier: tier };

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { kv } from "@vercel/kv";
 import {
   buildAbraSystemPrompt,
@@ -88,6 +89,15 @@ function resolveInternalHost(): string {
       ? `https://${process.env.VERCEL_URL}`
       : "http://localhost:3000")
   );
+}
+
+function stableSlackThreadId(channel: string, threadTs: string): string {
+  const hex = createHash("sha1")
+    .update(`${channel}:${threadTs}`)
+    .digest("hex")
+    .slice(0, 32);
+  const part4 = ((Number.parseInt(hex[16] || "0", 16) & 0x3) | 0x8).toString(16);
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-${part4}${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 }
 
 function buildSlackBlocks(fullText: string): Array<Record<string, unknown>> {
@@ -342,8 +352,7 @@ async function handleTeaching(msg: SlackMessageContext): Promise<string> {
 }
 
 async function callAbraChatViaInternalApi(
-  message: string,
-  history?: SlackThreadMessage[],
+  ctx: SlackMessageContext,
 ): Promise<{
   reply: string;
   sources: Array<{ title: string; source_table: "brain" | "email"; days_ago?: number }>;
@@ -364,9 +373,11 @@ async function callAbraChatViaInternalApi(
           Authorization: `Bearer ${cronSecret}`,
         },
         body: JSON.stringify({
-          message,
-          history: history || [],
+          message: ctx.text,
+          history: ctx.history || [],
           channel: "slack",
+          actor_label: ctx.displayName || ctx.user,
+          thread_id: stableSlackThreadId(ctx.channel, ctx.threadTs || ctx.ts),
         }),
       },
       45000,
@@ -611,7 +622,7 @@ export async function processAbraMessage(
     };
   }
 
-  const answer = await callAbraChatViaInternalApi(text, ctx.history || []);
+  const answer = await callAbraChatViaInternalApi(ctx);
   if (!answer) {
     throw new Error("Slack responder could not reach Abra chat");
   }
