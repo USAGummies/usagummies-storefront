@@ -37,6 +37,24 @@ export type SlackResponse = {
   answerLogId: string | null;
 };
 
+type StructuredDocKind = "chart_of_accounts";
+
+type StructuredDocSession = {
+  kind: StructuredDocKind;
+  actor: string;
+  chunks: string[];
+  totalChars: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type CoaRow = {
+  accountNumber: string;
+  description: string;
+  accountType: string;
+  subType: string;
+};
+
 type SlackPostOptions = {
   threadTs?: string;
   sources?: Array<{
@@ -59,6 +77,8 @@ type ProactiveMessageOptions = {
 };
 
 const SLACK_BLOCK_TEXT_LIMIT = 3000;
+const DATA_INGEST_THRESHOLD = 3000;
+const STRUCTURED_DOC_TTL_SECONDS = 24 * 60 * 60;
 
 function monitoredChannelSet(): Set<string> {
   const raw = process.env.SLACK_MONITORED_CHANNELS || "";
@@ -98,6 +118,244 @@ function stableSlackThreadId(channel: string, threadTs: string): string {
     .slice(0, 32);
   const part4 = ((Number.parseInt(hex[16] || "0", 16) & 0x3) | 0x8).toString(16);
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-${part4}${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+}
+
+function rootSlackThreadTs(ctx: SlackMessageContext): string {
+  return ctx.threadTs || ctx.ts;
+}
+
+function structuredDocKey(ctx: SlackMessageContext): string {
+  return `abra:slack:structured-doc:${ctx.channel}:${rootSlackThreadTs(ctx)}`;
+}
+
+function normalizeWhitespace(value: string): string {
+  return value.replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function looksLikeChartOfAccounts(text: string): boolean {
+  if (/(gl\s*account|account\s*type|sub\s*type)/i.test(text)) return true;
+  const accountHits = text.match(/\b\d{1,6}\./g) || [];
+  return accountHits.length >= 5 && /[ALCIPE]/.test(text);
+}
+
+function isDocumentResetCommand(text: string): boolean {
+  return /\b(fresh start|start over|reset|clear)\b/i.test(text);
+}
+
+function isDocumentFinalizeCommand(text: string): boolean {
+  return /\b(done|build it|compile|finish|finalize)\b/i.test(text);
+}
+
+function requestedDocumentFormat(
+  text: string,
+): "notion" | "csv" | "markdown" | null {
+  const normalized = text.toLowerCase();
+  if (
+    /\b(option 3|notion version|notion page|save to notion|give me notion)\b/.test(
+      normalized,
+    )
+  ) {
+    return "notion";
+  }
+  if (/\b(csv|excel-ready|spreadsheet|tab-separated|tsv)\b/.test(normalized)) {
+    return "csv";
+  }
+  if (/\b(option 2|markdown|table)\b/.test(normalized)) {
+    return "markdown";
+  }
+  return null;
+}
+
+function normalizeChartOfAccountsText(text: string): string {
+  return text
+    .replace(/\u00a0/g, " ")
+    .replace(/GL Account\s*Description\s*Account Type\s*Sub Type/gi, " ")
+    .replace(/GL Account\s+Description\s+Account Type\s+Sub Type/gi, " ")
+    .replace(/\r/g, "\n")
+    .replace(/\t+/g, " ")
+    .replace(/\n+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function parseChartOfAccountsRows(rawText: string): CoaRow[] {
+  const normalized = normalizeChartOfAccountsText(rawText);
+  const pattern =
+    /(\d{1,6})\.\s*([^0-9]+?)([ALCIPE])(?:\s*([A-Z]))?(?=(?:\s*\d{1,6}\.)|$)/g;
+  const rows = new Map<string, CoaRow>();
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(normalized)) !== null) {
+    const accountNumber = match[1].trim();
+    const description = normalizeWhitespace(
+      match[2].replace(/\s*[|,;:-]+\s*$/g, ""),
+    );
+    const accountType = (match[3] || "").trim();
+    const subType = (match[4] || "").trim();
+    if (!accountNumber || !description || !accountType) continue;
+
+    const nextRow: CoaRow = {
+      accountNumber,
+      description,
+      accountType,
+      subType,
+    };
+    const existing = rows.get(accountNumber);
+    if (!existing || nextRow.description.length > existing.description.length) {
+      rows.set(accountNumber, nextRow);
+    }
+  }
+
+  return Array.from(rows.values()).sort(
+    (a, b) => Number(a.accountNumber) - Number(b.accountNumber),
+  );
+}
+
+function renderChartOfAccountsMarkdown(rows: CoaRow[]): string {
+  const lines = [
+    "# TEST Chart of Accounts — Notion Version",
+    "",
+    `Parsed accounts: ${rows.length}`,
+    "",
+    "| GL Account | Description | Account Type | Sub Type |",
+    "|---|---|---|---|",
+    ...rows.map(
+      (row) =>
+        `| ${row.accountNumber} | ${row.description.replace(/\|/g, "/")} | ${row.accountType} | ${row.subType || "—"} |`,
+    ),
+  ];
+  return lines.join("\n");
+}
+
+function renderChartOfAccountsCsv(rows: CoaRow[]): string {
+  const escape = (value: string) => `"${String(value).replace(/"/g, '""')}"`;
+  return [
+    "GL Account,Description,Account Type,Sub Type",
+    ...rows.map((row) =>
+      [
+        escape(row.accountNumber),
+        escape(row.description),
+        escape(row.accountType),
+        escape(row.subType),
+      ].join(","),
+    ),
+  ].join("\n");
+}
+
+async function getStructuredDocSession(
+  ctx: SlackMessageContext,
+): Promise<StructuredDocSession | null> {
+  try {
+    const session = await kv.get<StructuredDocSession>(structuredDocKey(ctx));
+    if (!session || typeof session !== "object") return null;
+    if (!Array.isArray(session.chunks)) return null;
+    return session;
+  } catch {
+    return null;
+  }
+}
+
+async function saveStructuredDocSession(
+  ctx: SlackMessageContext,
+  session: StructuredDocSession,
+): Promise<void> {
+  await kv.set(structuredDocKey(ctx), session, {
+    ex: STRUCTURED_DOC_TTL_SECONDS,
+  });
+}
+
+async function clearStructuredDocSession(
+  ctx: SlackMessageContext,
+): Promise<void> {
+  try {
+    await kv.del(structuredDocKey(ctx));
+  } catch {
+    // non-critical
+  }
+}
+
+async function appendStructuredDocChunk(
+  ctx: SlackMessageContext,
+  kind: StructuredDocKind,
+): Promise<StructuredDocSession> {
+  const existing = await getStructuredDocSession(ctx);
+  const actor = ctx.displayName || ctx.user;
+  const nextChunks = [...(existing?.chunks || []), ctx.text];
+  const session: StructuredDocSession = {
+    kind,
+    actor,
+    chunks: nextChunks,
+    totalChars: nextChunks.reduce((sum, chunk) => sum + chunk.length, 0),
+    createdAt: existing?.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  await saveStructuredDocSession(ctx, session);
+  return session;
+}
+
+async function handleStructuredDocumentConversation(
+  ctx: SlackMessageContext,
+): Promise<SlackResponse | null> {
+  const existing = await getStructuredDocSession(ctx);
+  const format = requestedDocumentFormat(ctx.text);
+
+  if (isDocumentResetCommand(ctx.text) && existing) {
+    await clearStructuredDocSession(ctx);
+    return {
+      handled: true,
+      reply:
+        "Cleared the structured document session for this thread. Send the first chunk when you want to start again.",
+      sources: [],
+      answerLogId: null,
+    };
+  }
+
+  if (looksLikeChartOfAccounts(ctx.text) || (existing && ctx.text.length >= 200)) {
+    const session = await appendStructuredDocChunk(ctx, "chart_of_accounts");
+    const rows = parseChartOfAccountsRows(session.chunks.join("\n"));
+    return {
+      handled: true,
+      reply:
+        `Captured chart of accounts chunk ${session.chunks.length} for this thread.\n\n` +
+        `Current parse status: ${rows.length} account rows across ${session.totalChars.toLocaleString()} characters.\n\n` +
+        `Keep sending chunks in this thread. When you're done, say \`done\`, \`build it\`, \`give me notion version\`, or \`give me csv\`.`,
+      sources: [],
+      answerLogId: null,
+    };
+  }
+
+  if (!existing) return null;
+
+  if (isDocumentFinalizeCommand(ctx.text) || format) {
+    const rows = parseChartOfAccountsRows(existing.chunks.join("\n"));
+    if (rows.length === 0) {
+      return {
+        handled: true,
+        reply:
+          "I have the chunks for this thread, but I couldn't parse any chart-of-accounts rows yet. Send another chunk with the raw account lines, or say `start over` to reset.",
+        sources: [],
+        answerLogId: null,
+      };
+    }
+
+    const resolvedFormat = format || "markdown";
+    const body =
+      resolvedFormat === "csv"
+        ? renderChartOfAccountsCsv(rows)
+        : renderChartOfAccountsMarkdown(rows);
+
+    return {
+      handled: true,
+      reply:
+        resolvedFormat === "csv"
+          ? `CSV version ready below.\n\n\`\`\`\ncsv\n${body}\n\`\`\``
+          : `${body}\n\n_This was built from the chunks stored in this Slack thread. Say \`start over\` if you want me to discard and rebuild it._`,
+      sources: [],
+      answerLogId: null,
+    };
+  }
+
+  return null;
 }
 
 function buildSlackBlocks(fullText: string): Array<Record<string, unknown>> {
@@ -699,10 +957,13 @@ export async function processAbraMessage(
     };
   }
 
-  // Large structured data ingestion — auto-store in brain before chatting
-  // This ensures data pastes (chart of accounts, spreadsheet exports, etc.) are captured
-  // even if the chat API has trouble processing the full payload.
-  const DATA_INGEST_THRESHOLD = 3000;
+  const structuredDocResponse = await handleStructuredDocumentConversation(ctx);
+  if (structuredDocResponse) {
+    return structuredDocResponse;
+  }
+
+  // Large structured data that is not a managed document session still gets
+  // persisted before chat, so the operator does not lose the payload if chat fails.
   if (text.length > DATA_INGEST_THRESHOLD) {
     const actor = ctx.displayName || ctx.user;
     const titleSnippet = text.slice(0, 120).replace(/\n/g, " ").trim();
@@ -740,7 +1001,13 @@ export async function processAbraMessage(
 
   const answer = await callAbraChatViaInternalApi(ctx);
   if (!answer) {
-    throw new Error("Slack responder could not reach Abra chat");
+    return {
+      handled: true,
+      reply:
+        "I had trouble reaching my chat backend. I kept this thread intact, so please retry or break the request into smaller pieces if it was a large payload.",
+      sources: [],
+      answerLogId: null,
+    };
   }
 
   return {

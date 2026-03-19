@@ -61,6 +61,34 @@ async function sbFetch<T = unknown>(
   }
 }
 
+async function pingSupabase(): Promise<boolean> {
+  const env = getSupabaseEnv();
+  if (!env) return false;
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const res = await fetch(
+        `${env.baseUrl}/rest/v1/approvals?select=id&limit=1`,
+        {
+          method: "GET",
+          headers: {
+            apikey: env.serviceKey,
+            Authorization: `Bearer ${env.serviceKey}`,
+            "Content-Type": "application/json",
+          },
+          cache: "no-store",
+          signal: AbortSignal.timeout(5000),
+        },
+      );
+      if (res.ok) return true;
+    } catch {
+      // Retry once before treating it as degraded.
+    }
+  }
+
+  return false;
+}
+
 // ---------------------------------------------------------------------------
 // Data gatherers
 // ---------------------------------------------------------------------------
@@ -238,13 +266,12 @@ async function checkSystemHealth(): Promise<{
   let hasDegraded = false;
 
   // Check Supabase connectivity
-  const supabaseOk = await sbFetch<unknown>(
-    "/rest/v1/?limit=0",
-    { method: "HEAD" },
-  );
-  if (supabaseOk === null && getSupabaseEnv()) {
-    details.push("Supabase: unreachable");
-    hasIssue = true;
+  if (getSupabaseEnv()) {
+    const supabaseOk = await pingSupabase();
+    if (!supabaseOk) {
+      details.push("Supabase: degraded");
+      hasDegraded = true;
+    }
   }
 
   // Check Shopify Admin API
