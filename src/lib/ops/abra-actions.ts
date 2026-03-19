@@ -1862,9 +1862,32 @@ async function handleReadEmail(params: Record<string, unknown>): Promise<ActionR
       ? email.body.slice(0, maxBodyLen) + `\n\n[... truncated — full email is ${email.body.length} chars]`
       : email.body;
 
+    // Attachment info
+    const attachments = email.attachments || [];
+    const attachmentInfo = attachments.length > 0
+      ? `\n\nAttachments (${attachments.length}):\n${attachments.map((a) => `  • ${a.filename} (${a.mimeType}, ${(a.size / 1024).toFixed(0)}KB)`).join("\n")}`
+      : "";
+
+    // If user requested attachment reading and there are extractable attachments
+    const readAttachments = params.read_attachments === true && attachments.length > 0;
+    let attachmentText = "";
+    if (readAttachments) {
+      try {
+        const { readAllAttachments } = await import("@/lib/ops/gmail-reader");
+        const contents = await readAllAttachments(messageId, attachments);
+        for (const c of contents) {
+          if (c.textContent) {
+            attachmentText += `\n\n--- ATTACHMENT: ${c.filename} ---\n${c.textContent.slice(0, 5000)}`;
+          }
+        }
+      } catch {
+        attachmentText = "\n\n[Failed to extract attachment content]";
+      }
+    }
+
     return {
       success: true,
-      message: `Email from ${email.from} — "${email.subject}" (${email.date}):\n\n${body}`,
+      message: `Email from ${email.from} — "${email.subject}" (${email.date}):\n\n${body}${attachmentInfo}${attachmentText}`,
       data: {
         id: email.id,
         threadId: email.threadId,
@@ -1873,6 +1896,12 @@ async function handleReadEmail(params: Record<string, unknown>): Promise<ActionR
         subject: email.subject,
         date: email.date,
         body_length: email.body.length,
+        attachments: attachments.map((a) => ({
+          filename: a.filename,
+          mimeType: a.mimeType,
+          size: a.size,
+          attachmentId: a.attachmentId,
+        })),
       },
     };
   } catch (err) {

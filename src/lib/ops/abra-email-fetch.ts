@@ -2,7 +2,7 @@ import {
   emitSignal,
   extractEmailSignals,
 } from "@/lib/ops/abra-operational-signals";
-import { listEmails, readEmail } from "@/lib/ops/gmail-reader";
+import { listEmails, readEmail, readAllAttachments } from "@/lib/ops/gmail-reader";
 
 type EmailCategory =
   | "production"
@@ -459,7 +459,44 @@ export async function runEmailFetch(params?: {
 
       const subject = message.subject || "(no subject)";
       const rawBody = message.body || message.htmlBody || message.subject || "";
-      const body = rawBody.slice(0, 45_000);
+
+      // Extract attachment text for important emails (non-noise with attachments)
+      let attachmentText = "";
+      const attachmentSummaries: string[] = [];
+      if (message.attachments.length > 0) {
+        for (const att of message.attachments) {
+          attachmentSummaries.push(
+            `[Attachment: ${att.filename} (${att.mimeType}, ${(att.size / 1024).toFixed(0)}KB)]`,
+          );
+        }
+        // Only download and extract text for non-tiny, non-image attachments (PDFs, spreadsheets, text)
+        const extractable = message.attachments.filter(
+          (a) =>
+            a.size >= 1024 &&
+            !a.mimeType.startsWith("image/") &&
+            (a.mimeType === "application/pdf" ||
+              a.mimeType.includes("spreadsheet") ||
+              a.mimeType.includes("excel") ||
+              a.mimeType.startsWith("text/") ||
+              a.filename.toLowerCase().endsWith(".pdf") ||
+              a.filename.toLowerCase().endsWith(".xlsx") ||
+              a.filename.toLowerCase().endsWith(".csv")),
+        );
+        if (extractable.length > 0) {
+          try {
+            const contents = await readAllAttachments(message.id, extractable);
+            for (const c of contents) {
+              if (c.textContent) {
+                attachmentText += `\n\n--- ATTACHMENT: ${c.filename} ---\n${c.textContent.slice(0, 10_000)}`;
+              }
+            }
+          } catch {
+            // Non-fatal — continue without attachment text
+          }
+        }
+      }
+
+      const body = (rawBody + attachmentText).slice(0, 45_000);
       const fromRaw = message.from || envelope.from || "";
       const senderEmail = parseSenderEmail(fromRaw);
       const senderName = parseSenderName(fromRaw);
@@ -467,7 +504,7 @@ export async function runEmailFetch(params?: {
       const classified = classifyEmail({
         from: fromRaw,
         subject,
-        body,
+        body: rawBody, // classify on body text, not attachment bulk
       });
 
       const record = {
@@ -479,7 +516,10 @@ export async function runEmailFetch(params?: {
         subject: subject.slice(0, 500),
         received_at: receivedAt,
         raw_text: body || subject,
-        summary: summarize(subject, body),
+        summary: summarize(subject, body) +
+          (attachmentSummaries.length > 0
+            ? `\n${attachmentSummaries.join(" ")}`
+            : ""),
         category: classified.category,
         priority: classified.priority,
         action_required: classified.actionRequired,

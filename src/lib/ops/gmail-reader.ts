@@ -27,6 +27,18 @@ export type EmailEnvelope = {
   labelIds: string[];
 };
 
+export type EmailAttachment = {
+  attachmentId: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+};
+
+export type EmailAttachmentContent = EmailAttachment & {
+  data: Buffer;
+  textContent?: string; // extracted text for PDFs, spreadsheets, text files
+};
+
 export type EmailMessage = {
   id: string;
   threadId: string;
@@ -37,6 +49,7 @@ export type EmailMessage = {
   body: string; // plain text body
   htmlBody?: string;
   labelIds: string[];
+  attachments: EmailAttachment[];
 };
 
 export type ListEmailsOpts = {
@@ -143,6 +156,45 @@ function getHeader(headers: Array<{ name: string; value: string }>, name: string
 function decodeBody(data: string): string {
   // Gmail API returns base64url-encoded body
   return Buffer.from(data, "base64url").toString("utf-8");
+}
+
+type GmailPart = {
+  mimeType?: string;
+  filename?: string;
+  body?: { data?: string; attachmentId?: string; size?: number };
+  headers?: Array<{ name: string; value: string }>;
+  parts?: GmailPart[];
+};
+
+type GmailPayload = GmailPart;
+
+function extractAttachments(payload: GmailPayload): EmailAttachment[] {
+  const attachments: EmailAttachment[] = [];
+  function walk(parts: GmailPart[] | undefined) {
+    if (!parts) return;
+    for (const part of parts) {
+      if (part.filename && part.body?.attachmentId) {
+        attachments.push({
+          attachmentId: part.body.attachmentId,
+          filename: part.filename,
+          mimeType: part.mimeType || "application/octet-stream",
+          size: part.body.size || 0,
+        });
+      }
+      if (part.parts) walk(part.parts);
+    }
+  }
+  // Top-level part might itself be an attachment (rare)
+  if (payload.filename && payload.body?.attachmentId) {
+    attachments.push({
+      attachmentId: payload.body.attachmentId,
+      filename: payload.filename,
+      mimeType: payload.mimeType || "application/octet-stream",
+      size: payload.body.size || 0,
+    });
+  }
+  walk(payload.parts);
+  return attachments;
 }
 
 function extractTextBody(payload: {
@@ -269,8 +321,9 @@ export async function readEmail(messageId: string): Promise<EmailMessage | null>
       name: string;
       value: string;
     }>;
-    const payload = (res.data.payload || {}) as Parameters<typeof extractTextBody>[0];
+    const payload = (res.data.payload || {}) as GmailPayload;
     const { text, html } = extractTextBody(payload);
+    const attachments = extractAttachments(payload);
 
     return {
       id: messageId,
@@ -282,6 +335,7 @@ export async function readEmail(messageId: string): Promise<EmailMessage | null>
       body: text || html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim(),
       htmlBody: html || undefined,
       labelIds: (res.data.labelIds ?? []) as string[],
+      attachments,
     };
   } catch {
     return null;
@@ -304,6 +358,135 @@ export async function searchEmails(
   }
 
   return messages;
+}
+
+// ---------------------------------------------------------------------------
+// Attachment reading
+// ---------------------------------------------------------------------------
+
+const MAX_ATTACHMENT_SIZE = 5 * 1024 * 1024; // 5MB cap for serverless
+
+/**
+ * Download raw attachment content by message ID + attachment ID.
+ */
+export async function getAttachmentContent(
+  messageId: string,
+  attachmentId: string,
+): Promise<Buffer> {
+  const gmail = getGmailClient();
+  const res = await gmail.users.messages.attachments.get({
+    userId: "me",
+    messageId,
+    id: attachmentId,
+  });
+  return Buffer.from(res.data.data || "", "base64url");
+}
+
+/**
+ * Read an attachment and extract text content where possible.
+ * Supports PDFs (pdf-parse), spreadsheets (xlsx), and plain text files.
+ * Images and unsupported types return metadata only (no textContent).
+ * Enforces 5MB size cap to avoid OOM on serverless.
+ */
+export async function readAttachment(
+  messageId: string,
+  attachment: EmailAttachment,
+): Promise<EmailAttachmentContent> {
+  if (attachment.size > MAX_ATTACHMENT_SIZE) {
+    return {
+      ...attachment,
+      data: Buffer.alloc(0),
+      textContent: `[Attachment too large: ${(attachment.size / 1024 / 1024).toFixed(1)}MB, max ${MAX_ATTACHMENT_SIZE / 1024 / 1024}MB]`,
+    };
+  }
+
+  const data = await getAttachmentContent(messageId, attachment.attachmentId);
+  let textContent: string | undefined;
+
+  const mime = attachment.mimeType.toLowerCase();
+  const ext = attachment.filename.toLowerCase();
+
+  try {
+    // PDF extraction via pdfjs-dist (low-level, avoids pdf-parse v2 API issues)
+    if (mime === "application/pdf" || ext.endsWith(".pdf")) {
+      const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
+      const doc = await pdfjsLib.getDocument({ data: new Uint8Array(data) }).promise;
+      const pages: string[] = [];
+      for (let i = 1; i <= Math.min(doc.numPages, 50); i++) {
+        const page = await doc.getPage(i);
+        const content = await page.getTextContent();
+        const pageText = content.items
+          .map((item: Record<string, unknown>) => (item as { str?: string }).str || "")
+          .join(" ");
+        if (pageText.trim()) pages.push(pageText.trim());
+      }
+      textContent = pages.join("\n\n").trim() || undefined;
+      // Detect scanned PDFs (image-only, no extractable text)
+      if (!textContent || textContent.length < 20) {
+        textContent = "[Scanned PDF — no extractable text. Needs OCR.]";
+      }
+    }
+    // Spreadsheets (xlsx, xls, csv)
+    else if (
+      mime.includes("spreadsheet") ||
+      mime.includes("excel") ||
+      mime === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+      mime === "application/vnd.ms-excel" ||
+      ext.endsWith(".xlsx") ||
+      ext.endsWith(".xls")
+    ) {
+      const XLSX = await import("xlsx");
+      const workbook = XLSX.read(data, { type: "buffer" });
+      const sheets = workbook.SheetNames.map((name) => {
+        const sheet = workbook.Sheets[name];
+        return `[Sheet: ${name}]\n${XLSX.utils.sheet_to_csv(sheet)}`;
+      });
+      textContent = sheets.join("\n\n").trim() || undefined;
+    }
+    // CSV / plain text / JSON
+    else if (
+      mime.startsWith("text/") ||
+      ext.endsWith(".csv") ||
+      ext.endsWith(".json") ||
+      ext.endsWith(".txt")
+    ) {
+      textContent = data.toString("utf-8").trim() || undefined;
+    }
+    // Images — metadata only, no text extraction
+    else if (mime.startsWith("image/")) {
+      textContent = `[Image: ${attachment.filename} (${mime}, ${(attachment.size / 1024).toFixed(0)}KB)]`;
+    }
+  } catch (err) {
+    textContent = `[Failed to extract text from ${attachment.filename}: ${err instanceof Error ? err.message : "unknown error"}]`;
+  }
+
+  return { ...attachment, data, textContent };
+}
+
+/**
+ * Convenience: read all attachments for a message, extract text where possible.
+ * Skips inline images (tiny attachments < 1KB are likely email signatures).
+ */
+export async function readAllAttachments(
+  messageId: string,
+  attachments: EmailAttachment[],
+): Promise<EmailAttachmentContent[]> {
+  const results: EmailAttachmentContent[] = [];
+  for (const att of attachments) {
+    // Skip tiny inline images (email signatures, tracking pixels)
+    if (att.size < 1024 && att.mimeType.startsWith("image/")) continue;
+    try {
+      const content = await readAttachment(messageId, att);
+      results.push(content);
+    } catch {
+      results.push({
+        ...att,
+        data: Buffer.alloc(0),
+        textContent: `[Failed to download ${att.filename}]`,
+      });
+    }
+  }
+  return results;
 }
 
 // ---------------------------------------------------------------------------
