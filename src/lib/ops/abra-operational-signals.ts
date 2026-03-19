@@ -78,11 +78,21 @@ async function sbFetch(
 
 /**
  * Store a new operational signal (best-effort).
+ * Deduplicates by signal_type + title within the last 24 hours.
  */
 export async function emitSignal(
   signal: Omit<OperationalSignal, "acknowledged" | "acknowledged_by">,
 ): Promise<string | null> {
   try {
+    // Dedup: skip if an unacknowledged signal with same type+title exists from last 24h
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const existing = (await sbFetch(
+      `/rest/v1/abra_operational_signals?signal_type=eq.${encodeURIComponent(signal.signal_type)}&title=eq.${encodeURIComponent(signal.title)}&acknowledged=eq.false&created_at=gte.${cutoff}&select=id&limit=1`,
+    )) as Array<{ id: string }>;
+    if (existing.length > 0) {
+      return existing[0].id; // Already exists, return existing ID
+    }
+
     const rows = (await sbFetch("/rest/v1/abra_operational_signals", {
       method: "POST",
       headers: {
