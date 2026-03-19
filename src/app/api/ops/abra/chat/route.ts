@@ -188,7 +188,7 @@ const STRATEGY_TRIGGERS =
 const DIAGNOSTICS_TRIGGERS =
   /\b(diagnos|self.?check|what'?s broken|are you (working|ok|healthy)|system health|feed status|check yourself|run diagnostics)\b/i;
 const FINANCE_TRIGGERS =
-  /\b(chart of accounts|account balances?|qbo|quickbooks|bank balance|checking balance|credit card balance|p&l|profit.?(?:and|&).?loss|balance sheet|cash position|how much (?:do we have|is in|money)|financial (?:summary|snapshot|report|data)|account(?:s|ing) (?:summary|breakdown)|categoriz|investor loan|rene.?(?:s|'s|'s)? (?:money|loan|transfer|investment)|vendor(?:s| list)?|supplier(?:s)?|co.?pack|cogs|cost of goods|gross margin|expense(?:s| breakdown)|where .* money .* go|spending|purchases?|what (?:are|do) we (?:spend|pay)|who do we (?:pay|buy from))\b/i;
+  /\b(chart of accounts|account balances?|qbo|quickbooks|bank balance|checking balance|credit card balance|p&l|profit.?(?:and|&).?loss|balance sheet|cash position|how much (?:do we have|is in|money)|financial (?:summary|snapshot|report|data)|account(?:s|ing) (?:summary|breakdown)|categoriz|investor loan|rene.?(?:s|'s|'s)? (?:money|loan|transfer|investment)|vendor(?:s| list)?|supplier(?:s)?|co.?pack|cogs|cost of goods|gross margin|expense(?:s| breakdown)|where .* money .* go|spending|purchases?|what (?:are|do) we (?:spend|pay)|who do we (?:pay|buy from)|reconcil|1099|tax (?:liability|filing|return|compliance|status)|estimated (?:quarterly|tax)|accounts (?:receivable|payable)|inventory (?:value|on hand|count|worth)|depreciation|amortization|equity|liabilities|net (?:income|loss|worth)|revenue (?:breakdown|by channel)|burn rate|runway|profitability|breakeven|break.?even|capital structure|funding|every transaction|all transactions|transaction (?:list|detail|history)|general ledger|trial balance|what do the books look|how do the books|book(?:s|keeping))\b/i;
 
 type DetectedIntent =
   | { type: "initiative"; department: string | null; goal: string }
@@ -393,7 +393,7 @@ async function fetchCostSummary(): Promise<AbraCostContext | null> {
 }
 
 function isFinanceQuestion(message: string): boolean {
-  return /\b(finance|financial|revenue|margin|cogs|gross profit|profitability|aov|cash flow|budget|money|sales|orders|income|expenses|spending|p&l|profit|loss)\b/i.test(
+  return /\b(finance|financial|revenue|margin|cogs|gross profit|profitability|aov|cash flow|budget|money|sales|orders|income|expenses|spending|p&l|profit|loss|chart of accounts|qbo|quickbooks|balance sheet|bank balance|cash position|vendor|supplier|tax|1099|reconcil|depreciation|amortization|equity|liabilities|inventory|burn rate|runway|breakeven|capital|transaction|general ledger|trial balance|bookkeep)\b/i.test(
     message,
   );
 }
@@ -1366,7 +1366,7 @@ export async function POST(req: Request) {
       });
       return NextResponse.json({
         reply: costReply,
-        confidence: 0.95,
+        confidence: 95,
         sources: [],
         intent: "cost",
         thread_id: threadId,
@@ -1609,10 +1609,10 @@ export async function POST(req: Request) {
 
       // Pull additional QBO data based on what the user is asking about
       const qboBase = process.env.NEXT_PUBLIC_BASE_URL || "https://www.usagummies.com";
-      const wantsVendors = /vendor|supplier|co.?pack|who .* (pay|buy)|powers|albanese/i.test(message);
-      const wantsPnl = /p&l|profit.*loss|income.*statement|revenue.*expense|margin|cogs|cost of goods/i.test(message);
-      const wantsPurchases = /purchase|expense|spend|where .* money|what .* pay/i.test(message);
-      const wantsBalanceSheet = /balance sheet|assets|liabilities|equity|net worth/i.test(message);
+      const wantsVendors = /vendor|supplier|co.?pack|who .* (pay|buy)|powers|albanese|1099|contractor/i.test(message);
+      const wantsPnl = /p&l|profit.*loss|income.*statement|revenue.*expense|margin|cogs|cost of goods|profitability|breakeven|net (income|loss)/i.test(message);
+      const wantsPurchases = /purchase|expense|spend|where .* money|what .* pay|every transaction|all transactions|transaction (list|detail|history)|general ledger|trial balance|recent (activity|charges)|last 30 days/i.test(message);
+      const wantsBalanceSheet = /balance sheet|assets|liabilities|equity|net worth|capital structure|what do we (owe|own)|investor loan/i.test(message);
 
       const extraFetches = await Promise.allSettled([
         wantsVendors
@@ -1622,7 +1622,7 @@ export async function POST(req: Request) {
           ? fetch(`${qboBase}/api/ops/qbo/query?type=pnl`, { signal: AbortSignal.timeout(8_000) }).then(r => r.ok ? r.json() : null)
           : Promise.resolve(null),
         wantsPurchases
-          ? fetch(`${qboBase}/api/ops/qbo/query?type=purchases&limit=25`, { signal: AbortSignal.timeout(8_000) }).then(r => r.ok ? r.json() : null)
+          ? fetch(`${qboBase}/api/ops/qbo/query?type=purchases&limit=${/every|all|last 30/i.test(message) ? 100 : 25}`, { signal: AbortSignal.timeout(8_000) }).then(r => r.ok ? r.json() : null)
           : Promise.resolve(null),
         wantsBalanceSheet
           ? fetch(`${qboBase}/api/ops/qbo/query?type=balance_sheet`, { signal: AbortSignal.timeout(8_000) }).then(r => r.ok ? r.json() : null)
@@ -1747,7 +1747,7 @@ export async function POST(req: Request) {
 
       return NextResponse.json({
         reply: financeReply,
-        confidence: 0.95,
+        confidence: 95,
         sources: [],
         intent: "finance",
         thread_id: threadId,
@@ -2239,7 +2239,10 @@ export async function POST(req: Request) {
     // Build dynamic context strings for system prompt
     const today = new Date().toISOString().split("T")[0];
     const teamContext = buildTeamContext(teamMembers, vendors, today);
-    const signalsContext = buildSignalsContext(signals);
+    // Suppress operational signals/alerts for pure finance conversations to prevent
+    // irrelevant GitHub CI failures, ops alerts, etc. from polluting accounting answers
+    const isFinanceConversation = isFinanceQuestion(message);
+    const signalsContext = isFinanceConversation ? "" : buildSignalsContext(signals);
 
     const availableActions = getAvailableActions();
 
