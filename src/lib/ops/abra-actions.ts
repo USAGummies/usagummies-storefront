@@ -159,6 +159,21 @@ export const AUTO_EXEC_POLICIES: AutoExecPolicy[] = [
     daily_limit: 50,
     enabled: true, // Read-only — queries Notion ledger for financial data
   },
+  {
+    action_type: "query_qbo",
+    max_risk_level: "low",
+    min_confidence: 0.5,
+    daily_limit: 50,
+    enabled: true, // Read-only — queries QuickBooks Online
+  },
+  {
+    action_type: "categorize_qbo_transaction",
+    max_risk_level: "low",
+    min_confidence: 0.85,
+    daily_limit: 30,
+    enabled: true, // Auto-categorize bank feed transactions in QBO
+    max_amount: 5000, // Transactions > $5K need human review (except Rene investor loans)
+  },
 ];
 
 const EXTERNAL_SUBMISSION_ACTIONS = new Set([
@@ -1575,6 +1590,276 @@ async function handleSearchEmail(params: Record<string, unknown>): Promise<Actio
   }
 }
 
+// ---------------------------------------------------------------------------
+// QBO (QuickBooks Online) Actions
+// ---------------------------------------------------------------------------
+
+/** QBO Account ID mapping — matches Puzzle GL categories */
+const QBO_CATEGORIZATION_RULES: Array<{ pattern: string; accountId: number; accountName: string }> = [
+  // Software & SaaS
+  { pattern: "ANTHROPIC", accountId: 165, accountName: "Software - Operating Expense" },
+  { pattern: "APOLLO", accountId: 165, accountName: "Software - Operating Expense" },
+  { pattern: "CLAUDE", accountId: 165, accountName: "Software - Operating Expense" },
+  { pattern: "CLOUDFLARE", accountId: 165, accountName: "Software - Operating Expense" },
+  { pattern: "INVIDEO", accountId: 165, accountName: "Software - Operating Expense" },
+  { pattern: "METRICOOL", accountId: 165, accountName: "Software - Operating Expense" },
+  { pattern: "MIDJOURNEY", accountId: 165, accountName: "Software - Operating Expense" },
+  { pattern: "NOTION LABS", accountId: 165, accountName: "Software - Operating Expense" },
+  { pattern: "OPENAI", accountId: 165, accountName: "Software - Operating Expense" },
+  { pattern: "N8N", accountId: 165, accountName: "Software - Operating Expense" },
+  { pattern: "SPARK", accountId: 165, accountName: "Software - Operating Expense" },
+  { pattern: "SLACK", accountId: 165, accountName: "Software - Operating Expense" },
+  { pattern: "X CORP", accountId: 165, accountName: "Software - Operating Expense" },
+  { pattern: "VERCEL", accountId: 165, accountName: "Software - Operating Expense" },
+  { pattern: "SUPABASE", accountId: 165, accountName: "Software - Operating Expense" },
+  { pattern: "UPSTASH", accountId: 165, accountName: "Software - Operating Expense" },
+  { pattern: "PADDLE.NET", accountId: 165, accountName: "Software - Operating Expense" },
+  // Advertising
+  { pattern: "FACEBK", accountId: 16, accountName: "Advertising & marketing" },
+  { pattern: "FACEBOOK", accountId: 16, accountName: "Advertising & marketing" },
+  { pattern: "META ADS", accountId: 16, accountName: "Advertising & marketing" },
+  { pattern: "GOOGLE ADS", accountId: 16, accountName: "Advertising & marketing" },
+  { pattern: "TIKTOK", accountId: 16, accountName: "Advertising & marketing" },
+  { pattern: "CRAIGSLIST", accountId: 16, accountName: "Advertising & marketing" },
+  { pattern: "AMAZON ADS", accountId: 16, accountName: "Advertising & marketing" },
+  // Shipping
+  { pattern: "PIRATE SHIP", accountId: 159, accountName: "Shipping & Delivery" },
+  { pattern: "USPS", accountId: 159, accountName: "Shipping & Delivery" },
+  { pattern: "FEDEX", accountId: 159, accountName: "Shipping & Delivery" },
+  // Insurance
+  { pattern: "GEICO", accountId: 42, accountName: "Insurance" },
+  // Utilities
+  { pattern: "T-MOBILE", accountId: 91, accountName: "Utilities" },
+  { pattern: "TMOBILE", accountId: 91, accountName: "Utilities" },
+  // Ground Transport
+  { pattern: "EXXON", accountId: 162, accountName: "Ground Transportation" },
+  { pattern: "SHELL OIL", accountId: 162, accountName: "Ground Transportation" },
+  { pattern: "MAVERIK", accountId: 162, accountName: "Ground Transportation" },
+  { pattern: "UBER", accountId: 162, accountName: "Ground Transportation" },
+  { pattern: "LYFT", accountId: 162, accountName: "Ground Transportation" },
+  // Tax & Accounting
+  { pattern: "PILOT", accountId: 158, accountName: "Tax and Accounting" },
+  // Hosting / COGS
+  { pattern: "SHOPIFY", accountId: 166, accountName: "Hosting Fees" },
+  // Bank Fees
+  { pattern: "WIRE TRANSFER FEE", accountId: 160, accountName: "Bank Fees" },
+  { pattern: "PAST DUE FEE", accountId: 160, accountName: "Bank Fees" },
+  { pattern: "MONTHLY FEE", accountId: 160, accountName: "Bank Fees" },
+  { pattern: "SERVICE CHARGE", accountId: 160, accountName: "Bank Fees" },
+  // Interest
+  { pattern: "INTEREST CHARGE", accountId: 163, accountName: "Interest Expense" },
+  // Payment Processing (transfers, not expenses)
+  { pattern: "STRIPE", accountId: 168, accountName: "Transfers in Transit" },
+  // Credit Card Payments (internal transfers)
+  { pattern: "CAPITAL ONE DES:MOBILE PMT", accountId: 169, accountName: "Credit Card Payments" },
+  { pattern: "CAPITAL ONE MOBILE PYMT", accountId: 169, accountName: "Credit Card Payments" },
+  // Hardware
+  { pattern: "APPLE.COM", accountId: 156, accountName: "Computers & Hardware" },
+  { pattern: "APPLE STORE", accountId: 156, accountName: "Computers & Hardware" },
+  // Contractors
+  { pattern: "UPWORK", accountId: 157, accountName: "Independent Contractors" },
+  // Entertainment
+  { pattern: "RANCH WORLD", accountId: 37, accountName: "Entertainment" },
+  // Supplies
+  { pattern: "VISTAPRINT", accountId: 83, accountName: "Supplies" },
+  // Lodging
+  { pattern: "HAMPTON", accountId: 161, accountName: "Lodging" },
+  // *** CRITICAL: Rene investor money = LIABILITY, NEVER income ***
+  { pattern: "RENE G. GONZALEZ", accountId: 167, accountName: "Investor Loan - Rene" },
+  { pattern: "GONZALEZ, RENE", accountId: 167, accountName: "Investor Loan - Rene" },
+  { pattern: "RENE G GONZALEZ", accountId: 167, accountName: "Investor Loan - Rene" },
+];
+
+function qboCategorize(description: string): { accountId: number; accountName: string } | null {
+  const upper = description.toUpperCase();
+  for (const rule of QBO_CATEGORIZATION_RULES) {
+    if (upper.includes(rule.pattern.toUpperCase())) {
+      return { accountId: rule.accountId, accountName: rule.accountName };
+    }
+  }
+  return null;
+}
+
+function isReneInvestorTransfer(description: string): boolean {
+  const upper = description.toUpperCase();
+  return upper.includes("RENE G. GONZALEZ") ||
+    upper.includes("GONZALEZ, RENE") ||
+    upper.includes("RENE G GONZALEZ");
+}
+
+/**
+ * query_qbo — Read-only queries against QuickBooks Online.
+ * Supports: accounts, pnl, balance_sheet, pending_transactions
+ */
+async function handleQueryQBO(params: Record<string, unknown>): Promise<ActionResult> {
+  const queryType = String(params.query_type || "accounts");
+  const baseUrl = "https://www.usagummies.com";
+
+  try {
+    switch (queryType) {
+      case "accounts": {
+        const res = await fetch(`${baseUrl}/api/ops/qbo/accounts`);
+        if (!res.ok) return { success: false, message: `QBO accounts query failed: ${res.status}` };
+        const data = await res.json();
+        const accounts = (data.accounts || [])
+          .filter((a: Record<string, unknown>) => a.CurrentBalance !== 0)
+          .map((a: Record<string, unknown>) => `${a.Name}: $${Number(a.CurrentBalance || 0).toFixed(2)} (${a.AccountType})`)
+          .join("\n");
+        return {
+          success: true,
+          message: `QBO has ${data.count} accounts. Non-zero balances:\n${accounts || "(none)"}`,
+          data,
+        };
+      }
+      case "categorization_rules": {
+        const rules = QBO_CATEGORIZATION_RULES.map(r => `${r.pattern} -> ${r.accountName} (ID ${r.accountId})`).join("\n");
+        return {
+          success: true,
+          message: `QBO categorization rules (${QBO_CATEGORIZATION_RULES.length}):\n${rules}`,
+          data: { rules: QBO_CATEGORIZATION_RULES },
+        };
+      }
+      case "categorize": {
+        const description = String(params.description || "");
+        if (!description) return { success: false, message: "No description provided" };
+        const cat = qboCategorize(description);
+        const isRene = isReneInvestorTransfer(description);
+        if (isRene) {
+          return {
+            success: true,
+            message: `INVESTOR LOAN: "${description}" -> Investor Loan - Rene (ID 167). This is liability, NOT income.`,
+            data: { accountId: 167, accountName: "Investor Loan - Rene", isInvestorLoan: true },
+          };
+        }
+        if (cat) {
+          return {
+            success: true,
+            message: `Categorized: "${description}" -> ${cat.accountName} (ID ${cat.accountId})`,
+            data: cat,
+          };
+        }
+        return {
+          success: true,
+          message: `No auto-category found for "${description}". Needs manual review or new rule.`,
+          data: { accountId: null, suggestion: "Review manually or ask Ben" },
+        };
+      }
+      default:
+        return { success: false, message: `Unknown query_type: ${queryType}. Use: accounts, categorization_rules, categorize` };
+    }
+  } catch (err) {
+    return { success: false, message: `QBO query error: ${err instanceof Error ? err.message : String(err)}` };
+  }
+}
+
+/**
+ * categorize_qbo_transaction — Categorize a bank feed transaction in QBO.
+ * Auto-detects Rene investor transfers and flags them via Slack.
+ */
+async function handleCategorizeQBOTransaction(params: Record<string, unknown>): Promise<ActionResult> {
+  const description = String(params.description || "");
+  const amount = Number(params.amount || 0);
+  const date = String(params.date || new Date().toISOString().split("T")[0]);
+  const bankAccountId = Number(params.bank_account_id || 153); // Default: BofA checking
+
+  if (!description) {
+    return { success: false, message: "Transaction description is required" };
+  }
+
+  const cat = qboCategorize(description);
+  const isRene = isReneInvestorTransfer(description);
+
+  // CRITICAL: Rene transfers always get flagged via Slack
+  if (isRene) {
+    const accountId = 167; // Investor Loan - Rene
+    try {
+      await notify({
+        channel: "alerts",
+        text: [
+          `:money_with_wings: *Investor Loan Detected*`,
+          `> *From:* Rene G. Gonzalez Trust`,
+          `> *Amount:* $${Math.abs(amount).toLocaleString()}`,
+          `> *Date:* ${date}`,
+          `> *Description:* ${description}`,
+          ``,
+          `Categorized as *Investor Loan - Rene* (liability, NOT income).`,
+          `QBO Account ID: 167`,
+        ].join("\n"),
+      });
+    } catch {
+      // Best-effort Slack notification
+    }
+
+    // Create the deposit in QBO via import-batch
+    try {
+      const res = await fetch("https://www.usagummies.com/api/ops/qbo/import-batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          transactions: [{
+            date,
+            description,
+            amount: Math.abs(amount),
+            accountId,
+            isIncome: true, // Deposits into checking
+            bankAccountId,
+          }],
+        }),
+      });
+      const result = await res.json();
+      if (result.created > 0) {
+        return {
+          success: true,
+          message: `Investor Loan from Rene: $${Math.abs(amount).toLocaleString()} on ${date} -> Investor Loan - Rene (liability). Posted to QBO. Slack alerted.`,
+          data: { accountId, accountName: "Investor Loan - Rene", isInvestorLoan: true, qboResult: result },
+        };
+      }
+      return { success: false, message: `QBO posting failed: ${JSON.stringify(result)}` };
+    } catch (err) {
+      return { success: false, message: `QBO posting error: ${err instanceof Error ? err.message : String(err)}` };
+    }
+  }
+
+  // Normal categorization
+  if (!cat) {
+    return {
+      success: true,
+      message: `No auto-category for "${description}" ($${Math.abs(amount)}). Ask Ben how to categorize this.`,
+      data: { needsManualReview: true },
+    };
+  }
+
+  // Post to QBO
+  try {
+    const isIncome = amount > 0;
+    const res = await fetch("https://www.usagummies.com/api/ops/qbo/import-batch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        transactions: [{
+          date,
+          description,
+          amount: Math.abs(amount),
+          accountId: cat.accountId,
+          isIncome,
+          bankAccountId,
+        }],
+      }),
+    });
+    const result = await res.json();
+    if (result.created > 0) {
+      return {
+        success: true,
+        message: `QBO: "${description}" ($${Math.abs(amount)}) -> ${cat.accountName}. Posted.`,
+        data: { ...cat, qboResult: result },
+      };
+    }
+    return { success: false, message: `QBO posting failed: ${JSON.stringify(result)}` };
+  } catch (err) {
+    return { success: false, message: `QBO posting error: ${err instanceof Error ? err.message : String(err)}` };
+  }
+}
+
 const ACTION_HANDLERS: Record<
   string,
   (params: Record<string, unknown>) => Promise<ActionResult>
@@ -1596,6 +1881,8 @@ const ACTION_HANDLERS: Record<
   run_scenario: handleRunScenario,
   read_email: handleReadEmail,
   search_email: handleSearchEmail,
+  query_qbo: handleQueryQBO,
+  categorize_qbo_transaction: handleCategorizeQBOTransaction,
 };
 
 async function fetchApproval(approvalId: string): Promise<ApprovalRow | null> {
@@ -1850,6 +2137,9 @@ const DIRECT_EXEC_ACTIONS = new Set([
   "pause_initiative",
   // Draft email replies go to Slack for review before sending — that IS the gate
   "draft_email_reply",
+  // QBO operations — read-only queries and auto-categorization
+  "query_qbo",
+  "categorize_qbo_transaction",
 ]);
 
 /** Map action types → event bus event types for cross-department cascades */

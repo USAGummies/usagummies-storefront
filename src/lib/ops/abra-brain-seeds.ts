@@ -189,6 +189,73 @@ BIDDING STRATEGIES:
   },
 ];
 
+const QBO_SEEDS: BrainSeed[] = [
+  {
+    title: "QuickBooks Online Chart of Accounts — USA Gummies",
+    text: `USA Gummies uses QuickBooks Online (QBO) as the accounting system of record. Key custom accounts:
+
+EXPENSES:
+- Software - Operating Expense (ID 165): SaaS subscriptions — Anthropic, OpenAI, Notion, Slack, Vercel, Cloudflare, n8n, etc.
+- Advertising & marketing (ID 16): Facebook/Meta ads, Google Ads, TikTok ads, Craigslist, Amazon PPC
+- Shipping & Delivery (ID 159): Pirate Ship, USPS, FedEx — outbound customer shipping
+- Insurance (ID 42): GEICO business insurance
+- Utilities (ID 91): T-Mobile phone/internet
+- Ground Transportation (ID 162): Gas (Exxon, Shell, Maverik), Uber, Lyft
+- Tax and Accounting (ID 158): Pilot accounting service
+- Bank Fees (ID 160): Wire transfer fees, monthly fees, past due fees
+- Computers & Hardware (ID 156): Apple equipment purchases
+- Independent Contractors (ID 157): Upwork freelancers
+- Entertainment (ID 37): Business entertainment
+- Supplies (ID 83): Office supplies, Vistaprint
+- Lodging (ID 161): Business travel hotels
+- Interest Expense (ID 163): Credit card interest charges
+
+COGS:
+- Hosting Fees (ID 166): Shopify hosting fees (this is a cost of sales, not an operating expense)
+
+REVENUE:
+- Services Revenue (ID 164): Revenue from services
+
+LIABILITIES (NOT INCOME):
+- Investor Loan - Rene (ID 167): ALL money from Rene G. Gonzalez or The Rene G. Gonzalez Trust. This is investor capital/loan. NEVER categorize as income or revenue. This is a CRITICAL business rule.
+- Credit Card Payments (ID 169): Internal transfers between bank and credit card — NOT expenses
+
+ASSETS:
+- Transfers in Transit (ID 168): Stripe/payment processor payouts in transit — NOT income
+- Business Adv Fundamentals 7020 (ID 153): BofA checking account (primary operating account)
+
+CONNECTED BANK ACCOUNTS:
+- Bank of America checking (7020) — primary operating account
+- Capital One Platinum (8133) — credit card
+- Capital One QuicksilverOne (6682) — credit card`,
+    tags: ["qbo", "quickbooks", "chart_of_accounts", "accounting", "reference"],
+  },
+  {
+    title: "Rene Gonzalez Investor Loan — Critical Accounting Rule",
+    text: `CRITICAL RULE: Any transfer from Rene G. Gonzalez, "Gonzalez, Rene", or "The Rene G. Gonzalez Trust" to any USA Gummies bank account is an INVESTOR LOAN, not income.
+
+This must ALWAYS be categorized as:
+- QBO Account: "Investor Loan - Rene" (ID 167)
+- Account Type: Other Current Liability
+- This is a LIABILITY on the balance sheet, not revenue on the P&L
+
+Known transaction patterns:
+- Wire transfers from "THE RENE G. GONZALEZ TRUST RENE G GONZALEZ TRTEE"
+- Online transfers with "GONZALEZ, RENE" in description
+- Zelle or ACH transfers from Rene's accounts
+
+The largest known transfer was $99,970 on 2026-03-12 via wire.
+
+Why this matters: If investor capital is miscategorized as revenue, it inflates the P&L, overstates income, and creates incorrect tax liability. This is a fundamental accounting error that must never happen.
+
+When Abra detects a Rene investor transfer:
+1. Auto-categorize as Investor Loan - Rene (ID 167)
+2. Send Slack alert to #abra-control
+3. Log the amount and date for investor tracking`,
+    tags: ["qbo", "investor", "rene", "liability", "accounting", "critical_rule"],
+  },
+];
+
 function getSupabaseEnv() {
   const baseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -216,7 +283,7 @@ export async function seedCPGBrainEntries(): Promise<{ created: number; skipped:
   let created = 0;
   let skipped = 0;
 
-  const ALL_SEEDS = [...CPG_SEEDS, ...AMAZON_ADS_SEEDS];
+  const ALL_SEEDS = [...CPG_SEEDS, ...AMAZON_ADS_SEEDS, ...QBO_SEEDS];
   for (const seed of ALL_SEEDS) {
     // Check if entry already exists by title
     const existing = (await sbFetch(
