@@ -2576,6 +2576,88 @@ export async function POST(req: Request) {
     });
   }
 
+  // Handle /abra qbo <subcommand> — Direct QBO queries from Slack
+  const qboMatch = trimmedText.match(/^qbo\s+(.+)$/is);
+  if (qboMatch) {
+    const qboQuery = qboMatch[1].trim();
+    after(async () => {
+      try {
+        const baseUrl = process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : process.env.NEXT_PUBLIC_SITE_URL || "https://www.usagummies.com";
+        // Map common subcommands to QBO query types
+        const qboTypeMap: Record<string, string> = {
+          accounts: "accounts", account: "accounts", coa: "accounts",
+          vendors: "vendors", vendor: "vendors",
+          pnl: "pnl", "p&l": "pnl", "profit": "pnl", income: "pnl",
+          balance: "balance_sheet", "balance sheet": "balance_sheet", bs: "balance_sheet",
+          purchases: "purchases", purchase: "purchases", expenses: "purchases",
+        };
+        const lowerQuery = qboQuery.toLowerCase();
+        const queryType = qboTypeMap[lowerQuery] || lowerQuery.split(/\s+/)[0];
+        const res = await fetch(
+          `${baseUrl}/api/ops/qbo/query?type=${encodeURIComponent(queryType)}`,
+          { signal: AbortSignal.timeout(15000) },
+        );
+        if (!res.ok) {
+          const errText = await res.text().catch(() => "");
+          await postToSlackResponse(responseUrl, `❌ QBO query failed (${res.status}): ${errText.slice(0, 200)}`);
+          return;
+        }
+        const data = await res.json();
+        // Format response based on type
+        let reply = `📊 *QBO: ${queryType}*\n\`\`\`${JSON.stringify(data, null, 2).slice(0, 2800)}\`\`\``;
+        if (queryType === "accounts" && data.accounts) {
+          const nonZero = data.accounts.filter((a: Record<string, unknown>) => Number(a.CurrentBalance) !== 0);
+          const lines = nonZero.map((a: Record<string, unknown>) => `• ${a.Name}: $${Number(a.CurrentBalance || 0).toFixed(2)} (${a.AccountType})`);
+          reply = `📊 *QBO Accounts* (${data.count} total, ${nonZero.length} non-zero)\n${lines.join("\n") || "(all zero balances)"}`;
+        } else if (queryType === "vendors" && data.vendors) {
+          const lines = data.vendors.filter((v: Record<string, unknown>) => v.Active).map((v: Record<string, unknown>) => `• ${v.Name}${v.Balance ? ` ($${Number(v.Balance).toFixed(2)})` : ""}`);
+          reply = `📊 *QBO Vendors* (${data.count})\n${lines.join("\n") || "(none)"}`;
+        }
+        await postToSlackResponse(responseUrl, reply);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Unknown";
+        await postToSlackResponse(responseUrl, `❌ QBO error: ${msg.slice(0, 200)}`);
+      }
+    });
+    return NextResponse.json({ response_type: "ephemeral", text: `📊 Querying QBO: ${qboQuery}...` });
+  }
+
+  // Handle /abra backlog — Show or seed the operational backlog
+  const backlogMatch = /^backlog(?:\s+(seed))?$/i.exec(trimmedText);
+  if (backlogMatch) {
+    const seedMode = !!backlogMatch[1];
+    after(async () => {
+      try {
+        if (seedMode) {
+          const { seedOperationalBacklog } = await import("@/lib/ops/abra-operational-backlog");
+          const result = await seedOperationalBacklog();
+          await postToSlackResponse(responseUrl, result.created > 0
+            ? `✅ Seeded ${result.created} operational backlog items`
+            : `Backlog already has ${result.skipped} items`);
+          return;
+        }
+        const { getActiveBacklog } = await import("@/lib/ops/abra-operational-backlog");
+        const items = await getActiveBacklog();
+        if (items.length === 0) {
+          await postToSlackResponse(responseUrl, "📋 No active backlog items. Use `/abra backlog seed` to initialize.");
+          return;
+        }
+        const lines = items.slice(0, 15).map((item) => {
+          const icon = item.priority === "critical" ? "🔴" : item.priority === "high" ? "🟠" : "⚪";
+          const statusIcon = item.status === "blocked" ? "🚫" : item.status === "in_progress" ? "🔄" : "📋";
+          return `${statusIcon} ${icon} *[${item.owner.toUpperCase()}]* ${item.title}`;
+        });
+        await postToSlackResponse(responseUrl, `📋 *Operational Backlog* (${items.length} active)\n\n${lines.join("\n")}`);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Unknown";
+        await postToSlackResponse(responseUrl, `❌ Backlog error: ${msg.slice(0, 200)}`);
+      }
+    });
+    return NextResponse.json({ response_type: "ephemeral", text: seedMode ? "Seeding backlog..." : "Loading backlog..." });
+  }
+
   // Normal RAG query
   const queryText = answerMatch?.[1] || searchMatch?.[1] || text;
   after(async () => {

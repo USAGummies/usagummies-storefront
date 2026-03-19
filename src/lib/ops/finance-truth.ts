@@ -135,11 +135,14 @@ async function sbFetch(path: string, init: RequestInit = {}): Promise<unknown> {
 // matching the pattern in abra-actions.ts handleQueryQBO)
 // ---------------------------------------------------------------------------
 
-const QBO_BASE_URL = "https://www.usagummies.com";
+function getQBOBaseUrl(): string {
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  return process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://www.usagummies.com";
+}
 
 async function fetchQBOQuery(type: string, params: Record<string, string> = {}): Promise<unknown> {
   const searchParams = new URLSearchParams({ type, ...params });
-  const res = await fetch(`${QBO_BASE_URL}/api/ops/qbo/query?${searchParams.toString()}`, {
+  const res = await fetch(`${getQBOBaseUrl()}/api/ops/qbo/query?${searchParams.toString()}`, {
     cache: "no-store",
     signal: AbortSignal.timeout(15000),
   });

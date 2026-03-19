@@ -13,6 +13,7 @@
  * - abra-chat-persistence.ts — chat history, summarization, provenance
  */
 
+import { Buffer } from "node:buffer";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/config";
 import { isAuthorized } from "@/lib/ops/abra-auth";
@@ -68,6 +69,7 @@ import {
 } from "@/lib/ops/abra-intent";
 import { getCapabilityContext, markSuccess as capMarkSuccess, markFailure as capMarkFailure } from "@/lib/ops/capability-registry";
 import { getFinanceTruthContext } from "@/lib/ops/finance-truth";
+import { getBacklogContext } from "@/lib/ops/abra-operational-backlog";
 import {
   isSupabaseRelatedError,
   fetchActiveInitiatives,
@@ -102,6 +104,95 @@ const DEFAULT_MATCH_COUNT = 8;
 const DEFAULT_CLAUDE_MODEL =
   process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
 const MAX_MESSAGE_LENGTH = 16000;
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
+
+// ─── File Upload Helpers ───
+
+async function extractFileText(file: File): Promise<string> {
+  const ext = file.name.split(".").pop()?.toLowerCase() || "";
+  const buffer = Buffer.from(await file.arrayBuffer());
+
+  if (file.type.includes("pdf") || ext === "pdf") {
+    try {
+      const { PDFParse } = await import("pdf-parse");
+      const parser = new PDFParse({ data: buffer });
+      const parsed = await parser.getText();
+      await parser.destroy();
+      return parsed?.text?.trim() || "";
+    } catch {
+      return "[PDF extraction failed — file may be scanned/image-only]";
+    }
+  }
+
+  if (file.type.includes("spreadsheet") || file.type.includes("excel") || ext === "xlsx" || ext === "xls") {
+    try {
+      const XLSX = await import("xlsx");
+      const workbook = XLSX.read(buffer, { type: "buffer" });
+      const rows: string[] = [];
+      for (const sheetName of workbook.SheetNames) {
+        const sheet = workbook.Sheets[sheetName];
+        if (!sheet) continue;
+        rows.push(`--- Sheet: ${sheetName} ---`);
+        const csv = XLSX.utils.sheet_to_csv(sheet);
+        rows.push(csv);
+      }
+      return rows.join("\n").trim();
+    } catch {
+      return "[Spreadsheet extraction failed]";
+    }
+  }
+
+  // CSV, JSON, TXT, MD — read as text
+  const text = await file.text();
+  return text.trim();
+}
+
+async function ingestFileToMemory(file: File, extractedText: string, uploaderEmail: string): Promise<string> {
+  try {
+    const baseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!baseUrl || !serviceKey || !extractedText) return "";
+
+    const { generateEmbeddings } = await import("@/lib/ops/abra-embeddings");
+    const docId = crypto.randomUUID();
+    // Store a single summary chunk for the full document (up to 8000 chars for embedding)
+    const summaryText = extractedText.slice(0, 8000);
+    const embeddings = await generateEmbeddings([summaryText]);
+
+    const row = {
+      source_type: "manual",
+      source_ref: `document:${docId}:1`,
+      entry_type: "research",
+      title: file.name,
+      raw_text: `[document:${docId} mime:${file.type} uploaded_by:${uploaderEmail}]\n${extractedText}`.slice(0, 50000),
+      summary_text: extractedText.slice(0, 500),
+      category: "financial",
+      department: "operations",
+      confidence: "medium",
+      priority: "normal",
+      processed: true,
+      tags: ["document_upload", `uploaded_by:${uploaderEmail.toLowerCase()}`],
+      embedding: embeddings[0] || null,
+      created_at: new Date().toISOString(),
+    };
+
+    const headers = new Headers();
+    headers.set("apikey", serviceKey);
+    headers.set("Authorization", `Bearer ${serviceKey}`);
+    headers.set("Content-Type", "application/json");
+    headers.set("Prefer", "return=minimal");
+    await fetch(`${baseUrl}/rest/v1/open_brain_entries`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(row),
+      signal: AbortSignal.timeout(15000),
+    });
+    return docId;
+  } catch (err) {
+    console.error("[abra] File memory ingestion failed:", err instanceof Error ? err.message : err);
+    return "";
+  }
+}
 
 type ChatMessage = {
   role: "user" | "assistant";
@@ -436,6 +527,7 @@ export async function POST(req: Request) {
   const mode = (url.searchParams.get("mode") || "").toLowerCase();
   const healthMode = mode === "health" || mode === "quick";
 
+  // ─── Parse request (JSON or multipart/form-data with optional file) ───
   let payload: {
     message?: unknown;
     history?: unknown;
@@ -443,26 +535,59 @@ export async function POST(req: Request) {
     actor_label?: unknown;
     channel?: unknown;
   } = {};
-  try {
-    payload = await req.json();
-  } catch {
-    return NextResponse.json(
-      { error: "Invalid JSON payload" },
-      { status: 400 },
-    );
+  let uploadedFileContext = "";
+  let uploadedFileName = "";
+  let uploadedDocId = "";
+
+  const contentType = req.headers.get("content-type") || "";
+  if (contentType.includes("multipart/form-data")) {
+    try {
+      const formData = await req.formData();
+      payload = {
+        message: formData.get("message") as string | null,
+        history: (() => { try { return JSON.parse(formData.get("history") as string || "[]"); } catch { return []; } })(),
+        thread_id: formData.get("thread_id") as string | null,
+        actor_label: formData.get("actor_label") as string | null,
+        channel: formData.get("channel") as string | null,
+      };
+      const file = formData.get("file");
+      if (file instanceof File && file.size > 0) {
+        if (file.size > MAX_FILE_SIZE_BYTES) {
+          return NextResponse.json({ error: "File exceeds 10MB limit" }, { status: 400 });
+        }
+        const fileText = await extractFileText(file);
+        if (fileText) {
+          uploadedFileName = file.name;
+          uploadedFileContext = `\n\n--- UPLOADED DOCUMENT: ${file.name} ---\n${fileText.slice(0, 12000)}\n--- END DOCUMENT ---\n`;
+          // Store in memory (non-blocking)
+          void ingestFileToMemory(file, fileText, actorEmail).then((id) => { uploadedDocId = id; }).catch(() => {});
+        }
+      }
+    } catch {
+      return NextResponse.json({ error: "Invalid multipart payload" }, { status: 400 });
+    }
+  } else {
+    try {
+      payload = await req.json();
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid JSON payload" },
+        { status: 400 },
+      );
+    }
   }
 
-  const message =
+  const rawMessage =
     typeof payload.message === "string"
       ? payload.message.replaceAll("\0", "").trim()
       : "";
-  if (!message) {
+  if (!rawMessage) {
     return NextResponse.json(
       { error: "message is required" },
       { status: 400 },
     );
   }
-  if (message.length > MAX_MESSAGE_LENGTH) {
+  if (rawMessage.length > MAX_MESSAGE_LENGTH) {
     return NextResponse.json(
       {
         error: `message exceeds max length (${MAX_MESSAGE_LENGTH} chars)`,
@@ -470,6 +595,10 @@ export async function POST(req: Request) {
       { status: 400 },
     );
   }
+  // If a file was uploaded, append its content to the message so the LLM sees it
+  const message = uploadedFileContext
+    ? `${rawMessage}${uploadedFileContext}`
+    : rawMessage;
 
   const history = sanitizeHistory(payload.history);
   const requestedThreadId =
@@ -1457,7 +1586,7 @@ export async function POST(req: Request) {
 
     // Fetch corrections + departments + initiatives + cost + team + signals + live data (parallel)
     // When Supabase circuit is open, skip Supabase-dependent fetches to avoid 15s timeouts
-    const [corrections, departments, activeInitiatives, costSummary, teamMembers, vendors, signals, liveSnapshot, financialContext, ledgerCtx, financeTruth, capabilityStatus] =
+    const [corrections, departments, activeInitiatives, costSummary, teamMembers, vendors, signals, liveSnapshot, financialContext, ledgerCtx, financeTruth, capabilityStatus, backlogCtx] =
       await Promise.all([
         supabaseCircuitOpen ? Promise.resolve([] as Awaited<ReturnType<typeof fetchCorrections>>) : fetchCorrections(),
         supabaseCircuitOpen ? Promise.resolve([] as Awaited<ReturnType<typeof fetchDepartments>>) : fetchDepartments(),
@@ -1484,6 +1613,8 @@ export async function POST(req: Request) {
           : Promise.resolve(null as string | null),
         // Capability registry — real-time integration health for context
         getCapabilityContext().catch(() => null as string | null),
+        // Operational backlog — what Abra needs to work on
+        supabaseCircuitOpen ? Promise.resolve(null as string | null) : getBacklogContext().catch(() => null as string | null),
       ]);
     const competitorContext =
       isCompetitorQuestion(message) || messageDepartment === "sales_and_growth"
@@ -1518,7 +1649,7 @@ export async function POST(req: Request) {
     const enrichedFinancialContext = isFinanceConversation && financeTruth
       ? [financialContext, financeTruth].filter(Boolean).join("\n\n")
       : financialContext;
-    const augmentedLiveSnapshot = [liveSnapshot, temporalHint, dataStatusLine].filter(Boolean).join("\n") || null;
+    const augmentedLiveSnapshot = [liveSnapshot, temporalHint, dataStatusLine, backlogCtx].filter(Boolean).join("\n") || null;
 
     // Check deadline before expensive LLM call
     if (deadlineController.signal.aborted) {
