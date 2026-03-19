@@ -201,32 +201,21 @@ export async function GET(req: NextRequest) {
   }
 
   // Always dispatch the Abra scheduler for feeds, anomaly detection, morning brief, etc.
+  // Use direct fetch (fire-and-forget) instead of QStash to conserve daily QStash quota.
   let abraSchedulerOk = false;
   try {
     const abraUrl = `${baseUrl}/api/ops/abra/scheduler`;
     const cronSecret = process.env.CRON_SECRET;
-    if (qstash) {
-      await qstash.publishJSON({
-        url: abraUrl,
-        body: { triggeredBy: "master-scheduler" },
-        headers: cronSecret ? { authorization: `Bearer ${cronSecret}` } : {},
-        retries: 2,
-        timeout: "5m",
-      });
-      abraSchedulerOk = true;
-    } else {
-      // Direct fetch fallback (dev mode)
-      const res = await fetch(abraUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(cronSecret ? { authorization: `Bearer ${cronSecret}` } : {}),
-        },
-        body: JSON.stringify({ triggeredBy: "master-scheduler" }),
-        signal: AbortSignal.timeout(15000),
-      });
-      abraSchedulerOk = res.ok;
-    }
+    const res = await fetch(abraUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(cronSecret ? { authorization: `Bearer ${cronSecret}` } : {}),
+      },
+      body: JSON.stringify({ triggeredBy: "master-scheduler" }),
+      signal: AbortSignal.timeout(15000),
+    });
+    abraSchedulerOk = res.ok;
   } catch (e) {
     console.error("[scheduler] Abra scheduler dispatch failed:", e);
   }
@@ -239,46 +228,52 @@ export async function GET(req: NextRequest) {
     console.error("[scheduler] Health check failed:", e);
   }
 
-  // Keep audit cache warm so pages have recent reconciliation + freshness data.
+  // Keep audit cache warm — run every 30 min (top of hour + :30) instead of every 5 min
+  // to reduce function execution time on most scheduler cycles.
+  const etMin = nowET.getMinutes();
   let auditWarm = false;
-  try {
-    await runOpsAudit();
-    auditWarm = true;
-  } catch (err) {
-    console.error("[scheduler] Audit warmup failed:", err);
+  if (etMin < 5 || (etMin >= 30 && etMin < 35)) {
+    try {
+      await runOpsAudit();
+      auditWarm = true;
+    } catch (err) {
+      console.error("[scheduler] Audit warmup failed:", err);
+    }
   }
 
-  // Weekly connector SLA report (Monday ET) + nightly failure-injection report.
+  // Weekly connector SLA report — only check on Monday cycles or first-time init.
+  // Previously ran buildIntegrationSLAReport() every 5 min (wasteful).
   let integrationSLA: IntegrationSLAReport | null = null;
   let integrationSLAUpdated = false;
-  try {
-    const currentWeekReport = buildIntegrationSLAReport();
-    const existing = await readState<IntegrationSLAReport | null>(
-      "integration-sla-report",
-      null,
-    );
-
-    if (nowET.getDay() === 1 && existing?.weekKey !== currentWeekReport.weekKey) {
-      await writeState("integration-sla-report", currentWeekReport);
-      integrationSLA = currentWeekReport;
-      integrationSLAUpdated = true;
-    } else {
-      integrationSLA = existing || currentWeekReport;
-      if (!existing) {
+  if (nowET.getDay() === 1 && nowET.getHours() === 8 && etMin < 5) {
+    // Monday 8:00 AM ET — rebuild SLA report
+    try {
+      const currentWeekReport = buildIntegrationSLAReport();
+      const existing = await readState<IntegrationSLAReport | null>(
+        "integration-sla-report",
+        null,
+      );
+      if (!existing || existing.weekKey !== currentWeekReport.weekKey) {
         await writeState("integration-sla-report", currentWeekReport);
+        integrationSLA = currentWeekReport;
         integrationSLAUpdated = true;
+      } else {
+        integrationSLA = existing;
       }
+    } catch (err) {
+      console.error("[scheduler] Integration SLA report failed:", err);
     }
-  } catch (err) {
-    console.error("[scheduler] Integration SLA report failed:", err);
   }
 
+  // Chaos / failure-injection suite — run once daily at 3:00 AM ET instead of every 5 min.
   let chaos = null as Awaited<ReturnType<typeof runFailureInjectionSuite>> | null;
-  try {
-    chaos = await runFailureInjectionSuite();
-    await writeState("chaos-suite-report", chaos);
-  } catch (err) {
-    console.error("[scheduler] Failure-injection suite failed:", err);
+  if (nowET.getHours() === 3 && etMin < 5) {
+    try {
+      chaos = await runFailureInjectionSuite();
+      await writeState("chaos-suite-report", chaos);
+    } catch (err) {
+      console.error("[scheduler] Failure-injection suite failed:", err);
+    }
   }
 
   return NextResponse.json({
