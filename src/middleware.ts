@@ -32,6 +32,8 @@ const SELF_AUTHENTICATED_PREFIXES = [
   "/api/ops/gmail-callback", // One-time OAuth callback for Gmail setup
   "/api/ops/qbo/", // QBO OAuth flow + setup (authorize, callback, setup)
   "/api/ops/puzzle/", // Puzzle OAuth flow
+  "/api/ops/sweeps/", // Sweep runners — auth via CRON_SECRET or QStash signature
+  "/api/ops/workflows/", // Workflow engine — auth handled in route
 ];
 
 function isSelfAuthenticated(pathname: string): boolean {
