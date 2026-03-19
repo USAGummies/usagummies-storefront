@@ -50,8 +50,15 @@ export type FinanceDiscrepancy = {
 // ---------------------------------------------------------------------------
 
 export const BRAIN_VERIFIED = {
-  /** Actual landed COGS from Dutch Valley Foods Run #1, Sept 2025. */
-  COGS_PER_UNIT: 3.11,
+  /** HISTORICAL COGS from Dutch Valley Foods Run #1 (Sept 2025, 2,500 units).
+   *  This was the initial small run and is NOT the go-forward COGS.
+   *  Go-forward COGS uses Albanese + Belmark + Powers supply chain. */
+  COGS_PER_UNIT_RUN1: 3.11,
+
+  /** Forward-looking COGS per unit from new supply chain (pro forma, partially quoted).
+   *  Components: Albanese candy $0.919 + Belmark film $0.144 + Powers co-packing $0.35 + freight $0.109
+   *  NOTE: Powers pricing is a QUOTE, not a final contracted rate. */
+  COGS_PER_UNIT_FORWARD: 1.522,
 
   /** Full-year 2025 total revenue (Found Banking P&L). */
   REVENUE_2025: 1484.8,
@@ -466,19 +473,35 @@ export async function getVerifiedBalance(accountName: string): Promise<VerifiedA
 // ---------------------------------------------------------------------------
 
 /**
- * Returns the verified COGS per unit from Dutch Valley Foods Run #1 (Sept 2025).
- * This is a brain_verified constant: $3.11/unit = $7,762.60 / 2,500 units.
+ * Returns the go-forward COGS per unit from the new supply chain
+ * (Albanese + Belmark + Powers). This is the number to use for margin
+ * calculations, deal pricing, and financial projections.
  *
- * The Supabase product_config value ($1.35) is WRONG — it is ingredient-only
- * cost. The correct all-in landed COGS is $3.11.
+ * The $3.11 figure from Dutch Valley Run #1 is historical (small initial batch).
+ * The $1.35 in Supabase product_config is WRONG (ingredient-only).
+ *
+ * NOTE: Powers co-packing rate ($0.35/bag) is a QUOTE, not a final contract.
  */
 export async function getVerifiedCOGS(): Promise<VerifiedAmount> {
   return {
-    value: BRAIN_VERIFIED.COGS_PER_UNIT,
+    value: BRAIN_VERIFIED.COGS_PER_UNIT_FORWARD,
+    source: "brain_verified",
+    verified: true,
+    asOf: "2026-03-19T00:00:00.000Z",
+    note: `Forward COGS: $1.522/unit (Albanese candy $0.919 + Belmark film $0.144 + Powers co-packing $0.350 [QUOTE] + freight $0.109). Historical Run #1 COGS was $3.11/unit (Dutch Valley, 2,500 units, Sept 2025) — do not use for forward projections.`,
+  };
+}
+
+/**
+ * Returns the historical COGS from Dutch Valley Run #1 for P&L lookback.
+ */
+export async function getHistoricalCOGS(): Promise<VerifiedAmount> {
+  return {
+    value: BRAIN_VERIFIED.COGS_PER_UNIT_RUN1,
     source: "brain_verified",
     verified: true,
     asOf: "2025-09-10T00:00:00.000Z",
-    note: `Dutch Valley Foods Run #1 (Sept 2025): $7,762.60 for 2,500 units = $3.11/unit all-in (ingredients + packaging + co-packing + film). Supersedes the $1.35 figure in Supabase product_config (ingredient-only) and any $3.50 hardcoded estimate.`,
+    note: `Dutch Valley Foods Run #1 (Sept 2025): $7,762.60 for 2,500 units = $3.11/unit. Initial small batch — not representative of go-forward economics.`,
   };
 }
 
@@ -660,7 +683,8 @@ export async function getFinanceTruthContext(): Promise<string> {
   // --- Brain-verified constants ---
   lines.push("BRAIN-VERIFIED DATA (Source: Found Banking exports, verified 2026-03-13):");
   lines.push(`  Entity: ${BRAIN_VERIFIED.ENTITY}`);
-  lines.push(`  COGS per unit: $${BRAIN_VERIFIED.COGS_PER_UNIT.toFixed(2)} (Dutch Valley Foods Run #1, Sept 2025 — AUTHORITATIVE)`);
+  lines.push(`  COGS per unit (Run #1 historical): $${BRAIN_VERIFIED.COGS_PER_UNIT_RUN1.toFixed(2)} (Dutch Valley Foods, Sept 2025 — small 2,500 unit run)`);
+  lines.push(`  COGS per unit (forward/pro forma): $${BRAIN_VERIFIED.COGS_PER_UNIT_FORWARD.toFixed(2)} (Albanese + Belmark + Powers supply chain — Powers rate is QUOTE, not final)`);
   lines.push(`  2025 Full Year Revenue: $${BRAIN_VERIFIED.REVENUE_2025.toFixed(2)}`);
   lines.push(`  2025 Full Year COGS: $${BRAIN_VERIFIED.COGS_2025.toFixed(2)}`);
   lines.push(`  2025 Full Year OpEx: $${BRAIN_VERIFIED.OPEX_2025.toFixed(2)}`);
@@ -699,11 +723,20 @@ export async function getFinanceTruthContext(): Promise<string> {
 
   // --- COGS authoritative statement ---
   lines.push("COGS TRUTH:");
-  lines.push("  Authoritative COGS: $3.11/unit (brain_verified — Dutch Valley Foods Run #1)");
+  lines.push("  ⚠️ TWO COGS FIGURES — context matters:");
+  lines.push("  1. HISTORICAL (Run #1): $3.11/unit — Dutch Valley Foods, Sept 2025, 2,500 units");
+  lines.push("     - This was the initial small batch. High per-unit cost due to low volume.");
+  lines.push("     - Applies to: existing inventory from Run #1 still being sold.");
+  lines.push("  2. FORWARD (Pro Forma): $1.522/unit — New supply chain for 50K+ unit runs");
+  lines.push("     - Albanese candy: $0.919/unit");
+  lines.push("     - Belmark packaging film: $0.144/unit");
+  lines.push("     - Powers Confections co-packing: $0.350/unit (QUOTED, not final contract)");
+  lines.push("     - Inbound freight: $0.109/unit");
+  lines.push("     - This is the go-forward COGS for margin calculations and deal pricing.");
   lines.push("  WRONG values to ignore:");
   lines.push("    - $1.35/unit in Supabase product_config (ingredient-only, not all-in)");
-  lines.push("    - $3.50/unit (any hardcoded estimate — superseded)");
-  lines.push("  Applies to: All inventory from Run #1 (Sept 2025). No Run #2 yet as of Mar 2026.");
+  lines.push("    - $3.50/unit (any old hardcoded estimate — superseded)");
+  lines.push("  NOTE: Use $1.522 for all forward-looking margin/pricing analysis. Use $3.11 only when discussing Run #1 historical P&L.");
   lines.push("");
 
   // --- Source hierarchy reminder ---

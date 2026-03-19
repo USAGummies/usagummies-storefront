@@ -16,14 +16,14 @@
 // ---------------------------------------------------------------------------
 
 export const COST_STRUCTURE = {
-  /** All-in COGS per unit */
+  /** All-in COGS per unit (forward/pro forma — Powers rate is QUOTED, not final) */
   cogsPerUnit: 1.522,
-  /** Component breakdown */
+  /** Component breakdown (from supplier quotes, Mar 2026) */
   components: {
-    candy: 0.919,       // Albanese bulk gummy
-    packaging: 0.144,   // Belmark film
-    copacking: 0.350,   // Powers Inc labor
-    freight: 0.109,     // Inbound freight per unit
+    candy: 0.919,       // Albanese bulk gummy (verified from order)
+    packaging: 0.144,   // Belmark film (verified from order)
+    copacking: 0.350,   // Powers Confections tolling (QUOTE — not final contract)
+    freight: 0.109,     // Inbound freight per unit (estimated)
   },
   /** Retail MSRP */
   msrp: 4.99,

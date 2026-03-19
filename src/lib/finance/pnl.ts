@@ -59,7 +59,7 @@ async function getInventoryCostSnapshot(): Promise<InventoryCostSnapshot> {
   try {
     const rows = await queryDatabase(DB.INVENTORY);
     if (!rows || rows.length === 0) {
-      return { costPerUnit: 3.5, source: "fallback" };
+      return { costPerUnit: 1.522, source: "fallback" };
     }
 
     let weightedCostTotal = 0;
@@ -99,7 +99,7 @@ async function getInventoryCostSnapshot(): Promise<InventoryCostSnapshot> {
     console.error("[pnl] Inventory cost lookup failed:", err);
   }
 
-  return { costPerUnit: 3.5, source: "fallback" };
+  return { costPerUnit: 1.522, source: "fallback" };
 }
 
 // ---------------------------------------------------------------------------
@@ -268,7 +268,7 @@ async function getCOGS(): Promise<{
   const unitsSoldMTD = kpis?.unitsSold?.monthToDate || 0;
   const productCost = unitsSoldMTD * inventoryCost.costPerUnit;
   if (inventoryCost.source === "fallback") {
-    console.warn("[pnl] Falling back to default COGS ($3.50) — inventory costs unavailable");
+    console.warn("[pnl] Falling back to forward COGS ($1.522/unit — Albanese+Belmark+Powers pro forma)");
   }
 
   // Shopify transaction fees (~2.9% + $0.30 per transaction)

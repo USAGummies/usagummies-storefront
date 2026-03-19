@@ -291,16 +291,27 @@ Notes: This was the FIRST production run. Included film/packaging in cost. All 2
 Additional materials:
   - EnergiNut.com: $17.11 (Oct 2025 — materials/ingredients, possibly supplemental)
 
-=== CURRENT COGS BASIS ===
-Hard COGS per unit: $3.11 (from Run #1)
-This replaces the $3.50 estimate previously in code and the $1.35 in Supabase product_config.
-The $1.35 figure appears to be ingredient-only cost; the $3.11 includes packaging and manufacturing.
+=== HISTORICAL COGS (Run #1 only) ===
+Run #1 COGS: $3.11/unit (Dutch Valley Foods, 2,500 units, Sept 2025)
+This was the initial small batch — high per-unit cost due to low volume and single-source manufacturing.
+Applies ONLY to existing Run #1 inventory still being sold. Do NOT use for forward projections.
+
+=== GO-FORWARD COGS (New Supply Chain) ===
+Forward COGS: $1.522/unit — from new multi-supplier setup:
+  - Albanese Confectionery (candy/gummies): $0.919/unit
+  - Belmark Inc (packaging film): $0.144/unit
+  - Powers Confections (co-packing/tolling): $0.350/unit ⚠️ THIS IS A QUOTE, NOT A FINAL CONTRACT
+  - Inbound freight: $0.109/unit
+This is the basis for all deal pricing, margin analysis, and financial projections.
+The Powers rate may change once the contract is finalized for the 50K unit run.
 
 === PENDING ===
-No production runs in 2026 yet. Current inventory from Run #1 is being sold.
-Next run planning underway — quotes needed from Dutch Valley for larger quantity (MOQ analysis).
+50K unit production run in planning with Powers Confections. $8,750 deposit paid March 10, 2026.
+Final co-packing rate from Powers TBD — current $0.35/bag is quoted, not contracted.
 
-IMPORTANT: The Supabase product_config default of $1.35 COGS is WRONG. Actual landed COGS is $3.11/unit from Run #1. This needs to be corrected in the system.`,
+WRONG values to ignore:
+  - $1.35/unit in Supabase product_config (ingredient-only, not all-in)
+  - $3.50/unit (old hardcoded estimate — superseded)`,
     },
 
     // -----------------------------------------------------------------------
@@ -375,7 +386,8 @@ The burn rate dropped because:
 Current monthly burn: ~$1,000-1,300
 Current monthly revenue: ~$1,000-1,200 (based on 2026 annualized)
 Gap: Near breakeven on operating basis (excluding COGS)
-With COGS ($3.11/unit): Need ~420 units/month at $10 ASP to break even fully
+With forward COGS ($1.522/unit): Need ~130 units/month at $10 ASP to break even fully
+(Historical Run #1 COGS was $3.11/unit — that's the small batch cost, not go-forward)
 
 === TOP RECURRING MONTHLY COSTS (2026) ===
 1. Anthropic: ~$200-560/mo (variable by API usage)
@@ -478,12 +490,13 @@ GS1 US membership: $90 (April 2025) — UPC barcode registration for retail/whol
 Source: Verified from Found Banking records, March 2026.
 
 === CORRECTION 1: COGS PER UNIT ===
-WRONG (in Supabase product_config): $1.35/unit
-WRONG (hardcoded in pnl.ts): $3.50/unit
-CORRECT (from actual Run #1 data): $3.11/unit
-Basis: $7,762.60 total cost / 2,500 units = $3.105/unit
-Source: Dutch Valley Foods payments (Sept 5 + Sept 10, 2025)
-Action needed: Update Supabase product_config AND pnl.ts
+WRONG (in Supabase product_config): $1.35/unit (ingredient-only, not all-in)
+WRONG (hardcoded in pnl.ts): $3.50/unit (old estimate)
+HISTORICAL (Run #1): $3.11/unit — Dutch Valley Foods, Sept 2025, 2,500 units. Small initial batch, NOT go-forward.
+GO-FORWARD (Pro Forma): $1.522/unit — Albanese $0.919 + Belmark $0.144 + Powers $0.350 (QUOTE) + freight $0.109
+Source for forward: Supplier quotes collected March 2026 for 50K unit production run
+NOTE: Powers co-packing rate is a QUOTE ($0.35/bag tolling), not a final contract. May change.
+Action needed: Update Supabase product_config to $1.522 AND pnl.ts
 
 === CORRECTION 2: REVENUE RECOGNITION ===
 Found Banking uses CASH BASIS accounting.

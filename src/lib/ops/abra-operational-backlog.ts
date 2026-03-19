@@ -340,8 +340,8 @@ export async function seedOperationalBacklog(): Promise<{ created: number; skipp
       owner: "abra",
     },
     {
-      title: "Update Supabase product_config COGS from $1.35 to $3.11",
-      description: "The product_config table has $1.35/unit (ingredient-only). The actual verified COGS is $3.11/unit (all-in from Dutch Valley Run #1). This needs to be corrected to prevent wrong margin calculations.",
+      title: "Update Supabase product_config COGS from $1.35 to $1.522 (forward pro forma)",
+      description: "The product_config table has $1.35/unit (ingredient-only). The go-forward COGS is $1.522/unit (Albanese $0.919 + Belmark $0.144 + Powers $0.350 [QUOTE] + freight $0.109). The old $3.11 figure was from the initial Dutch Valley 2,500-unit run and is NOT representative of forward economics.",
       priority: "high",
       department: "finance",
       owner: "abra",
