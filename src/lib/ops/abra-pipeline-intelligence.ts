@@ -484,7 +484,7 @@ export async function generateLLMDealInsights(
     };
   }
 
-  const FALLBACK_PROMPT = `You are the B2B sales strategist for USA Gummies, a CPG vitamin gummy company.
+  const FALLBACK_PROMPT = `You are the B2B sales strategist for USA Gummies, a CPG confectionery gummy company.
 
 Given the current pipeline data, generate:
 1. A brief pipeline narrative (2-3 sentences summarizing health, momentum, and priorities)

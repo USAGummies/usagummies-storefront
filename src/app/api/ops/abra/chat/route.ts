@@ -73,6 +73,7 @@ import {
 } from "@/lib/ops/memory/conversation-summarizer";
 import { learnDecisionPatterns } from "@/lib/ops/memory/decision-patterns";
 import { captureOperationalPatterns } from "@/lib/ops/memory/operational-patterns";
+import { notifyAlert } from "@/lib/ops/notify";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -894,8 +895,8 @@ function queueChatHistory(params: {
       try {
         const lastCount = await kv.get<number>(summaryCountKey);
         if (typeof lastCount === "number" && lastCount >= messageCount) return;
-      } catch {
-        // continue without KV dedupe if read fails
+      } catch (err) {
+        console.error("[abra/chat] KV dedupe read failed — continuing without deduplication", err);
       }
 
       const summary = await summarizeConversation(
@@ -910,15 +911,24 @@ function queueChatHistory(params: {
       await storeConversationSummary(summary);
       try {
         await kv.set(summaryCountKey, messageCount, { ex: 7 * 24 * 60 * 60 });
-      } catch {
-        // non-critical
+      } catch (err) {
+        console.error("[abra/chat] KV dedupe write failed — summary count not persisted", err);
       }
-    } catch {
-      // Conversation summarization is best-effort.
+    } catch (err) {
+      console.error("[abra/chat] Conversation summarization failed", err);
+      void notifyAlert(
+        `Abra memory write failure (conversation summarization): ${err instanceof Error ? err.message : String(err)}`,
+      ).catch((notifyErr) =>
+        console.error("[abra/chat] Failed to send summarization failure alert", notifyErr),
+      );
     }
 
-    void learnDecisionPatterns().catch(() => {});
-    void captureOperationalPatterns().catch(() => {});
+    void learnDecisionPatterns().catch((err) =>
+      console.error("[abra/chat] learnDecisionPatterns failed", err),
+    );
+    void captureOperationalPatterns().catch((err) =>
+      console.error("[abra/chat] captureOperationalPatterns failed", err),
+    );
   });
 }
 
@@ -1207,6 +1217,7 @@ export async function POST(req: Request) {
     history?: unknown;
     thread_id?: unknown;
     actor_label?: unknown;
+    channel?: unknown;
   } = {};
   try {
     payload = await req.json();
@@ -1247,6 +1258,12 @@ export async function POST(req: Request) {
     typeof payload.actor_label === "string" && payload.actor_label.trim()
       ? payload.actor_label.trim().slice(0, 120)
       : actorEmail;
+  const VALID_CHANNELS = ["web", "slack", "api"] as const;
+  type AnswerChannel = (typeof VALID_CHANNELS)[number];
+  const rawChannel = typeof payload.channel === "string" ? payload.channel.trim() : "";
+  const channel: AnswerChannel = (VALID_CHANNELS as readonly string[]).includes(rawChannel)
+    ? (rawChannel as AnswerChannel)
+    : "web";
   const messageDepartment = detectDepartment(message);
 
   if (healthMode) {
@@ -1687,7 +1704,7 @@ export async function POST(req: Request) {
         if (anthropicKey) {
           const isCashQuestion = /\b(cash position|bank balance|checking balance|how much .*(in the bank|do we have|cash|money)|current balance|account balance|overdrawn|overdraft)\b/i.test(message);
           const isReconciliationQuestion = /\b(reconcil|setup|configure|set up|get started|initial|onboard|clean up|organize)\b/i.test(message);
-          const financePrompt = `You are Abra, the AI operations assistant for USA Gummies (a CPG vitamin gummy company). The user asked a financial question. Here is QBO data:\n\n${financeData}${revenueContext}${ledgerContext}\n\n${isReconciliationQuestion ? `RECONCILIATION & SETUP CONTEXT:\nThe QBO books are in early setup stage. Bank feeds are connected but transactions are minimally categorized. Key tasks Rene (bookkeeper) and Abra are working on:\n1. Import and categorize all historical transactions\n2. Set up proper vendor records (Powers Confections, Albanese, NinjaPrintHouse, Pirate Ship, etc.)\n3. Map the chart of accounts to the C-Corp structure (Form 1120)\n4. Reconcile bank feeds with actual bank statements\n5. Set up proper COGS tracking ($3.11/unit from verified production run data)\n6. Configure revenue accounts by channel (DTC/Amazon/Wholesale)\nAbra can help with batch categorization, transaction import, and data organization. Rene should focus on professional review and sign-off.\n\n` : ""}CRITICAL RULES:\n1. Any transfer from "Rene G. Gonzalez" or "Rene G Gonzalez Trust" is an INVESTOR LOAN (liability account ID 167), NEVER income. This is investor capital, not revenue.\n2. **MOST IMPORTANT RULE — READ THIS CAREFULLY:** The balances below are QBO BOOK BALANCES ONLY. QuickBooks book balances frequently diverge from actual bank balances when bank feed imports are behind, transactions are uncategorized, or reconciliation hasn't been done recently. ${isCashQuestion ? "The user is asking about cash/bank balances. You MUST lead your response with a prominent warning box like: '⚠️ **Important: These are QuickBooks book balances, not live bank balances.** QBO bank feeds may be behind — the actual bank balance could be significantly different. Please verify against your bank account directly before making any decisions based on these numbers.' Do NOT present QBO book balances as the actual cash position. Do NOT say 'the checking account is overdrawn' — say 'QBO books show X, but this may not reflect the actual bank balance.'" : "Label any balance figures as 'per QBO books' — never present them as definitive."}\n3. **WHEN DATA IS MISSING OR ALL ZEROS:** If the QBO data shows all $0.00 balances for categories like COGS, Expenses, or Income, do NOT present those zeros as fact. Instead explain honestly: "QBO doesn't have categorized data for this yet — the bank feed transactions haven't been fully imported and categorized. I'll flag this for Ben to get set up." Offer to note what needs to be configured.\n4. **KNOWN VENDORS (even if not in QBO yet):** Key USA Gummies vendors include Powers Confections (co-packer, Janesville WI), Albanese Confectionery (gummy base/ingredients), NinjaPrintHouse (packaging/labels), Pirate Ship (shipping), and various software (Shopify, Anthropic, Slack). If user asks about vendors and QBO has none, share this knowledge and note QBO vendor records need setup.\n5. **BE HONEST AND HELPFUL:** If you don't have the data to answer, say so clearly. Offer to flag it for configuration. Never make up numbers. Never present incomplete data as complete.\n6. **VERIFIED FINANCIAL DATA TAKES PRIORITY:** If both QBO data and Notion Ledger data are available, the Notion Ledger (verified from Found Banking records) is more authoritative for historical P&L, vendor totals, and revenue figures. QBO is the current working system being set up.\n7. **CORPORATE STRUCTURE:** USA Gummies is a C-Corporation (Wyoming), files Form 1120. Cash-basis accounting (per Found Banking). The chart of accounts follows standard categories mapped from Found to QBO.\n8. **KEY FINANCIALS (verified):** 2025 revenue $1,484.80, 2025 net income -$30,183.14 (launch year). 2026 YTD revenue ~$2,931.36. COGS per unit: $3.11 (verified from Dutch Valley Foods Run #1, Sept 2025). Current burn rate: ~$1,000-1,300/month.\n9. **WHEN WORKING WITH RENE (bookkeeper):** Rene is building the books from scratch. Be collaborative. If he asks for data, pull it from QBO and Notion and present it clearly. If data isn't in the system yet, explain what needs to be configured and offer to help set it up. Don't ask clarifying questions when you can look up the answer. When creating deliverables, create them as Notion pages under the Bookkeeping Hub.\n\nProvide a clear, helpful response to: "${message}"\n\nInclude specific account names, IDs, and balances where relevant. If the user asks about the Chart of Accounts, list the accounts organized by type. If asking about reconciliation or setup, provide a concrete action plan with what Abra can handle vs what needs manual review. Keep it concise but complete. Format with markdown.`;
+          const financePrompt = `You are Abra, the AI operations assistant for USA Gummies (a CPG confectionery gummy company). The user asked a financial question. Here is QBO data:\n\n${financeData}${revenueContext}${ledgerContext}\n\n${isReconciliationQuestion ? `RECONCILIATION & SETUP CONTEXT:\nThe QBO books are in early setup stage. Bank feeds are connected but transactions are minimally categorized. Key tasks Rene (bookkeeper) and Abra are working on:\n1. Import and categorize all historical transactions\n2. Set up proper vendor records (Powers Confections, Albanese, NinjaPrintHouse, Pirate Ship, etc.)\n3. Map the chart of accounts to the C-Corp structure (Form 1120)\n4. Reconcile bank feeds with actual bank statements\n5. Set up proper COGS tracking ($3.11/unit from verified production run data)\n6. Configure revenue accounts by channel (DTC/Amazon/Wholesale)\nAbra can help with batch categorization, transaction import, and data organization. Rene should focus on professional review and sign-off.\n\n` : ""}CRITICAL RULES:\n1. Any transfer from "Rene G. Gonzalez" or "Rene G Gonzalez Trust" is an INVESTOR LOAN (liability account ID 167), NEVER income. This is investor capital, not revenue.\n2. **MOST IMPORTANT RULE — READ THIS CAREFULLY:** The balances below are QBO BOOK BALANCES ONLY. QuickBooks book balances frequently diverge from actual bank balances when bank feed imports are behind, transactions are uncategorized, or reconciliation hasn't been done recently. ${isCashQuestion ? "The user is asking about cash/bank balances. You MUST lead your response with a prominent warning box like: '⚠️ **Important: These are QuickBooks book balances, not live bank balances.** QBO bank feeds may be behind — the actual bank balance could be significantly different. Please verify against your bank account directly before making any decisions based on these numbers.' Do NOT present QBO book balances as the actual cash position. Do NOT say 'the checking account is overdrawn' — say 'QBO books show X, but this may not reflect the actual bank balance.'" : "Label any balance figures as 'per QBO books' — never present them as definitive."}\n3. **WHEN DATA IS MISSING OR ALL ZEROS:** If the QBO data shows all $0.00 balances for categories like COGS, Expenses, or Income, do NOT present those zeros as fact. Instead explain honestly: "QBO doesn't have categorized data for this yet — the bank feed transactions haven't been fully imported and categorized. I'll flag this for Ben to get set up." Offer to note what needs to be configured.\n4. **KNOWN VENDORS (even if not in QBO yet):** Key USA Gummies vendors include Powers Confections (co-packer, Janesville WI), Albanese Confectionery (gummy base/ingredients), NinjaPrintHouse (packaging/labels), Pirate Ship (shipping), and various software (Shopify, Anthropic, Slack). If user asks about vendors and QBO has none, share this knowledge and note QBO vendor records need setup.\n5. **BE HONEST AND HELPFUL:** If you don't have the data to answer, say so clearly. Offer to flag it for configuration. Never make up numbers. Never present incomplete data as complete.\n6. **VERIFIED FINANCIAL DATA TAKES PRIORITY:** If both QBO data and Notion Ledger data are available, the Notion Ledger (verified from Found Banking records) is more authoritative for historical P&L, vendor totals, and revenue figures. QBO is the current working system being set up.\n7. **CORPORATE STRUCTURE:** USA Gummies is a C-Corporation (Wyoming), files Form 1120. Cash-basis accounting (per Found Banking). The chart of accounts follows standard categories mapped from Found to QBO.\n8. **KEY FINANCIALS (verified):** 2025 revenue $1,484.80, 2025 net income -$30,183.14 (launch year). 2026 YTD revenue ~$2,931.36. COGS per unit: $3.11 (verified from Dutch Valley Foods Run #1, Sept 2025). Current burn rate: ~$1,000-1,300/month.\n9. **WHEN WORKING WITH RENE (bookkeeper):** Rene is building the books from scratch. Be collaborative. If he asks for data, pull it from QBO and Notion and present it clearly. If data isn't in the system yet, explain what needs to be configured and offer to help set it up. Don't ask clarifying questions when you can look up the answer. When creating deliverables, create them as Notion pages under the Bookkeeping Hub.\n\nProvide a clear, helpful response to: "${message}"\n\nInclude specific account names, IDs, and balances where relevant. If the user asks about the Chart of Accounts, list the accounts organized by type. If asking about reconciliation or setup, provide a concrete action plan with what Abra can handle vs what needs manual review. Keep it concise but complete. Format with markdown.`;
           const llmRes = await fetch(
             "https://api.anthropic.com/v1/messages",
             {
@@ -2414,7 +2431,7 @@ export async function POST(req: Request) {
       memory_tiers_used: provenance.memory_tiers_used,
       department: messageDepartment,
       asked_by: actorEmail,
-      channel: "web",
+      channel,
       model_used: claudeResult.modelUsed,
     });
 

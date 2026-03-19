@@ -230,6 +230,14 @@ async function writeBrainEntry(params: {
   department: string;
 }): Promise<boolean> {
   try {
+    // Deduplication: skip insert if an entry with the same source_ref already exists
+    const existing = (await sbFetch(
+      `/rest/v1/open_brain_entries?source_ref=eq.${encodeURIComponent(params.sourceRef)}&select=id&limit=1`,
+    )) as { id: string }[];
+    if (Array.isArray(existing) && existing.length > 0) {
+      return true;
+    }
+
     const embedding = await buildEmbedding(
       `${params.title}\n${params.rawText}`,
     );

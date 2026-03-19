@@ -420,7 +420,7 @@ export async function extractEmailSignalsWithLLM(params: {
     return extractEmailSignals(params);
   }
 
-  const FALLBACK_PROMPT = `You are an operational signal detector for USA Gummies, a CPG vitamin gummy company.
+  const FALLBACK_PROMPT = `You are an operational signal detector for USA Gummies, a CPG confectionery gummy company.
 
 Analyze the email below and extract operational signals. For each signal, determine:
 - signal_type: one of "large_order", "complaint", "urgent_request", "payment_invoice", "supplier_update", "regulatory", "partnership_opportunity", "competitor_intel", "logistics_issue"

@@ -191,7 +191,7 @@ export async function analyzeAnomaliesWithLLM(): Promise<
   }
 
   // Load versioned prompt with fallback
-  const FALLBACK_PROMPT = `You are a CPG analytics expert for USA Gummies, a vitamin gummy company selling on Shopify and Amazon.
+  const FALLBACK_PROMPT = `You are a CPG analytics expert for USA Gummies, a confectionery gummy company selling on Shopify and Amazon.
 
 Given detected metric anomalies, provide root cause analysis. For each anomaly:
 1. Generate 1-2 plausible root cause hypotheses based on the metric, direction, and magnitude

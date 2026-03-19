@@ -143,8 +143,10 @@ async function onWholesaleOrderCreated(event: AbraEvent): Promise<void> {
   // 2. Create AR entry in Notion (Finance cascade)
   if (amount && customer) {
     const notionToken = process.env.NOTION_API_KEY || process.env.NOTION_TOKEN;
-    const arDbId = "707fad73b7cb431192a917e60a683476";
-    if (notionToken) {
+    const arDbId = process.env.NOTION_AR_TRACKER_DB || "";
+    if (!arDbId) {
+      console.warn("[abra-event-bus] NOTION_AR_TRACKER_DB is not set — skipping AR Tracker write");
+    } else if (notionToken) {
       try {
         await fetch(`https://api.notion.com/v1/pages`, {
           method: "POST",
@@ -178,8 +180,10 @@ async function onInvoiceReceived(event: AbraEvent): Promise<void> {
 
   // Add to AP Tracker in Notion
   const notionToken = process.env.NOTION_API_KEY || process.env.NOTION_TOKEN;
-  const apDbId = "c0adc90330694fcbba761fd5ce5d9802";
-  if (notionToken && vendor && amount) {
+  const apDbId = process.env.NOTION_AP_TRACKER_DB || "";
+  if (!apDbId) {
+    console.warn("[abra-event-bus] NOTION_AP_TRACKER_DB is not set — skipping AP Tracker write");
+  } else if (notionToken && vendor && amount) {
     try {
       await fetch(`https://api.notion.com/v1/pages`, {
         method: "POST",

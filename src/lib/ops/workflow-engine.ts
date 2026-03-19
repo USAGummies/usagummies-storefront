@@ -196,19 +196,89 @@ export function resolveInputs(
   return resolveValue(inputDef) as Record<string, unknown>;
 }
 
+/**
+ * Safe condition evaluator — no eval / new Function.
+ *
+ * Supported syntax (evaluated left-to-right with short-circuit):
+ *   - Boolean combinators:  &&  ||
+ *   - Unary negation:       !context.flag
+ *   - Comparisons:          ===  !==  >=  <=  >  <
+ *   - Bare path (truthy):   context.amount
+ *
+ * Paths are resolved against { context, steps } using dot-notation.
+ * String literals in comparisons must be quoted with " or '.
+ * Numeric literals are parsed with Number().
+ */
+function resolveConditionValue(raw: string, root: Record<string, unknown>): unknown {
+  const s = raw.trim();
+  if (!s) return undefined;
+  // quoted string literal
+  if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
+    return s.slice(1, -1);
+  }
+  // boolean / null / number literals
+  if (s === "true") return true;
+  if (s === "false") return false;
+  if (s === "null") return null;
+  if (s === "undefined") return undefined;
+  if (/^-?\d+(\.\d+)?$/.test(s)) return Number(s);
+  // dot-path: must start with "context" or "steps"
+  if (s.startsWith("context") || s.startsWith("steps")) {
+    return getPathValue(root, s);
+  }
+  return undefined;
+}
+
+function evaluateSingleClause(clause: string, root: Record<string, unknown>): boolean {
+  const s = clause.trim();
+  if (!s) return true;
+
+  // unary negation: !<path>
+  if (s.startsWith("!")) {
+    const inner = s.slice(1).trim();
+    return !evaluateSingleClause(inner, root);
+  }
+
+  // comparison operators (order matters: longer tokens first)
+  const ops = ["===", "!==", ">=", "<=", ">", "<"] as const;
+  for (const op of ops) {
+    const idx = s.indexOf(op);
+    if (idx === -1) continue;
+    // make sure it's not part of a longer token we already checked
+    const left = s.slice(0, idx);
+    const right = s.slice(idx + op.length);
+    const lv = resolveConditionValue(left, root);
+    const rv = resolveConditionValue(right, root);
+    switch (op) {
+      case "===": return lv === rv;
+      case "!==": return lv !== rv;
+      case ">=":  return (lv as number) >= (rv as number);
+      case "<=":  return (lv as number) <= (rv as number);
+      case ">":   return (lv as number) >  (rv as number);
+      case "<":   return (lv as number) <  (rv as number);
+    }
+  }
+
+  // bare path — truthy check
+  return Boolean(resolveConditionValue(s, root));
+}
+
 function evaluateCondition(condition: string | undefined, context: Record<string, unknown>): boolean {
   if (!condition?.trim()) return true;
   try {
-    const fn = new Function(
-      "context",
-      "steps",
-      `return Boolean(${condition});`,
-    );
-    const steps =
-      context.steps && typeof context.steps === "object"
-        ? context.steps
-        : {};
-    return Boolean(fn(context, steps));
+    const root: Record<string, unknown> = {
+      context,
+      steps: context.steps && typeof context.steps === "object" ? context.steps : {},
+    };
+
+    // Split on || first (lowest precedence), evaluate each branch with &&
+    const orBranches = condition.split("||");
+    for (const orBranch of orBranches) {
+      const andClauses = orBranch.split("&&");
+      const andResult = andClauses.every((clause) => evaluateSingleClause(clause, root));
+      if (andResult) return true;
+    }
+    return false;
   } catch {
     return false;
   }
