@@ -2068,7 +2068,7 @@ export function isReneInvestorTransfer(description: string): boolean {
  */
 async function handleQueryQBO(params: Record<string, unknown>): Promise<ActionResult> {
   const queryType = String(params.query_type || "accounts");
-  const baseUrl = "https://www.usagummies.com";
+  const baseUrl = getInternalOpsBaseUrl();
   const QBO_TIMEOUT_MS = 15_000; // 15s timeout for QBO API calls
 
   try {

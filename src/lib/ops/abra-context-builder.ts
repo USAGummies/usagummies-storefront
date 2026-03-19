@@ -128,7 +128,8 @@ export async function fetchActiveInitiatives(): Promise<AbraInitiativeContext[]>
         (q) => !r.answers?.[q.key],
       ).length,
     }));
-  } catch {
+  } catch (err) {
+    console.error("[abra] fetchActiveInitiatives failed:", err instanceof Error ? err.message : err);
     return [];
   }
 }
@@ -172,7 +173,8 @@ export async function fetchAskingInitiative(
       }
     }
     return null;
-  } catch {
+  } catch (err) {
+    console.error("[abra] fetchAskingInitiative failed:", err instanceof Error ? err.message : err);
     return null;
   }
 }
@@ -356,8 +358,8 @@ export async function fetchFinancialContext(): Promise<string | null> {
  * This is the authoritative financial source, NOT brain memory entries.
  */
 export async function fetchLedgerContext(message: string): Promise<string | null> {
-  // 3s timeout — Notion pagination is slow; KV cache handles repeat queries
-  const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000));
+  // 8s timeout — Notion pagination over 400+ rows is slow; KV cache (1h TTL) handles repeat queries
+  const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000));
   return Promise.race([fetchLedgerContextInner(message), timeout]);
 }
 
@@ -383,10 +385,12 @@ async function fetchLedgerContextInner(message: string): Promise<string | null> 
       let ledger: LedgerSummary | null = null;
       try {
         ledger = await kv.get<LedgerSummary>(cacheKey);
-      } catch { /* KV unavailable — fall through to Notion */ }
+      } catch (err) {
+        console.debug("[abra] KV cache read failed for", cacheKey, err instanceof Error ? err.message : "unknown");
+      }
       if (!ledger) {
         ledger = await queryLedgerSummary({ fiscalYear: `FY${year}` });
-        try { await kv.set(cacheKey, ledger, { ex: 3600 }); } catch { /* KV write failed — non-critical */ }
+        try { await kv.set(cacheKey, ledger, { ex: 3600 }); } catch (err) { console.debug("[abra] KV cache write failed for", cacheKey, err instanceof Error ? err.message : "unknown"); }
       }
       if (ledger.summary.transactionCount === 0) continue;
 

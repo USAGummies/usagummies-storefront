@@ -401,13 +401,18 @@ export async function POST(req: Request) {
         const cmd = commands[0];
 
         // Atomically claim it
+        const sbEnv = getSupabaseEnv();
+        if (!sbEnv) {
+          if (responseUrl) await replaceSlackMessage(responseUrl, "⚠️ Supabase not configured — cannot process draft");
+          return;
+        }
         const claimRes = await fetch(
-          `${getSupabaseEnv()?.baseUrl}/rest/v1/abra_email_commands?id=eq.${commandId}&status=eq.draft_reply_pending`,
+          `${sbEnv.baseUrl}/rest/v1/abra_email_commands?id=eq.${commandId}&status=eq.draft_reply_pending`,
           {
             method: "PATCH",
             headers: {
-              apikey: getSupabaseEnv()!.serviceKey,
-              Authorization: `Bearer ${getSupabaseEnv()!.serviceKey}`,
+              apikey: sbEnv.serviceKey,
+              Authorization: `Bearer ${sbEnv.serviceKey}`,
               "Content-Type": "application/json",
               Prefer: "return=representation",
             },
