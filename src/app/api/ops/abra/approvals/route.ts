@@ -138,6 +138,14 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: "Approval not found" }, { status: 404 });
     }
 
+    // Prevent double-processing — only allow decisions on pending approvals
+    if (existing[0].status !== "pending") {
+      return NextResponse.json(
+        { error: `Approval already resolved (status: ${existing[0].status})` },
+        { status: 409 },
+      );
+    }
+
     const deciderUserId = session?.user?.email
       ? await resolveUserIdFromEmail(session.user.email)
       : null;

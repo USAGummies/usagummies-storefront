@@ -427,7 +427,7 @@ export async function POST(req: Request) {
         const host = process.env.VERCEL_URL
           ? `https://${process.env.VERCEL_URL}`
           : process.env.NEXT_PUBLIC_SITE_URL || "https://www.usagummies.com";
-        const cronSecret = process.env.CRON_SECRET;
+        const cronSecret = process.env.CRON_SECRET?.trim();
 
         const sendRes = await fetch(`${host}/api/ops/abra/send-reply`, {
           method: "POST",

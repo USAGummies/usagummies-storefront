@@ -329,7 +329,7 @@ export async function syncKPIsToNotion(department: string): Promise<void> {
   const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   try {
     const res = await fetch(
-      `${baseUrl}/rest/v1/kpi_timeseries?department=eq.${department}&recorded_at=gte.${encodeURIComponent(since)}&select=metric_name,metric_value,recorded_at&order=recorded_at.desc&limit=30`,
+      `${baseUrl}/rest/v1/kpi_timeseries?department=eq.${department}&captured_for_date=gte.${encodeURIComponent(since)}&select=metric_name,value,captured_for_date&order=captured_for_date.desc&limit=30`,
       {
         headers: {
           apikey: serviceKey,
@@ -341,13 +341,13 @@ export async function syncKPIsToNotion(department: string): Promise<void> {
     if (!res.ok) return;
     const rows = (await res.json()) as Array<{
       metric_name?: string;
-      metric_value?: number;
-      recorded_at?: string;
+      value?: number;
+      captured_for_date?: string;
     }>;
     if (!Array.isArray(rows) || rows.length === 0) return;
 
     const body = rows
-      .map((row) => `- ${row.metric_name || "metric"}: ${Number(row.metric_value || 0)} (${row.recorded_at || "n/a"})`)
+      .map((row) => `- ${row.metric_name || "metric"}: ${Number(row.value || 0)} (${row.captured_for_date || "n/a"})`)
       .join("\n");
 
     await createNotionPage({

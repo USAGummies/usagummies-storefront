@@ -1562,8 +1562,8 @@ async function handleLogProductionRun(
     return { success: false, message: `Total cost $${totalCost.toLocaleString()} exceeds safety limit of $${MAX_PRODUCTION_COST.toLocaleString()}. Record this manually.` };
   }
 
-  const yieldRate = totalUnitsReceived / totalUnitsOrdered;
-  const costPerUnit = totalCost / totalUnitsReceived;
+  const yieldRate = totalUnitsOrdered > 0 ? totalUnitsReceived / totalUnitsOrdered : 0;
+  const costPerUnit = totalUnitsReceived > 0 ? totalCost / totalUnitsReceived : 0;
   const notes = typeof params.notes === "string" ? params.notes.slice(0, 2000) : "";
 
   const title = `Production Run — ${manufacturer} — ${runDateRaw}`;
@@ -1785,7 +1785,7 @@ async function handleRunScenario(
       adjRevenue = revenue * (1 + changePct / 100);
     } else if (varLower.includes("volume") || varLower.includes("demand") || varLower.includes("unit")) {
       adjUnits = Math.round(units * (1 + changePct / 100));
-      adjRevenue = (revenue / units) * adjUnits; // Scale revenue proportionally
+      adjRevenue = units > 0 ? (revenue / units) * adjUnits : 0; // Scale revenue proportionally
     } else {
       // Default: treat as cost adjustment
       adjCogs = cogsPerUnit * (1 + changePct / 100);
@@ -2069,11 +2069,12 @@ export function isReneInvestorTransfer(description: string): boolean {
 async function handleQueryQBO(params: Record<string, unknown>): Promise<ActionResult> {
   const queryType = String(params.query_type || "accounts");
   const baseUrl = "https://www.usagummies.com";
+  const QBO_TIMEOUT_MS = 15_000; // 15s timeout for QBO API calls
 
   try {
     switch (queryType) {
       case "accounts": {
-        const res = await fetch(`${baseUrl}/api/ops/qbo/accounts`);
+        const res = await fetch(`${baseUrl}/api/ops/qbo/accounts`, { signal: AbortSignal.timeout(QBO_TIMEOUT_MS) });
         if (!res.ok) return { success: false, message: `QBO accounts query failed: ${res.status}` };
         const data = await res.json();
         const accounts = (data.accounts || [])
@@ -2120,7 +2121,7 @@ async function handleQueryQBO(params: Record<string, unknown>): Promise<ActionRe
         };
       }
       case "vendors": {
-        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=vendors`);
+        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=vendors`, { signal: AbortSignal.timeout(QBO_TIMEOUT_MS) });
         if (!res.ok) return { success: false, message: `QBO vendor query failed: ${res.status}` };
         const data = (await res.json()) as { count: number; vendors: Array<{ Name: string; Balance: number; Active: boolean; Email: string | null; Phone: string | null }> };
         if (data.count === 0) {
@@ -2141,7 +2142,7 @@ async function handleQueryQBO(params: Record<string, unknown>): Promise<ActionRe
         const start = typeof params.start === "string" ? params.start : undefined;
         const end = typeof params.end === "string" ? params.end : undefined;
         const qs = [start ? `start=${start}` : "", end ? `end=${end}` : ""].filter(Boolean).join("&");
-        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=pnl${qs ? `&${qs}` : ""}`);
+        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=pnl${qs ? `&${qs}` : ""}`, { signal: AbortSignal.timeout(QBO_TIMEOUT_MS) });
         if (!res.ok) return { success: false, message: `QBO P&L report failed: ${res.status}` };
         const data = (await res.json()) as { period: { start: string; end: string }; summary: Record<string, string | number> };
         const entries = Object.entries(data.summary);
@@ -2156,7 +2157,7 @@ async function handleQueryQBO(params: Record<string, unknown>): Promise<ActionRe
         };
       }
       case "balance_sheet": {
-        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=balance_sheet`);
+        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=balance_sheet`, { signal: AbortSignal.timeout(QBO_TIMEOUT_MS) });
         if (!res.ok) return { success: false, message: `QBO balance sheet failed: ${res.status}` };
         const data = (await res.json()) as { asOf: string; summary: Record<string, string | number> };
         const entries = Object.entries(data.summary);
@@ -2172,7 +2173,7 @@ async function handleQueryQBO(params: Record<string, unknown>): Promise<ActionRe
       }
       case "purchases": {
         const limit = typeof params.limit === "number" ? params.limit : 20;
-        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=purchases&limit=${limit}`);
+        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=purchases&limit=${limit}`, { signal: AbortSignal.timeout(QBO_TIMEOUT_MS) });
         if (!res.ok) return { success: false, message: `QBO purchases query failed: ${res.status}` };
         const data = (await res.json()) as { count: number; purchases: Array<{ Date: string; Amount: number; Vendor: string | null; Note: string | null; Lines: Array<{ Description: string; Amount: number; Account: string }> }> };
         if (data.count === 0) {
@@ -2865,7 +2866,8 @@ const DIRECT_EXEC_ACTIONS = new Set([
   "query_ledger",
   // Internal data writes — Abra learning, organizing, recording
   "create_brain_entry",
-  "correct_claim",
+  // NOTE: correct_claim is INTENTIONALLY EXCLUDED — it writes to HOT memory tier
+  // and must go through approval. See abra-policy.ts tier: "approval_required".
   "acknowledge_signal",
   "create_task",
   "update_notion",
@@ -3046,8 +3048,11 @@ async function notifySlackPendingApproval(approvalId: string, action: AbraAction
  * Run at the start of each inbox-scan cycle to prevent approval pile-up.
  */
 export async function expireStaleApprovals(ttlHours = 24): Promise<number> {
-  const env = getSupabaseEnv();
-  if (!env) return 0;
+  try {
+    getSupabaseEnv(); // Validate credentials exist — throws if missing
+  } catch {
+    return 0; // No Supabase credentials configured
+  }
 
   const cutoff = new Date(Date.now() - ttlHours * 60 * 60 * 1000).toISOString();
 
@@ -3380,6 +3385,13 @@ export const KNOWN_ACTION_TYPES = new Set([
   "start_workflow",
   "resume_workflow",
   "calculate_deal",
+  "create_wholesale_draft_order",
+  "create_shopify_product_draft",
+  "store_brain_entry",
+  "update_brain_entry",
+  "search_brain",
+  "log_metric",
+  "run_monthly_close",
 ]);
 
 export function normalizeActionDirective(raw: unknown): AbraAction | null {

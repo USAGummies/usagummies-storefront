@@ -316,6 +316,15 @@ export async function GET(req: NextRequest) {
 // ---------------------------------------------------------------------------
 
 export async function POST(req: NextRequest) {
+  // Authentication — require CRON_SECRET Bearer token (same as GET handler)
+  const cronSecret = process.env.CRON_SECRET?.trim();
+  if (cronSecret) {
+    const authHeader = req.headers.get("authorization");
+    if (authHeader !== `Bearer ${cronSecret}`) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+  }
+
   try {
     const body = await req.json();
     const { engineId, agentKey } = body as {

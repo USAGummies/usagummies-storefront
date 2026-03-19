@@ -104,7 +104,7 @@ const DEFAULT_CLAUDE_MODEL =
 const MAX_MESSAGE_LENGTH = 16000;
 
 type ChatMessage = {
-  role: "user" | "assistant" | "system";
+  role: "user" | "assistant";
   content: string;
 };
 
@@ -117,12 +117,11 @@ function sanitizeHistory(history: unknown): ChatMessage[] {
         !!item && typeof item === "object",
     )
     .map((item): ChatMessage => {
+      // SECURITY: Never allow client to inject "system" role messages — treat as "user"
       const role: ChatMessage["role"] =
         item.role === "assistant"
           ? "assistant"
-          : item.role === "system"
-            ? "system"
-            : "user";
+          : "user";
       return {
         role,
         content:
@@ -536,7 +535,11 @@ export async function POST(req: Request) {
       try {
         const stored = await buildConversationContext(threadId, 12);
         if (stored.length > 0) {
-          effectiveHistory = stored;
+          // Map stored messages to strip any "system" role (treat as "user")
+          effectiveHistory = stored.map((m) => ({
+            role: m.role === "assistant" ? "assistant" as const : "user" as const,
+            content: m.content,
+          }));
         }
       } catch {
         // Best-effort: fall back to client-provided history.
@@ -1672,8 +1675,11 @@ export async function POST(req: Request) {
       await markSupabaseFailure(error);
     }
 
-    const message =
-      error instanceof Error ? error.message : "Unknown error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    // Never leak internal error details (Supabase URLs, stack traces) to client
+    const rawMsg = error instanceof Error ? error.message : "Unknown error";
+    const safeMessage = rawMsg.includes("supabase") || rawMsg.includes("SUPABASE") || rawMsg.includes("postgresql") || rawMsg.length > 200
+      ? "An internal error occurred. Please try again."
+      : rawMsg.replace(/https?:\/\/[^\s]+/g, "[redacted]");
+    return NextResponse.json({ error: safeMessage }, { status: 500 });
   }
 }
