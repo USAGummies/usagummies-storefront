@@ -1535,31 +1535,58 @@ export async function POST(req: Request) {
               a.Active !== false,
           );
 
-          const fmt = (accts: typeof accounts) =>
-            accts
-              .map(
-                (a) =>
-                  `  • ${a.Name} (ID ${a.Id}): $${(a.CurrentBalance ?? 0).toFixed(2)} [${a.AccountSubType || a.AccountType}]`,
-              )
-              .join("\n");
+          // Show all accounts with non-zero balances, plus a summary count of zero-balance accounts
+          const fmtNonZero = (accts: typeof accounts, label: string) => {
+            const nonZero = accts.filter((a) => (a.CurrentBalance ?? 0) !== 0);
+            const zeroCount = accts.length - nonZero.length;
+            const lines = nonZero.map(
+              (a) =>
+                `  • ${a.Name} (ID ${a.Id}): $${(a.CurrentBalance ?? 0).toFixed(2)} [${a.AccountSubType || a.AccountType}]`,
+            );
+            if (zeroCount > 0) {
+              lines.push(`  (+ ${zeroCount} more ${label} accounts with $0 balance)`);
+            }
+            return lines.join("\n");
+          };
+
+          // For expense/COGS specifically, list ALL account names (without balance) so Abra knows the structure
+          const fmtExpenseStructure = (accts: typeof accounts) => {
+            const nonZero = accts.filter((a) => (a.CurrentBalance ?? 0) !== 0);
+            const zero = accts.filter((a) => (a.CurrentBalance ?? 0) === 0);
+            const lines = nonZero.map(
+              (a) =>
+                `  • ${a.Name} (ID ${a.Id}): $${(a.CurrentBalance ?? 0).toFixed(2)} [${a.AccountSubType || a.AccountType}]`,
+            );
+            // Group zero-balance expense accounts by parent category for structure visibility
+            const categories = new Map<string, string[]>();
+            for (const a of zero) {
+              const parent = a.Name.includes(":") ? a.Name.split(":")[0].trim() : a.AccountSubType || a.AccountType;
+              if (!categories.has(parent)) categories.set(parent, []);
+              categories.get(parent)!.push(a.Name);
+            }
+            if (categories.size > 0) {
+              lines.push(`  (${zero.length} more accounts at $0, categories: ${Array.from(categories.keys()).slice(0, 15).join(", ")})`);
+            }
+            return lines.join("\n");
+          };
 
           financeData = [
             `QBO Chart of Accounts — ${accounts.length} total accounts`,
             "",
             `**Bank Accounts (${bankAccounts.length}):**`,
-            fmt(bankAccounts),
+            fmtNonZero(bankAccounts, "bank"),
             "",
             `**Income Accounts (${incomeAccounts.length}):**`,
-            fmt(incomeAccounts),
+            fmtNonZero(incomeAccounts, "income"),
             "",
             `**Expense/COGS Accounts (${expenseAccounts.length}):**`,
-            fmt(expenseAccounts),
+            fmtExpenseStructure(expenseAccounts),
             "",
             `**Liability Accounts (${liabilityAccounts.length}):**`,
-            fmt(liabilityAccounts),
+            fmtNonZero(liabilityAccounts, "liability"),
             "",
             `**Asset Accounts (${assetAccounts.length}):**`,
-            fmt(assetAccounts),
+            fmtNonZero(assetAccounts, "asset"),
           ].join("\n");
         } else {
           financeData =
