@@ -5,6 +5,16 @@ import { createNotionPage, updateNotionPage, queryLedgerSummary } from "@/lib/op
 import { DB } from "@/lib/notion/client";
 import { generateEmbedding } from "@/lib/ops/abra-embeddings";
 import { emitEvent, type AbraEventType } from "@/lib/ops/abra-event-bus";
+import {
+  adjustInventory,
+  createDiscountCode as createShopifyDiscountCode,
+  queryRecentOrders,
+} from "@/lib/ops/shopify-admin-actions";
+import {
+  buildReconciliationPeriod,
+  generateReconciliationReport,
+  type ReconciliationPeriod,
+} from "@/lib/ops/revenue-reconciliation";
 
 /** Map friendly database keys → Notion database IDs for create_notion_page action */
 const NOTION_DB_MAP: Record<string, string> = {
@@ -53,7 +63,7 @@ type ApprovalRow = {
 
 export type AutoExecPolicy = {
   action_type: string;
-  max_risk_level: "low";
+  max_risk_level: "low" | "medium";
   min_confidence: number;
   daily_limit: number;
   enabled: boolean;
@@ -173,6 +183,28 @@ export const AUTO_EXEC_POLICIES: AutoExecPolicy[] = [
     daily_limit: 30,
     enabled: true, // Auto-categorize bank feed transactions in QBO
     max_amount: 5000, // Transactions > $5K need human review (except Rene investor loans)
+  },
+  {
+    action_type: "query_shopify_orders",
+    max_risk_level: "low",
+    min_confidence: 0.6,
+    daily_limit: 30,
+    enabled: true,
+  },
+  {
+    action_type: "reconcile_transactions",
+    max_risk_level: "low",
+    min_confidence: 0.7,
+    daily_limit: 5,
+    enabled: true,
+  },
+  {
+    action_type: "update_shopify_inventory",
+    max_risk_level: "medium",
+    min_confidence: 0.9,
+    daily_limit: 10,
+    enabled: true,
+    max_amount: 500, // Max absolute inventory adjustment auto-exec
   },
 ];
 
@@ -301,6 +333,10 @@ function mapApprovalActionType(actionType: string): string {
   if (actionType === "update_notion") return "data_mutation";
   if (actionType === "create_task") return "data_mutation";
   if (actionType === "create_brain_entry") return "data_mutation";
+  if (actionType === "batch_categorize_qbo") return "data_mutation";
+  if (actionType === "create_qbo_invoice") return "data_mutation";
+  if (actionType === "update_shopify_inventory") return "data_mutation";
+  if (actionType === "create_shopify_discount") return "data_mutation";
   return "other";
 }
 
@@ -827,6 +863,22 @@ function isAllowedEmailRecipient(email: string): boolean {
   if (ALLOWED_EMAIL_ADDRESSES.has(normalized)) return true;
   const domain = normalized.split("@")[1];
   return domain ? ALLOWED_EMAIL_DOMAINS.has(domain) : false;
+}
+
+function getInternalOpsBaseUrl(): string {
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  return process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://www.usagummies.com";
+}
+
+function getInternalOpsHeaders(): HeadersInit {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  const cronSecret = (process.env.CRON_SECRET || "").trim();
+  if (cronSecret) {
+    headers.Authorization = `Bearer ${cronSecret}`;
+  }
+  return headers;
 }
 
 // ── Transaction validation ──────────────────────────────────────────────────
@@ -1595,7 +1647,7 @@ async function handleSearchEmail(params: Record<string, unknown>): Promise<Actio
 // ---------------------------------------------------------------------------
 
 /** QBO Account ID mapping — matches Puzzle GL categories */
-const QBO_CATEGORIZATION_RULES: Array<{ pattern: string; accountId: number; accountName: string }> = [
+export const QBO_CATEGORIZATION_RULES: Array<{ pattern: string; accountId: number; accountName: string }> = [
   // Software & SaaS
   { pattern: "ANTHROPIC", accountId: 165, accountName: "Software - Operating Expense" },
   { pattern: "APOLLO", accountId: 165, accountName: "Software - Operating Expense" },
@@ -1670,7 +1722,7 @@ const QBO_CATEGORIZATION_RULES: Array<{ pattern: string; accountId: number; acco
   { pattern: "RENE G GONZALEZ", accountId: 167, accountName: "Investor Loan - Rene" },
 ];
 
-function qboCategorize(description: string): { accountId: number; accountName: string } | null {
+export function qboCategorize(description: string): { accountId: number; accountName: string } | null {
   const upper = description.toUpperCase();
   for (const rule of QBO_CATEGORIZATION_RULES) {
     if (upper.includes(rule.pattern.toUpperCase())) {
@@ -1680,7 +1732,7 @@ function qboCategorize(description: string): { accountId: number; accountName: s
   return null;
 }
 
-function isReneInvestorTransfer(description: string): boolean {
+export function isReneInvestorTransfer(description: string): boolean {
   const upper = description.toUpperCase();
   return upper.includes("RENE G. GONZALEZ") ||
     upper.includes("GONZALEZ, RENE") ||
@@ -1860,6 +1912,282 @@ async function handleCategorizeQBOTransaction(params: Record<string, unknown>): 
   }
 }
 
+async function handleBatchCategorizeQBO(
+  params: Record<string, unknown>,
+): Promise<ActionResult> {
+  const mode = String(params.mode || "preview").toLowerCase();
+  const requestMode = mode === "auto" || mode === "execute" ? "execute" : "preview";
+  const transactionIds = Array.isArray(params.transactionIds)
+    ? params.transactionIds.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    : undefined;
+
+  try {
+    const res = await fetch(`${getInternalOpsBaseUrl()}/api/ops/qbo/categorize-batch`, {
+      method: "POST",
+      headers: getInternalOpsHeaders(),
+      body: JSON.stringify({
+        mode: requestMode,
+        ...(transactionIds && transactionIds.length > 0 ? { transactionIds } : {}),
+      }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(45000),
+    });
+
+    const text = await res.text();
+    const data = text ? (JSON.parse(text) as Record<string, unknown>) : {};
+    if (!res.ok) {
+      return {
+        success: false,
+        message: `Batch categorization failed (${res.status}): ${String(data.error || text || "unknown error").slice(0, 300)}`,
+      };
+    }
+
+    if (requestMode === "preview") {
+      const total = Number(data.total || 0);
+      const autoCategorizeable = Number(data.autoCategorizeable || 0);
+      const needsReview = Number(data.needsReview || 0);
+      const reneTransfers = Number(data.reneTransfers || 0);
+      return {
+        success: true,
+        message:
+          `QBO categorization preview: ${total} transaction(s) scanned; ` +
+          `${autoCategorizeable} auto-categorizable, ${needsReview} need review` +
+          `${reneTransfers > 0 ? `, ${reneTransfers} Rene investor transfer(s)` : ""}.`,
+        data,
+      };
+    }
+
+    return {
+      success: true,
+      message:
+        `QBO batch categorization complete: ${Number(data.categorized || 0)} categorized, ` +
+        `${Number(data.errors || 0)} errors` +
+        `${Number(data.reneAlerts || 0) > 0 ? `, ${Number(data.reneAlerts || 0)} Rene alert(s)` : ""}.`,
+      data,
+    };
+  } catch (err) {
+    return {
+      success: false,
+      message: `Batch categorization error: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+}
+
+async function handleCreateQBOInvoice(
+  params: Record<string, unknown>,
+): Promise<ActionResult> {
+  const customerName = sanitizeTitle(String(params.customerName || params.customer_name || ""));
+  const customerEmail = String(params.customerEmail || params.customer_email || "").trim().toLowerCase();
+  const memo = sanitizeText(String(params.memo || ""), 1000) || undefined;
+  const dueDateRaw = String(params.dueDate || params.due_date || "").trim();
+  const dueDate = /^\d{4}-\d{2}-\d{2}$/.test(dueDateRaw) ? dueDateRaw : undefined;
+  const rawLineItems = Array.isArray(params.lineItems)
+    ? params.lineItems
+    : Array.isArray(params.line_items)
+      ? params.line_items
+      : [];
+
+  const lineItems = rawLineItems
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const row = item as Record<string, unknown>;
+      const description = sanitizeTitle(String(row.description || ""));
+      const quantity = Number(row.quantity || 0);
+      const unitPrice = Number(row.unitPrice || row.unit_price || 0);
+      if (!description || quantity <= 0 || unitPrice < 0) return null;
+      return { description, quantity, unitPrice };
+    })
+    .filter((item): item is { description: string; quantity: number; unitPrice: number } => !!item);
+
+  if (!customerName || lineItems.length === 0) {
+    return { success: false, message: "customerName and at least one valid line item are required" };
+  }
+
+  try {
+    const res = await fetch(`${getInternalOpsBaseUrl()}/api/ops/qbo/invoice`, {
+      method: "POST",
+      headers: getInternalOpsHeaders(),
+      body: JSON.stringify({
+        customerName,
+        customerEmail: customerEmail || undefined,
+        lineItems,
+        dueDate,
+        memo,
+      }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(45000),
+    });
+
+    const text = await res.text();
+    const data = text ? (JSON.parse(text) as Record<string, unknown>) : {};
+    if (!res.ok) {
+      return {
+        success: false,
+        message: `QBO invoice failed (${res.status}): ${String(data.error || text || "unknown error").slice(0, 300)}`,
+      };
+    }
+
+    return {
+      success: true,
+      message:
+        `Created QBO invoice ${String(data.docNumber || data.invoiceId || "").trim() || "(draft)"} ` +
+        `for ${customerName} totaling $${Number(data.total || 0).toFixed(2)}.`,
+      data,
+    };
+  } catch (err) {
+    return {
+      success: false,
+      message: `QBO invoice error: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+}
+
+async function handleUpdateShopifyInventory(
+  params: Record<string, unknown>,
+): Promise<ActionResult> {
+  const variantId = String(params.variantId || params.variant_id || "").trim();
+  const adjustment = Number(params.adjustment || 0);
+  const reason = sanitizeTitle(String(params.reason || "correction")) || "correction";
+
+  if (!variantId || !Number.isFinite(adjustment) || adjustment === 0) {
+    return { success: false, message: "variantId and non-zero adjustment are required" };
+  }
+
+  try {
+    const result = await adjustInventory(variantId, adjustment, reason);
+    if (!result.success) {
+      return { success: false, message: result.error || "Inventory adjustment failed" };
+    }
+    return {
+      success: true,
+      message:
+        `Adjusted Shopify inventory by ${adjustment > 0 ? "+" : ""}${adjustment}` +
+        `${typeof result.newQuantity === "number" ? `; new quantity ${result.newQuantity}` : ""}.`,
+      data: result,
+    };
+  } catch (err) {
+    return {
+      success: false,
+      message: `Shopify inventory error: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+}
+
+async function handleCreateShopifyDiscount(
+  params: Record<string, unknown>,
+): Promise<ActionResult> {
+  const code = sanitizeTitle(String(params.code || ""));
+  const type = String(params.type || "percentage").toLowerCase();
+  const value = Number(params.value || 0);
+  const startsAt = String(params.startsAt || params.starts_at || "").trim() || undefined;
+  const endsAt = String(params.endsAt || params.ends_at || "").trim() || undefined;
+  const appliesTo = params.appliesTo === "all" || !params.appliesTo
+    ? "all"
+    : Array.isArray(params.appliesTo)
+      ? params.appliesTo.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+      : "all";
+
+  if (!code || !Number.isFinite(value) || value <= 0) {
+    return { success: false, message: "code and positive value are required" };
+  }
+
+  try {
+    const result = await createShopifyDiscountCode({
+      code,
+      type: type === "fixed" ? "fixed" : "percentage",
+      value,
+      appliesTo,
+      startsAt,
+      endsAt,
+    });
+    if (!result.ok) {
+      return { success: false, message: result.error || "Discount creation failed" };
+    }
+    return {
+      success: true,
+      message: `Created Shopify discount code ${result.code || code}.`,
+      data: result,
+    };
+  } catch (err) {
+    return {
+      success: false,
+      message: `Shopify discount error: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+}
+
+async function handleQueryShopifyOrders(
+  params: Record<string, unknown>,
+): Promise<ActionResult> {
+  const statusRaw = String(params.status || "open").toLowerCase();
+  const status = statusRaw === "closed" || statusRaw === "cancelled" ? statusRaw : "open";
+  const days = Math.max(1, Math.min(90, Number(params.days || 7) || 7));
+  const limit = Math.max(1, Math.min(100, Number(params.limit || 25) || 25));
+
+  try {
+    const orders = await queryRecentOrders({ status, days, limit });
+    const revenue = orders.reduce((sum, order) => sum + order.totalAmount, 0);
+    return {
+      success: true,
+      message:
+        `Shopify ${status} orders over the last ${days} day(s): ${orders.length} order(s), ` +
+        `$${revenue.toFixed(2)} total revenue.`,
+      data: {
+        status,
+        days,
+        count: orders.length,
+        revenue,
+        orders,
+      },
+    };
+  } catch (err) {
+    return {
+      success: false,
+      message: `Shopify order query error: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+}
+
+function buildCustomReconciliationPeriod(period: "day" | "week" | "month"): ReconciliationPeriod {
+  if (period === "month") {
+    return buildReconciliationPeriod();
+  }
+  const end = new Date();
+  const start = new Date(end);
+  start.setUTCDate(end.getUTCDate() - (period === "week" ? 6 : 0));
+  const startDate = start.toISOString().slice(0, 10);
+  const endDate = end.toISOString().slice(0, 10);
+  return {
+    startDate,
+    endDate,
+    label: period === "week" ? "Last 7 days" : "Today",
+  };
+}
+
+async function handleReconcileTransactions(
+  params: Record<string, unknown>,
+): Promise<ActionResult> {
+  const periodRaw = String(params.period || "month").toLowerCase();
+  const period = periodRaw === "day" || periodRaw === "week" ? periodRaw : "month";
+
+  try {
+    const report = await generateReconciliationReport(buildCustomReconciliationPeriod(period));
+    const issues = report.channels.filter((channel) => channel.status !== "matched").length;
+    return {
+      success: true,
+      message:
+        `Reconciliation for ${report.period.label}: ${report.channels.length} channel(s), ` +
+        `${issues} with discrepancies, total variance $${report.totalVariance.toFixed(2)}.`,
+      data: report,
+    };
+  } catch (err) {
+    return {
+      success: false,
+      message: `Reconciliation error: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+}
+
 const ACTION_HANDLERS: Record<
   string,
   (params: Record<string, unknown>) => Promise<ActionResult>
@@ -1883,6 +2211,12 @@ const ACTION_HANDLERS: Record<
   search_email: handleSearchEmail,
   query_qbo: handleQueryQBO,
   categorize_qbo_transaction: handleCategorizeQBOTransaction,
+  batch_categorize_qbo: handleBatchCategorizeQBO,
+  create_qbo_invoice: handleCreateQBOInvoice,
+  update_shopify_inventory: handleUpdateShopifyInventory,
+  create_shopify_discount: handleCreateShopifyDiscount,
+  query_shopify_orders: handleQueryShopifyOrders,
+  reconcile_transactions: handleReconcileTransactions,
 };
 
 async function fetchApproval(approvalId: string): Promise<ApprovalRow | null> {
@@ -2077,7 +2411,13 @@ export async function canAutoExecute(action: AbraAction): Promise<boolean> {
 
   const policy = AUTO_EXEC_POLICIES.find((item) => item.action_type === action.action_type);
   if (!policy || !policy.enabled) return false;
-  if (policy.max_risk_level !== "low" || action.risk_level !== "low") return false;
+  const riskRank: Record<AbraAction["risk_level"], number> = {
+    low: 0,
+    medium: 1,
+    high: 2,
+    critical: 3,
+  };
+  if (riskRank[action.risk_level] > riskRank[policy.max_risk_level]) return false;
 
   const confidence =
     typeof action.confidence === "number"
@@ -2087,9 +2427,10 @@ export async function canAutoExecute(action: AbraAction): Promise<boolean> {
 
   // Amount cap for financial actions (e.g. record_transaction)
   if (typeof policy.max_amount === "number" && action.params) {
-    const amount = typeof action.params.amount === "number"
-      ? Math.abs(action.params.amount)
-      : Math.abs(parseFloat(String(action.params.amount || "0")));
+    const rawAmount = action.params.amount ?? action.params.adjustment ?? 0;
+    const amount = typeof rawAmount === "number"
+      ? Math.abs(rawAmount)
+      : Math.abs(parseFloat(String(rawAmount || "0")));
     if (amount > policy.max_amount) return false;
   }
 
@@ -2176,41 +2517,106 @@ async function notifySlackPendingApproval(approvalId: string, action: AbraAction
     ? "\u{1F6A8}" : action.risk_level === "medium" ? "\u{26A0}\u{FE0F}" : "\u{1F4CB}";
   const tier = permissionTierForRisk(action.risk_level);
   const summary = (action.description || action.title || "").slice(0, 300);
+  const previewLines: string[] = [
+    `${riskEmoji} *Abra Needs Approval* (Tier ${tier})`,
+    `*Action:* \`${action.action_type}\``,
+    `*Risk:* ${action.risk_level}`,
+    `*Summary:* ${summary}`,
+  ];
+
+  if (action.action_type === "send_email") {
+    const to = String(action.params.to || "").trim();
+    const subject = String(action.params.subject || "").trim();
+    const body = String(action.params.body || action.params.html || action.params.message || "").trim();
+    if (to) previewLines.push(`*To:* ${to}`);
+    if (subject) previewLines.push(`*Subject:* ${subject}`);
+    if (body) {
+      previewLines.push("*Body Preview:*");
+      previewLines.push(`>${body.slice(0, 500).split("\n").join("\n> ")}`);
+    }
+  }
+
+  if (action.action_type === "create_qbo_invoice") {
+    const customerName = String(action.params.customerName || action.params.customer_name || "").trim();
+    const lineItems = Array.isArray(action.params.lineItems)
+      ? action.params.lineItems
+      : Array.isArray(action.params.line_items)
+        ? action.params.line_items
+        : [];
+    const total = lineItems.reduce((sum, item) => {
+      if (!item || typeof item !== "object") return sum;
+      const row = item as Record<string, unknown>;
+      return sum + (Number(row.quantity || 0) * Number(row.unitPrice || row.unit_price || 0));
+    }, 0);
+    if (customerName) previewLines.push(`*Customer:* ${customerName}`);
+    if (lineItems.length > 0) previewLines.push(`*Invoice Total:* $${total.toFixed(2)} across ${lineItems.length} line item(s)`);
+  }
+
+  if (action.action_type === "batch_categorize_qbo") {
+    try {
+      const previewRes = await fetch(`${getInternalOpsBaseUrl()}/api/ops/qbo/categorize-batch`, {
+        method: "POST",
+        headers: getInternalOpsHeaders(),
+        body: JSON.stringify({ mode: "preview" }),
+        cache: "no-store",
+        signal: AbortSignal.timeout(30000),
+      });
+      if (previewRes.ok) {
+        const preview = (await previewRes.json()) as Record<string, unknown>;
+        previewLines.push(
+          `*Preview:* ${Number(preview.total || 0)} scanned, ${Number(preview.autoCategorizeable || 0)} auto-categorizable, ${Number(preview.needsReview || 0)} need review`,
+        );
+      }
+    } catch {
+      // Best-effort preview only
+    }
+  }
 
   const fallbackText = `${riskEmoji} Abra Needs Approval (Tier ${tier}) — ${action.action_type}: ${summary}`;
+  const buttons: Array<Record<string, unknown>> = [
+    {
+      type: "button",
+      text: { type: "plain_text", text: action.action_type === "send_email" ? "Send" : "Approve", emoji: true },
+      style: "primary",
+      action_id: "approve_action",
+      value: approvalId,
+      confirm: {
+        title: { type: "plain_text", text: "Approve this action?" },
+        text: { type: "mrkdwn", text: `*${action.action_type}*: ${summary}` },
+        confirm: { type: "plain_text", text: action.action_type === "send_email" ? "Send" : "Approve" },
+        deny: { type: "plain_text", text: "Cancel" },
+      },
+    },
+  ];
+
+  if (action.action_type === "send_email") {
+    buttons.push({
+      type: "button",
+      text: { type: "plain_text", text: "Edit", emoji: true },
+      action_id: "edit_email_action",
+      value: approvalId,
+    });
+  }
+
+  buttons.push({
+    type: "button",
+    text: { type: "plain_text", text: action.action_type === "send_email" ? "Cancel" : "Reject", emoji: true },
+    style: "danger",
+    action_id: "reject_action",
+    value: approvalId,
+  });
 
   const blocks = [
     {
       type: "section",
       text: {
         type: "mrkdwn",
-        text: `${riskEmoji} *Abra Needs Approval* (Tier ${tier})\n*Action:* \`${action.action_type}\`\n*Risk:* ${action.risk_level}\n*Summary:* ${summary}`,
+        text: previewLines.join("\n"),
       },
     },
     {
       type: "actions",
-      elements: [
-        {
-          type: "button",
-          text: { type: "plain_text", text: "Approve", emoji: true },
-          style: "primary",
-          action_id: "approve_action",
-          value: approvalId,
-          confirm: {
-            title: { type: "plain_text", text: "Approve this action?" },
-            text: { type: "mrkdwn", text: `*${action.action_type}*: ${summary}` },
-            confirm: { type: "plain_text", text: "Approve" },
-            deny: { type: "plain_text", text: "Cancel" },
-          },
-        },
-        {
-          type: "button",
-          text: { type: "plain_text", text: "Reject", emoji: true },
-          style: "danger",
-          action_id: "reject_action",
-          value: approvalId,
-        },
-      ],
+      elements: buttons,
     },
   ];
 
@@ -2512,6 +2918,14 @@ export const KNOWN_ACTION_TYPES = new Set([
   "read_email",
   "search_email",
   "draft_email_reply",
+  "query_qbo",
+  "categorize_qbo_transaction",
+  "batch_categorize_qbo",
+  "create_qbo_invoice",
+  "update_shopify_inventory",
+  "create_shopify_discount",
+  "query_shopify_orders",
+  "reconcile_transactions",
   "calculate_deal",
 ]);
 
@@ -2541,6 +2955,10 @@ export function normalizeActionDirective(raw: unknown): AbraAction | null {
     "send_email",
     "send_slack",
     "draft_email_reply",
+    "batch_categorize_qbo",
+    "create_qbo_invoice",
+    "update_shopify_inventory",
+    "create_shopify_discount",
   ]);
   const risk = ELEVATED_RISK_ACTIONS.has(actionType) && rawRisk === "low"
     ? "medium"
@@ -2651,16 +3069,24 @@ EXAMPLES:
 • "what if ingredient costs go up 15%?" → emit run_scenario
 • "did you see the email from Rene?" → emit read_email with the message_id from inbox.
 • "find emails about the Powers invoice" → emit search_email with query "Powers invoice"
+• "categorize all pending bank transactions" → emit batch_categorize_qbo with mode "auto"
+• "create invoice for Brent Overman, 100 units at $3.50 each" → emit create_qbo_invoice
+• "how many orders this week?" → emit query_shopify_orders with days 7
+• "adjust Shopify inventory for variant X by -12" → emit update_shopify_inventory
+• "create discount code LAUNCH20 for 20% off" → emit create_shopify_discount
+• "reconcile this month" → emit reconcile_transactions with period "month"
 
 DATABASE KEYS for create_notion_page: meeting_notes, b2b_prospects, distributor_prospects, daily_performance, fleet_ops, inventory, sku_registry, cash_transactions, content_drafts, kpis, general
 
 ACTION EXECUTION TIERS:
 • AUTO-EXECUTE (low-risk, informational): create_brain_entry, acknowledge_signal, create_notion_page, create_task — these execute immediately.
 • AUTO-EXECUTE (low-risk, read-only): read_email, search_email, query_ledger — auto-execute IMMEDIATELY.
+• AUTO-EXECUTE (low-risk, commerce reads): query_qbo, query_shopify_orders, reconcile_transactions — auto-execute when emitted.
 • AUTO-EXECUTE (low-risk, operational data): log_production_run, record_vendor_quote — auto-execute when emitted.
 • AUTO-EXECUTE (stateless computation): run_scenario — computes hypotheticals. Auto-execute when emitted.
 • AUTO-EXECUTE WITH CAPS (financial): record_transaction — auto-executes ONLY if amount ≤ $500.
-• ALWAYS QUEUED (requires human approval): send_email, send_slack, correct_claim — NEVER auto-execute.
+• AUTO-EXECUTE WITH CAPS (inventory): update_shopify_inventory — auto-executes ONLY if absolute adjustment ≤ 500.
+• ALWAYS QUEUED (requires human approval): send_email, send_slack, correct_claim, batch_categorize_qbo, create_qbo_invoice, create_shopify_discount — NEVER auto-execute.
 
 ⚠️ ACTION SAFETY RULES:
 1. record_transaction — ONLY emit with amounts the USER explicitly stated. NEVER estimate amounts.
@@ -2668,7 +3094,9 @@ ACTION EXECUTION TIERS:
 3. log_production_run — ONLY emit with cost figures from VERIFIED sources. NEVER estimate production costs.
 4. run_scenario — Label EVERY output "⚠️ HYPOTHETICAL SCENARIO — not a forecast."
 5. create_brain_entry — Make titles factual and specific. NEVER store unverified dollar figures.
-6. GENERAL: If unsure whether to emit an action, DON'T. Ask the user first.`;
+6. create_qbo_invoice — ONLY emit with explicit quantities and unit prices. Never invent invoice totals.
+7. update_shopify_inventory — ONLY emit when the SKU/variant is explicit. Never guess which variant to adjust.
+8. GENERAL: If unsure whether to emit an action, DON'T. Ask the user first.`;
 }
 
 // ─── NAMED EXPORTS FOR TOOL_USE (route.ts executeToolCall) ──────────────

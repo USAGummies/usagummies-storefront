@@ -135,6 +135,39 @@ async function processApprovalAction(
   }
 }
 
+function parseEmailFields(values: Record<string, Record<string, { value?: string }>> | undefined): {
+  to: string;
+  subject: string;
+  body: string;
+} {
+  const getValue = (blockId: string, actionId: string) =>
+    String(values?.[blockId]?.[actionId]?.value || "").trim();
+  return {
+    to: getValue("email_to", "email_to"),
+    subject: getValue("email_subject", "email_subject"),
+    body: getValue("email_body", "email_body"),
+  };
+}
+
+async function openSlackModal(triggerId: string, view: Record<string, unknown>): Promise<void> {
+  const botToken = process.env.SLACK_BOT_TOKEN || "";
+  if (!botToken) throw new Error("SLACK_BOT_TOKEN not configured");
+
+  const res = await fetch("https://slack.com/api/views.open", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${botToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ trigger_id: triggerId, view }),
+    signal: AbortSignal.timeout(10000),
+  });
+  const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+  if (!res.ok || !json.ok) {
+    throw new Error(json.error || `Slack modal open failed (${res.status})`);
+  }
+}
+
 export async function POST(req: Request) {
   // Rate limit — generous tier (Slack retries aggressively)
   const { checkRateLimit } = await import("@/lib/ops/rate-limit");
@@ -162,13 +195,54 @@ export async function POST(req: Request) {
     actions?: Array<{ action_id?: string; value?: string }>;
     user?: { id?: string; username?: string; name?: string };
     response_url?: string;
+    trigger_id?: string;
     channel?: { id?: string };
     message?: { ts?: string; thread_ts?: string };
+    view?: {
+      callback_id?: string;
+      private_metadata?: string;
+      state?: {
+        values?: Record<string, Record<string, { value?: string }>>;
+      };
+    };
   } = {};
   try {
     payload = JSON.parse(payloadRaw);
   } catch {
     return NextResponse.json({ error: "Invalid payload JSON" }, { status: 400 });
+  }
+
+  if (payload.type === "view_submission" && payload.view?.callback_id === "edit_email_send_modal") {
+    const approvalId = String(payload.view.private_metadata || "").trim();
+    if (approvalId) {
+      const fields = parseEmailFields(payload.view.state?.values);
+      const existing = (await sbFetch(
+        `/rest/v1/approvals?id=eq.${approvalId}&select=id,proposed_payload&limit=1`,
+      )) as Array<Record<string, unknown>>;
+      const proposedPayload = existing[0]?.proposed_payload;
+      if (proposedPayload && typeof proposedPayload === "object") {
+        const current = proposedPayload as Record<string, unknown>;
+        const currentParams = current.params && typeof current.params === "object"
+          ? { ...(current.params as Record<string, unknown>) }
+          : {};
+        await sbFetch(`/rest/v1/approvals?id=eq.${approvalId}`, {
+          method: "PATCH",
+          headers: { Prefer: "return=minimal", "Content-Type": "application/json" },
+          body: JSON.stringify({
+            proposed_payload: {
+              ...current,
+              params: {
+                ...currentParams,
+                to: fields.to,
+                subject: fields.subject,
+                body: fields.body,
+              },
+            },
+          }),
+        });
+      }
+    }
+    return NextResponse.json({ response_action: "clear" });
   }
 
   if (payload.type !== "block_actions" || !Array.isArray(payload.actions)) {
@@ -224,6 +298,71 @@ export async function POST(req: Request) {
     return NextResponse.json({
       response_type: "ephemeral",
       text: decision === "approved" ? "⏳ Approving & executing..." : "⏳ Rejecting...",
+    });
+  }
+
+  if (actionId === "edit_email_action") {
+    const approvalId = value;
+    const triggerId = payload.trigger_id || "";
+    if (!triggerId) {
+      return NextResponse.json({ response_type: "ephemeral", text: "⚠️ Slack trigger not available." });
+    }
+
+    after(async () => {
+      const existing = (await sbFetch(
+        `/rest/v1/approvals?id=eq.${approvalId}&select=id,proposed_payload&limit=1`,
+      )) as Array<Record<string, unknown>>;
+      const proposedPayload = existing[0]?.proposed_payload;
+      const params = proposedPayload && typeof proposedPayload === "object"
+        ? (((proposedPayload as Record<string, unknown>).params || {}) as Record<string, unknown>)
+        : {};
+
+      await openSlackModal(triggerId, {
+        type: "modal",
+        callback_id: "edit_email_send_modal",
+        private_metadata: approvalId,
+        title: { type: "plain_text", text: "Edit email" },
+        submit: { type: "plain_text", text: "Save" },
+        close: { type: "plain_text", text: "Cancel" },
+        blocks: [
+          {
+            type: "input",
+            block_id: "email_to",
+            label: { type: "plain_text", text: "To" },
+            element: {
+              type: "plain_text_input",
+              action_id: "email_to",
+              initial_value: String(params.to || ""),
+            },
+          },
+          {
+            type: "input",
+            block_id: "email_subject",
+            label: { type: "plain_text", text: "Subject" },
+            element: {
+              type: "plain_text_input",
+              action_id: "email_subject",
+              initial_value: String(params.subject || ""),
+            },
+          },
+          {
+            type: "input",
+            block_id: "email_body",
+            label: { type: "plain_text", text: "Body" },
+            element: {
+              type: "plain_text_input",
+              action_id: "email_body",
+              multiline: true,
+              initial_value: String(params.body || params.html || params.message || ""),
+            },
+          },
+        ],
+      }).catch(() => {});
+    });
+
+    return NextResponse.json({
+      response_type: "ephemeral",
+      text: "✏️ Opening email editor...",
     });
   }
 

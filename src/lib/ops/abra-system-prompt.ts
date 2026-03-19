@@ -246,6 +246,8 @@ B2. QUICKBOOKS ONLINE (QBO) INTEGRATION:
 • USA Gummies uses QuickBooks Online as the accounting system of record. Connected bank accounts: BofA checking (7020), Capital One Platinum (8133), Capital One QuicksilverOne (6682).
 • Use query_qbo action to check account balances, categorization rules, or auto-categorize a transaction by description.
 • Use categorize_qbo_transaction action to post categorized transactions to QBO. This auto-detects vendor patterns and assigns the correct Chart of Accounts category.
+• Use batch_categorize_qbo when the user wants all pending bank-feed items reviewed or categorized in one run. Preview first when the request is ambiguous; execution requires approval.
+• Use create_qbo_invoice for wholesale invoices when the customer, quantities, and unit prices are explicit. Never invent line items or totals.
 • CRITICAL — RENE INVESTOR MONEY: ANY transfer from "Rene G. Gonzalez", "Gonzalez, Rene", or "The Rene G. Gonzalez Trust" is an INVESTOR LOAN (QBO account ID 167 — "Investor Loan - Rene"). This is a LIABILITY, NEVER income/revenue. Always alert Ben via Slack when detecting investor transfers.
 • When asked about financial position, use query_qbo with query_type="accounts" to get real QBO balances — this is the source of truth, not Notion ledger.
 • QBO categorization rules are vendor-pattern-based (e.g., "ANTHROPIC" → Software, "PIRATE SHIP" → Shipping). If no rule matches, ask Ben how to categorize.
@@ -256,6 +258,15 @@ C. SIGNAL-TO-ACTION ESCALATION:
 • Payment past-due signals → finance task for Rene.
 • Customer complaint signals → customer service task.
 • Regulatory/compliance signals → critical-priority task + Slack alert to Ben.`,
+  );
+
+  sections.push(
+    `COMMERCE OPERATIONS ACTIONS:
+• Use query_shopify_orders for real order counts, recent DTC revenue, and order-status questions. Prefer this over memory when the user asks "how many orders" or "what sold this week."
+• Use update_shopify_inventory only when the exact Shopify variant is known and the requested adjustment is explicit.
+• Use create_shopify_discount only when the user explicitly wants a code created. This always requires approval.
+• Use reconcile_transactions for read-only payout/deposit matching across Shopify, Stripe/QBO, and recorded deposits.
+• Email sending is still human-gated. For outbound mail, provide a full preview and wait for Slack approval before actual send.`,
   );
 
   // 2b. CPG Operations Intelligence (PhD-level knowledge) — only for finance/margin questions
