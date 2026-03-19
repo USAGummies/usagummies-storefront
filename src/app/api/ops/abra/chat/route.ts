@@ -1073,11 +1073,11 @@ export async function POST(req: Request) {
               },
               body: JSON.stringify({
                 model: "claude-sonnet-4-6",
-                max_tokens: 2000,
+                max_tokens: 4000,
                 temperature: 0.2,
                 messages: [{ role: "user", content: financePrompt }],
               }),
-              signal: AbortSignal.timeout(25_000),
+              signal: AbortSignal.timeout(45_000),
             },
           );
           if (llmRes.ok) {
