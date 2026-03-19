@@ -23,52 +23,93 @@ export async function runBankFeedSweep(): Promise<BankFeedSweepResult> {
     throw new Error("CRON_SECRET not configured");
   }
 
-  const res = await fetch(
-    `${resolveInternalHost()}/api/ops/abra/categorize-transactions`,
+  const host = resolveInternalHost();
+
+  // Step 1: Preview — find uncategorized transactions via QBO API
+  const previewRes = await fetch(
+    `${host}/api/ops/qbo/categorize-batch`,
     {
       method: "POST",
       headers: {
         Authorization: `Bearer ${cronSecret}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ apply: true }),
-      signal: AbortSignal.timeout(55_000),
+      body: JSON.stringify({ mode: "preview" }),
+      signal: AbortSignal.timeout(30_000),
     },
   );
-  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-  if (!res.ok) {
+
+  const previewData = (await previewRes.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!previewRes.ok) {
     throw new Error(
-      typeof data.error === "string"
-        ? data.error
-        : `Categorization sweep failed (${res.status})`,
+      typeof previewData.error === "string"
+        ? previewData.error
+        : `Bank feed preview failed (${previewRes.status})`,
     );
   }
 
-  const results = Array.isArray(data.results)
-    ? data.results as Array<Record<string, unknown>>
-    : [];
-  const investorTransfers = results.filter((row) =>
-    /rene/i.test(String(row.description || "")) ||
-    /investor/i.test(String(row.category || "")),
-  ).length;
+  const total = typeof previewData.total === "number" ? previewData.total : 0;
+  const autoCategorizeable = typeof previewData.autoCategorizeable === "number" ? previewData.autoCategorizeable : 0;
+  const needsReview = typeof previewData.needsReview === "number" ? previewData.needsReview : 0;
+  const reneTransfers = typeof previewData.reneTransfers === "number" ? previewData.reneTransfers : 0;
+
+  // If nothing to categorize, return early
+  if (total === 0) {
+    return {
+      total: 0,
+      highConfidence: 0,
+      lowConfidence: 0,
+      applied: 0,
+      investorTransfers: 0,
+    };
+  }
+
+  // Step 2: Execute — auto-categorize high-confidence matches
+  let applied = 0;
+  let executeErrors = 0;
+
+  if (autoCategorizeable > 0) {
+    const execRes = await fetch(
+      `${host}/api/ops/qbo/categorize-batch`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${cronSecret}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ mode: "execute" }),
+        signal: AbortSignal.timeout(50_000),
+      },
+    );
+
+    const execData = (await execRes.json().catch(() => ({}))) as Record<string, unknown>;
+    if (execRes.ok) {
+      applied = typeof execData.categorized === "number" ? execData.categorized : 0;
+      executeErrors = typeof execData.errors === "number" ? execData.errors : 0;
+    }
+  }
 
   const result: BankFeedSweepResult = {
-    total: typeof data.total === "number" ? data.total : results.length,
-    highConfidence:
-      typeof data.highConfidence === "number" ? data.highConfidence : 0,
-    lowConfidence:
-      typeof data.lowConfidence === "number" ? data.lowConfidence : 0,
-    applied: typeof data.applied === "number" ? data.applied : 0,
-    investorTransfers,
+    total,
+    highConfidence: autoCategorizeable,
+    lowConfidence: needsReview,
+    applied,
+    investorTransfers: reneTransfers,
   };
 
+  // Step 3: Post to Slack if there's anything to report
   if (result.total > 0) {
     const lines = [
-      `🏦 Bank feed sweep: ${result.applied} auto-categorized, ${result.lowConfidence} need review`,
+      `🏦 *Bank feed sweep complete*`,
+      `• ${result.applied} auto-categorized${executeErrors > 0 ? ` (${executeErrors} errors)` : ""}`,
+      result.lowConfidence > 0
+        ? `• ${result.lowConfidence} need manual review`
+        : null,
       result.investorTransfers > 0
-        ? `🔴 ${result.investorTransfers} investor transfer${result.investorTransfers === 1 ? "" : "s"} flagged`
+        ? `🔴 ${result.investorTransfers} investor transfer${result.investorTransfers === 1 ? "" : "s"} from Rene flagged`
         : null,
     ].filter(Boolean);
+
     await proactiveMessage({
       target: "channel",
       channelOrUserId: process.env.SLACK_CHANNEL_ALERTS || "C0ALS6W7VB4",
