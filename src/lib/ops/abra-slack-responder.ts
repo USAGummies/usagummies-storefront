@@ -588,6 +588,74 @@ export async function proactiveMessage(
   });
 }
 
+/**
+ * Open a DM channel with a Slack user.
+ * Uses conversations.open to get or create a DM channel ID.
+ */
+export async function openDmChannel(userId: string): Promise<string | null> {
+  const botToken = process.env.SLACK_BOT_TOKEN;
+  if (!botToken || !userId) return null;
+
+  try {
+    const res = await fetch("https://slack.com/api/conversations.open", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${botToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ users: userId }),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      ok?: boolean;
+      channel?: { id?: string };
+    };
+    return data.ok && data.channel?.id ? data.channel.id : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Send a direct message to a Slack user.
+ * Opens a DM channel first, then posts the message.
+ */
+export async function sendDirectMessage(
+  userId: string,
+  message: string,
+  opts?: { blocks?: Array<Record<string, unknown>> },
+): Promise<boolean> {
+  const dmChannelId = await openDmChannel(userId);
+  if (!dmChannelId) return false;
+  return postSlackMessage(dmChannelId, message, { blocks: opts?.blocks });
+}
+
+/**
+ * Look up a Slack user by email address.
+ */
+export async function findSlackUserByEmail(email: string): Promise<string | null> {
+  const botToken = process.env.SLACK_BOT_TOKEN;
+  if (!botToken || !email) return null;
+
+  try {
+    const url = new URL("https://slack.com/api/users.lookupByEmail");
+    url.searchParams.set("email", email);
+    const res = await fetch(url.toString(), {
+      headers: { Authorization: `Bearer ${botToken}` },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      ok?: boolean;
+      user?: { id?: string };
+    };
+    return data.ok && data.user?.id ? data.user.id : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function processAbraMessage(
   ctx: SlackMessageContext,
 ): Promise<SlackResponse> {
