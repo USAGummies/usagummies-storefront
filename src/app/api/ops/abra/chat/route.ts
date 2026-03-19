@@ -82,7 +82,7 @@ export const maxDuration = 60;
 const DEFAULT_MATCH_COUNT = 8;
 const DEFAULT_CLAUDE_MODEL =
   process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
-const MAX_MESSAGE_LENGTH = 4000;
+const MAX_MESSAGE_LENGTH = 16000;
 
 type ChatMessage = {
   role: "user" | "assistant" | "system";

@@ -384,7 +384,16 @@ async function callAbraChatViaInternalApi(
     );
 
     const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const errMsg = typeof data.error === "string" ? data.error : `HTTP ${res.status}`;
+      console.error("[abra-slack-responder] Chat API error:", errMsg);
+      // Return a graceful error reply instead of null (which throws)
+      return {
+        reply: `I had trouble processing that message (${errMsg}). Could you try again, or break it into smaller pieces?`,
+        sources: [],
+        answerLogId: null,
+      };
+    }
 
     const reply =
       typeof data.reply === "string" && data.reply.trim() ? data.reply.trim() : "";
@@ -688,6 +697,45 @@ export async function processAbraMessage(
       sources: [],
       answerLogId: null,
     };
+  }
+
+  // Large structured data ingestion — auto-store in brain before chatting
+  // This ensures data pastes (chart of accounts, spreadsheet exports, etc.) are captured
+  // even if the chat API has trouble processing the full payload.
+  const DATA_INGEST_THRESHOLD = 3000;
+  if (text.length > DATA_INGEST_THRESHOLD) {
+    const actor = ctx.displayName || ctx.user;
+    const titleSnippet = text.slice(0, 120).replace(/\n/g, " ").trim();
+    try {
+      const embedding = await buildEmbedding(
+        `Data upload from ${actor}: ${titleSnippet}`,
+      );
+      await sbFetch("/rest/v1/open_brain_entries", {
+        method: "POST",
+        headers: {
+          Prefer: "return=minimal",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          source_type: "manual",
+          source_ref: `slack-data-ingest-${ctx.channel}-${ctx.ts}`,
+          entry_type: "data_upload",
+          title: `Data from ${actor}: ${titleSnippet}`,
+          raw_text: text.slice(0, 50000),
+          summary_text: `Data upload (${text.length} chars) from ${actor} via Slack. First 500 chars: ${text.slice(0, 500)}`,
+          category: "operational",
+          department: "executive",
+          confidence: "high",
+          priority: "important",
+          processed: true,
+          embedding,
+          metadata: { uploaded_by: actor, channel: ctx.channel, char_count: text.length },
+        }),
+      });
+      console.log(`[abra-slack] Stored large data paste (${text.length} chars) from ${actor}`);
+    } catch (err) {
+      console.error("[abra-slack] Failed to store data paste:", err instanceof Error ? err.message : err);
+    }
   }
 
   const answer = await callAbraChatViaInternalApi(ctx);
