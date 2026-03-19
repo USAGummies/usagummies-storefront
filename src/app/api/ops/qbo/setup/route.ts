@@ -26,7 +26,7 @@ const ACCOUNTS_TO_CREATE: AccountDef[] = [
   {
     Name: "Software - Operating Expense",
     AccountType: "Expense",
-    AccountSubType: "Software",
+    AccountSubType: "OtherMiscellaneousServiceCost",
     AcctNum: "66200",
     Description: "SaaS subscriptions and software licenses",
   },
@@ -118,7 +118,7 @@ const ACCOUNTS_TO_CREATE: AccountDef[] = [
   {
     Name: "Hosting Fees",
     AccountType: "Cost of Goods Sold",
-    AccountSubType: "OtherCostsOfServiceCOS",
+    AccountSubType: "CostOfLaborCos",
     AcctNum: "51000",
     Description: "Web hosting and cloud infrastructure",
   },
@@ -133,21 +133,21 @@ const ACCOUNTS_TO_CREATE: AccountDef[] = [
   // Liability — Investor loan from Rene (NOT income)
   {
     Name: "Investor Loan - Rene",
-    AccountType: "Other Current Liabilities",
+    AccountType: "Other Current Liability",
     AccountSubType: "OtherCurrentLiabilities",
-    Description: "Investment/loan from Rene — not revenue",
+    Description: "Investment/loan from Rene - not revenue",
   },
   // Other
   {
     Name: "Transfers in Transit",
-    AccountType: "Other Current Assets",
+    AccountType: "Other Current Asset",
     AccountSubType: "OtherCurrentAssets",
     AcctNum: "10920",
     Description: "Payment processor transfers in transit",
   },
   {
     Name: "Credit Card Payments",
-    AccountType: "Other Current Liabilities",
+    AccountType: "Other Current Liability",
     AccountSubType: "OtherCurrentLiabilities",
     AcctNum: "21111",
     Description: "Credit card payment clearing",
@@ -225,8 +225,11 @@ export async function GET() {
       const isDuplicate = errors?.some(
         (e) =>
           String(e.code) === "6000" ||
+          String(e.code) === "6240" ||
           String(e.Message).includes("already been used") ||
-          String(e.Detail).includes("already been used"),
+          String(e.Message).includes("Duplicate Name") ||
+          String(e.Detail).includes("already been used") ||
+          String(e.Detail).includes("already exists"),
       );
 
       results.push({
