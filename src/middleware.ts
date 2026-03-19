@@ -30,6 +30,8 @@ const SELF_AUTHENTICATED_PREFIXES = [
   "/api/ops/department/", // Department API uses isAuthorized() (session + CRON_SECRET)
   "/api/ops/plaid/webhook", // Plaid webhook — verified by item_id match (JWK fast-follow)
   "/api/ops/gmail-callback", // One-time OAuth callback for Gmail setup
+  "/api/ops/qbo/", // QBO OAuth flow + setup (authorize, callback, setup)
+  "/api/ops/puzzle/", // Puzzle OAuth flow
 ];
 
 function isSelfAuthenticated(pathname: string): boolean {
