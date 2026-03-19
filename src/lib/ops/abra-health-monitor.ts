@@ -1,4 +1,5 @@
 import { getUnresolvedDeadLetters, type DeadLetter } from "@/lib/ops/abra-auto-teach";
+import { kv } from "@vercel/kv";
 import { notify } from "@/lib/ops/notify";
 
 export type IntegrationStatus = {
@@ -32,6 +33,28 @@ export type SystemHealth = {
   uptime: { healthy: number; degraded: number; down: number };
   last_checked: string;
 };
+
+const INTEGRATION_ALERT_TTL_SECONDS = 30 * 60;
+
+function slugifyKey(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function integrationAlertKey(systemName: string): string {
+  return `abra:health:alerted:${slugifyKey(systemName || "unknown")}`;
+}
+
+function integrationAlertFingerprint(integration: IntegrationStatus): string {
+  return JSON.stringify({
+    status: integration.connection_status,
+    error: (integration.error_summary || "unknown error").slice(0, 200),
+    last_error_at: integration.last_error_at || "",
+  });
+}
 
 function getSupabaseEnv() {
   const baseUrl =
@@ -178,17 +201,45 @@ export async function checkAndAlertHealth(): Promise<void> {
   const now = Date.now();
 
   for (const integration of health.integrations) {
+    const dedupKey = integrationAlertKey(integration.system_name);
+
     if (integration.connection_status !== "error" || !integration.last_error_at) {
+      try {
+        const previousFingerprint = await kv.get<string>(dedupKey);
+        if (previousFingerprint) {
+          await notify({
+            channel: "alerts",
+            text: `✅ ${integration.system_name} integration recovered.`,
+          });
+          await kv.del(dedupKey);
+        }
+      } catch {
+        // Recovery tracking is best-effort.
+      }
       continue;
     }
     const errorAt = new Date(integration.last_error_at).getTime();
     if (!Number.isFinite(errorAt)) continue;
     if (now - errorAt > 60 * 60 * 1000) continue;
 
+    const fingerprint = integrationAlertFingerprint(integration);
+    try {
+      const previousFingerprint = await kv.get<string>(dedupKey);
+      if (previousFingerprint === fingerprint) continue;
+    } catch {
+      // KV unavailable — fail open and still send the alert.
+    }
+
     await notify({
       channel: "alerts",
       text: `⚠️ ${integration.system_name} integration is DOWN: ${integration.error_summary || "unknown error"}`,
     });
+
+    try {
+      await kv.set(dedupKey, fingerprint, { ex: INTEGRATION_ALERT_TTL_SECONDS });
+    } catch {
+      // best-effort
+    }
   }
 
   const deadLetterByFeed = new Map<string, DeadLetter>();
