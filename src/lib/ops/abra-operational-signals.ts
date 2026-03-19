@@ -347,6 +347,31 @@ export function extractEmailSignals(params: {
     });
   }
 
+  // Payment confirmations, receipts, and order completions
+  if (
+    /\b(payment (?:received|confirmed|processed|completed|successful)|(?:invoice|order) (?:paid|fulfilled|shipped)|receipt (?:attached|enclosed|for your records)|(?:ach|wire|zelle) (?:transfer|payment) (?:received|confirmed)|transaction (?:confirmed|approved|completed)|(?:shipped|tracking|delivered|dispatched)|order (?:confirmation|received|placed|complete))\b/i.test(
+      text,
+    )
+  ) {
+    const amountMatch = text.match(/(?:\$|usd\s?)(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/i);
+    const amount = amountMatch ? Number(amountMatch[1].replace(/,/g, "")) : null;
+    const isPayment = /\b(payment|paid|receipt|ach|wire|zelle|transaction)\b/i.test(text);
+    const isShipment = /\b(shipped|tracking|delivered|dispatched)\b/i.test(text);
+    signals.push({
+      signal_type: isPayment ? "payment_confirmed" : isShipment ? "order_shipped" : "order_confirmed",
+      source: "email",
+      title: isPayment
+        ? `Payment confirmed${amount ? ` ($${amount.toLocaleString()})` : ""}`
+        : isShipment
+          ? "Shipment/delivery update"
+          : "Order confirmation received",
+      detail: `From: ${params.from}. Subject: ${params.subject}`,
+      severity: "info",
+      department: "finance",
+      metadata: { from: params.from, amount },
+    });
+  }
+
   // Supplier updates
   if (
     /\b(price increase|lead time|out of stock|discontinue|new product|allocation|minimum order)\b/.test(

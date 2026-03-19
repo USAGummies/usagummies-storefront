@@ -309,14 +309,25 @@ export async function fetchLiveBusinessSnapshot(): Promise<string | null> {
     if ((gmailUser || gmailClientId) && gmailClientId && gmailRefreshToken) {
       // Dynamic import to avoid loading googleapis on every request
       const { listEmails } = await import("@/lib/ops/gmail-reader");
-      const envelopes = await listEmails({ count: 5, folder: "INBOX" });
+      const [inboxEnvelopes, sentEnvelopes] = await Promise.all([
+        listEmails({ count: 5, folder: "INBOX" }),
+        listEmails({ count: 3, folder: "SENT" }).catch(() => [] as Awaited<ReturnType<typeof listEmails>>),
+      ]);
       void capMarkSuccess("gmail").catch(() => {});
-      if (envelopes.length > 0) {
-        lines.push(`LIVE INBOX (${envelopes.length} recent — use read_email action for full content):`);
-        for (const e of envelopes.slice(0, 5)) {
+      if (inboxEnvelopes.length > 0) {
+        lines.push(`LIVE INBOX (${inboxEnvelopes.length} recent — use read_email action for full content):`);
+        for (const e of inboxEnvelopes.slice(0, 5)) {
           const age = e.date ? `${Math.round((Date.now() - new Date(e.date).getTime()) / 3600000)}h ago` : "";
           const snippet = e.snippet ? ` — ${e.snippet.slice(0, 80)}` : "";
           lines.push(`  • [${e.id}] ${e.from}: "${e.subject}" (${age})${snippet}`);
+        }
+      }
+      if (sentEnvelopes.length > 0) {
+        lines.push(`\nRECENT SENT (what Ben has already communicated — use search_email "from:ben@usagummies.com" for more):`);
+        for (const e of sentEnvelopes.slice(0, 3)) {
+          const age = e.date ? `${Math.round((Date.now() - new Date(e.date).getTime()) / 3600000)}h ago` : "";
+          const snippet = e.snippet ? ` — ${e.snippet.slice(0, 80)}` : "";
+          lines.push(`  • [SENT ${age}] To: ${e.to || "unknown"}: "${e.subject}"${snippet}`);
         }
       }
     }

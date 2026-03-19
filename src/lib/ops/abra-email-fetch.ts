@@ -543,8 +543,81 @@ export async function runEmailFetch(params?: {
       }
     }
 
+    // ─── PASS 2: Also fetch SENT mail so Abra knows what Ben has already dealt with ───
+    const sentCount = Math.min(Math.max(Math.floor(count / 3), 10), 30);
+    try {
+      const sentEnvelopes = await listEmails({
+        folder: "SENT",
+        count: sentCount,
+        unreadOnly: false,
+      });
+
+      const sentProviderIds = sentEnvelopes
+        .map((env) => env.id)
+        .filter((id): id is string => typeof id === "string" && id.length > 0);
+      const existingSent = await getExistingProviderIds(sentProviderIds);
+
+      for (const envelope of sentEnvelopes) {
+        if (!envelope.id || existingSent.has(envelope.id)) {
+          skipped += 1;
+          continue;
+        }
+
+        const message = await readEmail(envelope.id);
+        if (!message) {
+          skipped += 1;
+          continue;
+        }
+
+        const subject = message.subject || "(no subject)";
+        const rawBody = message.body || message.htmlBody || message.subject || "";
+        const body = rawBody.slice(0, 20_000);
+        const senderEmail = "ben@usagummies.com"; // Sent mail is from us
+        const senderName = "Ben Stutman (Sent)";
+        const receivedAt = parseReceivedAt(message.date || envelope.date);
+
+        const record = {
+          provider_message_id: message.id,
+          message_id: message.id,
+          source_thread_id: message.threadId || envelope.threadId || null,
+          sender_name: senderName,
+          sender_email: senderEmail,
+          subject: `[SENT] ${subject}`.slice(0, 500),
+          received_at: receivedAt,
+          raw_text: body || subject,
+          summary: `[SENT by Ben] ${summarize(subject, body)}`,
+          category: "noise" as EmailCategory, // Sent mail doesn't trigger alerts
+          priority: "informational" as EmailPriority,
+          action_required: false,
+          suggested_action: null,
+          draft_status: null,
+          status: "read",
+        };
+
+        await embedAndStoreEmail(record);
+        inserted += 1;
+
+        // Also extract signals from sent mail — detect payment confirmations, commitments
+        const extracted = extractEmailSignals({
+          from: senderEmail,
+          subject: `[SENT] ${subject}`,
+          body,
+          department: "operations",
+        });
+        for (const signal of extracted) {
+          // Mark sent signals as informational (not action-required)
+          signal.severity = signal.severity === "critical" ? "warning" : "info";
+          const id = await emitSignal(signal);
+          if (id) signals += 1;
+        }
+      }
+    } catch (sentErr) {
+      console.error("[abra-email] Sent mail fetch failed (non-fatal):", sentErr instanceof Error ? sentErr.message : sentErr);
+      // Non-fatal — INBOX was already processed successfully
+    }
+
     return {
-      fetched: envelopes.length,
+      fetched: envelopes.length + sentCount,
       inserted,
       skipped,
       signals,
