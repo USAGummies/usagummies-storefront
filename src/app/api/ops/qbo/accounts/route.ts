@@ -28,7 +28,7 @@ export async function GET() {
       : "https://quickbooks.api.intuit.com";
 
   const query = encodeURIComponent(
-    "SELECT * FROM Account WHERE Active = true ORDERBY Name",
+    "SELECT * FROM Account WHERE Active = true ORDERBY Name MAXRESULTS 200",
   );
 
   const res = await fetch(
