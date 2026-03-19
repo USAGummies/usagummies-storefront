@@ -180,12 +180,15 @@ const STRATEGY_TRIGGERS =
   /\b(create .+ strategy|develop .+ strategy|build .+ strategy|strategic plan|financial plan|budget plan|let'?s (plan|strategize)|design .+ plan)\b/i;
 const DIAGNOSTICS_TRIGGERS =
   /\b(diagnos|self.?check|what'?s broken|are you (working|ok|healthy)|system health|feed status|check yourself|run diagnostics)\b/i;
+const FINANCE_TRIGGERS =
+  /\b(chart of accounts|account balances?|qbo|quickbooks|bank balance|checking balance|credit card balance|p&l|profit.?(?:and|&).?loss|balance sheet|cash position|how much (?:do we have|is in|money)|financial (?:summary|snapshot|report|data)|account(?:s|ing) (?:summary|breakdown)|categoriz|investor loan|rene.?(?:s|'s|'s)? (?:money|loan|transfer|investment))\b/i;
 
 type DetectedIntent =
   | { type: "initiative"; department: string | null; goal: string }
   | { type: "session"; department: string | null; sessionType: string }
   | { type: "cost" }
   | { type: "pipeline" }
+  | { type: "finance" }
   | { type: "strategy"; objective: string; department: string | null }
   | { type: "diagnostics" }
   | { type: "chat" };
@@ -199,6 +202,9 @@ function detectIntent(message: string): DetectedIntent {
   }
   if (PIPELINE_TRIGGERS.test(message)) {
     return { type: "pipeline" };
+  }
+  if (FINANCE_TRIGGERS.test(message)) {
+    return { type: "finance" };
   }
   if (STRATEGY_TRIGGERS.test(message)) {
     const department = detectDepartment(message);
@@ -1416,6 +1422,176 @@ export async function POST(req: Request) {
         confidence: 0.9,
         sources: [],
         intent: "pipeline",
+        thread_id: threadId,
+      });
+    }
+
+    // ─── Finance Fast-Path ───
+    if (intent.type === "finance") {
+      let financeData = "";
+      try {
+        // Fetch QBO accounts directly via our own API
+        const qboRes = await fetch(
+          `${process.env.NEXT_PUBLIC_BASE_URL || "https://www.usagummies.com"}/api/ops/qbo/accounts`,
+          { signal: AbortSignal.timeout(10_000) },
+        );
+        if (qboRes.ok) {
+          const qboJson = (await qboRes.json()) as {
+            count?: number;
+            accounts?: Array<{
+              Id: string;
+              Name: string;
+              AccountType: string;
+              AccountSubType?: string;
+              CurrentBalance?: number;
+              Active?: boolean;
+            }>;
+          };
+          const accounts = qboJson.accounts || [];
+
+          // Build a structured summary
+          const bankAccounts = accounts.filter(
+            (a) => a.AccountType === "Bank" && a.Active !== false,
+          );
+          const liabilityAccounts = accounts.filter(
+            (a) =>
+              (a.AccountType === "Other Current Liability" ||
+                a.AccountType === "Long Term Liability" ||
+                a.AccountType === "Credit Card") &&
+              a.Active !== false,
+          );
+          const expenseAccounts = accounts.filter(
+            (a) =>
+              (a.AccountType === "Expense" ||
+                a.AccountType === "Other Expense" ||
+                a.AccountType === "Cost of Goods Sold") &&
+              a.Active !== false,
+          );
+          const incomeAccounts = accounts.filter(
+            (a) =>
+              (a.AccountType === "Income" || a.AccountType === "Other Income") &&
+              a.Active !== false,
+          );
+          const assetAccounts = accounts.filter(
+            (a) =>
+              (a.AccountType === "Other Current Asset" ||
+                a.AccountType === "Fixed Asset") &&
+              a.Active !== false,
+          );
+
+          const fmt = (accts: typeof accounts) =>
+            accts
+              .map(
+                (a) =>
+                  `  • ${a.Name} (ID ${a.Id}): $${(a.CurrentBalance ?? 0).toFixed(2)} [${a.AccountSubType || a.AccountType}]`,
+              )
+              .join("\n");
+
+          financeData = [
+            `QBO Chart of Accounts — ${accounts.length} total accounts`,
+            "",
+            `**Bank Accounts (${bankAccounts.length}):**`,
+            fmt(bankAccounts),
+            "",
+            `**Income Accounts (${incomeAccounts.length}):**`,
+            fmt(incomeAccounts),
+            "",
+            `**Expense/COGS Accounts (${expenseAccounts.length}):**`,
+            fmt(expenseAccounts),
+            "",
+            `**Liability Accounts (${liabilityAccounts.length}):**`,
+            fmt(liabilityAccounts),
+            "",
+            `**Asset Accounts (${assetAccounts.length}):**`,
+            fmt(assetAccounts),
+          ].join("\n");
+        } else {
+          financeData =
+            "QBO API returned an error. QBO may not be connected — check /ops/finance for connection status.";
+        }
+      } catch (err) {
+        financeData = `Could not reach QBO API: ${err instanceof Error ? err.message : "unknown error"}`;
+      }
+
+      // Also pull revenue snapshot for richer context
+      let revenueContext = "";
+      try {
+        const rev = await getRevenueSnapshot("month");
+        if (rev) {
+          revenueContext = `\n\nRevenue Snapshot (rolling 30d):\n• Shopify: $${rev.shopify_revenue.toFixed(2)}\n• Amazon: $${rev.amazon_revenue.toFixed(2)}\n• Total: $${rev.total_revenue.toFixed(2)}\n• Orders: ${rev.order_count}\n• Avg order value: $${rev.avg_order_value.toFixed(2)}\n• vs prior period: ${rev.vs_prior_period_pct >= 0 ? "+" : ""}${rev.vs_prior_period_pct.toFixed(1)}%`;
+        }
+      } catch {
+        // Non-critical
+      }
+
+      // LLM synthesis
+      let financeReply = financeData;
+      try {
+        const anthropicKey = process.env.ANTHROPIC_API_KEY;
+        if (anthropicKey) {
+          const financePrompt = `You are Abra, the AI operations assistant for USA Gummies. The user asked a financial question. Here is the current QBO data:\n\n${financeData}${revenueContext}\n\nCRITICAL RULE: Any transfer from "Rene G. Gonzalez" or "Rene G Gonzalez Trust" is an INVESTOR LOAN (liability account ID 167), NEVER income. This is investor capital, not revenue.\n\nProvide a clear, helpful response to: "${message}"\n\nInclude specific account names, IDs, and balances where relevant. If the user asks about the Chart of Accounts, list the accounts organized by type. Keep it concise but complete. Format with markdown.`;
+          const llmRes = await fetch(
+            "https://api.anthropic.com/v1/messages",
+            {
+              method: "POST",
+              headers: {
+                "x-api-key": anthropicKey,
+                "anthropic-version": "2023-06-01",
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                model: "claude-sonnet-4-6",
+                max_tokens: 800,
+                temperature: 0.2,
+                messages: [{ role: "user", content: financePrompt }],
+              }),
+              signal: AbortSignal.timeout(15_000),
+            },
+          );
+          if (llmRes.ok) {
+            const llmData = (await llmRes.json()) as {
+              content?: Array<{ type: string; text?: string }>;
+              usage?: { input_tokens?: number; output_tokens?: number };
+            };
+            const llmText = (llmData.content || [])
+              .filter(
+                (b): b is { type: "text"; text: string } =>
+                  b.type === "text" && typeof b.text === "string",
+              )
+              .map((b) => b.text)
+              .join("");
+            if (llmText.length > 20) {
+              financeReply = llmText;
+              void logAICost?.({
+                endpoint: "abra-chat-finance",
+                provider: "anthropic",
+                model: "claude-sonnet-4-6",
+                inputTokens: llmData.usage?.input_tokens || 0,
+                outputTokens: llmData.usage?.output_tokens || 0,
+              }).catch(() => {});
+            }
+          }
+        }
+      } catch (err) {
+        console.error(
+          "[abra] Finance LLM synthesis failed, using template:",
+          err instanceof Error ? err.message : err,
+        );
+      }
+
+      queueChatHistory({
+        threadId,
+        userEmail: actorEmail,
+        userMessage: message,
+        assistantMessage: financeReply,
+        metadata: { intent: "finance" },
+      });
+
+      return NextResponse.json({
+        reply: financeReply,
+        confidence: 0.95,
+        sources: [],
+        intent: "finance",
         thread_id: threadId,
       });
     }
