@@ -272,32 +272,41 @@ export async function listEmails(opts: ListEmailsOpts = {}): Promise<EmailEnvelo
   const messages = listRes.data.messages ?? [];
   const envelopes: EmailEnvelope[] = [];
 
-  // Batch-fetch metadata for each message
-  for (const msg of messages) {
-    if (!msg.id) continue;
-    try {
-      const detail = await gmail.users.messages.get({
-        userId: "me",
-        id: msg.id,
-        format: "metadata",
-        metadataHeaders: ["From", "To", "Subject", "Date"],
-      });
-      const headers = (detail.data.payload?.headers ?? []) as Array<{
-        name: string;
-        value: string;
-      }>;
-      envelopes.push({
-        id: msg.id,
-        threadId: msg.threadId ?? "",
-        from: getHeader(headers, "From"),
-        to: getHeader(headers, "To"),
-        subject: getHeader(headers, "Subject"),
-        date: getHeader(headers, "Date"),
-        snippet: detail.data.snippet ?? "",
-        labelIds: (detail.data.labelIds ?? []) as string[],
-      });
-    } catch {
-      // Skip messages we can't read
+  // Batch-fetch metadata for each message (with per-message timeout to prevent cascading hangs)
+  const BATCH_SIZE = 5;
+  for (let i = 0; i < messages.length; i += BATCH_SIZE) {
+    const batch = messages.slice(i, i + BATCH_SIZE).filter((msg) => msg.id);
+    const results = await Promise.allSettled(
+      batch.map(async (msg) => {
+        const detail = await Promise.race([
+          gmail.users.messages.get({
+            userId: "me",
+            id: msg.id!,
+            format: "metadata",
+            metadataHeaders: ["From", "To", "Subject", "Date"],
+          }),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("message metadata timeout")), 5000),
+          ),
+        ]);
+        const headers = (detail.data.payload?.headers ?? []) as Array<{
+          name: string;
+          value: string;
+        }>;
+        return {
+          id: msg.id!,
+          threadId: msg.threadId ?? "",
+          from: getHeader(headers, "From"),
+          to: getHeader(headers, "To"),
+          subject: getHeader(headers, "Subject"),
+          date: getHeader(headers, "Date"),
+          snippet: detail.data.snippet ?? "",
+          labelIds: (detail.data.labelIds ?? []) as string[],
+        } as EmailEnvelope;
+      }),
+    );
+    for (const result of results) {
+      if (result.status === "fulfilled") envelopes.push(result.value);
     }
   }
 

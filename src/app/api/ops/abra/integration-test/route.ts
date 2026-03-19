@@ -4,6 +4,7 @@ import { notify } from "@/lib/ops/notify";
 import {
   testAmazon,
   testGA4Connection,
+  testGmailConnection,
   testOpenAIConnection,
   testShopifyConnection,
   testSlackConnection,
@@ -151,6 +152,11 @@ export async function GET(req: Request) {
           status: "not_configured" as const,
         },
         {
+          system: "gmail",
+          configured: !!((process.env.GMAIL_OAUTH_CLIENT_ID || process.env.GCP_GMAIL_OAUTH_CLIENT_ID) && (process.env.GMAIL_OAUTH_CLIENT_SECRET || process.env.GCP_GMAIL_OAUTH_CLIENT_SECRET) && (process.env.GMAIL_OAUTH_REFRESH_TOKEN || process.env.GCP_GMAIL_OAUTH_REFRESH_TOKEN)),
+          status: "not_configured" as const,
+        },
+        {
           system: "openai",
           configured: !!process.env.OPENAI_API_KEY,
           status: "not_configured" as const,
@@ -194,6 +200,7 @@ export async function GET(req: Request) {
     { system: "amazon", run: testAmazon },
     { system: "shopify", run: testShopifyConnection },
     { system: "ga4_analytics", run: testGA4Connection },
+    { system: "gmail", run: testGmailConnection },
     { system: "openai", run: testOpenAIConnection },
     { system: "supabase", run: testSupabaseConnection },
     { system: "slack", run: testSlackConnection },

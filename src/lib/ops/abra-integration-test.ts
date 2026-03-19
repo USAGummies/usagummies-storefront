@@ -1,6 +1,7 @@
 import { generateEmbedding } from "@/lib/ops/abra-embeddings";
 import { fetchGA4Report } from "@/lib/ops/abra-ga4-client";
 import { testAmazonConnection } from "@/lib/amazon/sp-api";
+import { listEmails } from "@/lib/ops/gmail-reader";
 
 export type IntegrationConnection = {
   configured: boolean;
@@ -214,6 +215,45 @@ export async function testSlackConnection(): Promise<IntegrationConnection> {
       };
     }
     return { configured: true, ok: true, message: "ok" };
+  } catch (error) {
+    return {
+      configured: true,
+      ok: false,
+      message: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+export async function testGmailConnection(): Promise<IntegrationConnection> {
+  const clientId =
+    process.env.GMAIL_OAUTH_CLIENT_ID || process.env.GCP_GMAIL_OAUTH_CLIENT_ID;
+  const clientSecret =
+    process.env.GMAIL_OAUTH_CLIENT_SECRET || process.env.GCP_GMAIL_OAUTH_CLIENT_SECRET;
+  const refreshToken =
+    process.env.GMAIL_OAUTH_REFRESH_TOKEN || process.env.GCP_GMAIL_OAUTH_REFRESH_TOKEN;
+  const saJson = process.env.GMAIL_SERVICE_ACCOUNT_JSON;
+
+  if (!saJson && !(clientId && clientSecret && refreshToken)) {
+    return {
+      configured: false,
+      ok: false,
+      message: "Gmail OAuth/Service Account not configured",
+    };
+  }
+
+  try {
+    // Lightweight test: list 1 email with a 10s timeout
+    const emails = await Promise.race([
+      listEmails({ count: 1, folder: "INBOX" }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Gmail API timeout (10s)")), 10000),
+      ),
+    ]);
+    return {
+      configured: true,
+      ok: true,
+      message: `ok (${emails.length} email fetched)`,
+    };
   } catch (error) {
     return {
       configured: true,

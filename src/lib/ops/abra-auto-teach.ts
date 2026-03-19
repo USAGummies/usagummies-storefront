@@ -1022,7 +1022,7 @@ export async function handleEmailFetchFeed(): Promise<FeedResult> {
   const feedKey = "email_fetch";
   try {
     const { runEmailFetch } = await import("@/lib/ops/abra-email-fetch");
-    const result = await runEmailFetch({ count: 50 });
+    const result = await runEmailFetch({ count: 25 });
     return {
       feed_key: feedKey,
       success: true,
