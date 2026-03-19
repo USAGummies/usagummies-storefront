@@ -11,6 +11,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { Client } from "@upstash/qstash";
+import { kv } from "@vercel/kv";
 import { getDueAgents, ENGINE_REGISTRY } from "@/lib/ops/engine-schedule";
 import { buildIntegrationSLAReport, type IntegrationSLAReport } from "@/lib/ops/env-check";
 import { runFailureInjectionSuite } from "@/lib/ops/failure-injection";
@@ -77,6 +78,12 @@ async function wasRecentlyDispatched(
   engineId: string,
   agentKey: string
 ): Promise<boolean> {
+  try {
+    const existing = await kv.get<string>(`scheduler:lock:${engineId}:${agentKey}`);
+    if (existing) return true;
+  } catch {
+    // KV unavailable — fall back to state-based dedupe
+  }
   const recent = await readState<RecentDispatch[]>("run-ledger-recent", []);
   const fiveMinAgo = Date.now() - 5 * 60 * 1000;
   return recent.some(
@@ -88,6 +95,14 @@ async function wasRecentlyDispatched(
 }
 
 async function recordDispatch(engineId: string, agentKey: string): Promise<void> {
+  try {
+    await kv.set(`scheduler:last_run:${engineId}:${agentKey}`, new Date().toISOString(), {
+      ex: 7 * 86400,
+    });
+    await kv.set(`scheduler:lock:${engineId}:${agentKey}`, "running", { ex: 300 });
+  } catch {
+    // KV unavailable — state ledger still records dispatches
+  }
   const recent = await readState<RecentDispatch[]>("run-ledger-recent", []);
   recent.push({ engineId, agentKey, at: new Date().toISOString() });
   // Keep only last 200 entries
@@ -133,11 +148,16 @@ export async function GET(req: NextRequest) {
       continue;
     }
 
+    const destination =
+      engineId === "sweeps"
+        ? `${baseUrl}/api/ops/sweeps/${agent.key}`
+        : `${baseUrl}/api/ops/engine/${engineId}/${agent.key}`;
+
     if (qstash) {
       // Dispatch via QStash for async execution
       try {
         const res = await qstash.publishJSON({
-          url: `${baseUrl}/api/ops/engine/${engineId}/${agent.key}`,
+          url: destination,
           body: { engineId, agentKey: agent.key, triggeredBy: "scheduler" },
           retries: 1,
           timeout: "5m",
@@ -331,10 +351,14 @@ export async function POST(req: NextRequest) {
       process.env.VERCEL_URL
         ? `https://${process.env.VERCEL_URL}`
         : process.env.NEXTAUTH_URL || "https://www.usagummies.com";
+    const destination =
+      engineId === "sweeps"
+        ? `${baseUrl}/api/ops/sweeps/${agentKey}`
+        : `${baseUrl}/api/ops/engine/${engineId}/${agentKey}`;
 
     if (qstash) {
       const res = await qstash.publishJSON({
-        url: `${baseUrl}/api/ops/engine/${engineId}/${agentKey}`,
+        url: destination,
         body: { engineId, agentKey, triggeredBy: "manual" },
         retries: 1,
         timeout: "5m",
@@ -347,10 +371,25 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    return NextResponse.json({
-      ok: false,
-      message: "QStash not configured — cannot dispatch",
+    const cronSecret = process.env.CRON_SECRET?.trim();
+    const directRes = await fetch(destination, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(cronSecret ? { Authorization: `Bearer ${cronSecret}` } : {}),
+      },
+      body: JSON.stringify({ engineId, agentKey, triggeredBy: "manual" }),
+      signal: AbortSignal.timeout(30_000),
     });
+
+    const directBody = (await directRes.json().catch(() => ({}))) as Record<string, unknown>;
+    return NextResponse.json({
+      ok: directRes.ok,
+      message: directRes.ok
+        ? `Dispatched ${agent.name} (${engineId}/${agentKey}) directly`
+        : `Direct dispatch failed for ${agent.name} (${engineId}/${agentKey})`,
+      result: directBody,
+    }, { status: directRes.ok ? 200 : 500 });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }

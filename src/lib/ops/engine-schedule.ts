@@ -184,6 +184,18 @@ export const ENGINE_REGISTRY: EngineConfig[] = [
     ],
   },
   {
+    id: "sweeps",
+    name: "Scheduled Intelligence Loops",
+    scriptFile: "internal-sweeps",
+    agents: [
+      { key: "email-sweep", name: "Email Sweep", schedule: "Every 15 min" },
+      { key: "bank-feed-sweep", name: "Bank Feed Sweep", schedule: "Every 60 min" },
+      { key: "morning-brief", name: "Morning Brief", schedule: "Daily 08:00" },
+      { key: "approval-expiry", name: "Approval Expiry", schedule: "Every 60 min" },
+      { key: "evening-recon", name: "Evening Recon", schedule: "Daily 21:00" },
+    ],
+  },
+  {
     id: "abra-sync",
     name: "Abra Brain Sync Engine",
     scriptFile: "abra-brain-sync.mjs",
