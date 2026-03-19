@@ -52,7 +52,6 @@ function integrationAlertFingerprint(integration: IntegrationStatus): string {
   return JSON.stringify({
     status: integration.connection_status,
     error: (integration.error_summary || "unknown error").slice(0, 200),
-    last_error_at: integration.last_error_at || "",
   });
 }
 
