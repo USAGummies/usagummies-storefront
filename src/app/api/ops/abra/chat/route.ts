@@ -5,11 +5,15 @@
  * Returns: { reply: string, sources: [...], confidence: number }
  *
  * Uses temporal search + dynamic system prompt for accurate, recency-aware answers.
+ *
+ * This route is a thin orchestrator. Business logic lives in:
+ * - abra-intent.ts         — intent detection (regex-based, no LLM)
+ * - abra-context-builder.ts — data fetching (Supabase, Shopify, QBO, etc.)
+ * - abra-action-executor.ts — action directive parsing & execution
+ * - abra-chat-persistence.ts — chat history, summarization, provenance
  */
 
-import { after, NextResponse } from "next/server";
-import { kv } from "@vercel/kv";
-import { createHash } from "node:crypto";
+import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/config";
 import { isAuthorized } from "@/lib/ops/abra-auth";
 import {
@@ -39,41 +43,54 @@ import {
   checkBudgetAndAlert,
 } from "@/lib/ops/abra-cost-tracker";
 import {
-  getCalendarMonthRevenue,
-  getMarginAnalysis,
   getRevenueSnapshot,
 } from "@/lib/ops/abra-financial-intel";
-import { searchTiered, searchWithTemporalAwareness, buildTieredContext, type TieredSearchResult } from "@/lib/ops/abra-memory-tiers";
-import { logAnswer, extractProvenance } from "@/lib/ops/abra-source-provenance";
+import { searchWithTemporalAwareness, buildTieredContext, type TieredSearchResult } from "@/lib/ops/abra-memory-tiers";
 import { getTeamMembers, getVendors, buildTeamContext } from "@/lib/ops/abra-team-directory";
 import { getActiveSignals, buildSignalsContext } from "@/lib/ops/abra-operational-signals";
 import {
   getAvailableActions,
-  proposeAndMaybeExecute,
   parseActionDirectives,
-  normalizeActionDirective,
-  KNOWN_ACTION_TYPES,
-  type AbraAction,
-  type ActionDirective,
 } from "@/lib/ops/abra-actions";
 import { analyzePipeline } from "@/lib/ops/abra-pipeline-intelligence";
-import { queryLedgerSummary } from "@/lib/ops/abra-notion-write";
 import { EMAIL_EXTRACTION_SKILL } from "@/lib/ops/abra-skill-email-data-extraction";
-import { DEAL_CALCULATOR_SKILL, calculateDeal, type ChannelType } from "@/lib/ops/abra-skill-deal-calculator";
-import {
-  buildConversationContext,
-  getThreadHistory as getStoredThreadHistory,
-  saveMessage,
-} from "@/lib/ops/abra-chat-history";
+import { DEAL_CALCULATOR_SKILL } from "@/lib/ops/abra-skill-deal-calculator";
 import { buildCrossDepartmentStrategy } from "@/lib/ops/abra-strategy-orchestrator";
 import { getSystemHealth } from "@/lib/ops/abra-health-monitor";
+
+// ─── Extracted modules ───
 import {
-  summarizeConversation,
-  storeConversationSummary,
-} from "@/lib/ops/memory/conversation-summarizer";
-import { learnDecisionPatterns } from "@/lib/ops/memory/decision-patterns";
-import { captureOperationalPatterns } from "@/lib/ops/memory/operational-patterns";
-import { notifyAlert } from "@/lib/ops/notify";
+  detectIntent,
+  isFinanceQuestion,
+  needsEmailExtractionSkill,
+  needsDealCalculatorSkill,
+  isCompetitorQuestion,
+} from "@/lib/ops/abra-intent";
+import {
+  isSupabaseRelatedError,
+  fetchActiveInitiatives,
+  fetchAskingInitiative,
+  extractInitiativeAnswers,
+  fetchCostSummary,
+  fetchLiveBusinessSnapshot,
+  fetchFinancialContext,
+  fetchLedgerContext,
+  fetchCompetitorContext,
+  captureCompetitorIntelFromChat,
+  buildEmbedding,
+  fetchCorrections,
+  fetchDepartments,
+  valueAsText,
+} from "@/lib/ops/abra-context-builder";
+import { executeActions } from "@/lib/ops/abra-action-executor";
+import {
+  isUuidLike,
+  makeThreadId,
+  queueChatHistory,
+  buildConversationContext,
+  logProvenance,
+  logUnansweredQuestions,
+} from "@/lib/ops/abra-chat-persistence";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -88,56 +105,6 @@ type ChatMessage = {
   role: "user" | "assistant" | "system";
   content: string;
 };
-
-function getSupabaseEnv() {
-  const baseUrl =
-    process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!baseUrl || !serviceKey) {
-    throw new Error(
-      "Missing SUPABASE_URL/NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY",
-    );
-  }
-  return { baseUrl, serviceKey };
-}
-
-async function sbFetch(path: string, init: RequestInit = {}) {
-  const { baseUrl, serviceKey } = getSupabaseEnv();
-  const headers = new Headers(init.headers || {});
-  headers.set("apikey", serviceKey);
-  headers.set("Authorization", `Bearer ${serviceKey}`);
-  headers.set("Content-Type", "application/json");
-
-  const res = await fetch(`${baseUrl}${path}`, {
-    ...init,
-    headers,
-    cache: "no-store",
-    signal: init.signal || AbortSignal.timeout(15000),
-  });
-
-  const text = await res.text();
-  let json: unknown = null;
-  if (text) {
-    try {
-      json = JSON.parse(text);
-    } catch {
-      json = text;
-    }
-  }
-
-  if (!res.ok) {
-    throw new Error(
-      `Supabase ${init.method || "GET"} ${path} failed (${res.status}): ${((typeof json === "string" ? json : JSON.stringify(json)) || "").slice(0, 500)}`,
-    );
-  }
-
-  return json;
-}
-
-function isSupabaseRelatedError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return /supabase|rest\/v1|service_role|SUPABASE/i.test(message);
-}
 
 function sanitizeHistory(history: unknown): ChatMessage[] {
   if (!Array.isArray(history)) return [];
@@ -175,672 +142,6 @@ function buildHealthModeReply(message: string): string {
   return "Abra is online. Health mode is responding and authenticated.";
 }
 
-// ─── Intent Detection (keyword-based, not LLM) ───
-const INITIATIVE_TRIGGERS =
-  /\b(get .+ under control|let'?s work on|build .+ structure|set up .+ department|organize .+ department|establish .+ process)\b/i;
-const SESSION_TRIGGERS =
-  /\b(let'?s (have a |)meet|start a (meeting|session|review)|review .+ department|how'?s .+ doing|check in on)\b/i;
-const COST_TRIGGERS =
-  /\b(ai spend|ai cost|how much (?:(?:am i|are we|is abra|does abra|do we) )?spend(?:ing)? on ai|abra(?:'s|'s) (?:monthly )?(?:cost|spend|budget)|monthly ai spend|ai cost report)\b/i;
-const PIPELINE_TRIGGERS =
-  /\b(sales pipeline|pipeline health|pipeline status|b2b pipeline|b2b deals?|wholesale deals?|pipeline deals?|active deals?|deal(s| ) (status|details|breakdown)|show .+ pipeline|what deals|which deals|which companies .+ pipeline|who .+ in .+ pipeline|pipeline summary|deal pipeline|b2b prospects?|top .+ deals?|prospects? by .+ value|biggest deals?|largest deals?|deal value)\b/i;
-const STRATEGY_TRIGGERS =
-  /\b(create .+ strategy|develop .+ strategy|build .+ strategy|strategic plan|financial plan|budget plan|let'?s (plan|strategize)|design .+ plan)\b/i;
-const DIAGNOSTICS_TRIGGERS =
-  /\b(diagnos|self.?check|what'?s broken|are you (working|ok|healthy)|system health|feed status|check yourself|run diagnostics)\b/i;
-const FINANCE_TRIGGERS =
-  /\b(chart of accounts|account balances?|qbo|quickbooks|bank balance|checking balance|credit card balance|p&l|profit.?(?:and|&).?loss|balance sheet|cash position|how much (?:do we have|is in|money)|financial (?:summary|snapshot|report|data)|account(?:s|ing) (?:summary|breakdown)|categoriz|investor loan|rene.?(?:s|'s|'s)? (?:money|loan|transfer|investment)|vendor(?:s| list)?|supplier(?:s)?|co.?pack|cogs|cost of goods|gross margin|expense(?:s| breakdown)|where .* money .* go|spending|purchases?|what (?:are|do) we (?:spend|pay)|who do we (?:pay|buy from)|reconcil|1099|tax (?:liability|filing|return|compliance|status)|estimated (?:quarterly|tax)|accounts (?:receivable|payable)|inventory (?:value|on hand|count|worth)|depreciation|amortization|equity|liabilities|net (?:income|loss|worth)|revenue (?:breakdown|by channel)|burn rate|runway|profitability|breakeven|break.?even|capital structure|funding|every transaction|all transactions|transaction (?:list|detail|history)|general ledger|trial balance|what do the books look|how do the books|book(?:s|keeping))\b/i;
-
-type DetectedIntent =
-  | { type: "initiative"; department: string | null; goal: string }
-  | { type: "session"; department: string | null; sessionType: string }
-  | { type: "cost" }
-  | { type: "pipeline" }
-  | { type: "finance" }
-  | { type: "strategy"; objective: string; department: string | null }
-  | { type: "diagnostics" }
-  | { type: "chat" };
-
-function detectIntent(message: string): DetectedIntent {
-  if (DIAGNOSTICS_TRIGGERS.test(message)) {
-    return { type: "diagnostics" };
-  }
-  if (COST_TRIGGERS.test(message)) {
-    return { type: "cost" };
-  }
-  if (PIPELINE_TRIGGERS.test(message)) {
-    return { type: "pipeline" };
-  }
-  if (FINANCE_TRIGGERS.test(message)) {
-    return { type: "finance" };
-  }
-  if (STRATEGY_TRIGGERS.test(message)) {
-    const department = detectDepartment(message);
-    return { type: "strategy", objective: message, department };
-  }
-  if (INITIATIVE_TRIGGERS.test(message)) {
-    const department = detectDepartment(message);
-    return { type: "initiative", department, goal: message };
-  }
-  if (SESSION_TRIGGERS.test(message)) {
-    const department = detectDepartment(message);
-    const sessionType = /review/i.test(message) ? "review" : "meeting";
-    return { type: "session", department, sessionType };
-  }
-  return { type: "chat" };
-}
-
-async function fetchActiveInitiatives(): Promise<AbraInitiativeContext[]> {
-  try {
-    const rows = (await sbFetch(
-      "/rest/v1/abra_initiatives?status=not.in.(completed,paused)&select=id,department,title,goal,status,questions,answers&order=created_at.desc&limit=5",
-    )) as Array<{
-      id: string;
-      department: string;
-      title: string | null;
-      goal: string;
-      status: string;
-      questions: Array<{ key: string }>;
-      answers: Record<string, string>;
-    }>;
-
-    return rows.map((r) => ({
-      id: r.id,
-      department: r.department,
-      title: r.title,
-      goal: r.goal,
-      status: r.status,
-      open_question_count: (r.questions || []).filter(
-        (q) => !r.answers?.[q.key],
-      ).length,
-    }));
-  } catch {
-    return [];
-  }
-}
-
-type AskingInitiative = {
-  id: string;
-  department: string;
-  title: string | null;
-  questions: PlaybookQuestion[];
-  answers: Record<string, unknown>;
-};
-
-async function fetchAskingInitiative(
-  department: string | null,
-): Promise<AskingInitiative | null> {
-  try {
-    let path =
-      "/rest/v1/abra_initiatives?status=eq.asking_questions&select=id,department,title,questions,answers&order=updated_at.desc&limit=5";
-    if (department) {
-      path += `&department=eq.${encodeURIComponent(department)}`;
-    }
-
-    const rows = (await sbFetch(path)) as Array<{
-      id: string;
-      department: string;
-      title: string | null;
-      questions: unknown;
-      answers: unknown;
-    }>;
-
-    for (const row of rows) {
-      const questions = Array.isArray(row.questions)
-        ? (row.questions as PlaybookQuestion[])
-        : [];
-      if (!questions.length) continue;
-      const answers =
-        row.answers && typeof row.answers === "object"
-          ? (row.answers as Record<string, unknown>)
-          : {};
-      const hasOpen = questions.some((q) => !valueAsText(answers[q.key], ""));
-      if (hasOpen) {
-        return {
-          id: row.id,
-          department: row.department,
-          title: row.title,
-          questions,
-          answers,
-        };
-      }
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-function valueAsText(value: unknown, fallback = ""): string {
-  if (typeof value === "string") return value.trim();
-  if (typeof value === "number" || typeof value === "boolean") {
-    return String(value);
-  }
-  return fallback;
-}
-
-function extractInitiativeAnswers(
-  message: string,
-  initiative: AskingInitiative,
-): Record<string, string> | null {
-  const openQuestions = initiative.questions.filter(
-    (question) => !valueAsText(initiative.answers[question.key], ""),
-  );
-  if (!openQuestions.length) return null;
-
-  const parsed: Record<string, string> = {};
-  const numbered = Array.from(
-    message.matchAll(/(?:^|\n)\s*(\d+)[).:-]\s*([^\n]+)/g),
-  );
-  if (numbered.length > 0) {
-    for (const match of numbered) {
-      const index = Number.parseInt(match[1], 10) - 1;
-      if (index >= 0 && index < openQuestions.length) {
-        const answer = match[2].trim();
-        if (answer) {
-          parsed[openQuestions[index].key] = answer;
-        }
-      }
-    }
-  }
-
-  const lines = message
-    .split(/\n+/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-  for (const line of lines) {
-    const pair = line.match(/^([^:]{2,80}):\s*(.+)$/);
-    if (!pair) continue;
-    const keyText = pair[1].toLowerCase().trim().replace(/\s+/g, "_");
-    const answer = pair[2].trim();
-    if (!answer) continue;
-    const question = openQuestions.find((q) => {
-      const keyMatch = q.key.toLowerCase() === keyText;
-      const fuzzyMatch = q.q.toLowerCase().includes(pair[1].toLowerCase().trim());
-      return keyMatch || fuzzyMatch;
-    });
-    if (question) {
-      parsed[question.key] = answer;
-    }
-  }
-
-  if (Object.keys(parsed).length === 0 && openQuestions.length === 1) {
-    const fallback = message.trim();
-    if (fallback.length >= 2 && fallback.length <= 500) {
-      parsed[openQuestions[0].key] = fallback;
-    }
-  }
-
-  if (Object.keys(parsed).length === 0) {
-    return null;
-  }
-  return parsed;
-}
-
-async function fetchCostSummary(): Promise<AbraCostContext | null> {
-  try {
-    const spend = await getMonthlySpend();
-    return {
-      total: spend.total,
-      budget: spend.budget,
-      remaining: spend.remaining,
-      pctUsed: spend.pctUsed,
-      byProvider: spend.byProvider,
-      byEndpoint: spend.byEndpoint,
-    };
-  } catch {
-    return null;
-  }
-}
-
-function isFinanceQuestion(message: string): boolean {
-  return /\b(finance|financial|revenue|margin|cogs|gross profit|profitability|aov|cash flow|budget|money|sales|orders|income|expenses|spending|p&l|profit|loss|chart of accounts|qbo|quickbooks|balance sheet|bank balance|cash position|vendor|supplier|tax|1099|reconcil|depreciation|amortization|equity|liabilities|inventory|burn rate|runway|breakeven|capital|transaction|general ledger|trial balance|bookkeep)\b/i.test(
-    message,
-  );
-}
-
-function needsEmailExtractionSkill(message: string): boolean {
-  return /\b(email|gmail|inbox|supplier|vendor|quote|invoice|freight|cogs|cost.*(per|unit|pound)|albanese|belmark|powers|dutch valley|bill thurner|greg kroetch|extract.*data|pull.*from.*email|find.*in.*email|check.*email|read.*email|production cost|packing fee|film cost)\b/i.test(
-    message,
-  );
-}
-
-function needsDealCalculatorSkill(message: string): boolean {
-  return /\b(deal|margin|pricing|wholesale price|price per unit|profit(ability)?|calculate.*deal|evaluate.*deal|should we take|quote.*price|how much.*make|unit economics|break.?even|channel.*comparison|faire.*margin|wholesale.*margin|distribution.*margin|negotiate.*price)\b/i.test(
-    message,
-  );
-}
-
-/**
- * Fetch a real-time snapshot of today's business activity.
- * Runs on EVERY chat to ensure Abra always has current data.
- * Lightweight — only fetches summary counts, not full payloads.
- */
-async function fetchLiveBusinessSnapshot(): Promise<string | null> {
-  const lines: string[] = [];
-  const today = new Date().toISOString().split("T")[0];
-
-  // 1. Shopify orders (last 24h) — lightweight REST call
-  try {
-    const shopifyDomain = process.env.SHOPIFY_STORE || process.env.SHOPIFY_STORE_DOMAIN;
-    const shopifyToken = process.env.SHOPIFY_ADMIN_TOKEN || process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
-    const shopifyVersion = process.env.SHOPIFY_API_VERSION || "2024-10";
-    if (shopifyDomain && shopifyToken) {
-      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      const url = `https://${shopifyDomain}/admin/api/${shopifyVersion}/orders.json?status=any&created_at_min=${since}&limit=250`;
-      const res = await fetch(url, {
-        headers: { "X-Shopify-Access-Token": shopifyToken, "Content-Type": "application/json" },
-        signal: AbortSignal.timeout(8000),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const orders = Array.isArray(data.orders) ? data.orders as Array<{ name?: string; total_price?: string; created_at?: string; financial_status?: string; fulfillment_status?: string | null; customer?: { first_name?: string; last_name?: string }; line_items?: Array<{ title?: string; quantity?: number }> }> : [];
-        if (orders.length > 0) {
-          const totalRev = orders.reduce((s, o) => s + parseFloat(o.total_price || "0"), 0);
-          const unfulfilled = orders.filter(o => !o.fulfillment_status || o.fulfillment_status === "null").length;
-          lines.push(`LIVE SHOPIFY (last 24h, as of ${today}): ${orders.length} orders, $${totalRev.toFixed(2)} revenue, ${unfulfilled} unfulfilled.`);
-          // Show most recent 5 orders
-          const recent = orders.slice(0, 5);
-          for (const o of recent) {
-            const items = (o.line_items || []).map(li => `${li.quantity}x ${li.title}`).join(", ");
-            const custName = [o.customer?.first_name, o.customer?.last_name].filter(Boolean).join(" ") || "Guest";
-            lines.push(`  • ${o.name}: $${o.total_price} from ${custName} — ${items} (${o.financial_status || "pending"}, ${o.fulfillment_status || "unfulfilled"})`);
-          }
-          if (orders.length > 5) lines.push(`  ... and ${orders.length - 5} more orders.`);
-        } else {
-          lines.push(`LIVE SHOPIFY (last 24h): No orders.`);
-        }
-      }
-    }
-  } catch { /* non-fatal */ }
-
-  // 2. Recent emails (last 5 inbox subjects) — lightweight metadata only
-  try {
-    const gmailUser = process.env.GMAIL_USER || process.env.GMAIL_SENDER || process.env.SMTP_USER;
-    const gmailClientId = process.env.GMAIL_CLIENT_ID || process.env.GMAIL_OAUTH_CLIENT_ID || process.env.GCP_GMAIL_OAUTH_CLIENT_ID;
-    const gmailRefreshToken = process.env.GMAIL_REFRESH_TOKEN || process.env.GMAIL_OAUTH_REFRESH_TOKEN || process.env.GCP_GMAIL_OAUTH_REFRESH_TOKEN;
-    if ((gmailUser || gmailClientId) && gmailClientId && gmailRefreshToken) {
-      // Dynamic import to avoid loading googleapis on every request
-      const { listEmails } = await import("@/lib/ops/gmail-reader");
-      const envelopes = await listEmails({ count: 5, folder: "INBOX" });
-      if (envelopes.length > 0) {
-        lines.push(`LIVE INBOX (${envelopes.length} recent — use read_email action for full content):`);
-        for (const e of envelopes.slice(0, 5)) {
-          const age = e.date ? `${Math.round((Date.now() - new Date(e.date).getTime()) / 3600000)}h ago` : "";
-          const snippet = e.snippet ? ` — ${e.snippet.slice(0, 80)}` : "";
-          lines.push(`  • [${e.id}] ${e.from}: "${e.subject}" (${age})${snippet}`);
-        }
-      }
-    }
-  } catch { /* non-fatal */ }
-
-  return lines.length > 0 ? lines.join("\n") : null;
-}
-
-async function fetchFinancialContext(): Promise<string | null> {
-  try {
-    const [calMonth, weekSnapshot] = await Promise.all([
-      getCalendarMonthRevenue(),
-      getRevenueSnapshot("week"),
-    ]);
-
-    // Guard: if both sources return zero data, treat as unavailable
-    if (calMonth.days_with_data === 0 && weekSnapshot.order_count === 0) {
-      console.log("[abra] Financial context: both KPI sources returned zero data");
-      return null;
-    }
-
-    const lines = [
-      `${calMonth.month} calendar month revenue (${calMonth.days_with_data} days of data): Shopify $${calMonth.shopify_revenue.toFixed(2)} (${calMonth.shopify_orders} orders), Amazon $${calMonth.amazon_revenue.toFixed(2)} (${calMonth.amazon_orders} orders), TOTAL $${calMonth.total_revenue.toFixed(2)} (${calMonth.total_orders} orders, AOV $${calMonth.avg_order_value.toFixed(2)}).`,
-      `Last 7 days revenue: total $${weekSnapshot.total_revenue.toFixed(2)} (${weekSnapshot.order_count} orders, AOV $${weekSnapshot.avg_order_value.toFixed(2)}).`,
-    ];
-
-    return lines.join("\n");
-  } catch (err) {
-    console.error("[abra] Financial context fetch failed:", err instanceof Error ? err.message : err);
-    return null;
-  }
-}
-
-/**
- * Fetch verified Notion ledger data for financial questions.
- * Returns P&L summary from the actual Cash & Transactions database — Layer 3 (bank deposits).
- * This is the authoritative financial source, NOT brain memory entries.
- */
-async function fetchLedgerContext(message: string): Promise<string | null> {
-  // 3s timeout — Notion pagination is slow; KV cache handles repeat queries
-  const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000));
-  return Promise.race([fetchLedgerContextInner(message), timeout]);
-}
-
-async function fetchLedgerContextInner(message: string): Promise<string | null> {
-  try {
-    // Detect which fiscal year the user is asking about
-    const currentYear = new Date().getFullYear().toString();
-    const yearMatch = message.match(/\b(20\d{2})\b/);
-    const requestedYear = yearMatch ? yearMatch[1] : null;
-
-    // Fetch both current year and requested year (if different)
-    const yearsToFetch = new Set<string>([currentYear]);
-    if (requestedYear) yearsToFetch.add(requestedYear);
-
-    const results: string[] = [];
-    results.push("VERIFIED NOTION LEDGER DATA (Layer 3: Bank Deposits — these are NET deposits, not gross revenue):");
-    results.push("Source: Notion Cash & Transactions database (https://www.notion.so/6325d16870024b83876b9e591b3d2d9c)");
-
-    for (const year of yearsToFetch) {
-      // Check KV cache first (1-hour TTL) — Notion pagination over 400+ rows is slow
-      const cacheKey = `abra:ledger:FY${year}`;
-      type LedgerSummary = Awaited<ReturnType<typeof queryLedgerSummary>>;
-      let ledger: LedgerSummary | null = null;
-      try {
-        ledger = await kv.get<LedgerSummary>(cacheKey);
-      } catch { /* KV unavailable — fall through to Notion */ }
-      if (!ledger) {
-        ledger = await queryLedgerSummary({ fiscalYear: `FY${year}` });
-        try { await kv.set(cacheKey, ledger, { ex: 3600 }); } catch { /* KV write failed — non-critical */ }
-      }
-      if (ledger.summary.transactionCount === 0) continue;
-
-      const s = ledger.summary;
-      results.push(`\nFY${year} (${s.transactionCount} transactions):`);
-      results.push(`  Revenue (bank deposits): $${s.totalIncome.toFixed(2)}`);
-      results.push(`  COGS: $${s.totalCOGS.toFixed(2)}`);
-      results.push(`  Operating Expenses: $${s.totalExpenses.toFixed(2)}`);
-      results.push(`  Total Spend (COGS + OpEx): $${s.totalAllSpend.toFixed(2)}`);
-      results.push(`  Net Income: $${s.netIncome.toFixed(2)}`);
-      if (s.totalOwnerInvestment > 0) {
-        results.push(`  Owner Investment/Transfers: $${s.totalOwnerInvestment.toFixed(2)}`);
-      }
-
-      // Top categories
-      const sortedCats = Object.entries(s.byCategory)
-        .sort(([, a], [, b]) => b - a)
-        .slice(0, 10);
-      if (sortedCats.length > 0) {
-        results.push("  By Category:");
-        for (const [cat, amt] of sortedCats) {
-          results.push(`    ${cat}: $${amt.toFixed(2)}`);
-        }
-      }
-
-      // Top vendors (from transaction detail)
-      const vendorTotals: Record<string, number> = {};
-      for (const tx of ledger.transactions) {
-        if (tx.vendor && tx.fiscalYear === `FY${year}`) {
-          vendorTotals[tx.vendor] = (vendorTotals[tx.vendor] || 0) + Math.abs(tx.amount);
-        }
-      }
-      const sortedVendors = Object.entries(vendorTotals)
-        .sort(([, a], [, b]) => b - a)
-        .slice(0, 8);
-      if (sortedVendors.length > 0) {
-        results.push("  Top Vendors:");
-        for (const [vendor, amt] of sortedVendors) {
-          results.push(`    ${vendor}: $${amt.toFixed(2)}`);
-        }
-      }
-    }
-
-    return results.length > 2 ? results.join("\n") : null;
-  } catch (err) {
-    console.error("[abra] Ledger context fetch failed:", err instanceof Error ? err.message : err);
-    return null;
-  }
-}
-
-type CompetitorIntelRow = {
-  competitor_name: string;
-  data_type: string;
-  title: string;
-  detail: string | null;
-  created_at: string;
-};
-
-const KNOWN_COMPETITORS = [
-  "haribo",
-  "trolli",
-  "albanese",
-  "sour patch",
-  "black forest",
-  "welch",
-  "smartsweets",
-  "yumearth",
-  "skittles",
-];
-
-function isCompetitorQuestion(message: string): boolean {
-  return /\b(competitor|competition|compete|vs\.?|pricing|promo|promotion|market share|positioning)\b/i.test(
-    message,
-  );
-}
-
-function extractCompetitorHint(message: string): string | null {
-  const lower = message.toLowerCase();
-  for (const name of KNOWN_COMPETITORS) {
-    if (lower.includes(name)) return name;
-  }
-  const vsMatch = lower.match(/\bvs\.?\s+([a-z0-9][a-z0-9\s-]{1,40})/i);
-  if (vsMatch?.[1]) return vsMatch[1].trim();
-  const compMatch = lower.match(/\bcompetitor\s+([a-z0-9][a-z0-9\s-]{1,40})/i);
-  if (compMatch?.[1]) return compMatch[1].trim();
-  return null;
-}
-
-function inferCompetitorDataType(message: string): string {
-  const lower = message.toLowerCase();
-  if (/\b(price|priced|pricing|\$|cost|cheaper|expensive)\b/.test(lower)) {
-    return "pricing";
-  }
-  if (/\b(promo|promotion|discount|coupon|sale|deal)\b/.test(lower)) {
-    return "promotion";
-  }
-  if (/\b(review|rating|stars?|feedback)\b/.test(lower)) {
-    return "review";
-  }
-  if (/\b(launch|flavor|sku|pack|size|ingredient|formula|product)\b/.test(lower)) {
-    return "product";
-  }
-  return "market_position";
-}
-
-function buildCompetitorDedupeKey(params: {
-  competitorName: string;
-  dataType: string;
-  message: string;
-}): string {
-  const canonical = [
-    params.competitorName.toLowerCase(),
-    params.dataType.toLowerCase(),
-    params.message.trim().toLowerCase(),
-  ].join("|");
-  return createHash("sha256").update(canonical).digest("hex");
-}
-
-function shouldCaptureCompetitorIntel(message: string): boolean {
-  if (!isCompetitorQuestion(message)) return false;
-  if (message.trim().length < 20) return false;
-  return /\b(saw|heard|noticed|offering|launched|running|selling|priced|discount|promo|review)\b/i.test(
-    message,
-  );
-}
-
-async function captureCompetitorIntelFromChat(params: {
-  message: string;
-  userEmail: string;
-  threadId: string;
-}) {
-  if (!shouldCaptureCompetitorIntel(params.message)) return;
-  const competitorName = extractCompetitorHint(params.message);
-  if (!competitorName) return;
-
-  const title =
-    params.message.length > 120
-      ? `${params.message.slice(0, 117)}...`
-      : params.message;
-  const dataType = inferCompetitorDataType(params.message);
-  const dedupeKey = buildCompetitorDedupeKey({
-    competitorName,
-    dataType,
-    message: params.message,
-  });
-
-  try {
-    await sbFetch("/rest/v1/abra_competitor_intel?on_conflict=dedupe_key", {
-      method: "POST",
-      headers: {
-        Prefer: "resolution=merge-duplicates,return=minimal",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        competitor_name: competitorName,
-        data_type: dataType,
-        title,
-        detail: params.message,
-        source: "manual",
-        metadata: {
-          captured_from_chat: true,
-          thread_id: params.threadId,
-        },
-        dedupe_key: dedupeKey,
-        department: "sales_and_growth",
-        created_by: params.userEmail,
-      }),
-    });
-  } catch {
-    await sbFetch("/rest/v1/abra_competitor_intel", {
-      method: "POST",
-      headers: {
-        Prefer: "return=minimal",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        competitor_name: competitorName,
-        data_type: dataType,
-        title,
-        detail: params.message,
-        source: "manual",
-        metadata: {
-          captured_from_chat: true,
-          thread_id: params.threadId,
-        },
-        department: "sales_and_growth",
-        created_by: params.userEmail,
-      }),
-    });
-  }
-}
-
-async function fetchCompetitorContext(message: string): Promise<string | null> {
-  try {
-    const hint = extractCompetitorHint(message);
-    const params = new URLSearchParams({
-      select: "competitor_name,data_type,title,detail,created_at",
-      order: "created_at.desc",
-      limit: "8",
-    });
-    if (hint) {
-      const cleaned = hint.replace(/[*%().,]/g, "").slice(0, 200);
-      if (cleaned) {
-        params.set("competitor_name", `ilike.*${encodeURIComponent(cleaned)}*`);
-      }
-    }
-
-    const rows = (await sbFetch(
-      `/rest/v1/abra_competitor_intel?${params.toString()}`,
-    )) as CompetitorIntelRow[];
-    if (!Array.isArray(rows) || rows.length === 0) return null;
-
-    const lines = rows.slice(0, 6).map((row, idx) => {
-      const detail = row.detail ? ` — ${row.detail.slice(0, 160)}` : "";
-      return `${idx + 1}. ${row.competitor_name} [${row.data_type}] ${row.title}${detail}`;
-    });
-
-    return `Recent competitor intelligence:\n${lines.join("\n")}\nUse this context in sales_and_growth recommendations and competitor comparisons.`;
-  } catch {
-    return null;
-  }
-}
-
-async function buildEmbedding(query: string): Promise<number[]> {
-  const openaiKey = process.env.OPENAI_API_KEY;
-  if (!openaiKey) {
-    throw new Error("OPENAI_API_KEY not configured for embeddings");
-  }
-
-  const embeddingRes = await fetch("https://api.openai.com/v1/embeddings", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${openaiKey}`,
-    },
-    body: JSON.stringify({
-      model: "text-embedding-3-small",
-      input: query,
-      dimensions: 1536,
-    }),
-    signal: AbortSignal.timeout(15000),
-  });
-
-  if (!embeddingRes.ok) {
-    const errorText = await embeddingRes.text().catch(() => "");
-    throw new Error(
-      `Embedding generation failed (${embeddingRes.status}): ${errorText.slice(0, 200)}`,
-    );
-  }
-
-  const data = await embeddingRes.json();
-  const embedding = data?.data?.[0]?.embedding;
-  if (!Array.isArray(embedding)) {
-    throw new Error("Failed to parse embedding vector");
-  }
-
-  return embedding as number[];
-}
-
-async function fetchCorrections(): Promise<AbraCorrection[]> {
-  try {
-    return (await sbFetch(
-      "/rest/v1/abra_corrections?active=eq.true&order=created_at.desc&limit=10&select=original_claim,correction,corrected_by,department",
-    )) as AbraCorrection[];
-  } catch {
-    return [];
-  }
-}
-
-async function fetchDepartments(): Promise<AbraDepartment[]> {
-  try {
-    return (await sbFetch(
-      "/rest/v1/abra_departments?select=name,owner_name,description,key_context,operating_pillar,executive_role,sub_departments,parent_department&order=name",
-    )) as AbraDepartment[];
-  } catch {
-    return [];
-  }
-}
-
-async function logUnansweredQuestion(
-  question: string,
-  askedBy: string,
-  context: string,
-) {
-  try {
-    await sbFetch("/rest/v1/abra_unanswered_questions", {
-      method: "POST",
-      headers: {
-        Prefer: "return=minimal",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        question,
-        asked_by: askedBy,
-        context: context.slice(0, 500),
-      }),
-    });
-  } catch {
-    // Best-effort
-  }
-}
-
 function buildConversation(history: ChatMessage[]): string {
   if (!history.length) return "";
   return history
@@ -849,88 +150,7 @@ function buildConversation(history: ChatMessage[]): string {
     .join("\n");
 }
 
-function isUuidLike(value: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    value,
-  );
-}
-
-function makeThreadId(): string {
-  return crypto.randomUUID();
-}
-
-function queueChatHistory(params: {
-  threadId: string;
-  userEmail: string;
-  userMessage: string;
-  assistantMessage: string;
-  modelUsed?: string;
-  metadata?: Record<string, unknown>;
-  actorLabel?: string;
-}) {
-  if (!isUuidLike(params.threadId)) return;
-  after(async () => {
-    try {
-      await saveMessage({
-        thread_id: params.threadId,
-        role: "user",
-        content: params.userMessage,
-        user_email: params.userEmail,
-      });
-
-      await saveMessage({
-        thread_id: params.threadId,
-        role: "assistant",
-        content: params.assistantMessage,
-        model_used: params.modelUsed,
-        metadata: params.metadata || {},
-        user_email: params.userEmail,
-      });
-
-      const history = await getStoredThreadHistory(params.threadId, 24);
-      if (history.length < 4) return;
-
-      const summaryCountKey = `abra:memory:summary-count:${params.threadId}`;
-      const messageCount = history.length;
-      try {
-        const lastCount = await kv.get<number>(summaryCountKey);
-        if (typeof lastCount === "number" && lastCount >= messageCount) return;
-      } catch (err) {
-        console.error("[abra/chat] KV dedupe read failed — continuing without deduplication", err);
-      }
-
-      const summary = await summarizeConversation(
-        history.map((row) => ({
-          role: row.role,
-          content: row.content,
-          timestamp: row.created_at,
-        })),
-        [params.actorLabel || params.userEmail, "Abra"],
-        { sourceRef: `conversation-thread:${params.threadId}` },
-      );
-      await storeConversationSummary(summary);
-      try {
-        await kv.set(summaryCountKey, messageCount, { ex: 7 * 24 * 60 * 60 });
-      } catch (err) {
-        console.error("[abra/chat] KV dedupe write failed — summary count not persisted", err);
-      }
-    } catch (err) {
-      console.error("[abra/chat] Conversation summarization failed", err);
-      void notifyAlert(
-        `Abra memory write failure (conversation summarization): ${err instanceof Error ? err.message : String(err)}`,
-      ).catch((notifyErr) =>
-        console.error("[abra/chat] Failed to send summarization failure alert", notifyErr),
-      );
-    }
-
-    void learnDecisionPatterns().catch((err) =>
-      console.error("[abra/chat] learnDecisionPatterns failed", err),
-    );
-    void captureOperationalPatterns().catch((err) =>
-      console.error("[abra/chat] captureOperationalPatterns failed", err),
-    );
-  });
-}
+// ─── LLM Call ───
 
 async function generateClaudeReply(input: {
   message: string;
@@ -1196,6 +416,8 @@ MARGIN & COST CLAIM VERIFICATION (applies when user asserts financial metrics):
     usage: usage || { inputTokens: 0, outputTokens: 0 },
   };
 }
+
+// ─── POST Handler ───
 
 export async function POST(req: Request) {
   // Rate limit — strict tier (AI costs money)
@@ -2229,7 +1451,7 @@ export async function POST(req: Request) {
 
     // Fetch corrections + departments + initiatives + cost + team + signals + live data (parallel)
     // When Supabase circuit is open, skip Supabase-dependent fetches to avoid 15s timeouts
-    const [corrections, departments, activeInitiatives, costSummary, teamMembers, vendors, signals, liveSnapshot, financialContext, ledgerContext] =
+    const [corrections, departments, activeInitiatives, costSummary, teamMembers, vendors, signals, liveSnapshot, financialContext, ledgerCtx] =
       await Promise.all([
         supabaseCircuitOpen ? Promise.resolve([] as Awaited<ReturnType<typeof fetchCorrections>>) : fetchCorrections(),
         supabaseCircuitOpen ? Promise.resolve([] as Awaited<ReturnType<typeof fetchDepartments>>) : fetchDepartments(),
@@ -2291,7 +1513,7 @@ export async function POST(req: Request) {
       activeInitiatives,
       costSummary,
       financialContext,
-      ledgerContext,
+      ledgerContext: ledgerCtx,
       competitorContext,
       teamContext,
       signalsContext,
@@ -2304,77 +1526,14 @@ export async function POST(req: Request) {
     const actionNotices: string[] = [];
     let baseReply = claudeResult.reply;
     if (!claudeResult.earlyExit) {
-      const parsedActions = parseActionDirectives(claudeResult.reply);
-      baseReply = parsedActions.cleanReply || claudeResult.reply;
-      // Separate read-only data actions from write actions — these auto-execute and feed results back
-      const READ_ONLY_ACTIONS = new Set(["read_email", "search_email", "query_ledger", "calculate_deal"]);
-      const readOnlyResults: string[] = [];
-
-      for (const directive of parsedActions.actions.slice(0, 3)) {
-        try {
-          // Handle calculate_deal inline — pure computation, no side effects
-          if (directive.action.action_type === "calculate_deal") {
-            const p = (directive.action.params || directive.action) as Record<string, unknown>;
-            const channelMap: Record<string, ChannelType> = {
-              dtc: "dtc", shopify: "dtc", amazon: "amazon", fba: "amazon",
-              wholesale: "wholesale_direct", wholesale_direct: "wholesale_direct",
-              faire: "faire", broker: "wholesale_broker", wholesale_broker: "wholesale_broker",
-            };
-            const ch = channelMap[String(p.channel || "wholesale_direct").toLowerCase()] || "wholesale_direct";
-            const result = calculateDeal({
-              customerName: String(p.customer || p.customerName || "Unknown"),
-              channel: ch,
-              units: Number(p.units) || 100,
-              pricePerUnit: p.price_per_unit != null ? Number(p.price_per_unit) : undefined,
-            });
-            readOnlyResults.push(
-              `## Deal Calculator Result\n` +
-              `**Customer:** ${result.customerName} | **Channel:** ${result.channel}\n` +
-              `**Units:** ${result.units} @ $${result.pricePerUnit}/unit\n\n` +
-              `| Metric | Value |\n|--------|-------|\n` +
-              `| Gross Revenue | $${result.grossRevenue.toFixed(2)} |\n` +
-              `| Channel Fees | $${result.channelFees.toFixed(2)} |\n` +
-              `| Net Revenue | $${result.netRevenue.toFixed(2)} |\n` +
-              `| Total COGS | $${result.totalCogs.toFixed(2)} |\n` +
-              `| **Gross Profit** | **$${result.grossProfit.toFixed(2)}** |\n` +
-              `| **Margin** | **${result.grossMarginPct.toFixed(1)}%** |\n` +
-              `| Profit/Unit | $${result.contributionPerUnit.toFixed(2)} |\n\n` +
-              `**Recommendation:** ${result.recommendation}\n\n` +
-              `**Channel Comparison:**\n` +
-              result.comparison.map(c => `- ${c.channel}: ${c.marginPct.toFixed(1)}% margin, $${c.profitPerUnit.toFixed(2)}/unit`).join("\n")
-            );
-            continue;
-          }
-          // Force read-only actions to low risk so auto-exec policies match
-          if (READ_ONLY_ACTIONS.has(directive.action.action_type)) {
-            directive.action.risk_level = "low";
-          }
-          const outcome = await proposeAndMaybeExecute(directive.action);
-          if (outcome.auto_executed) {
-            if (READ_ONLY_ACTIONS.has(directive.action.action_type) && outcome.result?.success && outcome.result.message) {
-              // For read-only actions, surface the full result content so the user sees it
-              readOnlyResults.push(outcome.result.message);
-            } else {
-              actionNotices.push(
-                `Done: auto-executed \`${directive.action.action_type}\` (${outcome.approval_id}).`,
-              );
-            }
-          } else {
-            actionNotices.push(
-              `Queued for approval: \`${directive.action.action_type}\` (${outcome.approval_id}).`,
-            );
-          }
-        } catch (error) {
-          actionNotices.push(
-            `Failed to queue action \`${directive.action.action_type}\`: ${error instanceof Error ? error.message : "unknown error"}`,
-          );
-        }
-      }
+      const actionResult = await executeActions(claudeResult.reply);
+      baseReply = actionResult.cleanReply;
+      actionNotices.push(...actionResult.actionNotices);
 
       // If we got read-only data back (email, ledger), do a follow-up Claude call with real data injected
       // Skip if we're past 35s to avoid hitting the 50s deadline with a second LLM call
-      if (readOnlyResults.length > 0 && (Date.now() - startMs) < 35_000) {
-        const dataContext = readOnlyResults.join("\n\n");
+      if (actionResult.readOnlyResults.length > 0 && (Date.now() - startMs) < 35_000) {
+        const dataContext = actionResult.readOnlyResults.join("\n\n");
         const followUpResult = await generateClaudeReply({
           message: `The user asked: "${message}"\n\nHere is the data I just retrieved from our systems:\n\n${dataContext}\n\nNow answer the user's original question using this REAL data. Use exact numbers from the data — never estimate or guess. Be specific and actionable.`,
           history: effectiveHistory,
@@ -2384,7 +1543,7 @@ export async function POST(req: Request) {
           activeInitiatives,
           costSummary,
           financialContext,
-          ledgerContext,
+          ledgerContext: ledgerCtx,
           competitorContext,
           teamContext,
           signalsContext,
@@ -2421,34 +1580,25 @@ export async function POST(req: Request) {
     const confidence = claudeResult.confidence;
 
     // Log answer provenance (best-effort, non-blocking)
-    const provenance = extractProvenance(responseSources);
-    void logAnswer({
-      question: message,
-      answer: reply,
-      source_ids: provenance.source_ids,
-      source_tables: provenance.source_tables,
+    logProvenance({
+      message,
+      reply,
+      sources: responseSources,
       confidence,
-      memory_tiers_used: provenance.memory_tiers_used,
       department: messageDepartment,
-      asked_by: actorEmail,
+      actorEmail,
       channel,
-      model_used: claudeResult.modelUsed,
+      modelUsed: claudeResult.modelUsed,
     });
 
     // Log unanswered questions
-    const detectedQuestions = detectQuestions(reply);
-    if (
-      detectedQuestions.length > 0 ||
-      shouldAskQuestions(confidence, tieredResults.all)
-    ) {
-      for (const q of detectedQuestions.slice(0, 3)) {
-        await logUnansweredQuestion(
-          q,
-          actorEmail,
-          `Original question: ${message}`,
-        );
-      }
-    }
+    void logUnansweredQuestions({
+      reply,
+      confidence,
+      sources: responseSources,
+      message,
+      actorEmail,
+    });
 
     queueChatHistory({
       threadId,
