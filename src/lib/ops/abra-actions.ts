@@ -3394,6 +3394,22 @@ export const KNOWN_ACTION_TYPES = new Set([
   "run_monthly_close",
 ]);
 
+/** When Claude emits action JSON without a nested "params" key, gather top-level
+ *  non-standard keys as implicit params (e.g. query_type, period_start, etc.) */
+function extractImplicitParams(obj: Record<string, unknown>, _actionType: string): Record<string, unknown> {
+  const STANDARD_KEYS = new Set([
+    "action_type", "action", "title", "description", "department",
+    "risk_level", "params", "requires_approval",
+  ]);
+  const params: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (!STANDARD_KEYS.has(key) && value !== undefined && value !== null) {
+      params[key] = value;
+    }
+  }
+  return params;
+}
+
 export function normalizeActionDirective(raw: unknown): AbraAction | null {
   if (!raw || typeof raw !== "object") return null;
   const obj = raw as Record<string, unknown>;
@@ -3452,7 +3468,7 @@ export function normalizeActionDirective(raw: unknown): AbraAction | null {
     params:
       obj.params && typeof obj.params === "object" && !Array.isArray(obj.params)
         ? (obj.params as Record<string, unknown>)
-        : {},
+        : extractImplicitParams(obj, actionType),
     requires_approval: obj.requires_approval !== false,
   };
 }
