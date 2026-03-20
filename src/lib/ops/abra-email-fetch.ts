@@ -3,6 +3,7 @@ import {
   extractEmailSignals,
 } from "@/lib/ops/abra-operational-signals";
 import { listEmails, readEmail, readAllAttachments } from "@/lib/ops/gmail-reader";
+import { readState, writeState } from "@/lib/ops/state";
 
 type EmailCategory =
   | "production"
@@ -418,7 +419,49 @@ export async function detectAwaitingReplies(opts?: {
       return b.hoursAgo - a.hoursAgo;
     });
 
-    return awaiting;
+    // Deduplication: suppress re-alerts within 24h per thread.
+    // Only re-alert if hoursAgo grew by 24+ since last alert (escalate to critical).
+    const alertState = await readState(
+      "abra-awaiting-reply-alerts",
+      {} as Record<string, { lastAlertedAt: string; lastHoursAgo: number }>,
+    );
+    const now = new Date().toISOString();
+    const deduped = awaiting.filter((item) => {
+      if (!item.threadId) return true;
+      const prev = alertState[item.threadId];
+      if (!prev) return true;
+      const msSinceLast = Date.now() - Date.parse(prev.lastAlertedAt);
+      const hoursSinceLast = msSinceLast / (60 * 60 * 1000);
+      if (hoursSinceLast < 24) {
+        // Only pass through if hoursAgo grew by 24+ (genuine escalation)
+        const hoursGrown = item.hoursAgo - prev.lastHoursAgo;
+        if (hoursGrown >= 24) {
+          item.escalation = "critical";
+          item.reason = `[Escalated] ${item.reason}`;
+          return true;
+        }
+        return false;
+      }
+      return true;
+    });
+
+    // Update state for all items being surfaced
+    const updated = { ...alertState };
+    for (const item of deduped) {
+      if (item.threadId) {
+        updated[item.threadId] = { lastAlertedAt: now, lastHoursAgo: item.hoursAgo };
+      }
+    }
+    // Trim entries older than 7 days
+    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+    for (const [threadId, entry] of Object.entries(updated)) {
+      if (Date.now() - Date.parse(entry.lastAlertedAt) > sevenDaysMs) {
+        delete updated[threadId];
+      }
+    }
+    await writeState("abra-awaiting-reply-alerts", updated).catch(() => {});
+
+    return deduped;
   } catch {
     return [];
   }

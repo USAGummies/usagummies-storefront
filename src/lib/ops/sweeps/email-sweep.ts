@@ -46,7 +46,10 @@ export async function runEmailSweep(): Promise<EmailSweepResult> {
     count: 20,
     query: "newer_than:15m",
     unreadOnly: true,
-  }).catch(() => []);
+  }).catch((err: unknown) => {
+    console.warn(`[email-sweep] Gmail listEmails failed: ${err instanceof Error ? err.message : String(err)}`);
+    return [];
+  });
 
   const actionable = preview.filter((email) => {
     const vip = getVipSender(parseSenderEmail(email.from));
