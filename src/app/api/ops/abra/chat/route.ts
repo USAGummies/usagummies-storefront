@@ -1786,9 +1786,11 @@ export async function POST(req: Request) {
       .join("\n\n");
 
     // ── Auto-generate file if user asked for export and Abra didn't emit the action ──
+    const wantsFile = /\b(spreadsheet|xlsx|csv|excel|export|download)\b/i.test(message);
+    console.log(`[chat] File auto-gen check: channel=${channel}, slackChannelId=${slackChannelId || "(empty)"}, wantsFile=${wantsFile}, replyLen=${baseReply.length}`);
     if (
-      slackChannelId &&
-      /\b(spreadsheet|xlsx|csv|excel|export.*file|file.*export|download|upload.*file)\b/i.test(message) &&
+      wantsFile &&
+      (slackChannelId || channel === "slack") &&
       !baseReply.includes("<action>") &&
       !baseReply.includes('"action_type":"generate_file"')
     ) {
