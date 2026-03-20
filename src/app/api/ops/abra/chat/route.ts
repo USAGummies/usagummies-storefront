@@ -1987,7 +1987,7 @@ export async function POST(req: Request) {
     const claudeRefusedFile = /\b(cannot generate|can[\u2019']t generate|don[\u2019']t have file|cannot create|can[\u2019']t create files?|cannot export|can[\u2019']t export|unable to generate|unable to create|not able to generate|not able to create|[Ii][\u2019'] ?m not able to|[Ii] cannot directly|downloadable xlsx|downloadable .{0,20}file)\b/i.test(normalizedReply);
     // Check if the action executor already handled generate_file
     // Only skip fallback if the action was actually executed (not just queued for approval)
-    const fileActionHandled = actionNotices.some(n => n.includes("generate_file") && n.includes("auto-executed"));
+    const fileActionHandled = actionNotices.some(n => n.includes("[generate_file]"));
     console.log(`[chat] File auto-gen check: channel=${channel}, slackChannelId=${slackChannelId || "(empty)"}, wantsFile=${wantsFile}, fileActionHandled=${fileActionHandled}, claudeRefusedFile=${claudeRefusedFile}, replyLen=${strippedReply.length}`);
 
     // Fix: if Claude refused to generate a file but the user clearly asked for one, force a generate_file action

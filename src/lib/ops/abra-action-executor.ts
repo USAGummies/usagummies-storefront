@@ -146,8 +146,9 @@ export async function executeActions(
             console.warn(`[action-executor] Read-only action ${directive.action.action_type} went to notices: success=${outcome.result?.success}, hasMessage=${!!outcome.result?.message}, message=${outcome.result?.message?.slice(0, 100)}`);
           }
           // For generate_file, use the handler's result message (e.g., upload confirmation with permalink)
+          // Tag with [generate_file] so the chat route's fileActionHandled guard can detect it.
           if (directive.action.action_type === "generate_file" && outcome.result?.message) {
-            actionNotices.push(`✅ ${outcome.result.message}`);
+            actionNotices.push(`✅ [generate_file] ${outcome.result.message}`);
           } else {
             // For other actions with meaningful result messages, surface the message directly
             const resultMsg = outcome.result?.success && outcome.result.message
