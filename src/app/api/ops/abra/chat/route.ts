@@ -1778,8 +1778,10 @@ export async function POST(req: Request) {
       }
     }
 
+    // Safety: always strip any remaining <action> tags before returning to the user
+    const strippedReply = baseReply.replace(/<action>\s*[\s\S]*?\s*<\/action>/gi, "").trim();
     const reply = [
-      baseReply,
+      strippedReply,
       actionNotices.length > 0 ? actionNotices.join("\n") : "",
     ]
       .filter(Boolean)
@@ -1787,12 +1789,13 @@ export async function POST(req: Request) {
 
     // ── Auto-generate file if user asked for export and Abra didn't emit the action ──
     const wantsFile = /\b(spreadsheet|xlsx|csv|excel|export|download)\b/i.test(message);
-    console.log(`[chat] File auto-gen check: channel=${channel}, slackChannelId=${slackChannelId || "(empty)"}, wantsFile=${wantsFile}, replyLen=${baseReply.length}`);
+    // Check if the action executor already handled generate_file
+    const fileActionHandled = actionNotices.some(n => n.includes("generate_file"));
+    console.log(`[chat] File auto-gen check: channel=${channel}, slackChannelId=${slackChannelId || "(empty)"}, wantsFile=${wantsFile}, fileActionHandled=${fileActionHandled}`);
     if (
       wantsFile &&
-      (slackChannelId || channel === "slack") &&
-      !baseReply.includes("<action>") &&
-      !baseReply.includes('"action_type":"generate_file"')
+      !fileActionHandled &&
+      (slackChannelId || channel === "slack")
     ) {
       // Extract markdown tables from the reply
       const tableRegex = /\|(.+)\|\n\|[-| :]+\|\n((?:\|.+\|\n?)+)/g;
