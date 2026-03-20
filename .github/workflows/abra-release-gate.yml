@@ -34,7 +34,7 @@ jobs:
   live-readiness-gate:
     runs-on: ubuntu-latest
     needs: compile-gate
-    if: github.ref == 'refs/heads/main' && secrets.CRON_SECRET != ''
+    if: github.ref == 'refs/heads/main'
     env:
       ABRA_BASE_URL: ${{ secrets.ABRA_BASE_URL }}
       CRON_SECRET: ${{ secrets.CRON_SECRET }}
