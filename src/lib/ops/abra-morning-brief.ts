@@ -14,6 +14,7 @@ type MetricSnapshot = {
   current: number;
   avg7: number;
   pctVsAvg: number;
+  stale?: boolean;
 };
 
 export type MorningBriefPayload = {
@@ -124,18 +125,33 @@ function arrow(value: number): string {
 
 async function getMetricSnapshot(metric: string): Promise<MetricSnapshot | null> {
   const rows = (await sbFetch(
-    `/rest/v1/kpi_timeseries?metric_name=eq.${encodeURIComponent(metric)}&window_type=eq.daily&select=value,captured_for_date&order=captured_for_date.desc&limit=8`,
-  )) as Array<{ value: number | string; captured_for_date: string }>;
+    `/rest/v1/kpi_timeseries?metric_name=eq.${encodeURIComponent(metric)}&window_type=eq.daily&select=value,captured_for_date,created_at&order=captured_for_date.desc&limit=8`,
+  )) as Array<{ value: number | string; captured_for_date: string; created_at?: string }>;
   if (!Array.isArray(rows) || rows.length === 0) return null;
+
+  // Freshness check: use created_at if available, else fall back to captured_for_date
+  const latestTs = rows[0]?.created_at
+    ? Date.parse(rows[0].created_at)
+    : Date.parse(`${rows[0]?.captured_for_date}T00:00:00Z`);
+  const ageMs = Number.isFinite(latestTs) ? Date.now() - latestTs : Infinity;
+  const ageHours = ageMs / (60 * 60 * 1000);
+
+  if (ageHours > 4) {
+    console.warn(
+      `[morning-brief] kpi_timeseries "${metric}" is ${ageHours.toFixed(1)}h old — data may be stale; returning null`,
+    );
+    return null;
+  }
 
   const current = Number(rows[0]?.value || 0);
   const history = rows.slice(1).map((row) => Number(row.value || 0));
   const avg7 = history.length ? avg(history) : current;
   return {
-    metric,
+    metric: ageHours > 2 ? `${metric} (stale data)` : metric,
     current,
     avg7,
     pctVsAvg: pct(current, avg7),
+    stale: ageHours > 2,
   };
 }
 

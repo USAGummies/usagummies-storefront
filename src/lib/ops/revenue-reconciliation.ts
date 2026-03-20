@@ -137,17 +137,39 @@ async function fetchBankDeposits(
   period: ReconciliationPeriod,
   channelKeywords: string[],
 ): Promise<BankDepositResult> {
-  const pages = await queryNotionDatabase({
-    database_id: DB.CASH_TRANSACTIONS,
-    filter: {
-      and: [
-        { property: "Date", date: { on_or_after: period.startDate } },
-        { property: "Date", date: { on_or_before: period.endDate } },
-      ],
-    },
-    sorts: [{ property: "Date", direction: "ascending" }],
-    page_size: 100,
-  });
+  // The filter assumes "Date" is a Notion `date` property. If the schema changed,
+  // the Notion API returns a validation error — detect this and fall back gracefully.
+  let pages: Array<Record<string, unknown>> = [];
+  try {
+    pages = await queryNotionDatabase({
+      database_id: DB.CASH_TRANSACTIONS,
+      filter: {
+        and: [
+          { property: "Date", date: { on_or_after: period.startDate } },
+          { property: "Date", date: { on_or_before: period.endDate } },
+        ],
+      },
+      sorts: [{ property: "Date", direction: "ascending" }],
+      page_size: 100,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const isSchemaError = /validation_error|property.*type|invalid.*filter|400/i.test(msg);
+    if (isSchemaError) {
+      console.error(
+        `[revenue-reconciliation] Notion "Date" property type mismatch on CASH_TRANSACTIONS — ` +
+        `filter assumed type:date but schema may have changed. Falling back to unfiltered query. ` +
+        `ACTION REQUIRED: verify "Date" property type in Notion. Error: ${msg}`,
+      );
+      pages = await queryNotionDatabase({
+        database_id: DB.CASH_TRANSACTIONS,
+        sorts: [{ property: "Date", direction: "ascending" }],
+        page_size: 100,
+      }).catch(() => []);
+    } else {
+      throw err;
+    }
+  }
 
   const result: BankDepositResult = { total: 0, count: 0, transactions: [] };
 

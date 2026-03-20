@@ -525,10 +525,21 @@ async function runWorkflowLoop(run: WorkflowRun): Promise<WorkflowRun> {
       return pauseForApproval(current, definition, step, outcome.error || "Step requires human review");
     }
 
+    // Prevent duplicate failure recording: if already failed at this step, return as-is
+    const alreadyFailed = current.step_results.find(
+      (r) => r.step_id === step.id && r.status === "failed",
+    );
+    if (alreadyFailed) {
+      return current;
+    }
+
+    const failureMsg = `Step "${step.name}" (${step.id}) failed: ${outcome.error || "unknown error"}`;
+    console.error(`[workflow-engine] ${definition.name} run ${current.id} — ${failureMsg}`);
+
     current = await updateWorkflowRun(current.id, {
       status: "failed",
       completed_at: new Date().toISOString(),
-      error: outcome.error || `Workflow failed at ${step.id}`,
+      error: failureMsg,
       step_results: setStepResult(current.step_results, {
         step_id: step.id,
         status: "failed",

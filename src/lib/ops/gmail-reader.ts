@@ -244,6 +244,28 @@ function extractTextBody(payload: {
 // Public API
 // ---------------------------------------------------------------------------
 
+/** Exponential backoff retry helper with jitter */
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  retries = 2,
+  baseDelayMs = 2000,
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err;
+      if (attempt < retries) {
+        const jitter = 1 + (Math.random() * 0.4 - 0.2); // ±20%
+        const delay = baseDelayMs * Math.pow(2, attempt) * jitter;
+        await new Promise((resolve) => setTimeout(resolve, Math.round(delay)));
+      }
+    }
+  }
+  throw lastError;
+}
+
 /**
  * List email envelopes (subject, from, date, snippet).
  */
@@ -262,14 +284,26 @@ export async function listEmails(opts: ListEmailsOpts = {}): Promise<EmailEnvelo
   const q = parts.length > 0 ? parts.join(" ") : undefined;
   const labelIds = folder === "INBOX" ? ["INBOX"] : undefined;
 
-  const listRes = await gmail.users.messages.list({
-    userId: "me",
-    maxResults: count,
-    q,
-    labelIds,
-  });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let listRes: any;
+  try {
+    listRes = await withRetry(() =>
+      gmail.users.messages.list({
+        userId: "me",
+        maxResults: count,
+        q,
+        labelIds,
+      }),
+    );
+  } catch (err) {
+    console.warn(
+      `[gmail-reader] listEmails failed after retries (folder=${folder}): ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return [];
+  }
 
-  const messages = listRes.data.messages ?? [];
+  const messages: Array<{ id?: string | null; threadId?: string | null }> =
+    listRes?.data?.messages ?? [];
   const envelopes: EmailEnvelope[] = [];
 
   // Batch-fetch metadata for each message (with per-message timeout to prevent cascading hangs)
@@ -286,7 +320,7 @@ export async function listEmails(opts: ListEmailsOpts = {}): Promise<EmailEnvelo
             metadataHeaders: ["From", "To", "Subject", "Date"],
           }),
           new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error("message metadata timeout")), 5000),
+            setTimeout(() => reject(new Error("message metadata timeout")), 10000),
           ),
         ]);
         const headers = (detail.data.payload?.headers ?? []) as Array<{
