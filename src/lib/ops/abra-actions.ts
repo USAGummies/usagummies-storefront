@@ -2595,14 +2595,94 @@ async function handleReconcileTransactions(
 // File Generation — Generate and upload spreadsheet/CSV files to Slack
 // ---------------------------------------------------------------------------
 
+/** Fetch data from a known source for file generation (avoids Claude output limits) */
+async function fetchDataForFileGeneration(
+  source: string,
+  params: Record<string, unknown>,
+): Promise<SpreadsheetData[]> {
+  const baseUrl = getInternalOpsBaseUrl();
+  const TIMEOUT = 15_000;
+
+  switch (source) {
+    case "qbo_accounts":
+    case "qbo_chart_of_accounts": {
+      const res = await fetch(`${baseUrl}/api/ops/qbo/accounts`, { signal: AbortSignal.timeout(TIMEOUT) });
+      if (!res.ok) throw new Error(`QBO accounts fetch failed: ${res.status}`);
+      const data = (await res.json()) as { accounts: Array<Record<string, unknown>>; count: number };
+      const accounts = data.accounts || [];
+      return [{
+        sheetName: "Chart of Accounts",
+        headers: ["ID", "Account Name", "Type", "Sub-Type", "Balance", "Active"],
+        rows: accounts.map((a): (string | number | boolean | null)[] => [
+          String(a.Id ?? ""),
+          String(a.Name ?? ""),
+          String(a.AccountType ?? ""),
+          String(a.AccountSubType ?? a.DetailType ?? ""),
+          typeof a.CurrentBalance === "number" ? a.CurrentBalance : 0,
+          a.Active !== false,
+        ]),
+      }];
+    }
+    case "qbo_vendors": {
+      const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=vendors`, { signal: AbortSignal.timeout(TIMEOUT) });
+      if (!res.ok) throw new Error(`QBO vendor fetch failed: ${res.status}`);
+      const data = (await res.json()) as { vendors: Array<Record<string, unknown>> };
+      return [{
+        sheetName: "Vendors",
+        headers: ["Vendor Name", "Balance", "Active", "Email", "Phone"],
+        rows: (data.vendors || []).map(v => [
+          String(v.Name || ""),
+          typeof v.Balance === "number" ? v.Balance : 0,
+          v.Active !== false,
+          String(v.Email || ""),
+          String(v.Phone || ""),
+        ]),
+      }];
+    }
+    case "qbo_pnl": {
+      const start = typeof params.start === "string" ? params.start : undefined;
+      const end = typeof params.end === "string" ? params.end : undefined;
+      const qs = [start ? `start=${start}` : "", end ? `end=${end}` : ""].filter(Boolean).join("&");
+      const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=pnl${qs ? `&${qs}` : ""}`, { signal: AbortSignal.timeout(TIMEOUT) });
+      if (!res.ok) throw new Error(`QBO P&L fetch failed: ${res.status}`);
+      const data = (await res.json()) as { rows?: Array<{ account: string; amount: number; type: string }> };
+      const rows = data.rows || [];
+      return [{
+        sheetName: "P&L",
+        headers: ["Account", "Type", "Amount"],
+        rows: rows.map(r => [String(r.account || ""), String(r.type || ""), r.amount || 0]),
+      }];
+    }
+    default:
+      throw new Error(`Unknown data source: "${source}". Supported: qbo_accounts, qbo_vendors, qbo_pnl`);
+  }
+}
+
 async function handleGenerateFile(params: Record<string, unknown>): Promise<ActionResult> {
-  console.log(`[handleGenerateFile] ENTRY — params keys: ${Object.keys(params).join(", ")}, channel_id=${params.channel_id || params.channelId || "NONE"}, hasHeaders=${Array.isArray(params.headers)}, hasRows=${Array.isArray(params.rows)}, hasSheets=${Array.isArray(params.sheets)}`);
+  console.log(`[handleGenerateFile] ENTRY — params keys: ${Object.keys(params).join(", ")}, channel_id=${params.channel_id || params.channelId || "NONE"}, hasHeaders=${Array.isArray(params.headers)}, hasRows=${Array.isArray(params.rows)}, hasSheets=${Array.isArray(params.sheets)}, source=${params.source || "none"}`);
   const channelId = String(params.channel_id || params.channelId || "");
   const threadTs = params.thread_ts ? String(params.thread_ts) : undefined;
   const filename = String(params.filename || "report.csv");
   const title = params.title ? String(params.title) : undefined;
   const comment = params.comment ? String(params.comment) : undefined;
   const format = filename.endsWith(".xlsx") ? "xlsx" as const : "csv" as const;
+
+  // If a data source is specified, fetch data server-side instead of from Claude's output
+  // This allows large datasets (e.g., 169 QBO accounts) without hitting Claude output limits
+  const source = typeof params.source === "string" ? params.source : "";
+  if (source) {
+    try {
+      const fetchedSheets = await fetchDataForFileGeneration(source, params);
+      if (fetchedSheets.length > 0 && channelId) {
+        const result = await uploadFileToSlack({ channelId, threadTs, filename, title, comment, format, data: fetchedSheets });
+        if (!result.ok) return { success: false, message: `File upload failed: ${result.error}` };
+        return { success: true, message: `Uploaded ${filename} to Slack${result.permalink ? `: ${result.permalink}` : ""}`, data: { fileId: result.fileId, permalink: result.permalink } };
+      }
+      return { success: false, message: `No data returned from source "${source}"` };
+    } catch (err) {
+      return { success: false, message: `Source fetch failed: ${err instanceof Error ? err.message : String(err)}` };
+    }
+  }
 
   // Parse sheet data — expects { headers: string[], rows: any[][] } or array of sheets
   let sheets: SpreadsheetData[];
