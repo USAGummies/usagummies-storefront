@@ -1971,7 +1971,7 @@ export async function POST(req: Request) {
         ? "" // Notices will fill the reply
         : "Done — I processed your request. Check this thread for any files or follow-up."
     );
-    const reply = [
+    let reply = [
       effectiveReply,
       actionNotices.length > 0 ? actionNotices.join("\n") : "",
     ]
@@ -2074,6 +2074,14 @@ export async function POST(req: Request) {
         }
       }
     }
+
+    // Recompute reply after forced actions may have pushed additional notices
+    reply = [
+      effectiveReply,
+      actionNotices.length > 0 ? actionNotices.join("\n") : "",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
 
     const SOURCE_RELEVANCE_THRESHOLD = 0.65;
     const seenIds = new Set<string>();
