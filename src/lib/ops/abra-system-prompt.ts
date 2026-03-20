@@ -75,6 +75,8 @@ export type AbraPromptContext = {
   signalsContext?: string;
   /** When true, include full CPG intelligence framework (~3K tokens). Default: false. */
   includeFinanceFramework?: boolean;
+  /** Identity context for the current user (name, role, calibration hint). */
+  actorContext?: string | null;
 };
 
 function normalizeDepartmentName(value: string): string {
@@ -497,6 +499,11 @@ These are the ONLY current team members. Do NOT reference anyone else as team un
     sections.push(ctx.signalsContext);
   }
 
+  // 4c. Actor identity context (who is sending this message — calibrates tone and detail level)
+  if (ctx.actorContext) {
+    sections.push(ctx.actorContext);
+  }
+
   // 5. Pinned Corrections (dynamic)
   if (ctx.corrections && ctx.corrections.length > 0) {
     const correctionLines = ctx.corrections
@@ -704,11 +711,21 @@ RULES:
   // 10. Formatting rules
   if (format === "slack") {
     sections.push(
-      `FORMAT: Respond formatted for Slack. Use *bold* for emphasis, _italic_ for asides, and bullet lists. Keep responses concise (under 500 words unless the question demands more). Cite sources as [brain:Title (Xd ago)] or [email:Subject (Xd ago)].`,
+      `FORMAT: Respond formatted for Slack. Use *bold* for emphasis, _italic_ for asides, and bullet lists. Cite sources as [brain:Title (Xd ago)] or [email:Subject (Xd ago)].
+
+RESPONSE LENGTH RULES (CRITICAL):
+• If the user's message is under 15 words and is a simple question, respond in 2–4 sentences max. No tables, no headers, no horizontal rules.
+• Only use tables and structured formatting when the question explicitly asks for analysis, comparison, breakdown, or a report.
+• Never start a response with a markdown header (##, ###, etc.). Start directly with the answer.
+• Keep Slack responses conversational and concise. You are texting a busy founder, not writing a report. If the answer fits in one sentence, use one sentence.
+
+SOURCE CITATION RULE: Only cite sources you actually drew from when composing this answer. Do not list context entries that weren't relevant to this specific question.`,
     );
   } else {
     sections.push(
-      `FORMAT: Be concise and actionable. Use markdown formatting. Keep responses under 500 words unless the question demands more. Cite sources as [brain:Title (Xd ago)] or [email:Subject (Xd ago)].`,
+      `FORMAT: Be concise and actionable. Use markdown formatting. Keep responses under 500 words unless the question demands more. Cite sources as [brain:Title (Xd ago)] or [email:Subject (Xd ago)].
+
+SOURCE CITATION RULE: Only cite sources you actually drew from when composing this answer. Do not list context entries that weren't relevant to this specific question.`,
     );
   }
 
