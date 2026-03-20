@@ -3478,6 +3478,7 @@ export const KNOWN_ACTION_TYPES = new Set([
   "search_brain",
   "log_metric",
   "run_monthly_close",
+  "generate_file",
 ]);
 
 /** When Claude emits action JSON without a nested "params" key, gather top-level

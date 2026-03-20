@@ -1790,7 +1790,8 @@ export async function POST(req: Request) {
     // ── Auto-generate file if user asked for export and Abra didn't emit the action ──
     const wantsFile = /\b(spreadsheet|xlsx|csv|excel|export|download)\b/i.test(message);
     // Check if the action executor already handled generate_file
-    const fileActionHandled = actionNotices.some(n => n.includes("generate_file"));
+    // Only skip fallback if the action was actually executed (not just queued for approval)
+    const fileActionHandled = actionNotices.some(n => n.includes("generate_file") && n.includes("auto-executed"));
     console.log(`[chat] File auto-gen check: channel=${channel}, slackChannelId=${slackChannelId || "(empty)"}, wantsFile=${wantsFile}, fileActionHandled=${fileActionHandled}`);
     if (
       wantsFile &&
