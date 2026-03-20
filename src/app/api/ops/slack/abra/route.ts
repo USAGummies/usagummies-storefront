@@ -1434,17 +1434,35 @@ async function callAbraChat(
 
   // Parse and execute any action directives from the LLM response
   const parsedActions = parseActionDirectives(reply);
-  reply = parsedActions.cleanReply || reply;
+  // Always use cleanReply (even if empty) — never fall back to the raw reply which
+  // still contains <action> blocks. Falling back caused postSlackMessage's
+  // stripActionTags to remove the block, leaving an empty message in Slack.
+  reply = parsedActions.cleanReply;
 
+  const actionNotices: string[] = [];
   for (const directive of parsedActions.actions.slice(0, 3)) {
     try {
-      await proposeAndMaybeExecute(directive.action);
+      const execResult = await proposeAndMaybeExecute(directive.action);
+      if (execResult.auto_executed && execResult.result) {
+        if (execResult.result.success) {
+          actionNotices.push(`✅ ${execResult.result.message}`);
+        } else {
+          actionNotices.push(`⚠️ ${execResult.result.message}`);
+        }
+      }
     } catch (actionErr) {
       console.error(
         `[slack/abra] action ${directive.action.action_type} failed:`,
         actionErr instanceof Error ? actionErr.message : actionErr,
       );
     }
+  }
+
+  // If Claude only emitted action blocks (no text), surface action results as the reply
+  if (!reply && actionNotices.length > 0) {
+    reply = actionNotices.join("\n");
+  } else if (actionNotices.length > 0) {
+    reply = `${reply}\n\n${actionNotices.join("\n")}`;
   }
 
   if (degraded) {
