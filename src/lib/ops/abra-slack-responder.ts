@@ -1013,13 +1013,28 @@ export async function getSlackDisplayName(userId: string): Promise<string> {
 }
 
 function stripActionTags(value: string): string {
-  return value
+  let result = value
     .replace(/<action>\s*[\s\S]*?\s*<\/action>/gi, "")
     .replace(/<tool_call>\s*[\s\S]*?\s*<\/tool_call>/gi, "")
     .replace(/<tool_response>\s*[\s\S]*?\s*<\/tool_response>/gi, "")
     .replace(/<tool>\s*[\s\S]*?\s*<\/tool>/gi, "")
-    .replace(/<function_call>\s*[\s\S]*?\s*<\/function_call>/gi, "")
-    .trim();
+    .replace(/<function_call>\s*[\s\S]*?\s*<\/function_call>/gi, "");
+
+  // Strip code-fenced JSON blocks containing action-like keys
+  result = result.replace(/```(?:json)?\s*\n([\s\S]*?)```/gi, (match, content) => {
+    if (/["'](action|tool|function_call|tool_call)["']\s*:/.test(content)) {
+      return "";
+    }
+    return match;
+  });
+
+  // Strip bare JSON objects on their own line that look like tool calls (with one level of nesting)
+  result = result.replace(
+    /^\s*\{(?:[^{}]|\{[^{}]*\})*"action"\s*:(?:[^{}]|\{[^{}]*\})*\}\s*$/gm,
+    "",
+  );
+
+  return result.trim();
 }
 
 /**
