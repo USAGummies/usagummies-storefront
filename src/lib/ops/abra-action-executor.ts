@@ -48,7 +48,10 @@ export async function executeActions(
 ): Promise<ActionExecutionResult> {
   const execStart = Date.now();
   const parsedActions = parseActionDirectives(reply);
-  const cleanReply = parsedActions.cleanReply || reply;
+  // Always use cleanReply (even if empty) — never fall back to the raw reply which
+  // still contains <action> blocks. The caller is responsible for providing a fallback
+  // message when cleanReply is empty (e.g., if Claude only emitted an action block).
+  const cleanReply = parsedActions.cleanReply;
   const actionNotices: string[] = [];
   const readOnlyResults: string[] = [];
 
@@ -112,6 +115,12 @@ export async function executeActions(
       if (READ_ONLY_ACTIONS.has(directive.action.action_type)) {
         directive.action.risk_level = "low";
       }
+      // generate_file is auto_with_audit tier with riskFloor "low" — Claude often
+      // omits risk_level (normalizeActionDirective defaults to "medium"), which blocks
+      // Tier 2 auto-exec. Force to "low" so the policy allows immediate execution.
+      if (directive.action.action_type === "generate_file") {
+        directive.action.risk_level = "low";
+      }
       // Dynamic per-action timeout: min(12s, remainingRouteTime - 2s)
       const perActionTimeout = remainingMs != null
         ? Math.min(PER_ACTION_TIMEOUT_MS, Math.max(1000, remainingMs - 2000))
@@ -136,9 +145,16 @@ export async function executeActions(
           if (isReadOnly) {
             console.warn(`[action-executor] Read-only action ${directive.action.action_type} went to notices: success=${outcome.result?.success}, hasMessage=${!!outcome.result?.message}, message=${outcome.result?.message?.slice(0, 100)}`);
           }
-          actionNotices.push(
-            `Done: auto-executed \`${directive.action.action_type}\` (${outcome.approval_id}).`,
-          );
+          // For generate_file, use the handler's result message (e.g., upload confirmation with permalink)
+          if (directive.action.action_type === "generate_file" && outcome.result?.message) {
+            actionNotices.push(`✅ ${outcome.result.message}`);
+          } else {
+            // For other actions with meaningful result messages, surface the message directly
+            const resultMsg = outcome.result?.success && outcome.result.message
+              ? outcome.result.message
+              : `Done: auto-executed \`${directive.action.action_type}\` (${outcome.approval_id}).`;
+            actionNotices.push(resultMsg);
+          }
         }
       } else {
         actionNotices.push(

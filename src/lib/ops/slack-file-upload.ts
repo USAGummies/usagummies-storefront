@@ -223,13 +223,20 @@ export async function uploadFileToSlack(opts: {
   let fileBuffer: Buffer;
   let mimeType: string;
 
-  if (format === "xlsx") {
-    fileBuffer = await generateXlsx(sheets);
-    mimeType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-  } else {
-    const csvStr = generateCsv(sheets[0]);
-    fileBuffer = Buffer.from(csvStr, "utf-8");
-    mimeType = "text/csv";
+  try {
+    if (format === "xlsx") {
+      fileBuffer = await generateXlsx(sheets);
+      mimeType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    } else {
+      const csvStr = generateCsv(sheets[0]);
+      fileBuffer = Buffer.from(csvStr, "utf-8");
+      mimeType = "text/csv";
+    }
+  } catch (err) {
+    return {
+      ok: false,
+      error: `File generation failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
   }
 
   // Use files.getUploadURLExternal + files.completeUploadExternal (v2 method)

@@ -1938,7 +1938,8 @@ export async function POST(req: Request) {
         baseReply = followUpResult.reply;
         // Strip any action directives from the follow-up (don't double-execute)
         const followUpParsed = parseActionDirectives(baseReply);
-        baseReply = followUpParsed.cleanReply || baseReply;
+        // Use cleanReply unconditionally — the safety strip below handles any remnants
+        baseReply = followUpParsed.cleanReply;
       }
     }
 
