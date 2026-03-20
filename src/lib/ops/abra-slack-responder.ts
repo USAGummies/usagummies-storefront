@@ -937,6 +937,7 @@ function stripActionTags(value: string): string {
   return value
     .replace(/<action>\s*[\s\S]*?\s*<\/action>/gi, "")
     .replace(/<tool_call>\s*[\s\S]*?\s*<\/tool_call>/gi, "")
+    .replace(/<tool_response>\s*[\s\S]*?\s*<\/tool_response>/gi, "")
     .replace(/<tool>\s*[\s\S]*?\s*<\/tool>/gi, "")
     .replace(/<function_call>\s*[\s\S]*?\s*<\/function_call>/gi, "")
     .trim();

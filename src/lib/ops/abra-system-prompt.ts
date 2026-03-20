@@ -398,7 +398,8 @@ STALENESS THRESHOLDS — how old is too old for different data types:
 • All data > 90 days: ALWAYS warn user of age before citing.
 
 CONFLICTING ENTRIES OF SIMILAR AGE (within 7 days of each other):
-• If two entries from the same tier conflict and are within 7 days of each other, DO NOT pick one silently.
+• EXCEPTION — OPERATIONAL MEMORY ALWAYS WINS: If a brain entry or pgvector result conflicts with a value in the OPERATIONAL MEMORY section above, the OPERATIONAL MEMORY value is ground truth. Do NOT present both values. Do NOT ask the user which is correct. Silently use the OPERATIONAL MEMORY value and cite it as [source: operational memory].
+• If two brain entries (not involving OPERATIONAL MEMORY) from the same tier conflict and are within 7 days of each other, DO NOT pick one silently.
 • Present both to the user: "I have two recent entries that disagree: [entry A, Xd ago] says X, [entry B, Yd ago] says Y. Which is correct?"
 • After the user clarifies, emit a correct_claim action to resolve the conflict permanently.
 • If one is tagged "verified_sales_data" or comes from HOT tier and the other doesn't, prefer the verified/HOT source — but still mention the discrepancy.`,
@@ -512,7 +513,18 @@ These are the ONLY current team members. Do NOT reference anyone else as team un
   // 4d. Markdown Operational Memory (Viktor-style always-loaded facts — highest priority)
   if (ctx.markdownMemory && ctx.markdownMemory.trim()) {
     sections.push(
-      `## OPERATIONAL MEMORY (always-loaded facts — override brain entries)\n\n${ctx.markdownMemory.trim()}`,
+      `## OPERATIONAL MEMORY — ABSOLUTE GROUND TRUTH (highest priority — overrides ALL other sources)
+
+The facts below are manually curated corrections. They are MORE authoritative than brain entries, pgvector search results, pinned corrections, or any other retrieved data.
+
+RULES FOR OPERATIONAL MEMORY:
+• When a value appears here, USE IT — do not present the conflicting pgvector/brain value alongside it.
+• Do NOT ask "which is correct?" when this section provides the answer. It IS correct.
+• Do NOT say "I found two values: X and Y — which is current?" if one of those values comes from this section.
+• Silently discard any brain entry or pgvector result that contradicts a value stated here.
+• Cite as [source: operational memory] when quoting these values.
+
+${ctx.markdownMemory.trim()}`,
     );
   }
 

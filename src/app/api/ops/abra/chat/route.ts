@@ -1942,11 +1942,12 @@ export async function POST(req: Request) {
       }
     }
 
-    // Safety: always strip any remaining <action>, <tool_call>, or code-fenced action tags before returning to the user
+    // Safety: always strip any remaining <action>, <tool_call>, <tool_response>, or code-fenced action tags before returning to the user
     console.log(`[chat] Pre-strip baseReply length: ${baseReply.length}, actionNotices: ${actionNotices.length}`);
     const strippedReply = baseReply
       .replace(/<action>\s*[\s\S]*?\s*<\/action>/gi, "")
       .replace(/<tool_call>\s*[\s\S]*?\s*<\/tool_call>/gi, "")
+      .replace(/<tool_response>\s*[\s\S]*?\s*<\/tool_response>/gi, "")
       .replace(/<tool>\s*[\s\S]*?\s*<\/tool>/gi, "")
       .replace(/<function_call>\s*[\s\S]*?\s*<\/function_call>/gi, "")
       .trim();
