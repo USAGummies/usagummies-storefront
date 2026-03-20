@@ -1825,6 +1825,30 @@ export async function POST(req: Request) {
     // Only skip fallback if the action was actually executed (not just queued for approval)
     const fileActionHandled = actionNotices.some(n => n.includes("generate_file") && n.includes("auto-executed"));
     console.log(`[chat] File auto-gen check: channel=${channel}, slackChannelId=${slackChannelId || "(empty)"}, wantsFile=${wantsFile}, fileActionHandled=${fileActionHandled}, claudeRefusedFile=${claudeRefusedFile}, replyLen=${strippedReply.length}`);
+
+    // Fix: if Claude refused to generate a file but the user clearly asked for one, force a generate_file action
+    if (wantsFile && claudeRefusedFile && !fileActionHandled) {
+      console.warn("[chat] Claude refused file generation — intercepting and forcing generate_file action");
+      const forcedFilename = /csv/i.test(rawMessage) ? "export.csv" : "export.xlsx";
+      const forcedSource = /vendor/i.test(rawMessage)
+        ? "qbo_vendors"
+        : /account|coa|chart of accounts/i.test(rawMessage)
+        ? "qbo_accounts"
+        : /p.?l|profit.?loss/i.test(rawMessage)
+        ? "qbo_pnl"
+        : undefined;
+      const forcedActionXml = `<action>{"action_type":"generate_file","title":"File Export","description":"Auto-forced — Abra incorrectly claimed it could not generate files","department":"operations","risk_level":"low","params":{"filename":"${forcedFilename}"${forcedSource ? `,"source":"${forcedSource}"` : ',"headers":[],"rows":[]'}}}</action>`;
+      try {
+        const forceResult = await executeActions(forcedActionXml, {
+          slackChannelId: slackChannelId || undefined,
+          slackThreadTs: slackThreadTs || undefined,
+          deadlineMs: Math.max(2000, 40_000 - (Date.now() - startMs)),
+        });
+        actionNotices.push(...forceResult.actionNotices);
+      } catch (err) {
+        console.warn("[chat] Forced generate_file action failed:", err instanceof Error ? err.message : err);
+      }
+    }
     if (
       (wantsFile || claudeRefusedFile) &&
       !fileActionHandled &&

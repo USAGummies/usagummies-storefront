@@ -40,7 +40,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
   });
 }
 
-const PER_ACTION_TIMEOUT_MS = 12_000; // 12s per action to prevent chained timeouts
+const PER_ACTION_TIMEOUT_MS = 12_000; // 12s upper bound per action
 
 export async function executeActions(
   reply: string,
@@ -53,11 +53,12 @@ export async function executeActions(
   const readOnlyResults: string[] = [];
 
   for (const directive of parsedActions.actions.slice(0, 3)) {
-    // Check if we're running out of time (leave 10s for response assembly)
+    // Check if we're running out of time (leave 2s for response assembly)
     const elapsed = Date.now() - execStart;
-    if (ctx?.deadlineMs && elapsed > ctx.deadlineMs) {
-      console.warn(`[action-executor] Deadline exceeded (${elapsed}ms), skipping remaining ${parsedActions.actions.length} actions`);
-      actionNotices.push("⏱️ Skipped remaining actions — approaching timeout.");
+    const remainingMs = ctx?.deadlineMs != null ? ctx.deadlineMs - elapsed : undefined;
+    if (remainingMs != null && remainingMs <= 2000) {
+      console.warn(`[action-executor] Deadline exceeded (elapsed=${elapsed}ms, remaining=${remainingMs}ms), skipping \`${directive.action.action_type}\` and remaining actions`);
+      actionNotices.push(`⏱️ Skipped \`${directive.action.action_type}\` due to time constraints — ask me to run it separately.`);
       break;
     }
     try {
@@ -111,9 +112,13 @@ export async function executeActions(
       if (READ_ONLY_ACTIONS.has(directive.action.action_type)) {
         directive.action.risk_level = "low";
       }
+      // Dynamic per-action timeout: min(12s, remainingRouteTime - 2s)
+      const perActionTimeout = remainingMs != null
+        ? Math.min(PER_ACTION_TIMEOUT_MS, Math.max(1000, remainingMs - 2000))
+        : PER_ACTION_TIMEOUT_MS;
       const outcome = await withTimeout(
         proposeAndMaybeExecute(directive.action),
-        PER_ACTION_TIMEOUT_MS,
+        perActionTimeout,
         directive.action.action_type,
       );
       if (outcome.auto_executed) {

@@ -191,6 +191,23 @@ export async function summarizeConversation(
     };
   }
 
+  // Try to extract partial fields via regex when full JSON.parse fails
+  function extractStringArray(json: string, key: string): string[] {
+    const match = json.match(new RegExp(`"${key}"\\s*:\\s*(\\[[^\\]]*\\])`, "s"));
+    if (!match) return [];
+    try {
+      const arr = JSON.parse(match[1]) as unknown;
+      return Array.isArray(arr) ? arr.filter((item): item is string => typeof item === "string") : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function extractString(json: string, key: string): string | null {
+    const match = json.match(new RegExp(`"${key}"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"`));
+    return match ? match[1] : null;
+  }
+
   let parsed: {
     topic?: string;
     key_facts?: string[];
@@ -204,19 +221,27 @@ export async function summarizeConversation(
   try {
     parsed = JSON.parse(rawJson);
   } catch {
-    console.warn("[conversation-summarizer] JSON.parse failed on extracted JSON, using fallback. Raw:", rawJson.slice(0, 200));
+    console.warn("[conversation-summarizer] JSON.parse failed — attempting partial regex extraction. Raw:", rawJson.slice(0, 400));
+    // Extract what we can via regex before falling back to empty arrays
+    const partialTopic = extractString(rawJson, "topic") || normalized[0]?.content.slice(0, 100) || "Business conversation";
+    const partialKeyFacts = extractStringArray(rawJson, "key_facts");
+    const partialDecisions = extractStringArray(rawJson, "decisions_made");
+    const partialActionItems = extractStringArray(rawJson, "action_items");
+    const partialSentiment = extractString(rawJson, "sentiment") || "neutral";
+    const partialSummary = extractString(rawJson, "summary_text") || `Conversation with ${participants.join(", ") || "unknown"} — partial summary extracted.`;
+    console.warn(`[conversation-summarizer] Partial extraction: topic="${partialTopic.slice(0, 60)}", facts=${partialKeyFacts.length}, decisions=${partialDecisions.length}, actions=${partialActionItems.length}`);
     return {
       participants: participants.filter(Boolean),
-      topic: normalized[0]?.content.slice(0, 100) || "Business conversation",
-      key_facts: [],
-      decisions_made: [],
-      action_items: [],
-      sentiment: "neutral",
+      topic: partialTopic,
+      key_facts: partialKeyFacts,
+      decisions_made: partialDecisions,
+      action_items: partialActionItems,
+      sentiment: partialSentiment,
       follow_up_needed: false,
       department: inferDepartment(normalized),
       entity_mentions: [],
       source_ref: options?.sourceRef || buildSourceRef(participants, normalized),
-      summary_text: `Conversation with ${participants.join(", ") || "unknown"} — malformed JSON in summary.`,
+      summary_text: partialSummary,
     };
   }
 

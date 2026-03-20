@@ -911,6 +911,15 @@ export async function getSlackDisplayName(userId: string): Promise<string> {
   }
 }
 
+function stripActionTags(value: string): string {
+  return value
+    .replace(/<action>\s*[\s\S]*?\s*<\/action>/gi, "")
+    .replace(/<tool_call>\s*[\s\S]*?\s*<\/tool_call>/gi, "")
+    .replace(/<tool>\s*[\s\S]*?\s*<\/tool>/gi, "")
+    .replace(/<function_call>\s*[\s\S]*?\s*<\/function_call>/gi, "")
+    .trim();
+}
+
 export async function postSlackMessage(
   channelId: string,
   text: string,
@@ -919,8 +928,10 @@ export async function postSlackMessage(
   const botToken = process.env.SLACK_BOT_TOKEN;
   if (!botToken || !channelId) return false;
 
+  // Second line of defense: strip any raw action/tool tags before sending to Slack
+  const cleanText = stripActionTags(text);
   const sourceText = formatSources(opts.sources || []);
-  const fullText = `🧠 *Abra*\n\n${text}${sourceText}`;
+  const fullText = `🧠 *Abra*\n\n${cleanText}${sourceText}`;
   const blocks = opts.blocks && opts.blocks.length > 0 ? opts.blocks : buildSlackBlocks(fullText);
   if (opts.answerLogId) {
     blocks.push(buildFeedbackBlock(opts.answerLogId));
