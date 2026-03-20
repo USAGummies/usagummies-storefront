@@ -892,6 +892,141 @@ export async function POST(req: Request) {
       });
     }
 
+    // ─── Comprehensive Report Handler ───
+    // For "full report / status report / operational report / comprehensive" requests,
+    // break into 4 parallel sub-queries (supply chain, sales, finance, action items)
+    // instead of a single LLM call that would hit the 60s timeout.
+    // Pattern follows abra-morning-brief.ts: independent sections, each try/catch-wrapped,
+    // assembled into one reply and optionally posted to Slack.
+    const isComprehensiveReport = /\b(full[\s-]+report|status[\s-]+report|operational[\s-]+report|comprehensive\b[\s\S]{0,30}(report|overview|summary|status|update)|give[\s\S]{0,20}report|run[\s\S]{0,20}report|generate[\s\S]{0,20}report|full[\s-]+status|complete[\s-]+report)\b/i.test(rawMessage);
+    if (isComprehensiveReport) {
+      const reportStart = Date.now();
+      const today = new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+      const reportModel = await getPreferredClaudeModel(DEFAULT_CLAUDE_MODEL);
+      const anthropicKey = process.env.ANTHROPIC_API_KEY || "";
+
+      // Fetch shared data in parallel — each is best-effort
+      const [revenueResult, pipelineResult, signalsResult] = await Promise.allSettled([
+        getRevenueSnapshot("week").catch(() => null),
+        analyzePipeline().catch(() => null),
+        getActiveSignals({ limit: 10 }).catch(() => [] as Array<{ title: string; severity: string; department?: string | null }>),
+      ]);
+
+      const revenue = revenueResult.status === "fulfilled" ? revenueResult.value : null;
+      const pipeline = pipelineResult.status === "fulfilled" ? pipelineResult.value : null;
+      const signals = (signalsResult.status === "fulfilled" ? signalsResult.value : []) as Array<{ title: string; severity: string; department?: string | null }>;
+
+      // Summarize data for LLM context
+      const revenueText = revenue
+        ? JSON.stringify(revenue, null, 2).slice(0, 600)
+        : "Revenue data unavailable — check Supabase KPI timeseries";
+
+      const pipelineText = pipeline
+        ? [
+            `Total pipeline value: $${(pipeline.total_pipeline_value || 0).toFixed(2)}`,
+            `Active deals: ${(pipeline.all_active_deals || []).length}`,
+            `Win rate (30d): ${(pipeline.win_rate_30d || 0).toFixed(1)}%`,
+            `At-risk deals: ${(pipeline.at_risk_deals || []).length}`,
+          ].join("\n")
+        : "Pipeline data unavailable";
+
+      const signalsText = signals.length > 0
+        ? signals.slice(0, 8).map(s => `[${s.severity}] ${s.title}`).join("\n")
+        : "No active signals";
+
+      const atRiskCount = pipeline ? (pipeline.at_risk_deals || []).length : 0;
+
+      const baseCtx = `You are Abra, the AI operations assistant for USA Gummies. Today is ${today}. Be concise, factual, and specific. Use markdown formatting. Keep each section under 200 words.`;
+
+      // Run one focused LLM call per section in parallel (12s timeout each)
+      async function callSectionLLM(sectionName: string, userPrompt: string): Promise<string> {
+        if (!anthropicKey) return `_${sectionName}: ANTHROPIC_API_KEY not configured_`;
+        try {
+          const r = await fetch("https://api.anthropic.com/v1/messages", {
+            method: "POST",
+            headers: { "x-api-key": anthropicKey, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
+            body: JSON.stringify({
+              model: reportModel,
+              max_tokens: 600,
+              temperature: 0.2,
+              messages: [{ role: "user", content: `${baseCtx}\n\n${userPrompt}` }],
+            }),
+            signal: AbortSignal.timeout(12_000),
+          });
+          if (!r.ok) return `_${sectionName}: API error ${r.status}_`;
+          const d = await r.json() as { content?: Array<{ type: string; text?: string }>; usage?: { input_tokens?: number; output_tokens?: number } };
+          // Log cost (best-effort)
+          void logAICost({
+            model: reportModel,
+            provider: "anthropic",
+            inputTokens: d.usage?.input_tokens || 0,
+            outputTokens: d.usage?.output_tokens || 0,
+            endpoint: "abra-chat-report",
+            department: messageDepartment || undefined,
+          }).catch(() => {});
+          const text = (d.content || [])
+            .filter((b): b is { type: "text"; text: string } => b.type === "text")
+            .map(b => b.text)
+            .join("")
+            .trim();
+          return text || `_${sectionName}: empty response_`;
+        } catch {
+          return `_${sectionName}: timed out or unavailable_`;
+        }
+      }
+
+      const [supplySection, salesSection, financeSection, actionSection] = await Promise.all([
+        callSectionLLM("Supply Chain", `Write the **Supply Chain** section of the USA Gummies operational status report.\n\nActive Signals:\n${signalsText}\n\nFocus on: inventory health, stockout risks, supply chain signals, production status, vendor risks. If no data is available, flag what needs to be checked manually.`),
+        callSectionLLM("Sales & Revenue", `Write the **Sales & Revenue** section of the USA Gummies operational status report.\n\nRevenue Metrics:\n${revenueText}\n\nPipeline:\n${pipelineText}\n\nFocus on: revenue performance vs targets, channel breakdown (Shopify / Amazon / Wholesale), pipeline health, key deals to action.`),
+        callSectionLLM("Finance", `Write the **Finance** section of the USA Gummies operational status report.\n\nRevenue:\n${revenueText}\n\nFocus on: cash position outlook, burn rate, AR/AP health, QBO data availability, financial risks. Note any data gaps that require manual QBO review.`),
+        callSectionLLM("Action Items", `Write the **Action Items** section of the USA Gummies operational status report.\n\nActive Signals (${signals.length} total):\n${signalsText}\n\nAt-risk pipeline deals: ${atRiskCount}\n\nProvide 5–7 specific, prioritized actions for the team today. Format as a numbered list with owner (if determinable) and urgency.`),
+      ]);
+
+      const elapsed = Math.round((Date.now() - reportStart) / 1000);
+      const fullReport = [
+        `# USA Gummies Status Report — ${today}`,
+        `_Generated in ${elapsed}s across 4 parallel analysis sections_`,
+        "",
+        "## Supply Chain",
+        supplySection,
+        "",
+        "## Sales & Revenue",
+        salesSection,
+        "",
+        "## Finance",
+        financeSection,
+        "",
+        "## Action Items",
+        actionSection,
+      ].join("\n");
+
+      // Post to Slack if channel is available
+      if (slackChannelId) {
+        try {
+          const { notify: slackNotify } = await import("@/lib/ops/notify");
+          await slackNotify({ channel: "daily", text: `USA Gummies Status Report — ${today}\n\n${fullReport.slice(0, 2800)}` });
+        } catch { /* non-fatal */ }
+      }
+
+      queueChatHistory({
+        threadId,
+        userEmail: actorEmail,
+        userMessage: rawMessage,
+        assistantMessage: fullReport,
+        metadata: { intent: "comprehensive_report", sections: 4, elapsed_ms: Date.now() - reportStart },
+        actorLabel,
+      });
+
+      clearTimeout(deadlineTimer);
+      return NextResponse.json({
+        reply: fullReport,
+        confidence: 0.85,
+        sources: [],
+        intent: "comprehensive_report",
+        thread_id: threadId,
+      });
+    }
+
     // ─── Finance Fast-Path ───
     // Only use fast-path for direct QBO data queries (balances, transactions, P&L).
     // Complex analytical questions (readiness assessment, setup plan, COGS breakdown,
@@ -1819,8 +1954,11 @@ export async function POST(req: Request) {
 
     // ── Auto-generate file if user asked for export and Abra didn't emit the action ──
     const wantsFile = /\b(spreadsheet|xlsx|csv|excel|export|download|file)\b/i.test(message);
-    // Also detect Claude refusing to generate files (training bias override)
-    const claudeRefusedFile = /\b(cannot generate|can't generate|don't have file|cannot create|can't create files|cannot export|can't export)\b/i.test(strippedReply);
+    // Also detect Claude refusing to generate files (training bias override).
+    // Normalize Unicode curly apostrophes (\u2018 \u2019) → straight apostrophe before testing,
+    // because Claude sometimes outputs \u2019 (right single quotation mark) in contractions.
+    const normalizedReply = strippedReply.replace(/[\u2018\u2019\u02BC\u2032]/g, "'");
+    const claudeRefusedFile = /\b(cannot generate|can[\u2019']t generate|don[\u2019']t have file|cannot create|can[\u2019']t create files?|cannot export|can[\u2019']t export|unable to generate|unable to create|not able to generate|not able to create|[Ii][\u2019'] ?m not able to|[Ii] cannot directly|downloadable xlsx|downloadable .{0,20}file)\b/i.test(normalizedReply);
     // Check if the action executor already handled generate_file
     // Only skip fallback if the action was actually executed (not just queued for approval)
     const fileActionHandled = actionNotices.some(n => n.includes("generate_file") && n.includes("auto-executed"));

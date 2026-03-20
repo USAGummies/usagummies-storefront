@@ -212,6 +212,24 @@ async function refreshAccessToken(
 // Status & Utility
 // ---------------------------------------------------------------------------
 
+/**
+ * Force-refresh the QBO access token regardless of the stored expiry time.
+ * Call this when a 401 is received from the QBO API — Intuit can invalidate
+ * tokens early (e.g., security events, revocation), so the stored expiresAt
+ * may still be in the future even though the token is dead.
+ * Returns the new access token, or null if refresh fails.
+ */
+export async function forceRefreshTokens(): Promise<string | null> {
+  const tokens = await loadTokens();
+  if (!tokens) {
+    console.warn("[qbo-auth] forceRefreshTokens: no tokens stored");
+    return null;
+  }
+  console.log("[qbo-auth] Force-refreshing token (ignoring expiresAt)...");
+  const updated = await refreshAccessToken(tokens);
+  return updated?.accessToken ?? null;
+}
+
 /** Get the QBO realm (company) ID. */
 export async function getRealmId(): Promise<string | null> {
   const tokens = await loadTokens();
