@@ -1596,7 +1596,36 @@ export async function POST(req: Request) {
 
     // Fetch corrections + departments + initiatives + cost + team + signals + live data (parallel)
     // When Supabase circuit is open, skip Supabase-dependent fetches to avoid 15s timeouts
-    const [corrections, departments, activeInitiatives, costSummary, teamMembers, vendors, signals, liveSnapshot, financialContext, ledgerCtx, financeTruth, capabilityStatus, backlogCtx] =
+    // Proactively fetch QBO data for finance questions so Claude doesn't need to emit query_qbo actions
+    const isFinance = isFinanceQuestion(message);
+    const qboDataPromise: Promise<string | null> = isFinance
+      ? (async () => {
+          try {
+            const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://www.usagummies.com";
+            const [vendorsRes, accountsRes] = await Promise.all([
+              fetch(`${baseUrl}/api/ops/qbo/query?type=vendors`, { signal: AbortSignal.timeout(8000) }),
+              fetch(`${baseUrl}/api/ops/qbo/accounts`, { signal: AbortSignal.timeout(8000) }),
+            ]);
+            const parts: string[] = [];
+            if (vendorsRes.ok) {
+              const vd = (await vendorsRes.json()) as { count: number; vendors: Array<{ Name: string; Balance: number; Active: boolean }> };
+              const active = (vd.vendors || []).filter((v: { Active: boolean }) => v.Active);
+              parts.push(`**QBO Vendors (${active.length} active):** ${active.map((v: { Name: string }) => v.Name).join(", ") || "(none)"}`);
+            }
+            if (accountsRes.ok) {
+              const ad = (await accountsRes.json()) as { count: number; accounts: Array<{ Name: string; AccountType: string; CurrentBalance: number; Active: boolean }> };
+              const nonZero = (ad.accounts || []).filter((a: { CurrentBalance: number; Active?: boolean }) => a.CurrentBalance !== 0 && a.Active !== false);
+              parts.push(`**QBO Accounts (${ad.count} total, ${nonZero.length} with balances):** ${nonZero.map((a: { Name: string; CurrentBalance: number; AccountType: string }) => `${a.Name}: $${a.CurrentBalance.toFixed(2)} [${a.AccountType}]`).join("; ") || "(all zero)"}`);
+            }
+            return parts.length > 0 ? `\n\n**LIVE QBO DATA:**\n${parts.join("\n")}` : null;
+          } catch (err) {
+            console.error("[abra] QBO proactive fetch failed:", err instanceof Error ? err.message : err);
+            return null;
+          }
+        })()
+      : Promise.resolve(null);
+
+    const [corrections, departments, activeInitiatives, costSummary, teamMembers, vendors, signals, liveSnapshot, financialContext, ledgerCtx, financeTruth, capabilityStatus, backlogCtx, qboContext] =
       await Promise.all([
         supabaseCircuitOpen ? Promise.resolve([] as Awaited<ReturnType<typeof fetchCorrections>>) : fetchCorrections(),
         supabaseCircuitOpen ? Promise.resolve([] as Awaited<ReturnType<typeof fetchDepartments>>) : fetchDepartments(),
@@ -1608,14 +1637,14 @@ export async function POST(req: Request) {
         fetchLiveBusinessSnapshot(), // Always fetch — uses Shopify/email APIs, not Supabase
         fetchFinancialContext(),      // Always fetch — uses KPI timeseries, not Supabase
         // Fetch verified ledger data for financial questions (Notion Cash & Transactions DB)
-        isFinanceQuestion(message)
+        isFinance
           ? fetchLedgerContext(message).catch((err) => {
               console.error("[abra] Ledger fetch failed:", err instanceof Error ? err.message : err);
               return null;
             })
           : Promise.resolve(null),
         // Finance truth layer — verified figures, source hierarchy, COGS truth
-        isFinanceQuestion(message)
+        isFinance
           ? getFinanceTruthContext().catch((err) => {
               console.error("[abra] Finance truth layer fetch failed:", err instanceof Error ? err.message : err);
               return null as string | null;
@@ -1625,6 +1654,8 @@ export async function POST(req: Request) {
         getCapabilityContext().catch(() => null as string | null),
         // Operational backlog — what Abra needs to work on
         supabaseCircuitOpen ? Promise.resolve(null as string | null) : getBacklogContext().catch(() => null as string | null),
+        // QBO live data for finance questions
+        qboDataPromise,
       ]);
     const competitorContext =
       isCompetitorQuestion(message) || messageDepartment === "sales_and_growth"
@@ -1655,9 +1686,9 @@ export async function POST(req: Request) {
     // Inject capability health so Claude knows what's up/down right now
     if (capabilityStatus) dataStatus.push(`\n[INTEGRATION HEALTH: ${capabilityStatus}]`);
     const dataStatusLine = dataStatus.length > 0 ? `\n[DATA FEED STATUS: ${dataStatus.join("; ")}. Do NOT invent numbers for unavailable feeds. If brain search failed, tell the user your memory is temporarily unavailable.]` : "";
-    // Combine finance truth layer with existing financial context for finance questions
-    const enrichedFinancialContext = isFinanceConversation && financeTruth
-      ? [financialContext, financeTruth].filter(Boolean).join("\n\n")
+    // Combine finance truth layer + QBO live data with existing financial context for finance questions
+    const enrichedFinancialContext = isFinanceConversation
+      ? [financialContext, financeTruth, qboContext].filter(Boolean).join("\n\n")
       : financialContext;
     const augmentedLiveSnapshot = [liveSnapshot, temporalHint, dataStatusLine, backlogCtx].filter(Boolean).join("\n") || null;
 
