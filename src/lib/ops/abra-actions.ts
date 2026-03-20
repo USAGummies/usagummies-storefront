@@ -3493,25 +3493,48 @@ export function parseActionDirectives(reply: string): {
   const codeBlockPattern = /```(\w+)\n([\s\S]*?)```/g;
   let cbMatch: RegExpExecArray | null;
   while ((cbMatch = codeBlockPattern.exec(reply)) !== null) {
-    const actionType = cbMatch[1];
-    if (!KNOWN_ACTION_TYPES.has(actionType)) continue;
+    const lang = cbMatch[1];
     const block = cbMatch[0];
     const body = cbMatch[2]?.trim() || "";
-    // Parse YAML-like key: "value" or key: value lines into params
-    const params: Record<string, unknown> = {};
-    for (const line of body.split("\n")) {
-      const kvMatch = line.match(/^(\w+):\s*(?:"([^"]*)"|'([^']*)'|(.+))$/);
-      if (kvMatch) {
-        params[kvMatch[1]] = kvMatch[2] ?? kvMatch[3] ?? kvMatch[4]?.trim();
+
+    // Format 1: ```query_qbo\nkey: value\n``` — language IS the action type
+    if (KNOWN_ACTION_TYPES.has(lang)) {
+      const params: Record<string, unknown> = {};
+      for (const line of body.split("\n")) {
+        const kvMatch = line.match(/^(\w+):\s*(?:"([^"]*)"|'([^']*)'|(.+))$/);
+        if (kvMatch) {
+          params[kvMatch[1]] = kvMatch[2] ?? kvMatch[3] ?? kvMatch[4]?.trim();
+        }
       }
+      const action = normalizeActionDirective({
+        action_type: lang,
+        params,
+        risk_level: "low",
+      });
+      if (action) {
+        actions.push({ action, raw: block });
+      }
+      continue;
     }
-    const action = normalizeActionDirective({
-      action_type: actionType,
-      params,
-      risk_level: "low",
-    });
-    if (action) {
-      actions.push({ action, raw: block });
+
+    // Format 2: ```json\n{"action":"query_qbo",...}\n``` — JSON with action/action_type field
+    if (lang === "json" || lang === "JSON") {
+      try {
+        const parsed = JSON.parse(body) as Record<string, unknown>;
+        const actionType = String(parsed.action_type || parsed.action || "");
+        if (KNOWN_ACTION_TYPES.has(actionType)) {
+          const action = normalizeActionDirective({
+            ...parsed,
+            action_type: actionType,
+            risk_level: parsed.risk_level || "low",
+          });
+          if (action) {
+            actions.push({ action, raw: block });
+          }
+        }
+      } catch {
+        // Not valid JSON — skip
+      }
     }
   }
 
