@@ -3466,6 +3466,7 @@ export function parseActionDirectives(reply: string): {
   let cleanReply = reply;
   let match: RegExpExecArray | null;
 
+  // Parse <action>{...}</action> tags
   while ((match = pattern.exec(reply)) !== null) {
     const block = match[0];
     const payloadRaw = match[1]?.trim() || "";
@@ -3477,6 +3478,40 @@ export function parseActionDirectives(reply: string): {
       }
     } catch {
       // Ignore malformed blocks and keep response usable.
+    }
+  }
+
+  // Also parse markdown fenced code blocks like ```query_qbo\nkey: "value"\n```
+  // Claude sometimes emits actions as fenced code blocks instead of <action> tags.
+  const KNOWN_ACTION_TYPES = new Set([
+    "query_qbo", "read_email", "search_email", "query_ledger", "send_slack",
+    "create_brain_entry", "create_task", "update_notion", "create_notion_page",
+    "categorize_qbo_transaction", "batch_categorize_qbo", "create_qbo_invoice",
+    "record_transaction", "log_production_run", "record_vendor_quote", "run_scenario",
+    "correct_claim", "update_shopify_inventory", "create_shopify_discount",
+  ]);
+  const codeBlockPattern = /```(\w+)\n([\s\S]*?)```/g;
+  let cbMatch: RegExpExecArray | null;
+  while ((cbMatch = codeBlockPattern.exec(reply)) !== null) {
+    const actionType = cbMatch[1];
+    if (!KNOWN_ACTION_TYPES.has(actionType)) continue;
+    const block = cbMatch[0];
+    const body = cbMatch[2]?.trim() || "";
+    // Parse YAML-like key: "value" or key: value lines into params
+    const params: Record<string, unknown> = {};
+    for (const line of body.split("\n")) {
+      const kvMatch = line.match(/^(\w+):\s*(?:"([^"]*)"|'([^']*)'|(.+))$/);
+      if (kvMatch) {
+        params[kvMatch[1]] = kvMatch[2] ?? kvMatch[3] ?? kvMatch[4]?.trim();
+      }
+    }
+    const action = normalizeActionDirective({
+      action_type: actionType,
+      params,
+      risk_level: "low",
+    });
+    if (action) {
+      actions.push({ action, raw: block });
     }
   }
 

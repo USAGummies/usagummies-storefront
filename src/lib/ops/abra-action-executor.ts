@@ -14,7 +14,7 @@ import {
 } from "@/lib/ops/abra-actions";
 import { calculateDeal, type ChannelType } from "@/lib/ops/abra-skill-deal-calculator";
 
-const READ_ONLY_ACTIONS = new Set(["read_email", "search_email", "query_ledger", "calculate_deal"]);
+const READ_ONLY_ACTIONS = new Set(["read_email", "search_email", "query_ledger", "query_qbo", "calculate_deal"]);
 
 export type ActionExecutionResult = {
   /** Reply text with <action> blocks stripped */
