@@ -4,11 +4,14 @@
  * Generates and uploads files (CSV, XLSX) to Slack channels.
  * All file generation happens in memory (no disk I/O) for serverless compatibility.
  *
+ * XLSX generation uses exceljs for full formatting support (fonts, colors, borders,
+ * number formats, frozen panes, auto-filters). The xlsx library is kept for reading only.
+ *
  * Requires OAuth scope: files:write (add to Slack app + reinstall)
  * Env var: SLACK_BOT_TOKEN
  */
 
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -33,6 +36,56 @@ export type SpreadsheetData = {
 };
 
 // ---------------------------------------------------------------------------
+// Formatting helpers
+// ---------------------------------------------------------------------------
+
+const HEADER_FILL: ExcelJS.Fill = {
+  type: "pattern",
+  pattern: "solid",
+  fgColor: { argb: "FF1F4E79" }, // dark blue
+};
+
+const HEADER_FONT: Partial<ExcelJS.Font> = {
+  bold: true,
+  color: { argb: "FFFFFFFF" }, // white
+  size: 11,
+};
+
+const ROW_FILL_LIGHT: ExcelJS.Fill = {
+  type: "pattern",
+  pattern: "solid",
+  fgColor: { argb: "FFF2F2F2" }, // light gray
+};
+
+const ROW_FILL_WHITE: ExcelJS.Fill = {
+  type: "pattern",
+  pattern: "solid",
+  fgColor: { argb: "FFFFFFFF" }, // white
+};
+
+const THIN_BORDER: Partial<ExcelJS.Border> = { style: "thin", color: { argb: "FFD0D0D0" } };
+
+const CELL_BORDER: Partial<ExcelJS.Borders> = {
+  top: THIN_BORDER,
+  left: THIN_BORDER,
+  bottom: THIN_BORDER,
+  right: THIN_BORDER,
+};
+
+/** Infer Excel number format string from header label */
+function inferNumFmt(header: string): string | null {
+  const h = header.toLowerCase();
+  if (/\bpercent\b|%/.test(h)) return "0.00%";
+  if (/price|cost|amount|revenue|sales|total|fee|balance|pay|earn|budget|spend|margin/.test(h)) return '"$"#,##0.00';
+  return null;
+}
+
+/** Whether a column header suggests date values */
+function isDateHeader(header: string): boolean {
+  return /\bdate\b|\bcreated\b|\bupdated\b|\btime\b|\bdue\b|\bstart\b|\bend\b/.test(header.toLowerCase());
+}
+
+// ---------------------------------------------------------------------------
 // File Generation (in-memory)
 // ---------------------------------------------------------------------------
 
@@ -53,34 +106,89 @@ export function generateCsv(data: SpreadsheetData): string {
   return lines.join("\n");
 }
 
-/** Generate XLSX Buffer from structured data (supports multiple sheets) */
-export function generateXlsx(
-  sheets: SpreadsheetData[],
-): Buffer {
-  const workbook = XLSX.utils.book_new();
+/** Generate professionally formatted XLSX Buffer (supports multiple sheets) */
+export async function generateXlsx(sheets: SpreadsheetData[]): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "Abra / USA Gummies";
+  workbook.created = new Date();
 
-  for (const sheet of sheets) {
-    const wsData = [sheet.headers, ...sheet.rows];
-    const ws = XLSX.utils.aoa_to_sheet(wsData);
+  for (let si = 0; si < sheets.length; si++) {
+    const sheet = sheets[si];
+    const rawName = sheet.sheetName || `Sheet${si + 1}`;
+    // Sheet names: max 31 chars, no special chars allowed by Excel
+    const sheetName = rawName.replace(/[\\/*?:[\]]/g, "").slice(0, 31);
+    const ws = workbook.addWorksheet(sheetName, {
+      views: [{ state: "frozen", ySplit: 1 }], // freeze top row
+    });
 
-    // Auto-size columns based on content
-    const colWidths = sheet.headers.map((h, i) => {
-      const maxLen = Math.max(
-        h.length,
+    const headers = sheet.headers;
+    const numFmts = headers.map(inferNumFmt);
+    const dateCols = headers.map(isDateHeader);
+
+    // ---- Header row ----
+    const headerRow = ws.addRow(headers);
+    headerRow.height = 20;
+    headerRow.eachCell((cell) => {
+      cell.fill = HEADER_FILL;
+      cell.font = HEADER_FONT;
+      cell.border = CELL_BORDER;
+      cell.alignment = { vertical: "middle", horizontal: "left" };
+    });
+
+    // ---- Data rows ----
+    for (let ri = 0; ri < sheet.rows.length; ri++) {
+      const rowData = sheet.rows[ri];
+      const dataRow = ws.addRow(rowData);
+      const isEven = ri % 2 === 0;
+
+      dataRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+        const colIdx = colNumber - 1;
+        cell.fill = isEven ? ROW_FILL_LIGHT : ROW_FILL_WHITE;
+        cell.border = CELL_BORDER;
+        cell.alignment = { vertical: "middle" };
+
+        // Apply number format if detected
+        const fmt = numFmts[colIdx];
+        if (fmt) {
+          if (typeof cell.value === "string" && !isNaN(Number(cell.value)) && cell.value !== "") {
+            cell.value = Number(cell.value);
+          }
+          if (typeof cell.value === "number") {
+            cell.numFmt = fmt;
+          }
+        }
+
+        // Parse date strings for date columns
+        if (dateCols[colIdx] && typeof cell.value === "string" && cell.value) {
+          const d = new Date(cell.value);
+          if (!isNaN(d.getTime())) {
+            cell.value = d;
+            cell.numFmt = "yyyy-mm-dd";
+          }
+        }
+      });
+    }
+
+    // ---- Auto-filter on header row ----
+    if (headers.length > 0) {
+      ws.autoFilter = {
+        from: { row: 1, column: 1 },
+        to: { row: 1, column: headers.length },
+      };
+    }
+
+    // ---- Auto-size columns based on content ----
+    ws.columns.forEach((col, i) => {
+      const header = headers[i] ?? "";
+      const maxContentLen = Math.max(
+        header.length,
         ...sheet.rows.map((r) => String(r[i] ?? "").length),
       );
-      return { wch: Math.min(maxLen + 2, 50) };
+      col.width = Math.min(Math.max(maxContentLen + 3, 10), 55);
     });
-    ws["!cols"] = colWidths;
-
-    XLSX.utils.book_append_sheet(
-      workbook,
-      ws,
-      (sheet.sheetName || `Sheet${sheets.indexOf(sheet) + 1}`).slice(0, 31),
-    );
   }
 
-  const buf = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+  const buf = await workbook.xlsx.writeBuffer();
   return Buffer.from(buf);
 }
 
@@ -91,7 +199,8 @@ export function generateXlsx(
 /**
  * Upload a file to a Slack channel.
  *
- * Uses the files.upload API (v1) which accepts file data directly.
+ * Uses the files.getUploadURLExternal + files.completeUploadExternal (v2) method
+ * which is more reliable in serverless environments.
  * Generates files in memory — no disk I/O.
  */
 export async function uploadFileToSlack(opts: {
@@ -115,7 +224,7 @@ export async function uploadFileToSlack(opts: {
   let mimeType: string;
 
   if (format === "xlsx") {
-    fileBuffer = generateXlsx(sheets);
+    fileBuffer = await generateXlsx(sheets);
     mimeType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
   } else {
     const csvStr = generateCsv(sheets[0]);
