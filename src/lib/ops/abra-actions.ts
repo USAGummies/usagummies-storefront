@@ -3573,6 +3573,8 @@ export function parseActionDirectives(reply: string): {
   while ((match = pattern.exec(reply)) !== null) {
     const block = match[0];
     const payloadRaw = match[1]?.trim() || "";
+    // Always strip the block from cleanReply, whether or not it parses
+    cleanReply = cleanReply.replace(block, "");
     try {
       const parsed = JSON.parse(payloadRaw) as unknown;
       const action = normalizeActionDirective(parsed);
@@ -3583,6 +3585,9 @@ export function parseActionDirectives(reply: string): {
       // Ignore malformed blocks and keep response usable.
     }
   }
+  // Also strip any remaining <action> blocks that didn't match the pattern
+  // (e.g., function-call style like <action>read_email({...})</action>)
+  cleanReply = cleanReply.replace(/<action>\s*[\s\S]*?\s*<\/action>/gi, "").trim();
 
   // Also parse markdown fenced code blocks like ```query_qbo\nkey: "value"\n```
   // Claude sometimes emits actions as fenced code blocks instead of <action> tags.
