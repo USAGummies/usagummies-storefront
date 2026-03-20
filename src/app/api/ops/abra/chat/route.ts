@@ -1942,15 +1942,26 @@ export async function POST(req: Request) {
       }
     }
 
-    // Safety: always strip any remaining <action>, <tool_call>, <tool_response>, or code-fenced action tags before returning to the user
+    // Safety: always strip any remaining <action>, <tool_call>, <tool_response>, code-fenced action blocks, or bare JSON action objects before returning to the user
     console.log(`[chat] Pre-strip baseReply length: ${baseReply.length}, actionNotices: ${actionNotices.length}`);
-    const strippedReply = baseReply
+    let strippedReply = baseReply
       .replace(/<action>\s*[\s\S]*?\s*<\/action>/gi, "")
       .replace(/<tool_call>\s*[\s\S]*?\s*<\/tool_call>/gi, "")
       .replace(/<tool_response>\s*[\s\S]*?\s*<\/tool_response>/gi, "")
       .replace(/<tool>\s*[\s\S]*?\s*<\/tool>/gi, "")
-      .replace(/<function_call>\s*[\s\S]*?\s*<\/function_call>/gi, "")
-      .trim();
+      .replace(/<function_call>\s*[\s\S]*?\s*<\/function_call>/gi, "");
+    // Strip code-fenced JSON blocks containing action-like keys
+    strippedReply = strippedReply.replace(/```(?:json)?\s*\n([\s\S]*?)```/gi, (match, content) => {
+      if (/["'](action|tool|function_call|tool_call)["']\s*:/.test(content)) {
+        return "";
+      }
+      return match;
+    });
+    // Strip bare JSON objects on their own line that look like tool calls (with one level of nesting)
+    strippedReply = strippedReply.replace(
+      /^\s*\{(?:[^{}]|\{[^{}]*\})*"action"\s*:(?:[^{}]|\{[^{}]*\})*\}\s*$/gm,
+      "",
+    ).trim();
     console.log(`[chat] Post-strip reply length: ${strippedReply.length}, first 200: ${strippedReply.slice(0, 200)}`);
 
     // Never return a completely empty reply — provide a fallback
