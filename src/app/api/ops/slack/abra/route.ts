@@ -534,25 +534,74 @@ async function logUnansweredQuestion(
 // ---------------------------------------------------------------------------
 // Subcommand: correct
 // ---------------------------------------------------------------------------
+async function extractCorrectionWithLLM(
+  freeformText: string,
+): Promise<{ original: string; correction: string } | null> {
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  if (!anthropicKey) return null;
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": anthropicKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6",
+        max_tokens: 256,
+        messages: [
+          {
+            role: "user",
+            content:
+              `Extract the correction from this text. Return JSON with two fields:\n` +
+              `- "original": what was wrong or being superseded (or "unspecified" if not stated)\n` +
+              `- "correction": what the correct/updated fact is\n\n` +
+              `Text: ${freeformText}\n\n` +
+              `Respond with only valid JSON, no markdown.`,
+          },
+        ],
+      }),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const raw = data?.content?.[0]?.text?.trim() ?? "";
+    const parsed = JSON.parse(raw);
+    if (parsed?.original && parsed?.correction) return parsed;
+  } catch {
+    // fall through
+  }
+  return null;
+}
+
 async function handleCorrectCommand(
   correctionText: string,
   userEmail: string,
 ): Promise<string> {
-  // Parse "You said X but actually Y" or similar patterns
-  // Accept flexible formats: "X → Y", "X but Y", "X, actually Y"
+  // Parse structured formats: "X → Y", "X but actually Y", "X, actually Y"
   let original = "";
   let correction = "";
+  let freeform = false;
 
   const arrowMatch = correctionText.match(
-    /^(.+?)\s*(?:→|->|but actually|but|, actually)\s+(.+)$/i,
+    /^(.+?)\s*(?:→|->|but actually|, actually)\s+(.+)$/is,
   );
   if (arrowMatch) {
     original = arrowMatch[1].trim();
     correction = arrowMatch[2].trim();
   } else {
-    // If no clear delimiter, treat whole thing as the correction
-    correction = correctionText;
-    original = "(unspecified — general correction)";
+    // Freeform correction — use LLM to extract structured fields
+    freeform = true;
+    const extracted = await extractCorrectionWithLLM(correctionText);
+    if (extracted) {
+      original = extracted.original;
+      correction = extracted.correction;
+    } else {
+      // LLM unavailable or failed — store full text as the correction
+      correction = correctionText;
+      original = "unspecified";
+    }
   }
 
   if (!correction) {
@@ -627,10 +676,21 @@ async function handleCorrectCommand(
     });
 
     // Also write to markdown memory (Viktor-style always-loaded corrections)
-    appendMarkdownCorrection(original, correction).catch((e) =>
+    const correctionForMd = freeform
+      ? `${correction}\n\n_Full text: ${correctionText}_`
+      : correction;
+    appendMarkdownCorrection(original, correctionForMd).catch((e) =>
       console.warn("[abra-correct] markdown write failed:", e),
     );
 
+    if (freeform) {
+      return (
+        `✅ *Correction stored.*\n` +
+        `• _Interpreted wrong:_ ${original}\n` +
+        `• _Interpreted correct:_ ${correction}\n\n` +
+        `_Full text saved verbatim. Abra will prioritize this over conflicting older data._`
+      );
+    }
     return `✅ *Correction stored.*\n• _Wrong:_ ${original}\n• _Correct:_ ${correction}\n\nAbra will prioritize this over conflicting older data.`;
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
