@@ -734,7 +734,7 @@ async function callAbraChatViaInternalApi(
           thread_id: stableSlackThreadId(ctx.channel, ctx.threadTs || ctx.ts),
         }),
       },
-      45000,
+      55000, // Must exceed chat route's 50s internal deadline
     );
 
     const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;

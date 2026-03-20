@@ -11,6 +11,7 @@ import { notify } from "@/lib/ops/notify";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60; // after() needs time for chat API call (up to 55s)
 
 type SlackFile = {
   id: string;
