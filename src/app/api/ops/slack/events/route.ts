@@ -2,10 +2,14 @@ import crypto from "node:crypto";
 import { after, NextResponse } from "next/server";
 import { kv } from "@vercel/kv";
 import {
+  deleteSlackMessage,
   getSlackDisplayName,
   getThreadHistory,
+  isLikelySlowQuery,
   postSlackMessage,
+  postSlackThinkingMessage,
   processAbraMessage,
+  updateSlackMessage,
 } from "@/lib/ops/abra-slack-responder";
 import { notify } from "@/lib/ops/notify";
 
@@ -267,6 +271,30 @@ export async function POST(req: Request) {
         fileContext ? `\n\n[ATTACHED FILES]\n${fileContext}` : "",
       ].filter(Boolean).join("");
 
+      const rootThreadTs = thread_ts || ts;
+
+      // For queries that will take >5s (i.e. anything hitting the LLM), post an
+      // immediate "thinking" acknowledgment so the user sees something right away
+      // instead of waiting silently for up to 55s.
+      let thinkingTs: string | null = null;
+      let stillThinkingTimer: ReturnType<typeof setTimeout> | null = null;
+
+      if (isLikelySlowQuery(messageText)) {
+        thinkingTs = await postSlackThinkingMessage(channel, rootThreadTs);
+
+        if (thinkingTs) {
+          // After 10s with no response, update the indicator so the user knows
+          // Abra is still working (not stuck/silent).
+          stillThinkingTimer = setTimeout(() => {
+            void updateSlackMessage(
+              channel,
+              thinkingTs!,
+              "Still working on it — this is a complex request...",
+            );
+          }, 10_000);
+        }
+      }
+
       const result = await processAbraMessage({
         text: messageText || "(file attachment — see attached files above)",
         user,
@@ -277,13 +305,31 @@ export async function POST(req: Request) {
         ...(history.length > 0 ? { history } : {}),
         forceRespond: event.type === "app_mention",
       });
-      if (!result.handled) return;
-      const rootThreadTs = thread_ts || ts;
-      await postSlackMessage(channel, result.reply, {
-        threadTs: rootThreadTs,
-        sources: result.sources,
-        answerLogId: result.answerLogId,
-      });
+
+      // Always clear the "still thinking" timer before we touch the message
+      if (stillThinkingTimer) clearTimeout(stillThinkingTimer);
+
+      if (!result.handled) {
+        // Abra decided not to respond — clean up the thinking indicator if present
+        if (thinkingTs) {
+          await deleteSlackMessage(channel, thinkingTs);
+        }
+        return;
+      }
+
+      if (thinkingTs) {
+        // Update the thinking placeholder with the real answer in-place
+        await updateSlackMessage(channel, thinkingTs, result.reply, {
+          sources: result.sources,
+          answerLogId: result.answerLogId,
+        });
+      } else {
+        await postSlackMessage(channel, result.reply, {
+          threadTs: rootThreadTs,
+          sources: result.sources,
+          answerLogId: result.answerLogId,
+        });
+      }
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Unknown Slack events processing error";
