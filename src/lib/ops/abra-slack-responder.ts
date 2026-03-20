@@ -133,26 +133,27 @@ function normalizeWhitespace(value: string): string {
 }
 
 function looksLikeChartOfAccounts(text: string): boolean {
-  // Explicit header match — always a COA
-  if (/(gl\s*account|account\s*type|sub\s*type)/i.test(text)) return true;
+  // Must be substantial — short messages are never COA data pastes
+  if (text.length < 300) return false;
 
-  const lines = text.split(/\n/);
+  // Explicit header match — always a COA (requires multiple header keywords)
+  const headerKeywords = ["gl account", "account type", "sub type", "account name", "detail type"].filter(
+    kw => text.toLowerCase().includes(kw),
+  );
+  if (headerKeywords.length >= 2) return true;
 
-  // 5+ lines that contain tab characters → structured data
+  const lines = text.split(/\n/).filter(l => l.trim().length > 0);
+
+  // 10+ lines that contain tab characters → structured tabular data (raised threshold)
   const tabLines = lines.filter((l) => /\t/.test(l));
-  if (tabLines.length >= 5) return true;
+  if (tabLines.length >= 10) return true;
 
-  // 5+ lines that each contain a 3–6 digit number → account rows
-  const numericLines = lines.filter((l) => /\b\d{3,6}\b/.test(l));
-  if (numericLines.length >= 5) return true;
-
-  // 5+ occurrences of standalone accounting type codes (A/L/E/I/C/P)
-  const typeCodes = text.match(/(?<![A-Za-z])[ALCIPE](?![A-Za-z])/g) || [];
-  if (typeCodes.length >= 5) return true;
-
-  // Legacy: period-terminated account numbers
-  const accountHits = text.match(/\b\d{1,6}\./g) || [];
-  if (accountHits.length >= 5 && /[ALCIPE]/.test(text)) return true;
+  // 10+ lines that each start with or contain a 4–6 digit account number
+  // AND look like structured rows (have separators like tabs, pipes, or multiple spaces)
+  const structuredNumericLines = lines.filter(
+    (l) => /\b\d{4,6}\b/.test(l) && (/\t/.test(l) || /\|/.test(l) || /  {2,}/.test(l)),
+  );
+  if (structuredNumericLines.length >= 10) return true;
 
   return false;
 }
@@ -406,7 +407,11 @@ async function handleStructuredDocumentConversation(
     };
   }
 
-  if (looksLikeChartOfAccounts(ctx.text) || (existing && ctx.text.length >= 200)) {
+  // Only continue an existing session if the new message also looks like structured data
+  // (not just any long message). This prevents normal conversation from being captured as chunks.
+  const isStructuredData = looksLikeChartOfAccounts(ctx.text);
+  const isSessionContinuation = existing && ctx.text.length >= 500 && /\t/.test(ctx.text);
+  if (isStructuredData || isSessionContinuation) {
     const session = await appendStructuredDocChunk(ctx, "chart_of_accounts");
     const rows = parseChartOfAccountsRows(session.chunks.join("\n"));
     return {
