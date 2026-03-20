@@ -1785,6 +1785,65 @@ export async function POST(req: Request) {
       .filter(Boolean)
       .join("\n\n");
 
+    // ── Auto-generate file if user asked for export and Abra didn't emit the action ──
+    if (
+      slackChannelId &&
+      /\b(spreadsheet|xlsx|csv|excel|export.*file|file.*export|download|upload.*file)\b/i.test(message) &&
+      !baseReply.includes("<action>") &&
+      !baseReply.includes('"action_type":"generate_file"')
+    ) {
+      // Extract markdown tables from the reply
+      const tableRegex = /\|(.+)\|\n\|[-| :]+\|\n((?:\|.+\|\n?)+)/g;
+      const tables: Array<{ headers: string[]; rows: string[][] }> = [];
+      let tableMatch;
+      while ((tableMatch = tableRegex.exec(baseReply)) !== null) {
+        const headerLine = tableMatch[1];
+        const bodyLines = tableMatch[2].trim().split("\n");
+        const headers = headerLine.split("|").map(h => h.trim()).filter(Boolean);
+        // Skip tiny tables (likely formatting, not data)
+        if (headers.length < 2 || bodyLines.length < 1) continue;
+        const rows = bodyLines.map(line =>
+          line.split("|").map(cell => cell.trim()).filter(Boolean)
+        );
+        tables.push({ headers, rows });
+      }
+
+      if (tables.length > 0) {
+        try {
+          const { uploadFileToSlack } = await import("@/lib/ops/slack-file-upload");
+          const filename = /csv/i.test(message) ? "export.csv" : "export.xlsx";
+          const format = filename.endsWith(".xlsx") ? "xlsx" as const : "csv" as const;
+          const sheets = tables.map((t, i) => ({
+            sheetName: tables.length > 1 ? `Sheet${i + 1}` : undefined,
+            headers: t.headers,
+            rows: t.rows.map(r => r.map(cell => {
+              // Convert dollar amounts and numbers
+              const clean = cell.replace(/^\$/, "").replace(/,/g, "");
+              const num = Number(clean);
+              return !isNaN(num) && clean !== "" && !/[a-zA-Z]/.test(clean) ? num : cell;
+            })),
+          }));
+
+          const result = await uploadFileToSlack({
+            channelId: slackChannelId,
+            threadTs: slackThreadTs || undefined,
+            filename,
+            format,
+            data: sheets,
+            comment: "📊 Here's your export!",
+          });
+
+          if (result.ok) {
+            console.log(`[chat] Auto-generated file ${filename} → ${result.permalink}`);
+          } else {
+            console.warn(`[chat] Auto file generation failed: ${result.error}`);
+          }
+        } catch (err) {
+          console.warn("[chat] Auto file generation error:", err);
+        }
+      }
+    }
+
     const seenIds = new Set<string>();
     const uniqueSources = tieredResults.all.filter((row) => {
       const sourceKey =
