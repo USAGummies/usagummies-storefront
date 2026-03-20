@@ -18,6 +18,7 @@ import {
   getValidAccessToken,
   getRealmId,
   isQBOConnected,
+  forceRefreshTokens,
 } from "./qbo-auth";
 
 // ---------------------------------------------------------------------------
@@ -122,9 +123,13 @@ async function qboFetch<T>(
       signal: init?.signal ?? AbortSignal.timeout(30000),
     });
 
-    // Retry once on 401 (token may have just expired)
+    // Retry once on 401 — force a token refresh before retrying.
+    // qboFetch retries by calling getValidAccessToken() which only refreshes
+    // when expiresAt has passed. But Intuit can invalidate tokens early, so
+    // we must force a refresh regardless of what expiresAt says.
     if (res.status === 401 && !retried) {
-      console.log("[qbo] Got 401, retrying with fresh token...");
+      console.log("[qbo] Got 401, force-refreshing token before retry...");
+      await forceRefreshTokens();
       return qboFetch<T>(path, init, true);
     }
 

@@ -2863,8 +2863,8 @@ async function fetchDataForFileGeneration(
 
   // Call QBO API directly instead of going through internal HTTP routes
   // (Vercel serverless functions can't reliably self-reference due to concurrency limits)
-  const { getValidAccessToken, getRealmId } = await import("@/lib/ops/qbo-auth");
-  const accessToken = await getValidAccessToken();
+  const { getValidAccessToken, getRealmId, forceRefreshTokens } = await import("@/lib/ops/qbo-auth");
+  let accessToken = await getValidAccessToken();
   if (!accessToken) throw new Error("QBO not connected — no valid access token");
   const realmId = await getRealmId();
   if (!realmId) throw new Error("QBO not connected — no realm ID");
@@ -2874,10 +2874,22 @@ async function fetchDataForFileGeneration(
 
   async function qboQuery(query: string) {
     const url = `${qboBase}/v3/company/${realmId}/query?query=${encodeURIComponent(query)}&minorversion=73`;
-    const res = await fetch(url, {
+    let res = await fetch(url, {
       headers: { Accept: "application/json", Authorization: `Bearer ${accessToken}` },
       signal: AbortSignal.timeout(TIMEOUT),
     });
+    // Retry once on 401 — Intuit may have invalidated the token early
+    if (res.status === 401) {
+      console.log("[abra-actions] QBO 401 in file generation — force-refreshing token...");
+      const newToken = await forceRefreshTokens();
+      if (newToken) {
+        accessToken = newToken;
+        res = await fetch(url, {
+          headers: { Accept: "application/json", Authorization: `Bearer ${accessToken}` },
+          signal: AbortSignal.timeout(TIMEOUT),
+        });
+      }
+    }
     if (!res.ok) throw new Error(`QBO API returned ${res.status}`);
     return res.json();
   }
@@ -2979,8 +2991,11 @@ async function fetchDataForFileGeneration(
 }
 
 async function handleGenerateFile(params: Record<string, unknown>): Promise<ActionResult> {
-  console.log(`[handleGenerateFile] ENTRY — params keys: ${Object.keys(params).join(", ")}, channel_id=${params.channel_id || params.channelId || "NONE"}, hasHeaders=${Array.isArray(params.headers)}, hasRows=${Array.isArray(params.rows)}, hasSheets=${Array.isArray(params.sheets)}, source=${params.source || "none"}`);
-  const channelId = String(params.channel_id || params.channelId || "");
+  // Fall back to configured default Slack channel when the caller (e.g. web chat) has no channel context.
+  // Set ABRA_SLACK_CHANNEL_ID in Vercel env to a Slack channel ID (e.g. C01234567) for web-chat file uploads.
+  const DEFAULT_CHANNEL = (process.env.ABRA_SLACK_CHANNEL_ID || process.env.SLACK_OPS_CHANNEL_ID || "").trim();
+  const channelId = String(params.channel_id || params.channelId || DEFAULT_CHANNEL);
+  console.log(`[handleGenerateFile] ENTRY — params keys: ${Object.keys(params).join(", ")}, channel_id=${channelId || "NONE"}, hasHeaders=${Array.isArray(params.headers)}, hasRows=${Array.isArray(params.rows)}, hasSheets=${Array.isArray(params.sheets)}, source=${params.source || "none"}`);
   const threadTs = params.thread_ts ? String(params.thread_ts) : undefined;
   const filename = String(params.filename || "report.csv");
   const title = params.title ? String(params.title) : undefined;
@@ -2993,12 +3008,15 @@ async function handleGenerateFile(params: Record<string, unknown>): Promise<Acti
   if (source) {
     try {
       const fetchedSheets = await fetchDataForFileGeneration(source, params);
-      if (fetchedSheets.length > 0 && channelId) {
-        const result = await uploadFileToSlack({ channelId, threadTs, filename, title, comment, format, data: fetchedSheets });
-        if (!result.ok) return { success: false, message: `File upload failed: ${result.error}` };
-        return { success: true, message: `Uploaded ${filename} to Slack${result.permalink ? `: ${result.permalink}` : ""}`, data: { fileId: result.fileId, permalink: result.permalink } };
+      if (fetchedSheets.length === 0) {
+        return { success: false, message: `No data returned from source "${source}"` };
       }
-      return { success: false, message: `No data returned from source "${source}"` };
+      if (!channelId) {
+        return { success: false, message: `File data fetched from "${source}" but no Slack channel configured. Set ABRA_SLACK_CHANNEL_ID in Vercel env to enable file uploads from web chat.` };
+      }
+      const result = await uploadFileToSlack({ channelId, threadTs, filename, title, comment, format, data: fetchedSheets });
+      if (!result.ok) return { success: false, message: `File upload failed: ${result.error}` };
+      return { success: true, message: `Uploaded ${filename} to Slack${result.permalink ? `: ${result.permalink}` : ""}`, data: { fileId: result.fileId, permalink: result.permalink } };
     } catch (err) {
       return { success: false, message: `Source fetch failed: ${err instanceof Error ? err.message : String(err)}` };
     }
