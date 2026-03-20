@@ -1301,19 +1301,23 @@ export async function processAbraMessage(
     return { handled: false, reply: "", sources: [], answerLogId: null };
   }
 
-  if (/^correct:/i.test(text)) {
+  // Strip leading Slack user/bot mentions so "teach:" and "correct:" routing
+  // works even when the user @-mentions Abra first (e.g. "<@U1234> teach: ...").
+  const textForRouting = text.replace(/^(<@[A-Z0-9]+>\s*)+/gi, "").trim();
+
+  if (/^correct:/i.test(textForRouting)) {
     return {
       handled: true,
-      reply: await handleCorrection(ctx),
+      reply: await handleCorrection({ ...ctx, text: textForRouting }),
       sources: [],
       answerLogId: null,
     };
   }
 
-  if (/^teach:/i.test(text)) {
+  if (/^teach:/i.test(textForRouting)) {
     return {
       handled: true,
-      reply: await handleTeaching(ctx),
+      reply: await handleTeaching({ ...ctx, text: textForRouting }),
       sources: [],
       answerLogId: null,
     };

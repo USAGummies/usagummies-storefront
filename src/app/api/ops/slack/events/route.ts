@@ -245,11 +245,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  if (await isDuplicateEvent(body.event_id || "")) {
-    return NextResponse.json({ ok: true });
-  }
+  // Capture idempotency values before entering after() — the request object
+  // may not be readable inside the background callback.
+  const eventId = body.event_id || "";
+  const isRetry = Boolean(req.headers.get("x-slack-retry-num"));
 
+  // Return 200 IMMEDIATELY so Slack never times out and retries.
+  // All processing — including the dedup check — happens inside after().
   after(async () => {
+    // Slack retries carry x-slack-retry-num. Since we already returned 200 on
+    // the original request, skip retries to prevent double-processing.
+    if (isRetry) return;
+
+    // Deduplicate by event_id (KV-backed, 5-minute TTL).
+    if (await isDuplicateEvent(eventId)) return;
+
     try {
       const [displayName, history] = await Promise.all([
         getSlackDisplayName(user),

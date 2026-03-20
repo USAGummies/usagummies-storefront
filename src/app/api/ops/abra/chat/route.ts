@@ -912,11 +912,15 @@ export async function POST(req: Request) {
       const reportModel = await getPreferredClaudeModel(DEFAULT_CLAUDE_MODEL);
       const anthropicKey = process.env.ANTHROPIC_API_KEY || "";
 
-      // Fetch shared data in parallel — each is best-effort
+      // Fetch shared data in parallel — each is best-effort with a hard 10s timeout
+      // so slow/hanging external calls (Shopify, QBO) never eat into the LLM budget.
+      const dataTimeout = <T>(p: Promise<T>, fallback: T): Promise<T> =>
+        Promise.race([p, new Promise<T>((resolve) => setTimeout(() => resolve(fallback), 10_000))]);
+
       const [revenueResult, pipelineResult, signalsResult] = await Promise.allSettled([
-        getRevenueSnapshot("week").catch(() => null),
-        analyzePipeline().catch(() => null),
-        getActiveSignals({ limit: 10 }).catch(() => [] as Array<{ title: string; severity: string; department?: string | null }>),
+        dataTimeout(getRevenueSnapshot("week").catch(() => null), null),
+        dataTimeout(analyzePipeline().catch(() => null), null),
+        dataTimeout(getActiveSignals({ limit: 10 }).catch(() => [] as Array<{ title: string; severity: string; department?: string | null }>), [] as Array<{ title: string; severity: string; department?: string | null }>),
       ]);
 
       const revenue = revenueResult.status === "fulfilled" ? revenueResult.value : null;
