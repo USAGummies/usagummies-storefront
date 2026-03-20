@@ -920,6 +920,134 @@ function stripActionTags(value: string): string {
     .trim();
 }
 
+/**
+ * Returns true if the message is likely to take >5s to process (goes through
+ * the LLM call chain). Short/fast commands like correct: and teach: return false.
+ * Used to decide whether to post an immediate "thinking" acknowledgment.
+ */
+export function isLikelySlowQuery(text: string): boolean {
+  const t = text.trim();
+  if (!t) return false;
+  // Fast commands — handled synchronously without an LLM call
+  if (/^correct:/i.test(t)) return false;
+  if (/^teach:/i.test(t)) return false;
+  if (looksLikeChartOfAccounts(t)) return false;
+  // Very short messages (greetings, quick lookups) are still slow because they
+  // hit the LLM, but they're fast enough that a "thinking" indicator isn't worth
+  // the noise. 80 chars is roughly one sentence.
+  if (t.length < 80) return false;
+  return true;
+}
+
+/**
+ * Post an immediate "Working on it..." acknowledgment and return the message ts
+ * so it can later be updated via updateSlackMessage().
+ */
+export async function postSlackThinkingMessage(
+  channelId: string,
+  threadTs: string,
+): Promise<string | null> {
+  const botToken = process.env.SLACK_BOT_TOKEN;
+  if (!botToken || !channelId) return null;
+
+  try {
+    const res = await fetch("https://slack.com/api/chat.postMessage", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${botToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        channel: channelId,
+        thread_ts: threadTs,
+        text: "🧠 Abra: Working on it...",
+        blocks: [
+          {
+            type: "section",
+            text: { type: "mrkdwn", text: "🧠 *Abra* — Working on it..." },
+          },
+        ],
+      }),
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { ok?: boolean; ts?: string };
+    return data.ok && data.ts ? data.ts : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Update a previously-posted bot message (e.g. the thinking indicator) with
+ * the final reply. Uses chat.update — only works on messages posted by this bot.
+ */
+export async function updateSlackMessage(
+  channelId: string,
+  messageTs: string,
+  text: string,
+  opts: SlackPostOptions = {},
+): Promise<boolean> {
+  const botToken = process.env.SLACK_BOT_TOKEN;
+  if (!botToken || !channelId || !messageTs) return false;
+
+  const cleanText = stripActionTags(text);
+  const sourceText = formatSources(opts.sources || []);
+  const fullText = `🧠 *Abra*\n\n${cleanText}${sourceText}`;
+  const blocks = opts.blocks && opts.blocks.length > 0 ? opts.blocks : buildSlackBlocks(fullText);
+  if (opts.answerLogId) {
+    blocks.push(buildFeedbackBlock(opts.answerLogId));
+  }
+
+  try {
+    const res = await fetch("https://slack.com/api/chat.update", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${botToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        channel: channelId,
+        ts: messageTs,
+        text: `🧠 Abra: ${text.slice(0, 200)}`,
+        mrkdwn: true,
+        blocks,
+      }),
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!res.ok) return false;
+    const data = (await res.json()) as { ok?: boolean };
+    return Boolean(data.ok);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Delete a bot-posted message (used to clean up a thinking indicator when
+ * Abra decides not to respond to a given message).
+ */
+export async function deleteSlackMessage(
+  channelId: string,
+  messageTs: string,
+): Promise<void> {
+  const botToken = process.env.SLACK_BOT_TOKEN;
+  if (!botToken || !channelId || !messageTs) return;
+  try {
+    await fetch("https://slack.com/api/chat.delete", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${botToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ channel: channelId, ts: messageTs }),
+      signal: AbortSignal.timeout(8000),
+    });
+  } catch {
+    // Non-critical — if delete fails the thinking message just lingers
+  }
+}
+
 export async function postSlackMessage(
   channelId: string,
   text: string,
