@@ -1753,6 +1753,7 @@ export async function POST(req: Request) {
       const actionResult = await executeActions(claudeResult.reply, {
         slackChannelId: slackChannelId || undefined,
         slackThreadTs: slackThreadTs || undefined,
+        deadlineMs: Math.max(0, 40_000 - (Date.now() - startMs)), // leave 15s for response assembly
       });
       baseReply = actionResult.cleanReply;
       actionNotices.push(...actionResult.actionNotices);

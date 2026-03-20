@@ -29,16 +29,37 @@ export type ActionExecutionResult = {
  * Process all action directives found in the LLM reply.
  * Returns the cleaned reply (without <action> blocks), action notices, and read-only data.
  */
+/** Wrap a promise with a timeout — rejects with TimeoutError if not resolved in time */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`Timeout: ${label} exceeded ${ms}ms`)), ms);
+    promise.then(
+      (v) => { clearTimeout(timer); resolve(v); },
+      (e) => { clearTimeout(timer); reject(e); },
+    );
+  });
+}
+
+const PER_ACTION_TIMEOUT_MS = 12_000; // 12s per action to prevent chained timeouts
+
 export async function executeActions(
   reply: string,
-  ctx?: { slackChannelId?: string; slackThreadTs?: string },
+  ctx?: { slackChannelId?: string; slackThreadTs?: string; deadlineMs?: number },
 ): Promise<ActionExecutionResult> {
+  const execStart = Date.now();
   const parsedActions = parseActionDirectives(reply);
   const cleanReply = parsedActions.cleanReply || reply;
   const actionNotices: string[] = [];
   const readOnlyResults: string[] = [];
 
   for (const directive of parsedActions.actions.slice(0, 3)) {
+    // Check if we're running out of time (leave 10s for response assembly)
+    const elapsed = Date.now() - execStart;
+    if (ctx?.deadlineMs && elapsed > ctx.deadlineMs) {
+      console.warn(`[action-executor] Deadline exceeded (${elapsed}ms), skipping remaining ${parsedActions.actions.length} actions`);
+      actionNotices.push("⏱️ Skipped remaining actions — approaching timeout.");
+      break;
+    }
     try {
       // Handle calculate_deal inline — pure computation, no side effects
       if (directive.action.action_type === "calculate_deal") {
@@ -90,7 +111,11 @@ export async function executeActions(
       if (READ_ONLY_ACTIONS.has(directive.action.action_type)) {
         directive.action.risk_level = "low";
       }
-      const outcome = await proposeAndMaybeExecute(directive.action);
+      const outcome = await withTimeout(
+        proposeAndMaybeExecute(directive.action),
+        PER_ACTION_TIMEOUT_MS,
+        directive.action.action_type,
+      );
       if (outcome.auto_executed) {
         const isReadOnly = READ_ONLY_ACTIONS.has(directive.action.action_type);
         if (isReadOnly && outcome.result?.success && outcome.result.message) {
