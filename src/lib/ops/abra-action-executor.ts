@@ -136,9 +136,11 @@ export async function executeActions(
           if (isReadOnly) {
             console.warn(`[action-executor] Read-only action ${directive.action.action_type} went to notices: success=${outcome.result?.success}, hasMessage=${!!outcome.result?.message}, message=${outcome.result?.message?.slice(0, 100)}`);
           }
-          actionNotices.push(
-            `Done: auto-executed \`${directive.action.action_type}\` (${outcome.approval_id}).`,
-          );
+          // For file uploads and other actions with meaningful result messages, surface the message
+          const resultMsg = outcome.result?.success && outcome.result.message
+            ? outcome.result.message
+            : `Done: auto-executed \`${directive.action.action_type}\` (${outcome.approval_id}).`;
+          actionNotices.push(resultMsg);
         }
       } else {
         actionNotices.push(

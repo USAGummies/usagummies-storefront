@@ -4126,6 +4126,10 @@ EXAMPLES:
 • "adjust Shopify inventory for variant X by -12" → emit update_shopify_inventory
 • "create discount code LAUNCH20 for 20% off" → emit create_shopify_discount
 • "reconcile this month" → emit reconcile_transactions with period "month"
+• "export vendor list to Excel" → emit generate_file with filename="vendor_list.xlsx", source="qbo_vendors", risk_level="low"
+• "give me the chart of accounts as a spreadsheet" → emit generate_file with filename="chart_of_accounts.xlsx", source="qbo_accounts", risk_level="low"
+• "export P&L to XLSX" → emit generate_file with filename="pnl.xlsx", source="qbo_pnl", risk_level="low"
+• "create a spreadsheet with this data" → emit generate_file with filename="export.xlsx", headers=[...], rows=[...], risk_level="low"
 
 DATABASE KEYS for create_notion_page: meeting_notes, b2b_prospects, distributor_prospects, daily_performance, fleet_ops, inventory, sku_registry, cash_transactions, content_drafts, kpis, general
 
@@ -4135,9 +4139,20 @@ ACTION EXECUTION TIERS:
 • AUTO-EXECUTE (low-risk, commerce reads): query_qbo, query_shopify_orders, reconcile_transactions — auto-execute when emitted.
 • AUTO-EXECUTE (low-risk, operational data): log_production_run, record_vendor_quote — auto-execute when emitted.
 • AUTO-EXECUTE (stateless computation): run_scenario — computes hypotheticals. Auto-execute when emitted.
+• AUTO-EXECUTE (file generation): generate_file — auto-executes immediately. Use whenever the user asks for a spreadsheet, XLSX, CSV, or file export. ALWAYS use risk_level: "low". The file is uploaded directly to Slack — NEVER say you can't generate files.
 • AUTO-EXECUTE WITH CAPS (financial): record_transaction — auto-executes ONLY if amount ≤ $500.
 • AUTO-EXECUTE WITH CAPS (inventory): update_shopify_inventory — auto-executes ONLY if absolute adjustment ≤ 500.
 • ALWAYS QUEUED (requires human approval): send_email, send_slack, correct_claim, batch_categorize_qbo, create_qbo_invoice, create_shopify_discount — NEVER auto-execute.
+
+generate_file USAGE:
+• Server-side data sources (preferred — fetches live data automatically):
+  - source="qbo_vendors" → full vendor list from QuickBooks
+  - source="qbo_accounts" → chart of accounts from QuickBooks
+  - source="qbo_pnl" → profit & loss report from QuickBooks
+• Direct data (when you already have the data inline):
+  - headers=["Col1","Col2",...], rows=[["val1","val2",...],...]
+• Always set filename with .xlsx extension for Excel, .csv for CSV.
+• Example: emit generate_file with filename="vendor_list.xlsx", source="qbo_vendors", risk_level="low"
 
 ⚠️ ACTION SAFETY RULES:
 1. record_transaction — ONLY emit with amounts the USER explicitly stated. NEVER estimate amounts.
@@ -4147,7 +4162,8 @@ ACTION EXECUTION TIERS:
 5. create_brain_entry — Make titles factual and specific. NEVER store unverified dollar figures.
 6. create_qbo_invoice — ONLY emit with explicit quantities and unit prices. Never invent invoice totals.
 7. update_shopify_inventory — ONLY emit when the SKU/variant is explicit. Never guess which variant to adjust.
-8. GENERAL: If unsure whether to emit an action, DON'T. Ask the user first.`;
+8. generate_file — ALWAYS use risk_level: "low" and prefer source= parameter over inline data. NEVER say you can't generate files.
+9. GENERAL: If unsure whether to emit an action, DON'T. Ask the user first.`;
 }
 
 // ─── NAMED EXPORTS FOR TOOL_USE (route.ts executeToolCall) ──────────────
