@@ -79,6 +79,27 @@ type ProactiveMessageOptions = {
 const SLACK_BLOCK_TEXT_LIMIT = 3000;
 const DATA_INGEST_THRESHOLD = 3000;
 const STRUCTURED_DOC_TTL_SECONDS = 24 * 60 * 60;
+const PENDING_CORRECTION_TTL_SECONDS = 30 * 60; // 30 minutes
+
+// ─── Known user identity map ───
+const KNOWN_SLACK_USERS: Record<string, { name: string; role: string; calibration: string }> = {
+  U08JY86Q508: {
+    name: "Ben Stutman",
+    role: "Founder/CEO",
+    calibration: "Wants executive summaries, key decisions, and action items. Skip deep accounting detail unless asked.",
+  },
+  U0ALL27JM38: {
+    name: "Rene Gonzalez",
+    role: "Finance Lead/Bookkeeper",
+    calibration: "Wants accounting detail and transaction-level data. Include line items, account categories, and reconciliation info.",
+  },
+};
+
+function getActorContext(userId: string): string | null {
+  const known = KNOWN_SLACK_USERS[userId];
+  if (!known) return null;
+  return `CURRENT USER: ${known.name} (${known.role}). Calibration: ${known.calibration}`;
+}
 
 function monitoredChannelSet(): Set<string> {
   const raw = process.env.SLACK_MONITORED_CHANNELS || "";
@@ -736,6 +757,7 @@ async function callAbraChatViaInternalApi(
           history: ctx.history || [],
           channel: "slack",
           actor_label: ctx.displayName || ctx.user,
+          actor_context: getActorContext(ctx.user),
           thread_id: stableSlackThreadId(ctx.channel, ctx.threadTs || ctx.ts),
           slack_channel_id: ctx.channel,
           slack_thread_ts: ctx.threadTs || ctx.ts,
@@ -1174,6 +1196,95 @@ export async function findSlackUserByEmail(email: string): Promise<string | null
   }
 }
 
+// ─── Conversational correction detection ───
+
+type PendingCorrection = {
+  original: string;
+  correction: string;
+};
+
+function pendingCorrectionKey(ctx: SlackMessageContext): string {
+  return `abra:slack:pending-correction:${ctx.channel}:${rootSlackThreadTs(ctx)}`;
+}
+
+/**
+ * Returns true when the message looks like an implicit correction to something Abra said
+ * (rather than a new question or command). Requires ≥3 words or an explicit correction pattern.
+ */
+function isConversationalCorrectionPattern(text: string): boolean {
+  const t = text.trim();
+  if (t.split(/\s+/).length < 3) return false;
+
+  // "actually [something]"
+  if (/^actually[,\s]/i.test(t)) return true;
+  // "not X, it's Y" / "not X — it's Y"
+  if (/\bnot\s+.+[,—–]\s*(it'?s|its|they'?re|the)\b/i.test(t)) return true;
+  // "the $449 is for..." / "the $X was for..."
+  if (/\bthe\s+\$[\d,]+\s+(is|was|isn'?t|wasn'?t)\s+(for|actually|not)\b/i.test(t)) return true;
+  // "that's wrong — it's..." / "that's incorrect, it should be..."
+  if (/\bthat'?s\s+(wrong|incorrect)\b.{5,}/i.test(t)) return true;
+  // "no, [something]" (negation followed by correction content)
+  if (/^no[,—–]\s*.{5,}/i.test(t)) return true;
+  // "wrong, [something]"
+  if (/^wrong[,—–.]\s*.{5,}/i.test(t)) return true;
+  // "[something] is not [X], it's [Y]"
+  if (/\bis not\b.+[,—–]\s*(it'?s|the)\b/i.test(t)) return true;
+
+  return false;
+}
+
+/**
+ * Returns true when the message is a short confirmation of a pending action.
+ */
+function isConfirmationText(text: string): boolean {
+  const t = text.trim().toLowerCase().replace(/[!.?]+$/, "");
+  return /^(yes|yeah|yep|yup|sure|ok|okay|do it|remember that|save it|save that|correct|exactly|right|please|go ahead|please do)$/.test(t);
+}
+
+/**
+ * Persist a correction pair to both abra_corrections and open_brain_entries,
+ * identical to handleCorrection but with pre-parsed content.
+ */
+async function persistCorrectionPair(
+  msg: SlackMessageContext,
+  original: string,
+  correction: string,
+): Promise<string> {
+  const actor = msg.displayName || msg.user;
+  const embeddingText = `CORRECTION: ${original} -> ${correction}`;
+  const embedding = await buildEmbedding(embeddingText);
+
+  await sbFetch("/rest/v1/abra_corrections", {
+    method: "POST",
+    headers: { Prefer: "return=minimal", "Content-Type": "application/json" },
+    body: JSON.stringify({
+      corrected_by: actor,
+      original_claim: original.slice(0, 500),
+      correction: correction.slice(0, 500),
+      embedding,
+    }),
+  });
+  await sbFetch("/rest/v1/open_brain_entries", {
+    method: "POST",
+    headers: { Prefer: "return=minimal", "Content-Type": "application/json" },
+    body: JSON.stringify({
+      source_type: "manual",
+      source_ref: `slack-correction-${Date.now()}`,
+      entry_type: "correction",
+      title: `Correction: ${original.slice(0, 100)}`,
+      raw_text: `WRONG: ${original}\nCORRECT: ${correction}\nCorrected by: ${actor}`,
+      summary_text: correction.slice(0, 500),
+      category: "correction",
+      department: "executive",
+      confidence: "high",
+      priority: "critical",
+      processed: true,
+      embedding,
+    }),
+  });
+  return `Stored — I'll remember: "${correction.slice(0, 120)}"`;
+}
+
 export async function processAbraMessage(
   ctx: SlackMessageContext,
 ): Promise<SlackResponse> {
@@ -1206,6 +1317,42 @@ export async function processAbraMessage(
       sources: [],
       answerLogId: null,
     };
+  }
+
+  // ─── Conversational correction flow (thread replies only) ───
+  if (ctx.threadTs) {
+    const pendingKey = pendingCorrectionKey(ctx);
+    try {
+      const pending = await kv.get<PendingCorrection>(pendingKey);
+      if (pending && isConfirmationText(text)) {
+        // User confirmed — persist and clear
+        await kv.del(pendingKey);
+        const reply = await persistCorrectionPair(ctx, pending.original, pending.correction);
+        return { handled: true, reply, sources: [], answerLogId: null };
+      }
+    } catch {
+      // KV failure is non-critical; fall through to normal flow
+    }
+
+    if (isConversationalCorrectionPattern(text)) {
+      const lastAbraMessage =
+        ctx.history?.filter((m) => m.role === "assistant").pop()?.content || "";
+      const pendingData: PendingCorrection = {
+        original: lastAbraMessage.slice(0, 300) || "previous Abra statement",
+        correction: text,
+      };
+      try {
+        await kv.set(pendingKey, pendingData, { ex: PENDING_CORRECTION_TTL_SECONDS });
+      } catch {
+        // Non-critical
+      }
+      return {
+        handled: true,
+        reply: "Got it — want me to remember this correction?",
+        sources: [],
+        answerLogId: null,
+      };
+    }
   }
 
   const structuredDocResponse = await handleStructuredDocumentConversation(ctx);
