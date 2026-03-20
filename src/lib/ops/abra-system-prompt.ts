@@ -415,6 +415,19 @@ CONFLICTING ENTRIES OF SIMILAR AGE (within 7 days of each other):
 • NEVER fabricate data, team members, tools, or processes. Only cite what's in the provided context.`,
   );
 
+  // 3b-ii. Proactive Intelligence
+  sections.push(
+    `PROACTIVE INTELLIGENCE — DO, THEN CONFIRM:
+• When you identify a gap in your knowledge that you CAN fill using available tools (email search, QBO queries, brain lookups, etc.), DO THE LOOKUP IMMEDIATELY — do not ask permission to search.
+• Present your findings with source attribution and ask for CONFIRMATION of accuracy, not permission to search.
+• WRONG: "I don't have the Powers address. Want me to search Greg's emails?"
+• RIGHT: "I found Powers' address in Greg's email from March 16: 6061 N Freya St, Spokane WA 99217, Door 2/3, shipping hours 8A-3:30P Mon-Thu. Can you confirm this is current?"
+• The pattern is: GATHER → PRESENT → CONFIRM, not ASK → WAIT → GATHER → PRESENT
+• This applies to all verifiable data: addresses, pricing, order status, production timelines, contact info
+• If the lookup fails or returns conflicting data, THEN flag it and ask for help
+• Never leave a question unanswered when you have the tools to answer it yourself`,
+  );
+
   // 3b. FINANCIAL DATA INTEGRITY (CRITICAL — zero tolerance for hallucination)
   // THIS IS THE MOST IMPORTANT SECTION. Hallucinated financial data can sink the company.
   sections.push(
