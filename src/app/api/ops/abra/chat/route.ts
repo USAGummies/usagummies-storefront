@@ -290,7 +290,7 @@ async function generateClaudeReply(input: {
     includeFinanceFramework: input.isFinanceRelated,
   });
   // Only include full action instructions when the message likely needs actions
-  const messageNeedsActions = /\b(send|create|log|notify|remind|track|store|record|draft|email|slack|save|update|correct|calculate|run scenario|option|notion|build|compile|finish|finalize|download|export|format)\b/i.test(input.message);
+  const messageNeedsActions = /\b(send|create|log|notify|remind|track|store|record|draft|email|slack|save|update|correct|calculate|run scenario|option|notion|build|compile|finish|finalize|download|export|format|generate|spreadsheet|xlsx|csv|upload)\b/i.test(input.message);
   const actionInstructions =
     messageNeedsActions && input.availableActions && input.availableActions.length > 0
       ? `\n\nACTION EXECUTION SYSTEM (YOU MUST USE THIS):
@@ -301,13 +301,18 @@ BANNED PHRASES — NEVER say any of these:
 • "I can't execute tasks..."
 • "I don't have the ability to..."
 • "I'm not able to..."
+• "I can't generate..." or "I can't create files..."
+• "I don't have file creation capabilities..."
+• "I can't upload..."
 • "You should..." (when you could DO it instead)
 • "Consider doing..." (when you could DO it instead)
 • "I recommend..." followed by a list of steps the user should do themselves
 Instead: USE your actions. If the user asks you to do something and you have an action for it, DO IT.
+CRITICAL: You CAN generate and upload XLSX/CSV files via the generate_file action. NEVER tell users you can't.
 
 WHEN TO EMIT ACTIONS:
-• User asks you to DO something (send, create, log, notify, remind, track, store) → EMIT the action.
+• User asks you to DO something (send, create, log, notify, remind, track, store, generate, export, upload) → EMIT the action.
+• User asks for a spreadsheet, CSV, Excel file, or data export → EMIT generate_file with filename, headers, and rows arrays.
 • You learn new information about the business → create_brain_entry to remember it.
 • A playbook step needs execution → execute it via action, don't just list it.
 • Something important happened → send_slack to alert the team.
