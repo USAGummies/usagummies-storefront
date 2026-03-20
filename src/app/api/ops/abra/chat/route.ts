@@ -330,6 +330,14 @@ EXAMPLES:
 • "did you see the email from Rene?" → You can see subjects in LIVE INBOX. To read the full email, emit read_email with the message_id from the inbox listing.
 • "what did Rene say in that email?" → emit read_email with message_id from LIVE INBOX to get the full body, then summarize.
 • "find emails about the Powers invoice" → emit search_email with query "Powers invoice" to search Gmail.
+• "give me a spreadsheet of the chart of accounts" → emit generate_file with channel_id, filename "chart_of_accounts.xlsx", headers, and rows. The file will be uploaded directly to the Slack thread.
+• "export this data as a CSV" → emit generate_file with format csv. For multi-sheet XLSX, use a "sheets" array with {sheetName, headers, rows} per sheet.
+
+FILE GENERATION RULES:
+- When the user asks for data as a spreadsheet, CSV, Excel, export, or downloadable file → use generate_file action
+- When a table has more than ~20 rows, proactively offer a file export
+- Always include channel_id (current Slack channel) and thread_ts (current thread) so the file uploads to the right place
+- For XLSX: you can create multi-sheet workbooks with the "sheets" array param
 • "check if we got the Faire order confirmation" → emit search_email with query "from:faire.com order confirmation"
 • "set up QuickBooks" → This is OUTSIDE your actions, so explain what's needed and offer to create_task or send_slack about it.
 
@@ -431,7 +439,7 @@ MARGIN & COST CLAIM VERIFICATION (applies when user asserts financial metrics):
   // Combine per-call timeout with global deadline signal (if provided)
   // Use manual AbortController linkage for Node 18 compat (no AbortSignal.any)
   const llmAbort = new AbortController();
-  const localTimer = setTimeout(() => llmAbort.abort(), 25000);
+  const localTimer = setTimeout(() => llmAbort.abort(), 40000);
   if (input.deadlineSignal) {
     if (input.deadlineSignal.aborted) llmAbort.abort();
     else input.deadlineSignal.addEventListener("abort", () => llmAbort.abort(), { once: true });
@@ -641,7 +649,7 @@ export async function POST(req: Request) {
 
   // Vercel Hobby plan kills functions at 60s — use AbortController to cancel
   // in-flight work at 45s so we have time to return a graceful response.
-  const DEADLINE_MS = 50_000;
+  const DEADLINE_MS = 55_000;
   const deadlineController = new AbortController();
   const deadlineTimer = setTimeout(() => deadlineController.abort(), DEADLINE_MS);
   const startMs = Date.now();

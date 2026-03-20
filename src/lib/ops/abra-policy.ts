@@ -102,6 +102,13 @@ export const ACTION_POLICIES: Record<string, ActionPolicy> = {
     description: "Search Abra semantic brain (vector search) — read-only.",
   },
 
+  generate_file: {
+    tier: "auto_with_audit",
+    riskFloor: "low",
+    dailyLimit: 20,
+    description: "Generate and upload spreadsheet/CSV files to Slack channels.",
+  },
+
   query_shopify_orders: {
     tier: "direct",
     riskFloor: "low",

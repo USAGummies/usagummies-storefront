@@ -18,6 +18,7 @@ import {
   type ReconciliationPeriod,
 } from "@/lib/ops/revenue-reconciliation";
 import { runMonthlyClose } from "@/lib/finance/monthly-close";
+import { uploadFileToSlack, type SpreadsheetData } from "@/lib/ops/slack-file-upload";
 import {
   canDirectExec as policyCanDirectExec,
   canAutoExec as policyCanAutoExec,
@@ -2583,6 +2584,73 @@ async function handleReconcileTransactions(
   }
 }
 
+// ---------------------------------------------------------------------------
+// File Generation — Generate and upload spreadsheet/CSV files to Slack
+// ---------------------------------------------------------------------------
+
+async function handleGenerateFile(params: Record<string, unknown>): Promise<ActionResult> {
+  const channelId = String(params.channel_id || params.channelId || "");
+  const threadTs = params.thread_ts ? String(params.thread_ts) : undefined;
+  const filename = String(params.filename || "report.csv");
+  const title = params.title ? String(params.title) : undefined;
+  const comment = params.comment ? String(params.comment) : undefined;
+  const format = filename.endsWith(".xlsx") ? "xlsx" as const : "csv" as const;
+
+  // Parse sheet data — expects { headers: string[], rows: any[][] } or array of sheets
+  let sheets: SpreadsheetData[];
+  if (Array.isArray(params.sheets)) {
+    sheets = (params.sheets as Array<Record<string, unknown>>).map((s) => ({
+      sheetName: s.sheetName ? String(s.sheetName) : undefined,
+      headers: Array.isArray(s.headers) ? s.headers.map(String) : [],
+      rows: Array.isArray(s.rows)
+        ? (s.rows as unknown[][]).map((r) =>
+            Array.isArray(r) ? r.map((v) => (v == null ? null : typeof v === "number" || typeof v === "boolean" ? v : String(v))) : [],
+          )
+        : [],
+    }));
+  } else if (params.headers && Array.isArray(params.headers)) {
+    sheets = [{
+      sheetName: params.sheetName ? String(params.sheetName) : undefined,
+      headers: (params.headers as unknown[]).map(String),
+      rows: Array.isArray(params.rows)
+        ? (params.rows as unknown[][]).map((r) =>
+            Array.isArray(r) ? r.map((v) => (v == null ? null : typeof v === "number" || typeof v === "boolean" ? v : String(v))) : [],
+          )
+        : [],
+    }];
+  } else {
+    return { success: false, message: "generate_file requires 'headers' + 'rows' arrays, or a 'sheets' array." };
+  }
+
+  if (sheets.length === 0 || sheets[0].headers.length === 0) {
+    return { success: false, message: "No data provided for file generation." };
+  }
+
+  if (!channelId) {
+    return { success: false, message: "generate_file requires 'channel_id' to upload the file." };
+  }
+
+  const result = await uploadFileToSlack({
+    channelId,
+    threadTs,
+    filename,
+    title,
+    comment,
+    format,
+    data: sheets,
+  });
+
+  if (!result.ok) {
+    return { success: false, message: `File upload failed: ${result.error}` };
+  }
+
+  return {
+    success: true,
+    message: `Uploaded ${filename} to Slack${result.permalink ? `: ${result.permalink}` : ""}`,
+    data: { fileId: result.fileId, permalink: result.permalink },
+  };
+}
+
 const ACTION_HANDLERS: Record<
   string,
   (params: Record<string, unknown>) => Promise<ActionResult>
@@ -2617,6 +2685,7 @@ const ACTION_HANDLERS: Record<
   run_monthly_close: handleRunMonthlyClose,
   start_workflow: handleStartWorkflow,
   resume_workflow: handleResumeWorkflow,
+  generate_file: handleGenerateFile,
 };
 
 async function fetchApproval(approvalId: string): Promise<ApprovalRow | null> {
@@ -3504,7 +3573,7 @@ export function parseActionDirectives(reply: string): {
     "create_brain_entry", "create_task", "update_notion", "create_notion_page",
     "categorize_qbo_transaction", "batch_categorize_qbo", "create_qbo_invoice",
     "record_transaction", "log_production_run", "record_vendor_quote", "run_scenario",
-    "correct_claim", "update_shopify_inventory", "create_shopify_discount",
+    "correct_claim", "update_shopify_inventory", "create_shopify_discount", "generate_file",
   ]);
   const codeBlockPattern = /```(\w+)\n([\s\S]*?)```/g;
   let cbMatch: RegExpExecArray | null;
