@@ -145,6 +145,11 @@ _All corrections to Abra's claims. These always override brain entries._
 **WRONG:** Powers co-packing rate is $0.350/unit or unconfirmed
 **CORRECT:** Powers co-packing rate is $0.385/unit (confirmed from Greg Kroetch's latest PO, supersedes old $0.350 quote). Use this for all COGS calculations — never equivocate on this figure.
 ---
+
+### 2026-03-20 CORRECTION (canonical)
+**WRONG:** Albanese case price is $32.20/case
+**CORRECT:** Albanese case price is $39.20/case for SKU 50270 (20 lbs/case × $1.96/lb = $39.20). The $32.20 was an error on Bill Thurner's internal PO to Morgan. The correct rate is $1.96/lb, confirmed by the quoted bracket price and wire confirmation. The per-unit candy cost of ~$0.919/unit was already based on $1.96/lb and remains correct.
+---
 `,
 
   "teachings.md": `# Teachings
@@ -177,7 +182,13 @@ _Accumulated knowledge taught by the team via \`/abra teach:\`_
 - Notes: Invoice is per-pound; weight is finished product weight
 
 ## Albanese — Bulk Gummy Supplier
-- Product: Bulk dye-free gummy bears (All American variety)
+- SKU: 50270 (Five Natural Flavor Gummi Bears — All American variety)
+- Case price: $39.20/case (NOT $32.20 — that was an error on Bill Thurner's internal PO to Morgan)
+- Per-lb rate: $1.96/lb
+- Case weight: 20 lbs/case
+- MOQ / last order: 1,260 cases = 14 pallets = 25,200 lbs
+- Freight: $5,852.50 (14 pallets to Spokane, WA)
+- Contact: Bill Thurner — BillT@albaneseconfectionery.com — 248-866-1588
 - Status: Active primary ingredient supplier
 
 ## Belmark — Labels / Packaging
@@ -231,6 +242,12 @@ _Accumulated knowledge taught by the team via \`/abra teach:\`_
 ## Product Category
 - Confectionery (candy), NOT supplements
 - Dye-free positioning is the core differentiation
+
+## Candy Ingredient Cost (Albanese SKU 50270)
+- Rate: $1.96/lb → $39.20/case (20 lbs/case)
+- Per finished bag (7.5 oz = 0.46875 lbs): $1.96 × 0.46875 = **$0.919/unit** candy ingredient cost
+- Note: The $0.919/unit figure was always derived from $1.96/lb. The $32.20/case figure that appeared on Bill Thurner's internal PO was an error; the correct case price is $39.20. No change to per-unit cost calculations.
+- Full forward COGS: ~$1.522/unit (candy $0.919 + Powers repacking ~$0.180 + Belmark labels)
 `,
 };
 
