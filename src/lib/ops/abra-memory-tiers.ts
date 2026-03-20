@@ -344,11 +344,13 @@ function formatRow(row: TieredSearchRow): string {
       ? row.metadata.entry_type
       : "";
 
-  const isTeaching = entryType === "teaching" || entryType === "auto_teach";
+  // Only auto-scraped entries are external industry data.
+  // Manually-taught entries (entry_type === "teaching") are company facts — do NOT warn Claude away from them.
+  const isAutoTeach = entryType === "auto_teach";
 
   const header = [
     `[${tier}]`,
-    isTeaching ? "⚠️ INDUSTRY REFERENCE (not company data)" : "",
+    isAutoTeach ? "⚠️ INDUSTRY REFERENCE (not company data)" : "",
     `[${source}] ${title}`,
     `${daysAgo}d ago`,
     `sim: ${sim}`,

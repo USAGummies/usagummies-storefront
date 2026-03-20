@@ -313,6 +313,7 @@ async function handleTeaching(msg: SlackMessageContext): Promise<string> {
     }),
   });
 
+  console.log(`[abra-teach] ✅ Teaching persisted — dept: ${department}, title: "${title}", embedding dims: ${embedding.length}`);
   return `Stored teaching for ${department}: "${content.slice(0, 180)}"`;
 }
 

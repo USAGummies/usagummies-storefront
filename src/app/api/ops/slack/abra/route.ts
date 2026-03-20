@@ -673,11 +673,14 @@ async function handleTeachCommand(
       { timeoutMs: 12000, maxRetries: 1 },
     );
 
-    let embedding: number[] | null = null;
-    if (embedRes.ok) {
-      const embedData = await embedRes.json();
-      const vec = embedData?.data?.[0]?.embedding;
-      if (Array.isArray(vec)) embedding = vec;
+    if (!embedRes.ok) {
+      const errText = await embedRes.text().catch(() => "");
+      throw new Error(`Embedding failed (${embedRes.status}): ${errText.slice(0, 200)}`);
+    }
+    const embedData = await embedRes.json();
+    const embedding = embedData?.data?.[0]?.embedding;
+    if (!Array.isArray(embedding)) {
+      throw new Error("Embedding generation returned no vector — teaching not stored");
     }
 
     await sbFetch("/rest/v1/open_brain_entries", {
@@ -702,6 +705,7 @@ async function handleTeachCommand(
       }),
     });
 
+    console.log(`[abra-teach] ✅ Teaching persisted — dept: ${department || "executive"}, title: "${title}", embedding dims: ${embedding.length}`);
     return `✅ *Teaching stored${department ? ` in ${department}` : ""}.*\n\n_"${content.slice(0, 200)}"_\n\nAbra will use this in future answers.`;
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
