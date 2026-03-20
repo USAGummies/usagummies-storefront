@@ -2596,6 +2596,7 @@ async function handleReconcileTransactions(
 // ---------------------------------------------------------------------------
 
 async function handleGenerateFile(params: Record<string, unknown>): Promise<ActionResult> {
+  console.log(`[handleGenerateFile] ENTRY — params keys: ${Object.keys(params).join(", ")}, channel_id=${params.channel_id || params.channelId || "NONE"}, hasHeaders=${Array.isArray(params.headers)}, hasRows=${Array.isArray(params.rows)}, hasSheets=${Array.isArray(params.sheets)}`);
   const channelId = String(params.channel_id || params.channelId || "");
   const threadTs = params.thread_ts ? String(params.thread_ts) : undefined;
   const filename = String(params.filename || "report.csv");
@@ -3187,19 +3188,25 @@ export async function proposeAndMaybeExecute(action: AbraAction): Promise<{
           auto_executed: true,
           result,
         };
-      } catch {
+      } catch (err) {
+        console.error(`[proposeAndMaybeExecute] Tier 1 direct exec FAILED for ${action.action_type}:`, err);
         // Fall through to normal approval flow on error
       }
     }
   }
 
   // ── Tier 2: Auto-exec with audit — execute immediately, log to decision_log ──
-  if (policyCanAutoExec(action.action_type, action.risk_level as RiskLevel)) {
-    // Also check against the legacy DIRECT_EXEC_ACTIONS set for backward compat
-    const handler = ACTION_HANDLERS[action.action_type];
-    if (handler && !policyRequiresApproval(action.action_type, action.risk_level as RiskLevel, extractAmount(action.params))) {
+  const tier2Policy = policyCanAutoExec(action.action_type, action.risk_level as RiskLevel);
+  const tier2Handler = ACTION_HANDLERS[action.action_type];
+  const tier2NeedsApproval = policyRequiresApproval(action.action_type, action.risk_level as RiskLevel, extractAmount(action.params));
+  console.log(`[proposeAndMaybeExecute] Tier 2 check for ${action.action_type}: policyOk=${tier2Policy}, hasHandler=${!!tier2Handler}, requiresApproval=${tier2NeedsApproval}, risk=${action.risk_level}`);
+
+  if (tier2Policy) {
+    if (tier2Handler && !tier2NeedsApproval) {
       try {
-        const result = await handler(action.params || {});
+        console.log(`[proposeAndMaybeExecute] Tier 2 EXECUTING ${action.action_type} with params keys: ${Object.keys(action.params || {}).join(", ")}`);
+        const result = await tier2Handler(action.params || {});
+        console.log(`[proposeAndMaybeExecute] Tier 2 ${action.action_type} result: success=${result.success}, message=${result.message?.slice(0, 200)}`);
         if (result.success) {
           void emitPostActionEvent(action, result);
           void writeAutoExecBrainEntry(action, result);
@@ -3209,9 +3216,12 @@ export async function proposeAndMaybeExecute(action: AbraAction): Promise<{
           auto_executed: true,
           result,
         };
-      } catch {
+      } catch (err) {
+        console.error(`[proposeAndMaybeExecute] Tier 2 auto-exec FAILED for ${action.action_type}:`, err);
         // Fall through to approval flow on error
       }
+    } else {
+      console.warn(`[proposeAndMaybeExecute] Tier 2 policy passed but blocked: hasHandler=${!!tier2Handler}, requiresApproval=${tier2NeedsApproval}`);
     }
   }
 
