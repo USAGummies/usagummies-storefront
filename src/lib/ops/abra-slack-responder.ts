@@ -732,6 +732,8 @@ async function callAbraChatViaInternalApi(
           channel: "slack",
           actor_label: ctx.displayName || ctx.user,
           thread_id: stableSlackThreadId(ctx.channel, ctx.threadTs || ctx.ts),
+          slack_channel_id: ctx.channel,
+          slack_thread_ts: ctx.threadTs || ctx.ts,
         }),
       },
       55000, // Must exceed chat route's 50s internal deadline

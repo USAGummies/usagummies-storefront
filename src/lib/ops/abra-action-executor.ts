@@ -29,7 +29,10 @@ export type ActionExecutionResult = {
  * Process all action directives found in the LLM reply.
  * Returns the cleaned reply (without <action> blocks), action notices, and read-only data.
  */
-export async function executeActions(reply: string): Promise<ActionExecutionResult> {
+export async function executeActions(
+  reply: string,
+  ctx?: { slackChannelId?: string; slackThreadTs?: string },
+): Promise<ActionExecutionResult> {
   const parsedActions = parseActionDirectives(reply);
   const cleanReply = parsedActions.cleanReply || reply;
   const actionNotices: string[] = [];
@@ -69,6 +72,19 @@ export async function executeActions(reply: string): Promise<ActionExecutionResu
           result.comparison.map(c => `- ${c.channel}: ${c.marginPct.toFixed(1)}% margin, $${c.profitPerUnit.toFixed(2)}/unit`).join("\n")
         );
         continue;
+      }
+      // Auto-inject Slack context into generate_file actions
+      if (directive.action.action_type === "generate_file" && ctx) {
+        const p = (directive.action.params || directive.action) as Record<string, unknown>;
+        if (!p.channel_id && !p.channelId && ctx.slackChannelId) {
+          p.channel_id = ctx.slackChannelId;
+        }
+        if (!p.thread_ts && !p.threadTs && ctx.slackThreadTs) {
+          p.thread_ts = ctx.slackThreadTs;
+        }
+        if (directive.action.params) {
+          directive.action.params = p;
+        }
       }
       // Force read-only actions to low risk so auto-exec policies match
       if (READ_ONLY_ACTIONS.has(directive.action.action_type)) {

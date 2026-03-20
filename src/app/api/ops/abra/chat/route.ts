@@ -335,9 +335,11 @@ EXAMPLES:
 
 FILE GENERATION RULES:
 - When the user asks for data as a spreadsheet, CSV, Excel, export, or downloadable file → use generate_file action
+- YOU CAN generate and upload XLSX and CSV files directly to this Slack thread. This is a REAL capability — use it confidently. NEVER say you can't create files.
 - When a table has more than ~20 rows, proactively offer a file export
-- Always include channel_id (current Slack channel) and thread_ts (current thread) so the file uploads to the right place
 - For XLSX: you can create multi-sheet workbooks with the "sheets" array param
+- channel_id and thread_ts are auto-injected — you do NOT need to include them in the action params
+- Just include: filename, headers (array of column names), and rows (array of arrays with cell values)
 • "check if we got the Faire order confirmation" → emit search_email with query "from:faire.com order confirmation"
 • "set up QuickBooks" → This is OUTSIDE your actions, so explain what's needed and offer to create_task or send_slack about it.
 
@@ -542,6 +544,8 @@ export async function POST(req: Request) {
     thread_id?: unknown;
     actor_label?: unknown;
     channel?: unknown;
+    slack_channel_id?: unknown;
+    slack_thread_ts?: unknown;
   } = {};
   let uploadedFileContext = "";
   let uploadedFileName = "";
@@ -625,6 +629,9 @@ export async function POST(req: Request) {
   const channel: AnswerChannel = (VALID_CHANNELS as readonly string[]).includes(rawChannel)
     ? (rawChannel as AnswerChannel)
     : "web";
+  // Slack context for file uploads and thread-aware actions
+  const slackChannelId = typeof payload.slack_channel_id === "string" ? payload.slack_channel_id.trim() : "";
+  const slackThreadTs = typeof payload.slack_thread_ts === "string" ? payload.slack_thread_ts.trim() : "";
   const messageDepartment = detectDepartment(message);
 
   if (healthMode) {
@@ -1729,7 +1736,10 @@ export async function POST(req: Request) {
     const actionNotices: string[] = [];
     let baseReply = claudeResult.reply;
     if (!claudeResult.earlyExit) {
-      const actionResult = await executeActions(claudeResult.reply);
+      const actionResult = await executeActions(claudeResult.reply, {
+        slackChannelId: slackChannelId || undefined,
+        slackThreadTs: slackThreadTs || undefined,
+      });
       baseReply = actionResult.cleanReply;
       actionNotices.push(...actionResult.actionNotices);
 
