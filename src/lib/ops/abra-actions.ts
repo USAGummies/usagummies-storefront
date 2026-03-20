@@ -189,6 +189,13 @@ export const AUTO_EXEC_POLICIES: AutoExecPolicy[] = [
     enabled: true, // Read-only — queries QuickBooks Online
   },
   {
+    action_type: "qbo_setup_assessment",
+    max_risk_level: "low",
+    min_confidence: 0.5,
+    daily_limit: 10,
+    enabled: true, // Read-only — assesses QBO setup against USA Gummies supply chain and Form 1120 requirements
+  },
+  {
     action_type: "categorize_qbo_transaction",
     max_risk_level: "low",
     min_confidence: 0.85,
@@ -2198,12 +2205,263 @@ async function handleQueryQBO(params: Record<string, unknown>): Promise<ActionRe
           data,
         };
       }
+      case "cash_flow": {
+        const start = typeof params.start === "string" ? params.start : undefined;
+        const end = typeof params.end === "string" ? params.end : undefined;
+        const qs = [start ? `start=${start}` : "", end ? `end=${end}` : ""].filter(Boolean).join("&");
+        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=cash_flow${qs ? `&${qs}` : ""}`, { signal: AbortSignal.timeout(QBO_TIMEOUT_MS) });
+        if (!res.ok) return { success: false, message: `QBO cash flow report failed: ${res.status}` };
+        const data = (await res.json()) as { period: { start: string; end: string }; summary: Record<string, string | number> };
+        const entries = Object.entries(data.summary);
+        if (entries.length === 0) {
+          return { success: true, message: `Cash flow report (${data.period.start} to ${data.period.end}): No data found. QBO transactions may not be categorized yet.` };
+        }
+        const lines = entries.map(([k, v]) => `• ${k}: ${typeof v === "number" ? `$${v.toFixed(2)}` : v}`);
+        return {
+          success: true,
+          message: `Cash Flow Statement (${data.period.start} to ${data.period.end}):\n${lines.join("\n")}`,
+          data,
+        };
+      }
+      case "bills": {
+        const start = typeof params.start === "string" ? params.start : undefined;
+        const end = typeof params.end === "string" ? params.end : undefined;
+        const qs = [start ? `start=${start}` : "", end ? `end=${end}` : ""].filter(Boolean).join("&");
+        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=bills${qs ? `&${qs}` : ""}`, { signal: AbortSignal.timeout(QBO_TIMEOUT_MS) });
+        if (!res.ok) return { success: false, message: `QBO bills query failed: ${res.status}` };
+        const data = (await res.json()) as { count: number; bills: Array<{ Date: string; Amount: number; Balance: number; Vendor: string | null; DueDate: string | null; Status: string }> };
+        if (data.count === 0) return { success: true, message: "No bills found in QBO." };
+        const unpaid = data.bills.filter(b => b.Status === "unpaid");
+        const lines = data.bills.slice(0, 20).map(b => {
+          const vendor = b.Vendor || "Unknown vendor";
+          const due = b.DueDate ? ` (due ${b.DueDate})` : "";
+          const balance = b.Balance > 0 ? ` — $${b.Balance.toFixed(2)} outstanding` : " — paid";
+          return `• ${b.Date}: $${b.Amount.toFixed(2)} — ${vendor}${due}${balance}`;
+        });
+        return {
+          success: true,
+          message: `QBO Bills (${data.count} total, ${unpaid.length} unpaid):\n${lines.join("\n")}`,
+          data,
+        };
+      }
+      case "invoices": {
+        const start = typeof params.start === "string" ? params.start : undefined;
+        const end = typeof params.end === "string" ? params.end : undefined;
+        const qs = [start ? `start=${start}` : "", end ? `end=${end}` : ""].filter(Boolean).join("&");
+        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=invoices${qs ? `&${qs}` : ""}`, { signal: AbortSignal.timeout(QBO_TIMEOUT_MS) });
+        if (!res.ok) return { success: false, message: `QBO invoices query failed: ${res.status}` };
+        const data = (await res.json()) as { count: number; invoices: Array<{ Date: string; Amount: number; Balance: number; Customer: string | null; DocNumber: string | null; Status: string }> };
+        if (data.count === 0) return { success: true, message: "No invoices found in QBO." };
+        const outstanding = data.invoices.filter(i => i.Status === "outstanding");
+        const lines = data.invoices.slice(0, 20).map(inv => {
+          const customer = inv.Customer || "Unknown customer";
+          const doc = inv.DocNumber ? ` (#${inv.DocNumber})` : "";
+          const balance = inv.Balance > 0 ? ` — $${inv.Balance.toFixed(2)} outstanding` : " — paid";
+          return `• ${inv.Date}: $${inv.Amount.toFixed(2)} — ${customer}${doc}${balance}`;
+        });
+        return {
+          success: true,
+          message: `QBO Invoices (${data.count} total, ${outstanding.length} outstanding):\n${lines.join("\n")}`,
+          data,
+        };
+      }
+      case "customers": {
+        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=customers`, { signal: AbortSignal.timeout(QBO_TIMEOUT_MS) });
+        if (!res.ok) return { success: false, message: `QBO customers query failed: ${res.status}` };
+        const data = (await res.json()) as { count: number; customers: Array<{ Name: string; Balance: number; Active: boolean; Email: string | null; Phone: string | null }> };
+        if (data.count === 0) return { success: true, message: "No customers found in QBO." };
+        const active = data.customers.filter(c => c.Active);
+        const withBalance = active.filter(c => c.Balance > 0);
+        const lines = withBalance.slice(0, 20).map(c => {
+          const contact = [c.Email, c.Phone].filter(Boolean).join(", ");
+          return `• ${c.Name}: $${c.Balance.toFixed(2)} balance${contact ? ` — ${contact}` : ""}`;
+        });
+        const noBalance = active.filter(c => c.Balance === 0);
+        return {
+          success: true,
+          message: `QBO Customers (${active.length} active):\n${lines.join("\n") || "(none with outstanding balance)"}${noBalance.length ? `\n\n${noBalance.length} additional customers with $0 balance.` : ""}`,
+          data,
+        };
+      }
+      case "metrics": {
+        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=metrics`, { signal: AbortSignal.timeout(QBO_TIMEOUT_MS) });
+        if (!res.ok) return { success: false, message: `QBO metrics query failed: ${res.status}` };
+        const data = (await res.json()) as {
+          cashPosition: number; burnRate: number; runway: number | null;
+          accountsReceivable: number; accountsPayable: number;
+          netIncome: number; totalRevenue: number; totalExpenses: number;
+          asOfDate: string; period: { start: string; end: string };
+        };
+        const runwayStr = data.runway != null ? `${data.runway} months` : "N/A (no expenses recorded)";
+        return {
+          success: true,
+          message: [
+            `QBO Financial Metrics (as of ${data.asOfDate}):`,
+            `• Cash position: $${data.cashPosition.toFixed(2)}`,
+            `• 30-day revenue: $${data.totalRevenue.toFixed(2)}`,
+            `• 30-day expenses: $${data.totalExpenses.toFixed(2)}`,
+            `• Net income (30d): $${data.netIncome.toFixed(2)}`,
+            `• Accounts receivable: $${data.accountsReceivable.toFixed(2)}`,
+            `• Accounts payable: $${data.accountsPayable.toFixed(2)}`,
+            `• Monthly burn rate: $${data.burnRate.toFixed(2)}`,
+            `• Runway: ${runwayStr}`,
+          ].join("\n"),
+          data,
+        };
+      }
       default:
-        return { success: false, message: `Unknown query_type: ${queryType}. Use: accounts, categorization_rules, categorize, vendors, pnl, balance_sheet, purchases` };
+        return { success: false, message: `Unknown query_type: ${queryType}. Use: accounts, categorization_rules, categorize, vendors, pnl, balance_sheet, purchases, cash_flow, bills, invoices, customers, metrics` };
     }
   } catch (err) {
     void capMarkFailure("qbo", err instanceof Error ? err.message : "query failed").catch(() => {});
     return { success: false, message: `QBO query error: ${err instanceof Error ? err.message : String(err)}` };
+  }
+}
+
+// Known USA Gummies supply chain vendors and sales channels for setup assessment
+const USA_GUMMIES_KNOWN_VENDORS = [
+  { name: "Albanese", aliases: ["albanese confectionery", "albanese candy"], category: "Candy Supplier" },
+  { name: "Belmark", aliases: ["belmark", "ninjaprinthouse", "ninja print house"], category: "Packaging" },
+  { name: "Powers Confections", aliases: ["powers confections", "powers"], category: "Co-Packer" },
+  { name: "PirateShip", aliases: ["pirateship", "pirate ship"], category: "Shipping" },
+  { name: "Shopify", aliases: ["shopify"], category: "Sales Channel" },
+  { name: "Amazon", aliases: ["amazon.com", "amazon seller", "amazon services"], category: "Sales Channel" },
+  { name: "Faire", aliases: ["faire", "faire wholesale"], category: "Sales Channel" },
+];
+
+// Chart of accounts keywords required for C-Corp Form 1120 filing
+const REQUIRED_1120_ACCOUNT_KEYWORDS: Record<string, string[]> = {
+  "Sales - Shopify (DTC revenue)": ["shopify", "dtc"],
+  "Sales - Amazon (marketplace)": ["amazon"],
+  "Sales - Wholesale / Faire": ["wholesale", "faire", "distributor"],
+  "COGS - Raw Materials (candy)": ["raw material", "candy", "albanese"],
+  "COGS - Packaging": ["packaging", "belmark", "label"],
+  "COGS - Co-Packing": ["co-pack", "copacking", "powers"],
+  "COGS - Fulfillment / Shipping": ["fulfillment", "shipping", "pirate"],
+  "Advertising & Marketing": ["advertising", "marketing", "ads"],
+  "Platform Fees": ["platform fee", "marketplace fee", "selling fee"],
+  "Owner Compensation": ["compensation", "salary", "wages", "payroll", "owner draw"],
+};
+
+/**
+ * qbo_setup_assessment — Pull chart of accounts, vendors, and uncategorized transactions.
+ * Compare against USA Gummies supply chain and identify gaps for C-Corp Form 1120 filing.
+ */
+async function handleQBOSetupAssessment(_params: Record<string, unknown>): Promise<ActionResult> {
+  const baseUrl = getInternalOpsBaseUrl();
+  const cronSecret = (process.env.CRON_SECRET || "").trim();
+  const QBO_TIMEOUT_MS = 20_000;
+
+  try {
+    // Fetch accounts, vendors, and uncategorized transaction preview in parallel
+    const [accountsRes, vendorsRes, uncatRes] = await Promise.allSettled([
+      fetch(`${baseUrl}/api/ops/qbo/accounts`, { signal: AbortSignal.timeout(QBO_TIMEOUT_MS) }),
+      fetch(`${baseUrl}/api/ops/qbo/query?type=vendors`, { signal: AbortSignal.timeout(QBO_TIMEOUT_MS) }),
+      fetch(`${baseUrl}/api/ops/qbo/categorize-batch`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${cronSecret}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "preview" }),
+        signal: AbortSignal.timeout(QBO_TIMEOUT_MS),
+      }),
+    ]);
+
+    let accounts: Array<{ Name: string; AccountType: string }> = [];
+    if (accountsRes.status === "fulfilled" && accountsRes.value.ok) {
+      const d = (await accountsRes.value.json()) as { accounts: typeof accounts };
+      accounts = d.accounts || [];
+    }
+
+    let qboVendors: Array<{ Name: string; Active: boolean }> = [];
+    if (vendorsRes.status === "fulfilled" && vendorsRes.value.ok) {
+      const d = (await vendorsRes.value.json()) as { vendors: typeof qboVendors };
+      qboVendors = (d.vendors || []).filter(v => v.Active);
+    }
+
+    let uncategorized = 0, needsReview = 0;
+    if (uncatRes.status === "fulfilled" && uncatRes.value.ok) {
+      const d = (await uncatRes.value.json()) as { total: number; needsReview: number };
+      uncategorized = d.total || 0;
+      needsReview = d.needsReview || 0;
+    }
+
+    // --- Check 1: Missing vendors ---
+    const vendorNamesLower = qboVendors.map(v => v.Name.toLowerCase());
+    const missingVendors: string[] = [];
+    for (const kv of USA_GUMMIES_KNOWN_VENDORS) {
+      const found = vendorNamesLower.some(qn => kv.aliases.some(alias => qn.includes(alias)));
+      if (!found) missingVendors.push(`${kv.name} (${kv.category})`);
+    }
+
+    // --- Check 2: Missing Form 1120 accounts ---
+    const accountNamesLower = accounts.map(a => a.Name.toLowerCase());
+    const missingAccounts: string[] = [];
+    for (const [reqName, keywords] of Object.entries(REQUIRED_1120_ACCOUNT_KEYWORDS)) {
+      const found = accountNamesLower.some(n => keywords.some(kw => n.includes(kw)));
+      if (!found) missingAccounts.push(reqName);
+    }
+
+    // --- Health score ---
+    const vendorScore = Math.round(
+      ((USA_GUMMIES_KNOWN_VENDORS.length - missingVendors.length) / USA_GUMMIES_KNOWN_VENDORS.length) * 100,
+    );
+    const accountScore = Math.round(
+      ((Object.keys(REQUIRED_1120_ACCOUNT_KEYWORDS).length - missingAccounts.length) / Object.keys(REQUIRED_1120_ACCOUNT_KEYWORDS).length) * 100,
+    );
+
+    // --- Build priorities ---
+    const priorities: string[] = [];
+    if (missingVendors.length > 0) {
+      priorities.push(`Add ${missingVendors.length} missing vendor(s) in QBO: ${missingVendors.join(", ")}`);
+    }
+    if (missingAccounts.length > 0) {
+      const preview = missingAccounts.slice(0, 3).join(", ");
+      priorities.push(`Create ${missingAccounts.length} missing account(s) for Form 1120: ${preview}${missingAccounts.length > 3 ? ", ..." : ""}`);
+    }
+    if (needsReview > 0) {
+      priorities.push(`Manually review ${needsReview} uncategorized transaction(s) that didn't match any rule`);
+    }
+
+    const vendorLine = missingVendors.length === 0
+      ? `✓ All ${USA_GUMMIES_KNOWN_VENDORS.length} key vendors present`
+      : `Missing: ${missingVendors.join(", ")}`;
+    const accountLine = missingAccounts.length === 0
+      ? `✓ All ${Object.keys(REQUIRED_1120_ACCOUNT_KEYWORDS).length} required accounts found`
+      : `Missing: ${missingAccounts.join("; ")}`;
+
+    const message = [
+      `QBO Setup Assessment`,
+      ``,
+      `Vendor coverage: ${USA_GUMMIES_KNOWN_VENDORS.length - missingVendors.length}/${USA_GUMMIES_KNOWN_VENDORS.length} known vendors in QBO (${vendorScore}%)`,
+      vendorLine,
+      ``,
+      `Form 1120 accounts: ${Object.keys(REQUIRED_1120_ACCOUNT_KEYWORDS).length - missingAccounts.length}/${Object.keys(REQUIRED_1120_ACCOUNT_KEYWORDS).length} required accounts found (${accountScore}%)`,
+      accountLine,
+      ``,
+      `Uncategorized transactions: ${uncategorized} total (${needsReview} need manual review)`,
+      ``,
+      priorities.length > 0
+        ? `Priorities:\n${priorities.map((p, i) => `${i + 1}. ${p}`).join("\n")}`
+        : `No critical gaps found. QBO is well-configured for C-Corp filing.`,
+    ].join("\n");
+
+    return {
+      success: true,
+      message,
+      data: {
+        vendorScore,
+        accountScore,
+        missingVendors,
+        missingAccounts,
+        uncategorizedTransactions: uncategorized,
+        needsManualReview: needsReview,
+        qboVendorCount: qboVendors.length,
+        qboAccountCount: accounts.length,
+        priorities,
+      },
+    };
+  } catch (err) {
+    void capMarkFailure("qbo", err instanceof Error ? err.message : "setup assessment failed").catch(() => {});
+    return { success: false, message: `QBO setup assessment error: ${err instanceof Error ? err.message : String(err)}` };
   }
 }
 
@@ -2823,6 +3081,7 @@ const ACTION_HANDLERS: Record<
   read_email: handleReadEmail,
   search_email: handleSearchEmail,
   query_qbo: handleQueryQBO,
+  qbo_setup_assessment: handleQBOSetupAssessment,
   categorize_qbo_transaction: handleCategorizeQBOTransaction,
   batch_categorize_qbo: handleBatchCategorizeQBO,
   create_qbo_invoice: handleCreateQBOInvoice,
@@ -3603,6 +3862,7 @@ export const KNOWN_ACTION_TYPES = new Set([
   "search_email",
   "draft_email_reply",
   "query_qbo",
+  "qbo_setup_assessment",
   "categorize_qbo_transaction",
   "batch_categorize_qbo",
   "create_qbo_invoice",

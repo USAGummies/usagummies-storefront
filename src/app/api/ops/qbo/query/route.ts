@@ -205,10 +205,162 @@ export async function GET(req: NextRequest) {
         });
       }
 
+      // ── Cash Flow Statement ──
+      case "cash_flow": {
+        const startDate = req.nextUrl.searchParams.get("start") || getYTDStart();
+        const endDate = req.nextUrl.searchParams.get("end") || todayISO();
+        const res = await qboGet(
+          realmId,
+          accessToken,
+          `/reports/CashFlow?start_date=${startDate}&end_date=${endDate}&minorversion=73`,
+        );
+        if (!res.ok) {
+          return NextResponse.json(
+            { error: "Cash flow report failed", detail: res.data },
+            { status: res.status },
+          );
+        }
+        const summary = extractReportSummary(res.data as Record<string, unknown>);
+        return NextResponse.json({
+          type: "cash_flow",
+          period: { start: startDate, end: endDate },
+          summary,
+          raw: res.data,
+        });
+      }
+
+      // ── Bills ──
+      case "bills": {
+        const startDate = req.nextUrl.searchParams.get("start");
+        const endDate = req.nextUrl.searchParams.get("end");
+        const conditions: string[] = [];
+        if (startDate) conditions.push(`TxnDate >= '${startDate}'`);
+        if (endDate) conditions.push(`TxnDate <= '${endDate}'`);
+        const whereClause = conditions.length ? ` WHERE ${conditions.join(" AND ")}` : "";
+        const result = await qboQuery<{
+          QueryResponse?: {
+            Bill?: Array<{
+              Id: string;
+              TxnDate?: string;
+              DueDate?: string;
+              TotalAmt?: number;
+              Balance?: number;
+              VendorRef?: { name?: string };
+            }>;
+          };
+        }>(realmId, accessToken, `SELECT * FROM Bill${whereClause} ORDERBY TxnDate DESC MAXRESULTS 100`);
+        const bills = (result?.QueryResponse?.Bill || []).map((b) => ({
+          Id: b.Id,
+          Date: b.TxnDate,
+          DueDate: b.DueDate || null,
+          Amount: b.TotalAmt || 0,
+          Balance: b.Balance || 0,
+          Vendor: b.VendorRef?.name || null,
+          Status: (b.Balance || 0) > 0 ? "unpaid" : "paid",
+        }));
+        return NextResponse.json({ type: "bills", count: bills.length, bills });
+      }
+
+      // ── Invoices ──
+      case "invoices": {
+        const startDate = req.nextUrl.searchParams.get("start");
+        const endDate = req.nextUrl.searchParams.get("end");
+        const conditions: string[] = [];
+        if (startDate) conditions.push(`TxnDate >= '${startDate}'`);
+        if (endDate) conditions.push(`TxnDate <= '${endDate}'`);
+        const whereClause = conditions.length ? ` WHERE ${conditions.join(" AND ")}` : "";
+        const result = await qboQuery<{
+          QueryResponse?: {
+            Invoice?: Array<{
+              Id: string;
+              TxnDate?: string;
+              DueDate?: string;
+              TotalAmt?: number;
+              Balance?: number;
+              CustomerRef?: { name?: string };
+              DocNumber?: string;
+            }>;
+          };
+        }>(realmId, accessToken, `SELECT * FROM Invoice${whereClause} ORDERBY TxnDate DESC MAXRESULTS 100`);
+        const invoices = (result?.QueryResponse?.Invoice || []).map((inv) => ({
+          Id: inv.Id,
+          Date: inv.TxnDate,
+          DueDate: inv.DueDate || null,
+          Amount: inv.TotalAmt || 0,
+          Balance: inv.Balance || 0,
+          Customer: inv.CustomerRef?.name || null,
+          DocNumber: inv.DocNumber || null,
+          Status: (inv.Balance || 0) > 0 ? "outstanding" : "paid",
+        }));
+        return NextResponse.json({ type: "invoices", count: invoices.length, invoices });
+      }
+
+      // ── Customers ──
+      case "customers": {
+        const result = await qboQuery<{
+          QueryResponse?: {
+            Customer?: Array<{
+              Id: string;
+              DisplayName?: string;
+              CompanyName?: string;
+              Balance?: number;
+              Active?: boolean;
+              PrimaryEmailAddr?: { Address?: string };
+              PrimaryPhone?: { FreeFormNumber?: string };
+            }>;
+          };
+        }>(realmId, accessToken, "SELECT * FROM Customer ORDERBY DisplayName MAXRESULTS 200");
+        const customers = (result?.QueryResponse?.Customer || []).map((c) => ({
+          Id: c.Id,
+          Name: c.DisplayName || c.CompanyName || "(unnamed)",
+          Balance: c.Balance || 0,
+          Active: c.Active !== false,
+          Email: c.PrimaryEmailAddr?.Address || null,
+          Phone: c.PrimaryPhone?.FreeFormNumber || null,
+        }));
+        return NextResponse.json({ type: "customers", count: customers.length, customers });
+      }
+
+      // ── Composite Metrics ──
+      case "metrics": {
+        const today = todayISO();
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+          .toISOString()
+          .split("T")[0];
+        const [pnlRes, bsRes] = await Promise.all([
+          qboGet(realmId, accessToken, `/reports/ProfitAndLoss?start_date=${thirtyDaysAgo}&end_date=${today}&minorversion=73`),
+          qboGet(realmId, accessToken, `/reports/BalanceSheet?date_macro=Today&minorversion=73`),
+        ]);
+        const pnlSummary = pnlRes.ok ? extractReportSummary(pnlRes.data as Record<string, unknown>) : {};
+        const bsSummary = bsRes.ok ? extractReportSummary(bsRes.data as Record<string, unknown>) : {};
+        const totalRevenue = (pnlSummary["Total Income"] as number) || 0;
+        const totalExpenses = (pnlSummary["Total Expenses"] as number) || 0;
+        const netIncome = (pnlSummary["Net Income"] as number) || (totalRevenue - totalExpenses);
+        const cashPosition = (bsSummary["Bank Accounts"] as number) || (bsSummary["Bank"] as number) || 0;
+        const accountsReceivable = (bsSummary["Accounts Receivable"] as number) || 0;
+        const accountsPayable = (bsSummary["Accounts Payable"] as number) || 0;
+        const burnRate = totalExpenses;
+        const runway = burnRate > 0 ? Math.round((cashPosition / burnRate) * 10) / 10 : null;
+        return NextResponse.json({
+          type: "metrics",
+          period: { start: thirtyDaysAgo, end: today },
+          cashPosition,
+          burnRate,
+          runway,
+          accountsReceivable,
+          accountsPayable,
+          netIncome,
+          totalRevenue,
+          totalExpenses,
+          currency: "USD",
+          asOfDate: today,
+        });
+      }
+
       default:
         return NextResponse.json(
           {
-            error: `Unknown type: ${queryType}. Use: vendors, pnl, balance_sheet, purchases`,
+            error: `Unknown type: ${queryType}. Use: vendors, pnl, balance_sheet, purchases, cash_flow, bills, invoices, customers, metrics`,
           },
           { status: 400 },
         );
