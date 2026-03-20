@@ -339,10 +339,18 @@ EXAMPLES:
 • "give me a spreadsheet of the chart of accounts" → emit generate_file with channel_id, filename "chart_of_accounts.xlsx", headers, and rows. The file will be uploaded directly to the Slack thread.
 • "export this data as a CSV" → emit generate_file with format csv. For multi-sheet XLSX, use a "sheets" array with {sheetName, headers, rows} per sheet.
 
-FILE GENERATION RULES (CRITICAL — you HAVE this capability):
-⚠️ You CAN create and upload XLSX and CSV files. The system handles file creation and Slack upload automatically when you emit a generate_file action. This is NOT a hypothetical — it is a working, deployed feature. When a user asks for a file/spreadsheet/export, you MUST emit the action. NEVER say "I can't create files" — that is FALSE.
-- When the user asks for data as a spreadsheet, CSV, Excel, export, or downloadable file → emit generate_file action
-- When a table has more than ~20 rows, proactively offer a file export
+FILE GENERATION RULES (ABSOLUTE REQUIREMENT):
+⚠️ You CAN and MUST create XLSX/CSV files. The system handles file creation and Slack upload automatically.
+FORBIDDEN RESPONSES (these are LIES — you DO have this capability):
+- "I cannot generate or export an actual .xlsx file"
+- "I don't have file-generation capability from this interface"
+- "What I can do is give you the data below, which you can paste into Excel"
+- Any variation of telling users to export from QBO/Notion/etc. themselves
+INSTEAD: Always emit the generate_file action with the data you have. Even partial data is better than no file.
+RULES:
+- When the user asks for data as a spreadsheet/CSV/Excel/export/file → ALWAYS emit generate_file action
+- Include ALL data rows you have — even if some show $0 or are incomplete
+- When a table has more than ~10 rows, proactively offer a file export
 - For XLSX: you can create multi-sheet workbooks with the "sheets" array param
 - channel_id and thread_ts are auto-injected — do NOT include them
 - Just emit: {"action_type":"generate_file","params":{"filename":"name.xlsx","headers":["Col1","Col2"],"rows":[["val1","val2"]]}}
@@ -1778,8 +1786,13 @@ export async function POST(req: Request) {
       }
     }
 
-    // Safety: always strip any remaining <action> tags before returning to the user
-    const strippedReply = baseReply.replace(/<action>\s*[\s\S]*?\s*<\/action>/gi, "").trim();
+    // Safety: always strip any remaining <action>, <tool_call>, or code-fenced action tags before returning to the user
+    const strippedReply = baseReply
+      .replace(/<action>\s*[\s\S]*?\s*<\/action>/gi, "")
+      .replace(/<tool_call>\s*[\s\S]*?\s*<\/tool_call>/gi, "")
+      .replace(/<tool>\s*[\s\S]*?\s*<\/tool>/gi, "")
+      .replace(/<function_call>\s*[\s\S]*?\s*<\/function_call>/gi, "")
+      .trim();
     const reply = [
       strippedReply,
       actionNotices.length > 0 ? actionNotices.join("\n") : "",
@@ -1788,21 +1801,24 @@ export async function POST(req: Request) {
       .join("\n\n");
 
     // ── Auto-generate file if user asked for export and Abra didn't emit the action ──
-    const wantsFile = /\b(spreadsheet|xlsx|csv|excel|export|download)\b/i.test(message);
+    const wantsFile = /\b(spreadsheet|xlsx|csv|excel|export|download|file)\b/i.test(message);
+    // Also detect Claude refusing to generate files (training bias override)
+    const claudeRefusedFile = /\b(cannot generate|can't generate|don't have file|cannot create|can't create files|cannot export|can't export)\b/i.test(strippedReply);
     // Check if the action executor already handled generate_file
     // Only skip fallback if the action was actually executed (not just queued for approval)
     const fileActionHandled = actionNotices.some(n => n.includes("generate_file") && n.includes("auto-executed"));
-    console.log(`[chat] File auto-gen check: channel=${channel}, slackChannelId=${slackChannelId || "(empty)"}, wantsFile=${wantsFile}, fileActionHandled=${fileActionHandled}`);
+    console.log(`[chat] File auto-gen check: channel=${channel}, slackChannelId=${slackChannelId || "(empty)"}, wantsFile=${wantsFile}, fileActionHandled=${fileActionHandled}, claudeRefusedFile=${claudeRefusedFile}, replyLen=${strippedReply.length}`);
     if (
-      wantsFile &&
+      (wantsFile || claudeRefusedFile) &&
       !fileActionHandled &&
       (slackChannelId || channel === "slack")
     ) {
-      // Extract markdown tables from the reply
+      // Extract markdown tables from the reply (use strippedReply which has the actual content)
+      const replyText = strippedReply || baseReply;
       const tableRegex = /\|(.+)\|\n\|[-| :]+\|\n((?:\|.+\|\n?)+)/g;
       const tables: Array<{ headers: string[]; rows: string[][] }> = [];
       let tableMatch;
-      while ((tableMatch = tableRegex.exec(baseReply)) !== null) {
+      while ((tableMatch = tableRegex.exec(replyText)) !== null) {
         const headerLine = tableMatch[1];
         const bodyLines = tableMatch[2].trim().split("\n");
         const headers = headerLine.split("|").map(h => h.trim()).filter(Boolean);
@@ -1814,6 +1830,8 @@ export async function POST(req: Request) {
         tables.push({ headers, rows });
       }
 
+      console.log(`[chat] File fallback: found ${tables.length} tables in reply (${replyText.length} chars)`);
+
       if (tables.length > 0) {
         try {
           const { uploadFileToSlack } = await import("@/lib/ops/slack-file-upload");
@@ -1823,20 +1841,22 @@ export async function POST(req: Request) {
             sheetName: tables.length > 1 ? `Sheet${i + 1}` : undefined,
             headers: t.headers,
             rows: t.rows.map(r => r.map(cell => {
-              // Convert dollar amounts and numbers
-              const clean = cell.replace(/^\$/, "").replace(/,/g, "");
+              // Convert dollar amounts and numbers — strip markdown bold/italic
+              const stripped = cell.replace(/\*+/g, "").replace(/_+/g, "").trim();
+              const clean = stripped.replace(/^\$/, "").replace(/,/g, "");
               const num = Number(clean);
-              return !isNaN(num) && clean !== "" && !/[a-zA-Z]/.test(clean) ? num : cell;
+              return !isNaN(num) && clean !== "" && !/[a-zA-Z]/.test(clean) ? num : stripped;
             })),
           }));
 
+          const targetChannel = slackChannelId || "";
           const result = await uploadFileToSlack({
-            channelId: slackChannelId,
+            channelId: targetChannel,
             threadTs: slackThreadTs || undefined,
             filename,
             format,
             data: sheets,
-            comment: "📊 Here's your export!",
+            comment: claudeRefusedFile ? "📊 Generated the file for you despite what Abra said!" : "📊 Here's your export!",
           });
 
           if (result.ok) {
