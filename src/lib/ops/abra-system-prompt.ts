@@ -77,6 +77,11 @@ export type AbraPromptContext = {
   includeFinanceFramework?: boolean;
   /** Identity context for the current user (name, role, calibration hint). */
   actorContext?: string | null;
+  /**
+   * Markdown memory from Supabase Storage (Viktor-style always-loaded operational facts).
+   * Injected before pgvector brain entries so corrections always take priority.
+   */
+  markdownMemory?: string | null;
 };
 
 function normalizeDepartmentName(value: string): string {
@@ -502,6 +507,13 @@ These are the ONLY current team members. Do NOT reference anyone else as team un
   // 4c. Actor identity context (who is sending this message — calibrates tone and detail level)
   if (ctx.actorContext) {
     sections.push(ctx.actorContext);
+  }
+
+  // 4d. Markdown Operational Memory (Viktor-style always-loaded facts — highest priority)
+  if (ctx.markdownMemory && ctx.markdownMemory.trim()) {
+    sections.push(
+      `## OPERATIONAL MEMORY (always-loaded facts — override brain entries)\n\n${ctx.markdownMemory.trim()}`,
+    );
   }
 
   // 5. Pinned Corrections (dynamic)
