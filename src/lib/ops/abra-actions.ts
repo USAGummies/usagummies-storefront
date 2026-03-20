@@ -2603,10 +2603,12 @@ async function fetchDataForFileGeneration(
   const baseUrl = getInternalOpsBaseUrl();
   const TIMEOUT = 15_000;
 
+  const headers = getInternalOpsHeaders();
+
   switch (source) {
     case "qbo_accounts":
     case "qbo_chart_of_accounts": {
-      const res = await fetch(`${baseUrl}/api/ops/qbo/accounts`, { signal: AbortSignal.timeout(TIMEOUT) });
+      const res = await fetch(`${baseUrl}/api/ops/qbo/accounts`, { headers, signal: AbortSignal.timeout(TIMEOUT) });
       if (!res.ok) throw new Error(`QBO accounts fetch failed: ${res.status}`);
       const data = (await res.json()) as { accounts: Array<Record<string, unknown>>; count: number };
       const accounts = data.accounts || [];
@@ -2624,13 +2626,13 @@ async function fetchDataForFileGeneration(
       }];
     }
     case "qbo_vendors": {
-      const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=vendors`, { signal: AbortSignal.timeout(TIMEOUT) });
+      const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=vendors`, { headers, signal: AbortSignal.timeout(TIMEOUT) });
       if (!res.ok) throw new Error(`QBO vendor fetch failed: ${res.status}`);
       const data = (await res.json()) as { vendors: Array<Record<string, unknown>> };
       return [{
         sheetName: "Vendors",
         headers: ["Vendor Name", "Balance", "Active", "Email", "Phone"],
-        rows: (data.vendors || []).map(v => [
+        rows: (data.vendors || []).map((v): (string | number | boolean | null)[] => [
           String(v.Name || ""),
           typeof v.Balance === "number" ? v.Balance : 0,
           v.Active !== false,
@@ -2643,14 +2645,14 @@ async function fetchDataForFileGeneration(
       const start = typeof params.start === "string" ? params.start : undefined;
       const end = typeof params.end === "string" ? params.end : undefined;
       const qs = [start ? `start=${start}` : "", end ? `end=${end}` : ""].filter(Boolean).join("&");
-      const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=pnl${qs ? `&${qs}` : ""}`, { signal: AbortSignal.timeout(TIMEOUT) });
+      const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=pnl${qs ? `&${qs}` : ""}`, { headers, signal: AbortSignal.timeout(TIMEOUT) });
       if (!res.ok) throw new Error(`QBO P&L fetch failed: ${res.status}`);
       const data = (await res.json()) as { rows?: Array<{ account: string; amount: number; type: string }> };
       const rows = data.rows || [];
       return [{
         sheetName: "P&L",
         headers: ["Account", "Type", "Amount"],
-        rows: rows.map(r => [String(r.account || ""), String(r.type || ""), r.amount || 0]),
+        rows: rows.map((r): (string | number | boolean | null)[] => [String(r.account || ""), String(r.type || ""), r.amount || 0]),
       }];
     }
     default:

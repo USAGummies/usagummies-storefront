@@ -121,6 +121,12 @@ export async function executeActions(
         if (isReadOnly && outcome.result?.success && outcome.result.message) {
           // For read-only actions, surface the full result content so the user sees it
           readOnlyResults.push(outcome.result.message);
+        } else if (outcome.result && !outcome.result.success) {
+          // Action executed but failed — show the error to the user
+          console.error(`[action-executor] Action ${directive.action.action_type} failed: ${outcome.result.message}`);
+          actionNotices.push(
+            `⚠️ \`${directive.action.action_type}\` failed: ${outcome.result.message || "unknown error"}`,
+          );
         } else {
           if (isReadOnly) {
             console.warn(`[action-executor] Read-only action ${directive.action.action_type} went to notices: success=${outcome.result?.success}, hasMessage=${!!outcome.result?.message}, message=${outcome.result?.message?.slice(0, 100)}`);
