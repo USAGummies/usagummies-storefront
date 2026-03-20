@@ -262,6 +262,7 @@ async function generateClaudeReply(input: {
   liveSnapshot?: string | null;
   deadlineSignal?: AbortSignal;
   isFinanceRelated?: boolean;
+  actorContext?: string | null;
 }): Promise<{
   reply: string;
   modelUsed: string;
@@ -288,6 +289,7 @@ async function generateClaudeReply(input: {
     teamContext: input.teamContext,
     signalsContext: input.signalsContext,
     includeFinanceFramework: input.isFinanceRelated,
+    actorContext: input.actorContext,
   });
   // Only include full action instructions when the message likely needs actions
   const messageNeedsActions = /\b(send|create|log|notify|remind|track|store|record|draft|email|slack|save|update|correct|calculate|run scenario|option|notion|build|compile|finish|finalize|download|export|format|generate|spreadsheet|xlsx|csv|upload)\b/i.test(input.message);
@@ -564,6 +566,7 @@ export async function POST(req: Request) {
     history?: unknown;
     thread_id?: unknown;
     actor_label?: unknown;
+    actor_context?: unknown;
     channel?: unknown;
     slack_channel_id?: unknown;
     slack_thread_ts?: unknown;
@@ -644,6 +647,10 @@ export async function POST(req: Request) {
     typeof payload.actor_label === "string" && payload.actor_label.trim()
       ? payload.actor_label.trim().slice(0, 120)
       : actorEmail;
+  const actorContext =
+    typeof payload.actor_context === "string" && payload.actor_context.trim()
+      ? payload.actor_context.trim().slice(0, 300)
+      : null;
   const VALID_CHANNELS = ["web", "slack", "api"] as const;
   type AnswerChannel = (typeof VALID_CHANNELS)[number];
   const rawChannel = typeof payload.channel === "string" ? payload.channel.trim() : "";
@@ -1886,6 +1893,7 @@ export async function POST(req: Request) {
       liveSnapshot: augmentedLiveSnapshot,
       deadlineSignal: deadlineController.signal,
       isFinanceRelated: isFinanceQuestion(message),
+      actorContext,
     });
     // Track Anthropic API success in capability registry
     void capMarkSuccess("anthropic").catch(() => {});
@@ -1921,6 +1929,7 @@ export async function POST(req: Request) {
           detectedDepartment: messageDepartment,
           liveSnapshot: augmentedLiveSnapshot,
           deadlineSignal: deadlineController.signal,
+          actorContext,
         });
         baseReply = followUpResult.reply;
         // Strip any action directives from the follow-up (don't double-execute)
@@ -2049,8 +2058,11 @@ export async function POST(req: Request) {
       }
     }
 
+    const SOURCE_RELEVANCE_THRESHOLD = 0.65;
     const seenIds = new Set<string>();
     const uniqueSources = tieredResults.all.filter((row) => {
+      // Drop low-relevance results from the source citation footer
+      if (typeof row.similarity === "number" && row.similarity < SOURCE_RELEVANCE_THRESHOLD) return false;
       const sourceKey =
         row.id ||
         `${row.source_table}:${row.title || ""}:${(row.summary_text || row.raw_text || "").slice(0, 50)}`;
