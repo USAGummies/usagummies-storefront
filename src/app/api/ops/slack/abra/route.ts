@@ -72,6 +72,11 @@ import {
   postSlackMessage as postSharedSlackMessage,
   processAbraMessage,
 } from "@/lib/ops/abra-slack-responder";
+import {
+  readAllMemory,
+  appendCorrection as appendMarkdownCorrection,
+  appendTeaching as appendMarkdownTeaching,
+} from "@/lib/ops/abra-markdown-memory";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -621,6 +626,11 @@ async function handleCorrectCommand(
       }),
     });
 
+    // Also write to markdown memory (Viktor-style always-loaded corrections)
+    appendMarkdownCorrection(original, correction).catch((e) =>
+      console.warn("[abra-correct] markdown write failed:", e),
+    );
+
     return `✅ *Correction stored.*\n• _Wrong:_ ${original}\n• _Correct:_ ${correction}\n\nAbra will prioritize this over conflicting older data.`;
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
@@ -704,6 +714,11 @@ async function handleTeachCommand(
         embedding,
       }),
     });
+
+    // Also write to markdown memory (Viktor-style always-loaded facts)
+    appendMarkdownTeaching(department || "general", content, userEmail).catch((e) =>
+      console.warn("[abra-teach] markdown write failed:", e),
+    );
 
     console.log(`[abra-teach] ✅ Teaching persisted — dept: ${department || "executive"}, title: "${title}", embedding dims: ${embedding.length}`);
     return `✅ *Teaching stored${department ? ` in ${department}` : ""}.*\n\n_"${content.slice(0, 200)}"_\n\nAbra will use this in future answers.`;
@@ -1178,11 +1193,12 @@ async function callAbraChat(
     }
   }
 
-  // --------------- Step 3: Fetch corrections + departments + active signals ---------------
-  const [corrections, departments, activeSignals] = await Promise.all([
+  // --------------- Step 3: Fetch corrections + departments + active signals + markdown memory ---------------
+  const [corrections, departments, activeSignals, markdownMemory] = await Promise.all([
     fetchCorrections(),
     fetchDepartments(),
     getActiveSignals({ limit: 8 }),
+    readAllMemory().catch(() => null),
   ]);
   const messageDepartment = detectDepartment(message);
 
@@ -1196,6 +1212,7 @@ async function callAbraChat(
     departments,
     conversationDepartment: messageDepartment,
     signalsContext,
+    markdownMemory,
   }) + actionInstructions;
 
   let context = "";
