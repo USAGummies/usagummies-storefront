@@ -218,6 +218,13 @@ export const AUTO_EXEC_POLICIES: AutoExecPolicy[] = [
     enabled: true,
     max_amount: 500, // Max absolute inventory adjustment auto-exec
   },
+  {
+    action_type: "generate_file",
+    max_risk_level: "low",
+    min_confidence: 0.5,
+    daily_limit: 20,
+    enabled: true, // File generation uploads to Slack — low risk
+  },
 ];
 
 const EXTERNAL_SUBMISSION_ACTIONS = new Set([
