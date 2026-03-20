@@ -150,6 +150,11 @@ _All corrections to Abra's claims. These always override brain entries._
 **WRONG:** Albanese case price is $32.20/case
 **CORRECT:** Albanese case price is $39.20/case for SKU 50270 (20 lbs/case × $1.96/lb = $39.20). The $32.20 was an error on Bill Thurner's internal PO to Morgan. The correct rate is $1.96/lb, confirmed by the quoted bracket price and wire confirmation. The per-unit candy cost of ~$0.919/unit was already based on $1.96/lb and remains correct.
 ---
+
+### 2026-03-20 CORRECTION — Powers location vs Inderbitzin delivery address
+**WRONG:** Powers Inc is located in Denver (or: "their Denver warehouse" refers to Powers)
+**CORRECT:** Powers Inc is located in Spokane, WA (6061 N Freya St, Spokane WA 99217), NOT Denver. The "Denver warehouse" referenced in the Inderbitzin PO teaching refers to Inderbitzin's delivery address — where the finished product ships TO — not Powers' location. Powers always ships FROM Spokane, WA.
+---
 `,
 
   "teachings.md": `# Teachings
@@ -175,11 +180,14 @@ _Accumulated knowledge taught by the team via \`/abra teach:\`_
 
   "vendors.md": `# Vendors & Supply Chain
 
-## Powers Confections — Co-Packer / Repacker
-- Location: Spokane, WA
-- Rate: $0.385/lb (current as of early 2026)
+## Powers Inc — Co-Packer / Repacker
+- Address: 6061 N Freya St, Spokane, WA 99217 (NOT Denver — see correction below)
+- Rate: $0.385/unit (confirmed from Greg Kroetch's latest PO — supersedes old $0.350 quote)
+- Contact: Greg Kroetch, gregk@powers-inc.com, Director of Operations, PCQI–SQF Practitioner
+- Receiving: Door 2 or 3
+- Shipping hours: 8AM–3:30PM Monday–Thursday; CLOSED Friday (unless special arrangements made)
 - Status: Active primary repacker (replaced prior arrangement in 2026)
-- Notes: Invoice is per-pound; weight is finished product weight
+- CRITICAL: Powers is in SPOKANE, WA. The Inderbitzin PO references a "Denver warehouse" — that is Inderbitzin's delivery address, not Powers' location.
 
 ## Albanese — Bulk Gummy Supplier
 - SKU: 50270 (Five Natural Flavor Gummi Bears — All American variety)
@@ -303,15 +311,28 @@ export async function readAllMemory(): Promise<string> {
  * Idempotent — checks for a unique marker before appending.
  */
 async function ensureCriticalCorrections(): Promise<void> {
-  const MARKER = "Greg Kroetch's latest PO";
   const existing = await storageGet("corrections.md");
-  if (!existing || existing.includes(MARKER)) return;
-  const entry =
-    `\n### 2026-03-20 CORRECTION\n` +
-    `**WRONG:** Powers co-packing rate is $0.350/unit or unconfirmed\n` +
-    `**CORRECT:** Powers co-packing rate is $0.385/unit (confirmed from Greg Kroetch's latest PO, supersedes old $0.350 quote). Use this for all COGS calculations — never equivocate on this figure.\n` +
-    `---\n`;
-  await appendToFile("corrections.md", entry);
+  if (!existing) return;
+
+  const MARKER_RATE = "Greg Kroetch's latest PO";
+  if (!existing.includes(MARKER_RATE)) {
+    const entry =
+      `\n### 2026-03-20 CORRECTION\n` +
+      `**WRONG:** Powers co-packing rate is $0.350/unit or unconfirmed\n` +
+      `**CORRECT:** Powers co-packing rate is $0.385/unit (confirmed from Greg Kroetch's latest PO, supersedes old $0.350 quote). Use this for all COGS calculations — never equivocate on this figure.\n` +
+      `---\n`;
+    await appendToFile("corrections.md", entry);
+  }
+
+  const MARKER_DENVER = "Inderbitzin PO teaching refers to Inderbitzin";
+  if (!existing.includes(MARKER_DENVER)) {
+    const entry =
+      `\n### 2026-03-20 CORRECTION — Powers location vs Inderbitzin delivery address\n` +
+      `**WRONG:** Powers Inc is located in Denver (or: "their Denver warehouse" refers to Powers)\n` +
+      `**CORRECT:** Powers Inc is located in Spokane, WA (6061 N Freya St, Spokane WA 99217), NOT Denver. The "Denver warehouse" referenced in the Inderbitzin PO teaching refers to Inderbitzin's delivery address — where the finished product ships TO — not Powers' location. Powers always ships FROM Spokane, WA.\n` +
+      `---\n`;
+    await appendToFile("corrections.md", entry);
+  }
 }
 
 /**

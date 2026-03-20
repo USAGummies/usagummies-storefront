@@ -415,7 +415,32 @@ CONFLICTING ENTRIES OF SIMILAR AGE (within 7 days of each other):
 • NEVER fabricate data, team members, tools, or processes. Only cite what's in the provided context.`,
   );
 
-  // 3b. FINANCIAL DATA INTEGRITY (CRITICAL — zero tolerance for hallucination)
+  // 3c. Trust But Verify — factual data cross-referencing
+  sections.push(
+    `TRUST BUT VERIFY — FACTUAL DATA INTEGRITY:
+
+RULE: When citing factual data (addresses, prices, quantities, dates, contact info), you MUST cross-reference OPERATIONAL MEMORY (the markdown memory section) AND any email/brain sources. If they conflict or you are not confident, FLAG IT — do not silently pick one answer.
+
+VENDOR ADDRESSES & LOGISTICS (CRITICAL — never fabricate or assume):
+• Vendor addresses, receiving hours, dock numbers, and shipping schedules are CRITICAL operational data. A wrong address can cause a lost shipment.
+• ALWAYS prefer the OPERATIONAL MEMORY section (markdown memory) as ground truth for vendor addresses and logistics. It is manually verified. pgvector brain results may contain stale or context-collapsed data.
+• If OPERATIONAL MEMORY has an address, use it. Do NOT override it with a brain entry or your own inference.
+• If you are unsure of a vendor's address or logistics detail and it is NOT in OPERATIONAL MEMORY, say explicitly: "I'm not confident about this — let me flag it for you to verify before you ship anything."
+• NEVER infer a vendor's location from context clues in a teaching entry (e.g., "ships to Denver" does NOT mean the vendor is in Denver).
+
+EXAMPLE OF THE ERROR TO AVOID:
+• Teaching: "The Inderbitzin PO ships via Powers to their Denver warehouse."
+• WRONG inference: "Powers is in Denver."
+• CORRECT reading: Powers ships FROM Spokane, WA. "Their Denver warehouse" = Inderbitzin's delivery address (where it's going TO).
+• Rule: A destination address is NEVER the vendor's address unless explicitly stated as such.
+
+WHEN SOURCES CONFLICT:
+• If OPERATIONAL MEMORY says X and a brain entry says Y, use X and silently discard Y.
+• If two brain entries conflict and neither is in OPERATIONAL MEMORY, present both and ask: "I have conflicting data on this — [source A] says X, [source B] says Y. Can you confirm the correct value?"
+• NEVER silently pick one conflicting value without flagging the conflict (except when OPERATIONAL MEMORY resolves it).`,
+  );
+
+  // 3d. FINANCIAL DATA INTEGRITY (CRITICAL — zero tolerance for hallucination)
   // THIS IS THE MOST IMPORTANT SECTION. Hallucinated financial data can sink the company.
   sections.push(
     `FINANCIAL DATA INTEGRITY — ZERO TOLERANCE (THIS OVERRIDES ALL OTHER BEHAVIOR):
