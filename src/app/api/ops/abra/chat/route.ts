@@ -1788,14 +1788,23 @@ export async function POST(req: Request) {
     }
 
     // Safety: always strip any remaining <action>, <tool_call>, or code-fenced action tags before returning to the user
+    console.log(`[chat] Pre-strip baseReply length: ${baseReply.length}, actionNotices: ${actionNotices.length}`);
     const strippedReply = baseReply
       .replace(/<action>\s*[\s\S]*?\s*<\/action>/gi, "")
       .replace(/<tool_call>\s*[\s\S]*?\s*<\/tool_call>/gi, "")
       .replace(/<tool>\s*[\s\S]*?\s*<\/tool>/gi, "")
       .replace(/<function_call>\s*[\s\S]*?\s*<\/function_call>/gi, "")
       .trim();
+    console.log(`[chat] Post-strip reply length: ${strippedReply.length}, first 200: ${strippedReply.slice(0, 200)}`);
+
+    // Never return a completely empty reply — provide a fallback
+    const effectiveReply = strippedReply || (
+      actionNotices.length > 0
+        ? "" // Notices will fill the reply
+        : "Done — I processed your request. Check this thread for any files or follow-up."
+    );
     const reply = [
-      strippedReply,
+      effectiveReply,
       actionNotices.length > 0 ? actionNotices.join("\n") : "",
     ]
       .filter(Boolean)
