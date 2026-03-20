@@ -2603,15 +2603,34 @@ async function fetchDataForFileGeneration(
   const baseUrl = getInternalOpsBaseUrl();
   const TIMEOUT = 15_000;
 
-  const headers = getInternalOpsHeaders();
+  // Call QBO API directly instead of going through internal HTTP routes
+  // (Vercel serverless functions can't reliably self-reference due to concurrency limits)
+  const { getValidAccessToken, getRealmId } = await import("@/lib/ops/qbo-auth");
+  const accessToken = await getValidAccessToken();
+  if (!accessToken) throw new Error("QBO not connected — no valid access token");
+  const realmId = await getRealmId();
+  if (!realmId) throw new Error("QBO not connected — no realm ID");
+  const qboBase = process.env.QBO_SANDBOX === "true"
+    ? "https://sandbox-quickbooks.api.intuit.com"
+    : "https://quickbooks.api.intuit.com";
+
+  async function qboQuery(query: string) {
+    const url = `${qboBase}/v3/company/${realmId}/query?query=${encodeURIComponent(query)}&minorversion=73`;
+    const res = await fetch(url, {
+      headers: { Accept: "application/json", Authorization: `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(TIMEOUT),
+    });
+    if (!res.ok) throw new Error(`QBO API returned ${res.status}`);
+    return res.json();
+  }
 
   switch (source) {
     case "qbo_accounts":
     case "qbo_chart_of_accounts": {
-      const res = await fetch(`${baseUrl}/api/ops/qbo/accounts`, { headers, signal: AbortSignal.timeout(TIMEOUT) });
-      if (!res.ok) throw new Error(`QBO accounts fetch failed: ${res.status}`);
-      const data = (await res.json()) as { accounts: Array<Record<string, unknown>>; count: number };
-      const accounts = data.accounts || [];
+      const data = (await qboQuery("SELECT * FROM Account MAXRESULTS 1000")) as {
+        QueryResponse?: { Account?: Array<Record<string, unknown>> };
+      };
+      const accounts = data.QueryResponse?.Account || [];
       return [{
         sheetName: "Chart of Accounts",
         headers: ["ID", "Account Name", "Type", "Sub-Type", "Balance", "Active"],
@@ -2619,40 +2638,81 @@ async function fetchDataForFileGeneration(
           String(a.Id ?? ""),
           String(a.Name ?? ""),
           String(a.AccountType ?? ""),
-          String(a.AccountSubType ?? a.DetailType ?? ""),
+          String(a.AccountSubType ?? ""),
           typeof a.CurrentBalance === "number" ? a.CurrentBalance : 0,
           a.Active !== false,
         ]),
       }];
     }
     case "qbo_vendors": {
-      const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=vendors`, { headers, signal: AbortSignal.timeout(TIMEOUT) });
-      if (!res.ok) throw new Error(`QBO vendor fetch failed: ${res.status}`);
-      const data = (await res.json()) as { vendors: Array<Record<string, unknown>> };
+      const data = (await qboQuery("SELECT * FROM Vendor MAXRESULTS 1000")) as {
+        QueryResponse?: { Vendor?: Array<Record<string, unknown>> };
+      };
+      const vendors = data.QueryResponse?.Vendor || [];
       return [{
         sheetName: "Vendors",
         headers: ["Vendor Name", "Balance", "Active", "Email", "Phone"],
-        rows: (data.vendors || []).map((v): (string | number | boolean | null)[] => [
-          String(v.Name || ""),
-          typeof v.Balance === "number" ? v.Balance : 0,
-          v.Active !== false,
-          String(v.Email || ""),
-          String(v.Phone || ""),
-        ]),
+        rows: vendors.map((v): (string | number | boolean | null)[] => {
+          const email = v.PrimaryEmailAddr && typeof v.PrimaryEmailAddr === "object"
+            ? String((v.PrimaryEmailAddr as Record<string, unknown>).Address || "")
+            : "";
+          const phone = v.PrimaryPhone && typeof v.PrimaryPhone === "object"
+            ? String((v.PrimaryPhone as Record<string, unknown>).FreeFormNumber || "")
+            : "";
+          return [
+            String(v.DisplayName || v.CompanyName || ""),
+            typeof v.Balance === "number" ? v.Balance : 0,
+            v.Active !== false,
+            email,
+            phone,
+          ];
+        }),
       }];
     }
     case "qbo_pnl": {
+      // P&L requires report endpoint, not query
       const start = typeof params.start === "string" ? params.start : undefined;
       const end = typeof params.end === "string" ? params.end : undefined;
-      const qs = [start ? `start=${start}` : "", end ? `end=${end}` : ""].filter(Boolean).join("&");
-      const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=pnl${qs ? `&${qs}` : ""}`, { headers, signal: AbortSignal.timeout(TIMEOUT) });
-      if (!res.ok) throw new Error(`QBO P&L fetch failed: ${res.status}`);
-      const data = (await res.json()) as { rows?: Array<{ account: string; amount: number; type: string }> };
-      const rows = data.rows || [];
+      const qs = [
+        start ? `start_date=${start}` : "",
+        end ? `end_date=${end}` : "",
+      ].filter(Boolean).join("&");
+      const url = `${qboBase}/v3/company/${realmId}/reports/ProfitAndLoss${qs ? `?${qs}` : ""}`;
+      const res = await fetch(url, {
+        headers: { Accept: "application/json", Authorization: `Bearer ${accessToken}` },
+        signal: AbortSignal.timeout(TIMEOUT),
+      });
+      if (!res.ok) throw new Error(`QBO P&L report failed: ${res.status}`);
+      const report = (await res.json()) as Record<string, unknown>;
+      // Extract rows from QBO report structure
+      const rows: (string | number | boolean | null)[][] = [];
+      function extractRows(section: Record<string, unknown>, depth = 0) {
+        const header = section.Header as Record<string, unknown> | undefined;
+        if (header?.ColData) {
+          const cols = header.ColData as Array<{ value: string }>;
+          rows.push([" ".repeat(depth * 2) + (cols[0]?.value || ""), "", cols[1]?.value ? Number(cols[1].value) || cols[1].value : 0]);
+        }
+        const rowData = section.Rows as { Row?: Array<Record<string, unknown>> } | undefined;
+        if (rowData?.Row) {
+          for (const row of rowData.Row) {
+            const colData = row.ColData as Array<{ value: string }> | undefined;
+            if (colData) {
+              rows.push([" ".repeat(depth * 2) + (colData[0]?.value || ""), "", colData[1]?.value ? Number(colData[1].value) || colData[1].value : 0]);
+            }
+            if (row.Rows) extractRows(row as Record<string, unknown>, depth + 1);
+            const summary = row.Summary as Record<string, unknown> | undefined;
+            if (summary?.ColData) {
+              const sCols = summary.ColData as Array<{ value: string }>;
+              rows.push([" ".repeat(depth * 2) + "TOTAL: " + (sCols[0]?.value || ""), "", sCols[1]?.value ? Number(sCols[1].value) || sCols[1].value : 0]);
+            }
+          }
+        }
+      }
+      if (report.Rows) extractRows(report as Record<string, unknown>);
       return [{
         sheetName: "P&L",
         headers: ["Account", "Type", "Amount"],
-        rows: rows.map((r): (string | number | boolean | null)[] => [String(r.account || ""), String(r.type || ""), r.amount || 0]),
+        rows,
       }];
     }
     default:
