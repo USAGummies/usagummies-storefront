@@ -9,6 +9,7 @@ import {
   extractClaudeUsage,
   logAICost,
 } from "@/lib/ops/abra-cost-tracker";
+import { appendCorrection as appendMarkdownCorrection } from "@/lib/ops/abra-markdown-memory";
 
 export type SlackThreadMessage = {
   role: "user" | "assistant";
@@ -636,10 +637,51 @@ async function buildEmbedding(input: string): Promise<number[]> {
   return embedding;
 }
 
+async function extractCorrectionWithLLM(
+  freeformText: string,
+): Promise<{ original: string; correction: string } | null> {
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  if (!anthropicKey) return null;
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": anthropicKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6",
+        max_tokens: 256,
+        messages: [
+          {
+            role: "user",
+            content:
+              `Extract the correction from this text. Return JSON with two fields:\n` +
+              `- "original": what was wrong or being superseded (or "unspecified" if not stated)\n` +
+              `- "correction": what the correct/updated fact is\n\n` +
+              `Text: ${freeformText}\n\n` +
+              `Respond with only valid JSON, no markdown.`,
+          },
+        ],
+      }),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const raw = data?.content?.[0]?.text?.trim() ?? "";
+    const parsed = JSON.parse(raw);
+    if (parsed?.original && parsed?.correction) return parsed;
+  } catch {
+    // fall through
+  }
+  return null;
+}
+
 function parseCorrection(text: string): { original: string; correction: string } | null {
   const body = text.replace(/^correct:\s*/i, "").trim();
   if (!body) return null;
-  const match = body.match(/^(.+?)\s+but\s+actually\s+(.+)$/i);
+  const match = body.match(/^(.+?)\s*(?:→|->|but actually|, actually)\s+(.+)$/is);
   if (!match) return null;
   return {
     original: match[1].trim(),
@@ -648,13 +690,35 @@ function parseCorrection(text: string): { original: string; correction: string }
 }
 
 async function handleCorrection(msg: SlackMessageContext): Promise<string> {
-  const parsed = parseCorrection(msg.text);
-  if (!parsed) {
+  const body = msg.text.replace(/^correct:\s*/i, "").trim();
+  let original = "";
+  let correction = "";
+  let freeform = false;
+
+  const structured = parseCorrection(msg.text);
+  if (structured) {
+    original = structured.original;
+    correction = structured.correction;
+  } else {
+    // Freeform correction — use LLM to extract structured fields
+    freeform = true;
+    const extracted = await extractCorrectionWithLLM(body);
+    if (extracted) {
+      original = extracted.original;
+      correction = extracted.correction;
+    } else {
+      // LLM unavailable or failed — store full text as the correction
+      correction = body;
+      original = "unspecified";
+    }
+  }
+
+  if (!correction) {
     return "Couldn't parse correction. Use `correct: <old> but actually <new>`.";
   }
 
   const actor = msg.displayName || msg.user;
-  const embeddingText = `CORRECTION: ${parsed.original} -> ${parsed.correction}`;
+  const embeddingText = `CORRECTION: ${original} -> ${correction}`;
   const embedding = await buildEmbedding(embeddingText);
   await sbFetch("/rest/v1/abra_corrections", {
     method: "POST",
@@ -664,8 +728,8 @@ async function handleCorrection(msg: SlackMessageContext): Promise<string> {
     },
     body: JSON.stringify({
       corrected_by: actor,
-      original_claim: parsed.original,
-      correction: parsed.correction,
+      original_claim: original,
+      correction,
       embedding,
     }),
   });
@@ -679,9 +743,9 @@ async function handleCorrection(msg: SlackMessageContext): Promise<string> {
       source_type: "manual",
       source_ref: `slack-correction-${Date.now()}`,
       entry_type: "correction",
-      title: `Correction: ${parsed.original.slice(0, 100)}`,
-      raw_text: `WRONG: ${parsed.original}\nCORRECT: ${parsed.correction}\nCorrected by: ${actor}`,
-      summary_text: parsed.correction.slice(0, 500),
+      title: `Correction: ${original.slice(0, 100)}`,
+      raw_text: `WRONG: ${original}\nCORRECT: ${correction}\nCorrected by: ${actor}`,
+      summary_text: correction.slice(0, 500),
       category: "correction",
       department: "executive",
       confidence: "high",
@@ -690,7 +754,22 @@ async function handleCorrection(msg: SlackMessageContext): Promise<string> {
       embedding,
     }),
   });
-  return `Stored correction: "${parsed.original}" → "${parsed.correction}".`;
+
+  // Dual-write to markdown memory (always-loaded, overrides pgvector)
+  const correctionForMd = freeform ? `${correction}\n\n_Full text: ${body}_` : correction;
+  appendMarkdownCorrection(original, correctionForMd).catch((e) =>
+    console.warn("[abra-correction] markdown write failed:", e),
+  );
+
+  if (freeform) {
+    return (
+      `✅ Correction stored.\n` +
+      `• _Interpreted wrong:_ ${original}\n` +
+      `• _Interpreted correct:_ ${correction}\n\n` +
+      `_Full text saved verbatim. Abra will prioritize this over conflicting older data._`
+    );
+  }
+  return `✅ Correction stored: "${original}" → "${correction}". Abra will prioritize this over conflicting older data.`;
 }
 
 async function handleTeaching(msg: SlackMessageContext): Promise<string> {

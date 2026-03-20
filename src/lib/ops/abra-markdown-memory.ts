@@ -140,6 +140,11 @@ _All corrections to Abra's claims. These always override brain entries._
 **WRONG:** Powers Confections rate is unknown
 **CORRECT:** Powers Confections repacking rate is $0.385/lb (current as of 2026).
 ---
+
+### 2026-03-20 CORRECTION
+**WRONG:** Powers co-packing rate is $0.350/unit or unconfirmed
+**CORRECT:** Powers co-packing rate is $0.385/unit (confirmed from Greg Kroetch's latest PO, supersedes old $0.350 quote). Use this for all COGS calculations — never equivocate on this figure.
+---
 `,
 
   "teachings.md": `# Teachings
@@ -265,11 +270,31 @@ export async function readAllMemory(): Promise<string> {
 
   const full = ordered.join("\n\n---\n\n");
 
+  // Self-healing migration: ensure critical corrections are in the live file.
+  // This runs async and does not block the return.
+  ensureCriticalCorrections().catch(() => {});
+
   // Hard cap at ~6000 chars to leave room for rest of prompt
   if (full.length > 6000) {
     return full.slice(0, 6000) + "\n\n_[memory truncated for context length]_";
   }
   return full;
+}
+
+/**
+ * Ensure one-time critical corrections exist in the live corrections.md file.
+ * Idempotent — checks for a unique marker before appending.
+ */
+async function ensureCriticalCorrections(): Promise<void> {
+  const MARKER = "Greg Kroetch's latest PO";
+  const existing = await storageGet("corrections.md");
+  if (!existing || existing.includes(MARKER)) return;
+  const entry =
+    `\n### 2026-03-20 CORRECTION\n` +
+    `**WRONG:** Powers co-packing rate is $0.350/unit or unconfirmed\n` +
+    `**CORRECT:** Powers co-packing rate is $0.385/unit (confirmed from Greg Kroetch's latest PO, supersedes old $0.350 quote). Use this for all COGS calculations — never equivocate on this figure.\n` +
+    `---\n`;
+  await appendToFile("corrections.md", entry);
 }
 
 /**
