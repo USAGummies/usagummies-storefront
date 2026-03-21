@@ -2985,15 +2985,80 @@ async function fetchDataForFileGeneration(
         rows,
       }];
     }
+    case "kpi_daily_revenue":
+    case "kpi_revenue_by_channel":
+    case "kpi_revenue": {
+      // Pull daily revenue by channel from Supabase kpi_timeseries
+      const now = new Date();
+      const monthStr = now.toISOString().slice(0, 7);
+      const firstOfMonth = `${monthStr}-01`;
+      const metrics = encodeURIComponent("(daily_revenue_shopify,daily_revenue_amazon,daily_orders_shopify,daily_orders_amazon)");
+      const rows = (await sbFetch(
+        `/rest/v1/kpi_timeseries?window_type=eq.daily&metric_name=in.${metrics}&captured_for_date=gte.${firstOfMonth}&select=metric_name,value,captured_for_date&order=captured_for_date.asc&limit=500`,
+      )) as Array<{ metric_name: string; value: unknown; captured_for_date: string }>;
+
+      const safeRows = Array.isArray(rows) ? rows : [];
+      // Group by date
+      const byDate = new Map<string, { shopify_rev: number; amazon_rev: number; shopify_orders: number; amazon_orders: number }>();
+      for (const r of safeRows) {
+        const d = r.captured_for_date;
+        if (!byDate.has(d)) byDate.set(d, { shopify_rev: 0, amazon_rev: 0, shopify_orders: 0, amazon_orders: 0 });
+        const entry = byDate.get(d)!;
+        const v = typeof r.value === "number" ? r.value : parseFloat(String(r.value ?? 0)) || 0;
+        if (r.metric_name === "daily_revenue_shopify") entry.shopify_rev += v;
+        else if (r.metric_name === "daily_revenue_amazon") entry.amazon_rev += v;
+        else if (r.metric_name === "daily_orders_shopify") entry.shopify_orders += v;
+        else if (r.metric_name === "daily_orders_amazon") entry.amazon_orders += v;
+      }
+
+      const dates = Array.from(byDate.keys()).sort();
+      // Compute 7-day rolling average (total revenue)
+      const dailyTotals = dates.map((d) => (byDate.get(d)!.shopify_rev + byDate.get(d)!.amazon_rev));
+      const dataRows: (string | number | null)[][] = dates.map((date, i) => {
+        const e = byDate.get(date)!;
+        const total = e.shopify_rev + e.amazon_rev;
+        const totalOrders = e.shopify_orders + e.amazon_orders;
+        const window = dailyTotals.slice(Math.max(0, i - 6), i + 1);
+        const rolling7d = window.length > 0 ? Math.round((window.reduce((s, v) => s + v, 0) / window.length) * 100) / 100 : 0;
+        const shopifyPct = total > 0 ? Math.round((e.shopify_rev / total) * 1000) / 10 : 0;
+        const amazonPct = total > 0 ? Math.round((e.amazon_rev / total) * 1000) / 10 : 0;
+        return [date, Math.round(e.shopify_rev * 100) / 100, Math.round(e.amazon_rev * 100) / 100, Math.round(total * 100) / 100, Math.round(e.shopify_orders), Math.round(e.amazon_orders), Math.round(totalOrders), shopifyPct, amazonPct, rolling7d];
+      });
+
+      // Summary sheet
+      const shopifyTotal = dates.reduce((s, d) => s + byDate.get(d)!.shopify_rev, 0);
+      const amazonTotal = dates.reduce((s, d) => s + byDate.get(d)!.amazon_rev, 0);
+      const grandTotal = shopifyTotal + amazonTotal;
+      const shopifyOrders = dates.reduce((s, d) => s + byDate.get(d)!.shopify_orders, 0);
+      const amazonOrders = dates.reduce((s, d) => s + byDate.get(d)!.amazon_orders, 0);
+      const totalOrders = shopifyOrders + amazonOrders;
+
+      return [
+        {
+          sheetName: "Daily Revenue",
+          headers: ["Date", "Shopify ($)", "Amazon ($)", "Total ($)", "Shopify Orders", "Amazon Orders", "Total Orders", "Shopify Mix %", "Amazon Mix %", "7-Day Rolling Avg ($)"],
+          rows: dataRows,
+        },
+        {
+          sheetName: "Summary",
+          headers: ["Channel", "Revenue ($)", "Orders", "AOV ($)", "Mix %"],
+          rows: [
+            ["Shopify", Math.round(shopifyTotal * 100) / 100, Math.round(shopifyOrders), shopifyOrders > 0 ? Math.round((shopifyTotal / shopifyOrders) * 100) / 100 : 0, grandTotal > 0 ? Math.round((shopifyTotal / grandTotal) * 1000) / 10 : 0],
+            ["Amazon", Math.round(amazonTotal * 100) / 100, Math.round(amazonOrders), amazonOrders > 0 ? Math.round((amazonTotal / amazonOrders) * 100) / 100 : 0, grandTotal > 0 ? Math.round((amazonTotal / grandTotal) * 1000) / 10 : 0],
+            ["TOTAL", Math.round(grandTotal * 100) / 100, Math.round(totalOrders), totalOrders > 0 ? Math.round((grandTotal / totalOrders) * 100) / 100 : 0, 100],
+          ],
+        },
+      ];
+    }
     default:
-      throw new Error(`Unknown data source: "${source}". Supported: qbo_accounts, qbo_vendors, qbo_pnl`);
+      throw new Error(`Unknown data source: "${source}". Supported: qbo_accounts, qbo_vendors, qbo_pnl, kpi_daily_revenue, kpi_revenue_by_channel`);
   }
 }
 
 async function handleGenerateFile(params: Record<string, unknown>): Promise<ActionResult> {
   // Fall back to configured default Slack channel when the caller (e.g. web chat) has no channel context.
   // Set ABRA_SLACK_CHANNEL_ID in Vercel env to a Slack channel ID (e.g. C01234567) for web-chat file uploads.
-  const DEFAULT_CHANNEL = (process.env.ABRA_SLACK_CHANNEL_ID || process.env.SLACK_OPS_CHANNEL_ID || "").trim();
+  const DEFAULT_CHANNEL = (process.env.ABRA_SLACK_CHANNEL_ID || process.env.SLACK_OPS_CHANNEL_ID || process.env.SLACK_CHANNEL_DAILY || "").trim();
   const channelId = String(params.channel_id || params.channelId || DEFAULT_CHANNEL);
   console.log(`[handleGenerateFile] ENTRY — params keys: ${Object.keys(params).join(", ")}, channel_id=${channelId || "NONE"}, hasHeaders=${Array.isArray(params.headers)}, hasRows=${Array.isArray(params.rows)}, hasSheets=${Array.isArray(params.sheets)}, source=${params.source || "none"}`);
   const threadTs = params.thread_ts ? String(params.thread_ts) : undefined;

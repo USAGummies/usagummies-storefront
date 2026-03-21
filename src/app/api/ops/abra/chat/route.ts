@@ -357,7 +357,9 @@ RULES:
   - source "qbo_accounts" or "qbo_chart_of_accounts" → all QBO accounts with ID, name, type, sub-type, balance
   - source "qbo_vendors" → all QBO vendors
   - source "qbo_pnl" → P&L data (add "start" and "end" date params)
+  - source "kpi_daily_revenue" or "kpi_revenue_by_channel" → daily Shopify + Amazon revenue/orders MTD with 7-day rolling avg and channel mix % (2 sheets: Daily Revenue + Summary)
   Example: {"action_type":"generate_file","params":{"filename":"chart_of_accounts.xlsx","source":"qbo_accounts"}}
+  Example: {"action_type":"generate_file","params":{"filename":"march_revenue.xlsx","source":"kpi_daily_revenue"}}
 - For SMALL datasets (under ~30 rows) → include headers and rows arrays directly in the action
 - When a table has more than ~10 rows, proactively offer a file export
 - For XLSX: you can create multi-sheet workbooks with the "sheets" array param
@@ -2000,6 +2002,8 @@ export async function POST(req: Request) {
         ? "qbo_accounts"
         : /p.?l|profit.?loss/i.test(rawMessage)
         ? "qbo_pnl"
+        : /revenue|sales|kpi|shopify|amazon.*daily|daily.*channel/i.test(rawMessage)
+        ? "kpi_daily_revenue"
         : undefined;
       const forcedActionXml = `<action>{"action_type":"generate_file","title":"File Export","description":"Auto-forced — Abra incorrectly claimed it could not generate files","department":"operations","risk_level":"low","params":{"filename":"${forcedFilename}"${forcedSource ? `,"source":"${forcedSource}"` : ',"headers":[],"rows":[]'}}}</action>`;
       try {
