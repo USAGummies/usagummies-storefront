@@ -246,7 +246,25 @@ export async function getMonthlySpend(
       };
     }
 
-    const total = Number(row.total_cost) || 0;
+    let total = Number(row.total_cost) || 0;
+
+    // Self-validation: cross-check total against sum of byProvider.
+    // If they diverge by >10%, the RPC is likely broken (e.g. cartesian product).
+    // Fall back to the provider sum which comes from a simpler aggregation.
+    const providerSum = Object.values(row.by_provider || {}).reduce(
+      (s: number, v: unknown) => s + (Number(v) || 0),
+      0,
+    );
+    if (providerSum > 0 && total > 0) {
+      const divergence = Math.abs(total - providerSum) / Math.max(total, providerSum);
+      if (divergence > 0.1) {
+        console.error(
+          `[abra-cost] SELF-CHECK FAILED: total ($${total.toFixed(2)}) diverges from provider sum ($${providerSum.toFixed(2)}) by ${(divergence * 100).toFixed(0)}%. Using provider sum as fallback.`,
+        );
+        total = providerSum;
+      }
+    }
+
     return {
       total: Math.round(total * 100) / 100,
       budget: MONTHLY_BUDGET,

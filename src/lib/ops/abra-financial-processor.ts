@@ -40,6 +40,7 @@ type BrainRow = {
   raw_text: string | null;
   summary_text: string | null;
   category: string | null;
+  entry_type: string | null;
   created_at: string;
 };
 
@@ -195,6 +196,17 @@ async function processFinancialEntry(entry: BrainRow): Promise<{
     return { transactions: 0 };
   }
 
+  // Source-type guard — NEVER auto-extract transactions from teachings or
+  // conversation summaries. These are contextual knowledge, not verified
+  // bank records. Only process entries from invoices, receipts, bank feeds,
+  // or email ingestion. This prevents phantom transactions from appearing
+  // in Rene's approval queue when someone teaches Abra about a planned payment.
+  const unsafeSourceTypes = new Set(["teaching", "summary", "auto_teach", "correction"]);
+  if (unsafeSourceTypes.has(entry.entry_type || "")) {
+    console.log(`[fin-processor] Skipping ${entry.id} — entry_type "${entry.entry_type}" is not a verified financial source`);
+    return { transactions: 0 };
+  }
+
   // Call Claude to extract transactions
   const model = await getPreferredClaudeModel("claude-sonnet-4-6");
 
@@ -329,7 +341,7 @@ export async function processFinancialBrainEntries(params?: {
   const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
 
   const rows = (await sbFetch(
-    `/rest/v1/open_brain_entries?department=eq.finance&or=(financial_processed.is.null,financial_processed.eq.false)&created_at=gte.${encodeURIComponent(twoDaysAgo)}&select=id,title,raw_text,summary_text,category,created_at&order=created_at.desc&limit=${limit}`,
+    `/rest/v1/open_brain_entries?department=eq.finance&or=(financial_processed.is.null,financial_processed.eq.false)&created_at=gte.${encodeURIComponent(twoDaysAgo)}&select=id,title,raw_text,summary_text,category,entry_type,created_at&order=created_at.desc&limit=${limit}`,
   )) as BrainRow[];
 
   if (!Array.isArray(rows) || rows.length === 0) {

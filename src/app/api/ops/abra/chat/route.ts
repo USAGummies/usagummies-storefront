@@ -664,6 +664,44 @@ export async function POST(req: Request) {
   const slackThreadTs = typeof payload.slack_thread_ts === "string" ? payload.slack_thread_ts.trim() : "";
   const messageDepartment = detectDepartment(message);
 
+  // ─── Intercept teach: commands and route directly to /api/ops/abra/teach ───
+  // Without this, Claude says "Logged" but never emits a create_brain_entry action,
+  // so web-chat teach commands vanish. The dedicated teach endpoint handles
+  // mention-stripping, embedding, and pgvector storage correctly.
+  const teachMatch = rawMessage.match(/^(?:teach|correct|correction|update):\s*(.+)/is);
+  if (teachMatch) {
+    try {
+      const host = new URL(req.url).origin;
+      const teachRes = await fetch(`${host}/api/ops/abra/teach`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: req.headers.get("Authorization") || "",
+        },
+        body: JSON.stringify({
+          content: teachMatch[1].trim(),
+          source: `web_chat:${actorEmail}`,
+          tags: [],
+        }),
+        signal: AbortSignal.timeout(15000),
+      });
+      const teachData = (await teachRes.json()) as Record<string, unknown>;
+      const reply = teachData.success
+        ? `Logged to brain (ID: ${String(teachData.id || "").slice(0, 8)}…). I'll use this in future answers.`
+        : `Failed to store teaching: ${teachData.message || "unknown error"}`;
+      return NextResponse.json({
+        reply,
+        confidence: teachData.success ? 100 : 50,
+        thread_id: threadId,
+        sources: [],
+        actions: [],
+      });
+    } catch (err) {
+      console.error("[chat] teach intercept failed:", err);
+      // Fall through to normal chat flow as fallback
+    }
+  }
+
   if (healthMode) {
     const reply = buildHealthModeReply(message);
     queueChatHistory({
