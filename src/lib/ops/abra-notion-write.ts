@@ -245,8 +245,8 @@ export async function updateNotionPage(params: {
   page_id: string;
   properties?: Record<string, unknown>;
   content?: string;
-}): Promise<boolean> {
-  if (!NOTION_API_KEY()) return false;
+}): Promise<{ ok: boolean; error?: string }> {
+  if (!NOTION_API_KEY()) return { ok: false, error: "NOTION_API_KEY not configured" };
 
   try {
     if (params.properties && Object.keys(params.properties).length > 0) {
@@ -268,9 +268,14 @@ export async function updateNotionPage(params: {
       }
     }
 
-    return true;
-  } catch {
-    return false;
+    return { ok: true };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    // Provide actionable guidance for the most common failure
+    const actionable = msg.includes("object_not_found") || msg.includes("404")
+      ? "Page not found — share the Notion page with the OpenClaw Agent integration first (open the page in Notion → Share → Invite → search 'OpenClaw Agent')"
+      : msg;
+    return { ok: false, error: actionable };
   }
 }
 

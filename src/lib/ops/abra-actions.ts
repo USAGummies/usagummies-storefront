@@ -830,14 +830,14 @@ async function handleUpdateNotion(
   }
 
   if (pageId) {
-    const ok = await updateNotionPage({
+    const result = await updateNotionPage({
       page_id: pageId,
       ...(properties ? { properties } : {}),
       ...(content ? { content } : {}),
     });
     return {
-      success: ok,
-      message: ok ? "Updated Notion page" : "Failed to update Notion page",
+      success: result.ok,
+      message: result.ok ? "Updated Notion page" : `Failed to update Notion page: ${result.error || "unknown error"}`,
     };
   }
 
