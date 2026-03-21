@@ -103,7 +103,7 @@ export const maxDuration = 60;
 const DEFAULT_MATCH_COUNT = 8;
 const DEFAULT_CLAUDE_MODEL =
   process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
-const MAX_MESSAGE_LENGTH = 16000;
+const MAX_MESSAGE_LENGTH = 5000;
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
 
 // ─── File Upload Helpers ───
