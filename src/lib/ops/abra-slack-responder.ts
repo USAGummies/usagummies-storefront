@@ -962,6 +962,63 @@ export async function getThreadHistory(
   }
 }
 
+/**
+ * Fetch recent channel messages (last 5) for non-threaded messages.
+ * Gives Abra context about what the user just said before @mentioning.
+ * Only includes messages from the last 10 minutes to keep context relevant.
+ */
+export async function getRecentChannelContext(
+  channelId: string,
+  currentTs: string,
+  limit = 5,
+): Promise<SlackThreadMessage[]> {
+  const botToken = process.env.SLACK_BOT_TOKEN;
+  if (!botToken) return [];
+
+  try {
+    // Only look back 10 minutes for relevant context
+    const tenMinAgo = String(Number(currentTs) - 600);
+
+    const url = new URL("https://slack.com/api/conversations.history");
+    url.searchParams.set("channel", channelId);
+    url.searchParams.set("latest", currentTs);
+    url.searchParams.set("oldest", tenMinAgo);
+    url.searchParams.set("limit", String(limit + 1)); // +1 because current message may be included
+    url.searchParams.set("inclusive", "false");
+
+    const res = await fetch(url.toString(), {
+      headers: { Authorization: `Bearer ${botToken}` },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return [];
+
+    const data = (await res.json()) as {
+      ok?: boolean;
+      messages?: Array<{ text?: string; bot_id?: string; subtype?: string; ts?: string }>;
+    };
+    if (!data.ok || !Array.isArray(data.messages)) return [];
+
+    return data.messages
+      .filter((m) => m.ts !== currentTs) // Exclude the current message
+      .map((message) => {
+        const text = String(message.text || "").trim();
+        if (!text) return null;
+        if (message.subtype && message.subtype !== "bot_message") return null;
+        const isBot = Boolean(message.bot_id);
+        return {
+          role: isBot ? "assistant" : "user",
+          content: isBot
+            ? text.replace(/^🧠\s*\*Abra\*\s*\n\n?/i, "").trim()
+            : text,
+        } as SlackThreadMessage;
+      })
+      .filter((value): value is SlackThreadMessage => !!value)
+      .reverse(); // Chronological order (oldest first)
+  } catch {
+    return [];
+  }
+}
+
 export async function getSlackDisplayName(userId: string): Promise<string> {
   if (!userId) return "slack-user";
   const cacheKey = `abra:slack:user:${userId}`;

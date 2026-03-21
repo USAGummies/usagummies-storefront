@@ -3142,6 +3142,38 @@ async function handleGenerateFile(params: Record<string, unknown>): Promise<Acti
   };
 }
 
+// ─── Pre-flight param validation ───
+// Checks required params before dispatching to handlers.
+// Returns null if valid, or an error message if required params are missing.
+const REQUIRED_PARAMS: Record<string, string[]> = {
+  send_slack: ["message"],
+  send_email: ["to", "subject", "body"],
+  draft_email_reply: ["to", "subject", "body"],
+  create_task: ["title"],
+  update_notion: ["page_id"],
+  create_brain_entry: ["title", "text"],
+  create_notion_page: ["title"],
+  record_transaction: ["type", "amount"],
+  generate_file: ["filename"],
+  correct_claim: ["original_claim", "correction"],
+  query_qbo: ["query_type"],
+};
+
+function validateActionParams(actionType: string, params: Record<string, unknown>): string | null {
+  const required = REQUIRED_PARAMS[actionType];
+  if (!required) return null; // No requirements defined = pass
+
+  const missing = required.filter((key) => {
+    const val = params[key];
+    return val === undefined || val === null || val === "";
+  });
+
+  if (missing.length > 0) {
+    return `${actionType} requires: ${missing.join(", ")}`;
+  }
+  return null;
+}
+
 const ACTION_HANDLERS: Record<
   string,
   (params: Record<string, unknown>) => Promise<ActionResult>
@@ -3831,6 +3863,18 @@ export async function executeAction(approvalId: string): Promise<ActionResult> {
     return { success: false, message: "Invalid action payload" };
   }
 
+  // Pre-flight param validation
+  const paramError = validateActionParams(action.action_type, action.params || {});
+  if (paramError) {
+    await markApprovalResolved({
+      approvalId,
+      status: "denied",
+      reasoning: `Param validation failed: ${paramError}`,
+      claimId: claimed.claimId,
+    });
+    return { success: false, message: paramError };
+  }
+
   const handler = ACTION_HANDLERS[action.action_type];
   if (!handler) {
     await markApprovalResolved({
@@ -3930,6 +3974,10 @@ export async function executeActionByType(
   actionType: string,
   params: Record<string, unknown>,
 ): Promise<ActionResult> {
+  const paramError = validateActionParams(actionType, params);
+  if (paramError) {
+    return { success: false, message: paramError };
+  }
   const handler = ACTION_HANDLERS[actionType];
   if (!handler) {
     return { success: false, message: `No handler for ${actionType}` };

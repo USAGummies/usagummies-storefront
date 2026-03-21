@@ -4,6 +4,7 @@ import { kv } from "@vercel/kv";
 import {
   deleteSlackMessage,
   getSlackDisplayName,
+  getRecentChannelContext,
   getThreadHistory,
   isLikelySlowQuery,
   postSlackMessage,
@@ -263,7 +264,9 @@ export async function POST(req: Request) {
     try {
       const [displayName, history] = await Promise.all([
         getSlackDisplayName(user),
-        thread_ts ? getThreadHistory(channel, thread_ts) : Promise.resolve([]),
+        thread_ts
+          ? getThreadHistory(channel, thread_ts)
+          : getRecentChannelContext(channel, ts),
       ]);
 
       // If files are attached, download and extract their content

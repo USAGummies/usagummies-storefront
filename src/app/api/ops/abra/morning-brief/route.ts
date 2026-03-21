@@ -635,6 +635,133 @@ export async function GET(req: Request) {
 }
 
 // ---------------------------------------------------------------------------
+// Rene's personalized finance DM — sent alongside the main morning brief
+// ---------------------------------------------------------------------------
+
+const RENE_SLACK_USER_ID = "U0ALL27JM38";
+
+async function fetchQboUncategorizedCount(): Promise<number> {
+  // Check QBO for uncategorized transactions (if QBO is connected)
+  try {
+    const { getValidAccessToken, getRealmId } = await import("@/lib/ops/qbo-auth");
+    const token = await getValidAccessToken();
+    const realmId = await getRealmId();
+    if (!token || !realmId) return 0;
+
+    const qboBase = process.env.QBO_SANDBOX === "true"
+      ? "https://sandbox-quickbooks.api.intuit.com"
+      : "https://quickbooks.api.intuit.com";
+
+    const res = await fetch(
+      `${qboBase}/v3/company/${realmId}/query?query=${encodeURIComponent("SELECT COUNT(*) FROM Purchase WHERE AccountRef IS NULL MAXRESULTS 1")}&minorversion=73`,
+      {
+        headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(10000),
+      },
+    );
+    if (!res.ok) return 0;
+    const data = (await res.json()) as { QueryResponse?: { totalCount?: number } };
+    return data.QueryResponse?.totalCount || 0;
+  } catch {
+    return 0;
+  }
+}
+
+async function fetchPendingApprovalDetails(): Promise<Array<{ id: string; summary: string; age_hours: number }>> {
+  const env = getSupabaseEnv();
+  if (!env) return [];
+  try {
+    const rows = (await sbFetch<Array<{ id: string; summary: string; created_at: string }>>(
+      "/rest/v1/approvals?status=eq.pending&select=id,summary,created_at&order=created_at.asc&limit=10",
+    ));
+    if (!rows) return [];
+    return rows.map((r) => ({
+      id: r.id,
+      summary: (r.summary || "").slice(0, 80),
+      age_hours: Math.round((Date.now() - new Date(r.created_at).getTime()) / 3600000),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+async function sendReneFinanceBrief(
+  briefData: BriefData,
+): Promise<{ ok: boolean; error?: string }> {
+  const botToken = process.env.SLACK_BOT_TOKEN;
+  if (!botToken) return { ok: false, error: "No SLACK_BOT_TOKEN" };
+
+  const [uncategorized, approvals] = await Promise.all([
+    fetchQboUncategorizedCount(),
+    fetchPendingApprovalDetails(),
+  ]);
+
+  const lines: string[] = [
+    `:brain: *Good morning, Rene — here's your finance brief for ${new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}*`,
+    "",
+  ];
+
+  // Revenue snapshot
+  const totalRev = briefData.shopify.revenue + briefData.amazon.revenue;
+  const totalOrders = briefData.shopify.orderCount + briefData.amazon.orderCount;
+  lines.push(`:moneybag: *Yesterday's Revenue:* $${totalRev.toFixed(2)} (${totalOrders} orders)`);
+  if (briefData.shopify.revenue > 0) lines.push(`  • Shopify: $${briefData.shopify.revenue.toFixed(2)} (${briefData.shopify.orderCount} orders)`);
+  if (briefData.amazon.revenue > 0) lines.push(`  • Amazon: $${briefData.amazon.revenue.toFixed(2)} (${briefData.amazon.orderCount} orders)`);
+  lines.push("");
+
+  // Approvals waiting
+  if (approvals.length > 0) {
+    lines.push(`:clipboard: *${approvals.length} approval(s) waiting for you:*`);
+    for (const a of approvals.slice(0, 5)) {
+      const urgency = a.age_hours > 24 ? " :rotating_light:" : "";
+      lines.push(`  • ${a.summary} (${a.age_hours}h ago)${urgency}`);
+    }
+    lines.push("");
+  }
+
+  // Uncategorized transactions
+  if (uncategorized > 0) {
+    lines.push(`:card_index_dividers: *${uncategorized} uncategorized transaction(s)* in QBO bank feed need review`);
+    lines.push("");
+  }
+
+  // System health
+  if (briefData.health.status !== "operational") {
+    lines.push(`:warning: *System health: ${briefData.health.status}* — ${briefData.health.details.join(", ")}`);
+    lines.push("");
+  }
+
+  // Today's priority
+  lines.push(":dart: *Today's priority:*");
+  if (approvals.length > 0 && approvals.some((a) => a.age_hours > 12)) {
+    lines.push("Review stale approvals — some have been waiting 12+ hours.");
+  } else if (uncategorized > 5) {
+    lines.push(`Categorize the ${uncategorized} pending bank feed transactions in QBO.`);
+  } else {
+    lines.push("All clear — check back with Abra if you need anything.");
+  }
+
+  const message = lines.join("\n");
+
+  // Send as DM to Rene
+  const res = await fetch("https://slack.com/api/chat.postMessage", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${botToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      channel: RENE_SLACK_USER_ID, // DM by user ID
+      text: message,
+    }),
+    signal: AbortSignal.timeout(10000),
+  });
+
+  const data = (await res.json()) as { ok: boolean; error?: string };
+  return { ok: data.ok, error: data.error };
+}
+
+// ---------------------------------------------------------------------------
 // POST handler — full Morning Brief with parallel data gathering, Block Kit,
 // Slack delivery, and Supabase archival
 // ---------------------------------------------------------------------------
@@ -711,9 +838,16 @@ export async function POST(req: Request) {
       );
     });
 
+    // 5. Rene's personalized finance DM (best-effort, never blocks)
+    const reneDmResult = await sendReneFinanceBrief(briefData).catch((err) => {
+      console.error("[morning-brief] Rene DM failed:", err instanceof Error ? err.message : err);
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    });
+
     return NextResponse.json({
       ok: true,
       slack: slackResult,
+      rene_dm: reneDmResult,
       data: {
         shopify_revenue: briefData.shopify.revenue,
         shopify_orders: briefData.shopify.orderCount,
