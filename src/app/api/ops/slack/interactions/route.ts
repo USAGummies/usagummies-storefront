@@ -302,6 +302,32 @@ export async function POST(req: Request) {
     });
   }
 
+  // ─── Batch categorization buttons ───
+  if (actionId === "approve_batch_categorize" || actionId === "reject_batch_categorize" || actionId === "review_batch_categorize") {
+    const responseUrl = payload.response_url || "";
+    if (actionId === "review_batch_categorize") {
+      after(async () => {
+        await replaceSlackMessage(responseUrl,
+          "📋 *Review mode* — open QBO Bank Transactions to review individually: https://app.qbo.intuit.com/app/banktransactions\n_Auto-categorized items are already applied. Only flagged items remain._"
+        );
+      });
+      return NextResponse.json({ response_type: "ephemeral", text: "📋 Opening review details..." });
+    }
+    if (actionId === "reject_batch_categorize") {
+      after(async () => {
+        await replaceSlackMessage(responseUrl, `❌ Batch rejected by ${actor}. Transactions remain uncategorized in QBO.`);
+      });
+      return NextResponse.json({ response_type: "ephemeral", text: "❌ Batch rejected." });
+    }
+    // approve_batch_categorize — already auto-applied, just acknowledge
+    after(async () => {
+      await replaceSlackMessage(responseUrl,
+        `✅ Batch approved by ${actor}. All auto-categorized transactions confirmed.`
+      );
+    });
+    return NextResponse.json({ response_type: "ephemeral", text: "✅ Batch approved!" });
+  }
+
   if (actionId === "edit_email_action") {
     const approvalId = value;
     const triggerId = payload.trigger_id || "";
