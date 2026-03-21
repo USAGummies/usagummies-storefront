@@ -323,6 +323,7 @@ FORMAT (append <action> JSON blocks, max 3 per reply):
 <action>{"action_type":"create_brain_entry","title":"...","description":"...","department":"executive","risk_level":"low","params":{"title":"...","text":"..."}}</action>
 <action>{"action_type":"generate_file","title":"Vendor List Export","description":"Export QBO vendors","department":"finance","risk_level":"low","params":{"filename":"vendors.xlsx","source":"qbo_vendors"}}</action>
 <action>{"action_type":"generate_file","title":"Chart of Accounts","description":"Export full COA","department":"finance","risk_level":"low","params":{"filename":"chart_of_accounts.xlsx","source":"qbo_accounts"}}</action>
+<action>{"action_type":"create_task","title":"Follow up with distributor","description":"Check PO status","department":"operations","risk_level":"low","params":{"title":"Follow up with Inderbitzin PO status","description":"Review PO #009180 and confirm delivery timeline","priority":"high"}}</action>
 
 EXAMPLES:
 • "remind the team about the production call" → emit send_slack action

@@ -119,8 +119,12 @@ export async function POST(req: Request) {
 
   const department = v.data.department?.toLowerCase() || "";
   const content = v.data.content;
+  const source = typeof v.data.source === "string" ? v.data.source : "";
+  // Detect if this is a correction (supersedes conflicting entries)
+  const isCorrection = /^correct|^correction|supersede|replaces|not.*was/i.test(content) ||
+    source.includes("correction");
   const title =
-    v.data.title || `Teaching: ${department || "general"} — ${content.slice(0, 60)}`;
+    v.data.title || `${isCorrection ? "Correction" : "Teaching"}: ${department || "general"} — ${content.slice(0, 60)}`;
 
   try {
     const circuitCheck = await canUseSupabase();
@@ -182,10 +186,45 @@ export async function POST(req: Request) {
     const resultId = rows[0]?.id;
     await markSupabaseSuccess();
 
+    // For corrections: find and supersede conflicting entries via semantic search
+    let supersededCount = 0;
+    if (isCorrection && resultId && embedding.length > 0) {
+      try {
+        const similar = (await sbFetch("/rest/v1/rpc/search_memory", {
+          method: "POST",
+          body: JSON.stringify({
+            query_embedding: `[${embedding.join(",")}]`,
+            match_count: 5,
+          }),
+        })) as Array<{ id: string; title: string; similarity: number }>;
+
+        const toSupersede = (Array.isArray(similar) ? similar : [])
+          .filter((s) => s.id !== resultId); // Don't supersede self
+        for (const old of toSupersede) {
+          await sbFetch(
+            `/rest/v1/open_brain_entries?id=eq.${encodeURIComponent(old.id)}&superseded_by=is.null`,
+            {
+              method: "PATCH",
+              headers: { Prefer: "return=minimal" },
+              body: JSON.stringify({
+                superseded_by: resultId,
+                superseded_at: new Date().toISOString(),
+              }),
+            },
+          );
+          supersededCount++;
+        }
+      } catch (err) {
+        console.warn("[teach] Supersession search failed (non-fatal):", err instanceof Error ? err.message : err);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       id: resultId,
-      message: `Teaching stored in ${department || "general"} knowledge. Abra will use this in future answers.`,
+      message: isCorrection
+        ? `Correction stored. ${supersededCount > 0 ? `${supersededCount} conflicting entr${supersededCount === 1 ? "y" : "ies"} superseded.` : "No conflicting entries found to supersede."} Abra will use the corrected info going forward.`
+        : `Teaching stored in ${department || "general"} knowledge. Abra will use this in future answers.`,
     });
   } catch (error) {
     if (isSupabaseRelatedError(error)) {

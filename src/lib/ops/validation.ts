@@ -205,6 +205,8 @@ export const TeachRequestSchema = z.object({
   department: z.string().trim().max(50).optional().default(""),
   content: z.string().trim().min(1, "content is required").max(10000),
   title: z.string().trim().max(200).optional(),
+  source: z.string().trim().max(200).optional(),
+  tags: z.array(z.string().max(50)).max(20).optional(),
 });
 
 /** POST /api/ops/abra/correct */

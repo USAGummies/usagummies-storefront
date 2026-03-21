@@ -3906,6 +3906,26 @@ export function getAvailableActions(): string[] {
   return Object.keys(ACTION_HANDLERS);
 }
 
+/** Reject a pending approval without executing it. */
+export async function rejectAction(
+  approvalId: string,
+  reason?: string,
+): Promise<ActionResult> {
+  if (!UUID_RE.test(approvalId)) {
+    return { success: false, message: "Invalid approval ID format" };
+  }
+  const current = await fetchApproval(approvalId);
+  if (!current) return { success: false, message: "Approval not found" };
+  if (current.status !== "pending") return { success: false, message: `Approval is already ${current.status}` };
+
+  await markApprovalResolved({
+    approvalId,
+    status: "denied",
+    reasoning: reason || "Rejected by user",
+  });
+  return { success: true, message: "Approval rejected" };
+}
+
 export async function executeActionByType(
   actionType: string,
   params: Record<string, unknown>,
