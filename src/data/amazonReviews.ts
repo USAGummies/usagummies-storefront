@@ -1,7 +1,7 @@
 export const AMAZON_REVIEWS = {
   source: "amazon",
   asin: "B0G1JK92TJ",
-  listingUrl: "https://www.amazon.com/dp/B0G1JK92TJ",
+  listingUrl: "https://www.amazon.com/dp/B0G1JK92TJ?maas=maas_adg_BA724FDB5D62533",
   aggregate: { rating: 4.8, count: 2000 },
   reviews: [
     {

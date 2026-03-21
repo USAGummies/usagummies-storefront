@@ -232,7 +232,7 @@ export default function WhereToBuyPage() {
               Shop online
             </Link>
             <a
-              href="https://www.amazon.com/dp/B0G1JK92TJ"
+              href="https://www.amazon.com/dp/B0G1JK92TJ?maas=maas_adg_BA724FDB5D62533"
               target="_blank"
               rel="noopener noreferrer"
               className="btn btn-outline pressable"
