@@ -97,6 +97,9 @@ CREATE POLICY "service_role_cost_log" ON public.abra_cost_log
   FOR ALL USING (true) WITH CHECK (true);
 
 -- RPC: Get monthly AI spend
+-- Fixed: original used LEFT JOIN LATERAL ... ON true which created a cartesian
+-- product (rows × providers × endpoints), inflating totals by ~30x.
+-- Now uses scalar subqueries for by_provider and by_endpoint aggregations.
 CREATE OR REPLACE FUNCTION public.get_monthly_ai_spend(
   target_month TEXT DEFAULT NULL  -- 'YYYY-MM' format, defaults to current month
 )
@@ -119,27 +122,19 @@ BEGIN
     COALESCE(SUM(c.input_tokens)::BIGINT, 0) AS total_input_tokens,
     COALESCE(SUM(c.output_tokens)::BIGINT, 0) AS total_output_tokens,
     COUNT(*)::BIGINT AS call_count,
-    COALESCE(
-      jsonb_object_agg(sub_p.provider, sub_p.cost) FILTER (WHERE sub_p.provider IS NOT NULL),
-      '{}'::jsonb
+    (SELECT COALESCE(jsonb_object_agg(p.provider, p.cost), '{}'::jsonb)
+     FROM (SELECT c2.provider, SUM(c2.estimated_cost_usd) AS cost
+           FROM public.abra_cost_log c2
+           WHERE to_char(c2.created_at, 'YYYY-MM') = m
+           GROUP BY c2.provider) p
     ) AS by_provider,
-    COALESCE(
-      jsonb_object_agg(sub_e.endpoint, sub_e.cost) FILTER (WHERE sub_e.endpoint IS NOT NULL),
-      '{}'::jsonb
+    (SELECT COALESCE(jsonb_object_agg(e.endpoint, e.cost), '{}'::jsonb)
+     FROM (SELECT c3.endpoint, SUM(c3.estimated_cost_usd) AS cost
+           FROM public.abra_cost_log c3
+           WHERE to_char(c3.created_at, 'YYYY-MM') = m
+           GROUP BY c3.endpoint) e
     ) AS by_endpoint
   FROM public.abra_cost_log c
-  LEFT JOIN LATERAL (
-    SELECT c2.provider, SUM(c2.estimated_cost_usd) AS cost
-    FROM public.abra_cost_log c2
-    WHERE to_char(c2.created_at, 'YYYY-MM') = m
-    GROUP BY c2.provider
-  ) sub_p ON true
-  LEFT JOIN LATERAL (
-    SELECT c3.endpoint, SUM(c3.estimated_cost_usd) AS cost
-    FROM public.abra_cost_log c3
-    WHERE to_char(c3.created_at, 'YYYY-MM') = m
-    GROUP BY c3.endpoint
-  ) sub_e ON true
   WHERE to_char(c.created_at, 'YYYY-MM') = m;
 END;
 $$ LANGUAGE plpgsql;
