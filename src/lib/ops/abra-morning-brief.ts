@@ -519,6 +519,83 @@ export async function generateMorningBrief(): Promise<string> {
   return text.length > 1990 ? `${text.slice(0, 1987)}...` : text;
 }
 
+// ── Prior Observation Helpers ────────────────────────────────────────────────
+
+/**
+ * Reads Abra's own prior morning-brief observations from the last 30 days.
+ * These are the entries Abra wrote after each previous run — the "case file"
+ * that enables pattern recognition across cycles.
+ */
+async function fetchPriorBriefObservations(): Promise<string> {
+  const env = getSupabaseEnv();
+  if (!env) return "";
+
+  try {
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const rows = await sbFetch(
+      `/rest/v1/open_brain_entries?source_ref=like.morning-brief-*&created_at=gte.${since}&select=title,summary_text,raw_text,created_at&order=created_at.desc&limit=30`,
+    ) as Array<{ title?: string; summary_text?: string; raw_text?: string; created_at: string }>;
+
+    if (!Array.isArray(rows) || rows.length === 0) return "";
+
+    const lines = rows.map((r) => {
+      const date = r.created_at.split("T")[0];
+      const body = r.summary_text || r.raw_text || "";
+      return `[${date}] ${r.title || "Morning Brief"}: ${body.slice(0, 400)}`;
+    });
+
+    return lines.join("\n\n");
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Writes today's morning brief as an open_brain_entries record so future
+ * runs can read it and build on it — the accumulation loop.
+ */
+async function writeBriefToMemory(briefText: string, dateShort: string): Promise<void> {
+  const env = getSupabaseEnv();
+  if (!env) return;
+
+  // Strip Slack formatting for a clean stored copy
+  const clean = briefText.replace(/[*`]/g, "").replace(/\n{3,}/g, "\n\n").trim();
+  // Title = first non-empty line (strip leading emoji + asterisks)
+  const firstLine = clean.split("\n").find((l) => l.trim().length > 0) || "Morning Brief";
+  const title = firstLine.replace(/^[^\w]*/, "").slice(0, 200);
+
+  try {
+    const headers = new Headers();
+    headers.set("apikey", env.serviceKey);
+    headers.set("Authorization", `Bearer ${env.serviceKey}`);
+    headers.set("Content-Type", "application/json");
+    headers.set("Prefer", "return=minimal");
+
+    await fetch(`${env.baseUrl}/rest/v1/open_brain_entries`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        source_type: "agent",
+        source_ref: `morning-brief-${dateShort}`,
+        entry_type: "summary",
+        title,
+        raw_text: clean,
+        summary_text: clean.slice(0, 800),
+        category: "operational",
+        department: "operations",
+        confidence: "high",
+        priority: "normal",
+        tags: ["morning-brief", "daily-synthesis"],
+      }),
+      signal: AbortSignal.timeout(8000),
+      cache: "no-store",
+    });
+  } catch (err) {
+    // Best-effort — don't break the brief if write-back fails
+    console.error("[morning-brief] write-back to brain failed:", err instanceof Error ? err.message : err);
+  }
+}
+
 export async function generateLLMMorningBrief(): Promise<string> {
   const payload = await generateMorningBriefPayload();
   const date = new Date();
@@ -528,6 +605,7 @@ export async function generateLLMMorningBrief(): Promise<string> {
     day: "numeric",
     year: "numeric",
   });
+  const dateShort = date.toISOString().split("T")[0];
 
   // Load versioned prompt with fallback
   const FALLBACK_PROMPT = `You are the executive briefing analyst for USA Gummies, a CPG company selling vitamin gummies on Shopify and Amazon.
@@ -563,10 +641,17 @@ Rules:
     return generateMorningBrief();
   }
 
+  // Load prior observations in parallel with LLM setup — best-effort
+  const priorObservations = await fetchPriorBriefObservations().catch(() => "");
+
   try {
     const model = await getPreferredClaudeModel(
       process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6",
     );
+
+    const priorContext = priorObservations
+      ? `\n\nPrior observations (your own notes from the last 30 days — use these to identify patterns and trends):\n${priorObservations}`
+      : "";
 
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -583,7 +668,7 @@ Rules:
         messages: [
           {
             role: "user",
-            content: `Generate the morning brief for ${dateLabel}.\n\nOperational data:\n${JSON.stringify(payload, null, 2)}`,
+            content: `Generate the morning brief for ${dateLabel}.\n\nOperational data:\n${JSON.stringify(payload, null, 2)}${priorContext}`,
           },
         ],
       }),
@@ -625,6 +710,9 @@ Rules:
     if (!text) {
       return generateMorningBrief();
     }
+
+    // Write this brief back to brain so future runs can build on it
+    writeBriefToMemory(text, dateShort).catch(() => {});
 
     // Prepend header and append footer
     const header = `🌅 *ABRA MORNING BRIEF — ${dateLabel}*\n\n`;
