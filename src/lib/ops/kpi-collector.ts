@@ -142,11 +142,45 @@ async function fetchAmazonTodayRevenue(): Promise<{
   }
 
   try {
-    const stats = await fetchAmazonOrderStats(1);
+    // Use calendar-day boundary (midnight PT) instead of rolling 24h window.
+    // This matches what Amazon Seller Central shows as "Today so far."
+    const ptNow = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
+    const midnightPT = new Date(ptNow.getFullYear(), ptNow.getMonth(), ptNow.getDate(), 0, 0, 0);
+    // Convert back to UTC for the API call
+    const ptOffset = ptNow.getTime() - new Date().getTime();
+    const midnightUTC = new Date(midnightPT.getTime() - ptOffset);
+    const createdAfter = midnightUTC.toISOString();
+
+    const { fetchOrders } = await import("@/lib/amazon/sp-api");
+    const { nowMinusBuffer } = await import("@/lib/amazon/sp-api");
+    const orders = await fetchOrders(createdAfter, nowMinusBuffer());
+
+    const totalOrders = orders.length;
+    const totalRevenue = orders.reduce(
+      (sum, o) => sum + parseFloat(o.OrderTotal?.Amount || "0"),
+      0,
+    );
+
+    // If OrderTotal is 0 for most orders (pending status), estimate from unit count
+    // Amazon typically doesn't populate OrderTotal until order is confirmed
+    const ordersWithTotal = orders.filter(o => parseFloat(o.OrderTotal?.Amount || "0") > 0);
+    const ordersWithoutTotal = totalOrders - ordersWithTotal.length;
+
+    let estimatedRevenue = totalRevenue;
+    if (ordersWithoutTotal > 0 && totalRevenue === 0) {
+      // Fallback: estimate from unit count × average sell price ($5.99)
+      const totalUnits = orders.reduce(
+        (sum, o) => sum + (o.NumberOfItemsShipped || 0) + (o.NumberOfItemsUnshipped || 0),
+        0,
+      );
+      estimatedRevenue = totalUnits * 5.99; // Our listing price
+      console.log(`[kpi] Amazon: ${ordersWithoutTotal} orders missing OrderTotal — estimated $${estimatedRevenue.toFixed(2)} from ${totalUnits} units × $5.99`);
+    }
+
     return {
-      revenue: stats.totalRevenue,
-      orderCount: stats.totalOrders,
-      error: null,
+      revenue: Math.round(estimatedRevenue * 100) / 100,
+      orderCount: totalOrders,
+      error: ordersWithoutTotal > 0 ? `${ordersWithoutTotal} orders missing OrderTotal (estimated)` : null,
     };
   } catch (err) {
     return {
