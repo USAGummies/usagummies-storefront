@@ -186,6 +186,13 @@ export async function POST(req: Request) {
     const resultId = rows[0]?.id;
     await markSupabaseSuccess();
 
+    // Index entities from the teaching (best-effort, never blocks)
+    if (resultId) {
+      import("@/lib/ops/signals/entity-graph").then(({ indexEntities }) =>
+        indexEntities(resultId, content).catch(() => {}),
+      ).catch(() => {});
+    }
+
     // For corrections: find and supersede conflicting entries via semantic search
     let supersededCount = 0;
     if (isCorrection && resultId && embedding.length > 0) {

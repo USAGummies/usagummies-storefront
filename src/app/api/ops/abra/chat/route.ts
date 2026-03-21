@@ -263,6 +263,7 @@ async function generateClaudeReply(input: {
   deadlineSignal?: AbortSignal;
   isFinanceRelated?: boolean;
   actorContext?: string | null;
+  domainContext?: string;
 }): Promise<{
   reply: string;
   modelUsed: string;
@@ -483,7 +484,7 @@ MARGIN & COST CLAIM VERIFICATION (applies when user asserts financial metrics):
       model: selectedModel,
       max_tokens: maxTokens,
       temperature: 0.2,
-      system: `${actionInstructions}\n\n${systemPrompt}${needsEmailExtractionSkill(input.message) ? `\n\n${EMAIL_EXTRACTION_SKILL.prompt}` : ""}${needsDealCalculatorSkill(input.message) ? `\n\n${DEAL_CALCULATOR_SKILL.prompt}` : ""}`,
+      system: `${actionInstructions}\n\n${systemPrompt}${input.domainContext ? `\n\n${input.domainContext}` : ""}${needsEmailExtractionSkill(input.message) ? `\n\n${EMAIL_EXTRACTION_SKILL.prompt}` : ""}${needsDealCalculatorSkill(input.message) ? `\n\n${DEAL_CALCULATOR_SKILL.prompt}` : ""}`,
       messages: [{ role: "user", content: userPrompt }],
     }),
     signal: llmAbort.signal,
@@ -664,6 +665,19 @@ export async function POST(req: Request) {
   const slackChannelId = typeof payload.slack_channel_id === "string" ? payload.slack_channel_id.trim() : "";
   const slackThreadTs = typeof payload.slack_thread_ts === "string" ? payload.slack_thread_ts.trim() : "";
   const messageDepartment = detectDepartment(message);
+
+  // ─── Intent routing — classify message domain for focused context ───
+  let domainContext = "";
+  try {
+    const { classifyIntent, getDomainContext } = await import("@/lib/ops/agents/intent-router");
+    const domain = classifyIntent(rawMessage);
+    domainContext = getDomainContext(domain);
+    if (domainContext) {
+      console.log(`[chat] Intent routed to domain: ${domain}`);
+    }
+  } catch {
+    // Non-fatal — fall through to full system prompt
+  }
 
   // ─── Intercept teach: commands and route directly to /api/ops/abra/teach ───
   // Without this, Claude says "Logged" but never emits a create_brain_entry action,
@@ -1967,6 +1981,7 @@ export async function POST(req: Request) {
       deadlineSignal: deadlineController.signal,
       isFinanceRelated: isFinanceQuestion(message),
       actorContext,
+      domainContext,
     });
     // Track Anthropic API success in capability registry
     void capMarkSuccess("anthropic").catch(() => {});
