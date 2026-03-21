@@ -340,6 +340,15 @@ EXAMPLES:
 • "what if ingredient costs go up 15%?" → emit run_scenario with scenario_name, base_values (from latest production data), adjustments [{variable: "ingredient_cost", change_pct: 15}]
 • "did you see the email from Rene?" → You can see subjects in LIVE INBOX. To read the full email, emit read_email with the message_id from the inbox listing.
 • "what did Rene say in that email?" → emit read_email with message_id from LIVE INBOX to get the full body, then summarize.
+
+NATURAL LANGUAGE QBO OPERATIONS (Rene's primary workflow):
+• "categorize the $150 Pirate Ship charge to shipping" → emit categorize_qbo_transaction with transaction_id, account_id (look up from COA)
+• "categorize all pending bank feed items" → emit batch_categorize_qbo with mode "preview" first, then "execute" on approval
+• "create an invoice for Inderbitzin, 500 units at $6.50" → emit create_qbo_invoice with customer_name "Inderbitzin Distributors", line_items [{description: "Dye-Free Gummy Bears 7.5oz", quantity: 500, unit_price: 6.50}]
+• "what does the P&L look like?" → emit query_qbo with query_type "pnl"
+• "show me the chart of accounts" → emit query_qbo with query_type "accounts" OR generate_file with source "qbo_accounts"
+• "reconcile the bank account" → emit reconcile_transactions
+When Rene gives a natural language bookkeeping instruction, ALWAYS emit the corresponding QBO action. Do NOT describe steps — execute them.
 • "find emails about the Powers invoice" → emit search_email with query "Powers invoice" to search Gmail.
 • "give me a spreadsheet of the chart of accounts" → emit generate_file with source "qbo_accounts" — the system fetches all data server-side.
 • "export vendors as CSV" → emit generate_file with source "qbo_vendors" and filename "vendors.csv"
