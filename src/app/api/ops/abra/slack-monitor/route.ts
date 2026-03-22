@@ -268,12 +268,19 @@ export async function POST(req: Request) {
               // Results are collected, then posted in order
               const processPart = async (partText: string, idx: number): Promise<{ idx: number; reply: string }> => {
                 const isCapabilityQuestion = /\b(can you|how do(?:es)? (?:that|this|it) work|is (?:that|it) possible|can we have|how does (?:collaboration|that work)|while i'?m driving|voice|hands.?free|conversational(?:ly)?|shared (?:worksheet|spreadsheet|document))\b/i.test(partText);
+                const isActionHeavy = /\b(create a|build a|come up with|make a|draft a|list of to.?dos|dashboard|tracker|tracking)\b/i.test(partText);
 
-                const endpoint = isCapabilityQuestion ? `${host}/api/ops/abra/chat?mode=quick` : `${host}/api/ops/abra/chat`;
-                const timeout = isCapabilityQuestion ? 20000 : 55000;
-                const message = isCapabilityQuestion
-                  ? `Answer this question about Abra's capabilities concisely (under 500 chars). Be honest about what you can and can't do: ${partText}`
-                  : partText;
+                const useQuickMode = isCapabilityQuestion;
+                const endpoint = useQuickMode ? `${host}/api/ops/abra/chat?mode=quick` : `${host}/api/ops/abra/chat`;
+                const timeout = useQuickMode ? 20000 : 55000;
+                let message = partText;
+                if (useQuickMode) {
+                  message = `Answer this question about Abra's capabilities concisely (under 500 chars). Be honest about what you can and can't do: ${partText}`;
+                } else if (isActionHeavy) {
+                  // For action-heavy requests, prepend a hint to respond with the action/list
+                  // rather than doing extensive data lookups first
+                  message = `[PRIORITY: Respond with actionable content immediately. Use what you know from brain entries — don't wait for all data sources.] ${partText}`;
+                }
 
                 const res = await fetch(endpoint, {
                   method: "POST",

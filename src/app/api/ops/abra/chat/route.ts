@@ -592,7 +592,8 @@ export async function POST(req: Request) {
   const actorEmail = session?.user?.email || "cron@system";
   const url = new URL(req.url);
   const mode = (url.searchParams.get("mode") || "").toLowerCase();
-  const healthMode = mode === "health" || mode === "quick";
+  const healthMode = mode === "health";
+  const quickMode = mode === "quick"; // Lightweight LLM call — no brain search, no finance pipeline
 
   // ─── Parse request (JSON or multipart/form-data with optional file) ───
   let payload: {
@@ -776,6 +777,44 @@ export async function POST(req: Request) {
       thread_id: threadId,
       mode: "health",
     });
+  }
+
+  // Quick mode — lightweight LLM call without brain search or finance pipeline
+  // Used for capability questions, meta queries, and fast confirmations
+  if (quickMode) {
+    const anthropicKey = process.env.ANTHROPIC_API_KEY || "";
+    try {
+      const quickRes = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "x-api-key": anthropicKey,
+          "anthropic-version": "2023-06-01",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1024,
+          system: `You are Abra, the AI operations assistant for USA Gummies. Answer the user's question concisely and honestly. If asked about capabilities, be transparent about what you can and cannot do. Keep responses under 500 words. USA Gummies is a CPG gummy candy company. Key people: Ben (CEO), Rene (finance/bookkeeper), Andrew (ops). Abra can: chat via Slack, generate XLSX files, record transactions, query financials, track pipeline, send emails, create Notion pages. Abra cannot: co-edit live documents, make phone calls (yet), or access external services not already integrated.`,
+          messages: [{ role: "user", content: message }],
+        }),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (quickRes.ok) {
+        const quickData = await quickRes.json() as { content?: Array<{ text?: string }> };
+        const quickReply = quickData.content?.[0]?.text || "I'm not sure how to answer that — try asking in a more specific way.";
+        return NextResponse.json({
+          reply: quickReply,
+          confidence: 70,
+          sources: [],
+          intent: "quick_mode",
+          thread_id: threadId,
+          mode: "quick",
+        });
+      }
+    } catch (quickErr) {
+      console.warn("[chat] Quick mode failed, falling through to full pipeline:", quickErr instanceof Error ? quickErr.message : quickErr);
+    }
+    // Fall through to full pipeline if quick mode fails
   }
 
   // Vercel Hobby plan kills functions at 60s — use AbortController to cancel
