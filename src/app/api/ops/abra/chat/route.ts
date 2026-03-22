@@ -2327,6 +2327,20 @@ export async function POST(req: Request) {
       // Conflicting sources reduce confidence
       if (reply.includes("conflict") || reply.includes("discrepancy")) score -= 10;
 
+      // Reply admits missing data = lower confidence
+      const replyLower = reply.toLowerCase();
+      if (replyLower.includes("don't have") || replyLower.includes("no data") ||
+          replyLower.includes("unavailable") || replyLower.includes("not in my") ||
+          replyLower.includes("couldn't find") || replyLower.includes("no brain entry")) {
+        score -= 20;
+      }
+
+      // Reply uses hedging language = slightly lower
+      if (replyLower.includes("approximately") || replyLower.includes("estimated") ||
+          replyLower.includes("roughly") || replyLower.includes("may not reflect")) {
+        score -= 5;
+      }
+
       // Clamp to 30-98 range (never 100% — epistemic humility)
       return Math.max(30, Math.min(98, score));
     })();
