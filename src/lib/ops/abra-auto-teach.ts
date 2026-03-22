@@ -476,24 +476,11 @@ export async function runShopifyOrdersFeed(): Promise<FeedResult> {
       });
     }
 
+    // KPI recording is now handled exclusively by the KPI collector.
+    // Auto-teach feeds should only write brain entries, not KPI timeseries.
+    // This prevents the overwrite bug where feed runs clobber corrected data.
     try {
       await Promise.all([
-        recordKPI({
-          metric_name: "daily_revenue_shopify",
-          value: totalRevenue,
-          department: "sales_and_growth",
-          source_system: "shopify",
-          metric_group: "sales",
-          entity_ref: "shopify",
-        }),
-        recordKPI({
-          metric_name: "daily_orders_shopify",
-          value: orders.length,
-          department: "sales_and_growth",
-          source_system: "shopify",
-          metric_group: "sales",
-          entity_ref: "shopify",
-        }),
         recordKPI({
           metric_name: "daily_aov",
           value: orders.length > 0 ? totalRevenue / orders.length : 0,
@@ -631,28 +618,14 @@ export async function handleAmazonOrdersFeed(): Promise<FeedResult> {
       }
     }
 
-    try {
-      await Promise.all([
-        recordKPI({
-          metric_name: "daily_revenue_amazon",
-          value: revenue,
-          department: "sales_and_growth",
-          source_system: "amazon",
-          metric_group: "sales",
-          entity_ref: "amazon",
-        }),
-        recordKPI({
-          metric_name: "daily_orders_amazon",
-          value: orders.length,
-          department: "sales_and_growth",
-          source_system: "amazon",
-          metric_group: "sales",
-          entity_ref: "amazon",
-        }),
-      ]);
-    } catch {
-      // best-effort
-    }
+    // KPI recording is now handled exclusively by the KPI collector
+    // (src/lib/ops/kpi-collector.ts) which uses unit-based estimation
+    // and Reports API backfill for Seller Central-grade accuracy.
+    // The auto-teach feed should NOT write to KPI timeseries because:
+    // 1. It runs more frequently and overwrites corrected data
+    // 2. Its revenue figure may not use the same estimation logic
+    // 3. Single-writer pattern prevents data conflicts
+    // Brain entries (written above) still capture the order summary.
 
     void updateIntHealth("amazon", true);
     return { feed_key: feedKey, success: true, entriesCreated: saved ? 1 : 0 };
