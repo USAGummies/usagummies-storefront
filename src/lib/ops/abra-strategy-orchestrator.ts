@@ -4,6 +4,7 @@ import {
   getMonthlySpend,
   logAICost,
 } from "@/lib/ops/abra-cost-tracker";
+import { createBrainEntry } from "@/lib/ops/abra-brain-writer";
 import { detectDepartment } from "@/lib/ops/department-playbooks";
 
 type ResearchResult = {
@@ -567,25 +568,18 @@ async function synthesizeStrategy(input: {
 async function storeStrategyInBrain(strategy: CrossDepartmentStrategy): Promise<void> {
   const sourceRef = `strategy:${strategy.topic}:${Date.now()}`;
   const rawText = JSON.stringify(strategy, null, 2);
-  await sbFetch("/rest/v1/open_brain_entries", {
-    method: "POST",
-    headers: {
-      Prefer: "return=minimal",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      source_type: "agent",
-      source_ref: sourceRef,
-      entry_type: "summary",
-      title: `Strategy Plan: ${strategy.objective.slice(0, 120)}`,
-      raw_text: rawText,
-      summary_text: strategy.summary.slice(0, 500),
-      category: "research",
-      department: detectDepartment(strategy.objective) || "executive",
-      confidence: strategy.confidence >= 0.75 ? "high" : "medium",
-      priority: "important",
-      processed: true,
-    }),
+  await createBrainEntry({
+    source_type: "agent",
+    source_ref: sourceRef,
+    entry_type: "summary",
+    title: `Strategy Plan: ${strategy.objective.slice(0, 120)}`,
+    raw_text: rawText,
+    summary_text: strategy.summary.slice(0, 500),
+    category: "research",
+    department: detectDepartment(strategy.objective) || "executive",
+    confidence: strategy.confidence >= 0.75 ? "high" : "medium",
+    priority: "important",
+    processed: true,
   });
 }
 

@@ -317,6 +317,13 @@ export async function POST(req: Request) {
     );
     outcomes.push(initiativeStep);
 
+    // Backfill any brain entries missing embeddings
+    const embeddingStep = await runStep("embedding_backfill", async () => {
+      const { backfillMissingEmbeddings } = await import("@/lib/ops/abra-brain-writer");
+      return backfillMissingEmbeddings(30);
+    });
+    outcomes.push(embeddingStep);
+
     const notificationData = {
       morning_brief: false,
       weekly_digest: false,
