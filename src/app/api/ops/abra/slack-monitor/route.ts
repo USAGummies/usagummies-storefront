@@ -264,104 +264,69 @@ export async function POST(req: Request) {
                 signal: AbortSignal.timeout(5000),
               });
 
-              // Process each part sequentially
-              for (let i = 0; i < parts.length; i++) {
-                try {
-                  // Fast-path: capability/meta questions don't need the full pipeline
-                  const isCapabilityQuestion = /\b(can you|how do(?:es)? (?:that|this|it) work|is (?:that|it) possible|can we have|how does (?:collaboration|that work)|while i'?m driving|voice|hands.?free|conversational(?:ly)?|shared (?:worksheet|spreadsheet|document))\b/i.test(parts[i]);
+              // Process ALL parts in parallel — each gets its own 55s budget
+              // Results are collected, then posted in order
+              const processPart = async (partText: string, idx: number): Promise<{ idx: number; reply: string }> => {
+                const isCapabilityQuestion = /\b(can you|how do(?:es)? (?:that|this|it) work|is (?:that|it) possible|can we have|how does (?:collaboration|that work)|while i'?m driving|voice|hands.?free|conversational(?:ly)?|shared (?:worksheet|spreadsheet|document))\b/i.test(partText);
 
-                  if (isCapabilityQuestion) {
-                    // Answer capability questions with a lightweight LLM call
-                    const capRes = await fetch(`${host}/api/ops/abra/chat?mode=quick`, {
-                      method: "POST",
-                      headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bearer ${cronSecret}`,
-                      },
-                      body: JSON.stringify({
-                        message: `Answer this question about Abra's capabilities concisely (under 500 chars). Be honest about what you can and can't do: ${parts[i]}`,
-                        history: [],
-                        channel: "slack",
-                      }),
-                      signal: AbortSignal.timeout(20000),
-                    });
+                const endpoint = isCapabilityQuestion ? `${host}/api/ops/abra/chat?mode=quick` : `${host}/api/ops/abra/chat`;
+                const timeout = isCapabilityQuestion ? 20000 : 55000;
+                const message = isCapabilityQuestion
+                  ? `Answer this question about Abra's capabilities concisely (under 500 chars). Be honest about what you can and can't do: ${partText}`
+                  : partText;
 
-                    if (capRes.ok) {
-                      const capData = (await capRes.json()) as { reply?: string };
-                      const capReply = typeof capData.reply === "string" ? capData.reply.trim() : "";
-                      if (capReply) {
-                        await fetch("https://slack.com/api/chat.postMessage", {
-                          method: "POST",
-                          headers: {
-                            Authorization: `Bearer ${botToken}`,
-                            "Content-Type": "application/json",
-                          },
-                          body: JSON.stringify({
-                            channel: channelId,
-                            text: `*Part ${i + 1}/${parts.length}:*\n\n${capReply}`.slice(0, 4000),
-                            thread_ts: threadTs,
-                            mrkdwn: true,
-                          }),
-                          signal: AbortSignal.timeout(10000),
-                        });
-                        continue; // Skip to next part
-                      }
-                    }
-                  }
+                const res = await fetch(endpoint, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${cronSecret}`,
+                  },
+                  body: JSON.stringify({
+                    message,
+                    history: isCapabilityQuestion ? [] : threadHistory,
+                    channel: "slack",
+                    actor_label: isCapabilityQuestion ? undefined : event.user,
+                    actor_context: isCapabilityQuestion ? undefined : actorCtx,
+                  }),
+                  signal: AbortSignal.timeout(timeout),
+                });
 
-                  const partRes = await fetch(`${host}/api/ops/abra/chat`, {
-                    method: "POST",
-                    headers: {
-                      "Content-Type": "application/json",
-                      Authorization: `Bearer ${cronSecret}`,
-                    },
-                    body: JSON.stringify({
-                      message: parts[i],
-                      history: threadHistory,
-                      channel: "slack",
-                      actor_label: event.user || undefined,
-                      actor_context: actorCtx,
-                    }),
-                    signal: AbortSignal.timeout(55000),
-                  });
+                if (!res.ok) return { idx, reply: "" };
+                const data = (await res.json()) as { reply?: string };
+                return { idx, reply: typeof data.reply === "string" ? data.reply.trim() : "" };
+              };
 
-                  if (partRes.ok) {
-                    const partData = (await partRes.json()) as { reply?: string };
-                    const partReply = typeof partData.reply === "string" ? partData.reply.trim() : "";
-                    if (partReply) {
-                      await fetch("https://slack.com/api/chat.postMessage", {
-                        method: "POST",
-                        headers: {
-                          Authorization: `Bearer ${botToken}`,
-                          "Content-Type": "application/json",
-                        },
-                        body: JSON.stringify({
-                          channel: channelId,
-                          text: `*Part ${i + 1}/${parts.length}:*\n\n${partReply}`,
-                          thread_ts: threadTs,
-                          mrkdwn: true,
-                        }),
-                        signal: AbortSignal.timeout(10000),
-                      });
-                    }
-                  }
-                } catch (partErr) {
-                  console.error(`[slack-monitor] Part ${i + 1} failed:`, partErr instanceof Error ? partErr.message : partErr);
-                  await fetch("https://slack.com/api/chat.postMessage", {
-                    method: "POST",
-                    headers: {
-                      Authorization: `Bearer ${botToken}`,
-                      "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                      channel: channelId,
-                      text: `*Part ${i + 1}/${parts.length}:* ⚠️ Timed out — try asking this part separately.`,
-                      thread_ts: threadTs,
-                      mrkdwn: true,
-                    }),
-                    signal: AbortSignal.timeout(5000),
-                  }).catch(() => {});
+              // Fire all parts simultaneously
+              const results = await Promise.allSettled(
+                parts.map((p, i) => processPart(p, i)),
+              );
+
+              // Post results in order
+              for (let i = 0; i < results.length; i++) {
+                const result = results[i];
+                let partReply: string;
+                if (result.status === "fulfilled" && result.value.reply) {
+                  partReply = result.value.reply;
+                } else {
+                  const errMsg = result.status === "rejected" && result.reason instanceof Error
+                    ? result.reason.message : "timed out";
+                  partReply = `⚠️ This part ${errMsg.includes("timeout") || errMsg.includes("Timeout") ? "timed out" : "failed"} — try asking it separately.`;
+                  console.error(`[slack-monitor] Part ${i + 1} failed:`, errMsg);
                 }
+                await fetch("https://slack.com/api/chat.postMessage", {
+                  method: "POST",
+                  headers: {
+                    Authorization: `Bearer ${botToken}`,
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    channel: channelId,
+                    text: `*Part ${i + 1}/${parts.length}:*\n\n${partReply}`.slice(0, 4000),
+                    thread_ts: threadTs,
+                    mrkdwn: true,
+                  }),
+                  signal: AbortSignal.timeout(10000),
+                });
               }
             } else {
               // Single question — normal flow
