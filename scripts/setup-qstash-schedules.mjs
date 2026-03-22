@@ -32,47 +32,32 @@ if (!CRON_SECRET) {
 // that need guaranteed timing independent of the engine scheduler.
 const SWEEP_URL = (name) => `${BASE_URL}/api/ops/abra/cron/sweep?name=${name}`;
 
+// QStash free tier: max 10 schedules.
+// Strategy: Use 10 QStash slots for the highest-frequency jobs.
+// The master-scheduler (every 5 min) dispatches ALL other sweeps
+// internally based on engine-schedule.ts timing rules.
 const SCHEDULES = [
-  // ─── Core Infrastructure (every 5 min) ───
+  // ─── Slot 1-2: Core (every 5 min) ───
   { name: "master-scheduler", url: `${BASE_URL}/api/ops/scheduler/master`, cron: "*/5 * * * *", method: "GET" },
   { name: "abra-inbox-scan", url: `${BASE_URL}/api/ops/abra/inbox-scan`, cron: "*/5 * * * *", method: "POST" },
 
-  // ─── High Frequency Sweeps (15-30 min) ───
+  // ─── Slot 3-4: High frequency (15-30 min) ───
   { name: "abra-email-sweep", url: SWEEP_URL("email-sweep"), cron: "*/15 * * * *", method: "POST" },
   { name: "abra-signal-scan", url: `${BASE_URL}/api/ops/abra/cron/signal-scan`, cron: "7,37 * * * *", method: "POST" },
 
-  // ─── Hourly Sweeps ───
+  // ─── Slot 5-7: Hourly ───
   { name: "abra-bank-feed-sweep", url: SWEEP_URL("bank-feed-sweep"), cron: "12 * * * *", method: "POST" },
   { name: "abra-bank-auto-tagger", url: SWEEP_URL("bank-auto-tagger"), cron: "17 * * * *", method: "POST" },
   { name: "abra-approval-expiry", url: SWEEP_URL("approval-expiry"), cron: "22 * * * *", method: "POST" },
 
-  // ─── Every 4-6 Hours ───
-  { name: "abra-qbo-health", url: SWEEP_URL("qbo-health-sweep"), cron: "42 */4 * * *", method: "POST" },
+  // ─── Slot 8-10: Key daily jobs ───
   { name: "abra-dashboard-push", url: `${BASE_URL}/api/ops/abra/cron/dashboard-push`, cron: "3 14,20,2 * * *", method: "POST" },
-  { name: "abra-feed-email", url: `${BASE_URL}/api/ops/abra/auto-teach?feed=email_fetch`, cron: "0 */4 * * *", method: "POST" },
-
-  // ─── Daily Sweeps ───
-  { name: "abra-self-monitor", url: `${BASE_URL}/api/ops/abra/cron/self-monitor`, cron: "57 13 * * *", method: "POST" },
-  { name: "abra-daily-pnl", url: SWEEP_URL("daily-pnl"), cron: "33 14 * * *", method: "POST" },
   { name: "abra-morning-brief", url: `${BASE_URL}/api/ops/abra/morning-brief`, cron: "3 15 * * *", method: "POST" },
-  { name: "abra-vendor-followup", url: SWEEP_URL("vendor-followup"), cron: "8 16 * * *", method: "POST" },
-  { name: "abra-competitive-monitor", url: SWEEP_URL("competitive-monitor"), cron: "13 19 * * *", method: "POST" },
-  { name: "abra-evening-recon", url: SWEEP_URL("evening-recon"), cron: "47 4 * * *", method: "POST" },
-  { name: "abra-triple-recon", url: SWEEP_URL("triple-recon"), cron: "53 5 * * *", method: "POST" },
-  { name: "abra-amazon-reviews", url: SWEEP_URL("amazon-review-ingester"), cron: "23 6 * * *", method: "POST" },
-  { name: "abra-outcome-check", url: `${BASE_URL}/api/ops/abra/outcome-check`, cron: "0 3 * * *", method: "POST" },
+  { name: "abra-self-monitor", url: `${BASE_URL}/api/ops/abra/cron/self-monitor`, cron: "57 13 * * *", method: "POST" },
 
-  // ─── Daily Data Feeds ───
-  { name: "abra-feed-shopify", url: `${BASE_URL}/api/ops/abra/auto-teach?feed=shopify_orders`, cron: "0 13 * * *", method: "POST" },
-  { name: "abra-feed-amazon", url: `${BASE_URL}/api/ops/abra/auto-teach?feed=amazon_orders`, cron: "10 13 * * *", method: "POST" },
-  { name: "abra-feed-inventory", url: `${BASE_URL}/api/ops/abra/auto-teach?feed=shopify_inventory`, cron: "30 13 * * *", method: "POST" },
-  { name: "abra-feed-ga4", url: `${BASE_URL}/api/ops/abra/auto-teach?feed=ga4_traffic`, cron: "0 5 * * *", method: "POST" },
-
-  // ─── Weekly ───
-  { name: "abra-weekly-digest", url: `${BASE_URL}/api/ops/abra/weekly-digest`, cron: "0 1 * * 1", method: "POST" },
-  { name: "abra-customer-intelligence", url: SWEEP_URL("customer-intelligence"), cron: "8 16 * * 1", method: "POST" },
-  { name: "abra-marketing-attribution", url: SWEEP_URL("marketing-attribution"), cron: "13 17 * * 1", method: "POST" },
-  { name: "abra-knowledge-base", url: SWEEP_URL("knowledge-base-builder"), cron: "18 5 * * 0", method: "POST" },
+  // All other sweeps (daily P&L, vendor follow-up, recon, feeds, weekly jobs)
+  // are dispatched by the master-scheduler every 5 min based on
+  // engine-schedule.ts timing. No dedicated QStash slots needed.
 ];
 
 function parseJsonSafe(text) {

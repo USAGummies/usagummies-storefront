@@ -28,7 +28,7 @@ const SELF_AUTHENTICATED_PREFIXES = [
   "/api/ops/slack/",
   "/api/ops/abra/", // All Abra routes use isAuthorized() from abra-auth.ts (session + CRON_SECRET)
   "/api/ops/department/", // Department API uses isAuthorized() (session + CRON_SECRET)
-  "/api/ops/plaid/webhook", // Plaid webhook — verified by item_id match (JWK fast-follow)
+  "/api/ops/plaid/", // Plaid endpoints — balance used by Abra crons, webhook verified by item_id
   "/api/ops/gmail-callback", // One-time OAuth callback for Gmail setup
   "/api/ops/qbo/", // QBO OAuth flow + setup (authorize, callback, setup)
   "/api/ops/puzzle/", // Puzzle OAuth flow
