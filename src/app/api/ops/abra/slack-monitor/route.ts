@@ -53,7 +53,7 @@ function splitMultiPartMessage(text: string): string[] {
   // Try numbered word patterns first: "One,", "Two,", "Three,", etc.
   const wordPattern = /\b(one|two|three|four|five|six|seven|eight|nine|ten),?\s/gi;
   const digitPattern = /\b(\d+)[.)]\s/g;
-  const transitionPattern = /\b(and then my last|my last question|and then|finally,?\s)/gi;
+  const transitionPattern = /\b(and then my last|my last question|and then,|finally,?\s|i would (?:also )?love to)\b/gi;
 
   // Collect all split points
   const splitPoints: Array<{ index: number; length: number }> = [];
@@ -83,8 +83,25 @@ function splitMultiPartMessage(text: string): string[] {
 
   if (dedupedPoints.length < 2) return [text];
 
-  // Extract parts
+  // Extract parts — include preamble if the first split point isn't at the start
   const parts: string[] = [];
+  if (dedupedPoints[0].index > 30) {
+    // There's meaningful preamble before the first numbered section
+    const preamble = text.slice(0, dedupedPoints[0].index).trim();
+    if (preamble.length > 20) {
+      // Prepend preamble to first part for context
+      const firstEnd = dedupedPoints.length > 1 ? dedupedPoints[1].index : text.length;
+      parts.push(preamble + " " + text.slice(dedupedPoints[0].index, firstEnd).trim());
+      // Start from second split point
+      for (let i = 1; i < dedupedPoints.length; i++) {
+        const start = dedupedPoints[i].index;
+        const end = i + 1 < dedupedPoints.length ? dedupedPoints[i + 1].index : text.length;
+        const part = text.slice(start, end).trim();
+        if (part.length > 20) parts.push(part);
+      }
+      return parts.length >= 2 ? parts : [text];
+    }
+  }
   for (let i = 0; i < dedupedPoints.length; i++) {
     const start = dedupedPoints[i].index;
     const end = i + 1 < dedupedPoints.length ? dedupedPoints[i + 1].index : text.length;
@@ -250,6 +267,48 @@ export async function POST(req: Request) {
               // Process each part sequentially
               for (let i = 0; i < parts.length; i++) {
                 try {
+                  // Fast-path: capability/meta questions don't need the full pipeline
+                  const isCapabilityQuestion = /\b(can you|how do(?:es)? (?:that|this|it) work|is (?:that|it) possible|can we have|how does (?:collaboration|that work)|while i'?m driving|voice|hands.?free|conversational(?:ly)?|shared (?:worksheet|spreadsheet|document))\b/i.test(parts[i]);
+
+                  if (isCapabilityQuestion) {
+                    // Answer capability questions with a lightweight LLM call
+                    const capRes = await fetch(`${host}/api/ops/abra/chat?mode=quick`, {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${cronSecret}`,
+                      },
+                      body: JSON.stringify({
+                        message: `Answer this question about Abra's capabilities concisely (under 500 chars). Be honest about what you can and can't do: ${parts[i]}`,
+                        history: [],
+                        channel: "slack",
+                      }),
+                      signal: AbortSignal.timeout(20000),
+                    });
+
+                    if (capRes.ok) {
+                      const capData = (await capRes.json()) as { reply?: string };
+                      const capReply = typeof capData.reply === "string" ? capData.reply.trim() : "";
+                      if (capReply) {
+                        await fetch("https://slack.com/api/chat.postMessage", {
+                          method: "POST",
+                          headers: {
+                            Authorization: `Bearer ${botToken}`,
+                            "Content-Type": "application/json",
+                          },
+                          body: JSON.stringify({
+                            channel: channelId,
+                            text: `*Part ${i + 1}/${parts.length}:*\n\n${capReply}`.slice(0, 4000),
+                            thread_ts: threadTs,
+                            mrkdwn: true,
+                          }),
+                          signal: AbortSignal.timeout(10000),
+                        });
+                        continue; // Skip to next part
+                      }
+                    }
+                  }
+
                   const partRes = await fetch(`${host}/api/ops/abra/chat`, {
                     method: "POST",
                     headers: {
