@@ -2131,16 +2131,28 @@ export async function POST(req: Request) {
         ? "" // Notices will fill the reply
         : "Done — I processed your request. Check this thread for any files or follow-up."
     );
-    // ── Fix false "Done" claims when actions failed ──
+    // ── Action Verification Loop — rewrite reply based on actual results ──
     let correctedReply = effectiveReply;
-    const hasFailedAction = actionNotices.some(n => /failed|error|❌|⚠️.*failed/i.test(n));
+    const failedActions = actionNotices.filter(n => /failed|error/i.test(n));
+    const succeededActions = actionNotices.filter(n => /✅|Uploaded|Created|Logged|Queued|approved|recorded/i.test(n));
+    const hasFailedAction = failedActions.length > 0;
+    const hasSucceededAction = succeededActions.length > 0;
+
     if (hasFailedAction) {
-      // Replace premature "Done" / "Updated" / "I have updated" claims with honest status
+      // Replace ALL premature success claims with honest status
       correctedReply = correctedReply
-        .replace(/\bDone\s*[—–-]\s*(the|I|it|your)\b/gi, "I attempted to")
-        .replace(/\bI have updated\b/gi, "I attempted to update")
+        .replace(/\bDone\s*[—–-]\s*(the|I|it|your|we|this)\b/gi, "I attempted to")
+        .replace(/\b(I have|I've|I\u2019ve) (updated|created|sent|posted|logged|recorded)\b/gi, "I attempted to $2")
         .replace(/\bUpdating now:\s*\n*\s*Done\b/gi, "Attempting now...")
-        .replace(/\bPage is live\b/gi, "Page update was attempted");
+        .replace(/\bPage is live\b/gi, "Page update was attempted")
+        .replace(/\bFile is ready\b/gi, "File generation was attempted")
+        .replace(/\bHere'?s the (file|document|spreadsheet|export)\b/gi, "The $1 generation was attempted")
+        .replace(/\bsuccessfully (updated|created|sent|generated)\b/gi, "attempted to $1");
+
+      // If ALL actions failed and reply still sounds positive, prepend a warning
+      if (!hasSucceededAction && !/attempted|failed|error|couldn't|could not/i.test(correctedReply.slice(0, 100))) {
+        correctedReply = `⚠️ **Action failed** — see error details below.\n\n${correctedReply}`;
+      }
     }
 
     let reply = [
