@@ -39,6 +39,62 @@ function getActorContext(userId: string): string {
   return ACTOR_PROFILES[userId] || `Slack user ${userId}`;
 }
 
+/**
+ * Split a multi-part message into separate questions.
+ * Detects numbered patterns: "One,", "1.", "Two,", "2.", "Three,", "3.", etc.
+ * Also detects "And then", "my last question", "finally" as separators.
+ * Returns array of parts — if only 1 part, the message is not multi-part.
+ */
+function splitMultiPartMessage(text: string): string[] {
+  // Only split long messages (short ones are likely single questions)
+  if (text.length < 200) return [text];
+
+  // Try numbered word patterns first: "One,", "Two,", "Three,", etc.
+  const wordPattern = /\b(one|two|three|four|five|six|seven|eight|nine|ten),?\s/gi;
+  const digitPattern = /\b(\d+)[.)]\s/g;
+  const transitionPattern = /\b(and then my last|my last question|and then|finally,?\s)/gi;
+
+  // Collect all split points
+  const splitPoints: Array<{ index: number; length: number }> = [];
+
+  for (const pattern of [wordPattern, digitPattern, transitionPattern]) {
+    let match;
+    while ((match = pattern.exec(text)) !== null) {
+      // Only use split points that are near the start of a sentence
+      // (preceded by newline, period+space, or start of string)
+      const before = text.slice(Math.max(0, match.index - 3), match.index);
+      if (match.index === 0 || /[.\n!?]\s*$/.test(before) || /,\s*$/.test(before)) {
+        splitPoints.push({ index: match.index, length: match[0].length });
+      }
+    }
+  }
+
+  if (splitPoints.length < 2) return [text]; // Not enough splits
+
+  // Sort by position and deduplicate nearby splits
+  splitPoints.sort((a, b) => a.index - b.index);
+  const dedupedPoints: typeof splitPoints = [splitPoints[0]];
+  for (let i = 1; i < splitPoints.length; i++) {
+    if (splitPoints[i].index - dedupedPoints[dedupedPoints.length - 1].index > 50) {
+      dedupedPoints.push(splitPoints[i]);
+    }
+  }
+
+  if (dedupedPoints.length < 2) return [text];
+
+  // Extract parts
+  const parts: string[] = [];
+  for (let i = 0; i < dedupedPoints.length; i++) {
+    const start = dedupedPoints[i].index;
+    const end = i + 1 < dedupedPoints.length ? dedupedPoints[i + 1].index : text.length;
+    const part = text.slice(start, end).trim();
+    if (part.length > 20) parts.push(part); // Skip tiny fragments
+  }
+
+  // If we couldn't get meaningful parts, return original
+  return parts.length >= 2 ? parts : [text];
+}
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -164,31 +220,16 @@ export async function POST(req: Request) {
                 ? `https://${process.env.VERCEL_URL}`
                 : "http://localhost:4000");
 
-            const chatRes = await fetch(`${host}/api/ops/abra/chat`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${cronSecret}`,
-              },
-              body: JSON.stringify({
-                message: text,
-                history: threadHistory,
-                channel: "slack",
-                actor_label: event.user || undefined,
-                actor_context: getActorContext(event.user || ""),
-              }),
-              signal: AbortSignal.timeout(45000),
-            });
+            // ── Multi-part message splitting ──
+            // If the message has numbered sections (One/1./Two/2./etc),
+            // split into separate requests and reply to each in the thread
+            const parts = splitMultiPartMessage(text);
+            const actorCtx = getActorContext(event.user || "");
 
-            if (!chatRes.ok) {
-              console.error(`[slack-monitor] Chat API returned ${chatRes.status}`);
-              return;
-            }
+            if (parts.length > 1) {
+              console.log(`[slack-monitor] Multi-part message detected: ${parts.length} parts`);
 
-            const data = (await chatRes.json()) as { reply?: string };
-            const reply = typeof data.reply === "string" ? data.reply.trim() : "";
-
-            if (reply) {
+              // Post an ack first
               await fetch("https://slack.com/api/chat.postMessage", {
                 method: "POST",
                 headers: {
@@ -197,12 +238,112 @@ export async function POST(req: Request) {
                 },
                 body: JSON.stringify({
                   channel: channelId,
-                  text: reply,
+                  text: `:brain: *Abra*\n\nGot it — ${parts.length} questions. Answering each one:`,
                   thread_ts: threadTs,
                   mrkdwn: true,
                 }),
-                signal: AbortSignal.timeout(10000),
+                signal: AbortSignal.timeout(5000),
               });
+
+              // Process each part sequentially
+              for (let i = 0; i < parts.length; i++) {
+                try {
+                  const partRes = await fetch(`${host}/api/ops/abra/chat`, {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      Authorization: `Bearer ${cronSecret}`,
+                    },
+                    body: JSON.stringify({
+                      message: parts[i],
+                      history: threadHistory,
+                      channel: "slack",
+                      actor_label: event.user || undefined,
+                      actor_context: actorCtx,
+                    }),
+                    signal: AbortSignal.timeout(55000),
+                  });
+
+                  if (partRes.ok) {
+                    const partData = (await partRes.json()) as { reply?: string };
+                    const partReply = typeof partData.reply === "string" ? partData.reply.trim() : "";
+                    if (partReply) {
+                      await fetch("https://slack.com/api/chat.postMessage", {
+                        method: "POST",
+                        headers: {
+                          Authorization: `Bearer ${botToken}`,
+                          "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({
+                          channel: channelId,
+                          text: `*Part ${i + 1}/${parts.length}:*\n\n${partReply}`,
+                          thread_ts: threadTs,
+                          mrkdwn: true,
+                        }),
+                        signal: AbortSignal.timeout(10000),
+                      });
+                    }
+                  }
+                } catch (partErr) {
+                  console.error(`[slack-monitor] Part ${i + 1} failed:`, partErr instanceof Error ? partErr.message : partErr);
+                  await fetch("https://slack.com/api/chat.postMessage", {
+                    method: "POST",
+                    headers: {
+                      Authorization: `Bearer ${botToken}`,
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                      channel: channelId,
+                      text: `*Part ${i + 1}/${parts.length}:* ⚠️ Timed out — try asking this part separately.`,
+                      thread_ts: threadTs,
+                      mrkdwn: true,
+                    }),
+                    signal: AbortSignal.timeout(5000),
+                  }).catch(() => {});
+                }
+              }
+            } else {
+              // Single question — normal flow
+              const chatRes = await fetch(`${host}/api/ops/abra/chat`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${cronSecret}`,
+                },
+                body: JSON.stringify({
+                  message: text,
+                  history: threadHistory,
+                  channel: "slack",
+                  actor_label: event.user || undefined,
+                  actor_context: actorCtx,
+                }),
+                signal: AbortSignal.timeout(55000),
+              });
+
+              if (!chatRes.ok) {
+                console.error(`[slack-monitor] Chat API returned ${chatRes.status}`);
+                return;
+              }
+
+              const data = (await chatRes.json()) as { reply?: string };
+              const reply = typeof data.reply === "string" ? data.reply.trim() : "";
+
+              if (reply) {
+                await fetch("https://slack.com/api/chat.postMessage", {
+                  method: "POST",
+                  headers: {
+                    Authorization: `Bearer ${botToken}`,
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    channel: channelId,
+                    text: reply,
+                    thread_ts: threadTs,
+                    mrkdwn: true,
+                  }),
+                  signal: AbortSignal.timeout(10000),
+                });
+              }
             }
           } catch (err) {
             console.error("[slack-monitor] Error responding to mention:", err);
