@@ -2078,15 +2078,25 @@ export async function POST(req: Request) {
     // Normalize Unicode curly apostrophes (\u2018 \u2019) → straight apostrophe before testing,
     // because Claude sometimes outputs \u2019 (right single quotation mark) in contractions.
     const normalizedReply = strippedReply.replace(/[\u2018\u2019\u02BC\u2032]/g, "'");
-    const claudeRefusedFile = /\b(cannot generate|can[\u2019']t generate|don[\u2019']t have file|cannot create|can[\u2019']t create files?|cannot export|can[\u2019']t export|unable to generate|unable to create|not able to generate|not able to create|[Ii][\u2019'] ?m not able to|[Ii] cannot directly|downloadable xlsx|downloadable .{0,20}file)\b/i.test(normalizedReply);
+    const claudeRefusedFile = /\b(cannot generate|can[\u2019']t generate|can[\u2019']t directly generate|don[\u2019']t have file|cannot create|can[\u2019']t create files?|cannot export|can[\u2019']t export|unable to generate|unable to create|not able to generate|not able to create|[Ii][\u2019'] ?m not able to|[Ii] cannot directly|downloadable xlsx|downloadable .{0,20}file|file export capability|don[\u2019']t have .{0,20}export|can[\u2019']t (?:directly )?(?:generate|create|attach|export))\b/i.test(normalizedReply);
     // Check if the action executor already handled generate_file
     // Only skip fallback if the action was actually executed (not just queued for approval)
     const fileActionHandled = actionNotices.some(n => n.includes("[generate_file]"));
     console.log(`[chat] File auto-gen check: channel=${channel}, slackChannelId=${slackChannelId || "(empty)"}, wantsFile=${wantsFile}, fileActionHandled=${fileActionHandled}, claudeRefusedFile=${claudeRefusedFile}, replyLen=${strippedReply.length}`);
 
     // Fix: if Claude refused to generate a file but the user clearly asked for one, force a generate_file action
+    // Also strip the refusal text from the reply since it's a hallucination
     if (wantsFile && claudeRefusedFile && !fileActionHandled) {
       console.warn("[chat] Claude refused file generation — intercepting and forcing generate_file action");
+      // Remove the hallucinated refusal from the reply
+      baseReply = baseReply
+        .replace(/⚠️?\s*(?:Heads? Up|Note|Important)[:\s]*I (?:Can't|Cannot|can't|cannot) (?:Generate|Create|Export|Directly Generate) (?:Excel |XLSX )?Files? (?:Directly)?[^\n]*\n?/gi, "")
+        .replace(/(?:Hey!?\s*)?I can't (?:directly )?(?:generate|create|attach|export)[^\n]*(?:file|xlsx|excel)[^\n]*\n?/gi, "")
+        .replace(/I'm a text-based AI assistant[^\n]*\n?/gi, "")
+        .replace(/I don't have (?:file )?(?:export|generation) capability[^\n]*\n?/gi, "")
+        .replace(/(?:What I (?:can|CAN) do|However|Instead|But here's what)[^\n]*(?:paste into Excel|copy into|get you there)[^\n]*\n?/gi, "")
+        .replace(/#+\s*(?:✅|⚠️)\s*(?:Current|Here's|Instead)[^\n]*ready to copy[^\n]*\n?/gi, "")
+        .trim();
       const forcedFilename = /csv/i.test(rawMessage) ? "export.csv" : "export.xlsx";
       const forcedSource = /vendor/i.test(rawMessage)
         ? "qbo_vendors"
