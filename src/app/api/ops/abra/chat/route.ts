@@ -688,6 +688,17 @@ export async function POST(req: Request) {
     if (domainContext) {
       console.log(`[chat] Intent routed to domain: ${domain}`);
     }
+    // Real-time data enrichment for sales/finance/supply_chain questions
+    if (domain === "sales" || domain === "finance" || domain === "supply_chain") {
+      try {
+        const { fetchLiveEnrichment } = await import("@/lib/ops/live-data-enrichment");
+        const cronSecret = (process.env.CRON_SECRET || "").trim();
+        const enrichment = await fetchLiveEnrichment(domain, url.origin, cronSecret);
+        if (enrichment) {
+          domainContext += `\n\n${enrichment.data} [source: ${enrichment.source}, fetched ${new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}]`;
+        }
+      } catch { /* non-fatal */ }
+    }
   } catch {
     // Non-fatal — fall through to full system prompt
   }
@@ -2251,6 +2262,24 @@ export async function POST(req: Request) {
     });
 
     clearTimeout(deadlineTimer);
+
+    // Citation enforcement — tag unverified dollar figures
+    try {
+      const { enforceCitations } = await import("@/lib/ops/citation-enforcer");
+      const contextForCitation = tieredResults.all.map((r) => r.summary_text || r.title || "").join("\n");
+      const citationResult = enforceCitations(reply, contextForCitation);
+      if (citationResult.processed !== reply) {
+        reply = citationResult.processed;
+      }
+    } catch { /* non-fatal */ }
+
+    // Cross-session conversation memory — auto-summarize long conversations
+    if (effectiveHistory.length >= 6) {
+      import("@/lib/ops/conversation-memory").then(({ summarizeAndStore }) =>
+        summarizeAndStore(threadId, effectiveHistory, actorLabel).catch(() => {}),
+      ).catch(() => {});
+    }
+
     return NextResponse.json({
       reply,
       confidence,
