@@ -353,6 +353,9 @@ When Rene gives a natural language bookkeeping instruction, ALWAYS emit the corr
 • "give me a spreadsheet of the chart of accounts" → emit generate_file with source "qbo_accounts" — the system fetches all data server-side.
 • "export vendors as CSV" → emit generate_file with source "qbo_vendors" and filename "vendors.csv"
 • "export this data as a CSV" → emit generate_file with format csv. For multi-sheet XLSX, use a "sheets" array with {sheetName, headers, rows} per sheet.
+• "what was our revenue on March 15?" → emit query_kpi with date "2026-03-15"
+• "revenue breakdown for last week?" → emit query_kpi with start_date and end_date
+• When asked about a SPECIFIC DATE's revenue/orders, ALWAYS emit query_kpi instead of saying "I don't have that data"
 
 FILE GENERATION RULES (ABSOLUTE REQUIREMENT):
 ⚠️ You CAN and MUST create XLSX/CSV files. The system handles file creation and Slack upload automatically.
@@ -384,7 +387,7 @@ DATABASE KEYS for create_notion_page: meeting_notes, b2b_prospects, distributor_
 
 ACTION EXECUTION TIERS:
 • AUTO-EXECUTE (low-risk, informational): create_brain_entry, acknowledge_signal, create_notion_page, create_task — these execute immediately when emitted.
-• AUTO-EXECUTE (low-risk, read-only): read_email, search_email — these only READ data, never modify anything. Auto-execute IMMEDIATELY when emitted. When a user asks about an email, DO NOT ask permission — just read it.
+• AUTO-EXECUTE (low-risk, read-only): read_email, search_email, query_kpi — these only READ data, never modify anything. Auto-execute IMMEDIATELY when emitted. When a user asks about an email or specific date's data, DO NOT ask permission — just read it.
 • AUTO-EXECUTE (low-risk, operational data): log_production_run, record_vendor_quote — these log operational data. Auto-execute when emitted.
 • AUTO-EXECUTE (stateless computation): run_scenario — computes hypotheticals without changing financial state. Auto-execute when emitted.
 • AUTO-EXECUTE WITH CAPS (financial): record_transaction — auto-executes ONLY if amount ≤ $500. Larger amounts queue for approval.
@@ -2108,15 +2111,23 @@ export async function POST(req: Request) {
         ? "kpi_daily_revenue"
         : undefined;
       const forcedActionXml = `<action>{"action_type":"generate_file","title":"File Export","description":"Auto-forced — Abra incorrectly claimed it could not generate files","department":"operations","risk_level":"low","params":{"filename":"${forcedFilename}"${forcedSource ? `,"source":"${forcedSource}"` : ',"headers":[],"rows":[]'}}}</action>`;
-      try {
-        const forceResult = await executeActions(forcedActionXml, {
-          slackChannelId: slackChannelId || undefined,
-          slackThreadTs: slackThreadTs || undefined,
-          deadlineMs: Math.max(2000, 40_000 - (Date.now() - startMs)),
-        });
-        actionNotices.push(...forceResult.actionNotices);
-      } catch (err) {
-        console.warn("[chat] Forced generate_file action failed:", err instanceof Error ? err.message : err);
+      if (slackChannelId || channel === "slack") {
+        // Slack context: upload via Slack API
+        try {
+          const forceResult = await executeActions(forcedActionXml, {
+            slackChannelId: slackChannelId || undefined,
+            slackThreadTs: slackThreadTs || undefined,
+            deadlineMs: Math.max(2000, 40_000 - (Date.now() - startMs)),
+          });
+          actionNotices.push(...forceResult.actionNotices);
+        } catch (err) {
+          console.warn("[chat] Forced generate_file action failed:", err instanceof Error ? err.message : err);
+        }
+      } else if (forcedSource) {
+        // Web chat context: provide a download URL instead
+        const downloadUrl = `${url.origin}/api/ops/abra/download?source=${encodeURIComponent(forcedSource)}&format=csv&filename=${encodeURIComponent(forcedFilename.replace(/\.xlsx$/, ".csv"))}`;
+        baseReply = `📊 Here's your export:\n\n**[Download ${forcedFilename}](${downloadUrl})**\n\n${baseReply}`;
+        actionNotices.push(`✅ [generate_file] Download link generated for ${forcedSource}`);
       }
     }
     if (

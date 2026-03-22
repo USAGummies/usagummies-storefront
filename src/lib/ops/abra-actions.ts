@@ -3055,6 +3055,57 @@ async function fetchDataForFileGeneration(
   }
 }
 
+async function handleQueryKPI(params: Record<string, unknown>): Promise<ActionResult> {
+  const date = typeof params.date === "string" ? params.date.trim() : "";
+  const startDate = typeof params.start_date === "string" ? params.start_date.trim() : date;
+  const endDate = typeof params.end_date === "string" ? params.end_date.trim() : date;
+  const metric = typeof params.metric === "string" ? params.metric.trim() : "";
+
+  if (!startDate) return { success: false, message: "date or start_date required (YYYY-MM-DD)" };
+
+  const metrics = metric
+    ? encodeURIComponent(`(${metric})`)
+    : encodeURIComponent("(daily_revenue_shopify,daily_revenue_amazon,daily_orders_shopify,daily_orders_amazon)");
+
+  try {
+    const dateFilter = startDate === endDate
+      ? `captured_for_date=eq.${startDate}`
+      : `captured_for_date=gte.${startDate}&captured_for_date=lte.${endDate}`;
+
+    const rows = (await sbFetch(
+      `/rest/v1/kpi_timeseries?window_type=eq.daily&metric_name=in.${metrics}&${dateFilter}&select=metric_name,value,captured_for_date&order=captured_for_date.asc&limit=200`,
+    )) as Array<{ metric_name: string; value: number; captured_for_date: string }>;
+
+    const safeRows = Array.isArray(rows) ? rows : [];
+    if (safeRows.length === 0) {
+      return { success: true, message: `No KPI data found for ${startDate}${endDate !== startDate ? ` to ${endDate}` : ""}`, data: { rows: [] } };
+    }
+
+    // Aggregate by date
+    const byDate = new Map<string, Record<string, number>>();
+    for (const r of safeRows) {
+      if (!byDate.has(r.captured_for_date)) byDate.set(r.captured_for_date, {});
+      byDate.get(r.captured_for_date)![r.metric_name] = Number(r.value) || 0;
+    }
+
+    const summary = Array.from(byDate.entries()).map(([d, metrics]) => {
+      const shopRev = metrics.daily_revenue_shopify || 0;
+      const amzRev = metrics.daily_revenue_amazon || 0;
+      const shopOrd = metrics.daily_orders_shopify || 0;
+      const amzOrd = metrics.daily_orders_amazon || 0;
+      return `${d}: Shopify $${shopRev.toFixed(2)} (${Math.round(shopOrd)} orders), Amazon $${amzRev.toFixed(2)} (${Math.round(amzOrd)} orders), Total $${(shopRev + amzRev).toFixed(2)}`;
+    }).join("\n");
+
+    return {
+      success: true,
+      message: summary,
+      data: { dates: Object.fromEntries(byDate), rowCount: safeRows.length },
+    };
+  } catch (err) {
+    return { success: false, message: `KPI query failed: ${err instanceof Error ? err.message : err}` };
+  }
+}
+
 async function handleGenerateFile(params: Record<string, unknown>): Promise<ActionResult> {
   // Fall back to configured default Slack channel when the caller (e.g. web chat) has no channel context.
   // Set ABRA_SLACK_CHANNEL_ID in Vercel env to a Slack channel ID (e.g. C01234567) for web-chat file uploads.
@@ -3210,6 +3261,7 @@ const ACTION_HANDLERS: Record<
   start_workflow: handleStartWorkflow,
   resume_workflow: handleResumeWorkflow,
   generate_file: handleGenerateFile,
+  query_kpi: handleQueryKPI,
 };
 
 async function fetchApproval(approvalId: string): Promise<ApprovalRow | null> {

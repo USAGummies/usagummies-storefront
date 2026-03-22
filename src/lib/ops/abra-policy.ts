@@ -88,6 +88,13 @@ export const ACTION_POLICIES: Record<string, ActionPolicy> = {
     description: "Query Notion financial ledger — read-only.",
   },
 
+  query_kpi: {
+    tier: "direct",
+    riskFloor: "low",
+    dailyLimit: 100,
+    description: "Query KPI timeseries for specific dates — read-only.",
+  },
+
   query_qbo: {
     tier: "direct",
     riskFloor: "low",
