@@ -11,6 +11,7 @@ import { adminRequest } from "@/lib/shopify/admin";
 import {
   isAmazonConfigured,
   fetchAmazonOrderStats,
+  fetchAccurateRevenue,
 } from "@/lib/amazon/sp-api";
 import { getRecentErrors } from "@/lib/ops/error-tracker";
 
@@ -205,6 +206,56 @@ async function fetchAmazonTodayRevenue(): Promise<{
   }
 }
 
+/**
+ * Backfill yesterday's Amazon revenue using the Reports API.
+ * Reports API gives Seller Central-grade accuracy (exact revenue per order).
+ * Runs daily to correct the unit-based estimates from the previous day.
+ */
+async function backfillYesterdayAmazonRevenue(): Promise<{
+  revenue: number;
+  orders: number;
+  units: number;
+  source: string;
+} | null> {
+  if (!isAmazonConfigured()) return null;
+
+  try {
+    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    const data = await fetchAccurateRevenue(yesterday, yesterday, 90000);
+
+    if (data.totalOrders === 0) return null;
+
+    // Update KPI timeseries with accurate data (overwrite the estimate)
+    await recordKPI({
+      metric_name: "daily_revenue_amazon",
+      value: data.totalRevenue,
+      metric_group: "amazon",
+      source_system: "amazon",
+      date: yesterday,
+    });
+
+    await recordKPI({
+      metric_name: "daily_orders_amazon",
+      value: data.totalOrders,
+      metric_group: "amazon",
+      source_system: "amazon",
+      date: yesterday,
+    });
+
+    console.log(`[kpi] Amazon Reports backfill: ${yesterday} → $${data.totalRevenue.toFixed(2)} revenue, ${data.totalOrders} orders (replaces estimate)`);
+
+    return {
+      revenue: data.totalRevenue,
+      orders: data.totalOrders,
+      units: data.totalUnits,
+      source: "amazon_reports_api",
+    };
+  } catch (err) {
+    console.warn("[kpi] Amazon Reports backfill failed (non-fatal):", err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
 async function fetchPendingApprovalsCount(): Promise<number> {
   const rows = await sbFetch<Array<{ id: string }>>(
     "/rest/v1/approvals?status=eq.pending&select=id&limit=200",
@@ -318,6 +369,12 @@ export async function collectDailyKPIs(): Promise<CollectionResult> {
     { key: "active_pipeline_deals", value: pipelineDeals },
     { key: "error_count", value: errorCount },
   );
+
+  // Fire-and-forget: backfill yesterday's Amazon data with Reports API
+  // for Seller Central-grade accuracy (replaces unit-based estimates)
+  backfillYesterdayAmazonRevenue().catch((err) => {
+    console.warn("[kpi] Amazon Reports backfill failed:", err instanceof Error ? err.message : err);
+  });
 
   return { metrics, errors };
 }

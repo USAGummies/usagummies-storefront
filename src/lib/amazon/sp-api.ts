@@ -720,3 +720,154 @@ export async function fetchOrdersSequential(
   }
   return results;
 }
+
+// ---------------------------------------------------------------------------
+// Reports API — Seller Central-grade accuracy for historical data
+// ---------------------------------------------------------------------------
+
+type ReportResponse = {
+  reportId: string;
+  reportType?: string;
+  processingStatus?: string;
+  reportDocumentId?: string;
+};
+
+type ReportDocumentResponse = {
+  reportDocumentId: string;
+  url: string;
+  compressionAlgorithm?: string;
+};
+
+/**
+ * Request an Amazon sales report for a date range.
+ * Returns the reportId — poll with getReportStatus() until complete.
+ */
+export async function requestSalesReport(
+  startDate: string,
+  endDate: string,
+): Promise<string> {
+  const result = await spApiPost<ReportResponse>("/reports/2021-06-30/reports", {
+    reportType: "GET_FLAT_FILE_ALL_ORDERS_DATA_BY_ORDER_DATE_GENERAL",
+    marketplaceIds: [MARKETPLACE_ID()],
+    dataStartTime: `${startDate}T00:00:00Z`,
+    dataEndTime: `${endDate}T23:59:59Z`,
+  });
+
+  if (!result.reportId) {
+    throw new Error("No reportId returned from Reports API");
+  }
+  return result.reportId;
+}
+
+/**
+ * Check the status of a report request.
+ */
+export async function getReportStatus(
+  reportId: string,
+): Promise<{ status: string; documentId: string | null }> {
+  const result = await spApiGet<ReportResponse>(
+    `/reports/2021-06-30/reports/${reportId}`,
+    {},
+  );
+  return {
+    status: result.processingStatus || "UNKNOWN",
+    documentId: result.reportDocumentId || null,
+  };
+}
+
+/**
+ * Download a completed report document and parse as TSV.
+ */
+export async function downloadReport(
+  documentId: string,
+): Promise<Array<Record<string, string>>> {
+  const docInfo = await spApiGet<ReportDocumentResponse>(
+    `/reports/2021-06-30/documents/${documentId}`,
+    {},
+  );
+
+  if (!docInfo.url) {
+    throw new Error("No download URL in report document");
+  }
+
+  const res = await fetch(docInfo.url, {
+    signal: AbortSignal.timeout(30000),
+  });
+  if (!res.ok) throw new Error(`Report download failed: ${res.status}`);
+
+  const text = await res.text();
+  const lines = text.trim().split("\n");
+  if (lines.length < 2) return [];
+
+  const headers = lines[0].split("\t");
+  return lines.slice(1).map((line) => {
+    const values = line.split("\t");
+    const row: Record<string, string> = {};
+    headers.forEach((h, i) => {
+      row[h.trim()] = (values[i] || "").trim();
+    });
+    return row;
+  });
+}
+
+/**
+ * Full pipeline: request report → poll until done → download → parse.
+ * Returns parsed order data with accurate revenue figures.
+ *
+ * This matches Seller Central's "Business Reports" data exactly.
+ */
+export async function fetchAccurateRevenue(
+  startDate: string,
+  endDate: string,
+  maxWaitMs = 120000,
+): Promise<{
+  orders: Array<{ date: string; orderId: string; revenue: number; units: number; status: string }>;
+  totalRevenue: number;
+  totalUnits: number;
+  totalOrders: number;
+}> {
+  const reportId = await requestSalesReport(startDate, endDate);
+
+  // Poll for completion
+  const deadline = Date.now() + maxWaitMs;
+  let documentId: string | null = null;
+
+  while (Date.now() < deadline) {
+    await sleep(10000); // Reports typically take 30-60 seconds
+    const status = await getReportStatus(reportId);
+
+    if (status.status === "DONE" && status.documentId) {
+      documentId = status.documentId;
+      break;
+    }
+    if (status.status === "CANCELLED" || status.status === "FATAL") {
+      throw new Error(`Report ${reportId} failed: ${status.status}`);
+    }
+    // Still processing — continue polling
+  }
+
+  if (!documentId) {
+    throw new Error(`Report ${reportId} timed out after ${maxWaitMs}ms`);
+  }
+
+  // Download and parse
+  const rows = await downloadReport(documentId);
+
+  const orders = rows.map((row) => ({
+    date: row["purchase-date"]?.slice(0, 10) || row["last-updated-date"]?.slice(0, 10) || "",
+    orderId: row["amazon-order-id"] || "",
+    revenue: parseFloat(row["item-price"] || "0") + parseFloat(row["shipping-price"] || "0"),
+    units: parseInt(row["quantity"] || "1", 10),
+    status: row["order-status"] || "",
+  }));
+
+  const totalRevenue = Math.round(orders.reduce((s, o) => s + o.revenue, 0) * 100) / 100;
+  const totalUnits = orders.reduce((s, o) => s + o.units, 0);
+
+  return {
+    orders,
+    totalRevenue,
+    totalUnits,
+    totalOrders: orders.length,
+  };
+}
