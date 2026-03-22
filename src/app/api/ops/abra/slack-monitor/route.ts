@@ -303,10 +303,31 @@ export async function POST(req: Request) {
                 return { idx, reply: typeof data.reply === "string" ? data.reply.trim() : "" };
               };
 
-              // Fire all parts simultaneously
-              const results = await Promise.allSettled(
-                parts.map((p, i) => processPart(p, i)),
+              // Fire parts with slight stagger to avoid Vercel concurrency limits
+              // Capability (quick) parts go first (fast), then data parts with 2s gaps
+              const partEntries = parts.map((p, i) => ({ text: p, idx: i }));
+              const quickParts = partEntries.filter((_, i) => {
+                return /\b(can you|how do(?:es)? (?:that|this|it) work|is (?:that|it) possible|can we have|how does (?:collaboration|that work)|while i'?m driving|voice|hands.?free|conversational(?:ly)?|shared (?:worksheet|spreadsheet|document))\b/i.test(parts[i]);
+              });
+              const fullParts = partEntries.filter(e => !quickParts.includes(e));
+
+              // Quick parts fire immediately (they finish in <5s)
+              const quickPromises = quickParts.map(e => processPart(e.text, e.idx));
+
+              // Full parts fire with 3s stagger to avoid concurrency contention
+              const fullPromises = fullParts.map((e, staggerIdx) =>
+                new Promise<{ idx: number; reply: string }>(resolve => {
+                  setTimeout(async () => {
+                    try {
+                      resolve(await processPart(e.text, e.idx));
+                    } catch (err) {
+                      resolve({ idx: e.idx, reply: `⚠️ Timed out — try asking this separately.` });
+                    }
+                  }, staggerIdx * 3000); // 0s, 3s, 6s stagger
+                })
               );
+
+              const results = await Promise.allSettled([...quickPromises, ...fullPromises]);
 
               // Post results in order
               for (let i = 0; i < results.length; i++) {
