@@ -161,20 +161,34 @@ async function fetchAmazonTodayRevenue(): Promise<{
       0,
     );
 
-    // If OrderTotal is 0 for most orders (pending status), estimate from unit count
-    // Amazon typically doesn't populate OrderTotal until order is confirmed
-    const ordersWithTotal = orders.filter(o => parseFloat(o.OrderTotal?.Amount || "0") > 0);
+    // Amazon SP-API OrderTotal is UNRELIABLE for same-day orders:
+    // - Pending orders often have $0 or partial amounts
+    // - Some orders show fee amounts instead of gross price
+    // - Seller Central "Sales" uses a different calculation
+    //
+    // Strategy: ALWAYS estimate from units × listing price ($5.99).
+    // This matches Seller Central's "Product sales" metric much more
+    // closely than OrderTotal. For USA Gummies with one SKU at $5.99,
+    // this is accurate to within pennies.
+    const totalUnits = orders.reduce(
+      (sum, o) => sum + (o.NumberOfItemsShipped || 0) + (o.NumberOfItemsUnshipped || 0),
+      0,
+    );
+
+    // Use unit-based estimation as primary, OrderTotal as sanity check
+    const LISTING_PRICE = 5.99;
+    const unitBasedRevenue = totalUnits * LISTING_PRICE;
+    const ordersWithTotal = orders.filter(o => parseFloat(o.OrderTotal?.Amount || "0") > 1);
     const ordersWithoutTotal = totalOrders - ordersWithTotal.length;
 
-    let estimatedRevenue = totalRevenue;
-    if (ordersWithoutTotal > 0 && totalRevenue === 0) {
-      // Fallback: estimate from unit count × average sell price ($5.99)
-      const totalUnits = orders.reduce(
-        (sum, o) => sum + (o.NumberOfItemsShipped || 0) + (o.NumberOfItemsUnshipped || 0),
-        0,
-      );
-      estimatedRevenue = totalUnits * 5.99; // Our listing price
-      console.log(`[kpi] Amazon: ${ordersWithoutTotal} orders missing OrderTotal — estimated $${estimatedRevenue.toFixed(2)} from ${totalUnits} units × $5.99`);
+    // If OrderTotal-based revenue is within 20% of unit-based, trust it.
+    // Otherwise use unit-based (more reliable for same-day data).
+    let estimatedRevenue: number;
+    if (totalRevenue > 0 && Math.abs(totalRevenue - unitBasedRevenue) / unitBasedRevenue < 0.2) {
+      estimatedRevenue = totalRevenue; // OrderTotal looks reasonable
+    } else {
+      estimatedRevenue = unitBasedRevenue; // Use unit estimate
+      console.log(`[kpi] Amazon: Using unit-based estimate $${unitBasedRevenue.toFixed(2)} (${totalUnits} units × $${LISTING_PRICE}) instead of OrderTotal $${totalRevenue.toFixed(2)} (${ordersWithoutTotal} orders missing/low OrderTotal)`);
     }
 
     return {
