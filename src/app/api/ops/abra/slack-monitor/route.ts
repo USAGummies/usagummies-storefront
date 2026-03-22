@@ -7,6 +7,7 @@
  * - Questions that Abra can answer proactively
  */
 import { NextResponse } from "next/server";
+import { after } from "next/server";
 import { createHmac } from "node:crypto";
 
 // ── Actor Profiles — calibrate Abra's tone per user ──
@@ -97,6 +98,7 @@ function splitMultiPartMessage(text: string): string[] {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60; // Vercel Hobby plan max
 
 /** Verify Slack request signature (v0) to prevent spoofed webhooks */
 async function verifySlackSignature(req: Request, rawBody: string): Promise<boolean> {
@@ -176,8 +178,8 @@ export async function POST(req: Request) {
       const abraBotId = "U0AKMSTL0GL"; // Abra's Slack user ID
 
       if (botToken && cronSecret) {
-        // Fire and forget — call the full Abra chat API and reply in thread
-        (async () => {
+        // Use after() to process in background — Vercel keeps the function alive
+        after(async () => {
           try {
             // ── Fetch thread history for context ──
             const threadHistory: Array<{ role: string; content: string }> = [];
@@ -348,7 +350,7 @@ export async function POST(req: Request) {
           } catch (err) {
             console.error("[slack-monitor] Error responding to mention:", err);
           }
-        })();
+        });
       }
     }
 
