@@ -95,6 +95,27 @@ export const ACTION_POLICIES: Record<string, ActionPolicy> = {
     description: "Query KPI timeseries for specific dates — read-only.",
   },
 
+  create_qbo_bill: {
+    tier: "auto_with_audit",
+    riskFloor: "medium",
+    dailyLimit: 20,
+    description: "Create a vendor bill in QBO. Bills >$500 require approval.",
+  },
+
+  amazon_update_price: {
+    tier: "approval_required",
+    riskFloor: "high",
+    dailyLimit: 5,
+    description: "Update Amazon listing price via SP-API. Always requires approval.",
+  },
+
+  amazon_update_ppc: {
+    tier: "approval_required",
+    riskFloor: "high",
+    dailyLimit: 10,
+    description: "Adjust Amazon PPC bids/budgets. Always requires approval.",
+  },
+
   query_qbo: {
     tier: "direct",
     riskFloor: "low",

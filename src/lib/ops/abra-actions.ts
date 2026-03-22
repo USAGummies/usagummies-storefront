@@ -2703,6 +2703,168 @@ async function handleCreateQBOInvoice(
   }
 }
 
+// ─── QBO Bill Creation (vendor → us payments) ───
+async function handleCreateQBOBill(
+  params: Record<string, unknown>,
+): Promise<ActionResult> {
+  const vendorName = sanitizeTitle(String(params.vendorName || params.vendor_name || params.vendor || ""));
+  const memo = sanitizeText(String(params.memo || params.description || ""), 1000);
+  const txnDate = String(params.date || params.txn_date || new Date().toISOString().slice(0, 10)).trim();
+  const dueDateRaw = String(params.dueDate || params.due_date || "").trim();
+  const rawLineItems = Array.isArray(params.lineItems) ? params.lineItems
+    : Array.isArray(params.line_items) ? params.line_items : [];
+
+  // If no line items but amount provided, create a single-line bill
+  const amount = Number(params.amount || 0);
+  const accountId = String(params.account_id || params.accountId || "").trim();
+  const category = String(params.category || "").trim();
+
+  const lineItems = rawLineItems.length > 0
+    ? rawLineItems.map((item) => {
+        if (!item || typeof item !== "object") return null;
+        const row = item as Record<string, unknown>;
+        return {
+          description: sanitizeTitle(String(row.description || "")),
+          amount: Number(row.amount || 0),
+          accountId: String(row.account_id || row.accountId || ""),
+        };
+      }).filter((item): item is { description: string; amount: number; accountId: string } => !!item && item.amount > 0)
+    : amount > 0
+      ? [{ description: memo || `Bill from ${vendorName}`, amount, accountId: accountId || "" }]
+      : [];
+
+  if (!vendorName) return { success: false, message: "vendor_name is required" };
+  if (lineItems.length === 0) return { success: false, message: "At least one line item with amount is required (or provide 'amount' directly)" };
+
+  const totalAmount = lineItems.reduce((s, l) => s + l.amount, 0);
+
+  try {
+    const { getValidAccessToken, getRealmId, forceRefreshTokens } = await import("@/lib/ops/qbo-auth");
+    let accessToken = await getValidAccessToken();
+    if (!accessToken) return { success: false, message: "QBO not connected" };
+    const realmId = await getRealmId();
+    if (!realmId) return { success: false, message: "QBO realm ID not found" };
+
+    const qboBase = process.env.QBO_SANDBOX === "true"
+      ? "https://sandbox-quickbooks.api.intuit.com"
+      : "https://quickbooks.api.intuit.com";
+
+    // Look up or create vendor
+    let vendorId: string | null = null;
+    const vendorSearch = await fetch(
+      `${qboBase}/v3/company/${realmId}/query?query=${encodeURIComponent(`SELECT Id FROM Vendor WHERE DisplayName = '${vendorName.replace(/'/g, "\\'")}'`)}&minorversion=73`,
+      { headers: { Accept: "application/json", Authorization: `Bearer ${accessToken}` }, signal: AbortSignal.timeout(10000) },
+    );
+    if (vendorSearch.ok) {
+      const vendorData = (await vendorSearch.json()) as { QueryResponse?: { Vendor?: Array<{ Id: string }> } };
+      vendorId = vendorData.QueryResponse?.Vendor?.[0]?.Id || null;
+    }
+
+    if (!vendorId) {
+      // Create vendor
+      const createRes = await fetch(`${qboBase}/v3/company/${realmId}/vendor?minorversion=73`, {
+        method: "POST",
+        headers: { Accept: "application/json", Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ DisplayName: vendorName }),
+        signal: AbortSignal.timeout(10000),
+      });
+      if (createRes.ok) {
+        const created = (await createRes.json()) as { Vendor?: { Id: string } };
+        vendorId = created.Vendor?.Id || null;
+      }
+    }
+
+    if (!vendorId) return { success: false, message: `Could not find or create vendor "${vendorName}" in QBO` };
+
+    // Create bill
+    const billBody: Record<string, unknown> = {
+      VendorRef: { value: vendorId },
+      TxnDate: txnDate,
+      Line: lineItems.map((li, i) => ({
+        Id: String(i + 1),
+        Amount: li.amount,
+        Description: li.description,
+        DetailType: "AccountBasedExpenseLineDetail",
+        AccountBasedExpenseLineDetail: li.accountId
+          ? { AccountRef: { value: li.accountId } }
+          : {},
+      })),
+    };
+    if (dueDateRaw && /^\d{4}-\d{2}-\d{2}$/.test(dueDateRaw)) billBody.DueDate = dueDateRaw;
+    if (memo) billBody.PrivateNote = memo;
+
+    let res = await fetch(`${qboBase}/v3/company/${realmId}/bill?minorversion=73`, {
+      method: "POST",
+      headers: { Accept: "application/json", Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify(billBody),
+      signal: AbortSignal.timeout(15000),
+    });
+
+    // Retry on 401
+    if (res.status === 401) {
+      const newToken = await forceRefreshTokens();
+      if (newToken) {
+        accessToken = newToken;
+        res = await fetch(`${qboBase}/v3/company/${realmId}/bill?minorversion=73`, {
+          method: "POST",
+          headers: { Accept: "application/json", Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+          body: JSON.stringify(billBody),
+          signal: AbortSignal.timeout(15000),
+        });
+      }
+    }
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      return { success: false, message: `QBO bill creation failed (${res.status}): ${errText.slice(0, 300)}` };
+    }
+
+    const billData = (await res.json()) as { Bill?: { Id: string; DocNumber: string } };
+    return {
+      success: true,
+      message: `Created QBO bill #${billData.Bill?.DocNumber || billData.Bill?.Id || "?"} for ${vendorName} — $${totalAmount.toFixed(2)}`,
+      data: { billId: billData.Bill?.Id, docNumber: billData.Bill?.DocNumber, total: totalAmount },
+    };
+  } catch (err) {
+    return { success: false, message: `QBO bill error: ${err instanceof Error ? err.message : String(err)}` };
+  }
+}
+
+// ─── Amazon Write Framework (stub — needs Advertising API credentials) ───
+async function handleAmazonUpdatePrice(
+  params: Record<string, unknown>,
+): Promise<ActionResult> {
+  const asin = String(params.asin || "B0G1JK92TJ").trim();
+  const newPrice = Number(params.price || 0);
+  const sku = String(params.sku || "C3-8YSA-IL5I").trim();
+
+  if (newPrice <= 0) return { success: false, message: "price must be a positive number" };
+  if (newPrice < 1 || newPrice > 100) return { success: false, message: "price must be between $1 and $100" };
+
+  // TODO: Implement when SP-API write permissions are granted
+  // The SP-API endpoint is: POST /listings/2021-08-01/items/{sellerId}/{sku}
+  // with patches array: [{ op: "replace", path: "/attributes/purchasable_offer", value: [...] }]
+  return {
+    success: false,
+    message: `Amazon price update not yet configured. Would set ASIN ${asin} (SKU ${sku}) to $${newPrice.toFixed(2)}. Requires SP-API Listings write permissions — contact Ben to enable.`,
+  };
+}
+
+async function handleAmazonUpdatePPC(
+  params: Record<string, unknown>,
+): Promise<ActionResult> {
+  const campaignId = String(params.campaign_id || "").trim();
+  const action = String(params.action || "").trim(); // adjust_bid, pause, resume, set_budget
+  const value = Number(params.value || 0);
+
+  // TODO: Implement when Amazon Advertising API credentials are configured
+  // API: advertising.amazon.com/v2/sp/campaigns/{campaignId}
+  return {
+    success: false,
+    message: `Amazon PPC management not yet configured. Would ${action} on campaign ${campaignId || "(default)"}${value > 0 ? ` with value $${value.toFixed(2)}` : ""}. Requires Amazon Advertising API credentials — set AMAZON_ADS_CLIENT_ID and AMAZON_ADS_CLIENT_SECRET.`,
+  };
+}
+
 async function handleUpdateShopifyInventory(
   params: Record<string, unknown>,
 ): Promise<ActionResult> {
@@ -3208,6 +3370,9 @@ const REQUIRED_PARAMS: Record<string, string[]> = {
   generate_file: ["filename"],
   correct_claim: ["original_claim", "correction"],
   query_qbo: ["query_type"],
+  create_qbo_bill: ["vendor_name"],
+  amazon_update_price: ["price"],
+  amazon_update_ppc: ["action"],
 };
 
 function validateActionParams(actionType: string, params: Record<string, unknown>): string | null {
@@ -3262,6 +3427,9 @@ const ACTION_HANDLERS: Record<
   resume_workflow: handleResumeWorkflow,
   generate_file: handleGenerateFile,
   query_kpi: handleQueryKPI,
+  create_qbo_bill: handleCreateQBOBill,
+  amazon_update_price: handleAmazonUpdatePrice,
+  amazon_update_ppc: handleAmazonUpdatePPC,
 };
 
 async function fetchApproval(approvalId: string): Promise<ApprovalRow | null> {
