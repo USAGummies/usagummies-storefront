@@ -9,6 +9,36 @@
 import { NextResponse } from "next/server";
 import { createHmac } from "node:crypto";
 
+// ── Actor Profiles — calibrate Abra's tone per user ──
+const ACTOR_PROFILES: Record<string, string> = {
+  // Rene Gonzalez — bookkeeper/investor rep
+  U0ALL27JM38: `ACTOR: Rene Gonzalez (bookkeeper, investor representative)
+COMMUNICATION STYLE FOR RENE:
+- Be CONCISE. Max 200 chars for simple answers. No essays.
+- NEVER ask more than 1 clarifying question per message.
+- If his intent is 80% clear, ACT on it. Don't ask for confirmation.
+- Default to ACTION over explanation. "Done" beats "Here's what I would do..."
+- Use simple language. No jargon, no acronyms he hasn't used first.
+- If he mentions a Notion page, he means the one he's been working on (TEST COA template).
+- Format for mobile: shorter lines, bullet points over tables.
+- He is building the books from scratch. Be collaborative, not interrogative.
+- CRITICAL: Rene's experience = investor's perception of Abra. Every interaction matters.`,
+
+  // Ben Stutman — founder/CEO
+  U08JY86Q508: `ACTOR: Ben Stutman (founder, CEO)
+COMMUNICATION STYLE FOR BEN:
+- Data-heavy responses welcome. Include source citations.
+- Tables and detailed breakdowns are fine.
+- Can handle technical jargon and financial terminology.
+- Proactively flag anomalies and risks.
+- Be direct but thorough. Ben wants the full picture.
+- When he corrects data, log it immediately and confirm the correction.`,
+};
+
+function getActorContext(userId: string): string {
+  return ACTOR_PROFILES[userId] || `Slack user ${userId}`;
+}
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -87,11 +117,47 @@ export async function POST(req: Request) {
 
       const botToken = process.env.SLACK_BOT_TOKEN;
       const cronSecret = (process.env.CRON_SECRET || "").trim();
+      const abraBotId = "U0AKMSTL0GL"; // Abra's Slack user ID
 
       if (botToken && cronSecret) {
         // Fire and forget — call the full Abra chat API and reply in thread
         (async () => {
           try {
+            // ── Fetch thread history for context ──
+            const threadHistory: Array<{ role: string; content: string }> = [];
+            if (threadTs && threadTs !== event.ts) {
+              // This is a threaded reply — fetch the thread
+              try {
+                const threadRes = await fetch(
+                  `https://slack.com/api/conversations.replies?channel=${channelId}&ts=${threadTs}&limit=15`,
+                  {
+                    headers: { Authorization: `Bearer ${botToken}` },
+                    signal: AbortSignal.timeout(5000),
+                  },
+                );
+                const threadData = (await threadRes.json()) as {
+                  ok: boolean;
+                  messages?: Array<{ user?: string; bot_id?: string; text?: string; ts?: string }>;
+                };
+                if (threadData.ok && threadData.messages) {
+                  // Convert to chat history format, excluding the current message
+                  for (const msg of threadData.messages) {
+                    if (msg.ts === event.ts) continue; // skip current message
+                    const msgText = (msg.text || "").replace(/<@[A-Z0-9]+>/g, "").trim();
+                    if (!msgText) continue;
+                    const isAbra = msg.user === abraBotId || !!msg.bot_id;
+                    threadHistory.push({
+                      role: isAbra ? "assistant" : "user",
+                      content: msgText,
+                    });
+                  }
+                }
+                console.log(`[slack-monitor] Thread context: ${threadHistory.length} messages from thread ${threadTs}`);
+              } catch (threadErr) {
+                console.warn("[slack-monitor] Failed to fetch thread history:", threadErr instanceof Error ? threadErr.message : threadErr);
+              }
+            }
+
             const host =
               process.env.NEXTAUTH_URL ||
               (process.env.VERCEL_URL
@@ -106,8 +172,10 @@ export async function POST(req: Request) {
               },
               body: JSON.stringify({
                 message: text,
-                history: [],
+                history: threadHistory,
                 channel: "slack",
+                actor_label: event.user || undefined,
+                actor_context: getActorContext(event.user || ""),
               }),
               signal: AbortSignal.timeout(45000),
             });
