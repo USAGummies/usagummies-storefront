@@ -571,10 +571,25 @@ export async function handleAmazonOrdersFeed(): Promise<FeedResult> {
       return { feed_key: feedKey, success: true, entriesCreated: 0 };
     }
 
-    const revenue = orders.reduce((sum, order) => {
+    // Use unit-based estimation when OrderTotal is missing/zero (pending orders)
+    const LISTING_PRICE = 5.99; // Single SKU — USA Gummies 2-pack
+    const totalUnitsForRev = orders.reduce(
+      (sum, o) =>
+        sum + (o.NumberOfItemsShipped || 0) + (o.NumberOfItemsUnshipped || 0),
+      0,
+    );
+    const orderTotalRevenue = orders.reduce((sum, order) => {
       return sum + parseFloat(order.OrderTotal?.Amount || "0");
     }, 0);
-    const summary = `Amazon orders (last 24h): ${orders.length} orders, $${revenue.toFixed(2)} total revenue. Marketplace: US.`;
+    // If OrderTotal is significantly lower than unit estimate, use the estimate
+    const unitEstimate = totalUnitsForRev * LISTING_PRICE;
+    const revenue = (orderTotalRevenue > 0 && orderTotalRevenue >= unitEstimate * 0.8)
+      ? orderTotalRevenue
+      : unitEstimate;
+    const revenueNote = revenue !== orderTotalRevenue
+      ? ` (estimated from ${totalUnitsForRev} units × $${LISTING_PRICE} — some orders pending)`
+      : "";
+    const summary = `Amazon orders (last 24h): ${orders.length} orders, $${revenue.toFixed(2)} total revenue${revenueNote}. Marketplace: US.`;
     const date = new Date().toISOString().split("T")[0];
     const saved = await writeBrainEntry({
       sourceRef: `amazon-orders-${date}`,
