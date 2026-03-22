@@ -730,6 +730,84 @@ Rules:
 export async function sendMorningBrief(): Promise<void> {
   const brief = await generateLLMMorningBrief();
   await notify({ channel: "daily", text: brief });
+
+  // Send Rene a finance-focused DM
+  try {
+    await sendReneMorningDM();
+  } catch (err) {
+    console.warn("[morning-brief] Rene DM failed:", err instanceof Error ? err.message : err);
+  }
+}
+
+const RENE_SLACK_USER_ID = "U0ALL27JM38";
+
+async function sendReneMorningDM(): Promise<void> {
+  const botToken = process.env.SLACK_BOT_TOKEN;
+  if (!botToken) return;
+
+  // Gather finance-relevant data
+  const [shopRev, amzRev, approvalCount] = await Promise.all([
+    getMetricSnapshot("daily_revenue_shopify").catch(() => null),
+    getMetricSnapshot("daily_revenue_amazon").catch(() => null),
+    getMetricSnapshot("pending_approvals").catch(() => null),
+  ]);
+
+  const yesterday = new Date(Date.now() - 86400000).toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+
+  const totalRev = Number(shopRev?.current || 0) + Number(amzRev?.current || 0);
+  const pendingApprovals = Math.round(Number(approvalCount?.current || 0));
+
+  const lines = [
+    `☀️ *Good morning, Rene* — ${yesterday} recap:`,
+    "",
+    `💰 Revenue: *$${totalRev.toFixed(2)}* (Shopify $${Number(shopRev?.current || 0).toFixed(2)} · Amazon $${Number(amzRev?.current || 0).toFixed(2)})`,
+  ];
+
+  if (pendingApprovals > 0) {
+    lines.push(`📋 *${pendingApprovals} approval(s)* waiting for your review`);
+  }
+
+  lines.push(
+    "",
+    "_Reply to me here with any questions about the books. I'm ready to help._",
+  );
+
+  // Open DM channel with Rene
+  const openRes = await fetch("https://slack.com/api/conversations.open", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${botToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ users: RENE_SLACK_USER_ID }),
+    signal: AbortSignal.timeout(5000),
+  });
+  const openData = (await openRes.json()) as { ok: boolean; channel?: { id: string } };
+  if (!openData.ok || !openData.channel?.id) {
+    console.warn("[morning-brief] Could not open DM with Rene");
+    return;
+  }
+
+  // Send the DM
+  await fetch("https://slack.com/api/chat.postMessage", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${botToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      channel: openData.channel.id,
+      text: lines.join("\n"),
+      unfurl_links: false,
+    }),
+    signal: AbortSignal.timeout(5000),
+  });
+
+  console.log("[morning-brief] Sent Rene finance DM");
 }
 
 // ── End-of-Day Summary ──────────────────────────────────────────────────

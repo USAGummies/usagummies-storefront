@@ -2289,7 +2289,36 @@ export async function POST(req: Request) {
     });
 
     const responseSources = claudeResult.earlyExit ? [] : uniqueSources;
-    const confidence = claudeResult.confidence;
+
+    // ── Calibrated confidence based on data quality, not Claude's self-assessment ──
+    const calibratedConfidence = (() => {
+      if (claudeResult.earlyExit) return 30;
+
+      let score = 50; // baseline
+
+      // Tier distribution — more HOT sources = higher confidence
+      const { hot, warm, cold } = tieredResults.tierCounts;
+      if (hot >= 3) score += 25;
+      else if (hot >= 1) score += 15;
+      else if (warm >= 2) score += 10;
+      else if (cold >= 1) score += 5;
+      // No brain entries at all = lower confidence
+      if (hot + warm + cold === 0) score -= 10;
+
+      // Live data sources boost confidence
+      if (financialContext) score += 10;
+      if (augmentedLiveSnapshot?.includes("KPI")) score += 5;
+
+      // Failed actions reduce confidence
+      if (actionNotices.some(n => /failed|error/i.test(n))) score -= 15;
+
+      // Conflicting sources reduce confidence
+      if (reply.includes("conflict") || reply.includes("discrepancy")) score -= 10;
+
+      // Clamp to 30-98 range (never 100% — epistemic humility)
+      return Math.max(30, Math.min(98, score));
+    })();
+    const confidence = calibratedConfidence;
 
     // Log answer provenance (best-effort, non-blocking)
     logProvenance({
