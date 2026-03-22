@@ -2595,6 +2595,15 @@ async function handleBatchCategorizeQBO(
     });
 
     const text = await res.text();
+
+    // Guard: if response is HTML (Vercel 404, QBO auth redirect, etc.), don't try to parse as JSON
+    if (text.trimStart().startsWith("<!") || text.trimStart().startsWith("<html")) {
+      return {
+        success: false,
+        message: `QBO batch categorization unavailable — endpoint returned HTML instead of JSON (likely QBO OAuth expired or deployment issue). Re-authenticate QBO at /ops/settings.`,
+      };
+    }
+
     const data = text ? (JSON.parse(text) as Record<string, unknown>) : {};
     if (!res.ok) {
       return {

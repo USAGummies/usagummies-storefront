@@ -84,13 +84,17 @@ export async function emitSignal(
   signal: Omit<OperationalSignal, "acknowledged" | "acknowledged_by">,
 ): Promise<string | null> {
   try {
-    // Dedup: skip if an unacknowledged signal with same type+title exists from last 24h
-    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    // Dedup: skip if an unacknowledged signal with same type exists from last 4h
+    // Use a 4h window (not 24h) and match on signal_type + source only
+    // This prevents the same anomaly from spamming Slack every 30 minutes
+    // even when the exact dollar amounts change slightly between checks
+    const cutoff = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
+    const dedupSource = signal.source ? `&source=eq.${encodeURIComponent(signal.source)}` : "";
     const existing = (await sbFetch(
-      `/rest/v1/abra_operational_signals?signal_type=eq.${encodeURIComponent(signal.signal_type)}&title=eq.${encodeURIComponent(signal.title)}&acknowledged=eq.false&created_at=gte.${cutoff}&select=id&limit=1`,
+      `/rest/v1/abra_operational_signals?signal_type=eq.${encodeURIComponent(signal.signal_type)}${dedupSource}&acknowledged=eq.false&created_at=gte.${cutoff}&select=id&limit=1`,
     )) as Array<{ id: string }>;
     if (existing.length > 0) {
-      return existing[0].id; // Already exists, return existing ID
+      return existing[0].id; // Already exists within 4h window, skip
     }
 
     const rows = (await sbFetch("/rest/v1/abra_operational_signals", {
