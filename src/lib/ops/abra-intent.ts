@@ -21,6 +21,8 @@ export const STRATEGY_TRIGGERS =
   /\b(create .+ strategy|develop .+ strategy|build .+ strategy|strategic plan|financial plan|budget plan|let'?s (plan|strategize)|design .+ plan)\b/i;
 export const DIAGNOSTICS_TRIGGERS =
   /\b(diagnos|self.?check|what'?s broken|are you (working|ok|healthy)|system health|feed status|check yourself|run diagnostics)\b/i;
+export const AUTOMATION_LOG_TRIGGERS =
+  /\b(automation log|automated tasks|what (?:tasks|sweeps|feeds|crons|jobs) (?:have |)run|task execution log|sweep log|feed log|what ran today|show (?:me )?(?:the )?(?:recent |)(?:automation|task|sweep|feed) (?:log|history|runs)|automation history)\b/i;
 export const FINANCE_TRIGGERS =
   /\b(chart of accounts|account balances?|qbo|quickbooks|bank balance|checking balance|credit card balance|p&l|profit.?(?:and|&).?loss|balance sheet|cash position|how much (?:do we have|is in|money)|financial (?:summary|snapshot|report|data)|account(?:s|ing) (?:summary|breakdown)|categoriz|investor loan|rene.?(?:s|'s|'s)? (?:money|loan|transfer|investment)|vendor(?:s| list)?|supplier(?:s)?|co.?pack|cogs|cost of goods|gross margin|expense(?:s| breakdown)|where .* money .* go|spending|purchases?|what (?:are|do) we (?:spend|pay)|who do we (?:pay|buy from)|reconcil|1099|tax (?:liability|filing|return|compliance|status)|estimated (?:quarterly|tax)|accounts (?:receivable|payable)|inventory (?:value|on hand|count|worth)|depreciation|amortization|equity|liabilities|net (?:income|loss|worth)|revenue (?:breakdown|by channel)|burn rate|runway|profitability|breakeven|break.?even|capital structure|funding|every transaction|all transactions|transaction (?:list|detail|history)|general ledger|trial balance|what do the books look|how do the books|book(?:s|keeping))\b/i;
 
@@ -34,6 +36,7 @@ export type DetectedIntent =
   | { type: "finance" }
   | { type: "strategy"; objective: string; department: string | null }
   | { type: "diagnostics" }
+  | { type: "automation_log" }
   | { type: "chat" };
 
 // ─── Data Paste Detection ───
@@ -89,6 +92,9 @@ export function detectIntent(message: string): DetectedIntent {
   // but is NOT a finance question and must NOT hit the QBO fast-path.
   if (isDataPaste(message)) {
     return { type: "chat" };
+  }
+  if (AUTOMATION_LOG_TRIGGERS.test(message)) {
+    return { type: "automation_log" };
   }
   if (DIAGNOSTICS_TRIGGERS.test(message)) {
     return { type: "diagnostics" };

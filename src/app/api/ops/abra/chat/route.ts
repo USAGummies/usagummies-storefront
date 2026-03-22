@@ -1444,6 +1444,41 @@ export async function POST(req: Request) {
       });
     }
 
+    if (intent.type === "automation_log") {
+      try {
+        const { getRecentAutomationLog } = await import("@/lib/ops/abra-health-monitor");
+        const logs = await getRecentAutomationLog(25);
+
+        if (logs.length === 0) {
+          return NextResponse.json({
+            reply: "No automation runs logged yet. The automation log was just created — runs will start appearing as feeds and KPI syncs execute.",
+            confidence: 90,
+            thread_id: threadId,
+          });
+        }
+
+        const logLines = logs.map((l) => {
+          const time = l.created_at?.slice(0, 19).replace("T", " ") || "?";
+          const icon = l.status === "success" ? "✅" : l.status === "error" ? "❌" : "⏭️";
+          return `| ${icon} | ${time} | ${l.task_name} | ${l.task_type} | ${l.records_processed} | ${l.error_message || "—"} |`;
+        }).join("\n");
+
+        const reply = `## Automation Execution Log\n\n| Status | Timestamp | Task | Type | Records | Error |\n|--------|-----------|------|------|---------|-------|\n${logLines}\n\n*${logs.length} most recent runs shown.*`;
+
+        return NextResponse.json({
+          reply,
+          confidence: 95,
+          thread_id: threadId,
+        });
+      } catch (err) {
+        return NextResponse.json({
+          reply: `Failed to query automation log: ${err instanceof Error ? err.message : "unknown error"}`,
+          confidence: 50,
+          thread_id: threadId,
+        });
+      }
+    }
+
     if (intent.type === "diagnostics") {
       let healthReport: string;
       try {
