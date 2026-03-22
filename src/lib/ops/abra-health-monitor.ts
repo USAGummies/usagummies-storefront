@@ -262,3 +262,70 @@ export async function checkAndAlertHealth(): Promise<void> {
     await markDeadLetterAlerted(deadLetter.id);
   }
 }
+
+// ---------------------------------------------------------------------------
+// Automation Execution Log — tracks all automated task runs
+// ---------------------------------------------------------------------------
+
+export async function logAutomationRun(params: {
+  task_name: string;
+  task_type?: string;
+  status: "success" | "error" | "skipped";
+  records_processed?: number;
+  duration_ms?: number;
+  details?: Record<string, unknown>;
+  error_message?: string;
+}): Promise<void> {
+  try {
+    const env = getSupabaseEnv();
+    if (!env) return;
+
+    await sbFetch("/rest/v1/abra_automation_log", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify({
+        task_name: params.task_name,
+        task_type: params.task_type || "sweep",
+        status: params.status,
+        records_processed: params.records_processed || 0,
+        duration_ms: params.duration_ms || 0,
+        details: params.details || {},
+        error_message: params.error_message || null,
+      }),
+    });
+  } catch {
+    // Best-effort logging — never block on log failures
+  }
+}
+
+export async function getRecentAutomationLog(
+  limit = 20,
+): Promise<Array<{
+  task_name: string;
+  task_type: string;
+  status: string;
+  records_processed: number;
+  duration_ms: number;
+  created_at: string;
+  error_message: string | null;
+}>> {
+  try {
+    const rows = await sbFetch(
+      `/rest/v1/abra_automation_log?order=created_at.desc&limit=${limit}`,
+    );
+    return Array.isArray(rows) ? rows as Array<{
+      task_name: string;
+      task_type: string;
+      status: string;
+      records_processed: number;
+      duration_ms: number;
+      created_at: string;
+      error_message: string | null;
+    }> : [];
+  } catch {
+    return [];
+  }
+}

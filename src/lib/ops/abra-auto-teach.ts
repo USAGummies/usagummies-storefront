@@ -7,6 +7,7 @@
 
 import { emitSignal } from "@/lib/ops/abra-operational-signals";
 import { recordKPI } from "@/lib/ops/abra-kpi-recorder";
+import { logAutomationRun } from "@/lib/ops/abra-health-monitor";
 import { notify } from "@/lib/ops/notify";
 
 export type AutoTeachFeed = {
@@ -1463,6 +1464,16 @@ export async function runFeed(feedKey: string): Promise<FeedResult> {
   if (!updatedV2) {
     void patchLegacyFeedStatus(feedKey, result);
   }
+
+  // Log to automation log for audit trail
+  logAutomationRun({
+    task_name: feedKey,
+    task_type: "feed",
+    status: result.success ? "success" : "error",
+    records_processed: result.entriesCreated,
+    details: { consecutive_failures: consecutiveFailures },
+    error_message: result.error || undefined,
+  }).catch(() => {});
 
   if (!result.success) {
     const errorText = result.error || "Unknown feed failure";

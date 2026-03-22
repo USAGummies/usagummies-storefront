@@ -7,6 +7,7 @@
  */
 
 import { recordKPI } from "@/lib/ops/abra-kpi-recorder";
+import { logAutomationRun } from "@/lib/ops/abra-health-monitor";
 import { adminRequest } from "@/lib/shopify/admin";
 import {
   isAmazonConfigured,
@@ -406,6 +407,19 @@ export async function recordKPIs(
       // Non-fatal — continue with remaining metrics
     }
   }
+
+  // Log the automation run
+  logAutomationRun({
+    task_name: "kpi_collection",
+    task_type: "sweep",
+    status: recorded > 0 ? "success" : "error",
+    records_processed: recorded,
+    details: {
+      metrics_collected: metrics.length,
+      shopify_revenue: metrics.find((m) => m.key === "daily_revenue_shopify")?.value,
+      amazon_revenue: metrics.find((m) => m.key === "daily_revenue_amazon")?.value,
+    },
+  }).catch(() => {});
 
   return recorded;
 }
