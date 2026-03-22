@@ -2131,8 +2131,20 @@ export async function POST(req: Request) {
         ? "" // Notices will fill the reply
         : "Done — I processed your request. Check this thread for any files or follow-up."
     );
+    // ── Fix false "Done" claims when actions failed ──
+    let correctedReply = effectiveReply;
+    const hasFailedAction = actionNotices.some(n => /failed|error|❌|⚠️.*failed/i.test(n));
+    if (hasFailedAction) {
+      // Replace premature "Done" / "Updated" / "I have updated" claims with honest status
+      correctedReply = correctedReply
+        .replace(/\bDone\s*[—–-]\s*(the|I|it|your)\b/gi, "I attempted to")
+        .replace(/\bI have updated\b/gi, "I attempted to update")
+        .replace(/\bUpdating now:\s*\n*\s*Done\b/gi, "Attempting now...")
+        .replace(/\bPage is live\b/gi, "Page update was attempted");
+    }
+
     let reply = [
-      effectiveReply,
+      correctedReply,
       actionNotices.length > 0 ? actionNotices.join("\n") : "",
     ]
       .filter(Boolean)

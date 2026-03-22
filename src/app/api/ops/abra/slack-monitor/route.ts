@@ -68,6 +68,23 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: true });
       }
 
+      // Skip side conversations — messages directed at another human, not Abra
+      // e.g., "ben asking about X?" or "Rene, did you see this?"
+      const isSideConversation =
+        // Starts with someone's name + question/statement (not "@Abra")
+        /^(ben|rene|greg|patrick|andrew)\b[,\s]/i.test(text) ||
+        // Short question clearly to another person
+        (/^(hey |yo |dude |bro )/i.test(text) && text.length < 60 && !/abra/i.test(text)) ||
+        // "asking about X?" pattern — relaying, not commanding
+        /\basking about\b/i.test(text) ||
+        // "did you see/hear/get" — human-to-human
+        /\bdid (you|he|she|they) (see|hear|get|send|check)\b/i.test(text);
+
+      if (isSideConversation) {
+        console.log(`[slack-monitor] Skipping side conversation: "${text.slice(0, 60)}"`);
+        return NextResponse.json({ ok: true });
+      }
+
       const botToken = process.env.SLACK_BOT_TOKEN;
       const cronSecret = (process.env.CRON_SECRET || "").trim();
 
