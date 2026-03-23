@@ -430,3 +430,192 @@ function extractReportTotal(
 
   return searchRows(rows);
 }
+
+// ---------------------------------------------------------------------------
+// WRITE: Vendor Management
+// ---------------------------------------------------------------------------
+
+export type QBOVendorInput = {
+  DisplayName: string;
+  CompanyName?: string;
+  PrimaryEmailAddr?: { Address: string };
+  PrimaryPhone?: { FreeFormNumber: string };
+  BillAddr?: {
+    Line1?: string;
+    City?: string;
+    CountrySubDivisionCode?: string;
+    PostalCode?: string;
+  };
+  PrintOnCheckName?: string;
+};
+
+/**
+ * Create a vendor in QBO.
+ * POST /vendor
+ */
+export async function createQBOVendor(
+  vendor: QBOVendorInput,
+): Promise<QBOEntity | null> {
+  return qboFetch<QBOEntity>("/vendor", {
+    method: "POST",
+    body: JSON.stringify(vendor),
+  });
+}
+
+/**
+ * Update an existing vendor in QBO.
+ * POST /vendor (with Id and SyncToken)
+ */
+export async function updateQBOVendor(
+  vendor: QBOEntity,
+): Promise<QBOEntity | null> {
+  return qboFetch<QBOEntity>("/vendor", {
+    method: "POST",
+    body: JSON.stringify(vendor),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// WRITE: Account (Chart of Accounts) Management
+// ---------------------------------------------------------------------------
+
+export type QBOAccountInput = {
+  Name: string;
+  AccountType: string;
+  AccountSubType?: string;
+  AcctNum?: string;
+  Description?: string;
+  ParentRef?: { value: string };
+  SubAccount?: boolean;
+};
+
+/**
+ * Create an account in QBO Chart of Accounts.
+ * POST /account
+ */
+export async function createQBOAccount(
+  account: QBOAccountInput,
+): Promise<QBOEntity | null> {
+  return qboFetch<QBOEntity>("/account", {
+    method: "POST",
+    body: JSON.stringify(account),
+  });
+}
+
+/**
+ * Update an existing account in QBO.
+ * POST /account (with Id and SyncToken — fetch first to get SyncToken)
+ */
+export async function updateQBOAccount(
+  account: QBOEntity,
+): Promise<QBOEntity | null> {
+  return qboFetch<QBOEntity>("/account", {
+    method: "POST",
+    body: JSON.stringify(account),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// WRITE: Invoice
+// ---------------------------------------------------------------------------
+
+export type QBOInvoiceLineInput = {
+  Description: string;
+  Amount: number;
+  Qty?: number;
+  UnitPrice?: number;
+  ItemRef?: { value: string; name?: string };
+};
+
+export type QBOInvoiceInput = {
+  CustomerRef: { value: string };
+  Line: Array<{
+    Amount: number;
+    DetailType: "SalesItemLineDetail";
+    SalesItemLineDetail: {
+      ItemRef?: { value: string; name?: string };
+      Qty?: number;
+      UnitPrice?: number;
+    };
+    Description?: string;
+  }>;
+  DueDate?: string;
+  DocNumber?: string;
+  CustomerMemo?: { value: string };
+  BillEmail?: { Address: string };
+};
+
+/**
+ * Create an invoice in QBO.
+ * POST /invoice
+ */
+export async function createQBOInvoice(
+  invoice: QBOInvoiceInput,
+): Promise<QBOEntity | null> {
+  return qboFetch<QBOEntity>("/invoice", {
+    method: "POST",
+    body: JSON.stringify(invoice),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// WRITE: Bill (record a vendor bill / AP)
+// ---------------------------------------------------------------------------
+
+export type QBOBillInput = {
+  VendorRef: { value: string };
+  Line: Array<{
+    Amount: number;
+    DetailType: "AccountBasedExpenseLineDetail";
+    AccountBasedExpenseLineDetail: {
+      AccountRef: { value: string };
+    };
+    Description?: string;
+  }>;
+  DueDate?: string;
+  DocNumber?: string;
+  TxnDate?: string;
+};
+
+/**
+ * Create a bill (AP entry) in QBO.
+ * POST /bill
+ */
+export async function createQBOBill(
+  bill: QBOBillInput,
+): Promise<QBOEntity | null> {
+  return qboFetch<QBOEntity>("/bill", {
+    method: "POST",
+    body: JSON.stringify(bill),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// WRITE: Customer Management
+// ---------------------------------------------------------------------------
+
+export type QBOCustomerInput = {
+  DisplayName: string;
+  CompanyName?: string;
+  PrimaryEmailAddr?: { Address: string };
+  PrimaryPhone?: { FreeFormNumber: string };
+  BillAddr?: {
+    Line1?: string;
+    City?: string;
+    CountrySubDivisionCode?: string;
+    PostalCode?: string;
+  };
+};
+
+/**
+ * Create a customer in QBO.
+ * POST /customer
+ */
+export async function createQBOCustomer(
+  customer: QBOCustomerInput,
+): Promise<QBOEntity | null> {
+  return qboFetch<QBOEntity>("/customer", {
+    method: "POST",
+    body: JSON.stringify(customer),
+  });
+}

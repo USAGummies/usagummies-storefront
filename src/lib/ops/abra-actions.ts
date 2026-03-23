@@ -367,6 +367,10 @@ function mapApprovalActionType(actionType: string): string {
   if (actionType === "create_brain_entry") return "data_mutation";
   if (actionType === "batch_categorize_qbo") return "data_mutation";
   if (actionType === "create_qbo_invoice") return "data_mutation";
+  if (actionType === "create_qbo_vendor") return "data_mutation";
+  if (actionType === "create_qbo_account") return "data_mutation";
+  if (actionType === "create_qbo_bill") return "data_mutation";
+  if (actionType === "create_qbo_customer") return "data_mutation";
   if (actionType === "update_shopify_inventory") return "data_mutation";
   if (actionType === "create_shopify_discount") return "data_mutation";
   return "other";
@@ -2648,6 +2652,160 @@ async function handleBatchCategorizeQBO(
   }
 }
 
+// ---------------------------------------------------------------------------
+// QBO: Create Vendor
+// ---------------------------------------------------------------------------
+
+async function handleCreateQBOVendor(
+  params: Record<string, unknown>,
+): Promise<ActionResult> {
+  const name = String(params.name || params.DisplayName || params.vendor_name || "").trim();
+  if (!name) return { success: false, message: "Vendor name is required" };
+
+  try {
+    const { createQBOVendor } = await import("@/lib/ops/qbo-client");
+    const result = await createQBOVendor({
+      DisplayName: name,
+      CompanyName: String(params.company_name || params.CompanyName || name),
+      ...(params.email ? { PrimaryEmailAddr: { Address: String(params.email) } } : {}),
+      ...(params.phone ? { PrimaryPhone: { FreeFormNumber: String(params.phone) } } : {}),
+      ...(params.address ? {
+        BillAddr: {
+          Line1: String(params.address),
+          City: String(params.city || ""),
+          CountrySubDivisionCode: String(params.state || ""),
+          PostalCode: String(params.zip || ""),
+        },
+      } : {}),
+    });
+
+    if (!result) return { success: false, message: "QBO vendor creation failed — check QBO connection" };
+    const vendorData = (result as Record<string, unknown>).Vendor || result;
+    const vendorId = (vendorData as Record<string, unknown>).Id || "unknown";
+    return {
+      success: true,
+      message: `✅ Created vendor "${name}" in QBO (ID: ${vendorId})`,
+      data: { vendorId, name },
+    };
+  } catch (err) {
+    return { success: false, message: `QBO vendor creation failed: ${err instanceof Error ? err.message : String(err)}` };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// QBO: Create Account (Chart of Accounts)
+// ---------------------------------------------------------------------------
+
+async function handleCreateQBOAccount(
+  params: Record<string, unknown>,
+): Promise<ActionResult> {
+  const name = String(params.name || params.Name || params.account_name || "").trim();
+  const accountType = String(params.type || params.AccountType || params.account_type || "").trim();
+  if (!name) return { success: false, message: "Account name is required" };
+  if (!accountType) return { success: false, message: "Account type is required (e.g., Expense, Income, Cost of Goods Sold, Bank, Other Current Asset)" };
+
+  try {
+    const { createQBOAccount } = await import("@/lib/ops/qbo-client");
+    const result = await createQBOAccount({
+      Name: name,
+      AccountType: accountType,
+      ...(params.sub_type || params.AccountSubType ? { AccountSubType: String(params.sub_type || params.AccountSubType) } : {}),
+      ...(params.number || params.AcctNum ? { AcctNum: String(params.number || params.AcctNum) } : {}),
+      ...(params.description || params.Description ? { Description: String(params.description || params.Description) } : {}),
+    });
+
+    if (!result) return { success: false, message: "QBO account creation failed — check QBO connection" };
+    const acctData = (result as Record<string, unknown>).Account || result;
+    const acctId = (acctData as Record<string, unknown>).Id || "unknown";
+    return {
+      success: true,
+      message: `✅ Created account "${name}" (${accountType}) in QBO (ID: ${acctId})`,
+      data: { accountId: acctId, name, type: accountType },
+    };
+  } catch (err) {
+    return { success: false, message: `QBO account creation failed: ${err instanceof Error ? err.message : String(err)}` };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// QBO: Create Bill (vendor AP)
+// ---------------------------------------------------------------------------
+
+async function handleCreateQBOBillAction(
+  params: Record<string, unknown>,
+): Promise<ActionResult> {
+  const vendorId = String(params.vendor_id || params.vendorId || "").trim();
+  const amount = Number(params.amount || 0);
+  const accountId = String(params.account_id || params.accountId || "").trim();
+
+  if (!vendorId) return { success: false, message: "vendor_id is required" };
+  if (!amount) return { success: false, message: "amount is required" };
+  if (!accountId) return { success: false, message: "account_id is required (expense account to charge)" };
+
+  try {
+    const { createQBOBill } = await import("@/lib/ops/qbo-client");
+    const result = await createQBOBill({
+      VendorRef: { value: vendorId },
+      Line: [{
+        Amount: amount,
+        DetailType: "AccountBasedExpenseLineDetail",
+        AccountBasedExpenseLineDetail: { AccountRef: { value: accountId } },
+        Description: String(params.description || params.memo || ""),
+      }],
+      ...(params.due_date ? { DueDate: String(params.due_date) } : {}),
+      ...(params.date || params.txn_date ? { TxnDate: String(params.date || params.txn_date) } : {}),
+      ...(params.doc_number ? { DocNumber: String(params.doc_number) } : {}),
+    });
+
+    if (!result) return { success: false, message: "QBO bill creation failed" };
+    const billData = (result as Record<string, unknown>).Bill || result;
+    const billId = (billData as Record<string, unknown>).Id || "unknown";
+    return {
+      success: true,
+      message: `✅ Created bill for $${amount.toFixed(2)} to vendor ${vendorId} in QBO (Bill ID: ${billId})`,
+      data: { billId, vendorId, amount },
+    };
+  } catch (err) {
+    return { success: false, message: `QBO bill creation failed: ${err instanceof Error ? err.message : String(err)}` };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// QBO: Create Customer
+// ---------------------------------------------------------------------------
+
+async function handleCreateQBOCustomerAction(
+  params: Record<string, unknown>,
+): Promise<ActionResult> {
+  const name = String(params.name || params.DisplayName || params.customer_name || "").trim();
+  if (!name) return { success: false, message: "Customer name is required" };
+
+  try {
+    const { createQBOCustomer } = await import("@/lib/ops/qbo-client");
+    const result = await createQBOCustomer({
+      DisplayName: name,
+      ...(params.company ? { CompanyName: String(params.company) } : {}),
+      ...(params.email ? { PrimaryEmailAddr: { Address: String(params.email) } } : {}),
+      ...(params.phone ? { PrimaryPhone: { FreeFormNumber: String(params.phone) } } : {}),
+    });
+
+    if (!result) return { success: false, message: "QBO customer creation failed" };
+    const custData = (result as Record<string, unknown>).Customer || result;
+    const custId = (custData as Record<string, unknown>).Id || "unknown";
+    return {
+      success: true,
+      message: `✅ Created customer "${name}" in QBO (ID: ${custId})`,
+      data: { customerId: custId, name },
+    };
+  } catch (err) {
+    return { success: false, message: `QBO customer creation failed: ${err instanceof Error ? err.message : String(err)}` };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// QBO: Create Invoice
+// ---------------------------------------------------------------------------
+
 async function handleCreateQBOInvoice(
   params: Record<string, unknown>,
 ): Promise<ActionResult> {
@@ -3384,7 +3542,10 @@ const REQUIRED_PARAMS: Record<string, string[]> = {
   generate_file: ["filename"],
   correct_claim: ["original_claim", "correction"],
   query_qbo: ["query_type"],
-  create_qbo_bill: ["vendor_name"],
+  create_qbo_vendor: ["name"],
+  create_qbo_account: ["name", "type"],
+  create_qbo_customer: ["name"],
+  create_qbo_bill: ["vendor_id", "amount", "account_id"],
   amazon_update_price: ["price"],
   amazon_update_ppc: ["action"],
 };
@@ -3430,6 +3591,10 @@ const ACTION_HANDLERS: Record<
   categorize_qbo_transaction: handleCategorizeQBOTransaction,
   batch_categorize_qbo: handleBatchCategorizeQBO,
   create_qbo_invoice: handleCreateQBOInvoice,
+  create_qbo_vendor: handleCreateQBOVendor,
+  create_qbo_account: handleCreateQBOAccount,
+  create_qbo_bill: handleCreateQBOBillAction,
+  create_qbo_customer: handleCreateQBOCustomerAction,
   update_shopify_inventory: handleUpdateShopifyInventory,
   create_shopify_discount: handleCreateShopifyDiscount,
   query_shopify_orders: handleQueryShopifyOrders,
@@ -3441,7 +3606,7 @@ const ACTION_HANDLERS: Record<
   resume_workflow: handleResumeWorkflow,
   generate_file: handleGenerateFile,
   query_kpi: handleQueryKPI,
-  create_qbo_bill: handleCreateQBOBill,
+  // create_qbo_bill already registered above as handleCreateQBOBillAction
   amazon_update_price: handleAmazonUpdatePrice,
   amazon_update_ppc: handleAmazonUpdatePPC,
 };
