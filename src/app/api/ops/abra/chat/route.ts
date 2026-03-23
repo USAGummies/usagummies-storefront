@@ -1384,9 +1384,10 @@ export async function POST(req: Request) {
           const isCashQuestion = /\b(cash position|bank balance|checking balance|how much .*(in the bank|do we have|cash|money)|current balance|account balance|overdrawn|overdraft)\b/i.test(message);
           const isReconciliationQuestion = /\b(reconcil|setup|configure|set up|get started|initial|onboard|clean up|organize)\b/i.test(message);
 
-          // Fetch live Plaid bank balance for cash questions
+          // Fetch live Plaid bank balance for ALL finance questions (not just cash)
+          // Real bank balance is always useful context for financial conversations
           let plaidContext = "";
-          if (isCashQuestion) {
+          {
             try {
               const plaidRes = await fetch(`${url.origin}/api/ops/plaid/balance`, {
                 headers: { Authorization: req.headers.get("Authorization") || "" },
@@ -1395,15 +1396,17 @@ export async function POST(req: Request) {
               if (plaidRes.ok) {
                 const plaidData = (await plaidRes.json()) as {
                   connected?: boolean;
-                  accounts?: Array<{ name: string; type: string; current: number; available: number | null }>;
+                  accounts?: Array<{ name: string; type: string; balances?: { current?: number; available?: number }; current?: number; available?: number | null }>;
                   lastUpdated?: string;
                 };
                 if (plaidData.connected && plaidData.accounts?.length) {
                   plaidContext = `\n\n**LIVE BANK BALANCES (Plaid — Bank of America, as of ${plaidData.lastUpdated || "now"}):**\n` +
-                    plaidData.accounts.map((a: { name: string; type: string; current: number; available: number | null }) =>
-                      `  • ${a.name} (${a.type}): Current $${a.current.toFixed(2)}${a.available != null ? `, Available $${a.available.toFixed(2)}` : ""}`
-                    ).join("\n") +
-                    `\n⚠️ These are REAL bank balances from Plaid. Use these for cash position questions, NOT QBO book balances.\n`;
+                    plaidData.accounts.map((a) => {
+                      const cur = a.balances?.current ?? a.current ?? 0;
+                      const avail = a.balances?.available ?? a.available;
+                      return `  • ${a.name} (${a.type}): Current $${cur.toFixed(2)}${avail != null ? `, Available $${avail.toFixed(2)}` : ""}`;
+                    }).join("\n") +
+                    `\n⚠️ These are REAL bank balances from Plaid. LEAD WITH THESE NUMBERS for cash position, NOT QBO book balances. The QBO -$8,649 is WRONG.\n`;
                 }
               }
             } catch (plaidErr) {

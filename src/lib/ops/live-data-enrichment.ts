@@ -69,14 +69,16 @@ export async function fetchLiveEnrichment(
         // Fetch Plaid balance
         const plaidData = (await fetchWithTimeout(`${host}/api/ops/plaid/balance`)) as {
           connected?: boolean;
-          accounts?: Array<{ name: string; current: number; type: string }>;
+          accounts?: Array<{ name: string; type: string; subtype?: string; balances?: { current?: number; available?: number; currency?: string } }>;
         } | null;
 
         if (!plaidData?.connected || !plaidData.accounts?.length) return null;
         const checking = plaidData.accounts.find(a => a.type === "depository") || plaidData.accounts[0];
+        const balance = checking.balances?.current ?? 0;
+        const available = checking.balances?.available ?? balance;
         return {
           domain: "finance",
-          data: `LIVE CASH: $${checking.current.toLocaleString("en-US", { minimumFractionDigits: 2 })} (${checking.name}, Bank of America via Plaid)`,
+          data: `LIVE BANK BALANCE (Plaid — authoritative): $${balance.toLocaleString("en-US", { minimumFractionDigits: 2 })} current, $${available.toLocaleString("en-US", { minimumFractionDigits: 2 })} available (${checking.name}, Bank of America). IGNORE QBO book balance — this is the real number.`,
           source: "plaid",
           fetchedAt: new Date().toISOString(),
         };
