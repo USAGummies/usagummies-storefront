@@ -411,6 +411,102 @@ export async function POST(req: Request) {
       console.log(
         `[slack-monitor] Message in ${event.channel}: ${(event.text || "").slice(0, 100)}`,
       );
+
+      // Auto-respond channels — Abra responds to ALL messages even without @mention
+      const AUTO_RESPOND_CHANNELS = new Set([
+        "C0AKG9FSC2J", // #financials — Rene's workspace with Abra
+      ]);
+
+      if (AUTO_RESPOND_CHANNELS.has(event.channel) && event.user !== "U0AKMSTL0GL") {
+        const text = event.text?.replace(/<@[A-Z0-9]+>/g, "").trim() || "";
+        if (text.length > 5) {
+          const channelId = event.channel;
+          const threadTs = event.thread_ts || event.ts;
+          const cronSecret = process.env.CRON_SECRET?.trim();
+          const botToken = process.env.SLACK_BOT_TOKEN;
+          const host =
+            process.env.NEXTAUTH_URL ||
+            (process.env.VERCEL_URL
+              ? `https://${process.env.VERCEL_URL}`
+              : "http://localhost:4000");
+
+          if (cronSecret && botToken) {
+            const actorCtx = getActorContext(event.user || "");
+
+            // Fetch thread history for context
+            let threadHistory: Array<{ role: string; content: string }> = [];
+            if (event.thread_ts) {
+              try {
+                const threadRes = await fetch(
+                  `https://slack.com/api/conversations.replies?channel=${channelId}&ts=${event.thread_ts}&limit=15`,
+                  {
+                    headers: { Authorization: `Bearer ${botToken}` },
+                    signal: AbortSignal.timeout(5000),
+                  },
+                );
+                const threadData = (await threadRes.json()) as {
+                  ok: boolean;
+                  messages?: Array<{ user?: string; bot_id?: string; text?: string; ts?: string }>;
+                };
+                if (threadData.ok && threadData.messages) {
+                  const abraBotId = "U0AKMSTL0GL";
+                  for (const msg of threadData.messages) {
+                    if (msg.ts === event.ts) continue;
+                    const isAbra = msg.user === abraBotId || !!msg.bot_id;
+                    threadHistory.push({
+                      role: isAbra ? "assistant" : "user",
+                      content: (msg.text || "").slice(0, 1000),
+                    });
+                  }
+                }
+              } catch {}
+            }
+
+            after(async () => {
+              try {
+                const chatRes = await fetch(`${host}/api/ops/abra/chat`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${cronSecret}`,
+                  },
+                  body: JSON.stringify({
+                    message: text,
+                    history: threadHistory,
+                    channel: "slack",
+                    actor_label: event.user || undefined,
+                    actor_context: actorCtx,
+                  }),
+                  signal: AbortSignal.timeout(55000),
+                });
+
+                if (chatRes.ok) {
+                  const chatData = (await chatRes.json()) as { reply?: string };
+                  const reply = typeof chatData.reply === "string" ? chatData.reply.trim() : "";
+                  if (reply) {
+                    await fetch("https://slack.com/api/chat.postMessage", {
+                      method: "POST",
+                      headers: {
+                        Authorization: `Bearer ${botToken}`,
+                        "Content-Type": "application/json",
+                      },
+                      body: JSON.stringify({
+                        channel: channelId,
+                        text: reply.slice(0, 4000),
+                        thread_ts: threadTs,
+                        mrkdwn: true,
+                      }),
+                      signal: AbortSignal.timeout(10000),
+                    });
+                  }
+                }
+              } catch (err) {
+                console.error("[slack-monitor] Auto-respond error:", err instanceof Error ? err.message : err);
+              }
+            });
+          }
+        }
+      }
     }
   }
 
