@@ -71,6 +71,8 @@ type ApprovalRow = {
   resolved_payload?: unknown;
   proposed_payload: unknown;
   auto_executed?: boolean | null;
+  executed_at?: string | null;
+  execution_result?: unknown;
 };
 
 export type AutoExecPolicy = {
@@ -3455,7 +3457,8 @@ async function claimPendingApproval(
   approvalId: string,
 ): Promise<{ claimId: string; approval: ApprovalRow } | null> {
   const claimId = randomUUID();
-  const rows = (await sbFetch(
+  // Try claiming unclaimed pending approvals first
+  let rows = (await sbFetch(
     `/rest/v1/approvals?id=eq.${encodeURIComponent(approvalId)}&status=eq.pending&batch_group=is.null`,
     {
       method: "PATCH",
@@ -3468,6 +3471,24 @@ async function claimPendingApproval(
       }),
     },
   )) as ApprovalRow[];
+
+  // If the approval was already claimed (batch_group set from a previous attempt),
+  // try claiming it anyway — this handles retries and the Slack approve button flow
+  if (!rows[0]?.id) {
+    rows = (await sbFetch(
+      `/rest/v1/approvals?id=eq.${encodeURIComponent(approvalId)}&status=eq.pending`,
+      {
+        method: "PATCH",
+        headers: {
+          Prefer: "return=representation",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          batch_group: claimId,
+        }),
+      },
+    )) as ApprovalRow[];
+  }
 
   if (!rows[0]?.id) return null;
   return { claimId, approval: rows[0] };
@@ -4056,12 +4077,38 @@ export async function executeAction(approvalId: string): Promise<ActionResult> {
     if (!current) {
       return { success: false, message: "Approval not found" };
     }
-    if (current.status === "approved") {
+    if (current.status === "approved" && current.executed_at) {
       return {
         success: true,
         message: "Approval already executed",
         data: current.resolved_payload || {},
       };
+    }
+    // Approved but never executed — execute it now
+    if (current.status === "approved" && !current.executed_at) {
+      const action = parseActionPayload(current.proposed_payload);
+      if (!action) {
+        return { success: false, message: "Invalid action payload on approved approval" };
+      }
+      const handler = ACTION_HANDLERS[action.action_type];
+      if (!handler) {
+        return { success: false, message: `No handler for ${action.action_type}` };
+      }
+      try {
+        const result = await handler(action.params || {});
+        // Update with execution result
+        await sbFetch(`/rest/v1/approvals?id=eq.${encodeURIComponent(approvalId)}`, {
+          method: "PATCH",
+          headers: { Prefer: "return=minimal", "Content-Type": "application/json" },
+          body: JSON.stringify({
+            executed_at: new Date().toISOString(),
+            execution_result: { success: result.success, message: result.message },
+          }),
+        });
+        return result;
+      } catch (err) {
+        return { success: false, message: err instanceof Error ? err.message : "Execution failed" };
+      }
     }
     if (current.status === "pending" && current.batch_group) {
       // Try to unclaim if stale (handler succeeded but markResolved failed)
