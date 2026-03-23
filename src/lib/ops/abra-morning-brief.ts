@@ -762,7 +762,7 @@ async function sendReneMorningDM(): Promise<void> {
   const pendingApprovals = Math.round(Number(approvalCount?.current || 0));
 
   const lines = [
-    `☀️ *Good morning, Rene* — ${yesterday} recap:`,
+    `☀️ *Good morning, <@U0ALL27JM38>* — ${yesterday} recap:`,
     "",
     `💰 Revenue: *$${totalRev.toFixed(2)}* (Shopify $${Number(shopRev?.current || 0).toFixed(2)} · Amazon $${Number(amzRev?.current || 0).toFixed(2)})`,
   ];
@@ -817,7 +817,7 @@ async function sendReneMorningDM(): Promise<void> {
     },
     body: JSON.stringify({
       channel: openData.channel.id,
-      text: `☀️ Good morning Rene — your finance brief is in <#${FINANCIALS_CHANNEL}>. ${pendingApprovals > 0 ? `${pendingApprovals} approval(s) waiting for your review.` : "No pending approvals."}`,
+      text: `☀️ Good morning <@U0ALL27JM38> — your finance brief is in <#${FINANCIALS_CHANNEL}>. ${pendingApprovals > 0 ? `${pendingApprovals} approval(s) waiting for your review.` : "No pending approvals."}`,
       unfurl_links: false,
     }),
     signal: AbortSignal.timeout(5000),
