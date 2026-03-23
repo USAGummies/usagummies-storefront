@@ -2186,6 +2186,9 @@ async function handleQueryQBO(params: Record<string, unknown>): Promise<ActionRe
           data,
         };
       }
+      case "transactions":
+      case "expenses":
+      case "recent_purchases":
       case "purchases": {
         const limit = typeof params.limit === "number" ? params.limit : 20;
         const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=purchases&limit=${limit}`, { signal: AbortSignal.timeout(QBO_TIMEOUT_MS) });
