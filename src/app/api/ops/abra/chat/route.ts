@@ -817,6 +817,59 @@ export async function POST(req: Request) {
     // Fall through to full pipeline if quick mode fails
   }
 
+  // ─── PRE-LLM FILE INTERCEPTOR ───
+  // Claude's base training makes it refuse to generate files ~50% of the time
+  // despite system prompt instructions. Fix: detect file requests BEFORE calling
+  // Claude, generate the file server-side, and return immediately.
+  const fileSourceMap: Record<string, string> = {
+    vendor: "qbo_vendors",
+    vendors: "qbo_vendors",
+    "vendor list": "qbo_vendors",
+    "chart of accounts": "qbo_accounts",
+    coa: "qbo_accounts",
+    accounts: "qbo_accounts",
+    "p&l": "qbo_pnl",
+    "profit and loss": "qbo_pnl",
+    pnl: "qbo_pnl",
+  };
+
+  const wantsFileNow = /\b(spreadsheet|xlsx|csv|excel|export.*(?:file|xlsx|csv)|generate.*(?:file|spreadsheet)|(?:file|spreadsheet).*(?:export|generate|create))\b/i.test(message);
+  if (wantsFileNow && (channel === "slack" || slackChannelId)) {
+    const lowerMsg = message.toLowerCase();
+    let detectedSource: string | undefined;
+    for (const [keyword, source] of Object.entries(fileSourceMap)) {
+      if (lowerMsg.includes(keyword)) {
+        detectedSource = source;
+        break;
+      }
+    }
+
+    if (detectedSource) {
+      try {
+        const fileActionXml = `<action>{"action_type":"generate_file","title":"File Export","description":"Pre-LLM file generation","department":"operations","risk_level":"low","params":{"filename":"${detectedSource.replace("qbo_", "")}_export.xlsx","source":"${detectedSource}"}}</action>`;
+        const fileResult = await executeActions(fileActionXml, {
+          slackChannelId: slackChannelId || undefined,
+          slackThreadTs: slackThreadTs || undefined,
+          deadlineMs: 30000,
+        });
+
+        const fileNotice = fileResult.actionNotices.find(n => n.includes("[generate_file]"));
+        if (fileNotice) {
+          return NextResponse.json({
+            reply: `📊 Done — file uploaded to this channel.\n\n${fileNotice}`,
+            confidence: 95,
+            thread_id: threadId,
+            sources: [{ type: "action", name: "generate_file" }],
+            actions: [],
+          });
+        }
+      } catch (fileErr) {
+        console.warn("[chat] Pre-LLM file interceptor failed:", fileErr instanceof Error ? fileErr.message : fileErr);
+        // Fall through to normal LLM pipeline
+      }
+    }
+  }
+
   // Vercel Hobby plan kills functions at 60s — use AbortController to cancel
   // in-flight work at 45s so we have time to return a graceful response.
   const DEADLINE_MS = 55_000;
