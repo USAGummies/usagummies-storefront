@@ -463,7 +463,7 @@ export async function POST(req: Request) {
                     });
                   }
                 }
-              } catch {}
+              } catch { /* non-fatal */ }
             }
 
             after(async () => {

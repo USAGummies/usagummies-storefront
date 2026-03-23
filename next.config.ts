@@ -95,6 +95,9 @@ const nextConfig: NextConfig = {
       { source: "/shipping", destination: "/policies/shipping", permanent: true },
       { source: "/returns", destination: "/policies/returns", permanent: true },
       { source: "/store", destination: "/shop", permanent: true },
+      { source: "/products", destination: "/shop", permanent: true },
+      { source: "/subscribe", destination: "/shop", permanent: false },
+      { source: "/rewards", destination: "/shop", permanent: false },
       { source: "/blog/rss.xml", destination: "/rss.xml", permanent: true },
     ];
   },

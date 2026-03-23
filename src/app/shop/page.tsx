@@ -353,38 +353,6 @@ export default async function ShopPage() {
         </div>
       </section>
 
-      <section className="bg-transparent" data-zone="SUBSCRIBE">
-        <div className="mx-auto max-w-6xl px-4 py-4">
-          <div className="rounded-[28px] border border-[rgba(45,122,58,0.2)] bg-[rgba(45,122,58,0.04)] p-4 sm:p-5">
-            <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
-              <div className="space-y-2">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[#2D7A3A]">
-                  Subscribe &amp; save
-                </div>
-                <div className="text-lg font-black text-[var(--text)] sm:text-xl">
-                  Never run out of gummies again.
-                </div>
-                <div className="text-sm text-[var(--muted)]">
-                  Subscribe to save <strong className="text-[#2D7A3A]">$0.50/bag</strong> below bundle pricing on every delivery.
-                  Free shipping, cancel anytime. Choose 5, 8, or 12 bags delivered monthly, every 6&nbsp;weeks, or bi-monthly.
-                </div>
-                <div className="flex flex-wrap gap-2 text-[10px] font-semibold text-[var(--muted)]">
-                  <span className="rounded-full border border-[var(--border)] px-2 py-0.5">Free shipping</span>
-                  <span className="rounded-full border border-[var(--border)] px-2 py-0.5">Cancel anytime</span>
-                  <span className="rounded-full border border-[var(--border)] px-2 py-0.5">Made in USA</span>
-                </div>
-              </div>
-              <Link
-                href="/subscribe"
-                className="inline-flex items-center gap-1.5 rounded-full bg-[#2D7A3A] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#246B2F] whitespace-nowrap"
-              >
-                Start a subscription &rarr;
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
-
       <section className="bg-transparent" data-zone="BLOG">
         <div className="mx-auto max-w-6xl px-4 py-4">
           <LatestFromBlog />

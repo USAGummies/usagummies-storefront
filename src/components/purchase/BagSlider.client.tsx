@@ -647,30 +647,6 @@ export default function BagSlider({
         </div>
       </div>
 
-      {/* Subscribe & save callout */}
-      {qty >= 5 && (() => {
-        const subPricing = subscriptionPricingForQty(qty);
-        return (
-          <a
-            href="/subscribe"
-            className="mt-3 flex flex-col gap-1 rounded-xl border border-[rgba(45,122,58,0.25)] bg-[rgba(45,122,58,0.05)] px-3.5 py-3 transition hover:bg-[rgba(45,122,58,0.1)]"
-          >
-            <div className="flex items-center gap-1.5 text-xs font-bold text-[#2D7A3A]">
-              <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 flex-shrink-0" fill="currentColor" aria-hidden="true">
-                <path d="M8 1a7 7 0 1 1 0 14A7 7 0 0 1 8 1Zm.75 3.5a.75.75 0 0 0-1.5 0v4a.75.75 0 0 0 .37.65l2.5 1.5a.75.75 0 1 0 .76-1.3L8.75 8.15V4.5Z" />
-              </svg>
-              Subscribe &amp; save $0.50/bag
-            </div>
-            <div className="text-[11px] text-[#1B2A4A]/60">
-              As low as <strong className="text-[#2D7A3A]">${subPricing.perBag.toFixed(2)}/bag</strong> with a subscription. Free shipping, cancel anytime.
-            </div>
-            <div className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-semibold text-[#2D7A3A]">
-              Start a subscription <span aria-hidden="true">&rarr;</span>
-            </div>
-          </a>
-        );
-      })()}
-
       {/* Flavor strip */}
       <div className="mt-4 pt-3 border-t border-[rgba(27,42,74,0.06)]">
         <div className="font-display text-[10px] font-semibold uppercase tracking-wider text-[#1B2A4A]/50 mb-2">

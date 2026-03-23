@@ -87,8 +87,8 @@ export function HomeHero() {
                   Stack bags. Save more.
                 </div>
                 <div style={{ opacity: 0.8, lineHeight: 1.6, marginTop: 8 }}>
-                  Free shipping and better pricing unlock as you add bags. 87% of shoppers
-                  end at 8 bags.
+                  Free shipping and better pricing unlock as you add bags. Most shoppers
+                  go with 8.
                 </div>
 
                 <div style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap" }}>

@@ -19,7 +19,7 @@ const SAVINGS_LADDER = [
   { qty: 12, label: "Best price", caption: "12 bags" },
 ];
 const MISSION_TARGET_QTY = 8;
-const MISSION_SOCIAL_PROOF = "87% of shoppers end at 8 bags.";
+const MISSION_SOCIAL_PROOF = "Most popular pick: 8 bags.";
 
 type QuickViewProps = {
   product: any;
