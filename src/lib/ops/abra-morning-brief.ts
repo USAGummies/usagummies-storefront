@@ -792,7 +792,23 @@ async function sendReneMorningDM(): Promise<void> {
     return;
   }
 
-  // Send the DM
+  // Send to #financials channel (C0AKG9FSC2J) — where Rene works on books
+  const FINANCIALS_CHANNEL = "C0AKG9FSC2J";
+  await fetch("https://slack.com/api/chat.postMessage", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${botToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      channel: FINANCIALS_CHANNEL,
+      text: lines.join("\n"),
+      unfurl_links: false,
+    }),
+    signal: AbortSignal.timeout(5000),
+  });
+
+  // Also ping Rene's DM with a pointer to the financials channel
   await fetch("https://slack.com/api/chat.postMessage", {
     method: "POST",
     headers: {
@@ -801,13 +817,13 @@ async function sendReneMorningDM(): Promise<void> {
     },
     body: JSON.stringify({
       channel: openData.channel.id,
-      text: lines.join("\n"),
+      text: `☀️ Good morning Rene — your finance brief is in <#${FINANCIALS_CHANNEL}>. ${pendingApprovals > 0 ? `${pendingApprovals} approval(s) waiting for your review.` : "No pending approvals."}`,
       unfurl_links: false,
     }),
     signal: AbortSignal.timeout(5000),
   });
 
-  console.log("[morning-brief] Sent Rene finance DM");
+  console.log("[morning-brief] Sent Rene finance brief to #financials + DM pointer");
 }
 
 // ── End-of-Day Summary ──────────────────────────────────────────────────
