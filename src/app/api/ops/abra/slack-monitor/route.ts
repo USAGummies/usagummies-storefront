@@ -478,6 +478,8 @@ export async function POST(req: Request) {
                     message: text,
                     history: threadHistory,
                     channel: "slack",
+                    slack_channel_id: channelId,
+                    slack_thread_ts: threadTs,
                     actor_label: event.user || undefined,
                     actor_context: actorCtx,
                   }),
