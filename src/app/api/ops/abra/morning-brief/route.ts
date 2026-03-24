@@ -3,6 +3,7 @@ import { isAuthorized, isCronAuthorized } from "@/lib/ops/abra-auth";
 import {
   generateMorningBrief,
   generateMorningBriefPayload,
+  sendMorningBrief as sendMorningBriefLib,
 } from "@/lib/ops/abra-morning-brief";
 import { notify } from "@/lib/ops/notify";
 import { adminRequest } from "@/lib/shopify/admin";
@@ -772,93 +773,15 @@ export async function POST(req: Request) {
   }
 
   try {
-    // 1. Gather all data sources in parallel
-    const [
-      shopifyResult,
-      amazonResult,
-      approvalsResult,
-      pipelineResult,
-      errorsResult,
-      healthResult,
-    ] = await Promise.all([
-      fetchShopifyYesterdayRevenue().catch(
-        (): ShopifyRevenueResult => ({
-          revenue: 0,
-          orderCount: 0,
-          error: "Shopify fetch failed",
-        }),
-      ),
-      fetchAmazonYesterdayRevenue().catch(
-        (): AmazonRevenueResult => ({
-          revenue: 0,
-          orderCount: 0,
-          configured: isAmazonConfigured(),
-          error: "Amazon fetch failed",
-        }),
-      ),
-      fetchPendingApprovals().catch(() => 0),
-      fetchPipelineMovement().catch(() => 0),
-      fetchErrorSummary().catch(
-        (): ErrorSummary => ({ total: 0, critical: 0, items: [] }),
-      ),
-      checkSystemHealth().catch(() => ({
-        status: "degraded" as SystemHealthStatus,
-        details: ["Health check failed"],
-      })),
-    ]);
-
-    // Agent schedule is synchronous — no need to await
-    const agentsResult = getTodaysScheduledAgents();
-
-    const briefData: BriefData = {
-      shopify: shopifyResult,
-      amazon: amazonResult,
-      approvals: approvalsResult,
-      pipelineMoves: pipelineResult,
-      errors: errorsResult,
-      health: healthResult,
-      agents: agentsResult,
-    };
-
-    // 2. Format as Slack Block Kit message
-    const { text, blocks } = buildSlackBlocks(briefData);
-
-    // 3. Post to Slack via notify (channel: "daily")
-    const slackResult = await notify({
-      channel: "daily",
-      text,
-      blocks,
-    });
-
-    // 4. Store in Supabase for history (best-effort)
-    await storeBriefInSupabase(briefData, text).catch((err) => {
-      console.error(
-        "[morning-brief] Supabase storage failed:",
-        err instanceof Error ? err.message : err,
-      );
-    });
-
-    // 5. Rene's personalized finance DM (best-effort, never blocks)
-    const reneDmResult = await sendReneFinanceBrief(briefData).catch((err) => {
-      console.error("[morning-brief] Rene DM failed:", err instanceof Error ? err.message : err);
-      return { ok: false, error: err instanceof Error ? err.message : String(err) };
-    });
+    await sendMorningBriefLib();
 
     return NextResponse.json({
       ok: true,
-      slack: slackResult,
-      rene_dm: reneDmResult,
-      data: {
-        shopify_revenue: briefData.shopify.revenue,
-        shopify_orders: briefData.shopify.orderCount,
-        amazon_revenue: briefData.amazon.revenue,
-        amazon_orders: briefData.amazon.orderCount,
-        combined_revenue: briefData.shopify.revenue + briefData.amazon.revenue,
-        pending_approvals: briefData.approvals,
-        pipeline_moves: briefData.pipelineMoves,
-        unresolved_errors: briefData.errors.total,
-        system_health: briefData.health.status,
-        scheduled_agents: briefData.agents.count,
+      sent: true,
+      mode: "lib_sendMorningBrief",
+      targets: {
+        ben: "dm",
+        rene: "#financials",
       },
     });
   } catch (error) {
