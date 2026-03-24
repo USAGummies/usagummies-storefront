@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getValidAccessToken, getRealmId } from "@/lib/ops/qbo-auth";
-import { isCronAuthorized } from "@/lib/ops/abra-auth";
+import { isAuthorized } from "@/lib/ops/abra-auth";
 import { createQBOAccount } from "@/lib/ops/qbo-client";
 
 export const runtime = "nodejs";
@@ -10,7 +10,11 @@ export const dynamic = "force-dynamic";
  * GET /api/ops/qbo/accounts — List all QBO Chart of Accounts
  * Returns account IDs, names, types for categorization mapping.
  */
-export async function GET() {
+export async function GET(req: Request) {
+  if (!(await isAuthorized(req))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const accessToken = await getValidAccessToken();
   if (!accessToken) {
     return NextResponse.json(
@@ -45,8 +49,9 @@ export async function GET() {
 
   const data = await res.json();
   if (!res.ok) {
+    console.error("[qbo/accounts] GET query failed:", res.status, JSON.stringify(data).slice(0, 300));
     return NextResponse.json(
-      { error: "QBO query failed", detail: data },
+      { error: "QBO query failed" },
       { status: res.status },
     );
   }
@@ -71,7 +76,7 @@ export async function GET() {
  * POST /api/ops/qbo/accounts — Create a new account in QBO Chart of Accounts
  */
 export async function POST(req: Request) {
-  if (!isCronAuthorized(req)) {
+  if (!(await isAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -119,13 +124,9 @@ export async function POST(req: Request) {
       message: `Created account "${body.name}" (${body.type}) ID: ${acctId}`,
     });
   } catch (error) {
+    console.error("[qbo/accounts] POST failed:", error instanceof Error ? error.message : error);
     return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Account creation failed",
-      },
+      { error: "Account creation failed" },
       { status: 500 },
     );
   }

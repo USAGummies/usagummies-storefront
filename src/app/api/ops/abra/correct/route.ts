@@ -198,8 +198,7 @@ export async function POST(req: Request) {
     if (isSupabaseRelatedError(error)) {
       await markSupabaseFailure(error);
     }
-    const message =
-      error instanceof Error ? error.message : "Correction failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("[correct] POST failed:", error instanceof Error ? error.message : error);
+    return NextResponse.json({ error: "Correction failed" }, { status: 500 });
   }
 }

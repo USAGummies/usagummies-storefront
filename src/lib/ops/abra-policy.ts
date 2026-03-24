@@ -118,6 +118,13 @@ export const ACTION_POLICIES: Record<string, ActionPolicy> = {
     description: "Query QuickBooks Online — read-only API calls.",
   },
 
+  qbo_setup_assessment: {
+    tier: "direct",
+    riskFloor: "low",
+    dailyLimit: 20,
+    description: "Assess QBO setup completeness using read-only QBO and categorization preview data.",
+  },
+
   // search_brain: removed — no handler exists. Brain search is automatic via tiered context.
 
   generate_file: {

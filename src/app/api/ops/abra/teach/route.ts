@@ -9,6 +9,7 @@
  */
 
 import { NextResponse } from "next/server";
+import { createHash } from "node:crypto";
 import { auth } from "@/lib/auth/config";
 import { isAuthorized } from "@/lib/ops/abra-auth";
 import {
@@ -125,6 +126,10 @@ export async function POST(req: Request) {
     source.includes("correction");
   const title =
     v.data.title || `${isCorrection ? "Correction" : "Teaching"}: ${department || "general"} — ${content.slice(0, 60)}`;
+  const sourceRef = `teaching-${createHash("sha256")
+    .update(`${department}|${title}|${content}`)
+    .digest("hex")
+    .slice(0, 24)}`;
 
   try {
     const circuitCheck = await canUseSupabase();
@@ -160,6 +165,18 @@ export async function POST(req: Request) {
     const embeddingText = `${title}. ${content}`;
     const embedding = await buildEmbedding(embeddingText.slice(0, 8000));
 
+    const existing = (await sbFetch(
+      `/rest/v1/open_brain_entries?source_ref=eq.${encodeURIComponent(sourceRef)}&select=id&limit=1`,
+    )) as Array<{ id: string }>;
+    if (existing[0]?.id) {
+      await markSupabaseSuccess();
+      return NextResponse.json({
+        success: true,
+        id: existing[0].id,
+        message: "Teaching already stored. Existing entry reused.",
+      });
+    }
+
     // Write to open_brain_entries as a high-priority teaching entry
     const rows = (await sbFetch("/rest/v1/open_brain_entries", {
       method: "POST",
@@ -169,7 +186,7 @@ export async function POST(req: Request) {
       },
       body: JSON.stringify({
         source_type: "manual",
-        source_ref: `teaching-${Date.now()}`,
+        source_ref: sourceRef,
         entry_type: "teaching",
         title,
         raw_text: `Taught by ${taughtBy}:\n${content}`,
@@ -237,7 +254,7 @@ export async function POST(req: Request) {
     if (isSupabaseRelatedError(error)) {
       await markSupabaseFailure(error);
     }
-    const message = error instanceof Error ? error.message : "Teaching failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("[teach] POST failed:", error instanceof Error ? error.message : error);
+    return NextResponse.json({ error: "Teaching failed" }, { status: 500 });
   }
 }

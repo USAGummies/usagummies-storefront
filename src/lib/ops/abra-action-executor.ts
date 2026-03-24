@@ -44,7 +44,12 @@ const PER_ACTION_TIMEOUT_MS = 12_000; // 12s upper bound per action
 
 export async function executeActions(
   reply: string,
-  ctx?: { slackChannelId?: string; slackThreadTs?: string; deadlineMs?: number },
+  ctx?: {
+    slackChannelId?: string;
+    slackThreadTs?: string;
+    deadlineMs?: number;
+    skipActionTypes?: Set<string>;
+  },
 ): Promise<ActionExecutionResult> {
   const execStart = Date.now();
   const parsedActions = parseActionDirectives(reply);
@@ -56,6 +61,10 @@ export async function executeActions(
   const readOnlyResults: string[] = [];
 
   for (const directive of parsedActions.actions.slice(0, 3)) {
+    if (ctx?.skipActionTypes?.has(directive.action.action_type)) {
+      console.log(`[action-executor] Skipping duplicate pre-executed action: ${directive.action.action_type}`);
+      continue;
+    }
     // Check if we're running out of time (leave 2s for response assembly)
     const elapsed = Date.now() - execStart;
     const remainingMs = ctx?.deadlineMs != null ? ctx.deadlineMs - elapsed : undefined;

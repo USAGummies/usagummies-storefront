@@ -581,7 +581,7 @@ export async function handleAmazonOrdersFeed(): Promise<FeedResult> {
     }
 
     // Use unit-based estimation when OrderTotal is missing/zero (pending orders)
-    const LISTING_PRICE = 5.99; // Single SKU — USA Gummies 2-pack
+    const LISTING_PRICE = parseFloat(process.env.AMAZON_LISTING_PRICE || "5.99");
     const totalUnitsForRev = orders.reduce(
       (sum, o) =>
         sum + (o.NumberOfItemsShipped || 0) + (o.NumberOfItemsUnshipped || 0),

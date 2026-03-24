@@ -2162,7 +2162,10 @@ async function handleQueryQBO(params: Record<string, unknown>): Promise<ActionRe
   try {
     switch (queryType) {
       case "accounts": {
-        const res = await fetch(`${baseUrl}/api/ops/qbo/accounts`, { signal: AbortSignal.timeout(QBO_TIMEOUT_MS) });
+        const res = await fetch(`${baseUrl}/api/ops/qbo/accounts`, {
+          headers: getInternalOpsHeaders(),
+          signal: AbortSignal.timeout(QBO_TIMEOUT_MS),
+        });
         if (!res.ok) return { success: false, message: `QBO accounts query failed: ${res.status}` };
         const data = await res.json();
         const accounts = (data.accounts || [])
@@ -2209,7 +2212,10 @@ async function handleQueryQBO(params: Record<string, unknown>): Promise<ActionRe
         };
       }
       case "vendors": {
-        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=vendors`, { signal: AbortSignal.timeout(QBO_TIMEOUT_MS) });
+        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=vendors`, {
+          headers: getInternalOpsHeaders(),
+          signal: AbortSignal.timeout(QBO_TIMEOUT_MS),
+        });
         if (!res.ok) return { success: false, message: `QBO vendor query failed: ${res.status}` };
         const data = (await res.json()) as { count: number; vendors: Array<{ Name: string; Balance: number; Active: boolean; Email: string | null; Phone: string | null }> };
         if (data.count === 0) {
@@ -2230,7 +2236,10 @@ async function handleQueryQBO(params: Record<string, unknown>): Promise<ActionRe
         const start = typeof params.start === "string" ? params.start : undefined;
         const end = typeof params.end === "string" ? params.end : undefined;
         const qs = [start ? `start=${start}` : "", end ? `end=${end}` : ""].filter(Boolean).join("&");
-        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=pnl${qs ? `&${qs}` : ""}`, { signal: AbortSignal.timeout(QBO_TIMEOUT_MS) });
+        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=pnl${qs ? `&${qs}` : ""}`, {
+          headers: getInternalOpsHeaders(),
+          signal: AbortSignal.timeout(QBO_TIMEOUT_MS),
+        });
         if (!res.ok) return { success: false, message: `QBO P&L report failed: ${res.status}` };
         const data = (await res.json()) as { period: { start: string; end: string }; summary: Record<string, string | number> };
         const entries = Object.entries(data.summary);
@@ -2245,7 +2254,10 @@ async function handleQueryQBO(params: Record<string, unknown>): Promise<ActionRe
         };
       }
       case "balance_sheet": {
-        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=balance_sheet`, { signal: AbortSignal.timeout(QBO_TIMEOUT_MS) });
+        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=balance_sheet`, {
+          headers: getInternalOpsHeaders(),
+          signal: AbortSignal.timeout(QBO_TIMEOUT_MS),
+        });
         if (!res.ok) return { success: false, message: `QBO balance sheet failed: ${res.status}` };
         const data = (await res.json()) as { asOf: string; summary: Record<string, string | number> };
         const entries = Object.entries(data.summary);
@@ -2264,7 +2276,10 @@ async function handleQueryQBO(params: Record<string, unknown>): Promise<ActionRe
       case "recent_purchases":
       case "purchases": {
         const limit = typeof params.limit === "number" ? params.limit : 20;
-        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=purchases&limit=${limit}`, { signal: AbortSignal.timeout(QBO_TIMEOUT_MS) });
+        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=purchases&limit=${limit}`, {
+          headers: getInternalOpsHeaders(),
+          signal: AbortSignal.timeout(QBO_TIMEOUT_MS),
+        });
         if (!res.ok) return { success: false, message: `QBO purchases query failed: ${res.status}` };
         const data = (await res.json()) as { count: number; purchases: Array<{ Date: string; Amount: number; Vendor: string | null; Note: string | null; Lines: Array<{ Description: string; Amount: number; Account: string }> }> };
         if (data.count === 0) {
@@ -2285,7 +2300,10 @@ async function handleQueryQBO(params: Record<string, unknown>): Promise<ActionRe
         const start = typeof params.start === "string" ? params.start : undefined;
         const end = typeof params.end === "string" ? params.end : undefined;
         const qs = [start ? `start=${start}` : "", end ? `end=${end}` : ""].filter(Boolean).join("&");
-        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=cash_flow${qs ? `&${qs}` : ""}`, { signal: AbortSignal.timeout(QBO_TIMEOUT_MS) });
+        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=cash_flow${qs ? `&${qs}` : ""}`, {
+          headers: getInternalOpsHeaders(),
+          signal: AbortSignal.timeout(QBO_TIMEOUT_MS),
+        });
         if (!res.ok) return { success: false, message: `QBO cash flow report failed: ${res.status}` };
         const data = (await res.json()) as { period: { start: string; end: string }; summary: Record<string, string | number> };
         const entries = Object.entries(data.summary);
@@ -2303,7 +2321,10 @@ async function handleQueryQBO(params: Record<string, unknown>): Promise<ActionRe
         const start = typeof params.start === "string" ? params.start : undefined;
         const end = typeof params.end === "string" ? params.end : undefined;
         const qs = [start ? `start=${start}` : "", end ? `end=${end}` : ""].filter(Boolean).join("&");
-        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=bills${qs ? `&${qs}` : ""}`, { signal: AbortSignal.timeout(QBO_TIMEOUT_MS) });
+        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=bills${qs ? `&${qs}` : ""}`, {
+          headers: getInternalOpsHeaders(),
+          signal: AbortSignal.timeout(QBO_TIMEOUT_MS),
+        });
         if (!res.ok) return { success: false, message: `QBO bills query failed: ${res.status}` };
         const data = (await res.json()) as { count: number; bills: Array<{ Date: string; Amount: number; Balance: number; Vendor: string | null; DueDate: string | null; Status: string }> };
         if (data.count === 0) return { success: true, message: "No bills found in QBO." };
@@ -2324,7 +2345,10 @@ async function handleQueryQBO(params: Record<string, unknown>): Promise<ActionRe
         const start = typeof params.start === "string" ? params.start : undefined;
         const end = typeof params.end === "string" ? params.end : undefined;
         const qs = [start ? `start=${start}` : "", end ? `end=${end}` : ""].filter(Boolean).join("&");
-        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=invoices${qs ? `&${qs}` : ""}`, { signal: AbortSignal.timeout(QBO_TIMEOUT_MS) });
+        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=invoices${qs ? `&${qs}` : ""}`, {
+          headers: getInternalOpsHeaders(),
+          signal: AbortSignal.timeout(QBO_TIMEOUT_MS),
+        });
         if (!res.ok) return { success: false, message: `QBO invoices query failed: ${res.status}` };
         const data = (await res.json()) as { count: number; invoices: Array<{ Date: string; Amount: number; Balance: number; Customer: string | null; DocNumber: string | null; Status: string }> };
         if (data.count === 0) return { success: true, message: "No invoices found in QBO." };
@@ -2342,7 +2366,10 @@ async function handleQueryQBO(params: Record<string, unknown>): Promise<ActionRe
         };
       }
       case "customers": {
-        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=customers`, { signal: AbortSignal.timeout(QBO_TIMEOUT_MS) });
+        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=customers`, {
+          headers: getInternalOpsHeaders(),
+          signal: AbortSignal.timeout(QBO_TIMEOUT_MS),
+        });
         if (!res.ok) return { success: false, message: `QBO customers query failed: ${res.status}` };
         const data = (await res.json()) as { count: number; customers: Array<{ Name: string; Balance: number; Active: boolean; Email: string | null; Phone: string | null }> };
         if (data.count === 0) return { success: true, message: "No customers found in QBO." };
@@ -2360,7 +2387,10 @@ async function handleQueryQBO(params: Record<string, unknown>): Promise<ActionRe
         };
       }
       case "metrics": {
-        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=metrics`, { signal: AbortSignal.timeout(QBO_TIMEOUT_MS) });
+        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=metrics`, {
+          headers: getInternalOpsHeaders(),
+          signal: AbortSignal.timeout(QBO_TIMEOUT_MS),
+        });
         if (!res.ok) return { success: false, message: `QBO metrics query failed: ${res.status}` };
         const data = (await res.json()) as {
           cashPosition: number; burnRate: number; runway: number | null;
@@ -2431,8 +2461,14 @@ async function handleQBOSetupAssessment(_params: Record<string, unknown>): Promi
   try {
     // Fetch accounts, vendors, and uncategorized transaction preview in parallel
     const [accountsRes, vendorsRes, uncatRes] = await Promise.allSettled([
-      fetch(`${baseUrl}/api/ops/qbo/accounts`, { signal: AbortSignal.timeout(QBO_TIMEOUT_MS) }),
-      fetch(`${baseUrl}/api/ops/qbo/query?type=vendors`, { signal: AbortSignal.timeout(QBO_TIMEOUT_MS) }),
+      fetch(`${baseUrl}/api/ops/qbo/accounts`, {
+        headers: getInternalOpsHeaders(),
+        signal: AbortSignal.timeout(QBO_TIMEOUT_MS),
+      }),
+      fetch(`${baseUrl}/api/ops/qbo/query?type=vendors`, {
+        headers: getInternalOpsHeaders(),
+        signal: AbortSignal.timeout(QBO_TIMEOUT_MS),
+      }),
       fetch(`${baseUrl}/api/ops/qbo/categorize-batch`, {
         method: "POST",
         headers: { Authorization: `Bearer ${cronSecret}`, "Content-Type": "application/json" },
@@ -3586,7 +3622,7 @@ const REQUIRED_PARAMS: Record<string, string[]> = {
   create_qbo_account: ["name", "type"],
   create_qbo_customer: ["name"],
   create_qbo_invoice: ["customer_name"],
-  create_qbo_bill: ["vendor_name", "amount"],
+  create_qbo_bill: ["vendor_name"],
   categorize_qbo_transaction: ["transaction_id", "account_id"],
   batch_categorize_qbo: ["mode"],
   reconcile_transactions: [],
@@ -3596,12 +3632,12 @@ const REQUIRED_PARAMS: Record<string, string[]> = {
   // Operations
   acknowledge_signal: ["signal_id"],
   pause_initiative: ["initiative_id"],
-  log_production_run: ["vendor", "units"],
-  record_vendor_quote: ["vendor", "product", "price"],
+  log_production_run: ["manufacturer", "run_date", "total_units_ordered", "total_cost"],
+  record_vendor_quote: ["vendor", "item_description", "quoted_price"],
   run_scenario: ["scenario_name"],
-  run_monthly_close: [],
-  start_workflow: ["workflow_name"],
-  resume_workflow: ["workflow_id"],
+  run_monthly_close: ["period"],
+  start_workflow: ["workflow_id"],
+  resume_workflow: ["run_id"],
   calculate_deal: ["channel"],
   // Shopify
   query_shopify_orders: [],

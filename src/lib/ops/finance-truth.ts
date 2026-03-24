@@ -147,9 +147,15 @@ function getQBOBaseUrl(): string {
   return process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://www.usagummies.com";
 }
 
+function getInternalOpsHeaders(): HeadersInit {
+  const cronSecret = (process.env.CRON_SECRET || "").trim();
+  return cronSecret ? { Authorization: `Bearer ${cronSecret}` } : {};
+}
+
 async function fetchQBOQuery(type: string, params: Record<string, string> = {}): Promise<unknown> {
   const searchParams = new URLSearchParams({ type, ...params });
   const res = await fetch(`${getQBOBaseUrl()}/api/ops/qbo/query?${searchParams.toString()}`, {
+    headers: getInternalOpsHeaders(),
     cache: "no-store",
     signal: AbortSignal.timeout(15000),
   });

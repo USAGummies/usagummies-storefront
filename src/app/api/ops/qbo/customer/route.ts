@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { isCronAuthorized } from "@/lib/ops/abra-auth";
+import { isAuthorized } from "@/lib/ops/abra-auth";
 import { createQBOCustomer } from "@/lib/ops/qbo-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
-  if (!isCronAuthorized(req)) {
+  if (!(await isAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -52,13 +52,9 @@ export async function POST(req: Request) {
       message: `Created customer "${body.name}" (ID: ${custId})`,
     });
   } catch (error) {
+    console.error("[qbo/customer] POST failed:", error instanceof Error ? error.message : error);
     return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Customer creation failed",
-      },
+      { error: "Customer creation failed" },
       { status: 500 },
     );
   }

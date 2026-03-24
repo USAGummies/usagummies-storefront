@@ -101,58 +101,33 @@ async function processApprovalAction(
   decision: "approved" | "denied",
   actor: string,
 ): Promise<{ ok: boolean; resultMsg?: string }> {
-  // Atomic claim: PATCH status from 'pending' to 'executing'/'denied' in one operation.
-  // If another click already changed the status, this returns 0 rows and we know it's a duplicate.
-  const claimStatus = decision === "denied" ? "denied" : "executing";
-  const claimed = (await sbFetch(
-    `/rest/v1/approvals?id=eq.${approvalId}&status=eq.pending`,
-    {
-      method: "PATCH",
-      headers: { Prefer: "return=representation", "Content-Type": "application/json" },
-      body: JSON.stringify({
-        status: claimStatus,
-        decision,
-        decided_at: new Date().toISOString(),
-        decided_by_user_id: actor,
-        decision_reasoning: `${decision === "denied" ? "Rejected" : "Approved"} by ${actor} via Slack`,
-      }),
-    },
-  )) as Array<Record<string, unknown>>;
-
-  // If no rows returned, someone else already claimed this approval
-  if (!claimed || claimed.length === 0) {
-    return { ok: false, resultMsg: "Already processed (duplicate click)" };
-  }
-
   if (decision === "denied") {
+    const claimed = (await sbFetch(
+      `/rest/v1/approvals?id=eq.${approvalId}&status=eq.pending`,
+      {
+        method: "PATCH",
+        headers: { Prefer: "return=representation", "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: "denied",
+          decision,
+          decided_at: new Date().toISOString(),
+          decided_by_user_id: actor,
+          decision_reasoning: `Rejected by ${actor} via Slack`,
+        }),
+      },
+    )) as Array<Record<string, unknown>>;
+    if (!claimed || claimed.length === 0) {
+      return { ok: false, resultMsg: "Already processed (duplicate click)" };
+    }
     return { ok: true };
   }
 
-  // Approved — execute the action
+  // Approved — let executeAction own the atomic claim path.
   try {
     const result = await executeAction(approvalId);
-    // Update status to final 'approved' after execution
-    await sbFetch(`/rest/v1/approvals?id=eq.${approvalId}`, {
-      method: "PATCH",
-      headers: { Prefer: "return=minimal", "Content-Type": "application/json" },
-      body: JSON.stringify({
-        status: "approved",
-        executed_at: new Date().toISOString(),
-        execution_result: { success: result.success, message: result.message?.slice(0, 500) },
-      }),
-    });
     return { ok: result.success, resultMsg: result.message };
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Execution failed";
-    // Mark as failed so it doesn't get re-executed
-    await sbFetch(`/rest/v1/approvals?id=eq.${approvalId}`, {
-      method: "PATCH",
-      headers: { Prefer: "return=minimal", "Content-Type": "application/json" },
-      body: JSON.stringify({
-        status: "approved",
-        execution_result: { success: false, error: msg },
-      }),
-    });
     return { ok: false, resultMsg: msg };
   }
 }

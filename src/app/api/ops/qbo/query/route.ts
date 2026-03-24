@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidAccessToken, getRealmId } from "@/lib/ops/qbo-auth";
+import { isAuthorized } from "@/lib/ops/abra-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,6 +49,10 @@ async function qboQuery<T>(
  * General-purpose QBO data endpoint for Abra.
  */
 export async function GET(req: NextRequest) {
+  if (!(await isAuthorized(req))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const accessToken = await getValidAccessToken();
   const realmId = await getRealmId();
   if (!accessToken || !realmId) {
@@ -366,10 +371,9 @@ export async function GET(req: NextRequest) {
         );
     }
   } catch (err) {
+    console.error("[qbo/query] GET failed:", err instanceof Error ? err.message : err);
     return NextResponse.json(
-      {
-        error: `QBO query failed: ${err instanceof Error ? err.message : String(err)}`,
-      },
+      { error: "QBO query failed" },
       { status: 500 },
     );
   }

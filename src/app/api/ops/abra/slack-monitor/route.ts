@@ -172,16 +172,25 @@ async function verifySlackSignature(req: Request, rawBody: string): Promise<bool
 const processedEvents = new Set<string>();
 const DEDUP_MAX_SIZE = 500;
 
-function isDuplicate(eventId: string): boolean {
+async function isDuplicate(eventId: string): Promise<boolean> {
   if (!eventId) return false;
-  if (processedEvents.has(eventId)) return true;
-  processedEvents.add(eventId);
-  // Prevent memory leak — trim oldest entries when set gets too large
-  if (processedEvents.size > DEDUP_MAX_SIZE) {
-    const first = processedEvents.values().next().value;
-    if (first) processedEvents.delete(first);
+  try {
+    const { kv } = await import("@vercel/kv");
+    const key = `abra:slack-monitor:event:${eventId}`;
+    const existing = await kv.get(key);
+    if (existing) return true;
+    await kv.set(key, "1", { ex: 60 * 10 });
+    return false;
+  } catch {
+    if (processedEvents.has(eventId)) return true;
+    processedEvents.add(eventId);
+    // Prevent memory leak — trim oldest entries when set gets too large
+    if (processedEvents.size > DEDUP_MAX_SIZE) {
+      const first = processedEvents.values().next().value;
+      if (first) processedEvents.delete(first);
+    }
+    return false;
   }
-  return false;
 }
 
 export async function POST(req: Request) {
@@ -197,7 +206,7 @@ export async function POST(req: Request) {
 
   // Deduplicate by event_id
   const eventId = body?.event_id || body?.event?.event_ts || "";
-  if (isDuplicate(eventId)) {
+  if (await isDuplicate(eventId)) {
     console.log(`[slack-monitor] Duplicate event ${eventId}, skipping`);
     return NextResponse.json({ ok: true });
   }

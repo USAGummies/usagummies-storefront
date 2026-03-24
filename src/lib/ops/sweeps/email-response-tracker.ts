@@ -69,7 +69,7 @@ export async function surfaceUnansweredEmails(): Promise<void> {
   // Query brain for recent email entries from tracked senders
   const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
   const res = await fetch(
-    `${env.baseUrl}/rest/v1/open_brain_entries?source_type=eq.api&created_at=gte.${encodeURIComponent(twoDaysAgo)}&title=ilike.*email*&select=id,title,content,created_at&order=created_at.desc&limit=50`,
+    `${env.baseUrl}/rest/v1/open_brain_entries?source_type=eq.api&created_at=gte.${encodeURIComponent(twoDaysAgo)}&title=ilike.*email*&select=id,title,raw_text,created_at&order=created_at.desc&limit=50`,
     {
       headers: {
         apikey: env.serviceKey,
@@ -83,7 +83,7 @@ export async function surfaceUnansweredEmails(): Promise<void> {
   const entries = (await res.json()) as Array<{
     id: string;
     title: string;
-    content: string;
+    raw_text: string;
     created_at: string;
   }>;
 
@@ -91,7 +91,7 @@ export async function surfaceUnansweredEmails(): Promise<void> {
   const actionable: Array<{ sender: string; subject: string; hoursAgo: number; snippet: string }> = [];
 
   for (const entry of entries) {
-    const content = (entry.content || entry.title || "").toLowerCase();
+    const content = (entry.raw_text || entry.title || "").toLowerCase();
     const matchedSender = TRACKED_SENDERS.find((s) => content.includes(s.toLowerCase()));
     if (!matchedSender) continue;
 

@@ -106,6 +106,36 @@ const DEFAULT_CLAUDE_MODEL =
   process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
 const MAX_MESSAGE_LENGTH = 5000;
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
+const PRE_EXEC_TIMEOUT_MS = 10_000;
+
+function buildInternalAuthHeaders(req: Request): HeadersInit {
+  const inboundAuth =
+    req.headers.get("authorization") || req.headers.get("Authorization") || "";
+  if (inboundAuth.trim()) {
+    return { Authorization: inboundAuth.trim() };
+  }
+  const cronSecret = (process.env.CRON_SECRET || "").trim();
+  return cronSecret ? { Authorization: `Bearer ${cronSecret}` } : {};
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`Timeout: ${label} exceeded ${ms}ms`)),
+      ms,
+    );
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
 
 // ─── File Upload Helpers ───
 
@@ -378,8 +408,8 @@ QBO CUSTOMER MANAGEMENT:
 <action>{"action_type":"create_qbo_customer","title":"Create Customer","description":"Add customer to QBO","department":"finance","risk_level":"low","params":{"name":"Inderbitzin Distributors"}}</action>
 
 QBO BILL CREATION (vendor → us):
-• "record the Powers invoice for $19,250" → emit create_qbo_bill with vendor_id (lookup from vendors), amount 19250, account_id (COGS account)
-• "enter the Belmark bill" → emit create_qbo_bill with vendor_id, amount, account_id
+• "record the Powers invoice for $19,250" → emit create_qbo_bill with vendor_name "Powers Confections", amount 19250, account_id (COGS account)
+• "enter the Belmark bill" → emit create_qbo_bill with vendor_name "Belmark", amount, account_id
 • If the vendor doesn't exist yet, create it first with create_qbo_vendor, then create the bill
 
 AMAZON WRITE OPERATIONS (requires credentials — stubs ready):
@@ -435,7 +465,7 @@ COMPLETE ACTION REFERENCE (emit these as <action> blocks):
 • create_qbo_account — Create a COA account in QBO. Params: name, type (Income/Expense/Cost of Goods Sold/etc), sub_type, number, description
 • create_qbo_customer — Create a customer in QBO. Params: name, company, email, phone
 • create_qbo_invoice — Create an invoice. Params: customer_name, line_items [{description, quantity, unit_price}], due_date
-• create_qbo_bill — Create a vendor bill (AP). Params: vendor_id, amount, account_id, description, date
+• create_qbo_bill — Create a vendor bill (AP). Params: vendor_name, amount and/or line_items, account_id, description, date
 • categorize_qbo_transaction — Categorize a transaction. Params: transaction_id, account_id
 • batch_categorize_qbo — Batch categorize bank feed. Params: mode (preview/auto)
 • reconcile_transactions — Reconcile bank transactions
@@ -446,12 +476,12 @@ COMPLETE ACTION REFERENCE (emit these as <action> blocks):
 • create_notion_page — Create a Notion page. Params: title, content, database_key
 • update_notion — Update an existing Notion page. Params: page_id, content
 • acknowledge_signal — Acknowledge an operational signal. Params: signal_id
-• log_production_run — Log production run data. Params: vendor, units, cost_per_unit, date
-• record_vendor_quote — Record a vendor quote. Params: vendor, product, price, quantity, terms
+• log_production_run — Log production run data. Params: manufacturer, run_date, total_units_ordered, total_cost, total_units_received, skus_produced
+• record_vendor_quote — Record a vendor quote. Params: vendor, item_description, quoted_price, price_type, quantity, unit, valid_until
 • run_scenario — Run a financial scenario. Params: scenario_name, base_values, adjustments
-• run_monthly_close — Run month-end close process. Params: month, year
-• start_workflow — Start a workflow/playbook. Params: workflow_name
-• resume_workflow — Resume a paused workflow. Params: workflow_id
+• run_monthly_close — Run month-end close process. Params: period (YYYY-MM)
+• start_workflow — Start a workflow/playbook. Params: workflow_id
+• resume_workflow — Resume a paused workflow. Params: run_id
 • pause_initiative — Pause a department initiative. Params: initiative_id
 • update_shopify_inventory — Update Shopify inventory. Params: variant_id, quantity
 • create_shopify_discount — Create a Shopify discount. Params: code, percentage, starts_at
@@ -1327,7 +1357,10 @@ export async function POST(req: Request) {
         // Fetch QBO accounts directly via our own API
         const qboRes = await fetch(
           `${process.env.NEXT_PUBLIC_BASE_URL || "https://www.usagummies.com"}/api/ops/qbo/accounts`,
-          { signal: AbortSignal.timeout(10_000) },
+          {
+            headers: buildInternalAuthHeaders(req),
+            signal: AbortSignal.timeout(10_000),
+          },
         );
         if (qboRes.ok) {
           const qboJson = (await qboRes.json()) as {
@@ -1454,16 +1487,28 @@ export async function POST(req: Request) {
 
       const extraFetches = await Promise.allSettled([
         wantsVendors
-          ? fetch(`${qboBase}/api/ops/qbo/query?type=vendors`, { signal: AbortSignal.timeout(8_000) }).then(r => r.ok ? r.json() : null)
+          ? fetch(`${qboBase}/api/ops/qbo/query?type=vendors`, {
+              headers: buildInternalAuthHeaders(req),
+              signal: AbortSignal.timeout(8_000),
+            }).then(r => r.ok ? r.json() : null)
           : Promise.resolve(null),
         wantsPnl
-          ? fetch(`${qboBase}/api/ops/qbo/query?type=pnl`, { signal: AbortSignal.timeout(8_000) }).then(r => r.ok ? r.json() : null)
+          ? fetch(`${qboBase}/api/ops/qbo/query?type=pnl`, {
+              headers: buildInternalAuthHeaders(req),
+              signal: AbortSignal.timeout(8_000),
+            }).then(r => r.ok ? r.json() : null)
           : Promise.resolve(null),
         wantsPurchases
-          ? fetch(`${qboBase}/api/ops/qbo/query?type=purchases&limit=${/every|all|last 30/i.test(message) ? 100 : 25}`, { signal: AbortSignal.timeout(8_000) }).then(r => r.ok ? r.json() : null)
+          ? fetch(`${qboBase}/api/ops/qbo/query?type=purchases&limit=${/every|all|last 30/i.test(message) ? 100 : 25}`, {
+              headers: buildInternalAuthHeaders(req),
+              signal: AbortSignal.timeout(8_000),
+            }).then(r => r.ok ? r.json() : null)
           : Promise.resolve(null),
         wantsBalanceSheet
-          ? fetch(`${qboBase}/api/ops/qbo/query?type=balance_sheet`, { signal: AbortSignal.timeout(8_000) }).then(r => r.ok ? r.json() : null)
+          ? fetch(`${qboBase}/api/ops/qbo/query?type=balance_sheet`, {
+              headers: buildInternalAuthHeaders(req),
+              signal: AbortSignal.timeout(8_000),
+            }).then(r => r.ok ? r.json() : null)
           : Promise.resolve(null),
       ]);
 
@@ -2129,8 +2174,14 @@ export async function POST(req: Request) {
           try {
             const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://www.usagummies.com";
             const [vendorsRes, accountsRes] = await Promise.all([
-              fetch(`${baseUrl}/api/ops/qbo/query?type=vendors`, { signal: AbortSignal.timeout(8000) }),
-              fetch(`${baseUrl}/api/ops/qbo/accounts`, { signal: AbortSignal.timeout(8000) }),
+              fetch(`${baseUrl}/api/ops/qbo/query?type=vendors`, {
+                headers: buildInternalAuthHeaders(req),
+                signal: AbortSignal.timeout(8000),
+              }),
+              fetch(`${baseUrl}/api/ops/qbo/accounts`, {
+                headers: buildInternalAuthHeaders(req),
+                signal: AbortSignal.timeout(8000),
+              }),
             ]);
             const parts: string[] = [];
             if (vendorsRes.ok) {
@@ -2226,10 +2277,26 @@ export async function POST(req: Request) {
     // ── DETERMINISTIC PRE-EXECUTION ──
     // Execute actions BEFORE the LLM runs. The LLM then composes a response
     // based on actual results, not its own decision about whether to act.
-    const preExec = await detectAndPreExecute(message, {
-      slackChannelId: slackChannelId || undefined,
-      slackThreadTs: slackThreadTs || undefined,
-    });
+    let preExec = {
+      preloadedData: "",
+      actionNotices: [] as string[],
+      didPreExecute: false,
+      executedActionTypes: new Set<string>(),
+    };
+    try {
+      preExec = await withTimeout(
+        detectAndPreExecute(message, {
+          slackChannelId: slackChannelId || undefined,
+          slackThreadTs: slackThreadTs || undefined,
+        }),
+        PRE_EXEC_TIMEOUT_MS,
+        "detectAndPreExecute",
+      );
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : "unknown error";
+      console.warn(`[chat] Pre-execution failed: ${errMsg}`);
+      preExec.actionNotices.push(`⚠️ Deterministic pre-execution failed: ${errMsg}`);
+    }
 
     // Inject pre-executed data into the LLM context so it can compose an intelligent response
     const preExecContext = preExec.didPreExecute
@@ -2263,13 +2330,14 @@ export async function POST(req: Request) {
     });
     // Track Anthropic API success in capability registry
     void capMarkSuccess("anthropic").catch(() => {});
-    const actionNotices: string[] = [];
+    const actionNotices: string[] = [...preExec.actionNotices];
     let baseReply = claudeResult.reply;
     if (!claudeResult.earlyExit) {
       const actionResult = await executeActions(claudeResult.reply, {
         slackChannelId: slackChannelId || undefined,
         slackThreadTs: slackThreadTs || undefined,
         deadlineMs: Math.max(0, 40_000 - (Date.now() - startMs)), // leave 15s for response assembly
+        skipActionTypes: preExec.executedActionTypes,
       });
       baseReply = actionResult.cleanReply;
       actionNotices.push(...actionResult.actionNotices);

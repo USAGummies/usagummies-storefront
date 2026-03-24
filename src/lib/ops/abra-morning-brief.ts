@@ -758,13 +758,17 @@ export async function sendMorningBrief(): Promise<void> {
         console.log("[morning-brief] DM sent to Ben");
       }
     } catch (err) {
-      console.warn("[morning-brief] Ben DM failed, falling back to channel:", err instanceof Error ? err.message : err);
-      // Fallback to channel if DM fails
-      await notify({ channel: "daily", text: brief });
+      console.warn("[morning-brief] Ben DM failed:", err instanceof Error ? err.message : err);
+      await notify({
+        channel: "alerts",
+        text: `⚠️ Morning brief DM to Ben failed: ${err instanceof Error ? err.message : "unknown error"}`,
+      });
     }
   } else {
-    // No bot token — use webhook fallback
-    await notify({ channel: "daily", text: brief });
+    await notify({
+      channel: "alerts",
+      text: "⚠️ Morning brief for Ben was not sent because SLACK_BOT_TOKEN is not configured.",
+    });
   }
 
   // Send Rene a finance-focused DM

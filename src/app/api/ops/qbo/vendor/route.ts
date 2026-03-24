@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { isCronAuthorized } from "@/lib/ops/abra-auth";
+import { isAuthorized } from "@/lib/ops/abra-auth";
 import { createQBOVendor } from "@/lib/ops/qbo-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
-  if (!isCronAuthorized(req)) {
+  if (!(await isAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -66,13 +66,9 @@ export async function POST(req: Request) {
       message: `Created vendor "${body.name}" (ID: ${vendorId})`,
     });
   } catch (error) {
+    console.error("[qbo/vendor] POST failed:", error instanceof Error ? error.message : error);
     return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Vendor creation failed",
-      },
+      { error: "Vendor creation failed" },
       { status: 500 },
     );
   }

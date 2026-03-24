@@ -15,6 +15,12 @@
  * to the results of actions that already executed.
  */
 
+import {
+  completeTask,
+  failTask,
+  queueTask,
+} from "@/lib/ops/abra-task-queue";
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -69,7 +75,13 @@ const PATTERNS: Array<{
 
   // ── EMAIL RESPONSE CHECK ──
   {
-    regex: /\b(which|what)\b.*\b(emails?|messages?)\b.*\b(need|require|await|waiting)\b.*\b(response|reply|answer)\b/i,
+    regex: /\b(which|what)\b.*\b(emails?|messages?)\b.*\b(need|require|await|waiting)\b.*\b(responses?|repl(?:y|ies)|answers?)\b/i,
+    actionType: "search_email",
+    extractParams: () => ({ query: "newer_than:3d is:inbox", count: 10 }),
+    priority: 1,
+  },
+  {
+    regex: /\b(emails?|messages?)\b.*\b(need|require|await|waiting)\b.*\b(responses?|repl(?:y|ies)|answers?)\b/i,
     actionType: "search_email",
     extractParams: () => ({ query: "newer_than:3d is:inbox", count: 10 }),
     priority: 1,
@@ -231,21 +243,63 @@ export async function detectAndPreExecute(
   console.log(`[deterministic] Detected ${toExecute.length} actions: ${toExecute.map(a => a.type).join(", ")}`);
 
   for (const action of toExecute) {
+    let taskId: string | null = null;
     try {
+      taskId = await queueTask({
+        task_type: "deterministic_pre_execution",
+        description: `Pre-execute ${action.type}`,
+        action_type: action.type,
+        action_params: action.params,
+        channel_id: ctx?.slackChannelId,
+        thread_ts: ctx?.slackThreadTs,
+      }).catch(() => null);
       console.log(`[deterministic] Executing pre-action: ${action.type} with params: ${JSON.stringify(action.params).slice(0, 200)}`);
-      const data = await executePreAction(action, ctx);
+      const data = await withTimeout(
+        executePreAction(action, ctx),
+        8_000,
+        `pre-action:${action.type}`,
+      );
       console.log(`[deterministic] Pre-action ${action.type} result: ${data ? data.slice(0, 100) : "null"}`);
       if (data) {
         result.preloadedData += `\n\n--- PRE-EXECUTED: ${action.type} ---\n${data}`;
         result.didPreExecute = true;
         result.executedActionTypes.add(action.type);
       }
+      if (taskId) {
+        void completeTask(
+          taskId,
+          data
+            ? `Pre-executed ${action.type}`
+            : `No-op pre-execution for ${action.type}`,
+        ).catch(() => {});
+      }
     } catch (err) {
-      console.error(`[deterministic] Pre-action ${action.type} FAILED:`, err instanceof Error ? err.message : err);
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`[deterministic] Pre-action ${action.type} FAILED:`, message);
+      result.actionNotices.push(`⚠️ Pre-execution for \`${action.type}\` failed: ${message}`);
+      if (taskId) {
+        void failTask(taskId, message).catch(() => {});
+      }
     }
   }
 
   return result;
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`Timeout: ${label} exceeded ${ms}ms`)), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -254,7 +308,7 @@ export async function detectAndPreExecute(
 
 async function executePreAction(
   action: DetectedAction,
-  ctx?: { slackChannelId?: string; slackThreadTs?: string },
+  _ctx?: { slackChannelId?: string; slackThreadTs?: string },
 ): Promise<string | null> {
   switch (action.type) {
     case "search_email": {
