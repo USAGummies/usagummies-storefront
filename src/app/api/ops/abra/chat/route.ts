@@ -2504,6 +2504,44 @@ export async function POST(req: Request) {
       }
     }
 
+    // ── Force email reading when Claude says "reading" but doesn't emit read_email ──
+    const emailActionHandled = actionNotices.some(n => n.includes("read_email") || n.includes("search_email") || n.includes("Email"));
+    const wantsEmailRead = /\b(read|check|pull|show|get|find)\b.*\b(email|inbox|mail|message)\b/i.test(message);
+    if (wantsEmailRead && !emailActionHandled && actionNotices.length === 0) {
+      try {
+        // Extract who to search for, or default to recent
+        const fromMatch = /\b(?:from|by)\s+(\w+(?:\s+\w+)?)/i.exec(message);
+        const searchQuery = fromMatch ? `from:${fromMatch[1]}` : "is:inbox";
+        const countMatch = /\b(\d+)\s+email/i.exec(message);
+        const count = countMatch ? parseInt(countMatch[1], 10) : 5;
+        const forcedEmailXml = `<action>{"action_type":"search_email","title":"Search Email","description":"Auto-forced email search","department":"operations","risk_level":"low","params":{"query":"${searchQuery}","count":${count}}}</action>`;
+        const emailResult = await executeActions(forcedEmailXml, {
+          slackChannelId: slackChannelId || undefined,
+          slackThreadTs: slackThreadTs || undefined,
+        });
+        if (emailResult.actionNotices.length > 0) actionNotices.push(...emailResult.actionNotices);
+        if (emailResult.readOnlyResults.length > 0) {
+          // We got email data — do a follow-up LLM call to summarize
+          const emailData = emailResult.readOnlyResults.join("\n\n");
+          if (emailData.length > 50) {
+            effectiveReply = `Here are the emails I found:\n\n${emailData.slice(0, 3000)}`;
+          }
+        }
+      } catch (err) {
+        console.warn("[chat] Forced email read failed:", err instanceof Error ? err.message : err);
+      }
+    }
+
+    // ── Force Excel generation for complex spreadsheet requests ──
+    const wantsSpreadsheet = /\b(excel|spreadsheet|xlsx|csv|export)\b.*\b(landed|cost|freight|revenue|vendor|account|pnl|p&l)\b/i.test(message) ||
+      /\b(landed|cost|freight|revenue)\b.*\b(excel|spreadsheet|xlsx|csv|export)\b/i.test(message);
+    const fileGenHandled = actionNotices.some(n => n.includes("[generate_file]"));
+    if (wantsSpreadsheet && !fileGenHandled && actionNotices.length === 0) {
+      // The file generation forced fallback in the earlier block should have caught this
+      // If it didn't, log it as an honest failure
+      console.warn(`[chat] Spreadsheet requested but not generated: "${message.slice(0, 80)}"`);
+    }
+
     // Recompute reply after forced actions may have pushed additional notices
     reply = [
       effectiveReply,
