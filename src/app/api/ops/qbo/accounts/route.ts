@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { getValidAccessToken, getRealmId } from "@/lib/ops/qbo-auth";
+import { isCronAuthorized } from "@/lib/ops/abra-auth";
+import { createQBOAccount } from "@/lib/ops/qbo-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -63,4 +65,68 @@ export async function GET() {
   );
 
   return NextResponse.json({ count: accounts.length, accounts });
+}
+
+/**
+ * POST /api/ops/qbo/accounts — Create a new account in QBO Chart of Accounts
+ */
+export async function POST(req: Request) {
+  if (!isCronAuthorized(req)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const body = (await req.json()) as {
+      name: string;
+      type: string;
+      sub_type?: string;
+      number?: string;
+      description?: string;
+    };
+
+    if (!body.name || !body.type) {
+      return NextResponse.json(
+        { error: "name and type are required" },
+        { status: 400 },
+      );
+    }
+
+    const result = await createQBOAccount({
+      Name: body.name,
+      AccountType: body.type,
+      ...(body.sub_type ? { AccountSubType: body.sub_type } : {}),
+      ...(body.number ? { AcctNum: body.number } : {}),
+      ...(body.description ? { Description: body.description } : {}),
+    });
+
+    if (!result) {
+      return NextResponse.json(
+        { error: "QBO account creation failed — check connection" },
+        { status: 500 },
+      );
+    }
+
+    const acctData =
+      (result as Record<string, unknown>).Account || result;
+    const acctId =
+      (acctData as Record<string, unknown>).Id || "unknown";
+
+    return NextResponse.json({
+      ok: true,
+      account_id: acctId,
+      name: body.name,
+      type: body.type,
+      message: `Created account "${body.name}" (${body.type}) ID: ${acctId}`,
+    });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Account creation failed",
+      },
+      { status: 500 },
+    );
+  }
 }
