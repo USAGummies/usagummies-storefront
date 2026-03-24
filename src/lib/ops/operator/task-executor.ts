@@ -4,6 +4,8 @@ import {
   getQBOAccounts,
   getQBOVendors,
 } from "@/lib/ops/qbo-client";
+import { readEmail, searchEmails } from "@/lib/ops/gmail-reader";
+import { notify } from "@/lib/ops/notify";
 
 export type OperatorTaskStatus =
   | "pending"
@@ -67,6 +69,10 @@ type QBOVendor = {
 type QBOPurchase = {
   Id?: string;
   SyncToken?: string;
+};
+
+type AbraChatResponse = {
+  reply?: string;
 };
 
 function getSupabaseEnv() {
@@ -193,6 +199,18 @@ function priorityWeight(priority: OperatorTaskRow["priority"]): number {
   }
 }
 
+function canPrepareApprovalTask(task: OperatorTaskRow): boolean {
+  return task.task_type === "email_draft_response" ||
+    task.task_type === "vendor_followup" ||
+    task.task_type === "distributor_followup";
+}
+
+function canExecuteTask(task: OperatorTaskRow): boolean {
+  if (canPrepareApprovalTask(task)) return true;
+  if (task.task_type === "qbo_record_from_email") return !task.requires_approval;
+  return !task.requires_approval;
+}
+
 export async function createOperatorTasks(
   tasks: Array<{
     task_type: string;
@@ -235,7 +253,14 @@ export async function createOperatorTasks(
         title: task.title,
         description: task.description || null,
         priority: task.priority || "medium",
-        status: task.requires_approval ? "needs_approval" : "pending",
+        status:
+          task.requires_approval && !(
+            task.task_type === "email_draft_response" ||
+            task.task_type === "vendor_followup" ||
+            task.task_type === "distributor_followup"
+          )
+            ? "needs_approval"
+            : "pending",
         source: task.source || "scheduler",
         assigned_to: task.assigned_to || "abra",
         requires_approval: task.requires_approval ?? false,
@@ -255,12 +280,16 @@ async function listReadyTasks(limit: number): Promise<OperatorTaskRow[]> {
   ).catch(() => []);
 
   const executable = (Array.isArray(rows) ? rows : [])
-    .filter((row) => !row.requires_approval)
+    .filter((row) => canExecuteTask(row))
     .filter((row) => row.retry_count < row.max_retries)
     .filter((row) =>
       row.task_type === "qbo_categorize" ||
       row.task_type === "qbo_assign_vendor" ||
-      row.task_type === "qbo_record_transaction",
+      row.task_type === "qbo_record_transaction" ||
+      row.task_type === "email_draft_response" ||
+      row.task_type === "qbo_record_from_email" ||
+      row.task_type === "vendor_followup" ||
+      row.task_type === "distributor_followup",
     )
     .sort((a, b) => {
       const byPriority = priorityWeight(a.priority) - priorityWeight(b.priority);
@@ -509,6 +538,216 @@ async function executeRecordTransactionTask(task: OperatorTaskRow): Promise<stri
   return `Recorded transfer ${description} to ${targetAccountName}`;
 }
 
+async function generateDraftViaChat(prompt: string): Promise<string> {
+  const res = await fetch(`${getInternalBaseUrl()}/api/ops/abra/chat`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getInternalHeaders(),
+    },
+    body: JSON.stringify({
+      message: prompt,
+      history: [],
+      channel: "operator",
+    }),
+    cache: "no-store",
+    signal: AbortSignal.timeout(55000),
+  });
+  if (!res.ok) {
+    throw new Error(`Abra chat draft generation failed (${res.status})`);
+  }
+  const data = (await res.json()) as AbraChatResponse;
+  const reply = String(data.reply || "").trim();
+  if (!reply) throw new Error("Abra chat returned an empty draft");
+  return reply;
+}
+
+async function queueDraftReply(params: {
+  to: string;
+  senderName: string;
+  subject: string;
+  body: string;
+  sourceEmailId?: string | null;
+  taskLabel: string;
+}): Promise<string> {
+  const commandId = `cmd-${crypto.randomUUID().slice(0, 8)}`;
+  let draftBody = params.body.trim();
+  if (!/best,\s*ben/i.test(draftBody)) {
+    draftBody = `${draftBody}\n\nBest,\nBen`;
+  }
+
+  await sbFetch("/rest/v1/abra_email_commands", {
+    method: "POST",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({
+      id: commandId,
+      status: "draft_reply_pending",
+      sender_name: params.senderName,
+      sender_email: params.to,
+      subject: params.subject,
+      task: params.taskLabel,
+      draft_reply_subject: params.subject,
+      draft_reply_body: draftBody,
+      body_snippet: draftBody.slice(0, 500),
+      ...(params.sourceEmailId ? { gmail_thread_id: params.sourceEmailId } : {}),
+    }),
+  });
+
+  await notify({
+    channel: "alerts",
+    text:
+      `📧 *Draft Reply Queued*\n` +
+      `*To:* ${params.to}\n*Subject:* ${params.subject}\n\n` +
+      `> ${draftBody.slice(0, 300).split("\n").join("\n> ")}\n\n` +
+      `_Send with:_ \`/abra sendreply ${commandId}\` _or discard with:_ \`/abra deny ${commandId}\``,
+  });
+
+  return commandId;
+}
+
+async function executeEmailDraftResponseTask(task: OperatorTaskRow): Promise<string> {
+  const messageId = String(task.execution_params?.message_id || "");
+  const sender = String(task.execution_params?.sender || "");
+  const senderEmail = String(task.execution_params?.sender_email || "");
+  const subject = String(task.execution_params?.subject || "Re: (no subject)");
+  if (!messageId || !senderEmail) throw new Error("Missing message_id or sender_email");
+
+  const message = await readEmail(messageId);
+  if (!message) throw new Error(`Email ${messageId} could not be read`);
+
+  const threadMessages = await searchEmails(
+    `subject:"${subject.replace(/^re:\s*/i, "").replace(/"/g, "")}" newer_than:30d`,
+    10,
+  );
+  const threadText = threadMessages
+    .slice(0, 6)
+    .map((entry) => `From: ${entry.from}\nTo: ${entry.to}\nDate: ${entry.date}\nSubject: ${entry.subject}\n\n${entry.body}`)
+    .join("\n\n---\n\n");
+
+  const draft = await generateDraftViaChat(
+    `Draft a reply to this email thread. Return only the email body, no commentary.\n\n` +
+    `Sender: ${sender}\n` +
+    `Subject: ${subject}\n\n` +
+    `Thread:\n${threadText || message.body}`,
+  );
+
+  const commandId = await queueDraftReply({
+    to: senderEmail,
+    senderName: sender || senderEmail,
+    subject: subject.toLowerCase().startsWith("re:") ? subject : `Re: ${subject}`,
+    body: draft,
+    sourceEmailId: messageId,
+    taskLabel: `Draft reply to ${sender || senderEmail}`,
+  });
+
+  return `Queued draft reply ${commandId} for ${sender || senderEmail}`;
+}
+
+async function executeQBORecordFromEmailTask(task: OperatorTaskRow): Promise<string> {
+  const amount = Math.abs(Number(task.execution_params?.amount || 0));
+  const description = String(task.execution_params?.description || task.title || "Email financial record");
+  const date = String(task.execution_params?.date || new Date().toISOString().slice(0, 10));
+  const vendor = String(task.execution_params?.vendor || "");
+  const senderEmail = String(task.execution_params?.sender_email || "");
+  if (!amount) throw new Error("Missing amount");
+
+  const [accountsResult, vendorsResult] = await Promise.all([getQBOAccounts(), getQBOVendors()]);
+  const accounts = ((accountsResult?.QueryResponse?.Account as QBOAccount[]) || []);
+  const softwareAccount =
+    accounts.find((account) => String(account.AcctNum || "") === "6200") ||
+    accounts.find((account) => /software/i.test(String(account.Name || "")));
+  const shippingAccount =
+    accounts.find((account) => String(account.AcctNum || "") === "6600") ||
+    accounts.find((account) => /shipping/i.test(String(account.Name || "")));
+  const fallbackAccount = softwareAccount || shippingAccount;
+  if (!fallbackAccount?.Id) throw new Error("No fallback QBO expense account found");
+
+  const bankAccount =
+    accounts.find((account) => account.AccountType === "Bank" && /checking/i.test(String(account.Name || ""))) ||
+    accounts.find((account) => account.AccountType === "Bank");
+  if (!bankAccount?.Id) throw new Error("No QBO bank account found");
+
+  const accountId =
+    /ship|postage|ups|fedex|usps/i.test(`${vendor} ${description}`) && shippingAccount?.Id
+      ? shippingAccount.Id
+      : fallbackAccount.Id;
+
+  const imported = await fetch(`${getInternalBaseUrl()}/api/ops/qbo/import-batch`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      transactions: [{
+        date,
+        description: `${description}${vendor ? ` (${vendor})` : ""}`,
+        amount,
+        accountId: Number(accountId),
+        isIncome: false,
+        bankAccountId: Number(bankAccount.Id),
+      }],
+    }),
+    signal: AbortSignal.timeout(45000),
+  });
+
+  const data = (await imported.json().catch(() => ({}))) as { created?: number; error?: string };
+  if (!imported.ok || Number(data.created || 0) < 1) {
+    throw new Error(String(data.error || `Failed to record email transaction (${imported.status})`).slice(0, 300));
+  }
+
+  const vendorRows = ((vendorsResult?.QueryResponse?.Vendor as QBOVendor[]) || []);
+  const vendorFound = vendorRows.some((row) =>
+    normalizeText(row.DisplayName || row.CompanyName) === normalizeText(vendor || senderEmail),
+  );
+  return `Recorded email-linked transaction ${description}${vendorFound ? "" : " (vendor not yet in QBO vendor list)"}`;
+}
+
+async function executeVendorFollowupTask(task: OperatorTaskRow): Promise<string> {
+  const email = String(task.execution_params?.contact_email || "");
+  const vendor = String(task.execution_params?.vendor || "vendor");
+  const lastSubject = String(task.execution_params?.last_subject || "Quick follow-up");
+  const bodyPreview = String(task.execution_params?.body_preview || "");
+  if (!email) throw new Error("Missing contact_email");
+
+  const draft = await generateDraftViaChat(
+    `Draft a short follow-up email to ${vendor}. Return only the email body.\n\n` +
+    `Last subject: ${lastSubject}\n` +
+    `Previous context:\n${bodyPreview}`,
+  );
+
+  const commandId = await queueDraftReply({
+    to: email,
+    senderName: vendor,
+    subject: lastSubject.toLowerCase().startsWith("re:") ? lastSubject : `Re: ${lastSubject}`,
+    body: draft,
+    taskLabel: `Vendor follow-up: ${vendor}`,
+  });
+
+  return `Queued vendor follow-up draft ${commandId} for ${vendor}`;
+}
+
+async function executeDistributorFollowupTask(task: OperatorTaskRow): Promise<string> {
+  const email = String(task.execution_params?.email || "");
+  const distributorName = String(task.execution_params?.distributor_name || "distributor");
+  const shipDate = String(task.execution_params?.ship_date || "");
+  const sampleDetails = String(task.execution_params?.sample_details || "");
+  if (!email) throw new Error("Missing distributor email");
+
+  const draft = await generateDraftViaChat(
+    `Draft a follow-up email to ${distributorName} about a sample shipment. Return only the email body.\n\n` +
+    `Ship date: ${shipDate}\n` +
+    `Context:\n${sampleDetails}`,
+  );
+
+  const commandId = await queueDraftReply({
+    to: email,
+    senderName: distributorName,
+    subject: `Follow-up on USA Gummies sample`,
+    body: draft,
+    taskLabel: `Distributor follow-up: ${distributorName}`,
+  });
+
+  return `Queued distributor follow-up draft ${commandId} for ${distributorName}`;
+}
+
 async function executeTask(task: OperatorTaskRow): Promise<string> {
   switch (task.task_type) {
     case "qbo_categorize":
@@ -517,6 +756,14 @@ async function executeTask(task: OperatorTaskRow): Promise<string> {
       return executeAssignVendorTask(task);
     case "qbo_record_transaction":
       return executeRecordTransactionTask(task);
+    case "email_draft_response":
+      return executeEmailDraftResponseTask(task);
+    case "qbo_record_from_email":
+      return executeQBORecordFromEmailTask(task);
+    case "vendor_followup":
+      return executeVendorFollowupTask(task);
+    case "distributor_followup":
+      return executeDistributorFollowupTask(task);
     default:
       throw new Error(`Unsupported operator task type: ${task.task_type}`);
   }
@@ -538,7 +785,7 @@ export async function executeOperatorTasks(limit = 10): Promise<OperatorExecutio
     if (!task) continue;
 
     try {
-      if (task.requires_approval) {
+      if (task.requires_approval && !canPrepareApprovalTask(task)) {
         await failTask(task, "Task requires approval", "needs_approval");
         summary.needsApproval += 1;
         summary.results.push({

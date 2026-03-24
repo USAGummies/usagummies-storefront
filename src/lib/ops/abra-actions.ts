@@ -3339,6 +3339,24 @@ export async function proposeAction(action: AbraAction): Promise<string> {
   const abraAgentId = await resolveAbraAgentId();
   const mappedType = mapApprovalActionType(action.action_type);
 
+  // Dedup: check if an identical pending approval exists in the last 2 hours
+  try {
+    const dedupCutoff = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    const existingApprovals = (await sbFetch(
+      `/rest/v1/approvals?action_type=eq.${encodeURIComponent(mappedType)}&status=eq.pending&created_at=gte.${dedupCutoff}&select=id,summary&limit=5`,
+    )) as Array<{ id: string; summary: string }>;
+    const summary = action.description || action.title || "";
+    const existing = existingApprovals.find(
+      (a) => a.summary === summary,
+    );
+    if (existing) {
+      console.log(`[proposeAction] Dedup: found existing pending approval ${existing.id} for "${summary}"`);
+      return existing.id;
+    }
+  } catch {
+    // Dedup check failed — proceed to create new approval
+  }
+
   const rows = (await sbFetch("/rest/v1/approvals", {
     method: "POST",
     headers: {

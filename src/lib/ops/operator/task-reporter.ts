@@ -5,10 +5,20 @@ export type OperatorCycleSummary = {
   createdTasks: number;
   pendingTasks: number;
   detectorSummary: {
-    uncategorized: number;
-    missingVendors: number;
-    zeroRevenueAccounts: number;
-    unrecordedKnownTransactions: number;
+    qbo: {
+      uncategorized: number;
+      missingVendors: number;
+      zeroRevenueAccounts: number;
+      unrecordedKnownTransactions: number;
+    };
+    email: {
+      replyTasks: number;
+      qboEmailTasks: number;
+    };
+    pipeline: {
+      distributorFollowups: number;
+      vendorFollowups: number;
+    };
   };
   execution: OperatorExecutionSummary;
 };
@@ -37,7 +47,9 @@ export async function reportOperatorCycle(summary: OperatorCycleSummary): Promis
   const text = [
     `🤖 *Abra Operator Cycle* — ${new Date().toLocaleTimeString("en-US", { timeZone: "America/Los_Angeles", hour: "numeric", minute: "2-digit" })} PT`,
     "",
-    `*Detected:* ${summary.detectorSummary.uncategorized} uncategorized, ${summary.detectorSummary.missingVendors} missing vendors, ${summary.detectorSummary.zeroRevenueAccounts} zero-balance revenue accounts, ${summary.detectorSummary.unrecordedKnownTransactions} known transactions not yet in QBO`,
+    `*QBO:* ${summary.detectorSummary.qbo.uncategorized} uncategorized, ${summary.detectorSummary.qbo.missingVendors} missing vendors, ${summary.detectorSummary.qbo.zeroRevenueAccounts} zero-balance revenue accounts, ${summary.detectorSummary.qbo.unrecordedKnownTransactions} known transactions not yet in QBO`,
+    `*Email:* ${summary.detectorSummary.email.replyTasks} reply draft task(s), ${summary.detectorSummary.email.qboEmailTasks} QBO-from-email task(s)`,
+    `*Pipeline:* ${summary.detectorSummary.pipeline.distributorFollowups} distributor follow-up(s), ${summary.detectorSummary.pipeline.vendorFollowups} vendor follow-up(s)`,
     `*Queued:* ${summary.createdTasks} new operator task(s)`,
     `*Executed:* ${summary.execution.completed} completed, ${summary.execution.failed} failed, ${summary.execution.blocked} blocked, ${summary.execution.needsApproval} awaiting approval`,
     ...(summary.pendingTasks > 0 ? [`*Remaining Pending:* ${summary.pendingTasks}`] : []),

@@ -1,3 +1,5 @@
+import { detectEmailOperatorGaps } from "@/lib/ops/operator/gap-detectors/email";
+import { detectPipelineOperatorGaps } from "@/lib/ops/operator/gap-detectors/pipeline";
 import { detectQBOOperatorGaps } from "@/lib/ops/operator/gap-detectors/qbo";
 import { createOperatorTasks, executeOperatorTasks } from "@/lib/ops/operator/task-executor";
 import { reportOperatorCycle } from "@/lib/ops/operator/task-reporter";
@@ -6,10 +8,20 @@ export type OperatorLoopResult = {
   createdTasks: number;
   pendingTasks: number;
   detectorSummary: {
-    uncategorized: number;
-    missingVendors: number;
-    zeroRevenueAccounts: number;
-    unrecordedKnownTransactions: number;
+    qbo: {
+      uncategorized: number;
+      missingVendors: number;
+      zeroRevenueAccounts: number;
+      unrecordedKnownTransactions: number;
+    };
+    email: {
+      replyTasks: number;
+      qboEmailTasks: number;
+    };
+    pipeline: {
+      distributorFollowups: number;
+      vendorFollowups: number;
+    };
   };
   execution: {
     scanned: number;
@@ -65,15 +77,27 @@ async function getPendingCount(): Promise<number> {
 }
 
 export async function runOperatorLoop(): Promise<OperatorLoopResult> {
-  const detected = await detectQBOOperatorGaps();
-  const createdTasks = await createOperatorTasks(detected.tasks);
+  const [qbo, email, pipeline] = await Promise.all([
+    detectQBOOperatorGaps(),
+    detectEmailOperatorGaps(),
+    detectPipelineOperatorGaps(),
+  ]);
+  const createdTasks = await createOperatorTasks([
+    ...qbo.tasks,
+    ...email.tasks,
+    ...pipeline.tasks,
+  ]);
   const execution = await executeOperatorTasks(12);
   const pendingTasks = await getPendingCount();
 
   const result: OperatorLoopResult = {
     createdTasks,
     pendingTasks,
-    detectorSummary: detected.summary,
+    detectorSummary: {
+      qbo: qbo.summary,
+      email: email.summary,
+      pipeline: pipeline.summary,
+    },
     execution,
   };
 

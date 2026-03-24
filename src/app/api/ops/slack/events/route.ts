@@ -292,7 +292,11 @@ export async function POST(req: Request) {
       let thinkingTs: string | null = null;
       let stillThinkingTimer: ReturnType<typeof setTimeout> | null = null;
 
-      if (isLikelySlowQuery(messageText)) {
+      // AUTO_RESPOND channels ALWAYS get a thinking message — Rene should never see silence
+      const AUTO_RESPOND_CHANNELS = new Set(["C0AKG9FSC2J"]);
+      const alwaysAck = AUTO_RESPOND_CHANNELS.has(channel);
+
+      if (alwaysAck || isLikelySlowQuery(messageText)) {
         thinkingTs = await postSlackThinkingMessage(channel, rootThreadTs);
 
         if (thinkingTs) {
