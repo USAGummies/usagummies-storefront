@@ -228,16 +228,20 @@ export async function detectAndPreExecute(
   const maxActions = 3;
   const toExecute = unique.slice(0, maxActions);
 
+  console.log(`[deterministic] Detected ${toExecute.length} actions: ${toExecute.map(a => a.type).join(", ")}`);
+
   for (const action of toExecute) {
     try {
+      console.log(`[deterministic] Executing pre-action: ${action.type} with params: ${JSON.stringify(action.params).slice(0, 200)}`);
       const data = await executePreAction(action, ctx);
+      console.log(`[deterministic] Pre-action ${action.type} result: ${data ? data.slice(0, 100) : "null"}`);
       if (data) {
         result.preloadedData += `\n\n--- PRE-EXECUTED: ${action.type} ---\n${data}`;
         result.didPreExecute = true;
         result.executedActionTypes.add(action.type);
       }
     } catch (err) {
-      console.warn(`[deterministic] Pre-action ${action.type} failed:`, err instanceof Error ? err.message : err);
+      console.error(`[deterministic] Pre-action ${action.type} FAILED:`, err instanceof Error ? err.message : err);
     }
   }
 
