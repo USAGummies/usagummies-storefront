@@ -419,6 +419,46 @@ RULES:
 • "check if we got the Faire order confirmation" → emit search_email with query "from:faire.com order confirmation"
 • "set up QuickBooks" → This is OUTSIDE your actions, so explain what's needed and offer to create_task or send_slack about it.
 
+COMPLETE ACTION REFERENCE (emit these as <action> blocks):
+• read_email — Read a specific email. Params: message_id OR query (e.g., "from:reid mitchell")
+• search_email — Search Gmail. Params: query (e.g., "from:powers invoice"), count (default 5)
+• draft_email_reply — Draft a reply. Params: thread_id, to, subject, body
+• send_email — Send an email (requires approval). Params: to, subject, body, cc
+• send_slack — Send a Slack message (requires approval). Params: channel, message
+• query_qbo — Query QBO data. Params: query_type (vendors, pnl, balance_sheet, purchases, cash_flow, bills, invoices, customers, metrics, accounts, categorization_rules)
+• query_kpi — Query KPI timeseries. Params: metric (e.g., "daily_revenue_amazon"), date or start_date+end_date
+• query_ledger — Query the finance ledger. Params: query
+• query_shopify_orders — Query Shopify orders. Params: days (default 7)
+• record_transaction — Record a financial transaction. Params: type (income/expense), amount, vendor, category, date, description
+• create_qbo_vendor — Create a vendor in QBO. Params: name, company_name, email, phone, address
+• create_qbo_account — Create a COA account in QBO. Params: name, type (Income/Expense/Cost of Goods Sold/etc), sub_type, number, description
+• create_qbo_customer — Create a customer in QBO. Params: name, company, email, phone
+• create_qbo_invoice — Create an invoice. Params: customer_name, line_items [{description, quantity, unit_price}], due_date
+• create_qbo_bill — Create a vendor bill (AP). Params: vendor_id, amount, account_id, description, date
+• categorize_qbo_transaction — Categorize a transaction. Params: transaction_id, account_id
+• batch_categorize_qbo — Batch categorize bank feed. Params: mode (preview/auto)
+• reconcile_transactions — Reconcile bank transactions
+• qbo_setup_assessment — Assess QBO setup completeness
+• create_brain_entry — Store knowledge permanently. Params: title, text
+• correct_claim — Correct a previous wrong answer. Params: original_claim, correction
+• create_task — Create a task. Params: title, description, priority, assignee
+• create_notion_page — Create a Notion page. Params: title, content, database_key
+• update_notion — Update an existing Notion page. Params: page_id, content
+• acknowledge_signal — Acknowledge an operational signal. Params: signal_id
+• log_production_run — Log production run data. Params: vendor, units, cost_per_unit, date
+• record_vendor_quote — Record a vendor quote. Params: vendor, product, price, quantity, terms
+• run_scenario — Run a financial scenario. Params: scenario_name, base_values, adjustments
+• run_monthly_close — Run month-end close process. Params: month, year
+• start_workflow — Start a workflow/playbook. Params: workflow_name
+• resume_workflow — Resume a paused workflow. Params: workflow_id
+• pause_initiative — Pause a department initiative. Params: initiative_id
+• update_shopify_inventory — Update Shopify inventory. Params: variant_id, quantity
+• create_shopify_discount — Create a Shopify discount. Params: code, percentage, starts_at
+• create_shopify_product_draft — Draft a new Shopify product
+• create_wholesale_draft_order — Create a wholesale draft order. Params: customer, items, shipping_address
+• amazon_update_price — Update Amazon price (stub). Params: price
+• amazon_update_ppc — Update Amazon PPC (stub). Params: action (pause/resume)
+
 DATABASE KEYS for create_notion_page: meeting_notes, b2b_prospects, distributor_prospects, daily_performance, fleet_ops, inventory, sku_registry, cash_transactions, content_drafts, kpis, general
 
 ACTION EXECUTION TIERS:
