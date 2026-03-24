@@ -2506,14 +2506,22 @@ export async function POST(req: Request) {
 
     // ── Force email reading when Claude says "reading" but doesn't emit read_email ──
     const emailActionHandled = actionNotices.some(n => n.includes("read_email") || n.includes("search_email") || n.includes("Email"));
-    const wantsEmailRead = /\b(read|check|pull|show|get|find)\b.*\b(email|inbox|mail|message)\b/i.test(message);
+    const wantsEmailRead = /\b(read|check|pull|show|get|find)\b.*\b(emails?|inbox|mail|messages?)\b/i.test(message);
     if (wantsEmailRead && !emailActionHandled && actionNotices.length === 0) {
       try {
-        // Extract who to search for, or default to recent
+        // Extract who to search for, or default to recent inbox
         const fromMatch = /\b(?:from|by)\s+(\w+(?:\s+\w+)?)/i.exec(message);
-        const searchQuery = fromMatch ? `from:${fromMatch[1]}` : "is:inbox";
-        const countMatch = /\b(\d+)\s+email/i.exec(message);
-        const count = countMatch ? parseInt(countMatch[1], 10) : 5;
+        const countMatch = /\b(\d+)\s+emails?\b/i.exec(message);
+        const count = countMatch ? Math.min(parseInt(countMatch[1], 10), 10) : 5;
+        // Build search query — use "newer_than:1d" for recent emails, "from:X" for specific sender
+        let searchQuery: string;
+        if (fromMatch) {
+          searchQuery = `from:${fromMatch[1]}`;
+        } else if (/\b(today|recent|latest|last|new|unread)\b/i.test(message)) {
+          searchQuery = "newer_than:1d";
+        } else {
+          searchQuery = "newer_than:2d";
+        }
         const forcedEmailXml = `<action>{"action_type":"search_email","title":"Search Email","description":"Auto-forced email search","department":"operations","risk_level":"low","params":{"query":"${searchQuery}","count":${count}}}</action>`;
         const emailResult = await executeActions(forcedEmailXml, {
           slackChannelId: slackChannelId || undefined,
