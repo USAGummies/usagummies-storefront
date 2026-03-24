@@ -159,9 +159,39 @@ async function verifySlackSignature(req: Request, rawBody: string): Promise<bool
   return mismatch === 0;
 }
 
+// ── Event deduplication: prevent duplicate processing on Slack retries ──
+const processedEvents = new Set<string>();
+const DEDUP_MAX_SIZE = 500;
+
+function isDuplicate(eventId: string): boolean {
+  if (!eventId) return false;
+  if (processedEvents.has(eventId)) return true;
+  processedEvents.add(eventId);
+  // Prevent memory leak — trim oldest entries when set gets too large
+  if (processedEvents.size > DEDUP_MAX_SIZE) {
+    const first = processedEvents.values().next().value;
+    if (first) processedEvents.delete(first);
+  }
+  return false;
+}
+
 export async function POST(req: Request) {
+  // Reject Slack retries immediately
+  const retryNum = req.headers.get("x-slack-retry-num");
+  if (retryNum) {
+    console.log(`[slack-monitor] Skipping Slack retry #${retryNum}`);
+    return NextResponse.json({ ok: true });
+  }
+
   const rawBody = await req.text();
   const body = JSON.parse(rawBody);
+
+  // Deduplicate by event_id
+  const eventId = body?.event_id || body?.event?.event_ts || "";
+  if (isDuplicate(eventId)) {
+    console.log(`[slack-monitor] Duplicate event ${eventId}, skipping`);
+    return NextResponse.json({ ok: true });
+  }
 
   // Handle Slack URL verification challenge (skip sig check — Slack sends this during setup)
   if (body.type === "url_verification") {
