@@ -92,8 +92,9 @@ export async function executeActions(
       const perActionTimeout = remainingMs != null
         ? Math.min(PER_ACTION_TIMEOUT_MS, Math.max(1000, remainingMs - 2000))
         : PER_ACTION_TIMEOUT_MS;
-      // Track this action in the task queue
-      const taskId = await queueTask({
+      // Track this action in the task queue — declared outside try so catch can access it
+      let taskId: string | null = null;
+      taskId = await queueTask({
         task_type: "action_execution",
         description: directive.action.description || directive.action.title || directive.action.action_type,
         action_type: directive.action.action_type,

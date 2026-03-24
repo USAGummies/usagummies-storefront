@@ -727,9 +727,45 @@ Rules:
   }
 }
 
+const BEN_SLACK_USER_ID = "U08JY86Q508";
+
 export async function sendMorningBrief(): Promise<void> {
   const brief = await generateLLMMorningBrief();
-  await notify({ channel: "daily", text: brief });
+
+  // DM the morning brief to Ben only — not to any channel
+  const botToken = process.env.SLACK_BOT_TOKEN;
+  if (botToken) {
+    try {
+      // Open DM channel with Ben
+      const dmRes = await fetch("https://slack.com/api/conversations.open", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${botToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ users: BEN_SLACK_USER_ID }),
+        signal: AbortSignal.timeout(5000),
+      });
+      const dmData = (await dmRes.json()) as { ok: boolean; channel?: { id: string } };
+      if (dmData.ok && dmData.channel?.id) {
+        await fetch("https://slack.com/api/chat.postMessage", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${botToken}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            channel: dmData.channel.id,
+            text: `☀️ *Morning Brief*\n\n${brief}`,
+            mrkdwn: true,
+          }),
+          signal: AbortSignal.timeout(10000),
+        });
+        console.log("[morning-brief] DM sent to Ben");
+      }
+    } catch (err) {
+      console.warn("[morning-brief] Ben DM failed, falling back to channel:", err instanceof Error ? err.message : err);
+      // Fallback to channel if DM fails
+      await notify({ channel: "daily", text: brief });
+    }
+  } else {
+    // No bot token — use webhook fallback
+    await notify({ channel: "daily", text: brief });
+  }
 
   // Send Rene a finance-focused DM
   try {

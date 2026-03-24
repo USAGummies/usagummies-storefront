@@ -107,10 +107,10 @@ export async function recordKPI(params: {
   const newPriority = SOURCE_PRIORITY[params.source_system || inferSource(params.metric_name)] || 2;
 
   try {
-    const existing = await sbFetch<Array<{ source_system: string }>>(
+    const existing = (await sbFetch(
       `/rest/v1/kpi_timeseries?metric_name=eq.${encodeURIComponent(params.metric_name)}&captured_for_date=eq.${capturedForDate}&window_type=eq.daily&select=source_system`,
-    );
-    if (existing && existing.length > 0) {
+    )) as Array<{ source_system: string }> | null;
+    if (existing && Array.isArray(existing) && existing.length > 0) {
       const existingPriority = SOURCE_PRIORITY[existing[0].source_system] || 2;
       // Only overwrite if new source is same or higher priority
       if (newPriority < existingPriority) {
