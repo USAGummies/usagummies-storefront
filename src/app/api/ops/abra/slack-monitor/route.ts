@@ -1,4 +1,26 @@
 /**
+ * Download a Slack file (requires bot token auth) and return as base64.
+ */
+async function downloadSlackImage(
+  url: string,
+  botToken: string,
+): Promise<{ base64: string; mediaType: string } | null> {
+  try {
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${botToken}` },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return null;
+    const buffer = await res.arrayBuffer();
+    const base64 = Buffer.from(buffer).toString("base64");
+    const contentType = res.headers.get("content-type") || "image/png";
+    return { base64, mediaType: contentType };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * POST /api/ops/abra/slack-monitor — Slack Events API webhook
  *
  * Monitors Slack channels for:
@@ -169,7 +191,22 @@ export async function POST(req: Request) {
       const channelId = event.channel;
       const threadTs = event.thread_ts || event.ts;
 
-      if (!text) {
+      // ── Extract image attachments from Slack files ──
+      const imageFiles: Array<{ url: string; mimetype: string; name: string }> = [];
+      if (Array.isArray(event.files)) {
+        for (const file of event.files) {
+          const mime = file.mimetype || "";
+          if (mime.startsWith("image/") && file.url_private) {
+            imageFiles.push({
+              url: file.url_private,
+              mimetype: mime,
+              name: file.name || "image",
+            });
+          }
+        }
+      }
+
+      if (!text && imageFiles.length === 0) {
         return NextResponse.json({ ok: true });
       }
 
@@ -359,6 +396,16 @@ export async function POST(req: Request) {
                 });
               }
             } else {
+              // Download any attached images for vision
+              let imageData: Array<{ base64: string; mediaType: string }> | undefined;
+              if (imageFiles.length > 0 && botToken) {
+                const downloaded = await Promise.all(
+                  imageFiles.slice(0, 3).map((f) => downloadSlackImage(f.url, botToken)),
+                );
+                const valid = downloaded.filter(Boolean) as Array<{ base64: string; mediaType: string }>;
+                if (valid.length > 0) imageData = valid;
+              }
+
               // Single question — normal flow
               const chatRes = await fetch(`${host}/api/ops/abra/chat`, {
                 method: "POST",
@@ -367,13 +414,14 @@ export async function POST(req: Request) {
                   Authorization: `Bearer ${cronSecret}`,
                 },
                 body: JSON.stringify({
-                  message: text,
+                  message: text || "Describe what you see in this image.",
                   history: threadHistory,
                   channel: "slack",
                   slack_channel_id: channelId,
                   slack_thread_ts: threadTs,
                   actor_label: event.user || undefined,
                   actor_context: actorCtx,
+                  ...(imageData ? { images: imageData } : {}),
                 }),
                 signal: AbortSignal.timeout(55000),
               });

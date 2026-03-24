@@ -264,6 +264,7 @@ async function generateClaudeReply(input: {
   isFinanceRelated?: boolean;
   actorContext?: string | null;
   domainContext?: string;
+  images?: Array<{ base64: string; mediaType: string }>;
 }): Promise<{
   reply: string;
   modelUsed: string;
@@ -533,7 +534,24 @@ MARGIN & COST CLAIM VERIFICATION (applies when user asserts financial metrics):
       max_tokens: maxTokens,
       temperature: 0.2,
       system: `${actionInstructions}\n\n${systemPrompt}${input.domainContext ? `\n\n${input.domainContext}` : ""}${needsEmailExtractionSkill(input.message) ? `\n\n${EMAIL_EXTRACTION_SKILL.prompt}` : ""}${needsDealCalculatorSkill(input.message) ? `\n\n${DEAL_CALCULATOR_SKILL.prompt}` : ""}`,
-      messages: [{ role: "user", content: userPrompt }],
+      messages: [{
+        role: "user",
+        content: input.images && input.images.length > 0
+          ? [
+              // Include images first so Claude sees them
+              ...input.images.map((img) => ({
+                type: "image" as const,
+                source: {
+                  type: "base64" as const,
+                  media_type: img.mediaType as "image/png" | "image/jpeg" | "image/gif" | "image/webp",
+                  data: img.base64,
+                },
+              })),
+              // Then the text prompt
+              { type: "text" as const, text: userPrompt },
+            ]
+          : userPrompt,
+      }],
     }),
     signal: llmAbort.signal,
   });
@@ -623,6 +641,7 @@ export async function POST(req: Request) {
     channel?: unknown;
     slack_channel_id?: unknown;
     slack_thread_ts?: unknown;
+    images?: unknown;
   } = {};
   let uploadedFileContext = "";
   let uploadedFileName = "";
@@ -2171,6 +2190,10 @@ export async function POST(req: Request) {
       isFinanceRelated: isFinanceQuestion(message),
       actorContext,
       domainContext,
+      // Pass images from Slack for vision support
+      images: Array.isArray(payload.images)
+        ? (payload.images as Array<{ base64: string; mediaType: string }>)
+        : undefined,
     });
     // Track Anthropic API success in capability registry
     void capMarkSuccess("anthropic").catch(() => {});
