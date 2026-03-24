@@ -95,22 +95,26 @@ export async function runEmailSweep(): Promise<EmailSweepResult> {
     noise,
   };
 
-  if (result.scanned > 0 || result.actionable > 0) {
-    const summary = [
-      `📬 Email sweep: ${result.scanned} scanned`,
-      result.urgent > 0 ? `${result.urgent} urgent` : null,
-      result.actionable > 0 ? `${result.actionable} actionable` : null,
-      result.commands > 0 ? `${result.commands} Abra commands` : null,
-      result.noise > 0 ? `${result.noise} likely noise` : null,
-    ]
-      .filter(Boolean)
-      .join(", ");
+  // Only notify Slack when there's something actionable — not just "X scanned"
+  if (result.urgent > 0 || result.actionable > 0 || result.commands > 0) {
+    const parts: string[] = [];
+    if (result.urgent > 0) parts.push(`🔴 ${result.urgent} urgent email(s) need attention`);
+    if (result.actionable > 0) parts.push(`📋 ${result.actionable} actionable email(s)`);
+    if (result.commands > 0) parts.push(`🤖 ${result.commands} Abra command(s) detected`);
+    // Include actionable email details if available
+    const actionableDetails = actionable.slice(0, 3).map((e) => {
+      const from = typeof e === "object" && e !== null ? (e as Record<string, unknown>).from || (e as Record<string, unknown>).sender || "" : "";
+      const subject = typeof e === "object" && e !== null ? (e as Record<string, unknown>).subject || "" : "";
+      return `  • ${from}: ${subject}`;
+    }).filter((s) => s.length > 6);
+    const message = parts.join("\n") + (actionableDetails.length > 0 ? "\n" + actionableDetails.join("\n") : "");
     await proactiveMessage({
       target: "channel",
       channelOrUserId: process.env.SLACK_CHANNEL_ALERTS || "C0ALS6W7VB4",
-      message: summary,
+      message,
     }).catch(() => {});
   }
+  // Silent when only routine scans with no actionable items
 
   return result;
 }
