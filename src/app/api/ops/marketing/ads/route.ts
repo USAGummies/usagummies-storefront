@@ -152,7 +152,7 @@ async function syncPlatform(
         platform,
         configured: true,
         lastSynced: cached ? new Date(cached.cachedAt).toISOString() : null,
-        error: err instanceof Error ? err.message : String(err),
+        error: "Internal server error",
         campaignCount: (cached?.data || []).length,
       },
     };
@@ -294,7 +294,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, ...compute(campaigns, []) });
   } catch (err) {
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : String(err) },
+      { error: "Internal server error" },
       { status: 500 },
     );
   }

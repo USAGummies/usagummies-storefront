@@ -5,8 +5,6 @@ import { isCronAuthorized } from "@/lib/ops/abra-auth";
 import { runAllDueFeeds, runFeed } from "@/lib/ops/abra-auto-teach";
 import { detectAnomalies } from "@/lib/ops/abra-anomaly-detection";
 import { emitSignal } from "@/lib/ops/abra-operational-signals";
-import { escalateOverdueTasks } from "@/lib/ops/abra-task-queue";
-import { surfaceUnansweredEmails } from "@/lib/ops/sweeps/email-response-tracker";
 import { autoManageInitiatives } from "@/lib/ops/abra-initiative-health";
 import {
   notifyCloseReady,
@@ -18,9 +16,10 @@ import { runEmailFetch } from "@/lib/ops/abra-email-fetch";
 import { generateActionableEmailDrafts } from "@/lib/ops/abra-email-drafter";
 import { processFinancialBrainEntries } from "@/lib/ops/abra-financial-processor";
 import { learnFromSentMail } from "@/lib/ops/abra-sent-mail-learner";
+import { backfillNullEmbeddings } from "@/lib/ops/abra-embeddings";
 import { queryLedgerSummary } from "@/lib/ops/abra-notion-write";
 import { kv } from "@vercel/kv";
-import { appendStateArray, readState, writeState } from "@/lib/ops/state";
+import { appendStateArray, readState, writeState, acquireKVLock, releaseKVLock } from "@/lib/ops/state";
 import { notify } from "@/lib/ops/notify";
 import {
   sendWeeklyDigest,
@@ -74,41 +73,27 @@ type SchedulerLedgerEntry = {
 
 async function acquireSchedulerLock(): Promise<SchedulerLock | null> {
   const now = Date.now();
-  const current = await readState<SchedulerLock | null>(
-    "abra-scheduler-lock",
-    null,
-  );
-  if (
-    current &&
-    typeof current.expires_at === "string" &&
-    new Date(current.expires_at).getTime() > now
-  ) {
-    return null;
-  }
-
   const lock: SchedulerLock = {
     run_id: randomUUID(),
     started_at: new Date(now).toISOString(),
     expires_at: new Date(now + LOCK_TTL_MS).toISOString(),
   };
-  await writeState("abra-scheduler-lock", lock);
-  const verify = await readState<SchedulerLock | null>(
+  // Atomic lock: uses SET NX (set-if-not-exists) + PX (TTL) on Vercel KV.
+  // This is race-free — only one cold start can acquire the lock.
+  const acquired = await acquireKVLock(
     "abra-scheduler-lock",
-    null,
+    lock,
+    LOCK_TTL_MS,
   );
-  if (!verify || verify.run_id !== lock.run_id) {
-    return null;
-  }
+  if (!acquired) return null;
   return lock;
 }
 
 async function releaseSchedulerLock(runId: string): Promise<void> {
+  // Verify we still own the lock before releasing
   const current = await readState<SchedulerLock | null>("abra-scheduler-lock", null);
   if (!current || current.run_id !== runId) return;
-  await writeState("abra-scheduler-lock", {
-    ...current,
-    expires_at: new Date(Date.now() - 1000).toISOString(),
-  });
+  await releaseKVLock("abra-scheduler-lock");
 }
 
 async function runStep<T>(name: string, fn: () => Promise<T>): Promise<StepOutcome<T>> {
@@ -259,6 +244,12 @@ export async function POST(req: Request) {
     });
     outcomes.push(ledgerCacheStep);
 
+    // Backfill any brain entries that have NULL embeddings
+    const embeddingBackfillStep = await runStep("embedding_backfill", async () =>
+      backfillNullEmbeddings(20),
+    );
+    outcomes.push(embeddingBackfillStep);
+
     const monthlyCloseStep = await runStep("monthly_close", async () => {
       if (!inMorningWindow(nowPT) || nowPT.getDate() !== 3) {
         return { skipped: true, reason: "not_due" };
@@ -318,26 +309,6 @@ export async function POST(req: Request) {
       autoManageInitiatives(),
     );
     outcomes.push(initiativeStep);
-
-    // ── Task Queue: Escalate overdue tasks ──
-    const taskEscalationStep = await runStep("task_escalation", async () => {
-      return escalateOverdueTasks();
-    });
-    outcomes.push(taskEscalationStep);
-
-    // ── Email Response Tracker: Surface unanswered emails ──
-    const emailTrackerStep = await runStep("email_response_tracker", async () => {
-      await surfaceUnansweredEmails();
-      return "checked";
-    });
-    outcomes.push(emailTrackerStep);
-
-    // Backfill any brain entries missing embeddings
-    const embeddingStep = await runStep("embedding_backfill", async () => {
-      const { backfillMissingEmbeddings } = await import("@/lib/ops/abra-brain-writer");
-      return backfillMissingEmbeddings(30);
-    });
-    outcomes.push(embeddingStep);
 
     const notificationData = {
       morning_brief: false,
@@ -452,10 +423,10 @@ export async function POST(req: Request) {
         `🚨 *Abra Scheduler Fatal Error* (run ${lock.run_id})\n` +
         `• ${error instanceof Error ? error.message : "Scheduler cycle failed"}`,
     }).catch(() => {});
+    console.error("[scheduler] Fatal error:", error instanceof Error ? error.message : error);
     return NextResponse.json(
       {
-        error:
-          error instanceof Error ? error.message : "Scheduler cycle failed",
+        error: "Scheduler cycle failed",
         run_id: lock.run_id,
       },
       { status: 500 },

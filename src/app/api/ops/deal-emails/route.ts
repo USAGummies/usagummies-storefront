@@ -232,7 +232,7 @@ export async function GET(request: NextRequest) {
         threads: [],
         generatedAt: new Date().toISOString(),
         budget: null,
-        error: err instanceof Error ? err.message : String(err),
+        error: "Internal server error",
       },
       { status: 500 },
     );

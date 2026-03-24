@@ -112,7 +112,7 @@ export async function POST(req: Request) {
           postResults.push({
             platform,
             ok: false,
-            error: err instanceof Error ? err.message : String(err),
+            error: "Internal server error",
           });
         }
       }
@@ -149,7 +149,7 @@ export async function POST(req: Request) {
     });
   } catch (err) {
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : String(err) },
+      { error: "Internal server error" },
       { status: 500 },
     );
   }

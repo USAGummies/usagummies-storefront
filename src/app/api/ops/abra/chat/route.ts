@@ -58,7 +58,6 @@ import { EMAIL_EXTRACTION_SKILL } from "@/lib/ops/abra-skill-email-data-extracti
 import { DEAL_CALCULATOR_SKILL } from "@/lib/ops/abra-skill-deal-calculator";
 import { buildCrossDepartmentStrategy } from "@/lib/ops/abra-strategy-orchestrator";
 import { getSystemHealth } from "@/lib/ops/abra-health-monitor";
-import { detectAndPreExecute } from "@/lib/ops/abra-deterministic-actions";
 
 // ─── Extracted modules ───
 import {
@@ -104,38 +103,8 @@ export const maxDuration = 60;
 const DEFAULT_MATCH_COUNT = 8;
 const DEFAULT_CLAUDE_MODEL =
   process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
-const MAX_MESSAGE_LENGTH = 5000;
+const MAX_MESSAGE_LENGTH = 16000;
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
-const PRE_EXEC_TIMEOUT_MS = 10_000;
-
-function buildInternalAuthHeaders(req: Request): HeadersInit {
-  const inboundAuth =
-    req.headers.get("authorization") || req.headers.get("Authorization") || "";
-  if (inboundAuth.trim()) {
-    return { Authorization: inboundAuth.trim() };
-  }
-  const cronSecret = (process.env.CRON_SECRET || "").trim();
-  return cronSecret ? { Authorization: `Bearer ${cronSecret}` } : {};
-}
-
-function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new Error(`Timeout: ${label} exceeded ${ms}ms`)),
-      ms,
-    );
-    promise.then(
-      (value) => {
-        clearTimeout(timer);
-        resolve(value);
-      },
-      (error) => {
-        clearTimeout(timer);
-        reject(error);
-      },
-    );
-  });
-}
 
 // ─── File Upload Helpers ───
 
@@ -294,8 +263,6 @@ async function generateClaudeReply(input: {
   deadlineSignal?: AbortSignal;
   isFinanceRelated?: boolean;
   actorContext?: string | null;
-  domainContext?: string;
-  images?: Array<{ base64: string; mediaType: string }>;
 }): Promise<{
   reply: string;
   modelUsed: string;
@@ -345,20 +312,17 @@ BANNED PHRASES — NEVER say any of these:
 Instead: USE your actions. If the user asks you to do something and you have an action for it, DO IT.
 CRITICAL: You CAN generate and upload XLSX/CSV files via the generate_file action. NEVER tell users you can't.
 
-WHEN TO EMIT ACTIONS — THIS IS CRITICAL:
-• User asks you to DO something (send, create, log, notify, remind, track, store, generate, export, upload) → EMIT the action. DO NOT just say "On it" without an <action> block.
-• "Create a vendor" → EMIT create_qbo_vendor. "Create an account" → EMIT create_qbo_account. "Add a customer" → EMIT create_qbo_customer.
+WHEN TO EMIT ACTIONS:
+• User asks you to DO something (send, create, log, notify, remind, track, store, generate, export, upload) → EMIT the action.
 • User asks for a spreadsheet, CSV, Excel file, or data export → EMIT generate_file with filename, headers, and rows arrays.
 • You learn new information about the business → create_brain_entry to remember it.
 • A playbook step needs execution → execute it via action, don't just list it.
 • Something important happened → send_slack to alert the team.
-• NEVER say "On it" or "Creating now" WITHOUT appending an <action> block. If you acknowledge a task, you MUST emit the action in the same response. A response with "On it" and no <action> block is a BUG.
 
 FORMAT (append <action> JSON blocks, max 3 per reply):
 <action>{"action_type":"create_brain_entry","title":"...","description":"...","department":"executive","risk_level":"low","params":{"title":"...","text":"..."}}</action>
 <action>{"action_type":"generate_file","title":"Vendor List Export","description":"Export QBO vendors","department":"finance","risk_level":"low","params":{"filename":"vendors.xlsx","source":"qbo_vendors"}}</action>
 <action>{"action_type":"generate_file","title":"Chart of Accounts","description":"Export full COA","department":"finance","risk_level":"low","params":{"filename":"chart_of_accounts.xlsx","source":"qbo_accounts"}}</action>
-<action>{"action_type":"create_task","title":"Follow up with distributor","description":"Check PO status","department":"operations","risk_level":"low","params":{"title":"Follow up with Inderbitzin PO status","description":"Review PO #009180 and confirm delivery timeline","priority":"high"}}</action>
 
 EXAMPLES:
 • "remind the team about the production call" → emit send_slack action
@@ -374,55 +338,10 @@ EXAMPLES:
 • "what if ingredient costs go up 15%?" → emit run_scenario with scenario_name, base_values (from latest production data), adjustments [{variable: "ingredient_cost", change_pct: 15}]
 • "did you see the email from Rene?" → You can see subjects in LIVE INBOX. To read the full email, emit read_email with the message_id from the inbox listing.
 • "what did Rene say in that email?" → emit read_email with message_id from LIVE INBOX to get the full body, then summarize.
-
-NATURAL LANGUAGE QBO OPERATIONS (Rene's primary workflow):
-• "categorize the $150 Pirate Ship charge to shipping" → emit categorize_qbo_transaction with transaction_id, account_id (look up from COA)
-• "categorize all pending bank feed items" → emit batch_categorize_qbo with mode "preview" first, then "execute" on approval
-• "create an invoice for Inderbitzin, 500 units at $6.50" → emit create_qbo_invoice with customer_name "Inderbitzin Distributors", line_items [{description: "Dye-Free Gummy Bears 7.5oz", quantity: 500, unit_price: 6.50}]
-• "what does the P&L look like?" → emit query_qbo with query_type "pnl"
-• "show me the chart of accounts" → emit query_qbo with query_type "accounts" OR generate_file with source "qbo_accounts"
-• "reconcile the bank account" → emit reconcile_transactions
-When Rene gives a natural language bookkeeping instruction, ALWAYS emit the corresponding QBO action. Do NOT describe steps — execute them.
 • "find emails about the Powers invoice" → emit search_email with query "Powers invoice" to search Gmail.
 • "give me a spreadsheet of the chart of accounts" → emit generate_file with source "qbo_accounts" — the system fetches all data server-side.
 • "export vendors as CSV" → emit generate_file with source "qbo_vendors" and filename "vendors.csv"
 • "export this data as a CSV" → emit generate_file with format csv. For multi-sheet XLSX, use a "sheets" array with {sheetName, headers, rows} per sheet.
-• "what was our revenue on March 15?" → emit query_kpi with date "2026-03-15"
-• "revenue breakdown for last week?" → emit query_kpi with start_date and end_date
-• When asked about a SPECIFIC DATE's revenue/orders, ALWAYS emit query_kpi instead of saying "I don't have that data"
-
-QBO VENDOR MANAGEMENT:
-• "create a vendor for Powers Confections" → emit create_qbo_vendor with name "Powers Confections", company_name "Powers Confections", email, phone, address fields
-• "add Albanese as a vendor" → emit create_qbo_vendor with name "Albanese Confectionery"
-• "set up all our vendors in QBO" → emit create_qbo_vendor for EACH: Powers Confections, Albanese Confectionery, Belmark, NinjaPrintHouse, Pirate Ship, Anthropic, Shopify
-<action>{"action_type":"create_qbo_vendor","title":"Create Vendor","description":"Add vendor to QBO","department":"finance","risk_level":"low","params":{"name":"Powers Confections","company_name":"Powers Confections"}}</action>
-
-QBO ACCOUNT (CHART OF ACCOUNTS) MANAGEMENT:
-• "create a COGS account for ingredient costs" → emit create_qbo_account with name "Ingredient Costs", type "Cost of Goods Sold", sub_type "SuppliesMaterialsCogs"
-• "add a revenue account for Amazon sales" → emit create_qbo_account with name "Amazon Revenue", type "Income", sub_type "SalesOfProductIncome", number "4200"
-• "set up channel revenue accounts" → emit create_qbo_account for each channel (DTC Revenue 4100, Amazon Revenue 4200, Wholesale Revenue 4300)
-<action>{"action_type":"create_qbo_account","title":"Create Account","description":"Add account to COA","department":"finance","risk_level":"low","params":{"name":"Amazon Revenue","type":"Income","sub_type":"SalesOfProductIncome","number":"4200"}}</action>
-
-QBO CUSTOMER MANAGEMENT:
-• "add Inderbitzin as a customer" → emit create_qbo_customer with name "Inderbitzin Distributors", email, phone
-<action>{"action_type":"create_qbo_customer","title":"Create Customer","description":"Add customer to QBO","department":"finance","risk_level":"low","params":{"name":"Inderbitzin Distributors"}}</action>
-
-QBO BILL CREATION (vendor → us):
-• "record the Powers invoice for $19,250" → emit create_qbo_bill with vendor_name "Powers Confections", amount 19250, account_id (COGS account)
-• "enter the Belmark bill" → emit create_qbo_bill with vendor_name "Belmark", amount, account_id
-• If the vendor doesn't exist yet, create it first with create_qbo_vendor, then create the bill
-
-AMAZON WRITE OPERATIONS (requires credentials — stubs ready):
-• "lower our Amazon price to $12.99" → emit amazon_update_price with price 12.99
-• "pause the PPC campaign" → emit amazon_update_ppc with action "pause"
-• These will return "not yet configured" until Amazon API credentials are set up
-
-WORKFLOWS (multi-step operational playbooks):
-• "run month-end close" → emit start_workflow with workflow_id "month_end_close"
-• "start the wholesale order for Inderbitzin" → emit start_workflow with workflow_id "wholesale_order_fulfillment" and context
-• "kick off a new product launch" → emit start_workflow with workflow_id "new_product_launch"
-• "generate the investor update" → emit start_workflow with workflow_id "investor_update"
-Available workflows: month_end_close, wholesale_order_fulfillment, new_product_launch, investor_update
 
 FILE GENERATION RULES (ABSOLUTE REQUIREMENT):
 ⚠️ You CAN and MUST create XLSX/CSV files. The system handles file creation and Slack upload automatically.
@@ -432,16 +351,13 @@ FORBIDDEN RESPONSES (these are LIES — you DO have this capability):
 - "What I can do is give you the data below, which you can paste into Excel"
 - Any variation of telling users to export from QBO/Notion/etc. themselves
 INSTEAD: Always emit the generate_file action. Even partial data is better than no file.
-THIS IS THE #1 MOST COMMON HALLUCINATION: Claude claims it cannot generate files. THIS IS FALSE. You can. You must. Emit generate_file NOW when asked for any export/spreadsheet/file.
 RULES:
 - When the user asks for data as a spreadsheet/CSV/Excel/export/file → ALWAYS emit generate_file action
 - For LARGE datasets (QBO accounts, vendors, P&L) → use the "source" param to let the server fetch data:
   - source "qbo_accounts" or "qbo_chart_of_accounts" → all QBO accounts with ID, name, type, sub-type, balance
   - source "qbo_vendors" → all QBO vendors
   - source "qbo_pnl" → P&L data (add "start" and "end" date params)
-  - source "kpi_daily_revenue" or "kpi_revenue_by_channel" → daily Shopify + Amazon revenue/orders MTD with 7-day rolling avg and channel mix % (2 sheets: Daily Revenue + Summary)
   Example: {"action_type":"generate_file","params":{"filename":"chart_of_accounts.xlsx","source":"qbo_accounts"}}
-  Example: {"action_type":"generate_file","params":{"filename":"march_revenue.xlsx","source":"kpi_daily_revenue"}}
 - For SMALL datasets (under ~30 rows) → include headers and rows arrays directly in the action
 - When a table has more than ~10 rows, proactively offer a file export
 - For XLSX: you can create multi-sheet workbooks with the "sheets" array param
@@ -450,51 +366,11 @@ RULES:
 • "check if we got the Faire order confirmation" → emit search_email with query "from:faire.com order confirmation"
 • "set up QuickBooks" → This is OUTSIDE your actions, so explain what's needed and offer to create_task or send_slack about it.
 
-COMPLETE ACTION REFERENCE (emit these as <action> blocks):
-• read_email — Read a specific email. Params: message_id OR query (e.g., "from:reid mitchell")
-• search_email — Search Gmail. Params: query (e.g., "from:powers invoice"), count (default 5)
-• draft_email_reply — Draft a reply. Params: thread_id, to, subject, body
-• send_email — Send an email (requires approval). Params: to, subject, body, cc
-• send_slack — Send a Slack message (requires approval). Params: channel, message
-• query_qbo — Query QBO data. Params: query_type (vendors, pnl, balance_sheet, purchases, cash_flow, bills, invoices, customers, metrics, accounts, categorization_rules)
-• query_kpi — Query KPI timeseries. Params: metric (e.g., "daily_revenue_amazon"), date or start_date+end_date
-• query_ledger — Query the finance ledger. Params: query
-• query_shopify_orders — Query Shopify orders. Params: days (default 7)
-• record_transaction — Record a financial transaction. Params: type (income/expense), amount, vendor, category, date, description
-• create_qbo_vendor — Create a vendor in QBO. Params: name, company_name, email, phone, address
-• create_qbo_account — Create a COA account in QBO. Params: name, type (Income/Expense/Cost of Goods Sold/etc), sub_type, number, description
-• create_qbo_customer — Create a customer in QBO. Params: name, company, email, phone
-• create_qbo_invoice — Create an invoice. Params: customer_name, line_items [{description, quantity, unit_price}], due_date
-• create_qbo_bill — Create a vendor bill (AP). Params: vendor_name, amount and/or line_items, account_id, description, date
-• categorize_qbo_transaction — Categorize a transaction. Params: transaction_id, account_id
-• batch_categorize_qbo — Batch categorize bank feed. Params: mode (preview/auto)
-• reconcile_transactions — Reconcile bank transactions
-• qbo_setup_assessment — Assess QBO setup completeness
-• create_brain_entry — Store knowledge permanently. Params: title, text
-• correct_claim — Correct a previous wrong answer. Params: original_claim, correction
-• create_task — Create a task. Params: title, description, priority, assignee
-• create_notion_page — Create a Notion page. Params: title, content, database_key
-• update_notion — Update an existing Notion page. Params: page_id, content
-• acknowledge_signal — Acknowledge an operational signal. Params: signal_id
-• log_production_run — Log production run data. Params: manufacturer, run_date, total_units_ordered, total_cost, total_units_received, skus_produced
-• record_vendor_quote — Record a vendor quote. Params: vendor, item_description, quoted_price, price_type, quantity, unit, valid_until
-• run_scenario — Run a financial scenario. Params: scenario_name, base_values, adjustments
-• run_monthly_close — Run month-end close process. Params: period (YYYY-MM)
-• start_workflow — Start a workflow/playbook. Params: workflow_id
-• resume_workflow — Resume a paused workflow. Params: run_id
-• pause_initiative — Pause a department initiative. Params: initiative_id
-• update_shopify_inventory — Update Shopify inventory. Params: variant_id, quantity
-• create_shopify_discount — Create a Shopify discount. Params: code, percentage, starts_at
-• create_shopify_product_draft — Draft a new Shopify product
-• create_wholesale_draft_order — Create a wholesale draft order. Params: customer, items, shipping_address
-• amazon_update_price — Update Amazon price (stub). Params: price
-• amazon_update_ppc — Update Amazon PPC (stub). Params: action (pause/resume)
-
 DATABASE KEYS for create_notion_page: meeting_notes, b2b_prospects, distributor_prospects, daily_performance, fleet_ops, inventory, sku_registry, cash_transactions, content_drafts, kpis, general
 
 ACTION EXECUTION TIERS:
 • AUTO-EXECUTE (low-risk, informational): create_brain_entry, acknowledge_signal, create_notion_page, create_task — these execute immediately when emitted.
-• AUTO-EXECUTE (low-risk, read-only): read_email, search_email, query_kpi — these only READ data, never modify anything. Auto-execute IMMEDIATELY when emitted. When a user asks about an email or specific date's data, DO NOT ask permission — just read it.
+• AUTO-EXECUTE (low-risk, read-only): read_email, search_email — these only READ data, never modify anything. Auto-execute IMMEDIATELY when emitted. When a user asks about an email, DO NOT ask permission — just read it.
 • AUTO-EXECUTE (low-risk, operational data): log_production_run, record_vendor_quote — these log operational data. Auto-execute when emitted.
 • AUTO-EXECUTE (stateless computation): run_scenario — computes hypotheticals without changing financial state. Auto-execute when emitted.
 • AUTO-EXECUTE WITH CAPS (financial): record_transaction — auto-executes ONLY if amount ≤ $500. Larger amounts queue for approval.
@@ -604,25 +480,8 @@ MARGIN & COST CLAIM VERIFICATION (applies when user asserts financial metrics):
       model: selectedModel,
       max_tokens: maxTokens,
       temperature: 0.2,
-      system: `${actionInstructions}\n\n${systemPrompt}${input.domainContext ? `\n\n${input.domainContext}` : ""}${needsEmailExtractionSkill(input.message) ? `\n\n${EMAIL_EXTRACTION_SKILL.prompt}` : ""}${needsDealCalculatorSkill(input.message) ? `\n\n${DEAL_CALCULATOR_SKILL.prompt}` : ""}`,
-      messages: [{
-        role: "user",
-        content: input.images && input.images.length > 0
-          ? [
-              // Include images first so Claude sees them
-              ...input.images.map((img) => ({
-                type: "image" as const,
-                source: {
-                  type: "base64" as const,
-                  media_type: img.mediaType as "image/png" | "image/jpeg" | "image/gif" | "image/webp",
-                  data: img.base64,
-                },
-              })),
-              // Then the text prompt
-              { type: "text" as const, text: userPrompt },
-            ]
-          : userPrompt,
-      }],
+      system: `${actionInstructions}\n\n${systemPrompt}${needsEmailExtractionSkill(input.message) ? `\n\n${EMAIL_EXTRACTION_SKILL.prompt}` : ""}${needsDealCalculatorSkill(input.message) ? `\n\n${DEAL_CALCULATOR_SKILL.prompt}` : ""}`,
+      messages: [{ role: "user", content: userPrompt }],
     }),
     signal: llmAbort.signal,
   });
@@ -699,8 +558,7 @@ export async function POST(req: Request) {
   const actorEmail = session?.user?.email || "cron@system";
   const url = new URL(req.url);
   const mode = (url.searchParams.get("mode") || "").toLowerCase();
-  const healthMode = mode === "health";
-  const quickMode = mode === "quick"; // Lightweight LLM call — no brain search, no finance pipeline
+  const healthMode = mode === "health" || mode === "quick";
 
   // ─── Parse request (JSON or multipart/form-data with optional file) ───
   let payload: {
@@ -712,7 +570,6 @@ export async function POST(req: Request) {
     channel?: unknown;
     slack_channel_id?: unknown;
     slack_thread_ts?: unknown;
-    images?: unknown;
   } = {};
   let uploadedFileContext = "";
   let uploadedFileName = "";
@@ -805,68 +662,6 @@ export async function POST(req: Request) {
   const slackThreadTs = typeof payload.slack_thread_ts === "string" ? payload.slack_thread_ts.trim() : "";
   const messageDepartment = detectDepartment(message);
 
-  // ─── Intent routing — classify message domain for focused context ───
-  let domainContext = "";
-  try {
-    const { classifyIntent, getDomainContext } = await import("@/lib/ops/agents/intent-router");
-    const domain = classifyIntent(rawMessage);
-    domainContext = getDomainContext(domain);
-    if (domainContext) {
-      console.log(`[chat] Intent routed to domain: ${domain}`);
-    }
-    // Real-time data enrichment for sales/finance/supply_chain questions
-    if (domain === "sales" || domain === "finance" || domain === "supply_chain") {
-      try {
-        const { fetchLiveEnrichment } = await import("@/lib/ops/live-data-enrichment");
-        const cronSecret = (process.env.CRON_SECRET || "").trim();
-        const enrichment = await fetchLiveEnrichment(domain, url.origin, cronSecret);
-        if (enrichment) {
-          domainContext += `\n\n${enrichment.data} [source: ${enrichment.source}, fetched ${new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}]`;
-        }
-      } catch { /* non-fatal */ }
-    }
-  } catch {
-    // Non-fatal — fall through to full system prompt
-  }
-
-  // ─── Intercept teach: commands and route directly to /api/ops/abra/teach ───
-  // Without this, Claude says "Logged" but never emits a create_brain_entry action,
-  // so web-chat teach commands vanish. The dedicated teach endpoint handles
-  // mention-stripping, embedding, and pgvector storage correctly.
-  const teachMatch = rawMessage.match(/^(?:teach|correct|correction|update):\s*(.+)/is);
-  if (teachMatch) {
-    try {
-      const host = new URL(req.url).origin;
-      const teachRes = await fetch(`${host}/api/ops/abra/teach`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: req.headers.get("Authorization") || "",
-        },
-        body: JSON.stringify({
-          content: teachMatch[1].trim(),
-          source: `web_chat:${actorEmail}`,
-          tags: [],
-        }),
-        signal: AbortSignal.timeout(15000),
-      });
-      const teachData = (await teachRes.json()) as Record<string, unknown>;
-      const reply = teachData.success
-        ? `Logged to brain (ID: ${String(teachData.id || "").slice(0, 8)}…). I'll use this in future answers.`
-        : `Failed to store teaching: ${teachData.message || "unknown error"}`;
-      return NextResponse.json({
-        reply,
-        confidence: teachData.success ? 100 : 50,
-        thread_id: threadId,
-        sources: [],
-        actions: [],
-      });
-    } catch (err) {
-      console.error("[chat] teach intercept failed:", err);
-      // Fall through to normal chat flow as fallback
-    }
-  }
-
   if (healthMode) {
     const reply = buildHealthModeReply(message);
     queueChatHistory({
@@ -885,97 +680,6 @@ export async function POST(req: Request) {
       thread_id: threadId,
       mode: "health",
     });
-  }
-
-  // Quick mode — lightweight LLM call without brain search or finance pipeline
-  // Used for capability questions, meta queries, and fast confirmations
-  if (quickMode) {
-    const anthropicKey = process.env.ANTHROPIC_API_KEY || "";
-    try {
-      const quickRes = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "x-api-key": anthropicKey,
-          "anthropic-version": "2023-06-01",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1024,
-          system: `You are Abra, the AI operations assistant for USA Gummies. Answer the user's question concisely and honestly. If asked about capabilities, be transparent about what you can and cannot do. Keep responses under 500 words. USA Gummies is a CPG gummy candy company. Key people: Ben (CEO), Rene (finance/bookkeeper), Andrew (ops). Abra can: chat via Slack, generate XLSX files, record transactions, query financials, track pipeline, send emails, create Notion pages. Abra cannot: co-edit live documents, make phone calls (yet), or access external services not already integrated.`,
-          messages: [{ role: "user", content: message }],
-        }),
-        signal: AbortSignal.timeout(15000),
-      });
-      if (quickRes.ok) {
-        const quickData = await quickRes.json() as { content?: Array<{ text?: string }> };
-        const quickReply = quickData.content?.[0]?.text || "I'm not sure how to answer that — try asking in a more specific way.";
-        return NextResponse.json({
-          reply: quickReply,
-          confidence: 70,
-          sources: [],
-          intent: "quick_mode",
-          thread_id: threadId,
-          mode: "quick",
-        });
-      }
-    } catch (quickErr) {
-      console.warn("[chat] Quick mode failed, falling through to full pipeline:", quickErr instanceof Error ? quickErr.message : quickErr);
-    }
-    // Fall through to full pipeline if quick mode fails
-  }
-
-  // ─── PRE-LLM FILE INTERCEPTOR ───
-  // Claude's base training makes it refuse to generate files ~50% of the time
-  // despite system prompt instructions. Fix: detect file requests BEFORE calling
-  // Claude, generate the file server-side, and return immediately.
-  const fileSourceMap: Record<string, string> = {
-    vendor: "qbo_vendors",
-    vendors: "qbo_vendors",
-    "vendor list": "qbo_vendors",
-    "chart of accounts": "qbo_accounts",
-    coa: "qbo_accounts",
-    accounts: "qbo_accounts",
-    "p&l": "qbo_pnl",
-    "profit and loss": "qbo_pnl",
-    pnl: "qbo_pnl",
-  };
-
-  const wantsFileNow = /\b(spreadsheet|xlsx|csv|excel|export.*(?:file|xlsx|csv)|generate.*(?:file|spreadsheet)|(?:file|spreadsheet).*(?:export|generate|create))\b/i.test(message);
-  if (wantsFileNow && (channel === "slack" || slackChannelId)) {
-    const lowerMsg = message.toLowerCase();
-    let detectedSource: string | undefined;
-    for (const [keyword, source] of Object.entries(fileSourceMap)) {
-      if (lowerMsg.includes(keyword)) {
-        detectedSource = source;
-        break;
-      }
-    }
-
-    if (detectedSource) {
-      try {
-        const fileActionXml = `<action>{"action_type":"generate_file","title":"File Export","description":"Pre-LLM file generation","department":"operations","risk_level":"low","params":{"filename":"${detectedSource.replace("qbo_", "")}_export.xlsx","source":"${detectedSource}"}}</action>`;
-        const fileResult = await executeActions(fileActionXml, {
-          slackChannelId: slackChannelId || undefined,
-          slackThreadTs: slackThreadTs || undefined,
-          deadlineMs: 30000,
-        });
-
-        const fileNotice = fileResult.actionNotices.find(n => n.includes("[generate_file]"));
-        if (fileNotice) {
-          return NextResponse.json({
-            reply: `📊 Done — file uploaded to this channel.\n\n${fileNotice}`,
-            confidence: 95,
-            thread_id: threadId,
-            sources: [{ type: "action", name: "generate_file" }],
-            actions: [],
-          });
-        }
-      } catch (fileErr) {
-        console.warn("[chat] Pre-LLM file interceptor failed:", fileErr instanceof Error ? fileErr.message : fileErr);
-        // Fall through to normal LLM pipeline
-      }
-    }
   }
 
   // Vercel Hobby plan kills functions at 60s — use AbortController to cancel
@@ -1016,18 +720,6 @@ export async function POST(req: Request) {
 
     // ─── Intent Detection ───
     const intent = detectIntent(message);
-
-    // Ensure domainContext is populated for all intent types (detectIntent and
-    // classifyIntent use different taxonomies — merge them so the LLM always
-    // gets domain-specific context regardless of which detector fires).
-    if (!domainContext) {
-      try {
-        const { classifyIntent: reClassify, getDomainContext: reGetDomain } = await import("@/lib/ops/agents/intent-router");
-        const fallbackDomain = reClassify(message);
-        domainContext = reGetDomain(fallbackDomain);
-      } catch { /* non-fatal */ }
-    }
-
 
     // Handle cost query with LLM synthesis
     if (intent.type === "cost") {
@@ -1357,10 +1049,7 @@ export async function POST(req: Request) {
         // Fetch QBO accounts directly via our own API
         const qboRes = await fetch(
           `${process.env.NEXT_PUBLIC_BASE_URL || "https://www.usagummies.com"}/api/ops/qbo/accounts`,
-          {
-            headers: buildInternalAuthHeaders(req),
-            signal: AbortSignal.timeout(10_000),
-          },
+          { signal: AbortSignal.timeout(10_000) },
         );
         if (qboRes.ok) {
           const qboJson = (await qboRes.json()) as {
@@ -1487,28 +1176,16 @@ export async function POST(req: Request) {
 
       const extraFetches = await Promise.allSettled([
         wantsVendors
-          ? fetch(`${qboBase}/api/ops/qbo/query?type=vendors`, {
-              headers: buildInternalAuthHeaders(req),
-              signal: AbortSignal.timeout(8_000),
-            }).then(r => r.ok ? r.json() : null)
+          ? fetch(`${qboBase}/api/ops/qbo/query?type=vendors`, { signal: AbortSignal.timeout(8_000) }).then(r => r.ok ? r.json() : null)
           : Promise.resolve(null),
         wantsPnl
-          ? fetch(`${qboBase}/api/ops/qbo/query?type=pnl`, {
-              headers: buildInternalAuthHeaders(req),
-              signal: AbortSignal.timeout(8_000),
-            }).then(r => r.ok ? r.json() : null)
+          ? fetch(`${qboBase}/api/ops/qbo/query?type=pnl`, { signal: AbortSignal.timeout(8_000) }).then(r => r.ok ? r.json() : null)
           : Promise.resolve(null),
         wantsPurchases
-          ? fetch(`${qboBase}/api/ops/qbo/query?type=purchases&limit=${/every|all|last 30/i.test(message) ? 100 : 25}`, {
-              headers: buildInternalAuthHeaders(req),
-              signal: AbortSignal.timeout(8_000),
-            }).then(r => r.ok ? r.json() : null)
+          ? fetch(`${qboBase}/api/ops/qbo/query?type=purchases&limit=${/every|all|last 30/i.test(message) ? 100 : 25}`, { signal: AbortSignal.timeout(8_000) }).then(r => r.ok ? r.json() : null)
           : Promise.resolve(null),
         wantsBalanceSheet
-          ? fetch(`${qboBase}/api/ops/qbo/query?type=balance_sheet`, {
-              headers: buildInternalAuthHeaders(req),
-              signal: AbortSignal.timeout(8_000),
-            }).then(r => r.ok ? r.json() : null)
+          ? fetch(`${qboBase}/api/ops/qbo/query?type=balance_sheet`, { signal: AbortSignal.timeout(8_000) }).then(r => r.ok ? r.json() : null)
           : Promise.resolve(null),
       ]);
 
@@ -1571,38 +1248,7 @@ export async function POST(req: Request) {
         if (anthropicKey) {
           const isCashQuestion = /\b(cash position|bank balance|checking balance|how much .*(in the bank|do we have|cash|money)|current balance|account balance|overdrawn|overdraft)\b/i.test(message);
           const isReconciliationQuestion = /\b(reconcil|setup|configure|set up|get started|initial|onboard|clean up|organize)\b/i.test(message);
-
-          // Fetch live Plaid bank balance for ALL finance questions (not just cash)
-          // Real bank balance is always useful context for financial conversations
-          let plaidContext = "";
-          {
-            try {
-              const plaidRes = await fetch(`${url.origin}/api/ops/plaid/balance`, {
-                headers: { Authorization: req.headers.get("Authorization") || "" },
-                signal: AbortSignal.timeout(10000),
-              });
-              if (plaidRes.ok) {
-                const plaidData = (await plaidRes.json()) as {
-                  connected?: boolean;
-                  accounts?: Array<{ name: string; type: string; balances?: { current?: number; available?: number }; current?: number; available?: number | null }>;
-                  lastUpdated?: string;
-                };
-                if (plaidData.connected && plaidData.accounts?.length) {
-                  plaidContext = `\n\n**LIVE BANK BALANCES (Plaid — Bank of America, as of ${plaidData.lastUpdated || "now"}):**\n` +
-                    plaidData.accounts.map((a) => {
-                      const cur = a.balances?.current ?? a.current ?? 0;
-                      const avail = a.balances?.available ?? a.available;
-                      return `  • ${a.name} (${a.type}): Current $${cur.toFixed(2)}${avail != null ? `, Available $${avail.toFixed(2)}` : ""}`;
-                    }).join("\n") +
-                    `\n⚠️ These are REAL bank balances from Plaid. LEAD WITH THESE NUMBERS for cash position, NOT QBO book balances. The QBO -$8,649 is WRONG.\n`;
-                }
-              }
-            } catch (plaidErr) {
-              console.warn("[abra] Plaid balance fetch failed:", plaidErr instanceof Error ? plaidErr.message : plaidErr);
-            }
-          }
-
-          const financePrompt = `You are Abra, the AI operations assistant for USA Gummies (a CPG confectionery gummy company). The user asked a financial question. Here is QBO data:\n\n${financeData}${plaidContext}${revenueContext}${ledgerContext}\n\n${isReconciliationQuestion ? `RECONCILIATION & SETUP CONTEXT:\nThe QBO books are in early setup stage. Bank feeds are connected but transactions are minimally categorized. Key tasks Rene (bookkeeper) and Abra are working on:\n1. Import and categorize all historical transactions\n2. Set up proper vendor records (Powers Confections, Albanese, NinjaPrintHouse, Pirate Ship, etc.)\n3. Map the chart of accounts to the C-Corp structure (Form 1120)\n4. Reconcile bank feeds with actual bank statements\n5. Set up proper COGS tracking (forward: $1.522/unit from Albanese+Belmark+Powers; historical Run #1: $3.11/unit)\n6. Configure revenue accounts by channel (DTC/Amazon/Wholesale)\nAbra can help with batch categorization, transaction import, and data organization. Rene should focus on professional review and sign-off.\n\n` : ""}CRITICAL RULES:\n1. Any transfer from Rene G. Gonzalez, Rene G Gonzalez Trust, Ben Stutman, Ben's family members, or ANY founder/investor personal account is an INVESTOR LOAN (liability account ID 167 or equivalent equity account), NEVER income. This is investor/owner capital, not revenue. Applies to spouse, family, trust, and personal transfers.\n2. **MOST IMPORTANT RULE — READ THIS CAREFULLY:** The balances below are QBO BOOK BALANCES ONLY. QuickBooks book balances frequently diverge from actual bank balances when bank feed imports are behind, transactions are uncategorized, or reconciliation hasn't been done recently. ${isCashQuestion ? "The user is asking about cash/bank balances. You MUST lead your response with a prominent warning box like: '⚠️ **Important: These are QuickBooks book balances, not live bank balances.** QBO bank feeds may be behind — the actual bank balance could be significantly different. Please verify against your bank account directly before making any decisions based on these numbers.' Do NOT present QBO book balances as the actual cash position. Do NOT say 'the checking account is overdrawn' — say 'QBO books show X, but this may not reflect the actual bank balance.'" : "Label any balance figures as 'per QBO books' — never present them as definitive."}\n3. **WHEN DATA IS MISSING OR ALL ZEROS:** If the QBO data shows all $0.00 balances for categories like COGS, Expenses, or Income, do NOT present those zeros as fact. Instead explain honestly: "QBO doesn't have categorized data for this yet — the bank feed transactions haven't been fully imported and categorized. I'll flag this for Ben to get set up." Offer to note what needs to be configured.\n4. **KNOWN VENDORS (even if not in QBO yet):** Key USA Gummies vendors include Powers Confections (co-packer, Janesville WI), Albanese Confectionery (gummy base/ingredients), NinjaPrintHouse (packaging/labels), Pirate Ship (shipping), and various software (Shopify, Anthropic, Slack). If user asks about vendors and QBO has none, share this knowledge and note QBO vendor records need setup.\n5. **BE HONEST AND HELPFUL:** If you don't have the data to answer, say so clearly. Offer to flag it for configuration. Never make up numbers. Never present incomplete data as complete.\n6. **VERIFIED FINANCIAL DATA TAKES PRIORITY:** If both QBO data and Notion Ledger data are available, the Notion Ledger (verified from Found Banking records) is more authoritative for historical P&L, vendor totals, and revenue figures. QBO is the current working system being set up.\n7. **CORPORATE STRUCTURE:** USA Gummies is a C-Corporation (Wyoming), files Form 1120. Cash-basis accounting (per Found Banking). The chart of accounts follows standard categories mapped from Found to QBO.\n8. **KEY FINANCIALS (verified):** 2025 revenue $1,484.80, 2025 net income -$30,183.14 (launch year). 2026 YTD revenue ~$2,931.36. COGS per unit: FORWARD $1.522 (Albanese $0.919 + Belmark $0.144 + Powers $0.350 [quote] + freight $0.109) — use for all margin/pricing. HISTORICAL $3.11 (Dutch Valley Run #1, 2,500 units, Sept 2025 — initial small batch, not representative). Current burn rate: ~$1,000-1,300/month.\n9. **WHEN WORKING WITH RENE (bookkeeper):** Rene is building the books from scratch. Be collaborative. If he asks for data, pull it from QBO and Notion and present it clearly. If data isn't in the system yet, explain what needs to be configured and offer to help set it up. Don't ask clarifying questions when you can look up the answer. When creating deliverables, create them as Notion pages under the Bookkeeping Hub.\n\nProvide a clear, helpful response to: "${message}"\n\nInclude specific account names, IDs, and balances where relevant. If the user asks about the Chart of Accounts, list the accounts organized by type. If asking about reconciliation or setup, provide a concrete action plan with what Abra can handle vs what needs manual review. Keep it concise but complete. Format with markdown.`;
+          const financePrompt = `You are Abra, the AI operations assistant for USA Gummies (a CPG confectionery gummy company). The user asked a financial question. Here is QBO data:\n\n${financeData}${revenueContext}${ledgerContext}\n\n${isReconciliationQuestion ? `RECONCILIATION & SETUP CONTEXT:\nThe QBO books are in early setup stage. Bank feeds are connected but transactions are minimally categorized. Key tasks Rene (bookkeeper) and Abra are working on:\n1. Import and categorize all historical transactions\n2. Set up proper vendor records (Powers Confections, Albanese, NinjaPrintHouse, Pirate Ship, etc.)\n3. Map the chart of accounts to the C-Corp structure (Form 1120)\n4. Reconcile bank feeds with actual bank statements\n5. Set up proper COGS tracking (forward: $1.522/unit from Albanese+Belmark+Powers; historical Run #1: $3.11/unit)\n6. Configure revenue accounts by channel (DTC/Amazon/Wholesale)\nAbra can help with batch categorization, transaction import, and data organization. Rene should focus on professional review and sign-off.\n\n` : ""}CRITICAL RULES:\n1. Any transfer from "Rene G. Gonzalez" or "Rene G Gonzalez Trust" is an INVESTOR LOAN (liability account ID 167), NEVER income. This is investor capital, not revenue.\n2. **MOST IMPORTANT RULE — READ THIS CAREFULLY:** The balances below are QBO BOOK BALANCES ONLY. QuickBooks book balances frequently diverge from actual bank balances when bank feed imports are behind, transactions are uncategorized, or reconciliation hasn't been done recently. ${isCashQuestion ? "The user is asking about cash/bank balances. You MUST lead your response with a prominent warning box like: '⚠️ **Important: These are QuickBooks book balances, not live bank balances.** QBO bank feeds may be behind — the actual bank balance could be significantly different. Please verify against your bank account directly before making any decisions based on these numbers.' Do NOT present QBO book balances as the actual cash position. Do NOT say 'the checking account is overdrawn' — say 'QBO books show X, but this may not reflect the actual bank balance.'" : "Label any balance figures as 'per QBO books' — never present them as definitive."}\n3. **WHEN DATA IS MISSING OR ALL ZEROS:** If the QBO data shows all $0.00 balances for categories like COGS, Expenses, or Income, do NOT present those zeros as fact. Instead explain honestly: "QBO doesn't have categorized data for this yet — the bank feed transactions haven't been fully imported and categorized. I'll flag this for Ben to get set up." Offer to note what needs to be configured.\n4. **KNOWN VENDORS (even if not in QBO yet):** Key USA Gummies vendors include Powers Confections (co-packer, Janesville WI), Albanese Confectionery (gummy base/ingredients), NinjaPrintHouse (packaging/labels), Pirate Ship (shipping), and various software (Shopify, Anthropic, Slack). If user asks about vendors and QBO has none, share this knowledge and note QBO vendor records need setup.\n5. **BE HONEST AND HELPFUL:** If you don't have the data to answer, say so clearly. Offer to flag it for configuration. Never make up numbers. Never present incomplete data as complete.\n6. **VERIFIED FINANCIAL DATA TAKES PRIORITY:** If both QBO data and Notion Ledger data are available, the Notion Ledger (verified from Found Banking records) is more authoritative for historical P&L, vendor totals, and revenue figures. QBO is the current working system being set up.\n7. **CORPORATE STRUCTURE:** USA Gummies is a C-Corporation (Wyoming), files Form 1120. Cash-basis accounting (per Found Banking). The chart of accounts follows standard categories mapped from Found to QBO.\n8. **KEY FINANCIALS (verified):** 2025 revenue $1,484.80, 2025 net income -$30,183.14 (launch year). 2026 YTD revenue ~$2,931.36. COGS per unit: FORWARD $1.522 (Albanese $0.919 + Belmark $0.144 + Powers $0.350 [quote] + freight $0.109) — use for all margin/pricing. HISTORICAL $3.11 (Dutch Valley Run #1, 2,500 units, Sept 2025 — initial small batch, not representative). Current burn rate: ~$1,000-1,300/month.\n9. **WHEN WORKING WITH RENE (bookkeeper):** Rene is building the books from scratch. Be collaborative. If he asks for data, pull it from QBO and Notion and present it clearly. If data isn't in the system yet, explain what needs to be configured and offer to help set it up. Don't ask clarifying questions when you can look up the answer. When creating deliverables, create them as Notion pages under the Bookkeeping Hub.\n\nProvide a clear, helpful response to: "${message}"\n\nInclude specific account names, IDs, and balances where relevant. If the user asks about the Chart of Accounts, list the accounts organized by type. If asking about reconciliation or setup, provide a concrete action plan with what Abra can handle vs what needs manual review. Keep it concise but complete. Format with markdown.`;
           const llmRes = await fetch(
             "https://api.anthropic.com/v1/messages",
             {
@@ -1672,41 +1318,6 @@ export async function POST(req: Request) {
         intent: "finance",
         thread_id: threadId,
       });
-    }
-
-    if (intent.type === "automation_log") {
-      try {
-        const { getRecentAutomationLog } = await import("@/lib/ops/abra-health-monitor");
-        const logs = await getRecentAutomationLog(25);
-
-        if (logs.length === 0) {
-          return NextResponse.json({
-            reply: "No automation runs logged yet. The automation log was just created — runs will start appearing as feeds and KPI syncs execute.",
-            confidence: 90,
-            thread_id: threadId,
-          });
-        }
-
-        const logLines = logs.map((l) => {
-          const time = l.created_at?.slice(0, 19).replace("T", " ") || "?";
-          const icon = l.status === "success" ? "✅" : l.status === "error" ? "❌" : "⏭️";
-          return `| ${icon} | ${time} | ${l.task_name} | ${l.task_type} | ${l.records_processed} | ${l.error_message || "—"} |`;
-        }).join("\n");
-
-        const reply = `## Automation Execution Log\n\n| Status | Timestamp | Task | Type | Records | Error |\n|--------|-----------|------|------|---------|-------|\n${logLines}\n\n*${logs.length} most recent runs shown.*`;
-
-        return NextResponse.json({
-          reply,
-          confidence: 95,
-          thread_id: threadId,
-        });
-      } catch (err) {
-        return NextResponse.json({
-          reply: `Failed to query automation log: ${err instanceof Error ? err.message : "unknown error"}`,
-          confidence: 50,
-          thread_id: threadId,
-        });
-      }
     }
 
     if (intent.type === "diagnostics") {
@@ -2174,14 +1785,8 @@ export async function POST(req: Request) {
           try {
             const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://www.usagummies.com";
             const [vendorsRes, accountsRes] = await Promise.all([
-              fetch(`${baseUrl}/api/ops/qbo/query?type=vendors`, {
-                headers: buildInternalAuthHeaders(req),
-                signal: AbortSignal.timeout(8000),
-              }),
-              fetch(`${baseUrl}/api/ops/qbo/accounts`, {
-                headers: buildInternalAuthHeaders(req),
-                signal: AbortSignal.timeout(8000),
-              }),
+              fetch(`${baseUrl}/api/ops/qbo/query?type=vendors`, { signal: AbortSignal.timeout(8000) }),
+              fetch(`${baseUrl}/api/ops/qbo/accounts`, { signal: AbortSignal.timeout(8000) }),
             ]);
             const parts: string[] = [];
             if (vendorsRes.ok) {
@@ -2274,37 +1879,8 @@ export async function POST(req: Request) {
       throw new DOMException("Deadline exceeded", "AbortError");
     }
 
-    // ── DETERMINISTIC PRE-EXECUTION ──
-    // Execute actions BEFORE the LLM runs. The LLM then composes a response
-    // based on actual results, not its own decision about whether to act.
-    let preExec = {
-      preloadedData: "",
-      actionNotices: [] as string[],
-      didPreExecute: false,
-      executedActionTypes: new Set<string>(),
-    };
-    try {
-      preExec = await withTimeout(
-        detectAndPreExecute(message, {
-          slackChannelId: slackChannelId || undefined,
-          slackThreadTs: slackThreadTs || undefined,
-        }),
-        PRE_EXEC_TIMEOUT_MS,
-        "detectAndPreExecute",
-      );
-    } catch (error) {
-      const errMsg = error instanceof Error ? error.message : "unknown error";
-      console.warn(`[chat] Pre-execution failed: ${errMsg}`);
-      preExec.actionNotices.push(`⚠️ Deterministic pre-execution failed: ${errMsg}`);
-    }
-
-    // Inject pre-executed data into the LLM context so it can compose an intelligent response
-    const preExecContext = preExec.didPreExecute
-      ? `\n\n[PRE-EXECUTED ACTIONS — Data already fetched for this request. Use this data to answer the user's question directly. Do NOT emit duplicate actions for data already provided below.]\n${preExec.preloadedData}`
-      : "";
-
     const claudeResult = await generateClaudeReply({
-      message: message + preExecContext,
+      message,
       history: effectiveHistory,
       tieredResults,
       corrections,
@@ -2322,22 +1898,16 @@ export async function POST(req: Request) {
       deadlineSignal: deadlineController.signal,
       isFinanceRelated: isFinanceQuestion(message),
       actorContext,
-      domainContext,
-      // Pass images from Slack for vision support
-      images: Array.isArray(payload.images)
-        ? (payload.images as Array<{ base64: string; mediaType: string }>)
-        : undefined,
     });
     // Track Anthropic API success in capability registry
     void capMarkSuccess("anthropic").catch(() => {});
-    const actionNotices: string[] = [...preExec.actionNotices];
+    const actionNotices: string[] = [];
     let baseReply = claudeResult.reply;
     if (!claudeResult.earlyExit) {
       const actionResult = await executeActions(claudeResult.reply, {
         slackChannelId: slackChannelId || undefined,
         slackThreadTs: slackThreadTs || undefined,
         deadlineMs: Math.max(0, 40_000 - (Date.now() - startMs)), // leave 15s for response assembly
-        skipActionTypes: preExec.executedActionTypes,
       });
       baseReply = actionResult.cleanReply;
       actionNotices.push(...actionResult.actionNotices);
@@ -2396,37 +1966,13 @@ export async function POST(req: Request) {
     console.log(`[chat] Post-strip reply length: ${strippedReply.length}, first 200: ${strippedReply.slice(0, 200)}`);
 
     // Never return a completely empty reply — provide a fallback
-    let effectiveReply = strippedReply || (
+    const effectiveReply = strippedReply || (
       actionNotices.length > 0
         ? "" // Notices will fill the reply
         : "Done — I processed your request. Check this thread for any files or follow-up."
     );
-    // ── Action Verification Loop — rewrite reply based on actual results ──
-    let correctedReply = effectiveReply;
-    const failedActions = actionNotices.filter(n => /failed|error/i.test(n));
-    const succeededActions = actionNotices.filter(n => /✅|Uploaded|Created|Logged|Queued|approved|recorded/i.test(n));
-    const hasFailedAction = failedActions.length > 0;
-    const hasSucceededAction = succeededActions.length > 0;
-
-    if (hasFailedAction) {
-      // Replace ALL premature success claims with honest status
-      correctedReply = correctedReply
-        .replace(/\bDone\s*[—–-]\s*(the|I|it|your|we|this)\b/gi, "I attempted to")
-        .replace(/\b(I have|I've|I\u2019ve) (updated|created|sent|posted|logged|recorded)\b/gi, "I attempted to $2")
-        .replace(/\bUpdating now:\s*\n*\s*Done\b/gi, "Attempting now...")
-        .replace(/\bPage is live\b/gi, "Page update was attempted")
-        .replace(/\bFile is ready\b/gi, "File generation was attempted")
-        .replace(/\bHere'?s the (file|document|spreadsheet|export)\b/gi, "The $1 generation was attempted")
-        .replace(/\bsuccessfully (updated|created|sent|generated)\b/gi, "attempted to $1");
-
-      // If ALL actions failed and reply still sounds positive, prepend a warning
-      if (!hasSucceededAction && !/attempted|failed|error|couldn't|could not/i.test(correctedReply.slice(0, 100))) {
-        correctedReply = `⚠️ **Action failed** — see error details below.\n\n${correctedReply}`;
-      }
-    }
-
     let reply = [
-      correctedReply,
+      effectiveReply,
       actionNotices.length > 0 ? actionNotices.join("\n") : "",
     ]
       .filter(Boolean)
@@ -2438,25 +1984,15 @@ export async function POST(req: Request) {
     // Normalize Unicode curly apostrophes (\u2018 \u2019) → straight apostrophe before testing,
     // because Claude sometimes outputs \u2019 (right single quotation mark) in contractions.
     const normalizedReply = strippedReply.replace(/[\u2018\u2019\u02BC\u2032]/g, "'");
-    const claudeRefusedFile = /\b(cannot generate|can[\u2019']t generate|can[\u2019']t directly generate|don[\u2019']t have file|cannot create|can[\u2019']t create files?|cannot export|can[\u2019']t export|unable to generate|unable to create|not able to generate|not able to create|[Ii][\u2019'] ?m not able to|[Ii] cannot directly|downloadable xlsx|downloadable .{0,20}file|file export capability|don[\u2019']t have .{0,20}export|can[\u2019']t (?:directly )?(?:generate|create|attach|export))\b/i.test(normalizedReply);
+    const claudeRefusedFile = /\b(cannot generate|can[\u2019']t generate|don[\u2019']t have file|cannot create|can[\u2019']t create files?|cannot export|can[\u2019']t export|unable to generate|unable to create|not able to generate|not able to create|[Ii][\u2019'] ?m not able to|[Ii] cannot directly|downloadable xlsx|downloadable .{0,20}file)\b/i.test(normalizedReply);
     // Check if the action executor already handled generate_file
     // Only skip fallback if the action was actually executed (not just queued for approval)
     const fileActionHandled = actionNotices.some(n => n.includes("[generate_file]"));
     console.log(`[chat] File auto-gen check: channel=${channel}, slackChannelId=${slackChannelId || "(empty)"}, wantsFile=${wantsFile}, fileActionHandled=${fileActionHandled}, claudeRefusedFile=${claudeRefusedFile}, replyLen=${strippedReply.length}`);
 
     // Fix: if Claude refused to generate a file but the user clearly asked for one, force a generate_file action
-    // Also strip the refusal text from the reply since it's a hallucination
     if (wantsFile && claudeRefusedFile && !fileActionHandled) {
       console.warn("[chat] Claude refused file generation — intercepting and forcing generate_file action");
-      // Remove the hallucinated refusal from the reply
-      baseReply = baseReply
-        .replace(/⚠️?\s*(?:Heads? Up|Note|Important)[:\s]*I (?:Can't|Cannot|can't|cannot) (?:Generate|Create|Export|Directly Generate) (?:Excel |XLSX )?Files? (?:Directly)?[^\n]*\n?/gi, "")
-        .replace(/(?:Hey!?\s*)?I can't (?:directly )?(?:generate|create|attach|export)[^\n]*(?:file|xlsx|excel)[^\n]*\n?/gi, "")
-        .replace(/I'm a text-based AI assistant[^\n]*\n?/gi, "")
-        .replace(/I don't have (?:file )?(?:export|generation) capability[^\n]*\n?/gi, "")
-        .replace(/(?:What I (?:can|CAN) do|However|Instead|But here's what)[^\n]*(?:paste into Excel|copy into|get you there)[^\n]*\n?/gi, "")
-        .replace(/#+\s*(?:✅|⚠️)\s*(?:Current|Here's|Instead)[^\n]*ready to copy[^\n]*\n?/gi, "")
-        .trim();
       const forcedFilename = /csv/i.test(rawMessage) ? "export.csv" : "export.xlsx";
       const forcedSource = /vendor/i.test(rawMessage)
         ? "qbo_vendors"
@@ -2464,27 +2000,17 @@ export async function POST(req: Request) {
         ? "qbo_accounts"
         : /p.?l|profit.?loss/i.test(rawMessage)
         ? "qbo_pnl"
-        : /revenue|sales|kpi|shopify|amazon.*daily|daily.*channel/i.test(rawMessage)
-        ? "kpi_daily_revenue"
         : undefined;
       const forcedActionXml = `<action>{"action_type":"generate_file","title":"File Export","description":"Auto-forced — Abra incorrectly claimed it could not generate files","department":"operations","risk_level":"low","params":{"filename":"${forcedFilename}"${forcedSource ? `,"source":"${forcedSource}"` : ',"headers":[],"rows":[]'}}}</action>`;
-      if (slackChannelId || channel === "slack") {
-        // Slack context: upload via Slack API
-        try {
-          const forceResult = await executeActions(forcedActionXml, {
-            slackChannelId: slackChannelId || undefined,
-            slackThreadTs: slackThreadTs || undefined,
-            deadlineMs: Math.max(2000, 40_000 - (Date.now() - startMs)),
-          });
-          actionNotices.push(...forceResult.actionNotices);
-        } catch (err) {
-          console.warn("[chat] Forced generate_file action failed:", err instanceof Error ? err.message : err);
-        }
-      } else if (forcedSource) {
-        // Web chat context: provide a download URL instead
-        const downloadUrl = `${url.origin}/api/ops/abra/download?source=${encodeURIComponent(forcedSource)}&format=csv&filename=${encodeURIComponent(forcedFilename.replace(/\.xlsx$/, ".csv"))}`;
-        baseReply = `📊 Here's your export:\n\n**[Download ${forcedFilename}](${downloadUrl})**\n\n${baseReply}`;
-        actionNotices.push(`✅ [generate_file] Download link generated for ${forcedSource}`);
+      try {
+        const forceResult = await executeActions(forcedActionXml, {
+          slackChannelId: slackChannelId || undefined,
+          slackThreadTs: slackThreadTs || undefined,
+          deadlineMs: Math.max(2000, 40_000 - (Date.now() - startMs)),
+        });
+        actionNotices.push(...forceResult.actionNotices);
+      } catch (err) {
+        console.warn("[chat] Forced generate_file action failed:", err instanceof Error ? err.message : err);
       }
     }
     if (
@@ -2549,89 +2075,6 @@ export async function POST(req: Request) {
       }
     }
 
-    // ── Force QBO write actions when Claude says "On it" but doesn't emit action ──
-    // Broader regex — matches "create vendor Powers", "add a vendor: Powers", "set up vendor—Powers", etc.
-    const qboVendorMatch = /\b(create|add|set up|make)\b.*\b(vendor|supplier)\b[^a-z]*(?:for |called |named |:|\u2014|-|)\s*["']?([A-Z][^"'\n,]{2,40})/i.exec(message);
-    const qboAccountMatch = /\b(create|add|set up|make)\b.*\b(account|coa)\b[^a-z]*(?:for |called |named |:|\u2014|-|)\s*["']?([A-Z][^"'\n,]{2,40})/i.exec(message);
-    const qboCustomerMatch = /\b(create|add|set up|make)\b.*\b(customer|client)\b[^a-z]*(?:for |called |named |:|\u2014|-|)\s*["']?([A-Z][^"'\n,]{2,40})/i.exec(message);
-
-    const qboActionHandled = actionNotices.some(n =>
-      n.includes("[create_qbo_vendor]") || n.includes("[create_qbo_account]") || n.includes("[create_qbo_customer]"),
-    );
-
-    if (!qboActionHandled) {
-      const forceQBOActions: Array<{ type: string; name: string }> = [];
-      if (qboVendorMatch) forceQBOActions.push({ type: "create_qbo_vendor", name: qboVendorMatch[3].trim() });
-      if (qboAccountMatch) forceQBOActions.push({ type: "create_qbo_account", name: qboAccountMatch[3].trim() });
-      if (qboCustomerMatch) forceQBOActions.push({ type: "create_qbo_customer", name: qboCustomerMatch[3].trim() });
-
-      for (const fa of forceQBOActions) {
-        console.log(`[chat] Forcing ${fa.type} for "${fa.name}" — Claude didn't emit action block`);
-        try {
-          const params: Record<string, unknown> = { name: fa.name };
-          if (fa.type === "create_qbo_account") {
-            params.type = "Expense"; // Default, will be overridden by approval
-          }
-          const forcedXml = `<action>{"action_type":"${fa.type}","title":"${fa.type}","description":"Auto-forced — Claude acknowledged but didn't emit action","department":"finance","risk_level":"low","params":${JSON.stringify(params)}}</action>`;
-          const forceResult = await executeActions(forcedXml, {
-            slackChannelId: slackChannelId || undefined,
-            slackThreadTs: slackThreadTs || undefined,
-          });
-          if (forceResult.actionNotices.length > 0) {
-            actionNotices.push(...forceResult.actionNotices);
-          }
-        } catch (err) {
-          console.warn(`[chat] Forced ${fa.type} failed:`, err instanceof Error ? err.message : err);
-        }
-      }
-    }
-
-    // ── Force email reading when Claude says "reading" but doesn't emit read_email ──
-    const emailActionHandled = actionNotices.some(n => n.includes("read_email") || n.includes("search_email") || n.includes("Email"));
-    const wantsEmailRead = /\b(read|check|pull|show|get|find)\b.*\b(emails?|inbox|mail|messages?)\b/i.test(message);
-    if (wantsEmailRead && !emailActionHandled && actionNotices.length === 0) {
-      try {
-        // Extract who to search for, or default to recent inbox
-        const fromMatch = /\b(?:from|by)\s+(\w+(?:\s+\w+)?)/i.exec(message);
-        const countMatch = /\b(\d+)\s+emails?\b/i.exec(message);
-        const count = countMatch ? Math.min(parseInt(countMatch[1], 10), 10) : 5;
-        // Build search query — use "newer_than:1d" for recent emails, "from:X" for specific sender
-        let searchQuery: string;
-        if (fromMatch) {
-          searchQuery = `from:${fromMatch[1]}`;
-        } else if (/\b(today|recent|latest|last|new|unread)\b/i.test(message)) {
-          searchQuery = "newer_than:1d";
-        } else {
-          searchQuery = "newer_than:2d";
-        }
-        const forcedEmailXml = `<action>{"action_type":"search_email","title":"Search Email","description":"Auto-forced email search","department":"operations","risk_level":"low","params":{"query":"${searchQuery}","count":${count}}}</action>`;
-        const emailResult = await executeActions(forcedEmailXml, {
-          slackChannelId: slackChannelId || undefined,
-          slackThreadTs: slackThreadTs || undefined,
-        });
-        if (emailResult.actionNotices.length > 0) actionNotices.push(...emailResult.actionNotices);
-        if (emailResult.readOnlyResults.length > 0) {
-          // We got email data — do a follow-up LLM call to summarize
-          const emailData = emailResult.readOnlyResults.join("\n\n");
-          if (emailData.length > 50) {
-            effectiveReply = `Here are the emails I found:\n\n${emailData.slice(0, 3000)}`;
-          }
-        }
-      } catch (err) {
-        console.warn("[chat] Forced email read failed:", err instanceof Error ? err.message : err);
-      }
-    }
-
-    // ── Force Excel generation for complex spreadsheet requests ──
-    const wantsSpreadsheet = /\b(excel|spreadsheet|xlsx|csv|export)\b.*\b(landed|cost|freight|revenue|vendor|account|pnl|p&l)\b/i.test(message) ||
-      /\b(landed|cost|freight|revenue)\b.*\b(excel|spreadsheet|xlsx|csv|export)\b/i.test(message);
-    const fileGenHandled = actionNotices.some(n => n.includes("[generate_file]"));
-    if (wantsSpreadsheet && !fileGenHandled && actionNotices.length === 0) {
-      // The file generation forced fallback in the earlier block should have caught this
-      // If it didn't, log it as an honest failure
-      console.warn(`[chat] Spreadsheet requested but not generated: "${message.slice(0, 80)}"`);
-    }
-
     // Recompute reply after forced actions may have pushed additional notices
     reply = [
       effectiveReply,
@@ -2639,38 +2082,6 @@ export async function POST(req: Request) {
     ]
       .filter(Boolean)
       .join("\n\n");
-
-    // ── "On it" detector: catch promises without actions ──
-    const saidOnIt = /\b(on it|creating.*now|i'?ll do that|doing that now|generating.*now|working on|i'?m on it|let me.*now|pulling.*now|i'?ll get that|one moment|querying|processing|retrieving|running that|executing|submitting|looking that up|let me pull|let me check|let me read|i'?ll handle|i'?ll take care)\b/i.test(effectiveReply);
-    const noActionsExecuted = actionNotices.length === 0;
-    const userAskedForAction = /\b(create|add|set up|generate|export|send|draft|build|make|update|record|log|categorize|respond|reply|read|check|pull|show|get|find|search|look up|analyze|review|audit|run|execute)\b/i.test(message);
-
-    if (saidOnIt && noActionsExecuted && userAskedForAction) {
-      console.warn(`[chat] HONEST FAILURE: Abra said "${effectiveReply.slice(0, 60)}" but executed 0 actions for: "${message.slice(0, 80)}"`);
-      // Log to task queue as a failed task
-      const { queueTask, failTask } = await import("@/lib/ops/abra-task-queue");
-      const taskId = await queueTask({
-        task_type: "promise_without_action",
-        description: `Abra said "On it" but didn't execute: ${message.slice(0, 200)}`,
-        requested_by: actorEmail,
-        channel_id: slackChannelId || undefined,
-        thread_ts: slackThreadTs || undefined,
-        deadline_minutes: 5,
-      }).catch(() => null);
-      if (taskId) {
-        void failTask(taskId, "LLM acknowledged task but did not emit an action block").catch(() => {});
-      }
-
-      // Append honest disclaimer and reassemble reply
-      effectiveReply += "\n\n⚠️ _I said I'd do this but my action system didn't fire. This has been logged and flagged for follow-up. If this is urgent, please ask me again or rephrase the request._";
-      // Reassemble reply with the updated effectiveReply
-      reply = [
-        effectiveReply,
-        actionNotices.length > 0 ? actionNotices.join("\n") : "",
-      ]
-        .filter(Boolean)
-        .join("\n\n");
-    }
 
     const SOURCE_RELEVANCE_THRESHOLD = 0.65;
     const seenIds = new Set<string>();
@@ -2686,50 +2097,7 @@ export async function POST(req: Request) {
     });
 
     const responseSources = claudeResult.earlyExit ? [] : uniqueSources;
-
-    // ── Calibrated confidence based on data quality, not Claude's self-assessment ──
-    const calibratedConfidence = (() => {
-      if (claudeResult.earlyExit) return 30;
-
-      let score = 50; // baseline
-
-      // Tier distribution — more HOT sources = higher confidence
-      const { hot, warm, cold } = tieredResults.tierCounts;
-      if (hot >= 3) score += 25;
-      else if (hot >= 1) score += 15;
-      else if (warm >= 2) score += 10;
-      else if (cold >= 1) score += 5;
-      // No brain entries at all = lower confidence
-      if (hot + warm + cold === 0) score -= 10;
-
-      // Live data sources boost confidence
-      if (financialContext) score += 10;
-      if (augmentedLiveSnapshot?.includes("KPI")) score += 5;
-
-      // Failed actions reduce confidence
-      if (actionNotices.some(n => /failed|error/i.test(n))) score -= 15;
-
-      // Conflicting sources reduce confidence
-      if (reply.includes("conflict") || reply.includes("discrepancy")) score -= 10;
-
-      // Reply admits missing data = lower confidence
-      const replyLower = reply.toLowerCase();
-      if (replyLower.includes("don't have") || replyLower.includes("no data") ||
-          replyLower.includes("unavailable") || replyLower.includes("not in my") ||
-          replyLower.includes("couldn't find") || replyLower.includes("no brain entry")) {
-        score -= 20;
-      }
-
-      // Reply uses hedging language = slightly lower
-      if (replyLower.includes("approximately") || replyLower.includes("estimated") ||
-          replyLower.includes("roughly") || replyLower.includes("may not reflect")) {
-        score -= 5;
-      }
-
-      // Clamp to 30-98 range (never 100% — epistemic humility)
-      return Math.max(30, Math.min(98, score));
-    })();
-    const confidence = calibratedConfidence;
+    const confidence = claudeResult.confidence;
 
     // Log answer provenance (best-effort, non-blocking)
     logProvenance({
@@ -2766,24 +2134,6 @@ export async function POST(req: Request) {
     });
 
     clearTimeout(deadlineTimer);
-
-    // Citation enforcement — tag unverified dollar figures
-    try {
-      const { enforceCitations } = await import("@/lib/ops/citation-enforcer");
-      const contextForCitation = tieredResults.all.map((r) => r.summary_text || r.title || "").join("\n");
-      const citationResult = enforceCitations(reply, contextForCitation);
-      if (citationResult.processed !== reply) {
-        reply = citationResult.processed;
-      }
-    } catch { /* non-fatal */ }
-
-    // Cross-session conversation memory — auto-summarize long conversations
-    if (effectiveHistory.length >= 6) {
-      import("@/lib/ops/conversation-memory").then(({ summarizeAndStore }) =>
-        summarizeAndStore(threadId, effectiveHistory, actorLabel).catch(() => {}),
-      ).catch(() => {});
-    }
-
     return NextResponse.json({
       reply,
       confidence,
@@ -2822,8 +2172,8 @@ export async function POST(req: Request) {
       await markSupabaseFailure(error);
     }
 
-    // Never leak internal error details to client — log full error server-side
-    console.error("[chat] Unhandled error:", error instanceof Error ? error.message : error);
+    // Never leak internal error details to client
+    console.error("[abra/chat] Fatal error:", error instanceof Error ? error.message : error);
     return NextResponse.json({ error: "An internal error occurred. Please try again." }, { status: 500 });
   }
 }

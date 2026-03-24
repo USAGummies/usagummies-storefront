@@ -118,7 +118,7 @@ export async function GET(req: Request) {
       }));
     }
   } catch (err) {
-    output.error = err instanceof Error ? err.message : String(err);
+    output.error = "Internal server error";
   }
 
   try {
@@ -149,7 +149,7 @@ export async function GET(req: Request) {
         });
     }
   } catch (err) {
-    output.error = output.error || (err instanceof Error ? err.message : String(err));
+    output.error = output.error || ("Internal server error");
   }
 
   const actionLog = await readState<Array<{ action: string; at: string }>>("social-action-log", []);
@@ -214,7 +214,7 @@ export async function POST(req: Request) {
     return NextResponse.json(result);
   } catch (err) {
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : String(err) },
+      { error: "Internal server error" },
       { status: 500 },
     );
   }

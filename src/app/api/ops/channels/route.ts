@@ -395,7 +395,7 @@ export async function GET() {
         dailyByChannel: [],
         channelMetrics: null,
         combined: { totalRevenue: 0, totalOrders: 0 },
-        error: err instanceof Error ? err.message : String(err),
+        error: "Failed to load channel data",
         generatedAt: new Date().toISOString(),
       },
       { status: 500 },

@@ -36,7 +36,7 @@ export async function POST(req: Request) {
   } catch (err) {
     console.error("[plaid] Token exchange failed:", err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Token exchange failed" },
+      { error: "Token exchange failed" },
       { status: 500 },
     );
   }

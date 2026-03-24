@@ -454,7 +454,7 @@ export async function GET() {
         adChannels: [],
         generatedAt: new Date().toISOString(),
         budget: null,
-        error: err instanceof Error ? err.message : String(err),
+        error: "Internal server error",
       },
       { status: 500 },
     );

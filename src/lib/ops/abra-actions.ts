@@ -27,7 +27,6 @@ import {
   clampRiskLevel,
   type RiskLevel,
 } from "@/lib/ops/abra-policy";
-import { calculateDeal, type ChannelType } from "@/lib/ops/abra-skill-deal-calculator";
 
 /** Map friendly database keys → Notion database IDs for create_notion_page action */
 const NOTION_DB_MAP: Record<string, string> = {
@@ -72,8 +71,6 @@ type ApprovalRow = {
   resolved_payload?: unknown;
   proposed_payload: unknown;
   auto_executed?: boolean | null;
-  executed_at?: string | null;
-  execution_result?: unknown;
 };
 
 export type AutoExecPolicy = {
@@ -368,10 +365,6 @@ function mapApprovalActionType(actionType: string): string {
   if (actionType === "create_brain_entry") return "data_mutation";
   if (actionType === "batch_categorize_qbo") return "data_mutation";
   if (actionType === "create_qbo_invoice") return "data_mutation";
-  if (actionType === "create_qbo_vendor") return "data_mutation";
-  if (actionType === "create_qbo_account") return "data_mutation";
-  if (actionType === "create_qbo_bill") return "data_mutation";
-  if (actionType === "create_qbo_customer") return "data_mutation";
   if (actionType === "update_shopify_inventory") return "data_mutation";
   if (actionType === "create_shopify_discount") return "data_mutation";
   return "other";
@@ -400,6 +393,43 @@ async function handleSendSlack(
   return { success: true, message: `Sent to Slack ${allowedChannel}` };
 }
 
+/**
+ * DLP guard: scan outbound email body for sensitive financial data.
+ * Blocks emails that contain cost/margin/COGS details or specific internal figures.
+ */
+function containsSensitiveFinancialData(text: string): string | null {
+  const lower = text.toLowerCase();
+
+  // Patterns: dollar amounts near sensitive keywords
+  const sensitiveKeywordPatterns = [
+    { pattern: /\$[\d,.]+\s*(?:cost|cogs|margin|markup|profit)/i, label: "cost/margin figures" },
+    { pattern: /(?:cost|cogs|margin|markup|profit)\s*(?:of|is|was|at|:)?\s*\$[\d,.]+/i, label: "cost/margin figures" },
+    { pattern: /(?:gross|net|unit)\s*margin\s*(?:of|is|was|at|:)?\s*\$?[\d,.]+%?/i, label: "margin data" },
+    { pattern: /(?:cost|cogs)\s*(?:per|\/)\s*(?:unit|lb|pound|case|bag)/i, label: "unit cost data" },
+  ];
+
+  for (const { pattern, label } of sensitiveKeywordPatterns) {
+    if (pattern.test(text)) {
+      return label;
+    }
+  }
+
+  // Specific internal cost figures that should never leak
+  const internalFigures = ["1.522", "0.919", "0.385"];
+  for (const figure of internalFigures) {
+    if (lower.includes(`$${figure}`) || lower.includes(figure)) {
+      // Only flag if it appears near financial context (not random text)
+      const idx = lower.indexOf(figure);
+      const surrounding = lower.slice(Math.max(0, idx - 40), idx + figure.length + 40);
+      if (/cost|cogs|margin|price|unit|per|profit|markup/i.test(surrounding)) {
+        return "specific internal cost figures";
+      }
+    }
+  }
+
+  return null;
+}
+
 async function handleSendEmail(
   params: Record<string, unknown>,
 ): Promise<ActionResult> {
@@ -416,6 +446,15 @@ async function handleSendEmail(
     return {
       success: false,
       message: `Email recipient "${to}" is not in the allowed list. Only @usagummies.com and pre-approved addresses are permitted.`,
+    };
+  }
+
+  // DLP guard: scan for sensitive financial data before sending
+  const dlpViolation = containsSensitiveFinancialData(`${subject} ${body}`);
+  if (dlpViolation) {
+    return {
+      success: false,
+      message: `Email blocked — contains potentially sensitive financial data (${dlpViolation}). Review and remove cost/margin details before sending.`,
     };
   }
 
@@ -844,7 +883,7 @@ async function handleUpdateNotion(
     });
     return {
       success: result.ok,
-      message: result.ok ? "Updated Notion page" : `Failed to update Notion page: ${result.error || "unknown error"}`,
+      message: result.ok ? "Updated Notion page" : `Failed to update Notion page: ${result.error || "unknown"}`,
     };
   }
 
@@ -1747,45 +1786,6 @@ async function handleRecordVendorQuote(
   };
 }
 
-// ---------------------------------------------------------------------------
-// Deal Calculator — pure read-only computation, no side effects
-// ---------------------------------------------------------------------------
-
-async function handleCalculateDeal(
-  params: Record<string, unknown>,
-): Promise<ActionResult> {
-  const channelMap: Record<string, ChannelType> = {
-    dtc: "dtc", shopify: "dtc", amazon: "amazon", fba: "amazon",
-    wholesale: "wholesale_direct", wholesale_direct: "wholesale_direct",
-    faire: "faire", broker: "wholesale_broker", wholesale_broker: "wholesale_broker",
-  };
-  const ch = channelMap[String(params.channel || "wholesale_direct").toLowerCase()] || "wholesale_direct";
-  const result = calculateDeal({
-    customerName: String(params.customer || params.customerName || params.customer_name || "Unknown"),
-    channel: ch,
-    units: Number(params.units) || 100,
-    pricePerUnit: params.price_per_unit != null ? Number(params.price_per_unit) : undefined,
-  });
-
-  const message =
-    `## Deal Calculator Result\n` +
-    `**Customer:** ${result.customerName} | **Channel:** ${result.channel}\n` +
-    `**Units:** ${result.units} @ $${result.pricePerUnit}/unit\n\n` +
-    `| Metric | Value |\n|--------|-------|\n` +
-    `| Gross Revenue | $${result.grossRevenue.toFixed(2)} |\n` +
-    `| Channel Fees | $${result.channelFees.toFixed(2)} |\n` +
-    `| Net Revenue | $${result.netRevenue.toFixed(2)} |\n` +
-    `| Total COGS | $${result.totalCogs.toFixed(2)} |\n` +
-    `| **Gross Profit** | **$${result.grossProfit.toFixed(2)}** |\n` +
-    `| **Margin** | **${result.grossMarginPct.toFixed(1)}%** |\n` +
-    `| Profit/Unit | $${result.contributionPerUnit.toFixed(2)} |\n\n` +
-    `**Recommendation:** ${result.recommendation}\n\n` +
-    `**Channel Comparison:**\n` +
-    result.comparison.map(c => `- ${c.channel}: ${c.marginPct.toFixed(1)}% margin, $${c.profitPerUnit.toFixed(2)}/unit`).join("\n");
-
-  return { success: true, message, data: result };
-}
-
 async function handleRunScenario(
   params: Record<string, unknown>,
 ): Promise<ActionResult> {
@@ -1929,36 +1929,9 @@ async function handleRunScenario(
 // ---------------------------------------------------------------------------
 
 async function handleReadEmail(params: Record<string, unknown>): Promise<ActionResult> {
-  let messageId = typeof params.message_id === "string" ? params.message_id.trim() : "";
-
-  // If no message_id provided, or it looks like a search query rather than a Gmail ID,
-  // search Gmail first to find the actual message ID
-  const searchQuery = typeof params.query === "string" ? params.query.trim()
-    : typeof params.search === "string" ? params.search.trim()
-    : "";
-  const looksLikeSearch = messageId.includes("search:") || messageId.includes("from:") ||
-    messageId.includes("subject:") || messageId.includes(" ") || messageId.length > 30;
-
-  if ((!messageId || looksLikeSearch) && (searchQuery || messageId)) {
-    try {
-      const { searchEmails } = await import("@/lib/ops/gmail-reader");
-      const query = searchQuery || messageId.replace(/^search:/i, "").trim();
-      const results = await searchEmails(query, 3);
-      if (results && results.length > 0) {
-        messageId = results[0].id || "";
-        if (!messageId) {
-          return { success: false, message: `Search found ${results.length} results for "${query}" but couldn't extract message ID.` };
-        }
-      } else {
-        return { success: false, message: `No emails found matching "${query}". Try a different search term.` };
-      }
-    } catch (searchErr) {
-      return { success: false, message: `Email search failed: ${searchErr instanceof Error ? searchErr.message : String(searchErr)}` };
-    }
-  }
-
+  const messageId = typeof params.message_id === "string" ? params.message_id.trim() : "";
   if (!messageId) {
-    return { success: false, message: "message_id or query/search is required. Either provide a Gmail message ID or a search query like 'from:reid mitchell'." };
+    return { success: false, message: "message_id is required. Use the message ID from the LIVE INBOX feed (e.g., '1234abcd5678efgh')." };
   }
 
   try {
@@ -2162,10 +2135,7 @@ async function handleQueryQBO(params: Record<string, unknown>): Promise<ActionRe
   try {
     switch (queryType) {
       case "accounts": {
-        const res = await fetch(`${baseUrl}/api/ops/qbo/accounts`, {
-          headers: getInternalOpsHeaders(),
-          signal: AbortSignal.timeout(QBO_TIMEOUT_MS),
-        });
+        const res = await fetch(`${baseUrl}/api/ops/qbo/accounts`, { signal: AbortSignal.timeout(QBO_TIMEOUT_MS) });
         if (!res.ok) return { success: false, message: `QBO accounts query failed: ${res.status}` };
         const data = await res.json();
         const accounts = (data.accounts || [])
@@ -2212,10 +2182,7 @@ async function handleQueryQBO(params: Record<string, unknown>): Promise<ActionRe
         };
       }
       case "vendors": {
-        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=vendors`, {
-          headers: getInternalOpsHeaders(),
-          signal: AbortSignal.timeout(QBO_TIMEOUT_MS),
-        });
+        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=vendors`, { signal: AbortSignal.timeout(QBO_TIMEOUT_MS) });
         if (!res.ok) return { success: false, message: `QBO vendor query failed: ${res.status}` };
         const data = (await res.json()) as { count: number; vendors: Array<{ Name: string; Balance: number; Active: boolean; Email: string | null; Phone: string | null }> };
         if (data.count === 0) {
@@ -2236,10 +2203,7 @@ async function handleQueryQBO(params: Record<string, unknown>): Promise<ActionRe
         const start = typeof params.start === "string" ? params.start : undefined;
         const end = typeof params.end === "string" ? params.end : undefined;
         const qs = [start ? `start=${start}` : "", end ? `end=${end}` : ""].filter(Boolean).join("&");
-        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=pnl${qs ? `&${qs}` : ""}`, {
-          headers: getInternalOpsHeaders(),
-          signal: AbortSignal.timeout(QBO_TIMEOUT_MS),
-        });
+        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=pnl${qs ? `&${qs}` : ""}`, { signal: AbortSignal.timeout(QBO_TIMEOUT_MS) });
         if (!res.ok) return { success: false, message: `QBO P&L report failed: ${res.status}` };
         const data = (await res.json()) as { period: { start: string; end: string }; summary: Record<string, string | number> };
         const entries = Object.entries(data.summary);
@@ -2254,10 +2218,7 @@ async function handleQueryQBO(params: Record<string, unknown>): Promise<ActionRe
         };
       }
       case "balance_sheet": {
-        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=balance_sheet`, {
-          headers: getInternalOpsHeaders(),
-          signal: AbortSignal.timeout(QBO_TIMEOUT_MS),
-        });
+        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=balance_sheet`, { signal: AbortSignal.timeout(QBO_TIMEOUT_MS) });
         if (!res.ok) return { success: false, message: `QBO balance sheet failed: ${res.status}` };
         const data = (await res.json()) as { asOf: string; summary: Record<string, string | number> };
         const entries = Object.entries(data.summary);
@@ -2271,15 +2232,9 @@ async function handleQueryQBO(params: Record<string, unknown>): Promise<ActionRe
           data,
         };
       }
-      case "transactions":
-      case "expenses":
-      case "recent_purchases":
       case "purchases": {
         const limit = typeof params.limit === "number" ? params.limit : 20;
-        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=purchases&limit=${limit}`, {
-          headers: getInternalOpsHeaders(),
-          signal: AbortSignal.timeout(QBO_TIMEOUT_MS),
-        });
+        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=purchases&limit=${limit}`, { signal: AbortSignal.timeout(QBO_TIMEOUT_MS) });
         if (!res.ok) return { success: false, message: `QBO purchases query failed: ${res.status}` };
         const data = (await res.json()) as { count: number; purchases: Array<{ Date: string; Amount: number; Vendor: string | null; Note: string | null; Lines: Array<{ Description: string; Amount: number; Account: string }> }> };
         if (data.count === 0) {
@@ -2300,10 +2255,7 @@ async function handleQueryQBO(params: Record<string, unknown>): Promise<ActionRe
         const start = typeof params.start === "string" ? params.start : undefined;
         const end = typeof params.end === "string" ? params.end : undefined;
         const qs = [start ? `start=${start}` : "", end ? `end=${end}` : ""].filter(Boolean).join("&");
-        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=cash_flow${qs ? `&${qs}` : ""}`, {
-          headers: getInternalOpsHeaders(),
-          signal: AbortSignal.timeout(QBO_TIMEOUT_MS),
-        });
+        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=cash_flow${qs ? `&${qs}` : ""}`, { signal: AbortSignal.timeout(QBO_TIMEOUT_MS) });
         if (!res.ok) return { success: false, message: `QBO cash flow report failed: ${res.status}` };
         const data = (await res.json()) as { period: { start: string; end: string }; summary: Record<string, string | number> };
         const entries = Object.entries(data.summary);
@@ -2321,10 +2273,7 @@ async function handleQueryQBO(params: Record<string, unknown>): Promise<ActionRe
         const start = typeof params.start === "string" ? params.start : undefined;
         const end = typeof params.end === "string" ? params.end : undefined;
         const qs = [start ? `start=${start}` : "", end ? `end=${end}` : ""].filter(Boolean).join("&");
-        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=bills${qs ? `&${qs}` : ""}`, {
-          headers: getInternalOpsHeaders(),
-          signal: AbortSignal.timeout(QBO_TIMEOUT_MS),
-        });
+        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=bills${qs ? `&${qs}` : ""}`, { signal: AbortSignal.timeout(QBO_TIMEOUT_MS) });
         if (!res.ok) return { success: false, message: `QBO bills query failed: ${res.status}` };
         const data = (await res.json()) as { count: number; bills: Array<{ Date: string; Amount: number; Balance: number; Vendor: string | null; DueDate: string | null; Status: string }> };
         if (data.count === 0) return { success: true, message: "No bills found in QBO." };
@@ -2345,10 +2294,7 @@ async function handleQueryQBO(params: Record<string, unknown>): Promise<ActionRe
         const start = typeof params.start === "string" ? params.start : undefined;
         const end = typeof params.end === "string" ? params.end : undefined;
         const qs = [start ? `start=${start}` : "", end ? `end=${end}` : ""].filter(Boolean).join("&");
-        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=invoices${qs ? `&${qs}` : ""}`, {
-          headers: getInternalOpsHeaders(),
-          signal: AbortSignal.timeout(QBO_TIMEOUT_MS),
-        });
+        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=invoices${qs ? `&${qs}` : ""}`, { signal: AbortSignal.timeout(QBO_TIMEOUT_MS) });
         if (!res.ok) return { success: false, message: `QBO invoices query failed: ${res.status}` };
         const data = (await res.json()) as { count: number; invoices: Array<{ Date: string; Amount: number; Balance: number; Customer: string | null; DocNumber: string | null; Status: string }> };
         if (data.count === 0) return { success: true, message: "No invoices found in QBO." };
@@ -2366,10 +2312,7 @@ async function handleQueryQBO(params: Record<string, unknown>): Promise<ActionRe
         };
       }
       case "customers": {
-        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=customers`, {
-          headers: getInternalOpsHeaders(),
-          signal: AbortSignal.timeout(QBO_TIMEOUT_MS),
-        });
+        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=customers`, { signal: AbortSignal.timeout(QBO_TIMEOUT_MS) });
         if (!res.ok) return { success: false, message: `QBO customers query failed: ${res.status}` };
         const data = (await res.json()) as { count: number; customers: Array<{ Name: string; Balance: number; Active: boolean; Email: string | null; Phone: string | null }> };
         if (data.count === 0) return { success: true, message: "No customers found in QBO." };
@@ -2387,10 +2330,7 @@ async function handleQueryQBO(params: Record<string, unknown>): Promise<ActionRe
         };
       }
       case "metrics": {
-        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=metrics`, {
-          headers: getInternalOpsHeaders(),
-          signal: AbortSignal.timeout(QBO_TIMEOUT_MS),
-        });
+        const res = await fetch(`${baseUrl}/api/ops/qbo/query?type=metrics`, { signal: AbortSignal.timeout(QBO_TIMEOUT_MS) });
         if (!res.ok) return { success: false, message: `QBO metrics query failed: ${res.status}` };
         const data = (await res.json()) as {
           cashPosition: number; burnRate: number; runway: number | null;
@@ -2461,14 +2401,8 @@ async function handleQBOSetupAssessment(_params: Record<string, unknown>): Promi
   try {
     // Fetch accounts, vendors, and uncategorized transaction preview in parallel
     const [accountsRes, vendorsRes, uncatRes] = await Promise.allSettled([
-      fetch(`${baseUrl}/api/ops/qbo/accounts`, {
-        headers: getInternalOpsHeaders(),
-        signal: AbortSignal.timeout(QBO_TIMEOUT_MS),
-      }),
-      fetch(`${baseUrl}/api/ops/qbo/query?type=vendors`, {
-        headers: getInternalOpsHeaders(),
-        signal: AbortSignal.timeout(QBO_TIMEOUT_MS),
-      }),
+      fetch(`${baseUrl}/api/ops/qbo/accounts`, { signal: AbortSignal.timeout(QBO_TIMEOUT_MS) }),
+      fetch(`${baseUrl}/api/ops/qbo/query?type=vendors`, { signal: AbortSignal.timeout(QBO_TIMEOUT_MS) }),
       fetch(`${baseUrl}/api/ops/qbo/categorize-batch`, {
         method: "POST",
         headers: { Authorization: `Bearer ${cronSecret}`, "Content-Type": "application/json" },
@@ -2707,15 +2641,6 @@ async function handleBatchCategorizeQBO(
     });
 
     const text = await res.text();
-
-    // Guard: if response is HTML (Vercel 404, QBO auth redirect, etc.), don't try to parse as JSON
-    if (text.trimStart().startsWith("<!") || text.trimStart().startsWith("<html")) {
-      return {
-        success: false,
-        message: `QBO batch categorization unavailable — endpoint returned HTML instead of JSON (likely QBO OAuth expired or deployment issue). Re-authenticate QBO at /ops/settings.`,
-      };
-    }
-
     const data = text ? (JSON.parse(text) as Record<string, unknown>) : {};
     if (!res.ok) {
       return {
@@ -2754,117 +2679,6 @@ async function handleBatchCategorizeQBO(
     };
   }
 }
-
-// ---------------------------------------------------------------------------
-// QBO: Create Vendor
-// ---------------------------------------------------------------------------
-
-async function handleCreateQBOVendor(
-  params: Record<string, unknown>,
-): Promise<ActionResult> {
-  const name = String(params.name || params.DisplayName || params.vendor_name || "").trim();
-  if (!name) return { success: false, message: "Vendor name is required" };
-
-  try {
-    const { createQBOVendor } = await import("@/lib/ops/qbo-client");
-    const result = await createQBOVendor({
-      DisplayName: name,
-      CompanyName: String(params.company_name || params.CompanyName || name),
-      ...(params.email ? { PrimaryEmailAddr: { Address: String(params.email) } } : {}),
-      ...(params.phone ? { PrimaryPhone: { FreeFormNumber: String(params.phone) } } : {}),
-      ...(params.address ? {
-        BillAddr: {
-          Line1: String(params.address),
-          City: String(params.city || ""),
-          CountrySubDivisionCode: String(params.state || ""),
-          PostalCode: String(params.zip || ""),
-        },
-      } : {}),
-    });
-
-    if (!result) return { success: false, message: "QBO vendor creation failed — check QBO connection" };
-    const vendorData = (result as Record<string, unknown>).Vendor || result;
-    const vendorId = (vendorData as Record<string, unknown>).Id || "unknown";
-    return {
-      success: true,
-      message: `✅ Created vendor "${name}" in QBO (ID: ${vendorId})`,
-      data: { vendorId, name },
-    };
-  } catch (err) {
-    return { success: false, message: `QBO vendor creation failed: ${err instanceof Error ? err.message : String(err)}` };
-  }
-}
-
-// ---------------------------------------------------------------------------
-// QBO: Create Account (Chart of Accounts)
-// ---------------------------------------------------------------------------
-
-async function handleCreateQBOAccount(
-  params: Record<string, unknown>,
-): Promise<ActionResult> {
-  const name = String(params.name || params.Name || params.account_name || "").trim();
-  const accountType = String(params.type || params.AccountType || params.account_type || "").trim();
-  if (!name) return { success: false, message: "Account name is required" };
-  if (!accountType) return { success: false, message: "Account type is required (e.g., Expense, Income, Cost of Goods Sold, Bank, Other Current Asset)" };
-
-  try {
-    const { createQBOAccount } = await import("@/lib/ops/qbo-client");
-    const result = await createQBOAccount({
-      Name: name,
-      AccountType: accountType,
-      ...(params.sub_type || params.AccountSubType ? { AccountSubType: String(params.sub_type || params.AccountSubType) } : {}),
-      ...(params.number || params.AcctNum ? { AcctNum: String(params.number || params.AcctNum) } : {}),
-      ...(params.description || params.Description ? { Description: String(params.description || params.Description) } : {}),
-    });
-
-    if (!result) return { success: false, message: "QBO account creation failed — check QBO connection" };
-    const acctData = (result as Record<string, unknown>).Account || result;
-    const acctId = (acctData as Record<string, unknown>).Id || "unknown";
-    return {
-      success: true,
-      message: `✅ Created account "${name}" (${accountType}) in QBO (ID: ${acctId})`,
-      data: { accountId: acctId, name, type: accountType },
-    };
-  } catch (err) {
-    return { success: false, message: `QBO account creation failed: ${err instanceof Error ? err.message : String(err)}` };
-  }
-}
-
-// ---------------------------------------------------------------------------
-// QBO: Create Customer
-// ---------------------------------------------------------------------------
-
-async function handleCreateQBOCustomerAction(
-  params: Record<string, unknown>,
-): Promise<ActionResult> {
-  const name = String(params.name || params.DisplayName || params.customer_name || "").trim();
-  if (!name) return { success: false, message: "Customer name is required" };
-
-  try {
-    const { createQBOCustomer } = await import("@/lib/ops/qbo-client");
-    const result = await createQBOCustomer({
-      DisplayName: name,
-      ...(params.company ? { CompanyName: String(params.company) } : {}),
-      ...(params.email ? { PrimaryEmailAddr: { Address: String(params.email) } } : {}),
-      ...(params.phone ? { PrimaryPhone: { FreeFormNumber: String(params.phone) } } : {}),
-    });
-
-    if (!result) return { success: false, message: "QBO customer creation failed" };
-    const custData = (result as Record<string, unknown>).Customer || result;
-    const custId = (custData as Record<string, unknown>).Id || "unknown";
-    return {
-      success: true,
-      message: `✅ Created customer "${name}" in QBO (ID: ${custId})`,
-      data: { customerId: custId, name },
-    };
-  } catch (err) {
-    return { success: false, message: `QBO customer creation failed: ${err instanceof Error ? err.message : String(err)}` };
-  }
-}
-
-// ---------------------------------------------------------------------------
-// QBO: Create Invoice
-// ---------------------------------------------------------------------------
 
 async function handleCreateQBOInvoice(
   params: Record<string, unknown>,
@@ -2933,168 +2747,6 @@ async function handleCreateQBOInvoice(
       message: `QBO invoice error: ${err instanceof Error ? err.message : String(err)}`,
     };
   }
-}
-
-// ─── QBO Bill Creation (vendor → us payments) ───
-async function handleCreateQBOBill(
-  params: Record<string, unknown>,
-): Promise<ActionResult> {
-  const vendorName = sanitizeTitle(String(params.vendorName || params.vendor_name || params.vendor || ""));
-  const memo = sanitizeText(String(params.memo || params.description || ""), 1000);
-  const txnDate = String(params.date || params.txn_date || new Date().toISOString().slice(0, 10)).trim();
-  const dueDateRaw = String(params.dueDate || params.due_date || "").trim();
-  const rawLineItems = Array.isArray(params.lineItems) ? params.lineItems
-    : Array.isArray(params.line_items) ? params.line_items : [];
-
-  // If no line items but amount provided, create a single-line bill
-  const amount = Number(params.amount || 0);
-  const accountId = String(params.account_id || params.accountId || "").trim();
-  const category = String(params.category || "").trim();
-
-  const lineItems = rawLineItems.length > 0
-    ? rawLineItems.map((item) => {
-        if (!item || typeof item !== "object") return null;
-        const row = item as Record<string, unknown>;
-        return {
-          description: sanitizeTitle(String(row.description || "")),
-          amount: Number(row.amount || 0),
-          accountId: String(row.account_id || row.accountId || ""),
-        };
-      }).filter((item): item is { description: string; amount: number; accountId: string } => !!item && item.amount > 0)
-    : amount > 0
-      ? [{ description: memo || `Bill from ${vendorName}`, amount, accountId: accountId || "" }]
-      : [];
-
-  if (!vendorName) return { success: false, message: "vendor_name is required" };
-  if (lineItems.length === 0) return { success: false, message: "At least one line item with amount is required (or provide 'amount' directly)" };
-
-  const totalAmount = lineItems.reduce((s, l) => s + l.amount, 0);
-
-  try {
-    const { getValidAccessToken, getRealmId, forceRefreshTokens } = await import("@/lib/ops/qbo-auth");
-    let accessToken = await getValidAccessToken();
-    if (!accessToken) return { success: false, message: "QBO not connected" };
-    const realmId = await getRealmId();
-    if (!realmId) return { success: false, message: "QBO realm ID not found" };
-
-    const qboBase = process.env.QBO_SANDBOX === "true"
-      ? "https://sandbox-quickbooks.api.intuit.com"
-      : "https://quickbooks.api.intuit.com";
-
-    // Look up or create vendor
-    let vendorId: string | null = null;
-    const vendorSearch = await fetch(
-      `${qboBase}/v3/company/${realmId}/query?query=${encodeURIComponent(`SELECT Id FROM Vendor WHERE DisplayName = '${vendorName.replace(/'/g, "\\'")}'`)}&minorversion=73`,
-      { headers: { Accept: "application/json", Authorization: `Bearer ${accessToken}` }, signal: AbortSignal.timeout(10000) },
-    );
-    if (vendorSearch.ok) {
-      const vendorData = (await vendorSearch.json()) as { QueryResponse?: { Vendor?: Array<{ Id: string }> } };
-      vendorId = vendorData.QueryResponse?.Vendor?.[0]?.Id || null;
-    }
-
-    if (!vendorId) {
-      // Create vendor
-      const createRes = await fetch(`${qboBase}/v3/company/${realmId}/vendor?minorversion=73`, {
-        method: "POST",
-        headers: { Accept: "application/json", Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ DisplayName: vendorName }),
-        signal: AbortSignal.timeout(10000),
-      });
-      if (createRes.ok) {
-        const created = (await createRes.json()) as { Vendor?: { Id: string } };
-        vendorId = created.Vendor?.Id || null;
-      }
-    }
-
-    if (!vendorId) return { success: false, message: `Could not find or create vendor "${vendorName}" in QBO` };
-
-    // Create bill
-    const billBody: Record<string, unknown> = {
-      VendorRef: { value: vendorId },
-      TxnDate: txnDate,
-      Line: lineItems.map((li, i) => ({
-        Id: String(i + 1),
-        Amount: li.amount,
-        Description: li.description,
-        DetailType: "AccountBasedExpenseLineDetail",
-        AccountBasedExpenseLineDetail: li.accountId
-          ? { AccountRef: { value: li.accountId } }
-          : {},
-      })),
-    };
-    if (dueDateRaw && /^\d{4}-\d{2}-\d{2}$/.test(dueDateRaw)) billBody.DueDate = dueDateRaw;
-    if (memo) billBody.PrivateNote = memo;
-
-    let res = await fetch(`${qboBase}/v3/company/${realmId}/bill?minorversion=73`, {
-      method: "POST",
-      headers: { Accept: "application/json", Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-      body: JSON.stringify(billBody),
-      signal: AbortSignal.timeout(15000),
-    });
-
-    // Retry on 401
-    if (res.status === 401) {
-      const newToken = await forceRefreshTokens();
-      if (newToken) {
-        accessToken = newToken;
-        res = await fetch(`${qboBase}/v3/company/${realmId}/bill?minorversion=73`, {
-          method: "POST",
-          headers: { Accept: "application/json", Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-          body: JSON.stringify(billBody),
-          signal: AbortSignal.timeout(15000),
-        });
-      }
-    }
-
-    if (!res.ok) {
-      const errText = await res.text().catch(() => "");
-      return { success: false, message: `QBO bill creation failed (${res.status}): ${errText.slice(0, 300)}` };
-    }
-
-    const billData = (await res.json()) as { Bill?: { Id: string; DocNumber: string } };
-    return {
-      success: true,
-      message: `Created QBO bill #${billData.Bill?.DocNumber || billData.Bill?.Id || "?"} for ${vendorName} — $${totalAmount.toFixed(2)}`,
-      data: { billId: billData.Bill?.Id, docNumber: billData.Bill?.DocNumber, total: totalAmount },
-    };
-  } catch (err) {
-    return { success: false, message: `QBO bill error: ${err instanceof Error ? err.message : String(err)}` };
-  }
-}
-
-// ─── Amazon Write Framework (stub — needs Advertising API credentials) ───
-async function handleAmazonUpdatePrice(
-  params: Record<string, unknown>,
-): Promise<ActionResult> {
-  const asin = String(params.asin || "B0G1JK92TJ").trim();
-  const newPrice = Number(params.price || 0);
-  const sku = String(params.sku || "C3-8YSA-IL5I").trim();
-
-  if (newPrice <= 0) return { success: false, message: "price must be a positive number" };
-  if (newPrice < 1 || newPrice > 100) return { success: false, message: "price must be between $1 and $100" };
-
-  // TODO: Implement when SP-API write permissions are granted
-  // The SP-API endpoint is: POST /listings/2021-08-01/items/{sellerId}/{sku}
-  // with patches array: [{ op: "replace", path: "/attributes/purchasable_offer", value: [...] }]
-  return {
-    success: false,
-    message: `Amazon price update not yet configured. Would set ASIN ${asin} (SKU ${sku}) to $${newPrice.toFixed(2)}. Requires SP-API Listings write permissions — contact Ben to enable.`,
-  };
-}
-
-async function handleAmazonUpdatePPC(
-  params: Record<string, unknown>,
-): Promise<ActionResult> {
-  const campaignId = String(params.campaign_id || "").trim();
-  const action = String(params.action || "").trim(); // adjust_bid, pause, resume, set_budget
-  const value = Number(params.value || 0);
-
-  // TODO: Implement when Amazon Advertising API credentials are configured
-  // API: advertising.amazon.com/v2/sp/campaigns/{campaignId}
-  return {
-    success: false,
-    message: `Amazon PPC management not yet configured. Would ${action} on campaign ${campaignId || "(default)"}${value > 0 ? ` with value $${value.toFixed(2)}` : ""}. Requires Amazon Advertising API credentials — set AMAZON_ADS_CLIENT_ID and AMAZON_ADS_CLIENT_SECRET.`,
-  };
 }
 
 async function handleUpdateShopifyInventory(
@@ -3379,131 +3031,15 @@ async function fetchDataForFileGeneration(
         rows,
       }];
     }
-    case "kpi_daily_revenue":
-    case "kpi_revenue_by_channel":
-    case "kpi_revenue": {
-      // Pull daily revenue by channel from Supabase kpi_timeseries
-      const now = new Date();
-      const monthStr = now.toISOString().slice(0, 7);
-      const firstOfMonth = `${monthStr}-01`;
-      const metrics = encodeURIComponent("(daily_revenue_shopify,daily_revenue_amazon,daily_orders_shopify,daily_orders_amazon)");
-      const rows = (await sbFetch(
-        `/rest/v1/kpi_timeseries?window_type=eq.daily&metric_name=in.${metrics}&captured_for_date=gte.${firstOfMonth}&select=metric_name,value,captured_for_date&order=captured_for_date.asc&limit=500`,
-      )) as Array<{ metric_name: string; value: unknown; captured_for_date: string }>;
-
-      const safeRows = Array.isArray(rows) ? rows : [];
-      // Group by date
-      const byDate = new Map<string, { shopify_rev: number; amazon_rev: number; shopify_orders: number; amazon_orders: number }>();
-      for (const r of safeRows) {
-        const d = r.captured_for_date;
-        if (!byDate.has(d)) byDate.set(d, { shopify_rev: 0, amazon_rev: 0, shopify_orders: 0, amazon_orders: 0 });
-        const entry = byDate.get(d)!;
-        const v = typeof r.value === "number" ? r.value : parseFloat(String(r.value ?? 0)) || 0;
-        if (r.metric_name === "daily_revenue_shopify") entry.shopify_rev += v;
-        else if (r.metric_name === "daily_revenue_amazon") entry.amazon_rev += v;
-        else if (r.metric_name === "daily_orders_shopify") entry.shopify_orders += v;
-        else if (r.metric_name === "daily_orders_amazon") entry.amazon_orders += v;
-      }
-
-      const dates = Array.from(byDate.keys()).sort();
-      // Compute 7-day rolling average (total revenue)
-      const dailyTotals = dates.map((d) => (byDate.get(d)!.shopify_rev + byDate.get(d)!.amazon_rev));
-      const dataRows: (string | number | null)[][] = dates.map((date, i) => {
-        const e = byDate.get(date)!;
-        const total = e.shopify_rev + e.amazon_rev;
-        const totalOrders = e.shopify_orders + e.amazon_orders;
-        const window = dailyTotals.slice(Math.max(0, i - 6), i + 1);
-        const rolling7d = window.length > 0 ? Math.round((window.reduce((s, v) => s + v, 0) / window.length) * 100) / 100 : 0;
-        const shopifyPct = total > 0 ? Math.round((e.shopify_rev / total) * 1000) / 10 : 0;
-        const amazonPct = total > 0 ? Math.round((e.amazon_rev / total) * 1000) / 10 : 0;
-        return [date, Math.round(e.shopify_rev * 100) / 100, Math.round(e.amazon_rev * 100) / 100, Math.round(total * 100) / 100, Math.round(e.shopify_orders), Math.round(e.amazon_orders), Math.round(totalOrders), shopifyPct, amazonPct, rolling7d];
-      });
-
-      // Summary sheet
-      const shopifyTotal = dates.reduce((s, d) => s + byDate.get(d)!.shopify_rev, 0);
-      const amazonTotal = dates.reduce((s, d) => s + byDate.get(d)!.amazon_rev, 0);
-      const grandTotal = shopifyTotal + amazonTotal;
-      const shopifyOrders = dates.reduce((s, d) => s + byDate.get(d)!.shopify_orders, 0);
-      const amazonOrders = dates.reduce((s, d) => s + byDate.get(d)!.amazon_orders, 0);
-      const totalOrders = shopifyOrders + amazonOrders;
-
-      return [
-        {
-          sheetName: "Daily Revenue",
-          headers: ["Date", "Shopify ($)", "Amazon ($)", "Total ($)", "Shopify Orders", "Amazon Orders", "Total Orders", "Shopify Mix %", "Amazon Mix %", "7-Day Rolling Avg ($)"],
-          rows: dataRows,
-        },
-        {
-          sheetName: "Summary",
-          headers: ["Channel", "Revenue ($)", "Orders", "AOV ($)", "Mix %"],
-          rows: [
-            ["Shopify", Math.round(shopifyTotal * 100) / 100, Math.round(shopifyOrders), shopifyOrders > 0 ? Math.round((shopifyTotal / shopifyOrders) * 100) / 100 : 0, grandTotal > 0 ? Math.round((shopifyTotal / grandTotal) * 1000) / 10 : 0],
-            ["Amazon", Math.round(amazonTotal * 100) / 100, Math.round(amazonOrders), amazonOrders > 0 ? Math.round((amazonTotal / amazonOrders) * 100) / 100 : 0, grandTotal > 0 ? Math.round((amazonTotal / grandTotal) * 1000) / 10 : 0],
-            ["TOTAL", Math.round(grandTotal * 100) / 100, Math.round(totalOrders), totalOrders > 0 ? Math.round((grandTotal / totalOrders) * 100) / 100 : 0, 100],
-          ],
-        },
-      ];
-    }
     default:
-      throw new Error(`Unknown data source: "${source}". Supported: qbo_accounts, qbo_vendors, qbo_pnl, kpi_daily_revenue, kpi_revenue_by_channel`);
-  }
-}
-
-async function handleQueryKPI(params: Record<string, unknown>): Promise<ActionResult> {
-  const date = typeof params.date === "string" ? params.date.trim() : "";
-  const startDate = typeof params.start_date === "string" ? params.start_date.trim() : date;
-  const endDate = typeof params.end_date === "string" ? params.end_date.trim() : date;
-  const metric = typeof params.metric === "string" ? params.metric.trim() : "";
-
-  if (!startDate) return { success: false, message: "date or start_date required (YYYY-MM-DD)" };
-
-  const metrics = metric
-    ? encodeURIComponent(`(${metric})`)
-    : encodeURIComponent("(daily_revenue_shopify,daily_revenue_amazon,daily_orders_shopify,daily_orders_amazon)");
-
-  try {
-    const dateFilter = startDate === endDate
-      ? `captured_for_date=eq.${startDate}`
-      : `captured_for_date=gte.${startDate}&captured_for_date=lte.${endDate}`;
-
-    const rows = (await sbFetch(
-      `/rest/v1/kpi_timeseries?window_type=eq.daily&metric_name=in.${metrics}&${dateFilter}&select=metric_name,value,captured_for_date&order=captured_for_date.asc&limit=200`,
-    )) as Array<{ metric_name: string; value: number; captured_for_date: string }>;
-
-    const safeRows = Array.isArray(rows) ? rows : [];
-    if (safeRows.length === 0) {
-      return { success: true, message: `No KPI data found for ${startDate}${endDate !== startDate ? ` to ${endDate}` : ""}`, data: { rows: [] } };
-    }
-
-    // Aggregate by date
-    const byDate = new Map<string, Record<string, number>>();
-    for (const r of safeRows) {
-      if (!byDate.has(r.captured_for_date)) byDate.set(r.captured_for_date, {});
-      byDate.get(r.captured_for_date)![r.metric_name] = Number(r.value) || 0;
-    }
-
-    const summary = Array.from(byDate.entries()).map(([d, metrics]) => {
-      const shopRev = metrics.daily_revenue_shopify || 0;
-      const amzRev = metrics.daily_revenue_amazon || 0;
-      const shopOrd = metrics.daily_orders_shopify || 0;
-      const amzOrd = metrics.daily_orders_amazon || 0;
-      return `${d}: Shopify $${shopRev.toFixed(2)} (${Math.round(shopOrd)} orders), Amazon $${amzRev.toFixed(2)} (${Math.round(amzOrd)} orders), Total $${(shopRev + amzRev).toFixed(2)}`;
-    }).join("\n");
-
-    return {
-      success: true,
-      message: summary,
-      data: { dates: Object.fromEntries(byDate), rowCount: safeRows.length },
-    };
-  } catch (err) {
-    return { success: false, message: `KPI query failed: ${err instanceof Error ? err.message : err}` };
+      throw new Error(`Unknown data source: "${source}". Supported: qbo_accounts, qbo_vendors, qbo_pnl`);
   }
 }
 
 async function handleGenerateFile(params: Record<string, unknown>): Promise<ActionResult> {
   // Fall back to configured default Slack channel when the caller (e.g. web chat) has no channel context.
   // Set ABRA_SLACK_CHANNEL_ID in Vercel env to a Slack channel ID (e.g. C01234567) for web-chat file uploads.
-  const DEFAULT_CHANNEL = (process.env.ABRA_SLACK_CHANNEL_ID || process.env.SLACK_OPS_CHANNEL_ID || process.env.SLACK_CHANNEL_DAILY || "").trim();
+  const DEFAULT_CHANNEL = (process.env.ABRA_SLACK_CHANNEL_ID || process.env.SLACK_OPS_CHANNEL_ID || "").trim();
   const channelId = String(params.channel_id || params.channelId || DEFAULT_CHANNEL);
   console.log(`[handleGenerateFile] ENTRY — params keys: ${Object.keys(params).join(", ")}, channel_id=${channelId || "NONE"}, hasHeaders=${Array.isArray(params.headers)}, hasRows=${Array.isArray(params.rows)}, hasSheets=${Array.isArray(params.sheets)}, source=${params.source || "none"}`);
   const threadTs = params.thread_ts ? String(params.thread_ts) : undefined;
@@ -3515,14 +3051,6 @@ async function handleGenerateFile(params: Record<string, unknown>): Promise<Acti
   // If a data source is specified, fetch data server-side instead of from Claude's output
   // This allows large datasets (e.g., 169 QBO accounts) without hitting Claude output limits
   const source = typeof params.source === "string" ? params.source : "";
-  // Whitelist allowed data sources to prevent unauthorized data export
-  const ALLOWED_SOURCES = new Set([
-    "qbo_accounts", "qbo_chart_of_accounts", "qbo_vendors", "qbo_pnl",
-    "kpi_daily_revenue", "kpi_revenue_by_channel", "kpi_timeseries",
-  ]);
-  if (source && !ALLOWED_SOURCES.has(source)) {
-    return { success: false, message: `Unknown data source: "${source}". Supported: ${[...ALLOWED_SOURCES].join(", ")}` };
-  }
   if (source) {
     try {
       const fetchedSheets = await fetchDataForFileGeneration(source, params);
@@ -3595,76 +3123,6 @@ async function handleGenerateFile(params: Record<string, unknown>): Promise<Acti
   };
 }
 
-// ─── Pre-flight param validation ───
-// Checks required params before dispatching to handlers.
-// Returns null if valid, or an error message if required params are missing.
-const REQUIRED_PARAMS: Record<string, string[]> = {
-  // Communication
-  send_slack: ["message"],
-  send_email: ["to", "subject", "body"],
-  draft_email_reply: ["to", "subject", "body"],
-  // Email reading
-  read_email: [], // message_id OR query — validated in handler
-  search_email: ["query"],
-  // Tasks & Notion
-  create_task: ["title"],
-  update_notion: ["page_id"],
-  create_brain_entry: ["title", "text"],
-  create_notion_page: ["title"],
-  // Finance
-  record_transaction: ["type", "amount"],
-  correct_claim: ["original_claim", "correction"],
-  query_qbo: ["query_type"],
-  query_kpi: [], // metric or date — flexible params
-  query_ledger: [], // query string — flexible
-  // QBO write
-  create_qbo_vendor: ["name"],
-  create_qbo_account: ["name", "type"],
-  create_qbo_customer: ["name"],
-  create_qbo_invoice: ["customer_name"],
-  create_qbo_bill: ["vendor_name"],
-  categorize_qbo_transaction: ["transaction_id", "account_id"],
-  batch_categorize_qbo: ["mode"],
-  reconcile_transactions: [],
-  qbo_setup_assessment: [],
-  // File generation
-  generate_file: ["filename"],
-  // Operations
-  acknowledge_signal: ["signal_id"],
-  pause_initiative: ["initiative_id"],
-  log_production_run: ["manufacturer", "run_date", "total_units_ordered", "total_cost"],
-  record_vendor_quote: ["vendor", "item_description", "quoted_price"],
-  run_scenario: ["scenario_name"],
-  run_monthly_close: ["period"],
-  start_workflow: ["workflow_id"],
-  resume_workflow: ["run_id"],
-  calculate_deal: ["channel"],
-  // Shopify
-  query_shopify_orders: [],
-  update_shopify_inventory: ["variant_id", "quantity"],
-  create_shopify_discount: ["code", "percentage"],
-  create_shopify_product_draft: ["title"],
-  create_wholesale_draft_order: ["customer"],
-  // Amazon (stubs)
-  amazon_update_price: ["price"],
-  amazon_update_ppc: ["action"],
-};
-
-function validateActionParams(actionType: string, params: Record<string, unknown>): string | null {
-  const required = REQUIRED_PARAMS[actionType];
-  if (!required) return null; // No requirements defined = pass
-
-  const missing = required.filter((key) => {
-    const val = params[key];
-    return val === undefined || val === null || val === "";
-  });
-
-  if (missing.length > 0) {
-    return `${actionType} requires: ${missing.join(", ")}`;
-  }
-  return null;
-}
-
 const ACTION_HANDLERS: Record<
   string,
   (params: Record<string, unknown>) => Promise<ActionResult>
@@ -3683,7 +3141,6 @@ const ACTION_HANDLERS: Record<
   correct_claim: handleCorrectClaim,
   log_production_run: handleLogProductionRun,
   record_vendor_quote: handleRecordVendorQuote,
-  calculate_deal: handleCalculateDeal,
   run_scenario: handleRunScenario,
   read_email: handleReadEmail,
   search_email: handleSearchEmail,
@@ -3692,10 +3149,6 @@ const ACTION_HANDLERS: Record<
   categorize_qbo_transaction: handleCategorizeQBOTransaction,
   batch_categorize_qbo: handleBatchCategorizeQBO,
   create_qbo_invoice: handleCreateQBOInvoice,
-  create_qbo_vendor: handleCreateQBOVendor,
-  create_qbo_account: handleCreateQBOAccount,
-  create_qbo_bill: handleCreateQBOBill,
-  create_qbo_customer: handleCreateQBOCustomerAction,
   update_shopify_inventory: handleUpdateShopifyInventory,
   create_shopify_discount: handleCreateShopifyDiscount,
   query_shopify_orders: handleQueryShopifyOrders,
@@ -3706,10 +3159,6 @@ const ACTION_HANDLERS: Record<
   start_workflow: handleStartWorkflow,
   resume_workflow: handleResumeWorkflow,
   generate_file: handleGenerateFile,
-  query_kpi: handleQueryKPI,
-  // create_qbo_bill registered above — uses handleCreateQBOBill (auto-creates vendor if needed)
-  amazon_update_price: handleAmazonUpdatePrice,
-  amazon_update_ppc: handleAmazonUpdatePPC,
 };
 
 async function fetchApproval(approvalId: string): Promise<ApprovalRow | null> {
@@ -3723,8 +3172,7 @@ async function claimPendingApproval(
   approvalId: string,
 ): Promise<{ claimId: string; approval: ApprovalRow } | null> {
   const claimId = randomUUID();
-  // Try claiming unclaimed pending approvals first
-  let rows = (await sbFetch(
+  const rows = (await sbFetch(
     `/rest/v1/approvals?id=eq.${encodeURIComponent(approvalId)}&status=eq.pending&batch_group=is.null`,
     {
       method: "PATCH",
@@ -3737,24 +3185,6 @@ async function claimPendingApproval(
       }),
     },
   )) as ApprovalRow[];
-
-  // If the approval was already claimed (batch_group set from a previous attempt),
-  // try claiming it anyway — this handles retries and the Slack approve button flow
-  if (!rows[0]?.id) {
-    rows = (await sbFetch(
-      `/rest/v1/approvals?id=eq.${encodeURIComponent(approvalId)}&status=eq.pending`,
-      {
-        method: "PATCH",
-        headers: {
-          Prefer: "return=representation",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          batch_group: claimId,
-        }),
-      },
-    )) as ApprovalRow[];
-  }
 
   if (!rows[0]?.id) return null;
   return { claimId, approval: rows[0] };
@@ -4267,11 +3697,27 @@ export async function proposeAndMaybeExecute(action: AbraAction): Promise<{
     throw new Error("Failed to derive approval id");
   }
 
-  // Always require human approval — Tier 1 (direct) and Tier 2 (auto_with_audit)
-  // handle all auto-execution cases via the new policy system in abra-policy.ts.
-  const owner = getApprovalOwner(action.action_type, action.risk_level as RiskLevel);
-  await notifySlackPendingApproval(approvalId, action, owner);
-  return { approval_id: approvalId, auto_executed: false };
+  // Check auto-execute eligibility (legacy path — respects daily limits & global flag)
+  const eligible = await canAutoExecute(action);
+  if (!eligible) {
+    // Not auto-executable → notify the right owner via Slack
+    const owner = getApprovalOwner(action.action_type, action.risk_level as RiskLevel);
+    await notifySlackPendingApproval(approvalId, action, owner);
+    return { approval_id: approvalId, auto_executed: false };
+  }
+
+  const result = await executeAction(approvalId);
+  const autoExecuted = !!result.success;
+  await updateAutoExecTracking({ approvalId, autoExecuted, result });
+  if (autoExecuted) {
+    await writeAutoExecBrainEntry(action, result);
+  }
+
+  return {
+    approval_id: approvalId,
+    auto_executed: autoExecuted,
+    ...(result ? { result } : {}),
+  };
 }
 
 /** Extract a numeric amount from action params for policy cap checks */
@@ -4327,38 +3773,12 @@ export async function executeAction(approvalId: string): Promise<ActionResult> {
     if (!current) {
       return { success: false, message: "Approval not found" };
     }
-    if (current.status === "approved" && current.executed_at) {
+    if (current.status === "approved") {
       return {
         success: true,
         message: "Approval already executed",
         data: current.resolved_payload || {},
       };
-    }
-    // Approved but never executed — execute it now
-    if (current.status === "approved" && !current.executed_at) {
-      const action = parseActionPayload(current.proposed_payload);
-      if (!action) {
-        return { success: false, message: "Invalid action payload on approved approval" };
-      }
-      const handler = ACTION_HANDLERS[action.action_type];
-      if (!handler) {
-        return { success: false, message: `No handler for ${action.action_type}` };
-      }
-      try {
-        const result = await handler(action.params || {});
-        // Update with execution result
-        await sbFetch(`/rest/v1/approvals?id=eq.${encodeURIComponent(approvalId)}`, {
-          method: "PATCH",
-          headers: { Prefer: "return=minimal", "Content-Type": "application/json" },
-          body: JSON.stringify({
-            executed_at: new Date().toISOString(),
-            execution_result: { success: result.success, message: result.message },
-          }),
-        });
-        return result;
-      } catch (err) {
-        return { success: false, message: err instanceof Error ? err.message : "Execution failed" };
-      }
     }
     if (current.status === "pending" && current.batch_group) {
       // Try to unclaim if stale (handler succeeded but markResolved failed)
@@ -4390,18 +3810,6 @@ export async function executeAction(approvalId: string): Promise<ActionResult> {
       claimId: claimed.claimId,
     });
     return { success: false, message: "Invalid action payload" };
-  }
-
-  // Pre-flight param validation
-  const paramError = validateActionParams(action.action_type, action.params || {});
-  if (paramError) {
-    await markApprovalResolved({
-      approvalId,
-      status: "denied",
-      reasoning: `Param validation failed: ${paramError}`,
-      claimId: claimed.claimId,
-    });
-    return { success: false, message: paramError };
   }
 
   const handler = ACTION_HANDLERS[action.action_type];
@@ -4479,34 +3887,51 @@ export function getAvailableActions(): string[] {
   return Object.keys(ACTION_HANDLERS);
 }
 
-/** Reject a pending approval without executing it. */
+/**
+ * Reject a pending approval with a reason.
+ */
 export async function rejectAction(
   approvalId: string,
   reason?: string,
 ): Promise<ActionResult> {
-  if (!UUID_RE.test(approvalId)) {
-    return { success: false, message: "Invalid approval ID format" };
-  }
-  const current = await fetchApproval(approvalId);
-  if (!current) return { success: false, message: "Approval not found" };
-  if (current.status !== "pending") return { success: false, message: `Approval is already ${current.status}` };
+  try {
+    const baseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!baseUrl || !serviceKey) return { success: false, message: "Supabase not configured" };
 
-  await markApprovalResolved({
-    approvalId,
-    status: "denied",
-    reasoning: reason || "Rejected by user",
-  });
-  return { success: true, message: "Approval rejected" };
+    const res = await fetch(
+      `${baseUrl}/rest/v1/approvals?id=eq.${approvalId}`,
+      {
+        method: "PATCH",
+        headers: {
+          apikey: serviceKey,
+          Authorization: `Bearer ${serviceKey}`,
+          "Content-Type": "application/json",
+          Prefer: "return=minimal",
+        },
+        body: JSON.stringify({
+          status: "denied",
+          decision: "denied",
+          decision_reasoning: reason || "Rejected by user",
+          decided_at: new Date().toISOString(),
+        }),
+        signal: AbortSignal.timeout(10000),
+      },
+    );
+
+    return {
+      success: res.ok,
+      message: res.ok ? `Approval ${approvalId} rejected` : `Failed to reject: ${res.status}`,
+    };
+  } catch (err) {
+    return { success: false, message: `Reject failed: ${err instanceof Error ? err.message : String(err)}` };
+  }
 }
 
 export async function executeActionByType(
   actionType: string,
   params: Record<string, unknown>,
 ): Promise<ActionResult> {
-  const paramError = validateActionParams(actionType, params);
-  if (paramError) {
-    return { success: false, message: paramError };
-  }
   const handler = ACTION_HANDLERS[actionType];
   if (!handler) {
     return { success: false, message: `No handler for ${actionType}` };
@@ -4555,8 +3980,10 @@ export const KNOWN_ACTION_TYPES = new Set([
   "calculate_deal",
   "create_wholesale_draft_order",
   "create_shopify_product_draft",
-  // Removed orphaned actions: store_brain_entry, update_brain_entry, search_brain, log_metric
-  // These had no handlers — use create_brain_entry, correct_claim instead
+  "store_brain_entry",
+  "update_brain_entry",
+  "search_brain",
+  "log_metric",
   "run_monthly_close",
   "generate_file",
 ]);

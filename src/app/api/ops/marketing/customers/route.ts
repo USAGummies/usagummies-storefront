@@ -401,8 +401,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json(result);
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error("[marketing/customers] GET failed:", message);
-    return NextResponse.json(emptyResponse(message), { status: 500 });
+    console.error("[marketing/customers] GET failed:", err instanceof Error ? err.message : err);
+    return NextResponse.json(emptyResponse("Failed to load customer data"), { status: 500 });
   }
 }

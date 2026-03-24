@@ -20,7 +20,7 @@ export async function GET() {
   } catch (err) {
     console.error("[forecast] Build failed:", err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Forecast build failed" },
+      { error: "Forecast build failed" },
       { status: 500 },
     );
   }

@@ -136,7 +136,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json(result);
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = "Internal server error";
     return NextResponse.json(
       {
         images: [],
@@ -408,7 +408,7 @@ export async function POST(req: Request) {
     );
   } catch (err) {
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : String(err) },
+      { error: "Internal server error" },
       { status: 500 },
     );
   }

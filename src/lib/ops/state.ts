@@ -30,6 +30,12 @@ type KVClient = {
   set(key: string, value: unknown, opts?: { ex?: number }): Promise<string | null>;
 };
 
+/** Extended KV client with NX/PX/del support for atomic locking */
+type KVClientFull = KVClient & {
+  set(key: string, value: unknown, opts?: { ex?: number; nx?: boolean; px?: number }): Promise<string | null>;
+  del(key: string): Promise<number>;
+};
+
 let _kv: KVClient | null = null;
 
 async function getKV(): Promise<KVClient> {
@@ -181,4 +187,57 @@ export async function appendStateArray<T>(
   const existing = await readStateArray<T>(key);
   existing.push(...newItems);
   await writeState(key, existing.slice(-maxItems));
+}
+
+// ---------------------------------------------------------------------------
+// Atomic lock — uses SET NX (set-if-not-exists) on Vercel KV
+// ---------------------------------------------------------------------------
+
+/**
+ * Atomically acquire a lock using SET NX + PX on Vercel KV.
+ * Returns true if the lock was acquired, false if it already exists.
+ * On local (non-cloud), falls back to read-then-write (acceptable for dev).
+ */
+export async function acquireKVLock<T>(
+  key: StateKey,
+  value: T,
+  ttlMs: number,
+): Promise<boolean> {
+  if (isCloud()) {
+    try {
+      const kv = await getKV();
+      // SET key value NX PX ttlMs — atomic set-if-not-exists with TTL
+      const result = await (kv as KVClientFull).set(kvKey(key), value, {
+        nx: true,
+        px: ttlMs,
+      });
+      // Vercel KV returns "OK" on success, null if key already exists
+      return result === "OK";
+    } catch {
+      return false;
+    }
+  }
+
+  // Local fallback: simple read-then-write (no concurrent cold starts locally)
+  const existing = await readState<T | null>(key, null);
+  if (existing !== null) return false;
+  await writeState(key, value);
+  return true;
+}
+
+/**
+ * Release a lock by deleting the key from KV.
+ */
+export async function releaseKVLock(key: StateKey): Promise<void> {
+  if (isCloud()) {
+    try {
+      const kv = await getKV();
+      await (kv as KVClientFull).del(kvKey(key));
+    } catch (err) {
+      console.error(`[state] KV lock release failed for ${key}:`, err);
+    }
+    return;
+  }
+  // Local: just expire the lock by overwriting with null
+  await writeState(key, null);
 }

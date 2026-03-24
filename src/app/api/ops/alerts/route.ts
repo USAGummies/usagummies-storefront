@@ -457,7 +457,7 @@ export async function GET(req: NextRequest) {
         generatedAt: new Date().toISOString(),
         lastFetched: new Date().toISOString(),
         budget: null,
-        error: err instanceof Error ? err.message : String(err),
+        error: "Internal server error",
       },
       { status: 500 },
     );
@@ -526,7 +526,7 @@ export async function PATCH(req: NextRequest) {
   } catch (err) {
     console.error("[alerts] PATCH failed:", err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : String(err) },
+      { error: "Internal server error" },
       { status: 500 },
     );
   }

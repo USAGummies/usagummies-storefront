@@ -271,7 +271,7 @@ export async function GET() {
         shopify: null,
         amazon: null,
         chartData: [],
-        error: err instanceof Error ? err.message : String(err),
+        error: "Failed to load dashboard data",
         generatedAt: new Date().toISOString(),
       },
       { status: 500 },

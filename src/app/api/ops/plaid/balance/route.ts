@@ -74,7 +74,7 @@ export async function GET() {
   } catch (err) {
     console.error("[plaid] Balance fetch failed:", err);
     return NextResponse.json(
-      { connected: true, error: err instanceof Error ? err.message : "Balance fetch failed" },
+      { connected: true, error: "Balance fetch failed" },
       { status: 500 },
     );
   }

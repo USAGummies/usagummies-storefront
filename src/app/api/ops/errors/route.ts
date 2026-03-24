@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
   } catch (err) {
     console.error("[api/ops/errors] GET failed:", err);
     return NextResponse.json(
-      { errors: [], error: err instanceof Error ? err.message : String(err) },
+      { errors: [], error: "Internal server error" },
       { status: 500 },
     );
   }
@@ -103,7 +103,7 @@ export async function PATCH(req: NextRequest) {
   } catch (err) {
     console.error("[api/ops/errors] PATCH failed:", err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : String(err) },
+      { error: "Internal server error" },
       { status: 500 },
     );
   }

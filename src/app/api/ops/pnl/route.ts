@@ -125,7 +125,7 @@ export async function GET(req: Request) {
   } catch (err) {
     console.error("[pnl] Build failed:", err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "P&L build failed" },
+      { error: "P&L build failed" },
       { status: 500 },
     );
   }

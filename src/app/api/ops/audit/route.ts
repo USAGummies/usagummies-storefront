@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
         generatedAt: new Date().toISOString(),
         lastFetched: new Date().toISOString(),
         budget: null,
-        error: err instanceof Error ? err.message : String(err),
+        error: "Internal server error",
       },
       { status: 500 },
     );

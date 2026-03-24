@@ -261,7 +261,7 @@ export async function GET() {
     return NextResponse.json(
       {
         profitability: null,
-        error: err instanceof Error ? err.message : String(err),
+        error: "Internal server error",
         generatedAt: new Date().toISOString(),
       },
       { status: 500 },

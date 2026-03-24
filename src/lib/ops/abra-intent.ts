@@ -21,10 +21,17 @@ export const STRATEGY_TRIGGERS =
   /\b(create .+ strategy|develop .+ strategy|build .+ strategy|strategic plan|financial plan|budget plan|let'?s (plan|strategize)|design .+ plan)\b/i;
 export const DIAGNOSTICS_TRIGGERS =
   /\b(diagnos|self.?check|what'?s broken|are you (working|ok|healthy)|system health|feed status|check yourself|run diagnostics)\b/i;
-export const AUTOMATION_LOG_TRIGGERS =
-  /\b(automation log|automated tasks|what (?:tasks|sweeps|feeds|crons|jobs) (?:have |)run|task execution log|sweep log|feed log|what ran today|show (?:me )?(?:the )?(?:recent |)(?:automation|task|sweep|feed) (?:log|history|runs)|automation history)\b/i;
+export const EMAIL_TRIGGERS =
+  /\b(check (?:my |the )?(?:email|inbox|mail)|scan (?:my |the )?inbox|any (?:new |unread )?(?:mail|email)|who emailed|check if anyone (?:emailed|sent|wrote)|email from \w+|what(?:'s| is) in (?:my |the )?inbox|anything i owe people|do i owe anyone|unread (?:mail|email)|pull (?:up |)(?:my |the )?(?:email|inbox)|new messages?)\b/i;
+
+export const INVENTORY_TRIGGERS =
+  /\b(how much stock|inventory (?:count|level|status)|fba inventory|what(?:'s| is) in stock|stock (?:level|count|check)|warehouse (?:inventory|stock)|inventory (?:on hand|remaining)|how many (?:units|bags|cases)|reorder|stock.?out|out of stock|low stock|amazon (?:inventory|stock|fba))\b/i;
+
+export const REVENUE_TRIGGERS =
+  /\b(how much did we (?:make|sell|earn)|what(?:'s| is) our revenue|sales (?:today|yesterday|this (?:week|month)|last (?:week|month))|how are sales|revenue (?:today|yesterday|this (?:week|month))|daily sales|total (?:sales|revenue)|order (?:volume|count|total)|how(?:'s| is) (?:business|revenue) (?:doing|going|looking))\b/i;
+
 export const FINANCE_TRIGGERS =
-  /\b(chart of accounts|account balances?|qbo|quickbooks|bank balance|checking balance|credit card balance|p&l|profit.?(?:and|&).?loss|balance sheet|cash position|how much (?:do we have|is in|money)|financial (?:summary|snapshot|report|data)|account(?:s|ing) (?:summary|breakdown)|categoriz|investor loan|rene.?(?:s|'s|'s)? (?:money|loan|transfer|investment)|vendor(?:s| list)?|supplier(?:s)?|co.?pack|cogs|cost of goods|gross margin|expense(?:s| breakdown)|where .* money .* go|spending|purchases?|what (?:are|do) we (?:spend|pay)|who do we (?:pay|buy from)|reconcil|1099|tax (?:liability|filing|return|compliance|status)|estimated (?:quarterly|tax)|accounts (?:receivable|payable)|inventory (?:value|on hand|count|worth)|depreciation|amortization|equity|liabilities|net (?:income|loss|worth)|revenue (?:breakdown|by channel)|burn rate|runway|profitability|breakeven|break.?even|capital structure|funding|every transaction|all transactions|transaction (?:list|detail|history)|general ledger|trial balance|what do the books look|how do the books|book(?:s|keeping))\b/i;
+  /\b(chart of accounts|account balances?|qbo|quickbooks|bank balance|checking balance|credit card balance|p&l|profit.?(?:and|&).?loss|balance sheet|cash position|how much (?:do we have|is in|money)|financial (?:summary|snapshot|report|data)|account(?:s|ing) (?:summary|breakdown)|categoriz|investor loan|rene.?(?:s|'s|'s)? (?:money|loan|transfer|investment)|vendor(?:s| list)?|supplier(?:s)?|co.?pack|cogs|cost of goods|gross margin|expense(?:s| breakdown)|where .* money .* go|spending|purchases?|what (?:are|do) we (?:spend|pay)|who do we (?:pay|buy from)|reconcil|1099|tax (?:liability|filing|return|compliance|status)|estimated (?:quarterly|tax)|accounts (?:receivable|payable)|inventory (?:value|on hand|count|worth)|depreciation|amortization|equity|liabilities|net (?:income|loss|worth)|revenue (?:breakdown|by channel)|burn rate|runway|profitability|breakeven|break.?even|capital structure|funding|every transaction|all transactions|transaction (?:list|detail|history)|general ledger|trial balance|what do the books look|how do the books|book(?:s|keeping)|pull up the p&l|show me the (?:balance sheet|p&l|books)|what(?:'s| is) in qbo|run the p&l|check quickbooks)\b/i;
 
 // ─── Intent Types ───
 
@@ -34,9 +41,11 @@ export type DetectedIntent =
   | { type: "cost" }
   | { type: "pipeline" }
   | { type: "finance" }
+  | { type: "email" }
+  | { type: "inventory" }
+  | { type: "revenue" }
   | { type: "strategy"; objective: string; department: string | null }
   | { type: "diagnostics" }
-  | { type: "automation_log" }
   | { type: "chat" };
 
 // ─── Data Paste Detection ───
@@ -93,9 +102,6 @@ export function detectIntent(message: string): DetectedIntent {
   if (isDataPaste(message)) {
     return { type: "chat" };
   }
-  if (AUTOMATION_LOG_TRIGGERS.test(message)) {
-    return { type: "automation_log" };
-  }
   if (DIAGNOSTICS_TRIGGERS.test(message)) {
     return { type: "diagnostics" };
   }
@@ -104,6 +110,15 @@ export function detectIntent(message: string): DetectedIntent {
   }
   if (PIPELINE_TRIGGERS.test(message)) {
     return { type: "pipeline" };
+  }
+  if (EMAIL_TRIGGERS.test(message)) {
+    return { type: "email" };
+  }
+  if (INVENTORY_TRIGGERS.test(message)) {
+    return { type: "inventory" };
+  }
+  if (REVENUE_TRIGGERS.test(message)) {
+    return { type: "revenue" };
   }
   if (FINANCE_TRIGGERS.test(message)) {
     return { type: "finance" };

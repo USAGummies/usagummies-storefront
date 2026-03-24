@@ -32,7 +32,7 @@ export async function POST(request: Request) {
   } catch (err) {
     console.error("[plaid] Link token creation failed:", err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Failed to create link token" },
+      { error: "Failed to create link token" },
       { status: 500 },
     );
   }

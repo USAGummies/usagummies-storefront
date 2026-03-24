@@ -203,7 +203,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error("[finance/upload] CSV upload failed:", err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Upload failed" },
+      { error: "Upload failed" },
       { status: 500 },
     );
   }

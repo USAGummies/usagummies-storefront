@@ -361,7 +361,7 @@ async function fetchShopifyFulfilledTotals(asOf: string): Promise<{
   } catch (err) {
     return {
       totals: { pa: 0, wa: 0, unassigned: 0, total: 0 },
-      error: err instanceof Error ? err.message : String(err),
+      error: "Internal server error",
     };
   }
 }
@@ -847,7 +847,7 @@ export async function GET(req: Request) {
   } catch (err) {
     console.error("[inventory] Failed:", err);
     return NextResponse.json(
-      emptyResponse(err instanceof Error ? err.message : String(err)),
+      emptyResponse("Internal server error"),
       { status: 500 },
     );
   }
@@ -870,7 +870,7 @@ export async function POST(req: Request) {
     });
   } catch (err) {
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : String(err) },
+      { error: "Internal server error" },
       { status: 500 },
     );
   }

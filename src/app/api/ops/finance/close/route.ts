@@ -45,7 +45,7 @@ export async function POST(req: Request) {
   } catch (err) {
     console.error("[monthly-close] Failed:", err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Monthly close failed" },
+      { error: "Monthly close failed" },
       { status: 500 },
     );
   }
@@ -62,7 +62,7 @@ export async function GET(req: Request) {
   } catch (err) {
     console.error("[monthly-close] List failed:", err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Failed to list periods" },
+      { error: "Failed to list periods" },
       { status: 500 },
     );
   }

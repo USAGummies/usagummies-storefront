@@ -575,7 +575,7 @@ export async function POST(req: Request) {
   } catch (err) {
     console.error("[ops-chat] Route error:", err);
     return new Response(
-      JSON.stringify({ error: err instanceof Error ? err.message : "Unknown error" }),
+      JSON.stringify({ error: "Chat request failed" }),
       { status: 500, headers: { "Content-Type": "application/json" } },
     );
   }

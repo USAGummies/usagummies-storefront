@@ -61,7 +61,7 @@ export async function GET(req: Request) {
     console.error("[auth-audit] API failed:", err);
     return NextResponse.json(
       {
-        error: err instanceof Error ? err.message : "Failed to fetch audit log",
+        error: "Failed to fetch audit log",
       },
       { status: 500 },
     );

@@ -170,6 +170,7 @@ export async function POST(
   } catch (err) {
     const durationMs = Date.now() - startTime;
     const errorMsg = err instanceof Error ? err.message : String(err);
+    console.error(`[engine] Agent ${agentKey} failed:`, errorMsg);
 
     record.completedAt = etTimestamp();
     record.durationMs = durationMs;
@@ -189,7 +190,7 @@ export async function POST(
         agent: agentKey,
         name: agent.name,
         status: "failed",
-        error: errorMsg,
+        error: "Agent execution failed",
         durationMs,
       },
       { status: 500 }

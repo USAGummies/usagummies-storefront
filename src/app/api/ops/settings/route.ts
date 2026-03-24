@@ -213,7 +213,7 @@ export async function GET() {
         },
         canEditRoles: false,
         generatedAt: new Date().toISOString(),
-        error: err instanceof Error ? err.message : String(err),
+        error: "Failed to load settings",
       } satisfies SettingsResponse,
       { status: 200 },
     );
@@ -257,7 +257,7 @@ export async function PATCH(req: NextRequest) {
     });
   } catch (err) {
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : String(err) },
+      { error: "Settings update failed" },
       { status: 500 },
     );
   }
