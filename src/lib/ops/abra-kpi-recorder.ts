@@ -93,10 +93,32 @@ export async function recordKPI(params: {
     params.date ||
     new Date().toISOString().slice(0, 10);
 
-  // Delete ALL existing rows for this metric+date regardless of entity_ref.
-  // This prevents duplicates when different code paths use different entity_ref
-  // values (e.g. "shopify" vs "global") for the same logical metric.
+  // Check if a higher-quality source already exists for this metric+date.
+  // Don't overwrite Reports API data with less accurate feed data.
+  const SOURCE_PRIORITY: Record<string, number> = {
+    amazon: 1, // SP-API Orders (unit estimation)
+    shopify: 2,
+    calculated: 3,
+    found: 3,
+    manual: 4,
+    quickbooks: 4,
+    faire: 2,
+  };
+  const newPriority = SOURCE_PRIORITY[params.source_system || inferSource(params.metric_name)] || 2;
+
   try {
+    const existing = await sbFetch<Array<{ source_system: string }>>(
+      `/rest/v1/kpi_timeseries?metric_name=eq.${encodeURIComponent(params.metric_name)}&captured_for_date=eq.${capturedForDate}&window_type=eq.daily&select=source_system`,
+    );
+    if (existing && existing.length > 0) {
+      const existingPriority = SOURCE_PRIORITY[existing[0].source_system] || 2;
+      // Only overwrite if new source is same or higher priority
+      if (newPriority < existingPriority) {
+        console.log(`[kpi] Skipping overwrite: ${params.metric_name} ${capturedForDate} has ${existing[0].source_system} (priority ${existingPriority}), not overwriting with priority ${newPriority}`);
+        return;
+      }
+    }
+    // Delete existing row to prevent duplicates
     await sbFetch(
       `/rest/v1/kpi_timeseries?metric_name=eq.${encodeURIComponent(params.metric_name)}&captured_for_date=eq.${capturedForDate}&window_type=eq.daily`,
       {
