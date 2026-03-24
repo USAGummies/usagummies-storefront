@@ -68,6 +68,7 @@ function summarizeCompletedTasks(summary: OperatorExecutionSummary): string[] {
     qbo_assign_vendor: "vendor assignment",
     qbo_record_transaction: "QBO journal record",
     qbo_record_from_email: "QBO email import",
+    qbo_revenue_gap: "QBO revenue sync",
     email_draft_response: "email draft",
     vendor_followup: "vendor follow-up draft",
     distributor_followup: "distributor follow-up draft",

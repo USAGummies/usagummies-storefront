@@ -1,6 +1,7 @@
 import { detectEmailOperatorGaps } from "@/lib/ops/operator/gap-detectors/email";
 import { detectPipelineOperatorGaps } from "@/lib/ops/operator/gap-detectors/pipeline";
 import { detectQBOOperatorGaps } from "@/lib/ops/operator/gap-detectors/qbo";
+import { runOperatorHealthMonitor } from "@/lib/ops/operator/health-monitor";
 import { createOperatorTasks, executeOperatorTasks } from "@/lib/ops/operator/task-executor";
 import { reportOperatorCycle } from "@/lib/ops/operator/task-reporter";
 
@@ -36,6 +37,14 @@ export type OperatorLoopResult = {
       taskType: string;
       status: "pending" | "in_progress" | "completed" | "failed" | "blocked" | "needs_approval";
       message: string;
+    }>;
+  };
+  health?: {
+    ok: boolean;
+    checks: Array<{
+      name: "qbo" | "slack" | "gmail" | "supabase" | "brain";
+      ok: boolean;
+      detail: string;
     }>;
   };
 };
@@ -104,5 +113,6 @@ export async function runOperatorLoop(): Promise<OperatorLoopResult> {
   };
 
   await reportOperatorCycle(result);
+  result.health = await runOperatorHealthMonitor();
   return result;
 }

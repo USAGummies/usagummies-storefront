@@ -95,6 +95,12 @@ type AbraChatResponse = {
   reply?: string;
 };
 
+type ExecuteTaskResult = {
+  status: "completed" | "needs_approval";
+  message: string;
+  data?: Record<string, unknown>;
+};
+
 const EMAIL_VENDOR_ACCOUNT_MAP: Array<{ test: RegExp; accountCode: string; label: string }> = [
   { test: /anthropic|claude/i, accountCode: "126", label: "Software & apps" },
   { test: /pirate ship/i, accountCode: "127", label: "Shipping & postage" },
@@ -107,6 +113,13 @@ const EMAIL_VENDOR_ACCOUNT_MAP: Array<{ test: RegExp; accountCode: string; label
   { test: /google|facebook|meta/i, accountCode: "16", label: "Advertising" },
   { test: /office depot|uline/i, accountCode: "83", label: "Supplies" },
 ];
+
+const REVENUE_ACCOUNT_METRIC_MAP: Record<string, { metricNames: string[]; qboAccountId: number; label: string }> = {
+  "4100": { metricNames: ["daily_revenue_amazon"], qboAccountId: 171, label: "Amazon revenue" },
+  "4200": { metricNames: ["daily_revenue_shopify"], qboAccountId: 172, label: "Shopify DTC revenue" },
+  "4300": { metricNames: ["daily_revenue_wholesale"], qboAccountId: 173, label: "Wholesale revenue" },
+  "4400": { metricNames: ["daily_revenue_faire", "daily_revenue_wholesale"], qboAccountId: 174, label: "Faire revenue" },
+};
 
 function getSupabaseEnv() {
   const baseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -359,6 +372,19 @@ async function fetchAccountsViaApi(): Promise<QBOAccount[]> {
   return Array.isArray(data.accounts) ? data.accounts : [];
 }
 
+async function markNeedsApproval(task: OperatorTaskRow, message: string, result?: Record<string, unknown>) {
+  await sbFetch(`/rest/v1/abra_operator_tasks?id=eq.${task.id}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      status: "needs_approval",
+      requires_approval: true,
+      execution_result: result || null,
+      error_message: message.slice(0, 1000),
+      completed_at: null,
+    }),
+  });
+}
+
 export async function createOperatorTasks(
   tasks: Array<{
     task_type: string;
@@ -453,6 +479,7 @@ async function listReadyTasks(limit: number): Promise<OperatorTaskRow[]> {
       row.task_type === "qbo_categorize" ||
       row.task_type === "qbo_assign_vendor" ||
       row.task_type === "qbo_record_transaction" ||
+      row.task_type === "qbo_revenue_gap" ||
       row.task_type === "email_draft_response" ||
       row.task_type === "qbo_record_from_email" ||
       row.task_type === "vendor_followup" ||
@@ -743,6 +770,108 @@ async function executeRecordTransactionTask(task: OperatorTaskRow): Promise<stri
   return `Recorded transfer ${description} to ${targetAccountName}`;
 }
 
+type KPIRevenueRow = {
+  metric_name?: string | null;
+  value?: number | null;
+  captured_for_date?: string | null;
+};
+
+async function fetchRevenueGapAmount(accountCode: string): Promise<{
+  amount: number;
+  metricNames: string[];
+  qboAccountId: number;
+  label: string;
+}> {
+  const mapping = REVENUE_ACCOUNT_METRIC_MAP[accountCode];
+  if (!mapping) {
+    throw new Error(`No KPI mapping configured for revenue account ${accountCode}`);
+  }
+
+  const monthStart = new Date();
+  monthStart.setUTCDate(1);
+  const startDate = monthStart.toISOString().slice(0, 10);
+  const metricFilter = `(${mapping.metricNames.map((name) => encodeURIComponent(name)).join(",")})`;
+  const rows = await sbFetch<KPIRevenueRow[]>(
+    `/rest/v1/kpi_timeseries?window_type=eq.daily&metric_name=in.${metricFilter}&captured_for_date=gte.${startDate}&select=metric_name,value,captured_for_date&limit=5000`,
+  ).catch(() => []);
+
+  const amount = (Array.isArray(rows) ? rows : [])
+    .filter((row) => mapping.metricNames.includes(String(row.metric_name || "")))
+    .reduce((sum, row) => sum + (Number(row.value || 0) || 0), 0);
+
+  return {
+    amount,
+    metricNames: mapping.metricNames,
+    qboAccountId: mapping.qboAccountId,
+    label: mapping.label,
+  };
+}
+
+async function executeRevenueGapTask(task: OperatorTaskRow): Promise<ExecuteTaskResult> {
+  const accountCode = String(task.execution_params?.accountCode || "");
+  const accountName = String(task.execution_params?.accountName || "");
+  if (!accountCode) throw new Error("Missing accountCode");
+
+  const { amount, qboAccountId, label, metricNames } = await fetchRevenueGapAmount(accountCode);
+  if (amount <= 0) {
+    return {
+      status: "completed",
+      message: `No KPI revenue found to post for ${accountCode} ${accountName}`.trim(),
+      data: { amount, metricNames, qboAccountId, skipped: true, accountCode, accountName },
+    };
+  }
+
+  if (amount > 500) {
+    return {
+      status: "needs_approval",
+      message: `Revenue gap for ${label} requires approval before posting $${amount.toFixed(2)} to QBO`,
+      data: { amount, metricNames, qboAccountId, accountCode, accountName },
+    };
+  }
+
+  const accounts = [
+    ...(((await getQBOAccounts())?.QueryResponse?.Account as QBOAccount[]) || []),
+    ...(await fetchAccountsViaApi()),
+  ].filter((account, index, arr) => {
+    const id = String(account.Id || "");
+    return id ? arr.findIndex((item) => String(item.Id || "") === id) === index : true;
+  });
+  const bankAccount =
+    accounts.find((account) => account.AccountType === "Bank" && /checking/i.test(String(account.Name || ""))) ||
+    accounts.find((account) => account.AccountType === "Bank");
+  if (!bankAccount?.Id) throw new Error("No QBO bank account found");
+
+  const imported = await fetch(`${getInternalBaseUrl()}/api/ops/qbo/import-batch`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getInternalHeaders(),
+    },
+    body: JSON.stringify({
+      transactions: [{
+        date: new Date().toISOString().slice(0, 10),
+        description: `Abra operator revenue sync — ${label} (${accountCode}${accountName ? ` ${accountName}` : ""})`,
+        amount,
+        accountId: qboAccountId,
+        isIncome: true,
+        bankAccountId: Number(bankAccount.Id),
+      }],
+    }),
+    cache: "no-store",
+    signal: AbortSignal.timeout(45000),
+  });
+  const data = (await imported.json().catch(() => ({}))) as { created?: number; error?: string };
+  if (!imported.ok || Number(data.created || 0) < 1) {
+    throw new Error(String(data.error || `Failed to record revenue gap deposit (${imported.status})`).slice(0, 300));
+  }
+
+  return {
+    status: "completed",
+    message: `Recorded $${amount.toFixed(2)} ${label} deposit to QBO`,
+    data: { amount, metricNames, qboAccountId, accountCode, accountName },
+  };
+}
+
 async function generateDraftViaChat(prompt: string, fallbackDraft?: string): Promise<string> {
   const res = await fetch(`${getInternalBaseUrl()}/api/ops/abra/chat`, {
     method: "POST",
@@ -969,7 +1098,7 @@ async function executeDistributorFollowupTask(task: OperatorTaskRow): Promise<st
   return `Queued distributor follow-up draft ${commandId} for ${distributorName}`;
 }
 
-async function executeTask(task: OperatorTaskRow): Promise<string> {
+async function executeTask(task: OperatorTaskRow): Promise<string | ExecuteTaskResult> {
   switch (task.task_type) {
     case "qbo_categorize":
       return executeCategorizeTask(task);
@@ -981,6 +1110,8 @@ async function executeTask(task: OperatorTaskRow): Promise<string> {
       return executeEmailDraftResponseTask(task);
     case "qbo_record_from_email":
       return executeQBORecordFromEmailTask(task);
+    case "qbo_revenue_gap":
+      return executeRevenueGapTask(task);
     case "vendor_followup":
       return executeVendorFollowupTask(task);
     case "distributor_followup":
@@ -1018,18 +1149,39 @@ export async function executeOperatorTasks(limit = 10): Promise<OperatorExecutio
         continue;
       }
 
-      const message = await executeTask(task);
+      const result = await executeTask(task);
+      const finalResult = typeof result === "string"
+        ? { status: "completed" as const, message: result, data: undefined }
+        : result;
+
+      if (finalResult.status === "needs_approval") {
+        await markNeedsApproval(task, finalResult.message, {
+          ok: false,
+          requires_approval: true,
+          ...(finalResult.data || {}),
+        });
+        summary.needsApproval += 1;
+        summary.results.push({
+          taskId: task.id,
+          taskType: task.task_type,
+          status: "needs_approval",
+          message: finalResult.message,
+        });
+        continue;
+      }
+
       await completeTask(task.id, {
         ok: true,
-        message,
+        message: finalResult.message,
         completed_at: new Date().toISOString(),
+        ...(finalResult.data || {}),
       });
       summary.completed += 1;
       summary.results.push({
         taskId: task.id,
         taskType: task.task_type,
         status: "completed",
-        message,
+        message: finalResult.message,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Task execution failed";
