@@ -6,6 +6,7 @@ import {
 } from "@/lib/ops/qbo-client";
 import { readEmail, searchEmails } from "@/lib/ops/gmail-reader";
 import { notify } from "@/lib/ops/notify";
+import { loadLearnedQboRules, resolveQboCategory } from "@/lib/ops/operator/qbo-resolution";
 
 export type OperatorTaskStatus =
   | "pending"
@@ -101,19 +102,6 @@ type ExecuteTaskResult = {
   data?: Record<string, unknown>;
 };
 
-const EMAIL_VENDOR_ACCOUNT_MAP: Array<{ test: RegExp; accountCode: string; label: string }> = [
-  { test: /anthropic|claude/i, accountCode: "126", label: "Software & apps" },
-  { test: /pirate ship/i, accountCode: "127", label: "Shipping & postage" },
-  { test: /albanese/i, accountCode: "176", label: "COGS: Albanese" },
-  { test: /belmark/i, accountCode: "177", label: "COGS: Belmark" },
-  { test: /powers/i, accountCode: "178", label: "COGS: Powers" },
-  { test: /shopify/i, accountCode: "126", label: "Software & apps" },
-  { test: /amazon/i, accountCode: "122", label: "Merchant account fees" },
-  { test: /geico/i, accountCode: "42", label: "Insurance" },
-  { test: /google|facebook|meta/i, accountCode: "16", label: "Advertising" },
-  { test: /office depot|uline/i, accountCode: "83", label: "Supplies" },
-];
-
 const REVENUE_ACCOUNT_METRIC_MAP: Record<string, { metricNames: string[]; qboAccountId: number; label: string }> = {
   "4100": { metricNames: ["daily_revenue_amazon"], qboAccountId: 171, label: "Amazon revenue" },
   "4200": { metricNames: ["daily_revenue_shopify"], qboAccountId: 172, label: "Shopify DTC revenue" },
@@ -153,8 +141,12 @@ async function sbFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 function getInternalBaseUrl(): string {
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
-  return process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://www.usagummies.com";
+  return (
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.NEXTAUTH_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined) ||
+    "https://www.usagummies.com"
+  );
 }
 
 function getInternalHeaders(): HeadersInit {
@@ -534,7 +526,7 @@ async function failTask(task: OperatorTaskRow, message: string, status: Operator
   });
 }
 
-async function executeCategorizeTask(task: OperatorTaskRow): Promise<string> {
+async function executeCategorizeTask(task: OperatorTaskRow): Promise<ExecuteTaskResult> {
   const transactionId = String(task.execution_params?.transactionId || "");
   const suggestedAccountId = String(task.execution_params?.suggestedAccountId || "");
   const suggestedAccountName = String(task.execution_params?.suggestedAccountName || "");
@@ -557,7 +549,20 @@ async function executeCategorizeTask(task: OperatorTaskRow): Promise<string> {
     Line: buildPurchaseLinesWithAccount(purchase, suggestedAccountId, suggestedAccountName || undefined),
   });
   if (updated.ok) {
-    return `Categorized transaction ${transactionId} to ${suggestedAccountName || suggestedAccountId}`;
+    return {
+      status: "completed",
+      message: `Categorized transaction ${transactionId} to ${suggestedAccountName || suggestedAccountId}`,
+      data: {
+        transactionId,
+        beforeAccountId: String(task.execution_params?.currentAccountId || ""),
+        beforeAccountName: String(task.execution_params?.currentAccountName || ""),
+        afterAccountId: suggestedAccountId,
+        afterAccountName: suggestedAccountName,
+        confidence: Number(task.execution_params?.confidence || 0),
+        reasoning: String(task.execution_params?.reasoning || ""),
+        matchedPattern: String(task.execution_params?.matchedPattern || ""),
+      },
+    };
   }
 
   const res = await fetch(`${getInternalBaseUrl()}/api/ops/qbo/categorize-batch`, {
@@ -584,7 +589,20 @@ async function executeCategorizeTask(task: OperatorTaskRow): Promise<string> {
       `No transaction categorized for ${transactionId}${updated.body ? ` (${updated.body.slice(0, 180)})` : ""}`,
     );
   }
-  return `Categorized transaction ${transactionId}`;
+  return {
+    status: "completed",
+    message: `Categorized transaction ${transactionId}`,
+    data: {
+      transactionId,
+      beforeAccountId: String(task.execution_params?.currentAccountId || ""),
+      beforeAccountName: String(task.execution_params?.currentAccountName || ""),
+      afterAccountId: suggestedAccountId,
+      afterAccountName: suggestedAccountName,
+      confidence: Number(task.execution_params?.confidence || 0),
+      reasoning: String(task.execution_params?.reasoning || ""),
+      matchedPattern: String(task.execution_params?.matchedPattern || ""),
+    },
+  };
 }
 
 async function executeAssignVendorTask(task: OperatorTaskRow): Promise<string> {
@@ -1007,12 +1025,13 @@ async function executeQBORecordFromEmailTask(task: OperatorTaskRow): Promise<str
     accounts.find((account) => account.AccountType === "Bank");
   if (!bankAccount?.Id) throw new Error("No QBO bank account found");
 
-  const matchedRule = EMAIL_VENDOR_ACCOUNT_MAP.find((rule) => rule.test.test(`${vendor} ${description}`));
+  const learnedRules = await loadLearnedQboRules();
+  const matchedRule = resolveQboCategory(`${vendor} ${description}`, amount, learnedRules);
   const mappedAccount =
-    (matchedRule
+    (matchedRule.accountId
       ? (
-        accounts.find((account) => String(account.Id || "") === matchedRule.accountCode) ||
-        accounts.find((account) => normalizeText(String(account.Name || "")) === normalizeText(matchedRule.label))
+        accounts.find((account) => String(account.Id || "") === matchedRule.accountId) ||
+        accounts.find((account) => normalizeText(String(account.Name || "")) === normalizeText(matchedRule.accountName))
       )
       : null) ||
     accounts.find((account) => String(account.Id || "") === "2") ||
@@ -1045,7 +1064,7 @@ async function executeQBORecordFromEmailTask(task: OperatorTaskRow): Promise<str
 
   const vendorRows = ((vendorsResult?.QueryResponse?.Vendor as QBOVendor[]) || []);
   const vendorFound = vendorRows.some((row) => vendorMatches(row, vendor || senderEmail));
-  return `Recorded email-linked transaction ${description} to ${String(mappedAccount.Name || matchedRule?.label || "Uncategorized Expense")}${vendorFound ? "" : " (vendor not yet in QBO vendor list)"}`;
+  return `Recorded email-linked transaction ${description} to ${String(mappedAccount.Name || matchedRule.accountName || "Uncategorized Expense")}${vendorFound ? "" : " (vendor not yet in QBO vendor list)"}`;
 }
 
 async function executeVendorFollowupTask(task: OperatorTaskRow): Promise<string> {

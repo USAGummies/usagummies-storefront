@@ -10,6 +10,7 @@ import {
   logAICost,
 } from "@/lib/ops/abra-cost-tracker";
 import { appendCorrection as appendMarkdownCorrection } from "@/lib/ops/abra-markdown-memory";
+import { maybeLearnFinancialCorrection } from "@/lib/ops/operator/correction-learner";
 
 export type SlackThreadMessage = {
   role: "user" | "assistant";
@@ -1830,6 +1831,16 @@ export async function processAbraMessage(
     return {
       handled: true,
       reply: await handleTeaching({ ...ctx, text: textForRouting }),
+      sources: [],
+      answerLogId: null,
+    };
+  }
+
+  const learnedFinancialCorrection = await maybeLearnFinancialCorrection({ ...ctx, text: textForRouting });
+  if (learnedFinancialCorrection) {
+    return {
+      handled: true,
+      reply: learnedFinancialCorrection,
       sources: [],
       answerLogId: null,
     };

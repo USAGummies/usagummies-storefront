@@ -2,6 +2,7 @@ import { detectEmailOperatorGaps } from "@/lib/ops/operator/gap-detectors/email"
 import { detectPipelineOperatorGaps } from "@/lib/ops/operator/gap-detectors/pipeline";
 import { detectQBOOperatorGaps } from "@/lib/ops/operator/gap-detectors/qbo";
 import { runOperatorHealthMonitor } from "@/lib/ops/operator/health-monitor";
+import { runPnlSanityChecker } from "@/lib/ops/operator/pnl-sanity-checker";
 import { createOperatorTasks, executeOperatorTasks } from "@/lib/ops/operator/task-executor";
 import { reportOperatorCycle } from "@/lib/ops/operator/task-reporter";
 
@@ -46,6 +47,14 @@ export type OperatorLoopResult = {
       ok: boolean;
       detail: string;
     }>;
+  };
+  pnlSanity?: {
+    ok: boolean;
+    corrections: string[];
+    revenue: number;
+    cogs: number;
+    expenses: number;
+    netIncome: number;
   };
 };
 
@@ -100,6 +109,17 @@ export async function runOperatorLoop(): Promise<OperatorLoopResult> {
   ]);
   const execution = await executeOperatorTasks(12);
   const pendingTasks = await getPendingCount();
+  const qboModified = execution.results.some(
+    (row) =>
+      row.status === "completed" &&
+      (
+        row.taskType === "qbo_categorize" ||
+        row.taskType === "qbo_assign_vendor" ||
+        row.taskType === "qbo_record_transaction" ||
+        row.taskType === "qbo_record_from_email" ||
+        row.taskType === "qbo_revenue_gap"
+      ),
+  );
 
   const result: OperatorLoopResult = {
     createdTasks,
@@ -111,6 +131,10 @@ export async function runOperatorLoop(): Promise<OperatorLoopResult> {
     },
     execution,
   };
+
+  if (qboModified) {
+    result.pnlSanity = await runPnlSanityChecker();
+  }
 
   await reportOperatorCycle(result);
   result.health = await runOperatorHealthMonitor();
