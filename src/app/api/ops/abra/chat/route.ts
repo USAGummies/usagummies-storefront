@@ -2457,8 +2457,15 @@ export async function POST(req: Request) {
         void failTask(taskId, "LLM acknowledged task but did not emit an action block").catch(() => {});
       }
 
-      // Append honest disclaimer to the reply
+      // Append honest disclaimer and reassemble reply
       effectiveReply += "\n\n⚠️ _I said I'd do this but my action system didn't fire. This has been logged and flagged for follow-up. If this is urgent, please ask me again or rephrase the request._";
+      // Reassemble reply with the updated effectiveReply
+      reply = [
+        effectiveReply,
+        actionNotices.length > 0 ? actionNotices.join("\n") : "",
+      ]
+        .filter(Boolean)
+        .join("\n\n");
     }
 
     const SOURCE_RELEVANCE_THRESHOLD = 0.65;
