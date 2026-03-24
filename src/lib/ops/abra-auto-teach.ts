@@ -124,30 +124,52 @@ async function sbFetch(
   return json;
 }
 
-async function buildEmbedding(text: string): Promise<number[]> {
+async function buildEmbedding(text: string, retries = 1): Promise<number[]> {
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) throw new Error("OPENAI_API_KEY not configured");
 
-  const res = await fetch("https://api.openai.com/v1/embeddings", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${openaiKey}`,
-    },
-    body: JSON.stringify({
-      model: "text-embedding-3-small",
-      input: text.slice(0, 8000),
-      dimensions: 1536,
-    }),
-    signal: AbortSignal.timeout(15000),
-  });
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch("https://api.openai.com/v1/embeddings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${openaiKey}`,
+        },
+        body: JSON.stringify({
+          model: "text-embedding-3-small",
+          input: text.slice(0, 8000),
+          dimensions: 1536,
+        }),
+        signal: AbortSignal.timeout(15000),
+      });
 
-  if (!res.ok) {
-    throw new Error(`Embedding failed (${res.status})`);
+      if (res.status === 429 && attempt < retries) {
+        // Rate limited — wait and retry
+        await new Promise((r) => setTimeout(r, 2000));
+        continue;
+      }
+
+      if (!res.ok) {
+        throw new Error(`Embedding failed (${res.status})`);
+      }
+
+      const data = await res.json();
+      const embedding = data?.data?.[0]?.embedding;
+      if (!embedding || !Array.isArray(embedding) || embedding.length === 0) {
+        throw new Error("Empty embedding returned from OpenAI");
+      }
+      return embedding;
+    } catch (err) {
+      if (attempt < retries) {
+        console.warn(`[embedding] Attempt ${attempt + 1} failed, retrying:`, err instanceof Error ? err.message : err);
+        await new Promise((r) => setTimeout(r, 1000));
+        continue;
+      }
+      throw err;
+    }
   }
-
-  const data = await res.json();
-  return data?.data?.[0]?.embedding || [];
+  throw new Error("Embedding failed after all retries");
 }
 
 function normalizeFeed(raw: AutoTeachFeed): AutoTeachFeed {

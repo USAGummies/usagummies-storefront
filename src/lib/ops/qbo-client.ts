@@ -133,6 +133,14 @@ async function qboFetch<T>(
       return qboFetch<T>(path, init, true);
     }
 
+    // Handle rate limiting — wait and retry once
+    if (res.status === 429 && !retried) {
+      const retryAfter = parseInt(res.headers.get("Retry-After") || "5", 10);
+      console.warn(`[qbo] Rate limited (429), waiting ${retryAfter}s before retry...`);
+      await new Promise((r) => setTimeout(r, retryAfter * 1000));
+      return qboFetch<T>(path, init, true);
+    }
+
     if (!res.ok) {
       const text = await res.text().catch(() => "");
       console.warn(
