@@ -58,6 +58,36 @@ export async function GET(req: NextRequest) {
 
   try {
     switch (queryType) {
+      // ── Accounts (Chart of Accounts) ──
+      case "accounts": {
+        const result = await qboQuery<{
+          QueryResponse?: {
+            Account?: Array<{
+              Id: string;
+              Name?: string;
+              AccountType?: string;
+              AccountSubType?: string;
+              AcctNum?: string;
+              CurrentBalance?: number;
+              Active?: boolean;
+            }>;
+          };
+        }>(realmId, accessToken, "SELECT * FROM Account MAXRESULTS 500");
+        const accounts = result?.QueryResponse?.Account || [];
+        return NextResponse.json({
+          type: "accounts",
+          count: accounts.length,
+          accounts: accounts.map((a) => ({
+            Id: a.Id,
+            Name: a.Name || "",
+            AccountType: a.AccountType || "",
+            AccountSubType: a.AccountSubType || "",
+            AcctNum: a.AcctNum || "",
+            CurrentBalance: a.CurrentBalance || 0,
+            Active: a.Active ?? true,
+          })),
+        });
+      }
       // ── Vendor list ──
       case "vendors": {
         const result = await qboQuery<{
@@ -360,7 +390,7 @@ export async function GET(req: NextRequest) {
       default:
         return NextResponse.json(
           {
-            error: `Unknown type: ${queryType}. Use: vendors, pnl, balance_sheet, purchases, cash_flow, bills, invoices, customers, metrics`,
+            error: `Unknown type: ${queryType}. Use: accounts, vendors, pnl, balance_sheet, purchases, cash_flow, bills, invoices, customers, metrics`,
           },
           { status: 400 },
         );

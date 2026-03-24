@@ -3031,8 +3031,33 @@ async function fetchDataForFileGeneration(
         rows,
       }];
     }
+    case "qbo_transactions":
+    case "qbo_purchases":
+    case "transactions": {
+      const host = process.env.NEXTAUTH_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:4000");
+      const cronSecret = (process.env.CRON_SECRET || "").trim();
+      const res = await fetch(`${host}/api/ops/qbo/query?type=purchases&limit=500`, {
+        headers: { Authorization: `Bearer ${cronSecret}` },
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!res.ok) throw new Error(`QBO purchases query failed: ${res.status}`);
+      const data = (await res.json()) as { purchases?: Array<{ Date: string; Amount: number; Vendor: string | null; Lines: Array<{ Description: string; Amount: number; Account: string }> }> };
+      const purchases = data.purchases || [];
+      const rows: (string | number | boolean | null)[][] = purchases.map(p => [
+        p.Date || "",
+        p.Amount || 0,
+        p.Vendor || "Unknown",
+        (p.Lines?.[0]?.Account || "Uncategorized"),
+        (p.Lines?.[0]?.Description || ""),
+      ]);
+      return [{
+        sheetName: "Transactions",
+        headers: ["Date", "Amount", "Vendor", "Account", "Description"],
+        rows,
+      }];
+    }
     default:
-      throw new Error(`Unknown data source: "${source}". Supported: qbo_accounts, qbo_vendors, qbo_pnl`);
+      throw new Error(`Unknown data source: "${source}". Supported: qbo_accounts, qbo_vendors, qbo_pnl, qbo_transactions`);
   }
 }
 
