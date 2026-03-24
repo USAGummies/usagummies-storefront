@@ -2239,7 +2239,7 @@ export async function POST(req: Request) {
     console.log(`[chat] Post-strip reply length: ${strippedReply.length}, first 200: ${strippedReply.slice(0, 200)}`);
 
     // Never return a completely empty reply — provide a fallback
-    const effectiveReply = strippedReply || (
+    let effectiveReply = strippedReply || (
       actionNotices.length > 0
         ? "" // Notices will fill the reply
         : "Done — I processed your request. Check this thread for any files or follow-up."
@@ -2435,6 +2435,31 @@ export async function POST(req: Request) {
     ]
       .filter(Boolean)
       .join("\n\n");
+
+    // ── "On it" detector: catch promises without actions ──
+    const saidOnIt = /\b(on it|creating.*now|i'?ll do that|doing that now|generating.*now|working on|i'?m on it|let me.*now|pulling.*now)\b/i.test(effectiveReply);
+    const noActionsExecuted = actionNotices.length === 0;
+    const userAskedForAction = /\b(create|add|set up|generate|export|send|draft|build|make|update|record|log|categorize|respond|reply)\b/i.test(message);
+
+    if (saidOnIt && noActionsExecuted && userAskedForAction) {
+      console.warn(`[chat] HONEST FAILURE: Abra said "${effectiveReply.slice(0, 60)}" but executed 0 actions for: "${message.slice(0, 80)}"`);
+      // Log to task queue as a failed task
+      const { queueTask, failTask } = await import("@/lib/ops/abra-task-queue");
+      const taskId = await queueTask({
+        task_type: "promise_without_action",
+        description: `Abra said "On it" but didn't execute: ${message.slice(0, 200)}`,
+        requested_by: actorEmail,
+        channel_id: slackChannelId || undefined,
+        thread_ts: slackThreadTs || undefined,
+        deadline_minutes: 5,
+      }).catch(() => null);
+      if (taskId) {
+        void failTask(taskId, "LLM acknowledged task but did not emit an action block").catch(() => {});
+      }
+
+      // Append honest disclaimer to the reply
+      effectiveReply += "\n\n⚠️ _I said I'd do this but my action system didn't fire. This has been logged and flagged for follow-up. If this is urgent, please ask me again or rephrase the request._";
+    }
 
     const SOURCE_RELEVANCE_THRESHOLD = 0.65;
     const seenIds = new Set<string>();
