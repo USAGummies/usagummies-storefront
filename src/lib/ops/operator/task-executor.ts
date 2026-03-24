@@ -69,6 +69,25 @@ type QBOVendor = {
 type QBOPurchase = {
   Id?: string;
   SyncToken?: string;
+  PaymentType?: string;
+  AccountRef?: { value?: string; name?: string };
+  CreditCardAccountRef?: { value?: string; name?: string };
+  PrivateNote?: string;
+  TxnDate?: string;
+  TotalAmt?: number;
+  Line?: Array<{
+    Id?: string;
+    Amount?: number;
+    Description?: string;
+    DetailType?: string;
+    AccountBasedExpenseLineDetail?: {
+      AccountRef?: { value?: string; name?: string };
+      BillableStatus?: string;
+      CustomerRef?: { value?: string; name?: string };
+      ClassRef?: { value?: string; name?: string };
+      TaxCodeRef?: { value?: string; name?: string };
+    };
+  }>;
   EntityRef?: { name?: string; value?: string };
 };
 
@@ -195,6 +214,85 @@ async function qboUpdatePurchase(
   };
 }
 
+async function fetchPurchaseById(purchaseId: string): Promise<QBOPurchase | null> {
+  const result = await qboQuery<{ QueryResponse?: { Purchase?: QBOPurchase[] } }>(
+    `SELECT * FROM Purchase WHERE Id = '${purchaseId}' MAXRESULTS 1`,
+  );
+  return result?.QueryResponse?.Purchase?.[0] || null;
+}
+
+function buildPurchaseLinesWithAccount(
+  purchase: QBOPurchase,
+  accountId: string,
+  accountName?: string,
+): Array<Record<string, unknown>> {
+  const lines = Array.isArray(purchase.Line) ? purchase.Line : [];
+  if (!lines.length) {
+    const amount = Number(purchase.TotalAmt || 0);
+    return amount
+      ? [{
+          Amount: amount,
+          DetailType: "AccountBasedExpenseLineDetail",
+          Description: purchase.PrivateNote || `Purchase ${purchase.Id || ""}`.trim(),
+          AccountBasedExpenseLineDetail: {
+            AccountRef: {
+              value: accountId,
+              ...(accountName ? { name: accountName } : {}),
+            },
+          },
+        }]
+      : [];
+  }
+
+  return lines.map((line) => ({
+    ...(line.Id ? { Id: line.Id } : {}),
+    Amount: Number(line.Amount || 0),
+    Description: line.Description || undefined,
+    DetailType: line.DetailType || "AccountBasedExpenseLineDetail",
+    AccountBasedExpenseLineDetail: {
+      ...(line.AccountBasedExpenseLineDetail?.BillableStatus
+        ? { BillableStatus: line.AccountBasedExpenseLineDetail.BillableStatus }
+        : {}),
+      ...(line.AccountBasedExpenseLineDetail?.CustomerRef
+        ? { CustomerRef: line.AccountBasedExpenseLineDetail.CustomerRef }
+        : {}),
+      ...(line.AccountBasedExpenseLineDetail?.ClassRef
+        ? { ClassRef: line.AccountBasedExpenseLineDetail.ClassRef }
+        : {}),
+      ...(line.AccountBasedExpenseLineDetail?.TaxCodeRef
+        ? { TaxCodeRef: line.AccountBasedExpenseLineDetail.TaxCodeRef }
+        : {}),
+      AccountRef: {
+        value: accountId,
+        ...(accountName ? { name: accountName } : {}),
+      },
+    },
+  }));
+}
+
+function buildPurchaseUpdateWithVendor(
+  purchase: QBOPurchase,
+  vendorId: string,
+  vendorName: string,
+): Record<string, unknown> {
+  return {
+    sparse: false,
+    Id: purchase.Id,
+    SyncToken: purchase.SyncToken,
+    ...(purchase.AccountRef ? { AccountRef: purchase.AccountRef } : {}),
+    ...(purchase.CreditCardAccountRef ? { CreditCardAccountRef: purchase.CreditCardAccountRef } : {}),
+    ...(purchase.PaymentType ? { PaymentType: purchase.PaymentType } : {}),
+    ...(purchase.PrivateNote ? { PrivateNote: purchase.PrivateNote } : {}),
+    ...(purchase.TxnDate ? { TxnDate: purchase.TxnDate } : {}),
+    EntityRef: {
+      value: vendorId,
+      name: vendorName,
+      type: "Vendor",
+    },
+    ...(Array.isArray(purchase.Line) ? { Line: purchase.Line } : {}),
+  };
+}
+
 function normalizeText(value: string | null | undefined): string {
   return String(value || "").trim().toLowerCase();
 }
@@ -246,6 +344,19 @@ function canExecuteTask(task: OperatorTaskRow): boolean {
   if (canPrepareApprovalTask(task)) return true;
   if (task.task_type === "qbo_record_from_email") return !task.requires_approval;
   return !task.requires_approval;
+}
+
+async function fetchAccountsViaApi(): Promise<QBOAccount[]> {
+  const res = await fetch(`${getInternalBaseUrl()}/api/ops/qbo/query?type=accounts`, {
+    headers: {
+      ...getInternalHeaders(),
+    },
+    cache: "no-store",
+    signal: AbortSignal.timeout(30000),
+  });
+  if (!res.ok) return [];
+  const data = (await res.json().catch(() => ({}))) as { accounts?: QBOAccount[] };
+  return Array.isArray(data.accounts) ? data.accounts : [];
 }
 
 export async function createOperatorTasks(
@@ -398,7 +509,29 @@ async function failTask(task: OperatorTaskRow, message: string, status: Operator
 
 async function executeCategorizeTask(task: OperatorTaskRow): Promise<string> {
   const transactionId = String(task.execution_params?.transactionId || "");
+  const suggestedAccountId = String(task.execution_params?.suggestedAccountId || "");
+  const suggestedAccountName = String(task.execution_params?.suggestedAccountName || "");
   if (!transactionId) throw new Error("Missing transactionId");
+  if (!suggestedAccountId) throw new Error("Missing suggestedAccountId");
+
+  const purchase = await fetchPurchaseById(transactionId);
+  if (!purchase?.Id || !purchase.SyncToken) {
+    throw new Error(`Purchase ${transactionId} not found`);
+  }
+
+  const updated = await qboUpdatePurchase(purchase.Id, purchase.SyncToken, {
+    sparse: false,
+    ...(purchase.AccountRef ? { AccountRef: purchase.AccountRef } : {}),
+    ...(purchase.CreditCardAccountRef ? { CreditCardAccountRef: purchase.CreditCardAccountRef } : {}),
+    ...(purchase.PaymentType ? { PaymentType: purchase.PaymentType } : {}),
+    ...(purchase.PrivateNote ? { PrivateNote: purchase.PrivateNote } : {}),
+    ...(purchase.TxnDate ? { TxnDate: purchase.TxnDate } : {}),
+    ...(purchase.EntityRef ? { EntityRef: purchase.EntityRef } : {}),
+    Line: buildPurchaseLinesWithAccount(purchase, suggestedAccountId, suggestedAccountName || undefined),
+  });
+  if (updated.ok) {
+    return `Categorized transaction ${transactionId} to ${suggestedAccountName || suggestedAccountId}`;
+  }
 
   const res = await fetch(`${getInternalBaseUrl()}/api/ops/qbo/categorize-batch`, {
     method: "POST",
@@ -420,7 +553,9 @@ async function executeCategorizeTask(task: OperatorTaskRow): Promise<string> {
     throw new Error(String(data.error || `Categorization failed (${res.status})`).slice(0, 300));
   }
   if (Number(data.categorized || 0) < 1) {
-    throw new Error(`No transaction categorized for ${transactionId}`);
+    throw new Error(
+      `No transaction categorized for ${transactionId}${updated.body ? ` (${updated.body.slice(0, 180)})` : ""}`,
+    );
   }
   return `Categorized transaction ${transactionId}`;
 }
@@ -464,6 +599,7 @@ async function executeAssignVendorTask(task: OperatorTaskRow): Promise<string> {
 
   const attempts = [
     { EntityRef: { value: vendorId, name: inferredVendorName, type: "Vendor" } },
+    buildPurchaseUpdateWithVendor(purchase, vendorId, inferredVendorName),
     { VendorRef: { value: vendorId, name: inferredVendorName } },
   ];
 
@@ -607,7 +743,7 @@ async function executeRecordTransactionTask(task: OperatorTaskRow): Promise<stri
   return `Recorded transfer ${description} to ${targetAccountName}`;
 }
 
-async function generateDraftViaChat(prompt: string): Promise<string> {
+async function generateDraftViaChat(prompt: string, fallbackDraft?: string): Promise<string> {
   const res = await fetch(`${getInternalBaseUrl()}/api/ops/abra/chat`, {
     method: "POST",
     headers: {
@@ -622,11 +758,15 @@ async function generateDraftViaChat(prompt: string): Promise<string> {
     signal: AbortSignal.timeout(55000),
   });
   if (!res.ok) {
+    if (fallbackDraft) return fallbackDraft;
     throw new Error(`Abra chat draft generation failed (${res.status})`);
   }
   const data = (await res.json()) as AbraChatResponse;
   const reply = String(data.reply || "").trim();
-  if (!reply) throw new Error("Abra chat returned an empty draft");
+  if (!reply) {
+    if (fallbackDraft) return fallbackDraft;
+    throw new Error("Abra chat returned an empty draft");
+  }
   return reply;
 }
 
@@ -690,13 +830,15 @@ async function executeEmailDraftResponseTask(task: OperatorTaskRow): Promise<str
   const threadText = threadMessages
     .slice(0, 6)
     .map((entry) => `From: ${entry.from}\nTo: ${entry.to}\nDate: ${entry.date}\nSubject: ${entry.subject}\n\n${entry.body}`)
-    .join("\n\n---\n\n");
+    .join("\n\n---\n\n")
+    .slice(0, 6000);
 
   const draft = await generateDraftViaChat(
     `Draft a reply to this email thread. Return only the email body, no commentary.\n\n` +
     `Sender: ${sender}\n` +
     `Subject: ${subject}\n\n` +
-    `Thread:\n${threadText || message.body}`,
+    `Thread:\n${threadText || String(message.body || "").slice(0, 6000)}`,
+    `Hi ${sender.split("<")[0].trim() || senderEmail.split("@")[0]},\n\nThanks for the note. I reviewed the thread regarding "${subject}". I’m on it and will follow up with the specific details requested shortly.\n\nBest,\nBen`,
   );
 
   const commandId = await queueDraftReply({
@@ -719,8 +861,18 @@ async function executeQBORecordFromEmailTask(task: OperatorTaskRow): Promise<str
   const senderEmail = String(task.execution_params?.sender_email || "");
   if (!amount) throw new Error("Missing amount");
 
-  const [accountsResult, vendorsResult] = await Promise.all([getQBOAccounts(), getQBOVendors()]);
-  const accounts = ((accountsResult?.QueryResponse?.Account as QBOAccount[]) || []);
+  const [accountsResult, vendorsResult, apiAccounts] = await Promise.all([
+    getQBOAccounts(),
+    getQBOVendors(),
+    fetchAccountsViaApi(),
+  ]);
+  const accounts = [
+    ...(((accountsResult?.QueryResponse?.Account as QBOAccount[]) || [])),
+    ...apiAccounts,
+  ].filter((account, index, arr) => {
+    const id = String(account.Id || "");
+    return id ? arr.findIndex((item) => String(item.Id || "") === id) === index : true;
+  });
   const bankAccount =
     accounts.find((account) => account.AccountType === "Bank" && /checking/i.test(String(account.Name || ""))) ||
     accounts.find((account) => account.AccountType === "Bank");
@@ -729,7 +881,10 @@ async function executeQBORecordFromEmailTask(task: OperatorTaskRow): Promise<str
   const matchedRule = EMAIL_VENDOR_ACCOUNT_MAP.find((rule) => rule.test.test(`${vendor} ${description}`));
   const mappedAccount =
     (matchedRule
-      ? accounts.find((account) => String(account.Id || "") === matchedRule.accountCode)
+      ? (
+        accounts.find((account) => String(account.Id || "") === matchedRule.accountCode) ||
+        accounts.find((account) => normalizeText(String(account.Name || "")) === normalizeText(matchedRule.label))
+      )
       : null) ||
     accounts.find((account) => String(account.Id || "") === "2") ||
     accounts.find((account) => /uncategorized/i.test(String(account.Name || "")));
@@ -775,6 +930,7 @@ async function executeVendorFollowupTask(task: OperatorTaskRow): Promise<string>
     `Draft a short follow-up email to ${vendor}. Return only the email body.\n\n` +
     `Last subject: ${lastSubject}\n` +
     `Previous context:\n${bodyPreview}`,
+    `Hi ${vendor},\n\nFollowing up on "${lastSubject}" and checking whether anything further is needed from our side. Happy to keep things moving.\n\nBest,\nBen`,
   );
 
   const commandId = await queueDraftReply({
@@ -799,6 +955,7 @@ async function executeDistributorFollowupTask(task: OperatorTaskRow): Promise<st
     `Draft a follow-up email to ${distributorName} about a sample shipment. Return only the email body.\n\n` +
     `Ship date: ${shipDate}\n` +
     `Context:\n${sampleDetails}`,
+    `Hi ${distributorName},\n\nFollowing up on the USA Gummies sample we sent around ${shipDate}. I wanted to see if you had a chance to review it and whether it makes sense to discuss next steps.\n\nBest,\nBen`,
   );
 
   const commandId = await queueDraftReply({

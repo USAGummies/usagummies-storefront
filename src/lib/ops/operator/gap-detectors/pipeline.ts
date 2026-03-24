@@ -19,7 +19,7 @@ type BrainRow = {
 
 const DISTRIBUTOR_TITLE_PATTERN = /^(Distributor Prospects|B2B Prospects):\s*/i;
 const INVALID_DISTRIBUTOR_NAME_PATTERN =
-  /(https?:\/\/|www\.|\.com\b|\.co\.id\b|›|&ndash;|aktivasi windows|generador de video|katadata|invideo|asani)/i;
+  /(https?:\/\/|www\.|\.com\b|\.co\.id\b|›|&ndash;|company overview|contact details|aktivasi windows|generador de video|katadata|invideo|asani)/i;
 const VALID_EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
 
 const TRACKED_VENDOR_QUERIES = [
