@@ -932,10 +932,21 @@ async function sendReneMorningDM(): Promise<void> {
   const qboHealthPct = purchases.length > 0 ? Math.round((categorizedCount / purchases.length) * 100) : 100;
 
   const summary = ((pnl || {}).summary || {}) as Record<string, unknown>;
-  const revenue = numberValue(summary.TotalIncome || summary.Income || summary.Revenue);
-  const cogs = numberValue(summary.TotalCostOfGoodsSold || summary.CostOfGoodsSold || summary.COGS);
-  const expenses = numberValue(summary.TotalExpenses || summary.Expenses);
-  const netIncome = numberValue(summary.NetIncome || revenue - cogs - expenses);
+  const revenue = numberValue(
+    summary["Total Income"] || summary.TotalIncome || summary.Income || summary.Revenue,
+  );
+  const cogs = numberValue(
+    summary["Total Cost of Goods Sold"] ||
+      summary.TotalCostOfGoodsSold ||
+      summary.CostOfGoodsSold ||
+      summary.COGS,
+  );
+  const expenses = numberValue(
+    summary["Total Expenses"] || summary.TotalExpenses || summary.Expenses,
+  );
+  const netIncome = numberValue(
+    summary["Net Income"] || summary.NetIncome || revenue - cogs - expenses,
+  );
 
   const operatorParts = Object.entries(operator.completedByType || {})
     .slice(0, 4)
