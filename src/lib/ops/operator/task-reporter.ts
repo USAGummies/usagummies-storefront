@@ -21,6 +21,28 @@ export type OperatorCycleSummary = {
       distributorFollowups: number;
       vendorFollowups: number;
     };
+    vendorPayments?: {
+      dueSoonCount: number;
+      dueSoonAmount: number;
+      overdueCount: number;
+      overdueAmount: number;
+    };
+    inventory?: {
+      healthy: number;
+      info: number;
+      warning: number;
+      critical: number;
+    };
+    reconciliation?: {
+      ran: boolean;
+      discrepancies: number;
+      amazonDifference: number;
+      shopifyDifference: number;
+      bankDifference: number;
+    };
+    wholesale?: {
+      invoiceTasks: number;
+    };
   };
   execution: OperatorExecutionSummary;
 };
@@ -72,6 +94,8 @@ function summarizeCompletedTasks(summary: OperatorExecutionSummary): string[] {
     email_draft_response: "email draft",
     vendor_followup: "vendor follow-up draft",
     distributor_followup: "distributor follow-up draft",
+    generate_wholesale_invoice: "wholesale invoice draft",
+    inventory_reorder_po: "inventory PO draft",
   };
 
   return Array.from(counts.entries()).map(([taskType, count]) =>
@@ -139,6 +163,26 @@ export async function reportOperatorCycle(summary: OperatorCycleSummary): Promis
     `*QBO Health:* ${qboHealthPct}% categorized (${summary.detectorSummary.qbo.categorizedTransactions}/${summary.detectorSummary.qbo.totalTransactions})`,
     `*Email:* ${summary.detectorSummary.email.replyTasks} reply draft task(s), ${summary.detectorSummary.email.qboEmailTasks} QBO-from-email task(s)`,
     `*Pipeline:* ${summary.detectorSummary.pipeline.distributorFollowups} distributor follow-up(s), ${summary.detectorSummary.pipeline.vendorFollowups} vendor follow-up(s)`,
+    ...(summary.detectorSummary.vendorPayments
+      ? [
+          `*AP:* ${summary.detectorSummary.vendorPayments.dueSoonCount} due soon (${summary.detectorSummary.vendorPayments.dueSoonAmount.toFixed(2)}), ` +
+            `${summary.detectorSummary.vendorPayments.overdueCount} overdue (${summary.detectorSummary.vendorPayments.overdueAmount.toFixed(2)})`,
+        ]
+      : []),
+    ...(summary.detectorSummary.inventory
+      ? [
+          `*Inventory:* ${summary.detectorSummary.inventory.critical} critical, ${summary.detectorSummary.inventory.warning} warning, ${summary.detectorSummary.inventory.info} info`,
+        ]
+      : []),
+    ...(summary.detectorSummary.reconciliation?.ran
+      ? [
+          `*Reconciliation:* ${summary.detectorSummary.reconciliation.discrepancies} discrepancy task(s) ` +
+            `(Amazon ${summary.detectorSummary.reconciliation.amazonDifference.toFixed(2)}, Shopify ${summary.detectorSummary.reconciliation.shopifyDifference.toFixed(2)}, Bank ${summary.detectorSummary.reconciliation.bankDifference.toFixed(2)})`,
+        ]
+      : []),
+    ...(summary.detectorSummary.wholesale
+      ? [`*Wholesale:* ${summary.detectorSummary.wholesale.invoiceTasks} invoice draft task(s)`]
+      : []),
     `*Queued:* ${summary.createdTasks} new operator task(s)`,
     `*Executed:* ${summary.execution.completed} completed, ${summary.execution.failed} failed, ${summary.execution.blocked} blocked, ${summary.execution.needsApproval} awaiting approval`,
     ...(summary.pendingTasks > 0 ? [`*Remaining Pending:* ${summary.pendingTasks}`] : []),

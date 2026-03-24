@@ -5,8 +5,8 @@ import {
   getQBOVendors,
 } from "@/lib/ops/qbo-client";
 import { readEmail, searchEmails } from "@/lib/ops/gmail-reader";
-import { notify } from "@/lib/ops/notify";
 import { loadLearnedQboRules, resolveQboCategory } from "@/lib/ops/operator/qbo-resolution";
+import { proposeAndMaybeExecute } from "@/lib/ops/abra-actions";
 
 export type OperatorTaskStatus =
   | "pending"
@@ -109,6 +109,10 @@ const REVENUE_ACCOUNT_METRIC_MAP: Record<string, { metricNames: string[]; qboAcc
   "4400": { metricNames: ["daily_revenue_faire", "daily_revenue_wholesale"], qboAccountId: 174, label: "Faire revenue" },
 };
 
+const POWERS_EMAIL = "gregk@powers-inc.com";
+const WHOLESALE_UNIT_PRICE = 2.1;
+const FINANCIALS_CHANNEL_ID = "C0AKG9FSC2J";
+
 function getSupabaseEnv() {
   const baseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -159,6 +163,25 @@ function getQBOBaseUrl(realmId: string): string {
     ? "https://sandbox-quickbooks.api.intuit.com"
     : "https://quickbooks.api.intuit.com";
   return `${host}/v3/company/${realmId}`;
+}
+
+async function postFinancialsMessage(text: string): Promise<void> {
+  const token = (process.env.SLACK_BOT_TOKEN || "").trim();
+  if (!token) return;
+  await fetch("https://slack.com/api/chat.postMessage", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      channel: FINANCIALS_CHANNEL_ID,
+      text,
+      mrkdwn: true,
+      unfurl_links: false,
+    }),
+    signal: AbortSignal.timeout(10000),
+  }).catch(() => {});
 }
 
 async function qboQuery<T>(query: string): Promise<T | null> {
@@ -341,6 +364,8 @@ function priorityWeight(priority: OperatorTaskRow["priority"]): number {
 
 function canPrepareApprovalTask(task: OperatorTaskRow): boolean {
   return task.task_type === "email_draft_response" ||
+    task.task_type === "generate_wholesale_invoice" ||
+    task.task_type === "inventory_reorder_po" ||
     task.task_type === "vendor_followup" ||
     task.task_type === "distributor_followup";
 }
@@ -441,6 +466,8 @@ export async function createOperatorTasks(
         status:
           task.requires_approval && !(
             task.task_type === "email_draft_response" ||
+            task.task_type === "generate_wholesale_invoice" ||
+            task.task_type === "inventory_reorder_po" ||
             task.task_type === "vendor_followup" ||
             task.task_type === "distributor_followup"
           )
@@ -474,6 +501,8 @@ async function listReadyTasks(limit: number): Promise<OperatorTaskRow[]> {
       row.task_type === "qbo_revenue_gap" ||
       row.task_type === "email_draft_response" ||
       row.task_type === "qbo_record_from_email" ||
+      row.task_type === "generate_wholesale_invoice" ||
+      row.task_type === "inventory_reorder_po" ||
       row.task_type === "vendor_followup" ||
       row.task_type === "distributor_followup",
     )
@@ -917,47 +946,70 @@ async function generateDraftViaChat(prompt: string, fallbackDraft?: string): Pro
   return reply;
 }
 
-async function queueDraftReply(params: {
+async function queueApprovalDraftEmail(params: {
   to: string;
-  senderName: string;
   subject: string;
   body: string;
-  sourceEmailId?: string | null;
   taskLabel: string;
 }): Promise<string> {
-  const commandId = `cmd-${crypto.randomUUID().slice(0, 8)}`;
   let draftBody = params.body.trim();
   if (!/best,\s*ben/i.test(draftBody)) {
     draftBody = `${draftBody}\n\nBest,\nBen`;
   }
 
-  await sbFetch("/rest/v1/abra_email_commands", {
-    method: "POST",
-    headers: { Prefer: "return=minimal" },
-    body: JSON.stringify({
-      id: commandId,
-      status: "draft_reply_pending",
-      sender_name: params.senderName,
-      sender_email: params.to,
+  const outcome = await proposeAndMaybeExecute({
+    action_type: "send_email",
+    title: params.taskLabel,
+    description: params.taskLabel,
+    department: "finance",
+    risk_level: "medium",
+    requires_approval: true,
+    params: {
+      to: params.to,
       subject: params.subject,
-      task: params.taskLabel,
-      draft_reply_subject: params.subject,
-      draft_reply_body: draftBody,
-      body_snippet: draftBody.slice(0, 500),
-      ...(params.sourceEmailId ? { gmail_thread_id: params.sourceEmailId } : {}),
-    }),
+      body: draftBody,
+    },
   });
+  return outcome.approval_id;
+}
 
-  await notify({
-    channel: "alerts",
-    text:
-      `📧 *Draft Reply Queued*\n` +
-      `*To:* ${params.to}\n*Subject:* ${params.subject}\n\n` +
-      `> ${draftBody.slice(0, 300).split("\n").join("\n> ")}\n\n` +
-      `_Send with:_ \`/abra sendreply ${commandId}\` _or discard with:_ \`/abra deny ${commandId}\``,
-  });
+function normalizeSubjectForThread(subject: string): string {
+  return subject.replace(/^(re|fwd?):\s*/gi, "").replace(/\s+/g, " ").trim();
+}
 
-  return commandId;
+async function buildEmailThreadContext(messageId: string, senderEmail: string, subject: string): Promise<string> {
+  const primary = await readEmail(messageId);
+  const normalizedSubject = normalizeSubjectForThread(subject).replace(/"/g, "");
+  const queryParts = [
+    normalizedSubject ? `subject:"${normalizedSubject}"` : "",
+    senderEmail ? `(from:${senderEmail} OR to:${senderEmail})` : "",
+    "newer_than:60d",
+  ].filter(Boolean);
+  const threadMessages = await searchEmails(queryParts.join(" "), 20).catch(() => []);
+
+  const allMessages = [
+    ...(primary ? [primary] : []),
+    ...threadMessages,
+  ];
+
+  const seen = new Set<string>();
+  const uniqueMessages = allMessages
+    .filter((item) => item?.id && !seen.has(item.id) && (seen.add(item.id), true))
+    .sort((a, b) => new Date(a.date || "").getTime() - new Date(b.date || "").getTime());
+
+  return uniqueMessages
+    .map((entry) =>
+      [
+        `From: ${entry.from}`,
+        `To: ${entry.to}`,
+        `Date: ${entry.date}`,
+        `Subject: ${entry.subject}`,
+        "",
+        String(entry.body || "").trim(),
+      ].join("\n"),
+    )
+    .join("\n\n---\n\n")
+    .slice(0, 12000);
 }
 
 async function executeEmailDraftResponseTask(task: OperatorTaskRow): Promise<string> {
@@ -967,37 +1019,40 @@ async function executeEmailDraftResponseTask(task: OperatorTaskRow): Promise<str
   const subject = String(task.execution_params?.subject || "Re: (no subject)");
   if (!messageId || !senderEmail) throw new Error("Missing message_id or sender_email");
 
-  const message = await readEmail(messageId);
-  if (!message) throw new Error(`Email ${messageId} could not be read`);
-
-  const threadMessages = await searchEmails(
-    `subject:"${subject.replace(/^re:\s*/i, "").replace(/"/g, "")}" newer_than:30d`,
-    10,
-  );
-  const threadText = threadMessages
-    .slice(0, 6)
-    .map((entry) => `From: ${entry.from}\nTo: ${entry.to}\nDate: ${entry.date}\nSubject: ${entry.subject}\n\n${entry.body}`)
-    .join("\n\n---\n\n")
-    .slice(0, 6000);
+  const threadText = await buildEmailThreadContext(messageId, senderEmail, subject);
+  if (!threadText) throw new Error(`Email thread ${messageId} could not be read`);
 
   const draft = await generateDraftViaChat(
-    `Draft a reply to this email thread. Return only the email body, no commentary.\n\n` +
-    `Sender: ${sender}\n` +
-    `Subject: ${subject}\n\n` +
-    `Thread:\n${threadText || String(message.body || "").slice(0, 6000)}`,
+    [
+      "Draft a professional reply to this email thread. Return only the email body, no commentary.",
+      "",
+      "Use this 6-step framework internally before writing:",
+      "1. Full context of the thread",
+      "2. Questions that need answering",
+      "3. Answers we already know",
+      "4. Information that must NOT leave the company (COGS, margins, costs)",
+      "5. Best-interest framing for USA Gummies",
+      "6. Draft the response",
+      "",
+      "Hard rule: Do NOT include any cost, margin, or COGS information.",
+      "Reply as Ben Stutman, Founder, USA Gummies.",
+      "",
+      `Sender: ${sender}`,
+      `Subject: ${subject}`,
+      "",
+      `Thread:\n${threadText}`,
+    ].join("\n"),
     `Hi ${sender.split("<")[0].trim() || senderEmail.split("@")[0]},\n\nThanks for the note. I reviewed the thread regarding "${subject}". I’m on it and will follow up with the specific details requested shortly.\n\nBest,\nBen`,
   );
 
-  const commandId = await queueDraftReply({
+  const approvalId = await queueApprovalDraftEmail({
     to: senderEmail,
-    senderName: sender || senderEmail,
     subject: subject.toLowerCase().startsWith("re:") ? subject : `Re: ${subject}`,
     body: draft,
-    sourceEmailId: messageId,
     taskLabel: `Draft reply to ${sender || senderEmail}`,
   });
 
-  return `Queued draft reply ${commandId} for ${sender || senderEmail}`;
+  return `Queued draft reply approval ${approvalId} for ${sender || senderEmail}`;
 }
 
 async function executeQBORecordFromEmailTask(task: OperatorTaskRow): Promise<string> {
@@ -1081,15 +1136,14 @@ async function executeVendorFollowupTask(task: OperatorTaskRow): Promise<string>
     `Hi ${vendor},\n\nFollowing up on "${lastSubject}" and checking whether anything further is needed from our side. Happy to keep things moving.\n\nBest,\nBen`,
   );
 
-  const commandId = await queueDraftReply({
+  const approvalId = await queueApprovalDraftEmail({
     to: email,
-    senderName: vendor,
     subject: lastSubject.toLowerCase().startsWith("re:") ? lastSubject : `Re: ${lastSubject}`,
     body: draft,
     taskLabel: `Vendor follow-up: ${vendor}`,
   });
 
-  return `Queued vendor follow-up draft ${commandId} for ${vendor}`;
+  return `Queued vendor follow-up approval ${approvalId} for ${vendor}`;
 }
 
 async function executeDistributorFollowupTask(task: OperatorTaskRow): Promise<string> {
@@ -1106,15 +1160,91 @@ async function executeDistributorFollowupTask(task: OperatorTaskRow): Promise<st
     `Hi ${distributorName},\n\nFollowing up on the USA Gummies sample we sent around ${shipDate}. I wanted to see if you had a chance to review it and whether it makes sense to discuss next steps.\n\nBest,\nBen`,
   );
 
-  const commandId = await queueDraftReply({
+  const approvalId = await queueApprovalDraftEmail({
     to: email,
-    senderName: distributorName,
     subject: `Follow-up on USA Gummies sample`,
     body: draft,
     taskLabel: `Distributor follow-up: ${distributorName}`,
   });
 
-  return `Queued distributor follow-up draft ${commandId} for ${distributorName}`;
+  return `Queued distributor follow-up approval ${approvalId} for ${distributorName}`;
+}
+
+async function executeInventoryReorderPoTask(task: OperatorTaskRow): Promise<string> {
+  const sku = String(task.execution_params?.sku || "");
+  const productName = String(task.execution_params?.product_name || "inventory item");
+  const currentStock = Number(task.execution_params?.current_stock || 0);
+  const daysUntilStockout = Number(task.execution_params?.days_until_stockout || 0);
+  const suggestedQty = Math.ceil(Number(task.execution_params?.suggested_reorder_qty || 0));
+  const body = [
+    "Hi Greg,",
+    "",
+    `We need to initiate a production run for ${productName}${sku ? ` (${sku})` : ""}.`,
+    `Current stock is ${currentStock} units with roughly ${Number.isFinite(daysUntilStockout) ? daysUntilStockout.toFixed(1) : "unknown"} days of runway remaining.`,
+    "",
+    `Requested order: ${suggestedQty.toLocaleString()} units`,
+    "Please confirm availability, lead time, and next steps.",
+    "",
+    "Best,",
+    "Ben Stutman",
+    "USA Gummies",
+  ].join("\n");
+
+  const approvalId = await queueApprovalDraftEmail({
+    to: String(task.execution_params?.vendor_email || POWERS_EMAIL),
+    subject: `Draft PO request — ${productName}${sku ? ` (${sku})` : ""}`,
+    body,
+    taskLabel: `Draft PO to Powers for ${productName}`,
+  });
+
+  return `Queued PO draft approval ${approvalId} for ${productName}`;
+}
+
+async function executeGenerateWholesaleInvoiceTask(task: OperatorTaskRow): Promise<string> {
+  const quantity = Math.max(0, Number(task.execution_params?.quantity || task.execution_params?.units || 0));
+  if (!quantity) throw new Error("Missing wholesale shipment quantity");
+  const customerName = String(task.execution_params?.customer_name || "Inderbitzin");
+  const sourceRef = String(task.execution_params?.source_ref || "");
+  const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const total = Number((quantity * WHOLESALE_UNIT_PRICE).toFixed(2));
+
+  const invoiceRes = await fetch(`${getInternalBaseUrl()}/api/ops/qbo/invoice`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getInternalHeaders(),
+    },
+    body: JSON.stringify({
+      customerName,
+      lineItems: [
+        {
+          description: `${quantity} wholesale units at $${WHOLESALE_UNIT_PRICE.toFixed(2)}/unit`,
+          quantity,
+          unitPrice: WHOLESALE_UNIT_PRICE,
+        },
+      ],
+      dueDate,
+      memo: `Wholesale shipment invoice. Terms: Net 30.${sourceRef ? ` Source: ${sourceRef}` : ""}`,
+    }),
+    cache: "no-store",
+    signal: AbortSignal.timeout(45000),
+  });
+  const invoiceData = (await invoiceRes.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!invoiceRes.ok) {
+    throw new Error(String(invoiceData.error || `QBO invoice draft creation failed (${invoiceRes.status})`).slice(0, 300));
+  }
+
+  const invoiceId = String(invoiceData.invoiceId || "");
+  const docNumber = String(invoiceData.docNumber || invoiceId || "");
+  if (!invoiceId && !docNumber) {
+    throw new Error("QBO invoice draft creation failed");
+  }
+
+  await postFinancialsMessage(
+    `🧾 Invoice ${docNumber || invoiceId} created for ${customerName} — $${total.toFixed(2)} for ${quantity} units. Awaiting approval before sending.`,
+  );
+
+  return `Created draft wholesale invoice ${docNumber || invoiceId} for ${customerName} totaling $${total.toFixed(2)}`;
 }
 
 async function executeTask(task: OperatorTaskRow): Promise<string | ExecuteTaskResult> {
@@ -1131,6 +1261,10 @@ async function executeTask(task: OperatorTaskRow): Promise<string | ExecuteTaskR
       return executeQBORecordFromEmailTask(task);
     case "qbo_revenue_gap":
       return executeRevenueGapTask(task);
+    case "generate_wholesale_invoice":
+      return executeGenerateWholesaleInvoiceTask(task);
+    case "inventory_reorder_po":
+      return executeInventoryReorderPoTask(task);
     case "vendor_followup":
       return executeVendorFollowupTask(task);
     case "distributor_followup":

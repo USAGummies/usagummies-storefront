@@ -7,6 +7,7 @@ import { detectAwaitingReplies } from "@/lib/ops/abra-email-fetch";
 import { notify } from "@/lib/ops/notify";
 import { createNotionPage } from "@/lib/ops/abra-notion-write";
 import { readState } from "@/lib/ops/state";
+import { RECONCILIATION_SUMMARY_STATE_KEY, type ReconciliationSummary } from "@/lib/ops/operator/reconciliation";
 import { getDailyGoalSnapshot, formatGoalSlack } from "@/lib/ops/daily-goal-tracker";
 
 type MetricSnapshot = {
@@ -851,6 +852,77 @@ function shortOperatorLabel(taskType: string): string {
   return taskType.replace(/_/g, " ");
 }
 
+function thresholdForDays(days: number): "healthy" | "info" | "warning" | "critical" {
+  if (!Number.isFinite(days) || days > 45) return "healthy";
+  if (days > 30) return "info";
+  if (days >= 14) return "warning";
+  return "critical";
+}
+
+async function getInventoryBrief(): Promise<{
+  counts: Record<"healthy" | "info" | "warning" | "critical", number>;
+  watch: string[];
+}> {
+  const inventory = await analyzeInventory();
+  const totals = inventory.filter((item) => item.channel === "total");
+  const counts = {
+    healthy: 0,
+    info: 0,
+    warning: 0,
+    critical: 0,
+  };
+
+  for (const item of totals) {
+    counts[thresholdForDays(item.days_until_stockout)] += 1;
+  }
+
+  const watch = totals
+    .filter((item) => thresholdForDays(item.days_until_stockout) !== "healthy")
+    .slice(0, 3)
+    .map((item) => {
+      const threshold = thresholdForDays(item.days_until_stockout);
+      const icon = threshold === "critical" ? "🔴" : threshold === "warning" ? "🟡" : "⚠️";
+      return `${icon} ${item.product_name}: ${item.current_stock} units, ~${Number.isFinite(item.days_until_stockout) ? item.days_until_stockout.toFixed(1) : "?"} days`;
+    });
+
+  return { counts, watch };
+}
+
+async function getVendorPaymentBrief(): Promise<{
+  dueSoonCount: number;
+  dueSoonAmount: number;
+  overdueCount: number;
+  overdueAmount: number;
+}> {
+  const billsData = await fetchInternalOpsJson("/api/ops/qbo/query?type=bills");
+  const bills = Array.isArray((billsData || {}).bills)
+    ? ((billsData || {}).bills as Array<Record<string, unknown>>)
+    : [];
+
+  let dueSoonAmount = 0;
+  let overdueAmount = 0;
+  let dueSoonCount = 0;
+  let overdueCount = 0;
+
+  for (const bill of bills) {
+    const balance = numberValue(bill.Balance);
+    if (balance <= 0) continue;
+    const due = String(bill.DueDate || bill.Date || "");
+    const target = new Date(`${due.slice(0, 10)}T00:00:00Z`).getTime();
+    if (!Number.isFinite(target)) continue;
+    const daysUntil = Math.floor((target - Date.now()) / 86400000);
+    if (daysUntil < 0) {
+      overdueCount += 1;
+      overdueAmount += balance;
+    } else if (daysUntil <= 5) {
+      dueSoonCount += 1;
+      dueSoonAmount += balance;
+    }
+  }
+
+  return { dueSoonCount, dueSoonAmount, overdueCount, overdueAmount };
+}
+
 export async function sendMorningBrief(): Promise<void> {
   const brief = await generateLLMMorningBrief();
 
@@ -906,7 +978,7 @@ async function sendReneMorningDM(): Promise<void> {
   if (!botToken) return;
 
   const yesterdayIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  const [pnl, purchasesData, operator, reviewTasks] = await Promise.all([
+  const [pnl, purchasesData, operator, reviewTasks, inventoryBrief, apBrief, reconciliation] = await Promise.all([
     fetchInternalOpsJson("/api/ops/qbo/query?type=pnl"),
     fetchInternalOpsJson("/api/ops/qbo/query?type=purchases&limit=200"),
     getOperatorTaskBrief().catch(() => ({
@@ -918,6 +990,17 @@ async function sendReneMorningDM(): Promise<void> {
     sbFetch(
       "/rest/v1/abra_operator_tasks?or=(assigned_to.eq.rene,requires_approval.eq.true)&status=in.(pending,needs_approval)&select=title,task_type,assigned_to,requires_approval&order=created_at.asc&limit=5",
     ).catch(() => []),
+    getInventoryBrief().catch(() => ({
+      counts: { healthy: 0, info: 0, warning: 0, critical: 0 },
+      watch: [],
+    })),
+    getVendorPaymentBrief().catch(() => ({
+      dueSoonCount: 0,
+      dueSoonAmount: 0,
+      overdueCount: 0,
+      overdueAmount: 0,
+    })),
+    readState<ReconciliationSummary | null>(RECONCILIATION_SUMMARY_STATE_KEY, null).catch(() => null),
   ]);
 
   const purchases = Array.isArray((purchasesData || {}).purchases)
@@ -963,7 +1046,17 @@ async function sendReneMorningDM(): Promise<void> {
     `• P&L MTD — Revenue *$${revenue.toFixed(2)}* · Expenses *$${expenses.toFixed(2)}* · Net income *$${netIncome.toFixed(2)}*`,
     `• QBO health: *${qboHealthPct}% categorized* (${categorizedCount}/${purchases.length || 0})`,
     `• Operator overnight: *${operator.completedLast24h}* completed${operatorParts.length ? ` (${operatorParts.join(", ")})` : ""}`,
+    `• AP aging: *$${apBrief.dueSoonAmount.toFixed(2)}* due this week across ${apBrief.dueSoonCount} bill(s); *$${apBrief.overdueAmount.toFixed(2)}* overdue across ${apBrief.overdueCount} bill(s)`,
+    `• Inventory watch: *${inventoryBrief.counts.critical}* critical, *${inventoryBrief.counts.warning}* warning, *${inventoryBrief.counts.info}* info`,
   ];
+
+  if (reconciliation?.ran) {
+    lines.push(
+      `• Reconciliation: Amazon ${reconciliation.amazonDifference > 5 ? `⚠️ $${reconciliation.amazonDifference.toFixed(2)} unmatched` : "✅ matched"} · ` +
+      `Shopify ${reconciliation.shopifyDifference > 5 ? `⚠️ $${reconciliation.shopifyDifference.toFixed(2)} unmatched` : "✅ matched"} · ` +
+      `Bank ${reconciliation.bankDifference > 5 ? `⚠️ $${reconciliation.bankDifference.toFixed(2)} off` : "✅ matched"}`,
+    );
+  }
 
   if (reviewRows.length > 0) {
     lines.push("");
@@ -978,6 +1071,14 @@ async function sendReneMorningDM(): Promise<void> {
     lines.push("⏳ *Needs approval*");
     for (const task of operator.needsApproval.slice(0, 3)) {
       lines.push(`• ${task.title}`);
+    }
+  }
+
+  if (inventoryBrief.watch.length > 0) {
+    lines.push("");
+    lines.push("📦 *Inventory watch*");
+    for (const item of inventoryBrief.watch) {
+      lines.push(`• ${item}`);
     }
   }
 
