@@ -17,6 +17,13 @@ type MetricSnapshot = {
   stale?: boolean;
 };
 
+type OperatorTaskBrief = {
+  completedLast24h: number;
+  completedByType: Record<string, number>;
+  pendingCount: number;
+  needsApproval: Array<{ title: string; task_type: string }>;
+};
+
 export type MorningBriefPayload = {
   generated_at: string;
   feed_data_available: boolean;
@@ -38,6 +45,15 @@ export type MorningBriefPayload = {
     pending_approvals: number;
     pending_tasks: number;
     total_open: number;
+  };
+  operator: {
+    completed_last_24h: number;
+    completed_by_type: Record<string, number>;
+    pending_count: number;
+    needs_approval: Array<{
+      title: string;
+      task_type: string;
+    }>;
   };
   anomalies: {
     count: number;
@@ -200,6 +216,37 @@ async function getPendingTaskCount(): Promise<number> {
   return abrCount + legacyCount;
 }
 
+async function getOperatorTaskBrief(): Promise<OperatorTaskBrief> {
+  const completedSince = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const [completedRows, pendingRows, approvalRows] = await Promise.all([
+    sbFetch(
+      `/rest/v1/abra_operator_tasks?status=eq.completed&completed_at=gte.${encodeURIComponent(completedSince)}&select=task_type&limit=500`,
+    ) as Promise<Array<{ task_type?: string | null }>>,
+    sbFetch(
+      "/rest/v1/abra_operator_tasks?status=eq.pending&select=id&limit=500",
+    ) as Promise<Array<{ id: string }>>,
+    sbFetch(
+      "/rest/v1/abra_operator_tasks?status=eq.needs_approval&select=title,task_type&order=created_at.asc&limit=5",
+    ) as Promise<Array<{ title?: string | null; task_type?: string | null }>>,
+  ]);
+
+  const completedByType: Record<string, number> = {};
+  for (const row of completedRows || []) {
+    const key = String(row.task_type || "other");
+    completedByType[key] = (completedByType[key] || 0) + 1;
+  }
+
+  return {
+    completedLast24h: Array.isArray(completedRows) ? completedRows.length : 0,
+    completedByType,
+    pendingCount: Array.isArray(pendingRows) ? pendingRows.length : 0,
+    needsApproval: (approvalRows || []).map((row) => ({
+      title: String(row.title || "Operator task"),
+      task_type: String(row.task_type || "task"),
+    })),
+  };
+}
+
 export async function generateMorningBriefPayload(): Promise<MorningBriefPayload> {
   const [
     shopifyRevenue,
@@ -210,6 +257,7 @@ export async function generateMorningBriefPayload(): Promise<MorningBriefPayload
     initiatives,
     pendingApprovals,
     pendingTasks,
+    operatorSummary,
     goalSnapshot,
   ] = await Promise.all([
     getMetricSnapshot("daily_revenue_shopify"),
@@ -223,6 +271,12 @@ export async function generateMorningBriefPayload(): Promise<MorningBriefPayload
     })),
     getPendingApprovalsCount().catch(() => 0),
     getPendingTaskCount().catch(() => 0),
+    getOperatorTaskBrief().catch(() => ({
+      completedLast24h: 0,
+      completedByType: {},
+      pendingCount: 0,
+      needsApproval: [],
+    })),
     getDailyGoalSnapshot().catch(() => null),
   ]);
 
@@ -257,6 +311,12 @@ export async function generateMorningBriefPayload(): Promise<MorningBriefPayload
       pending_approvals: pendingApprovals,
       pending_tasks: pendingTasks,
       total_open: pendingApprovals + pendingTasks,
+    },
+    operator: {
+      completed_last_24h: operatorSummary.completedLast24h,
+      completed_by_type: operatorSummary.completedByType,
+      pending_count: operatorSummary.pendingCount,
+      needs_approval: operatorSummary.needsApproval,
     },
     anomalies: {
       count: Array.isArray(anomalies) ? anomalies.length : 0,
@@ -469,6 +529,35 @@ export async function generateMorningBrief(): Promise<string> {
     lines.push("");
   } catch {
     // Skip pending actions section
+  }
+
+  try {
+    const operator = await getOperatorTaskBrief();
+    const parts = Object.entries(operator.completedByType)
+      .slice(0, 4)
+      .map(([taskType, count]) => {
+        const label =
+          taskType === "qbo_categorize" ? "categorizations" :
+          taskType === "qbo_assign_vendor" ? "vendor assignments" :
+          taskType === "email_draft_response" ? "email drafts" :
+          taskType === "vendor_followup" || taskType === "distributor_followup" ? "follow-ups" :
+          taskType.replace(/_/g, " ");
+        return `${count} ${label}`;
+      });
+
+    lines.push("🤖 *Operator*");
+    lines.push(
+      `• ${operator.completedLast24h} tasks completed overnight${parts.length ? ` (${parts.join(", ")})` : ""}. ${operator.pendingCount} pending.`,
+    );
+    if (operator.needsApproval.length > 0) {
+      lines.push(`• ${operator.needsApproval.length} tasks need your approval:`);
+      for (const task of operator.needsApproval.slice(0, 3)) {
+        lines.push(`  - ${task.title}`);
+      }
+    }
+    lines.push("");
+  } catch {
+    // Skip operator section
   }
 
   try {

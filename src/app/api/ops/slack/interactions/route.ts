@@ -298,6 +298,62 @@ export async function POST(req: Request) {
     });
   }
 
+  if (actionId === "approve_operator_task" || actionId === "reject_operator_task") {
+    const responseUrl = payload.response_url || "";
+    const approved = actionId === "approve_operator_task";
+
+    after(async () => {
+      try {
+        if (approved) {
+          const claimed = (await sbFetch(
+            `/rest/v1/abra_operator_tasks?id=eq.${value}&status=eq.needs_approval`,
+            {
+              method: "PATCH",
+              headers: { Prefer: "return=representation", "Content-Type": "application/json" },
+              body: JSON.stringify({
+                status: "pending",
+                requires_approval: false,
+                error_message: null,
+              }),
+            },
+          )) as Array<Record<string, unknown>>;
+          const text = claimed.length
+            ? `✅ Operator task approved by ${actor}. It has been re-queued for execution.`
+            : "⚠️ Operator task already processed or not awaiting approval.";
+          if (responseUrl) await replaceSlackMessage(responseUrl, text);
+          if (channelId && threadTs) await postSlackMessage(channelId, text, { threadTs }).catch(() => {});
+          return;
+        }
+
+        const denied = (await sbFetch(
+          `/rest/v1/abra_operator_tasks?id=eq.${value}&status=eq.needs_approval`,
+          {
+            method: "PATCH",
+            headers: { Prefer: "return=representation", "Content-Type": "application/json" },
+            body: JSON.stringify({
+              status: "blocked",
+              error_message: `Rejected by ${actor} via Slack`,
+              completed_at: new Date().toISOString(),
+            }),
+          },
+        )) as Array<Record<string, unknown>>;
+        const text = denied.length
+          ? `❌ Operator task rejected by ${actor}`
+          : "⚠️ Operator task already processed or not awaiting approval.";
+        if (responseUrl) await replaceSlackMessage(responseUrl, text);
+        if (channelId && threadTs) await postSlackMessage(channelId, text, { threadTs }).catch(() => {});
+      } catch (err) {
+        const text = err instanceof Error ? err.message : "Operator task approval failed";
+        if (responseUrl) await replaceSlackMessage(responseUrl, `⚠️ ${text}`);
+      }
+    });
+
+    return NextResponse.json({
+      response_type: "ephemeral",
+      text: approved ? "⏳ Approving operator task..." : "⏳ Rejecting operator task...",
+    });
+  }
+
   // ─── Batch categorization buttons ───
   if (actionId === "approve_batch_categorize" || actionId === "reject_batch_categorize" || actionId === "review_batch_categorize") {
     const responseUrl = payload.response_url || "";

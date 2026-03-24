@@ -23,6 +23,8 @@ export type QBOGapDetectorResult = {
     missingVendors: number;
     zeroRevenueAccounts: number;
     unrecordedKnownTransactions: number;
+    categorizedTransactions: number;
+    totalTransactions: number;
   };
 };
 
@@ -356,6 +358,8 @@ export async function detectQBOOperatorGaps(): Promise<QBOGapDetectorResult> {
       missingVendors: vendorTasks.length,
       zeroRevenueAccounts: zeroRevenueTasks.length,
       unrecordedKnownTransactions: knownTransactionTasks.length,
+      categorizedTransactions: Math.max(0, purchases.length - categorizeTasks.length),
+      totalTransactions: purchases.length,
     },
   };
 }

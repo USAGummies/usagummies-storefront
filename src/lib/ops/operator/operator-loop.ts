@@ -13,6 +13,8 @@ export type OperatorLoopResult = {
       missingVendors: number;
       zeroRevenueAccounts: number;
       unrecordedKnownTransactions: number;
+      categorizedTransactions: number;
+      totalTransactions: number;
     };
     email: {
       replyTasks: number;

@@ -69,11 +69,25 @@ type QBOVendor = {
 type QBOPurchase = {
   Id?: string;
   SyncToken?: string;
+  EntityRef?: { name?: string; value?: string };
 };
 
 type AbraChatResponse = {
   reply?: string;
 };
+
+const EMAIL_VENDOR_ACCOUNT_MAP: Array<{ test: RegExp; accountCode: string; label: string }> = [
+  { test: /anthropic|claude/i, accountCode: "126", label: "Software & apps" },
+  { test: /pirate ship/i, accountCode: "127", label: "Shipping & postage" },
+  { test: /albanese/i, accountCode: "176", label: "COGS: Albanese" },
+  { test: /belmark/i, accountCode: "177", label: "COGS: Belmark" },
+  { test: /powers/i, accountCode: "178", label: "COGS: Powers" },
+  { test: /shopify/i, accountCode: "126", label: "Software & apps" },
+  { test: /amazon/i, accountCode: "122", label: "Merchant account fees" },
+  { test: /geico/i, accountCode: "42", label: "Insurance" },
+  { test: /google|facebook|meta/i, accountCode: "16", label: "Advertising" },
+  { test: /office depot|uline/i, accountCode: "83", label: "Supplies" },
+];
 
 function getSupabaseEnv() {
   const baseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -150,13 +164,13 @@ async function qboUpdatePurchase(
   purchaseId: string,
   syncToken: string,
   body: Record<string, unknown>,
-): Promise<boolean> {
+): Promise<{ ok: boolean; status: number; body: string }> {
   const [{ getValidAccessToken, getRealmId }] = await Promise.all([
     import("@/lib/ops/qbo-auth"),
   ]);
   const accessToken = await getValidAccessToken();
   const realmId = await getRealmId();
-  if (!accessToken || !realmId) return false;
+  if (!accessToken || !realmId) return { ok: false, status: 401, body: "QBO auth unavailable" };
 
   const res = await fetch(`${getQBOBaseUrl(realmId)}/purchase?minorversion=73`, {
     method: "POST",
@@ -174,11 +188,34 @@ async function qboUpdatePurchase(
     cache: "no-store",
     signal: AbortSignal.timeout(30000),
   });
-  return res.ok;
+  return {
+    ok: res.ok,
+    status: res.status,
+    body: await res.text().catch(() => ""),
+  };
 }
 
 function normalizeText(value: string | null | undefined): string {
   return String(value || "").trim().toLowerCase();
+}
+
+function normalizeVendorKey(value: string | null | undefined): string {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\b(inc|llc|co|company|corp|corporation|subscription|payments?)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function vendorMatches(candidate: QBOVendor, targetName: string): boolean {
+  const target = normalizeVendorKey(targetName);
+  if (!target) return false;
+  const names = [candidate.DisplayName, candidate.CompanyName]
+    .map(normalizeVendorKey)
+    .filter(Boolean);
+  return names.some((name) => name === target || name.includes(target) || target.includes(name));
 }
 
 function extractAccountCode(value: unknown): string | null {
@@ -228,20 +265,39 @@ export async function createOperatorTasks(
   if (!tasks.length) return 0;
 
   const recent = await sbFetch<OperatorTaskRow[]>(
-    `/rest/v1/abra_operator_tasks?select=id,task_type,status,execution_params&created_at=gte.${encodeURIComponent(
-      new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-    )}&status=in.(pending,in_progress,needs_approval,completed)&limit=500`,
+    `/rest/v1/abra_operator_tasks?select=id,task_type,status,execution_params,created_at,completed_at,retry_count,max_retries&created_at=gte.${encodeURIComponent(
+      new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString(),
+    )}&limit=1000`,
   ).catch(() => []);
-
-  const existingKeys = new Set(
-    (Array.isArray(recent) ? recent : [])
-      .map((task) => normalizeText(String(task.execution_params?.natural_key || "")))
-      .filter(Boolean),
-  );
 
   const inserts = tasks.filter((task) => {
     const naturalKey = normalizeText(String(task.execution_params?.natural_key || ""));
-    return naturalKey ? !existingKeys.has(naturalKey) : true;
+    if (!naturalKey) return true;
+
+    const existing = (Array.isArray(recent) ? recent : []).filter((row) =>
+      normalizeText(String(row.execution_params?.natural_key || "")) === naturalKey,
+    );
+    if (!existing.length) return true;
+
+    const now = Date.now();
+    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+
+    for (const row of existing) {
+      if (row.status === "pending" || row.status === "in_progress" || row.status === "needs_approval") {
+        return false;
+      }
+      if (row.status === "completed") {
+        const completedAt = row.completed_at || row.created_at;
+        if (!completedAt || now - new Date(completedAt).getTime() < sevenDaysMs) {
+          return false;
+        }
+      }
+      if ((row.status === "failed" || row.status === "blocked") && row.retry_count < row.max_retries) {
+        return false;
+      }
+    }
+
+    return true;
   });
   if (!inserts.length) return 0;
 
@@ -276,7 +332,7 @@ export async function createOperatorTasks(
 
 async function listReadyTasks(limit: number): Promise<OperatorTaskRow[]> {
   const rows = await sbFetch<OperatorTaskRow[]>(
-    `/rest/v1/abra_operator_tasks?select=*&status=eq.pending&order=created_at.asc&limit=${Math.max(limit * 4, 20)}`,
+    `/rest/v1/abra_operator_tasks?select=*&status=in.(pending,failed)&order=created_at.asc&limit=${Math.max(limit * 4, 40)}`,
   ).catch(() => []);
 
   const executable = (Array.isArray(rows) ? rows : [])
@@ -302,13 +358,14 @@ async function listReadyTasks(limit: number): Promise<OperatorTaskRow[]> {
 
 async function claimTask(task: OperatorTaskRow): Promise<OperatorTaskRow | null> {
   const rows = await sbFetch<OperatorTaskRow[]>(
-    `/rest/v1/abra_operator_tasks?id=eq.${task.id}&status=eq.pending`,
+    `/rest/v1/abra_operator_tasks?id=eq.${task.id}&status=in.(pending,failed)`,
     {
       method: "PATCH",
       headers: { Prefer: "return=representation" },
       body: JSON.stringify({
         status: "in_progress",
         started_at: new Date().toISOString(),
+        error_message: null,
       }),
     },
   ).catch(() => []);
@@ -383,9 +440,8 @@ async function executeAssignVendorTask(task: OperatorTaskRow): Promise<string> {
   ]);
 
   const vendors = ((vendorsResult?.QueryResponse?.Vendor as QBOVendor[]) || []);
-  let vendorId = vendors.find((vendor) =>
-    normalizeText(vendor.DisplayName || vendor.CompanyName) === normalizeText(inferredVendorName),
-  )?.Id;
+  const matchedVendor = vendors.find((vendor) => vendorMatches(vendor, inferredVendorName));
+  let vendorId = matchedVendor?.Id;
 
   if (!vendorId) {
     const created = await createQBOVendor({
@@ -402,15 +458,22 @@ async function executeAssignVendorTask(task: OperatorTaskRow): Promise<string> {
   if (!purchase?.Id || !purchase.SyncToken) {
     throw new Error(`Purchase ${purchaseId} not found`);
   }
-
-  const updated = await qboUpdatePurchase(purchase.Id, purchase.SyncToken, {
-    EntityRef: { value: vendorId },
-  });
-  if (!updated) {
-    throw new Error(`Failed to assign vendor ${inferredVendorName}`);
+  if (normalizeVendorKey(purchase.EntityRef?.name) === normalizeVendorKey(inferredVendorName)) {
+    return `Vendor ${inferredVendorName} already assigned to purchase ${purchaseId}`;
   }
 
-  return `Assigned vendor ${inferredVendorName} to purchase ${purchaseId}`;
+  const attempts = [
+    { EntityRef: { value: vendorId, name: inferredVendorName, type: "Vendor" } },
+    { VendorRef: { value: vendorId, name: inferredVendorName } },
+  ];
+
+  for (const payload of attempts) {
+    const updated = await qboUpdatePurchase(purchase.Id, purchase.SyncToken, payload);
+    if (updated.ok) {
+      return `Assigned vendor ${inferredVendorName} to purchase ${purchaseId}`;
+    }
+  }
+  throw new Error(`Failed to assign vendor ${inferredVendorName}`);
 }
 
 async function resolveJournalAccounts(task: OperatorTaskRow): Promise<{
@@ -465,7 +528,10 @@ async function executeRecordTransactionTask(task: OperatorTaskRow): Promise<stri
   if (kind === "expense") {
     const imported = await fetch(`${getInternalBaseUrl()}/api/ops/qbo/import-batch`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...getInternalHeaders(),
+      },
       body: JSON.stringify({
         transactions: [{
           date,
@@ -488,7 +554,10 @@ async function executeRecordTransactionTask(task: OperatorTaskRow): Promise<stri
   if (kind === "income") {
     const imported = await fetch(`${getInternalBaseUrl()}/api/ops/qbo/import-batch`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...getInternalHeaders(),
+      },
       body: JSON.stringify({
         transactions: [{
           date,
@@ -548,7 +617,6 @@ async function generateDraftViaChat(prompt: string): Promise<string> {
     body: JSON.stringify({
       message: prompt,
       history: [],
-      channel: "operator",
     }),
     cache: "no-store",
     signal: AbortSignal.timeout(55000),
@@ -653,34 +721,32 @@ async function executeQBORecordFromEmailTask(task: OperatorTaskRow): Promise<str
 
   const [accountsResult, vendorsResult] = await Promise.all([getQBOAccounts(), getQBOVendors()]);
   const accounts = ((accountsResult?.QueryResponse?.Account as QBOAccount[]) || []);
-  const softwareAccount =
-    accounts.find((account) => String(account.AcctNum || "") === "6200") ||
-    accounts.find((account) => /software/i.test(String(account.Name || "")));
-  const shippingAccount =
-    accounts.find((account) => String(account.AcctNum || "") === "6600") ||
-    accounts.find((account) => /shipping/i.test(String(account.Name || "")));
-  const fallbackAccount = softwareAccount || shippingAccount;
-  if (!fallbackAccount?.Id) throw new Error("No fallback QBO expense account found");
-
   const bankAccount =
     accounts.find((account) => account.AccountType === "Bank" && /checking/i.test(String(account.Name || ""))) ||
     accounts.find((account) => account.AccountType === "Bank");
   if (!bankAccount?.Id) throw new Error("No QBO bank account found");
 
-  const accountId =
-    /ship|postage|ups|fedex|usps/i.test(`${vendor} ${description}`) && shippingAccount?.Id
-      ? shippingAccount.Id
-      : fallbackAccount.Id;
+  const matchedRule = EMAIL_VENDOR_ACCOUNT_MAP.find((rule) => rule.test.test(`${vendor} ${description}`));
+  const mappedAccount =
+    (matchedRule
+      ? accounts.find((account) => String(account.Id || "") === matchedRule.accountCode)
+      : null) ||
+    accounts.find((account) => String(account.Id || "") === "2") ||
+    accounts.find((account) => /uncategorized/i.test(String(account.Name || "")));
+  if (!mappedAccount?.Id) throw new Error("No fallback QBO expense account found");
 
   const imported = await fetch(`${getInternalBaseUrl()}/api/ops/qbo/import-batch`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...getInternalHeaders(),
+    },
     body: JSON.stringify({
       transactions: [{
         date,
         description: `${description}${vendor ? ` (${vendor})` : ""}`,
         amount,
-        accountId: Number(accountId),
+        accountId: Number(mappedAccount.Id),
         isIncome: false,
         bankAccountId: Number(bankAccount.Id),
       }],
@@ -694,10 +760,8 @@ async function executeQBORecordFromEmailTask(task: OperatorTaskRow): Promise<str
   }
 
   const vendorRows = ((vendorsResult?.QueryResponse?.Vendor as QBOVendor[]) || []);
-  const vendorFound = vendorRows.some((row) =>
-    normalizeText(row.DisplayName || row.CompanyName) === normalizeText(vendor || senderEmail),
-  );
-  return `Recorded email-linked transaction ${description}${vendorFound ? "" : " (vendor not yet in QBO vendor list)"}`;
+  const vendorFound = vendorRows.some((row) => vendorMatches(row, vendor || senderEmail));
+  return `Recorded email-linked transaction ${description} to ${String(mappedAccount.Name || matchedRule?.label || "Uncategorized Expense")}${vendorFound ? "" : " (vendor not yet in QBO vendor list)"}`;
 }
 
 async function executeVendorFollowupTask(task: OperatorTaskRow): Promise<string> {

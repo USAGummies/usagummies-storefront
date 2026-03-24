@@ -3064,7 +3064,7 @@ async function fetchDataForFileGeneration(
 async function handleGenerateFile(params: Record<string, unknown>): Promise<ActionResult> {
   // Fall back to configured default Slack channel when the caller (e.g. web chat) has no channel context.
   // Set ABRA_SLACK_CHANNEL_ID in Vercel env to a Slack channel ID (e.g. C01234567) for web-chat file uploads.
-  const DEFAULT_CHANNEL = (process.env.ABRA_SLACK_CHANNEL_ID || process.env.SLACK_OPS_CHANNEL_ID || "").trim();
+  const DEFAULT_CHANNEL = (process.env.ABRA_SLACK_CHANNEL_ID || process.env.SLACK_OPS_CHANNEL_ID || "C0ALS6W7VB4").trim(); // Fallback to #abra-control
   const channelId = String(params.channel_id || params.channelId || DEFAULT_CHANNEL);
   console.log(`[handleGenerateFile] ENTRY — params keys: ${Object.keys(params).join(", ")}, channel_id=${channelId || "NONE"}, hasHeaders=${Array.isArray(params.headers)}, hasRows=${Array.isArray(params.rows)}, hasSheets=${Array.isArray(params.sheets)}, source=${params.source || "none"}`);
   const threadTs = params.thread_ts ? String(params.thread_ts) : undefined;
