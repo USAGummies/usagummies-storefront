@@ -986,6 +986,18 @@ export async function POST(req: Request) {
     // ─── Intent Detection ───
     const intent = detectIntent(message);
 
+    // Ensure domainContext is populated for all intent types (detectIntent and
+    // classifyIntent use different taxonomies — merge them so the LLM always
+    // gets domain-specific context regardless of which detector fires).
+    if (!domainContext) {
+      try {
+        const { classifyIntent: reClassify, getDomainContext: reGetDomain } = await import("@/lib/ops/agents/intent-router");
+        const fallbackDomain = reClassify(message);
+        domainContext = reGetDomain(fallbackDomain);
+      } catch { /* non-fatal */ }
+    }
+
+
     // Handle cost query with LLM synthesis
     if (intent.type === "cost") {
       const spend = await getMonthlySpend();
@@ -2682,11 +2694,8 @@ export async function POST(req: Request) {
       await markSupabaseFailure(error);
     }
 
-    // Never leak internal error details (Supabase URLs, stack traces) to client
-    const rawMsg = error instanceof Error ? error.message : "Unknown error";
-    const safeMessage = rawMsg.includes("supabase") || rawMsg.includes("SUPABASE") || rawMsg.includes("postgresql") || rawMsg.length > 200
-      ? "An internal error occurred. Please try again."
-      : rawMsg.replace(/https?:\/\/[^\s]+/g, "[redacted]");
-    return NextResponse.json({ error: safeMessage }, { status: 500 });
+    // Never leak internal error details to client — log full error server-side
+    console.error("[chat] Unhandled error:", error instanceof Error ? error.message : error);
+    return NextResponse.json({ error: "An internal error occurred. Please try again." }, { status: 500 });
   }
 }

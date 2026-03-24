@@ -1,6 +1,8 @@
 /**
  * Download a Slack file (requires bot token auth) and return as base64.
  */
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5MB
+
 async function downloadSlackImage(
   url: string,
   botToken: string,
@@ -11,9 +13,16 @@ async function downloadSlackImage(
       signal: AbortSignal.timeout(10000),
     });
     if (!res.ok) return null;
-    const buffer = await res.arrayBuffer();
-    const base64 = Buffer.from(buffer).toString("base64");
     const contentType = res.headers.get("content-type") || "image/png";
+    // Validate content-type is an image
+    if (!contentType.startsWith("image/")) return null;
+    // Check Content-Length header before downloading body
+    const contentLength = parseInt(res.headers.get("content-length") || "0", 10);
+    if (contentLength > MAX_IMAGE_BYTES) return null;
+    const buffer = await res.arrayBuffer();
+    // Double-check actual buffer size
+    if (buffer.byteLength > MAX_IMAGE_BYTES) return null;
+    const base64 = Buffer.from(buffer).toString("base64");
     return { base64, mediaType: contentType };
   } catch {
     return null;
@@ -241,16 +250,18 @@ export async function POST(req: Request) {
       }
 
       // Skip side conversations — messages directed at another human, not Abra
-      // e.g., "ben asking about X?" or "Rene, did you see this?"
-      const isSideConversation =
+      // NEVER skip if "abra" is mentioned anywhere in the text (user is talking to us)
+      const mentionsAbra = /abra/i.test(text) || /abra/i.test(event.text || "");
+      const isSideConversation = !mentionsAbra && (
         // Starts with someone's name + question/statement (not "@Abra")
         /^(ben|rene|greg|patrick|andrew)\b[,\s]/i.test(text) ||
         // Short question clearly to another person
-        (/^(hey |yo |dude |bro )/i.test(text) && text.length < 60 && !/abra/i.test(text)) ||
+        (/^(hey |yo |dude |bro )/i.test(text) && text.length < 60) ||
         // "asking about X?" pattern — relaying, not commanding
         /\basking about\b/i.test(text) ||
         // "did you see/hear/get" — human-to-human
-        /\bdid (you|he|she|they) (see|hear|get|send|check)\b/i.test(text);
+        /\bdid (you|he|she|they) (see|hear|get|send|check)\b/i.test(text)
+      );
 
       if (isSideConversation) {
         console.log(`[slack-monitor] Skipping side conversation: "${text.slice(0, 60)}"`);
@@ -267,8 +278,8 @@ export async function POST(req: Request) {
           try {
             // ── Fetch thread history for context ──
             const threadHistory: Array<{ role: string; content: string }> = [];
-            if (threadTs && threadTs !== event.ts) {
-              // This is a threaded reply — fetch the thread
+            if (threadTs) {
+              // Fetch thread history — include parent message (ts === thread_ts) but skip current event
               try {
                 const threadRes = await fetch(
                   `https://slack.com/api/conversations.replies?channel=${channelId}&ts=${threadTs}&limit=15`,

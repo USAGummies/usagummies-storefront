@@ -134,6 +134,13 @@ export const ACTION_POLICIES: Record<string, ActionPolicy> = {
     description: "Query Shopify orders via Admin API — read-only.",
   },
 
+  calculate_deal: {
+    tier: "direct",
+    riskFloor: "low",
+    dailyLimit: 100,
+    description: "Calculate deal margins and profitability — pure read-only computation.",
+  },
+
   run_scenario: {
     tier: "direct",
     riskFloor: "low",

@@ -3,7 +3,7 @@
  *
  * Extracted from the monolithic chat route. Handles:
  * - Parsing <action> XML blocks from Claude's reply
- * - Executing read-only actions (email, ledger, deal calculator) inline
+ * - Executing read-only actions (email, ledger, etc.) via standard handlers
  * - Queueing write actions for approval via proposeAndMaybeExecute
  * - Building action notices for the response
  */
@@ -12,7 +12,6 @@ import {
   parseActionDirectives,
   proposeAndMaybeExecute,
 } from "@/lib/ops/abra-actions";
-import { calculateDeal, type ChannelType } from "@/lib/ops/abra-skill-deal-calculator";
 import { queueTask, completeTask, failTask } from "@/lib/ops/abra-task-queue";
 
 const READ_ONLY_ACTIONS = new Set(["read_email", "search_email", "query_ledger", "query_qbo", "calculate_deal"]);
@@ -66,39 +65,6 @@ export async function executeActions(
       break;
     }
     try {
-      // Handle calculate_deal inline — pure computation, no side effects
-      if (directive.action.action_type === "calculate_deal") {
-        const p = (directive.action.params || directive.action) as Record<string, unknown>;
-        const channelMap: Record<string, ChannelType> = {
-          dtc: "dtc", shopify: "dtc", amazon: "amazon", fba: "amazon",
-          wholesale: "wholesale_direct", wholesale_direct: "wholesale_direct",
-          faire: "faire", broker: "wholesale_broker", wholesale_broker: "wholesale_broker",
-        };
-        const ch = channelMap[String(p.channel || "wholesale_direct").toLowerCase()] || "wholesale_direct";
-        const result = calculateDeal({
-          customerName: String(p.customer || p.customerName || "Unknown"),
-          channel: ch,
-          units: Number(p.units) || 100,
-          pricePerUnit: p.price_per_unit != null ? Number(p.price_per_unit) : undefined,
-        });
-        readOnlyResults.push(
-          `## Deal Calculator Result\n` +
-          `**Customer:** ${result.customerName} | **Channel:** ${result.channel}\n` +
-          `**Units:** ${result.units} @ $${result.pricePerUnit}/unit\n\n` +
-          `| Metric | Value |\n|--------|-------|\n` +
-          `| Gross Revenue | $${result.grossRevenue.toFixed(2)} |\n` +
-          `| Channel Fees | $${result.channelFees.toFixed(2)} |\n` +
-          `| Net Revenue | $${result.netRevenue.toFixed(2)} |\n` +
-          `| Total COGS | $${result.totalCogs.toFixed(2)} |\n` +
-          `| **Gross Profit** | **$${result.grossProfit.toFixed(2)}** |\n` +
-          `| **Margin** | **${result.grossMarginPct.toFixed(1)}%** |\n` +
-          `| Profit/Unit | $${result.contributionPerUnit.toFixed(2)} |\n\n` +
-          `**Recommendation:** ${result.recommendation}\n\n` +
-          `**Channel Comparison:**\n` +
-          result.comparison.map(c => `- ${c.channel}: ${c.marginPct.toFixed(1)}% margin, $${c.profitPerUnit.toFixed(2)}/unit`).join("\n")
-        );
-        continue;
-      }
       // Auto-inject Slack context into generate_file actions
       if (directive.action.action_type === "generate_file" && ctx) {
         const p = (directive.action.params || directive.action) as Record<string, unknown>;
@@ -186,9 +152,20 @@ export async function executeActions(
         );
       }
     } catch (error) {
-      actionNotices.push(
-        `Failed to queue action \`${directive.action.action_type}\`: ${error instanceof Error ? error.message : "unknown error"}`,
-      );
+      const errMsg = error instanceof Error ? error.message : "unknown error";
+      const isTimeout = errMsg.includes("Timeout") || errMsg.includes("timeout") || errMsg.includes("exceeded");
+      // If timeout but task was queued, report accurately
+      if (isTimeout && taskId) {
+        void failTask(taskId, `Execution timed out after ${PER_ACTION_TIMEOUT_MS}ms`).catch(() => {});
+        actionNotices.push(
+          `⏱️ \`${directive.action.action_type}\` timed out but was logged. It may still be processing — check back shortly.`,
+        );
+      } else {
+        if (taskId) void failTask(taskId, errMsg).catch(() => {});
+        actionNotices.push(
+          `⚠️ \`${directive.action.action_type}\` failed: ${errMsg}`,
+        );
+      }
     }
   }
 

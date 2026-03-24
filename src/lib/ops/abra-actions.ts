@@ -27,6 +27,7 @@ import {
   clampRiskLevel,
   type RiskLevel,
 } from "@/lib/ops/abra-policy";
+import { calculateDeal, type ChannelType } from "@/lib/ops/abra-skill-deal-calculator";
 
 /** Map friendly database keys → Notion database IDs for create_notion_page action */
 const NOTION_DB_MAP: Record<string, string> = {
@@ -1746,6 +1747,45 @@ async function handleRecordVendorQuote(
   };
 }
 
+// ---------------------------------------------------------------------------
+// Deal Calculator — pure read-only computation, no side effects
+// ---------------------------------------------------------------------------
+
+async function handleCalculateDeal(
+  params: Record<string, unknown>,
+): Promise<ActionResult> {
+  const channelMap: Record<string, ChannelType> = {
+    dtc: "dtc", shopify: "dtc", amazon: "amazon", fba: "amazon",
+    wholesale: "wholesale_direct", wholesale_direct: "wholesale_direct",
+    faire: "faire", broker: "wholesale_broker", wholesale_broker: "wholesale_broker",
+  };
+  const ch = channelMap[String(params.channel || "wholesale_direct").toLowerCase()] || "wholesale_direct";
+  const result = calculateDeal({
+    customerName: String(params.customer || params.customerName || params.customer_name || "Unknown"),
+    channel: ch,
+    units: Number(params.units) || 100,
+    pricePerUnit: params.price_per_unit != null ? Number(params.price_per_unit) : undefined,
+  });
+
+  const message =
+    `## Deal Calculator Result\n` +
+    `**Customer:** ${result.customerName} | **Channel:** ${result.channel}\n` +
+    `**Units:** ${result.units} @ $${result.pricePerUnit}/unit\n\n` +
+    `| Metric | Value |\n|--------|-------|\n` +
+    `| Gross Revenue | $${result.grossRevenue.toFixed(2)} |\n` +
+    `| Channel Fees | $${result.channelFees.toFixed(2)} |\n` +
+    `| Net Revenue | $${result.netRevenue.toFixed(2)} |\n` +
+    `| Total COGS | $${result.totalCogs.toFixed(2)} |\n` +
+    `| **Gross Profit** | **$${result.grossProfit.toFixed(2)}** |\n` +
+    `| **Margin** | **${result.grossMarginPct.toFixed(1)}%** |\n` +
+    `| Profit/Unit | $${result.contributionPerUnit.toFixed(2)} |\n\n` +
+    `**Recommendation:** ${result.recommendation}\n\n` +
+    `**Channel Comparison:**\n` +
+    result.comparison.map(c => `- ${c.channel}: ${c.marginPct.toFixed(1)}% margin, $${c.profitPerUnit.toFixed(2)}/unit`).join("\n");
+
+  return { success: true, message, data: result };
+}
+
 async function handleRunScenario(
   params: Record<string, unknown>,
 ): Promise<ActionResult> {
@@ -2755,49 +2795,6 @@ async function handleCreateQBOAccount(
 }
 
 // ---------------------------------------------------------------------------
-// QBO: Create Bill (vendor AP)
-// ---------------------------------------------------------------------------
-
-async function handleCreateQBOBillAction(
-  params: Record<string, unknown>,
-): Promise<ActionResult> {
-  const vendorId = String(params.vendor_id || params.vendorId || "").trim();
-  const amount = Number(params.amount || 0);
-  const accountId = String(params.account_id || params.accountId || "").trim();
-
-  if (!vendorId) return { success: false, message: "vendor_id is required" };
-  if (!amount) return { success: false, message: "amount is required" };
-  if (!accountId) return { success: false, message: "account_id is required (expense account to charge)" };
-
-  try {
-    const { createQBOBill } = await import("@/lib/ops/qbo-client");
-    const result = await createQBOBill({
-      VendorRef: { value: vendorId },
-      Line: [{
-        Amount: amount,
-        DetailType: "AccountBasedExpenseLineDetail",
-        AccountBasedExpenseLineDetail: { AccountRef: { value: accountId } },
-        Description: String(params.description || params.memo || ""),
-      }],
-      ...(params.due_date ? { DueDate: String(params.due_date) } : {}),
-      ...(params.date || params.txn_date ? { TxnDate: String(params.date || params.txn_date) } : {}),
-      ...(params.doc_number ? { DocNumber: String(params.doc_number) } : {}),
-    });
-
-    if (!result) return { success: false, message: "QBO bill creation failed" };
-    const billData = (result as Record<string, unknown>).Bill || result;
-    const billId = (billData as Record<string, unknown>).Id || "unknown";
-    return {
-      success: true,
-      message: `✅ Created bill for $${amount.toFixed(2)} to vendor ${vendorId} in QBO (Bill ID: ${billId})`,
-      data: { billId, vendorId, amount },
-    };
-  } catch (err) {
-    return { success: false, message: `QBO bill creation failed: ${err instanceof Error ? err.message : String(err)}` };
-  }
-}
-
-// ---------------------------------------------------------------------------
 // QBO: Create Customer
 // ---------------------------------------------------------------------------
 
@@ -3566,21 +3563,53 @@ async function handleGenerateFile(params: Record<string, unknown>): Promise<Acti
 // Checks required params before dispatching to handlers.
 // Returns null if valid, or an error message if required params are missing.
 const REQUIRED_PARAMS: Record<string, string[]> = {
+  // Communication
   send_slack: ["message"],
   send_email: ["to", "subject", "body"],
   draft_email_reply: ["to", "subject", "body"],
+  // Email reading
+  read_email: [], // message_id OR query — validated in handler
+  search_email: ["query"],
+  // Tasks & Notion
   create_task: ["title"],
   update_notion: ["page_id"],
   create_brain_entry: ["title", "text"],
   create_notion_page: ["title"],
+  // Finance
   record_transaction: ["type", "amount"],
-  generate_file: ["filename"],
   correct_claim: ["original_claim", "correction"],
   query_qbo: ["query_type"],
+  query_kpi: [], // metric or date — flexible params
+  query_ledger: [], // query string — flexible
+  // QBO write
   create_qbo_vendor: ["name"],
   create_qbo_account: ["name", "type"],
   create_qbo_customer: ["name"],
-  create_qbo_bill: ["vendor_id", "amount", "account_id"],
+  create_qbo_invoice: ["customer_name"],
+  create_qbo_bill: ["vendor_name", "amount"],
+  categorize_qbo_transaction: ["transaction_id", "account_id"],
+  batch_categorize_qbo: ["mode"],
+  reconcile_transactions: [],
+  qbo_setup_assessment: [],
+  // File generation
+  generate_file: ["filename"],
+  // Operations
+  acknowledge_signal: ["signal_id"],
+  pause_initiative: ["initiative_id"],
+  log_production_run: ["vendor", "units"],
+  record_vendor_quote: ["vendor", "product", "price"],
+  run_scenario: ["scenario_name"],
+  run_monthly_close: [],
+  start_workflow: ["workflow_name"],
+  resume_workflow: ["workflow_id"],
+  calculate_deal: ["channel"],
+  // Shopify
+  query_shopify_orders: [],
+  update_shopify_inventory: ["variant_id", "quantity"],
+  create_shopify_discount: ["code", "percentage"],
+  create_shopify_product_draft: ["title"],
+  create_wholesale_draft_order: ["customer"],
+  // Amazon (stubs)
   amazon_update_price: ["price"],
   amazon_update_ppc: ["action"],
 };
@@ -3618,6 +3647,7 @@ const ACTION_HANDLERS: Record<
   correct_claim: handleCorrectClaim,
   log_production_run: handleLogProductionRun,
   record_vendor_quote: handleRecordVendorQuote,
+  calculate_deal: handleCalculateDeal,
   run_scenario: handleRunScenario,
   read_email: handleReadEmail,
   search_email: handleSearchEmail,
@@ -3628,7 +3658,7 @@ const ACTION_HANDLERS: Record<
   create_qbo_invoice: handleCreateQBOInvoice,
   create_qbo_vendor: handleCreateQBOVendor,
   create_qbo_account: handleCreateQBOAccount,
-  create_qbo_bill: handleCreateQBOBillAction,
+  create_qbo_bill: handleCreateQBOBill,
   create_qbo_customer: handleCreateQBOCustomerAction,
   update_shopify_inventory: handleUpdateShopifyInventory,
   create_shopify_discount: handleCreateShopifyDiscount,
@@ -3641,7 +3671,7 @@ const ACTION_HANDLERS: Record<
   resume_workflow: handleResumeWorkflow,
   generate_file: handleGenerateFile,
   query_kpi: handleQueryKPI,
-  // create_qbo_bill already registered above as handleCreateQBOBillAction
+  // create_qbo_bill registered above — uses handleCreateQBOBill (auto-creates vendor if needed)
   amazon_update_price: handleAmazonUpdatePrice,
   amazon_update_ppc: handleAmazonUpdatePPC,
 };
@@ -4201,27 +4231,11 @@ export async function proposeAndMaybeExecute(action: AbraAction): Promise<{
     throw new Error("Failed to derive approval id");
   }
 
-  // Check auto-execute eligibility (legacy path — respects daily limits & global flag)
-  const eligible = await canAutoExecute(action);
-  if (!eligible) {
-    // Not auto-executable → notify the right owner via Slack
-    const owner = getApprovalOwner(action.action_type, action.risk_level as RiskLevel);
-    await notifySlackPendingApproval(approvalId, action, owner);
-    return { approval_id: approvalId, auto_executed: false };
-  }
-
-  const result = await executeAction(approvalId);
-  const autoExecuted = !!result.success;
-  await updateAutoExecTracking({ approvalId, autoExecuted, result });
-  if (autoExecuted) {
-    await writeAutoExecBrainEntry(action, result);
-  }
-
-  return {
-    approval_id: approvalId,
-    auto_executed: autoExecuted,
-    ...(result ? { result } : {}),
-  };
+  // Always require human approval — Tier 1 (direct) and Tier 2 (auto_with_audit)
+  // handle all auto-execution cases via the new policy system in abra-policy.ts.
+  const owner = getApprovalOwner(action.action_type, action.risk_level as RiskLevel);
+  await notifySlackPendingApproval(approvalId, action, owner);
+  return { approval_id: approvalId, auto_executed: false };
 }
 
 /** Extract a numeric amount from action params for policy cap checks */

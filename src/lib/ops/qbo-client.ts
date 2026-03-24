@@ -497,6 +497,14 @@ export type QBOAccountInput = {
   SubAccount?: boolean;
 };
 
+const VALID_QBO_ACCOUNT_TYPES = new Set([
+  "Bank", "Other Current Asset", "Fixed Asset", "Other Asset",
+  "Accounts Receivable", "Equity", "Expense", "Other Expense",
+  "Cost of Goods Sold", "Accounts Payable", "Credit Card",
+  "Long Term Liability", "Other Current Liability", "Income",
+  "Other Income",
+]);
+
 /**
  * Create an account in QBO Chart of Accounts.
  * POST /account
@@ -504,6 +512,9 @@ export type QBOAccountInput = {
 export async function createQBOAccount(
   account: QBOAccountInput,
 ): Promise<QBOEntity | null> {
+  if (!VALID_QBO_ACCOUNT_TYPES.has(account.AccountType)) {
+    throw new Error(`Invalid QBO AccountType: "${account.AccountType}". Valid: ${[...VALID_QBO_ACCOUNT_TYPES].join(", ")}`);
+  }
   return qboFetch<QBOEntity>("/account", {
     method: "POST",
     body: JSON.stringify(account),

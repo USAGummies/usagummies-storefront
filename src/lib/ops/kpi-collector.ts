@@ -178,7 +178,7 @@ async function fetchAmazonTodayRevenue(): Promise<{
     );
 
     // Use unit-based estimation as primary, OrderTotal as sanity check
-    const LISTING_PRICE = 5.99;
+    const LISTING_PRICE = parseFloat(process.env.AMAZON_LISTING_PRICE || "5.99");
     const unitBasedRevenue = totalUnits * LISTING_PRICE;
     const ordersWithTotal = orders.filter(o => parseFloat(o.OrderTotal?.Amount || "0") > 1);
     const ordersWithoutTotal = totalOrders - ordersWithTotal.length;

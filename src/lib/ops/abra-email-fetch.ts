@@ -530,7 +530,7 @@ export async function runEmailFetch(params?: {
             const contents = await readAllAttachments(message.id, extractable);
             for (const c of contents) {
               if (c.textContent) {
-                attachmentText += `\n\n--- ATTACHMENT: ${c.filename} ---\n${c.textContent.slice(0, 10_000)}`;
+                attachmentText += `\n\n--- ATTACHMENT: ${c.filename} ---\n${c.textContent.slice(0, 50_000)}`;
               }
             }
           } catch {

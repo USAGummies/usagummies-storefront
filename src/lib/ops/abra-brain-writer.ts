@@ -216,3 +216,39 @@ export async function backfillMissingEmbeddings(
 
   return { processed: entries.length, succeeded, failed };
 }
+
+/**
+ * Delete brain entries older than 7 days that still have NULL embeddings.
+ * These entries have had ample time to be backfilled and are now orphaned.
+ */
+export async function cleanupOrphanedEntries(): Promise<{ deleted: number }> {
+  const baseUrl = SUPABASE_URL();
+  const serviceKey = SUPABASE_KEY();
+  if (!baseUrl || !serviceKey) return { deleted: 0 };
+
+  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  const res = await fetch(
+    `${baseUrl}/rest/v1/open_brain_entries?embedding=is.null&created_at=lt.${cutoff}`,
+    {
+      method: "DELETE",
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+        Prefer: "return=representation",
+      },
+      signal: AbortSignal.timeout(15000),
+    },
+  );
+
+  if (!res.ok) {
+    console.error(`[brain] Orphan cleanup failed: ${res.status}`);
+    return { deleted: 0 };
+  }
+
+  const deleted = ((await res.json()) as unknown[]).length;
+  if (deleted > 0) {
+    console.log(`[brain] Cleaned up ${deleted} orphaned entries (>7d, no embedding)`);
+  }
+  return { deleted };
+}
