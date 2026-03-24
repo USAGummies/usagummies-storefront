@@ -366,7 +366,11 @@ export async function GET(req: NextRequest) {
         const totalRevenue = (pnlSummary["Total Income"] as number) || 0;
         const totalExpenses = (pnlSummary["Total Expenses"] as number) || 0;
         const netIncome = (pnlSummary["Net Income"] as number) || (totalRevenue - totalExpenses);
-        const cashPosition = (bsSummary["Bank Accounts"] as number) || (bsSummary["Bank"] as number) || 0;
+        const cashPosition =
+          (bsSummary["Total Bank Accounts"] as number) ||
+          (bsSummary["Bank Accounts"] as number) ||
+          (bsSummary["Bank"] as number) ||
+          0;
         const accountsReceivable = (bsSummary["Accounts Receivable"] as number) || 0;
         const accountsPayable = (bsSummary["Accounts Payable"] as number) || 0;
         const burnRate = totalExpenses;
