@@ -95,12 +95,7 @@ export const ACTION_POLICIES: Record<string, ActionPolicy> = {
     description: "Query KPI timeseries for specific dates — read-only.",
   },
 
-  create_qbo_bill: {
-    tier: "auto_with_audit",
-    riskFloor: "medium",
-    dailyLimit: 20,
-    description: "Create a vendor bill in QBO. Bills >$500 require approval.",
-  },
+  // create_qbo_bill defined below in QBO write section
 
   amazon_update_price: {
     tier: "approval_required",
