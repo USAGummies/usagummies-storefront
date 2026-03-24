@@ -2553,7 +2553,7 @@ export async function POST(req: Request) {
     // ── "On it" detector: catch promises without actions ──
     const saidOnIt = /\b(on it|creating.*now|i'?ll do that|doing that now|generating.*now|working on|i'?m on it|let me.*now|pulling.*now|i'?ll get that|one moment|querying|processing|retrieving|running that|executing|submitting|looking that up|let me pull|let me check|let me read|i'?ll handle|i'?ll take care)\b/i.test(effectiveReply);
     const noActionsExecuted = actionNotices.length === 0;
-    const userAskedForAction = /\b(create|add|set up|generate|export|send|draft|build|make|update|record|log|categorize|respond|reply)\b/i.test(message);
+    const userAskedForAction = /\b(create|add|set up|generate|export|send|draft|build|make|update|record|log|categorize|respond|reply|read|check|pull|show|get|find|search|look up|analyze|review|audit|run|execute)\b/i.test(message);
 
     if (saidOnIt && noActionsExecuted && userAskedForAction) {
       console.warn(`[chat] HONEST FAILURE: Abra said "${effectiveReply.slice(0, 60)}" but executed 0 actions for: "${message.slice(0, 80)}"`);
