@@ -5,6 +5,7 @@ import {
   getQBOVendors,
 } from "@/lib/ops/qbo-client";
 import { readEmail, searchEmails } from "@/lib/ops/gmail-reader";
+import { runInvestorUpdatePackage } from "@/lib/ops/operator/reports/investor-update";
 import { loadLearnedQboRules, resolveQboCategory } from "@/lib/ops/operator/qbo-resolution";
 import { proposeAndMaybeExecute } from "@/lib/ops/abra-actions";
 
@@ -502,6 +503,7 @@ async function listReadyTasks(limit: number): Promise<OperatorTaskRow[]> {
       row.task_type === "email_draft_response" ||
       row.task_type === "qbo_record_from_email" ||
       row.task_type === "generate_wholesale_invoice" ||
+      row.task_type === "generate_investor_update" ||
       row.task_type === "inventory_reorder_po" ||
       row.task_type === "vendor_followup" ||
       row.task_type === "distributor_followup",
@@ -1247,6 +1249,14 @@ async function executeGenerateWholesaleInvoiceTask(task: OperatorTaskRow): Promi
   return `Created draft wholesale invoice ${docNumber || invoiceId} for ${customerName} totaling $${total.toFixed(2)}`;
 }
 
+async function executeGenerateInvestorUpdateTask(): Promise<string> {
+  const result = await runInvestorUpdatePackage(true);
+  if (!result.ran) {
+    return "Investor update package skipped";
+  }
+  return `Generated investor update package for ${result.monthLabel}`;
+}
+
 async function executeTask(task: OperatorTaskRow): Promise<string | ExecuteTaskResult> {
   switch (task.task_type) {
     case "qbo_categorize":
@@ -1263,6 +1273,8 @@ async function executeTask(task: OperatorTaskRow): Promise<string | ExecuteTaskR
       return executeRevenueGapTask(task);
     case "generate_wholesale_invoice":
       return executeGenerateWholesaleInvoiceTask(task);
+    case "generate_investor_update":
+      return executeGenerateInvestorUpdateTask();
     case "inventory_reorder_po":
       return executeInventoryReorderPoTask(task);
     case "vendor_followup":

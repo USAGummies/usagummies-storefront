@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>USA Gummies — Label Generator</title>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<style>
+  @page { size: 4in 6in; margin: 0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Arial', 'Helvetica Neue', sans-serif;
+    background: #f3f4f6;
+    color: #000;
+  }
+
+  /* === CONTROLS === */
+  .controls {
+    max-width: 860px; margin: 20px auto; background: #fff;
+    border-radius: 10px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+  .controls h1 { font-size: 18px; margin-bottom: 2px; }
+  .controls .sub { font-size: 12px; color: #666; margin-bottom: 16px; }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  .form-group { display: flex; flex-direction: column; gap: 2px; }
+  .form-group label { font-size: 10px; font-weight: 600; text-transform: uppercase; color: #555; }
+  .form-group input {
+    padding: 7px 9px; border: 1.5px solid #ddd; border-radius: 5px;
+    font-size: 13px; font-weight: 600; font-family: inherit;
+  }
+  .form-group input:focus { outline: none; border-color: #333; }
+  .tab-row { display: flex; gap: 0; margin-bottom: 16px; border-bottom: 2px solid #e5e7eb; }
+  .tab {
+    padding: 7px 18px; font-size: 12px; font-weight: 700; cursor: pointer;
+    border-bottom: 3px solid transparent; color: #999;
+  }
+  .tab:hover { color: #333; }
+  .tab.active { color: #000; border-bottom-color: #000; }
+  .ship-section { display: none; border: 1.5px dashed #ccc; border-radius: 8px; padding: 10px; margin-bottom: 12px; background: #fafafa; }
+  .ship-section.visible { display: block; }
+  .ship-section h3 { font-size: 11px; font-weight: 700; color: #666; margin-bottom: 6px; }
+  .btn-row { display: flex; gap: 8px; margin-top: 12px; }
+  .btn { padding: 9px 20px; border: none; border-radius: 5px; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .btn-primary { background: #111; color: #fff; }
+  .btn-outline { background: #fff; color: #111; border: 2px solid #111; }
+
+  /* === LABEL FRAME === */
+  .preview-area { max-width: 860px; margin: 0 auto 40px; display: flex; justify-content: center; }
+  .label-frame {
+    width: 4in; height: 6in; background: #fff;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15); overflow: hidden;
+  }
+
+  /* === LABEL (B&W THERMAL OPTIMIZED) === */
+  .label {
+    width: 100%; height: 100%; border: 2.5px solid #000;
+    display: flex; flex-direction: column; overflow: hidden;
+    font-family: Arial, Helvetica, sans-serif;
+  }
+
+  .lbl-header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 0.06in 0.1in; border-bottom: 2.5px solid #000;
+  }
+  .lbl-header img {
+    height: 0.62in; width: auto;
+    filter: grayscale(1) contrast(5) brightness(0.4);
+  }
+  .lbl-header-text { flex: 1; text-align: right; }
+  .lbl-header-text .pname {
+    font-size: 13pt; font-weight: 900; line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+  .lbl-header-text .psub { font-size: 7pt; font-weight: 600; margin-top: 1px; }
+  .lbl-header-text .badge {
+    display: inline-block; border: 2px solid #000; padding: 0px 6px;
+    font-size: 7pt; font-weight: 900; letter-spacing: 0.08em; margin-bottom: 2px;
+  }
+
+  /* Info rows */
+  .lbl-row {
+    display: flex; border-bottom: 1.5px solid #000;
+  }
+  .lbl-cell {
+    flex: 1; padding: 0.02in 0.08in;
+    border-right: 1px solid #999;
+  }
+  .lbl-cell:last-child { border-right: none; }
+  .lbl-cell-lbl { font-size: 5.5pt; font-weight: 800; text-transform: uppercase; color: #555; letter-spacing: 0.04em; }
+  .lbl-cell-val { font-size: 8.5pt; font-weight: 800; }
+
+  /* Pack bar */
+  .lbl-pack {
+    display: flex; justify-content: center; align-items: center; gap: 12px;
+    padding: 0.035in 0.1in; border-bottom: 2.5px solid #000;
+    font-size: 10pt; font-weight: 900; letter-spacing: 0.02em;
+  }
+  .lbl-pack .box {
+    border: 2.5px solid #000; padding: 1px 10px;
+    font-size: 11pt;
+  }
+
+  /* Barcode */
+  .lbl-bc {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 0.03in 0.1in; border-bottom: 1.5px solid #000;
+  }
+  .lbl-bc-lbl { font-size: 5.5pt; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #444; margin-bottom: 1px; }
+  .lbl-bc svg { max-width: 100%; height: auto; }
+
+  .lbl-upc-row {
+    display: flex; align-items: center; justify-content: flex-end;
+    padding: 0.01in 0.08in; gap: 4px; border-bottom: 1px solid #000;
+  }
+  .lbl-upc-row span { font-size: 5pt; font-weight: 700; color: #666; text-transform: uppercase; }
+
+  /* Dates */
+  .lbl-dates {
+    display: flex; justify-content: space-between;
+    padding: 0.035in 0.1in; border-bottom: 1.5px solid #000;
+  }
+  .lbl-dates .f { display: flex; gap: 3px; align-items: baseline; }
+  .lbl-dates .fl { font-weight: 800; font-size: 6pt; text-transform: uppercase; color: #444; }
+  .lbl-dates .fv { font-weight: 900; font-size: 9.5pt; }
+
+  /* Ship row */
+  .lbl-ship { display: flex; border-bottom: 1.5px solid #000; }
+  .lbl-ship-blk { flex: 1; padding: 0.025in 0.07in; }
+  .lbl-ship-blk:first-child { border-right: 1.5px solid #000; }
+  .lbl-ship-lbl { font-size: 6pt; font-weight: 900; text-transform: uppercase; letter-spacing: 0.08em; }
+  .lbl-ship-val { font-size: 7pt; font-weight: 600; line-height: 1.2; }
+
+  /* PO row */
+  .lbl-po { display: flex; padding: 0.02in 0.1in; border-bottom: 1px solid #000; font-size: 7pt; }
+
+  /* Footer */
+  .lbl-footer {
+    padding: 0.025in 0.08in; display: flex; justify-content: space-between;
+    align-items: flex-end; font-size: 6pt; line-height: 1.25;
+  }
+  .lbl-footer .co { font-weight: 800; font-size: 7pt; }
+  .lbl-footer .rt { text-align: right; font-weight: 700; font-size: 6pt; }
+
+  @media print {
+    .controls { display: none !important; }
+    body { background: #fff; }
+    .label-frame { box-shadow: none; }
+    .preview-area { margin: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="controls">
+  <h1>USA Gummies — Label Generator</h1>
+  <p class="sub">B&W thermal printer optimized. Fill in details, click Print.</p>
+
+  <div class="tab-row">
+    <div class="tab active" data-tab="case" onclick="switchTab('case')">Case Label</div>
+    <div class="tab" data-tab="master" onclick="switchTab('master')">Master Carton</div>
+  </div>
+
+  <div class="form-grid">
+    <div class="form-group">
+      <label>Lot / Batch #</label>
+      <input type="text" id="lot" value="20251016" oninput="renderLabel()">
+    </div>
+    <div class="form-group">
+      <label>Manufacture Date</label>
+      <input type="date" id="mfg-date" value="2025-10-16" oninput="renderLabel()">
+    </div>
+    <div class="form-group">
+      <label>Best By Date</label>
+      <input type="date" id="bestby-date" value="2026-10-16" oninput="renderLabel()">
+    </div>
+  </div>
+
+  <div class="ship-section" id="ship-section">
+    <h3>Ship-To (Master Carton)</h3>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Distributor</label>
+        <input type="text" id="ship-name" placeholder="UNFI, KeHE..." oninput="renderLabel()">
+      </div>
+      <div class="form-group">
+        <label>Address</label>
+        <input type="text" id="ship-addr" placeholder="123 Warehouse Rd" oninput="renderLabel()">
+      </div>
+      <div class="form-group">
+        <label>City, State ZIP</label>
+        <input type="text" id="ship-csz" placeholder="Spokane, WA 99201" oninput="renderLabel()">
+      </div>
+      <div class="form-group">
+        <label>PO #</label>
+        <input type="text" id="po" placeholder="PO-00000" oninput="renderLabel()">
+      </div>
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-primary" onclick="window.print()">Print Label</button>
+    <button class="btn btn-outline" onclick="renderLabel()">Refresh</button>
+  </div>
+</div>
+
+<div class="preview-area">
+  <div class="label-frame" id="lbl"></div>
+</div>
+
+<script>
+let tab = 'case';
+const UPC1 = "199284715530";
+const UPC2 = "199284373242";
+
+function g14(upc, ind) {
+  const b = ind + '0' + upc.slice(0,11);
+  let s = 0;
+  for (let i=0;i<13;i++) s += parseInt(b[i]) * ((i%2===0)?3:1);
+  return b + ((10-(s%10))%10);
+}
+
+function fd(v) {
+  if(!v) return '__/__/____';
+  const d=new Date(v+'T00:00:00');
+  return `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}/${d.getFullYear()}`;
+}
+
+function switchTab(t) {
+  tab=t;
+  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x.dataset.tab===t));
+  document.getElementById('ship-section').classList.toggle('visible',t==='master');
+  renderLabel();
+}
+
+function renderLabel() {
+  const lot=document.getElementById('lot').value||'________';
+  const mfg=fd(document.getElementById('mfg-date').value);
+  const bb=fd(document.getElementById('bestby-date').value);
+  const c=document.getElementById('lbl');
+
+  if(tab==='case') {
+    c.innerHTML = `
+    <div class="label">
+      <div class="lbl-header">
+        <img src="logo.png" alt="USA Gummies">
+        <div class="lbl-header-text">
+          <div class="pname">ALL AMERICAN<br>GUMMY BEARS</div>
+          <div class="psub">5 Fruit Flavors &bull; 7.5 oz Bag</div>
+        </div>
+      </div>
+      <div class="lbl-row">
+        <div class="lbl-cell"><div class="lbl-cell-lbl">SKU</div><div class="lbl-cell-val">UG-AAGB-6CT</div></div>
+        <div class="lbl-cell"><div class="lbl-cell-lbl">Unit UPC</div><div class="lbl-cell-val">${UPC1}</div></div>
+      </div>
+      <div class="lbl-row">
+        <div class="lbl-cell"><div class="lbl-cell-lbl">Net Weight</div><div class="lbl-cell-val">2.81 lbs (45 oz)</div></div>
+        <div class="lbl-cell"><div class="lbl-cell-lbl">Gross Weight</div><div class="lbl-cell-val">3.4 lbs</div></div>
+        <div class="lbl-cell"><div class="lbl-cell-lbl">Dimensions</div><div class="lbl-cell-val">7"&times;7"&times;7"</div></div>
+      </div>
+      <div class="lbl-pack">
+        CASE PACK: <span class="box">6 BAGS / CASE</span> 7.5 oz EA
+      </div>
+      <div class="lbl-bc">
+        <div class="lbl-bc-lbl">ITF-14 &mdash; Case</div>
+        <svg id="bc1"></svg>
+      </div>
+      <div class="lbl-upc-row">
+        <span>Unit UPC:</span>
+        <svg id="bc2"></svg>
+      </div>
+      <div class="lbl-dates">
+        <div class="f"><span class="fl">Lot:</span><span class="fv">${lot}</span></div>
+        <div class="f"><span class="fl">Mfg:</span><span class="fv">${mfg}</span></div>
+        <div class="f"><span class="fl">Best By:</span><span class="fv">${bb}</span></div>
+      </div>
+      <div class="lbl-footer">
+        <div>
+          <div class="co">USA Gummies &bull; usagummies.com</div>
+          <div>Packed in FDA-Registered Facilities</div>
+          <div>No Artificial Dyes &bull; Made in USA</div>
+          <div style="font-size:5pt;color:#666;">Store cool &amp; dry. Avoid direct sunlight.</div>
+        </div>
+        <div class="rt">CONTAINS: NONE OF<br>THE TOP 9 ALLERGENS</div>
+      </div>
+    </div>`;
+    setTimeout(()=>{
+      try {
+        JsBarcode("#bc1",g14(UPC1,"1"),{format:"ITF14",width:2.2,height:58,displayValue:true,fontSize:13,font:"monospace",fontOptions:"bold",textMargin:2,margin:4});
+        JsBarcode("#bc2",UPC1,{format:"UPC",width:1.1,height:26,displayValue:true,fontSize:8,font:"monospace",textMargin:1,margin:2});
+      }catch(e){}
+    },40);
+  } else {
+    const sn=document.getElementById('ship-name').value||'[Distributor]';
+    const sa=document.getElementById('ship-addr').value||'[Address]';
+    const sc=document.getElementById('ship-csz').value||'[City, State ZIP]';
+    const po=document.getElementById('po').value||'_______________';
+    c.innerHTML = `
+    <div class="label">
+      <div class="lbl-header">
+        <img src="logo.png" alt="USA Gummies">
+        <div class="lbl-header-text">
+          <div class="badge">MASTER CARTON</div>
+          <div class="pname">ALL AMERICAN<br>GUMMY BEARS</div>
+        </div>
+      </div>
+      <div class="lbl-ship">
+        <div class="lbl-ship-blk">
+          <div class="lbl-ship-lbl">Ship From</div>
+          <div class="lbl-ship-val">USA Gummies c/o Powers Confections<br>6061 N Freya St, Spokane, WA 99217</div>
+        </div>
+        <div class="lbl-ship-blk">
+          <div class="lbl-ship-lbl">Ship To</div>
+          <div class="lbl-ship-val">${sn}<br>${sa}<br>${sc}</div>
+        </div>
+      </div>
+      <div class="lbl-pack">
+        <span class="box">6 CASES &times; 6 = 36 UNITS</span> 7.5 oz / bag
+      </div>
+      <div class="lbl-row">
+        <div class="lbl-cell"><div class="lbl-cell-lbl">Case UPC</div><div class="lbl-cell-val">${UPC1}</div></div>
+        <div class="lbl-cell"><div class="lbl-cell-lbl">Master UPC</div><div class="lbl-cell-val">${UPC2}</div></div>
+        <div class="lbl-cell"><div class="lbl-cell-lbl">SKU</div><div class="lbl-cell-val">UG-AAGB-MC6</div></div>
+      </div>
+      <div class="lbl-row">
+        <div class="lbl-cell"><div class="lbl-cell-lbl">Gross Wt</div><div class="lbl-cell-val">22.0 lbs</div></div>
+        <div class="lbl-cell"><div class="lbl-cell-lbl">Net Wt</div><div class="lbl-cell-val">16.88 lbs</div></div>
+        <div class="lbl-cell"><div class="lbl-cell-lbl">Dims</div><div class="lbl-cell-val">22"&times;14"&times;8"</div></div>
+        <div class="lbl-cell"><div class="lbl-cell-lbl">Ti&times;Hi</div><div class="lbl-cell-val">6&times;4</div></div>
+      </div>
+      <div class="lbl-bc">
+        <div class="lbl-bc-lbl">ITF-14 &mdash; Master Carton</div>
+        <svg id="bc1"></svg>
+      </div>
+      <div class="lbl-dates">
+        <div class="f"><span class="fl">Lot:</span><span class="fv">${lot}</span></div>
+        <div class="f"><span class="fl">Mfg:</span><span class="fv">${mfg}</span></div>
+        <div class="f"><span class="fl">Best By:</span><span class="fv">${bb}</span></div>
+      </div>
+      <div class="lbl-po">
+        <div class="f"><span class="fl">PO#:</span><span class="fv" style="font-size:8pt;">${po}</span></div>
+      </div>
+      <div class="lbl-footer">
+        <div>
+          <div class="co">USA Gummies &bull; usagummies.com</div>
+          <div>FDA-Registered &bull; No Artificial Dyes &bull; Made in USA</div>
+          <div style="font-size:5pt;color:#666;">Store cool &amp; dry &bull; Allergen-Free (Top 9)</div>
+        </div>
+        <div class="rt">KEEP DRY<br>DO NOT STACK &gt;5 HIGH</div>
+      </div>
+    </div>`;
+    setTimeout(()=>{
+      try {
+        JsBarcode("#bc1",g14(UPC2,"2"),{format:"ITF14",width:2.2,height:55,displayValue:true,fontSize:12,font:"monospace",fontOptions:"bold",textMargin:2,margin:4});
+      }catch(e){}
+    },40);
+  }
+}
+renderLabel();
+</script>
+</body>
+</html>

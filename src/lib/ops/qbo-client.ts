@@ -577,6 +577,19 @@ export async function createQBOInvoice(
   });
 }
 
+export async function deleteQBOInvoice(
+  invoiceId: string,
+  syncToken: string,
+): Promise<QBOEntity | null> {
+  return qboFetch<QBOEntity>("/invoice?operation=delete&minorversion=73", {
+    method: "POST",
+    body: JSON.stringify({
+      Id: invoiceId,
+      SyncToken: syncToken,
+    }),
+  });
+}
+
 // ---------------------------------------------------------------------------
 // WRITE: Bill (record a vendor bill / AP)
 // ---------------------------------------------------------------------------

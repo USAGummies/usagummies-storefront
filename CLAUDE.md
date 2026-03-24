@@ -35,5 +35,17 @@ E-commerce storefront + ops platform for USA Gummies. Next.js 15 App Router depl
 - **Slack** — notifications via webhook (single webhook with channel prefixes)
 - **Gmail SMTP** — transactional email via `smtp.gmail.com:465`
 
+## Thermal Label Printing (Polono PL70e-BT)
+- **Printer**: Polono PL70e-BT via USB (`_PL70e_BT` in CUPS)
+- **Label size**: 4×6 (100mm×150mm) die-cut shipping labels
+- **Critical**: Must use `zeMediaTracking=Continuous` mode — Gap mode causes blank labels between prints
+- **Print command** (no blanks):
+  ```
+  lp -d _PL70e_BT -o PageSize=w288h432 -o zeMediaTracking=Continuous -o page-top=0 -o page-bottom=0 -o page-left=0 -o page-right=0 -o fit-to-page -n <QTY> '<file>.pdf'
+  ```
+- **Label files**: `labels/` directory — case label, master carton label, interactive generator (`index.html`)
+- **PDF generation**: Use Puppeteer (`/tmp/make-labels.mjs`) with `width: '100mm', height: '150mm'`, logo embedded as base64, barcodes via JsBarcode CDN
+- **Logo for thermal**: CSS `filter: grayscale(1) contrast(10) brightness(0.75)` converts color logo to clean B&W
+
 ## Testing
 No test suite configured. Verify changes via `npm run build` (catches TypeScript and build errors).

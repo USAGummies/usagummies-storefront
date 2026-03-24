@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>USA Gummies — Case Label</title>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<style>
+  @page {
+    size: 4in 6in;
+    margin: 0;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Arial', 'Helvetica Neue', sans-serif;
+    width: 4in;
+    height: 6in;
+    padding: 0.15in;
+    background: #fff;
+    color: #000;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .label {
+    width: 100%;
+    height: 100%;
+    border: 2px solid #000;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* === HEADER === */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.08in 0.12in;
+    border-bottom: 2px solid #000;
+    background: #0a1628;
+    min-height: 0.65in;
+  }
+  .header img {
+    height: 0.55in;
+    width: auto;
+  }
+  .header-right {
+    text-align: right;
+    color: #fff;
+  }
+  .header-right .product-name {
+    font-size: 11pt;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    line-height: 1.1;
+  }
+  .header-right .product-sub {
+    font-size: 7.5pt;
+    font-weight: 400;
+    opacity: 0.85;
+    margin-top: 1px;
+  }
+
+  /* === INFO GRID === */
+  .info-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    border-bottom: 1.5px solid #000;
+    font-size: 8pt;
+  }
+  .info-cell {
+    padding: 0.04in 0.1in;
+    border-right: 1px solid #ccc;
+    border-bottom: 1px solid #ccc;
+  }
+  .info-cell:nth-child(even) { border-right: none; }
+  .info-cell:nth-last-child(-n+2) { border-bottom: none; }
+  .info-label {
+    font-size: 6pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #555;
+    letter-spacing: 0.05em;
+  }
+  .info-value {
+    font-size: 9pt;
+    font-weight: 700;
+    color: #000;
+    margin-top: 0px;
+  }
+
+  /* === PACK CONFIG BAR === */
+  .pack-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.05in 0.12in;
+    background: #f0f0f0;
+    border-bottom: 1.5px solid #000;
+    font-size: 9pt;
+    font-weight: 700;
+  }
+  .pack-bar .highlight {
+    background: #0a1628;
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 2px;
+    font-size: 10pt;
+  }
+
+  /* === BARCODE SECTION === */
+  .barcode-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0.06in 0.15in;
+    border-bottom: 1.5px solid #000;
+  }
+  .barcode-label-text {
+    font-size: 6.5pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #555;
+    margin-bottom: 2px;
+  }
+  .barcode-section svg {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* === LOT / DATE ROW === */
+  .lot-date-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.04in 0.12in;
+    border-bottom: 1px solid #000;
+    font-size: 8.5pt;
+  }
+  .lot-date-row .field {
+    display: flex;
+    gap: 4px;
+    align-items: baseline;
+  }
+  .lot-date-row .field-label {
+    font-weight: 700;
+    font-size: 7pt;
+    text-transform: uppercase;
+    color: #555;
+  }
+  .lot-date-row .field-value {
+    font-weight: 800;
+    font-size: 9.5pt;
+  }
+
+  /* === FOOTER === */
+  .footer {
+    padding: 0.04in 0.12in;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    font-size: 6.5pt;
+    color: #333;
+    line-height: 1.3;
+  }
+  .footer-left { max-width: 60%; }
+  .footer-right {
+    text-align: right;
+    font-weight: 700;
+    font-size: 7pt;
+  }
+  .footer .company {
+    font-weight: 700;
+    font-size: 7pt;
+  }
+  .footer .storage {
+    font-style: italic;
+    font-size: 6pt;
+    color: #666;
+  }
+
+  /* === UPC SMALL (optional secondary) === */
+  .upc-small-section {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 0.02in 0.12in 0.04in;
+    gap: 6px;
+    border-bottom: 1px solid #ccc;
+  }
+  .upc-small-label {
+    font-size: 5.5pt;
+    color: #888;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+
+  @media print {
+    body { padding: 0; }
+    .label { border: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="label">
+  <!-- HEADER: Logo + Product Name -->
+  <div class="header">
+    <img src="logo.png" alt="USA Gummies" onerror="this.style.display='none'">
+    <div class="header-right">
+      <div class="product-name">ALL AMERICAN<br>GUMMY BEARS</div>
+      <div class="product-sub">5 Fruit Flavors &bull; 7.5 oz Bag</div>
+    </div>
+  </div>
+
+  <!-- INFO GRID -->
+  <div class="info-section">
+    <div class="info-cell">
+      <div class="info-label">SKU</div>
+      <div class="info-value">UG-AAGB-6CT</div>
+    </div>
+    <div class="info-cell">
+      <div class="info-label">UPC (Unit)</div>
+      <div class="info-value">199284715530</div>
+    </div>
+    <div class="info-cell">
+      <div class="info-label">Net Weight</div>
+      <div class="info-value">2.81 lbs (45 oz)</div>
+    </div>
+    <div class="info-cell">
+      <div class="info-label">Gross Weight</div>
+      <div class="info-value">3.4 lbs</div>
+    </div>
+    <div class="info-cell">
+      <div class="info-label">Case Dimensions</div>
+      <div class="info-value">7" × 7" × 7"</div>
+    </div>
+    <div class="info-cell">
+      <div class="info-label">Country of Origin</div>
+      <div class="info-value">MADE IN USA 🇺🇸</div>
+    </div>
+  </div>
+
+  <!-- PACK CONFIGURATION BAR -->
+  <div class="pack-bar">
+    <span>CASE PACK:</span>
+    <span class="highlight">6 BAGS / CASE</span>
+    <span>7.5 oz EACH</span>
+  </div>
+
+  <!-- PRIMARY BARCODE: ITF-14 -->
+  <div class="barcode-section">
+    <div class="barcode-label-text">ITF-14 &mdash; Case Barcode</div>
+    <svg id="barcode-itf14"></svg>
+  </div>
+
+  <!-- SECONDARY UPC -->
+  <div class="upc-small-section">
+    <span class="upc-small-label">Unit UPC-A:</span>
+    <svg id="barcode-upc-small"></svg>
+  </div>
+
+  <!-- LOT / DATE -->
+  <div class="lot-date-row">
+    <div class="field">
+      <span class="field-label">Lot:</span>
+      <span class="field-value" id="lot-display">20251016</span>
+    </div>
+    <div class="field">
+      <span class="field-label">Mfg:</span>
+      <span class="field-value" id="mfg-display">10/16/2025</span>
+    </div>
+    <div class="field">
+      <span class="field-label">Best By:</span>
+      <span class="field-value" id="bestby-display">10/16/2026</span>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div class="footer-left">
+      <div class="company">USA Gummies &bull; usagummies.com</div>
+      <div>Packed in FDA-Registered Facilities</div>
+      <div>No Artificial Dyes &bull; Colored with Fruit &amp; Vegetable Extracts</div>
+      <div class="storage">Store in a cool, dry place. Avoid direct sunlight.</div>
+    </div>
+    <div class="footer-right">
+      <div>CONTAINS: NONE OF THE</div>
+      <div>TOP 9 ALLERGENS</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ITF-14: Prepend indicator digit "1" to UPC (drop check digit), recalculate
+  // UPC-A: 199284715530 → strip check digit → 19928471553 → prepend "1" → 119928471553 → calc check → 14-digit GTIN
+  // Actually for ITF-14: take GTIN-12 (199284715530), pad to 13 digits (0199284715530), prepend indicator "1" → 10199284715530 (14 digits)
+  // Then recalculate check digit for 14-digit GTIN
+
+  function calcGTIN14(upc12, indicator) {
+    // Remove existing check digit from UPC-12
+    const base = upc12.slice(0, 11);
+    // Pad to 12 digits with leading zero, prepend indicator
+    const gtin13NoCheck = indicator + '0' + base; // 13 digits
+    // Calculate check digit
+    let sum = 0;
+    for (let i = 0; i < 13; i++) {
+      const digit = parseInt(gtin13NoCheck[i]);
+      sum += (i % 2 === 0) ? digit * 3 : digit;
+    }
+    const check = (10 - (sum % 10)) % 10;
+    return gtin13NoCheck + check;
+  }
+
+  const UPC_CASE = "199284715530";
+  const GTIN14 = calcGTIN14(UPC_CASE, "1");
+
+  // ITF-14 barcode (Interleaved 2 of 5)
+  JsBarcode("#barcode-itf14", GTIN14, {
+    format: "ITF14",
+    width: 2.2,
+    height: 65,
+    displayValue: true,
+    fontSize: 14,
+    font: "monospace",
+    fontOptions: "bold",
+    textMargin: 3,
+    margin: 5,
+    background: "#ffffff"
+  });
+
+  // Small UPC-A (secondary)
+  JsBarcode("#barcode-upc-small", UPC_CASE, {
+    format: "UPC",
+    width: 1.2,
+    height: 30,
+    displayValue: true,
+    fontSize: 9,
+    font: "monospace",
+    textMargin: 1,
+    margin: 2,
+    background: "#ffffff"
+  });
+</script>
+
+</body>
+</html>

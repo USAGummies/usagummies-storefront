@@ -43,6 +43,12 @@ export type OperatorCycleSummary = {
     wholesale?: {
       invoiceTasks: number;
     };
+    reports?: {
+      weeklyArAp?: { ran: boolean };
+      monthlyPnl?: { ran: boolean };
+      monthlyBalanceSheet?: { ran: boolean };
+      investorUpdate?: { ran: boolean };
+    };
   };
   execution: OperatorExecutionSummary;
 };
@@ -95,6 +101,7 @@ function summarizeCompletedTasks(summary: OperatorExecutionSummary): string[] {
     vendor_followup: "vendor follow-up draft",
     distributor_followup: "distributor follow-up draft",
     generate_wholesale_invoice: "wholesale invoice draft",
+    generate_investor_update: "investor update package",
     inventory_reorder_po: "inventory PO draft",
   };
 
@@ -182,6 +189,14 @@ export async function reportOperatorCycle(summary: OperatorCycleSummary): Promis
       : []),
     ...(summary.detectorSummary.wholesale
       ? [`*Wholesale:* ${summary.detectorSummary.wholesale.invoiceTasks} invoice draft task(s)`]
+      : []),
+    ...(summary.detectorSummary.reports
+      ? [
+          `*Reports:* weekly AR/AP ${summary.detectorSummary.reports.weeklyArAp?.ran ? "ran" : "idle"}, ` +
+            `monthly P&L ${summary.detectorSummary.reports.monthlyPnl?.ran ? "ran" : "idle"}, ` +
+            `balance sheet ${summary.detectorSummary.reports.monthlyBalanceSheet?.ran ? "ran" : "idle"}, ` +
+            `investor update ${summary.detectorSummary.reports.investorUpdate?.ran ? "ran" : "idle"}`,
+        ]
       : []),
     `*Queued:* ${summary.createdTasks} new operator task(s)`,
     `*Executed:* ${summary.execution.completed} completed, ${summary.execution.failed} failed, ${summary.execution.blocked} blocked, ${summary.execution.needsApproval} awaiting approval`,

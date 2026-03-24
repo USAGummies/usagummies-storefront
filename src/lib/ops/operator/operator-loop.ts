@@ -6,6 +6,10 @@ import { detectVendorPaymentTasks } from "@/lib/ops/operator/gap-detectors/vendo
 import { runOperatorHealthMonitor } from "@/lib/ops/operator/health-monitor";
 import { runPnlSanityChecker } from "@/lib/ops/operator/pnl-sanity-checker";
 import { runDailyFinancialReconciliation } from "@/lib/ops/operator/reconciliation";
+import { runInvestorUpdatePackage } from "@/lib/ops/operator/reports/investor-update";
+import { runMonthlyBalanceSheetReport } from "@/lib/ops/operator/reports/monthly-balance-sheet";
+import { runMonthlyPnlReport } from "@/lib/ops/operator/reports/monthly-pnl";
+import { runWeeklyArApReport } from "@/lib/ops/operator/reports/weekly-ar-ap";
 import { createOperatorTasks, executeOperatorTasks } from "@/lib/ops/operator/task-executor";
 import { reportOperatorCycle } from "@/lib/ops/operator/task-reporter";
 
@@ -50,6 +54,12 @@ export type OperatorLoopResult = {
     };
     wholesale: {
       invoiceTasks: number;
+    };
+    reports?: {
+      weeklyArAp?: { ran: boolean };
+      monthlyPnl?: { ran: boolean };
+      monthlyBalanceSheet?: { ran: boolean };
+      investorUpdate?: { ran: boolean };
     };
   };
   execution: {
@@ -291,6 +301,19 @@ export async function runOperatorLoop(): Promise<OperatorLoopResult> {
   if (qboModified) {
     result.pnlSanity = await runPnlSanityChecker();
   }
+
+  const [weeklyArAp, monthlyPnl, monthlyBalanceSheet, investorUpdate] = await Promise.all([
+    runWeeklyArApReport().catch(() => ({ ran: false })),
+    runMonthlyPnlReport().catch(() => ({ ran: false })),
+    runMonthlyBalanceSheetReport().catch(() => ({ ran: false })),
+    runInvestorUpdatePackage().catch(() => ({ ran: false })),
+  ]);
+  result.detectorSummary.reports = {
+    weeklyArAp: { ran: Boolean(weeklyArAp.ran) },
+    monthlyPnl: { ran: Boolean(monthlyPnl.ran) },
+    monthlyBalanceSheet: { ran: Boolean(monthlyBalanceSheet.ran) },
+    investorUpdate: { ran: Boolean(investorUpdate.ran) },
+  };
 
   await reportOperatorCycle(result);
   result.health = await runOperatorHealthMonitor();

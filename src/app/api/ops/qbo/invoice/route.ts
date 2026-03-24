@@ -35,6 +35,7 @@ type QBOItem = {
 type InvoiceResponse = {
   Invoice?: {
     Id?: string;
+    SyncToken?: string;
     DocNumber?: string;
     TotalAmt?: number;
     DueDate?: string;
@@ -213,4 +214,50 @@ export async function POST(req: Request) {
     emailSent,
     customerId: customer.Id,
   });
+}
+
+export async function DELETE(req: Request) {
+  if (!(await isAuthorized(req))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const body = await req.json().catch(() => ({})) as { invoiceId?: string };
+  const invoiceId = String(body.invoiceId || "").trim();
+  if (!invoiceId) {
+    return NextResponse.json({ error: "Missing invoiceId" }, { status: 400 });
+  }
+
+  const accessToken = await getValidAccessToken();
+  const realmId = await getRealmId();
+  if (!accessToken || !realmId) {
+    return NextResponse.json({ error: "QBO is not connected" }, { status: 401 });
+  }
+
+  const existing = await queryOne<{ QueryResponse?: { Invoice?: InvoiceResponse["Invoice"][] } }>(
+    realmId,
+    accessToken,
+    `SELECT * FROM Invoice WHERE Id = '${invoiceId.replace(/'/g, "\\'")}' MAXRESULTS 1`,
+  );
+  const invoice = existing?.QueryResponse?.Invoice?.[0];
+  if (!invoice?.Id || !invoice.SyncToken) {
+    return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+  }
+
+  const deleted = await qboFetch<Record<string, unknown>>(
+    realmId,
+    accessToken,
+    "/invoice?operation=delete&minorversion=73",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        Id: invoice.Id,
+        SyncToken: invoice.SyncToken,
+      }),
+    },
+  );
+  if (!deleted) {
+    return NextResponse.json({ error: "Failed to delete invoice" }, { status: 502 });
+  }
+
+  return NextResponse.json({ ok: true, invoiceId: invoice.Id });
 }
