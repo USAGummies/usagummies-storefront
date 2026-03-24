@@ -1,10 +1,13 @@
+import { runBatchTransactionReview } from "@/lib/ops/operator/batch-review";
 import { detectEmailOperatorGaps } from "@/lib/ops/operator/gap-detectors/email";
 import { detectInventoryAlerts } from "@/lib/ops/operator/gap-detectors/inventory";
 import { detectPipelineOperatorGaps } from "@/lib/ops/operator/gap-detectors/pipeline";
 import { detectQBOOperatorGaps } from "@/lib/ops/operator/gap-detectors/qbo";
 import { detectVendorPaymentTasks } from "@/lib/ops/operator/gap-detectors/vendor-payments";
 import { runOperatorHealthMonitor } from "@/lib/ops/operator/health-monitor";
+import { runMeetingPrepAutoGeneration } from "@/lib/ops/operator/meeting-prep";
 import { runPnlSanityChecker } from "@/lib/ops/operator/pnl-sanity-checker";
+import { surfaceProactiveEmailTasks } from "@/lib/ops/operator/proactive-email";
 import { runDailyFinancialReconciliation } from "@/lib/ops/operator/reconciliation";
 import { runInvestorUpdatePackage } from "@/lib/ops/operator/reports/investor-update";
 import { runMonthlyBalanceSheetReport } from "@/lib/ops/operator/reports/monthly-balance-sheet";
@@ -301,6 +304,12 @@ export async function runOperatorLoop(): Promise<OperatorLoopResult> {
   if (qboModified) {
     result.pnlSanity = await runPnlSanityChecker();
   }
+
+  await Promise.all([
+    surfaceProactiveEmailTasks().catch(() => ({ surfaced: 0 })),
+    runBatchTransactionReview().catch(() => ({ ran: false, count: 0 })),
+    runMeetingPrepAutoGeneration().catch(() => ({ generated: 0 })),
+  ]);
 
   const [weeklyArAp, monthlyPnl, monthlyBalanceSheet, investorUpdate] = await Promise.all([
     runWeeklyArApReport().catch(() => ({ ran: false })),

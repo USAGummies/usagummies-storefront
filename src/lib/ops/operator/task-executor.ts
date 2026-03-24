@@ -372,6 +372,14 @@ function canPrepareApprovalTask(task: OperatorTaskRow): boolean {
 }
 
 function canExecuteTask(task: OperatorTaskRow): boolean {
+  if (
+    (task.task_type === "email_draft_response" ||
+      task.task_type === "vendor_followup" ||
+      task.task_type === "distributor_followup") &&
+    String(task.execution_result?.approval_id || "").trim()
+  ) {
+    return false;
+  }
   if (canPrepareApprovalTask(task)) return true;
   if (task.task_type === "qbo_record_from_email") return !task.requires_approval;
   return !task.requires_approval;
@@ -1014,7 +1022,7 @@ async function buildEmailThreadContext(messageId: string, senderEmail: string, s
     .slice(0, 12000);
 }
 
-async function executeEmailDraftResponseTask(task: OperatorTaskRow): Promise<string> {
+async function executeEmailDraftResponseTask(task: OperatorTaskRow): Promise<ExecuteTaskResult> {
   const messageId = String(task.execution_params?.message_id || "");
   const sender = String(task.execution_params?.sender || "");
   const senderEmail = String(task.execution_params?.sender_email || "");
@@ -1054,7 +1062,17 @@ async function executeEmailDraftResponseTask(task: OperatorTaskRow): Promise<str
     taskLabel: `Draft reply to ${sender || senderEmail}`,
   });
 
-  return `Queued draft reply approval ${approvalId} for ${sender || senderEmail}`;
+  return {
+    status: "completed",
+    message: `Queued draft reply approval ${approvalId} for ${sender || senderEmail}`,
+    data: {
+      approval_id: approvalId,
+      sender,
+      sender_email: senderEmail,
+      subject,
+      body_preview: String(draft).replace(/\s+/g, " ").trim().slice(0, 400),
+    },
+  };
 }
 
 async function executeQBORecordFromEmailTask(task: OperatorTaskRow): Promise<string> {
@@ -1124,7 +1142,7 @@ async function executeQBORecordFromEmailTask(task: OperatorTaskRow): Promise<str
   return `Recorded email-linked transaction ${description} to ${String(mappedAccount.Name || matchedRule.accountName || "Uncategorized Expense")}${vendorFound ? "" : " (vendor not yet in QBO vendor list)"}`;
 }
 
-async function executeVendorFollowupTask(task: OperatorTaskRow): Promise<string> {
+async function executeVendorFollowupTask(task: OperatorTaskRow): Promise<ExecuteTaskResult> {
   const email = String(task.execution_params?.contact_email || "");
   const vendor = String(task.execution_params?.vendor || "vendor");
   const lastSubject = String(task.execution_params?.last_subject || "Quick follow-up");
@@ -1145,10 +1163,20 @@ async function executeVendorFollowupTask(task: OperatorTaskRow): Promise<string>
     taskLabel: `Vendor follow-up: ${vendor}`,
   });
 
-  return `Queued vendor follow-up approval ${approvalId} for ${vendor}`;
+  return {
+    status: "completed",
+    message: `Queued vendor follow-up approval ${approvalId} for ${vendor}`,
+    data: {
+      approval_id: approvalId,
+      sender: vendor,
+      sender_email: email,
+      subject: lastSubject,
+      body_preview: String(draft).replace(/\s+/g, " ").trim().slice(0, 400),
+    },
+  };
 }
 
-async function executeDistributorFollowupTask(task: OperatorTaskRow): Promise<string> {
+async function executeDistributorFollowupTask(task: OperatorTaskRow): Promise<ExecuteTaskResult> {
   const email = String(task.execution_params?.email || "");
   const distributorName = String(task.execution_params?.distributor_name || "distributor");
   const shipDate = String(task.execution_params?.ship_date || "");
@@ -1169,7 +1197,17 @@ async function executeDistributorFollowupTask(task: OperatorTaskRow): Promise<st
     taskLabel: `Distributor follow-up: ${distributorName}`,
   });
 
-  return `Queued distributor follow-up approval ${approvalId} for ${distributorName}`;
+  return {
+    status: "completed",
+    message: `Queued distributor follow-up approval ${approvalId} for ${distributorName}`,
+    data: {
+      approval_id: approvalId,
+      sender: distributorName,
+      sender_email: email,
+      subject: "Follow-up on USA Gummies sample",
+      body_preview: String(draft).replace(/\s+/g, " ").trim().slice(0, 400),
+    },
+  };
 }
 
 async function executeInventoryReorderPoTask(task: OperatorTaskRow): Promise<string> {

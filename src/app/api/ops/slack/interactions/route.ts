@@ -165,6 +165,85 @@ async function openSlackModal(triggerId: string, view: Record<string, unknown>):
   }
 }
 
+async function postSlackBlocks(
+  channelId: string,
+  text: string,
+  blocks: unknown[],
+  threadTs?: string,
+): Promise<void> {
+  const botToken = process.env.SLACK_BOT_TOKEN || "";
+  if (!botToken || !channelId) return;
+
+  await fetch("https://slack.com/api/chat.postMessage", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${botToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      channel: channelId,
+      text,
+      blocks,
+      ...(threadTs ? { thread_ts: threadTs } : {}),
+      mrkdwn: true,
+      unfurl_links: false,
+    }),
+    signal: AbortSignal.timeout(10000),
+  }).catch(() => {});
+}
+
+type OperatorTaskRecord = {
+  id: string;
+  title: string;
+  status: string;
+  due_by: string | null;
+  execution_params?: Record<string, unknown> | null;
+  execution_result?: Record<string, unknown> | null;
+};
+
+type ApprovalRecord = {
+  id: string;
+  proposed_payload?: Record<string, unknown> | null;
+};
+
+function mergeTaskExecutionResult(
+  task: OperatorTaskRecord,
+  patch: Record<string, unknown>,
+): Record<string, unknown> {
+  return {
+    ...(task.execution_result || {}),
+    ...patch,
+  };
+}
+
+async function fetchOperatorTask(taskId: string): Promise<OperatorTaskRecord | null> {
+  const rows = (await sbFetch(
+    `/rest/v1/abra_operator_tasks?id=eq.${taskId}&select=id,title,status,due_by,execution_params,execution_result&limit=1`,
+  )) as OperatorTaskRecord[];
+  return rows[0] || null;
+}
+
+async function fetchApproval(approvalId: string): Promise<ApprovalRecord | null> {
+  const rows = (await sbFetch(
+    `/rest/v1/approvals?id=eq.${approvalId}&select=id,proposed_payload&limit=1`,
+  )) as ApprovalRecord[];
+  return rows[0] || null;
+}
+
+async function denyApproval(approvalId: string, actor: string): Promise<void> {
+  await sbFetch(`/rest/v1/approvals?id=eq.${approvalId}&status=eq.pending`, {
+    method: "PATCH",
+    headers: { Prefer: "return=minimal", "Content-Type": "application/json" },
+    body: JSON.stringify({
+      status: "denied",
+      decision: "denied",
+      decided_at: new Date().toISOString(),
+      decided_by_user_id: actor,
+      decision_reasoning: `Skipped by ${actor} from proactive email surface`,
+    }),
+  }).catch(() => {});
+}
+
 export async function POST(req: Request) {
   // Rate limit — generous tier (Slack retries aggressively)
   const { checkRateLimit } = await import("@/lib/ops/rate-limit");
@@ -351,6 +430,134 @@ export async function POST(req: Request) {
     return NextResponse.json({
       response_type: "ephemeral",
       text: approved ? "⏳ Approving operator task..." : "⏳ Rejecting operator task...",
+    });
+  }
+
+  if (actionId === "view_email_draft" || actionId === "skip_email_task" || actionId === "remind_email_task") {
+    const responseUrl = payload.response_url || "";
+
+    after(async () => {
+      try {
+        const task = await fetchOperatorTask(value);
+        if (!task) {
+          if (responseUrl) await replaceSlackMessage(responseUrl, "⚠️ Email task not found.");
+          return;
+        }
+
+        const approvalId = String(task.execution_result?.approval_id || task.execution_params?.approval_id || "").trim();
+
+        if (actionId === "skip_email_task") {
+          if (approvalId) {
+            await denyApproval(approvalId, actor);
+          }
+          await sbFetch(`/rest/v1/abra_operator_tasks?id=eq.${task.id}`, {
+            method: "PATCH",
+            body: JSON.stringify({
+              status: "completed",
+              execution_result: mergeTaskExecutionResult(task, {
+                skipped_at: new Date().toISOString(),
+                skipped_by: actor,
+                surfaced_at: new Date().toISOString(),
+                message: "skipped by user",
+              }),
+              completed_at: new Date().toISOString(),
+              error_message: null,
+            }),
+          });
+          if (responseUrl) await replaceSlackMessage(responseUrl, `✅ Skipped by ${actor}`);
+          return;
+        }
+
+        if (actionId === "remind_email_task") {
+          const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+          await sbFetch(`/rest/v1/abra_operator_tasks?id=eq.${task.id}`, {
+            method: "PATCH",
+            body: JSON.stringify({
+              status: "pending",
+              due_by: tomorrow,
+              execution_result: mergeTaskExecutionResult(task, {
+                surfaced_at: null,
+                surfaced_slack_ts: null,
+                remind_after: tomorrow,
+              }),
+            }),
+          });
+          if (responseUrl) await replaceSlackMessage(responseUrl, `⏰ I’ll resurface this tomorrow.`);
+          return;
+        }
+
+        if (!approvalId) {
+          if (responseUrl) await replaceSlackMessage(responseUrl, "⚠️ Draft approval not found for this task.");
+          return;
+        }
+
+        const approval = await fetchApproval(approvalId);
+        const payloadData = approval?.proposed_payload || {};
+        const params = payloadData && typeof payloadData.params === "object"
+          ? (payloadData.params as Record<string, unknown>)
+          : {};
+        const to = String(params.to || "");
+        const subject = String(params.subject || task.execution_params?.subject || task.title);
+        const body = String(params.body || params.html || params.message || "");
+        const previewText = body || String(task.execution_result?.body_preview || task.execution_params?.body_preview || "(draft body unavailable)");
+
+        await postSlackBlocks(
+          channelId,
+          `Draft reply for ${subject}`,
+          [
+            {
+              type: "section",
+              text: {
+                type: "mrkdwn",
+                text:
+                  `*To:* ${to || "(unknown)"}\n` +
+                  `*Subject:* ${subject}\n\n` +
+                  previewText.slice(0, 2800),
+              },
+            },
+            {
+              type: "actions",
+              elements: [
+                {
+                  type: "button",
+                  text: { type: "plain_text", text: "Approve" },
+                  style: "primary",
+                  action_id: "approve_action",
+                  value: approvalId,
+                },
+                {
+                  type: "button",
+                  text: { type: "plain_text", text: "Edit" },
+                  action_id: "edit_email_action",
+                  value: approvalId,
+                },
+                {
+                  type: "button",
+                  text: { type: "plain_text", text: "Reject" },
+                  style: "danger",
+                  action_id: "reject_action",
+                  value: approvalId,
+                },
+              ],
+            },
+          ],
+          threadTs || payload.message?.ts,
+        );
+        if (responseUrl) await replaceSlackMessage(responseUrl, "📨 Draft posted in thread.");
+      } catch (err) {
+        const text = err instanceof Error ? err.message : "Email task action failed";
+        if (responseUrl) await replaceSlackMessage(responseUrl, `⚠️ ${text}`);
+      }
+    });
+
+    return NextResponse.json({
+      response_type: "ephemeral",
+      text:
+        actionId === "view_email_draft"
+          ? "📨 Loading draft..."
+          : actionId === "skip_email_task"
+            ? "⏳ Skipping..."
+            : "⏳ Snoozing until tomorrow...",
     });
   }
 
