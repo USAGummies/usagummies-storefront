@@ -58,6 +58,7 @@ import { EMAIL_EXTRACTION_SKILL } from "@/lib/ops/abra-skill-email-data-extracti
 import { DEAL_CALCULATOR_SKILL } from "@/lib/ops/abra-skill-deal-calculator";
 import { buildCrossDepartmentStrategy } from "@/lib/ops/abra-strategy-orchestrator";
 import { getSystemHealth } from "@/lib/ops/abra-health-monitor";
+import { detectAndPreExecute } from "@/lib/ops/abra-deterministic-actions";
 
 // ─── Extracted modules ───
 import {
@@ -2222,8 +2223,21 @@ export async function POST(req: Request) {
       throw new DOMException("Deadline exceeded", "AbortError");
     }
 
+    // ── DETERMINISTIC PRE-EXECUTION ──
+    // Execute actions BEFORE the LLM runs. The LLM then composes a response
+    // based on actual results, not its own decision about whether to act.
+    const preExec = await detectAndPreExecute(message, {
+      slackChannelId: slackChannelId || undefined,
+      slackThreadTs: slackThreadTs || undefined,
+    });
+
+    // Inject pre-executed data into the LLM context so it can compose an intelligent response
+    const preExecContext = preExec.didPreExecute
+      ? `\n\n[PRE-EXECUTED ACTIONS — Data already fetched for this request. Use this data to answer the user's question directly. Do NOT emit duplicate actions for data already provided below.]\n${preExec.preloadedData}`
+      : "";
+
     const claudeResult = await generateClaudeReply({
-      message,
+      message: message + preExecContext,
       history: effectiveHistory,
       tieredResults,
       corrections,
