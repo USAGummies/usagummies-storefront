@@ -2456,9 +2456,10 @@ export async function POST(req: Request) {
     }
 
     // ── Force QBO write actions when Claude says "On it" but doesn't emit action ──
-    const qboVendorMatch = /\b(create|add|set up)\b.*\b(vendor|supplier)\b.*\b(?:for |called |named )["']?([^"'\n,]+)/i.exec(message);
-    const qboAccountMatch = /\b(create|add|set up)\b.*\b(account|coa)\b.*\b(?:for |called |named )["']?([^"'\n,]+)/i.exec(message);
-    const qboCustomerMatch = /\b(create|add|set up)\b.*\b(customer|client)\b.*\b(?:for |called |named )["']?([^"'\n,]+)/i.exec(message);
+    // Broader regex — matches "create vendor Powers", "add a vendor: Powers", "set up vendor—Powers", etc.
+    const qboVendorMatch = /\b(create|add|set up|make)\b.*\b(vendor|supplier)\b[^a-z]*(?:for |called |named |:|\u2014|-|)\s*["']?([A-Z][^"'\n,]{2,40})/i.exec(message);
+    const qboAccountMatch = /\b(create|add|set up|make)\b.*\b(account|coa)\b[^a-z]*(?:for |called |named |:|\u2014|-|)\s*["']?([A-Z][^"'\n,]{2,40})/i.exec(message);
+    const qboCustomerMatch = /\b(create|add|set up|make)\b.*\b(customer|client)\b[^a-z]*(?:for |called |named |:|\u2014|-|)\s*["']?([A-Z][^"'\n,]{2,40})/i.exec(message);
 
     const qboActionHandled = actionNotices.some(n =>
       n.includes("[create_qbo_vendor]") || n.includes("[create_qbo_account]") || n.includes("[create_qbo_customer]"),
@@ -2500,7 +2501,7 @@ export async function POST(req: Request) {
       .join("\n\n");
 
     // ── "On it" detector: catch promises without actions ──
-    const saidOnIt = /\b(on it|creating.*now|i'?ll do that|doing that now|generating.*now|working on|i'?m on it|let me.*now|pulling.*now)\b/i.test(effectiveReply);
+    const saidOnIt = /\b(on it|creating.*now|i'?ll do that|doing that now|generating.*now|working on|i'?m on it|let me.*now|pulling.*now|i'?ll get that|one moment|querying|processing|retrieving|running that|executing|submitting|looking that up|let me pull|let me check|let me read|i'?ll handle|i'?ll take care)\b/i.test(effectiveReply);
     const noActionsExecuted = actionNotices.length === 0;
     const userAskedForAction = /\b(create|add|set up|generate|export|send|draft|build|make|update|record|log|categorize|respond|reply)\b/i.test(message);
 

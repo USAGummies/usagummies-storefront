@@ -118,12 +118,7 @@ export const ACTION_POLICIES: Record<string, ActionPolicy> = {
     description: "Query QuickBooks Online — read-only API calls.",
   },
 
-  search_brain: {
-    tier: "direct",
-    riskFloor: "low",
-    dailyLimit: 200,
-    description: "Search Abra semantic brain (vector search) — read-only.",
-  },
+  // search_brain: removed — no handler exists. Brain search is automatic via tiered context.
 
   generate_file: {
     tier: "auto_with_audit",
@@ -158,20 +153,7 @@ export const ACTION_POLICIES: Record<string, ActionPolicy> = {
     description: "Write a new fact/memory to Abra's open brain entries.",
   },
 
-  update_brain_entry: {
-    tier: "auto_with_audit",
-    riskFloor: "low",
-    dailyLimit: 50,
-    description: "Update an existing brain entry — internal learning.",
-  },
-
-  store_brain_entry: {
-    tier: "auto_with_audit",
-    riskFloor: "low",
-    dailyLimit: 50,
-    description:
-      "Embed and store a brain entry via the Supabase edge function — internal write.",
-  },
+  // update_brain_entry, store_brain_entry: removed — no handlers. Use create_brain_entry instead.
 
   acknowledge_signal: {
     tier: "auto_with_audit",
@@ -187,12 +169,7 @@ export const ACTION_POLICIES: Record<string, ActionPolicy> = {
     description: "Create a task in the ops platform — internal project management.",
   },
 
-  log_metric: {
-    tier: "auto_with_audit",
-    riskFloor: "low",
-    dailyLimit: 100,
-    description: "Log a KPI or metric value — append-only internal write.",
-  },
+  // log_metric: removed — no handler. KPIs recorded via kpi-collector, not LLM actions.
 
   log_production_run: {
     tier: "auto_with_audit",

@@ -3482,6 +3482,14 @@ async function handleGenerateFile(params: Record<string, unknown>): Promise<Acti
   // If a data source is specified, fetch data server-side instead of from Claude's output
   // This allows large datasets (e.g., 169 QBO accounts) without hitting Claude output limits
   const source = typeof params.source === "string" ? params.source : "";
+  // Whitelist allowed data sources to prevent unauthorized data export
+  const ALLOWED_SOURCES = new Set([
+    "qbo_accounts", "qbo_chart_of_accounts", "qbo_vendors", "qbo_pnl",
+    "kpi_daily_revenue", "kpi_revenue_by_channel", "kpi_timeseries",
+  ]);
+  if (source && !ALLOWED_SOURCES.has(source)) {
+    return { success: false, message: `Unknown data source: "${source}". Supported: ${[...ALLOWED_SOURCES].join(", ")}` };
+  }
   if (source) {
     try {
       const fetchedSheets = await fetchDataForFileGeneration(source, params);
@@ -4497,10 +4505,8 @@ export const KNOWN_ACTION_TYPES = new Set([
   "calculate_deal",
   "create_wholesale_draft_order",
   "create_shopify_product_draft",
-  "store_brain_entry",
-  "update_brain_entry",
-  "search_brain",
-  "log_metric",
+  // Removed orphaned actions: store_brain_entry, update_brain_entry, search_brain, log_metric
+  // These had no handlers — use create_brain_entry, correct_claim instead
   "run_monthly_close",
   "generate_file",
 ]);
