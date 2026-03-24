@@ -809,26 +809,10 @@ async function sendReneMorningDM(): Promise<void> {
 
   lines.push(
     "",
-    "_Reply to me here with any questions about the books. I'm ready to help._",
+    "_Reply in #financials with any questions about the books._",
   );
 
-  // Open DM channel with Rene
-  const openRes = await fetch("https://slack.com/api/conversations.open", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${botToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ users: RENE_SLACK_USER_ID }),
-    signal: AbortSignal.timeout(5000),
-  });
-  const openData = (await openRes.json()) as { ok: boolean; channel?: { id: string } };
-  if (!openData.ok || !openData.channel?.id) {
-    console.warn("[morning-brief] Could not open DM with Rene");
-    return;
-  }
-
-  // Send to #financials channel (C0AKG9FSC2J) — where Rene works on books
+  // Post to #financials channel — NOT as a DM to Rene
   const FINANCIALS_CHANNEL = "C0AKG9FSC2J";
   await fetch("https://slack.com/api/chat.postMessage", {
     method: "POST",
@@ -844,20 +828,7 @@ async function sendReneMorningDM(): Promise<void> {
     signal: AbortSignal.timeout(5000),
   });
 
-  // Also ping Rene's DM with a pointer to the financials channel
-  await fetch("https://slack.com/api/chat.postMessage", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${botToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      channel: openData.channel.id,
-      text: `☀️ Good morning <@U0ALL27JM38> — your finance brief is in <#${FINANCIALS_CHANNEL}>. ${pendingApprovals > 0 ? `${pendingApprovals} approval(s) waiting for your review.` : "No pending approvals."}`,
-      unfurl_links: false,
-    }),
-    signal: AbortSignal.timeout(5000),
-  });
+  // Rene's finance brief goes to #financials only — no DM
 
   console.log("[morning-brief] Sent Rene finance brief to #financials + DM pointer");
 }

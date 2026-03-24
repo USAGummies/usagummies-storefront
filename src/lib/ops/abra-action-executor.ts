@@ -64,6 +64,8 @@ export async function executeActions(
       actionNotices.push(`⏱️ Skipped \`${directive.action.action_type}\` due to time constraints — ask me to run it separately.`);
       break;
     }
+    // Declare taskId outside try so catch can access it for failure tracking
+    let taskId: string | null = null;
     try {
       // Auto-inject Slack context into generate_file actions
       if (directive.action.action_type === "generate_file" && ctx) {
@@ -92,8 +94,7 @@ export async function executeActions(
       const perActionTimeout = remainingMs != null
         ? Math.min(PER_ACTION_TIMEOUT_MS, Math.max(1000, remainingMs - 2000))
         : PER_ACTION_TIMEOUT_MS;
-      // Track this action in the task queue — declared outside try so catch can access it
-      let taskId: string | null = null;
+      // Track this action in the task queue
       taskId = await queueTask({
         task_type: "action_execution",
         description: directive.action.description || directive.action.title || directive.action.action_type,
