@@ -824,6 +824,7 @@ async function fetchInternalOpsJson(path: string): Promise<Record<string, unknow
   const cronSecret = (process.env.CRON_SECRET || "").trim();
   if (!cronSecret) return null;
   const host =
+    process.env.NEXT_PUBLIC_SITE_URL ||
     process.env.NEXTAUTH_URL ||
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
   const res = await fetch(`${host}${path}`, {
