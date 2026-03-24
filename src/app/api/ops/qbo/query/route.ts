@@ -429,49 +429,53 @@ function extractReportSummary(
     const rows = (report as { Rows?: { Row?: unknown[] } })?.Rows?.Row;
     if (!Array.isArray(rows)) return summary;
 
-    for (const section of rows) {
-      const sec = section as {
-        group?: string;
-        Summary?: { ColData?: Array<{ value?: string }> };
-        Rows?: { Row?: unknown[] };
-        Header?: { ColData?: Array<{ value?: string }> };
-      };
+    const addSummaryValue = (label: string | undefined, value: string | undefined, groupName?: string) => {
+      if (!label || value == null || value === "") return;
+      const normalized = isNaN(Number(value)) ? value : Number(value);
+      summary[label] = normalized;
+      if (groupName) {
+        summary[`${groupName} > ${label}`] = normalized;
+      }
+    };
 
-      const groupName = sec.group || "";
+    const walkRows = (rowList: unknown[], parentGroup = "") => {
+      for (const rawRow of rowList) {
+        const row = rawRow as {
+          group?: string;
+          type?: string;
+          Header?: { ColData?: Array<{ value?: string }> };
+          Summary?: { ColData?: Array<{ value?: string }> };
+          ColData?: Array<{ value?: string }>;
+          Rows?: { Row?: unknown[] };
+        };
 
-      // Get section total from Summary row
-      if (sec.Summary?.ColData) {
-        const cols = sec.Summary.ColData;
-        if (cols.length >= 2) {
-          const label = cols[0]?.value || groupName;
-          const value = cols[1]?.value;
-          if (label && value) {
-            summary[label] = isNaN(Number(value)) ? value : Number(value);
+        const headerLabel = row.Header?.ColData?.[0]?.value || "";
+        const groupName = row.group || headerLabel || parentGroup;
+
+        if (row.Summary?.ColData && row.Summary.ColData.length >= 2) {
+          addSummaryValue(
+            row.Summary.ColData[0]?.value || groupName,
+            row.Summary.ColData[1]?.value,
+            parentGroup || undefined,
+          );
+        }
+
+        if (row.type === "Data" && row.ColData && row.ColData.length >= 2) {
+          const label = row.ColData[0]?.value;
+          const value = row.ColData[1]?.value;
+          if (label && value && value !== "0.00") {
+            const key = parentGroup ? `${parentGroup} > ${label}` : label;
+            summary[key] = isNaN(Number(value)) ? value : Number(value);
           }
         }
-      }
 
-      // Also walk nested rows for detail
-      if (sec.Rows?.Row && Array.isArray(sec.Rows.Row)) {
-        for (const row of sec.Rows.Row) {
-          const r = row as {
-            ColData?: Array<{ value?: string }>;
-            Summary?: { ColData?: Array<{ value?: string }> };
-            type?: string;
-          };
-          if (r.type === "Data" && r.ColData && r.ColData.length >= 2) {
-            const label = r.ColData[0]?.value;
-            const value = r.ColData[1]?.value;
-            if (label && value && value !== "0.00") {
-              const key = groupName
-                ? `${groupName} > ${label}`
-                : label;
-              summary[key] = isNaN(Number(value)) ? value : Number(value);
-            }
-          }
+        if (row.Rows?.Row && Array.isArray(row.Rows.Row)) {
+          walkRows(row.Rows.Row, groupName);
         }
       }
-    }
+    };
+
+    walkRows(rows);
   } catch {
     // Best-effort parsing
   }
