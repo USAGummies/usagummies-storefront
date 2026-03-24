@@ -316,7 +316,9 @@ export async function POST(req: Request) {
         ts,
         ...(thread_ts ? { threadTs: thread_ts } : {}),
         ...(history.length > 0 ? { history } : {}),
-        forceRespond: event.type === "app_mention",
+        forceRespond: event.type === "app_mention" || [
+          "C0AKG9FSC2J", // #financials — Rene's workspace, always respond
+        ].includes(channel),
       });
 
       // Always clear the "still thinking" timer before we touch the message
