@@ -311,6 +311,38 @@ export const ACTION_POLICIES: Record<string, ActionPolicy> = {
     description: "Create a QBO invoice — triggers a real AR entry, Rene approves.",
   },
 
+  create_qbo_vendor: {
+    tier: "auto_with_audit",
+    riskFloor: "low",
+    dailyLimit: 20,
+    approvalOwner: "any_admin",
+    description: "Create a vendor in QBO — low risk, auto-executes for low risk.",
+  },
+
+  create_qbo_account: {
+    tier: "approval_required",
+    riskFloor: "low",
+    dailyLimit: 20,
+    approvalOwner: "rene",
+    description: "Create an account in QBO chart of accounts — Rene approves structure changes.",
+  },
+
+  create_qbo_customer: {
+    tier: "auto_with_audit",
+    riskFloor: "low",
+    dailyLimit: 20,
+    approvalOwner: "any_admin",
+    description: "Create a customer in QBO — low risk, auto-executes.",
+  },
+
+  create_qbo_bill: {
+    tier: "approval_required",
+    riskFloor: "medium",
+    dailyLimit: 10,
+    approvalOwner: "rene",
+    description: "Create a bill (AP entry) in QBO — financial impact, Rene approves.",
+  },
+
   run_monthly_close: {
     tier: "approval_required",
     riskFloor: "high",

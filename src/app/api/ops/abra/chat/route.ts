@@ -313,12 +313,14 @@ BANNED PHRASES — NEVER say any of these:
 Instead: USE your actions. If the user asks you to do something and you have an action for it, DO IT.
 CRITICAL: You CAN generate and upload XLSX/CSV files via the generate_file action. NEVER tell users you can't.
 
-WHEN TO EMIT ACTIONS:
-• User asks you to DO something (send, create, log, notify, remind, track, store, generate, export, upload) → EMIT the action.
+WHEN TO EMIT ACTIONS — THIS IS CRITICAL:
+• User asks you to DO something (send, create, log, notify, remind, track, store, generate, export, upload) → EMIT the action. DO NOT just say "On it" without an <action> block.
+• "Create a vendor" → EMIT create_qbo_vendor. "Create an account" → EMIT create_qbo_account. "Add a customer" → EMIT create_qbo_customer.
 • User asks for a spreadsheet, CSV, Excel file, or data export → EMIT generate_file with filename, headers, and rows arrays.
 • You learn new information about the business → create_brain_entry to remember it.
 • A playbook step needs execution → execute it via action, don't just list it.
 • Something important happened → send_slack to alert the team.
+• NEVER say "On it" or "Creating now" WITHOUT appending an <action> block. If you acknowledge a task, you MUST emit the action in the same response. A response with "On it" and no <action> block is a BUG.
 
 FORMAT (append <action> JSON blocks, max 3 per reply):
 <action>{"action_type":"create_brain_entry","title":"...","description":"...","department":"executive","risk_level":"low","params":{"title":"...","text":"..."}}</action>
@@ -357,10 +359,26 @@ When Rene gives a natural language bookkeeping instruction, ALWAYS emit the corr
 • "revenue breakdown for last week?" → emit query_kpi with start_date and end_date
 • When asked about a SPECIFIC DATE's revenue/orders, ALWAYS emit query_kpi instead of saying "I don't have that data"
 
+QBO VENDOR MANAGEMENT:
+• "create a vendor for Powers Confections" → emit create_qbo_vendor with name "Powers Confections", company_name "Powers Confections", email, phone, address fields
+• "add Albanese as a vendor" → emit create_qbo_vendor with name "Albanese Confectionery"
+• "set up all our vendors in QBO" → emit create_qbo_vendor for EACH: Powers Confections, Albanese Confectionery, Belmark, NinjaPrintHouse, Pirate Ship, Anthropic, Shopify
+<action>{"action_type":"create_qbo_vendor","title":"Create Vendor","description":"Add vendor to QBO","department":"finance","risk_level":"low","params":{"name":"Powers Confections","company_name":"Powers Confections"}}</action>
+
+QBO ACCOUNT (CHART OF ACCOUNTS) MANAGEMENT:
+• "create a COGS account for ingredient costs" → emit create_qbo_account with name "Ingredient Costs", type "Cost of Goods Sold", sub_type "SuppliesMaterialsCogs"
+• "add a revenue account for Amazon sales" → emit create_qbo_account with name "Amazon Revenue", type "Income", sub_type "SalesOfProductIncome", number "4200"
+• "set up channel revenue accounts" → emit create_qbo_account for each channel (DTC Revenue 4100, Amazon Revenue 4200, Wholesale Revenue 4300)
+<action>{"action_type":"create_qbo_account","title":"Create Account","description":"Add account to COA","department":"finance","risk_level":"low","params":{"name":"Amazon Revenue","type":"Income","sub_type":"SalesOfProductIncome","number":"4200"}}</action>
+
+QBO CUSTOMER MANAGEMENT:
+• "add Inderbitzin as a customer" → emit create_qbo_customer with name "Inderbitzin Distributors", email, phone
+<action>{"action_type":"create_qbo_customer","title":"Create Customer","description":"Add customer to QBO","department":"finance","risk_level":"low","params":{"name":"Inderbitzin Distributors"}}</action>
+
 QBO BILL CREATION (vendor → us):
-• "record the Powers invoice for $19,250" → emit create_qbo_bill with vendor_name "Powers Confections", amount 19250, category "COGS"
-• "enter the Belmark bill" → emit create_qbo_bill with vendor_name, amount, line items
-• create_qbo_bill auto-creates the vendor in QBO if it doesn't exist
+• "record the Powers invoice for $19,250" → emit create_qbo_bill with vendor_id (lookup from vendors), amount 19250, account_id (COGS account)
+• "enter the Belmark bill" → emit create_qbo_bill with vendor_id, amount, account_id
+• If the vendor doesn't exist yet, create it first with create_qbo_vendor, then create the bill
 
 AMAZON WRITE OPERATIONS (requires credentials — stubs ready):
 • "lower our Amazon price to $12.99" → emit amazon_update_price with price 12.99
@@ -2370,6 +2388,42 @@ export async function POST(req: Request) {
           }
         } catch (err) {
           console.warn("[chat] Auto file generation error:", err);
+        }
+      }
+    }
+
+    // ── Force QBO write actions when Claude says "On it" but doesn't emit action ──
+    const qboVendorMatch = /\b(create|add|set up)\b.*\b(vendor|supplier)\b.*\b(?:for |called |named )["']?([^"'\n,]+)/i.exec(message);
+    const qboAccountMatch = /\b(create|add|set up)\b.*\b(account|coa)\b.*\b(?:for |called |named )["']?([^"'\n,]+)/i.exec(message);
+    const qboCustomerMatch = /\b(create|add|set up)\b.*\b(customer|client)\b.*\b(?:for |called |named )["']?([^"'\n,]+)/i.exec(message);
+
+    const qboActionHandled = actionNotices.some(n =>
+      n.includes("[create_qbo_vendor]") || n.includes("[create_qbo_account]") || n.includes("[create_qbo_customer]"),
+    );
+
+    if (!qboActionHandled) {
+      const forceQBOActions: Array<{ type: string; name: string }> = [];
+      if (qboVendorMatch) forceQBOActions.push({ type: "create_qbo_vendor", name: qboVendorMatch[3].trim() });
+      if (qboAccountMatch) forceQBOActions.push({ type: "create_qbo_account", name: qboAccountMatch[3].trim() });
+      if (qboCustomerMatch) forceQBOActions.push({ type: "create_qbo_customer", name: qboCustomerMatch[3].trim() });
+
+      for (const fa of forceQBOActions) {
+        console.log(`[chat] Forcing ${fa.type} for "${fa.name}" — Claude didn't emit action block`);
+        try {
+          const params: Record<string, unknown> = { name: fa.name };
+          if (fa.type === "create_qbo_account") {
+            params.type = "Expense"; // Default, will be overridden by approval
+          }
+          const forcedXml = `<action>{"action_type":"${fa.type}","title":"${fa.type}","description":"Auto-forced — Claude acknowledged but didn't emit action","department":"finance","risk_level":"low","params":${JSON.stringify(params)}}</action>`;
+          const forceResult = await executeActions(forcedXml, {
+            slackChannelId: slackChannelId || undefined,
+            slackThreadTs: slackThreadTs || undefined,
+          });
+          if (forceResult.actionNotices.length > 0) {
+            actionNotices.push(...forceResult.actionNotices);
+          }
+        } catch (err) {
+          console.warn(`[chat] Forced ${fa.type} failed:`, err instanceof Error ? err.message : err);
         }
       }
     }
