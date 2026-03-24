@@ -18,6 +18,7 @@ import { processFinancialBrainEntries } from "@/lib/ops/abra-financial-processor
 import { learnFromSentMail } from "@/lib/ops/abra-sent-mail-learner";
 import { backfillNullEmbeddings } from "@/lib/ops/abra-embeddings";
 import { queryLedgerSummary } from "@/lib/ops/abra-notion-write";
+import { runOperatorLoop } from "@/lib/ops/operator/operator-loop";
 import { kv } from "@vercel/kv";
 import { appendStateArray, readState, writeState, acquireKVLock, releaseKVLock } from "@/lib/ops/state";
 import { notify } from "@/lib/ops/notify";
@@ -223,6 +224,11 @@ export async function POST(req: Request) {
       processFinancialBrainEntries({ limit: 10 }),
     );
     outcomes.push(financialStep);
+
+    const operatorStep = await runStep("operator", async () =>
+      runOperatorLoop(),
+    );
+    outcomes.push(operatorStep);
 
     // Learn from Ben's sent emails once per day (morning run only)
     if (inMorningWindow(nowPT)) {

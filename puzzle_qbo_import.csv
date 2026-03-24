@@ -1,0 +1,522 @@
+Date,Amount,Vendor,Description,Category,GL_Number,Bank_Account,Account_Mask
+2026-03-23,-21.69,Anthropic,ANTHROPIC,Software - Operating Expense,66200,Platinum,8133
+2026-03-23,-54.00,Ownerrez,OWNERREZ,No Category,,Platinum,8133
+2026-03-23,-65.14,Pirate Ship,Pirate Ship DES:payment ID:payment INDN:USA Gummies CO ID:XXXXX11058 WEB,Shipping,68400,Business Adv Fundamentals,7020
+2026-03-23,-2000.00,,Zelle payment to Katie Mettler Conf# w1steeipv,No Category,,Business Adv Fundamentals,7020
+2026-03-21,-21.70,Anthropic,ANTHROPIC,Software - Operating Expense,66200,Platinum,8133
+2026-03-21,-134.70,Amazon,Amazon Payments,No Category,,Platinum,8133
+2026-03-20,-57.50,Intuit,INTUIT * DES:QBooks Onl ID:7029550 INDN:USA GUMMIES CO ID:XXXXX56346 CCD,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-03-20,-449.67,Pirate Ship,Pirate Ship DES:payment ID:payment INDN:USA Gummies CO ID:XXXXX11058 WEB,Shipping,68400,Business Adv Fundamentals,7020
+2026-03-19,24.02,,SHOPIFY DES:SHOPIFY ID:ST-J2O9F2D7M5H3 INDN:USA GUMMIES LLC CO ID: XXXXX8598 CCD,No Category,,Business Adv Fundamentals,7020
+2026-03-19,-72.73,Office Depot,Office Depot,Supplies,68300,Platinum,8133
+2026-03-19,-105.00,shopify,SHOPIFY*XXXXXXXXXX,Hosting Fees,51000,Platinum,8133
+2026-03-18,-27.00,Anthropic,ANTHROPIC,Software - Operating Expense,66200,Platinum,8133
+2026-03-18,-29.99,Company Sage,COMPANY SAGE DES:COMPANY SA ID:ST-Y6B7T8A1Y6D4 INDN:USA GUMMIES CO ID:XXXXX65600 WEB,No Category,,Business Adv Fundamentals,7020
+2026-03-18,-30.00,,Wire Transfer Fee,Bank Fees,68600,Business Adv Fundamentals,7020
+2026-03-18,-60.75,Pirate Ship,Pirate Ship DES:payment ID:payment INDN:USA Gummies CO ID:XXXXX11058 WEB,Shipping,68400,Business Adv Fundamentals,7020
+2026-03-18,-228.78,Pirate Ship,Pirate Ship DES:payment ID:payment INDN:USA Gummies CO ID:XXXXX11058 WEB,Shipping,68400,Business Adv Fundamentals,7020
+2026-03-18,-6989.66,,"WIRE TYPE:WIRE OUT DATE:260318 TIME:0508 ET TRN:XXXXXXXXXX557727 SERVICE REF:003531 BNF:BELMARK ID:19392580 BNF BK:ASSOCIATED BANK, N. A. ID:XXXXX0575 PMT DET:TTV9A8K3J /ACC/USA GUMMIES",No Category,,Business Adv Fundamentals,7020
+2026-03-17,23.87,,Shopify DES:Shopify ID:ST-M8D0Y8J7E3A5 INDN:USA GUMMIES LLC CO ID:XXXXX48598 CCD,No Category,,Business Adv Fundamentals,7020
+2026-03-17,0.18,,Pirate Ship DES:PSHIP CASH ID:01faa2e6314d INDN:USA Gummies CO ID:XXXXX11058 WEB,Shipping,68400,Business Adv Fundamentals,7020
+2026-03-17,-7.32,Pirate Ship,Pirate Ship DES:payment ID:payment INDN:USA Gummies CO ID:XXXXX11058 WEB,Shipping,68400,Business Adv Fundamentals,7020
+2026-03-17,-30.00,,Wire Transfer Fee,Bank Fees,68600,Business Adv Fundamentals,7020
+2026-03-17,-51.84,Notion,"NOTION LABS, INC.",Software - Operating Expense,66200,Platinum,8133
+2026-03-17,-100.00,Claude.ai,CLAUDE.AI SUBSCRIPTION,Software - Operating Expense,66200,Platinum,8133
+2026-03-17,-128.52,Claude.ai,CLAUDE.AI SUBSCRIPTION,Software - Operating Expense,66200,Platinum,8133
+2026-03-17,-55244.50,,WIRE TYPE:WIRE OUT DATE:260317 TIME:1842 ET TRN:XXXXXXXXXX557423 SERVICE REF:016376 BNF:ALBANESE CONFECTIONERY GRO ID:1658640 BNF BK:B MO BANK N.A. ID:XXXXX0288 PMT DET:TEGCPT7YH /ACC/U SA GUMMIES,No Category,,Business Adv Fundamentals,7020
+2026-03-16,-25.94,Svcs Rainier Lux,SVCSrainierlux,Entertainment,63400,Platinum,8133
+2026-03-16,-43.75,Slack,SLACK T08JY86Q4TA,Software - Operating Expense,66200,Platinum,8133
+2026-03-16,-60.00,OpenAI,OPENAI *CHATGPT SUBSCR,Software - Operating Expense,66200,Platinum,8133
+2026-03-16,-188.68,T-Mobile,T-Mobile,Utilities,67300,Business Adv Fundamentals,7020
+2026-03-16,-1083.70,Nerd Alley,GDP*Nerd Alley 3DPrint,No Category,,Platinum,8133
+2026-03-16,-1546.52,GEICO,GEICO,Insurance,68100,Business Adv Fundamentals,7020
+2026-03-13,0.51,,MyOCCU DES:ACCTVERIFY ID: INDN:Benjamin Stutman CO ID:XXXXX4461 WEB,No Category,,Business Adv Fundamentals,7020
+2026-03-13,0.15,,MyOCCU DES:ACCTVERIFY ID: INDN:Benjamin Stutman CO ID:XXXXX4461 WEB,No Category,,Business Adv Fundamentals,7020
+2026-03-13,-0.66,Myoccu,MyOCCU DES:ACCTVERIFY ID: INDN:Benjamin Stutman CO ID:XXXXX4461 WEB,No Category,,Business Adv Fundamentals,7020
+2026-03-13,-6.29,Pirate Ship,Pirate Ship DES:payment ID:payment INDN:USA Gummies CO ID:XXXXX11058 WEB,Shipping,68400,Business Adv Fundamentals,7020
+2026-03-13,-15.00,,Wire Transfer Fee,Bank Fees,68600,Business Adv Fundamentals,7020
+2026-03-13,-3496.76,,CAPITAL ONE AUTO DES:CARPAY ID:CP0E3B97E41232B INDN:Benjamin Stutman CO ID:XXXXX19806 CCD,No Category,,Business Adv Fundamentals,7020
+2026-03-12,99970.00,,WIRE TYPE:BOOK IN DATE:260312 TIME:1337 ET TRN:XXXXXXXXXX454815 SNDR REF:XXXXX0296 ORIG:1/THE RENE G. GONZALEZ TR ID:XXXXX4747301 PMT DET:BALANCE LOAD $30 PREV SENT,No Category,,Business Adv Fundamentals,7020
+2026-03-12,3193.45,,CAPITAL ONE MOBILE PYMT,Credit Card Payments,21111,Platinum,8133
+2026-03-12,60.48,,Found DES:Transfer ID: INDN:Benjamin Stutman CO ID:XXXXX44643 PPD,No Category,,Business Adv Fundamentals,7020
+2026-03-12,10.00,,"Online transfer from CHK 7301 Confirmation# p5vv8i64b; GONZALEZ, RENE",No Category,,Business Adv Fundamentals,7020
+2026-03-12,-1722.83,,CAPITAL ONE DES:MOBILE PMT ID:CA04B997693DEE2 INDN:Benjamin Stutman CO ID:XXXXX44380 CCD,No Category,,Business Adv Fundamentals,7020
+2026-03-12,-1937.61,,AMERICAN EXPRESS DES:ACH PMT ID:W2894 INDN:USA GUMMIES CO ID:XXXXX33497 WEB,No Category,,Business Adv Fundamentals,7020
+2026-03-12,-3193.45,,CAPITAL ONE DES:MOBILE PMT ID:CA03CC110EF226B INDN:Benjamin Stutman CO ID:XXXXX44380 CCD,Credit Card Payments,21111,Business Adv Fundamentals,7020
+2026-03-11,-60.48,,Bank Account 7020,No Category,,Business Adv Fundamentals,7020
+2026-03-10,59.48,,Found Plus,No Category,,Business Adv Fundamentals,7020
+2026-03-10,10.00,,THE RENE G. GONZALEZ TRUST RENE G GONZALEZ TRTEE U/A 03/05/2018,No Category,,Business Adv Fundamentals,7020
+2026-03-10,-5.00,,Anthropic,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-03-10,-5.92,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2026-03-10,-7.18,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2026-03-10,-20.00,,Anthropic,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-03-09,24.02,,Shopify,No Category,,Business Adv Fundamentals,7020
+2026-03-09,7.52,,Social media to Primary,No Category,,Business Adv Fundamentals,7020
+2026-03-09,-10.92,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2026-03-09,-24.00,,PADDLE.NET* N8N CLOUD1,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-03-08,35.81,Amazon,AMAZON.CUZV6OZVX,No Category,,Business Adv Fundamentals,7020
+2026-03-07,-25.00,,ASHFORD VALLEY G,No Category,,Business Adv Fundamentals,7020
+2026-03-06,36.00,,Niki Lodato,No Category,,Business Adv Fundamentals,7020
+2026-03-06,7.64,,Social media to Primary,No Category,,Business Adv Fundamentals,7020
+2026-03-06,-49.79,Google,GOOGLE *SVCSusagummies,No Category,,Business Adv Fundamentals,7020
+2026-03-05,39.41,,FAIRE WHOLESALE,No Category,,Business Adv Fundamentals,7020
+2026-03-05,9.00,,Social media to Primary,No Category,,Business Adv Fundamentals,7020
+2026-03-04,26.00,,Social media to Primary,No Category,,Business Adv Fundamentals,7020
+2026-03-04,-1.19,Google,Google Workspace_raini,No Category,,Business Adv Fundamentals,7020
+2026-03-04,-5.00,,Anthropic,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-03-04,-6.30,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2026-03-04,-22.35,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2026-03-04,-25.00,,Anthropic,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-03-02,49.31,,SHOPIFY,No Category,,Business Adv Fundamentals,7020
+2026-03-02,37.49,Amazon,AMAZON.CGGC7330Q,No Category,,Business Adv Fundamentals,7020
+2026-03-02,-69.45,,INTEREST CHARGE:PURCHASES,Interest Expense,87000,Platinum,8133
+2026-03-01,0.12,,Balance bonus,No Category,,Business Adv Fundamentals,7020
+2026-03-01,-2.27,,WWW.BRAVE.COM,No Category,,Business Adv Fundamentals,7020
+2026-03-01,-5.61,Google,GOOGLE *Workspace_rain,No Category,,Business Adv Fundamentals,7020
+2026-03-01,-9.58,Google,GOOGLE *Workspace_redt,No Category,,Business Adv Fundamentals,7020
+2026-02-28,-40.00,,PAST DUE FEE,Bank Fees,68600,Platinum,8133
+2026-02-27,39.41,,FAIRE WHOLESALE,No Category,,Business Adv Fundamentals,7020
+2026-02-27,-11.63,,Anthropic,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-27,-13.63,,Anthropic,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-27,-19.50,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2026-02-27,-29.00,,WWW.CRATEJOY.COM,No Category,,Business Adv Fundamentals,7020
+2026-02-26,105.00,,Social media to Primary,No Category,,Business Adv Fundamentals,7020
+2026-02-26,-10.28,,Anthropic,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-26,-10.29,,Anthropic,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-26,-10.59,,Anthropic,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-26,-10.69,,Anthropic,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-26,-11.58,,Anthropic,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-26,-11.66,,Anthropic,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-26,-11.96,,Anthropic,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-26,-12.26,,Anthropic,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-26,-105.00,shopify,SHOPIFY* 489111022,Hosting Fees,51000,Business Adv Fundamentals,7020
+2026-02-25,-10.33,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2026-02-25,-10.89,,Anthropic,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-25,-11.09,,Anthropic,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-25,-92.24,,COMPANY SAGE,No Category,,Business Adv Fundamentals,7020
+2026-02-25,-100.00,,RUMBLE USA INC.,No Category,,Business Adv Fundamentals,7020
+2026-02-24,485.20,Stripe,Stripe,Transfers in Transit: Payment Processor,10920,Business Adv Fundamentals,7020
+2026-02-24,40.00,,Social media to Primary,No Category,,Business Adv Fundamentals,7020
+2026-02-24,34.21,,FAIRE WHOLESALE,No Category,,Business Adv Fundamentals,7020
+2026-02-24,-10.31,,Anthropic,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-24,-10.55,,Anthropic,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-24,-10.56,,Anthropic,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-24,-10.62,,Anthropic,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-24,-11.25,,Anthropic,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-24,-11.64,,Anthropic,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-24,-15.00,,Anthropic,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-24,-48.52,,THE HIGHLANDER,No Category,,Business Adv Fundamentals,7020
+2026-02-23,37.18,Amazon,AMAZON.CQAWBDIIG,No Category,,Business Adv Fundamentals,7020
+2026-02-23,24.02,,SHOPIFY,No Category,,Business Adv Fundamentals,7020
+2026-02-23,-50.08,shell,Shell,Ground Transportation,62300,Business Adv Fundamentals,7020
+2026-02-22,57.97,,FAIRE WHOLESALE,No Category,,Business Adv Fundamentals,7020
+2026-02-20,14.30,Amazon,AMAZON.CZN4Q0FJP,No Category,,Business Adv Fundamentals,7020
+2026-02-20,-6.68,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2026-02-20,-7.52,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2026-02-20,-50.00,,OWNERREZ,No Category,,Business Adv Fundamentals,7020
+2026-02-19,-20.21,apple,Apple,Computers & Hardware,66100,Business Adv Fundamentals,7020
+2026-02-18,25.62,Amazon,AMAZON.CGNARP8LG,No Category,,Business Adv Fundamentals,7020
+2026-02-14,54.00,,Check deposit,Services Revenue,41000,Business Adv Fundamentals,7020
+2026-02-13,-12.99,apple,Apple,Computers & Hardware,66100,Business Adv Fundamentals,7020
+2026-02-13,-21.80,apple,Apple,Computers & Hardware,66100,Business Adv Fundamentals,7020
+2026-02-12,60.00,,Social media to Primary,No Category,,Business Adv Fundamentals,7020
+2026-02-12,55.00,,Social media to Primary,No Category,,Business Adv Fundamentals,7020
+2026-02-12,20.94,,Shopify,No Category,,Business Adv Fundamentals,7020
+2026-02-12,-10.64,,Anthropic,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-12,-10.77,,Anthropic,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-12,-10.84,,Anthropic,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-12,-11.22,,Anthropic,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-12,-11.63,,Anthropic,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-12,-12.05,,Anthropic,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-12,-12.43,,Anthropic,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-11,485.20,Stripe,Stripe,Transfers in Transit: Payment Processor,10920,Business Adv Fundamentals,7020
+2026-02-11,-8.68,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2026-02-11,-10.61,,Anthropic,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-11,-11.11,,Anthropic,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-11,-11.78,,Anthropic,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-11,-11.91,,Anthropic,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-11,-11.97,,Anthropic,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-11,-12.70,,Anthropic,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-11,-15.00,,Anthropic,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-11,-20.00,OpenAI,OPENAI,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-11,-22.68,Amazon,Amazon,No Category,,Business Adv Fundamentals,7020
+2026-02-11,-60.00,OpenAI,OPENAI *CHATGPT SUBSCR,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-11,-100.00,,RUMBLE USA INC.,No Category,,Business Adv Fundamentals,7020
+2026-02-10,1.29,,Shopify,No Category,,Business Adv Fundamentals,7020
+2026-02-10,-10.00,OpenAI,OPENAI,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-10,-15.00,OpenAI,OPENAI,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-06,10.94,,Cash back,No Category,,Business Adv Fundamentals,7020
+2026-02-06,-10.00,OpenAI,OPENAI,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-06,-10.02,OpenAI,OPENAI,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-06,-10.03,OpenAI,OPENAI,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-05,50.00,,USA GUMMIES,No Category,,Business Adv Fundamentals,7020
+2026-02-05,-10.00,OpenAI,OPENAI,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-05,-25.00,OpenAI,OPENAI,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-04,30.00,,USA GUMMIES,No Category,,Business Adv Fundamentals,7020
+2026-02-04,9.00,,Social media to Primary,No Category,,Business Adv Fundamentals,7020
+2026-02-04,-10.10,OpenAI,OPENAI,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-04,-10.52,OpenAI,OPENAI,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-04,-10.68,OpenAI,OPENAI,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-03,25.00,,Social media to Primary,No Category,,Business Adv Fundamentals,7020
+2026-02-03,-10.00,OpenAI,OPENAI,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-03,-10.80,,ASHFORD VALLEY G,No Category,,Business Adv Fundamentals,7020
+2026-02-02,-10.00,OpenAI,OPENAI,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-02,-13.83,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2026-02-02,-73.25,,INTEREST CHARGE:PURCHASES,Interest Expense,87000,Platinum,8133
+2026-02-01,0.13,,Balance bonus,No Category,,Business Adv Fundamentals,7020
+2026-02-01,-2.47,Google,GOOGLE *SVCSrainierlux,No Category,,Business Adv Fundamentals,7020
+2026-02-01,-43.75,Slack,SLACK T08JY86Q4TA,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-02-01,-49.79,Google,GOOGLE *SVCSusagummies,No Category,,Business Adv Fundamentals,7020
+2026-01-30,-5.92,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2026-01-30,-26.10,,WWW.CRATEJOY.COM,No Category,,Business Adv Fundamentals,7020
+2026-01-30,-29.99,,COMPANY SAGE,No Category,,Business Adv Fundamentals,7020
+2026-01-30,-81.31,,RT* NINJAPRINTHOUSE.CO,No Category,,Business Adv Fundamentals,7020
+2026-01-30,-100.00,,RUMBLE USA INC.,No Category,,Business Adv Fundamentals,7020
+2026-01-29,45.00,,USA GUMMIES,No Category,,Business Adv Fundamentals,7020
+2026-01-29,5.38,Amazon,AMAZON.CJGJRRUTI,No Category,,Business Adv Fundamentals,7020
+2026-01-29,-10.46,Cloudflare,CLOUDFLARE,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-01-28,1164.90,Stripe,Stripe,Transfers in Transit: Payment Processor,10920,Business Adv Fundamentals,7020
+2026-01-28,-15.00,,Wire transfer fee,Bank Fees,68600,Business Adv Fundamentals,7020
+2026-01-28,-29.00,,PAST DUE FEE,Bank Fees,68600,Platinum,8133
+2026-01-28,-41.00,,SPORT CLIPS - WA116 -,No Category,,Business Adv Fundamentals,7020
+2026-01-28,-52.97,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2026-01-28,-83.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2026-01-28,-99.00,Apollo.io,APOLLO.IO,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-01-28,-520.00,,Dutch Valley Foods,No Category,,Business Adv Fundamentals,7020
+2026-01-27,40.37,Stripe,Stripe,Transfers in Transit: Payment Processor,10920,Business Adv Fundamentals,7020
+2026-01-27,-8.64,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2026-01-27,-10.00,Ranch World,RANCH WORLD,Entertainment,63400,Platinum,8133
+2026-01-27,-17.17,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2026-01-26,-5.00,Craigslist,CRAIGSLIST.ORG,Advertising,65100,Platinum,8133
+2026-01-26,-49.00,Onlinevehiclelisting,ONLINEVEHICLELISTING,No Category,,Platinum,8133
+2026-01-20,-5.25,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2026-01-16,-1.00,shopify,SHOPIFY* 474636979,Hosting Fees,51000,Business Adv Fundamentals,7020
+2026-01-16,-6.00,Utah Mved,UTAH- MVED,No Category,,Platinum,8133
+2026-01-15,-8.81,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2026-01-15,-16.00,shopify,SHOPIFY* 474270478,Hosting Fees,51000,Business Adv Fundamentals,7020
+2026-01-14,-10.00,Midjourney,MIDJOURNEY INC.,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-01-14,-48.94,Amazon,Amazon,No Category,,Business Adv Fundamentals,7020
+2026-01-05,54.00,,Check deposit,Services Revenue,41000,Business Adv Fundamentals,7020
+2026-01-05,20.00,,Referral bonus,No Category,,Business Adv Fundamentals,7020
+2026-01-05,10.51,,Cash back,No Category,,Business Adv Fundamentals,7020
+2026-01-03,38.00,,Social media to Primary,No Category,,Business Adv Fundamentals,7020
+2026-01-03,-20.00,OpenAI,OPENAI,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-01-02,-70.46,,INTEREST CHARGE:PURCHASES,Interest Expense,87000,Platinum,8133
+2026-01-01,0.08,,Balance bonus,No Category,,Business Adv Fundamentals,7020
+2026-01-01,-42.05,Slack,SLACK T08JY86Q4TA,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2026-01-01,-49.45,Google,GOOGLE *SVCSusagummies,No Category,,Business Adv Fundamentals,7020
+2025-12-31,-6.32,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2025-12-31,-6.48,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2025-12-29,0.01,Amazon,AMAZON.CDYJVYM92,No Category,,Business Adv Fundamentals,7020
+2025-12-29,-7.35,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2025-12-24,100.00,,CAPITAL ONE MOBILE PYMT,Credit Card Payments,21111,Platinum,8133
+2025-12-23,40.37,Stripe,Stripe,Transfers in Transit: Payment Processor,10920,Business Adv Fundamentals,7020
+2025-12-23,-8.51,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2025-12-23,-233.17,GEICO,Geico,Insurance,68100,Business Adv Fundamentals,7020
+2025-12-22,46.29,,SQUARESPACE PAYM,No Category,,Business Adv Fundamentals,7020
+2025-12-22,46.29,,SQUARESPACE PAYM,No Category,,Business Adv Fundamentals,7020
+2025-12-22,-7.62,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2025-12-22,-9.59,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2025-12-22,-90.84,Amazon,AMZNomh9YAWo,No Category,,Business Adv Fundamentals,7020
+2025-12-20,-27.20,,Worksp,No Category,,Business Adv Fundamentals,7020
+2025-12-19,22.99,,SQUARESPACE PAYM,No Category,,Business Adv Fundamentals,7020
+2025-12-19,-8.06,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2025-12-18,50.00,,Mastercard debit · 7548,No Category,,Business Adv Fundamentals,7020
+2025-12-18,-1.00,shopify,SHOPIFY* 460528970,Hosting Fees,51000,Business Adv Fundamentals,7020
+2025-12-18,-29.99,,WYOMINGLLCATTORNEY,No Category,,Business Adv Fundamentals,7020
+2025-12-17,50.00,,Social media to Primary,No Category,,Business Adv Fundamentals,7020
+2025-12-17,-6.28,Pirate Ship,Pirate Ship,Shipping,68400,Business Adv Fundamentals,7020
+2025-12-17,-8.98,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2025-12-17,-38.86,,Websit,No Category,,Business Adv Fundamentals,7020
+2025-12-16,63.46,,SQUARESPACE PAYM,No Category,,Business Adv Fundamentals,7020
+2025-12-16,-7.86,Pirate Ship,Pirate Ship,Shipping,68400,Business Adv Fundamentals,7020
+2025-12-12,-13.47,Pirate Ship,Pirate Ship,Shipping,68400,Business Adv Fundamentals,7020
+2025-12-12,-15.64,Pirate Ship,Pirate Ship,Shipping,68400,Business Adv Fundamentals,7020
+2025-12-09,-12.95,,Cmpgns,No Category,,Business Adv Fundamentals,7020
+2025-12-07,10.94,,Cash back,No Category,,Business Adv Fundamentals,7020
+2025-12-05,-40.00,Pirate Ship,Pirate Ship,Shipping,68400,Business Adv Fundamentals,7020
+2025-12-03,82.24,,SQUARESPACE PAYM,No Category,,Business Adv Fundamentals,7020
+2025-12-03,-6.32,Pirate Ship,Pirate Ship,Shipping,68400,Business Adv Fundamentals,7020
+2025-12-03,-8.63,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2025-12-03,-8.98,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2025-12-03,-12.73,Amazon,Amazon,No Category,,Business Adv Fundamentals,7020
+2025-12-03,-49.45,Google,GOOGLE*SVCSUSAGUMMIES.,No Category,,Business Adv Fundamentals,7020
+2025-12-02,-40.00,Twitter,X CORP. PAID FEATURES,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2025-12-01,0.30,,Balance bonus,No Category,,Business Adv Fundamentals,7020
+2025-12-01,-6.14,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2025-12-01,-43.75,Slack,SLACK T08JY86Q4TA,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2025-11-30,-45.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-11-30,-48.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-11-29,200.00,,Mastercard debit · 7548,No Category,,Business Adv Fundamentals,7020
+2025-11-29,-43.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-11-29,-45.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-11-29,-45.35,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-11-28,120.00,,Primary to Social media,No Category,,Business Adv Fundamentals,7020
+2025-11-28,-5.15,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-11-28,-36.11,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-11-28,-37.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-11-28,-39.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-11-28,-41.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-11-26,87.21,,SQUARESPACE PAYM,No Category,,Business Adv Fundamentals,7020
+2025-11-26,-34.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-11-25,100.00,,Primary to Social media,No Category,,Business Adv Fundamentals,7020
+2025-11-25,-8.77,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2025-11-25,-34.10,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-11-24,46.29,,SQUARESPACE PAYM,No Category,,Business Adv Fundamentals,7020
+2025-11-24,40.37,Stripe,Stripe,Transfers in Transit: Payment Processor,10920,Business Adv Fundamentals,7020
+2025-11-24,-6.16,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2025-11-24,-6.32,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2025-11-24,-8.47,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2025-11-23,-31.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-11-22,-25.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-11-22,-28.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-11-21,-8.16,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2025-11-21,-8.91,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2025-11-21,-23.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-11-20,22.99,,SQUARESPACE PAYM,No Category,,Business Adv Fundamentals,7020
+2025-11-20,-8.91,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2025-11-20,-10.73,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2025-11-20,-27.20,,Worksp,No Category,,Business Adv Fundamentals,7020
+2025-11-19,-7.72,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2025-11-19,-21.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-11-19,-34.42,Amazon,Amazon,No Category,,Business Adv Fundamentals,7020
+2025-11-18,116.17,,SQUARESPACE PAYM,No Category,,Business Adv Fundamentals,7020
+2025-11-18,33.67,,SQUARESPACE PAYM,No Category,,Business Adv Fundamentals,7020
+2025-11-18,-19.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-11-18,-29.99,,WYOMINGLLCATTORNEY,No Category,,Business Adv Fundamentals,7020
+2025-11-17,33.59,,USA GUMMIES,No Category,,Business Adv Fundamentals,7020
+2025-11-17,-10.92,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2025-11-17,-15.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-11-17,-17.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-11-17,-38.86,,Websit,No Category,,Business Adv Fundamentals,7020
+2025-11-16,-1.00,shopify,SHOPIFY* 446083133,Hosting Fees,51000,Business Adv Fundamentals,7020
+2025-11-16,-82.14,Vistaprint,VISTAPRINT,Supplies,68300,Business Adv Fundamentals,7020
+2025-11-15,200.00,,Primary to Social media,No Category,,Business Adv Fundamentals,7020
+2025-11-15,-4.62,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-11-15,-9.24,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-11-15,-18.48,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-11-15,-41.72,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-11-14,9.39,,SQUARESPACE PAYM,No Category,,Business Adv Fundamentals,7020
+2025-11-14,-11.34,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2025-11-13,208.13,,SQUARESPACE PAYM,No Category,,Business Adv Fundamentals,7020
+2025-11-12,92.89,,SQUARESPACE PAYM,No Category,,Business Adv Fundamentals,7020
+2025-11-12,-6.70,Pirate Ship,Pirate Ship,Shipping,68400,Business Adv Fundamentals,7020
+2025-11-11,-8.15,Pirate Ship,Pirate Ship,Shipping,68400,Business Adv Fundamentals,7020
+2025-11-11,-8.30,Pirate Ship,Pirate Ship,Shipping,68400,Business Adv Fundamentals,7020
+2025-11-11,-8.81,Pirate Ship,Pirate Ship,Shipping,68400,Business Adv Fundamentals,7020
+2025-11-11,-11.34,Pirate Ship,Pirate Ship,Shipping,68400,Business Adv Fundamentals,7020
+2025-11-10,30.25,,Check deposit,Services Revenue,41000,Business Adv Fundamentals,7020
+2025-11-10,-12.95,,Cmpgns,No Category,,Business Adv Fundamentals,7020
+2025-11-10,-90.00,TikTok,TIKTOK PROMOTE,Advertising,65100,Business Adv Fundamentals,7020
+2025-11-07,90.00,,Social media to Primary,No Category,,Business Adv Fundamentals,7020
+2025-11-07,22.99,,SQUARESPACE PAYM,No Category,,Business Adv Fundamentals,7020
+2025-11-07,-8.30,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2025-11-06,-120.00,,INVIDEO INC,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2025-11-05,2621.40,,SQUARESPACE PAYM,No Category,,Business Adv Fundamentals,7020
+2025-11-05,500.00,,Social media to Primary,No Category,,Business Adv Fundamentals,7020
+2025-11-05,15.31,,Cash back,No Category,,Business Adv Fundamentals,7020
+2025-11-05,-7.56,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2025-11-05,-39.99,Amazon,Amazon,No Category,,Business Adv Fundamentals,7020
+2025-11-05,-750.00,,Ryan Cross,No Category,,Business Adv Fundamentals,7020
+2025-11-05,-1800.00,,Zach Mason,No Category,,Business Adv Fundamentals,7020
+2025-11-03,51.43,,SQUARESPACE PAYM,No Category,,Business Adv Fundamentals,7020
+2025-11-03,-14.12,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2025-11-03,-35.00,,DEEVID AI,No Category,,Business Adv Fundamentals,7020
+2025-11-03,-40.00,Twitter,X CORP. PAID FEATURES,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2025-11-03,-60.00,OpenAI,OPENAI *CHATGPT SUBSCR,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2025-11-01,150.00,,Primary to Social media,No Category,,Business Adv Fundamentals,7020
+2025-11-01,0.90,,Balance bonus,No Category,,Business Adv Fundamentals,7020
+2025-11-01,-34.81,Google,GOOGLE *SVCSusagummies,No Category,,Business Adv Fundamentals,7020
+2025-11-01,-61.25,Slack,SLACK T08JY86Q4TA,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2025-11-01,-225.92,Google,Google Ads,Advertising,65100,Business Adv Fundamentals,7020
+2025-10-31,309.26,,SQUARESPACE PAYM,No Category,,Business Adv Fundamentals,7020
+2025-10-30,500.00,,Mastercard debit · 7548,No Category,,Business Adv Fundamentals,7020
+2025-10-30,300.00,,Primary to Social media,No Category,,Business Adv Fundamentals,7020
+2025-10-30,-7.72,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2025-10-30,-12.28,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2025-10-30,-94.00,,RANGEME.COM 4156464040,No Category,,Business Adv Fundamentals,7020
+2025-10-30,-350.00,Google,Google Ads,Advertising,65100,Business Adv Fundamentals,7020
+2025-10-28,-6.28,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2025-10-27,50.00,,Mastercard debit · 7548,No Category,,Business Adv Fundamentals,7020
+2025-10-27,-6.72,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2025-10-27,-7.66,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2025-10-27,-29.95,,ZEELY.APP,No Category,,Business Adv Fundamentals,7020
+2025-10-27,-39.95,,ZEELY.APP,No Category,,Business Adv Fundamentals,7020
+2025-10-27,-308.00,,SUPPORT@ZEELY.APP,No Category,,Business Adv Fundamentals,7020
+2025-10-25,-83.93,,Blip Billboards,No Category,,Business Adv Fundamentals,7020
+2025-10-24,-6.44,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2025-10-24,-100.63,,Blip Billboards,No Category,,Business Adv Fundamentals,7020
+2025-10-23,-258.37,GEICO,Geico,Insurance,68100,Business Adv Fundamentals,7020
+2025-10-22,150.00,,Primary to Social media,No Category,,Business Adv Fundamentals,7020
+2025-10-22,-200.00,Google,Google Ads,Advertising,65100,Business Adv Fundamentals,7020
+2025-10-21,250.00,,Primary to Social media,No Category,,Business Adv Fundamentals,7020
+2025-10-21,0.22,,Pirate Ship,No Category,,Business Adv Fundamentals,7020
+2025-10-21,-10.19,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2025-10-21,-13.92,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2025-10-21,-68.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-10-21,-73.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-10-21,-78.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-10-20,-9.03,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2025-10-20,-27.20,,Worksp,No Category,,Business Adv Fundamentals,7020
+2025-10-20,-51.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-10-20,-55.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-10-20,-59.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-10-20,-63.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-10-19,-43.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-10-19,-47.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-10-19,-50.00,Google,Google Ads,Advertising,65100,Business Adv Fundamentals,7020
+2025-10-18,-25.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-10-18,-28.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-10-18,-29.99,,WYOMINGLLCATTORNEY,No Category,,Business Adv Fundamentals,7020
+2025-10-18,-31.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-10-18,-34.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-10-18,-37.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-10-18,-40.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-10-17,-13.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-10-17,-15.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-10-17,-15.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-10-17,-17.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-10-17,-19.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-10-17,-21.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-10-17,-23.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-10-16,-7.37,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2025-10-16,-8.15,Pirate Ship,PIRATE SHIP,Shipping,68400,Business Adv Fundamentals,7020
+2025-10-16,-9.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-10-16,-10.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-10-16,-10.00,Google,Google Ads,Advertising,65100,Business Adv Fundamentals,7020
+2025-10-16,-11.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-10-16,-12.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-10-15,-2.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-10-15,-3.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-10-15,-4.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-10-15,-5.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-10-15,-6.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-10-15,-7.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-10-15,-8.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-10-14,2448.76,,Kraken,No Category,,Business Adv Fundamentals,7020
+2025-10-14,1000.00,,Primary to Social media,No Category,,Business Adv Fundamentals,7020
+2025-10-14,-750.00,,Ryan Cross,No Category,,Business Adv Fundamentals,7020
+2025-10-13,-17.11,,SP ENERGINUT.COM,No Category,,Business Adv Fundamentals,7020
+2025-10-11,-101.01,Pilot,PILOT FLYING J,Tax and Accounting,64400,Business Adv Fundamentals,7020
+2025-10-10,-45.76,shell,Shell,Ground Transportation,62300,Business Adv Fundamentals,7020
+2025-10-10,-100.00,,Zach Mason,No Category,,Business Adv Fundamentals,7020
+2025-10-09,-93.93,,Quality Inn Wi,No Category,,Business Adv Fundamentals,7020
+2025-10-08,-69.94,Exxon,ExxonMobil,Ground Transportation,62300,Business Adv Fundamentals,7020
+2025-10-08,-86.89,Maverik,Maverik,Ground Transportation,62300,Business Adv Fundamentals,7020
+2025-10-06,-120.00,,INVIDEO INC,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2025-10-03,500.00,,Mastercard debit · 7548,No Category,,Business Adv Fundamentals,7020
+2025-10-03,-35.00,,DEEVID AI,No Category,,Business Adv Fundamentals,7020
+2025-10-03,-60.00,OpenAI,OPENAI *CHATGPT SUBSCR,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2025-10-02,6.56,,Cash back,No Category,,Business Adv Fundamentals,7020
+2025-10-02,-40.00,Twitter,X CORP. PAID FEATURES,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2025-10-01,0.71,,Balance bonus,No Category,,Business Adv Fundamentals,7020
+2025-10-01,-5.44,,Worksp,No Category,,Business Adv Fundamentals,7020
+2025-10-01,-24.58,Google,GOOGLE *SVCSusagummies,No Category,,Business Adv Fundamentals,7020
+2025-09-29,-26.25,Slack,SLACK T08JY86Q4TA,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2025-09-28,600.00,,Mastercard debit · 7548,No Category,,Business Adv Fundamentals,7020
+2025-09-28,-750.00,,Ryan Cross,No Category,,Business Adv Fundamentals,7020
+2025-09-23,-258.37,GEICO,Geico,Insurance,68100,Business Adv Fundamentals,7020
+2025-09-20,-18.14,,Worksp,No Category,,Business Adv Fundamentals,7020
+2025-09-18,-8.63,,Spark Mail Ai,No Category,,Business Adv Fundamentals,7020
+2025-09-18,-29.99,,WYOMINGLLCATTORNEY,No Category,,Business Adv Fundamentals,7020
+2025-09-17,-38.86,,Websit,No Category,,Business Adv Fundamentals,7020
+2025-09-15,375.00,,Kraken,No Category,,Business Adv Fundamentals,7020
+2025-09-15,-750.00,,Ryan Cross,No Category,,Business Adv Fundamentals,7020
+2025-09-13,-151.09,T-Mobile,T-Mobile,Utilities,67300,Business Adv Fundamentals,7020
+2025-09-10,800.00,,Mastercard debit · 7548,No Category,,Business Adv Fundamentals,7020
+2025-09-10,-4.96,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-09-10,-7207.05,,Dutch Valley Foods,No Category,,Business Adv Fundamentals,7020
+2025-09-09,6761.00,,Kraken,No Category,,Business Adv Fundamentals,7020
+2025-09-08,-58.29,,Domain,No Category,,Business Adv Fundamentals,7020
+2025-09-08,-350.00,T-Mobile,T-Mobile,Utilities,67300,Business Adv Fundamentals,7020
+2025-09-07,-119.93,,Found Plus,No Category,,Business Adv Fundamentals,7020
+2025-09-05,510.00,,Mastercard debit · 7548,No Category,,Business Adv Fundamentals,7020
+2025-09-05,-13.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-09-05,-555.55,,Dutch Valley Foods,No Category,,Business Adv Fundamentals,7020
+2025-09-04,-11.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-09-04,-12.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-09-03,-8.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-09-03,-9.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-09-03,-10.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-09-02,-1.04,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-09-02,-1.60,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-09-02,-5.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-09-02,-6.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-09-02,-7.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-09-02,-40.00,Twitter,X CORP. PAID FEATURES,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2025-09-01,0.81,,Balance bonus,No Category,,Business Adv Fundamentals,7020
+2025-09-01,-1.03,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-09-01,-1.09,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-09-01,-1.72,Google,GOOGLE *SVCSusagummies,No Category,,Business Adv Fundamentals,7020
+2025-09-01,-2.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-09-01,-3.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-09-01,-4.00,Facebook,Facebook,Advertising,65100,Business Adv Fundamentals,7020
+2025-08-30,-27.00,,METRICOOL.COM,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2025-08-23,-108.54,GEICO,Geico,Insurance,68100,Business Adv Fundamentals,7020
+2025-08-21,-62.55,,Blip Billboards,No Category,,Business Adv Fundamentals,7020
+2025-08-20,-18.14,,Worksp,No Category,,Business Adv Fundamentals,7020
+2025-08-19,106.06,,Check deposit,Services Revenue,41000,Business Adv Fundamentals,7020
+2025-08-19,-81.64,,Blip Billboards,No Category,,Business Adv Fundamentals,7020
+2025-08-18,850.00,,Kraken,No Category,,Business Adv Fundamentals,7020
+2025-08-18,-8.63,SPARK,SPARK,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2025-08-18,-17.23,,U.S. Post Office,No Category,,Business Adv Fundamentals,7020
+2025-08-18,-29.99,,WYOMINGLLCATTORNEY,No Category,,Business Adv Fundamentals,7020
+2025-08-18,-38.86,,Websit,No Category,,Business Adv Fundamentals,7020
+2025-08-18,-100.59,,Blip Billboards,No Category,,Business Adv Fundamentals,7020
+2025-08-18,-750.00,,Ryan Cross,No Category,,Business Adv Fundamentals,7020
+2025-08-17,-118.38,,Blip Billboards,No Category,,Business Adv Fundamentals,7020
+2025-08-16,-62.42,,Blip Billboards,No Category,,Business Adv Fundamentals,7020
+2025-08-14,-44.81,,Blip Billboards,No Category,,Business Adv Fundamentals,7020
+2025-08-10,-120.00,,INVIDEO INC,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2025-08-08,-99.00,,Rangeme,No Category,,Business Adv Fundamentals,7020
+2025-08-08,-257.84,,WRIST-BAND* WRIST-BAND,No Category,,Business Adv Fundamentals,7020
+2025-08-07,2000.00,,Kraken,No Category,,Business Adv Fundamentals,7020
+2025-08-07,-3.44,,Websit,No Category,,Business Adv Fundamentals,7020
+2025-08-07,-798.00,,ZEBRAPACK.COM,No Category,,Business Adv Fundamentals,7020
+2025-08-02,-40.00,Twitter,X CORP. PAID FEATURES,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2025-07-29,-192.00,,QRTIGER QR CODE,No Category,,Business Adv Fundamentals,7020
+2025-07-28,-210.03,,Logo&team Sportsw,No Category,,Business Adv Fundamentals,7020
+2025-07-23,-108.54,GEICO,Geico,Insurance,68100,Business Adv Fundamentals,7020
+2025-07-21,-18.14,,INV,No Category,,Business Adv Fundamentals,7020
+2025-07-18,-29.99,,WYOMINGLLCATTORNEY,No Category,,Business Adv Fundamentals,7020
+2025-07-17,-26.99,,INV,No Category,,Business Adv Fundamentals,7020
+2025-07-12,-192.72,T-Mobile,T-Mobile,Utilities,67300,Business Adv Fundamentals,7020
+2025-07-12,-600.00,,Hunter Of Design,No Category,,Business Adv Fundamentals,7020
+2025-07-02,-29.99,Upwork,Upwork,Independent Contractors,64100,Business Adv Fundamentals,7020
+2025-06-23,-108.49,GEICO,Geico,Insurance,68100,Business Adv Fundamentals,7020
+2025-06-20,-17.92,,INV,No Category,,Business Adv Fundamentals,7020
+2025-06-19,400.00,,Mastercard debit · 7548,No Category,,Business Adv Fundamentals,7020
+2025-06-19,-1500.00,,Troy Burkhart,No Category,,Business Adv Fundamentals,7020
+2025-06-18,-29.99,,WYOMINGLLCATTORNEY,No Category,,Business Adv Fundamentals,7020
+2025-06-17,-26.66,,INV,No Category,,Business Adv Fundamentals,7020
+2025-06-16,-605.29,T-Mobile,T-Mobile,Utilities,67300,Business Adv Fundamentals,7020
+2025-06-12,1000.00,,Mastercard debit · 7548,No Category,,Business Adv Fundamentals,7020
+2025-06-11,-200.96,T-Mobile,T-Mobile,Utilities,67300,Business Adv Fundamentals,7020
+2025-06-03,-4.63,,INV,No Category,,Business Adv Fundamentals,7020
+2025-05-23,-108.07,GEICO,Geico,Insurance,68100,Business Adv Fundamentals,7020
+2025-05-20,-8.96,,INV,No Category,,Business Adv Fundamentals,7020
+2025-05-19,-29.99,,WYOMINGLLCATTORNEY,No Category,,Business Adv Fundamentals,7020
+2025-05-17,-26.66,,INV,No Category,,Business Adv Fundamentals,7020
+2025-05-16,-201.05,T-Mobile,T-Mobile,Utilities,67300,Business Adv Fundamentals,7020
+2025-05-12,-40.00,Twitter,X CORP. PAID FEATURES,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2025-05-06,400.00,,Mastercard debit · 7548,No Category,,Business Adv Fundamentals,7020
+2025-05-06,-360.50,,Lowe Graham Jones PLLC,No Category,,Business Adv Fundamentals,7020
+2025-05-05,2100.00,,Kraken,No Category,,Business Adv Fundamentals,7020
+2025-05-05,-2000.00,,Troy Burkhart,No Category,,Business Adv Fundamentals,7020
+2025-04-28,-108.09,GEICO,Geico,Insurance,68100,Business Adv Fundamentals,7020
+2025-04-22,-8.96,,INV,No Category,,Business Adv Fundamentals,7020
+2025-04-19,-90.00,,Gs1 Us Inc.,No Category,,Business Adv Fundamentals,7020
+2025-04-19,-299.00,,WYOMINGLLCATTORNEY,No Category,,Business Adv Fundamentals,7020
+2025-04-17,-26.66,,INV,No Category,,Business Adv Fundamentals,7020
+2025-04-12,-40.00,Twitter,X CORP. PAID FEATURES,Software - Operating Expense,66200,Business Adv Fundamentals,7020
+2025-04-11,-184.05,T-Mobile,T-Mobile,Utilities,67300,Business Adv Fundamentals,7020
+2025-04-04,-536.25,,Hawk Design LLC,No Category,,Business Adv Fundamentals,7020
+2025-03-28,-110.82,Pilot,PILOT FLYING J,Tax and Accounting,64400,Business Adv Fundamentals,7020
+2025-03-28,-136.85,Hampton,HAMPTON INN & SUITES,Lodging,62100,Business Adv Fundamentals,7020
+2025-03-21,-60.00,,TRADEMARK ENGINE,No Category,,Business Adv Fundamentals,7020
+2025-03-21,-350.00,,Usptofee-w,No Category,,Business Adv Fundamentals,7020
+2025-03-17,-59.00,,Certicopy-w,No Category,,Business Adv Fundamentals,7020
+2025-03-17,-99.00,,Privacypr-w,No Category,,Business Adv Fundamentals,7020
+2025-03-17,-149.00,,Atlm-w,No Category,,Business Adv Fundamentals,7020
+2025-03-17,-167.44,,INV,No Category,,Business Adv Fundamentals,7020
+2025-03-12,-40.00,Twitter,X CORP. PAID FEATURES,Software - Operating Expense,66200,Business Adv Fundamentals,7020
