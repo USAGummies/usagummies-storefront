@@ -13,6 +13,7 @@ import {
   proposeAndMaybeExecute,
 } from "@/lib/ops/abra-actions";
 import { calculateDeal, type ChannelType } from "@/lib/ops/abra-skill-deal-calculator";
+import { queueTask, completeTask, failTask } from "@/lib/ops/abra-task-queue";
 
 const READ_ONLY_ACTIONS = new Set(["read_email", "search_email", "query_ledger", "query_qbo", "calculate_deal"]);
 
@@ -125,11 +126,33 @@ export async function executeActions(
       const perActionTimeout = remainingMs != null
         ? Math.min(PER_ACTION_TIMEOUT_MS, Math.max(1000, remainingMs - 2000))
         : PER_ACTION_TIMEOUT_MS;
+      // Track this action in the task queue
+      const taskId = await queueTask({
+        task_type: "action_execution",
+        description: directive.action.description || directive.action.title || directive.action.action_type,
+        action_type: directive.action.action_type,
+        action_params: directive.action.params as Record<string, unknown> | undefined,
+        channel_id: ctx?.slackChannelId,
+        thread_ts: ctx?.slackThreadTs,
+      }).catch(() => null);
+
       const outcome = await withTimeout(
         proposeAndMaybeExecute(directive.action),
         perActionTimeout,
         directive.action.action_type,
       );
+
+      // Track completion/failure in task queue
+      if (taskId) {
+        if (outcome.auto_executed && outcome.result?.success) {
+          void completeTask(taskId, outcome.result.message || "Completed").catch(() => {});
+        } else if (outcome.auto_executed && !outcome.result?.success) {
+          void failTask(taskId, outcome.result?.message || "Action failed").catch(() => {});
+        } else if (!outcome.auto_executed) {
+          void completeTask(taskId, `Queued for approval: ${outcome.approval_id}`).catch(() => {});
+        }
+      }
+
       if (outcome.auto_executed) {
         const isReadOnly = READ_ONLY_ACTIONS.has(directive.action.action_type);
         if (isReadOnly && outcome.result?.success && outcome.result.message) {

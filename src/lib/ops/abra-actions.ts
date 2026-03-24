@@ -1889,9 +1889,36 @@ async function handleRunScenario(
 // ---------------------------------------------------------------------------
 
 async function handleReadEmail(params: Record<string, unknown>): Promise<ActionResult> {
-  const messageId = typeof params.message_id === "string" ? params.message_id.trim() : "";
+  let messageId = typeof params.message_id === "string" ? params.message_id.trim() : "";
+
+  // If no message_id provided, or it looks like a search query rather than a Gmail ID,
+  // search Gmail first to find the actual message ID
+  const searchQuery = typeof params.query === "string" ? params.query.trim()
+    : typeof params.search === "string" ? params.search.trim()
+    : "";
+  const looksLikeSearch = messageId.includes("search:") || messageId.includes("from:") ||
+    messageId.includes("subject:") || messageId.includes(" ") || messageId.length > 30;
+
+  if ((!messageId || looksLikeSearch) && (searchQuery || messageId)) {
+    try {
+      const { searchEmails } = await import("@/lib/ops/gmail-reader");
+      const query = searchQuery || messageId.replace(/^search:/i, "").trim();
+      const results = await searchEmails(query, 3);
+      if (results && results.length > 0) {
+        messageId = results[0].id || "";
+        if (!messageId) {
+          return { success: false, message: `Search found ${results.length} results for "${query}" but couldn't extract message ID.` };
+        }
+      } else {
+        return { success: false, message: `No emails found matching "${query}". Try a different search term.` };
+      }
+    } catch (searchErr) {
+      return { success: false, message: `Email search failed: ${searchErr instanceof Error ? searchErr.message : String(searchErr)}` };
+    }
+  }
+
   if (!messageId) {
-    return { success: false, message: "message_id is required. Use the message ID from the LIVE INBOX feed (e.g., '1234abcd5678efgh')." };
+    return { success: false, message: "message_id or query/search is required. Either provide a Gmail message ID or a search query like 'from:reid mitchell'." };
   }
 
   try {

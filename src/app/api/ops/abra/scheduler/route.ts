@@ -5,6 +5,8 @@ import { isCronAuthorized } from "@/lib/ops/abra-auth";
 import { runAllDueFeeds, runFeed } from "@/lib/ops/abra-auto-teach";
 import { detectAnomalies } from "@/lib/ops/abra-anomaly-detection";
 import { emitSignal } from "@/lib/ops/abra-operational-signals";
+import { escalateOverdueTasks } from "@/lib/ops/abra-task-queue";
+import { surfaceUnansweredEmails } from "@/lib/ops/sweeps/email-response-tracker";
 import { autoManageInitiatives } from "@/lib/ops/abra-initiative-health";
 import {
   notifyCloseReady,
@@ -316,6 +318,19 @@ export async function POST(req: Request) {
       autoManageInitiatives(),
     );
     outcomes.push(initiativeStep);
+
+    // ── Task Queue: Escalate overdue tasks ──
+    const taskEscalationStep = await runStep("task_escalation", async () => {
+      return escalateOverdueTasks();
+    });
+    outcomes.push(taskEscalationStep);
+
+    // ── Email Response Tracker: Surface unanswered emails ──
+    const emailTrackerStep = await runStep("email_response_tracker", async () => {
+      await surfaceUnansweredEmails();
+      return "checked";
+    });
+    outcomes.push(emailTrackerStep);
 
     // Backfill any brain entries missing embeddings
     const embeddingStep = await runStep("embedding_backfill", async () => {
