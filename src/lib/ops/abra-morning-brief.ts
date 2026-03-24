@@ -817,6 +817,38 @@ Rules:
 }
 
 const BEN_SLACK_USER_ID = "U08JY86Q508";
+const RENE_SLACK_USER_ID = "U0ALL27JM38";
+const FINANCIALS_CHANNEL = "C0AKG9FSC2J";
+
+async function fetchInternalOpsJson(path: string): Promise<Record<string, unknown> | null> {
+  const cronSecret = (process.env.CRON_SECRET || "").trim();
+  if (!cronSecret) return null;
+  const host =
+    process.env.NEXTAUTH_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
+  const res = await fetch(`${host}${path}`, {
+    headers: {
+      Authorization: `Bearer ${cronSecret}`,
+      "Content-Type": "application/json",
+    },
+    signal: AbortSignal.timeout(15000),
+    cache: "no-store",
+  });
+  if (!res.ok) return null;
+  return (await res.json().catch(() => null)) as Record<string, unknown> | null;
+}
+
+function numberValue(value: unknown): number {
+  return typeof value === "number" ? value : Number(value || 0);
+}
+
+function shortOperatorLabel(taskType: string): string {
+  if (taskType === "qbo_categorize") return "categorizations";
+  if (taskType === "qbo_assign_vendor") return "vendor assignments";
+  if (taskType === "email_draft_response") return "email drafts";
+  if (taskType === "vendor_followup" || taskType === "distributor_followup") return "follow-ups";
+  return taskType.replace(/_/g, " ");
+}
 
 export async function sendMorningBrief(): Promise<void> {
   const brief = await generateLLMMorningBrief();
@@ -868,45 +900,77 @@ export async function sendMorningBrief(): Promise<void> {
   }
 }
 
-const RENE_SLACK_USER_ID = "U0ALL27JM38";
-
 async function sendReneMorningDM(): Promise<void> {
   const botToken = process.env.SLACK_BOT_TOKEN;
   if (!botToken) return;
 
-  // Gather finance-relevant data
-  const [shopRev, amzRev, approvalCount] = await Promise.all([
-    getMetricSnapshot("daily_revenue_shopify").catch(() => null),
-    getMetricSnapshot("daily_revenue_amazon").catch(() => null),
-    getMetricSnapshot("pending_approvals").catch(() => null),
+  const yesterdayIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const [pnl, purchasesData, operator, reviewTasks] = await Promise.all([
+    fetchInternalOpsJson("/api/ops/qbo/query?type=pnl"),
+    fetchInternalOpsJson("/api/ops/qbo/query?type=purchases&limit=200"),
+    getOperatorTaskBrief().catch(() => ({
+      completedLast24h: 0,
+      completedByType: {},
+      pendingCount: 0,
+      needsApproval: [],
+    })),
+    sbFetch(
+      "/rest/v1/abra_operator_tasks?or=(assigned_to.eq.rene,requires_approval.eq.true)&status=in.(pending,needs_approval)&select=title,task_type,assigned_to,requires_approval&order=created_at.asc&limit=5",
+    ).catch(() => []),
   ]);
 
-  const yesterday = new Date(Date.now() - 86400000).toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
+  const purchases = Array.isArray((purchasesData || {}).purchases)
+    ? ((purchasesData || {}).purchases as Array<Record<string, unknown>>)
+    : [];
+  const uncategorizedCount = purchases.filter((purchase) => {
+    const firstLine = Array.isArray(purchase.Lines) ? ((purchase.Lines[0] || {}) as Record<string, unknown>) : {};
+    const account = String(firstLine.Account || "").toLowerCase();
+    return !account || account.includes("uncategorized");
+  }).length;
+  const newBankFeedItems = purchases.filter((purchase) => String(purchase.Date || "") >= yesterdayIso).length;
+  const categorizedCount = purchases.length - uncategorizedCount;
+  const qboHealthPct = purchases.length > 0 ? Math.round((categorizedCount / purchases.length) * 100) : 100;
 
-  const totalRev = Number(shopRev?.current || 0) + Number(amzRev?.current || 0);
-  const pendingApprovals = Math.round(Number(approvalCount?.current || 0));
+  const summary = ((pnl || {}).summary || {}) as Record<string, unknown>;
+  const revenue = numberValue(summary.TotalIncome || summary.Income || summary.Revenue);
+  const cogs = numberValue(summary.TotalCostOfGoodsSold || summary.CostOfGoodsSold || summary.COGS);
+  const expenses = numberValue(summary.TotalExpenses || summary.Expenses);
+  const netIncome = numberValue(summary.NetIncome || revenue - cogs - expenses);
+
+  const operatorParts = Object.entries(operator.completedByType || {})
+    .slice(0, 4)
+    .map(([taskType, count]) => `${count} ${shortOperatorLabel(taskType)}`);
+  const reviewRows = Array.isArray(reviewTasks) ? reviewTasks as Array<Record<string, unknown>> : [];
 
   const lines = [
-    `☀️ *Good morning, <@U0ALL27JM38>* — ${yesterday} recap:`,
+    `☀️ *Good morning <@${RENE_SLACK_USER_ID}> — here's your financial snapshot:*`,
     "",
-    `💰 Revenue: *$${totalRev.toFixed(2)}* (Shopify $${Number(shopRev?.current || 0).toFixed(2)} · Amazon $${Number(amzRev?.current || 0).toFixed(2)})`,
+    `• Uncategorized transactions: *${uncategorizedCount}*`,
+    `• New bank feed items since yesterday: *${newBankFeedItems}*`,
+    `• Transactions needing review: *${reviewRows.length}*`,
+    `• P&L MTD — Revenue *$${revenue.toFixed(2)}* · Expenses *$${expenses.toFixed(2)}* · Net income *$${netIncome.toFixed(2)}*`,
+    `• QBO health: *${qboHealthPct}% categorized* (${categorizedCount}/${purchases.length || 0})`,
+    `• Operator overnight: *${operator.completedLast24h}* completed${operatorParts.length ? ` (${operatorParts.join(", ")})` : ""}`,
   ];
 
-  if (pendingApprovals > 0) {
-    lines.push(`📋 *${pendingApprovals} approval(s)* waiting for your review`);
+  if (reviewRows.length > 0) {
+    lines.push("");
+    lines.push("📋 *Needs your review*");
+    for (const row of reviewRows.slice(0, 3)) {
+      lines.push(`• ${String(row.title || row.task_type || "Operator task")}`);
+    }
   }
 
-  lines.push(
-    "",
-    "_Reply in #financials with any questions about the books._",
-  );
+  if ((operator.needsApproval || []).length > 0) {
+    lines.push("");
+    lines.push("⏳ *Needs approval*");
+    for (const task of operator.needsApproval.slice(0, 3)) {
+      lines.push(`• ${task.title}`);
+    }
+  }
 
-  // Post to #financials channel — NOT as a DM to Rene
-  const FINANCIALS_CHANNEL = "C0AKG9FSC2J";
+  lines.push("", "_Reply in #financials and I'll handle the next finance item directly._");
+
   await fetch("https://slack.com/api/chat.postMessage", {
     method: "POST",
     headers: {
@@ -916,6 +980,7 @@ async function sendReneMorningDM(): Promise<void> {
     body: JSON.stringify({
       channel: FINANCIALS_CHANNEL,
       text: lines.join("\n"),
+      mrkdwn: true,
       unfurl_links: false,
     }),
     signal: AbortSignal.timeout(5000),
@@ -923,7 +988,7 @@ async function sendReneMorningDM(): Promise<void> {
 
   // Rene's finance brief goes to #financials only — no DM
 
-  console.log("[morning-brief] Sent Rene finance brief to #financials + DM pointer");
+  console.log("[morning-brief] Sent Rene finance brief to #financials");
 }
 
 // ── End-of-Day Summary ──────────────────────────────────────────────────

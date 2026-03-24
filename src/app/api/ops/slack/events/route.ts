@@ -329,7 +329,15 @@ export async function POST(req: Request) {
       if (stillThinkingTimer) clearTimeout(stillThinkingTimer);
 
       if (!result.handled) {
-        // Abra decided not to respond — clean up the thinking indicator if present
+        if (alwaysAck) {
+          const fallbackText = "Got it. Tell me the specific finance item you want handled and I’ll take it from here.";
+          if (thinkingTs) {
+            await updateSlackMessage(channel, thinkingTs, fallbackText);
+          } else {
+            await postSlackMessage(channel, fallbackText, { threadTs: rootThreadTs });
+          }
+          return;
+        }
         if (thinkingTs) {
           await deleteSlackMessage(channel, thinkingTs);
         }
@@ -353,6 +361,11 @@ export async function POST(req: Request) {
       const message =
         error instanceof Error ? error.message : "Unknown Slack events processing error";
       console.error("[ops/slack/events] async processing failed:", message);
+      if (channel === "C0AKG9FSC2J") {
+        await postSlackMessage(channel, "I hit an error while processing that. I kept the thread intact. Send the next instruction and I’ll continue.", {
+          threadTs: thread_ts || ts,
+        }).catch(() => {});
+      }
       void notify({
         channel: "alerts",
         text: `🚨 Slack events async processing failed: ${message}`,

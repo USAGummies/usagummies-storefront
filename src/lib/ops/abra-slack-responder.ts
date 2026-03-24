@@ -81,6 +81,8 @@ const SLACK_BLOCK_TEXT_LIMIT = 3000;
 const DATA_INGEST_THRESHOLD = 3000;
 const STRUCTURED_DOC_TTL_SECONDS = 24 * 60 * 60;
 const PENDING_CORRECTION_TTL_SECONDS = 30 * 60; // 30 minutes
+const FINANCIALS_CHANNEL_ID = "C0AKG9FSC2J";
+const RENE_SLACK_USER_ID = "U0ALL27JM38";
 
 // ─── Known user identity map ───
 const KNOWN_SLACK_USERS: Record<string, { name: string; role: string; calibration: string }> = {
@@ -102,6 +104,14 @@ function getActorContext(userId: string): string | null {
   return `CURRENT USER: ${known.name} (${known.role}). Calibration: ${known.calibration}`;
 }
 
+function isReneUser(userId: string): boolean {
+  return userId === RENE_SLACK_USER_ID;
+}
+
+function isFinancialsChannel(channelId: string): boolean {
+  return channelId === FINANCIALS_CHANNEL_ID;
+}
+
 function monitoredChannelSet(): Set<string> {
   const raw = process.env.SLACK_MONITORED_CHANNELS || "";
   return new Set(
@@ -113,6 +123,7 @@ function monitoredChannelSet(): Set<string> {
 }
 
 export function shouldAbraRespond(text: string, channel: string): boolean {
+  if (isFinancialsChannel(channel)) return true;
   const normalized = (text || "").trim().toLowerCase();
   const mention =
     /(^|\s)@abra\b/i.test(normalized) ||
@@ -122,6 +133,328 @@ export function shouldAbraRespond(text: string, channel: string): boolean {
     /^teach:/i.test(normalized);
   const monitored = monitoredChannelSet().has(channel);
   return mention || monitored;
+}
+
+function isAcknowledgmentText(text: string): boolean {
+  const normalized = text.trim().toLowerCase().replace(/[.!?]+$/g, "");
+  return /^(ok|okay|k|kk|thanks|thank you|got it|understood|sounds good|perfect|done|great|works|copy)$/.test(normalized);
+}
+
+function isMinimalPrompt(text: string): boolean {
+  return /^[\s?!.]+$/.test(text.trim());
+}
+
+function countQuestions(text: string): number {
+  return (text.match(/\?/g) || []).length;
+}
+
+function parseBulletOrNumberedItems(text: string): string[] {
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .map((line) => {
+      const match = line.match(/^(?:\d+[).:-]|\d+\s+|[-*•])\s*(.+)$/);
+      return match?.[1]?.trim() || "";
+    })
+    .filter(Boolean);
+}
+
+function findLatestAssistantNumberedList(history: SlackThreadMessage[] | undefined): string[] {
+  const reversed = [...(history || [])].reverse();
+  for (const item of reversed) {
+    if (item.role !== "assistant") continue;
+    const parsed = parseBulletOrNumberedItems(item.content);
+    if (parsed.length >= 3) return parsed;
+  }
+  return [];
+}
+
+function buildBatchExecutionPrompt(question: string, answer: string, index: number): string {
+  return [
+    `Process Rene's answer #${index + 1}.`,
+    `Original Abra question: ${question}`,
+    `Rene's answer: ${answer}`,
+    "Apply the answer immediately. Persist it to memory if it is a business rule, preference, or operating policy. If the answer authorizes or instructs an internal action, execute it. Keep the Slack response brief and action-focused.",
+  ].join("\n");
+}
+
+function normalizeSlackReply(reply: string): string {
+  return reply
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]+\n/g, "\n")
+    .trim();
+}
+
+function collapseMarkdownTable(text: string): string {
+  const lines = text.split("\n");
+  const out: string[] = [];
+  let idx = 0;
+  while (idx < lines.length) {
+    const line = lines[idx];
+    if (line.includes("|") && idx + 1 < lines.length && /^\s*\|?[-:| ]+\|?\s*$/.test(lines[idx + 1] || "")) {
+      const header = line.split("|").map((part) => part.trim()).filter(Boolean);
+      idx += 2;
+      while (idx < lines.length && lines[idx].includes("|")) {
+        const cols = lines[idx].split("|").map((part) => part.trim()).filter(Boolean);
+        if (cols.length > 0) {
+          const bullet = cols
+            .map((value, colIdx) => `${header[colIdx] || `Field ${colIdx + 1}`}: ${value}`)
+            .join(" • ");
+          out.push(`• ${bullet}`);
+        }
+        idx += 1;
+      }
+      continue;
+    }
+    out.push(line);
+    idx += 1;
+  }
+  return out.join("\n");
+}
+
+function trimReplyForRene(text: string, maxChars: number): string {
+  if (text.length <= maxChars) return text;
+  const cutoff = text.lastIndexOf("\n", maxChars);
+  const safeCutoff = cutoff > maxChars * 0.6 ? cutoff : maxChars;
+  return `${text.slice(0, safeCutoff).trim()}\n\nNext step: send the one item you want handled first.`;
+}
+
+function formatReneSlackReply(text: string, opts: { isReport: boolean }): string {
+  let result = collapseMarkdownTable(normalizeSlackReply(text));
+  if (countQuestions(result) > 1) {
+    const firstQuestionIdx = result.indexOf("?");
+    result =
+      firstQuestionIdx >= 0
+        ? `${result.slice(0, firstQuestionIdx + 1).trim()}\n\nNext step: send the one item you want handled first.`
+        : result;
+  }
+  const maxChars = opts.isReport ? 2000 : 500;
+  return trimReplyForRene(result, maxChars);
+}
+
+function looksLikeQboReadQuery(text: string): boolean {
+  const normalized = text.toLowerCase();
+  return (
+    /\bp&l\b|\bprofit and loss\b/.test(normalized) ||
+    /\btransactions?\b/.test(normalized) ||
+    /\bcash position\b|\bbalance sheet\b|\bvendors?\b|\bchart of accounts\b|\bcoa\b/.test(normalized) ||
+    /\baccounts payable\b|\baccounts receivable\b|\bbills?\b|\binvoices?\b/.test(normalized)
+  );
+}
+
+function looksLikeQboReportQuery(text: string): boolean {
+  const normalized = text.toLowerCase();
+  return /\bp&l\b|\bprofit and loss\b|\btransactions?\b|\bvendors?\b|\bchart of accounts\b|\bcash position\b|\bbalance sheet\b/.test(normalized);
+}
+
+async function fetchInternalJson(path: string): Promise<Record<string, unknown> | null> {
+  const cronSecret = (process.env.CRON_SECRET || "").trim();
+  if (!cronSecret) return null;
+  const host = resolveInternalHost();
+  const res = await fetchWithTimeout(
+    `${host}${path}`,
+    {
+      headers: {
+        Authorization: `Bearer ${cronSecret}`,
+        "Content-Type": "application/json",
+      },
+    },
+    15000,
+  );
+  if (!res.ok) return null;
+  return (await res.json().catch(() => null)) as Record<string, unknown> | null;
+}
+
+function formatCurrency(value: number): string {
+  return `$${value.toFixed(2)}`;
+}
+
+function formatQboPnlForSlack(data: Record<string, unknown>): string | null {
+  const period = (data.period || {}) as Record<string, unknown>;
+  const summary = (data.summary || {}) as Record<string, unknown>;
+  const revenue = Number(summary.TotalIncome || summary.Income || summary.Revenue || 0);
+  const cogs = Number(summary.TotalCostOfGoodsSold || summary.CostOfGoodsSold || summary.COGS || 0);
+  const expenses = Number(summary.TotalExpenses || summary.Expenses || 0);
+  const netIncome = Number(summary.NetIncome || summary.NetOperatingIncome || revenue - cogs - expenses || 0);
+  return [
+    `• P&L MTD (${String(period.start || "start")} to ${String(period.end || "today")})`,
+    `• Revenue: ${formatCurrency(revenue)}`,
+    `• COGS: ${formatCurrency(cogs)}`,
+    `• Expenses: ${formatCurrency(expenses)}`,
+    `• Net income: ${formatCurrency(netIncome)}`,
+    "",
+    "Next step: tell me which line item, transaction set, or adjustment you want me to handle.",
+  ].join("\n");
+}
+
+function formatQboTransactionsForSlack(data: Record<string, unknown>): string | null {
+  const purchases = Array.isArray(data.purchases) ? (data.purchases as Array<Record<string, unknown>>) : [];
+  if (purchases.length === 0) {
+    return "• Recent transactions: none found.\n\nNext step: ask me for a different date range or an Excel export.";
+  }
+  const totalsByMonth = new Map<string, number>();
+  const grouped = new Map<string, string[]>();
+  for (const purchase of purchases) {
+    const date = String(purchase.Date || "");
+    const month = date.slice(0, 7) || "unknown";
+    const amount = Number(purchase.Amount || 0);
+    const vendor = String(purchase.Vendor || "Unknown vendor");
+    const desc = Array.isArray(purchase.Lines) ? String(((purchase.Lines[0] || {}) as Record<string, unknown>).Description || "") : "";
+    totalsByMonth.set(month, (totalsByMonth.get(month) || 0) + amount);
+    const lines = grouped.get(month) || [];
+    lines.push(`• ${date}: ${formatCurrency(amount)} — ${vendor}${desc ? ` (${desc.slice(0, 60)})` : ""}`);
+    grouped.set(month, lines);
+  }
+  const months = [...grouped.keys()].sort().reverse();
+  const out = ["• Recent QBO transactions"];
+  for (const month of months.slice(0, 3)) {
+    out.push(`• ${month} total: ${formatCurrency(totalsByMonth.get(month) || 0)}`);
+    out.push(...(grouped.get(month) || []).slice(0, 5));
+  }
+  out.push("", "Next step: tell me which transaction you want categorized, exported, or reviewed.");
+  return out.join("\n");
+}
+
+function formatQboVendorsForSlack(data: Record<string, unknown>): string | null {
+  const vendors = Array.isArray(data.vendors) ? (data.vendors as Array<Record<string, unknown>>) : [];
+  const active = vendors.filter((vendor) => vendor.Active !== false);
+  return [
+    `• Active QBO vendors: ${active.length}`,
+    ...active.slice(0, 8).map((vendor) => `• ${String(vendor.Name || "Unknown")}`),
+    "",
+    "Next step: tell me which vendor you want created, updated, or tied to a transaction.",
+  ].join("\n");
+}
+
+function formatQboCashPositionForSlack(data: Record<string, unknown>): string | null {
+  return [
+    `• Cash position: ${formatCurrency(Number(data.cashPosition || 0))}`,
+    `• 30-day revenue: ${formatCurrency(Number(data.totalRevenue || 0))}`,
+    `• 30-day expenses: ${formatCurrency(Number(data.totalExpenses || 0))}`,
+    `• Net income: ${formatCurrency(Number(data.netIncome || 0))}`,
+    "",
+    "Next step: tell me whether you want the detailed transactions, P&L, or balance sheet behind this.",
+  ].join("\n");
+}
+
+function formatQboAccountsForSlack(data: Record<string, unknown>): string | null {
+  const accounts = Array.isArray(data.accounts) ? (data.accounts as Array<Record<string, unknown>>) : [];
+  return [
+    `• Chart of accounts: ${accounts.length} accounts`,
+    ...accounts
+      .slice(0, 10)
+      .map((account) => `• ${String(account.AcctNum || "")} ${String(account.Name || "").trim()}`.trim()),
+    "",
+    "Next step: ask for the Excel export if you want the full list.",
+  ].join("\n");
+}
+
+async function maybeHandleReneQboQuery(ctx: SlackMessageContext): Promise<SlackResponse | null> {
+  if (!isReneUser(ctx.user) || !looksLikeQboReadQuery(ctx.text)) return null;
+  const text = ctx.text.toLowerCase();
+  try {
+    if (/\bp&l\b|\bprofit and loss\b/.test(text)) {
+      const data = await fetchInternalJson("/api/ops/qbo/query?type=pnl");
+      if (data) return { handled: true, reply: formatReneSlackReply(formatQboPnlForSlack(data) || "I couldn’t format the live P&L.", { isReport: true }), sources: [], answerLogId: null };
+    }
+    if (/\btransactions?\b/.test(text)) {
+      const data = await fetchInternalJson("/api/ops/qbo/query?type=purchases&limit=50");
+      if (data) {
+        const body = formatQboTransactionsForSlack(data) || "I couldn’t format the live transaction list.";
+        return { handled: true, reply: formatReneSlackReply(body, { isReport: true }), sources: [], answerLogId: null };
+      }
+    }
+    if (/\bcash position\b/.test(text)) {
+      const data = await fetchInternalJson("/api/ops/qbo/query?type=metrics");
+      if (data) return { handled: true, reply: formatReneSlackReply(formatQboCashPositionForSlack(data) || "I couldn’t format the live cash position.", { isReport: false }), sources: [], answerLogId: null };
+    }
+    if (/\bvendors?\b/.test(text)) {
+      const data = await fetchInternalJson("/api/ops/qbo/query?type=vendors");
+      if (data) return { handled: true, reply: formatReneSlackReply(formatQboVendorsForSlack(data) || "I couldn’t format the live vendor list.", { isReport: false }), sources: [], answerLogId: null };
+    }
+    if (/\bchart of accounts\b|\bcoa\b/.test(text)) {
+      const data = await fetchInternalJson("/api/ops/qbo/accounts");
+      if (data) return { handled: true, reply: formatReneSlackReply(formatQboAccountsForSlack(data) || "I couldn’t format the chart of accounts.", { isReport: true }), sources: [], answerLogId: null };
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+async function persistBatchAnswerToBrain(ctx: SlackMessageContext, pairs: Array<{ question: string; answer: string }>): Promise<void> {
+  const actor = ctx.displayName || ctx.user;
+  const rawText = pairs
+    .map((pair, index) => `Q${index + 1}: ${pair.question}\nA${index + 1}: ${pair.answer}`)
+    .join("\n\n");
+  const embedding = await buildEmbedding(`Rene batch answers\n${rawText.slice(0, 4000)}`);
+  await sbFetch("/rest/v1/open_brain_entries", {
+    method: "POST",
+    headers: {
+      Prefer: "return=minimal",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      source_type: "manual",
+      source_ref: `slack-batch-answers-${ctx.channel}-${rootSlackThreadTs(ctx)}-${Date.now()}`,
+      entry_type: "teaching",
+      title: `Batch answers from ${actor}`,
+      raw_text: rawText,
+      summary_text: rawText.slice(0, 500),
+      category: "teaching",
+      department: "finance",
+      confidence: "high",
+      priority: "important",
+      processed: true,
+      embedding,
+    }),
+  });
+}
+
+async function maybeHandleBatchNumberedAnswers(ctx: SlackMessageContext): Promise<SlackResponse | null> {
+  if (!ctx.threadTs) return null;
+  const answers = parseBulletOrNumberedItems(ctx.text);
+  if (answers.length < 3) return null;
+  const priorQuestions = findLatestAssistantNumberedList(ctx.history);
+  if (priorQuestions.length === 0) return null;
+
+  const pairs = answers.map((answer, index) => ({
+    question: priorQuestions[index] || `Question ${index + 1}`,
+    answer,
+  }));
+
+  const results: string[] = [];
+  for (let index = 0; index < pairs.length; index += 1) {
+    const pair = pairs[index];
+    const outcome = await callAbraChatViaInternalApi({
+      ...ctx,
+      text: buildBatchExecutionPrompt(pair.question, pair.answer, index),
+      history: ctx.history,
+    });
+    if (outcome?.reply) {
+      results.push(`• ${pair.answer}\n  ${normalizeSlackReply(outcome.reply).split("\n")[0]}`);
+    }
+  }
+
+  try {
+    await persistBatchAnswerToBrain(ctx, pairs);
+  } catch {
+    // best effort
+  }
+
+  const reply = [
+    `Processed ${pairs.length} numbered answers from this thread.`,
+    ...results.slice(0, 8),
+    "",
+    "Next step: send the next batch or the one item you want me to handle now.",
+  ].join("\n");
+
+  return {
+    handled: true,
+    reply: isReneUser(ctx.user) ? formatReneSlackReply(reply, { isReport: true }) : reply,
+    sources: [],
+    answerLogId: null,
+  };
 }
 
 function resolveInternalHost(): string {
@@ -942,7 +1275,6 @@ export async function getThreadHistory(
     if (!data.ok || !Array.isArray(data.messages)) return [];
 
     return data.messages
-      .slice(1)
       .map((message) => {
         const text = String(message.text || "").trim();
         if (!text) return null;
@@ -1441,8 +1773,17 @@ export async function processAbraMessage(
   ctx: SlackMessageContext,
 ): Promise<SlackResponse> {
   const text = (ctx.text || "").trim();
-  if (!text) {
+  if (!text && !ctx.forceRespond) {
     return { handled: false, reply: "", sources: [], answerLogId: null };
+  }
+
+  if (!text && ctx.forceRespond) {
+    return {
+      handled: true,
+      reply: "What can I help with?",
+      sources: [],
+      answerLogId: null,
+    };
   }
 
   const shouldRespondNow =
@@ -1456,6 +1797,25 @@ export async function processAbraMessage(
   // Strip leading Slack user/bot mentions so "teach:" and "correct:" routing
   // works even when the user @-mentions Abra first (e.g. "<@U1234> teach: ...").
   const textForRouting = text.replace(/^(<@[A-Z0-9]+>\s*)+/gi, "").trim();
+
+  if (ctx.forceRespond && isFinancialsChannel(ctx.channel)) {
+    if (isAcknowledgmentText(textForRouting)) {
+      return {
+        handled: true,
+        reply: "Got it, let me know if you need anything else.",
+        sources: [],
+        answerLogId: null,
+      };
+    }
+    if (isMinimalPrompt(textForRouting)) {
+      return {
+        handled: true,
+        reply: "What can I help with?",
+        sources: [],
+        answerLogId: null,
+      };
+    }
+  }
 
   if (/^correct:/i.test(textForRouting)) {
     return {
@@ -1473,6 +1833,11 @@ export async function processAbraMessage(
       sources: [],
       answerLogId: null,
     };
+  }
+
+  const batchResponse = await maybeHandleBatchNumberedAnswers({ ...ctx, text: textForRouting });
+  if (batchResponse) {
+    return batchResponse;
   }
 
   // ─── Conversational correction flow (thread replies only) ───
@@ -1514,6 +1879,11 @@ export async function processAbraMessage(
   const structuredDocResponse = await handleStructuredDocumentConversation(ctx);
   if (structuredDocResponse) {
     return structuredDocResponse;
+  }
+
+  const liveReneQboResponse = await maybeHandleReneQboQuery({ ...ctx, text: textForRouting });
+  if (liveReneQboResponse) {
+    return liveReneQboResponse;
   }
 
   // Large structured data that is not a managed document session still gets
@@ -1566,7 +1936,10 @@ export async function processAbraMessage(
 
   return {
     handled: true,
-    reply: answer.reply,
+    reply:
+      isReneUser(ctx.user)
+        ? formatReneSlackReply(answer.reply, { isReport: looksLikeQboReportQuery(textForRouting) || answer.reply.length > 500 })
+        : answer.reply,
     sources: answer.sources,
     answerLogId: answer.answerLogId,
   };
