@@ -349,12 +349,14 @@ export async function POST(req: Request) {
         await updateSlackMessage(channel, thinkingTs, result.reply, {
           sources: result.sources,
           answerLogId: result.answerLogId,
+          blocks: result.blocks,
         });
       } else {
         await postSlackMessage(channel, result.reply, {
           threadTs: rootThreadTs,
           sources: result.sources,
           answerLogId: result.answerLogId,
+          blocks: result.blocks,
         });
       }
     } catch (error) {

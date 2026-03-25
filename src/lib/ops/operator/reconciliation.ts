@@ -19,8 +19,10 @@ export type ReconciliationSummary = {
   date: string;
   amazonRevenue: number;
   amazonDeposits: number;
+  amazonFees: number;
   shopifyRevenue: number;
   shopifyDeposits: number;
+  shopifyFees: number;
   plaidBalance: number;
   qboBookBalance: number;
   amazonDifference: number;
@@ -152,6 +154,24 @@ function depositMatchesChannel(purchase: Record<string, unknown>, keywords: stri
   return keywords.some((keyword) => haystack.includes(keyword));
 }
 
+function lineAccountId(line: Record<string, unknown>): string {
+  const accountRef =
+    (line.AccountRef && typeof line.AccountRef === "object"
+      ? (line.AccountRef as Record<string, unknown>).value
+      : null) ||
+    line.AccountId ||
+    line.Account ||
+    "";
+  return String(accountRef || "").trim();
+}
+
+function purchaseMatchesAccount(purchase: Record<string, unknown>, accountIds: string[]): boolean {
+  const ids = new Set(accountIds.map((id) => String(id).trim()));
+  if (!ids.size) return false;
+  const lines = Array.isArray(purchase.Lines) ? (purchase.Lines as Array<Record<string, unknown>>) : [];
+  return lines.some((line) => ids.has(lineAccountId(line)));
+}
+
 function buildDiscrepancyTask(params: {
   source: "amazon" | "shopify" | "bank";
   expected: number;
@@ -199,6 +219,34 @@ async function postFinancialsMessage(text: string): Promise<void> {
   }).catch(() => {});
 }
 
+function buildFeeTask(params: {
+  source: "amazon_fee" | "shopify_fee";
+  amount: number;
+  detail: string;
+}): OperatorTaskInsert {
+  const sourceLabel = params.source === "amazon_fee" ? "Amazon fees" : "Shopify fees";
+  const accountId = params.source === "amazon_fee" ? "122" : "122";
+  return {
+    task_type: "qbo_record_transaction",
+    title: `Record ${sourceLabel} — ${formatCurrency(params.amount)}`,
+    description: params.detail,
+    priority: "medium",
+    source: "operator:reconciliation",
+    assigned_to: "rene",
+    requires_approval: params.amount > 500,
+    execution_params: {
+      natural_key: buildNaturalKey(["reconciliation_fee", todayIso(), params.source, params.amount.toFixed(2)]),
+      type: "expense",
+      amount: round2(params.amount),
+      account_id: accountId,
+      account_name: "Merchant Fees",
+      description: sourceLabel,
+      reasoning: params.detail,
+    },
+    tags: ["finance", "reconciliation", "fees"],
+  };
+}
+
 export async function runDailyFinancialReconciliation(): Promise<{
   tasks: OperatorTaskInsert[];
   summary: ReconciliationSummary;
@@ -213,8 +261,10 @@ export async function runDailyFinancialReconciliation(): Promise<{
         date: today,
         amazonRevenue: 0,
         amazonDeposits: 0,
+        amazonFees: 0,
         shopifyRevenue: 0,
         shopifyDeposits: 0,
+        shopifyFees: 0,
         plaidBalance: 0,
         qboBookBalance: 0,
         amazonDifference: 0,
@@ -237,12 +287,12 @@ export async function runDailyFinancialReconciliation(): Promise<{
   const deposits = purchases.filter((purchase) => Number(purchase.Amount || 0) > 0 && String(purchase.Date || "").slice(0, 10) === day);
   const amazonDeposits = round2(
     deposits
-      .filter((purchase) => depositMatchesChannel(purchase, ["amazon"]))
+      .filter((purchase) => depositMatchesChannel(purchase, ["amazon"]) || purchaseMatchesAccount(purchase, ["171"]))
       .reduce((sum, purchase) => sum + (Number(purchase.Amount || 0) || 0), 0),
   );
   const shopifyDeposits = round2(
     deposits
-      .filter((purchase) => depositMatchesChannel(purchase, ["shopify", "stripe"]))
+      .filter((purchase) => depositMatchesChannel(purchase, ["shopify", "stripe"]) || purchaseMatchesAccount(purchase, ["172"]))
       .reduce((sum, purchase) => sum + (Number(purchase.Amount || 0) || 0), 0),
   );
   const qboBookBalance = round2(qboBook.value || 0);
@@ -250,6 +300,8 @@ export async function runDailyFinancialReconciliation(): Promise<{
   const amazonDifference = round2(Math.abs(amazonRevenue - amazonDeposits));
   const shopifyDifference = round2(Math.abs(shopifyRevenue - shopifyDeposits));
   const bankDifference = round2(Math.abs(plaidBalance - qboBookBalance));
+  const amazonFees = round2(Math.max(0, amazonRevenue - amazonDeposits));
+  const shopifyFees = round2(Math.max(0, shopifyRevenue - shopifyDeposits));
 
   const tasks: OperatorTaskInsert[] = [];
   if (amazonDifference > 5) {
@@ -272,6 +324,24 @@ export async function runDailyFinancialReconciliation(): Promise<{
       }),
     );
   }
+  if (amazonFees > 0) {
+    tasks.push(
+      buildFeeTask({
+        source: "amazon_fee",
+        amount: amazonFees,
+        detail: `Amazon reconciliation for ${day}: KPI gross revenue ${formatCurrency(amazonRevenue)}, deposits ${formatCurrency(amazonDeposits)}, fees ${formatCurrency(amazonFees)}.`,
+      }),
+    );
+  }
+  if (shopifyFees > 0) {
+    tasks.push(
+      buildFeeTask({
+        source: "shopify_fee",
+        amount: shopifyFees,
+        detail: `Shopify reconciliation for ${day}: KPI gross revenue ${formatCurrency(shopifyRevenue)}, deposits ${formatCurrency(shopifyDeposits)}, fees ${formatCurrency(shopifyFees)}.`,
+      }),
+    );
+  }
   if (bankDifference > 5) {
     tasks.push(
       buildDiscrepancyTask({
@@ -289,8 +359,10 @@ export async function runDailyFinancialReconciliation(): Promise<{
     date: day,
     amazonRevenue,
     amazonDeposits,
+    amazonFees,
     shopifyRevenue,
     shopifyDeposits,
+    shopifyFees,
     plaidBalance,
     qboBookBalance,
     amazonDifference,
@@ -309,7 +381,9 @@ export async function runDailyFinancialReconciliation(): Promise<{
   await postFinancialsMessage(
     `🔎 *Daily reconciliation* (${day})\n` +
       `• Amazon ${amazonStatus}\n` +
+      `• Amazon reconciliation: ${formatCurrency(amazonRevenue)} gross, ${formatCurrency(amazonDeposits)} deposited, ${formatCurrency(amazonFees)} fees\n` +
       `• Shopify ${shopifyStatus}\n` +
+      `• Shopify reconciliation: ${formatCurrency(shopifyRevenue)} gross, ${formatCurrency(shopifyDeposits)} deposited, ${formatCurrency(shopifyFees)} fees\n` +
       `• Bank balance: ${bankStatus}${bankDifference > 5 ? " (difference may be uncleared transactions)" : ""}`,
   );
 

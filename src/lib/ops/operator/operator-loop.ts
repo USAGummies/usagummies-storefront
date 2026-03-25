@@ -15,6 +15,8 @@ import { runMonthlyPnlReport } from "@/lib/ops/operator/reports/monthly-pnl";
 import { runWeeklyArApReport } from "@/lib/ops/operator/reports/weekly-ar-ap";
 import { createOperatorTasks, executeOperatorTasks } from "@/lib/ops/operator/task-executor";
 import { reportOperatorCycle } from "@/lib/ops/operator/task-reporter";
+import { runUnifiedInventoryPosition } from "@/lib/ops/operator/unified-inventory";
+import { runUnifiedRevenueDashboard } from "@/lib/ops/operator/unified-revenue";
 
 export type OperatorLoopResult = {
   createdTasks: number;
@@ -304,6 +306,11 @@ export async function runOperatorLoop(): Promise<OperatorLoopResult> {
   if (qboModified) {
     result.pnlSanity = await runPnlSanityChecker();
   }
+
+  await Promise.all([
+    runUnifiedRevenueDashboard().catch(() => ({ ran: false, summary: null })),
+    runUnifiedInventoryPosition().catch(() => ({ ran: false, summary: null })),
+  ]);
 
   await Promise.all([
     surfaceProactiveEmailTasks().catch(() => ({ surfaced: 0 })),

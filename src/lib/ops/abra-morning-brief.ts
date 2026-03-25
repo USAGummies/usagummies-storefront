@@ -8,6 +8,8 @@ import { notify } from "@/lib/ops/notify";
 import { createNotionPage } from "@/lib/ops/abra-notion-write";
 import { readState } from "@/lib/ops/state";
 import { RECONCILIATION_SUMMARY_STATE_KEY, type ReconciliationSummary } from "@/lib/ops/operator/reconciliation";
+import { UNIFIED_INVENTORY_STATE_KEY, type UnifiedInventorySummary } from "@/lib/ops/operator/unified-inventory";
+import { UNIFIED_REVENUE_STATE_KEY, type UnifiedRevenueSummary } from "@/lib/ops/operator/unified-revenue";
 import { getDailyGoalSnapshot, formatGoalSlack } from "@/lib/ops/daily-goal-tracker";
 
 type MetricSnapshot = {
@@ -852,6 +854,129 @@ function shortOperatorLabel(taskType: string): string {
   return taskType.replace(/_/g, " ");
 }
 
+function compactCurrency(value: number, digits = 0): string {
+  return `$${Number(value || 0).toLocaleString("en-US", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  })}`;
+}
+
+function compactCountLabel(count: number, singular: string, plural = `${singular}s`): string {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function topOperatorTypes(completedByType: Record<string, number>, limit = 1): string {
+  return Object.entries(completedByType)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([taskType, count]) => `${count} ${shortOperatorLabel(taskType)}`)
+    .join(", ");
+}
+
+async function fetchCompactAttentionItems(limit = 2): Promise<string[]> {
+  const rows = await sbFetch(
+    `/rest/v1/abra_operator_tasks?status=in.(pending,needs_approval)&select=title&order=created_at.asc&limit=${limit}`,
+  ).catch(() => []);
+  return Array.isArray(rows)
+    ? (rows as Array<{ title?: string | null }>)
+        .map((row) => String(row.title || "").trim())
+        .filter(Boolean)
+        .slice(0, limit)
+    : [];
+}
+
+function shortEmailName(name: string): string {
+  return name
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b(inc|llc|co|corporation|confections)\b/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+async function buildCompactBenBrief(): Promise<string> {
+  const [revenue, inventory, operator, approvals, awaiting, priorities] = await Promise.all([
+    readState<UnifiedRevenueSummary | null>(UNIFIED_REVENUE_STATE_KEY, null).catch(() => null),
+    readState<UnifiedInventorySummary | null>(UNIFIED_INVENTORY_STATE_KEY, null).catch(() => null),
+    getOperatorTaskBrief().catch(() => ({
+      completedLast24h: 0,
+      completedByType: {},
+      pendingCount: 0,
+      needsApproval: [],
+    })),
+    getPendingApprovalsCount().catch(() => 0),
+    detectAwaitingReplies({ sentCount: 30, lookbackHours: 72 }).catch(() => []),
+    fetchCompactAttentionItems(2).catch(() => []),
+  ]);
+
+  const emailLine = Array.isArray(awaiting) && awaiting.length
+    ? awaiting
+        .slice(0, 3)
+        .map((item) => `${shortEmailName(item.recipientName || item.recipientEmail.split("@")[0] || "Contact")} ${Math.max(1, Math.round(Number(item.hoursAgo || 0) / 24))}d`)
+        .join(", ")
+    : "none";
+  const inventoryBits: string[] = [];
+  if (inventory?.fbaUnits) inventoryBits.push(`~${inventory.fbaUnits} units FBA`);
+  if (inventory?.andrewUnits) inventoryBits.push(`${inventory.andrewUnits} incoming from Andrew`);
+  if (inventory?.powersUnits) inventoryBits.push(`${inventory.powersUnits} at Powers`);
+  const lines = [
+    `🌅 Good morning <@${BEN_SLACK_USER_ID}>`,
+    "",
+    `💰 Yesterday: ${compactCurrency(revenue?.total || 0, 2)} | MTD: ${compactCurrency(revenue?.mtd || 0)} (Amazon ${revenue?.mix.amazonPct || 0}%, DTC ${revenue?.mix.shopifyPct || 0}%)`,
+    `📧 ${compactCountLabel(Array.isArray(awaiting) ? awaiting.length : 0, "email")} need response${emailLine !== "none" ? ` (${emailLine})` : ""}`,
+    `📦 Inventory: ${inventoryBits.join(", ") || "position updating"}`,
+    `🎯 Today: ${(priorities || []).join(", ") || "review operator queue, clear approvals"}`,
+    `⚠️ ${compactCountLabel(approvals, "approval")} pending`,
+    "",
+    `Reply "emails" for drafts or "approve" for pending items.`,
+  ];
+
+  return lines.join("\n").slice(0, 500);
+}
+
+async function buildCompactReneBrief(): Promise<string> {
+  const [revenue, operator, approvals, purchasesData, pendingEmailTasks, reconciliation] = await Promise.all([
+    readState<UnifiedRevenueSummary | null>(UNIFIED_REVENUE_STATE_KEY, null).catch(() => null),
+    getOperatorTaskBrief().catch(() => ({
+      completedLast24h: 0,
+      completedByType: {},
+      pendingCount: 0,
+      needsApproval: [],
+    })),
+    getPendingApprovalsCount().catch(() => 0),
+    fetchInternalOpsJson("/api/ops/qbo/query?type=purchases&limit=200"),
+    sbFetch("/rest/v1/abra_operator_tasks?task_type=in.(email_draft_response,vendor_followup,distributor_followup)&status=in.(pending,needs_approval)&select=id&limit=50").catch(() => []),
+    readState<ReconciliationSummary | null>(RECONCILIATION_SUMMARY_STATE_KEY, null).catch(() => null),
+  ]);
+
+  const purchases = Array.isArray((purchasesData || {}).purchases)
+    ? ((purchasesData || {}).purchases as Array<Record<string, unknown>>)
+    : [];
+  const reviewCount = purchases.filter((purchase) => {
+    const firstLine = Array.isArray(purchase.Lines) ? ((purchase.Lines[0] || {}) as Record<string, unknown>) : {};
+    const account = String(firstLine.Account || "").toLowerCase();
+    return !account || account.includes("uncategorized");
+  }).length;
+  const categorizedCount = Math.max(0, purchases.length - reviewCount);
+  const qboHealthPct = purchases.length ? Math.round((categorizedCount / purchases.length) * 100) : 100;
+  const operatorLead = topOperatorTypes(operator.completedByType, 1) || "0 categorizations";
+  const approvalCount = Math.max(approvals, operator.needsApproval.length);
+
+  const lines = [
+    `🌅 Good morning <@${RENE_SLACK_USER_ID}>`,
+    "",
+    `💰 Yesterday: ${compactCurrency(revenue?.total || 0, 2)} rev | MTD: ${compactCurrency(revenue?.mtd || 0)}`,
+    `📊 QBO: ${qboHealthPct}% categorized | ${reviewCount} need review`,
+    `📧 ${compactCountLabel(Array.isArray(pendingEmailTasks) ? pendingEmailTasks.length : 0, "vendor email")} need response`,
+    `✅ Operator: ${operatorLead} overnight`,
+    `⚠️ ${compactCountLabel(approvalCount, "approval")} pending${reconciliation?.ran && reconciliation.bankDifference > 5 ? ` | Bank diff ${compactCurrency(reconciliation.bankDifference, 2)}` : ""}`,
+    "",
+    `Reply "review" to see transactions or "emails" to see drafts.`,
+  ];
+
+  return lines.join("\n").slice(0, 500);
+}
+
 function thresholdForDays(days: number): "healthy" | "info" | "warning" | "critical" {
   if (!Number.isFinite(days) || days > 45) return "healthy";
   if (days > 30) return "info";
@@ -924,7 +1049,7 @@ async function getVendorPaymentBrief(): Promise<{
 }
 
 export async function sendMorningBrief(): Promise<void> {
-  const brief = await generateLLMMorningBrief();
+  const brief = await buildCompactBenBrief();
 
   // DM the morning brief to Ben only — not to any channel
   const botToken = process.env.SLACK_BOT_TOKEN;
@@ -976,113 +1101,7 @@ export async function sendMorningBrief(): Promise<void> {
 async function sendReneMorningDM(): Promise<void> {
   const botToken = process.env.SLACK_BOT_TOKEN;
   if (!botToken) return;
-
-  const yesterdayIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  const [pnl, purchasesData, operator, reviewTasks, inventoryBrief, apBrief, reconciliation] = await Promise.all([
-    fetchInternalOpsJson("/api/ops/qbo/query?type=pnl"),
-    fetchInternalOpsJson("/api/ops/qbo/query?type=purchases&limit=200"),
-    getOperatorTaskBrief().catch(() => ({
-      completedLast24h: 0,
-      completedByType: {},
-      pendingCount: 0,
-      needsApproval: [],
-    })),
-    sbFetch(
-      "/rest/v1/abra_operator_tasks?or=(assigned_to.eq.rene,requires_approval.eq.true)&status=in.(pending,needs_approval)&select=title,task_type,assigned_to,requires_approval&order=created_at.asc&limit=5",
-    ).catch(() => []),
-    getInventoryBrief().catch(() => ({
-      counts: { healthy: 0, info: 0, warning: 0, critical: 0 },
-      watch: [],
-    })),
-    getVendorPaymentBrief().catch(() => ({
-      dueSoonCount: 0,
-      dueSoonAmount: 0,
-      overdueCount: 0,
-      overdueAmount: 0,
-    })),
-    readState<ReconciliationSummary | null>(RECONCILIATION_SUMMARY_STATE_KEY, null).catch(() => null),
-  ]);
-
-  const purchases = Array.isArray((purchasesData || {}).purchases)
-    ? ((purchasesData || {}).purchases as Array<Record<string, unknown>>)
-    : [];
-  const uncategorizedCount = purchases.filter((purchase) => {
-    const firstLine = Array.isArray(purchase.Lines) ? ((purchase.Lines[0] || {}) as Record<string, unknown>) : {};
-    const account = String(firstLine.Account || "").toLowerCase();
-    return !account || account.includes("uncategorized");
-  }).length;
-  const newBankFeedItems = purchases.filter((purchase) => String(purchase.Date || "") >= yesterdayIso).length;
-  const categorizedCount = purchases.length - uncategorizedCount;
-  const qboHealthPct = purchases.length > 0 ? Math.round((categorizedCount / purchases.length) * 100) : 100;
-
-  const summary = ((pnl || {}).summary || {}) as Record<string, unknown>;
-  const revenue = numberValue(
-    summary["Total Income"] || summary.TotalIncome || summary.Income || summary.Revenue,
-  );
-  const cogs = numberValue(
-    summary["Total Cost of Goods Sold"] ||
-      summary.TotalCostOfGoodsSold ||
-      summary.CostOfGoodsSold ||
-      summary.COGS,
-  );
-  const expenses = numberValue(
-    summary["Total Expenses"] || summary.TotalExpenses || summary.Expenses,
-  );
-  const netIncome = numberValue(
-    summary["Net Income"] || summary.NetIncome || revenue - cogs - expenses,
-  );
-
-  const operatorParts = Object.entries(operator.completedByType || {})
-    .slice(0, 4)
-    .map(([taskType, count]) => `${count} ${shortOperatorLabel(taskType)}`);
-  const reviewRows = Array.isArray(reviewTasks) ? reviewTasks as Array<Record<string, unknown>> : [];
-
-  const lines = [
-    `☀️ *Good morning <@${RENE_SLACK_USER_ID}> — here's your financial snapshot:*`,
-    "",
-    `• Uncategorized transactions: *${uncategorizedCount}*`,
-    `• New bank feed items since yesterday: *${newBankFeedItems}*`,
-    `• Transactions needing review: *${reviewRows.length}*`,
-    `• P&L MTD — Revenue *$${revenue.toFixed(2)}* · Expenses *$${expenses.toFixed(2)}* · Net income *$${netIncome.toFixed(2)}*`,
-    `• QBO health: *${qboHealthPct}% categorized* (${categorizedCount}/${purchases.length || 0})`,
-    `• Operator overnight: *${operator.completedLast24h}* completed${operatorParts.length ? ` (${operatorParts.join(", ")})` : ""}`,
-    `• AP aging: *$${apBrief.dueSoonAmount.toFixed(2)}* due this week across ${apBrief.dueSoonCount} bill(s); *$${apBrief.overdueAmount.toFixed(2)}* overdue across ${apBrief.overdueCount} bill(s)`,
-    `• Inventory watch: *${inventoryBrief.counts.critical}* critical, *${inventoryBrief.counts.warning}* warning, *${inventoryBrief.counts.info}* info`,
-  ];
-
-  if (reconciliation?.ran) {
-    lines.push(
-      `• Reconciliation: Amazon ${reconciliation.amazonDifference > 5 ? `⚠️ $${reconciliation.amazonDifference.toFixed(2)} unmatched` : "✅ matched"} · ` +
-      `Shopify ${reconciliation.shopifyDifference > 5 ? `⚠️ $${reconciliation.shopifyDifference.toFixed(2)} unmatched` : "✅ matched"} · ` +
-      `Bank ${reconciliation.bankDifference > 5 ? `⚠️ $${reconciliation.bankDifference.toFixed(2)} off` : "✅ matched"}`,
-    );
-  }
-
-  if (reviewRows.length > 0) {
-    lines.push("");
-    lines.push("📋 *Needs your review*");
-    for (const row of reviewRows.slice(0, 3)) {
-      lines.push(`• ${String(row.title || row.task_type || "Operator task")}`);
-    }
-  }
-
-  if ((operator.needsApproval || []).length > 0) {
-    lines.push("");
-    lines.push("⏳ *Needs approval*");
-    for (const task of operator.needsApproval.slice(0, 3)) {
-      lines.push(`• ${task.title}`);
-    }
-  }
-
-  if (inventoryBrief.watch.length > 0) {
-    lines.push("");
-    lines.push("📦 *Inventory watch*");
-    for (const item of inventoryBrief.watch) {
-      lines.push(`• ${item}`);
-    }
-  }
-
-  lines.push("", "_Reply in #financials and I'll handle the next finance item directly._");
+  const brief = await buildCompactReneBrief();
 
   await fetch("https://slack.com/api/chat.postMessage", {
     method: "POST",
@@ -1092,7 +1111,7 @@ async function sendReneMorningDM(): Promise<void> {
     },
     body: JSON.stringify({
       channel: FINANCIALS_CHANNEL,
-      text: lines.join("\n"),
+      text: brief,
       mrkdwn: true,
       unfurl_links: false,
     }),

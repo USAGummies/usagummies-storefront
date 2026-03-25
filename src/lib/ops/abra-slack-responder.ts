@@ -11,6 +11,8 @@ import {
 } from "@/lib/ops/abra-cost-tracker";
 import { appendCorrection as appendMarkdownCorrection } from "@/lib/ops/abra-markdown-memory";
 import { maybeLearnFinancialCorrection } from "@/lib/ops/operator/correction-learner";
+import { readState } from "@/lib/ops/state";
+import { UNIFIED_REVENUE_STATE_KEY, type UnifiedRevenueSummary } from "@/lib/ops/operator/unified-revenue";
 
 export type SlackThreadMessage = {
   role: "user" | "assistant";
@@ -37,6 +39,7 @@ export type SlackResponse = {
     days_ago?: number;
   }>;
   answerLogId: string | null;
+  blocks?: Array<Record<string, unknown>>;
 };
 
 type StructuredDocKind = "chart_of_accounts";
@@ -186,6 +189,10 @@ function normalizeSlackReply(reply: string): string {
     .trim();
 }
 
+function stripMarkdownHeaders(text: string): string {
+  return text.replace(/^\s{0,3}#{1,6}\s+(.+)$/gm, "*$1*");
+}
+
 function collapseMarkdownTable(text: string): string {
   const lines = text.split("\n");
   const out: string[] = [];
@@ -221,7 +228,7 @@ function trimReplyForRene(text: string, maxChars: number): string {
 }
 
 function formatReneSlackReply(text: string, opts: { isReport: boolean }): string {
-  let result = collapseMarkdownTable(normalizeSlackReply(text));
+  let result = stripMarkdownHeaders(collapseMarkdownTable(normalizeSlackReply(text)));
   if (countQuestions(result) > 1) {
     const firstQuestionIdx = result.indexOf("?");
     result =
@@ -229,8 +236,275 @@ function formatReneSlackReply(text: string, opts: { isReport: boolean }): string
         ? `${result.slice(0, firstQuestionIdx + 1).trim()}\n\nNext step: send the one item you want handled first.`
         : result;
   }
-  const maxChars = opts.isReport ? 2000 : 500;
+  const maxChars = opts.isReport ? 1500 : 300;
   return trimReplyForRene(result, maxChars);
+}
+
+function isQuickCommand(text: string, values: string[]): boolean {
+  const normalized = text.trim().toLowerCase().replace(/[!?.,]+$/g, "");
+  return values.includes(normalized);
+}
+
+function compactCurrency(value: number, digits = 0): string {
+  return `$${Number(value || 0).toLocaleString("en-US", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  })}`;
+}
+
+async function fetchPlaidLiveBalance(): Promise<number> {
+  const data = await fetchInternalJson("/api/ops/plaid/balance");
+  const accounts = Array.isArray(data?.accounts) ? (data.accounts as Array<Record<string, unknown>>) : [];
+  return accounts.reduce((sum, account) => {
+    const balances = (account.balances && typeof account.balances === "object")
+      ? (account.balances as Record<string, unknown>)
+      : {};
+    return sum + Number(balances.current ?? balances.available ?? 0);
+  }, 0);
+}
+
+async function fetchRevenueSnapshotForQuickCommand(): Promise<{
+  today: number;
+  mtd: number;
+  amazon: number;
+  shopify: number;
+}> {
+  const unified = await readState<UnifiedRevenueSummary | null>(UNIFIED_REVENUE_STATE_KEY, null).catch(() => null);
+  const today = Number(unified?.total || 0);
+  const mtd = Number(unified?.mtd || 0);
+  const amazon = Number(unified?.amazon || 0);
+  const shopify = Number(unified?.shopify || 0);
+  if (today || mtd) {
+    return { today, mtd, amazon, shopify };
+  }
+
+  const now = new Date();
+  const todayIso = now.toISOString().slice(0, 10);
+  const monthStart = `${todayIso.slice(0, 7)}-01`;
+  const rows = await sbFetch(
+    `/rest/v1/kpi_timeseries?window_type=eq.daily&metric_name=in.(daily_revenue_amazon,daily_revenue_shopify)&captured_for_date=gte.${monthStart}&select=metric_name,captured_for_date,value&limit=120`,
+  ).catch(() => []);
+  const series = Array.isArray(rows) ? (rows as Array<{ metric_name?: string | null; captured_for_date?: string | null; value?: number | null }>) : [];
+  let amazonToday = 0;
+  let shopifyToday = 0;
+  let mtdTotal = 0;
+  for (const row of series) {
+    const metric = String(row.metric_name || "");
+    const date = String(row.captured_for_date || "");
+    const value = Number(row.value || 0);
+    if (date === todayIso && metric === "daily_revenue_amazon") amazonToday += value;
+    if (date === todayIso && metric === "daily_revenue_shopify") shopifyToday += value;
+    mtdTotal += value;
+  }
+  return { today: amazonToday + shopifyToday, mtd: mtdTotal, amazon: amazonToday, shopify: shopifyToday };
+}
+
+async function fetchPendingTaskCounts(): Promise<Record<string, number>> {
+  const rows = await sbFetch(
+    "/rest/v1/abra_operator_tasks?status=in.(pending,needs_approval,in_progress)&select=task_type&limit=500",
+  ).catch(() => []);
+  const counts: Record<string, number> = {};
+  for (const row of (Array.isArray(rows) ? rows : []) as Array<{ task_type?: string | null }>) {
+    const key = String(row.task_type || "other");
+    counts[key] = (counts[key] || 0) + 1;
+  }
+  return counts;
+}
+
+async function fetchPendingApprovals(): Promise<Array<{ id: string; title: string }>> {
+  const approvals = await sbFetch(
+    "/rest/v1/approvals?status=eq.pending&select=id,summary,proposed_payload&order=created_at.asc&limit=5",
+  ).catch(() => []);
+  return (Array.isArray(approvals) ? approvals : []).map((row) => {
+    const record = row as Record<string, unknown>;
+    const payload = record.proposed_payload && typeof record.proposed_payload === "object"
+      ? (record.proposed_payload as Record<string, unknown>)
+      : {};
+    return {
+      id: String(record.id || ""),
+      title: String(record.summary || payload.summary || payload.action_type || "Pending approval"),
+    };
+  }).filter((row) => row.id);
+}
+
+async function fetchPendingEmailTasks(): Promise<Array<{ id: string; title: string; body: string }>> {
+  const rows = await sbFetch(
+    "/rest/v1/abra_operator_tasks?task_type=in.(email_draft_response,vendor_followup,distributor_followup)&status=in.(pending,needs_approval)&select=id,title,execution_result&order=created_at.asc&limit=5",
+  ).catch(() => []);
+  return (Array.isArray(rows) ? rows : []).map((row) => {
+    const record = row as Record<string, unknown>;
+    const executionResult = record.execution_result && typeof record.execution_result === "object"
+      ? (record.execution_result as Record<string, unknown>)
+      : {};
+    return {
+      id: String(record.id || ""),
+      title: String(record.title || "Email draft"),
+      body: String(executionResult.draft || executionResult.message || ""),
+    };
+  }).filter((row) => row.id);
+}
+
+function buildApprovalBlocks(approvals: Array<{ id: string; title: string }>): Array<Record<string, unknown>> {
+  return approvals.flatMap((approval) => ([
+    {
+      type: "section",
+      text: { type: "mrkdwn", text: `⏳ *${approval.title}*` },
+    },
+    {
+      type: "actions",
+      elements: [
+        {
+          type: "button",
+          text: { type: "plain_text", text: "Approve" },
+          style: "primary",
+          action_id: "approve_action",
+          value: approval.id,
+        },
+        {
+          type: "button",
+          text: { type: "plain_text", text: "Reject" },
+          style: "danger",
+          action_id: "reject_action",
+          value: approval.id,
+        },
+      ],
+    },
+  ]));
+}
+
+function buildEmailBlocks(tasks: Array<{ id: string; title: string; body: string }>): Array<Record<string, unknown>> {
+  return tasks.flatMap((task) => ([
+    {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `📧 *${task.title}*\n${(task.body || "Draft ready").slice(0, 140)}`,
+      },
+    },
+    {
+      type: "actions",
+      elements: [
+        {
+          type: "button",
+          text: { type: "plain_text", text: "View Draft" },
+          style: "primary",
+          action_id: "view_email_draft",
+          value: task.id,
+        },
+        {
+          type: "button",
+          text: { type: "plain_text", text: "Skip" },
+          action_id: "skip_email_task",
+          value: task.id,
+        },
+        {
+          type: "button",
+          text: { type: "plain_text", text: "Remind Tomorrow" },
+          action_id: "remind_email_task",
+          value: task.id,
+        },
+      ],
+    },
+  ]));
+}
+
+async function maybeHandleQuickCommand(ctx: SlackMessageContext): Promise<SlackResponse | null> {
+  const text = ctx.text.trim();
+  if (isQuickCommand(text, ["rev", "revenue"])) {
+    const snapshot = await fetchRevenueSnapshotForQuickCommand();
+    return {
+      handled: true,
+      reply: `Today: ${compactCurrency(snapshot.today, 2)} | MTD: ${compactCurrency(snapshot.mtd)} | Amazon ${compactCurrency(snapshot.amazon, 2)} / Shopify ${compactCurrency(snapshot.shopify, 2)}`,
+      sources: [],
+      answerLogId: null,
+    };
+  }
+  if (isQuickCommand(text, ["cash"])) {
+    const balance = await fetchPlaidLiveBalance().catch(() => 0);
+    return {
+      handled: true,
+      reply: `Cash: ${compactCurrency(balance, 2)} (Plaid live)`,
+      sources: [],
+      answerLogId: null,
+    };
+  }
+  if (isQuickCommand(text, ["pnl"])) {
+    const data = await fetchInternalJson("/api/ops/qbo/query?type=pnl");
+    const body = data ? formatQboPnlForSlack(data) : null;
+    return {
+      handled: true,
+      reply: formatReneSlackReply(body || "I couldn’t load the live P&L.", { isReport: false }),
+      sources: [],
+      answerLogId: null,
+    };
+  }
+  if (isQuickCommand(text, ["vendors"])) {
+    const data = await fetchInternalJson("/api/ops/qbo/query?type=vendors");
+    return {
+      handled: true,
+      reply: formatReneSlackReply(formatQboVendorsForSlack(data || {}) || "No vendors found.", { isReport: false }),
+      sources: [],
+      answerLogId: null,
+    };
+  }
+  if (isQuickCommand(text, ["tasks"])) {
+    const counts = await fetchPendingTaskCounts();
+    const total = Object.values(counts).reduce((sum, value) => sum + value, 0);
+    return {
+      handled: true,
+      reply: `${total} pending: ${counts.qbo_categorize || 0} categorizations, ${counts.email_draft_response || 0} email drafts, ${(counts.vendor_followup || 0) + (counts.distributor_followup || 0)} follow-ups`,
+      sources: [],
+      answerLogId: null,
+    };
+  }
+  if (isQuickCommand(text, ["approve"])) {
+    const approvals = await fetchPendingApprovals();
+    return {
+      handled: true,
+      reply: approvals.length ? `${approvals.length} approval${approvals.length === 1 ? "" : "s"} pending.` : "No pending approvals.",
+      sources: [],
+      answerLogId: null,
+      blocks: approvals.length ? buildApprovalBlocks(approvals) : undefined,
+    };
+  }
+  if (isQuickCommand(text, ["emails"])) {
+    const tasks = await fetchPendingEmailTasks();
+    return {
+      handled: true,
+      reply: tasks.length ? `${tasks.length} draft${tasks.length === 1 ? "" : "s"} ready for review.` : "No email drafts are waiting right now.",
+      sources: [],
+      answerLogId: null,
+      blocks: tasks.length ? buildEmailBlocks(tasks) : undefined,
+    };
+  }
+  if (isQuickCommand(text, ["review"])) {
+    const data = await fetchInternalJson("/api/ops/qbo/query?type=purchases&limit=20");
+    if (!data) return null;
+    const purchases = Array.isArray(data.purchases) ? (data.purchases as Array<Record<string, unknown>>) : [];
+    const reviewRows = purchases.filter((purchase) => {
+      const firstLine = Array.isArray(purchase.Lines) ? ((purchase.Lines[0] || {}) as Record<string, unknown>) : {};
+      const account = String(firstLine.Account || "").toLowerCase();
+      return !account || account.includes("uncategorized");
+    });
+    const body = reviewRows.length
+      ? ["Need review:", ...reviewRows.slice(0, 5).map((purchase, index) => `• row ${index + 1}: ${String(purchase.Date || "")} ${compactCurrency(Number(purchase.Amount || 0), 2)} — ${String(purchase.Vendor || "Unknown")}`), "", "Reply like `row 2 is shipping`."] .join("\n")
+      : "No uncategorized transactions need review right now.";
+    return {
+      handled: true,
+      reply: formatReneSlackReply(body, { isReport: false }),
+      sources: [],
+      answerLogId: null,
+    };
+  }
+  if (isQuickCommand(text, ["help"])) {
+    return {
+      handled: true,
+      reply: `Quick commands: rev, cash, pnl, vendors, tasks, review, emails, approve.`,
+      sources: [],
+      answerLogId: null,
+    };
+  }
+  return null;
 }
 
 function looksLikeQboReadQuery(text: string): boolean {
@@ -273,10 +547,10 @@ function formatCurrency(value: number): string {
 function formatQboPnlForSlack(data: Record<string, unknown>): string | null {
   const period = (data.period || {}) as Record<string, unknown>;
   const summary = (data.summary || {}) as Record<string, unknown>;
-  const revenue = Number(summary.TotalIncome || summary.Income || summary.Revenue || 0);
-  const cogs = Number(summary.TotalCostOfGoodsSold || summary.CostOfGoodsSold || summary.COGS || 0);
-  const expenses = Number(summary.TotalExpenses || summary.Expenses || 0);
-  const netIncome = Number(summary.NetIncome || summary.NetOperatingIncome || revenue - cogs - expenses || 0);
+  const revenue = Number(summary["Total Income"] || summary.TotalIncome || summary["Total Revenue"] || summary.Revenue || summary.Income || 0);
+  const cogs = Number(summary["Total Cost of Goods Sold"] || summary.TotalCostOfGoodsSold || summary["Total COGS"] || summary.COGS || summary.CostOfGoodsSold || 0);
+  const expenses = Math.abs(Number(summary["Total Expenses"] || summary.TotalExpenses || summary.Expenses || 0));
+  const netIncome = Number(summary["Net Income"] || summary.NetIncome || summary["Net Operating Income"] || summary.NetOperatingIncome || revenue - cogs - expenses || 0);
   return [
     `• P&L MTD (${String(period.start || "start")} to ${String(period.end || "today")})`,
     `• Revenue: ${formatCurrency(revenue)}`,
@@ -1836,6 +2110,11 @@ export async function processAbraMessage(
     };
   }
 
+  const quickCommandResponse = await maybeHandleQuickCommand({ ...ctx, text: textForRouting });
+  if (quickCommandResponse) {
+    return quickCommandResponse;
+  }
+
   const learnedFinancialCorrection = await maybeLearnFinancialCorrection({ ...ctx, text: textForRouting });
   if (learnedFinancialCorrection) {
     return {
@@ -1953,6 +2232,7 @@ export async function processAbraMessage(
         : answer.reply,
     sources: answer.sources,
     answerLogId: answer.answerLogId,
+    blocks: undefined,
   };
 }
 
