@@ -550,7 +550,13 @@ function formatQboPnlForSlack(data: Record<string, unknown>): string | null {
   const revenue = Number(summary["Total Income"] || summary.TotalIncome || summary["Total Revenue"] || summary.Revenue || summary.Income || 0);
   const cogs = Number(summary["Total Cost of Goods Sold"] || summary.TotalCostOfGoodsSold || summary["Total COGS"] || summary.COGS || summary.CostOfGoodsSold || 0);
   const expenses = Math.abs(Number(summary["Total Expenses"] || summary.TotalExpenses || summary.Expenses || 0));
-  const netIncome = Number(summary["Net Income"] || summary.NetIncome || summary["Net Operating Income"] || summary.NetOperatingIncome || revenue - cogs - expenses || 0);
+  // Compute net income from components — QBO sometimes returns wrong sign
+  const rawNetIncome = Number(summary["Net Income"] || summary.NetIncome || summary["Net Operating Income"] || summary.NetOperatingIncome || 0);
+  const computedNetIncome = revenue - cogs - expenses;
+  // If QBO says positive but computed says negative (or vice versa), trust computed
+  const netIncome = Math.sign(rawNetIncome) !== Math.sign(computedNetIncome) && computedNetIncome !== 0
+    ? computedNetIncome
+    : rawNetIncome || computedNetIncome;
   return [
     `• P&L MTD (${String(period.start || "start")} to ${String(period.end || "today")})`,
     `• Revenue: ${formatCurrency(revenue)}`,
