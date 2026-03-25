@@ -56,15 +56,38 @@ function categoryAliasToAccountHint(categoryHint: string): string {
   if (hint.includes("merchant")) return "122";
   if (hint.includes("advertising")) return "16";
   if (hint.includes("insurance")) return "42";
-  if (hint.includes("utilit")) return "91";
+  if (hint.includes("utilit")) return "78";
   if (hint.includes("suppl")) return "83";
   if (hint.includes("fuel")) return "146";
   if (hint.includes("albanese")) return "176";
   if (hint.includes("belmark")) return "177";
   if (hint.includes("powers")) return "178";
-  if (hint.includes("dutch")) return "28";
+  if (hint.includes("packag")) return "179";
+  if (hint.includes("dutch")) return "175";
+  if (hint.includes("investor") || hint.includes("loan")) return "167";
   if (hint.includes("personal")) return "2";
   return categoryHint.trim();
+}
+
+function extractKnownVendor(value: string): string {
+  const match = value.match(/\b(anthropic|pirate ship|shopify|amazon|google|youtube|facebook|meta|geico|t-mobile|tmobile|intuit|quickbooks|office depot|staples|uline|slack|openai|stripe|arco|shell|chevron|albanese|belmark|powers|dutch valley|ninja|ninjaprinthaus|rene|gonzalez|stutman|ben)\b/i);
+  return match?.[1]?.trim() || "";
+}
+
+function sanitizePattern(rawPattern: string, categoryHint = ""): string {
+  const knownFromPattern = extractKnownVendor(rawPattern);
+  if (knownFromPattern) return knownFromPattern;
+
+  const knownFromCategory = extractKnownVendor(categoryHint);
+  if (knownFromCategory) return knownFromCategory;
+
+  return rawPattern
+    .replace(/\$[\d,.]+/g, " ")
+    .replace(/\b(anything from|categorize|all|the|this|that|these|those)\b/gi, " ")
+    .replace(/\b(charges?|transactions?|purchases?|payments?|deposits?|expense|expenses)\b/gi, " ")
+    .replace(/\bfor\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 async function resolveAccount(categoryHint: string): Promise<LearnedCorrection | null> {
@@ -84,7 +107,16 @@ async function resolveAccount(categoryHint: string): Promise<LearnedCorrection |
   }
 
   const partial = accounts.find((account) => normalizeText(String(account.Name || "")).includes(normalizedHint));
-  if (!partial?.Id) return null;
+  if (!partial?.Id) {
+    if (/^\d+$/.test(hint)) {
+      return {
+        pattern: "",
+        accountId: hint,
+        accountName: categoryHint.trim() || hint,
+      };
+    }
+    return null;
+  }
   return {
     pattern: "",
     accountId: String(partial.Id),
@@ -96,7 +128,14 @@ function parseCorrection(text: string, ctx: SlackMessageContext): { pattern: str
   const cleaned = text.trim();
   let match = cleaned.match(/^categorize\s+(.+?)\s+to\s+(.+)$/i);
   if (match) {
-    return { pattern: match[1].trim(), categoryHint: match[2].trim() };
+    const categoryHint = match[2].trim();
+    return { pattern: sanitizePattern(match[1].trim(), categoryHint), categoryHint };
+  }
+
+  match = cleaned.match(/^(?:anything from\s+)?(.+?)\s+(?:is|should be)\s+(.+)$/i);
+  if (match) {
+    const categoryHint = match[2].trim();
+    return { pattern: sanitizePattern(match[1].trim(), categoryHint), categoryHint };
   }
 
   match = cleaned.match(/^(?:that should be|it should be)\s+(.+)$/i);

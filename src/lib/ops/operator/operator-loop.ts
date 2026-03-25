@@ -2,7 +2,7 @@ import { runBatchTransactionReview } from "@/lib/ops/operator/batch-review";
 import { detectEmailOperatorGaps } from "@/lib/ops/operator/gap-detectors/email";
 import { detectInventoryAlerts } from "@/lib/ops/operator/gap-detectors/inventory";
 import { detectPipelineOperatorGaps } from "@/lib/ops/operator/gap-detectors/pipeline";
-import { detectQBOOperatorGaps } from "@/lib/ops/operator/gap-detectors/qbo";
+import { detectQBOOperatorGaps, upgradeExistingQboReviewTasks } from "@/lib/ops/operator/gap-detectors/qbo";
 import { detectVendorPaymentTasks } from "@/lib/ops/operator/gap-detectors/vendor-payments";
 import { runOperatorHealthMonitor } from "@/lib/ops/operator/health-monitor";
 import { runMeetingPrepAutoGeneration } from "@/lib/ops/operator/meeting-prep";
@@ -267,7 +267,9 @@ export async function runOperatorLoop(): Promise<OperatorLoopResult> {
     ...reconciliation.tasks,
     ...wholesale.tasks,
   ]);
-  const execution = await executeOperatorTasks(12);
+  const upgradedReviewTasks = await upgradeExistingQboReviewTasks().catch(() => 0);
+  const executionLimit = qbo.summary.uncategorized >= 20 ? 60 : 12;
+  const execution = await executeOperatorTasks(executionLimit);
   const pendingTasks = await getPendingCount();
   const qboModified = execution.results.some(
     (row) =>
@@ -283,7 +285,7 @@ export async function runOperatorLoop(): Promise<OperatorLoopResult> {
   );
 
   const result: OperatorLoopResult = {
-    createdTasks,
+    createdTasks: createdTasks + upgradedReviewTasks,
     pendingTasks,
     detectorSummary: {
       qbo: qbo.summary,

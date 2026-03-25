@@ -78,6 +78,13 @@ type LedgerTransaction = {
   status: string | null;
 };
 
+type ExistingReviewTaskRow = {
+  id: string;
+  title: string;
+  status: string;
+  execution_params: Record<string, unknown> | null;
+};
+
 const REVENUE_ACCOUNT_CODES = new Set(["4100", "4200", "4300", "4400"]);
 
 const VENDOR_NAME_OVERRIDES: Array<{ test: RegExp; vendorName: string }> = [
@@ -108,6 +115,36 @@ function getInternalBaseUrl(): string {
 function getInternalHeaders(): HeadersInit {
   const cronSecret = (process.env.CRON_SECRET || "").trim();
   return cronSecret ? { Authorization: `Bearer ${cronSecret}` } : {};
+}
+
+function getSupabaseEnv() {
+  const baseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!baseUrl || !serviceKey) {
+    throw new Error("Missing Supabase credentials");
+  }
+  return { baseUrl, serviceKey };
+}
+
+async function sbFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const env = getSupabaseEnv();
+  const headers = new Headers(init.headers || {});
+  headers.set("apikey", env.serviceKey);
+  headers.set("Authorization", `Bearer ${env.serviceKey}`);
+  if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+
+  const res = await fetch(`${env.baseUrl}${path}`, {
+    ...init,
+    headers,
+    cache: "no-store",
+    signal: init.signal ?? AbortSignal.timeout(20000),
+  });
+  const text = await res.text();
+  const json = text ? JSON.parse(text) : null;
+  if (!res.ok) {
+    throw new Error(`Supabase ${init.method || "GET"} ${path} failed (${res.status})`);
+  }
+  return json as T;
 }
 
 function normalizeText(value: string | null | undefined): string {
@@ -175,65 +212,71 @@ async function fetchCategorizePreview(): Promise<CategorizePreviewRow[]> {
 
 async function buildCategorizeTasks(preview: CategorizePreviewRow[]): Promise<OperatorTaskInsert[]> {
   const learnedRules = await loadLearnedQboRules();
+  const tasks: OperatorTaskInsert[] = [];
 
-  return preview
-    .filter((row) => row.entityType === "Purchase")
-    .map((row) => {
-      const resolution = resolveQboCategory(row.description, row.amount, learnedRules);
-      const baseParams = {
-        transactionId: row.transactionId,
-        entityType: row.entityType,
-        description: row.description,
-        amount: row.amount,
-        date: row.date,
-        currentAccountId: row.currentAccountId,
-        currentAccountName: row.currentAccountName,
-        confidence: resolution.confidence,
-        reasoning: resolution.reasoning,
-        matchedPattern: resolution.pattern,
-        resolutionSource: resolution.source,
-      };
+  for (const row of preview) {
+    if (row.entityType !== "Purchase") continue;
 
-      if (resolution.matched && resolution.accountId && resolution.confidence >= 80) {
-        return {
-          task_type: "qbo_categorize",
-          title: `Categorize ${row.description} to ${resolution.accountName}`,
-          description:
-            `Update QBO purchase ${row.transactionId} dated ${row.date} from ${row.currentAccountName || "uncategorized"} to ${resolution.accountName}. ` +
-            `Reason: ${resolution.reasoning}`,
-          priority: resolution.confidence >= 95 || row.isReneTransfer ? "high" : "medium",
-          source: "gap_detector:qbo",
-          assigned_to: "abra",
-          execution_params: {
-            natural_key: taskNaturalKey(["qbo_categorize", row.transactionId, resolution.accountId]),
-            suggestedAccountId: resolution.accountId,
-            suggestedAccountName: resolution.accountName,
-            ...baseParams,
-          },
-          tags: ["qbo", "finance", "categorization", "auto-resolved"],
-        };
-      }
+    const resolution = resolveQboCategory(row.description, row.amount, learnedRules);
+    if (resolution.skip) continue;
 
-      return {
-        task_type: "qbo_review_transaction",
-        title: `Review uncategorized transaction ${row.description}`,
+    const baseParams = {
+      transactionId: row.transactionId,
+      entityType: row.entityType,
+      description: row.description,
+      amount: row.amount,
+      date: row.date,
+      currentAccountId: row.currentAccountId,
+      currentAccountName: row.currentAccountName,
+      confidence: resolution.confidence,
+      reasoning: resolution.reasoning,
+      matchedPattern: resolution.pattern,
+      resolutionSource: resolution.source,
+    };
+
+    if (resolution.matched && resolution.accountId && resolution.confidence >= 80) {
+      tasks.push({
+        task_type: "qbo_categorize",
+        title: `Categorize ${row.description} to ${resolution.accountName}`,
         description:
-          resolution.confidence >= 50 && resolution.accountName
-            ? `Potential match: ${resolution.accountName} (${resolution.confidence}% confidence). ${resolution.reasoning}`
-            : `No confident categorization match found. ${resolution.reasoning}`,
-        priority: "high",
+          `Update QBO purchase ${row.transactionId} dated ${row.date} from ${row.currentAccountName || "uncategorized"} to ${resolution.accountName}. ` +
+          `Reason: ${resolution.reasoning}`,
+        priority: resolution.confidence >= 95 || row.isReneTransfer ? "high" : "medium",
         source: "gap_detector:qbo",
-        assigned_to: "rene",
-        requires_approval: true,
+        assigned_to: "abra",
         execution_params: {
-          natural_key: taskNaturalKey(["qbo_review_transaction", row.transactionId]),
+          natural_key: taskNaturalKey(["qbo_categorize", row.transactionId, resolution.accountId]),
           suggestedAccountId: resolution.accountId,
           suggestedAccountName: resolution.accountName,
           ...baseParams,
         },
-        tags: ["qbo", "finance", "review"],
-      };
+        tags: ["qbo", "finance", "categorization", "auto-resolved"],
+      });
+      continue;
+    }
+
+    tasks.push({
+      task_type: "qbo_review_transaction",
+      title: `Review uncategorized transaction ${row.description}`,
+      description:
+        resolution.confidence >= 50 && resolution.accountName
+          ? `Potential match: ${resolution.accountName} (${resolution.confidence}% confidence). ${resolution.reasoning}`
+          : `No confident categorization match found. ${resolution.reasoning}`,
+      priority: "high",
+      source: "gap_detector:qbo",
+      assigned_to: "rene",
+      requires_approval: true,
+      execution_params: {
+        natural_key: taskNaturalKey(["qbo_review_transaction", row.transactionId]),
+        suggestedAccountId: resolution.accountId,
+        suggestedAccountName: resolution.accountName,
+        ...baseParams,
+      },
+      tags: ["qbo", "finance", "review"],
     });
+  }
+
+  return tasks;
 }
 
 function buildMissingVendorTasks(
@@ -406,4 +449,67 @@ export async function detectQBOOperatorGaps(): Promise<QBOGapDetectorResult> {
       totalTransactions: purchases.length,
     },
   };
+}
+
+export async function upgradeExistingQboReviewTasks(): Promise<number> {
+  const learnedRules = await loadLearnedQboRules().catch(() => []);
+  const rows = await sbFetch<ExistingReviewTaskRow[]>(
+    "/rest/v1/abra_operator_tasks?select=id,title,status,execution_params&task_type=eq.qbo_review_transaction&status=in.(pending,needs_approval)&limit=200",
+  ).catch(() => []);
+
+  let upgraded = 0;
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const params = row.execution_params || {};
+    const description = String(params.description || row.title || "");
+    const amount = Number(params.amount || 0);
+    const resolution = resolveQboCategory(description, amount, learnedRules);
+    if (resolution.skip) {
+      await sbFetch(`/rest/v1/abra_operator_tasks?id=eq.${row.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          status: "completed",
+          execution_result: {
+            ok: true,
+            skipped: true,
+            reason: resolution.reasoning,
+          },
+          error_message: null,
+          completed_at: new Date().toISOString(),
+        }),
+      }).catch(() => {});
+      continue;
+    }
+    if (!(resolution.matched && resolution.accountId && resolution.confidence >= 80)) continue;
+
+    await sbFetch(`/rest/v1/abra_operator_tasks?id=eq.${row.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        task_type: "qbo_categorize",
+        title: `Categorize ${description} to ${resolution.accountName}`,
+        description:
+          resolution.confidence >= 95
+            ? `Upgraded from review queue. Exact match to ${resolution.accountName}. ${resolution.reasoning}`
+            : `Upgraded from review queue. ${resolution.reasoning}`,
+        status: "pending",
+        assigned_to: "abra",
+        requires_approval: false,
+        approval_id: null,
+        execution_result: null,
+        error_message: null,
+        execution_params: {
+          ...params,
+          natural_key: taskNaturalKey(["qbo_categorize", String(params.transactionId || ""), resolution.accountId]),
+          suggestedAccountId: resolution.accountId,
+          suggestedAccountName: resolution.accountName,
+          confidence: resolution.confidence,
+          reasoning: resolution.reasoning,
+          matchedPattern: resolution.pattern,
+          resolutionSource: resolution.source,
+        },
+      }),
+    }).catch(() => {});
+    upgraded += 1;
+  }
+
+  return upgraded;
 }

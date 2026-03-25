@@ -154,8 +154,6 @@ export async function reportOperatorCycle(summary: OperatorCycleSummary): Promis
     summary.execution.blocked > 0 ||
     summary.execution.needsApproval > 0;
 
-  if (!hasMaterialActivity) return;
-
   const approvalTasks = await fetchApprovalTasks();
   const qboHealthPct = summary.detectorSummary.qbo.totalTransactions > 0
     ? Math.round((summary.detectorSummary.qbo.categorizedTransactions / summary.detectorSummary.qbo.totalTransactions) * 100)
@@ -200,6 +198,7 @@ export async function reportOperatorCycle(summary: OperatorCycleSummary): Promis
       : []),
     `*Queued:* ${summary.createdTasks} new operator task(s)`,
     `*Executed:* ${summary.execution.completed} completed, ${summary.execution.failed} failed, ${summary.execution.blocked} blocked, ${summary.execution.needsApproval} awaiting approval`,
+    ...(!hasMaterialActivity ? ["*Activity:* no material changes this cycle"] : []),
     ...(summary.pendingTasks > 0 ? [`*Remaining Pending:* ${summary.pendingTasks}`] : []),
     ...(approvalTasks.length ? [`*Needs Approval:* ${approvalTasks.length}`] : []),
     "",

@@ -1,4 +1,5 @@
 import {
+  createQBOAccount,
   createQBOJournalEntry,
   createQBOVendor,
   getQBOAccounts,
@@ -60,6 +61,7 @@ type QBOAccount = {
   Name?: string;
   AccountType?: string;
   AcctNum?: string;
+  AccountSubType?: string;
 };
 
 type QBOVendor = {
@@ -113,6 +115,11 @@ const REVENUE_ACCOUNT_METRIC_MAP: Record<string, { metricNames: string[]; qboAcc
 const POWERS_EMAIL = "gregk@powers-inc.com";
 const WHOLESALE_UNIT_PRICE = 2.1;
 const FINANCIALS_CHANNEL_ID = "C0AKG9FSC2J";
+const CATEGORIZATION_ACCOUNT_FALLBACKS: Record<string, { name: string; accountType: string; acctNum?: string; accountSubType?: string }> = {
+  "179": { name: "COGS Packaging", accountType: "Cost of Goods Sold", acctNum: "5300" },
+  "175": { name: "COGS general", accountType: "Cost of Goods Sold", acctNum: "5100" },
+  "167": { name: "Investor Loan - Rene", accountType: "Long Term Liability", acctNum: "2300" },
+};
 
 function getSupabaseEnv() {
   const baseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -398,6 +405,56 @@ async function fetchAccountsViaApi(): Promise<QBOAccount[]> {
   return Array.isArray(data.accounts) ? data.accounts : [];
 }
 
+async function ensureCategorizationAccount(targetId: string, targetName: string): Promise<{ accountId: string; accountName: string }> {
+  const allAccounts = [
+    ...((((await getQBOAccounts())?.QueryResponse?.Account as QBOAccount[]) || [])),
+    ...(await fetchAccountsViaApi()),
+  ].filter((account, index, arr) => {
+    const id = String(account.Id || "");
+    return id ? arr.findIndex((item) => String(item.Id || "") === id) === index : true;
+  });
+
+  const direct = allAccounts.find((account) => String(account.Id || "") === targetId);
+  if (direct?.Id) {
+    return { accountId: String(direct.Id), accountName: String(direct.Name || targetName || targetId) };
+  }
+
+  const byName = allAccounts.find((account) => normalizeText(String(account.Name || "")) === normalizeText(targetName));
+  if (byName?.Id) {
+    return { accountId: String(byName.Id), accountName: String(byName.Name || targetName || targetId) };
+  }
+
+  const fallback = CATEGORIZATION_ACCOUNT_FALLBACKS[targetId];
+  if (!fallback) {
+    return { accountId: targetId, accountName: targetName || targetId };
+  }
+
+  const created = await createQBOAccount({
+    Name: fallback.name,
+    AccountType: fallback.accountType,
+    ...(fallback.accountSubType ? { AccountSubType: fallback.accountSubType } : {}),
+    ...(fallback.acctNum ? { AcctNum: fallback.acctNum } : {}),
+    Description: `Created automatically by Abra operator to support transaction categorization.`,
+  }).catch(() => null);
+
+  const createdEntity = ((created as Record<string, unknown>)?.Account || created || null) as Record<string, unknown> | null;
+  const createdId = String(createdEntity?.Id || "");
+  if (createdId) {
+    return { accountId: createdId, accountName: String(createdEntity?.Name || fallback.name) };
+  }
+
+  const refreshed = [
+    ...((((await getQBOAccounts())?.QueryResponse?.Account as QBOAccount[]) || [])),
+    ...(await fetchAccountsViaApi()),
+  ];
+  const refreshedMatch = refreshed.find((account) => normalizeText(String(account.Name || "")) === normalizeText(fallback.name));
+  if (refreshedMatch?.Id) {
+    return { accountId: String(refreshedMatch.Id), accountName: String(refreshedMatch.Name || fallback.name) };
+  }
+
+  throw new Error(`Unable to resolve QBO account ${targetId} ${targetName}`.trim());
+}
+
 async function markNeedsApproval(task: OperatorTaskRow, message: string, result?: Record<string, unknown>) {
   await sbFetch(`/rest/v1/abra_operator_tasks?id=eq.${task.id}`, {
     method: "PATCH",
@@ -567,10 +624,15 @@ async function failTask(task: OperatorTaskRow, message: string, status: Operator
 
 async function executeCategorizeTask(task: OperatorTaskRow): Promise<ExecuteTaskResult> {
   const transactionId = String(task.execution_params?.transactionId || "");
-  const suggestedAccountId = String(task.execution_params?.suggestedAccountId || "");
-  const suggestedAccountName = String(task.execution_params?.suggestedAccountName || "");
+  const requestedAccountId = String(task.execution_params?.suggestedAccountId || "");
+  const requestedAccountName = String(task.execution_params?.suggestedAccountName || "");
   if (!transactionId) throw new Error("Missing transactionId");
-  if (!suggestedAccountId) throw new Error("Missing suggestedAccountId");
+  if (!requestedAccountId) throw new Error("Missing suggestedAccountId");
+
+  const { accountId: suggestedAccountId, accountName: suggestedAccountName } = await ensureCategorizationAccount(
+    requestedAccountId,
+    requestedAccountName,
+  );
 
   const purchase = await fetchPurchaseById(transactionId);
   if (!purchase?.Id || !purchase.SyncToken) {
