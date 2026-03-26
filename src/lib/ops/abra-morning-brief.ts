@@ -6,7 +6,7 @@ import { analyzeInventory } from "@/lib/ops/abra-inventory-forecast";
 import { detectAwaitingReplies } from "@/lib/ops/abra-email-fetch";
 import { notify } from "@/lib/ops/notify";
 import { createNotionPage } from "@/lib/ops/abra-notion-write";
-import { readState } from "@/lib/ops/state";
+import { readState, writeState } from "@/lib/ops/state";
 import { RECONCILIATION_SUMMARY_STATE_KEY, type ReconciliationSummary } from "@/lib/ops/operator/reconciliation";
 import { OPEN_PO_TRACKER_STATE_KEY, type OpenPoSummary } from "@/lib/ops/operator/po-tracker";
 import { UNIFIED_INVENTORY_STATE_KEY, type UnifiedInventorySummary } from "@/lib/ops/operator/unified-inventory";
@@ -823,6 +823,26 @@ Rules:
 const BEN_SLACK_USER_ID = "U08JY86Q508";
 const RENE_SLACK_USER_ID = "U0ALL27JM38";
 const FINANCIALS_CHANNEL = "C0AKG9FSC2J";
+const MORNING_BRIEF_HOLD_KEY = "abra:morning_brief_hold" as never;
+const MORNING_BRIEF_HELD_KEY = "abra:morning_brief_held" as never;
+const BEN_LAST_SEEN_KEY = "abra:ben_last_seen" as never;
+
+type HeldMorningBrief = {
+  date: string;
+  content: string;
+  held_at: string;
+};
+
+function pacificDateLabel(value = new Date()): string {
+  return value.toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
+}
+
+function isSamePacificDay(iso: string | null | undefined, now = new Date()): boolean {
+  if (!iso) return false;
+  const parsed = new Date(iso);
+  if (!Number.isFinite(parsed.getTime())) return false;
+  return pacificDateLabel(parsed) === pacificDateLabel(now);
+}
 
 async function fetchInternalOpsJson(path: string): Promise<Record<string, unknown> | null> {
   const cronSecret = (process.env.CRON_SECRET || "").trim();
@@ -1055,10 +1075,24 @@ async function getVendorPaymentBrief(): Promise<{
 
 export async function sendMorningBrief(): Promise<void> {
   const brief = await buildCompactBenBrief();
+  const holdEnabled = await readState<boolean>(MORNING_BRIEF_HOLD_KEY, true).catch(() => true);
+  const benLastSeen = await readState<{ ts?: string } | null>(BEN_LAST_SEEN_KEY, null).catch(() => null);
+  const lastSeenTs = benLastSeen?.ts || null;
+  const benSeenRecently = lastSeenTs
+    ? Number.isFinite(Date.parse(lastSeenTs)) && Date.now() - Date.parse(lastSeenTs) <= 30 * 60 * 1000
+    : false;
+  const benSeenToday = isSamePacificDay(lastSeenTs);
 
   // DM the morning brief to Ben only — not to any channel
   const botToken = process.env.SLACK_BOT_TOKEN;
-  if (botToken) {
+  if (holdEnabled && (!benSeenRecently || !benSeenToday)) {
+    await writeState<HeldMorningBrief>(MORNING_BRIEF_HELD_KEY, {
+      date: pacificDateLabel(),
+      content: brief,
+      held_at: new Date().toISOString(),
+    }).catch(() => {});
+    console.log("[morning-brief] Holding Ben brief until Ben pings Abra");
+  } else if (botToken) {
     try {
       // Open DM channel with Ben
       const dmRes = await fetch("https://slack.com/api/conversations.open", {

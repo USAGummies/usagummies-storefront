@@ -1,4 +1,4 @@
-import { searchEmails } from "@/lib/ops/gmail-reader";
+import { readAllAttachments, readEmail, searchEmails } from "@/lib/ops/gmail-reader";
 import type { OperatorTaskInsert } from "@/lib/ops/operator/gap-detectors/qbo";
 
 type PoCaptureResult = {
@@ -21,11 +21,12 @@ type ParsedPo = {
   emailSubject: string;
   emailFrom: string;
   needsShipping: boolean;
+  needsReview: boolean;
 };
 
 const WHOLESALE_UNIT_PRICE = 2.1;
 const RETAIL_UNIT_PRICE = 3.49;
-const KNOWN_WHOLESALE_RE = /(inderbitzin|patrick|wholesale|distributor|sample)/i;
+const KNOWN_WHOLESALE_RE = /(inderbitzin|patrick|mike arlint|glacier wholesalers|wholesale|distributor)/i;
 
 function normalizeText(value: string | null | undefined): string {
   return String(value || "").replace(/\s+/g, " ").trim();
@@ -45,7 +46,9 @@ function extractCustomerName(from: string, body: string): string {
 
 function extractPoNumber(text: string): string | null {
   const match = text.match(/\b(?:po|p\.o\.|purchase order|order)\s*#?\s*:?\s*([A-Z0-9-]{3,})\b/i);
-  return match?.[1]?.trim() || null;
+  const candidate = match?.[1]?.trim() || null;
+  if (!candidate) return null;
+  return /\d/.test(candidate) ? candidate : null;
 }
 
 function parseQuantity(text: string): number | null {
@@ -84,10 +87,7 @@ function extractShippingAddress(text: string): string | null {
 
 function looksLikePoEmail(subject: string, body: string, from: string): boolean {
   const haystack = `${subject}\n${body}\n${from}`;
-  return (
-    /\b(po|p\.o\.|purchase order|order confirmation|po number|po #)\b/i.test(haystack) &&
-    /\b(units?|cases?|bags?|master cartons?)\b/i.test(haystack)
-  ) || KNOWN_WHOLESALE_RE.test(haystack);
+  return /\b(po|p\.o\.|purchase order|order confirmation|po number|po #)\b/i.test(haystack);
 }
 
 function parsePoFromEmail(message: {
@@ -101,16 +101,17 @@ function parsePoFromEmail(message: {
   const text = `${message.subject}\n${message.body}`;
   const poNumber = extractPoNumber(text);
   const quantity = parseQuantity(text);
-  if (!poNumber || !quantity) return null;
+  if (!poNumber) return null;
 
   const wholesale = KNOWN_WHOLESALE_RE.test(`${message.from}\n${text}`);
   const unitPrice = extractUnitPrice(text, wholesale);
   const customerName = extractCustomerName(message.from, message.body);
-  const total = Number((quantity * unitPrice).toFixed(2));
+  const normalizedQuantity = quantity || 0;
+  const total = Number((normalizedQuantity * unitPrice).toFixed(2));
   return {
     customerName,
     poNumber,
-    quantity,
+    quantity: normalizedQuantity,
     unitPrice,
     total,
     deliveryDate: extractDeliveryDate(text),
@@ -120,22 +121,53 @@ function parsePoFromEmail(message: {
     emailSubject: message.subject,
     emailFrom: message.from,
     needsShipping: !/inderbitzin/i.test(customerName),
+    needsReview: normalizedQuantity <= 0,
   };
+}
+
+async function enrichPoCandidate(message: {
+  id: string;
+  threadId: string;
+  from: string;
+  subject: string;
+  body: string;
+}): Promise<ParsedPo | null> {
+  const fullMessage = await readEmail(message.id).catch(() => null);
+  const attachments = fullMessage?.attachments || [];
+  const extracted = attachments.length
+    ? await readAllAttachments(message.id, attachments).catch(() => [])
+    : [];
+  const attachmentText = extracted
+    .map((attachment) => String(attachment.textContent || ""))
+    .filter((text) => text && !text.startsWith("["))
+    .join("\n\n");
+  const merged = {
+    ...message,
+    body: [message.body, attachmentText].filter(Boolean).join("\n\n"),
+  };
+  return parsePoFromEmail(merged);
 }
 
 export async function detectPoCaptureTasks(): Promise<PoCaptureResult> {
   const emails = await searchEmails(
-    'newer_than:1d (subject:(PO OR "Purchase Order" OR Order OR "P.O.") OR "purchase order" OR "PO #" OR "order confirmation")',
+    'newer_than:1d (subject:(PO OR "Purchase Order" OR "P.O.") OR "purchase order" OR "PO #" OR "PO ")',
     50,
   ).catch(() => []);
 
-  const tasks = (Array.isArray(emails) ? emails : [])
-    .map((message) => parsePoFromEmail(message))
+  const parsed = await Promise.all(
+    (Array.isArray(emails) ? emails : []).map((message) => enrichPoCandidate(message)),
+  );
+
+  const tasks = parsed
     .filter((parsed): parsed is ParsedPo => Boolean(parsed))
     .map((po) => ({
       task_type: "po_received",
-      title: `PO #${po.poNumber} from ${po.customerName} — ${po.quantity} units, $${po.total.toFixed(2)}`,
-      description: `Detected purchase order email from ${po.emailFrom} (${po.emailSubject}).`,
+      title: po.needsReview
+        ? `PO #${po.poNumber} from ${po.customerName} — quantity pending review`
+        : `PO #${po.poNumber} from ${po.customerName} — ${po.quantity} units, $${po.total.toFixed(2)}`,
+      description: po.needsReview
+        ? `Detected purchase order email from ${po.emailFrom} (${po.emailSubject}), but quantity needs manual review from the scanned attachment.`
+        : `Detected purchase order email from ${po.emailFrom} (${po.emailSubject}).`,
       priority: "high" as const,
       source: "gap_detector:po_capture",
       assigned_to: "ben",
@@ -154,8 +186,9 @@ export async function detectPoCaptureTasks(): Promise<PoCaptureResult> {
         email_subject: po.emailSubject,
         email_from: po.emailFrom,
         needs_shipping: po.needsShipping,
+        needs_review: po.needsReview,
       },
-      tags: ["po", "invoice", "approval"],
+      tags: ["po", "invoice", "approval", ...(po.needsReview ? ["needs_review"] : [])],
     }));
 
   return {

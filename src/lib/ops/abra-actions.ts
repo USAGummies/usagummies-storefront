@@ -3377,7 +3377,7 @@ export async function proposeAction(action: AbraAction): Promise<string> {
     );
     if (existing) {
       console.log(`[proposeAction] Dedup: found existing pending approval ${existing.id} for "${summary}"`);
-      return existing.id;
+      return `existing:${existing.id}`;
     }
   } catch {
     // Dedup check failed — proceed to create new approval
@@ -3771,7 +3771,9 @@ export async function proposeAndMaybeExecute(action: AbraAction): Promise<{
   if (!eligible) {
     // Not auto-executable → notify the right owner via Slack
     const owner = getApprovalOwner(action.action_type, action.risk_level as RiskLevel);
-    await notifySlackPendingApproval(approvalId, action, owner);
+    if (!status.startsWith("existing:")) {
+      await notifySlackPendingApproval(approvalId, action, owner);
+    }
     return { approval_id: approvalId, auto_executed: false };
   }
 

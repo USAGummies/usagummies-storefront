@@ -16,6 +16,7 @@
  *   await notifyDaily(dailySummaryText);
  */
 
+import { createHash } from "node:crypto";
 import { isCloud, readState, writeState } from "./state";
 import { classifyNotification } from "@/lib/ops/operator/four-d-filter";
 
@@ -50,6 +51,8 @@ type NotificationGateState = {
     type: string;
   }>;
 };
+
+type NotificationDedupState = Record<string, string>;
 
 // ---------------------------------------------------------------------------
 // Slack Bot Token + Channel ID (preferred — posts to specific channels)
@@ -105,6 +108,8 @@ async function sendSlackBot(
 
 const SLACK_FALLBACK_WEBHOOK = process.env.SLACK_SUPPORT_WEBHOOK_URL;
 const NOTIFICATION_GATE_KEY = "operator:notification_gate" as never;
+const NOTIFICATION_DEDUP_KEY = "operator:notification_dedup" as never;
+const NOTIFICATION_DEDUP_WINDOW_MS = 6 * 60 * 60 * 1000;
 
 const SLACK_WEBHOOK_MAP: Record<NotifyChannel, string | undefined> = {
   alerts: process.env.SLACK_WEBHOOK_ALERTS || SLACK_FALLBACK_WEBHOOK,
@@ -227,6 +232,37 @@ async function passNotificationGate(
   return { allow: true, deferred: false };
 }
 
+function notificationHash(opts: NotifyOpts): string {
+  return createHash("sha256")
+    .update(`${opts.channel}\n${opts.type || "generic"}\n${opts.text}`)
+    .digest("hex");
+}
+
+function pruneNotificationDedupState(
+  state: NotificationDedupState,
+  now = Date.now(),
+): NotificationDedupState {
+  return Object.fromEntries(
+    Object.entries(state).filter(([, iso]) => {
+      const ts = Date.parse(iso);
+      return Number.isFinite(ts) && now - ts < NOTIFICATION_DEDUP_WINDOW_MS;
+    }),
+  );
+}
+
+async function passNotificationDedup(opts: NotifyOpts): Promise<boolean> {
+  const state = pruneNotificationDedupState(
+    await readState<NotificationDedupState>(NOTIFICATION_DEDUP_KEY, {}),
+  );
+  const hash = notificationHash(opts);
+  if (state[hash]) {
+    return false;
+  }
+  state[hash] = new Date().toISOString();
+  await writeState(NOTIFICATION_DEDUP_KEY, state);
+  return true;
+}
+
 // ---------------------------------------------------------------------------
 // Twilio SMS (optional — for critical alerts only)
 // ---------------------------------------------------------------------------
@@ -321,6 +357,9 @@ export async function notify(opts: NotifyOpts): Promise<{ slack: boolean; sms?: 
   const result: { slack: boolean; sms?: boolean; imessage?: boolean } = { slack: false };
   const gate = await passNotificationGate(opts);
   if (!gate.allow) {
+    return result;
+  }
+  if (!(await passNotificationDedup(opts))) {
     return result;
   }
 

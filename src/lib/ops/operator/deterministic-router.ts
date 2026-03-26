@@ -30,6 +30,7 @@ function parseInvoiceInstruction(message: string): Record<string, unknown> {
 export function routeMessage(message: string, _actor: string): RoutedAction | null {
   const msg = message.toLowerCase().trim();
 
+  if (msg === "?") return { intent: "help", action: "show_help", params: {}, result: null, executed: false, error: null };
   if (/^(rev|revenue)$/i.test(msg)) return { intent: "revenue", action: "query_kpi_revenue", params: {}, result: null, executed: false, error: null };
   if (/^(cash)$/i.test(msg) || /\b(cash position|cash balance|how much cash|bank balance)\b/i.test(msg)) {
     return { intent: "cash", action: "query_plaid_balance", params: {}, result: null, executed: false, error: null };
@@ -42,6 +43,8 @@ export function routeMessage(message: string, _actor: string): RoutedAction | nu
   }
   if (/^(tasks?)$/i.test(msg)) return { intent: "tasks", action: "query_operator_tasks", params: {}, result: null, executed: false, error: null };
   if (/^(approve)$/i.test(msg)) return { intent: "approve", action: "query_pending_approvals", params: {}, result: null, executed: false, error: null };
+  if (/^(emails?)$/i.test(msg)) return { intent: "check_email", action: "check_email", params: { query: "newer_than:2d" }, result: null, executed: false, error: null };
+  if (/^(review)$/i.test(msg)) return { intent: "review_transactions", action: "show_review_transactions", params: {}, result: null, executed: false, error: null };
   if (/^(help)$/i.test(msg)) return { intent: "help", action: "show_help", params: {}, result: null, executed: false, error: null };
 
   if (/\b(excel|xlsx|spreadsheet|export|csv)\b/i.test(msg)) {
@@ -98,8 +101,11 @@ export function routeMessage(message: string, _actor: string): RoutedAction | nu
     };
   }
 
+  if (/\b(any new emails?|check my email|check email)\b/i.test(msg)) {
+    return { intent: "search_email", action: "search_email", params: { query: "newer_than:2d" }, result: null, executed: false, error: null };
+  }
   if (/\b(email|inbox|mail)\b/i.test(msg) && /\b(read|check|show|what|any|new)\b/i.test(msg)) {
-    return { intent: "check_email", action: "search_email", params: { query: "newer_than:2d" }, result: null, executed: false, error: null };
+    return { intent: "check_email", action: "check_email", params: { query: "newer_than:2d" }, result: null, executed: false, error: null };
   }
   if (/\b(reply|respond|draft)\b.*\b(to|email)\b/i.test(msg)) {
     return { intent: "draft_reply", action: "draft_email_reply", params: { instruction: message }, result: null, executed: false, error: null };

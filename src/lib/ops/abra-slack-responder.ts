@@ -13,7 +13,7 @@ import { appendCorrection as appendMarkdownCorrection } from "@/lib/ops/abra-mar
 import { executeRoutedAction, renderRoutedActionResponse } from "@/lib/ops/operator/action-executor";
 import { maybeLearnFinancialCorrection } from "@/lib/ops/operator/correction-learner";
 import { routeMessage } from "@/lib/ops/operator/deterministic-router";
-import { readState } from "@/lib/ops/state";
+import { readState, writeState } from "@/lib/ops/state";
 import { UNIFIED_REVENUE_STATE_KEY, type UnifiedRevenueSummary } from "@/lib/ops/operator/unified-revenue";
 import { uploadFileToSlack, type SpreadsheetData } from "@/lib/ops/slack-file-upload";
 
@@ -97,6 +97,15 @@ const FINANCIALS_CHANNEL_ID = "C0AKG9FSC2J";
 const ABRA_CONTROL_CHANNEL_ID = "C0ALS6W7VB4";
 const RENE_SLACK_USER_ID = "U0ALL27JM38";
 const ABRA_SLACK_USER_ID = "U0AKMSTL0GL";
+const BEN_SLACK_USER_ID = "U08JY86Q508";
+const MORNING_BRIEF_HELD_KEY = "abra:morning_brief_held" as never;
+const BEN_LAST_SEEN_KEY = "abra:ben_last_seen" as never;
+
+type HeldMorningBrief = {
+  date: string;
+  content: string;
+  held_at: string;
+};
 
 // ─── Known user identity map ───
 const KNOWN_SLACK_USERS: Record<string, { name: string; role: string; calibration: string }> = {
@@ -122,6 +131,10 @@ function isReneUser(userId: string): boolean {
   return userId === RENE_SLACK_USER_ID;
 }
 
+function isBenUser(userId: string): boolean {
+  return userId === BEN_SLACK_USER_ID;
+}
+
 function isFinancialsChannel(channelId: string): boolean {
   return channelId === FINANCIALS_CHANNEL_ID;
 }
@@ -138,6 +151,29 @@ function monitoredChannelSet(): Set<string> {
       .map((value) => value.trim())
       .filter(Boolean),
   );
+}
+
+function pacificDateLabel(value = new Date()): string {
+  return value.toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
+}
+
+async function updateBenLastSeen(ctx: SlackMessageContext): Promise<void> {
+  if (!isBenUser(ctx.user)) return;
+  await writeState(BEN_LAST_SEEN_KEY, {
+    ts: new Date().toISOString(),
+    channel: ctx.channel,
+    source_ts: ctx.ts,
+  }).catch(() => {});
+}
+
+async function releaseHeldMorningBriefIfNeeded(ctx: SlackMessageContext): Promise<void> {
+  if (!isBenUser(ctx.user)) return;
+  const held = await readState<HeldMorningBrief | null>(MORNING_BRIEF_HELD_KEY, null).catch(() => null);
+  if (!held?.content || held.date !== pacificDateLabel()) return;
+  const sent = await sendDirectMessage(BEN_SLACK_USER_ID, `☀️ *Morning Brief*\n\n${held.content}`).catch(() => false);
+  if (sent) {
+    await writeState(MORNING_BRIEF_HELD_KEY, null).catch(() => {});
+  }
 }
 
 export function shouldAbraRespond(text: string, channel: string): boolean {
@@ -2361,6 +2397,8 @@ export async function processAbraMessage(
 ): Promise<SlackResponse> {
   const text = (ctx.text || "").trim();
   const hasUploads = Boolean(ctx.uploadedFiles && ctx.uploadedFiles.length > 0);
+  await updateBenLastSeen(ctx);
+  await releaseHeldMorningBriefIfNeeded(ctx);
   if (!text && !ctx.forceRespond && !hasUploads) {
     return { handled: false, reply: "", sources: [], answerLogId: null };
   }

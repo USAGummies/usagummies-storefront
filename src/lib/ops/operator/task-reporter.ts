@@ -1,4 +1,5 @@
 import { notify } from "@/lib/ops/notify";
+import { readState, writeState } from "@/lib/ops/state";
 import type { OperatorExecutionSummary } from "@/lib/ops/operator/task-executor";
 
 export type OperatorCycleSummary = {
@@ -66,6 +67,14 @@ type ApprovalTask = {
   title: string;
   task_type: string;
 };
+
+type OperatorReportDedupState = {
+  signature: string | null;
+  posted_at: string | null;
+};
+
+const OPERATOR_REPORT_DEDUP_KEY = "operator:report_cycle_dedup" as const;
+const OPERATOR_REPORT_DEDUP_WINDOW_MS = 60 * 60 * 1000;
 
 function getSupabaseEnv() {
   const baseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -154,6 +163,59 @@ function buildApprovalBlocks(tasks: ApprovalTask[]): unknown[] {
   return blocks;
 }
 
+function buildReportSignature(
+  summary: OperatorCycleSummary,
+  approvalTasks: ApprovalTask[],
+  qboHealthPct: number,
+  completedLines: string[],
+): string {
+  const executionResults = summary.execution.results
+    .filter((result) => result.status !== "completed")
+    .slice(0, 5)
+    .map((result) => `${result.status}:${result.taskType}:${result.message}`);
+
+  return JSON.stringify({
+    createdTasks: summary.createdTasks,
+    pendingTasks: summary.pendingTasks,
+    detectorSummary: summary.detectorSummary,
+    execution: {
+      completed: summary.execution.completed,
+      failed: summary.execution.failed,
+      blocked: summary.execution.blocked,
+      needsApproval: summary.execution.needsApproval,
+      results: executionResults,
+    },
+    approvalTasks: approvalTasks.map((task) => `${task.id}:${task.task_type}:${task.title}`),
+    qboHealthPct,
+    completedLines,
+  });
+}
+
+async function shouldPostOperatorReport(signature: string): Promise<boolean> {
+  const state = await readState<OperatorReportDedupState>(OPERATOR_REPORT_DEDUP_KEY, {
+    signature: null,
+    posted_at: null,
+  });
+
+  if (!state.signature || !state.posted_at) {
+    return true;
+  }
+
+  const postedAt = new Date(state.posted_at).getTime();
+  if (!Number.isFinite(postedAt)) {
+    return true;
+  }
+
+  return !(state.signature === signature && Date.now() - postedAt < OPERATOR_REPORT_DEDUP_WINDOW_MS);
+}
+
+async function markOperatorReportPosted(signature: string): Promise<void> {
+  await writeState(OPERATOR_REPORT_DEDUP_KEY, {
+    signature,
+    posted_at: new Date().toISOString(),
+  } satisfies OperatorReportDedupState);
+}
+
 export async function reportOperatorCycle(summary: OperatorCycleSummary): Promise<void> {
   const hasMaterialActivity =
     summary.createdTasks > 0 ||
@@ -168,6 +230,10 @@ export async function reportOperatorCycle(summary: OperatorCycleSummary): Promis
     : 100;
 
   const completedLines = summarizeCompletedTasks(summary.execution);
+  const signature = buildReportSignature(summary, approvalTasks, qboHealthPct, completedLines);
+  if (!(await shouldPostOperatorReport(signature))) {
+    return;
+  }
 
   const lines = [
     `🤖 *Abra Operator Cycle* — ${new Date().toLocaleTimeString("en-US", { timeZone: "America/Los_Angeles", hour: "numeric", minute: "2-digit" })} PT`,
@@ -245,4 +311,6 @@ export async function reportOperatorCycle(summary: OperatorCycleSummary): Promis
           ? "medium"
           : "low",
   });
+
+  await markOperatorReportPosted(signature);
 }

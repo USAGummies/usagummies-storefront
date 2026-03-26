@@ -245,10 +245,24 @@ export async function executeRoutedAction(
           commands: ["rev", "cash", "pnl", "vendors", "tasks", "approve", "help"],
         };
         break;
+      case "check_email":
       case "search_email": {
         const query = String(action.params.query || "newer_than:2d");
         const emails = await listEmails({ query, count: 5 }).catch(() => []);
         action.result = { emails, query };
+        break;
+      }
+      case "show_review_transactions": {
+        const data = await fetchInternalJson("/api/ops/qbo/query?type=purchases&limit=50");
+        const purchases = Array.isArray(data?.purchases) ? (data.purchases as Array<Record<string, unknown>>) : [];
+        const reviewRows = purchases.filter((purchase) => {
+          const firstLine = Array.isArray(purchase.Lines)
+            ? ((purchase.Lines[0] || {}) as Record<string, unknown>)
+            : {};
+          const account = String(firstLine.Account || "").toLowerCase();
+          return !account || account.includes("uncategorized");
+        });
+        action.result = { purchases: reviewRows };
         break;
       }
       case "categorize_qbo_transaction": {
@@ -473,6 +487,7 @@ export function renderRoutedActionResponse(action: RoutedAction): { reply: strin
     }
     case "show_help":
       return { reply: "Quick commands: rev, cash, pnl, vendors, tasks, approve, help." };
+    case "check_email":
     case "search_email": {
       const result = (action.result as Record<string, unknown> | null) || {};
       const emails = Array.isArray(result.emails)
@@ -483,6 +498,17 @@ export function renderRoutedActionResponse(action: RoutedAction): { reply: strin
         reply: emails.length
           ? formatList(`Recent email matches for ${query}`, emails.slice(0, 5).map((email) => `${String(email.from || "Unknown")}: ${String(email.subject || "(no subject)")}`), "tell me which thread you want read or drafted.")
           : "No recent matching emails found.",
+      };
+    }
+    case "show_review_transactions": {
+      const purchases = Array.isArray((action.result as Record<string, unknown> | null)?.purchases)
+        ? (((action.result as Record<string, unknown>).purchases) as Array<Record<string, unknown>>)
+        : [];
+      const lines = purchases.slice(0, 8).map((p, index) => `row ${index + 1}: ${String(p.Date || "")} ${compactCurrency(Number(p.Amount || 0))} — ${String(p.Vendor || "Unknown")}`);
+      return {
+        reply: purchases.length
+          ? formatList("Transactions needing review", lines, "reply like `row 2 is shipping`.")
+          : "No uncategorized transactions need review right now.",
       };
     }
     case "categorize_qbo_transaction":
