@@ -33,7 +33,8 @@ export type ReconciliationSummary = {
 
 const STATE_KEY = "abra-operator-reconciliation-last-run" as never;
 export const RECONCILIATION_SUMMARY_STATE_KEY = "abra-operator-reconciliation-summary" as never;
-const FINANCIALS_CHANNEL_ID = "C0AKG9FSC2J";
+const RECONCILIATION_POSTED_DATES_STATE_KEY = "abra:reconciliation_posted_dates" as never;
+const CONTROL_CHANNEL_ID = "C0ALS6W7VB4";
 
 function getSupabaseEnv() {
   const baseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -210,7 +211,7 @@ async function postFinancialsMessage(text: string): Promise<void> {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      channel: FINANCIALS_CHANNEL_ID,
+      channel: CONTROL_CHANNEL_ID,
       text,
       mrkdwn: true,
       unfurl_links: false,
@@ -378,14 +379,19 @@ export async function runDailyFinancialReconciliation(): Promise<{
       ? `Plaid ${formatCurrency(plaidBalance)} vs QBO ${formatCurrency(qboBookBalance)}`
       : "✅ matched";
 
-  await postFinancialsMessage(
-    `🔎 *Daily reconciliation* (${day})\n` +
-      `• Amazon ${amazonStatus}\n` +
-      `• Amazon reconciliation: ${formatCurrency(amazonRevenue)} gross, ${formatCurrency(amazonDeposits)} deposited, ${formatCurrency(amazonFees)} fees\n` +
-      `• Shopify ${shopifyStatus}\n` +
-      `• Shopify reconciliation: ${formatCurrency(shopifyRevenue)} gross, ${formatCurrency(shopifyDeposits)} deposited, ${formatCurrency(shopifyFees)} fees\n` +
-      `• Bank balance: ${bankStatus}${bankDifference > 5 ? " (difference may be uncleared transactions)" : ""}`,
-  );
+  const postedDates = await readState<string[]>(RECONCILIATION_POSTED_DATES_STATE_KEY, []);
+  const recentPostedDates = Array.isArray(postedDates) ? postedDates.slice(-30) : [];
+  if (!recentPostedDates.includes(day)) {
+    await postFinancialsMessage(
+      `🔎 *Daily reconciliation* (${day})\n` +
+        `• Amazon ${amazonStatus}\n` +
+        `• Amazon reconciliation: ${formatCurrency(amazonRevenue)} gross, ${formatCurrency(amazonDeposits)} deposited, ${formatCurrency(amazonFees)} fees\n` +
+        `• Shopify ${shopifyStatus}\n` +
+        `• Shopify reconciliation: ${formatCurrency(shopifyRevenue)} gross, ${formatCurrency(shopifyDeposits)} deposited, ${formatCurrency(shopifyFees)} fees\n` +
+        `• Bank balance: ${bankStatus}${bankDifference > 5 ? " (difference may be uncleared transactions)" : ""}`,
+    );
+    await writeState(RECONCILIATION_POSTED_DATES_STATE_KEY, [...recentPostedDates, day].slice(-30));
+  }
 
   await writeState(STATE_KEY, { date: today });
   await writeState(RECONCILIATION_SUMMARY_STATE_KEY, summary);

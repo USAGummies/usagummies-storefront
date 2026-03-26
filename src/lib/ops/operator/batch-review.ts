@@ -13,6 +13,18 @@ type ReviewTaskRow = {
   execution_params: Record<string, unknown> | null;
 };
 
+type FlatQboPurchase = {
+  Id?: string;
+  Date?: string;
+  Amount?: number;
+  BankAccount?: string | null;
+  Vendor?: string | null;
+  Lines?: Array<{
+    Description?: string | null;
+    Account?: string | null;
+  }>;
+};
+
 const STATE_KEY = "abra-operator-batch-review-last-run" as never;
 
 function getSupabaseEnv() {
@@ -63,6 +75,33 @@ function similarityKey(value: string): string {
     .join(" ");
 }
 
+function getInternalBaseUrl(): string {
+  return (
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.NEXTAUTH_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined) ||
+    "https://www.usagummies.com"
+  );
+}
+
+function getInternalHeaders(): HeadersInit {
+  const cronSecret = (process.env.CRON_SECRET || "").trim();
+  return cronSecret ? { Authorization: `Bearer ${cronSecret}` } : {};
+}
+
+async function fetchFlatPurchases(limit = 200): Promise<FlatQboPurchase[]> {
+  const res = await fetch(`${getInternalBaseUrl()}/api/ops/qbo/query?type=purchases&limit=${limit}`, {
+    headers: {
+      ...getInternalHeaders(),
+    },
+    cache: "no-store",
+    signal: AbortSignal.timeout(30000),
+  });
+  if (!res.ok) return [];
+  const data = (await res.json().catch(() => ({}))) as { purchases?: FlatQboPurchase[] };
+  return Array.isArray(data.purchases) ? data.purchases : [];
+}
+
 export async function runBatchTransactionReview(force = false): Promise<BatchReviewResult> {
   const { isoDate } = currentPtDateParts();
   const lastRun = await readState<{ date?: string } | null>(STATE_KEY, null);
@@ -91,14 +130,55 @@ export async function runBatchTransactionReview(force = false): Promise<BatchRev
       return a.confidence - b.confidence;
     });
 
+  const grouped = Array.from(
+    sorted.reduce((map, item) => {
+      const bucket = map.get(item.groupKey) || [];
+      bucket.push(item);
+      map.set(item.groupKey, bucket);
+      return map;
+    }, new Map<string, typeof sorted>()),
+  )
+    .map(([groupKey, items]) => ({
+      groupKey,
+      count: items.length,
+      avgConfidence: items.length
+        ? Math.round(items.reduce((sum, item) => sum + item.confidence, 0) / items.length)
+        : 0,
+      examples: items.slice(0, 3).map((item) => item.description).join(" | "),
+    }))
+    .sort((a, b) => b.count - a.count || a.avgConfidence - b.avgConfidence);
+
+  const purchases = await fetchFlatPurchases(200).catch(() => []);
+  const quicksilver = purchases.filter((purchase) => /quicksilverone/i.test(String(purchase.BankAccount || "")));
+  const quicksilverRows = quicksilver.map((purchase) => {
+    const line = Array.isArray(purchase.Lines) ? purchase.Lines[0] : null;
+    return [
+      String(purchase.Id || ""),
+      String(purchase.Date || "").slice(0, 10),
+      round2(Number(purchase.Amount || 0)),
+      String(line?.Description || purchase.Vendor || ""),
+      String(line?.Account || ""),
+    ];
+  });
+
   await uploadWorkbook({
     channelId: FINANCIALS_CHANNEL_ID,
     filename: `rene-transaction-review-${isoDate}.xlsx`,
     comment:
-      `<@${RENE_SLACK_ID}> — ${sorted.length} transactions need your input. I categorized the ones I recognized. ` +
-      `The rest are in the attached file, grouped by similar descriptions.\n\n` +
+      `<@${RENE_SLACK_ID}> — I found ${grouped.length} groups of similar transactions (${sorted.length} total). ` +
+      `I categorized the ones I recognized. The rest are in the attached file.\n\n` +
       `Reply with corrections like:\n• row 5 is personal\n• row 12 is shipping\n• anything from ARCO is vehicle fuel`,
     sheets: [
+      {
+        sheetName: "Groups",
+        headers: ["Group", "Count", "Avg Confidence %", "Examples"],
+        rows: grouped.map((group) => [
+          group.groupKey,
+          group.count,
+          group.avgConfidence,
+          group.examples,
+        ]),
+      },
       {
         sheetName: "Review",
         headers: ["Row #", "Group", "Date", "Amount", "Description", "Suggested Category", "Confidence %", "Task ID"],
@@ -113,6 +193,13 @@ export async function runBatchTransactionReview(force = false): Promise<BatchRev
           task.id,
         ]),
       },
+      ...(quicksilverRows.length
+        ? [{
+            sheetName: "QuicksilverOne",
+            headers: ["Transaction ID", "Date", "Amount", "Description", "Current Account"],
+            rows: quicksilverRows,
+          }]
+        : []),
     ],
   });
 

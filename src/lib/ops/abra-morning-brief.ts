@@ -8,6 +8,7 @@ import { notify } from "@/lib/ops/notify";
 import { createNotionPage } from "@/lib/ops/abra-notion-write";
 import { readState } from "@/lib/ops/state";
 import { RECONCILIATION_SUMMARY_STATE_KEY, type ReconciliationSummary } from "@/lib/ops/operator/reconciliation";
+import { OPEN_PO_TRACKER_STATE_KEY, type OpenPoSummary } from "@/lib/ops/operator/po-tracker";
 import { UNIFIED_INVENTORY_STATE_KEY, type UnifiedInventorySummary } from "@/lib/ops/operator/unified-inventory";
 import { UNIFIED_REVENUE_STATE_KEY, type UnifiedRevenueSummary } from "@/lib/ops/operator/unified-revenue";
 import { getDailyGoalSnapshot, formatGoalSlack } from "@/lib/ops/daily-goal-tracker";
@@ -895,7 +896,7 @@ function shortEmailName(name: string): string {
 }
 
 async function buildCompactBenBrief(): Promise<string> {
-  const [revenue, inventory, operator, approvals, awaiting, priorities] = await Promise.all([
+  const [revenue, inventory, operator, approvals, awaiting, priorities, openPo] = await Promise.all([
     readState<UnifiedRevenueSummary | null>(UNIFIED_REVENUE_STATE_KEY, null).catch(() => null),
     readState<UnifiedInventorySummary | null>(UNIFIED_INVENTORY_STATE_KEY, null).catch(() => null),
     getOperatorTaskBrief().catch(() => ({
@@ -907,6 +908,7 @@ async function buildCompactBenBrief(): Promise<string> {
     getPendingApprovalsCount().catch(() => 0),
     detectAwaitingReplies({ sentCount: 30, lookbackHours: 72 }).catch(() => []),
     fetchCompactAttentionItems(2).catch(() => []),
+    readState<OpenPoSummary | null>(OPEN_PO_TRACKER_STATE_KEY, null).catch(() => null),
   ]);
 
   const emailLine = Array.isArray(awaiting) && awaiting.length
@@ -925,6 +927,7 @@ async function buildCompactBenBrief(): Promise<string> {
     `💰 Yesterday: ${compactCurrency(revenue?.total || 0, 2)} | MTD: ${compactCurrency(revenue?.mtd || 0)} (Amazon ${revenue?.mix.amazonPct || 0}%, DTC ${revenue?.mix.shopifyPct || 0}%)`,
     `📧 ${compactCountLabel(Array.isArray(awaiting) ? awaiting.length : 0, "email")} need response${emailLine !== "none" ? ` (${emailLine})` : ""}`,
     `📦 Inventory: ${inventoryBits.join(", ") || "position updating"}`,
+    `📋 Open POs: ${openPo?.openCount || 0} orders, ${compactCurrency(openPo?.committedRevenue || 0)} committed${openPo?.overdue[0] ? ` | PO #${openPo.overdue[0].poNumber} overdue ${openPo.overdue[0].daysOverdue}d` : ""}`,
     `🎯 Today: ${(priorities || []).join(", ") || "review operator queue, clear approvals"}`,
     `⚠️ ${compactCountLabel(approvals, "approval")} pending`,
     "",
@@ -935,7 +938,7 @@ async function buildCompactBenBrief(): Promise<string> {
 }
 
 async function buildCompactReneBrief(): Promise<string> {
-  const [revenue, operator, approvals, purchasesData, pendingEmailTasks, reconciliation] = await Promise.all([
+  const [revenue, operator, approvals, purchasesData, pendingEmailTasks, reconciliation, openPo] = await Promise.all([
     readState<UnifiedRevenueSummary | null>(UNIFIED_REVENUE_STATE_KEY, null).catch(() => null),
     getOperatorTaskBrief().catch(() => ({
       completedLast24h: 0,
@@ -947,6 +950,7 @@ async function buildCompactReneBrief(): Promise<string> {
     fetchInternalOpsJson("/api/ops/qbo/query?type=purchases&limit=200"),
     sbFetch("/rest/v1/abra_operator_tasks?task_type=in.(email_draft_response,vendor_followup,distributor_followup)&status=in.(pending,needs_approval)&select=id&limit=50").catch(() => []),
     readState<ReconciliationSummary | null>(RECONCILIATION_SUMMARY_STATE_KEY, null).catch(() => null),
+    readState<OpenPoSummary | null>(OPEN_PO_TRACKER_STATE_KEY, null).catch(() => null),
   ]);
 
   const purchases = Array.isArray((purchasesData || {}).purchases)
@@ -968,6 +972,7 @@ async function buildCompactReneBrief(): Promise<string> {
     `💰 Yesterday: ${compactCurrency(revenue?.total || 0, 2)} rev | MTD: ${compactCurrency(revenue?.mtd || 0)}`,
     `📊 QBO: ${qboHealthPct}% categorized | ${reviewCount} need review`,
     `📧 ${compactCountLabel(Array.isArray(pendingEmailTasks) ? pendingEmailTasks.length : 0, "vendor email")} need response`,
+    `📋 Open POs: ${openPo?.openCount || 0} orders, ${compactCurrency(openPo?.committedRevenue || 0)} committed${openPo?.overdue[0] ? ` | #${openPo.overdue[0].poNumber} overdue ${openPo.overdue[0].daysOverdue}d` : ""}`,
     `✅ Operator: ${operatorLead} overnight`,
     `⚠️ ${compactCountLabel(approvalCount, "approval")} pending${reconciliation?.ran && reconciliation.bankDifference > 5 ? ` | Bank diff ${compactCurrency(reconciliation.bankDifference, 2)}` : ""}`,
     "",

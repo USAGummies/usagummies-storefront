@@ -29,6 +29,8 @@ type SlackFile = {
   url_private_download?: string;
 };
 
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+
 type SlackEventBody = {
   type?: string;
   challenge?: string;
@@ -99,6 +101,10 @@ function isExtractableFile(file: SlackFile): boolean {
   return EXTRACTABLE_TYPES.has(ext) || EXTRACTABLE_TYPES.has(file.mimetype || "") || EXTRACTABLE_TYPES.has(file.filetype || "");
 }
 
+function isImageFile(file: SlackFile): boolean {
+  return Boolean((file.mimetype || "").startsWith("image/"));
+}
+
 async function downloadSlackFile(url: string): Promise<Buffer | null> {
   const botToken = process.env.SLACK_BOT_TOKEN;
   if (!botToken || !url) return null;
@@ -115,10 +121,41 @@ async function downloadSlackFile(url: string): Promise<Buffer | null> {
   }
 }
 
+async function downloadSlackImage(file: SlackFile): Promise<{ name: string; mimeType: string; buffer: Buffer } | null> {
+  const botToken = process.env.SLACK_BOT_TOKEN;
+  const url = file.url_private_download || file.url_private;
+  if (!botToken || !url) return null;
+  try {
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${botToken}` },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) return null;
+    const contentType = res.headers.get("content-type") || file.mimetype || "image/png";
+    if (!contentType.startsWith("image/")) return null;
+    const contentLength = parseInt(res.headers.get("content-length") || "0", 10);
+    if (contentLength > MAX_IMAGE_BYTES) return null;
+    const arrayBuffer = await res.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    if (buffer.byteLength > MAX_IMAGE_BYTES) return null;
+    return {
+      name: file.name || "slack-image",
+      mimeType: contentType,
+      buffer,
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function extractSlackFiles(files: SlackFile[]): Promise<string> {
   const results: string[] = [];
 
   for (const file of files.slice(0, 5)) { // Max 5 files
+    if (isImageFile(file)) {
+      results.push(`📎 ${file.name || "image"} — image attached`);
+      continue;
+    }
     if (!isExtractableFile(file)) {
       results.push(`📎 ${file.name} (${file.filetype || "unknown"}) — skipped (unsupported type or too large)`);
       continue;
@@ -271,16 +308,26 @@ export async function POST(req: Request) {
 
       // If files are attached, download and extract their content
       let fileContext = "";
+      let uploadedFiles: Array<{ name: string; mimeType: string; buffer: Buffer }> = [];
       if (hasFiles) {
-        const extracted = await extractSlackFiles(files!);
+        const [extracted, images] = await Promise.all([
+          extractSlackFiles(files!),
+          Promise.all((files || []).filter(isImageFile).slice(0, 1).map((file) => downloadSlackImage(file))),
+        ]);
         if (extracted) {
           fileContext = extracted;
         }
+        uploadedFiles = images.filter((value): value is { name: string; mimeType: string; buffer: Buffer } => Boolean(value));
       }
 
       // Build the message text — include file context if present
+      const explicitText = text?.trim() || "";
+      const inferredPrompt =
+        !explicitText && uploadedFiles.length > 0
+          ? "Please analyze the attached image from Slack and answer the user directly."
+          : "";
       const messageText = [
-        text?.trim() || "",
+        explicitText || inferredPrompt,
         fileContext ? `\n\n[ATTACHED FILES]\n${fileContext}` : "",
       ].filter(Boolean).join("");
 
@@ -293,8 +340,8 @@ export async function POST(req: Request) {
       let stillThinkingTimer: ReturnType<typeof setTimeout> | null = null;
 
       // AUTO_RESPOND channels ALWAYS get a thinking message — Rene should never see silence
-      const AUTO_RESPOND_CHANNELS = new Set(["C0AKG9FSC2J"]);
-      const alwaysAck = AUTO_RESPOND_CHANNELS.has(channel);
+      const AUTO_RESPOND_CHANNELS = new Set(["C0AKG9FSC2J", "C0ALS6W7VB4", "C0A9S88E1FT"]);
+      const alwaysAck = event.type === "app_mention" || AUTO_RESPOND_CHANNELS.has(channel);
 
       if (alwaysAck || isLikelySlowQuery(messageText)) {
         thinkingTs = await postSlackThinkingMessage(channel, rootThreadTs);
@@ -320,8 +367,11 @@ export async function POST(req: Request) {
         ts,
         ...(thread_ts ? { threadTs: thread_ts } : {}),
         ...(history.length > 0 ? { history } : {}),
+        ...(uploadedFiles.length > 0 ? { uploadedFiles } : {}),
         forceRespond: event.type === "app_mention" || [
           "C0AKG9FSC2J", // #financials — Rene's workspace, always respond
+          "C0ALS6W7VB4", // #abra-control — founder/operator workspace, always respond
+          "C0A9S88E1FT", // #abra-testing — direct testing workspace
         ].includes(channel),
       });
 
@@ -330,7 +380,10 @@ export async function POST(req: Request) {
 
       if (!result.handled) {
         if (alwaysAck) {
-          const fallbackText = "Got it. Tell me the specific finance item you want handled and I’ll take it from here.";
+          const fallbackText =
+            channel === "C0AKG9FSC2J"
+              ? "Got it. Tell me the specific finance item you want handled and I’ll take it from here."
+              : "Got it. Tell me the specific item you want handled and I’ll take it from here.";
           if (thinkingTs) {
             await updateSlackMessage(channel, thinkingTs, fallbackText);
           } else {
@@ -363,7 +416,7 @@ export async function POST(req: Request) {
       const message =
         error instanceof Error ? error.message : "Unknown Slack events processing error";
       console.error("[ops/slack/events] async processing failed:", message);
-      if (channel === "C0AKG9FSC2J") {
+      if (event.type === "app_mention" || channel === "C0AKG9FSC2J" || channel === "C0ALS6W7VB4" || channel === "C0A9S88E1FT") {
         await postSlackMessage(channel, "I hit an error while processing that. I kept the thread intact. Send the next instruction and I’ll continue.", {
           threadTs: thread_ts || ts,
         }).catch(() => {});

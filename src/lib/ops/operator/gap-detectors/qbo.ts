@@ -1,6 +1,11 @@
 import { getQBOAccounts, getQBOTransactions, getQBOVendors } from "@/lib/ops/qbo-client";
 import { queryLedgerSummary } from "@/lib/ops/abra-notion-write";
-import { loadLearnedQboRules, resolveQboCategory } from "@/lib/ops/operator/qbo-resolution";
+import {
+  loadLearnedQboRules,
+  resolveByDescription,
+  resolveQboCategory,
+  upsertLearnedQboRule,
+} from "@/lib/ops/operator/qbo-resolution";
 
 export type OperatorTaskPriority = "critical" | "high" | "medium" | "low";
 
@@ -43,6 +48,22 @@ type CategorizePreviewRow = {
   needsReview: boolean;
   isReneTransfer: boolean;
   syncToken: string;
+};
+
+type FlatQboPurchase = {
+  Id?: string;
+  Date?: string;
+  Amount?: number;
+  PaymentType?: string | null;
+  BankAccount?: string | null;
+  Vendor?: string | null;
+  Note?: string | null;
+  Lines?: Array<{
+    Description?: string | null;
+    Amount?: number | null;
+    Account?: string | null;
+    AccountId?: string | null;
+  }>;
 };
 
 type QBOAccount = {
@@ -210,24 +231,118 @@ async function fetchCategorizePreview(): Promise<CategorizePreviewRow[]> {
   return Array.isArray(data.preview) ? data.preview : [];
 }
 
-async function buildCategorizeTasks(preview: CategorizePreviewRow[]): Promise<OperatorTaskInsert[]> {
+async function fetchFlatPurchases(limit = 200): Promise<FlatQboPurchase[]> {
+  const res = await fetch(`${getInternalBaseUrl()}/api/ops/qbo/query?type=purchases&limit=${limit}`, {
+    headers: {
+      ...getInternalHeaders(),
+    },
+    cache: "no-store",
+    signal: AbortSignal.timeout(45000),
+  });
+  if (!res.ok) return [];
+  const data = (await res.json().catch(() => ({}))) as { purchases?: FlatQboPurchase[] };
+  return Array.isArray(data.purchases) ? data.purchases : [];
+}
+
+function isUncategorizedAccount(accountName: string | null | undefined, accountId?: string | null): boolean {
+  const normalized = normalizeText(accountName);
+  return !normalized || normalized.includes("uncategorized") || String(accountId || "").trim() === "2";
+}
+
+function primaryLine(purchase: FlatQboPurchase): NonNullable<FlatQboPurchase["Lines"]>[number] | null {
+  return Array.isArray(purchase.Lines) ? purchase.Lines[0] || null : null;
+}
+
+function buildPurchaseDescription(purchase: FlatQboPurchase): string {
+  const line = primaryLine(purchase);
+  return [
+    purchase.Vendor,
+    line?.Description,
+    purchase.Note,
+    purchase.BankAccount,
+  ]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .join(" | ");
+}
+
+function extractLearnedPattern(purchase: FlatQboPurchase): string | null {
+  const vendor = String(purchase.Vendor || "").trim();
+  if (vendor) return vendor;
+
+  const source = buildPurchaseDescription(purchase)
+    .toUpperCase()
+    .replace(/\[PUZZLE IMPORT\]|\[PUZZLE\]/g, " ")
+    .replace(/\([^)]*@[^)]*\)/g, " ")
+    .replace(/\bDES:[^ ]+\b/g, " ")
+    .replace(/\bID:[^ ]*\b/g, " ")
+    .replace(/\bINDN:[^ ]+\b/g, " ")
+    .replace(/\bCO ID:[^ ]+\b/g, " ")
+    .replace(/\bWEB\b/g, " ")
+    .replace(/\bPAYMENT\b/g, " ")
+    .replace(/\bINVOICE\b/g, " ")
+    .replace(/[^A-Z0-9 ]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!source) return null;
+
+  const match = source.match(
+    /\b(COVERDASH|HELIUM ?10|OWNERREZ|CRATEJOY|BRAVE|COMPANY SAGE|AMERICAN EXPRESS|ASHFORD VALLEY|RUMBLE USA|THE HIGHLANDER|MYOCCU)\b/,
+  );
+  if (match?.[1]) return match[1];
+
+  const tokens = source
+    .split(" ")
+    .filter((token) =>
+      token &&
+      !["PUZZLE", "IMPORT", "USA", "GUMMIES", "BANK", "ACCOUNT", "YOUR", "FROM", "THIS", "ONE", "FIX", "ADDED", "PROFIT"].includes(token),
+    )
+    .slice(0, 3);
+  return tokens.length ? tokens.join(" ") : null;
+}
+
+async function buildCategorizeTasksFromPurchases(purchases: FlatQboPurchase[]): Promise<OperatorTaskInsert[]> {
   const learnedRules = await loadLearnedQboRules();
   const tasks: OperatorTaskInsert[] = [];
 
-  for (const row of preview) {
-    if (row.entityType !== "Purchase") continue;
+  for (const purchase of purchases) {
+    const line = primaryLine(purchase);
+    const currentAccountName = String(line?.Account || "").trim();
+    const currentAccountId = String(line?.AccountId || "").trim();
+    if (!isUncategorizedAccount(currentAccountName, currentAccountId)) continue;
 
-    const resolution = resolveQboCategory(row.description, row.amount, learnedRules);
+    const transactionId = String(purchase.Id || "").trim();
+    if (!transactionId) continue;
+
+    const description = buildPurchaseDescription(purchase);
+    const amount = Number(purchase.Amount || line?.Amount || 0);
+    const date = String(purchase.Date || "").slice(0, 10);
+    const descriptionResolution = resolveByDescription(description, learnedRules);
+    const resolution = descriptionResolution
+      ? {
+          matched: true,
+          confidence: descriptionResolution.confidence,
+          accountId: descriptionResolution.accountId,
+          accountName: descriptionResolution.accountName,
+          reasoning: descriptionResolution.reasoning,
+          pattern: null,
+          source: "builtin_partial" as const,
+          skip: false,
+        }
+      : resolveQboCategory(description, amount, learnedRules);
     if (resolution.skip) continue;
 
     const baseParams = {
-      transactionId: row.transactionId,
-      entityType: row.entityType,
-      description: row.description,
-      amount: row.amount,
-      date: row.date,
-      currentAccountId: row.currentAccountId,
-      currentAccountName: row.currentAccountName,
+      transactionId,
+      entityType: "Purchase",
+      description,
+      amount,
+      date,
+      currentAccountId,
+      currentAccountName: currentAccountName || "Uncategorized Expense",
+      bankAccount: purchase.BankAccount || null,
+      vendor: purchase.Vendor || null,
+      note: purchase.Note || null,
       confidence: resolution.confidence,
       reasoning: resolution.reasoning,
       matchedPattern: resolution.pattern,
@@ -237,15 +352,15 @@ async function buildCategorizeTasks(preview: CategorizePreviewRow[]): Promise<Op
     if (resolution.matched && resolution.accountId && resolution.confidence >= 80) {
       tasks.push({
         task_type: "qbo_categorize",
-        title: `Categorize ${row.description} to ${resolution.accountName}`,
+        title: `Categorize ${description} to ${resolution.accountName}`,
         description:
-          `Update QBO purchase ${row.transactionId} dated ${row.date} from ${row.currentAccountName || "uncategorized"} to ${resolution.accountName}. ` +
+          `Update QBO purchase ${transactionId} dated ${date} from ${currentAccountName || "uncategorized"} to ${resolution.accountName}. ` +
           `Reason: ${resolution.reasoning}`,
-        priority: resolution.confidence >= 95 || row.isReneTransfer ? "high" : "medium",
+        priority: resolution.confidence >= 95 ? "high" : "medium",
         source: "gap_detector:qbo",
         assigned_to: "abra",
         execution_params: {
-          natural_key: taskNaturalKey(["qbo_categorize", row.transactionId, resolution.accountId]),
+          natural_key: taskNaturalKey(["qbo_categorize", transactionId, resolution.accountId]),
           suggestedAccountId: resolution.accountId,
           suggestedAccountName: resolution.accountName,
           ...baseParams,
@@ -257,17 +372,17 @@ async function buildCategorizeTasks(preview: CategorizePreviewRow[]): Promise<Op
 
     tasks.push({
       task_type: "qbo_review_transaction",
-      title: `Review uncategorized transaction ${row.description}`,
+      title: `Review uncategorized transaction ${description}`,
       description:
         resolution.confidence >= 50 && resolution.accountName
           ? `Potential match: ${resolution.accountName} (${resolution.confidence}% confidence). ${resolution.reasoning}`
           : `No confident categorization match found. ${resolution.reasoning}`,
-      priority: "high",
+      priority: resolution.confidence >= 70 ? "high" : "medium",
       source: "gap_detector:qbo",
       assigned_to: "rene",
       requires_approval: true,
       execution_params: {
-        natural_key: taskNaturalKey(["qbo_review_transaction", row.transactionId]),
+        natural_key: taskNaturalKey(["qbo_review_transaction", transactionId]),
         suggestedAccountId: resolution.accountId,
         suggestedAccountName: resolution.accountName,
         ...baseParams,
@@ -342,6 +457,97 @@ function buildRevenueGapTasks(accounts: QBOAccount[]): OperatorTaskInsert[] {
     }));
 }
 
+function buildQuicksilverReviewTasks(purchases: FlatQboPurchase[]): OperatorTaskInsert[] {
+  const quicksilver = purchases.filter((purchase) => /quicksilverone/i.test(String(purchase.BankAccount || "")));
+  if (!quicksilver.length) return [];
+
+  return [{
+    task_type: "qbo_quicksilver_review",
+    title: `Review ${quicksilver.length} QuicksilverOne transactions for business vs personal`,
+    description:
+      `QuicksilverOne is known to mix personal and business activity. Review ${quicksilver.length} transactions and identify which are business expenses.`,
+    priority: "high",
+    source: "gap_detector:qbo",
+    assigned_to: "rene",
+    requires_approval: true,
+    execution_params: {
+      natural_key: taskNaturalKey(["qbo_quicksilver_review", "quicksilverone"]),
+      transactionIds: quicksilver.map((purchase) => String(purchase.Id || "")).filter(Boolean),
+      count: quicksilver.length,
+    },
+    tags: ["qbo", "finance", "review", "quicksilverone"],
+  }];
+}
+
+async function learnFromManualCategorization(
+  purchases: FlatQboPurchase[],
+  accounts: QBOAccount[],
+): Promise<number> {
+  const rows = await sbFetch<ExistingReviewTaskRow[]>(
+    "/rest/v1/abra_operator_tasks?select=id,title,status,execution_params&task_type=in.(qbo_review_transaction,qbo_quicksilver_review)&status=in.(pending,needs_approval)&limit=200",
+  ).catch(() => []);
+  const purchaseById = new Map(
+    purchases
+      .filter((purchase) => purchase.Id)
+      .map((purchase) => [String(purchase.Id), purchase]),
+  );
+
+  let learned = 0;
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const params = row.execution_params || {};
+    const transactionId = String(params.transactionId || "").trim();
+    if (!transactionId) continue;
+
+    const purchase = purchaseById.get(transactionId);
+    if (!purchase) continue;
+
+    const line = primaryLine(purchase);
+    const accountName = String(line?.Account || "").trim();
+    const accountId = String(line?.AccountId || "").trim();
+    if (isUncategorizedAccount(accountName, accountId)) continue;
+
+    const matchedAccount = accounts.find((account) =>
+      (accountId && String(account.Id || "") === accountId) ||
+      normalizeText(account.Name) === normalizeText(accountName),
+    );
+    if (!matchedAccount?.Id || !matchedAccount?.Name) continue;
+
+    const pattern = extractLearnedPattern(purchase);
+    if (pattern) {
+      await upsertLearnedQboRule({
+        pattern,
+        accountId: String(matchedAccount.Id),
+        accountName: String(matchedAccount.Name),
+        confidence: 0.95,
+        createdBy: "rene_qbo_ui",
+        notes: `Observed as manually categorized in QBO from transaction ${transactionId}.`,
+      }).catch(() => null);
+      console.info(`Learned from Rene: ${pattern} -> ${matchedAccount.Name} (observed in QBO)`);
+    }
+
+    await sbFetch(`/rest/v1/abra_operator_tasks?id=eq.${row.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        status: "completed",
+        completed_at: new Date().toISOString(),
+        error_message: null,
+        execution_result: {
+          ok: true,
+          learned: true,
+          transactionId,
+          accountId: String(matchedAccount.Id),
+          accountName: String(matchedAccount.Name),
+          pattern,
+          message: `Learned from Rene: ${pattern || buildPurchaseDescription(purchase)} -> ${matchedAccount.Name}`,
+        },
+      }),
+    }).catch(() => {});
+    learned += 1;
+  }
+
+  return learned;
+}
+
 function buildKnownTransactionTasks(
   ledgerTransactions: LedgerTransaction[],
   purchases: QBOPurchase[],
@@ -408,8 +614,8 @@ function buildKnownTransactionTasks(
 }
 
 export async function detectQBOOperatorGaps(): Promise<QBOGapDetectorResult> {
-  const [preview, accountsResult, vendorsResult, purchasesResult, ledgerResult] = await Promise.all([
-    fetchCategorizePreview(),
+  const [flatPurchases, accountsResult, vendorsResult, purchasesResult, ledgerResult] = await Promise.all([
+    fetchFlatPurchases(200),
     getQBOAccounts(),
     getQBOVendors(),
     getQBOTransactions(undefined, undefined, 200),
@@ -428,10 +634,16 @@ export async function detectQBOOperatorGaps(): Promise<QBOGapDetectorResult> {
     return ageMs <= 30 * 24 * 60 * 60 * 1000;
   });
 
-  const categorizeTasks = await buildCategorizeTasks(preview);
+  await learnFromManualCategorization(flatPurchases, accounts).catch(() => 0);
+  const categorizeTasks = await buildCategorizeTasksFromPurchases(flatPurchases);
   const vendorTasks = buildMissingVendorTasks(purchases, vendorNames);
   const zeroRevenueTasks = buildRevenueGapTasks(accounts);
   const knownTransactionTasks = buildKnownTransactionTasks(recentLedger, purchases);
+  const quicksilverReviewTasks = buildQuicksilverReviewTasks(flatPurchases);
+  const uncategorizedCount = flatPurchases.filter((purchase) => {
+    const line = primaryLine(purchase);
+    return isUncategorizedAccount(String(line?.Account || ""), String(line?.AccountId || ""));
+  }).length;
 
   return {
     tasks: [
@@ -439,14 +651,15 @@ export async function detectQBOOperatorGaps(): Promise<QBOGapDetectorResult> {
       ...vendorTasks,
       ...zeroRevenueTasks,
       ...knownTransactionTasks,
+      ...quicksilverReviewTasks,
     ],
     summary: {
-      uncategorized: categorizeTasks.length,
+      uncategorized: uncategorizedCount,
       missingVendors: vendorTasks.length,
       zeroRevenueAccounts: zeroRevenueTasks.length,
       unrecordedKnownTransactions: knownTransactionTasks.length,
-      categorizedTransactions: Math.max(0, purchases.length - categorizeTasks.length),
-      totalTransactions: purchases.length,
+      categorizedTransactions: Math.max(0, flatPurchases.length - uncategorizedCount),
+      totalTransactions: flatPurchases.length,
     },
   };
 }
@@ -462,7 +675,19 @@ export async function upgradeExistingQboReviewTasks(): Promise<number> {
     const params = row.execution_params || {};
     const description = String(params.description || row.title || "");
     const amount = Number(params.amount || 0);
-    const resolution = resolveQboCategory(description, amount, learnedRules);
+    const descriptionResolution = resolveByDescription(description, learnedRules);
+    const resolution = descriptionResolution
+      ? {
+          matched: true,
+          confidence: descriptionResolution.confidence,
+          accountId: descriptionResolution.accountId,
+          accountName: descriptionResolution.accountName,
+          reasoning: descriptionResolution.reasoning,
+          pattern: null,
+          source: "builtin_partial" as const,
+          skip: false,
+        }
+      : resolveQboCategory(description, amount, learnedRules);
     if (resolution.skip) {
       await sbFetch(`/rest/v1/abra_operator_tasks?id=eq.${row.id}`, {
         method: "PATCH",
@@ -479,6 +704,30 @@ export async function upgradeExistingQboReviewTasks(): Promise<number> {
       }).catch(() => {});
       continue;
     }
+
+    if (resolution.matched && resolution.accountId && resolution.confidence >= 70 && resolution.confidence < 80) {
+      await sbFetch(`/rest/v1/abra_operator_tasks?id=eq.${row.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          title: `Review uncategorized transaction ${description}`,
+          description: `Potential match: ${resolution.accountName} (${resolution.confidence}% confidence). ${resolution.reasoning}`,
+          status: "needs_approval",
+          assigned_to: "rene",
+          requires_approval: true,
+          execution_params: {
+            ...params,
+            suggestedAccountId: resolution.accountId,
+            suggestedAccountName: resolution.accountName,
+            confidence: resolution.confidence,
+            reasoning: resolution.reasoning,
+            matchedPattern: resolution.pattern,
+            resolutionSource: resolution.source,
+          },
+        }),
+      }).catch(() => {});
+      continue;
+    }
+
     if (!(resolution.matched && resolution.accountId && resolution.confidence >= 80)) continue;
 
     await sbFetch(`/rest/v1/abra_operator_tasks?id=eq.${row.id}`, {

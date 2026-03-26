@@ -10,7 +10,9 @@ import {
   logAICost,
 } from "@/lib/ops/abra-cost-tracker";
 import { appendCorrection as appendMarkdownCorrection } from "@/lib/ops/abra-markdown-memory";
+import { executeRoutedAction, renderRoutedActionResponse } from "@/lib/ops/operator/action-executor";
 import { maybeLearnFinancialCorrection } from "@/lib/ops/operator/correction-learner";
+import { routeMessage } from "@/lib/ops/operator/deterministic-router";
 import { readState } from "@/lib/ops/state";
 import { UNIFIED_REVENUE_STATE_KEY, type UnifiedRevenueSummary } from "@/lib/ops/operator/unified-revenue";
 import { uploadFileToSlack, type SpreadsheetData } from "@/lib/ops/slack-file-upload";
@@ -29,6 +31,11 @@ export type SlackMessageContext = {
   displayName?: string;
   history?: SlackThreadMessage[];
   forceRespond?: boolean;
+  uploadedFiles?: Array<{
+    name: string;
+    mimeType: string;
+    buffer: Buffer;
+  }>;
 };
 
 export type SlackResponse = {
@@ -89,6 +96,7 @@ const PENDING_CORRECTION_TTL_SECONDS = 30 * 60; // 30 minutes
 const FINANCIALS_CHANNEL_ID = "C0AKG9FSC2J";
 const ABRA_CONTROL_CHANNEL_ID = "C0ALS6W7VB4";
 const RENE_SLACK_USER_ID = "U0ALL27JM38";
+const ABRA_SLACK_USER_ID = "U0AKMSTL0GL";
 
 // ─── Known user identity map ───
 const KNOWN_SLACK_USERS: Record<string, { name: string; role: string; calibration: string }> = {
@@ -136,6 +144,7 @@ export function shouldAbraRespond(text: string, channel: string): boolean {
   if (isFinancialsChannel(channel) || isControlChannel(channel)) return true;
   const normalized = (text || "").trim().toLowerCase();
   const mention =
+    new RegExp(`<@${ABRA_SLACK_USER_ID}>`, "i").test(text || "") ||
     /(^|\s)@abra\b/i.test(normalized) ||
     /^abra[\s,:]/i.test(normalized) ||
     /\babra,\b/i.test(normalized) ||
@@ -143,6 +152,13 @@ export function shouldAbraRespond(text: string, channel: string): boolean {
     /^teach:/i.test(normalized);
   const monitored = monitoredChannelSet().has(channel);
   return mention || monitored;
+}
+
+function hasExplicitAbraMention(text: string): boolean {
+  return (
+    new RegExp(`<@${ABRA_SLACK_USER_ID}>`, "i").test(text || "") ||
+    /(^|\s)@abra\b/i.test(text || "")
+  );
 }
 
 function isAcknowledgmentText(text: string): boolean {
@@ -562,6 +578,28 @@ async function maybeHandleOperatorStatusQuery(ctx: SlackMessageContext): Promise
   };
 }
 
+function maybeHandleQboUiGuidance(ctx: SlackMessageContext): SlackResponse | null {
+  const text = ctx.text.toLowerCase();
+  if (!/\b(account numbers|qbo settings|quickbooks settings|quickbooks ui|chart of accounts settings)\b/.test(text)) {
+    return null;
+  }
+  if (!/\benable\b|\bturn on\b|\bhow do i\b|\bwhere\b|\bsettings\b/.test(text)) {
+    return null;
+  }
+  return {
+    handled: true,
+    reply: [
+      "• QuickBooks UI: Settings ⚙️ → Account and settings → Advanced",
+      "• In Chart of accounts, enable Account numbers",
+      "• Save, then reopen the chart of accounts",
+      "",
+      "I can’t change QBO UI settings by API. Next step: once it’s on, I can help create, review, or export the accounts.",
+    ].join("\n"),
+    sources: [],
+    answerLogId: null,
+  };
+}
+
 function looksLikeQboReadQuery(text: string): boolean {
   const normalized = text.toLowerCase();
   if (/\b(create|generate|record|categorize|assign|set up|setup|add)\b/.test(normalized)) {
@@ -749,6 +787,9 @@ async function uploadQboExport(
   if (!result.ok) {
     return `I tried to generate ${opts.filename}, but the upload failed: ${result.error || "unknown error"}.`;
   }
+  if (result.skipped) {
+    return `Already uploaded — see above${result.permalink ? `: ${result.permalink}` : ""}`;
+  }
   return `Uploaded ${opts.filename} to Slack${result.permalink ? `: ${result.permalink}` : ""}`;
 }
 
@@ -806,6 +847,23 @@ async function maybeHandleReneQboQuery(ctx: SlackMessageContext): Promise<SlackR
   if (!isReneUser(ctx.user) || !looksLikeQboReadQuery(ctx.text)) return null;
   const text = ctx.text.toLowerCase();
   try {
+    if (/\benable\b.*\baccount numbers\b|\baccount numbers\b.*\benable\b|\bqbo\b.*\bsettings\b|\bquickbooks\b.*\bsettings\b/.test(text)) {
+      return {
+        handled: true,
+        reply: formatReneSlackReply(
+          [
+            "• QBO UI path: Settings ⚙️ → Account and settings → Advanced",
+            "• In Chart of accounts, turn on Account numbers",
+            "• Click Save, then reopen Chart of accounts",
+            "",
+            "I can’t change QuickBooks UI settings by API. Next step: once it’s enabled, I can help create, review, or export the accounts.",
+          ].join("\n"),
+          { isReport: false },
+        ),
+        sources: [],
+        answerLogId: null,
+      };
+    }
     if (/\bp&l\b|\bprofit and loss\b/.test(text)) {
       const data = await fetchInternalJson("/api/ops/qbo/query?type=pnl");
       if (data) return { handled: true, reply: formatReneSlackReply(formatQboPnlForSlack(data) || "I couldn’t format the live P&L.", { isReport: true }), sources: [], answerLogId: null };
@@ -1653,27 +1711,59 @@ async function callAbraChatViaInternalApi(
   const host = resolveInternalHost();
 
   try {
-    const res = await fetchWithTimeout(
-      `${host}/api/ops/abra/chat`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${cronSecret}`,
+    const deliveryPrefix =
+      hasExplicitAbraMention(ctx.text) || isFinancialsChannel(ctx.channel) || isControlChannel(ctx.channel)
+        ? "[SLACK DELIVERY OVERRIDE] This message is directed to Abra. Respond directly to the user. Do not decline because other humans are mentioned in the thread.\n\n"
+        : "";
+
+    let res: Response;
+    if (ctx.uploadedFiles && ctx.uploadedFiles.length > 0) {
+      const form = new FormData();
+      form.set("message", `${deliveryPrefix}${ctx.text}`);
+      form.set("history", JSON.stringify(ctx.history || []));
+      form.set("channel", "slack");
+      form.set("actor_label", ctx.displayName || ctx.user);
+      form.set("actor_context", getActorContext(ctx.user) || "");
+      form.set("thread_id", stableSlackThreadId(ctx.channel, ctx.threadTs || ctx.ts));
+      form.set("slack_channel_id", ctx.channel);
+      form.set("slack_thread_ts", ctx.threadTs || ctx.ts);
+      const firstFile = ctx.uploadedFiles[0];
+      const blob = new Blob([new Uint8Array(firstFile.buffer)], { type: firstFile.mimeType || "application/octet-stream" });
+      form.set("file", blob, firstFile.name);
+      res = await fetchWithTimeout(
+        `${host}/api/ops/abra/chat`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${cronSecret}`,
+          },
+          body: form,
         },
-        body: JSON.stringify({
-          message: ctx.text,
-          history: ctx.history || [],
-          channel: "slack",
-          actor_label: ctx.displayName || ctx.user,
-          actor_context: getActorContext(ctx.user),
-          thread_id: stableSlackThreadId(ctx.channel, ctx.threadTs || ctx.ts),
-          slack_channel_id: ctx.channel,
-          slack_thread_ts: ctx.threadTs || ctx.ts,
-        }),
-      },
-      55000, // Must exceed chat route's 50s internal deadline
-    );
+        55000,
+      );
+    } else {
+      res = await fetchWithTimeout(
+        `${host}/api/ops/abra/chat`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${cronSecret}`,
+          },
+          body: JSON.stringify({
+            message: `${deliveryPrefix}${ctx.text}`,
+            history: ctx.history || [],
+            channel: "slack",
+            actor_label: ctx.displayName || ctx.user,
+            actor_context: getActorContext(ctx.user),
+            thread_id: stableSlackThreadId(ctx.channel, ctx.threadTs || ctx.ts),
+            slack_channel_id: ctx.channel,
+            slack_thread_ts: ctx.threadTs || ctx.ts,
+          }),
+        },
+        55000, // Must exceed chat route's 50s internal deadline
+      );
+    }
 
     const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
     if (!res.ok) {
@@ -2270,11 +2360,12 @@ export async function processAbraMessage(
   ctx: SlackMessageContext,
 ): Promise<SlackResponse> {
   const text = (ctx.text || "").trim();
-  if (!text && !ctx.forceRespond) {
+  const hasUploads = Boolean(ctx.uploadedFiles && ctx.uploadedFiles.length > 0);
+  if (!text && !ctx.forceRespond && !hasUploads) {
     return { handled: false, reply: "", sources: [], answerLogId: null };
   }
 
-  if (!text && ctx.forceRespond) {
+  if (!text && ctx.forceRespond && !hasUploads) {
     return {
       handled: true,
       reply: "What can I help with?",
@@ -2295,7 +2386,7 @@ export async function processAbraMessage(
   // works even when the user @-mentions Abra first (e.g. "<@U1234> teach: ...").
   const textForRouting = text.replace(/^(<@[A-Z0-9]+>\s*)+/gi, "").trim();
 
-  if (ctx.forceRespond && isFinancialsChannel(ctx.channel)) {
+  if (ctx.forceRespond && (isFinancialsChannel(ctx.channel) || isControlChannel(ctx.channel))) {
     if (isAcknowledgmentText(textForRouting)) {
       return {
         handled: true,
@@ -2332,9 +2423,39 @@ export async function processAbraMessage(
     };
   }
 
+  const routed = routeMessage(textForRouting, ctx.displayName || ctx.user);
+  if (routed) {
+    const executed = await executeRoutedAction(routed, {
+      actor: ctx.displayName || ctx.user,
+      slackChannelId: ctx.channel,
+      slackThreadTs: ctx.threadTs || ctx.ts,
+      slackUserId: ctx.user,
+      history: ctx.history,
+    });
+    if (executed.executed && !executed.error) {
+      const rendered = renderRoutedActionResponse(executed);
+      return {
+        handled: true,
+        reply: isReneUser(ctx.user)
+          ? formatReneSlackReply(rendered.reply, {
+              isReport: looksLikeQboReportQuery(textForRouting) || rendered.reply.length > 500,
+            })
+          : rendered.reply,
+        sources: [],
+        answerLogId: null,
+        blocks: rendered.blocks,
+      };
+    }
+  }
+
   const quickCommandResponse = await maybeHandleQuickCommand({ ...ctx, text: textForRouting });
   if (quickCommandResponse) {
     return quickCommandResponse;
+  }
+
+  const qboUiGuidance = maybeHandleQboUiGuidance({ ...ctx, text: textForRouting });
+  if (qboUiGuidance) {
+    return qboUiGuidance;
   }
 
   const exportResponse = await maybeHandleQboExportRequest({ ...ctx, text: textForRouting });

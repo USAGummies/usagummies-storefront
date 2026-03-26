@@ -16,7 +16,8 @@
  *   await notifyDaily(dailySummaryText);
  */
 
-import { isCloud } from "./state";
+import { isCloud, readState, writeState } from "./state";
+import { classifyNotification } from "@/lib/ops/operator/four-d-filter";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -29,10 +30,25 @@ export type NotifyOpts = {
   text: string;
   /** Optional Slack Block Kit payload */
   blocks?: unknown[];
+  /** Notification metadata used by Four D filtering / gating */
+  type?: string;
+  target?: string;
+  changed?: boolean;
+  priority?: "critical" | "high" | "medium" | "low";
   /** Send SMS via Twilio as well (for critical alerts) */
   sms?: boolean;
   /** Phone numbers to SMS (defaults to Ben's numbers) */
   smsRecipients?: string[];
+};
+
+type NotificationGateState = {
+  recent: Record<string, number[]>;
+  deferred: Array<{
+    channel: NotifyChannel;
+    text: string;
+    created_at: string;
+    type: string;
+  }>;
 };
 
 // ---------------------------------------------------------------------------
@@ -88,6 +104,7 @@ async function sendSlackBot(
 // ---------------------------------------------------------------------------
 
 const SLACK_FALLBACK_WEBHOOK = process.env.SLACK_SUPPORT_WEBHOOK_URL;
+const NOTIFICATION_GATE_KEY = "operator:notification_gate" as never;
 
 const SLACK_WEBHOOK_MAP: Record<NotifyChannel, string | undefined> = {
   alerts: process.env.SLACK_WEBHOOK_ALERTS || SLACK_FALLBACK_WEBHOOK,
@@ -140,6 +157,74 @@ async function sendSlack(
   }
   // Fall back to webhooks
   return sendSlackWebhook(channel, text, blocks);
+}
+
+async function passNotificationGate(
+  opts: NotifyOpts,
+): Promise<{ allow: boolean; deferred: boolean }> {
+  const hasRoutingMetadata =
+    typeof opts.type === "string" ||
+    typeof opts.target === "string" ||
+    typeof opts.priority === "string" ||
+    typeof opts.changed === "boolean";
+  if (!hasRoutingMetadata) {
+    return { allow: true, deferred: false };
+  }
+
+  const priority = opts.priority || "medium";
+  const type = opts.type || "generic";
+  const target = opts.target || "team";
+  const changed = opts.changed !== false;
+  const decision = classifyNotification({
+    type,
+    content: opts.text,
+    priority,
+    target,
+    changed,
+  });
+
+  if (decision === "delete") {
+    return { allow: false, deferred: false };
+  }
+
+  const state = await readState<NotificationGateState>(NOTIFICATION_GATE_KEY, {
+    recent: {},
+    deferred: [],
+  });
+  const now = Date.now();
+  const recent = Array.isArray(state.recent[opts.channel])
+    ? state.recent[opts.channel].filter((ts) => now - ts < 60 * 60 * 1000)
+    : [];
+  state.recent[opts.channel] = recent;
+
+  if (priority !== "critical" && recent.length >= 3) {
+    state.deferred.push({
+      channel: opts.channel,
+      text: opts.text,
+      created_at: new Date(now).toISOString(),
+      type,
+    });
+    state.deferred = state.deferred.slice(-100);
+    await writeState(NOTIFICATION_GATE_KEY, state);
+    return { allow: false, deferred: true };
+  }
+
+  if (decision === "defer" && priority !== "critical") {
+    state.deferred.push({
+      channel: opts.channel,
+      text: opts.text,
+      created_at: new Date(now).toISOString(),
+      type,
+    });
+    state.deferred = state.deferred.slice(-100);
+    await writeState(NOTIFICATION_GATE_KEY, state);
+    return { allow: false, deferred: true };
+  }
+
+  recent.push(now);
+  state.recent[opts.channel] = recent.slice(-10);
+  await writeState(NOTIFICATION_GATE_KEY, state);
+  return { allow: true, deferred: false };
 }
 
 // ---------------------------------------------------------------------------
@@ -234,6 +319,10 @@ async function sendIMessageLocal(text: string): Promise<boolean> {
 export async function notify(opts: NotifyOpts): Promise<{ slack: boolean; sms?: boolean; imessage?: boolean }> {
   const { channel, text, blocks, sms, smsRecipients } = opts;
   const result: { slack: boolean; sms?: boolean; imessage?: boolean } = { slack: false };
+  const gate = await passNotificationGate(opts);
+  if (!gate.allow) {
+    return result;
+  }
 
   // Try Slack first
   result.slack = await sendSlack(channel, text, blocks);

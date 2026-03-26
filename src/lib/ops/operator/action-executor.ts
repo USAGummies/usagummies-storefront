@@ -1,0 +1,483 @@
+import { getQBOMetrics } from "@/lib/ops/qbo-client";
+import { searchEmails } from "@/lib/ops/gmail-reader";
+import { maybeLearnFinancialCorrection } from "@/lib/ops/operator/correction-learner";
+import { proposeAndMaybeExecute, type AbraAction } from "@/lib/ops/abra-actions";
+import { type SlackMessageContext } from "@/lib/ops/abra-slack-responder";
+import { type RoutedAction } from "@/lib/ops/operator/deterministic-router";
+
+type ApprovalRow = {
+  id: string;
+  summary?: string | null;
+  proposed_payload?: Record<string, unknown> | null;
+};
+
+function getSupabaseEnv() {
+  const baseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!baseUrl || !serviceKey) {
+    throw new Error("Missing Supabase credentials");
+  }
+  return { baseUrl, serviceKey };
+}
+
+async function sbFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const env = getSupabaseEnv();
+  const headers = new Headers(init.headers || {});
+  headers.set("apikey", env.serviceKey);
+  headers.set("Authorization", `Bearer ${env.serviceKey}`);
+  if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  const res = await fetch(`${env.baseUrl}${path}`, {
+    ...init,
+    headers,
+    cache: "no-store",
+    signal: init.signal ?? AbortSignal.timeout(15000),
+  });
+  const text = await res.text();
+  const json = text ? JSON.parse(text) : null;
+  if (!res.ok) throw new Error(`Supabase ${path} failed (${res.status})`);
+  return json as T;
+}
+
+function getInternalBaseUrl(): string {
+  return (
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.NEXTAUTH_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined) ||
+    "https://www.usagummies.com"
+  );
+}
+
+function getInternalHeaders(): HeadersInit {
+  const cronSecret = (process.env.CRON_SECRET || "").trim();
+  return cronSecret ? { Authorization: `Bearer ${cronSecret}`, "Content-Type": "application/json" } : { "Content-Type": "application/json" };
+}
+
+async function fetchInternalJson(path: string): Promise<Record<string, unknown> | null> {
+  const res = await fetch(`${getInternalBaseUrl()}${path}`, {
+    headers: getInternalHeaders(),
+    cache: "no-store",
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!res.ok) return null;
+  return (await res.json().catch(() => null)) as Record<string, unknown> | null;
+}
+
+async function postInternalJson(
+  path: string,
+  body: Record<string, unknown>,
+  timeoutMs = 20000,
+): Promise<Record<string, unknown>> {
+  const res = await fetch(`${getInternalBaseUrl()}${path}`, {
+    method: "POST",
+    headers: getInternalHeaders(),
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!res.ok || json.error) {
+    throw new Error(String(json.error || `${path} failed (${res.status})`));
+  }
+  return json;
+}
+
+function compactCurrency(value: number, digits = 2): string {
+  return `$${Number(value || 0).toLocaleString("en-US", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  })}`;
+}
+
+function parseLineItemsFromInstruction(instruction: string): Array<{ description: string; quantity: number; unitPrice: number }> {
+  const quantityMatch = instruction.match(/\b(\d[\d,]*)\s+(units?|bags?)\b/i);
+  const quantity = quantityMatch ? Number(quantityMatch[1].replace(/,/g, "")) : 0;
+  const priceMatch = instruction.match(/\$([\d,.]+)\s*(?:\/|per)?\s*(?:unit|bag)?/i);
+  const unitPrice = priceMatch ? Number(priceMatch[1].replace(/,/g, "")) : 0;
+  if (!quantity || !Number.isFinite(quantity)) return [];
+  return [{ description: "All American Gummy Bears 7.5oz", quantity, unitPrice: unitPrice || 2.1 }];
+}
+
+function buildAction(action_type: string, params: Record<string, unknown>, title: string, description: string): AbraAction {
+  return {
+    action_type,
+    title,
+    description,
+    department: "operations",
+    risk_level: "low",
+    params,
+    requires_approval: false,
+    confidence: 0.95,
+  };
+}
+
+export async function executeRoutedAction(
+  action: RoutedAction,
+  context: { actor: string; slackChannelId?: string; slackThreadTs?: string; slackUserId?: string; history?: Array<{ role: "user" | "assistant"; content: string }> },
+): Promise<RoutedAction> {
+  try {
+    switch (action.action) {
+      case "query_kpi_revenue": {
+        const now = new Date();
+        const today = now.toISOString().slice(0, 10);
+        const monthStart = `${today.slice(0, 7)}-01`;
+        const rows = await sbFetch<Array<{ metric_name?: string | null; captured_for_date?: string | null; value?: number | null }>>(
+          `/rest/v1/kpi_timeseries?window_type=eq.daily&metric_name=in.(daily_revenue_amazon,daily_revenue_shopify,daily_revenue_total_unified)&captured_for_date=gte.${monthStart}&select=metric_name,captured_for_date,value&limit=120`,
+        ).catch(() => []);
+        let todayAmazon = 0;
+        let todayShopify = 0;
+        let mtd = 0;
+        for (const row of rows) {
+          const metric = String(row.metric_name || "");
+          const date = String(row.captured_for_date || "");
+          const value = Number(row.value || 0);
+          if (date === today && metric === "daily_revenue_amazon") todayAmazon += value;
+          if (date === today && metric === "daily_revenue_shopify") todayShopify += value;
+          if (metric !== "daily_revenue_total_unified") mtd += value;
+        }
+        action.result = {
+          today: todayAmazon + todayShopify,
+          mtd,
+          amazon: todayAmazon,
+          shopify: todayShopify,
+        };
+        break;
+      }
+      case "query_plaid_balance": {
+        const metrics = await getQBOMetrics().catch(() => null);
+        const live = await fetchInternalJson("/api/ops/plaid/balance");
+        const accounts = Array.isArray(live?.accounts) ? (live?.accounts as Array<Record<string, unknown>>) : [];
+        const balance = accounts.reduce((sum, account) => {
+          const balances = account.balances && typeof account.balances === "object"
+            ? (account.balances as Record<string, unknown>)
+            : {};
+          return sum + Number(balances.current ?? balances.available ?? 0);
+        }, 0);
+        action.result = {
+          balance,
+          burnRate: Number(metrics?.burnRate || 0),
+          runway: Number(metrics?.runway || 0),
+        };
+        break;
+      }
+      case "query_qbo_pnl":
+        action.result = await fetchInternalJson("/api/ops/qbo/query?type=pnl");
+        break;
+      case "query_qbo_vendors":
+        action.result = await fetchInternalJson("/api/ops/qbo/query?type=vendors");
+        break;
+      case "query_qbo_balance_sheet":
+        action.result = await fetchInternalJson("/api/ops/qbo/query?type=balance_sheet");
+        break;
+      case "query_qbo_accounts":
+        action.result = await fetchInternalJson("/api/ops/qbo/accounts");
+        break;
+      case "query_qbo_purchases":
+        action.result = await fetchInternalJson("/api/ops/qbo/query?type=purchases&limit=50");
+        break;
+      case "query_qbo_bills":
+        action.result = await fetchInternalJson("/api/ops/qbo/query?type=bills");
+        break;
+      case "query_qbo_invoices":
+        action.result = await fetchInternalJson("/api/ops/qbo/query?type=invoices");
+        break;
+      case "query_qbo_cash_flow":
+        action.result = await fetchInternalJson("/api/ops/qbo/query?type=cash_flow");
+        break;
+      case "query_operator_tasks": {
+        const rows = await sbFetch<Array<{ task_type?: string | null }>>(
+          "/rest/v1/abra_operator_tasks?status=in.(pending,needs_approval,in_progress)&select=task_type&limit=500",
+        ).catch(() => []);
+        const counts: Record<string, number> = {};
+        for (const row of rows) {
+          const key = String(row.task_type || "other");
+          counts[key] = (counts[key] || 0) + 1;
+        }
+        action.result = counts;
+        break;
+      }
+      case "query_pending_approvals": {
+        const approvals = await sbFetch<ApprovalRow[]>(
+          "/rest/v1/approvals?status=eq.pending&select=id,summary,proposed_payload&order=created_at.asc&limit=10",
+        ).catch(() => []);
+        action.result = approvals;
+        break;
+      }
+      case "show_help":
+        action.result = {
+          commands: ["rev", "cash", "pnl", "vendors", "tasks", "approve", "help"],
+        };
+        break;
+      case "search_email": {
+        const emails = await searchEmails(String(action.params.query || "newer_than:2d"), 5).catch(() => []);
+        action.result = { emails };
+        break;
+      }
+      case "categorize_qbo_transaction": {
+        const response = await maybeLearnFinancialCorrection({
+          text: String(action.params.instruction || ""),
+          user: context.slackUserId || context.actor,
+          displayName: context.actor,
+          channel: context.slackChannelId || "slack",
+          ts: new Date().toISOString(),
+          threadTs: context.slackThreadTs,
+          history: context.history || [],
+          forceRespond: true,
+        } as SlackMessageContext);
+        action.result = { message: response || "No matching financial correction pattern found." };
+        break;
+      }
+      case "create_qbo_vendor": {
+        const name = String(action.params.name || "").trim();
+        const existingVendors = await fetchInternalJson("/api/ops/qbo/query?type=vendors");
+        const vendors = Array.isArray(existingVendors?.vendors)
+          ? (existingVendors.vendors as Array<Record<string, unknown>>)
+          : [];
+        const existing = vendors.find((vendor) => String(vendor.Name || "").trim().toLowerCase() === name.toLowerCase());
+        if (existing) {
+          action.result = {
+            ok: true,
+            vendor_id: String(existing.Id || ""),
+            name,
+            message: `Vendor ${name} already exists in QBO.`,
+          };
+          break;
+        }
+        const result = await postInternalJson("/api/ops/qbo/vendor", { name });
+        action.result = result;
+        break;
+      }
+      case "create_qbo_customer": {
+        const name = String(action.params.name || "").trim();
+        const result = await postInternalJson("/api/ops/qbo/customer", { name });
+        action.result = result;
+        break;
+      }
+      case "create_qbo_invoice": {
+        const instruction = String(action.params.instruction || "");
+        const customerName = String(action.params.customerName || "").trim();
+        const lineItems = parseLineItemsFromInstruction(instruction);
+        const result = await postInternalJson("/api/ops/qbo/invoice", { customerName, lineItems }, 30000);
+        action.result = result;
+        break;
+      }
+      case "generate_file": {
+        const instruction = String(action.params.instruction || "").toLowerCase();
+        const source =
+          /chart of accounts|coa/.test(instruction) ? "qbo_accounts" :
+          /p&l|profit|loss/.test(instruction) ? "qbo_pnl" :
+          /vendor/.test(instruction) ? "qbo_vendors" :
+          "transactions";
+        const filename =
+          source === "qbo_accounts" ? "chart_of_accounts.xlsx" :
+          source === "qbo_pnl" ? "pnl.xlsx" :
+          source === "qbo_vendors" ? "vendors.xlsx" :
+          "transactions.xlsx";
+        const result = await proposeAndMaybeExecute(buildAction("generate_file", {
+          filename,
+          source,
+          slack_channel_id: context.slackChannelId,
+          slack_thread_ts: context.slackThreadTs,
+          channel_id: context.slackChannelId,
+          thread_ts: context.slackThreadTs,
+        }, "Generate file", `Generate ${filename}`));
+        action.result = result;
+        break;
+      }
+      case "draft_email_reply": {
+        const result = await proposeAndMaybeExecute(buildAction("draft_email_reply", {
+          to: "unknown@pending.local",
+          subject: "Re:",
+          body: `Draft requested from instruction:\n${String(action.params.instruction || "")}`,
+        }, "Draft email reply", "Queue an email draft for approval"));
+        action.result = result;
+        break;
+      }
+      case "create_brain_entry": {
+        const text = String(action.params.text || "").trim();
+        const result = await proposeAndMaybeExecute(buildAction("create_brain_entry", {
+          title: `Teaching from ${context.actor}`,
+          text,
+          category: "teaching",
+          entry_type: "teaching",
+          tags: ["deterministic-router"],
+        }, "Create brain entry", "Store teaching in memory"));
+        action.result = result;
+        break;
+      }
+      case "correct_brain_entry": {
+        const text = String(action.params.text || "").trim();
+        const result = await proposeAndMaybeExecute(buildAction("correct_claim", {
+          original_claim: "Previous statement",
+          correction: text,
+          corrected_by: context.actor,
+        }, "Correct claim", "Store a correction"));
+        action.result = result;
+        break;
+      }
+      default:
+        throw new Error(`Unsupported routed action: ${action.action}`);
+    }
+    action.executed = true;
+  } catch (err) {
+    action.error = err instanceof Error ? err.message : String(err);
+    action.executed = false;
+  }
+  return action;
+}
+
+function formatPnl(data: Record<string, unknown> | null): string {
+  if (!data) return "I couldn't load the live P&L.";
+  const summary = (data.summary || {}) as Record<string, unknown>;
+  const period = (data.period || {}) as Record<string, unknown>;
+  const revenue = Number(summary["Total Income"] || summary.TotalIncome || summary["Total Revenue"] || 0);
+  const cogs = Number(summary["Total Cost of Goods Sold"] || summary.TotalCostOfGoodsSold || summary["Total COGS"] || 0);
+  const expenses = Math.abs(Number(summary["Total Expenses"] || summary.TotalExpenses || 0));
+  const net = revenue - cogs - expenses;
+  return [
+    `• P&L (${String(period.start || "start")} to ${String(period.end || "today")})`,
+    `• Revenue: ${compactCurrency(revenue)}`,
+    `• COGS: ${compactCurrency(cogs)}`,
+    `• Expenses: ${compactCurrency(expenses)}`,
+    `• Net income: ${compactCurrency(net)}`,
+  ].join("\n");
+}
+
+function formatList(label: string, items: string[], nextStep: string): string {
+  return [`• ${label}`, ...items.map((item) => `• ${item}`), "", `Next step: ${nextStep}`].join("\n");
+}
+
+export function renderRoutedActionResponse(action: RoutedAction): { reply: string; blocks?: Array<Record<string, unknown>> } {
+  switch (action.action) {
+    case "query_kpi_revenue": {
+      const result = (action.result || {}) as Record<string, unknown>;
+      return {
+        reply: `Today: ${compactCurrency(Number(result.today || 0))} | MTD: ${compactCurrency(Number(result.mtd || 0), 0)} | Amazon ${compactCurrency(Number(result.amazon || 0))} / Shopify ${compactCurrency(Number(result.shopify || 0))}`,
+      };
+    }
+    case "query_plaid_balance": {
+      const result = (action.result || {}) as Record<string, unknown>;
+      const runway = Number(result.runway || 0);
+      const runwayText = runway > 0 ? ` | Runway ${runway.toFixed(1)} months` : "";
+      return {
+        reply: `Cash: ${compactCurrency(Number(result.balance || 0))} (Plaid live)${runwayText}`,
+      };
+    }
+    case "query_qbo_pnl":
+      return { reply: formatPnl((action.result || null) as Record<string, unknown> | null) };
+    case "query_qbo_vendors": {
+      const vendors = Array.isArray((action.result as Record<string, unknown> | null)?.vendors)
+        ? ((action.result as Record<string, unknown>).vendors as Array<Record<string, unknown>>)
+        : [];
+      return {
+        reply: formatList(`Active QBO vendors: ${vendors.length}`, vendors.slice(0, 8).map((v) => String(v.Name || "Unknown")), "tell me which vendor you want created, updated, or tied to a transaction."),
+      };
+    }
+    case "query_qbo_accounts": {
+      const accounts = Array.isArray((action.result as Record<string, unknown> | null)?.accounts)
+        ? ((action.result as Record<string, unknown>).accounts as Array<Record<string, unknown>>)
+        : [];
+      return {
+        reply: formatList(`Chart of accounts: ${accounts.length} accounts`, accounts.slice(0, 10).map((a) => `${String(a.AcctNum || "")} ${String(a.Name || "").trim()}`.trim()), "ask for the Excel export if you want the full list."),
+      };
+    }
+    case "query_qbo_purchases": {
+      const purchases = Array.isArray((action.result as Record<string, unknown> | null)?.purchases)
+        ? ((action.result as Record<string, unknown>).purchases as Array<Record<string, unknown>>)
+        : [];
+      const lines = purchases.slice(0, 8).map((p) => `${String(p.Date || "")}: ${compactCurrency(Number(p.Amount || 0))} — ${String(p.Vendor || "Unknown")}`);
+      return { reply: formatList("Recent QBO transactions", lines, "tell me which transaction you want categorized, exported, or reviewed.") };
+    }
+    case "query_qbo_bills": {
+      const bills = Array.isArray((action.result as Record<string, unknown> | null)?.bills)
+        ? ((action.result as Record<string, unknown>).bills as Array<Record<string, unknown>>)
+        : [];
+      const unpaid = bills.filter((bill) => Number(bill.Balance || 0) > 0);
+      const total = unpaid.reduce((sum, bill) => sum + Number(bill.Balance || bill.Amount || 0), 0);
+      return { reply: formatList(`Accounts payable: ${compactCurrency(total)}`, unpaid.slice(0, 5).map((bill) => `${String(bill.Vendor || "Unknown")}: ${compactCurrency(Number(bill.Balance || bill.Amount || 0))}`), "tell me which vendor bill you want reviewed or exported.") };
+    }
+    case "query_qbo_invoices": {
+      const invoices = Array.isArray((action.result as Record<string, unknown> | null)?.invoices)
+        ? ((action.result as Record<string, unknown>).invoices as Array<Record<string, unknown>>)
+        : [];
+      const outstanding = invoices.filter((invoice) => Number(invoice.Balance || 0) > 0);
+      const total = outstanding.reduce((sum, invoice) => sum + Number(invoice.Balance || invoice.Amount || 0), 0);
+      return { reply: formatList(`Accounts receivable: ${compactCurrency(total)}`, outstanding.slice(0, 5).map((invoice) => `${String(invoice.Customer || "Unknown")}: ${compactCurrency(Number(invoice.Balance || invoice.Amount || 0))}`), "tell me which invoice, customer, or date range you want me to dig into.") };
+    }
+    case "query_qbo_balance_sheet": {
+      const summary = (((action.result || {}) as Record<string, unknown>).summary || {}) as Record<string, unknown>;
+      return {
+        reply: [
+          `• Balance sheet`,
+          `• Assets: ${compactCurrency(Number(summary["Total Assets"] || summary.TotalAssets || 0))}`,
+          `• Liabilities: ${compactCurrency(Number(summary["Total Liabilities"] || summary.TotalLiabilities || 0))}`,
+          `• Equity: ${compactCurrency(Number(summary["Total Equity"] || summary.TotalEquity || 0))}`,
+          "",
+          "Next step: tell me which balance, loan, or account group you want broken down.",
+        ].join("\n"),
+      };
+    }
+    case "query_qbo_cash_flow": {
+      return { reply: "Cash flow loaded. Next step: tell me whether you want the operating, investing, or financing detail." };
+    }
+    case "query_operator_tasks": {
+      const counts = (action.result || {}) as Record<string, number>;
+      const total = Object.values(counts).reduce((sum, value) => sum + Number(value || 0), 0);
+      return {
+        reply: `${total} pending: ${counts.qbo_categorize || 0} categorizations, ${counts.email_draft_response || 0} email drafts, ${(counts.vendor_followup || 0) + (counts.distributor_followup || 0)} follow-ups`,
+      };
+    }
+    case "query_pending_approvals": {
+      const approvals = Array.isArray(action.result) ? (action.result as ApprovalRow[]) : [];
+      return {
+        reply: approvals.length ? `${approvals.length} approval${approvals.length === 1 ? "" : "s"} pending.` : "No pending approvals.",
+      };
+    }
+    case "show_help":
+      return { reply: "Quick commands: rev, cash, pnl, vendors, tasks, approve, help." };
+    case "search_email": {
+      const emails = Array.isArray((action.result as Record<string, unknown> | null)?.emails)
+        ? ((action.result as Record<string, unknown>).emails as Array<Record<string, unknown>>)
+        : [];
+      return {
+        reply: emails.length
+          ? formatList("Recent email matches", emails.slice(0, 5).map((email) => `${String(email.from || "Unknown")}: ${String(email.subject || "(no subject)")}`), "tell me which thread you want read or drafted.")
+          : "No recent matching emails found.",
+      };
+    }
+    case "categorize_qbo_transaction":
+      return { reply: String(((action.result || {}) as Record<string, unknown>).message || "Categorization processed.") };
+    case "create_qbo_vendor":
+      return {
+        reply:
+          String(((action.result || {}) as Record<string, unknown>).message || "").trim() ||
+          `${String(action.params.name || "Vendor")} created in QBO.`,
+      };
+    case "create_qbo_customer":
+      return {
+        reply:
+          String(((action.result || {}) as Record<string, unknown>).message || "").trim() ||
+          `${String(action.params.name || "Customer")} created in QBO.`,
+      };
+    case "create_qbo_invoice": {
+      const result = (action.result || {}) as Record<string, unknown>;
+      return { reply: `Draft invoice created in QBO: ${String(result.docNumber || result.invoiceId || "(draft)")}.` };
+    }
+    case "generate_file": {
+      const result = (action.result || {}) as Record<string, unknown>;
+      const filename = String(result.filename || action.params.filename || "report.xlsx");
+      const message = String(result.message || "").trim();
+      return {
+        reply: /(?:xlsx|csv|uploaded|download)/i.test(message)
+          ? message
+          : `${filename} uploaded.`,
+      };
+    }
+    case "draft_email_reply":
+      return { reply: "Draft reply queued for human approval. It was not sent." };
+    case "create_brain_entry":
+      return { reply: "Stored in memory." };
+    case "correct_brain_entry":
+      return { reply: "Correction stored." };
+    default:
+      return { reply: action.executed ? "Done." : `I couldn't execute ${action.action}.` };
+  }
+}

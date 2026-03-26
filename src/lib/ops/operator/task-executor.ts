@@ -1,8 +1,11 @@
 import {
   createQBOAccount,
+  createQBOCustomer,
+  createQBOInvoice,
   createQBOJournalEntry,
   createQBOVendor,
   getQBOAccounts,
+  getQBOCustomers,
   getQBOVendors,
 } from "@/lib/ops/qbo-client";
 import { readEmail, searchEmails } from "@/lib/ops/gmail-reader";
@@ -114,7 +117,7 @@ const REVENUE_ACCOUNT_METRIC_MAP: Record<string, { metricNames: string[]; qboAcc
 
 const POWERS_EMAIL = "gregk@powers-inc.com";
 const WHOLESALE_UNIT_PRICE = 2.1;
-const FINANCIALS_CHANNEL_ID = "C0AKG9FSC2J";
+const CONTROL_CHANNEL_ID = "C0ALS6W7VB4";
 const CATEGORIZATION_ACCOUNT_FALLBACKS: Record<string, { name: string; accountType: string; acctNum?: string; accountSubType?: string }> = {
   "179": { name: "COGS Packaging", accountType: "Cost of Goods Sold", acctNum: "5300" },
   "175": { name: "COGS general", accountType: "Cost of Goods Sold", acctNum: "5100" },
@@ -183,7 +186,7 @@ async function postFinancialsMessage(text: string): Promise<void> {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      channel: FINANCIALS_CHANNEL_ID,
+      channel: CONTROL_CHANNEL_ID,
       text,
       mrkdwn: true,
       unfurl_links: false,
@@ -568,6 +571,7 @@ async function listReadyTasks(limit: number): Promise<OperatorTaskRow[]> {
       row.task_type === "email_draft_response" ||
       row.task_type === "qbo_record_from_email" ||
       row.task_type === "generate_wholesale_invoice" ||
+      row.task_type === "po_received" ||
       row.task_type === "generate_investor_update" ||
       row.task_type === "inventory_reorder_po" ||
       row.task_type === "vendor_followup" ||
@@ -1349,6 +1353,164 @@ async function executeGenerateWholesaleInvoiceTask(task: OperatorTaskRow): Promi
   return `Created draft wholesale invoice ${docNumber || invoiceId} for ${customerName} totaling $${total.toFixed(2)}`;
 }
 
+async function findOrCreateCustomer(params: {
+  customerName: string;
+  customerEmail?: string;
+}): Promise<string> {
+  const customers = ((await getQBOCustomers())?.QueryResponse?.Customer as Array<Record<string, unknown>>) || [];
+  const normalizedTarget = normalizeVendorKey(params.customerName);
+  const existing = customers.find((customer) => {
+    const displayName = normalizeVendorKey(String(customer.DisplayName || ""));
+    const companyName = normalizeVendorKey(String(customer.CompanyName || ""));
+    return displayName === normalizedTarget || companyName === normalizedTarget || displayName.includes(normalizedTarget);
+  });
+  const existingId = String(existing?.Id || "");
+  if (existingId) return existingId;
+
+  const created = await createQBOCustomer({
+    DisplayName: params.customerName,
+    CompanyName: params.customerName,
+    ...(params.customerEmail ? { PrimaryEmailAddr: { Address: params.customerEmail } } : {}),
+  }).catch(() => null);
+  const createdEntity = ((created as Record<string, unknown>)?.Customer || created || null) as Record<string, unknown> | null;
+  const createdId = String(createdEntity?.Id || "");
+  if (!createdId) throw new Error(`Failed to create QBO customer ${params.customerName}`);
+  return createdId;
+}
+
+async function writeOpenPoEntry(params: {
+  poNumber: string;
+  customerName: string;
+  quantity: number;
+  total: number;
+  deliveryDate: string | null;
+}): Promise<void> {
+  const sourceRef = `open-po:${params.poNumber}`;
+  const title = `Open PO: ${params.customerName} PO #${params.poNumber}`;
+  const rawText =
+    `Open PO: ${params.customerName} PO #${params.poNumber}, ${params.quantity} units, $${params.total.toFixed(2)}, ` +
+    `due ${params.deliveryDate || "TBD"}`;
+  const summary = rawText.slice(0, 500);
+  const existing = await sbFetch<Array<{ id: string }>>(
+    `/rest/v1/open_brain_entries?source_ref=eq.${encodeURIComponent(sourceRef)}&select=id&limit=1`,
+  ).catch(() => []);
+
+  if (existing[0]?.id) {
+    await sbFetch(`/rest/v1/open_brain_entries?id=eq.${existing[0].id}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        title,
+        raw_text: rawText,
+        summary_text: summary,
+      }),
+    }).catch(() => {});
+    return;
+  }
+
+  await sbFetch("/rest/v1/open_brain_entries", {
+    method: "POST",
+    body: JSON.stringify({
+      source_type: "manual",
+      source_ref: sourceRef,
+      entry_type: "observation",
+      title,
+      raw_text: rawText,
+      summary_text: summary,
+      category: "sales",
+      department: "sales",
+      tags: [`po:${params.poNumber.toLowerCase()}`, "open-po"],
+      processed: true,
+    }),
+  }).catch(() => {});
+}
+
+async function postSlackChannelMessage(channelId: string, text: string): Promise<void> {
+  const token = (process.env.SLACK_BOT_TOKEN || "").trim();
+  if (!token || !channelId) return;
+  await fetch("https://slack.com/api/chat.postMessage", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      channel: channelId,
+      text,
+      mrkdwn: true,
+      unfurl_links: false,
+    }),
+    signal: AbortSignal.timeout(10000),
+  }).catch(() => {});
+}
+
+async function executePoReceivedTask(task: OperatorTaskRow): Promise<string> {
+  const poNumber = String(task.execution_params?.po_number || "").trim();
+  const customerName = String(task.execution_params?.customer_name || "Customer").trim();
+  const quantity = Math.max(0, Number(task.execution_params?.quantity || 0));
+  const unitPrice = Math.max(0, Number(task.execution_params?.unit_price || 0));
+  const deliveryDate = String(task.execution_params?.delivery_date || "").trim() || null;
+  const shippingAddress = String(task.execution_params?.shipping_address || "").trim() || null;
+  const needsShipping = Boolean(task.execution_params?.needs_shipping);
+  const customerEmail = String(task.execution_params?.customer_email || "").trim();
+  if (!poNumber || !quantity || !unitPrice) {
+    throw new Error("Missing PO number, quantity, or unit price");
+  }
+
+  const customerId = customerName.toLowerCase() === "inderbitzin"
+    ? "20"
+    : await findOrCreateCustomer({ customerName, customerEmail });
+  const total = Number((quantity * unitPrice).toFixed(2));
+  const invoice = await createQBOInvoice({
+    CustomerRef: { value: customerId },
+    Line: [
+      {
+        Amount: total,
+        DetailType: "SalesItemLineDetail",
+        Description: "All American Gummy Bears 7.5oz",
+        SalesItemLineDetail: {
+          Qty: quantity,
+          UnitPrice: unitPrice,
+        },
+      },
+      ...(needsShipping
+        ? [{
+            Amount: 0,
+            DetailType: "SalesItemLineDetail" as const,
+            Description: `Shipping (TBD)${shippingAddress ? ` — ${shippingAddress}` : ""}`,
+            SalesItemLineDetail: {
+              Qty: 1,
+              UnitPrice: 0,
+            },
+          }]
+        : []),
+    ],
+    DueDate: deliveryDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+    DocNumber: poNumber,
+    ...(customerEmail ? { BillEmail: { Address: customerEmail } } : {}),
+    CustomerMemo: {
+      value: `PO ${poNumber}. Shipping cost to be determined when product ships.`,
+    },
+  }).catch(() => null);
+  const invoiceEntity = ((invoice as Record<string, unknown>)?.Invoice || invoice || null) as Record<string, unknown> | null;
+  const invoiceId = String(invoiceEntity?.Id || invoiceEntity?.DocNumber || "");
+  if (!invoiceId) {
+    throw new Error(`Failed to create QBO invoice draft for PO ${poNumber}`);
+  }
+
+  await writeOpenPoEntry({
+    poNumber,
+    customerName,
+    quantity,
+    total,
+    deliveryDate,
+  });
+
+  await postSlackChannelMessage(CONTROL_CHANNEL_ID, `✅ PO #${poNumber} from ${customerName} logged. Invoice draft #${invoiceId} created in QBO. ${quantity} units, $${total.toFixed(2)}.`);
+  await postSlackChannelMessage("C0AKG9FSC2J", `<@U0ALL27JM38> New PO #${poNumber} — Invoice draft created for $${total.toFixed(2)}. Needs shipping cost before sending.`);
+
+  return `Logged PO #${poNumber} from ${customerName}. Created QBO invoice draft ${invoiceId} for $${total.toFixed(2)}.`;
+}
+
 async function executeGenerateInvestorUpdateTask(): Promise<string> {
   const result = await runInvestorUpdatePackage(true);
   if (!result.ran) {
@@ -1373,6 +1535,8 @@ async function executeTask(task: OperatorTaskRow): Promise<string | ExecuteTaskR
       return executeRevenueGapTask(task);
     case "generate_wholesale_invoice":
       return executeGenerateWholesaleInvoiceTask(task);
+    case "po_received":
+      return executePoReceivedTask(task);
     case "generate_investor_update":
       return executeGenerateInvestorUpdateTask();
     case "inventory_reorder_po":

@@ -30,6 +30,8 @@ type BuiltinRule = {
   exactNames: string[];
   recurringAmounts?: number[];
   transactionKind?: "expense" | "income" | "any";
+  exactConfidence?: number;
+  partialConfidence?: number;
 };
 
 const BUILTIN_QBO_RULES: BuiltinRule[] = [
@@ -59,6 +61,12 @@ const BUILTIN_QBO_RULES: BuiltinRule[] = [
   { pattern: "BLIP BILLBOARDS", accountId: "16", accountName: "Advertising", regex: /blip\s*billboards?/i, exactNames: ["blip billboards", "blip"] },
   { pattern: "RANGEME", accountId: "126", accountName: "Software", regex: /rangeme/i, exactNames: ["rangeme"] },
   { pattern: "WEBSITE / DOMAIN", accountId: "126", accountName: "Software", regex: /websit|domain|workspace|worksp|qr\s*tiger|qrtiger/i, exactNames: ["website", "domain", "workspace", "qrtiger"] },
+  { pattern: "COVERDASH", accountId: "42", accountName: "Insurance", regex: /coverdash|useascend/i, exactNames: ["coverdash", "useascend"], exactConfidence: 95, partialConfidence: 80 },
+  { pattern: "HELIUM10", accountId: "126", accountName: "Software", regex: /helium\s*10|helium10/i, exactNames: ["helium10", "helium 10"], exactConfidence: 90, partialConfidence: 75 },
+  { pattern: "OWNERREZ", accountId: "126", accountName: "Software", regex: /ownerrez/i, exactNames: ["ownerrez"], exactConfidence: 72, partialConfidence: 70 },
+  { pattern: "CRATEJOY", accountId: "126", accountName: "Software", regex: /cratejoy/i, exactNames: ["cratejoy"], exactConfidence: 72, partialConfidence: 70 },
+  { pattern: "BRAVE", accountId: "126", accountName: "Software", regex: /brave(\.com)?/i, exactNames: ["brave", "brave com"], exactConfidence: 72, partialConfidence: 70 },
+  { pattern: "COMPANY SAGE", accountId: "126", accountName: "Software", regex: /company\s*sage/i, exactNames: ["company sage"], exactConfidence: 72, partialConfidence: 70 },
   { pattern: "FOUND PLUS", accountId: "109", accountName: "Bank fees & service charges", regex: /found\s*plus/i, exactNames: ["found plus"] },
   { pattern: "LEGAL FEES", accountId: "119", accountName: "Legal Fees", regex: /wyomingllcattorney|trademark engine|lowe graham|privacypr|certicopy/i, exactNames: ["wyomingllcattorney", "trademark engine", "privacypr", "certicopy"] },
   { pattern: "DESIGN / BRANDING", accountId: "16", accountName: "Advertising", regex: /hunter of design|hawk design|ryan cross|troy burkhart|logo.?team|rushordertees|wrist.?band/i, exactNames: ["hunter of design", "hawk design", "ryan cross", "troy burkhart"] },
@@ -66,7 +74,6 @@ const BUILTIN_QBO_RULES: BuiltinRule[] = [
 
 const SKIP_QBO_RULES: Array<{ pattern: string; regex: RegExp; reason: string }> = [
   { pattern: "FOUND BANKING", regex: /found(\s+banking)?/i, reason: "Internal Found Banking transfer." },
-  { pattern: "CREDIT CARD PAYMENT", regex: /credit\s*card\s*payment|payment\s+thank\s+you|autopay/i, reason: "Credit card payment should be treated as an internal transfer." },
 ];
 
 function inferTransactionKind(description: string, amount: number): "expense" | "income" {
@@ -124,6 +131,22 @@ export function normalizeQboText(value: string | null | undefined): string {
     .trim();
 }
 
+function stripQboNoise(value: string): string {
+  return String(value || "")
+    .replace(/\[puzzle import\]|\[puzzle\]/gi, " ")
+    .replace(/\([^)]*@[^)]*\)/g, " ")
+    .replace(/\bdes:[^ ]+/gi, " ")
+    .replace(/\bid:[^ ]*/gi, " ")
+    .replace(/\bindn:[^ ]+/gi, " ")
+    .replace(/\bco id:[^ ]+/gi, " ")
+    .replace(/\bweb\b/gi, " ")
+    .replace(/\bach pmt\b/gi, " payment ")
+    .replace(/\bwww\./gi, " ")
+    .replace(/\bcom\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function amountClose(amount: number, expected: number): boolean {
   return Math.abs(Math.abs(amount) - expected) <= 1.5;
 }
@@ -138,6 +161,20 @@ export async function loadLearnedQboRules(): Promise<LearnedQboRule[]> {
     "/rest/v1/abra_qbo_learning_rules?select=*&active=eq.true&order=created_at.desc&limit=200",
   ).catch(() => []);
   return Array.isArray(rows) ? rows : [];
+}
+
+export function resolveByDescription(
+  description: string,
+  learnedRules: LearnedQboRule[] = [],
+): { accountId: string; accountName: string | null; confidence: number; reasoning: string } | null {
+  const resolution = resolveQboCategory(description, 1, learnedRules);
+  if (!(resolution.matched && resolution.accountId) || resolution.skip) return null;
+  return {
+    accountId: resolution.accountId,
+    accountName: resolution.accountName,
+    confidence: resolution.confidence,
+    reasoning: resolution.reasoning,
+  };
 }
 
 export async function upsertLearnedQboRule(input: {
@@ -197,7 +234,8 @@ export function resolveQboCategory(
   amount: number,
   learnedRules: LearnedQboRule[] = [],
 ): ResolvedQboCategory {
-  const normalized = normalizeQboText(description);
+  const cleanedDescription = stripQboNoise(description);
+  const normalized = normalizeQboText(cleanedDescription || description);
   const transactionKind = inferTransactionKind(description, amount);
   if (!normalized) {
     return {
@@ -225,8 +263,50 @@ export function resolveQboCategory(
     };
   }
 
+  if (
+    /(american express|capital one|citi|chase)/i.test(description) &&
+    /(payment|pymt|pmt|autopay|thank you)/i.test(description)
+  ) {
+    return {
+      matched: true,
+      confidence: 95,
+      accountId: "169",
+      accountName: "Credit Card Payments",
+      reasoning: "Detected a credit card payment / internal transfer.",
+      pattern: "CREDIT CARD PAYMENT",
+      source: "builtin_exact",
+      skip: false,
+    };
+  }
+
+  if (/(wire transfer fee|past due fee|monthly fee|service charge|bank fee)/i.test(description)) {
+    return {
+      matched: true,
+      confidence: 95,
+      accountId: "160",
+      accountName: "Bank Fees",
+      reasoning: "Detected a bank fee / service charge transaction.",
+      pattern: "BANK FEE",
+      source: "builtin_exact",
+      skip: false,
+    };
+  }
+
+  if (/\binterest\b/i.test(description)) {
+    return {
+      matched: true,
+      confidence: 95,
+      accountId: "163",
+      accountName: "Interest Expense",
+      reasoning: "Detected an interest charge.",
+      pattern: "INTEREST",
+      source: "builtin_exact",
+      skip: false,
+    };
+  }
+
   for (const rule of SKIP_QBO_RULES) {
-    if (rule.regex.test(description)) {
+    if (rule.regex.test(description) || rule.regex.test(cleanedDescription)) {
       return {
         matched: true,
         confidence: 100,
@@ -258,10 +338,10 @@ export function resolveQboCategory(
 
   for (const rule of BUILTIN_QBO_RULES) {
     if (rule.transactionKind && rule.transactionKind !== "any" && rule.transactionKind !== transactionKind) continue;
-    if (matchesExactName(description, rule)) {
+    if (matchesExactName(cleanedDescription || description, rule)) {
       return {
         matched: true,
-        confidence: 95,
+        confidence: rule.exactConfidence ?? 95,
         accountId: rule.accountId,
         accountName: rule.accountName,
         reasoning: `Exact vendor match for ${rule.pattern}.`,
@@ -286,11 +366,11 @@ export function resolveQboCategory(
         skip: false,
       };
     }
-    if (rule.regex.test(description)) {
+    if (rule.regex.test(description) || rule.regex.test(cleanedDescription)) {
       const googleWorkspace = /google\s+workspace|workspace|gsuite|g suite/i.test(description);
       return {
         matched: true,
-        confidence: 80,
+        confidence: rule.partialConfidence ?? 80,
         accountId: rule.pattern === "GOOGLE ADS" && googleWorkspace ? "126" : rule.accountId,
         accountName: rule.pattern === "GOOGLE ADS" && googleWorkspace ? "Software" : rule.accountName,
         reasoning: `Partial description match for ${rule.pattern}.`,

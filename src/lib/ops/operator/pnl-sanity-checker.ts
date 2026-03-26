@@ -132,7 +132,7 @@ async function postFinancialsMessage(text: string): Promise<void> {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      channel: "C0AKG9FSC2J",
+      channel: "C0ALS6W7VB4",
       text,
     }),
     signal: AbortSignal.timeout(10000),

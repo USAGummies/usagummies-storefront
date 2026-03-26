@@ -53,6 +53,8 @@ import {
   getAvailableActions,
   parseActionDirectives,
 } from "@/lib/ops/abra-actions";
+import { executeRoutedAction, renderRoutedActionResponse } from "@/lib/ops/operator/action-executor";
+import { routeMessage } from "@/lib/ops/operator/deterministic-router";
 import { analyzePipeline } from "@/lib/ops/abra-pipeline-intelligence";
 import { EMAIL_EXTRACTION_SKILL } from "@/lib/ops/abra-skill-email-data-extraction";
 import { DEAL_CALCULATOR_SKILL } from "@/lib/ops/abra-skill-deal-calculator";
@@ -263,6 +265,11 @@ async function generateClaudeReply(input: {
   deadlineSignal?: AbortSignal;
   isFinanceRelated?: boolean;
   actorContext?: string | null;
+  uploadedImage?: {
+    base64: string;
+    mediaType: string;
+    fileName: string;
+  } | null;
 }): Promise<{
   reply: string;
   modelUsed: string;
@@ -469,6 +476,26 @@ MARGIN & COST CLAIM VERIFICATION (applies when user asserts financial metrics):
     if (input.deadlineSignal.aborted) llmAbort.abort();
     else input.deadlineSignal.addEventListener("abort", () => llmAbort.abort(), { once: true });
   }
+  const anthropicMessages = input.uploadedImage
+    ? [{
+        role: "user",
+        content: [
+          {
+            type: "image",
+            source: {
+              type: "base64",
+              media_type: input.uploadedImage.mediaType,
+              data: input.uploadedImage.base64,
+            },
+          },
+          {
+            type: "text",
+            text: userPrompt,
+          },
+        ],
+      }]
+    : [{ role: "user", content: userPrompt }];
+
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -481,7 +508,7 @@ MARGIN & COST CLAIM VERIFICATION (applies when user asserts financial metrics):
       max_tokens: maxTokens,
       temperature: 0.2,
       system: `${actionInstructions}\n\n${systemPrompt}${needsEmailExtractionSkill(input.message) ? `\n\n${EMAIL_EXTRACTION_SKILL.prompt}` : ""}${needsDealCalculatorSkill(input.message) ? `\n\n${DEAL_CALCULATOR_SKILL.prompt}` : ""}`,
-      messages: [{ role: "user", content: userPrompt }],
+      messages: anthropicMessages,
     }),
     signal: llmAbort.signal,
   });
@@ -546,14 +573,19 @@ MARGIN & COST CLAIM VERIFICATION (applies when user asserts financial metrics):
 // ─── POST Handler ───
 
 export async function POST(req: Request) {
-  // Rate limit — strict tier (AI costs money)
-  const { checkRateLimit } = await import("@/lib/ops/rate-limit");
-  const rl = await checkRateLimit(req, "strict");
-  if (rl.limited) return rl.response!;
-
-  if (!(await isAuthorized(req))) {
+  const authorized = await isAuthorized(req);
+  if (!authorized) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  // Rate limit public callers, but never throttle authorized internal automation.
+  const hasBearerAuth = Boolean(req.headers.get("authorization")?.trim());
+  if (!hasBearerAuth) {
+    const { checkRateLimit } = await import("@/lib/ops/rate-limit");
+    const rl = await checkRateLimit(req, "strict");
+    if (rl.limited) return rl.response!;
+  }
+
   const session = await auth();
   const actorEmail = session?.user?.email || "cron@system";
   const url = new URL(req.url);
@@ -574,6 +606,11 @@ export async function POST(req: Request) {
   let uploadedFileContext = "";
   let uploadedFileName = "";
   let uploadedDocId = "";
+  let uploadedImage: {
+    base64: string;
+    mediaType: string;
+    fileName: string;
+  } | null = null;
 
   const contentType = req.headers.get("content-type") || "";
   if (contentType.includes("multipart/form-data")) {
@@ -591,12 +628,23 @@ export async function POST(req: Request) {
         if (file.size > MAX_FILE_SIZE_BYTES) {
           return NextResponse.json({ error: "File exceeds 10MB limit" }, { status: 400 });
         }
-        const fileText = await extractFileText(file);
-        if (fileText) {
+        if ((file.type || "").startsWith("image/")) {
+          const buffer = Buffer.from(await file.arrayBuffer());
           uploadedFileName = file.name;
-          uploadedFileContext = `\n\n--- UPLOADED DOCUMENT: ${file.name} ---\n${fileText.slice(0, 12000)}\n--- END DOCUMENT ---\n`;
-          // Store in memory (non-blocking)
-          void ingestFileToMemory(file, fileText, actorEmail).then((id) => { uploadedDocId = id; }).catch(() => {});
+          uploadedImage = {
+            base64: buffer.toString("base64"),
+            mediaType: file.type || "image/png",
+            fileName: file.name,
+          };
+          uploadedFileContext = `\n\n--- ATTACHED IMAGE: ${file.name} ---\nDescribe and analyze the attached image if it is relevant to the user's request.\n--- END IMAGE ---\n`;
+        } else {
+          const fileText = await extractFileText(file);
+          if (fileText) {
+            uploadedFileName = file.name;
+            uploadedFileContext = `\n\n--- UPLOADED DOCUMENT: ${file.name} ---\n${fileText.slice(0, 12000)}\n--- END DOCUMENT ---\n`;
+            // Store in memory (non-blocking)
+            void ingestFileToMemory(file, fileText, actorEmail).then((id) => { uploadedDocId = id; }).catch(() => {});
+          }
         }
       }
     } catch {
@@ -680,6 +728,38 @@ export async function POST(req: Request) {
       thread_id: threadId,
       mode: "health",
     });
+  }
+
+  const routedAction = routeMessage(rawMessage, actorEmail);
+  if (routedAction) {
+    const executedAction = await executeRoutedAction(routedAction, {
+      actor: actorLabel,
+      slackChannelId: slackChannelId || undefined,
+      slackThreadTs: slackThreadTs || undefined,
+    });
+    if (executedAction.executed && !executedAction.error) {
+      const rendered = renderRoutedActionResponse(executedAction);
+      queueChatHistory({
+        threadId,
+        userEmail: actorEmail,
+        userMessage: message,
+        assistantMessage: rendered.reply,
+        metadata: {
+          intent: executedAction.intent,
+          deterministic_action: executedAction.action,
+        },
+        actorLabel,
+      });
+      return NextResponse.json({
+        reply: rendered.reply,
+        confidence: 1,
+        sources: [],
+        intent: executedAction.intent,
+        thread_id: threadId,
+        deterministic_action: executedAction.action,
+        deterministic_result: executedAction.result,
+      });
+    }
   }
 
   // Vercel Hobby plan kills functions at 60s — use AbortController to cancel
@@ -1897,8 +1977,9 @@ export async function POST(req: Request) {
       liveSnapshot: augmentedLiveSnapshot,
       deadlineSignal: deadlineController.signal,
       isFinanceRelated: isFinanceQuestion(message),
-      actorContext,
-    });
+        actorContext,
+        uploadedImage,
+      });
     // Track Anthropic API success in capability registry
     void capMarkSuccess("anthropic").catch(() => {});
     const actionNotices: string[] = [];

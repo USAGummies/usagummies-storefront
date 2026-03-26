@@ -12,6 +12,7 @@
  */
 
 import ExcelJS from "exceljs";
+import { kv } from "@vercel/kv";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -24,6 +25,7 @@ export type SlackFileUploadResult = {
   fileId?: string;
   permalink?: string;
   error?: string;
+  skipped?: boolean;
 };
 
 export type SpreadsheetData = {
@@ -34,6 +36,18 @@ export type SpreadsheetData = {
   /** Row data — each row is an array of cell values */
   rows: (string | number | boolean | null)[][];
 };
+
+type SlackHistoryMessage = {
+  ts?: string;
+  files?: Array<{
+    id?: string;
+    name?: string;
+    title?: string;
+    permalink?: string;
+  }>;
+};
+
+const recentUploadFallback = new Map<string, { permalink?: string; expiresAt: number }>();
 
 // ---------------------------------------------------------------------------
 // Formatting helpers
@@ -217,6 +231,59 @@ export async function uploadFileToSlack(opts: {
     return { ok: false, error: "SLACK_BOT_TOKEN not configured" };
   }
 
+  const dedupeKey = `abra:file-upload:${opts.channelId}:${opts.filename.toLowerCase()}`;
+
+  async function findRecentDuplicate(): Promise<{ permalink?: string } | null> {
+    try {
+      const cached = await kv.get<{ permalink?: string }>(dedupeKey);
+      if (cached) return cached;
+    } catch {
+      const local = recentUploadFallback.get(dedupeKey);
+      if (local && local.expiresAt > Date.now()) {
+        return { permalink: local.permalink };
+      }
+      if (local) recentUploadFallback.delete(dedupeKey);
+    }
+    try {
+      const url = new URL("https://slack.com/api/conversations.history");
+      url.searchParams.set("channel", opts.channelId);
+      url.searchParams.set("oldest", String(Math.floor(Date.now() / 1000) - (2 * 60 * 60)));
+      url.searchParams.set("limit", "100");
+      const res = await fetch(url.toString(), {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!res.ok) return null;
+      const data = (await res.json()) as {
+        ok?: boolean;
+        messages?: SlackHistoryMessage[];
+      };
+      if (!data.ok || !Array.isArray(data.messages)) return null;
+      for (const message of data.messages) {
+        for (const file of message.files || []) {
+          const name = String(file.name || file.title || "").trim();
+          if (name === opts.filename) {
+            return { permalink: file.permalink };
+          }
+        }
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  const duplicate = await findRecentDuplicate();
+  if (duplicate) {
+    return {
+      ok: true,
+      skipped: true,
+      permalink: duplicate.permalink,
+    };
+  }
+
   const format = opts.format || (opts.filename.endsWith(".xlsx") ? "xlsx" : "csv");
   const sheets = Array.isArray(opts.data) ? opts.data : [opts.data];
 
@@ -315,6 +382,14 @@ export async function uploadFileToSlack(opts: {
     }
 
     const file = completeData.files?.[0];
+    try {
+      await kv.set(dedupeKey, { permalink: file?.permalink }, { ex: 2 * 60 * 60 });
+    } catch {
+      recentUploadFallback.set(dedupeKey, {
+        permalink: file?.permalink,
+        expiresAt: Date.now() + (2 * 60 * 60 * 1000),
+      });
+    }
     return {
       ok: true,
       fileId: file?.id || urlData.file_id,

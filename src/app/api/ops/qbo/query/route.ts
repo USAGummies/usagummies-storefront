@@ -54,7 +54,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "QBO not connected" }, { status: 401 });
   }
 
-  const queryType = req.nextUrl.searchParams.get("type") || "vendors";
+  const rawType = (req.nextUrl.searchParams.get("type") || "vendors").trim().toLowerCase();
+  const queryType =
+    rawType === "transactions" || rawType === "expenses" || rawType === "recent_purchases"
+      ? "purchases"
+      : rawType;
 
   try {
     switch (queryType) {

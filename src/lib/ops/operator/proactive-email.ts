@@ -2,6 +2,7 @@ import {
   ABRA_CONTROL_CHANNEL_ID,
   formatCurrency,
 } from "@/lib/ops/operator/reports/shared";
+import { readState, writeState } from "@/lib/ops/state";
 
 type OperatorTaskRow = {
   id: string;
@@ -17,6 +18,11 @@ type OperatorTaskRow = {
 export type ProactiveEmailSurfaceResult = {
   surfaced: number;
 };
+
+type SurfacedEmailState = Record<string, string>;
+
+const SURFACED_EMAILS_STATE_KEY = "abra:surfaced_emails" as never;
+const SURFACED_TTL_MS = 48 * 60 * 60 * 1000;
 
 function getSupabaseEnv() {
   const baseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -82,10 +88,34 @@ function getSurfacedAt(task: OperatorTaskRow): string {
   return String(task.execution_result?.surfaced_at || "").trim();
 }
 
-function shouldSurface(task: OperatorTaskRow, now = Date.now()): boolean {
+function getSurfaceKey(task: OperatorTaskRow): string {
+  return String(
+    task.execution_params?.message_id ||
+    task.execution_params?.thread_id ||
+    task.execution_params?.email_message_id ||
+    task.id,
+  ).trim();
+}
+
+function pruneSurfacedState(
+  state: SurfacedEmailState,
+  now = Date.now(),
+): SurfacedEmailState {
+  return Object.fromEntries(
+    Object.entries(state).filter(([, surfacedAt]) => {
+      const ts = new Date(surfacedAt).getTime();
+      return Number.isFinite(ts) && now - ts < SURFACED_TTL_MS;
+    }),
+  );
+}
+
+function shouldSurface(task: OperatorTaskRow, surfacedState: SurfacedEmailState, now = Date.now()): boolean {
   if (!getApprovalId(task)) return false;
   const surfacedAt = getSurfacedAt(task);
   if (surfacedAt) return false;
+  const surfaceKey = getSurfaceKey(task);
+  const priorSurfacedAt = surfaceKey ? surfacedState[surfaceKey] : "";
+  if (priorSurfacedAt) return false;
   if (!task.due_by) return true;
   const dueAt = new Date(task.due_by).getTime();
   return !Number.isFinite(dueAt) || dueAt <= now;
@@ -175,11 +205,14 @@ async function markSurfaced(task: OperatorTaskRow, ts?: string): Promise<void> {
 }
 
 export async function surfaceProactiveEmailTasks(): Promise<ProactiveEmailSurfaceResult> {
+  const surfacedState = pruneSurfacedState(
+    await readState<SurfacedEmailState>(SURFACED_EMAILS_STATE_KEY, {}),
+  );
   const rows = await sbFetch<OperatorTaskRow[]>(
     `/rest/v1/abra_operator_tasks?select=id,task_type,title,created_at,due_by,execution_params,execution_result,status&task_type=in.(email_draft_response,vendor_followup,distributor_followup)&status=in.(completed,needs_approval,pending)&order=created_at.asc&limit=50`,
   ).catch(() => []);
 
-  const actionable = (Array.isArray(rows) ? rows : []).filter((task) => shouldSurface(task));
+  const actionable = (Array.isArray(rows) ? rows : []).filter((task) => shouldSurface(task, surfacedState));
   let surfaced = 0;
 
   for (const task of actionable) {
@@ -187,8 +220,14 @@ export async function surfaceProactiveEmailTasks(): Promise<ProactiveEmailSurfac
     const result = await postSlackBlocks(ABRA_CONTROL_CHANNEL_ID, card.text, card.blocks);
     if (!result.ok) continue;
     surfaced += 1;
+    const surfaceKey = getSurfaceKey(task);
+    if (surfaceKey) {
+      surfacedState[surfaceKey] = new Date().toISOString();
+    }
     await markSurfaced(task, result.ts).catch(() => {});
   }
+
+  await writeState(SURFACED_EMAILS_STATE_KEY, surfacedState).catch(() => {});
 
   return { surfaced };
 }

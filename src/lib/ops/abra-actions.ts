@@ -3103,6 +3103,9 @@ async function handleGenerateFile(params: Record<string, unknown>): Promise<Acti
       }
       const result = await uploadFileToSlack({ channelId, threadTs, filename, title, comment, format, data: fetchedSheets });
       if (!result.ok) return { success: false, message: `File upload failed: ${result.error}` };
+      if (result.skipped) {
+        return { success: true, message: `Already uploaded — see above${result.permalink ? `: ${result.permalink}` : ""}`, data: { permalink: result.permalink, skipped: true } };
+      }
       return { success: true, message: `Uploaded ${filename} to Slack${result.permalink ? `: ${result.permalink}` : ""}`, data: { fileId: result.fileId, permalink: result.permalink } };
     } catch (err) {
       return { success: false, message: `Source fetch failed: ${err instanceof Error ? err.message : String(err)}` };
@@ -3155,6 +3158,13 @@ async function handleGenerateFile(params: Record<string, unknown>): Promise<Acti
 
   if (!result.ok) {
     return { success: false, message: `File upload failed: ${result.error}` };
+  }
+  if (result.skipped) {
+    return {
+      success: true,
+      message: `Already uploaded — see above${result.permalink ? `: ${result.permalink}` : ""}`,
+      data: { permalink: result.permalink, skipped: true },
+    };
   }
 
   return {

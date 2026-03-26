@@ -43,6 +43,14 @@ export type OperatorCycleSummary = {
     wholesale?: {
       invoiceTasks: number;
     };
+    poCapture?: {
+      detected: number;
+    };
+    openPo?: {
+      openCount: number;
+      committedRevenue: number;
+      overdueCount: number;
+    };
     reports?: {
       weeklyArAp?: { ran: boolean };
       monthlyPnl?: { ran: boolean };
@@ -188,6 +196,12 @@ export async function reportOperatorCycle(summary: OperatorCycleSummary): Promis
     ...(summary.detectorSummary.wholesale
       ? [`*Wholesale:* ${summary.detectorSummary.wholesale.invoiceTasks} invoice draft task(s)`]
       : []),
+    ...(summary.detectorSummary.poCapture
+      ? [`*PO Capture:* ${summary.detectorSummary.poCapture.detected} purchase order email(s) detected`]
+      : []),
+    ...(summary.detectorSummary.openPo
+      ? [`*Open POs:* ${summary.detectorSummary.openPo.openCount} open, $${summary.detectorSummary.openPo.committedRevenue.toFixed(2)} committed${summary.detectorSummary.openPo.overdueCount ? `, ${summary.detectorSummary.openPo.overdueCount} overdue` : ""}`]
+      : []),
     ...(summary.detectorSummary.reports
       ? [
           `*Reports:* weekly AR/AP ${summary.detectorSummary.reports.weeklyArAp?.ran ? "ran" : "idle"}, ` +
@@ -221,5 +235,14 @@ export async function reportOperatorCycle(summary: OperatorCycleSummary): Promis
     channel: "alerts",
     text,
     blocks: approvalTasks.length ? buildApprovalBlocks(approvalTasks) : undefined,
+    type: "operator_cycle",
+    target: "ben",
+    changed: hasMaterialActivity || approvalTasks.length > 0,
+    priority:
+      summary.execution.failed > 0
+        ? "high"
+        : summary.execution.needsApproval > 0 || approvalTasks.length > 0
+          ? "medium"
+          : "low",
   });
 }

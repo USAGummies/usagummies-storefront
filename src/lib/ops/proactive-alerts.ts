@@ -51,6 +51,8 @@ export type ProactiveScanResult = {
 };
 
 type DedupMap = Record<string, number>; // dedupKey → timestamp ms
+type SignalPostState = Record<string, number>;
+const SIGNAL_POST_STATE_KEY = "abra:signal_posts" as never;
 
 // ---------------------------------------------------------------------------
 // Supabase helpers (matches codebase convention — raw fetch, no SDK)
@@ -167,6 +169,14 @@ async function loadDedupMap(): Promise<DedupMap> {
 
 async function saveDedupMap(map: DedupMap): Promise<void> {
   await writeState("proactive-alert-dedup", map);
+}
+
+async function loadSignalPostState(): Promise<SignalPostState> {
+  return readState(SIGNAL_POST_STATE_KEY, {} as SignalPostState);
+}
+
+async function saveSignalPostState(map: SignalPostState): Promise<void> {
+  await writeState(SIGNAL_POST_STATE_KEY, map);
 }
 
 function isDuplicate(dedupKey: string, dedupTtlHours: number, map: DedupMap): boolean {
@@ -426,6 +436,7 @@ export async function runProactiveAlertScan(): Promise<ProactiveScanResult> {
 
   // Deduplication
   const dedupMap = await loadDedupMap();
+  const signalPostState = await loadSignalPostState();
   let sent = 0;
   let suppressed = 0;
 
@@ -437,9 +448,20 @@ export async function runProactiveAlertScan(): Promise<ProactiveScanResult> {
       delete dedupMap[key];
     }
   }
+  for (const [key, ts] of Object.entries(signalPostState)) {
+    if (now - ts > 24 * 60 * 60 * 1000) {
+      delete signalPostState[key];
+    }
+  }
 
   for (const alert of alerts) {
     if (isDuplicate(alert.dedupKey, alert.dedupTtlHours, dedupMap)) {
+      suppressed++;
+      continue;
+    }
+    const signalKey = `${alert.type}|proactive-alerts`;
+    const lastSignalTs = signalPostState[signalKey];
+    if (lastSignalTs && now - lastSignalTs < 6 * 60 * 60 * 1000) {
       suppressed++;
       continue;
     }
@@ -456,11 +478,13 @@ export async function runProactiveAlertScan(): Promise<ProactiveScanResult> {
 
     // Mark as sent in dedup map
     dedupMap[alert.dedupKey] = now;
+    signalPostState[signalKey] = now;
     sent++;
   }
 
   // Persist updated dedup map
   await saveDedupMap(dedupMap);
+  await saveSignalPostState(signalPostState);
 
   return { alerts, sent, suppressed };
 }
