@@ -4,6 +4,10 @@ import { getValidAccessToken, getRealmId } from "@/lib/ops/qbo-auth";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+function normalizeAccountingMethod(value: string | null): "Cash" | "Accrual" {
+  return value?.toLowerCase() === "accrual" ? "Accrual" : "Cash";
+}
+
 function getBaseUrl(realmId: string): string {
   const host =
     process.env.QBO_SANDBOX === "true"
@@ -127,14 +131,21 @@ export async function GET(req: NextRequest) {
       // ── P&L Report ──
       case "pnl": {
         const startDate =
-          req.nextUrl.searchParams.get("start") || getYTDStart();
+          req.nextUrl.searchParams.get("start") ||
+          req.nextUrl.searchParams.get("start_date") ||
+          getYTDStart();
         const endDate =
-          req.nextUrl.searchParams.get("end") || todayISO();
+          req.nextUrl.searchParams.get("end") ||
+          req.nextUrl.searchParams.get("end_date") ||
+          todayISO();
+        const accountingMethod = normalizeAccountingMethod(
+          req.nextUrl.searchParams.get("basis"),
+        );
 
         const res = await qboGet(
           realmId,
           accessToken,
-          `/reports/ProfitAndLoss?start_date=${startDate}&end_date=${endDate}&minorversion=73`,
+          `/reports/ProfitAndLoss?start_date=${startDate}&end_date=${endDate}&accounting_method=${accountingMethod}&minorversion=73`,
         );
 
         if (!res.ok) {
@@ -150,6 +161,7 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({
           type: "pnl",
           period: { start: startDate, end: endDate },
+          basis: accountingMethod,
           summary,
           raw: report,
         });
@@ -361,8 +373,15 @@ export async function GET(req: NextRequest) {
         const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
           .toISOString()
           .split("T")[0];
+        const accountingMethod = normalizeAccountingMethod(
+          req.nextUrl.searchParams.get("basis"),
+        );
         const [pnlRes, bsRes] = await Promise.all([
-          qboGet(realmId, accessToken, `/reports/ProfitAndLoss?start_date=${thirtyDaysAgo}&end_date=${today}&minorversion=73`),
+          qboGet(
+            realmId,
+            accessToken,
+            `/reports/ProfitAndLoss?start_date=${thirtyDaysAgo}&end_date=${today}&accounting_method=${accountingMethod}&minorversion=73`,
+          ),
           qboGet(realmId, accessToken, `/reports/BalanceSheet?date_macro=Today&minorversion=73`),
         ]);
         const pnlSummary = pnlRes.ok ? extractReportSummary(pnlRes.data as Record<string, unknown>) : {};
@@ -390,6 +409,7 @@ export async function GET(req: NextRequest) {
           netIncome,
           totalRevenue,
           totalExpenses,
+          basis: accountingMethod,
           currency: "USD",
           asOfDate: today,
         });

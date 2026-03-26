@@ -12,6 +12,7 @@ import {
   runMonthlyClose,
 } from "@/lib/ops/abra-monthly-close";
 import { sendMorningBrief, sendEndOfDaySummary } from "@/lib/ops/abra-morning-brief";
+import { runDailyEvaluation } from "@/lib/ops/evaluation/daily-evaluation";
 import { runEmailFetch } from "@/lib/ops/abra-email-fetch";
 import { generateActionableEmailDrafts } from "@/lib/ops/abra-email-drafter";
 import { processFinancialBrainEntries } from "@/lib/ops/abra-financial-processor";
@@ -317,11 +318,35 @@ export async function POST(req: Request) {
     outcomes.push(initiativeStep);
 
     const notificationData = {
+      daily_evaluation: false,
       morning_brief: false,
       weekly_digest: false,
       monthly_report: false,
     };
     if (inMorningWindow(nowPT)) {
+      const evaluationStep = await runStep("daily_evaluation", async () => {
+        const today = nowPT.toISOString().slice(0, 10);
+        const lastRun = await readState<{ date?: string } | null>(
+          "abra-evaluation-last-run",
+          null,
+        );
+        if (lastRun?.date === today) {
+          return { skipped: true, reason: "already_ran", date: today };
+        }
+        const result = await runDailyEvaluation(
+          process.env.NEXTAUTH_URL || "https://www.usagummies.com",
+        );
+        await writeState("abra-evaluation-last-run", { date: today, passed: result.passed, failed: result.failed });
+        return {
+          skipped: false,
+          passed: result.passed,
+          failed: result.failed,
+          promptVersion: result.promptVersion,
+        };
+      });
+      outcomes.push(evaluationStep);
+      notificationData.daily_evaluation = evaluationStep.ok;
+
       const briefStep = await runStep("morning_brief", sendMorningBrief);
       outcomes.push(briefStep);
       notificationData.morning_brief = briefStep.ok;

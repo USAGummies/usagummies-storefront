@@ -1,9 +1,11 @@
 import { getQBOMetrics } from "@/lib/ops/qbo-client";
-import { searchEmails } from "@/lib/ops/gmail-reader";
+import { listEmails } from "@/lib/ops/gmail-reader";
 import { maybeLearnFinancialCorrection } from "@/lib/ops/operator/correction-learner";
 import { proposeAndMaybeExecute, type AbraAction } from "@/lib/ops/abra-actions";
 import { type SlackMessageContext } from "@/lib/ops/abra-slack-responder";
 import { type RoutedAction } from "@/lib/ops/operator/deterministic-router";
+import { readState } from "@/lib/ops/state";
+import { UNIFIED_REVENUE_STATE_KEY } from "@/lib/ops/operator/unified-revenue";
 
 type ApprovalRow = {
   id: string;
@@ -119,6 +121,24 @@ export async function executeRoutedAction(
         const now = new Date();
         const today = now.toISOString().slice(0, 10);
         const monthStart = `${today.slice(0, 7)}-01`;
+        const cachedSummary = await readState<{
+          date?: string;
+          total?: number;
+          mtd?: number;
+          amazon?: number;
+          shopify?: number;
+        } | null>(UNIFIED_REVENUE_STATE_KEY as never, null).catch(() => null);
+        if (cachedSummary && typeof cachedSummary.total === "number" && typeof cachedSummary.mtd === "number") {
+          action.result = {
+            today: Number(cachedSummary.total || 0),
+            mtd: Number(cachedSummary.mtd || 0),
+            amazon: Number(cachedSummary.amazon || 0),
+            shopify: Number(cachedSummary.shopify || 0),
+            sourceDate: cachedSummary.date || null,
+            cached: true,
+          };
+          break;
+        }
         const rows = await sbFetch<Array<{ metric_name?: string | null; captured_for_date?: string | null; value?: number | null }>>(
           `/rest/v1/kpi_timeseries?window_type=eq.daily&metric_name=in.(daily_revenue_amazon,daily_revenue_shopify,daily_revenue_total_unified)&captured_for_date=gte.${monthStart}&select=metric_name,captured_for_date,value&limit=120`,
         ).catch(() => []);
@@ -142,6 +162,25 @@ export async function executeRoutedAction(
         break;
       }
       case "query_plaid_balance": {
+        const cachedCashPosition = await readState<{
+          balance?: number;
+          monthly_burn?: number;
+          monthlyBurn?: number;
+        } | null>("cash-position" as never, null).catch(() => null);
+        if (cachedCashPosition && typeof cachedCashPosition.balance === "number") {
+          const burnRate = Number(
+            cachedCashPosition.monthly_burn ??
+            cachedCashPosition.monthlyBurn ??
+            0,
+          );
+          action.result = {
+            balance: Number(cachedCashPosition.balance || 0),
+            burnRate,
+            runway: burnRate > 0 ? Number(cachedCashPosition.balance || 0) / burnRate : 0,
+            cached: true,
+          };
+          break;
+        }
         const metrics = await getQBOMetrics().catch(() => null);
         const live = await fetchInternalJson("/api/ops/plaid/balance");
         const accounts = Array.isArray(live?.accounts) ? (live?.accounts as Array<Record<string, unknown>>) : [];
@@ -207,8 +246,9 @@ export async function executeRoutedAction(
         };
         break;
       case "search_email": {
-        const emails = await searchEmails(String(action.params.query || "newer_than:2d"), 5).catch(() => []);
-        action.result = { emails };
+        const query = String(action.params.query || "newer_than:2d");
+        const emails = await listEmails({ query, count: 5 }).catch(() => []);
+        action.result = { emails, query };
         break;
       }
       case "categorize_qbo_transaction": {
@@ -434,12 +474,14 @@ export function renderRoutedActionResponse(action: RoutedAction): { reply: strin
     case "show_help":
       return { reply: "Quick commands: rev, cash, pnl, vendors, tasks, approve, help." };
     case "search_email": {
-      const emails = Array.isArray((action.result as Record<string, unknown> | null)?.emails)
-        ? ((action.result as Record<string, unknown>).emails as Array<Record<string, unknown>>)
+      const result = (action.result as Record<string, unknown> | null) || {};
+      const emails = Array.isArray(result.emails)
+        ? (result.emails as Array<Record<string, unknown>>)
         : [];
+      const query = String(result.query || "email");
       return {
         reply: emails.length
-          ? formatList("Recent email matches", emails.slice(0, 5).map((email) => `${String(email.from || "Unknown")}: ${String(email.subject || "(no subject)")}`), "tell me which thread you want read or drafted.")
+          ? formatList(`Recent email matches for ${query}`, emails.slice(0, 5).map((email) => `${String(email.from || "Unknown")}: ${String(email.subject || "(no subject)")}`), "tell me which thread you want read or drafted.")
           : "No recent matching emails found.",
       };
     }

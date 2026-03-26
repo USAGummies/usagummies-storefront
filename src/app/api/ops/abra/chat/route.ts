@@ -55,6 +55,7 @@ import {
 } from "@/lib/ops/abra-actions";
 import { executeRoutedAction, renderRoutedActionResponse } from "@/lib/ops/operator/action-executor";
 import { routeMessage } from "@/lib/ops/operator/deterministic-router";
+import { getPromptVersion } from "@/lib/ops/prompt-version";
 import { analyzePipeline } from "@/lib/ops/abra-pipeline-intelligence";
 import { EMAIL_EXTRACTION_SKILL } from "@/lib/ops/abra-skill-email-data-extraction";
 import { DEAL_CALCULATOR_SKILL } from "@/lib/ops/abra-skill-deal-calculator";
@@ -107,6 +108,19 @@ const DEFAULT_CLAUDE_MODEL =
   process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
 const MAX_MESSAGE_LENGTH = 5000;
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
+
+function jsonWithPromptVersion(
+  payload: Record<string, unknown>,
+  init?: ResponseInit,
+) {
+  return NextResponse.json(
+    {
+      ...payload,
+      prompt_version: getPromptVersion().version,
+    },
+    init,
+  );
+}
 
 // ─── File Upload Helpers ───
 
@@ -699,6 +713,7 @@ export async function POST(req: Request) {
     typeof payload.actor_context === "string" && payload.actor_context.trim()
       ? payload.actor_context.trim().slice(0, 300)
       : null;
+  const lowerRawMessage = rawMessage.toLowerCase().trim();
   const VALID_CHANNELS = ["web", "slack", "api"] as const;
   type AnswerChannel = (typeof VALID_CHANNELS)[number];
   const rawChannel = typeof payload.channel === "string" ? payload.channel.trim() : "";
@@ -710,6 +725,174 @@ export async function POST(req: Request) {
   const slackThreadTs = typeof payload.slack_thread_ts === "string" ? payload.slack_thread_ts.trim() : "";
   const messageDepartment = detectDepartment(message);
 
+  if (lowerRawMessage === "?") {
+    return jsonWithPromptVersion({
+      reply: "What can I help with?",
+      confidence: 1,
+      sources: [],
+      intent: "quick_ack",
+      thread_id: threadId,
+      deterministic_action: "quick_ack_question",
+    });
+  }
+
+  if (/^(ok|okay|k)$/i.test(rawMessage)) {
+    return jsonWithPromptVersion({
+      reply: "Got it. Let me know if you need anything else.",
+      confidence: 1,
+      sources: [],
+      intent: "quick_ack",
+      thread_id: threadId,
+      deterministic_action: "quick_ack_ok",
+    });
+  }
+
+  const emailSearchMatch = rawMessage.match(/^search my email for\s+(.+)$/i);
+  if (emailSearchMatch) {
+    const term = emailSearchMatch[1].trim();
+    const executedAction = await executeRoutedAction(
+      {
+        intent: "check_email",
+        action: "search_email",
+        params: { query: term },
+        result: null,
+        executed: false,
+        error: null,
+      },
+      {
+        actor: actorLabel,
+        slackChannelId: slackChannelId || undefined,
+        slackThreadTs: slackThreadTs || undefined,
+      },
+    );
+    if (executedAction.executed && !executedAction.error) {
+      const rendered = renderRoutedActionResponse(executedAction);
+      return jsonWithPromptVersion({
+        reply: rendered.reply,
+        confidence: 1,
+        sources: [],
+        intent: executedAction.intent,
+        thread_id: threadId,
+        deterministic_action: executedAction.action,
+        deterministic_result: executedAction.result,
+      });
+    }
+  }
+
+  if (/^what needs my attention(?:\s+today|\s+right now)?$/i.test(rawMessage)) {
+    const [tasksAction, approvalsAction] = await Promise.all([
+      executeRoutedAction(
+        {
+          intent: "tasks",
+          action: "query_operator_tasks",
+          params: {},
+          result: null,
+          executed: false,
+          error: null,
+        },
+        {
+          actor: actorLabel,
+          slackChannelId: slackChannelId || undefined,
+          slackThreadTs: slackThreadTs || undefined,
+        },
+      ),
+      executeRoutedAction(
+        {
+          intent: "approve",
+          action: "query_pending_approvals",
+          params: {},
+          result: null,
+          executed: false,
+          error: null,
+        },
+        {
+          actor: actorLabel,
+          slackChannelId: slackChannelId || undefined,
+          slackThreadTs: slackThreadTs || undefined,
+        },
+      ),
+    ]);
+
+    const counts = (tasksAction.result || {}) as Record<string, unknown>;
+    const totalPending = Object.values(counts).reduce<number>(
+      (sum, value) => sum + Number(value || 0),
+      0,
+    );
+    const approvals = Array.isArray(approvalsAction.result) ? approvalsAction.result.length : 0;
+    const reviewCount =
+      Number(counts.qbo_review_transaction || 0) +
+      Number(counts.reconciliation_discrepancy || 0);
+    const emailCount =
+      Number(counts.email_draft_response || 0) +
+      Number(counts.vendor_followup || 0) +
+      Number(counts.distributor_followup || 0);
+    const reply =
+      `Top items: ${totalPending} pending total. ` +
+      `${reviewCount} finance reviews, ${emailCount} email/follow-up tasks, ${approvals} approval${approvals === 1 ? "" : "s"} waiting. ` +
+      `Next step: say "transactions", "emails", or "approve".`;
+
+    return jsonWithPromptVersion({
+      reply,
+      confidence: 1,
+      sources: [],
+      intent: "attention_summary",
+      thread_id: threadId,
+      deterministic_action: "attention_summary",
+      deterministic_result: {
+        totalPending,
+        reviewCount,
+        emailCount,
+        approvals,
+      },
+    });
+  }
+
+  if (/^how are things going$/i.test(rawMessage)) {
+    const tasksAction = await executeRoutedAction(
+      {
+        intent: "tasks",
+        action: "query_operator_tasks",
+        params: {},
+        result: null,
+        executed: false,
+        error: null,
+      },
+      {
+        actor: actorLabel,
+        slackChannelId: slackChannelId || undefined,
+        slackThreadTs: slackThreadTs || undefined,
+      },
+    );
+    const counts = (tasksAction.result || {}) as Record<string, unknown>;
+    const totalPending = Object.values(counts).reduce<number>(
+      (sum, value) => sum + Number(value || 0),
+      0,
+    );
+    const reviewCount =
+      Number(counts.qbo_review_transaction || 0) +
+      Number(counts.reconciliation_discrepancy || 0);
+    const followupCount =
+      Number(counts.email_draft_response || 0) +
+      Number(counts.vendor_followup || 0) +
+      Number(counts.distributor_followup || 0);
+    return jsonWithPromptVersion({
+      reply:
+        `Stable overall. ${totalPending} pending tasks, ` +
+        `${reviewCount} finance reviews, ${followupCount} email/follow-up items. ` +
+        `Next step: ask for "transactions", "emails", or "pnl".`,
+      confidence: 1,
+      sources: [],
+      intent: "status_summary",
+      thread_id: threadId,
+      deterministic_action: "status_summary",
+      deterministic_result: {
+        totalPending,
+        reviewCount,
+        followupCount,
+      },
+    });
+  }
+
   if (healthMode) {
     const reply = buildHealthModeReply(message);
     queueChatHistory({
@@ -720,7 +903,7 @@ export async function POST(req: Request) {
       metadata: { intent: "health_mode" },
       actorLabel,
     });
-    return NextResponse.json({
+    return jsonWithPromptVersion({
       reply,
       confidence: 1,
       sources: [],
@@ -750,7 +933,7 @@ export async function POST(req: Request) {
         },
         actorLabel,
       });
-      return NextResponse.json({
+      return jsonWithPromptVersion({
         reply: rendered.reply,
         confidence: 1,
         sources: [],
@@ -2215,7 +2398,7 @@ export async function POST(req: Request) {
     });
 
     clearTimeout(deadlineTimer);
-    return NextResponse.json({
+    return jsonWithPromptVersion({
       reply,
       confidence,
       thread_id: threadId,
@@ -2239,7 +2422,7 @@ export async function POST(req: Request) {
 
     // Check if this was our deadline abort
     if (deadlineController.signal.aborted || (error instanceof Error && error.name === "AbortError")) {
-      return NextResponse.json({
+      return jsonWithPromptVersion({
         reply: "I'm still gathering data for your request, but I hit my response time limit. Could you try a more specific question, or ask me to focus on just one part of what you need?",
         confidence: 0.3,
         sources: [],

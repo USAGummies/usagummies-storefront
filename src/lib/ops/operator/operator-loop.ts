@@ -33,6 +33,11 @@ export interface StepLastRun {
   notes: string;
 }
 
+type CachedSummaryMeta = {
+  cached?: boolean;
+  lastChecked?: string;
+};
+
 const STEP_STATE_KEYS = {
   qbo_gap: "operator:step:qbo_gap:last_run" as const,
   email_gap: "operator:step:email_gap:last_run" as const,
@@ -52,10 +57,50 @@ const STEP_STATE_KEYS = {
   health_monitor: "operator:step:health_monitor:last_run" as const,
 };
 
+const STEP_SUMMARY_KEYS = {
+  qbo_gap: "operator:step:qbo_gap:summary" as const,
+  email_gap: "operator:step:email_gap:summary" as const,
+  pipeline_gap: "operator:step:pipeline_gap:summary" as const,
+  vendor_payments: "operator:step:vendor_payments:summary" as const,
+  inventory: "operator:step:inventory:summary" as const,
+  reconciliation: "operator:step:reconciliation:summary" as const,
+  wholesale: "operator:step:wholesale:summary" as const,
+  po_capture: "operator:step:po_capture:summary" as const,
+  open_po_tracker: "operator:step:open_po_tracker:summary" as const,
+};
+
 type StepOutcome<T> = {
   data: T;
   state: StepLastRun & { skipped?: boolean };
 };
+
+async function cacheStepSummary<T extends Record<string, unknown>>(
+  key: keyof typeof STEP_SUMMARY_KEYS,
+  value: T,
+): Promise<T> {
+  await writeState(STEP_SUMMARY_KEYS[key], value);
+  return value;
+}
+
+async function getStepSummary<T extends Record<string, unknown>>(
+  key: keyof typeof STEP_SUMMARY_KEYS,
+  step: StepOutcome<unknown>,
+  current: T | null,
+  fallback: T,
+): Promise<T & CachedSummaryMeta> {
+  if (current) {
+    return cacheStepSummary(key, current);
+  }
+  const cached = await readState<T | null>(STEP_SUMMARY_KEYS[key], null);
+  if (cached) {
+    return {
+      ...cached,
+      cached: true,
+      lastChecked: step.state.timestamp,
+    };
+  }
+  return fallback;
+}
 
 async function loadOperatorGuidance(): Promise<{
   heartbeatLoaded: boolean;
@@ -116,45 +161,45 @@ export type OperatorLoopResult = {
       unrecordedKnownTransactions: number;
       categorizedTransactions: number;
       totalTransactions: number;
-    };
+    } & CachedSummaryMeta;
     email: {
       replyTasks: number;
       qboEmailTasks: number;
-    };
+    } & CachedSummaryMeta;
     pipeline: {
       distributorFollowups: number;
       vendorFollowups: number;
-    };
+    } & CachedSummaryMeta;
     vendorPayments: {
       dueSoonCount: number;
       dueSoonAmount: number;
       overdueCount: number;
       overdueAmount: number;
-    };
+    } & CachedSummaryMeta;
     inventory: {
       healthy: number;
       info: number;
       warning: number;
       critical: number;
-    };
+    } & CachedSummaryMeta;
     reconciliation: {
       ran: boolean;
       discrepancies: number;
       amazonDifference: number;
       shopifyDifference: number;
       bankDifference: number;
-    };
+    } & CachedSummaryMeta;
     wholesale: {
       invoiceTasks: number;
-    };
+    } & CachedSummaryMeta;
     poCapture?: {
       detected: number;
-    };
+    } & CachedSummaryMeta;
     openPo?: {
       openCount: number;
       committedRevenue: number;
       overdueCount: number;
-    };
+    } & CachedSummaryMeta;
     reports?: {
       weeklyArAp?: { ran: boolean };
       monthlyPnl?: { ran: boolean };
@@ -389,14 +434,48 @@ export async function runOperatorLoop(): Promise<OperatorLoopResult> {
       notes: `detected=${data.summary.detected}`,
     })),
   ]);
-  const qbo = qboStep.data || { tasks: [], summary: { uncategorized: 0, missingVendors: 0, zeroRevenueAccounts: 0, unrecordedKnownTransactions: 0, categorizedTransactions: 0, totalTransactions: 0 } };
-  const email = emailStep.data || { tasks: [], summary: { replyTasks: 0, qboEmailTasks: 0 } };
-  const pipeline = pipelineStep.data || { tasks: [], summary: { distributorFollowups: 0, vendorFollowups: 0 } };
-  const vendorPayments = vendorPaymentsStep.data || { tasks: [], summary: { dueSoonCount: 0, dueSoonAmount: 0, overdueCount: 0, overdueAmount: 0 } };
-  const inventory = inventoryStep.data || { tasks: [], summary: { healthy: 0, info: 0, warning: 0, critical: 0 } };
-  const reconciliation = reconciliationStep.data || { tasks: [], summary: { ran: false, discrepancies: 0, amazonDifference: 0, shopifyDifference: 0, bankDifference: 0 } };
-  const wholesale = wholesaleStep.data || { tasks: [], summary: { invoiceTasks: 0 } };
-  const poCapture = poCaptureStep.data || { tasks: [], summary: { detected: 0 } };
+  const qbo = qboStep.data || { tasks: [], summary: null };
+  const email = emailStep.data || { tasks: [], summary: null };
+  const pipeline = pipelineStep.data || { tasks: [], summary: null };
+  const vendorPayments = vendorPaymentsStep.data || { tasks: [], summary: null };
+  const inventory = inventoryStep.data || { tasks: [], summary: null };
+  const reconciliation = reconciliationStep.data || { tasks: [], summary: null };
+  const wholesale = wholesaleStep.data || { tasks: [], summary: null };
+  const poCapture = poCaptureStep.data || { tasks: [], summary: null };
+  const [
+    qboSummary,
+    emailSummary,
+    pipelineSummary,
+    vendorPaymentsSummary,
+    inventorySummary,
+    reconciliationSummary,
+    wholesaleSummary,
+    poCaptureSummary,
+  ] = await Promise.all([
+    getStepSummary("qbo_gap", qboStep, qbo.summary, { uncategorized: 0, missingVendors: 0, zeroRevenueAccounts: 0, unrecordedKnownTransactions: 0, categorizedTransactions: 0, totalTransactions: 0 }),
+    getStepSummary("email_gap", emailStep, email.summary, { replyTasks: 0, qboEmailTasks: 0 }),
+    getStepSummary("pipeline_gap", pipelineStep, pipeline.summary, { distributorFollowups: 0, vendorFollowups: 0 }),
+    getStepSummary("vendor_payments", vendorPaymentsStep, vendorPayments.summary, { dueSoonCount: 0, dueSoonAmount: 0, overdueCount: 0, overdueAmount: 0 }),
+    getStepSummary("inventory", inventoryStep, inventory.summary, { healthy: 0, info: 0, warning: 0, critical: 0 }),
+    getStepSummary("reconciliation", reconciliationStep, reconciliation.summary, {
+      ran: false,
+      date: "",
+      amazonRevenue: 0,
+      amazonDeposits: 0,
+      amazonFees: 0,
+      shopifyRevenue: 0,
+      shopifyDeposits: 0,
+      shopifyFees: 0,
+      plaidBalance: 0,
+      qboBookBalance: 0,
+      discrepancies: 0,
+      amazonDifference: 0,
+      shopifyDifference: 0,
+      bankDifference: 0,
+    }),
+    getStepSummary("wholesale", wholesaleStep, wholesale.summary, { invoiceTasks: 0 }),
+    getStepSummary("po_capture", poCaptureStep, poCapture.summary, { detected: 0 }),
+  ]);
   const createdTasks = await createOperatorTasks([
     ...qbo.tasks,
     ...email.tasks,
@@ -408,7 +487,7 @@ export async function runOperatorLoop(): Promise<OperatorLoopResult> {
     ...poCapture.tasks,
   ]);
   const upgradedReviewTasks = await upgradeExistingQboReviewTasks().catch(() => 0);
-  const executionLimit = qbo.summary.uncategorized >= 20 ? 60 : 12;
+  const executionLimit = qboSummary.uncategorized >= 20 ? 60 : 12;
   const executionStep = await runStep("task_execution", 5, () => executeOperatorTasks(executionLimit), (data) => ({
     itemsProcessed: data.scanned,
     itemsChanged: data.completed + data.needsApproval,
@@ -460,20 +539,16 @@ export async function runOperatorLoop(): Promise<OperatorLoopResult> {
       task_execution: executionStep.state,
     },
     detectorSummary: {
-      qbo: qbo.summary,
-      email: email.summary,
-      pipeline: pipeline.summary,
-      vendorPayments: vendorPayments.summary,
-      inventory: inventory.summary,
+      qbo: qboSummary,
+      email: emailSummary,
+      pipeline: pipelineSummary,
+      vendorPayments: vendorPaymentsSummary,
+      inventory: inventorySummary,
       reconciliation: {
-        ran: reconciliation.summary.ran,
-        discrepancies: reconciliation.summary.discrepancies,
-        amazonDifference: reconciliation.summary.amazonDifference,
-        shopifyDifference: reconciliation.summary.shopifyDifference,
-        bankDifference: reconciliation.summary.bankDifference,
+        ...reconciliationSummary,
       },
-      wholesale: wholesale.summary,
-      poCapture: poCapture.summary,
+      wholesale: wholesaleSummary,
+      poCapture: poCaptureSummary,
     },
     execution,
   };
@@ -499,17 +574,25 @@ export async function runOperatorLoop(): Promise<OperatorLoopResult> {
       notes: `open=${data.openCount} overdue=${data.overdue.length}`,
     })),
   ]);
-  const openPoSummary = openPoStep.data || { openCount: 0, committedRevenue: 0, overdue: [] };
+  const openPoData = openPoStep.data || null;
+  const openPoSummary = await getStepSummary(
+    "open_po_tracker",
+    openPoStep,
+    openPoData
+      ? {
+          openCount: openPoData.openCount,
+          committedRevenue: openPoData.committedRevenue,
+          overdueCount: openPoData.overdue.length,
+        }
+      : null,
+    { openCount: 0, committedRevenue: 0, overdueCount: 0 },
+  );
   Object.assign(result.stepRuns || {}, {
     unified_revenue: revenueStep.state,
     unified_inventory: inventoryPositionStep.state,
     open_po_tracker: openPoStep.state,
   });
-  result.detectorSummary.openPo = {
-    openCount: openPoSummary.openCount,
-    committedRevenue: openPoSummary.committedRevenue,
-    overdueCount: openPoSummary.overdue.length,
-  };
+  result.detectorSummary.openPo = openPoSummary;
 
   const [emailSurfaceStep, batchReviewStep, meetingPrepStep] = await Promise.all([
     runStep("email_surface", 6 * 60, () => surfaceProactiveEmailTasks(), (data) => ({
