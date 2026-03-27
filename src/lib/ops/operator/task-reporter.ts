@@ -15,6 +15,9 @@ export type OperatorCycleSummary = {
       totalTransactions: number;
     };
     email: {
+      processed?: number;
+      actionsTaken?: number;
+      needsAttention?: number;
       replyTasks: number;
       qboEmailTasks: number;
     };
@@ -115,6 +118,7 @@ function summarizeCompletedTasks(summary: OperatorExecutionSummary): string[] {
     qbo_record_from_email: "QBO email import",
     qbo_revenue_gap: "QBO revenue sync",
     email_draft_response: "email draft",
+    vendor_response_needed: "vendor reply draft",
     vendor_followup: "vendor follow-up draft",
     distributor_followup: "distributor follow-up draft",
     generate_wholesale_invoice: "wholesale invoice draft",
@@ -240,7 +244,7 @@ export async function reportOperatorCycle(summary: OperatorCycleSummary): Promis
     "",
     `*QBO:* ${summary.detectorSummary.qbo.uncategorized} uncategorized, ${summary.detectorSummary.qbo.missingVendors} missing vendors, ${summary.detectorSummary.qbo.zeroRevenueAccounts} zero-balance revenue accounts, ${summary.detectorSummary.qbo.unrecordedKnownTransactions} known transactions not yet in QBO`,
     `*QBO Health:* ${qboHealthPct}% categorized (${summary.detectorSummary.qbo.categorizedTransactions}/${summary.detectorSummary.qbo.totalTransactions})`,
-    `*Email:* ${summary.detectorSummary.email.replyTasks} reply draft task(s), ${summary.detectorSummary.email.qboEmailTasks} QBO-from-email task(s)`,
+    `*Email:* ${summary.detectorSummary.email.processed ?? 0} processed, ${summary.detectorSummary.email.actionsTaken ?? summary.detectorSummary.email.qboEmailTasks} action(s) taken, ${summary.detectorSummary.email.needsAttention ?? summary.detectorSummary.email.replyTasks} need attention`,
     `*Pipeline:* ${summary.detectorSummary.pipeline.distributorFollowups} distributor follow-up(s), ${summary.detectorSummary.pipeline.vendorFollowups} vendor follow-up(s)`,
     ...(summary.detectorSummary.vendorPayments
       ? [

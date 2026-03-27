@@ -24,6 +24,7 @@ export type EntityEvent = {
   summary: string;
   date: string;
   channel?: EntityState["last_contact_channel"] | null;
+  entity_type?: EntityState["type"];
   next_action?: string | null;
   next_action_date?: string | null;
   note?: string | null;
@@ -208,16 +209,27 @@ export function extractEntityMentions(text: string): string[] {
 export async function updateEntityFromEvent(entityName: string, event: EntityEvent): Promise<EntityState | null> {
   const states = await ensureEntityStatesInitialized();
   const matched = findEntityMatch(entityName, states);
-  if (!matched) return null;
   const nextStates = [...states];
-  const idx = nextStates.findIndex((state) => state.name === matched.name);
-  if (idx < 0) return null;
-  const previous = nextStates[idx];
   const eventDate = event.date || new Date().toISOString().slice(0, 10);
   const daysSince = Math.max(
     0,
     Math.floor((Date.now() - new Date(`${eventDate}T00:00:00Z`).getTime()) / (24 * 60 * 60 * 1000)),
   );
+  const idx = matched ? nextStates.findIndex((state) => state.name === matched.name) : -1;
+  const previous: EntityState = idx >= 0
+    ? nextStates[idx]
+    : {
+        name: entityName.trim() || "Unknown entity",
+        type: event.entity_type || "partner",
+        last_contact_date: null,
+        last_contact_channel: null,
+        last_contact_summary: null,
+        open_items: [],
+        next_action: null,
+        next_action_date: null,
+        relationship_status: "new",
+        notes: [],
+      };
   const openItems = event.open_item
     ? [...previous.open_items.filter((item) => item.description !== event.open_item?.description), event.open_item].slice(-8)
     : previous.open_items;
@@ -235,7 +247,8 @@ export async function updateEntityFromEvent(entityName: string, event: EntityEve
     open_items: openItems,
     notes,
   };
-  nextStates[idx] = updated;
+  if (idx >= 0) nextStates[idx] = updated;
+  else nextStates.push(updated);
   await writeState(ENTITY_STATE_KEY, nextStates);
   return updated;
 }

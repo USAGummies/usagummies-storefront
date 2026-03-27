@@ -140,6 +140,8 @@ export const STATE_KEYS = {
   "operator:step:qbo_gap:summary": "operator-step-qbo-gap-summary.json",
   "operator:step:email_gap:last_run": "operator-step-email-gap-last-run.json",
   "operator:step:email_gap:summary": "operator-step-email-gap-summary.json",
+  "operator:step:email_intelligence:last_run": "operator-step-email-intelligence-last-run.json",
+  "operator:step:email_intelligence:summary": "operator-step-email-intelligence-summary.json",
   "operator:step:pipeline_gap:last_run": "operator-step-pipeline-gap-last-run.json",
   "operator:step:pipeline_gap:summary": "operator-step-pipeline-gap-summary.json",
   "operator:step:vendor_payments:last_run": "operator-step-vendor-payments-last-run.json",
@@ -163,6 +165,8 @@ export const STATE_KEYS = {
   "operator:step:health_monitor:last_run": "operator-step-health-monitor-last-run.json",
   "operator:step:follow_up_scheduler:last_run": "operator-step-follow-up-scheduler-last-run.json",
   "operator:step:follow_up_scheduler:summary": "operator-step-follow-up-scheduler-summary.json",
+  "operator:email_processed": "operator-email-processed.json",
+  "operator:email_intelligence_summary": "operator-email-intelligence-summary.json",
   "abra-evaluation-last-run": "abra-evaluation-last-run.json",
 
   // Agent performance tracking

@@ -376,6 +376,7 @@ function priorityWeight(priority: OperatorTaskRow["priority"]): number {
 
 function canPrepareApprovalTask(task: OperatorTaskRow): boolean {
   return task.task_type === "email_draft_response" ||
+    task.task_type === "vendor_response_needed" ||
     task.task_type === "generate_wholesale_invoice" ||
     task.task_type === "inventory_reorder_po" ||
     task.task_type === "vendor_followup" ||
@@ -385,6 +386,7 @@ function canPrepareApprovalTask(task: OperatorTaskRow): boolean {
 function canExecuteTask(task: OperatorTaskRow): boolean {
   if (
     (task.task_type === "email_draft_response" ||
+      task.task_type === "vendor_response_needed" ||
       task.task_type === "vendor_followup" ||
       task.task_type === "distributor_followup") &&
     String(task.execution_result?.approval_id || "").trim()
@@ -536,6 +538,7 @@ export async function createOperatorTasks(
         status:
           task.requires_approval && !(
             task.task_type === "email_draft_response" ||
+            task.task_type === "vendor_response_needed" ||
             task.task_type === "generate_wholesale_invoice" ||
             task.task_type === "inventory_reorder_po" ||
             task.task_type === "vendor_followup" ||
@@ -570,6 +573,7 @@ async function listReadyTasks(limit: number): Promise<OperatorTaskRow[]> {
       row.task_type === "qbo_record_transaction" ||
       row.task_type === "qbo_revenue_gap" ||
       row.task_type === "email_draft_response" ||
+      row.task_type === "vendor_response_needed" ||
       row.task_type === "qbo_record_from_email" ||
       row.task_type === "generate_wholesale_invoice" ||
       row.task_type === "po_received" ||
@@ -1552,6 +1556,8 @@ async function executeTask(task: OperatorTaskRow): Promise<string | ExecuteTaskR
     case "qbo_record_transaction":
       return executeRecordTransactionTask(task);
     case "email_draft_response":
+      return executeEmailDraftResponseTask(task);
+    case "vendor_response_needed":
       return executeEmailDraftResponseTask(task);
     case "qbo_record_from_email":
       return executeQBORecordFromEmailTask(task);

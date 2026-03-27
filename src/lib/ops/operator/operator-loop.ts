@@ -3,7 +3,7 @@ import path from "node:path";
 import { ensureEntityStatesInitialized } from "@/lib/ops/operator/entities/entity-state";
 import { appendDrivingModeBacklog, getDrivingModeState } from "@/lib/ops/operator/driving-mode";
 import { runBatchTransactionReview } from "@/lib/ops/operator/batch-review";
-import { detectEmailOperatorGaps } from "@/lib/ops/operator/gap-detectors/email";
+import { runEmailIntelligence } from "@/lib/ops/operator/email-intelligence";
 import { detectInventoryAlerts } from "@/lib/ops/operator/gap-detectors/inventory";
 import { detectPipelineOperatorGaps } from "@/lib/ops/operator/gap-detectors/pipeline";
 import { detectPoCaptureTasks } from "@/lib/ops/operator/gap-detectors/po-capture";
@@ -14,7 +14,6 @@ import { runOperatorHealthMonitor } from "@/lib/ops/operator/health-monitor";
 import { runMeetingPrepAutoGeneration } from "@/lib/ops/operator/meeting-prep";
 import { runOpenPoTracker } from "@/lib/ops/operator/po-tracker";
 import { runPnlSanityChecker } from "@/lib/ops/operator/pnl-sanity-checker";
-import { surfaceProactiveEmailTasks } from "@/lib/ops/operator/proactive-email";
 import { runDailyFinancialReconciliation } from "@/lib/ops/operator/reconciliation";
 import { runInvestorUpdatePackage } from "@/lib/ops/operator/reports/investor-update";
 import { runMonthlyBalanceSheetReport } from "@/lib/ops/operator/reports/monthly-balance-sheet";
@@ -42,7 +41,7 @@ type CachedSummaryMeta = {
 
 const STEP_STATE_KEYS = {
   qbo_gap: "operator:step:qbo_gap:last_run" as const,
-  email_gap: "operator:step:email_gap:last_run" as const,
+  email_intelligence: "operator:step:email_intelligence:last_run" as const,
   pipeline_gap: "operator:step:pipeline_gap:last_run" as const,
   vendor_payments: "operator:step:vendor_payments:last_run" as const,
   inventory: "operator:step:inventory:last_run" as const,
@@ -54,7 +53,6 @@ const STEP_STATE_KEYS = {
   unified_revenue: "operator:step:unified_revenue:last_run" as const,
   unified_inventory: "operator:step:unified_inventory:last_run" as const,
   open_po_tracker: "operator:step:open_po_tracker:last_run" as const,
-  email_surface: "operator:step:email_surface:last_run" as const,
   batch_review: "operator:step:batch_review:last_run" as const,
   meeting_prep: "operator:step:meeting_prep:last_run" as const,
   health_monitor: "operator:step:health_monitor:last_run" as const,
@@ -62,7 +60,7 @@ const STEP_STATE_KEYS = {
 
 const STEP_SUMMARY_KEYS = {
   qbo_gap: "operator:step:qbo_gap:summary" as const,
-  email_gap: "operator:step:email_gap:summary" as const,
+  email_intelligence: "operator:step:email_intelligence:summary" as const,
   pipeline_gap: "operator:step:pipeline_gap:summary" as const,
   vendor_payments: "operator:step:vendor_payments:summary" as const,
   inventory: "operator:step:inventory:summary" as const,
@@ -167,6 +165,9 @@ export type OperatorLoopResult = {
       totalTransactions: number;
     } & CachedSummaryMeta;
     email: {
+      processed?: number;
+      actionsTaken?: number;
+      needsAttention?: number;
       replyTasks: number;
       qboEmailTasks: number;
     } & CachedSummaryMeta;
@@ -409,10 +410,10 @@ export async function runOperatorLoop(): Promise<OperatorLoopResult> {
       itemsChanged: data.summary.uncategorized,
       notes: `uncategorized=${data.summary.uncategorized}`,
     })),
-    runStep("email_gap", 15, () => detectEmailOperatorGaps(), (data) => ({
-      itemsProcessed: data.tasks.length,
-      itemsChanged: data.summary.replyTasks + data.summary.qboEmailTasks,
-      notes: `reply=${data.summary.replyTasks} qbo=${data.summary.qboEmailTasks}`,
+    runStep("email_intelligence", 60, () => runEmailIntelligence(), (data) => ({
+      itemsProcessed: data.summary.processed,
+      itemsChanged: data.summary.actionsTaken + data.summary.needsAttention,
+      notes: `processed=${data.summary.processed} actions=${data.summary.actionsTaken} attention=${data.summary.needsAttention}`,
     })),
     runStep("pipeline_gap", 30, () => detectPipelineOperatorGaps(), (data) => ({
       itemsProcessed: data.tasks.length,
@@ -471,7 +472,7 @@ export async function runOperatorLoop(): Promise<OperatorLoopResult> {
     followUpSummary,
   ] = await Promise.all([
     getStepSummary("qbo_gap", qboStep, qbo.summary, { uncategorized: 0, missingVendors: 0, zeroRevenueAccounts: 0, unrecordedKnownTransactions: 0, categorizedTransactions: 0, totalTransactions: 0 }),
-    getStepSummary("email_gap", emailStep, email.summary, { replyTasks: 0, qboEmailTasks: 0 }),
+    getStepSummary("email_intelligence", emailStep, email.summary, { processed: 0, actionsTaken: 0, needsAttention: 0, replyTasks: 0, qboEmailTasks: 0, details: [] }),
     getStepSummary("pipeline_gap", pipelineStep, pipeline.summary, { distributorFollowups: 0, vendorFollowups: 0 }),
     getStepSummary("vendor_payments", vendorPaymentsStep, vendorPayments.summary, { dueSoonCount: 0, dueSoonAmount: 0, overdueCount: 0, overdueAmount: 0 }),
     getStepSummary("inventory", inventoryStep, inventory.summary, { healthy: 0, info: 0, warning: 0, critical: 0 }),
@@ -549,7 +550,7 @@ export async function runOperatorLoop(): Promise<OperatorLoopResult> {
         notes: `heartbeat=${guidance.heartbeatLoaded} soul=${guidance.soulLoaded} order=${guidance.heartbeatItems.join(" | ")}`,
       },
       qbo_gap: qboStep.state,
-      email_gap: emailStep.state,
+      email_intelligence: emailStep.state,
       pipeline_gap: pipelineStep.state,
       vendor_payments: vendorPaymentsStep.state,
       inventory: inventoryStep.state,
@@ -616,12 +617,7 @@ export async function runOperatorLoop(): Promise<OperatorLoopResult> {
   });
   result.detectorSummary.openPo = openPoSummary;
 
-  const [emailSurfaceStep, batchReviewStep, meetingPrepStep] = await Promise.all([
-    runStep("email_surface", 6 * 60, () => surfaceProactiveEmailTasks(), (data) => ({
-      itemsProcessed: data.surfaced,
-      itemsChanged: data.surfaced,
-      notes: `surfaced=${data.surfaced}`,
-    })),
+  const [batchReviewStep, meetingPrepStep] = await Promise.all([
     runStep("batch_review", 24 * 60, () => runBatchTransactionReview(), (data) => ({
       itemsProcessed: data.ran ? 1 : 0,
       itemsChanged: data.ran ? 1 : 0,
@@ -634,7 +630,6 @@ export async function runOperatorLoop(): Promise<OperatorLoopResult> {
     })),
   ]);
   Object.assign(result.stepRuns || {}, {
-    email_surface: emailSurfaceStep.state,
     batch_review: batchReviewStep.state,
     meeting_prep: meetingPrepStep.state,
   });
@@ -642,7 +637,7 @@ export async function runOperatorLoop(): Promise<OperatorLoopResult> {
   const drivingMode = await getDrivingModeState().catch(() => ({ active: false }));
   if (drivingMode?.active) {
     const backlogParts: string[] = [];
-    if (emailSurfaceStep.data?.surfaced) backlogParts.push(`${emailSurfaceStep.data.surfaced} emails surfaced`);
+    if (emailSummary.needsAttention) backlogParts.push(`${emailSummary.needsAttention} email items need attention`);
     if (execution.completed) backlogParts.push(`${execution.completed} tasks completed`);
     if (execution.needsApproval) backlogParts.push(`${execution.needsApproval} approvals queued`);
     if (followUpSummary.dueCount) backlogParts.push(`${followUpSummary.dueCount} follow-ups due`);
