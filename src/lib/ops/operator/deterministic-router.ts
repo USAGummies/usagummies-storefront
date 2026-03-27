@@ -33,8 +33,11 @@ export function routeMessage(message: string, _actor: string): RoutedAction | nu
   if (/^(good morning|morning)$/i.test(msg)) {
     return { intent: "morning_status", action: "query_company_status", params: { greeting: true }, result: null, executed: false, error: null };
   }
-  if (/\b(i'?m heading to spokane now|heading to spokane now|driving to spokane)\b/i.test(msg)) {
-    return { intent: "travel_ack", action: "acknowledge_trip", params: {}, result: null, executed: false, error: null };
+  if (/\b(i'?m driving|heading out|on the road|in the car|i'?m on the road|heading to|driving to)\b/i.test(msg)) {
+    return { intent: "driving_mode", action: "activate_driving_mode", params: { instruction: message }, result: null, executed: false, error: null };
+  }
+  if (/\b(i'?m here|arrived|parked|back at desk|done driving)\b/i.test(msg)) {
+    return { intent: "driving_mode_off", action: "deactivate_driving_mode", params: { instruction: message }, result: null, executed: false, error: null };
   }
 
   if (msg === "?") return { intent: "help", action: "show_help", params: {}, result: null, executed: false, error: null };
@@ -139,6 +142,9 @@ export function routeMessage(message: string, _actor: string): RoutedAction | nu
   }
   if (/\b(any new emails?|check my email|check email)\b/i.test(msg)) {
     return { intent: "search_email", action: "search_email", params: { query: "newer_than:2d" }, result: null, executed: false, error: null };
+  }
+  if (/\b(what emails need responses|emails need responses|who needs a reply|what emails need replies)\b/i.test(msg)) {
+    return { intent: "check_email", action: "check_email", params: { query: "newer_than:3d" }, result: null, executed: false, error: null };
   }
   if (/\b(email|inbox|mail)\b/i.test(msg) && /\b(read|check|show|what|any|new)\b/i.test(msg)) {
     return { intent: "check_email", action: "check_email", params: { query: "newer_than:2d" }, result: null, executed: false, error: null };

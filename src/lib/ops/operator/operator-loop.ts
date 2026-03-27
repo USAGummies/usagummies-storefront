@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { ensureEntityStatesInitialized } from "@/lib/ops/operator/entities/entity-state";
+import { appendDrivingModeBacklog, getDrivingModeState } from "@/lib/ops/operator/driving-mode";
 import { runBatchTransactionReview } from "@/lib/ops/operator/batch-review";
 import { detectEmailOperatorGaps } from "@/lib/ops/operator/gap-detectors/email";
 import { detectInventoryAlerts } from "@/lib/ops/operator/gap-detectors/inventory";
@@ -8,6 +9,7 @@ import { detectPipelineOperatorGaps } from "@/lib/ops/operator/gap-detectors/pip
 import { detectPoCaptureTasks } from "@/lib/ops/operator/gap-detectors/po-capture";
 import { detectQBOOperatorGaps, upgradeExistingQboReviewTasks } from "@/lib/ops/operator/gap-detectors/qbo";
 import { detectVendorPaymentTasks } from "@/lib/ops/operator/gap-detectors/vendor-payments";
+import { detectScheduledFollowUps } from "@/lib/ops/operator/follow-up-scheduler";
 import { runOperatorHealthMonitor } from "@/lib/ops/operator/health-monitor";
 import { runMeetingPrepAutoGeneration } from "@/lib/ops/operator/meeting-prep";
 import { runOpenPoTracker } from "@/lib/ops/operator/po-tracker";
@@ -47,6 +49,7 @@ const STEP_STATE_KEYS = {
   reconciliation: "operator:step:reconciliation:last_run" as const,
   wholesale: "operator:step:wholesale:last_run" as const,
   po_capture: "operator:step:po_capture:last_run" as const,
+  follow_up_scheduler: "operator:step:follow_up_scheduler:last_run" as const,
   task_execution: "operator:step:task_execution:last_run" as const,
   unified_revenue: "operator:step:unified_revenue:last_run" as const,
   unified_inventory: "operator:step:unified_inventory:last_run" as const,
@@ -66,6 +69,7 @@ const STEP_SUMMARY_KEYS = {
   reconciliation: "operator:step:reconciliation:summary" as const,
   wholesale: "operator:step:wholesale:summary" as const,
   po_capture: "operator:step:po_capture:summary" as const,
+  follow_up_scheduler: "operator:step:follow_up_scheduler:summary" as const,
   open_po_tracker: "operator:step:open_po_tracker:summary" as const,
 };
 
@@ -194,6 +198,13 @@ export type OperatorLoopResult = {
     } & CachedSummaryMeta;
     poCapture?: {
       detected: number;
+    } & CachedSummaryMeta;
+    followUps?: {
+      dueCount: number;
+      due: Array<{
+        entity: string;
+        daysSince: number;
+      }>;
     } & CachedSummaryMeta;
     openPo?: {
       openCount: number;
@@ -392,7 +403,7 @@ export async function runOperatorLoop(): Promise<OperatorLoopResult> {
   await ensureEntityStatesInitialized();
   const guidance = await loadOperatorGuidance();
 
-  const [qboStep, emailStep, pipelineStep, vendorPaymentsStep, inventoryStep, reconciliationStep, wholesaleStep, poCaptureStep] = await Promise.all([
+  const [qboStep, emailStep, pipelineStep, vendorPaymentsStep, inventoryStep, reconciliationStep, wholesaleStep, poCaptureStep, followUpStep] = await Promise.all([
     runStep("qbo_gap", 15, () => detectQBOOperatorGaps(), (data) => ({
       itemsProcessed: data.summary.totalTransactions,
       itemsChanged: data.summary.uncategorized,
@@ -433,6 +444,11 @@ export async function runOperatorLoop(): Promise<OperatorLoopResult> {
       itemsChanged: data.summary.detected,
       notes: `detected=${data.summary.detected}`,
     })),
+    runStep("follow_up_scheduler", 12 * 60, () => detectScheduledFollowUps(), (data) => ({
+      itemsProcessed: data.tasks.length,
+      itemsChanged: data.summary.dueCount,
+      notes: `due=${data.summary.dueCount}`,
+    })),
   ]);
   const qbo = qboStep.data || { tasks: [], summary: null };
   const email = emailStep.data || { tasks: [], summary: null };
@@ -442,6 +458,7 @@ export async function runOperatorLoop(): Promise<OperatorLoopResult> {
   const reconciliation = reconciliationStep.data || { tasks: [], summary: null };
   const wholesale = wholesaleStep.data || { tasks: [], summary: null };
   const poCapture = poCaptureStep.data || { tasks: [], summary: null };
+  const followUps = followUpStep.data || { tasks: [], summary: null };
   const [
     qboSummary,
     emailSummary,
@@ -451,6 +468,7 @@ export async function runOperatorLoop(): Promise<OperatorLoopResult> {
     reconciliationSummary,
     wholesaleSummary,
     poCaptureSummary,
+    followUpSummary,
   ] = await Promise.all([
     getStepSummary("qbo_gap", qboStep, qbo.summary, { uncategorized: 0, missingVendors: 0, zeroRevenueAccounts: 0, unrecordedKnownTransactions: 0, categorizedTransactions: 0, totalTransactions: 0 }),
     getStepSummary("email_gap", emailStep, email.summary, { replyTasks: 0, qboEmailTasks: 0 }),
@@ -475,6 +493,7 @@ export async function runOperatorLoop(): Promise<OperatorLoopResult> {
     }),
     getStepSummary("wholesale", wholesaleStep, wholesale.summary, { invoiceTasks: 0 }),
     getStepSummary("po_capture", poCaptureStep, poCapture.summary, { detected: 0 }),
+    getStepSummary("follow_up_scheduler", followUpStep, followUps.summary, { dueCount: 0, due: [] }),
   ]);
   const createdTasks = await createOperatorTasks([
     ...qbo.tasks,
@@ -485,6 +504,7 @@ export async function runOperatorLoop(): Promise<OperatorLoopResult> {
     ...reconciliation.tasks,
     ...wholesale.tasks,
     ...poCapture.tasks,
+    ...followUps.tasks,
   ]);
   const upgradedReviewTasks = await upgradeExistingQboReviewTasks().catch(() => 0);
   const executionLimit = qboSummary.uncategorized >= 20 ? 60 : 12;
@@ -536,6 +556,7 @@ export async function runOperatorLoop(): Promise<OperatorLoopResult> {
       reconciliation: reconciliationStep.state,
       wholesale: wholesaleStep.state,
       po_capture: poCaptureStep.state,
+      follow_up_scheduler: followUpStep.state,
       task_execution: executionStep.state,
     },
     detectorSummary: {
@@ -549,6 +570,7 @@ export async function runOperatorLoop(): Promise<OperatorLoopResult> {
       },
       wholesale: wholesaleSummary,
       poCapture: poCaptureSummary,
+      followUps: followUpSummary,
     },
     execution,
   };
@@ -616,6 +638,18 @@ export async function runOperatorLoop(): Promise<OperatorLoopResult> {
     batch_review: batchReviewStep.state,
     meeting_prep: meetingPrepStep.state,
   });
+
+  const drivingMode = await getDrivingModeState().catch(() => ({ active: false }));
+  if (drivingMode?.active) {
+    const backlogParts: string[] = [];
+    if (emailSurfaceStep.data?.surfaced) backlogParts.push(`${emailSurfaceStep.data.surfaced} emails surfaced`);
+    if (execution.completed) backlogParts.push(`${execution.completed} tasks completed`);
+    if (execution.needsApproval) backlogParts.push(`${execution.needsApproval} approvals queued`);
+    if (followUpSummary.dueCount) backlogParts.push(`${followUpSummary.dueCount} follow-ups due`);
+    if (backlogParts.length) {
+      await appendDrivingModeBacklog(backlogParts.join(", ")).catch(() => {});
+    }
+  }
 
   const [weeklyArAp, monthlyPnl, monthlyBalanceSheet, investorUpdate] = await Promise.all([
     runWeeklyArApReport().catch(() => ({ ran: false })),

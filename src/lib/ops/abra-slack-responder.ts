@@ -12,6 +12,15 @@ import {
 import { appendCorrection as appendMarkdownCorrection } from "@/lib/ops/abra-markdown-memory";
 import { executeRoutedAction, renderRoutedActionResponse } from "@/lib/ops/operator/action-executor";
 import { maybeLearnFinancialCorrection } from "@/lib/ops/operator/correction-learner";
+import {
+  appendDrivingModeBacklog,
+  formatDrivingModeReply,
+  getDrivingModeState,
+} from "@/lib/ops/operator/driving-mode";
+import {
+  extractEntityMentions,
+  updateEntityFromEvent,
+} from "@/lib/ops/operator/entities/entity-state";
 import { routeMessage } from "@/lib/ops/operator/deterministic-router";
 import { readState, writeState } from "@/lib/ops/state";
 import { UNIFIED_REVENUE_STATE_KEY, type UnifiedRevenueSummary } from "@/lib/ops/operator/unified-revenue";
@@ -386,7 +395,7 @@ async function fetchRecentOperatorTasks(hours = 24): Promise<Array<{ task_type: 
   });
 }
 
-function summarizeOperatorTasks(rows: Array<{ task_type: string; status: string }>): string {
+function summarizeOperatorTasks(rows: Array<{ task_type: string; status: string }>, mode: "today" | "overnight" = "today"): string {
   const completed = rows.filter((row) => row.status === "completed");
   const grouped: Record<string, number> = {};
   for (const row of completed) {
@@ -402,7 +411,7 @@ function summarizeOperatorTasks(rows: Array<{ task_type: string; status: string 
   ].filter(Boolean);
   const pending = rows.filter((row) => row.status === "pending" || row.status === "needs_approval").length;
   return [
-    `Operator today: ${completed.length} task${completed.length === 1 ? "" : "s"} completed.`,
+    `Operator ${mode}: ${completed.length} task${completed.length === 1 ? "" : "s"} completed.`,
     highlights.length ? `Highlights: ${highlights.join(", ")}.` : "Highlights: no major automated actions completed yet.",
     `${pending} task${pending === 1 ? "" : "s"} still pending review or execution.`,
   ].join(" ");
@@ -609,9 +618,10 @@ async function maybeHandleOperatorStatusQuery(ctx: SlackMessageContext): Promise
     return null;
   }
   const rows = await fetchRecentOperatorTasks(24);
+  const mode = /\b(overnight|last night)\b/i.test(ctx.text) ? "overnight" : "today";
   return {
     handled: true,
-    reply: summarizeOperatorTasks(rows),
+    reply: summarizeOperatorTasks(rows, mode),
     sources: [],
     answerLogId: null,
   };
@@ -1750,15 +1760,17 @@ async function callAbraChatViaInternalApi(
   const host = resolveInternalHost();
 
   try {
+    const conversationContext = buildConversationContextBlock(ctx);
     const deliveryPrefix =
       hasExplicitAbraMention(ctx.text) || isFinancialsChannel(ctx.channel) || isControlChannel(ctx.channel)
         ? "[SLACK DELIVERY OVERRIDE] This message is directed to Abra. Respond directly to the user. Do not decline because other humans are mentioned in the thread.\n\n"
         : "";
+    const messageWithContext = `${deliveryPrefix}${conversationContext}${ctx.text}`.trim();
 
     let res: Response;
     if (ctx.uploadedFiles && ctx.uploadedFiles.length > 0) {
       const form = new FormData();
-      form.set("message", `${deliveryPrefix}${ctx.text}`);
+      form.set("message", messageWithContext);
       form.set("history", JSON.stringify(ctx.history || []));
       form.set("channel", "slack");
       form.set("actor_label", ctx.displayName || ctx.user);
@@ -1790,7 +1802,7 @@ async function callAbraChatViaInternalApi(
             Authorization: `Bearer ${cronSecret}`,
           },
           body: JSON.stringify({
-            message: `${deliveryPrefix}${ctx.text}`,
+            message: messageWithContext,
             history: ctx.history || [],
             channel: "slack",
             actor_label: ctx.displayName || ctx.user,
@@ -1868,6 +1880,73 @@ async function callAbraChatViaInternalApi(
       answerLogId: null,
     };
   }
+}
+
+function buildConversationContextBlock(ctx: SlackMessageContext): string {
+  const history = Array.isArray(ctx.history) ? ctx.history : [];
+  if (!ctx.threadTs || history.length === 0) return "";
+
+  const topicSource = history.find((item) => item.role === "user" && item.content.trim())?.content || ctx.text;
+  const topic = topicSource.replace(/\s+/g, " ").trim().slice(0, 180);
+
+  const decisions = history
+    .filter((item) => item.role === "assistant" && /\b(done|categorized|created|queued|stored|updated|posted|draft)\b/i.test(item.content))
+    .slice(-4)
+    .map((item) => item.content.replace(/\s+/g, " ").trim().slice(0, 180));
+
+  const sharedData = history
+    .map((item) => item.content)
+    .filter((content) => /(\$[\d,]+(?:\.\d{2})?|invoice\s+#?\w+|po\s+#?\w+|account\s+\d+)/i.test(content))
+    .slice(-4)
+    .map((content) => content.replace(/\s+/g, " ").trim().slice(0, 180));
+
+  const corrections = history
+    .filter((item) => item.role === "user" && /\b(wrong|actually|should be|that is|it's|its|from now on)\b/i.test(item.content))
+    .slice(-4)
+    .map((item) => item.content.replace(/\s+/g, " ").trim().slice(0, 180));
+
+  const lines = ["[THREAD CONTEXT]", `Topic: ${topic}`];
+  if (decisions.length) {
+    lines.push("Previous exchanges:");
+    for (const decision of decisions) lines.push(`- ${decision}`);
+  }
+  if (sharedData.length) {
+    lines.push("Shared data:");
+    for (const item of sharedData) lines.push(`- ${item}`);
+  }
+  if (corrections.length) {
+    lines.push("Corrections:");
+    for (const correction of corrections) lines.push(`- ${correction}`);
+  }
+  lines.push(`Current message: ${ctx.text}`);
+  lines.push("");
+  return `${lines.join("\n")}\n`;
+}
+
+async function syncEntityMentionsFromSlack(ctx: SlackMessageContext, text: string): Promise<void> {
+  const entities = extractEntityMentions(text);
+  if (entities.length === 0) return;
+  for (const entityName of entities) {
+    await updateEntityFromEvent(entityName, {
+      type: "slack_mention",
+      summary: text.replace(/\s+/g, " ").trim().slice(0, 220),
+      date: new Date().toISOString().slice(0, 10),
+      channel: "slack",
+    }).catch(() => null);
+  }
+}
+
+async function maybeApplyDrivingModeReply(
+  ctx: SlackMessageContext,
+  reply: string,
+): Promise<string> {
+  if (ctx.user !== BEN_SLACK_USER_ID) return reply;
+  const drivingMode = await getDrivingModeState();
+  if (!drivingMode?.active) return reply;
+  if (reply.length > 160 || /\n|•|#|\|/.test(reply)) {
+    await appendDrivingModeBacklog(reply.replace(/\s+/g, " ").trim()).catch(() => {});
+  }
+  return formatDrivingModeReply(reply);
 }
 
 export async function getThreadHistory(
@@ -2426,6 +2505,7 @@ export async function processAbraMessage(
   // Strip leading Slack user/bot mentions so "teach:" and "correct:" routing
   // works even when the user @-mentions Abra first (e.g. "<@U1234> teach: ...").
   const textForRouting = text.replace(/^(<@[A-Z0-9]+>\s*)+/gi, "").trim();
+  await syncEntityMentionsFromSlack(ctx, textForRouting);
 
   if (ctx.forceRespond && (isFinancialsChannel(ctx.channel) || isControlChannel(ctx.channel))) {
     if (isAcknowledgmentText(textForRouting)) {
@@ -2475,13 +2555,14 @@ export async function processAbraMessage(
     });
     if (executed.executed && !executed.error) {
       const rendered = renderRoutedActionResponse(executed);
+      const reply = isReneUser(ctx.user)
+        ? formatReneSlackReply(rendered.reply, {
+            isReport: looksLikeQboReportQuery(textForRouting) || rendered.reply.length > 500,
+          })
+        : await maybeApplyDrivingModeReply(ctx, rendered.reply);
       return {
         handled: true,
-        reply: isReneUser(ctx.user)
-          ? formatReneSlackReply(rendered.reply, {
-              isReport: looksLikeQboReportQuery(textForRouting) || rendered.reply.length > 500,
-            })
-          : rendered.reply,
+        reply,
         sources: [],
         answerLogId: null,
         blocks: rendered.blocks,
@@ -2609,26 +2690,30 @@ export async function processAbraMessage(
 
   const answer = await callAbraChatViaInternalApi(ctx);
   if (!answer) {
+    const fallbackReply = await maybeApplyDrivingModeReply(
+      ctx,
+      "I had trouble reaching my chat backend. I kept this thread intact, so please retry or break the request into smaller pieces if it was a large payload.",
+    );
     return {
       handled: true,
-      reply:
-        "I had trouble reaching my chat backend. I kept this thread intact, so please retry or break the request into smaller pieces if it was a large payload.",
+      reply: fallbackReply,
       sources: [],
       answerLogId: null,
     };
   }
 
+  const finalReply = isReneUser(ctx.user)
+    ? formatReneSlackReply(
+        /\bcreate\b.*\binvoice\b/i.test(textForRouting)
+          ? `${answer.reply.replace(/\n+\s*Next step:[\s\S]*$/i, "").trim()}\n\nDraft invoice created in QBO and held for approval.`
+          : answer.reply,
+        { isReport: /\bcreate\b.*\binvoice\b/i.test(textForRouting) || looksLikeQboReportQuery(textForRouting) || answer.reply.length > 500 },
+      )
+    : await maybeApplyDrivingModeReply(ctx, answer.reply);
+
   return {
     handled: true,
-    reply:
-      isReneUser(ctx.user)
-        ? formatReneSlackReply(
-            /\bcreate\b.*\binvoice\b/i.test(textForRouting)
-              ? `${answer.reply.replace(/\n+\s*Next step:[\s\S]*$/i, "").trim()}\n\nDraft invoice created in QBO and held for approval.`
-              : answer.reply,
-            { isReport: /\bcreate\b.*\binvoice\b/i.test(textForRouting) || looksLikeQboReportQuery(textForRouting) || answer.reply.length > 500 },
-          )
-        : answer.reply,
+    reply: finalReply,
     sources: answer.sources,
     answerLogId: answer.answerLogId,
     blocks: undefined,

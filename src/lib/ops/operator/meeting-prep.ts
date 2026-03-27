@@ -1,5 +1,5 @@
 import { readState, writeState } from "@/lib/ops/state";
-import { searchEmails } from "@/lib/ops/gmail-reader";
+import { readEmail, searchEmails } from "@/lib/ops/gmail-reader";
 import { ABRA_CONTROL_CHANNEL_ID } from "@/lib/ops/operator/reports/shared";
 
 type BrainMeetingRow = {
@@ -15,6 +15,7 @@ type MeetingPrepResult = {
 };
 
 const STATE_KEY = "abra-operator-meeting-prep-log" as never;
+const DOSSIER_STATE_KEY = "abra:powers_dossier_last_built" as never;
 
 function getSupabaseEnv() {
   const baseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -124,6 +125,78 @@ async function generatePrep(prompt: string): Promise<string> {
   return String(data.reply || "").trim();
 }
 
+async function upsertBrainEntry(title: string, sourceRef: string, rawText: string, summaryText: string): Promise<void> {
+  const existing = await sbFetch<Array<{ id: string }>>(
+    `/rest/v1/open_brain_entries?source_ref=eq.${encodeURIComponent(sourceRef)}&select=id&limit=1`,
+  ).catch(() => []);
+  const payload = {
+    source_type: "manual",
+    source_ref: sourceRef,
+    entry_type: "teaching",
+    title,
+    raw_text: rawText,
+    summary_text: summaryText.slice(0, 1000),
+    category: "operational",
+    department: "executive",
+    tags: ["powers", "greg", "meeting-dossier"],
+    processed: true,
+  };
+  if (existing[0]?.id) {
+    await sbFetch(`/rest/v1/open_brain_entries?id=eq.${existing[0].id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }).catch(() => {});
+    return;
+  }
+  await sbFetch("/rest/v1/open_brain_entries", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  }).catch(() => {});
+}
+
+export async function buildPowersEmailDossier(): Promise<string> {
+  const lastBuilt = await readState<{ built_at?: string } | null>(DOSSIER_STATE_KEY, null).catch(() => null);
+  if (lastBuilt?.built_at && Date.now() - Date.parse(lastBuilt.built_at) < 12 * 60 * 60 * 1000) {
+    return "Powers email dossier already refreshed today.";
+  }
+  const envelopes = await searchEmails("from:gregk@powers-inc.com", 25).catch(() => []);
+  const emails = await Promise.all(
+    (Array.isArray(envelopes) ? envelopes : []).slice(0, 20).map(async (envelope) => readEmail(envelope.id).catch(() => null)),
+  );
+  const timeline = emails
+    .filter((email): email is NonNullable<typeof email> => Boolean(email))
+    .map((email) => [
+      `Date: ${email.date}`,
+      `Subject: ${email.subject}`,
+      `From: ${email.from}`,
+      `To: ${email.to}`,
+      String(email.body || "").slice(0, 1200),
+    ].join("\n"))
+    .join("\n\n---\n\n");
+
+  if (!timeline.trim()) return "No Greg/Powers emails found for dossier.";
+
+  const dossier = await generatePrep(
+    [
+      "Generate a complete relationship dossier for Powers Confections based on Greg's emails.",
+      "Include: timeline of interactions, every price/quote mentioned, commitments made, open questions, attachment references.",
+      "Be factual and concise.",
+      "",
+      timeline,
+    ].join("\n"),
+  ).catch(() => "");
+
+  const raw = dossier || timeline.slice(0, 12000);
+  await upsertBrainEntry(
+    "Powers Confections — Complete Email Dossier",
+    "powers-email-dossier",
+    raw,
+    raw.slice(0, 1000),
+  );
+  await writeState(DOSSIER_STATE_KEY, { built_at: new Date().toISOString() }).catch(() => {});
+  return raw;
+}
+
 async function collectPowersContext(): Promise<string> {
   const [emails, brainRows] = await Promise.all([
     searchEmails("from:gregk@powers-inc.com newer_than:30d", 5).catch(() => []),
@@ -156,6 +229,7 @@ async function collectPowersContext(): Promise<string> {
 }
 
 export async function runMeetingPrepAutoGeneration(): Promise<MeetingPrepResult> {
+  await buildPowersEmailDossier().catch(() => "");
   const rows = await sbFetch<BrainMeetingRow[]>(
     `/rest/v1/open_brain_entries?select=id,title,raw_text,summary_text,created_at&or=(title.ilike.*meeting*,raw_text.ilike.*meeting*)&order=created_at.desc&limit=40`,
   ).catch(() => []);

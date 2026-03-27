@@ -1,5 +1,6 @@
 import { listEmails, readEmail, searchEmails, type EmailEnvelope } from "@/lib/ops/gmail-reader";
 import type { OperatorTaskInsert } from "@/lib/ops/operator/gap-detectors/qbo";
+import { updateEntityFromEvent } from "@/lib/ops/operator/entities/entity-state";
 
 type EmailGapDetectorResult = {
   tasks: OperatorTaskInsert[];
@@ -162,6 +163,15 @@ export async function detectEmailOperatorGaps(): Promise<EmailGapDetectorResult>
   const qboEmailTasks: OperatorTaskInsert[] = [];
 
   for (const envelope of emails) {
+    const senderRule = extractSenderRule(envelope.from);
+    if (senderRule) {
+      await updateEntityFromEvent(senderRule.name, {
+        type: "email_received",
+        summary: envelope.subject || envelope.snippet || "Email received",
+        date: envelope.date.slice(0, 10),
+        channel: "email",
+      }).catch(() => {});
+    }
     const replyTask = await buildReplyTask(envelope);
     if (replyTask) replyTasks.push(replyTask);
 

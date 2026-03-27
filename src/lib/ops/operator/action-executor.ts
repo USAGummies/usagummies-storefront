@@ -4,10 +4,19 @@ import { maybeLearnFinancialCorrection } from "@/lib/ops/operator/correction-lea
 import { proposeAndMaybeExecute, type AbraAction } from "@/lib/ops/abra-actions";
 import { type SlackMessageContext } from "@/lib/ops/abra-slack-responder";
 import { type RoutedAction } from "@/lib/ops/operator/deterministic-router";
+import {
+  activateDrivingMode,
+  deactivateDrivingMode,
+} from "@/lib/ops/operator/driving-mode";
 import { readState, writeState } from "@/lib/ops/state";
 import { UNIFIED_REVENUE_STATE_KEY } from "@/lib/ops/operator/unified-revenue";
 import { UNIFIED_INVENTORY_STATE_KEY, type UnifiedInventorySummary } from "@/lib/ops/operator/unified-inventory";
-import { ENTITY_STATE_KEY, type EntityState } from "@/lib/ops/operator/entities/entity-state";
+import {
+  ENTITY_STATE_KEY,
+  extractEntityMentions,
+  type EntityState,
+  updateEntityFromEvent,
+} from "@/lib/ops/operator/entities/entity-state";
 
 type ApprovalRow = {
   id: string;
@@ -212,6 +221,16 @@ export async function executeRoutedAction(
       case "query_qbo_pnl":
         action.result = await fetchInternalJson("/api/ops/qbo/query?type=pnl");
         break;
+      case "activate_driving_mode": {
+        const state = await activateDrivingMode(String(action.params.instruction || ""));
+        action.result = state;
+        break;
+      }
+      case "deactivate_driving_mode": {
+        const result = await deactivateDrivingMode();
+        action.result = result;
+        break;
+      }
       case "query_company_status": {
         const [revenue, tasks, inventory] = await Promise.all([
           executeRoutedAction({ intent: "revenue", action: "query_kpi_revenue", params: {}, result: null, executed: false, error: null }, context),
@@ -476,7 +495,29 @@ export async function executeRoutedAction(
         const instruction = String(action.params.instruction || "");
         const customerName = String(action.params.customerName || "").trim();
         const lineItems = parseLineItemsFromInstruction(instruction);
+        const totalValue = lineItems.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.unitPrice || 0)), 0);
+        if (context.slackUserId === "U0ALL27JM38" && totalValue > 500) {
+          action.result = {
+            ok: false,
+            heldForApproval: true,
+            customerName,
+            total: totalValue,
+            message: `Invoice request captured for ${customerName || "customer"}, but amounts over $500 still need Ben's approval before I create the draft.`,
+          };
+          break;
+        }
         const result = await postInternalJson("/api/ops/qbo/invoice", { customerName, lineItems }, 30000);
+        await updateEntityFromEvent(customerName, {
+          type: "invoice_created",
+          summary: `Draft invoice ${String(result.docNumber || result.invoiceId || "").trim() || "(draft)"} created for ${compactCurrency(totalValue)}`,
+          date: pacificDateLabel(),
+          channel: "slack",
+          open_item: {
+            description: `Invoice ${String(result.docNumber || result.invoiceId || "(draft)")} pending`,
+            due_date: null,
+            priority: "high",
+          },
+        }).catch(() => null);
         action.result = result;
         break;
       }
@@ -521,29 +562,34 @@ export async function executeRoutedAction(
           entry_type: "teaching",
           tags: ["deterministic-router"],
         }, "Create brain entry", "Store teaching in memory"));
-        let entityUpdated = false;
-        if (/greg/i.test(text) && /(co-?packing|co-packing|powers)/i.test(text)) {
-          const states = await readState<EntityState[]>(ENTITY_STATE_KEY, []).catch(() => []);
-          const nextStates = Array.isArray(states) ? [...states] : [];
-          const idx = nextStates.findIndex((state) => /powers/i.test(state.name));
-          const note = `Greg confirmed ${text.replace(/^.*?greg confirmed\s*/i, "").trim()}`.trim();
-          if (idx >= 0) {
-            const current = nextStates[idx];
-            nextStates[idx] = {
-              ...current,
-              last_contact_date: pacificDateLabel(),
-              last_contact_channel: "slack",
-              last_contact_summary: note || current.last_contact_summary,
-              relationship_status: "active",
-              notes: [...current.notes, note].filter(Boolean).slice(-10),
-              next_action: "Incorporate Greg confirmation into Powers commercial follow-up.",
-              next_action_date: pacificDateLabel(),
-            };
-            await writeState(ENTITY_STATE_KEY, nextStates).catch(() => {});
-            entityUpdated = true;
-          }
+        const entityMentions = extractEntityMentions(text);
+        if (/greg/i.test(text) && /(co-?packing|co-packing|powers)/i.test(text) && !entityMentions.includes("Powers")) {
+          entityMentions.push("Powers");
         }
-        action.result = { result, entityUpdated };
+        let entityUpdated = false;
+        for (const entityName of entityMentions) {
+          const updated = await updateEntityFromEvent(entityName, {
+            type: "teaching",
+            summary: text,
+            date: pacificDateLabel(),
+            channel: "slack",
+            note: text,
+            next_action: /confirmed/i.test(text) ? "Confirm in writing" : null,
+            open_item: /po\s*#?\s*([a-z0-9-]+)/i.test(text)
+              ? {
+                  description: `Teaching note: ${text.slice(0, 120)}`,
+                  due_date: null,
+                  priority: "medium",
+                }
+              : null,
+          }).catch(() => null);
+          if (updated) entityUpdated = true;
+        }
+        if (entityUpdated) {
+          const states = await readState<EntityState[]>(ENTITY_STATE_KEY, []).catch(() => []);
+          await writeState(ENTITY_STATE_KEY, states).catch(() => {});
+        }
+        action.result = { result, entityUpdated, entityMentions };
         break;
       }
       case "correct_brain_entry": {
@@ -606,6 +652,25 @@ export function renderRoutedActionResponse(action: RoutedAction): { reply: strin
     }
     case "query_qbo_pnl":
       return { reply: formatPnl((action.result || null) as Record<string, unknown> | null) };
+    case "activate_driving_mode": {
+      const result = (action.result || {}) as Record<string, unknown>;
+      const destination = String(result.destination || "").trim();
+      return {
+        reply: destination
+          ? `Drive safe. Driving mode is on for ${destination}. Want the Powers prep ready when you stop?`
+          : "Drive safe. Driving mode is on. Want the Powers prep ready when you stop?",
+      };
+    }
+    case "deactivate_driving_mode": {
+      const result = (action.result || {}) as Record<string, unknown>;
+      const count = Number(result.count || 0);
+      const summary = String(result.summary || "").trim();
+      return {
+        reply: count > 0
+          ? `Driving mode is off. While you were driving: ${summary || `${count} updates queued`}. Want the full summary?`
+          : "Driving mode is off. Nothing urgent stacked up while you were driving. Want the Powers prep now?",
+      };
+    }
     case "query_company_status": {
       const result = (action.result || {}) as Record<string, unknown>;
       const revenue = (result.revenue || {}) as Record<string, unknown>;
@@ -736,7 +801,7 @@ export function renderRoutedActionResponse(action: RoutedAction): { reply: strin
       const query = String(result.query || "email");
       return {
         reply: emails.length
-          ? formatList(`Recent email matches for ${query}`, emails.slice(0, 5).map((email) => `${String(email.from || "Unknown")}: ${String(email.subject || "(no subject)")}`), "tell me which thread you want read or drafted.")
+          ? formatList(`Emails needing response for ${query}`, emails.slice(0, 5).map((email) => `${String(email.from || "Unknown")}: ${String(email.subject || "(no subject)")}`), "tell me which thread you want read or drafted.")
           : "No recent matching emails found.",
       };
     }
@@ -778,8 +843,8 @@ export function renderRoutedActionResponse(action: RoutedAction): { reply: strin
       const notes = Array.isArray(result.notes) ? (result.notes as string[]) : [];
       return {
         reply: [
-          `Powers meeting prep ${result.latestMeetingId ? "is ready" : "context is ready"}.`,
-          "Open questions: shelf life, film seal, co-packing rate, production timeline.",
+          `Powers meeting prep with Greg ${result.latestMeetingId ? "is ready" : "context is ready"}.`,
+          "Key questions for Greg: shelf life, film seal, co-packing rate, and production timeline.",
           notes.length ? `Recent context: ${notes[0].replace(/\s+/g, " ").slice(0, 160)}` : "Recent context: no new Powers note found in brain.",
           "Next step: ask if you want the full prep doc posted again.",
         ].join(" "),
@@ -812,6 +877,9 @@ export function renderRoutedActionResponse(action: RoutedAction): { reply: strin
       };
     case "create_qbo_invoice": {
       const result = (action.result || {}) as Record<string, unknown>;
+      if (result.heldForApproval) {
+        return { reply: String(result.message || "Invoice request captured and held for Ben's approval.") };
+      }
       return { reply: `Draft invoice created in QBO: ${String(result.docNumber || result.invoiceId || "(draft)")}.` };
     }
     case "generate_file": {
@@ -829,7 +897,7 @@ export function renderRoutedActionResponse(action: RoutedAction): { reply: strin
     case "create_brain_entry":
       return {
         reply: ((action.result || {}) as Record<string, unknown>).entityUpdated
-          ? "Stored in memory and updated the Powers relationship state for follow-up."
+          ? `Stored in memory and updated entity state for ${String((((action.result || {}) as Record<string, unknown>).entityMentions as string[] || []).join(", ") || "the relevant contact")}.`
           : "Stored in memory.",
       };
     case "correct_brain_entry":

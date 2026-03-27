@@ -916,7 +916,7 @@ function shortEmailName(name: string): string {
 }
 
 async function buildCompactBenBrief(): Promise<string> {
-  const [revenue, inventory, operator, approvals, awaiting, priorities, openPo] = await Promise.all([
+  const [revenue, inventory, operator, approvals, awaiting, priorities, openPo, followUps] = await Promise.all([
     readState<UnifiedRevenueSummary | null>(UNIFIED_REVENUE_STATE_KEY, null).catch(() => null),
     readState<UnifiedInventorySummary | null>(UNIFIED_INVENTORY_STATE_KEY, null).catch(() => null),
     getOperatorTaskBrief().catch(() => ({
@@ -929,6 +929,7 @@ async function buildCompactBenBrief(): Promise<string> {
     detectAwaitingReplies({ sentCount: 30, lookbackHours: 72 }).catch(() => []),
     fetchCompactAttentionItems(2).catch(() => []),
     readState<OpenPoSummary | null>(OPEN_PO_TRACKER_STATE_KEY, null).catch(() => null),
+    readState<{ due?: Array<{ entity?: string; daysSince?: number }> } | null>("operator:step:follow_up_scheduler:summary" as never, null).catch(() => null),
   ]);
 
   const emailLine = Array.isArray(awaiting) && awaiting.length
@@ -941,6 +942,9 @@ async function buildCompactBenBrief(): Promise<string> {
   if (inventory?.fbaUnits) inventoryBits.push(`~${inventory.fbaUnits} units FBA`);
   if (inventory?.andrewUnits) inventoryBits.push(`${inventory.andrewUnits} incoming from Andrew`);
   if (inventory?.powersUnits) inventoryBits.push(`${inventory.powersUnits} at Powers`);
+  const followUpLine = Array.isArray(followUps?.due) && followUps.due.length
+    ? followUps.due.slice(0, 2).map((item) => `${item.entity} ${item.daysSince}d`).join(", ")
+    : "";
   const lines = [
     `🌅 Good morning <@${BEN_SLACK_USER_ID}>`,
     "",
@@ -948,6 +952,7 @@ async function buildCompactBenBrief(): Promise<string> {
     `📧 ${compactCountLabel(Array.isArray(awaiting) ? awaiting.length : 0, "email")} need response${emailLine !== "none" ? ` (${emailLine})` : ""}`,
     `📦 Inventory: ${inventoryBits.join(", ") || "position updating"}`,
     `📋 Open POs: ${openPo?.openCount || 0} orders, ${compactCurrency(openPo?.committedRevenue || 0)} committed${openPo?.overdue[0] ? ` | PO #${openPo.overdue[0].poNumber} overdue ${openPo.overdue[0].daysOverdue}d` : ""}`,
+    followUpLine ? `📞 Follow-ups due: ${followUpLine}` : "",
     `🎯 Today: ${(priorities || []).join(", ") || "review operator queue, clear approvals"}`,
     `⚠️ ${compactCountLabel(approvals, "approval")} pending`,
     "",

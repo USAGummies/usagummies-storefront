@@ -19,6 +19,17 @@ export interface EntityState {
 
 export const ENTITY_STATE_KEY = "operator:entity_states" as never;
 
+export type EntityEvent = {
+  type: string;
+  summary: string;
+  date: string;
+  channel?: EntityState["last_contact_channel"] | null;
+  next_action?: string | null;
+  next_action_date?: string | null;
+  note?: string | null;
+  open_item?: EntityState["open_items"][number] | null;
+};
+
 const INITIAL_ENTITY_STATES: EntityState[] = [
   {
     name: "Powers Confections",
@@ -132,4 +143,99 @@ export async function ensureEntityStatesInitialized(): Promise<EntityState[]> {
   }
   await writeState(ENTITY_STATE_KEY, INITIAL_ENTITY_STATES);
   return INITIAL_ENTITY_STATES;
+}
+
+function normalize(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+const ENTITY_ALIASES: Record<string, string[]> = {
+  "Powers Confections": ["powers", "greg", "greg k", "greg kroetch", "powers confections", "powers foods"],
+  "Albanese Confectionery": ["albanese", "bill", "bill albanese"],
+  "Belmark": ["belmark", "jonathan"],
+  "Inderbitzin Distributors": ["inderbitzin", "patrick", "patrick mcdonald", "interbitson"],
+  "Reid Mitchell": ["reid", "reid mitchell"],
+  "Rene Gonzalez": ["rene", "rene gonzalez"],
+  "Mike Arlint": ["mike arlint", "arlint", "mike"],
+};
+
+function relationshipFromDays(days: number, current: EntityState["relationship_status"]): EntityState["relationship_status"] {
+  if (days <= 3) return "active";
+  if (days <= 7) return current === "new" ? "new" : "pending";
+  if (days <= 14) return "stale";
+  return "cold";
+}
+
+export function findEntityMatch(entityName: string, states: EntityState[]): EntityState | null {
+  const needle = normalize(entityName);
+  if (!needle) return null;
+  let best: EntityState | null = null;
+  let bestScore = 0;
+  for (const state of states) {
+    const names = [state.name, ...(ENTITY_ALIASES[state.name] || [])].map(normalize);
+    for (const candidate of names) {
+      if (!candidate) continue;
+      let score = 0;
+      if (candidate === needle) score = 1;
+      else if (candidate.includes(needle) || needle.includes(candidate)) score = 0.8;
+      else {
+        const overlap = candidate.split(" ").filter((part) => needle.includes(part)).length;
+        score = overlap >= 2 ? 0.65 : 0;
+      }
+      if (score > bestScore) {
+        best = state;
+        bestScore = score;
+      }
+    }
+  }
+  return bestScore >= 0.65 ? best : null;
+}
+
+export function extractEntityMentions(text: string): string[] {
+  const haystack = normalize(text);
+  const matches = new Set<string>();
+  for (const [name, aliases] of Object.entries(ENTITY_ALIASES)) {
+    for (const alias of [name, ...aliases]) {
+      const normalizedAlias = normalize(alias);
+      if (normalizedAlias && haystack.includes(normalizedAlias)) {
+        matches.add(name);
+      }
+    }
+  }
+  return [...matches];
+}
+
+export async function updateEntityFromEvent(entityName: string, event: EntityEvent): Promise<EntityState | null> {
+  const states = await ensureEntityStatesInitialized();
+  const matched = findEntityMatch(entityName, states);
+  if (!matched) return null;
+  const nextStates = [...states];
+  const idx = nextStates.findIndex((state) => state.name === matched.name);
+  if (idx < 0) return null;
+  const previous = nextStates[idx];
+  const eventDate = event.date || new Date().toISOString().slice(0, 10);
+  const daysSince = Math.max(
+    0,
+    Math.floor((Date.now() - new Date(`${eventDate}T00:00:00Z`).getTime()) / (24 * 60 * 60 * 1000)),
+  );
+  const openItems = event.open_item
+    ? [...previous.open_items.filter((item) => item.description !== event.open_item?.description), event.open_item].slice(-8)
+    : previous.open_items;
+  const notes = event.note
+    ? [...previous.notes, event.note].filter(Boolean).slice(-12)
+    : previous.notes;
+  const updated: EntityState = {
+    ...previous,
+    last_contact_date: eventDate,
+    last_contact_channel: event.channel ?? previous.last_contact_channel,
+    last_contact_summary: event.summary || previous.last_contact_summary,
+    next_action: event.next_action ?? previous.next_action,
+    next_action_date: event.next_action_date ?? previous.next_action_date,
+    relationship_status: relationshipFromDays(daysSince, previous.relationship_status),
+    open_items: openItems,
+    notes,
+  };
+  nextStates[idx] = updated;
+  await writeState(ENTITY_STATE_KEY, nextStates);
+  return updated;
 }

@@ -128,6 +128,10 @@ export const STATE_KEYS = {
   "abra:ben_last_seen": "abra-ben-last-seen.json",
   "abra:morning_brief_hold": "abra-morning-brief-hold.json",
   "abra:morning_brief_held": "abra-morning-brief-held.json",
+  "abra:driving_mode": "abra-driving-mode.json",
+  "abra:driving_mode_backlog": "abra-driving-mode-backlog.json",
+  "abra:powers_dossier_last_built": "abra-powers-dossier-last-built.json",
+  "abra-operator-meeting-prep-log": "abra-operator-meeting-prep-log.json",
   "operator:entity_states": "operator-entity-states.json",
   "operator:notification_gate": "operator-notification-gate.json",
   "operator:notification_dedup": "operator-notification-dedup.json",
@@ -157,6 +161,8 @@ export const STATE_KEYS = {
   "operator:step:batch_review:last_run": "operator-step-batch-review-last-run.json",
   "operator:step:meeting_prep:last_run": "operator-step-meeting-prep-last-run.json",
   "operator:step:health_monitor:last_run": "operator-step-health-monitor-last-run.json",
+  "operator:step:follow_up_scheduler:last_run": "operator-step-follow-up-scheduler-last-run.json",
+  "operator:step:follow_up_scheduler:summary": "operator-step-follow-up-scheduler-summary.json",
   "abra-evaluation-last-run": "abra-evaluation-last-run.json",
 
   // Agent performance tracking

@@ -11,6 +11,7 @@ import {
 import { readEmail, searchEmails } from "@/lib/ops/gmail-reader";
 import { runInvestorUpdatePackage } from "@/lib/ops/operator/reports/investor-update";
 import { loadLearnedQboRules, resolveQboCategory } from "@/lib/ops/operator/qbo-resolution";
+import { updateEntityFromEvent } from "@/lib/ops/operator/entities/entity-state";
 import { proposeAndMaybeExecute } from "@/lib/ops/abra-actions";
 
 export type OperatorTaskStatus =
@@ -1349,6 +1350,17 @@ async function executeGenerateWholesaleInvoiceTask(task: OperatorTaskRow): Promi
   await postFinancialsMessage(
     `🧾 Invoice ${docNumber || invoiceId} created for ${customerName} — $${total.toFixed(2)} for ${quantity} units. Awaiting approval before sending.`,
   );
+  await updateEntityFromEvent(customerName, {
+    type: "invoice_created",
+    summary: `Draft invoice ${docNumber || invoiceId} created for ${quantity} units totaling $${total.toFixed(2)}`,
+    date: new Date().toISOString().slice(0, 10),
+    channel: "email",
+    open_item: {
+      description: `Invoice ${docNumber || invoiceId} pending approval`,
+      due_date: dueDate,
+      priority: "high",
+    },
+  }).catch(() => null);
 
   return `Created draft wholesale invoice ${docNumber || invoiceId} for ${customerName} totaling $${total.toFixed(2)}`;
 }
@@ -1504,6 +1516,18 @@ async function executePoReceivedTask(task: OperatorTaskRow): Promise<string> {
     total,
     deliveryDate,
   });
+  await updateEntityFromEvent(customerName, {
+    type: "po_received",
+    summary: `PO ${poNumber} received for ${quantity} units totaling $${total.toFixed(2)}`,
+    date: new Date().toISOString().slice(0, 10),
+    channel: "email",
+    open_item: {
+      description: `PO #${poNumber} — ${quantity} units`,
+      due_date: deliveryDate,
+      priority: "high",
+    },
+    next_action: "Confirm shipping cost and invoice send timing",
+  }).catch(() => null);
 
   await postSlackChannelMessage(CONTROL_CHANNEL_ID, `✅ PO #${poNumber} from ${customerName} logged. Invoice draft #${invoiceId} created in QBO. ${quantity} units, $${total.toFixed(2)}.`);
   await postSlackChannelMessage("C0AKG9FSC2J", `<@U0ALL27JM38> New PO #${poNumber} — Invoice draft created for $${total.toFixed(2)}. Needs shipping cost before sending.`);
