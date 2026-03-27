@@ -1115,7 +1115,7 @@ export function renderRoutedActionResponse(action: RoutedAction): { reply: strin
       const nestedResult = (result.result || {}) as Record<string, unknown>;
       const proposedPayload = (nestedResult.proposed_payload || {}) as Record<string, unknown>;
       const params = (proposedPayload.params || {}) as Record<string, unknown>;
-      const text = String(params.text || "");
+      const text = String(params.text || action.params.text || "");
       const mentions = entityMentions.join(", ");
       const triggered = /(shipment arrives|production starts|deposit is \$|upc barcode|logo file|greg confirmed|andrew confirmed)/i.test(text);
       const detail =
