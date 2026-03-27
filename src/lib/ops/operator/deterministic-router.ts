@@ -27,6 +27,22 @@ function parseInvoiceInstruction(message: string): Record<string, unknown> {
   };
 }
 
+function looksLikeCorrectionInstruction(msg: string): boolean {
+  if (/^(what|how|who|when|where|why)\b/i.test(msg)) return false;
+  if (/\b(categorize|recategorize)\b.*\b(to|as)\b/i.test(msg)) return true;
+  if (/^(?:that should be|it should be)\s+.+$/i.test(msg)) return true;
+  if (/^(?:wrong|that'?s wrong|that is wrong)\s*[—,:-]?\s*(?:it'?s\s+)?(.+)$/i.test(msg)) return true;
+  if (/\bpersonal expense\b|\bthat'?s personal\b/i.test(msg)) return true;
+  if (/^(?:anything from\s+).+?\s+(?:is|should be)\s+.+$/i.test(msg)) return true;
+  if (
+    /\b(charge|deposit|transaction|purchase|payment|expense|transfer)\b/i.test(msg) &&
+    /\b(?:is|should be)\b/i.test(msg)
+  ) {
+    return true;
+  }
+  return false;
+}
+
 export function routeMessage(message: string, _actor: string): RoutedAction | null {
   const msg = message.toLowerCase().trim();
 
@@ -161,13 +177,7 @@ export function routeMessage(message: string, _actor: string): RoutedAction | nu
   if (/\b(invoices?|receivable|who owes us money)\b/i.test(msg)) return { intent: "invoices", action: "query_qbo_invoices", params: {}, result: null, executed: false, error: null };
   if (/\b(transactions?|purchases?|expenses?)\b/i.test(msg)) return { intent: "transactions", action: "query_qbo_purchases", params: {}, result: null, executed: false, error: null };
 
-  if (
-    /\b(categorize|recategorize)\b.*\b(to|as)\b/i.test(msg) ||
-    /^(?:anything from\s+)?.+?\s+(?:is|should be)\s+.+$/i.test(msg) ||
-    /^(?:that should be|it should be)\s+.+$/i.test(msg) ||
-    /^(?:wrong|that'?s wrong|that is wrong)\s*[—,:-]?\s*(?:it'?s\s+)?(.+)$/i.test(msg) ||
-    /\bpersonal expense\b|\bthat'?s personal\b/i.test(msg)
-  ) {
+  if (looksLikeCorrectionInstruction(msg)) {
     return { intent: "categorize", action: "categorize_qbo_transaction", params: { instruction: message }, result: null, executed: false, error: null };
   }
   if (/\b(create|add|set up)\b.*\b(vendor|supplier)\b/i.test(msg)) {
