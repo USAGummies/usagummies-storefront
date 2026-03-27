@@ -1098,13 +1098,14 @@ async function executeEmailDraftResponseTask(task: OperatorTaskRow): Promise<Exe
   const messageId = String(task.execution_params?.message_id || "");
   const sender = String(task.execution_params?.sender || "");
   const senderEmail = String(task.execution_params?.sender_email || "");
-  const subject = String(task.execution_params?.subject || "Re: (no subject)");
+  const subject = String(task.execution_params?.custom_draft_subject || task.execution_params?.subject || "Re: (no subject)");
+  const customDraftBody = String(task.execution_params?.custom_draft_body || "").trim();
   if (!messageId || !senderEmail) throw new Error("Missing message_id or sender_email");
 
   const threadText = await buildEmailThreadContext(messageId, senderEmail, subject);
   if (!threadText) throw new Error(`Email thread ${messageId} could not be read`);
 
-  const draft = await generateDraftViaChat(
+  const draft = customDraftBody || await generateDraftViaChat(
     [
       "Draft a professional reply to this email thread. Return only the email body, no commentary.",
       "",
@@ -1219,7 +1220,17 @@ async function executeVendorFollowupTask(task: OperatorTaskRow): Promise<Execute
   const vendor = String(task.execution_params?.vendor || "vendor");
   const lastSubject = String(task.execution_params?.last_subject || "Quick follow-up");
   const bodyPreview = String(task.execution_params?.body_preview || "");
-  if (!email) throw new Error("Missing contact_email");
+  if (!email) {
+    return {
+      status: "completed",
+      message: `Logged follow-up reminder for ${vendor}; no contact_email is on file.`,
+      data: {
+        vendor,
+        subject: lastSubject,
+        missing_contact_email: true,
+      },
+    };
+  }
 
   const draft = await generateDraftViaChat(
     `Draft a short follow-up email to ${vendor}. Return only the email body.\n\n` +

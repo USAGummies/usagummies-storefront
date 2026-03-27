@@ -217,6 +217,13 @@ async function qboPost<T>(path: string, body: Record<string, unknown>): Promise<
   return (await res.json().catch(() => null)) as T | null;
 }
 
+async function findOperatorTaskByNaturalKey(naturalKey: string): Promise<Record<string, unknown> | null> {
+  const rows = await sbFetch<Array<Record<string, unknown>>>(
+    `/rest/v1/abra_operator_tasks?select=id,status,execution_params&execution_params->>natural_key=eq.${encodeURIComponent(naturalKey)}&order=created_at.desc&limit=1`,
+  ).catch(() => []);
+  return rows[0] || null;
+}
+
 async function findOrCreateCustomer(params: {
   customerName: string;
   customerEmail?: string | null;
@@ -295,13 +302,18 @@ export async function getPurchaseOrderByNumber(poNumber: string): Promise<Purcha
 export async function upsertPurchaseOrder(po: PurchaseOrder): Promise<PurchaseOrder> {
   const existing = await getPurchaseOrderByNumber(po.po_number);
   const now = new Date().toISOString();
+  const computedTotals = computePoTotals({
+    units: po.units,
+    unitPrice: po.unit_price,
+    shippingCost: po.shipping_cost,
+  });
   const payload: PurchaseOrder = {
     ...po,
     customer_name: normalizeText(po.customer_name),
     customer_email: normalizeText(po.customer_email) || null,
     customer_entity_id: normalizeText(po.customer_entity_id) || null,
-    subtotal: computePoTotals(po).subtotal,
-    total: computePoTotals(po).total,
+    subtotal: computedTotals.subtotal,
+    total: computedTotals.total,
     delivery_address: normalizeText(po.delivery_address) || null,
     requested_delivery_date: normalizeText(po.requested_delivery_date) || null,
     payment_terms: normalizeText(po.payment_terms) || DEFAULT_PAYMENT_TERMS,
@@ -471,6 +483,33 @@ export async function receivePO(input: ReceivePoInput): Promise<PurchaseOrder> {
     note: po.notes.join(" | ") || null,
   }).catch(() => null);
 
+  if (!po.qbo_invoice_id && po.customer_email && po.source_email_id) {
+    await sbFetch("/rest/v1/abra_operator_tasks", {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+      body: JSON.stringify({
+        task_type: "email_draft_response",
+        title: `Ask ${po.customer_name} to confirm PO ${po.po_number} quantity`,
+        description: `PO ${po.po_number} is missing quantity or unit price details. Draft a clarification email for approval.`,
+        priority: "high",
+        source: "po_pipeline",
+        assigned_to: "ben",
+        requires_approval: true,
+        execution_params: {
+          natural_key: `po-quantity-followup:${po.po_number}`,
+          message_id: po.source_email_id,
+          sender: po.customer_name,
+          sender_email: po.customer_email,
+          subject: `Re: PO ${po.po_number}`,
+          custom_draft_subject: `Re: PO ${po.po_number}`,
+          custom_draft_body: `Hi ${po.customer_name.split("/")[0].trim().split(" ")[0] || po.customer_name},\n\nThanks for the PO. Could you confirm the quantity and unit price so I can get the invoice together?\n\nBest,\nBen`,
+          po_number: po.po_number,
+        },
+        tags: ["po", "email", "approval"],
+      }),
+    }).catch(() => null);
+  }
+
   if (po.qbo_invoice_id) {
     await postSlackMessage(
       ABRA_CONTROL_CHANNEL_ID,
@@ -572,28 +611,32 @@ export async function markDelivered(poNumber: string): Promise<PurchaseOrder | n
     notes: mergeNotes(po.notes, [`Delivered ${deliveredAt}`, `Payment due ${dueDate}`]),
   });
 
-  await sbFetch("/rest/v1/abra_operator_tasks", {
-    method: "POST",
-    headers: { Prefer: "resolution=merge-duplicates,return=representation" },
-    body: JSON.stringify({
-      task_type: "vendor_followup",
-      title: `Payment due from ${updated.customer_name} for PO ${updated.po_number}`,
-      description: `PO ${updated.po_number} delivered. ${updated.total ? `Payment of ${formatCurrency(updated.total)} ` : "Payment "}due ${dueDate}.`,
-      priority: "high",
-      source: "po_pipeline",
-      assigned_to: "ben",
-      requires_approval: true,
-      execution_params: {
-        natural_key: `po-payment-due:${updated.po_number}`,
-        po_number: updated.po_number,
-        customer_name: updated.customer_name,
-        due_date: dueDate,
-        amount: updated.total,
-      },
-      due_by: dueDate,
-      tags: ["po", "payment_due"],
-    }),
-  }).catch(() => null);
+  const paymentDueNaturalKey = `po-payment-due:${updated.po_number}`;
+  const existingFollowup = await findOperatorTaskByNaturalKey(paymentDueNaturalKey);
+  if (!existingFollowup) {
+    await sbFetch("/rest/v1/abra_operator_tasks", {
+      method: "POST",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify({
+        task_type: "vendor_followup",
+        title: `Payment due from ${updated.customer_name} for PO ${updated.po_number}`,
+        description: `PO ${updated.po_number} delivered. ${updated.total ? `Payment of ${formatCurrency(updated.total)} ` : "Payment "}due ${dueDate}.`,
+        priority: "high",
+        source: "po_pipeline",
+        assigned_to: "ben",
+        requires_approval: true,
+        execution_params: {
+          natural_key: paymentDueNaturalKey,
+          po_number: updated.po_number,
+          customer_name: updated.customer_name,
+          due_date: dueDate,
+          amount: updated.total,
+        },
+        due_by: dueDate,
+        tags: ["po", "payment_due"],
+      }),
+    }).catch(() => null);
+  }
 
   return updated;
 }

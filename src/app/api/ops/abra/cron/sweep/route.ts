@@ -26,10 +26,6 @@ type SweepResult = {
 
 // Lazy imports to avoid loading everything on cold start
 const SWEEP_REGISTRY: Record<string, () => Promise<unknown>> = {
-  "email-sweep": async () => {
-    const { runEmailSweep } = await import("@/lib/ops/sweeps/email-sweep");
-    return runEmailSweep();
-  },
   "bank-feed-sweep": async () => {
     const { runBankFeedSweep } = await import("@/lib/ops/sweeps/bank-feed-sweep");
     return runBankFeedSweep();
@@ -92,10 +88,6 @@ const SWEEP_REGISTRY: Record<string, () => Promise<unknown>> = {
   "amazon-review-ingester": async () => {
     const { ingestAmazonReviews } = await import("@/lib/ops/sweeps/amazon-review-ingester");
     return ingestAmazonReviews();
-  },
-  "email-action-extractor": async () => {
-    // Runs as part of email sweep — standalone trigger processes recent emails
-    return { message: "Email action extraction runs as part of email-sweep" };
   },
 };
 

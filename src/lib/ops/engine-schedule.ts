@@ -188,7 +188,6 @@ export const ENGINE_REGISTRY: EngineConfig[] = [
     name: "Scheduled Intelligence Loops",
     scriptFile: "internal-sweeps",
     agents: [
-      { key: "email-sweep", name: "Email Sweep", schedule: "Every 15 min" },
       { key: "bank-feed-sweep", name: "Bank Feed Sweep", schedule: "Every 60 min" },
       { key: "morning-brief", name: "Morning Brief", schedule: "Daily 08:00" },
       { key: "approval-expiry", name: "Approval Expiry", schedule: "Every 60 min" },

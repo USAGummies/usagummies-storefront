@@ -5,7 +5,7 @@
  * Stores representative examples as brain entries so the email drafter
  * can retrieve them via RAG during reply generation.
  *
- * Runs on schedule (daily or weekly) from inbox-scan or scheduler.
+ * Runs on schedule (daily or weekly) from the central scheduler.
  * Idempotent: tracks processed message IDs in Supabase to avoid re-processing.
  *
  * SAFETY: Only reads sent mail. Never sends anything. No external side effects.

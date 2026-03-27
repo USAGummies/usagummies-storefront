@@ -37,20 +37,18 @@ const SWEEP_URL = (name) => `${BASE_URL}/api/ops/abra/cron/sweep?name=${name}`;
 // The master-scheduler (every 5 min) dispatches ALL other sweeps
 // internally based on engine-schedule.ts timing rules.
 const SCHEDULES = [
-  // ─── Slot 1-2: Core (every 5 min) ───
+  // ─── Slot 1: Core (every 5 min) ───
   { name: "master-scheduler", url: `${BASE_URL}/api/ops/scheduler/master`, cron: "*/5 * * * *", method: "GET" },
-  { name: "abra-inbox-scan", url: `${BASE_URL}/api/ops/abra/inbox-scan`, cron: "*/5 * * * *", method: "POST" },
 
-  // ─── Slot 3-4: High frequency (15-30 min) ───
-  { name: "abra-email-sweep", url: SWEEP_URL("email-sweep"), cron: "*/15 * * * *", method: "POST" },
+  // ─── Slot 2: High frequency (15-30 min) ───
   { name: "abra-signal-scan", url: `${BASE_URL}/api/ops/abra/cron/signal-scan`, cron: "7,37 * * * *", method: "POST" },
 
-  // ─── Slot 5-7: Hourly ───
+  // ─── Slot 3-5: Hourly ───
   { name: "abra-bank-feed-sweep", url: SWEEP_URL("bank-feed-sweep"), cron: "12 * * * *", method: "POST" },
   { name: "abra-bank-auto-tagger", url: SWEEP_URL("bank-auto-tagger"), cron: "17 * * * *", method: "POST" },
   { name: "abra-approval-expiry", url: SWEEP_URL("approval-expiry"), cron: "22 * * * *", method: "POST" },
 
-  // ─── Slot 8-10: Key daily jobs ───
+  // ─── Slot 6-8: Key daily jobs ───
   { name: "abra-dashboard-push", url: `${BASE_URL}/api/ops/abra/cron/dashboard-push`, cron: "3 14,20,2 * * *", method: "POST" },
   { name: "abra-morning-brief", url: `${BASE_URL}/api/ops/abra/morning-brief`, cron: "3 15 * * *", method: "POST" },
   { name: "abra-self-monitor", url: `${BASE_URL}/api/ops/abra/cron/self-monitor`, cron: "57 13 * * *", method: "POST" },

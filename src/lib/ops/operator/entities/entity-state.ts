@@ -25,6 +25,7 @@ export type EntityEvent = {
   date: string;
   channel?: EntityState["last_contact_channel"] | null;
   entity_type?: EntityState["type"];
+  allowCreate?: boolean;
   next_action?: string | null;
   next_action_date?: string | null;
   note?: string | null;
@@ -167,6 +168,15 @@ function relationshipFromDays(days: number, current: EntityState["relationship_s
   return "cold";
 }
 
+function normalizeEventDate(value: string | null | undefined): string {
+  const raw = String(value || "").trim();
+  if (!raw) return new Date().toISOString().slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const parsed = new Date(raw);
+  if (Number.isFinite(parsed.getTime())) return parsed.toISOString().slice(0, 10);
+  return new Date().toISOString().slice(0, 10);
+}
+
 export function findEntityMatch(entityName: string, states: EntityState[]): EntityState | null {
   const needle = normalize(entityName);
   if (!needle) return null;
@@ -209,12 +219,15 @@ export function extractEntityMentions(text: string): string[] {
 export async function updateEntityFromEvent(entityName: string, event: EntityEvent): Promise<EntityState | null> {
   const states = await ensureEntityStatesInitialized();
   const matched = findEntityMatch(entityName, states);
+  if (!matched && !event.allowCreate) {
+    return null;
+  }
   const nextStates = [...states];
-  const eventDate = event.date || new Date().toISOString().slice(0, 10);
-  const daysSince = Math.max(
-    0,
-    Math.floor((Date.now() - new Date(`${eventDate}T00:00:00Z`).getTime()) / (24 * 60 * 60 * 1000)),
-  );
+  const eventDate = normalizeEventDate(event.date);
+  const eventAt = new Date(`${eventDate}T00:00:00Z`).getTime();
+  const daysSince = Number.isFinite(eventAt)
+    ? Math.max(0, Math.floor((Date.now() - eventAt) / (24 * 60 * 60 * 1000)))
+    : 0;
   const idx = matched ? nextStates.findIndex((state) => state.name === matched.name) : -1;
   const previous: EntityState = idx >= 0
     ? nextStates[idx]

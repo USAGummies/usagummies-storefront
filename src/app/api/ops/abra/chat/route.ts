@@ -51,7 +51,6 @@ import { getTeamMembers, getVendors, buildTeamContext } from "@/lib/ops/abra-tea
 import { getActiveSignals, buildSignalsContext } from "@/lib/ops/abra-operational-signals";
 import {
   getAvailableActions,
-  parseActionDirectives,
 } from "@/lib/ops/abra-actions";
 import { executeRoutedAction, renderRoutedActionResponse } from "@/lib/ops/operator/action-executor";
 import { routeMessage } from "@/lib/ops/operator/deterministic-router";
@@ -84,13 +83,11 @@ import {
   fetchFinancialContext,
   fetchLedgerContext,
   fetchCompetitorContext,
-  captureCompetitorIntelFromChat,
   buildEmbedding,
   fetchCorrections,
   fetchDepartments,
   valueAsText,
 } from "@/lib/ops/abra-context-builder";
-import { executeActions } from "@/lib/ops/abra-action-executor";
 import {
   isUuidLike,
   makeThreadId,
@@ -109,6 +106,20 @@ const DEFAULT_CLAUDE_MODEL =
   process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
 const MAX_MESSAGE_LENGTH = 5000;
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
+
+function stripInjectedSlackContext(message: string): string {
+  const trimmed = message.trim();
+  if (!trimmed) return trimmed;
+
+  const tailAfterCurrentMessage = trimmed.match(
+    /\[THREAD CONTEXT\][\s\S]*?Current message:\s*[^\n]*\n\n([\s\S]+)$/i,
+  );
+  if (tailAfterCurrentMessage?.[1]?.trim()) {
+    return tailAfterCurrentMessage[1].trim();
+  }
+
+  return trimmed.replace(/^\[SLACK DELIVERY OVERRIDE\][\s\S]*?\n\n/i, "").trim();
+}
 
 async function maybeFormatDrivingReply(actorLabel: string, reply: string): Promise<string> {
   if (!/ben/i.test(actorLabel || "")) return reply;
@@ -687,6 +698,7 @@ export async function POST(req: Request) {
     typeof payload.message === "string"
       ? payload.message.replaceAll("\0", "").trim()
       : "";
+  const routedMessage = stripInjectedSlackContext(rawMessage);
   if (!rawMessage) {
     return jsonWithPromptVersion({
       reply: "What can I help with?",
@@ -725,7 +737,7 @@ export async function POST(req: Request) {
     typeof payload.actor_context === "string" && payload.actor_context.trim()
       ? payload.actor_context.trim().slice(0, 300)
       : null;
-  const lowerRawMessage = rawMessage.toLowerCase().trim();
+  const lowerRawMessage = routedMessage.toLowerCase().trim();
   const VALID_CHANNELS = ["web", "slack", "api"] as const;
   type AnswerChannel = (typeof VALID_CHANNELS)[number];
   const rawChannel = typeof payload.channel === "string" ? payload.channel.trim() : "";
@@ -748,7 +760,7 @@ export async function POST(req: Request) {
     });
   }
 
-  if (/^(ok|okay|k)$/i.test(rawMessage)) {
+  if (/^(ok|okay|k)$/i.test(routedMessage)) {
     return jsonWithPromptVersion({
       reply: "Got it. Let me know if you need anything else.",
       confidence: 1,
@@ -759,7 +771,7 @@ export async function POST(req: Request) {
     });
   }
 
-  const emailSearchMatch = rawMessage.match(/^search my email for\s+(.+)$/i);
+  const emailSearchMatch = routedMessage.match(/^search my email for\s+(.+)$/i);
   if (emailSearchMatch) {
     const term = emailSearchMatch[1].trim();
     const executedAction = await executeRoutedAction(
@@ -792,7 +804,7 @@ export async function POST(req: Request) {
     }
   }
 
-  if (/^what needs my attention(?:\s+today|\s+right now)?$/i.test(rawMessage)) {
+  if (/^what needs my attention(?:\s+today|\s+right now)?$/i.test(routedMessage)) {
     const [tasksAction, approvalsAction] = await Promise.all([
       executeRoutedAction(
         {
@@ -860,7 +872,7 @@ export async function POST(req: Request) {
     });
   }
 
-  if (/^how are things going$/i.test(rawMessage)) {
+  if (/^how are things going$/i.test(routedMessage)) {
     const tasksAction = await executeRoutedAction(
       {
         intent: "tasks",
@@ -926,7 +938,7 @@ export async function POST(req: Request) {
     });
   }
 
-  const routedAction = routeMessage(rawMessage, actorEmail);
+  const routedAction = routeMessage(routedMessage, actorEmail);
   if (routedAction) {
     const executedAction = await executeRoutedAction(routedAction, {
       actor: actorLabel,
@@ -973,12 +985,6 @@ export async function POST(req: Request) {
     if (supabaseCircuitOpen) {
       console.log("[abra] Supabase circuit open — will skip memory search, continuing with live data only");
     }
-    void captureCompetitorIntelFromChat({
-      message,
-      userEmail: actorEmail,
-      threadId,
-    }).catch(() => {});
-
     let effectiveHistory = history;
     if (isUuidLike(threadId)) {
       try {
@@ -2180,46 +2186,7 @@ export async function POST(req: Request) {
     // Track Anthropic API success in capability registry
     void capMarkSuccess("anthropic").catch(() => {});
     const actionNotices: string[] = [];
-    let baseReply = claudeResult.reply;
-    if (!claudeResult.earlyExit) {
-      const actionResult = await executeActions(claudeResult.reply, {
-        slackChannelId: slackChannelId || undefined,
-        slackThreadTs: slackThreadTs || undefined,
-        deadlineMs: Math.max(0, 40_000 - (Date.now() - startMs)), // leave 15s for response assembly
-      });
-      baseReply = actionResult.cleanReply;
-      actionNotices.push(...actionResult.actionNotices);
-
-      // If we got read-only data back (email, ledger), do a follow-up Claude call with real data injected
-      // Skip if we're past 35s to avoid hitting the 50s deadline with a second LLM call
-      if (actionResult.readOnlyResults.length > 0 && (Date.now() - startMs) < 35_000) {
-        const dataContext = actionResult.readOnlyResults.join("\n\n");
-        const followUpResult = await generateClaudeReply({
-          message: `The user asked: "${message}"\n\nHere is the data I just retrieved from our systems:\n\n${dataContext}\n\nNow answer the user's original question using this REAL data. Use exact numbers from the data — never estimate or guess. Be specific and actionable.`,
-          history: effectiveHistory,
-          tieredResults,
-          corrections,
-          departments,
-          activeInitiatives,
-          costSummary,
-          financialContext: enrichedFinancialContext,
-          ledgerContext: ledgerCtx,
-          competitorContext,
-          teamContext,
-          signalsContext,
-          availableActions,
-          detectedDepartment: messageDepartment,
-          liveSnapshot: augmentedLiveSnapshot,
-          deadlineSignal: deadlineController.signal,
-          actorContext,
-        });
-        baseReply = followUpResult.reply;
-        // Strip any action directives from the follow-up (don't double-execute)
-        const followUpParsed = parseActionDirectives(baseReply);
-        // Use cleanReply unconditionally — the safety strip below handles any remnants
-        baseReply = followUpParsed.cleanReply;
-      }
-    }
+    const baseReply = claudeResult.reply;
 
     // Safety: always strip any remaining <action>, <tool_call>, <tool_response>, code-fenced action blocks, or bare JSON action objects before returning to the user
     console.log(`[chat] Pre-strip baseReply length: ${baseReply.length}, actionNotices: ${actionNotices.length}`);
@@ -2244,117 +2211,10 @@ export async function POST(req: Request) {
     console.log(`[chat] Post-strip reply length: ${strippedReply.length}, first 200: ${strippedReply.slice(0, 200)}`);
 
     // Never return a completely empty reply — provide a fallback
-    const effectiveReply = strippedReply || (
-      actionNotices.length > 0
-        ? "" // Notices will fill the reply
-        : "Done — I processed your request. Check this thread for any files or follow-up."
-    );
+    const effectiveReply =
+      strippedReply ||
+      "I can answer questions here, but actions are limited to the supported direct commands right now.";
     let reply = [
-      effectiveReply,
-      actionNotices.length > 0 ? actionNotices.join("\n") : "",
-    ]
-      .filter(Boolean)
-      .join("\n\n");
-
-    // ── Auto-generate file if user asked for export and Abra didn't emit the action ──
-    const wantsFile = /\b(spreadsheet|xlsx|csv|excel|export|download|file)\b/i.test(message);
-    // Also detect Claude refusing to generate files (training bias override).
-    // Normalize Unicode curly apostrophes (\u2018 \u2019) → straight apostrophe before testing,
-    // because Claude sometimes outputs \u2019 (right single quotation mark) in contractions.
-    const normalizedReply = strippedReply.replace(/[\u2018\u2019\u02BC\u2032]/g, "'");
-    const claudeRefusedFile = /\b(cannot generate|can[\u2019']t generate|don[\u2019']t have file|cannot create|can[\u2019']t create files?|cannot export|can[\u2019']t export|unable to generate|unable to create|not able to generate|not able to create|[Ii][\u2019'] ?m not able to|[Ii] cannot directly|downloadable xlsx|downloadable .{0,20}file)\b/i.test(normalizedReply);
-    // Check if the action executor already handled generate_file
-    // Only skip fallback if the action was actually executed (not just queued for approval)
-    const fileActionHandled = actionNotices.some(n => n.includes("[generate_file]"));
-    console.log(`[chat] File auto-gen check: channel=${channel}, slackChannelId=${slackChannelId || "(empty)"}, wantsFile=${wantsFile}, fileActionHandled=${fileActionHandled}, claudeRefusedFile=${claudeRefusedFile}, replyLen=${strippedReply.length}`);
-
-    // Fix: if Claude refused to generate a file but the user clearly asked for one, force a generate_file action
-    if (wantsFile && claudeRefusedFile && !fileActionHandled) {
-      console.warn("[chat] Claude refused file generation — intercepting and forcing generate_file action");
-      const forcedFilename = /csv/i.test(rawMessage) ? "export.csv" : "export.xlsx";
-      const forcedSource = /vendor/i.test(rawMessage)
-        ? "qbo_vendors"
-        : /account|coa|chart of accounts/i.test(rawMessage)
-        ? "qbo_accounts"
-        : /p.?l|profit.?loss/i.test(rawMessage)
-        ? "qbo_pnl"
-        : undefined;
-      const forcedActionXml = `<action>{"action_type":"generate_file","title":"File Export","description":"Auto-forced — Abra incorrectly claimed it could not generate files","department":"operations","risk_level":"low","params":{"filename":"${forcedFilename}"${forcedSource ? `,"source":"${forcedSource}"` : ',"headers":[],"rows":[]'}}}</action>`;
-      try {
-        const forceResult = await executeActions(forcedActionXml, {
-          slackChannelId: slackChannelId || undefined,
-          slackThreadTs: slackThreadTs || undefined,
-          deadlineMs: Math.max(2000, 40_000 - (Date.now() - startMs)),
-        });
-        actionNotices.push(...forceResult.actionNotices);
-      } catch (err) {
-        console.warn("[chat] Forced generate_file action failed:", err instanceof Error ? err.message : err);
-      }
-    }
-    if (
-      (wantsFile || claudeRefusedFile) &&
-      !fileActionHandled &&
-      (slackChannelId || channel === "slack")
-    ) {
-      // Extract markdown tables from the reply (use strippedReply which has the actual content)
-      const replyText = strippedReply || baseReply;
-      const tableRegex = /\|(.+)\|\n\|[-| :]+\|\n((?:\|.+\|\n?)+)/g;
-      const tables: Array<{ headers: string[]; rows: string[][] }> = [];
-      let tableMatch;
-      while ((tableMatch = tableRegex.exec(replyText)) !== null) {
-        const headerLine = tableMatch[1];
-        const bodyLines = tableMatch[2].trim().split("\n");
-        const headers = headerLine.split("|").map(h => h.trim()).filter(Boolean);
-        // Skip tiny tables (likely formatting, not data)
-        if (headers.length < 2 || bodyLines.length < 1) continue;
-        const rows = bodyLines.map(line =>
-          line.split("|").map(cell => cell.trim()).filter(Boolean)
-        );
-        tables.push({ headers, rows });
-      }
-
-      console.log(`[chat] File fallback: found ${tables.length} tables in reply (${replyText.length} chars)`);
-
-      if (tables.length > 0) {
-        try {
-          const { uploadFileToSlack } = await import("@/lib/ops/slack-file-upload");
-          const filename = /csv/i.test(message) ? "export.csv" : "export.xlsx";
-          const format = filename.endsWith(".xlsx") ? "xlsx" as const : "csv" as const;
-          const sheets = tables.map((t, i) => ({
-            sheetName: tables.length > 1 ? `Sheet${i + 1}` : undefined,
-            headers: t.headers,
-            rows: t.rows.map(r => r.map(cell => {
-              // Convert dollar amounts and numbers — strip markdown bold/italic
-              const stripped = cell.replace(/\*+/g, "").replace(/_+/g, "").trim();
-              const clean = stripped.replace(/^\$/, "").replace(/,/g, "");
-              const num = Number(clean);
-              return !isNaN(num) && clean !== "" && !/[a-zA-Z]/.test(clean) ? num : stripped;
-            })),
-          }));
-
-          const targetChannel = slackChannelId || "";
-          const result = await uploadFileToSlack({
-            channelId: targetChannel,
-            threadTs: slackThreadTs || undefined,
-            filename,
-            format,
-            data: sheets,
-            comment: claudeRefusedFile ? "📊 Generated the file for you despite what Abra said!" : "📊 Here's your export!",
-          });
-
-          if (result.ok) {
-            console.log(`[chat] Auto-generated file ${filename} → ${result.permalink}`);
-          } else {
-            console.warn(`[chat] Auto file generation failed: ${result.error}`);
-          }
-        } catch (err) {
-          console.warn("[chat] Auto file generation error:", err);
-        }
-      }
-    }
-
-    // Recompute reply after forced actions may have pushed additional notices
-    reply = [
       effectiveReply,
       actionNotices.length > 0 ? actionNotices.join("\n") : "",
     ]

@@ -182,7 +182,7 @@ function parseInvoiceNumber(text: string): string | null {
 }
 
 function parsePoNumber(text: string): string | null {
-  const match = text.match(/\b(?:po|p\.o\.|purchase order|order)\s*#?\s*:?\s*([A-Z0-9-]{3,})\b/i);
+  const match = text.match(/\b(?:po\b|p\.o\.\b|purchase order\b|order\b)\s*#?\s*:?\s*([A-Z0-9-]{3,})\b/i);
   const candidate = match?.[1] || "";
   return /\d/.test(candidate) ? candidate : null;
 }
@@ -512,12 +512,6 @@ async function processSingleEmail(
           ? { description: `Invoice ${invoiceNumber || subject} — ${formatCurrency(amount)}`, due_date: invoiceDate, priority: amount > 500 ? "high" : "medium" }
           : null,
       }).catch(() => null);
-      if (result.created && amount) {
-        await postSlackMessage(
-          FINANCIALS_CHANNEL_ID,
-          `Invoice from ${vendorName} for ${formatCurrency(amount)} — draft bill created in QBO.`,
-        ).catch(() => null);
-      }
       return {
         messageId: message.id,
         subject,
@@ -874,42 +868,8 @@ async function processSingleEmail(
 }
 
 async function maybePostSummary(summary: EmailIntelligenceSummary, forceSummary = false): Promise<boolean> {
-  if (summary.processed <= 0) return false;
-  const state = await readState<{ posted_at?: string; signature?: string } | null>(EMAIL_SUMMARY_STATE_KEY, null);
-  const signature = JSON.stringify({
-    processed: summary.processed,
-    actions: summary.details.map((detail) => detail.action),
-    needsAttention: summary.details.map((detail) => detail.needsAttention).filter(Boolean),
-  });
-  const postedAt = state?.posted_at ? new Date(state.posted_at).getTime() : 0;
-  if (!forceSummary && postedAt && Date.now() - postedAt < SUMMARY_DEDUP_WINDOW_MS && state?.signature === signature) {
-    return false;
-  }
-
-  const actions = summary.details
-    .filter((detail) => detail.type !== "RECEIPT" && detail.type !== "OTHER")
-    .map((detail) => detail.action)
-    .filter(Boolean)
-    .slice(0, 5);
-  const needsAttention = summary.details
-    .filter((detail) => detail.type !== "RECEIPT")
-    .map((detail) => detail.needsAttention)
-    .filter((detail): detail is string => Boolean(detail))
-    .slice(0, 3);
-  const lines = [
-    `📧 Email intelligence — ${summary.processed} new email${summary.processed === 1 ? "" : "s"} processed`,
-    "",
-    "Actions taken:",
-    ...(actions.length ? actions.map((action) => `• ${action}`) : ["• No new actions taken"]),
-  ];
-  if (needsAttention.length) {
-    lines.push("", "Needs your attention:", ...needsAttention.map((item) => `• ${item}`));
-  }
-  await postSlackMessage(ABRA_CONTROL_CHANNEL_ID, lines.join("\n")).catch(() => null);
-  await writeState(EMAIL_SUMMARY_STATE_KEY, {
-    posted_at: new Date().toISOString(),
-    signature,
-  }).catch(() => null);
+  void summary;
+  void forceSummary;
   return true;
 }
 

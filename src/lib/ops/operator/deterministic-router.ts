@@ -182,6 +182,9 @@ export function routeMessage(message: string, _actor: string): RoutedAction | nu
   if (/\b(top 3 things i should do right now|what should i do right now|focus on today)\b/i.test(msg)) {
     return { intent: "priority_actions", action: "query_priority_actions", params: {}, result: null, executed: false, error: null };
   }
+  if (/\b(generate|prepare|create)\b.*\binvestor update\b/i.test(msg)) {
+    return { intent: "investor_update", action: "generate_investor_update_package", params: {}, result: null, executed: false, error: null };
+  }
   if (/\b(investor loan balance|how much has rene invested|rene.*invested|investor loan)\b/i.test(msg)) {
     return { intent: "investor_loan", action: "query_investor_loan_balance", params: {}, result: null, executed: false, error: null };
   }
@@ -311,6 +314,10 @@ export function routeMessage(message: string, _actor: string): RoutedAction | nu
   }
   if (/\b(reply|respond|draft)\b.*\b(to|email)\b/i.test(msg)) {
     return { intent: "draft_reply", action: "draft_email_reply", params: { instruction: message }, result: null, executed: false, error: null };
+  }
+
+  if (/^[a-z]{12,}$/i.test(msg)) {
+    return { intent: "help", action: "show_help", params: {}, result: null, executed: false, error: null };
   }
 
   return null;

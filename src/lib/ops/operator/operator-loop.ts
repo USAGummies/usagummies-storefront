@@ -402,8 +402,7 @@ async function detectWholesaleInvoiceTasks() {
 export async function runOperatorLoop(): Promise<OperatorLoopResult> {
   await ensureEntityStatesInitialized();
   const guidance = await loadOperatorGuidance();
-
-  const [qboStep, emailStep, pipelineStep, vendorPaymentsStep, inventoryStep, reconciliationStep, wholesaleStep, poCaptureStep, followUpStep] = await Promise.all([
+  const [qboStep, emailStep, openPoStep] = await Promise.all([
     runStep("qbo_gap", 15, () => detectQBOOperatorGaps(), (data) => ({
       itemsProcessed: data.summary.totalTransactions,
       itemsChanged: data.summary.uncategorized,
@@ -414,129 +413,56 @@ export async function runOperatorLoop(): Promise<OperatorLoopResult> {
       itemsChanged: data.summary.actionsTaken + data.summary.needsAttention,
       notes: `processed=${data.summary.processed} actions=${data.summary.actionsTaken} attention=${data.summary.needsAttention}`,
     })),
-    runStep("pipeline_gap", 30, () => detectPipelineOperatorGaps(), (data) => ({
-      itemsProcessed: data.tasks.length,
-      itemsChanged: data.summary.distributorFollowups + data.summary.vendorFollowups,
-      notes: `distributor=${data.summary.distributorFollowups} vendor=${data.summary.vendorFollowups}`,
-    })),
-    runStep("vendor_payments", 60, () => detectVendorPaymentTasks(), (data) => ({
-      itemsProcessed: data.tasks.length,
-      itemsChanged: data.summary.dueSoonCount + data.summary.overdueCount,
-      notes: `due=${data.summary.dueSoonCount} overdue=${data.summary.overdueCount}`,
-    })),
-    runStep("inventory", 60, () => detectInventoryAlerts(), (data) => ({
-      itemsProcessed: data.tasks.length,
-      itemsChanged: data.summary.warning + data.summary.critical,
-      notes: `warning=${data.summary.warning} critical=${data.summary.critical}`,
-    })),
-    runStep("reconciliation", 24 * 60, () => runDailyFinancialReconciliation(), (data) => ({
-      itemsProcessed: data.tasks.length,
-      itemsChanged: data.summary.discrepancies,
-      notes: `ran=${data.summary.ran} discrepancies=${data.summary.discrepancies}`,
-    })),
-    runStep("wholesale", 60, () => detectWholesaleInvoiceTasks(), (data) => ({
-      itemsProcessed: data.tasks.length,
-      itemsChanged: data.summary.invoiceTasks,
-      notes: `invoiceTasks=${data.summary.invoiceTasks}`,
-    })),
-    runStep("po_capture", 60, async () => ({ tasks: [], summary: { detected: 0 } }), (data) => ({
-      itemsProcessed: data.tasks.length,
-      itemsChanged: data.summary.detected,
-      notes: "handled by email_intelligence",
-    })),
-    runStep("follow_up_scheduler", 12 * 60, () => detectScheduledFollowUps(), (data) => ({
-      itemsProcessed: data.tasks.length,
-      itemsChanged: data.summary.dueCount,
-      notes: `due=${data.summary.dueCount}`,
+    runStep("open_po_tracker", 60, () => getPurchaseOrderSummary(), (data) => ({
+      itemsProcessed: data.openCount,
+      itemsChanged: data.overdue.length,
+      notes: `open=${data.openCount} overdue=${data.overdue.length}`,
     })),
   ]);
+
   const qbo = qboStep.data || { tasks: [], summary: null };
   const email = emailStep.data || { tasks: [], summary: null };
-  const pipeline = pipelineStep.data || { tasks: [], summary: null };
-  const vendorPayments = vendorPaymentsStep.data || { tasks: [], summary: null };
-  const inventory = inventoryStep.data || { tasks: [], summary: null };
-  const reconciliation = reconciliationStep.data || { tasks: [], summary: null };
-  const wholesale = wholesaleStep.data || { tasks: [], summary: null };
-  const poCapture = poCaptureStep.data || { tasks: [], summary: null };
-  const followUps = followUpStep.data || { tasks: [], summary: null };
-  const [
-    qboSummary,
-    emailSummary,
-    pipelineSummary,
-    vendorPaymentsSummary,
-    inventorySummary,
-    reconciliationSummary,
-    wholesaleSummary,
-    poCaptureSummary,
-    followUpSummary,
-  ] = await Promise.all([
-    getStepSummary("qbo_gap", qboStep, qbo.summary, { uncategorized: 0, missingVendors: 0, zeroRevenueAccounts: 0, unrecordedKnownTransactions: 0, categorizedTransactions: 0, totalTransactions: 0 }),
-    getStepSummary("email_intelligence", emailStep, email.summary, { processed: 0, actionsTaken: 0, needsAttention: 0, replyTasks: 0, qboEmailTasks: 0, details: [] }),
-    getStepSummary("pipeline_gap", pipelineStep, pipeline.summary, { distributorFollowups: 0, vendorFollowups: 0 }),
-    getStepSummary("vendor_payments", vendorPaymentsStep, vendorPayments.summary, { dueSoonCount: 0, dueSoonAmount: 0, overdueCount: 0, overdueAmount: 0 }),
-    getStepSummary("inventory", inventoryStep, inventory.summary, { healthy: 0, info: 0, warning: 0, critical: 0 }),
-    getStepSummary("reconciliation", reconciliationStep, reconciliation.summary, {
-      ran: false,
-      date: "",
-      amazonRevenue: 0,
-      amazonDeposits: 0,
-      amazonFees: 0,
-      shopifyRevenue: 0,
-      shopifyDeposits: 0,
-      shopifyFees: 0,
-      plaidBalance: 0,
-      qboBookBalance: 0,
-      discrepancies: 0,
-      amazonDifference: 0,
-      shopifyDifference: 0,
-      bankDifference: 0,
+  const openPoData = openPoStep.data || null;
+
+  const [qboSummary, emailSummary, openPoSummary] = await Promise.all([
+    getStepSummary("qbo_gap", qboStep, qbo.summary, {
+      uncategorized: 0,
+      missingVendors: 0,
+      zeroRevenueAccounts: 0,
+      unrecordedKnownTransactions: 0,
+      categorizedTransactions: 0,
+      totalTransactions: 0,
     }),
-    getStepSummary("wholesale", wholesaleStep, wholesale.summary, { invoiceTasks: 0 }),
-    getStepSummary("po_capture", poCaptureStep, poCapture.summary, { detected: 0 }),
-    getStepSummary("follow_up_scheduler", followUpStep, followUps.summary, { dueCount: 0, due: [] }),
+    getStepSummary("email_intelligence", emailStep, email.summary, {
+      processed: 0,
+      actionsTaken: 0,
+      needsAttention: 0,
+      replyTasks: 0,
+      qboEmailTasks: 0,
+      details: [],
+    }),
+    getStepSummary(
+      "open_po_tracker",
+      openPoStep,
+      openPoData
+        ? {
+            openCount: openPoData.openCount,
+            committedRevenue: openPoData.committedRevenue,
+            overdueCount: openPoData.overdue.length,
+          }
+        : null,
+      { openCount: 0, committedRevenue: 0, overdueCount: 0 },
+    ),
   ]);
+
   const createdTasks = await createOperatorTasks([
     ...qbo.tasks,
     ...email.tasks,
-    ...pipeline.tasks,
-    ...vendorPayments.tasks,
-    ...inventory.tasks,
-    ...reconciliation.tasks,
-    ...wholesale.tasks,
-    ...poCapture.tasks,
-    ...followUps.tasks,
   ]);
   const upgradedReviewTasks = await upgradeExistingQboReviewTasks().catch(() => 0);
-  const executionLimit = qboSummary.uncategorized >= 20 ? 60 : 12;
-  const executionStep = await runStep("task_execution", 5, () => executeOperatorTasks(executionLimit), (data) => ({
-    itemsProcessed: data.scanned,
-    itemsChanged: data.completed + data.needsApproval,
-    notes: `completed=${data.completed} failed=${data.failed}`,
-    result: data.failed > 0 ? "partial" : "success",
-  }));
-  const execution = executionStep.data || {
-    scanned: 0,
-    completed: 0,
-    failed: 0,
-    blocked: 0,
-    needsApproval: 0,
-    results: [],
-  };
   const pendingTasks = await getPendingCount();
-  const qboModified = execution.results.some(
-    (row) =>
-      row.status === "completed" &&
-      (
-        row.taskType === "qbo_categorize" ||
-        row.taskType === "qbo_assign_vendor" ||
-        row.taskType === "qbo_record_transaction" ||
-        row.taskType === "qbo_record_from_email" ||
-        row.taskType === "qbo_revenue_gap" ||
-        row.taskType === "generate_wholesale_invoice"
-      ),
-  );
 
-  const result: OperatorLoopResult = {
+  return {
     createdTasks: createdTasks + upgradedReviewTasks,
     pendingTasks,
     stepRuns: {
@@ -550,127 +476,25 @@ export async function runOperatorLoop(): Promise<OperatorLoopResult> {
       },
       qbo_gap: qboStep.state,
       email_intelligence: emailStep.state,
-      pipeline_gap: pipelineStep.state,
-      vendor_payments: vendorPaymentsStep.state,
-      inventory: inventoryStep.state,
-      reconciliation: reconciliationStep.state,
-      wholesale: wholesaleStep.state,
-      po_capture: poCaptureStep.state,
-      follow_up_scheduler: followUpStep.state,
-      task_execution: executionStep.state,
+      open_po_tracker: openPoStep.state,
     },
     detectorSummary: {
       qbo: qboSummary,
       email: emailSummary,
-      pipeline: pipelineSummary,
-      vendorPayments: vendorPaymentsSummary,
-      inventory: inventorySummary,
-      reconciliation: {
-        ...reconciliationSummary,
-      },
-      wholesale: wholesaleSummary,
-      poCapture: poCaptureSummary,
-      followUps: followUpSummary,
+      pipeline: { distributorFollowups: 0, vendorFollowups: 0 },
+      vendorPayments: { dueSoonCount: 0, dueSoonAmount: 0, overdueCount: 0, overdueAmount: 0 },
+      inventory: { healthy: 0, info: 0, warning: 0, critical: 0 },
+      reconciliation: { ran: false, discrepancies: 0, amazonDifference: 0, shopifyDifference: 0, bankDifference: 0 },
+      wholesale: { invoiceTasks: 0 },
+      openPo: openPoSummary,
     },
-    execution,
+    execution: {
+      scanned: 0,
+      completed: 0,
+      failed: 0,
+      blocked: 0,
+      needsApproval: 0,
+      results: [],
+    },
   };
-
-  if (qboModified) {
-    result.pnlSanity = await runPnlSanityChecker();
-  }
-
-  const [revenueStep, inventoryPositionStep, openPoStep] = await Promise.all([
-    runStep("unified_revenue", 12 * 60, () => runUnifiedRevenueDashboard(), (data) => ({
-      itemsProcessed: data.summary ? 1 : 0,
-      itemsChanged: data.ran ? 1 : 0,
-      notes: `ran=${data.ran}`,
-    })),
-    runStep("unified_inventory", 12 * 60, () => runUnifiedInventoryPosition(), (data) => ({
-      itemsProcessed: data.summary ? 1 : 0,
-      itemsChanged: data.ran ? 1 : 0,
-      notes: `ran=${data.ran}`,
-    })),
-    runStep("open_po_tracker", 60, () => getPurchaseOrderSummary(), (data) => ({
-      itemsProcessed: data.openCount,
-      itemsChanged: data.overdue.length,
-      notes: `open=${data.openCount} overdue=${data.overdue.length}`,
-    })),
-  ]);
-  const openPoData = openPoStep.data || null;
-  const openPoSummary = await getStepSummary(
-    "open_po_tracker",
-    openPoStep,
-    openPoData
-      ? {
-          openCount: openPoData.openCount,
-          committedRevenue: openPoData.committedRevenue,
-          overdueCount: openPoData.overdue.length,
-        }
-      : null,
-    { openCount: 0, committedRevenue: 0, overdueCount: 0 },
-  );
-  Object.assign(result.stepRuns || {}, {
-    unified_revenue: revenueStep.state,
-    unified_inventory: inventoryPositionStep.state,
-    open_po_tracker: openPoStep.state,
-  });
-  result.detectorSummary.openPo = openPoSummary;
-
-  const [batchReviewStep, meetingPrepStep] = await Promise.all([
-    runStep("batch_review", 24 * 60, () => runBatchTransactionReview(), (data) => ({
-      itemsProcessed: data.ran ? 1 : 0,
-      itemsChanged: data.ran ? 1 : 0,
-      notes: `ran=${data.ran}`,
-    })),
-    runStep("meeting_prep", 24 * 60, () => runMeetingPrepAutoGeneration(), (data) => ({
-      itemsProcessed: data.generated,
-      itemsChanged: data.generated,
-      notes: `generated=${data.generated}`,
-    })),
-  ]);
-  Object.assign(result.stepRuns || {}, {
-    batch_review: batchReviewStep.state,
-    meeting_prep: meetingPrepStep.state,
-  });
-
-  const drivingMode = await getDrivingModeState().catch(() => ({ active: false }));
-  if (drivingMode?.active) {
-    const backlogParts: string[] = [];
-    if (emailSummary.needsAttention) backlogParts.push(`${emailSummary.needsAttention} email items need attention`);
-    if (execution.completed) backlogParts.push(`${execution.completed} tasks completed`);
-    if (execution.needsApproval) backlogParts.push(`${execution.needsApproval} approvals queued`);
-    if (followUpSummary.dueCount) backlogParts.push(`${followUpSummary.dueCount} follow-ups due`);
-    if (backlogParts.length) {
-      await appendDrivingModeBacklog(backlogParts.join(", ")).catch(() => {});
-    }
-  }
-
-  const [weeklyArAp, monthlyPnl, monthlyBalanceSheet, investorUpdate] = await Promise.all([
-    runWeeklyArApReport().catch(() => ({ ran: false })),
-    runMonthlyPnlReport().catch(() => ({ ran: false })),
-    runMonthlyBalanceSheetReport().catch(() => ({ ran: false })),
-    runInvestorUpdatePackage().catch(() => ({ ran: false })),
-  ]);
-  result.detectorSummary.reports = {
-    weeklyArAp: { ran: Boolean(weeklyArAp.ran) },
-    monthlyPnl: { ran: Boolean(monthlyPnl.ran) },
-    monthlyBalanceSheet: { ran: Boolean(monthlyBalanceSheet.ran) },
-    investorUpdate: { ran: Boolean(investorUpdate.ran) },
-  };
-
-  await reportOperatorCycle(result);
-  const healthStep = await runStep("health_monitor", 15, () => runOperatorHealthMonitor(), (data) => ({
-    itemsProcessed: data.checks.length,
-    itemsChanged: data.ok ? 0 : 1,
-    notes: data.ok ? "all green" : "degraded",
-    result: data.ok ? "success" : "partial",
-  }));
-  result.health = healthStep.data || {
-    ok: healthStep.state.result === "success",
-    checks: [],
-  };
-  Object.assign(result.stepRuns || {}, {
-    health_monitor: healthStep.state,
-  });
-  return result;
 }

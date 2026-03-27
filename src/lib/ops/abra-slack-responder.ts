@@ -11,7 +11,6 @@ import {
 } from "@/lib/ops/abra-cost-tracker";
 import { appendCorrection as appendMarkdownCorrection } from "@/lib/ops/abra-markdown-memory";
 import { executeRoutedAction, renderRoutedActionResponse } from "@/lib/ops/operator/action-executor";
-import { maybeLearnFinancialCorrection } from "@/lib/ops/operator/correction-learner";
 import {
   appendDrivingModeBacklog,
   formatDrivingModeReply,
@@ -22,6 +21,7 @@ import {
   updateEntityFromEvent,
 } from "@/lib/ops/operator/entities/entity-state";
 import { routeMessage } from "@/lib/ops/operator/deterministic-router";
+import { shouldPostSlackResponse } from "@/lib/ops/slack-dedup";
 import { readState, writeState } from "@/lib/ops/state";
 import { UNIFIED_REVENUE_STATE_KEY, type UnifiedRevenueSummary } from "@/lib/ops/operator/unified-revenue";
 import { uploadFileToSlack, type SpreadsheetData } from "@/lib/ops/slack-file-upload";
@@ -2275,6 +2275,12 @@ export async function postSlackMessage(
   if (opts.answerLogId) {
     blocks.push(buildFeedbackBlock(opts.answerLogId));
   }
+  if (!(await shouldPostSlackResponse({
+    channel: opts.threadTs ? `${channelId}:${opts.threadTs}` : channelId,
+    text: fullText,
+  }))) {
+    return true;
+  }
 
   try {
     const res = await fetch("https://slack.com/api/chat.postMessage", {
@@ -2505,8 +2511,6 @@ export async function processAbraMessage(
   // Strip leading Slack user/bot mentions so "teach:" and "correct:" routing
   // works even when the user @-mentions Abra first (e.g. "<@U1234> teach: ...").
   const textForRouting = text.replace(/^(<@[A-Z0-9]+>\s*)+/gi, "").trim();
-  await syncEntityMentionsFromSlack(ctx, textForRouting);
-
   if (ctx.forceRespond && (isFinancialsChannel(ctx.channel) || isControlChannel(ctx.channel))) {
     if (isAcknowledgmentText(textForRouting)) {
       return {
@@ -2590,55 +2594,9 @@ export async function processAbraMessage(
     return operatorStatusResponse;
   }
 
-  const learnedFinancialCorrection = await maybeLearnFinancialCorrection({ ...ctx, text: textForRouting });
-  if (learnedFinancialCorrection) {
-    return {
-      handled: true,
-      reply: learnedFinancialCorrection,
-      sources: [],
-      answerLogId: null,
-    };
-  }
-
   const batchResponse = await maybeHandleBatchNumberedAnswers({ ...ctx, text: textForRouting });
   if (batchResponse) {
     return batchResponse;
-  }
-
-  // ─── Conversational correction flow (thread replies only) ───
-  if (ctx.threadTs) {
-    const pendingKey = pendingCorrectionKey(ctx);
-    try {
-      const pending = await kv.get<PendingCorrection>(pendingKey);
-      if (pending && isConfirmationText(text)) {
-        // User confirmed — persist and clear
-        await kv.del(pendingKey);
-        const reply = await persistCorrectionPair(ctx, pending.original, pending.correction);
-        return { handled: true, reply, sources: [], answerLogId: null };
-      }
-    } catch {
-      // KV failure is non-critical; fall through to normal flow
-    }
-
-    if (isConversationalCorrectionPattern(text)) {
-      const lastAbraMessage =
-        ctx.history?.filter((m) => m.role === "assistant").pop()?.content || "";
-      const pendingData: PendingCorrection = {
-        original: lastAbraMessage.slice(0, 300) || "previous Abra statement",
-        correction: text,
-      };
-      try {
-        await kv.set(pendingKey, pendingData, { ex: PENDING_CORRECTION_TTL_SECONDS });
-      } catch {
-        // Non-critical
-      }
-      return {
-        handled: true,
-        reply: "Got it — want me to remember this correction?",
-        sources: [],
-        answerLogId: null,
-      };
-    }
   }
 
   const structuredDocResponse = await handleStructuredDocumentConversation(ctx);
@@ -2649,43 +2607,6 @@ export async function processAbraMessage(
   const liveReneQboResponse = await maybeHandleReneQboQuery({ ...ctx, text: textForRouting });
   if (liveReneQboResponse) {
     return liveReneQboResponse;
-  }
-
-  // Large structured data that is not a managed document session still gets
-  // persisted before chat, so the operator does not lose the payload if chat fails.
-  if (text.length > DATA_INGEST_THRESHOLD) {
-    const actor = ctx.displayName || ctx.user;
-    const titleSnippet = text.slice(0, 120).replace(/\n/g, " ").trim();
-    try {
-      const embedding = await buildEmbedding(
-        `Data upload from ${actor}: ${titleSnippet}`,
-      );
-      await sbFetch("/rest/v1/open_brain_entries", {
-        method: "POST",
-        headers: {
-          Prefer: "return=minimal",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          source_type: "manual",
-          source_ref: `slack-data-ingest-${ctx.channel}-${ctx.ts}`,
-          entry_type: "data_upload",
-          title: `Data from ${actor}: ${titleSnippet}`,
-          raw_text: text.slice(0, 50000),
-          summary_text: `Data upload (${text.length} chars) from ${actor} via Slack. First 500 chars: ${text.slice(0, 500)}`,
-          category: "operational",
-          department: "executive",
-          confidence: "high",
-          priority: "important",
-          processed: true,
-          embedding,
-          metadata: { uploaded_by: actor, channel: ctx.channel, char_count: text.length },
-        }),
-      });
-      console.log(`[abra-slack] Stored large data paste (${text.length} chars) from ${actor}`);
-    } catch (err) {
-      console.error("[abra-slack] Failed to store data paste:", err instanceof Error ? err.message : err);
-    }
   }
 
   const answer = await callAbraChatViaInternalApi(ctx);

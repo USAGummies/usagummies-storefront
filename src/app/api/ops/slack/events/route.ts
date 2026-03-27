@@ -1,6 +1,5 @@
 import crypto from "node:crypto";
 import { after, NextResponse } from "next/server";
-import { kv } from "@vercel/kv";
 import {
   deleteSlackMessage,
   getSlackDisplayName,
@@ -12,7 +11,7 @@ import {
   processAbraMessage,
   updateSlackMessage,
 } from "@/lib/ops/abra-slack-responder";
-import { notify } from "@/lib/ops/notify";
+import { shouldProcessSlackEvent } from "@/lib/ops/slack-dedup";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -69,19 +68,6 @@ function verifySlackSignature(req: Request, body: string): boolean {
   const expectedBuffer = Buffer.from(expected);
   if (providedBuffer.length !== expectedBuffer.length) return false;
   return crypto.timingSafeEqual(providedBuffer, expectedBuffer);
-}
-
-async function isDuplicateEvent(eventId: string): Promise<boolean> {
-  if (!eventId) return false;
-  const key = `abra:slack:event:${eventId}`;
-  try {
-    const existing = await kv.get(key);
-    if (existing) return true;
-    await kv.set(key, "1", { ex: 300 });
-  } catch {
-    // KV unavailable — fail open
-  }
-  return false;
 }
 
 const EXTRACTABLE_TYPES = new Set([
@@ -295,8 +281,14 @@ export async function POST(req: Request) {
     // the original request, skip retries to prevent double-processing.
     if (isRetry) return;
 
-    // Deduplicate by event_id (KV-backed, 5-minute TTL).
-    if (await isDuplicateEvent(eventId)) return;
+    if (!(await shouldProcessSlackEvent({
+      type: event.type || "",
+      channel,
+      user,
+      text: text || "",
+    }))) {
+      return;
+    }
 
     try {
       const [displayName, history] = await Promise.all([
@@ -421,10 +413,6 @@ export async function POST(req: Request) {
           threadTs: thread_ts || ts,
         }).catch(() => {});
       }
-      void notify({
-        channel: "alerts",
-        text: `🚨 Slack events async processing failed: ${message}`,
-      });
     }
   });
 

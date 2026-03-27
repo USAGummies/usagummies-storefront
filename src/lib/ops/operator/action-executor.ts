@@ -12,6 +12,7 @@ import {
 import { readState, writeState } from "@/lib/ops/state";
 import { UNIFIED_REVENUE_STATE_KEY } from "@/lib/ops/operator/unified-revenue";
 import { UNIFIED_INVENTORY_STATE_KEY, type UnifiedInventorySummary } from "@/lib/ops/operator/unified-inventory";
+import { runInvestorUpdatePackage } from "@/lib/ops/operator/reports/investor-update";
 import {
   ENTITY_STATE_KEY,
   extractEntityMentions,
@@ -268,6 +269,29 @@ export async function executeRoutedAction(
         break;
       }
       case "query_plaid_balance": {
+        const cachedPlaid = await readState<{
+          data?: {
+            accounts?: Array<Record<string, unknown>>;
+          };
+        } | null>("plaid-balance-cache" as never, null).catch(() => null);
+        const cachedAccounts = Array.isArray(cachedPlaid?.data?.accounts)
+          ? cachedPlaid.data.accounts
+          : [];
+        if (cachedAccounts.length > 0) {
+          const balance = cachedAccounts.reduce((sum, account) => {
+            const balances = account.balances && typeof account.balances === "object"
+              ? (account.balances as Record<string, unknown>)
+              : {};
+            return sum + Number(balances.current ?? balances.available ?? 0);
+          }, 0);
+          action.result = {
+            balance,
+            burnRate: 0,
+            runway: 0,
+            cached: true,
+          };
+          break;
+        }
         const cachedCashPosition = await readState<{
           balance?: number;
           monthly_burn?: number;
@@ -287,7 +311,6 @@ export async function executeRoutedAction(
           };
           break;
         }
-        const metrics = await getQBOMetrics().catch(() => null);
         const live = await fetchInternalJson("/api/ops/plaid/balance");
         const accounts = Array.isArray(live?.accounts) ? (live?.accounts as Array<Record<string, unknown>>) : [];
         const balance = accounts.reduce((sum, account) => {
@@ -298,8 +321,8 @@ export async function executeRoutedAction(
         }, 0);
         action.result = {
           balance,
-          burnRate: Number(metrics?.burnRate || 0),
-          runway: Number(metrics?.runway || 0),
+          burnRate: 0,
+          runway: 0,
         };
         break;
       }
@@ -569,6 +592,10 @@ export async function executeRoutedAction(
           taskCounts: tasks.result || {},
           approvals: Array.isArray(approvals.result) ? approvals.result.length : 0,
         };
+        break;
+      }
+      case "generate_investor_update_package": {
+        action.result = await runInvestorUpdatePackage(true);
         break;
       }
       case "query_meeting_prep": {
@@ -1135,6 +1162,15 @@ export function renderRoutedActionResponse(action: RoutedAction): { reply: strin
           `2. Review ${approvals} approval${approvals === 1 ? "" : "s"} waiting in Abra.`,
           `3. Move the ${Number(taskCounts.email_draft_response || 0)} email draft${Number(taskCounts.email_draft_response || 0) === 1 ? "" : "s"} and follow-ups forward.`,
         ].join("\n"),
+      };
+    }
+    case "generate_investor_update_package": {
+      const result = (action.result || {}) as Record<string, unknown>;
+      const monthLabel = String(result.monthLabel || "this month");
+      return {
+        reply: result.ran
+          ? `Investor update package generated for ${monthLabel} and queued for review.`
+          : `Investor update package was already current for ${monthLabel}.`,
       };
     }
     case "query_meeting_prep": {

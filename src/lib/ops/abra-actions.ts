@@ -3656,7 +3656,7 @@ async function notifySlackPendingApproval(approvalId: string, action: AbraAction
 
 /**
  * Expire stale pending approvals older than the given TTL.
- * Run at the start of each inbox-scan cycle to prevent approval pile-up.
+ * Run at the start of each scheduled email-processing cycle to prevent approval pile-up.
  */
 export async function expireStaleApprovals(ttlHours = 24): Promise<number> {
   try {

@@ -3,7 +3,6 @@ import { Receiver } from "@upstash/qstash";
 import { kv } from "@vercel/kv";
 import { notifyAlert } from "@/lib/ops/notify";
 import { recordAgentRun } from "@/lib/ops/agent-performance";
-import { runEmailSweep } from "@/lib/ops/sweeps/email-sweep";
 import { runBankFeedSweep } from "@/lib/ops/sweeps/bank-feed-sweep";
 import { runMorningBrief } from "@/lib/ops/sweeps/morning-brief";
 import { runApprovalExpirySweep } from "@/lib/ops/sweeps/approval-expiry";
@@ -14,7 +13,6 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const SWEEP_HANDLERS = {
-  "email-sweep": runEmailSweep,
   "bank-feed-sweep": runBankFeedSweep,
   "morning-brief": runMorningBrief,
   "approval-expiry": runApprovalExpirySweep,
