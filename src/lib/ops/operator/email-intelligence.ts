@@ -15,6 +15,7 @@ import {
 import { createBrainEntry } from "@/lib/ops/abra-brain-writer";
 import { updateEntityFromEvent } from "@/lib/ops/operator/entities/entity-state";
 import type { OperatorTaskInsert } from "@/lib/ops/operator/gap-detectors/qbo";
+import { receivePO } from "@/lib/ops/operator/po-pipeline";
 import { readState, writeState } from "@/lib/ops/state";
 import { createQBOBill, createQBOVendor, getQBOAccounts, getQBOVendors } from "@/lib/ops/qbo-client";
 
@@ -199,6 +200,58 @@ function parseQuantity(text: string): number | null {
   const orderedShipped = normalized.match(/(\d[\d,]*)\s+ordered\s+(\d[\d,]*)\s+shipped/i);
   if (orderedShipped) return Number(orderedShipped[2].replace(/,/g, ""));
   return null;
+}
+
+function parseUnitPrice(text: string): number | null {
+  const patterns = [
+    /\$([\d,.]+)\s*(?:per|\/)\s*(?:unit|bag|case|carton|master carton)/i,
+    /\beach[:\s]+\$?([\d,.]+)/i,
+    /\bunit price[:\s]+\$?([\d,.]+)/i,
+  ];
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (!match?.[1]) continue;
+    const value = Number(match[1].replace(/,/g, ""));
+    if (Number.isFinite(value) && value > 0) return value;
+  }
+  return null;
+}
+
+function parsePaymentTerms(text: string): string | null {
+  const net = text.match(/\bnet\s*(\d{1,3})\b/i);
+  if (net?.[1]) return `Net ${net[1]}`;
+  if (/\bcod\b/i.test(text)) return "COD";
+  if (/\bprepaid\b/i.test(text)) return "Prepaid";
+  return null;
+}
+
+function parseRequestedDeliveryDate(text: string, fallbackDate?: string): string | null {
+  const requested =
+    text.match(/\b(?:deliver|delivery|ship(?:ping)?)\s+(?:by|on|for)\s+([A-Za-z]+\s+\d{1,2}(?:,\s*20\d{2})?)/i) ||
+    text.match(/\brequested delivery[:\s]+([A-Za-z]+\s+\d{1,2}(?:,\s*20\d{2})?)/i);
+  if (requested?.[1]) {
+    const parsed = new Date(requested[1]);
+    if (Number.isFinite(parsed.getTime())) return parsed.toISOString().slice(0, 10);
+  }
+  return parseDate(text, fallbackDate);
+}
+
+function parseDeliveryAddress(text: string): string | null {
+  const addressBlock =
+    text.match(/\bship to[:\s]+([\s\S]{0,220}?)(?:\n\n|terms?:|po\s*#|purchase order|$)/i) ||
+    text.match(/\bdelivery address[:\s]+([\s\S]{0,220}?)(?:\n\n|terms?:|po\s*#|purchase order|$)/i);
+  const cleaned = normalizeText(addressBlock?.[1] || "");
+  return cleaned || null;
+}
+
+function attachmentNeedsManualReview(attachments: EmailAttachmentContent[]): boolean {
+  if (!hasPdfAttachment(attachments)) return false;
+  return attachments.some((attachment) => {
+    if (!(attachment.mimeType === "application/pdf" || attachment.filename.toLowerCase().endsWith(".pdf"))) {
+      return false;
+    }
+    return !normalizeText(attachment.textContent);
+  });
 }
 
 function parseTrackingNumber(text: string): string | null {
@@ -475,10 +528,31 @@ async function processSingleEmail(
       };
     }
     case "PURCHASE_ORDER": {
-      const poNumber = parsePoNumber(combinedText) || "unknown";
-      const quantity = parseQuantity(combinedText) || 0;
+      const bodyText = [message.subject, message.body].filter(Boolean).join("\n\n");
+      const poNumber = parsePoNumber(bodyText) || parsePoNumber(combinedText) || "unknown";
+      const quantity = parseQuantity(bodyText) || parseQuantity(combinedText) || 0;
+      const unitPrice = parseUnitPrice(bodyText) || parseUnitPrice(combinedText) || WHOLESALE_UNIT_PRICE;
       const customerName = inferVendorOrEntity(message, combinedText);
-      const total = Number((quantity * WHOLESALE_UNIT_PRICE).toFixed(2));
+      const deliveryAddress = parseDeliveryAddress(bodyText) || parseDeliveryAddress(combinedText);
+      const requestedDeliveryDate = parseRequestedDeliveryDate(bodyText, message.date) || parseRequestedDeliveryDate(combinedText, message.date);
+      const paymentTerms = parsePaymentTerms(bodyText) || parsePaymentTerms(combinedText) || "Net 30";
+      const unreadablePdf = attachmentNeedsManualReview(attachments);
+      const notes = unreadablePdf
+        ? ["PDF attached but not machine-readable. Manual review of attachment needed for exact quantities."]
+        : [];
+      const total = quantity > 0 ? Number((quantity * unitPrice).toFixed(2)) : 0;
+      const poRecord = await receivePO({
+        poNumber,
+        customerName,
+        customerEmail: extractEmailAddress(message.from),
+        units: quantity > 0 ? quantity : null,
+        unitPrice: quantity > 0 ? unitPrice : null,
+        deliveryAddress,
+        requestedDeliveryDate,
+        paymentTerms,
+        sourceEmailId: message.id,
+        notes,
+      }).catch(() => null);
       tasks.push({
         task_type: "po_received",
         title: quantity > 0
@@ -495,21 +569,27 @@ async function processSingleEmail(
           natural_key: `po:${poNumber}`.toLowerCase(),
           customer_name: customerName,
           po_number: poNumber,
-          quantity,
-          unit_price: WHOLESALE_UNIT_PRICE,
-          total,
+          quantity: quantity || null,
+          unit_price: quantity > 0 ? unitPrice : null,
+          total: total || null,
+          delivery_date: requestedDeliveryDate,
+          shipping_address: deliveryAddress,
+          customer_email: extractEmailAddress(message.from),
+          payment_terms: paymentTerms,
+          po_record_id: poRecord?.id || null,
+          qbo_invoice_id: poRecord?.qbo_invoice_id || null,
           email_message_id: message.id,
           email_thread_id: message.threadId,
           email_subject: subject,
           email_from: message.from,
           needs_shipping: !/inderbitzin/i.test(customerName),
-          needs_review: quantity <= 0,
+          needs_review: quantity <= 0 || unreadablePdf,
         },
-        tags: ["po", "invoice", "approval", ...(quantity <= 0 ? ["needs_review"] : [])],
+        tags: ["po", "invoice", "approval", ...((quantity <= 0 || unreadablePdf) ? ["needs_review"] : [])],
       });
       await recordBrainEntry(
         `PO ${poNumber} from ${customerName}`,
-        `${subject}\nQuantity: ${quantity || "pending review"}\nUnit price: ${formatCurrency(WHOLESALE_UNIT_PRICE)}\n\n${combinedText}`,
+        `${subject}\nQuantity: ${quantity || "pending review"}\nUnit price: ${formatCurrency(quantity > 0 ? unitPrice : WHOLESALE_UNIT_PRICE)}\nDelivery: ${deliveryAddress || "unknown"}\nTerms: ${paymentTerms}\n\n${combinedText}`,
         ["email", "po", customerName.toLowerCase()],
       );
       await updateEntityFromEvent(customerName, {
@@ -529,10 +609,12 @@ async function processSingleEmail(
         messageId: message.id,
         subject,
         type,
-        action: quantity > 0
-          ? `Queued PO ${poNumber} from ${customerName} for invoice draft`
+        action: poRecord?.qbo_invoice_id
+          ? `Created invoice draft for PO ${poNumber} from ${customerName}`
           : `Logged PO ${poNumber} from ${customerName} — quantity pending review`,
-        needsAttention: quantity > 0 ? null : `PO ${poNumber} from ${customerName} still needs quantity review from the scanned PDF`,
+        needsAttention: poRecord?.qbo_invoice_id
+          ? null
+          : `PO ${poNumber} from ${customerName} still needs manual review${unreadablePdf ? " from the unreadable PDF" : ""}`,
       };
     }
     case "SHIPPING_TRACKING": {

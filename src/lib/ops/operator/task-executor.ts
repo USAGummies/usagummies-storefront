@@ -12,6 +12,7 @@ import { readEmail, searchEmails } from "@/lib/ops/gmail-reader";
 import { runInvestorUpdatePackage } from "@/lib/ops/operator/reports/investor-update";
 import { loadLearnedQboRules, resolveQboCategory } from "@/lib/ops/operator/qbo-resolution";
 import { updateEntityFromEvent } from "@/lib/ops/operator/entities/entity-state";
+import { receivePO } from "@/lib/ops/operator/po-pipeline";
 import { proposeAndMaybeExecute } from "@/lib/ops/abra-actions";
 
 export type OperatorTaskStatus =
@@ -1462,81 +1463,32 @@ async function postSlackChannelMessage(channelId: string, text: string): Promise
 async function executePoReceivedTask(task: OperatorTaskRow): Promise<string> {
   const poNumber = String(task.execution_params?.po_number || "").trim();
   const customerName = String(task.execution_params?.customer_name || "Customer").trim();
-  const quantity = Math.max(0, Number(task.execution_params?.quantity || 0));
-  const unitPrice = Math.max(0, Number(task.execution_params?.unit_price || 0));
+  const quantity = Number(task.execution_params?.quantity || 0);
+  const unitPrice = Number(task.execution_params?.unit_price || 0);
   const deliveryDate = String(task.execution_params?.delivery_date || "").trim() || null;
   const shippingAddress = String(task.execution_params?.shipping_address || "").trim() || null;
-  const needsShipping = Boolean(task.execution_params?.needs_shipping);
   const customerEmail = String(task.execution_params?.customer_email || "").trim();
-  if (!poNumber || !quantity || !unitPrice) {
-    throw new Error("Missing PO number, quantity, or unit price");
+  if (!poNumber) {
+    throw new Error("Missing PO number");
   }
-
-  const customerId = customerName.toLowerCase() === "inderbitzin"
-    ? "20"
-    : await findOrCreateCustomer({ customerName, customerEmail });
-  const total = Number((quantity * unitPrice).toFixed(2));
-  const invoice = await createQBOInvoice({
-    CustomerRef: { value: customerId },
-    Line: [
-      {
-        Amount: total,
-        DetailType: "SalesItemLineDetail",
-        Description: "All American Gummy Bears 7.5oz",
-        SalesItemLineDetail: {
-          Qty: quantity,
-          UnitPrice: unitPrice,
-        },
-      },
-      ...(needsShipping
-        ? [{
-            Amount: 0,
-            DetailType: "SalesItemLineDetail" as const,
-            Description: `Shipping (TBD)${shippingAddress ? ` — ${shippingAddress}` : ""}`,
-            SalesItemLineDetail: {
-              Qty: 1,
-              UnitPrice: 0,
-            },
-          }]
-        : []),
-    ],
-    DueDate: deliveryDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
-    DocNumber: poNumber,
-    ...(customerEmail ? { BillEmail: { Address: customerEmail } } : {}),
-    CustomerMemo: {
-      value: `PO ${poNumber}. Shipping cost to be determined when product ships.`,
-    },
-  }).catch(() => null);
-  const invoiceEntity = ((invoice as Record<string, unknown>)?.Invoice || invoice || null) as Record<string, unknown> | null;
-  const invoiceId = String(invoiceEntity?.Id || invoiceEntity?.DocNumber || "");
-  if (!invoiceId) {
-    throw new Error(`Failed to create QBO invoice draft for PO ${poNumber}`);
-  }
-
-  await writeOpenPoEntry({
+  const po = await receivePO({
     poNumber,
     customerName,
-    quantity,
-    total,
-    deliveryDate,
+    customerEmail: customerEmail || null,
+    units: Number.isFinite(quantity) && quantity > 0 ? quantity : null,
+    unitPrice: Number.isFinite(unitPrice) && unitPrice > 0 ? unitPrice : null,
+    deliveryAddress: shippingAddress,
+    requestedDeliveryDate: deliveryDate,
+    paymentTerms: String(task.execution_params?.payment_terms || "").trim() || "Net 30",
+    sourceEmailId: String(task.execution_params?.email_message_id || task.id),
+    notes: [
+      String(task.execution_params?.needs_review ? "Task executor replay: manual review still required." : ""),
+    ].filter(Boolean),
   });
-  await updateEntityFromEvent(customerName, {
-    type: "po_received",
-    summary: `PO ${poNumber} received for ${quantity} units totaling $${total.toFixed(2)}`,
-    date: new Date().toISOString().slice(0, 10),
-    channel: "email",
-    open_item: {
-      description: `PO #${poNumber} — ${quantity} units`,
-      due_date: deliveryDate,
-      priority: "high",
-    },
-    next_action: "Confirm shipping cost and invoice send timing",
-  }).catch(() => null);
-
-  await postSlackChannelMessage(CONTROL_CHANNEL_ID, `✅ PO #${poNumber} from ${customerName} logged. Invoice draft #${invoiceId} created in QBO. ${quantity} units, $${total.toFixed(2)}.`);
-  await postSlackChannelMessage("C0AKG9FSC2J", `<@U0ALL27JM38> New PO #${poNumber} — Invoice draft created for $${total.toFixed(2)}. Needs shipping cost before sending.`);
-
-  return `Logged PO #${poNumber} from ${customerName}. Created QBO invoice draft ${invoiceId} for $${total.toFixed(2)}.`;
+  if (po.qbo_invoice_id) {
+    return `Logged PO #${po.po_number} from ${po.customer_name}. Created or confirmed QBO invoice draft ${po.qbo_invoice_id}.`;
+  }
+  return `Logged PO #${po.po_number} from ${po.customer_name}. Quantity or pricing still needs review before invoice creation.`;
 }
 
 async function executeGenerateInvestorUpdateTask(): Promise<string> {

@@ -6,13 +6,12 @@ import { runBatchTransactionReview } from "@/lib/ops/operator/batch-review";
 import { runEmailIntelligence } from "@/lib/ops/operator/email-intelligence";
 import { detectInventoryAlerts } from "@/lib/ops/operator/gap-detectors/inventory";
 import { detectPipelineOperatorGaps } from "@/lib/ops/operator/gap-detectors/pipeline";
-import { detectPoCaptureTasks } from "@/lib/ops/operator/gap-detectors/po-capture";
 import { detectQBOOperatorGaps, upgradeExistingQboReviewTasks } from "@/lib/ops/operator/gap-detectors/qbo";
 import { detectVendorPaymentTasks } from "@/lib/ops/operator/gap-detectors/vendor-payments";
 import { detectScheduledFollowUps } from "@/lib/ops/operator/follow-up-scheduler";
 import { runOperatorHealthMonitor } from "@/lib/ops/operator/health-monitor";
 import { runMeetingPrepAutoGeneration } from "@/lib/ops/operator/meeting-prep";
-import { runOpenPoTracker } from "@/lib/ops/operator/po-tracker";
+import { getPurchaseOrderSummary } from "@/lib/ops/operator/po-pipeline";
 import { runPnlSanityChecker } from "@/lib/ops/operator/pnl-sanity-checker";
 import { runDailyFinancialReconciliation } from "@/lib/ops/operator/reconciliation";
 import { runInvestorUpdatePackage } from "@/lib/ops/operator/reports/investor-update";
@@ -440,10 +439,10 @@ export async function runOperatorLoop(): Promise<OperatorLoopResult> {
       itemsChanged: data.summary.invoiceTasks,
       notes: `invoiceTasks=${data.summary.invoiceTasks}`,
     })),
-    runStep("po_capture", 30, () => detectPoCaptureTasks(), (data) => ({
+    runStep("po_capture", 60, async () => ({ tasks: [], summary: { detected: 0 } }), (data) => ({
       itemsProcessed: data.tasks.length,
       itemsChanged: data.summary.detected,
-      notes: `detected=${data.summary.detected}`,
+      notes: "handled by email_intelligence",
     })),
     runStep("follow_up_scheduler", 12 * 60, () => detectScheduledFollowUps(), (data) => ({
       itemsProcessed: data.tasks.length,
@@ -591,7 +590,7 @@ export async function runOperatorLoop(): Promise<OperatorLoopResult> {
       itemsChanged: data.ran ? 1 : 0,
       notes: `ran=${data.ran}`,
     })),
-    runStep("open_po_tracker", 60, () => runOpenPoTracker(), (data) => ({
+    runStep("open_po_tracker", 60, () => getPurchaseOrderSummary(), (data) => ({
       itemsProcessed: data.openCount,
       itemsChanged: data.overdue.length,
       notes: `open=${data.openCount} overdue=${data.overdue.length}`,

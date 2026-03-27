@@ -1,4 +1,5 @@
 import { getVerifiedBalance } from "@/lib/ops/finance-truth";
+import { findPotentialPoPaymentMatches } from "@/lib/ops/operator/po-pipeline";
 import { readState, writeState } from "@/lib/ops/state";
 
 type OperatorTaskInsert = {
@@ -248,6 +249,32 @@ function buildFeeTask(params: {
   };
 }
 
+function buildPoPaymentMatchTask(params: {
+  poNumber: string;
+  customerName: string;
+  amount: number;
+  depositDate: string;
+}): OperatorTaskInsert {
+  return {
+    task_type: "reconciliation_discrepancy",
+    title: `Deposit may match PO ${params.poNumber} — ${formatCurrency(params.amount)}`,
+    description: `Deposit of ${formatCurrency(params.amount)} may match PO ${params.poNumber} from ${params.customerName}. Confirm before marking paid.`,
+    priority: "medium",
+    source: "operator:reconciliation",
+    assigned_to: "rene",
+    requires_approval: true,
+    execution_params: {
+      natural_key: buildNaturalKey(["po_payment_match", params.poNumber, params.depositDate, params.amount.toFixed(2)]),
+      source: "po_payment_match",
+      po_number: params.poNumber,
+      customer_name: params.customerName,
+      deposit_amount: round2(params.amount),
+      deposit_date: params.depositDate,
+    },
+    tags: ["finance", "reconciliation", "po_payment_match"],
+  };
+}
+
 export async function runDailyFinancialReconciliation(): Promise<{
   tasks: OperatorTaskInsert[];
   summary: ReconciliationSummary;
@@ -353,6 +380,22 @@ export async function runDailyFinancialReconciliation(): Promise<{
         priority: "medium",
       }),
     );
+  }
+
+  for (const deposit of deposits) {
+    const amount = round2(Number(deposit.Amount || 0));
+    if (amount <= 0) continue;
+    const matches = await findPotentialPoPaymentMatches(amount, 5).catch(() => []);
+    for (const match of matches.slice(0, 2)) {
+      tasks.push(
+        buildPoPaymentMatchTask({
+          poNumber: match.po_number,
+          customerName: match.customer_name,
+          amount,
+          depositDate: String(deposit.Date || day).slice(0, 10),
+        }),
+      );
+    }
   }
 
   const summary: ReconciliationSummary = {

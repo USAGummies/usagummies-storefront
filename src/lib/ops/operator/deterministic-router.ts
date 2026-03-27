@@ -27,6 +27,13 @@ function parseInvoiceInstruction(message: string): Record<string, unknown> {
   };
 }
 
+function parsePoNumberFromMessage(message: string): string {
+  const match =
+    message.match(/\bpo\s*#?\s*([a-z0-9-]{3,})\b/i) ||
+    message.match(/\border\s*#?\s*([a-z0-9-]{3,})\b/i);
+  return match?.[1]?.trim() || "";
+}
+
 function looksLikeCorrectionInstruction(msg: string): boolean {
   if (/^(what|how|who|when|where|why)\b/i.test(msg)) return false;
   if (/\b(categorize|recategorize)\b.*\b(to|as)\b/i.test(msg)) return true;
@@ -47,6 +54,46 @@ export function routeMessage(message: string, _actor: string): RoutedAction | nu
   const msg = message.toLowerCase().trim();
 
   if (msg.startsWith("teach:")) {
+    const teachText = message.slice(6).trim();
+    const poNumber = parsePoNumberFromMessage(teachText);
+    const shippingCostMatch = teachText.match(/\bshipping cost(?: for)?(?: po)?\s*#?\s*[a-z0-9-]*\s*(?:is|=)?\s*\$([\d,.]+)/i);
+    if (/\bshipped\b/i.test(teachText) && poNumber) {
+      return {
+        intent: "ship_po",
+        action: "ship_purchase_order",
+        params: {
+          poNumber,
+          instruction: teachText,
+        },
+        result: null,
+        executed: false,
+        error: null,
+      };
+    }
+    if (/\bdelivered\b/i.test(teachText) && poNumber) {
+      return {
+        intent: "deliver_po",
+        action: "mark_purchase_order_delivered",
+        params: { poNumber, instruction: teachText },
+        result: null,
+        executed: false,
+        error: null,
+      };
+    }
+    if (shippingCostMatch?.[1] && poNumber) {
+      return {
+        intent: "po_shipping_cost",
+        action: "update_purchase_order_shipping",
+        params: {
+          poNumber,
+          shippingCost: Number(shippingCostMatch[1].replace(/,/g, "")),
+          instruction: teachText,
+        },
+        result: null,
+        executed: false,
+        error: null,
+      };
+    }
     return { intent: "teach", action: "create_brain_entry", params: { text: message.slice(6).trim() }, result: null, executed: false, error: null };
   }
   if (msg.startsWith("correct:")) {
@@ -86,6 +133,8 @@ export function routeMessage(message: string, _actor: string): RoutedAction | nu
   if (/^(approve)$/i.test(msg)) return { intent: "approve", action: "query_pending_approvals", params: {}, result: null, executed: false, error: null };
   if (/^(emails?)$/i.test(msg)) return { intent: "check_email", action: "check_email", params: { query: "newer_than:2d" }, result: null, executed: false, error: null };
   if (/^(review)$/i.test(msg)) return { intent: "review_transactions", action: "show_review_transactions", params: {}, result: null, executed: false, error: null };
+  if (/^(pos|orders|open pos)$/i.test(msg)) return { intent: "purchase_orders", action: "query_purchase_orders", params: {}, result: null, executed: false, error: null };
+  if (/^(po pipeline)$/i.test(msg)) return { intent: "po_pipeline", action: "query_purchase_order_pipeline", params: {}, result: null, executed: false, error: null };
   if (/^(help)$/i.test(msg)) return { intent: "help", action: "show_help", params: {}, result: null, executed: false, error: null };
   if (/^(ok|okay|thanks|thank you)$/i.test(msg)) return null;
 
@@ -139,6 +188,41 @@ export function routeMessage(message: string, _actor: string): RoutedAction | nu
   if (/\b(how many transactions are categorized vs uncategorized|categorized vs uncategorized|qbo health)\b/i.test(msg)) {
     return { intent: "qbo_health", action: "query_qbo_health", params: {}, result: null, executed: false, error: null };
   }
+  if (/\bshipped(?: the)?(?: glacier)?(?: order)?\b/i.test(msg) && parsePoNumberFromMessage(msg)) {
+    return {
+      intent: "ship_po",
+      action: "ship_purchase_order",
+      params: { poNumber: parsePoNumberFromMessage(message), instruction: message },
+      result: null,
+      executed: false,
+      error: null,
+    };
+  }
+  if ((/\bpo\b/i.test(msg) && /\bdelivered\b/i.test(msg)) && parsePoNumberFromMessage(msg)) {
+    return {
+      intent: "deliver_po",
+      action: "mark_purchase_order_delivered",
+      params: { poNumber: parsePoNumberFromMessage(message), instruction: message },
+      result: null,
+      executed: false,
+      error: null,
+    };
+  }
+  if (/\bshipping cost for po\b/i.test(msg) && parsePoNumberFromMessage(msg)) {
+    const shippingCostMatch = msg.match(/\$([\d,.]+)/);
+    return {
+      intent: "po_shipping_cost",
+      action: "update_purchase_order_shipping",
+      params: {
+        poNumber: parsePoNumberFromMessage(message),
+        shippingCost: shippingCostMatch?.[1] ? Number(shippingCostMatch[1].replace(/,/g, "")) : null,
+        instruction: message,
+      },
+      result: null,
+      executed: false,
+      error: null,
+    };
+  }
   if (/\bsend an email\b/i.test(msg)) {
     return { intent: "draft_reply", action: "draft_email_reply", params: { instruction: message }, result: null, executed: false, error: null };
   }
@@ -161,6 +245,16 @@ export function routeMessage(message: string, _actor: string): RoutedAction | nu
   if (/\b(chart of accounts|coa)\b/i.test(msg)) return { intent: "coa", action: "query_qbo_accounts", params: {}, result: null, executed: false, error: null };
   if (/\b(cash flow)\b/i.test(msg)) return { intent: "cash_flow", action: "query_qbo_cash_flow", params: {}, result: null, executed: false, error: null };
   if (/\b(bills?|payable|owe vendors)\b/i.test(msg)) return { intent: "bills", action: "query_qbo_bills", params: {}, result: null, executed: false, error: null };
+  if (/^\s*po\s*#?\s*[a-z0-9-]{3,}\s*$/i.test(msg)) {
+    return {
+      intent: "purchase_order_detail",
+      action: "query_purchase_order_detail",
+      params: { poNumber: parsePoNumberFromMessage(message) },
+      result: null,
+      executed: false,
+      error: null,
+    };
+  }
   if (/\b(create|generate)\b.*\binvoice\b/i.test(msg)) {
     return {
       intent: "create_invoice",

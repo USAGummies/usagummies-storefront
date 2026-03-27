@@ -9,7 +9,10 @@ import { notify } from "@/lib/ops/notify";
 import { createNotionPage } from "@/lib/ops/abra-notion-write";
 import { readState, writeState } from "@/lib/ops/state";
 import { RECONCILIATION_SUMMARY_STATE_KEY, type ReconciliationSummary } from "@/lib/ops/operator/reconciliation";
-import { OPEN_PO_TRACKER_STATE_KEY, type OpenPoSummary } from "@/lib/ops/operator/po-tracker";
+import {
+  getOpenPurchaseOrders,
+  getPurchaseOrderSummary,
+} from "@/lib/ops/operator/po-pipeline";
 import { UNIFIED_INVENTORY_STATE_KEY, type UnifiedInventorySummary } from "@/lib/ops/operator/unified-inventory";
 import { UNIFIED_REVENUE_STATE_KEY, type UnifiedRevenueSummary } from "@/lib/ops/operator/unified-revenue";
 import { getDailyGoalSnapshot, formatGoalSlack } from "@/lib/ops/daily-goal-tracker";
@@ -943,24 +946,21 @@ async function buildPowersMeetingBenBrief(): Promise<MeetingTodayBrief> {
   const isMeetingDay = await detectPowersMeetingToday();
   if (!isMeetingDay) return { isMeetingDay: false, brief: null };
 
-  const [recentEmails, awaiting, revenue, cashState, poTasks] = await Promise.all([
+  const [recentEmails, awaiting, revenue, cashState, openPos] = await Promise.all([
     listEmails({ query: "newer_than:1d", count: 20 }).catch(() => []),
     detectAwaitingReplies({ sentCount: 30, lookbackHours: 72 }).catch(() => []),
     readState<UnifiedRevenueSummary | null>(UNIFIED_REVENUE_STATE_KEY, null).catch(() => null),
     readState<{ balance?: number } | null>("cash-position" as never, null).catch(() => null),
-    sbFetch("/rest/v1/abra_operator_tasks?task_type=eq.po_received&select=title,execution_params,status&order=created_at.desc&limit=10").catch(() => []),
+    getOpenPurchaseOrders().catch(() => []),
   ]);
 
-  const poRows = Array.isArray(poTasks)
-    ? (poTasks as Array<{ title?: string | null; execution_params?: Record<string, unknown> | null; status?: string | null }>)
-    : [];
-  const inderbitzin = poRows.find((row) => /inderbitzin/i.test(String(row.title || "")) || /inderbitzin/i.test(JSON.stringify(row.execution_params || {})));
-  const mike = poRows.find((row) => /mike arlint|140812/i.test(String(row.title || "")) || /140812/i.test(JSON.stringify(row.execution_params || {})));
+  const inderbitzin = (Array.isArray(openPos) ? openPos : []).find((row) => /inderbitzin/i.test(String(row.customer_name || "")) || String(row.po_number || "") === "009180");
+  const mike = (Array.isArray(openPos) ? openPos : []).find((row) => /mike arlint|glacier/i.test(String(row.customer_name || "")) || String(row.po_number || "") === "140812");
   const inderLine = inderbitzin
-    ? "Inderbitzin #009180 (828 units)"
+    ? `Inderbitzin #009180 (${inderbitzin.units || 828} units)`
     : "Inderbitzin #009180 (828 units)";
   const mikeLine = mike
-    ? "Mike Arlint #140812 (pending qty)"
+    ? `Mike Arlint #140812 (${mike.units ? `${mike.units} units` : "pending qty"})`
     : "Mike Arlint #140812 (pending qty)";
 
   const lines = [
@@ -988,7 +988,7 @@ export async function buildCompactBenBrief(): Promise<string> {
     return powersMeeting.brief;
   }
 
-  const [revenue, inventory, operator, approvals, awaiting, priorities, openPo, followUps] = await Promise.all([
+  const [revenue, inventory, operator, approvals, awaiting, priorities, openPo, followUps, openPoRows] = await Promise.all([
     readState<UnifiedRevenueSummary | null>(UNIFIED_REVENUE_STATE_KEY, null).catch(() => null),
     readState<UnifiedInventorySummary | null>(UNIFIED_INVENTORY_STATE_KEY, null).catch(() => null),
     getOperatorTaskBrief().catch(() => ({
@@ -1000,8 +1000,9 @@ export async function buildCompactBenBrief(): Promise<string> {
     getPendingApprovalsCount().catch(() => 0),
     detectAwaitingReplies({ sentCount: 30, lookbackHours: 72 }).catch(() => []),
     fetchCompactAttentionItems(2).catch(() => []),
-    readState<OpenPoSummary | null>(OPEN_PO_TRACKER_STATE_KEY, null).catch(() => null),
+    getPurchaseOrderSummary().catch(() => null),
     readState<{ due?: Array<{ entity?: string; daysSince?: number }> } | null>("operator:step:follow_up_scheduler:summary" as never, null).catch(() => null),
+    getOpenPurchaseOrders().catch(() => []),
   ]);
 
   const emailLine = Array.isArray(awaiting) && awaiting.length
@@ -1017,6 +1018,12 @@ export async function buildCompactBenBrief(): Promise<string> {
   const followUpLine = Array.isArray(followUps?.due) && followUps.due.length
     ? followUps.due.slice(0, 2).map((item) => `${item.entity} ${item.daysSince}d`).join(", ")
     : "";
+  const poDetailLine = Array.isArray(openPoRows) && openPoRows.length
+    ? openPoRows
+        .slice(0, 2)
+        .map((po) => `${po.customer_name.split("/")[0].trim()} #${po.po_number} — ${po.units ? `${po.units} units` : "qty TBD"} — ${po.status}`)
+        .join(" | ")
+    : "";
   const lines = [
     `🌅 Good morning <@${BEN_SLACK_USER_ID}>`,
     "",
@@ -1024,6 +1031,7 @@ export async function buildCompactBenBrief(): Promise<string> {
     `📧 ${compactCountLabel(Array.isArray(awaiting) ? awaiting.length : 0, "email")} need response${emailLine !== "none" ? ` (${emailLine})` : ""}`,
     `📦 Inventory: ${inventoryBits.join(", ") || "position updating"}`,
     `📋 Open POs: ${openPo?.openCount || 0} orders, ${compactCurrency(openPo?.committedRevenue || 0)} committed${openPo?.overdue[0] ? ` | PO #${openPo.overdue[0].poNumber} overdue ${openPo.overdue[0].daysOverdue}d` : ""}`,
+    poDetailLine ? `• ${poDetailLine}` : "",
     followUpLine ? `📞 Follow-ups due: ${followUpLine}` : "",
     `🎯 Today: ${(priorities || []).join(", ") || "review operator queue, clear approvals"}`,
     `⚠️ ${compactCountLabel(approvals, "approval")} pending`,
@@ -1047,7 +1055,7 @@ export async function buildCompactReneBrief(): Promise<string> {
     fetchInternalOpsJson("/api/ops/qbo/query?type=purchases&limit=200"),
     sbFetch("/rest/v1/abra_operator_tasks?task_type=in.(email_draft_response,vendor_followup,distributor_followup)&status=in.(pending,needs_approval)&select=id&limit=50").catch(() => []),
     readState<ReconciliationSummary | null>(RECONCILIATION_SUMMARY_STATE_KEY, null).catch(() => null),
-    readState<OpenPoSummary | null>(OPEN_PO_TRACKER_STATE_KEY, null).catch(() => null),
+    getPurchaseOrderSummary().catch(() => null),
   ]);
 
   const purchases = Array.isArray((purchasesData || {}).purchases)

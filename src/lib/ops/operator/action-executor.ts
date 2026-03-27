@@ -18,6 +18,14 @@ import {
   type EntityState,
   updateEntityFromEvent,
 } from "@/lib/ops/operator/entities/entity-state";
+import {
+  getOpenPurchaseOrders,
+  getPurchaseOrderByNumber,
+  getPurchaseOrderSummary,
+  matchPayment,
+  markDelivered,
+  shipPO,
+} from "@/lib/ops/operator/po-pipeline";
 
 type ApprovalRow = {
   id: string;
@@ -158,6 +166,26 @@ function parseLineItemsFromInstruction(instruction: string): Array<{ description
   const unitPrice = priceMatch ? Number(priceMatch[1].replace(/,/g, "")) : 0;
   if (!quantity || !Number.isFinite(quantity)) return [];
   return [{ description: "All American Gummy Bears 7.5oz", quantity, unitPrice: unitPrice || 2.1 }];
+}
+
+function parseTrackingFromInstruction(instruction: string): { carrier: string | null; trackingNumber: string | null; estimatedDelivery: string | null } {
+  const trackingNumber =
+    instruction.match(/\btracking\s*#?\s*([A-Z0-9-]{6,})\b/i)?.[1] ||
+    instruction.match(/\bvia\s+(?:fedex|ups|usps)\s+([A-Z0-9-]{6,})\b/i)?.[1] ||
+    null;
+  const carrierMatch = instruction.match(/\b(fedex|ups|usps)\b/i);
+  const etaMatch = instruction.match(/\b(?:eta|delivers?|delivery)\s+(?:on|by)?\s*([A-Za-z]+\s+\d{1,2}(?:,\s*20\d{2})?|\d{4}-\d{2}-\d{2})/i);
+  const estimatedDelivery = etaMatch?.[1]
+    ? (() => {
+        const parsed = new Date(etaMatch[1]);
+        return Number.isFinite(parsed.getTime()) ? parsed.toISOString().slice(0, 10) : null;
+      })()
+    : null;
+  return {
+    carrier: carrierMatch?.[1] || null,
+    trackingNumber,
+    estimatedDelivery,
+  };
 }
 
 function pacificDateLabel(value = new Date()): string {
@@ -457,6 +485,72 @@ export async function executeRoutedAction(
           return !account || account.includes("uncategorized");
         });
         action.result = { purchases: reviewRows };
+        break;
+      }
+      case "query_purchase_orders": {
+        action.result = await getOpenPurchaseOrders().catch(() => []);
+        break;
+      }
+      case "query_purchase_order_detail": {
+        const poNumber = String(action.params.poNumber || "").trim();
+        action.result = poNumber ? await getPurchaseOrderByNumber(poNumber).catch(() => null) : null;
+        break;
+      }
+      case "query_purchase_order_pipeline": {
+        const [summary, orders] = await Promise.all([
+          getPurchaseOrderSummary().catch(() => ({ openCount: 0, committedRevenue: 0, overdue: [], byStatus: {} })),
+          getOpenPurchaseOrders().catch(() => []),
+        ]);
+        action.result = { summary, orders };
+        break;
+      }
+      case "ship_purchase_order": {
+        const poNumber = String(action.params.poNumber || "").trim();
+        const instruction = String(action.params.instruction || "");
+        const tracking = parseTrackingFromInstruction(instruction);
+        const shippingCost =
+          action.params.shippingCost != null
+            ? Number(action.params.shippingCost)
+            : (() => {
+                const match = instruction.match(/\$([\d,.]+)/);
+                return match?.[1] ? Number(match[1].replace(/,/g, "")) : null;
+              })();
+        action.result = poNumber
+          ? await shipPO({
+              poNumber,
+              shippingCost: Number.isFinite(Number(shippingCost)) ? Number(shippingCost) : null,
+              carrier: tracking.carrier,
+              trackingNumber: tracking.trackingNumber,
+              estimatedDelivery: tracking.estimatedDelivery,
+              note: instruction,
+            }).catch(() => null)
+          : null;
+        break;
+      }
+      case "mark_purchase_order_delivered": {
+        const poNumber = String(action.params.poNumber || "").trim();
+        action.result = poNumber ? await markDelivered(poNumber).catch(() => null) : null;
+        break;
+      }
+      case "update_purchase_order_shipping": {
+        const poNumber = String(action.params.poNumber || "").trim();
+        const shippingCost = Number(action.params.shippingCost || 0);
+        action.result = poNumber && shippingCost > 0
+          ? await shipPO({
+              poNumber,
+              shippingCost,
+              note: String(action.params.instruction || ""),
+            }).catch(() => null)
+          : null;
+        break;
+      }
+      case "mark_purchase_order_paid": {
+        const poNumber = String(action.params.poNumber || "").trim();
+        const amount = Number(action.params.amount || 0);
+        const depositDate = String(action.params.depositDate || pacificDateLabel());
+        action.result = poNumber && amount > 0
+          ? await matchPayment({ poNumber, depositAmount: amount, depositDate }).catch(() => null)
+          : null;
         break;
       }
       case "query_pipeline_followups": {
@@ -961,6 +1055,66 @@ export function renderRoutedActionResponse(action: RoutedAction): { reply: strin
           : "No uncategorized transactions need review right now.",
       };
     }
+    case "query_purchase_orders": {
+      const orders = Array.isArray(action.result) ? (action.result as Array<Record<string, unknown>>) : [];
+      return {
+        reply: orders.length
+          ? formatList(
+              "Open POs",
+              orders.slice(0, 8).map((po) => `#${String(po.po_number || "")} ${String(po.customer_name || "Customer")} — ${String(po.status || "received")}${po.total ? ` — ${compactCurrency(Number(po.total || 0))}` : ""}`),
+              "ask for `po 140812` or `po pipeline` if you want the details.",
+            )
+          : "No open purchase orders right now.",
+      };
+    }
+    case "query_purchase_order_detail": {
+      const po = (action.result || null) as Record<string, unknown> | null;
+      if (!po) return { reply: "I couldn't find that PO." };
+      return {
+        reply: [
+          `PO #${String(po.po_number || "")} — ${String(po.customer_name || "Customer")}`,
+          `Status: ${String(po.status || "received")}`,
+          `Units: ${po.units ?? "TBD"} | Price: ${po.unit_price ? compactCurrency(Number(po.unit_price || 0)) : "TBD"} | Total: ${po.total ? compactCurrency(Number(po.total || 0)) : "TBD"}`,
+          `Invoice: ${String(po.qbo_invoice_id || "not created")} | Terms: ${String(po.payment_terms || "Net 30")}`,
+          po.tracking_number ? `Tracking: ${String(po.tracking_carrier || "carrier")} ${String(po.tracking_number)}` : "",
+        ].filter(Boolean).join("\n"),
+      };
+    }
+    case "query_purchase_order_pipeline": {
+      const result = (action.result || {}) as Record<string, unknown>;
+      const summary = (result.summary || {}) as Record<string, unknown>;
+      const orders = Array.isArray(result.orders) ? (result.orders as Array<Record<string, unknown>>) : [];
+      return {
+        reply: [
+          `PO pipeline: ${compactCurrency(Number(summary.committedRevenue || 0))} across ${Number(summary.openCount || 0)} open order${Number(summary.openCount || 0) === 1 ? "" : "s"}.`,
+          orders.slice(0, 4).map((po) => `#${String(po.po_number || "")} ${String(po.customer_name || "Customer")} — ${String(po.status || "received")}${po.total ? ` — ${compactCurrency(Number(po.total || 0))}` : ""}`).join(" | "),
+        ].filter(Boolean).join(" "),
+      };
+    }
+    case "ship_purchase_order":
+      return {
+        reply: action.result
+          ? `Marked PO #${String((action.result as Record<string, unknown>).po_number || "")} as shipped.`
+          : "I couldn't update that PO shipment.",
+      };
+    case "mark_purchase_order_delivered":
+      return {
+        reply: action.result
+          ? `Marked PO #${String((action.result as Record<string, unknown>).po_number || "")} as delivered and started the payment clock.`
+          : "I couldn't mark that PO delivered.",
+      };
+    case "update_purchase_order_shipping":
+      return {
+        reply: action.result
+          ? `Updated shipping on PO #${String((action.result as Record<string, unknown>).po_number || "")}.`
+          : "I couldn't update that PO shipping cost.",
+      };
+    case "mark_purchase_order_paid":
+      return {
+        reply: action.result
+          ? `Marked PO #${String((action.result as Record<string, unknown>).po_number || "")} as paid.`
+          : "I couldn't match that payment to a PO.",
+      };
     case "query_pipeline_followups": {
       const tasks = Array.isArray((action.result as Record<string, unknown> | null)?.tasks)
         ? (((action.result as Record<string, unknown>).tasks) as Array<Record<string, unknown>>)
