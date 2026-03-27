@@ -1,16 +1,13 @@
 import crypto from "node:crypto";
 import { after, NextResponse } from "next/server";
 import {
-  deleteSlackMessage,
   getSlackDisplayName,
   getRecentChannelContext,
   getThreadHistory,
-  isLikelySlowQuery,
   postSlackMessage,
-  postSlackThinkingMessage,
-  processAbraMessage,
-  updateSlackMessage,
 } from "@/lib/ops/abra-slack-responder";
+import { executeRoutedAction, renderRoutedActionResponse } from "@/lib/ops/operator/action-executor";
+import { routeMessage } from "@/lib/ops/operator/deterministic-router";
 import { shouldProcessSlackEvent } from "@/lib/ops/slack-dedup";
 
 export const runtime = "nodejs";
@@ -219,6 +216,52 @@ async function extractSlackFiles(files: SlackFile[]): Promise<string> {
   return results.join("\n\n");
 }
 
+function getInternalBaseUrl(): string {
+  return (
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.NEXTAUTH_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "") ||
+    "https://www.usagummies.com"
+  );
+}
+
+function stripAbraMention(text: string): string {
+  return text.replace(/<@U0AKMSTL0GL>\s*/g, "").trim();
+}
+
+async function callReadOnlyChatRoute(payload: {
+  message: string;
+  history: Array<{ role: "user" | "assistant"; content: string }>;
+  actorLabel: string;
+  channel: string;
+  slackChannelId: string;
+  slackThreadTs: string;
+}): Promise<{ reply: string; blocks?: Array<Record<string, unknown>> } | null> {
+  const cronSecret = (process.env.CRON_SECRET || "").trim();
+  const res = await fetch(`${getInternalBaseUrl()}/api/ops/abra/chat`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(cronSecret ? { Authorization: `Bearer ${cronSecret}` } : {}),
+    },
+    body: JSON.stringify({
+      message: payload.message,
+      history: payload.history,
+      actor_label: payload.actorLabel,
+      channel: "slack",
+      slack_channel_id: payload.slackChannelId,
+      slack_thread_ts: payload.slackThreadTs,
+    }),
+    cache: "no-store",
+    signal: AbortSignal.timeout(55000),
+  });
+  if (!res.ok) return null;
+  const data = (await res.json().catch(() => null)) as Record<string, unknown> | null;
+  if (!data || typeof data.reply !== "string" || !data.reply.trim()) return null;
+  const blocks = Array.isArray(data.blocks) ? (data.blocks as Array<Record<string, unknown>>) : undefined;
+  return { reply: data.reply.trim(), blocks };
+}
+
 export async function POST(req: Request) {
   if (!process.env.SLACK_SIGNING_SECRET) {
     return NextResponse.json(
@@ -324,92 +367,53 @@ export async function POST(req: Request) {
       ].filter(Boolean).join("");
 
       const rootThreadTs = thread_ts || ts;
+      const normalizedMessage = stripAbraMention(messageText || "(file attachment — see attached files above)");
+      const routed = routeMessage(normalizedMessage, user);
 
-      // For queries that will take >5s (i.e. anything hitting the LLM), post an
-      // immediate "thinking" acknowledgment so the user sees something right away
-      // instead of waiting silently for up to 55s.
-      let thinkingTs: string | null = null;
-      let stillThinkingTimer: ReturnType<typeof setTimeout> | null = null;
-
-      // AUTO_RESPOND channels ALWAYS get a thinking message — Rene should never see silence
-      const AUTO_RESPOND_CHANNELS = new Set(["C0AKG9FSC2J", "C0ALS6W7VB4", "C0A9S88E1FT"]);
-      const alwaysAck = event.type === "app_mention" || AUTO_RESPOND_CHANNELS.has(channel);
-
-      if (alwaysAck || isLikelySlowQuery(messageText)) {
-        thinkingTs = await postSlackThinkingMessage(channel, rootThreadTs);
-
-        if (thinkingTs) {
-          // After 10s with no response, update the indicator so the user knows
-          // Abra is still working (not stuck/silent).
-          stillThinkingTimer = setTimeout(() => {
-            void updateSlackMessage(
-              channel,
-              thinkingTs!,
-              "Still working on it — this is a complex request...",
-            );
-          }, 10_000);
-        }
-      }
-
-      const result = await processAbraMessage({
-        text: messageText || "(file attachment — see attached files above)",
-        user,
-        displayName,
-        channel,
-        ts,
-        ...(thread_ts ? { threadTs: thread_ts } : {}),
-        ...(history.length > 0 ? { history } : {}),
-        ...(uploadedFiles.length > 0 ? { uploadedFiles } : {}),
-        forceRespond: event.type === "app_mention" || [
-          "C0AKG9FSC2J", // #financials — Rene's workspace, always respond
-          "C0ALS6W7VB4", // #abra-control — founder/operator workspace, always respond
-          "C0A9S88E1FT", // #abra-testing — direct testing workspace
-        ].includes(channel),
-      });
-
-      // Always clear the "still thinking" timer before we touch the message
-      if (stillThinkingTimer) clearTimeout(stillThinkingTimer);
-
-      if (!result.handled) {
-        if (alwaysAck) {
-          const fallbackText =
-            channel === "C0AKG9FSC2J"
-              ? "Got it. Tell me the specific finance item you want handled and I’ll take it from here."
-              : "Got it. Tell me the specific item you want handled and I’ll take it from here.";
-          if (thinkingTs) {
-            await updateSlackMessage(channel, thinkingTs, fallbackText);
-          } else {
-            await postSlackMessage(channel, fallbackText, { threadTs: rootThreadTs });
-          }
-          return;
-        }
-        if (thinkingTs) {
-          await deleteSlackMessage(channel, thinkingTs);
-        }
+      if (routed) {
+        const executed = await executeRoutedAction(routed, {
+          actor: displayName,
+          slackChannelId: channel,
+          slackThreadTs: rootThreadTs,
+          slackUserId: user,
+          history,
+        });
+        const rendered = renderRoutedActionResponse(executed);
+        await postSlackMessage(channel, rendered.reply, {
+          threadTs: rootThreadTs,
+          blocks: rendered.blocks,
+        });
         return;
       }
 
-      if (thinkingTs) {
-        // Update the thinking placeholder with the real answer in-place
-        await updateSlackMessage(channel, thinkingTs, result.reply, {
-          sources: result.sources,
-          answerLogId: result.answerLogId,
-          blocks: result.blocks,
-        });
-      } else {
-        await postSlackMessage(channel, result.reply, {
+      const chatResult = await callReadOnlyChatRoute({
+        message: normalizedMessage,
+        history,
+        actorLabel: displayName,
+        channel: "slack",
+        slackChannelId: channel,
+        slackThreadTs: rootThreadTs,
+      });
+
+      if (chatResult?.reply) {
+        await postSlackMessage(channel, chatResult.reply, {
           threadTs: rootThreadTs,
-          sources: result.sources,
-          answerLogId: result.answerLogId,
-          blocks: result.blocks,
+          blocks: chatResult.blocks,
         });
+        return;
       }
+
+      await postSlackMessage(
+        channel,
+        "I hit an error while processing that. Send the next instruction and I’ll continue.",
+        { threadTs: rootThreadTs },
+      );
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Unknown Slack events processing error";
       console.error("[ops/slack/events] async processing failed:", message);
       if (event.type === "app_mention" || channel === "C0AKG9FSC2J" || channel === "C0ALS6W7VB4" || channel === "C0A9S88E1FT") {
-        await postSlackMessage(channel, "I hit an error while processing that. I kept the thread intact. Send the next instruction and I’ll continue.", {
+        await postSlackMessage(channel, "I hit an error while processing that. Send the next instruction and I’ll continue.", {
           threadTs: thread_ts || ts,
         }).catch(() => {});
       }
