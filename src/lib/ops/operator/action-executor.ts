@@ -27,6 +27,31 @@ type ApprovalRow = {
 
 type MeetingPrepLog = Record<string, string>;
 
+function summarizeOperatorTasks(
+  rows: Array<{ task_type: string; status: string }>,
+  mode: "today" | "overnight" = "today",
+): string {
+  const completed = rows.filter((row) => row.status === "completed");
+  const grouped: Record<string, number> = {};
+  for (const row of completed) {
+    grouped[row.task_type] = (grouped[row.task_type] || 0) + 1;
+  }
+  const highlights = [
+    grouped.qbo_categorize ? `${grouped.qbo_categorize} categorized` : "",
+    grouped.qbo_assign_vendor ? `${grouped.qbo_assign_vendor} vendor assignments` : "",
+    grouped.email_draft_response ? `${grouped.email_draft_response} email drafts` : "",
+    grouped.distributor_followup || grouped.vendor_followup
+      ? `${(grouped.distributor_followup || 0) + (grouped.vendor_followup || 0)} follow-ups`
+      : "",
+  ].filter(Boolean);
+  const pending = rows.filter((row) => row.status === "pending" || row.status === "needs_approval").length;
+  return [
+    `Operator ${mode}: ${completed.length} task${completed.length === 1 ? "" : "s"} completed.`,
+    highlights.length ? `Highlights: ${highlights.join(", ")}.` : "Highlights: no major automated actions completed yet.",
+    `${pending} task${pending === 1 ? "" : "s"} still pending review or execution.`,
+  ].join(" ");
+}
+
 function extractEmailSearchQuery(instruction: string): string {
   const fromMatch = instruction.match(/\bfrom\s+(.+)$/i);
   if (fromMatch?.[1]) return fromMatch[1].trim();
@@ -468,6 +493,21 @@ export async function executeRoutedAction(
       case "query_rene_activity": {
         const todayCount = await getSlackHistoryCountForUser("C0AKG9FSC2J", "U0ALL27JM38").catch(() => 0);
         action.result = { todayCount };
+        break;
+      }
+      case "query_operator_summary": {
+        const mode = String(action.params.mode || "today") === "overnight" ? "overnight" : "today";
+        const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        const rows = await sbFetch<Array<{ task_type?: string | null; status?: string | null }>>(
+          `/rest/v1/abra_operator_tasks?select=task_type,status,updated_at&updated_at=gte.${encodeURIComponent(cutoff)}&limit=500`,
+        ).catch(() => []);
+        action.result = {
+          mode,
+          rows: rows.map((row) => ({
+            task_type: String(row.task_type || "unknown"),
+            status: String(row.status || "unknown"),
+          })),
+        };
         break;
       }
       case "query_driving_backlog": {
@@ -964,6 +1004,16 @@ export function renderRoutedActionResponse(action: RoutedAction): { reply: strin
           : "No. Rene has not messaged in #financials yet today.",
       };
     }
+    case "query_operator_summary": {
+      const result = (action.result || {}) as Record<string, unknown>;
+      const mode = String(result.mode || "today") === "overnight" ? "overnight" : "today";
+      const rows = Array.isArray(result.rows)
+        ? (result.rows as Array<{ task_type: string; status: string }>)
+        : [];
+      return {
+        reply: summarizeOperatorTasks(rows, mode),
+      };
+    }
     case "query_driving_backlog": {
       const result = (action.result || {}) as Record<string, unknown>;
       const items = Array.isArray(result.items) ? (result.items as Array<Record<string, unknown>>) : [];
@@ -1059,12 +1109,28 @@ export function renderRoutedActionResponse(action: RoutedAction): { reply: strin
     case "refuse_destructive_request":
     case "refuse_financial_tamper":
       return { reply: String(((action.result || {}) as Record<string, unknown>).message || "I can't do that.") };
-    case "create_brain_entry":
+    case "create_brain_entry": {
+      const result = ((action.result || {}) as Record<string, unknown>);
+      const entityMentions = (result.entityMentions as string[] | undefined) || [];
+      const nestedResult = (result.result || {}) as Record<string, unknown>;
+      const proposedPayload = (nestedResult.proposed_payload || {}) as Record<string, unknown>;
+      const params = (proposedPayload.params || {}) as Record<string, unknown>;
+      const text = String(params.text || "");
+      const mentions = entityMentions.join(", ");
+      const triggered = /(shipment arrives|production starts|deposit is \$|upc barcode|logo file|greg confirmed|andrew confirmed)/i.test(text);
+      const detail =
+        /shipment arrives/i.test(text) ? "Shipment timing captured." :
+        /production starts|greg confirmed/i.test(text) ? "Production note captured." :
+        /deposit is \$/i.test(text) ? "Financial note captured." :
+        /logo file|upc barcode/i.test(text) ? "Follow-up requirement captured." :
+        "Update captured.";
+      const snippet = text ? ` ${text.replace(/\s+/g, " ").slice(0, 110)}.` : "";
       return {
-        reply: ((action.result || {}) as Record<string, unknown>).entityUpdated
-          ? `Stored in memory and updated entity state for ${String((((action.result || {}) as Record<string, unknown>).entityMentions as string[] || []).join(", ") || "the relevant contact")}.`
-          : "Stored in memory.",
+        reply: result.entityUpdated
+          ? `Learned and stored in memory.${snippet} ${detail}${mentions ? ` Updated entity state for ${mentions}.` : ""}${triggered ? " Triggered downstream tracking." : ""}`
+          : `Learned and stored in memory.${snippet} ${detail}${triggered ? " Triggered downstream tracking." : ""}`,
       };
+    }
     case "correct_brain_entry":
       return { reply: "Correction stored." };
     default:

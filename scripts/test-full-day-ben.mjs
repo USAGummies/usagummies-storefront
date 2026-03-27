@@ -27,6 +27,10 @@ function readAllLocalEnv() {
 
 const BASE_URL = process.argv[2] || "http://127.0.0.1:3353";
 
+function shouldUseHttp(baseUrl) {
+  return /^https?:\/\//i.test(baseUrl);
+}
+
 function containsAny(text, checks) {
   const haystack = String(text || "").toLowerCase();
   return checks.some((check) => haystack.includes(check.toLowerCase()));
@@ -59,6 +63,38 @@ function runSlackResponderBatch(messages) {
   }
 }
 
+async function runHttpBatch(messages) {
+  const cronSecret = readEnv("CRON_SECRET");
+  const headers = {
+    "Content-Type": "application/json",
+    ...(cronSecret ? { Authorization: `Bearer ${cronSecret}` } : {}),
+  };
+
+  const results = [];
+  for (const message of messages) {
+    const startedAt = Date.now();
+    const res = await fetch(`${BASE_URL}/api/ops/abra/chat`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        message: message.text,
+        channel: "slack",
+        slack_channel_id: message.channel,
+        actor_label: message.displayName,
+      }),
+      signal: AbortSignal.timeout(30000),
+    });
+    const payload = await res.json().catch(() => ({}));
+    results.push({
+      handled: res.ok && String(payload.reply || "").trim().length > 0,
+      reply: String(payload.reply || ""),
+      ms: Date.now() - startedAt,
+      status: res.status,
+    });
+  }
+  return results;
+}
+
 const tests = [
   { name: "good morning", action: false, validate: (reply) => containsAny(reply, ["good morning", "today", "status"]) },
   { name: "what emails need responses today", action: false, validate: (reply) => containsAny(reply, ["email", "draft", "response"]) },
@@ -86,7 +122,9 @@ async function run() {
     channel: "C0ALS6W7VB4",
     displayName: "Ben Stutman",
   }));
-  const results = runSlackResponderBatch(payload);
+  const results = shouldUseHttp(BASE_URL)
+    ? await runHttpBatch(payload)
+    : runSlackResponderBatch(payload);
 
   for (let index = 0; index < tests.length; index += 1) {
     const test = tests[index];

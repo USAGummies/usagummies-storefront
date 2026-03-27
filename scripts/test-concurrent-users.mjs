@@ -7,6 +7,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
+const BASE_URL = process.argv[2] || "";
 
 function readAllLocalEnv() {
   const out = {};
@@ -40,6 +41,39 @@ function containsAll(text, checks) {
 }
 
 async function runOne(test, localEnv) {
+  if (/^https?:\/\//i.test(BASE_URL)) {
+    const startedAt = Date.now();
+    const cronSecret = localEnv.CRON_SECRET || "";
+    const res = await fetch(`${BASE_URL}/api/ops/abra/chat`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(cronSecret ? { Authorization: `Bearer ${cronSecret}` } : {}),
+      },
+      body: JSON.stringify({
+        message: test.text,
+        channel: "slack",
+        slack_channel_id: test.channel,
+        actor_label: test.actor === "Ben" ? "Ben Stutman" : "Rene Gonzalez",
+      }),
+      signal: AbortSignal.timeout(30000),
+    });
+    const data = await res.json().catch(() => ({}));
+    const reply = String(data.reply || "");
+    const pass =
+      res.ok &&
+      reply.trim().length > 0 &&
+      containsAll(reply, test.mustContain) &&
+      (test.actor !== "Ben" || !reply.includes("Rene")) &&
+      (test.actor !== "Rene" || !reply.includes("Ben"));
+    return {
+      ...test,
+      pass,
+      ms: Date.now() - startedAt,
+      reply,
+    };
+  }
+
   const inputPath = path.join(os.tmpdir(), `concurrent-${test.user}-${Date.now()}-${Math.random().toString(36).slice(2)}.json`);
   fs.writeFileSync(inputPath, JSON.stringify({
     text: test.text,

@@ -96,6 +96,9 @@ export function routeMessage(message: string, _actor: string): RoutedAction | nu
   if (/\b(has rene messaged today|did rene message today)\b/i.test(msg)) {
     return { intent: "rene_activity", action: "query_rene_activity", params: {}, result: null, executed: false, error: null };
   }
+  if (/\b(what did abra do (today|overnight|last night)|what did the operator do (today|overnight|last night)|operator summary)\b/i.test(msg)) {
+    return { intent: "operator_summary", action: "query_operator_summary", params: { mode: /\b(overnight|last night)\b/i.test(msg) ? "overnight" : "today" }, result: null, executed: false, error: null };
+  }
   if (/\b(what happened while i was out today|what happened while i was driving|what happened while i was out)\b/i.test(msg)) {
     return { intent: "driving_summary", action: "query_driving_backlog", params: {}, result: null, executed: false, error: null };
   }
@@ -158,7 +161,13 @@ export function routeMessage(message: string, _actor: string): RoutedAction | nu
   if (/\b(invoices?|receivable|who owes us money)\b/i.test(msg)) return { intent: "invoices", action: "query_qbo_invoices", params: {}, result: null, executed: false, error: null };
   if (/\b(transactions?|purchases?|expenses?)\b/i.test(msg)) return { intent: "transactions", action: "query_qbo_purchases", params: {}, result: null, executed: false, error: null };
 
-  if (/\b(categorize|recategorize)\b.*\b(to|as)\b/i.test(msg)) {
+  if (
+    /\b(categorize|recategorize)\b.*\b(to|as)\b/i.test(msg) ||
+    /^(?:anything from\s+)?.+?\s+(?:is|should be)\s+.+$/i.test(msg) ||
+    /^(?:that should be|it should be)\s+.+$/i.test(msg) ||
+    /^(?:wrong|that'?s wrong|that is wrong)\s*[—,:-]?\s*(?:it'?s\s+)?(.+)$/i.test(msg) ||
+    /\bpersonal expense\b|\bthat'?s personal\b/i.test(msg)
+  ) {
     return { intent: "categorize", action: "categorize_qbo_transaction", params: { instruction: message }, result: null, executed: false, error: null };
   }
   if (/\b(create|add|set up)\b.*\b(vendor|supplier)\b/i.test(msg)) {
