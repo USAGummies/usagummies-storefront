@@ -170,7 +170,10 @@ async function releaseHeldMorningBriefIfNeeded(ctx: SlackMessageContext): Promis
   if (!isBenUser(ctx.user)) return;
   const held = await readState<HeldMorningBrief | null>(MORNING_BRIEF_HELD_KEY, null).catch(() => null);
   if (!held?.content || held.date !== pacificDateLabel()) return;
-  const sent = await sendDirectMessage(BEN_SLACK_USER_ID, `☀️ *Morning Brief*\n\n${held.content}`).catch(() => false);
+  const briefMessage = `☀️ *Morning Brief*\n\n${held.content}`;
+  const sent =
+    (await sendDirectMessage(BEN_SLACK_USER_ID, briefMessage).catch(() => false)) ||
+    (await postSlackMessage(ctx.channel, briefMessage, { threadTs: ctx.threadTs || ctx.ts }).catch(() => false));
   if (sent) {
     await writeState(MORNING_BRIEF_HELD_KEY, null).catch(() => {});
   }

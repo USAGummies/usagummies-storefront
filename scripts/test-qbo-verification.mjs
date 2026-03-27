@@ -35,8 +35,8 @@ async function getJson(path) {
   return { ok: res.ok, status: res.status, ms, json };
 }
 
-function accountExists(accounts, acctNum) {
-  return accounts.some((account) => String(account.AcctNum || "").trim() === String(acctNum));
+function accountExists(accounts, matcher) {
+  return accounts.some((account) => matcher(account));
 }
 
 async function run() {
@@ -54,13 +54,25 @@ async function run() {
     detail: `count=${vendors.json.count || 0}`,
   });
 
-  const accounts = await getJson("/api/ops/qbo/accounts");
-  const requiredAccounts = ["4100", "4200", "4300", "4400", "5100", "5200", "5300", "5400", "2300"];
+  const accounts = await getJson("/api/ops/qbo/query?type=accounts");
+  const requiredAccounts = [
+    (account) => String(account.Name || "").toLowerCase() === "amazon" && String(account.AcctNum || "").trim() === "400010",
+    (account) => String(account.Name || "").toLowerCase().includes("shopify") && String(account.AcctNum || "").trim() === "400020",
+    (account) => String(account.Name || "").toLowerCase().includes("wholesale") && String(account.AcctNum || "").trim() === "400025",
+    (account) => String(account.Name || "").toLowerCase() === "faire" && String(account.AcctNum || "").trim() === "400030",
+    (account) => String(account.Name || "").toLowerCase().includes("albanese") && String(account.AcctNum || "").trim() === "500010",
+    (account) => String(account.Name || "").toLowerCase().includes("belmark") && String(account.AcctNum || "").trim() === "500015",
+    (account) => String(account.Name || "").toLowerCase().includes("powers") && String(account.AcctNum || "").trim() === "500020",
+    (account) => String(account.Name || "").toLowerCase().includes("freight") && String(account.AcctNum || "").trim() === "500025",
+    (account) =>
+      String(account.Name || "").toLowerCase().includes("investor loan") &&
+      /liability/i.test(String(account.AccountType || "")),
+  ];
   checks.push({
     name: "accounts",
     ok:
       accounts.ok &&
-      requiredAccounts.every((acctNum) => accountExists(accounts.json.accounts || [], acctNum)),
+      requiredAccounts.every((matcher) => accountExists(accounts.json.accounts || [], matcher)),
     detail: `required=${requiredAccounts.length}`,
   });
 

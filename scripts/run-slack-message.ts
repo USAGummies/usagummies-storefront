@@ -21,22 +21,36 @@ async function main() {
   const payload = JSON.parse(raw) as InputMessage | InputMessage[];
   const inputs = Array.isArray(payload) ? payload : [payload];
   const results = [];
+  const original = {
+    log: console.log,
+    info: console.info,
+    warn: console.warn,
+  };
+  console.log = () => {};
+  console.info = () => {};
+  console.warn = () => {};
 
-  for (const item of inputs) {
-    const startedAt = Date.now();
-    const result = await processAbraMessage({
-      text: item.text,
-      user: item.user,
-      channel: item.channel,
-      ts: item.ts || `${Date.now() / 1000}`,
-      ...(item.threadTs ? { threadTs: item.threadTs } : {}),
-      ...(item.displayName ? { displayName: item.displayName } : {}),
-      ...(item.history ? { history: item.history } : {}),
-    });
-    results.push({
-      ms: Date.now() - startedAt,
-      ...result,
-    });
+  try {
+    for (const item of inputs) {
+      const startedAt = Date.now();
+      const result = await processAbraMessage({
+        text: item.text,
+        user: item.user,
+        channel: item.channel,
+        ts: item.ts || `${Date.now() / 1000}`,
+        ...(item.threadTs ? { threadTs: item.threadTs } : {}),
+        ...(item.displayName ? { displayName: item.displayName } : {}),
+        ...(item.history ? { history: item.history } : {}),
+      });
+      results.push({
+        ms: Date.now() - startedAt,
+        ...result,
+      });
+    }
+  } finally {
+    console.log = original.log;
+    console.info = original.info;
+    console.warn = original.warn;
   }
 
   process.stdout.write(JSON.stringify(Array.isArray(payload) ? results : results[0]));

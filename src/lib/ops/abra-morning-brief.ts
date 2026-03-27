@@ -1114,12 +1114,18 @@ export async function sendMorningBrief(): Promise<void> {
           signal: AbortSignal.timeout(10000),
         });
         console.log("[morning-brief] DM sent to Ben");
+      } else {
+        await notify({
+          channel: "alerts",
+          text: `☀️ Ben Morning Brief\n\n${brief}`,
+        });
+        console.warn("[morning-brief] Ben DM unavailable, posted brief to alerts channel");
       }
     } catch (err) {
       console.warn("[morning-brief] Ben DM failed:", err instanceof Error ? err.message : err);
       await notify({
         channel: "alerts",
-        text: `⚠️ Morning brief DM to Ben failed: ${err instanceof Error ? err.message : "unknown error"}`,
+        text: `☀️ Ben Morning Brief\n\n${brief}`,
       });
     }
   } else {
