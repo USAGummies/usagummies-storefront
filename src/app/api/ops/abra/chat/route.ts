@@ -55,6 +55,7 @@ import {
 } from "@/lib/ops/abra-actions";
 import { executeRoutedAction, renderRoutedActionResponse } from "@/lib/ops/operator/action-executor";
 import { routeMessage } from "@/lib/ops/operator/deterministic-router";
+import { formatDrivingModeReply, getDrivingModeState } from "@/lib/ops/operator/driving-mode";
 import { getPromptVersion } from "@/lib/ops/prompt-version";
 import { analyzePipeline } from "@/lib/ops/abra-pipeline-intelligence";
 import { EMAIL_EXTRACTION_SKILL } from "@/lib/ops/abra-skill-email-data-extraction";
@@ -108,6 +109,13 @@ const DEFAULT_CLAUDE_MODEL =
   process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
 const MAX_MESSAGE_LENGTH = 5000;
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
+
+async function maybeFormatDrivingReply(actorLabel: string, reply: string): Promise<string> {
+  if (!/ben/i.test(actorLabel || "")) return reply;
+  const driving = await getDrivingModeState().catch(() => null);
+  if (!driving?.active) return reply;
+  return formatDrivingModeReply(reply);
+}
 
 function jsonWithPromptVersion(
   payload: Record<string, unknown>,
@@ -680,10 +688,14 @@ export async function POST(req: Request) {
       ? payload.message.replaceAll("\0", "").trim()
       : "";
   if (!rawMessage) {
-    return NextResponse.json(
-      { error: "message is required" },
-      { status: 400 },
-    );
+    return jsonWithPromptVersion({
+      reply: "What can I help with?",
+      confidence: 1,
+      sources: [],
+      intent: "quick_ack",
+      thread_id: makeThreadId(),
+      deterministic_action: "quick_ack_empty",
+    });
   }
   if (rawMessage.length > MAX_MESSAGE_LENGTH) {
     return NextResponse.json(
@@ -767,8 +779,9 @@ export async function POST(req: Request) {
     );
     if (executedAction.executed && !executedAction.error) {
       const rendered = renderRoutedActionResponse(executedAction);
+      const finalReply = await maybeFormatDrivingReply(actorLabel, rendered.reply);
       return jsonWithPromptVersion({
-        reply: rendered.reply,
+        reply: finalReply,
         confidence: 1,
         sources: [],
         intent: executedAction.intent,
@@ -922,11 +935,12 @@ export async function POST(req: Request) {
     });
     if (executedAction.executed && !executedAction.error) {
       const rendered = renderRoutedActionResponse(executedAction);
+      const finalReply = await maybeFormatDrivingReply(actorLabel, rendered.reply);
       queueChatHistory({
         threadId,
         userEmail: actorEmail,
         userMessage: message,
-        assistantMessage: rendered.reply,
+        assistantMessage: finalReply,
         metadata: {
           intent: executedAction.intent,
           deterministic_action: executedAction.action,
@@ -934,7 +948,7 @@ export async function POST(req: Request) {
         actorLabel,
       });
       return jsonWithPromptVersion({
-        reply: rendered.reply,
+        reply: finalReply,
         confidence: 1,
         sources: [],
         intent: executedAction.intent,

@@ -19,11 +19,11 @@ function normalize(text: string): string {
 }
 
 export function isDrivingActivationText(text: string): boolean {
-  return /\b(i'?m driving|heading out|on the road|in the car|driving to|heading to)\b/i.test(text);
+  return /\b(i'?m driving|heading out|on the road|in the car|driving to|heading to|heading home|heading back)\b/i.test(text);
 }
 
 export function isDrivingDeactivationText(text: string): boolean {
-  return /\b(i'?m here|arrived|parked|back at desk|done driving)\b/i.test(text);
+  return /\b(i'?m here|arrived|parked|back at desk|done driving|i'?m home|home now)\b/i.test(text);
 }
 
 export function extractDrivingDestination(text: string): string | null {
@@ -86,7 +86,7 @@ function stripFormatting(text: string): string {
 
 export function formatDrivingModeReply(text: string): string {
   const stripped = stripFormatting(text);
-  const shortened = stripped.length > 200 ? `${stripped.slice(0, 196).trim()}...` : stripped;
+  const shortened = stripped.length > 176 ? `${stripped.slice(0, 176).trim()}...` : stripped;
   if (/[?]$/.test(shortened)) return shortened;
   return `${shortened} Need anything else?`;
 }

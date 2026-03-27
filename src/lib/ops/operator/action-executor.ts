@@ -4,6 +4,7 @@ import { maybeLearnFinancialCorrection } from "@/lib/ops/operator/correction-lea
 import { proposeAndMaybeExecute, type AbraAction } from "@/lib/ops/abra-actions";
 import { type SlackMessageContext } from "@/lib/ops/abra-slack-responder";
 import { type RoutedAction } from "@/lib/ops/operator/deterministic-router";
+import { buildCompactBenBrief, buildCompactReneBrief } from "@/lib/ops/abra-morning-brief";
 import {
   activateDrivingMode,
   deactivateDrivingMode,
@@ -25,6 +26,29 @@ type ApprovalRow = {
 };
 
 type MeetingPrepLog = Record<string, string>;
+
+function extractEmailSearchQuery(instruction: string): string {
+  const fromMatch = instruction.match(/\bfrom\s+(.+)$/i);
+  if (fromMatch?.[1]) return fromMatch[1].trim();
+  return instruction.trim();
+}
+
+async function getSlackHistoryCountForUser(channel: string, userId: string): Promise<number> {
+  const token = (process.env.SLACK_BOT_TOKEN || "").trim();
+  if (!token) return 0;
+  const url = new URL("https://slack.com/api/conversations.history");
+  url.searchParams.set("channel", channel);
+  url.searchParams.set("oldest", `${Math.floor((Date.now() - 24 * 60 * 60 * 1000) / 1000)}`);
+  url.searchParams.set("limit", "200");
+  const res = await fetch(url.toString(), {
+    headers: { Authorization: `Bearer ${token}` },
+    signal: AbortSignal.timeout(10000),
+  }).catch(() => null);
+  if (!res?.ok) return 0;
+  const data = (await res.json().catch(() => ({}))) as { ok?: boolean; messages?: Array<{ user?: string }> };
+  const messages = Array.isArray(data.messages) ? data.messages : [];
+  return messages.filter((message) => String(message.user || "") === userId).length;
+}
 
 function getSupabaseEnv() {
   const baseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -117,6 +141,14 @@ function pacificDateLabel(value = new Date()): string {
 
 function compactCurrency0(value: number): string {
   return compactCurrency(value, 0);
+}
+
+function isBenActor(context: { actor: string; slackUserId?: string }): boolean {
+  return context.slackUserId === "U08JY86Q508" || /ben/i.test(context.actor || "");
+}
+
+function isReneActor(context: { actor: string; slackUserId?: string }): boolean {
+  return context.slackUserId === "U0ALL27JM38" || /rene/i.test(context.actor || "");
 }
 
 function buildAction(action_type: string, params: Record<string, unknown>, title: string, description: string): AbraAction {
@@ -232,6 +264,14 @@ export async function executeRoutedAction(
         break;
       }
       case "query_company_status": {
+        if (action.params.greeting && isBenActor(context)) {
+          action.result = { specialBrief: await buildCompactBenBrief() };
+          break;
+        }
+        if (action.params.greeting && isReneActor(context)) {
+          action.result = { specialBrief: await buildCompactReneBrief() };
+          break;
+        }
         const [revenue, tasks, inventory] = await Promise.all([
           executeRoutedAction({ intent: "revenue", action: "query_kpi_revenue", params: {}, result: null, executed: false, error: null }, context),
           executeRoutedAction({ intent: "tasks", action: "query_operator_tasks", params: {}, result: null, executed: false, error: null }, context),
@@ -373,7 +413,10 @@ export async function executeRoutedAction(
         break;
       case "check_email":
       case "search_email": {
-        const query = String(action.params.query || "newer_than:2d");
+        const rawQuery = String(action.params.query || "newer_than:2d");
+        const query = /\bread the email from\b/i.test(rawQuery)
+          ? `newer_than:365d ${extractEmailSearchQuery(rawQuery)}`
+          : rawQuery;
         const emails = await listEmails({ query, count: 5 }).catch(() => []);
         action.result = { emails, query };
         break;
@@ -422,6 +465,42 @@ export async function executeRoutedAction(
         };
         break;
       }
+      case "query_rene_activity": {
+        const todayCount = await getSlackHistoryCountForUser("C0AKG9FSC2J", "U0ALL27JM38").catch(() => 0);
+        action.result = { todayCount };
+        break;
+      }
+      case "query_driving_backlog": {
+        const backlog = await readState<{ items?: Array<{ ts: string; summary: string }> } | null>("abra:driving_mode_backlog" as never, null).catch(() => null);
+        const items = Array.isArray(backlog?.items) ? backlog.items : [];
+        action.result = { count: items.length, items: items.slice(-8) };
+        break;
+      }
+      case "query_rene_needs": {
+        const [approvals, tasks] = await Promise.all([
+          sbFetch<ApprovalRow[]>("/rest/v1/approvals?status=eq.pending&select=id,summary&order=requested_at.asc&limit=10").catch(() => []),
+          sbFetch<Array<{ title?: string | null; status?: string | null; task_type?: string | null }>>(
+            "/rest/v1/abra_operator_tasks?status=in.(pending,needs_approval)&select=title,status,task_type&order=created_at.asc&limit=12",
+          ).catch(() => []),
+        ]);
+        action.result = { approvals, tasks };
+        break;
+      }
+      case "query_qbo_health": {
+        const data = await fetchInternalJson("/api/ops/qbo/query?type=purchases&limit=200");
+        const purchases = Array.isArray(data?.purchases) ? (data.purchases as Array<Record<string, unknown>>) : [];
+        const uncategorized = purchases.filter((purchase) => {
+          const firstLine = Array.isArray(purchase.Lines) ? ((purchase.Lines[0] || {}) as Record<string, unknown>) : {};
+          const account = String(firstLine.Account || "").toLowerCase();
+          return !account || account.includes("uncategorized");
+        }).length;
+        action.result = {
+          total: purchases.length,
+          uncategorized,
+          categorized: Math.max(0, purchases.length - uncategorized),
+        };
+        break;
+      }
       case "query_wholesale_scenario": {
         const instruction = String(action.params.instruction || "");
         const accountsMatch = instruction.match(/\b(\d+)\s+wholesale accounts?\b/i);
@@ -449,6 +528,29 @@ export async function executeRoutedAction(
           totalRevenue,
           cogs,
         };
+        break;
+      }
+      case "query_historical_pnl": {
+        const year = String(action.params.year || "").trim();
+        const start = year ? `${year}-01-01` : "";
+        const end = year ? `${year}-12-31` : "";
+        const data = year
+          ? await fetchInternalJson(`/api/ops/qbo/query?type=pnl&start_date=${start}&end_date=${end}`)
+          : null;
+        action.result = { year, data };
+        break;
+      }
+      case "query_channel_revenue": {
+        const channel = String(action.params.channel || "").trim().toLowerCase();
+        action.result = { channel, found: false };
+        break;
+      }
+      case "refuse_destructive_request": {
+        action.result = { message: "I can't delete financial records from Slack. If you need cleanup, I can queue a review-safe audit step instead." };
+        break;
+      }
+      case "refuse_financial_tamper": {
+        action.result = { message: "I can't alter balances to arbitrary numbers. I can help reconcile the books or investigate why a balance looks wrong." };
         break;
       }
       case "categorize_qbo_transaction": {
@@ -496,7 +598,7 @@ export async function executeRoutedAction(
         const customerName = String(action.params.customerName || "").trim();
         const lineItems = parseLineItemsFromInstruction(instruction);
         const totalValue = lineItems.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.unitPrice || 0)), 0);
-        if (context.slackUserId === "U0ALL27JM38" && totalValue > 500) {
+        if (isReneActor(context) && totalValue > 500) {
           action.result = {
             ok: false,
             heldForApproval: true,
@@ -673,6 +775,9 @@ export function renderRoutedActionResponse(action: RoutedAction): { reply: strin
     }
     case "query_company_status": {
       const result = (action.result || {}) as Record<string, unknown>;
+      if (typeof result.specialBrief === "string" && result.specialBrief.trim()) {
+        return { reply: result.specialBrief };
+      }
       const revenue = (result.revenue || {}) as Record<string, unknown>;
       const tasks = (result.tasks || {}) as Record<string, number>;
       const inventory = (result.inventory || {}) as Record<string, unknown>;
@@ -850,6 +955,48 @@ export function renderRoutedActionResponse(action: RoutedAction): { reply: strin
         ].join(" "),
       };
     }
+    case "query_rene_activity": {
+      const result = (action.result || {}) as Record<string, unknown>;
+      const todayCount = Number(result.todayCount || 0);
+      return {
+        reply: todayCount > 0
+          ? `Yes. Rene has messaged ${todayCount} time${todayCount === 1 ? "" : "s"} in #financials today.`
+          : "No. Rene has not messaged in #financials yet today.",
+      };
+    }
+    case "query_driving_backlog": {
+      const result = (action.result || {}) as Record<string, unknown>;
+      const items = Array.isArray(result.items) ? (result.items as Array<Record<string, unknown>>) : [];
+      return {
+        reply: items.length
+          ? `While you were out: ${items.slice(0, 4).map((item) => String(item.summary || "")).filter(Boolean).join(" | ")}`
+          : "Nothing urgent piled up while you were out.",
+      };
+    }
+    case "query_rene_needs": {
+      const result = (action.result || {}) as Record<string, unknown>;
+      const approvals = Array.isArray(result.approvals) ? (result.approvals as ApprovalRow[]) : [];
+      const tasks = Array.isArray(result.tasks) ? (result.tasks as Array<Record<string, unknown>>) : [];
+      const items = [
+        ...approvals.slice(0, 2).map((approval) => String(approval.summary || "Approval waiting")),
+        ...tasks.slice(0, 2).map((task) => String(task.title || task.task_type || "Pending task")),
+      ].filter(Boolean);
+      return {
+        reply: items.length
+          ? `Rene needs: ${items.join(" | ")}`
+          : "Rene does not have anything waiting on you right now.",
+      };
+    }
+    case "query_qbo_health": {
+      const result = (action.result || {}) as Record<string, unknown>;
+      const total = Number(result.total || 0);
+      const categorized = Number(result.categorized || 0);
+      const uncategorized = Number(result.uncategorized || 0);
+      const pct = total > 0 ? Math.round((categorized / total) * 100) : 100;
+      return {
+        reply: `QBO health: ${categorized}/${total} categorized (${pct}%) | ${uncategorized} uncategorized.`,
+      };
+    }
     case "query_wholesale_scenario": {
       const result = (action.result || {}) as Record<string, unknown>;
       return {
@@ -894,6 +1041,24 @@ export function renderRoutedActionResponse(action: RoutedAction): { reply: strin
     }
     case "draft_email_reply":
       return { reply: "Draft reply queued for human approval. It was not sent." };
+    case "query_historical_pnl": {
+      const result = (action.result || {}) as Record<string, unknown>;
+      const year = String(result.year || "").trim();
+      const data = (result.data || null) as Record<string, unknown> | null;
+      const summary = ((data || {}).summary || {}) as Record<string, unknown>;
+      const revenue = Number(summary["Total Income"] || summary.TotalIncome || summary["Total Revenue"] || 0);
+      if (!year || !data || (!revenue && Object.keys(summary).length === 0)) {
+        return { reply: `I don't have reliable P&L data for ${year || "that period"} in the current books yet.` };
+      }
+      return { reply: formatPnl(data) };
+    }
+    case "query_channel_revenue": {
+      const result = (action.result || {}) as Record<string, unknown>;
+      return { reply: `I don't have a ${String(result.channel || "that")} revenue channel in the current books.` };
+    }
+    case "refuse_destructive_request":
+    case "refuse_financial_tamper":
+      return { reply: String(((action.result || {}) as Record<string, unknown>).message || "I can't do that.") };
     case "create_brain_entry":
       return {
         reply: ((action.result || {}) as Record<string, unknown>).entityUpdated

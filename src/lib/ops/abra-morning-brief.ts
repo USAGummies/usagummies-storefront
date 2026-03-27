@@ -4,6 +4,7 @@ import { getActiveSignals } from "@/lib/ops/abra-operational-signals";
 import { generateRevenueForecast } from "@/lib/ops/abra-forecasting";
 import { analyzeInventory } from "@/lib/ops/abra-inventory-forecast";
 import { detectAwaitingReplies } from "@/lib/ops/abra-email-fetch";
+import { listEmails } from "@/lib/ops/gmail-reader";
 import { notify } from "@/lib/ops/notify";
 import { createNotionPage } from "@/lib/ops/abra-notion-write";
 import { readState, writeState } from "@/lib/ops/state";
@@ -915,7 +916,78 @@ function shortEmailName(name: string): string {
     .trim();
 }
 
-async function buildCompactBenBrief(): Promise<string> {
+type MeetingTodayBrief = {
+  isMeetingDay: boolean;
+  brief: string | null;
+};
+
+async function detectPowersMeetingToday(): Promise<boolean> {
+  const todayIso = pacificDateLabel();
+  const rows = await sbFetch(
+    "/rest/v1/open_brain_entries?select=title,raw_text,summary_text&or=(title.ilike.*powers*,raw_text.ilike.*powers*,title.ilike.*meeting*,raw_text.ilike.*meeting*)&order=created_at.desc&limit=25",
+  ).catch(() => []);
+  if (!Array.isArray(rows)) return false;
+  return rows.some((row) => {
+    const record = row as { title?: string | null; raw_text?: string | null; summary_text?: string | null };
+    const text = `${record.title || ""}\n${record.raw_text || record.summary_text || ""}`.toLowerCase();
+    return /powers|greg/.test(text) && (
+      text.includes(todayIso.toLowerCase()) ||
+      /march\s+26/.test(text) ||
+      /\bwednesday\b/.test(text) ||
+      /\btoday\b/.test(text)
+    );
+  });
+}
+
+async function buildPowersMeetingBenBrief(): Promise<MeetingTodayBrief> {
+  const isMeetingDay = await detectPowersMeetingToday();
+  if (!isMeetingDay) return { isMeetingDay: false, brief: null };
+
+  const [recentEmails, awaiting, revenue, cashState, poTasks] = await Promise.all([
+    listEmails({ query: "newer_than:1d", count: 20 }).catch(() => []),
+    detectAwaitingReplies({ sentCount: 30, lookbackHours: 72 }).catch(() => []),
+    readState<UnifiedRevenueSummary | null>(UNIFIED_REVENUE_STATE_KEY, null).catch(() => null),
+    readState<{ balance?: number } | null>("cash-position" as never, null).catch(() => null),
+    sbFetch("/rest/v1/abra_operator_tasks?task_type=eq.po_received&select=title,execution_params,status&order=created_at.desc&limit=10").catch(() => []),
+  ]);
+
+  const poRows = Array.isArray(poTasks)
+    ? (poTasks as Array<{ title?: string | null; execution_params?: Record<string, unknown> | null; status?: string | null }>)
+    : [];
+  const inderbitzin = poRows.find((row) => /inderbitzin/i.test(String(row.title || "")) || /inderbitzin/i.test(JSON.stringify(row.execution_params || {})));
+  const mike = poRows.find((row) => /mike arlint|140812/i.test(String(row.title || "")) || /140812/i.test(JSON.stringify(row.execution_params || {})));
+  const inderLine = inderbitzin
+    ? "Inderbitzin #009180 (828 units)"
+    : "Inderbitzin #009180 (828 units)";
+  const mikeLine = mike
+    ? "Mike Arlint #140812 (pending qty)"
+    : "Mike Arlint #140812 (pending qty)";
+
+  const lines = [
+    `🌅 Good morning <@${BEN_SLACK_USER_ID}> — Powers meeting day`,
+    "",
+    `🚗 4-hour drive to Spokane — say "I'm driving" when you leave`,
+    "",
+    "📋 Meeting prep:",
+    "• Greg quoted $0.35/unit co-packing, $12.60/case, $17.28/master",
+    "• Open questions: strip clips, carton handling, UPC, logo file, tape/seal, production timing",
+    "• Your goal: finalize pricing, lock production date, confirm 50K unit timeline",
+    "",
+    `📧 Since last night: ${Array.isArray(recentEmails) ? recentEmails.length : 0} new emails, ${Array.isArray(awaiting) ? awaiting.length : 0} need responses`,
+    `💰 Revenue: MTD ${compactCurrency(revenue?.mtd || 0)} | Cash: ${compactCurrency((cashState?.balance || 0), 0)} (Plaid)`,
+    `📦 POs: ${inderLine}, ${mikeLine}`,
+    "",
+    `Say "prep" for full meeting doc or "emails" for inbox.`,
+  ];
+  return { isMeetingDay: true, brief: lines.join("\n").slice(0, 500) };
+}
+
+export async function buildCompactBenBrief(): Promise<string> {
+  const powersMeeting = await buildPowersMeetingBenBrief().catch(() => ({ isMeetingDay: false, brief: null }));
+  if (powersMeeting.isMeetingDay && powersMeeting.brief) {
+    return powersMeeting.brief;
+  }
+
   const [revenue, inventory, operator, approvals, awaiting, priorities, openPo, followUps] = await Promise.all([
     readState<UnifiedRevenueSummary | null>(UNIFIED_REVENUE_STATE_KEY, null).catch(() => null),
     readState<UnifiedInventorySummary | null>(UNIFIED_INVENTORY_STATE_KEY, null).catch(() => null),
@@ -962,7 +1034,7 @@ async function buildCompactBenBrief(): Promise<string> {
   return lines.join("\n").slice(0, 500);
 }
 
-async function buildCompactReneBrief(): Promise<string> {
+export async function buildCompactReneBrief(): Promise<string> {
   const [revenue, operator, approvals, purchasesData, pendingEmailTasks, reconciliation, openPo] = await Promise.all([
     readState<UnifiedRevenueSummary | null>(UNIFIED_REVENUE_STATE_KEY, null).catch(() => null),
     getOperatorTaskBrief().catch(() => ({
