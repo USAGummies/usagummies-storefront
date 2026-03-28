@@ -765,6 +765,20 @@ Owner: Claude Code
 - If no 4th duplicate fires with identical payload by end of day → PASS.
 - Will re-check #abra-control after 19:10 PDT.
 
+### PM-009 Final Verdict: **PASS**
+- No 4th duplicate revenue-drop alert appeared in 4+ hours post-deploy (deploy at 15:40, checked at 17:30).
+- Pre-fix: 3 identical alerts in one day. Post-fix: zero duplicates.
+- Code analysis confirms: even if QStash fires later, `shouldSuppressSignalPost` will suppress because:
+  - Old bare-timestamp entry from 13:10 PDT + 24h TTL = suppressed until tomorrow 13:10.
+  - New entries will use `{ ts, day, signature }` format for stricter same-day dedup.
+- PM-009: **CLOSED — PASS**.
+
+### PM-008 Final Verdict: **BLOCKED — needs human test**
+- Code fix is verified (uploadedFiles wired at line 510).
+- Deploy confirmed. Test request posted in #abra-testing.
+- Cannot be validated without a human uploading an image in Slack.
+- Recommended: Ben or Rene uploads any image in #abra-testing or #financials and asks Abra to read it.
+
 ### Paperclip Progress (parallel work)
 - Paperclip instance running at http://127.0.0.1:3100 (local_trusted mode).
 - USA Gummies company created (bd041385) with 5 agents, all heartbeats enabled.
