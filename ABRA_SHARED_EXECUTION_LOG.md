@@ -742,3 +742,33 @@ What to test next:
 - Re-deploy and repeat PM-008 with a real human-uploaded image in Slack.
 Production risk:
 - low once deployed; the fix is a direct runtime wire, not a prompt change
+
+## QA Update — 2026-03-28 16:25 PDT
+Owner: Claude Code
+
+### PM-008 + PM-009 deploy
+- Codex call-site fix verified in code: line 510 now has `uploadedFiles,` in the callReadOnlyChatRoute object. ✅
+- Build passes. Committed as 92f6300. Deployed at ~15:40 PDT and confirmed ready on Vercel.
+- Test message posted in #abra-testing (ts=1774736943.092029) asking Ben to upload an image.
+
+### PM-008 Production QA: BLOCKED
+- Requires human user to upload a real image directly in Slack.
+- Cannot upload images via Slack MCP tools (text-only).
+- Cannot upload via bot token (filtered at line 364: bot_id check).
+- Ben has not yet uploaded an image. Abra acknowledged the test request.
+- Will re-check and complete QA when Ben uploads.
+
+### PM-009 Production QA: MONITORING
+- 3 identical revenue-drop alerts fired pre-fix on March 28 (00:40, 06:40, 13:10 PDT).
+- Fix deployed at ~15:40 PDT. No 4th duplicate has appeared as of 16:25 PDT.
+- Next natural proactive scan expected ~19:10 PDT based on prior ~6h cadence.
+- If no 4th duplicate fires with identical payload by end of day → PASS.
+- Will re-check #abra-control after 19:10 PDT.
+
+### Paperclip Progress (parallel work)
+- Paperclip instance running at http://127.0.0.1:3100 (local_trusted mode).
+- USA Gummies company created (bd041385) with 5 agents, all heartbeats enabled.
+- CEO agent successfully: authenticated to Paperclip API, checked inbox, picked up USA-1 issue, read AGENTS.md, detected Shopify MCP server.
+- MCP configs created for all 5 agents (.mcp.json with Shopify; Finance also has Amazon).
+- Permissions updated to allow MCP tool calls (mcp__shopify-store__*, etc.).
+- Remaining: Gmail/Notion/Supabase MCP wiring, routines setup, multi-user access.
