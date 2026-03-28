@@ -288,20 +288,39 @@ function maybeHandleKnownThreadGuardrails(
   return null;
 }
 
-async function callReadOnlyChatRoute(payload: {
+type ChatRouteUpload = { name: string; mimeType: string; buffer: Buffer };
+
+export async function buildReadOnlyChatRouteRequest(payload: {
   message: string;
   history: Array<{ role: "user" | "assistant"; content: string }>;
   actorLabel: string;
   channel: string;
   slackChannelId: string;
   slackThreadTs: string;
-}): Promise<{ reply: string; blocks?: Array<Record<string, unknown>> } | null> {
+  uploadedFiles?: ChatRouteUpload[];
+}): Promise<{ headers: HeadersInit; body: string | FormData }> {
   const cronSecret = (process.env.CRON_SECRET || "").trim();
-  const res = await fetch(`${getInternalBaseUrl()}/api/ops/abra/chat`, {
-    method: "POST",
+  const authHeaders: Record<string, string> = cronSecret
+    ? { Authorization: `Bearer ${cronSecret}` }
+    : {};
+  if (payload.uploadedFiles && payload.uploadedFiles.length > 0) {
+    const form = new FormData();
+    form.set("message", payload.message);
+    form.set("history", JSON.stringify(payload.history));
+    form.set("actor_label", payload.actorLabel);
+    form.set("channel", "slack");
+    form.set("slack_channel_id", payload.slackChannelId);
+    form.set("slack_thread_ts", payload.slackThreadTs);
+    const firstFile = payload.uploadedFiles[0];
+    const blob = new Blob([new Uint8Array(firstFile.buffer)], { type: firstFile.mimeType || "application/octet-stream" });
+    form.set("file", blob, firstFile.name);
+    return { headers: authHeaders, body: form };
+  }
+
+  return {
     headers: {
       "Content-Type": "application/json",
-      ...(cronSecret ? { Authorization: `Bearer ${cronSecret}` } : {}),
+      ...authHeaders,
     },
     body: JSON.stringify({
       message: payload.message,
@@ -311,6 +330,23 @@ async function callReadOnlyChatRoute(payload: {
       slack_channel_id: payload.slackChannelId,
       slack_thread_ts: payload.slackThreadTs,
     }),
+  };
+}
+
+async function callReadOnlyChatRoute(payload: {
+  message: string;
+  history: Array<{ role: "user" | "assistant"; content: string }>;
+  actorLabel: string;
+  channel: string;
+  slackChannelId: string;
+  slackThreadTs: string;
+  uploadedFiles?: ChatRouteUpload[];
+}): Promise<{ reply: string; blocks?: Array<Record<string, unknown>> } | null> {
+  const request = await buildReadOnlyChatRouteRequest(payload);
+  const res = await fetch(`${getInternalBaseUrl()}/api/ops/abra/chat`, {
+    method: "POST",
+    headers: request.headers,
+    body: request.body,
     cache: "no-store",
     signal: AbortSignal.timeout(55000),
   });

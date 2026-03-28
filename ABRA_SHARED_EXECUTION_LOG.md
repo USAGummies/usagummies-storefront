@@ -515,3 +515,154 @@ What to test next:
 - In the same thread, correct Abra with `you know my meeting with powers was the 25th...` and verify it acknowledges the correction instead of categorization behavior.
 Production risk:
 - medium
+
+## Production QA Round 2 — 2026-03-28 12:40 PDT
+Owner: Claude Code
+Area: PM-005 / PM-006 / PM-010 live Slack validation
+Deploy: commit 65e53b8, Vercel production confirmed live at 12:39 PDT
+Channel: #abra-testing (C0A9S88E1FT), #abra-control (C0ALS6W7VB4)
+
+### QA-004: PM-005 — PDF upload and text extraction
+Status: INCONCLUSIVE — test method limitation
+Input: Uploaded `test-bank-statement.pdf` (100KB, text-based, 7 transactions) to #abra-testing via Slack Bot API. Then sent: `@Abra I just uploaded a bank statement PDF above. Can you read it and extract the transactions? What's the closing balance?`
+Expected: Abra downloads the PDF, extracts text via `file-text-extraction.ts`, and returns transaction data + closing balance ($9,746.09).
+Actual: Abra responded: "I cannot read PDF file attachments directly. The file isn't passed to me as extractable text."
+Root cause of test failure: The PDF was uploaded using the bot token (`xoxb-...`), so the Slack events route correctly rejected it at line 364: `if (bot_id || subtype === "bot_message") return`. The file never entered the extraction pipeline. Ben's follow-up message referenced the PDF but had no file attached — so events route processed a text-only message with no file to extract.
+Code verification: The extraction code path IS present and wired:
+- `src/app/api/ops/slack/events/route.ts` line 197: PDF extraction via `extractPdfTextFromBuffer`
+- `src/lib/ops/file-text-extraction.ts`: unified `pdfjs-dist` extractor
+- `src/app/api/ops/abra/chat/route.ts` line 60: imports same extractor
+The old hardcoded guardrail "PDF parsing is unavailable on the server" is confirmed REMOVED.
+What's needed: A human (Ben or Rene) must upload a PDF directly in Slack. Bot-uploaded files are correctly skipped.
+Manual test for Ben: Upload `/tmp/test-bank-statement.pdf` to #abra-testing and say "@Abra extract the transactions and closing balance from this PDF."
+
+### QA-005: PM-010 — meeting/calendar routing (date question)
+Status: PASS
+Input: `@Abra what day is my powers meeting? Can you verify from my email please?`
+Expected: Meeting evidence from email, not transaction categorization or raw email dump.
+Actual: "I found the meeting referenced as March 25, 2026 in email 'Clarifying questions'. I also found other date references: April 1, Mar 25, 2026."
+Evidence: Thread ts=1774726801.236269, reply ts=1774726812.232869
+Notes: Correct routing to `query_meeting_context`. Single reply (PM-007 dedup holding). Compare to March 27 pre-patch: same question returned "Found 0 similar transactions and fixed 0."
+
+### QA-006: PM-010 — meeting/calendar correction in same thread
+Status: PASS
+Input (same thread): `you know my meeting with powers was the 25th from the information in my emails. So how is today the powers meeting day?`
+Expected: Acknowledgment/correction, not finance categorization.
+Actual: "Understood. I'll use the meeting date from the thread context instead of assuming today."
+Evidence: Thread ts=1774726801.236269, reply ts=1774726937.069869
+Notes: Correct routing to `acknowledge_meeting_correction`. Single reply. Compare to March 27 pre-patch: "Got it — powers → today the powers meeting day?. Found 0 similar transactions and fixed 0."
+
+### QA-007: PM-006 — bank-feed sweep dedup
+Status: PENDING — awaiting 1:12 PM hourly sweep
+Last pre-fix message: 12:12 PM (pre-deploy). Deploy live at 12:39 PM.
+Next expected sweep: ~1:12 PM. If counts unchanged (still 0/41), the fix should suppress the post.
+Will update after sweep fires.
+
+### Side observation: PM-007 dedup lock holding
+Both PM-010 test messages got exactly 1 reply each. No duplicates in any post-deploy interaction. Per-message reply lock from Day 4-6 continues to work.
+
+## 2026-03-28 14:55 PT — Replatform plan locked
+Owner: Codex
+Summary:
+- Added `ABRA_REPLATFORM_PLAN.md` as the canonical migration/build-order document.
+- Locked the hybrid decision:
+  - Paperclip = orchestration/control plane
+  - current repo = execution backend + storefront
+  - Slack = user interface
+  - Notion = blueprint / curated knowledge
+- Confirmed that API/MCP integrations stay primary; Computer Use is fallback only.
+- Confirmed there will be no big-bang migration and no deletions until the new control-plane path proves itself.
+
+### Notion Sync Payload
+Target Notion root page:
+- `USA Gummies 2.0 — Project Abra`
+- https://www.notion.so/31d4c0c42c2e810f936fd59d0431cc5d
+
+Claude Code should mirror the following into Notion as a new subpage or section titled:
+- `Abra Replatform Plan — Hybrid Control Plane`
+
+Content to mirror:
+1. Goal
+- Get to a working multi-user operating system for USA Gummies as fast as possible.
+- Users: Ben, Rene, Drew.
+- Results over architecture purity.
+
+2. Architecture decision
+- Paperclip = orchestration/control plane.
+- Current repo = execution backend and storefront.
+- Slack = main human interface.
+- Claude/Codex workers = bounded background workers.
+- Computer Use = fallback only.
+
+3. Keep
+- Gmail ingestion/email intelligence.
+- QBO integration.
+- Supabase runtime state.
+- PO pipeline.
+- approvals.
+- entity state.
+- storefront app.
+
+4. Stop building on
+- monolithic chatbot orchestration.
+- LLM-first action routing for core workflows.
+- duplicated responder/orchestration paths.
+- custom scheduling glue where the control plane can own it.
+
+5. First agents
+- Abra CEO
+- Email Intelligence
+- Finance
+- Operations
+- Sales
+
+6. First routines
+- Email intelligence sweep
+- Morning brief
+- Finance digest
+- PO review
+
+7. Build order
+- Phase 1: stand up Paperclip pilot locally and prove one real workflow.
+- Phase 2: route core daily work through the new layer.
+- Phase 3: retire redundant orchestration only after parity is proven.
+
+8. Ownership split
+- Codex: backend execution hardening, deterministic handlers, state/idempotency, thin adapters.
+- Claude Code: Paperclip setup, Slack QA, live validation, Notion sync.
+
+9. Non-negotiables
+- Never auto-send email.
+- Keep deterministic state and dedup logic.
+- Prefer APIs/MCP over Computer Use.
+- No deletions until the new layer proves itself.
+
+Blocker:
+- Notion write is blocked in Codex session because available Notion tools are read-only and Playwright browser is not authenticated.
+- Claude Code should perform the actual Notion write/sync from its side and then log the page URL back here.
+
+## Handoff — 2026-03-28 14:35 PDT
+Owner: Codex
+Area: PM-008 image capability consistency + PM-009 revenue-signal dedup
+Files:
+- /Users/ben/usagummies-storefront/src/app/api/ops/slack/events/route.ts
+- /Users/ben/usagummies-storefront/src/lib/ops/proactive-alerts.ts
+- /Users/ben/usagummies-storefront/src/lib/ops/__tests__/proactive-alerts-and-images.test.ts
+What changed:
+- PM-008 fixed at the Slack-events owner path: image-attached Slack messages now use the same multipart upload path to `/api/ops/abra/chat` that the main Slack responder uses. That means the actual image bytes are forwarded instead of only a text hint, so Abra now has one consistent capability story for direct Slack image uploads.
+- Added exported helper `buildReadOnlyChatRouteRequest(...)` so the Slack events route has one explicit request builder for JSON vs multipart behavior.
+- PM-009 fixed at the proactive-alert owner: revenue-drop notifications now suppress identical same-day signal payloads instead of reposting after the old 6-hour window. The legacy `dedupKey` is still honored, but signal-post state now tracks `{ ts, day, signature }` so same-day identical revenue alerts do not repeat.
+What was actually broken:
+- PM-008 was not just prompt wording. The Slack events route downloaded the image but only passed a text message into the chat route, while the main Slack responder used multipart with the actual image bytes. Two different ingestion paths caused contradictory capability behavior.
+- PM-009 was another notification-state problem: the old proactive-alert path only used a 6-hour dedup window, so the same revenue-drop payload could repost twice in one day.
+Tests run:
+- `npm --prefix /Users/ben/usagummies-storefront test -- src/lib/ops/__tests__/proactive-alerts-and-images.test.ts src/lib/ops/__tests__/router-and-sweep.test.ts src/lib/ops/__tests__/file-text-extraction.test.ts src/lib/ops/__tests__/abra-action-helpers.test.ts src/lib/ops/__tests__/abra-schemas.test.ts`
+- `npm --prefix /Users/ben/usagummies-storefront run build`
+Results:
+- targeted tests: 24/24 passed
+- build: passed
+What to test next:
+- In production Slack, upload a real image directly as a human user and ask Abra to read it. Expected: single consistent answer grounded in the image, not a capability contradiction.
+- Trigger or observe the revenue-drop scan twice on the same day with unchanged data. Expected: only one Slack alert for the identical payload.
+Production risk:
+- medium until Claude verifies production behavior after deploy

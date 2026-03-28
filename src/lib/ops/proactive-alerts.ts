@@ -51,7 +51,12 @@ export type ProactiveScanResult = {
 };
 
 type DedupMap = Record<string, number>; // dedupKey → timestamp ms
-type SignalPostState = Record<string, number>;
+type SignalPostEntry = {
+  ts: number;
+  day: string;
+  signature: string;
+};
+type SignalPostState = Record<string, number | SignalPostEntry>;
 const SIGNAL_POST_STATE_KEY = "abra:signal_posts" as never;
 
 // ---------------------------------------------------------------------------
@@ -186,6 +191,31 @@ function isDuplicate(dedupKey: string, dedupTtlHours: number, map: DedupMap): bo
   return Date.now() - lastTs < ttlMs;
 }
 
+export function buildProactiveAlertSignature(alert: Pick<ProactiveAlert, "type" | "title" | "message" | "data">): string {
+  return JSON.stringify({
+    type: alert.type,
+    title: alert.title,
+    message: alert.message,
+    data: alert.data,
+  });
+}
+
+export function shouldSuppressSignalPost(
+  entry: number | SignalPostEntry | undefined,
+  currentDay: string,
+  signature: string,
+  nowMs: number,
+  ttlHours = 6,
+): boolean {
+  if (!entry) return false;
+  if (typeof entry === "number") {
+    return nowMs - entry < ttlHours * 60 * 60 * 1000;
+  }
+  if (entry.day !== currentDay) return false;
+  if (entry.signature === signature) return true;
+  return nowMs - entry.ts < ttlHours * 60 * 60 * 1000 && entry.signature === signature;
+}
+
 // ---------------------------------------------------------------------------
 // ET time helper
 // ---------------------------------------------------------------------------
@@ -244,7 +274,7 @@ export async function checkRevenueDrop(): Promise<ProactiveAlert | null> {
       dropPct: Math.round(dropPct),
     },
     dedupKey: `revenue-drop-${todayStr}`,
-    dedupTtlHours: 6,
+    dedupTtlHours: 24,
   };
 }
 
@@ -442,13 +472,15 @@ export async function runProactiveAlertScan(): Promise<ProactiveScanResult> {
 
   // Clean expired entries from dedup map
   const now = Date.now();
+  const currentDay = getDateStringET(0);
   for (const [key, ts] of Object.entries(dedupMap)) {
     // Remove entries older than 24h regardless of TTL
     if (now - ts > 24 * 60 * 60 * 1000) {
       delete dedupMap[key];
     }
   }
-  for (const [key, ts] of Object.entries(signalPostState)) {
+  for (const [key, entry] of Object.entries(signalPostState)) {
+    const ts = typeof entry === "number" ? entry : entry.ts;
     if (now - ts > 24 * 60 * 60 * 1000) {
       delete signalPostState[key];
     }
@@ -460,8 +492,9 @@ export async function runProactiveAlertScan(): Promise<ProactiveScanResult> {
       continue;
     }
     const signalKey = `${alert.type}|proactive-alerts`;
-    const lastSignalTs = signalPostState[signalKey];
-    if (lastSignalTs && now - lastSignalTs < 6 * 60 * 60 * 1000) {
+    const signature = buildProactiveAlertSignature(alert);
+    const lastSignalEntry = signalPostState[signalKey];
+    if (shouldSuppressSignalPost(lastSignalEntry, currentDay, signature, now)) {
       suppressed++;
       continue;
     }
@@ -478,7 +511,7 @@ export async function runProactiveAlertScan(): Promise<ProactiveScanResult> {
 
     // Mark as sent in dedup map
     dedupMap[alert.dedupKey] = now;
-    signalPostState[signalKey] = now;
+    signalPostState[signalKey] = { ts: now, day: currentDay, signature };
     sent++;
   }
 
