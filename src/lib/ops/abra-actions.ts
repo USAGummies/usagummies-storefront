@@ -27,6 +27,7 @@ import {
   clampRiskLevel,
   type RiskLevel,
 } from "@/lib/ops/abra-policy";
+import { deriveTaskTitle, extractNotionPageId } from "@/lib/ops/abra-action-helpers";
 
 /** Map friendly database keys → Notion database IDs for create_notion_page action */
 const NOTION_DB_MAP: Record<string, string> = {
@@ -822,8 +823,7 @@ async function handleDraftEmailReply(
 async function handleCreateTask(
   params: Record<string, unknown>,
 ): Promise<ActionResult> {
-  const title = sanitizeTitle(String(params.title || ""));
-  if (!title) return { success: false, message: "Task title is required" };
+  const title = deriveTaskTitle(params);
 
   const description = sanitizeText(String(params.description || ""));
   const priorityRaw = String(params.priority || "normal").toLowerCase();
@@ -864,14 +864,18 @@ async function handleCreateTask(
 async function handleUpdateNotion(
   params: Record<string, unknown>,
 ): Promise<ActionResult> {
-  const pageId = typeof params.page_id === "string" ? params.page_id.replace(/-/g, "") : "";
+  const pageId =
+    extractNotionPageId(params.page_id) ||
+    extractNotionPageId(params.url) ||
+    extractNotionPageId(params.page) ||
+    null;
   const content = typeof params.content === "string" ? sanitizeText(params.content, 10000) : undefined;
   const properties =
     params.properties && typeof params.properties === "object"
       ? (params.properties as Record<string, unknown>)
       : undefined;
 
-  if (pageId && !/^[0-9a-f]{32}$/i.test(pageId)) {
+  if (params.page_id && !pageId) {
     return { success: false, message: "page_id must be a valid Notion page ID (32 hex characters)" };
   }
 
@@ -4124,16 +4128,38 @@ export function normalizeActionDirective(raw: unknown): AbraAction | null {
       ? obj.department.trim().slice(0, 50)
       : "executive";
 
+  const params =
+    obj.params && typeof obj.params === "object" && !Array.isArray(obj.params)
+      ? { ...(obj.params as Record<string, unknown>) }
+      : extractImplicitParams(obj, actionType);
+
+  if (actionType === "create_task") {
+    if (!String(params.title || "").trim()) {
+      params.title = title;
+    }
+    if (!String(params.description || "").trim() && typeof obj.description === "string") {
+      params.description = obj.description.trim().slice(0, 500);
+    }
+  }
+
+  if (actionType === "update_notion" && !params.page_id) {
+    const pageCandidate =
+      obj.page_id ||
+      obj.url ||
+      (typeof obj.description === "string" ? obj.description : "");
+    const extractedPageId = extractNotionPageId(pageCandidate);
+    if (extractedPageId) {
+      params.page_id = extractedPageId;
+    }
+  }
+
   return {
     action_type: actionType,
     title,
     description,
     department,
     risk_level: risk,
-    params:
-      obj.params && typeof obj.params === "object" && !Array.isArray(obj.params)
-        ? (obj.params as Record<string, unknown>)
-        : extractImplicitParams(obj, actionType),
+    params,
     requires_approval: obj.requires_approval !== false,
   };
 }

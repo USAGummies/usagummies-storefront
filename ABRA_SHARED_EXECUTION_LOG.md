@@ -305,3 +305,32 @@ Target (Architecture §1 Intake Layer): "Attachments, PDFs, screenshots, and ima
 Actual: PDF extraction fails on server. Day 4-6 patch stops Abra from lying about it, but capability is missing.
 Impact: Rene cannot upload bank statement PDFs for processing.
 Fix owner: Codex (runtime architecture).
+
+## Handoff — 2026-03-28 11:09 PDT
+Owner: Codex
+Area: PM-001 / PM-002 / PM-003 runtime fixes
+Files:
+- /Users/ben/usagummies-storefront/src/lib/ops/abra-actions.ts
+- /Users/ben/usagummies-storefront/src/lib/ops/abra-action-helpers.ts
+- /Users/ben/usagummies-storefront/src/lib/ops/abra-system-prompt.ts
+- /Users/ben/usagummies-storefront/src/lib/ops/__tests__/abra-action-helpers.test.ts
+What changed:
+- PM-001 fixed at the root cause: `create_task` now derives a sane title deterministically and `normalizeActionDirective()` maps top-level action fields into `params` before handler execution.
+- PM-002 fixed at the root cause: `update_notion` now accepts shared Notion URLs and normalizes them through a canonical page-id extractor before validation.
+- PM-003 fixed at the root cause: system prompt side-conversation rules now state that direct `@Abra` mentions always get a response, and mentions of Ben/Rene do not suppress valid requests in `#financials` or `#abra-control`.
+What was actually broken:
+- `create_task` handler depended on `params.title`, but LLM-produced directives often set `title` at the top level; the handler then failed with `Task title is required`.
+- `update_notion` only accepted bare 32-char IDs, so normal Slack-pasted Notion URLs were rejected.
+- Prompt guidance still explicitly told Abra to stay silent when another human was referenced, even on direct asks.
+Tests run:
+- `npm --prefix /Users/ben/usagummies-storefront test -- src/lib/ops/__tests__/abra-action-helpers.test.ts src/lib/ops/__tests__/abra-schemas.test.ts`
+- `npm --prefix /Users/ben/usagummies-storefront run build`
+Results:
+- targeted tests: 15/15 passed
+- build: passed
+Remaining risk:
+- PM-004 and PM-005 remain open.
+- `abra-actions.ts` is still oversized and should be reduced further out of the core runtime path.
+Next recommended owner split:
+- Codex: PM-004 and any deterministic runtime cleanup replacing regex guardrails with capability/state logic.
+- Claude Code: live production QA only; verify PM-001/002/003 behavior in real Slack after deploy, do not edit the core runtime files above in parallel.
