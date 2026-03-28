@@ -666,3 +666,59 @@ What to test next:
 - Trigger or observe the revenue-drop scan twice on the same day with unchanged data. Expected: only one Slack alert for the identical payload.
 Production risk:
 - medium until Claude verifies production behavior after deploy
+
+## QA — 2026-03-28 14:45 PDT
+Owner: Claude Code
+Scope: PM-008 and PM-009 production validation after Codex fixes deployed
+
+### QA-008: PM-008 Image Consistency
+Status: **INCOMPLETE FIX — call site not wired**
+
+Pre-fix evidence (pre-deploy, same session March 28):
+- Thread ts=1774718693.303979 (#financials): Rene uploaded image.png. Abra replied: "I can see the attached image! Let me read it carefully. The image shows a Powers Confections invoice..." — claims to read and identify content.
+- Thread ts=1774718811.895639 (#financials, 2 min later): Rene said "@Abra i just added an image convert that image to excel". Abra gave TWO duplicate replies:
+  - Reply 1 (ts=1774718819): "I can see the image you uploaded, but I need to know what's in it to convert it to Excel."
+  - Reply 2 (ts=1774718821): "I can see the image you uploaded, but I need to know what's in it... My brain has a known gap with reading image content directly"
+- Confirms both bugs: (a) capability contradiction — claims to read in one thread, denies in the next; (b) duplicate replies in same thread.
+
+Codex fix analysis (commit f3f7cb6):
+- Added `ChatRouteUpload` type and `buildReadOnlyChatRouteRequest()` with multipart FormData support when `uploadedFiles` is present.
+- Added `callReadOnlyChatRoute` signature to accept `uploadedFiles?: ChatRouteUpload[]`.
+- **CRITICAL GAP**: The actual call site at line 503 of `events/route.ts` does NOT pass `uploadedFiles` to `callReadOnlyChatRoute`. The `uploadedFiles` array is collected at line 441-450 but never forwarded. The multipart plumbing exists but is not connected.
+- This means post-deploy, image uploads will still go through the text-only JSON path, not the multipart path that forwards actual image bytes.
+
+Post-fix test: **BLOCKED — requires human user to upload image in Slack**
+- Cannot upload images via Slack MCP tools (text-only)
+- Cannot upload via bot token (filtered at line 364: `if (bot_id || subtype === "bot_message")`)
+- Code review confirms the fix is structurally incomplete
+
+Result: **FAIL (code review)** — fix adds plumbing but doesn't wire it at the call site. Codex needs to add `uploadedFiles` to the `callReadOnlyChatRoute` call on line 503.
+
+### QA-009: PM-009 Revenue-Drop Dedup
+Status: **MONITORING — pre-fix evidence confirmed, post-fix observation pending**
+
+Pre-fix evidence (all March 28, identical payload):
+- ts=1774683604.712929 (#abra-control, 00:40 PDT): "Revenue drop: -86% day-over-day, 2026-03-22: $5.99 vs 2026-03-21: $42.92"
+- ts=1774705205.431629 (#abra-control, 06:40 PDT): DUPLICATE — exact same message
+- ts=1774728604.398559 (#abra-control, 13:10 PDT): DUPLICATE — exact same message, third time
+- 3 identical alerts in one day confirms the PM-009 bug (old 6-hour dedup window allowed reposting).
+
+Codex fix analysis (commit f3f7cb6):
+- `shouldSuppressSignalPost()` now checks `{ ts, day, signature }` — same-day identical signatures are suppressed.
+- `buildProactiveAlertSignature()` creates a deterministic JSON string from alert type/title/message/data.
+- `dedupTtlHours` increased from 6 to 24 for revenue-drop alerts.
+- Signal post state now stores `{ ts, day, signature }` instead of bare timestamp.
+- Fix looks correct and complete in code review.
+
+Post-fix observation:
+- Fix deployed at ~14:35 PDT (commit f3f7cb6).
+- Last pre-fix alert was at 13:10 PDT. Next natural scan expected ~19:10 PDT.
+- As of 14:45 PDT, no new revenue-drop alerts have appeared post-deploy.
+- **Must monitor**: If no 4th duplicate appears by end of day, result is PASS. If a 4th duplicate appears with same payload, result is FAIL.
+
+Result: **PENDING** — code review PASS, production verification requires next scan cycle.
+
+### Action Items
+- PM-008: Codex must wire `uploadedFiles` into the `callReadOnlyChatRoute({...})` call at line 503 of `src/app/api/ops/slack/events/route.ts`. One-line fix: add `uploadedFiles,` to the object literal.
+- PM-009: Claude Code will check #abra-control after 19:00 PDT for 4th duplicate. If none, mark PASS.
+- PM-008 also still has the duplicate reply sub-bug (2 replies in ts=1774718811 thread). That's PM-007 territory — needs continued monitoring.
