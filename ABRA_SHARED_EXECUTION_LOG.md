@@ -141,11 +141,12 @@ QBO is accounting truth. Gmail is communication truth.
 
 ### Claude Code — active (claimed 2026-03-28 14:30 PT)
 - Read both canonical docs (done)
-- Production Slack validation against target architecture (done — 5 mismatches recorded as PM-001 through PM-005)
+- Production Slack validation against target architecture (done — 10 mismatches total)
 - Shipped Day 4-6 defensive patch (commit d73064a)
 - Verified Codex PM-001/002/003 fixes, committed and pushed (commit 4197218)
 - Live production QA: PM-001 PASS, PM-002 PASS, PM-003 PASS (2026-03-28 11:19 PDT)
-- Remaining: PM-004 and PM-005 are open, owned by Codex
+- Full channel scan: found 5 new mismatches PM-006 through PM-010 (2026-03-28 11:30 PDT)
+- Priority for Codex: PM-006 (bank feed spam, HIGH) and PM-010 (router misclassification, HIGH)
 
 ## Handoff Format
 When handing work between Codex and Claude Code, append an entry like this:
@@ -376,3 +377,74 @@ Notes: System prompt rewrite correctly ensures direct @Abra mentions always get 
 - PM-003: PASS — @mention false positive eliminated in production
 - PM-004: OPEN — hardcoded regex guardrails still present (low risk, Codex owns)
 - PM-005: OPEN — PDF parsing still broken (Codex owns)
+
+## Production Monitoring — 2026-03-28 11:30 PDT
+Owner: Claude Code
+Area: live Slack channel scan for regressions and new mismatches
+Channels scanned: #abra-control, #financials, #abra-testing
+Timeframe: 2026-03-27 through 2026-03-28 (post-deploy and pre-deploy behavior)
+
+### PM-006: Bank Feed Reconciliation hourly spam in #abra-control
+Target (Architecture §Non-Negotiable): "No repeated spam alerts for the same email." / notification dedup state should prevent identical alerts.
+Actual: The exact same message — "0 transactions auto-categorized, 41 need manual review" — posts every hour in #abra-control. On March 28 alone: 00:12, 01:12, 02:12, 03:12, 04:12, 05:12, 06:12, 07:12, 08:12, 09:12, 10:12, 11:12 (12+ identical messages). Zero content changes between any of them.
+Evidence: #abra-control channel history, every message at :12 past the hour.
+Impact: HIGH — Rene sees 12+ identical messages/day. This is the exact "duplicate alert spam" the target architecture lists as a completion criteria to eliminate. Erodes trust.
+Suggested owner: Codex (scheduled notification dedup is part of the operator loop / state system).
+Suggested fix: Bank feed reconciliation should only post when: (a) the counts change, OR (b) max once per day as a digest. The hourly cron should check last-posted state and skip if nothing changed.
+
+### PM-007: Duplicate replies in threads (pre-patch, likely fixed)
+Target (Architecture §Non-Negotiable): "Every message to Abra gets a response" — singular, not plural.
+Actual (pre-patch, March 27): Ben's thread at ts=1774624380.537729 in #financials shows massive duplication:
+- Reply 1 + Reply 3: identical ("Yesterday... $42.92 total")
+- Reply 5 + Reply 6: identical ("Got it — powers → today the powers meeting day?. Found 0 similar transactions")
+- Reply 8 + Reply 9: identical ("Drive safe. Driving mode is on.")
+- Reply 11 + Reply 12: identical (GitHub notification dump)
+- Reply 14 + Reply 17: identical ("Draft reply queued for human approval")
+Evidence: Thread in #financials, 17 replies where ~8 are duplicates.
+Impact: This was the worst user experience — Ben expressed frustration: "My dog is smarter than this."
+Status: LIKELY FIXED by Day 4-6 patch (d73064a) which added `shouldClaimSlackMessageReply` per-message lock. Post-patch messages (March 28) show single replies. Needs continued monitoring.
+Suggested owner: Claude Code (monitoring) / Codex (if regression recurs).
+
+### PM-008: Image/screenshot reading capability contradiction
+Target (Architecture §1 Intake): "Attachments, PDFs, screenshots, and images" are primary operational inputs. §Non-Negotiable: "No fake 'On it' responses when no action happened."
+Actual: On March 28, Rene uploaded images in #financials. Abra gave contradictory responses within 2 minutes:
+- ts=1774718693 (image.png upload): "I can see the attached image! Let me read it carefully. The image shows a Powers Confections invoice..." — claims to read it, identifies content.
+- ts=1774718811 (same session, different message): "I can see that an image was attached, but I can't extract the data from it... My brain has a known gap with reading image content directly"
+Additionally, ts=1774718811 got TWO replies (duplicate): one saying "describe what the image contains" and another saying "My brain has a known gap."
+Evidence: #financials threads at ts=1774718693.303979 and ts=1774718811.895639.
+Impact: MEDIUM — Abra claims a capability in one message and denies it in the next. This is the "no fake responses" violation. Rene cannot trust Abra's self-reported capabilities.
+Suggested owner: Codex (image ingestion path, capability declaration in system prompt).
+Suggested fix: Abra should have ONE consistent answer about image reading. Either it can extract data from Slack image uploads (via the Slack API file download + vision model) or it honestly cannot. The system prompt should declare the true capability, not let the LLM improvise.
+
+### PM-009: Revenue drop signal fires twice daily
+Target (Architecture §Non-Negotiable): Notification dedup — same signal should not repeat.
+Actual: "Revenue drop: -86% day-over-day (2026-03-22: $5.99 vs 2026-03-21: $42.92)" posted at both 00:40 and 06:40 on March 28. Same data, same comparison, same day.
+Evidence: #abra-control at ts=1774683604.712929 and ts=1774705205.431629.
+Impact: LOW — only 2 duplicates, but same root cause as PM-006 (scheduled notification dedup not checking last-posted state).
+Suggested owner: Codex (signal/alert dedup in operator loop).
+
+### PM-010: Deterministic router misclassifies intent in threads
+Target (Architecture §4 Department Workers): Workers should "own a narrow domain." §5 Execution: "input → classify → extract → update state → execute action."
+Actual (March 27, #financials thread ts=1774624380):
+- Ben: "you know my meeting with powers was the 25th from the information in my emails. So how is today the powers meeting day?"
+  Abra: "Got it — powers → today the powers meeting day?. Found 0 similar transactions and fixed 0."
+  → This is a TRANSACTION CATEGORIZATION response to a CALENDAR/SCHEDULING question. The router sent it to the finance worker.
+- Ben: "what day is my powers meeting? Can you verify from my email please?"
+  Abra: "Emails needing response for newer than:2d • USAGummies <notifications@github.com>..."
+  → This is a raw EMAIL LISTING dump in response to a specific meeting date question. The router sent it to the email worker with the wrong intent.
+Evidence: #financials thread at ts=1774624380.537729, replies 5-6 and 11-12.
+Impact: HIGH — Ben asked a simple question twice and got nonsense both times. This is the core "understanding layer" failure: Abra cannot classify intent correctly in conversational threads.
+Suggested owner: Codex (deterministic router / intent classification).
+Suggested fix: Thread context should inform intent classification. When a user corrects Abra ("you know my meeting was the 25th"), the intent is correction/acknowledgment, not transaction categorization. When a user asks "what day is my meeting," the intent is calendar lookup, not email listing.
+
+### Updated QA Summary
+- PM-001: PASS (fixed by Codex, verified in production)
+- PM-002: PASS (fixed by Codex, verified in production)
+- PM-003: PASS (fixed by Codex, verified in production)
+- PM-004: OPEN — hardcoded regex guardrails (low risk, Codex owns)
+- PM-005: OPEN — PDF parsing broken (Codex owns)
+- PM-006: NEW — bank feed reconciliation hourly spam (HIGH, Codex owns)
+- PM-007: LIKELY FIXED — duplicate replies in threads (monitoring)
+- PM-008: NEW — image reading capability contradiction (MEDIUM, Codex owns)
+- PM-009: NEW — revenue signal fires twice daily (LOW, Codex owns)
+- PM-010: NEW — deterministic router misclassifies intent in threads (HIGH, Codex owns)
