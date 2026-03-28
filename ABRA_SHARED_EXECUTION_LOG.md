@@ -143,7 +143,9 @@ QBO is accounting truth. Gmail is communication truth.
 - Read both canonical docs (done)
 - Production Slack validation against target architecture (done — 5 mismatches recorded as PM-001 through PM-005)
 - Shipped Day 4-6 defensive patch (commit d73064a)
-- Next: draft Codex prompt for PM-001, PM-002, PM-003 fixes
+- Verified Codex PM-001/002/003 fixes, committed and pushed (commit 4197218)
+- Live production QA: PM-001 PASS, PM-002 PASS, PM-003 PASS (2026-03-28 11:19 PDT)
+- Remaining: PM-004 and PM-005 are open, owned by Codex
 
 ## Handoff Format
 When handing work between Codex and Claude Code, append an entry like this:
@@ -334,3 +336,43 @@ Remaining risk:
 Next recommended owner split:
 - Codex: PM-004 and any deterministic runtime cleanup replacing regex guardrails with capability/state logic.
 - Claude Code: live production QA only; verify PM-001/002/003 behavior in real Slack after deploy, do not edit the core runtime files above in parallel.
+
+## Production QA — 2026-03-28 11:19 PDT
+Owner: Claude Code
+Area: PM-001 / PM-002 / PM-003 live Slack validation
+Deploy: commit 4197218, Vercel production confirmed live
+Channel: #abra-testing (C0A9S88E1FT)
+
+### QA-001: PM-001 — create_task from conversational request
+Status: PASS
+Input: `@Abra add a task for Ben to follow up with Greg about the production timeline next week`
+Expected: Task created with derived title, no "Task title is required" error
+Actual: Abra responded "On it — creating the task now." and emitted `<create_task>` with:
+- title: "Follow up with Greg Kroetch on production timeline"
+- description: Rich context referencing March 26 meeting, packaging decision, outstanding questions
+- assigned_to: BEN, priority: high, due_date: 2026-04-04, department: operations
+Evidence: Thread at ts=1774721937.108539, reply ts=1774721950.144499
+Notes: Title derivation worked — humanized from conversational input. Codex `normalizeActionDirective` correctly mapped top-level fields into params.
+
+### QA-002: PM-002 — update_notion with pasted Notion URL
+Status: PASS
+Input: `@Abra update this Notion page to mark Powers production status as confirmed: https://www.notion.so/TEST-Chart-of-Accounts-3284c0c42c2e81b1bfdbd763ce1497cd`
+Expected: Page ID extracted from URL, no "page_id must be a valid Notion page ID" rejection
+Actual: Abra accepted the URL, acknowledged the update, and flagged that the URL points to "TEST Chart of Accounts" — asked for confirmation it's the right page for a production status field. No validation error.
+Evidence: Thread at ts=1774721944.191409, reply ts=1774721954.108229
+Notes: `extractNotionPageId` correctly pulled `3284c0c42c2e81b1bfdbd763ce1497cd` from the shared URL. Bonus: Abra showed contextual awareness by noting the page name vs. requested content mismatch.
+
+### QA-003: PM-003 — @Abra mention referencing another human
+Status: PASS
+Input: `@Abra has Ben found pricing for key man insurance yet? Rene needs to know before the board meeting`
+Expected: Substantive response, no "directed at another human" suppression
+Actual: Abra responded with grounded status update — cited brain entry about State Farm, physical exam schedule, and expected pricing timeline (early-to-mid April). No false positive.
+Evidence: Thread at ts=1774721945.123729, reply ts=1774721955.346999
+Notes: System prompt rewrite correctly ensures direct @Abra mentions always get a response. References to Ben and Rene in the same message did not trigger side-conversation suppression.
+
+### QA Summary
+- PM-001: PASS — create_task title derivation works in production
+- PM-002: PASS — Notion URL extraction works in production
+- PM-003: PASS — @mention false positive eliminated in production
+- PM-004: OPEN — hardcoded regex guardrails still present (low risk, Codex owns)
+- PM-005: OPEN — PDF parsing still broken (Codex owns)
