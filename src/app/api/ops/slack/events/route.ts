@@ -8,7 +8,7 @@ import {
 } from "@/lib/ops/abra-slack-responder";
 import { executeRoutedAction, renderRoutedActionResponse } from "@/lib/ops/operator/action-executor";
 import { routeMessage } from "@/lib/ops/operator/deterministic-router";
-import { shouldProcessSlackEvent } from "@/lib/ops/slack-dedup";
+import { shouldClaimSlackMessageReply, shouldProcessSlackEvent } from "@/lib/ops/slack-dedup";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -229,6 +229,71 @@ function stripAbraMention(text: string): string {
   return text.replace(/<@U0AKMSTL0GL>\s*/g, "").trim();
 }
 
+function normalizeConstraintText(value: string): string {
+  return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function buildThreadConstraintBlock(
+  message: string,
+  history: Array<{ role: "user" | "assistant"; content: string }>,
+  fileContext: string,
+): string {
+  const userTexts = [...history.filter((item) => item.role === "user").map((item) => item.content), message]
+    .map(normalizeConstraintText)
+    .filter(Boolean);
+  const joined = userTexts.join("\n");
+  const constraints: string[] = [];
+
+  if (/\b(?:do not|don't|dont|not)\b[\s\S]{0,50}\b(qbo|quickbooks)\b/i.test(joined) || /\bnot from qbo\b/i.test(joined)) {
+    constraints.push("Do not use QBO or QuickBooks as the source.");
+  }
+  if (/\bexcel\b/i.test(joined) || /\bcsv\b/i.test(joined)) {
+    constraints.push("Prefer Excel or CSV output if the user is asking for an export.");
+  }
+  if (/\bpdf\b/i.test(joined) || /PDF extraction failed/i.test(fileContext)) {
+    constraints.push("Do not promise PDF conversion unless extraction has already succeeded in this thread. If PDF parsing is unavailable, say so plainly and suggest CSV as the fallback.");
+  }
+  if (history.some((item) => item.role === "assistant")) {
+    constraints.push("You are already participating in this Slack thread. Stay engaged even if Ben or other humans are mentioned. Do not go silent.");
+  }
+
+  if (constraints.length === 0) return "";
+  return `[THREAD CONSTRAINTS]\n${constraints.map((item) => `- ${item}`).join("\n")}\n\n`;
+}
+
+function latestAssistantSummary(history: Array<{ role: "user" | "assistant"; content: string }>): string | null {
+  const latest = [...history].reverse().find((item) => item.role === "assistant" && item.content.trim());
+  if (!latest) return null;
+  const normalized = normalizeConstraintText(latest.content).replace(/^:brain:\s*abra:\s*/i, "");
+  const sentence = normalized.split(/(?<=[.!?])\s+/)[0]?.trim() || normalized;
+  return sentence.slice(0, 220);
+}
+
+function maybeHandleKnownThreadGuardrails(
+  message: string,
+  history: Array<{ role: "user" | "assistant"; content: string }>,
+): string | null {
+  const normalized = normalizeConstraintText(message).toLowerCase();
+
+  if (
+    /\b(found|bank statements?|statement export)\b/i.test(message) &&
+    (/\bexcel\b/i.test(message) || /\bcsv\b/i.test(message))
+  ) {
+    return "I can’t pull raw bank statements directly from Found or BofA inside Abra. If you export CSVs from the bank portals, I can organize them. PDF parsing is currently unavailable on the server.";
+  }
+
+  if (/\bpdf\b/i.test(message) && (/\bexcel\b/i.test(message) || /\bcsv\b/i.test(message))) {
+    return "CSV works right now. PDF conversion is currently unavailable on the server, so I should not promise direct PDF extraction until that parser is fixed.";
+  }
+
+  if ((normalized.startsWith("ben,") || normalized.startsWith("ben ")) && history.some((item) => item.role === "assistant")) {
+    const summary = latestAssistantSummary(history);
+    return summary ? `For Ben: ${summary}` : "For Ben: current blocker is still being investigated.";
+  }
+
+  return null;
+}
+
 async function callReadOnlyChatRoute(payload: {
   message: string;
   history: Array<{ role: "user" | "assistant"; content: string }>;
@@ -367,7 +432,23 @@ export async function POST(req: Request) {
       ].filter(Boolean).join("");
 
       const rootThreadTs = thread_ts || ts;
+      if (!(await shouldClaimSlackMessageReply({
+        channel,
+        rootThreadTs,
+        user,
+        messageTs: ts,
+      }))) {
+        return;
+      }
+
       const normalizedMessage = stripAbraMention(messageText || "(file attachment — see attached files above)");
+      const guardrailReply = maybeHandleKnownThreadGuardrails(normalizedMessage, history);
+      if (guardrailReply) {
+        await postSlackMessage(channel, guardrailReply, {
+          threadTs: rootThreadTs,
+        });
+        return;
+      }
       const routed = routeMessage(normalizedMessage, user);
 
       if (routed) {
@@ -386,8 +467,9 @@ export async function POST(req: Request) {
         return;
       }
 
+      const conversationMessage = `${buildThreadConstraintBlock(normalizedMessage, history, fileContext)}${normalizedMessage}`.trim();
       const chatResult = await callReadOnlyChatRoute({
-        message: normalizedMessage,
+        message: conversationMessage,
         history,
         actorLabel: displayName,
         channel: "slack",

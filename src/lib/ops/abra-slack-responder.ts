@@ -1762,8 +1762,11 @@ async function callAbraChatViaInternalApi(
   try {
     const conversationContext = buildConversationContextBlock(ctx);
     const deliveryPrefix =
-      hasExplicitAbraMention(ctx.text) || isFinancialsChannel(ctx.channel) || isControlChannel(ctx.channel)
-        ? "[SLACK DELIVERY OVERRIDE] This message is directed to Abra. Respond directly to the user. Do not decline because other humans are mentioned in the thread.\n\n"
+      hasExplicitAbraMention(ctx.text) ||
+      isFinancialsChannel(ctx.channel) ||
+      isControlChannel(ctx.channel) ||
+      Boolean(ctx.threadTs)
+        ? "[SLACK DELIVERY OVERRIDE] This message is directed to Abra. Respond directly to the user. Stay engaged even if other humans are mentioned in the thread. If the user addresses Ben or another human, give a concise status summary instead of going silent.\n\n"
         : "";
     const messageWithContext = `${deliveryPrefix}${conversationContext}${ctx.text}`.trim();
 

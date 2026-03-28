@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-type DedupType = "event" | "response";
+type DedupType = "event" | "response" | "message";
 
 function getSupabaseEnv() {
   const baseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -50,6 +50,15 @@ export function buildSlackResponseDedupKey(params: {
   text: string;
 }): string {
   return makeHash([params.channel, params.text.trim().slice(0, 200)].join("\n"));
+}
+
+export function buildSlackMessageDedupKey(params: {
+  channel: string;
+  rootThreadTs: string;
+  user: string;
+  messageTs: string;
+}): string {
+  return makeHash([params.channel, params.rootThreadTs, params.user, params.messageTs].join("\n"));
 }
 
 async function pruneOldRows(): Promise<void> {
@@ -110,5 +119,17 @@ export async function shouldPostSlackResponse(params: {
   const dedupKey = buildSlackResponseDedupKey(params);
   if (await hasRecentSlackDedup(dedupKey, "response")) return false;
   await registerSlackDedup(dedupKey, "response");
+  return true;
+}
+
+export async function shouldClaimSlackMessageReply(params: {
+  channel: string;
+  rootThreadTs: string;
+  user: string;
+  messageTs: string;
+}): Promise<boolean> {
+  const dedupKey = buildSlackMessageDedupKey(params);
+  if (await hasRecentSlackDedup(dedupKey, "message")) return false;
+  await registerSlackDedup(dedupKey, "message");
   return true;
 }

@@ -632,22 +632,29 @@ export async function executeRoutedAction(
         let shopifyToday = 0;
         let amazonMtd = 0;
         let shopifyMtd = 0;
-        let sawTodayRow = false;
+        let sawAmazonToday = false;
+        let sawShopifyToday = false;
         for (const row of rows) {
           const metric = String(row.metric_name || "");
           const date = String(row.captured_for_date || "");
           const value = Number(row.value || 0);
           if (metric === "daily_revenue_amazon") amazonMtd += value;
           if (metric === "daily_revenue_shopify") shopifyMtd += value;
-          if (date === today) {
-            sawTodayRow = true;
-            if (metric === "daily_revenue_amazon") amazonToday += value;
-            if (metric === "daily_revenue_shopify") shopifyToday += value;
+          if (date === today && metric === "daily_revenue_amazon") {
+            sawAmazonToday = true;
+            amazonToday += value;
+          }
+          if (date === today && metric === "daily_revenue_shopify") {
+            sawShopifyToday = true;
+            shopifyToday += value;
           }
         }
-        const todayText = sawTodayRow ? compactCurrency(amazonToday + shopifyToday) : "no data yet";
+        const sawAnyToday = sawAmazonToday || sawShopifyToday;
+        const todayText = sawAnyToday ? compactCurrency(amazonToday + shopifyToday) : "no data yet";
+        const amazonText = sawAmazonToday ? compactCurrency(amazonToday) : "today unavailable";
+        const shopifyText = sawShopifyToday ? compactCurrency(shopifyToday) : "today unavailable";
         action.result = {
-          reply: `Today: ${todayText} | MTD: ${compactCurrency(amazonMtd + shopifyMtd)} | Amazon ${compactCurrency(amazonToday)} / Shopify ${compactCurrency(shopifyToday)}`,
+          reply: `Today: ${todayText} | MTD: ${compactCurrency(amazonMtd + shopifyMtd)} | Amazon ${amazonText} / Shopify ${shopifyText}`,
         } satisfies RenderedResult;
         break;
       }
