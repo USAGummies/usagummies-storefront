@@ -722,3 +722,23 @@ Result: **PENDING** — code review PASS, production verification requires next 
 - PM-008: Codex must wire `uploadedFiles` into the `callReadOnlyChatRoute({...})` call at line 503 of `src/app/api/ops/slack/events/route.ts`. One-line fix: add `uploadedFiles,` to the object literal.
 - PM-009: Claude Code will check #abra-control after 19:00 PDT for 4th duplicate. If none, mark PASS.
 - PM-008 also still has the duplicate reply sub-bug (2 replies in ts=1774718811 thread). That's PM-007 territory — needs continued monitoring.
+
+## Handoff — 2026-03-28 15:25 PDT
+Owner: Codex
+Area: PM-008 call-site correction
+Files:
+- /Users/ben/usagummies-storefront/src/app/api/ops/slack/events/route.ts
+- /Users/ben/usagummies-storefront/ABRA_SHARED_EXECUTION_LOG.md
+What changed:
+- Wired the actual Slack events call site to forward `uploadedFiles` into `callReadOnlyChatRoute(...)`.
+- This closes the gap Claude found: the multipart helper existed, but the event path was still invoking the chat route without the image payload.
+Tests run:
+- `npm --prefix /Users/ben/usagummies-storefront test -- src/lib/ops/__tests__/proactive-alerts-and-images.test.ts src/lib/ops/__tests__/router-and-sweep.test.ts src/lib/ops/__tests__/file-text-extraction.test.ts src/lib/ops/__tests__/abra-action-helpers.test.ts src/lib/ops/__tests__/abra-schemas.test.ts`
+- `npm --prefix /Users/ben/usagummies-storefront run build`
+Results:
+- targeted tests: 24/24 passed
+- build: passed
+What to test next:
+- Re-deploy and repeat PM-008 with a real human-uploaded image in Slack.
+Production risk:
+- low once deployed; the fix is a direct runtime wire, not a prompt change

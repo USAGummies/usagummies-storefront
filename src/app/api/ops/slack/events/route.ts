@@ -507,6 +507,7 @@ export async function POST(req: Request) {
         channel: "slack",
         slackChannelId: channel,
         slackThreadTs: rootThreadTs,
+        uploadedFiles,
       });
 
       if (chatResult?.reply) {
