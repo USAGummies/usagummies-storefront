@@ -136,6 +136,7 @@ export const STATE_KEYS = {
   "operator:notification_gate": "operator-notification-gate.json",
   "operator:notification_dedup": "operator-notification-dedup.json",
   "operator:report_cycle_dedup": "operator-report-cycle-dedup.json",
+  "operator:bank_feed_sweep:last_posted": "operator-bank-feed-sweep-last-posted.json",
   "operator:step:qbo_gap:last_run": "operator-step-qbo-gap-last-run.json",
   "operator:step:qbo_gap:summary": "operator-step-qbo-gap-summary.json",
   "operator:step:email_gap:last_run": "operator-step-email-gap-last-run.json",

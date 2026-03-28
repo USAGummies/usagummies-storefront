@@ -1,9 +1,9 @@
 import { Buffer } from "node:buffer";
 import { NextResponse } from "next/server";
-import { PDFParse } from "pdf-parse";
 import * as XLSX from "xlsx";
 import { auth } from "@/lib/auth/config";
 import { generateEmbeddings } from "@/lib/ops/abra-embeddings";
+import { extractPdfTextFromBuffer } from "@/lib/ops/file-text-extraction";
 import { validateRequest, IngestDeleteSchema } from "@/lib/ops/validation";
 
 export const runtime = "nodejs";
@@ -129,10 +129,11 @@ async function extractRawSegments(file: File): Promise<{ segments: string[]; mim
   const buffer = Buffer.from(await file.arrayBuffer());
 
   if (mimeType.includes("pdf") || ext === "pdf") {
-    const parser = new PDFParse({ data: buffer });
-    const parsed = await parser.getText();
-    await parser.destroy();
-    return { segments: chunkText(parsed?.text || ""), mimeType };
+    const extracted = await extractPdfTextFromBuffer(buffer, {
+      maxPages: 100,
+      maxChars: 200_000,
+    });
+    return { segments: chunkText(extracted.text), mimeType };
   }
 
   if (

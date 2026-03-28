@@ -57,6 +57,7 @@ import { EMAIL_EXTRACTION_SKILL } from "@/lib/ops/abra-skill-email-data-extracti
 import { DEAL_CALCULATOR_SKILL } from "@/lib/ops/abra-skill-deal-calculator";
 import { buildCrossDepartmentStrategy } from "@/lib/ops/abra-strategy-orchestrator";
 import { getSystemHealth } from "@/lib/ops/abra-health-monitor";
+import { extractPdfTextFromBuffer } from "@/lib/ops/file-text-extraction";
 
 // ─── Extracted modules ───
 import {
@@ -138,11 +139,12 @@ async function extractFileText(file: File): Promise<string> {
 
   if (file.type.includes("pdf") || ext === "pdf") {
     try {
-      const { PDFParse } = await import("pdf-parse");
-      const parser = new PDFParse({ data: buffer });
-      const parsed = await parser.getText();
-      await parser.destroy();
-      return parsed?.text?.trim() || "";
+      const extracted = await extractPdfTextFromBuffer(buffer, {
+        maxPages: 30,
+        maxChars: 50_000,
+        scannedPlaceholder: "[Scanned PDF — no extractable text. Needs OCR or CSV export.]",
+      });
+      return extracted.text;
     } catch {
       return "[PDF extraction failed — file may be scanned/image-only]";
     }
@@ -757,7 +759,9 @@ export async function POST(req: Request) {
     });
   }
 
-  const routedAction = routeMessage(routedMessage, actorEmail);
+  const routedAction = routeMessage(routedMessage, actorEmail, {
+    history,
+  });
   if (routedAction) {
     const executedAction = await executeRoutedAction(routedAction, {
       actor: actorLabel,

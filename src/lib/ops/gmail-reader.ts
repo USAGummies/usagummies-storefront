@@ -11,6 +11,7 @@
  */
 
 import { google } from "googleapis";
+import { extractPdfTextFromBuffer } from "@/lib/ops/file-text-extraction";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -427,7 +428,7 @@ export async function getAttachmentContent(
 
 /**
  * Read an attachment and extract text content where possible.
- * Supports PDFs (pdf-parse), spreadsheets (xlsx), and plain text files.
+ * Supports PDFs (pdfjs-dist), spreadsheets (xlsx), and plain text files.
  * Images and unsupported types return metadata only (no textContent).
  * Enforces 5MB size cap to avoid OOM on serverless.
  */
@@ -450,24 +451,14 @@ export async function readAttachment(
   const ext = attachment.filename.toLowerCase();
 
   try {
-    // PDF extraction via pdfjs-dist (low-level, avoids pdf-parse v2 API issues)
+    // PDF extraction via shared pdfjs-dist helper
     if (mime === "application/pdf" || ext.endsWith(".pdf")) {
-      const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
-      const doc = await pdfjsLib.getDocument({ data: new Uint8Array(data) }).promise;
-      const pages: string[] = [];
-      for (let i = 1; i <= Math.min(doc.numPages, 50); i++) {
-        const page = await doc.getPage(i);
-        const content = await page.getTextContent();
-        const pageText = content.items
-          .map((item: Record<string, unknown>) => (item as { str?: string }).str || "")
-          .join(" ");
-        if (pageText.trim()) pages.push(pageText.trim());
-      }
-      textContent = pages.join("\n\n").trim() || undefined;
-      // Detect scanned PDFs (image-only, no extractable text)
-      if (!textContent || textContent.length < 20) {
-        textContent = "[Scanned PDF — no extractable text. Needs OCR.]";
-      }
+      const extracted = await extractPdfTextFromBuffer(data, {
+        maxPages: 50,
+        maxChars: 50_000,
+        scannedPlaceholder: "[Scanned PDF — no extractable text. Needs OCR.]",
+      });
+      textContent = extracted.text || undefined;
     }
     // Spreadsheets (xlsx, xls, csv)
     else if (

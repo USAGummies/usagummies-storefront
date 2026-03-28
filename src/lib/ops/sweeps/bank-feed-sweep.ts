@@ -1,4 +1,5 @@
 import { proactiveMessage } from "@/lib/ops/abra-slack-responder";
+import { readState, writeState } from "@/lib/ops/state";
 
 export type BankFeedSweepResult = {
   total: number;
@@ -7,6 +8,40 @@ export type BankFeedSweepResult = {
   applied: number;
   investorTransfers: number;
 };
+
+type BankFeedSweepPostState = {
+  date: string;
+  signature: string;
+};
+
+const BANK_FEED_SWEEP_POST_STATE_KEY = "operator:bank_feed_sweep:last_posted" as const;
+
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+export function buildBankFeedSweepSignature(
+  result: BankFeedSweepResult,
+  executeErrors: number,
+): string {
+  return JSON.stringify({
+    total: result.total,
+    applied: result.applied,
+    lowConfidence: result.lowConfidence,
+    investorTransfers: result.investorTransfers,
+    executeErrors,
+  });
+}
+
+export function shouldPostBankFeedSweepUpdate(
+  previous: BankFeedSweepPostState | null,
+  currentDate: string,
+  signature: string,
+): boolean {
+  if (!previous) return true;
+  if (previous.date !== currentDate) return true;
+  return previous.signature !== signature;
+}
 
 function resolveInternalHost(): string {
   return (
@@ -99,6 +134,13 @@ export async function runBankFeedSweep(): Promise<BankFeedSweepResult> {
 
   // Step 3: Post interactive Slack report with batch approval button
   if (result.total > 0) {
+    const currentDate = todayIso();
+    const signature = buildBankFeedSweepSignature(result, executeErrors);
+    const lastPosted = await readState<BankFeedSweepPostState | null>(BANK_FEED_SWEEP_POST_STATE_KEY, null);
+    if (!shouldPostBankFeedSweepUpdate(lastPosted, currentDate, signature)) {
+      return result;
+    }
+
     const botToken = process.env.SLACK_BOT_TOKEN;
     const channel = process.env.SLACK_CHANNEL_ALERTS || "C0ALS6W7VB4";
 
@@ -192,6 +234,11 @@ export async function runBankFeedSweep(): Promise<BankFeedSweepResult> {
         signal: AbortSignal.timeout(5000),
       }).catch(() => {});
     }
+
+    await writeState(BANK_FEED_SWEEP_POST_STATE_KEY, {
+      date: currentDate,
+      signature,
+    });
   }
 
   return result;

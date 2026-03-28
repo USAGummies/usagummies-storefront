@@ -448,3 +448,70 @@ Suggested fix: Thread context should inform intent classification. When a user c
 - PM-008: NEW — image reading capability contradiction (MEDIUM, Codex owns)
 - PM-009: NEW — revenue signal fires twice daily (LOW, Codex owns)
 - PM-010: NEW — deterministic router misclassifies intent in threads (HIGH, Codex owns)
+
+## Handoff — 2026-03-28 12:04 PDT
+Owner: Codex
+Area: PM-005 PDF parsing runtime fix
+Files:
+- /Users/ben/usagummies-storefront/src/lib/ops/file-text-extraction.ts
+- /Users/ben/usagummies-storefront/src/app/api/ops/abra/chat/route.ts
+- /Users/ben/usagummies-storefront/src/app/api/ops/abra/ingest/route.ts
+- /Users/ben/usagummies-storefront/src/lib/ops/gmail-reader.ts
+- /Users/ben/usagummies-storefront/src/app/api/ops/slack/events/route.ts
+- /Users/ben/usagummies-storefront/src/lib/ops/__tests__/file-text-extraction.test.ts
+What changed:
+- Replaced fragmented PDF extraction implementations with one shared `pdfjs-dist` helper.
+- Chat uploads, document ingest, Gmail attachment reads, and Slack file extraction now all use the same PDF extraction path.
+- Removed the false "PDF parsing is unavailable on the server" language from Slack thread guardrails; capability is now stated accurately: text-based PDFs work, scanned/image-only PDFs still need OCR or CSV.
+What was actually broken:
+- Production had multiple PDF paths with different libraries and behavior. Gmail/Slack used `pdfjs-dist`, while chat uploads and document ingest still used `pdf-parse`.
+- That meant PDF support varied by intake path and the Slack guardrail layer was hardcoded to say PDF parsing was unavailable even when other paths could parse text-based PDFs.
+Tests run:
+- `npm --prefix /Users/ben/usagummies-storefront test -- src/lib/ops/__tests__/file-text-extraction.test.ts src/lib/ops/__tests__/abra-action-helpers.test.ts src/lib/ops/__tests__/abra-schemas.test.ts`
+- `npm --prefix /Users/ben/usagummies-storefront run build`
+Results:
+- targeted tests: 17/17 passed
+- build: passed
+Remaining risk:
+- Scanned/image-only PDFs still need OCR; this fix restores text-based PDF extraction, not OCR.
+- PM-004 remains open: regex guardrails should still be removed/replaced with deterministic capability/state logic.
+What to test next:
+- Upload a real text-based PDF bank statement or export in production Slack and verify extraction works end to end.
+- Upload a scanned/image-only PDF and verify Abra says OCR/CSV is needed instead of claiming server incapability.
+Production risk:
+- medium
+
+## Handoff — 2026-03-28 12:33 PDT
+Owner: Codex
+Area: PM-006 bank-feed spam + PM-010 meeting/calendar misrouting
+Files:
+- /Users/ben/usagummies-storefront/src/lib/ops/sweeps/bank-feed-sweep.ts
+- /Users/ben/usagummies-storefront/src/lib/ops/state-keys.ts
+- /Users/ben/usagummies-storefront/src/lib/ops/operator/deterministic-router.ts
+- /Users/ben/usagummies-storefront/src/lib/ops/operator/action-executor.ts
+- /Users/ben/usagummies-storefront/src/lib/ops/abra-slack-responder.ts
+- /Users/ben/usagummies-storefront/src/app/api/ops/slack/events/route.ts
+- /Users/ben/usagummies-storefront/src/app/api/ops/abra/chat/route.ts
+- /Users/ben/usagummies-storefront/src/lib/ops/__tests__/router-and-sweep.test.ts
+What changed:
+- PM-006 fixed at the sweep owner: bank-feed sweep now stores a per-day post signature and skips reposting the same summary when counts have not changed.
+- PM-010 fixed by adding thread-aware meeting/calendar routing before fallback paths. Meeting verification questions now route to `query_meeting_context`, and meeting-date corrections route to `acknowledge_meeting_correction` instead of wandering into finance/email fallback behavior.
+- Slack responder, Slack events route, and chat route now pass conversation history into the deterministic router so thread context can influence classification.
+What was actually broken:
+- PM-006 was not in the reconciliation worker; it was the hourly bank-feed sweep posting the same summary every run with no last-posted state check.
+- PM-010 happened because the deterministic layer had no meeting/calendar route and no thread context, so those messages fell through into unrelated action paths.
+Tests run:
+- `npm --prefix /Users/ben/usagummies-storefront test -- src/lib/ops/__tests__/router-and-sweep.test.ts src/lib/ops/__tests__/file-text-extraction.test.ts src/lib/ops/__tests__/abra-action-helpers.test.ts src/lib/ops/__tests__/abra-schemas.test.ts`
+- `npm --prefix /Users/ben/usagummies-storefront run build`
+Results:
+- targeted tests: 21/21 passed
+- build: passed
+Remaining risk:
+- PM-008 and PM-009 remain open.
+- The new meeting lookup uses recent email + brain evidence and is intentionally narrow; it fixes the observed failure mode, but broader calendar/scheduling support still needs a proper worker later.
+What to test next:
+- Run the bank-feed sweep twice against production with no underlying count change and verify only one Slack post appears.
+- In Slack, ask: `what day is my powers meeting? Can you verify from my email please?` and verify Abra returns meeting evidence, not a transaction or raw email dump.
+- In the same thread, correct Abra with `you know my meeting with powers was the 25th...` and verify it acknowledges the correction instead of categorization behavior.
+Production risk:
+- medium

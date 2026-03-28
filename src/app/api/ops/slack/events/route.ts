@@ -6,6 +6,7 @@ import {
   getThreadHistory,
   postSlackMessage,
 } from "@/lib/ops/abra-slack-responder";
+import { extractPdfTextFromBuffer } from "@/lib/ops/file-text-extraction";
 import { executeRoutedAction, renderRoutedActionResponse } from "@/lib/ops/operator/action-executor";
 import { routeMessage } from "@/lib/ops/operator/deterministic-router";
 import { shouldClaimSlackMessageReply, shouldProcessSlackEvent } from "@/lib/ops/slack-dedup";
@@ -188,19 +189,12 @@ async function extractSlackFiles(files: SlackFile[]): Promise<string> {
       // PDF
       if (ext === "pdf" || mime === "application/pdf") {
         try {
-          const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
-          const doc = await (pdfjsLib as unknown as { getDocument: (arg: { data: Uint8Array }) => { promise: Promise<{ numPages: number; getPage: (n: number) => Promise<{ getTextContent: () => Promise<{ items: Array<Record<string, unknown>> }> }> }> } }).getDocument({ data: new Uint8Array(data) }).promise;
-          const pages: string[] = [];
-          for (let i = 1; i <= Math.min(doc.numPages, 30); i++) {
-            const page = await doc.getPage(i);
-            const content = await page.getTextContent();
-            const pageText = content.items
-              .map((item) => (item as { str?: string }).str || "")
-              .join(" ");
-            if (pageText.trim()) pages.push(pageText.trim());
-          }
-          const pdfText = pages.join("\n\n").slice(0, 50000);
-          results.push(`📎 **${file.name}** (PDF, ${doc.numPages} pages):\n${pdfText}`);
+          const extracted = await extractPdfTextFromBuffer(data, {
+            maxPages: 30,
+            maxChars: 50_000,
+            scannedPlaceholder: "[Scanned PDF — no extractable text. Needs OCR or CSV export.]",
+          });
+          results.push(`📎 **${file.name}** (PDF):\n${extracted.text}`);
         } catch (pdfErr) {
           results.push(`📎 ${file.name} — PDF extraction failed: ${pdfErr instanceof Error ? pdfErr.message : "unknown error"}`);
         }
@@ -251,7 +245,7 @@ function buildThreadConstraintBlock(
     constraints.push("Prefer Excel or CSV output if the user is asking for an export.");
   }
   if (/\bpdf\b/i.test(joined) || /PDF extraction failed/i.test(fileContext)) {
-    constraints.push("Do not promise PDF conversion unless extraction has already succeeded in this thread. If PDF parsing is unavailable, say so plainly and suggest CSV as the fallback.");
+    constraints.push("Do not promise OCR. If the PDF text was extracted, use it. If the file is scanned/image-only, say that plainly and suggest OCR or CSV as the fallback.");
   }
   if (history.some((item) => item.role === "assistant")) {
     constraints.push("You are already participating in this Slack thread. Stay engaged even if Ben or other humans are mentioned. Do not go silent.");
@@ -279,11 +273,11 @@ function maybeHandleKnownThreadGuardrails(
     /\b(found|bank statements?|statement export)\b/i.test(message) &&
     (/\bexcel\b/i.test(message) || /\bcsv\b/i.test(message))
   ) {
-    return "I can’t pull raw bank statements directly from Found or BofA inside Abra. If you export CSVs from the bank portals, I can organize them. PDF parsing is currently unavailable on the server.";
+    return "I can organize CSV exports from Found or BofA. If you upload a text-based PDF, I can extract it; if the statement is scanned/image-only, it still needs OCR or CSV.";
   }
 
   if (/\bpdf\b/i.test(message) && (/\bexcel\b/i.test(message) || /\bcsv\b/i.test(message))) {
-    return "CSV works right now. PDF conversion is currently unavailable on the server, so I should not promise direct PDF extraction until that parser is fixed.";
+    return "CSV is the safest path. I can read text-based PDFs, but scanned/image-only PDFs still need OCR before I can convert them reliably.";
   }
 
   if ((normalized.startsWith("ben,") || normalized.startsWith("ben ")) && history.some((item) => item.role === "assistant")) {
@@ -449,7 +443,9 @@ export async function POST(req: Request) {
         });
         return;
       }
-      const routed = routeMessage(normalizedMessage, user);
+      const routed = routeMessage(normalizedMessage, user, {
+        history,
+      });
 
       if (routed) {
         const executed = await executeRoutedAction(routed, {

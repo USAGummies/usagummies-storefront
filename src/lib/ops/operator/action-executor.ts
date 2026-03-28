@@ -48,6 +48,13 @@ type PurchaseOrderRow = {
   status?: string | null;
 };
 
+type BrainEntryRow = {
+  title?: string | null;
+  raw_text?: string | null;
+  summary_text?: string | null;
+  created_at?: string | null;
+};
+
 function getSupabaseEnv() {
   const baseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -229,6 +236,81 @@ function parseCorrectInstruction(text: string): { original: string; correction: 
     }
   }
   return null;
+}
+
+function extractDateMentions(text: string): string[] {
+  const matches = new Set<string>();
+  const patterns = [
+    /\b(?:jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july|aug|august|sep|sept|september|oct|october|nov|november|dec|december)\s+\d{1,2}(?:st|nd|rd|th)?(?:,\s*\d{4})?\b/gi,
+    /\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/g,
+    /\b20\d{2}-\d{2}-\d{2}\b/g,
+  ];
+  for (const pattern of patterns) {
+    for (const match of text.matchAll(pattern)) {
+      if (match[0]) matches.add(match[0]);
+    }
+  }
+  return [...matches];
+}
+
+function extractMentionedDate(text: string): string | null {
+  return extractDateMentions(text)[0] || null;
+}
+
+function buildMeetingEmailQueries(instruction: string, history: Array<{ role: "user" | "assistant"; content: string }> = []): string[] {
+  const haystack = `${instruction}\n${history.map((item) => item.content).join("\n")}`.toLowerCase();
+  if (/\bpowers|greg|spokane\b/.test(haystack)) {
+    return [
+      "from:gregk@powers-inc.com newer_than:90d",
+      "Powers newer_than:90d",
+      "Spokane newer_than:90d",
+    ];
+  }
+  if (/\bmeeting|calendar\b/.test(haystack)) {
+    return ["meeting newer_than:30d", "calendar newer_than:30d"];
+  }
+  return ["newer_than:14d"];
+}
+
+async function fetchMeetingEvidence(
+  instruction: string,
+  history: Array<{ role: "user" | "assistant"; content: string }> = [],
+): Promise<Array<{ source: string; text: string; createdAt: string }>> {
+  const queries = buildMeetingEmailQueries(instruction, history);
+  const seen = new Set<string>();
+  const emails = [];
+  for (const query of queries) {
+    const rows = await searchEmails(query, 5).catch(() => []);
+    for (const row of rows) {
+      if (seen.has(row.id)) continue;
+      seen.add(row.id);
+      emails.push(row);
+    }
+  }
+
+  const emailEvidence = emails
+    .filter((email) => /\b(meeting|powers|greg|spokane)\b/i.test(`${email.subject}\n${email.body}`))
+    .map((email) => ({
+      source: `email "${email.subject}"`,
+      text: `${email.subject}\n${email.body}`.slice(0, 4000),
+      createdAt: email.date || "",
+    }));
+
+  const brainRows = await sbFetch<BrainEntryRow[]>(
+    "/rest/v1/open_brain_entries?select=title,raw_text,summary_text,created_at&or=(title.ilike.*powers*,raw_text.ilike.*powers*,summary_text.ilike.*powers*,title.ilike.*meeting*,raw_text.ilike.*meeting*,summary_text.ilike.*meeting*)&order=created_at.desc&limit=12",
+  ).catch(() => []);
+
+  const brainEvidence = Array.isArray(brainRows)
+    ? brainRows
+        .map((row) => ({
+          source: `brain "${String(row.title || "untitled")}"`,
+          text: [row.title, row.summary_text, row.raw_text].filter(Boolean).join("\n").slice(0, 4000),
+          createdAt: String(row.created_at || ""),
+        }))
+        .filter((row) => /\b(meeting|powers|greg|spokane)\b/i.test(row.text))
+    : [];
+
+  return [...emailEvidence, ...brainEvidence].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
 }
 
 function accountAliasMap(): Record<string, string> {
@@ -776,6 +858,43 @@ export async function executeRoutedAction(
             `Actionable email (${actionable.length})`,
             ...visible.map((email) => `• ${email.from} | ${email.subject} | ${email.date}`),
           ].join("\n") + more,
+        } satisfies RenderedResult;
+        break;
+      }
+      case "acknowledge_meeting_correction": {
+        const statedDate = extractMentionedDate(String(action.params.instruction || ""));
+        action.result = {
+          reply: statedDate
+            ? `Understood. I’ll treat the meeting date as ${statedDate} in this thread instead of assuming today.`
+            : "Understood. I’ll use the meeting date from the thread context instead of assuming today.",
+        } satisfies RenderedResult;
+        break;
+      }
+      case "query_meeting_context": {
+        const instruction = String(action.params.instruction || "");
+        const evidence = await fetchMeetingEvidence(instruction, context.history || []);
+        if (!evidence.length) {
+          action.result = {
+            reply: "I couldn’t verify the meeting date from email or saved notes yet.",
+          } satisfies RenderedResult;
+          break;
+        }
+        const recent = evidence.slice(0, 5);
+        const dated = recent
+          .map((item) => ({ ...item, dates: extractDateMentions(item.text) }))
+          .filter((item) => item.dates.length > 0);
+        if (!dated.length) {
+          action.result = {
+            reply: `I found recent meeting context in ${recent[0].source}, but no explicit date to verify.`,
+          } satisfies RenderedResult;
+          break;
+        }
+        const primary = dated[0];
+        const uniqueDates = [...new Set(dated.flatMap((item) => item.dates))];
+        const conflictSuffix =
+          uniqueDates.length > 1 ? ` I also found other date references: ${uniqueDates.slice(1, 3).join(", ")}.` : "";
+        action.result = {
+          reply: `I found the meeting referenced as ${primary.dates[0]} in ${primary.source}.${conflictSuffix}`,
         } satisfies RenderedResult;
         break;
       }

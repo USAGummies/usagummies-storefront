@@ -2551,7 +2551,9 @@ export async function processAbraMessage(
     };
   }
 
-  const routed = routeMessage(textForRouting, ctx.displayName || ctx.user);
+  const routed = routeMessage(textForRouting, ctx.displayName || ctx.user, {
+    history: ctx.history,
+  });
   if (routed) {
     const executed = await executeRoutedAction(routed, {
       actor: ctx.displayName || ctx.user,
