@@ -431,10 +431,15 @@ export async function POST(req: Request) {
 
       // Build the message text — include file context if present
       const explicitText = text?.trim() || "";
+      const isReceiptsChannel = channel === "C0APYNE9E73";
       const inferredPrompt =
         !explicitText && uploadedFiles.length > 0
-          ? "Please analyze the attached image from Slack and answer the user directly."
-          : "";
+          ? isReceiptsChannel
+            ? "A receipt image was uploaded to #receipts-capture. Read/OCR this image and extract: vendor name, date, amount, payment method, and likely expense category. Present a structured summary and suggest the QBO category. Ask if the user wants it recorded."
+            : "Please analyze the attached image from Slack and answer the user directly."
+          : isReceiptsChannel && uploadedFiles.length > 0
+            ? `[RECEIPTS CHANNEL] This image is a transaction receipt uploaded for reconciliation. Read/OCR the image and extract: vendor name, date, amount, payment method, and likely expense category. Present a structured summary. User message: ${explicitText}`
+            : "";
       const messageText = [
         explicitText || inferredPrompt,
         fileContext ? `\n\n[ATTACHED FILES]\n${fileContext}` : "",
