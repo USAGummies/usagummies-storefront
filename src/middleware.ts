@@ -34,6 +34,7 @@ const SELF_AUTHENTICATED_PREFIXES = [
   "/api/ops/puzzle/", // Puzzle OAuth flow
   "/api/ops/sweeps/", // Sweep runners — auth via CRON_SECRET or QStash signature
   "/api/ops/workflows/", // Workflow engine — auth handled in route
+  "/api/ops/approvals", // Approvals — GET uses hasApprovalsReadAccess (session + CRON_SECRET), POST requires session
 ];
 
 function isSelfAuthenticated(pathname: string): boolean {
