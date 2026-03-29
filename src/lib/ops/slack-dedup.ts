@@ -36,6 +36,23 @@ function makeHash(input: string): string {
   return createHash("sha256").update(input).digest("hex");
 }
 
+export function buildSlackDedupRowId(
+  dedupKey: string,
+  dedupType: DedupType,
+): string {
+  const hex = makeHash([dedupType, dedupKey].join("\n")).slice(0, 32).split("");
+  hex[12] = "4";
+  hex[16] = ((parseInt(hex[16], 16) & 0x3) | 0x8).toString(16);
+  const normalized = hex.join("");
+  return [
+    normalized.slice(0, 8),
+    normalized.slice(8, 12),
+    normalized.slice(12, 16),
+    normalized.slice(16, 20),
+    normalized.slice(20, 32),
+  ].join("-");
+}
+
 export function buildSlackEventDedupKey(params: {
   eventId?: string | null;
   channel: string;
@@ -107,10 +124,31 @@ export async function registerSlackDedup(
       Prefer: "return=minimal",
     },
     body: JSON.stringify({
+      id: buildSlackDedupRowId(dedupKey, dedupType),
       dedup_key: dedupKey,
       dedup_type: dedupType,
     }),
   });
+}
+
+async function claimSlackDedup(
+  dedupKey: string,
+  dedupType: DedupType,
+): Promise<boolean> {
+  try {
+    await registerSlackDedup(dedupKey, dedupType);
+    return true;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (
+      message.includes("(409)") ||
+      message.toLowerCase().includes("duplicate key") ||
+      message.includes("23505")
+    ) {
+      return false;
+    }
+    throw error;
+  }
 }
 
 export async function shouldProcessSlackEvent(params: {
@@ -122,9 +160,7 @@ export async function shouldProcessSlackEvent(params: {
   text?: string;
 }): Promise<boolean> {
   const dedupKey = buildSlackEventDedupKey(params);
-  if (await hasRecentSlackDedup(dedupKey, "event")) return false;
-  await registerSlackDedup(dedupKey, "event");
-  return true;
+  return claimSlackDedup(dedupKey, "event");
 }
 
 export async function shouldPostSlackResponse(params: {
@@ -132,9 +168,7 @@ export async function shouldPostSlackResponse(params: {
   text: string;
 }): Promise<boolean> {
   const dedupKey = buildSlackResponseDedupKey(params);
-  if (await hasRecentSlackDedup(dedupKey, "response")) return false;
-  await registerSlackDedup(dedupKey, "response");
-  return true;
+  return claimSlackDedup(dedupKey, "response");
 }
 
 export async function shouldClaimSlackMessageReply(params: {
@@ -144,7 +178,5 @@ export async function shouldClaimSlackMessageReply(params: {
   messageTs: string;
 }): Promise<boolean> {
   const dedupKey = buildSlackMessageDedupKey(params);
-  if (await hasRecentSlackDedup(dedupKey, "message")) return false;
-  await registerSlackDedup(dedupKey, "message");
-  return true;
+  return claimSlackDedup(dedupKey, "message");
 }

@@ -2609,3 +2609,39 @@ Verified live on `https://www.usagummies.com` with authenticated requests:
 - `/api/ops/abra/cron/signal-scan` → `disabled: true`
 
 Result: legacy Vercel/QStash Abra automation is no longer live in production. Paperclip is now the sole autonomous control plane.
+
+## Codex Handoff — 2026-03-29 01:24 PT
+
+### Scope: Runner Supervision + Atomic Slack Dedup
+
+#### Paperclip Runner Hardening (local ops host)
+Updated the live Paperclip host outside the repo:
+- Added supervised launchd service: `com.usagummies.paperclip-server`
+- Added `/Users/ben/paperclip-usagummies/scripts/run-paperclip-server.sh`
+- Added `/Users/ben/paperclip-usagummies/scripts/ensure-paperclip-server.sh`
+- Updated heartbeat runner and health-check to use the shared repair/start path
+- Added heartbeat stale recovery via `launchctl kickstart -k gui/$UID/com.usagummies.paperclip-heartbeat`
+
+Validation:
+- `bash -n` passed for all Paperclip scripts
+- launchd plist lint passed
+- killed the live Paperclip listener process on port 3100
+- launchd restarted it automatically
+- health endpoint returned HTTP 200 after restart
+
+#### Slack Direct-Reply Dedup Hardening (repo)
+Files changed:
+- `src/lib/ops/slack-dedup.ts`
+- `src/lib/ops/__tests__/proactive-alerts-and-images.test.ts`
+
+What changed:
+- Replaced the remaining check-then-register Slack dedup race with an atomic claim path
+- Slack dedup rows now use a deterministic UUID primary key derived from `dedup_type + dedup_key`
+- duplicate insert conflict is treated as "already claimed"
+- this closes the race window for direct Slack reply claiming even beyond the specific `app_mention` mirror case
+
+Validation:
+- Ran: `npm test -- src/lib/ops/__tests__/proactive-alerts-and-images.test.ts src/lib/ops/__tests__/router-and-sweep.test.ts src/lib/ops/__tests__/approvals-route.test.ts src/lib/ops/__tests__/control-plane-route.test.ts`
+- Result: `22/22` passed
+- Ran: `npm run build`
+- Result: passed

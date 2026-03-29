@@ -8,7 +8,10 @@ import {
   shouldSuppressSameDayAlertType,
   shouldSuppressSignalPost,
 } from "@/lib/ops/proactive-alerts";
-import { buildSlackEventDedupKey } from "@/lib/ops/slack-dedup";
+import {
+  buildSlackDedupRowId,
+  buildSlackEventDedupKey,
+} from "@/lib/ops/slack-dedup";
 
 vi.mock("server-only", () => ({}));
 
@@ -72,6 +75,27 @@ describe("Slack image upload handoff", () => {
         text: "<@U0AKMSTL0GL> what is our BofA balance?",
       }),
     ).toBe(false);
+  });
+
+  it("builds a stable UUID row id for atomic Slack dedup claims", () => {
+    const dedupKey = buildSlackEventDedupKey({
+      eventId: null,
+      channel: "C123",
+      user: "U123",
+      messageTs: "1711670000.123456",
+      rootThreadTs: "1711670000.123456",
+      text: "<@U0AKMSTL0GL> what is our BofA balance?",
+    });
+
+    const eventId = buildSlackDedupRowId(dedupKey, "event");
+    const sameEventId = buildSlackDedupRowId(dedupKey, "event");
+    const messageId = buildSlackDedupRowId(dedupKey, "message");
+
+    expect(eventId).toBe(sameEventId);
+    expect(eventId).not.toBe(messageId);
+    expect(eventId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
   });
 });
 
