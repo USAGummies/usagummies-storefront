@@ -18,6 +18,7 @@ const RequestSchema = z.object({
   lineItems: z.array(LineItemSchema).min(1).max(50),
   dueDate: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   memo: z.string().trim().max(1000).optional(),
+  sendEmail: z.boolean().optional().default(false),
 });
 
 type QBOCustomer = {
@@ -201,7 +202,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "QBO invoice creation failed" }, { status: 502 });
   }
 
-  const emailSent = parsed.data.customerEmail
+  // NEVER auto-send invoice emails unless explicitly requested with sendEmail: true
+  const emailSent = parsed.data.sendEmail && parsed.data.customerEmail
     ? await sendInvoiceEmail(realmId, accessToken, invoiceId, parsed.data.customerEmail)
     : false;
 
