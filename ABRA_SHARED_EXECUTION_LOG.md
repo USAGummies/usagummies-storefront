@@ -1188,3 +1188,82 @@ From Operations agent workspace (`source $AGENT_HOME/.env`):
 2. **Test HEARTBEAT.md-driven workflow**: Instead of issue routing, let the Operations agent's heartbeat routine call the control-plane endpoints directly during its 9 AM window — bypasses inbox routing entirely
 3. **QBO query E2E**: Test `/api/ops/qbo/query` from Finance workspace
 4. **PM-007 re-test**: Verify Codex's Slack dedup fix in production after deploy
+
+---
+
+## E2E Proof — 2026-03-28 19:02 PDT
+Owner: Claude Code
+Area: Paperclip inbox routing investigation + full end-to-end proof
+
+### Inbox Routing: Root Cause Identified
+
+**Previous hypothesis** (run ID mismatch): WRONG.
+**Actual root cause**: Paperclip's inbox routing works correctly when Paperclip manages the full lifecycle. The failures (USA-7, USA-8) were caused by:
+
+1. **External `heartbeat run` conflicts with auto-assignment**: When an issue transitions to `todo` with an assignee, Paperclip automatically creates a run (source: `automation`, trigger: `system`) and starts the agent. Manually triggering `heartbeat run` creates a SECOND session (with `--resume` reusing a stale conversation) that races with the auto-triggered one.
+
+2. **`--resume` session stickiness**: The manually-triggered heartbeat resumes the agent's prior conversation, which has no memory of the new issue. The auto-triggered run starts fresh and correctly sees the issue in `inbox-lite`.
+
+3. **URL mismatch**: Agent's `.env` had `USAGUMMIES_API_BASE=https://usagummies.com` (production), but the backend was on `http://localhost:4000`. The agent's USA-9 run correctly discovered the issue, called the API, but got HTML 404s from the production URL.
+
+**Proof**: USA-9 activity log shows the auto-triggered run (`94d58b94`) did:
+- `issue.checked_out` at 01:56:25
+- `issue.comment_added` at 01:58:12 (the agent posted results)
+- `issue.updated` → `done` at 01:58:21
+- `inbox-lite` returned the issue correctly for the auto-triggered run
+
+### Fixes Applied
+1. All 5 agent `.env` files: `USAGUMMIES_API_BASE` changed from `https://usagummies.com` to `http://localhost:4000`
+2. All 5 agent `.env` files: added `BACKEND_URL=http://localhost:4000`
+3. Operations + Email Intelligence HEARTBEAT.md: replaced hardcoded `http://localhost:4000` with `$BACKEND_URL`
+4. HEARTBEAT.md env section: added note to always `source $AGENT_HOME/.env` first
+
+### USA-10: Full End-to-End Proof ✅
+
+**Issue**: USA-10 — "E2E-v4: PO review — source .env, use $BACKEND_URL"
+**Agent**: Operations (8de1ae22)
+**Lifecycle**:
+- Created as `backlog` → updated to `todo` → Paperclip auto-triggered run
+- Agent started at 19:02:04, issue completed at 19:02:32 (~28 seconds)
+- Agent posted 1 structured comment with full API results
+
+**Agent Comment (verbatim excerpt)**:
+```
+Environment verification successful:
+- BACKEND_URL: http://localhost:4000
+- CRON_SECRET: properly configured
+
+Step A: PO Summary
+{"ok":true,"operation":"po.summary","summary":{"openCount":2,"committedRevenue":1738.8,
+ "overdue":[],"byStatus":{"received":1,"delivered":1}}}
+
+Step B: PO List
+{"ok":true,"operation":"po.list","rows":[
+  {"po_number":"140812","customer_name":"Mike Arlint / Glacier Wholesalers Inc","status":"received"},
+  {"po_number":"009180","customer_name":"Inderbitzin Distributors","status":"delivered","units":828,"total":1738.8}
+],"count":2}
+
+Step C: Approvals
+{"approvals":[],"totalPending":0,"generatedAt":"2026-03-29T02:02:17.503Z",
+ "degraded":false,"source":"supabase","circuitOpen":false}
+```
+
+### Success Criteria Met
+| Criteria | Result |
+|----------|--------|
+| Agent reliably sees assigned issue | ✅ Auto-assignment via todo transition |
+| Agent executes the routine | ✅ All 3 API calls executed in sequence |
+| Agent calls backend successfully | ✅ po.summary, po.list, approvals all HTTP 200 |
+| Result logged in dashboard/shared log | ✅ Comment posted to issue, logged here |
+
+### Recommended Production Path
+1. **Do NOT manually trigger `heartbeat run`** for issue-based work. Let Paperclip's auto-assignment handle it.
+2. **For scheduled routines** (morning brief, PO review, etc.): Use HEARTBEAT.md time-gated logic. Paperclip's heartbeat system wakes the agent periodically; the agent checks the clock and runs the routine if in-window.
+3. **For ad-hoc tasks**: Create issue → assign to agent → set status to `todo` → Paperclip auto-triggers.
+4. **Env management**: Always use `$BACKEND_URL` in HEARTBEAT.md. Set it to `http://localhost:4000` for local, `https://usagummies.com` for production/VPS.
+
+### Remaining Work
+1. Update CEO, Finance, Sales HEARTBEAT.md to use `$BACKEND_URL` pattern
+2. Wire CEO morning brief to call `po.summary` + `email_intelligence.summary` + Shopify MCP
+3. Test Finance agent against `/api/ops/qbo/query`
+4. PM-007 production re-test after deploy
