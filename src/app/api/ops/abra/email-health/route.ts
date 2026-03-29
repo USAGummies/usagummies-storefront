@@ -6,7 +6,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { sendViaGmailApi } from "@/lib/ops/gmail-reader";
+import { sendViaGmailApi, testGmailApiSendDiagnostic } from "@/lib/ops/gmail-reader";
 import { sendOpsEmail } from "@/lib/ops/email";
 
 export const runtime = "nodejs";
@@ -62,35 +62,31 @@ export async function POST(req: Request) {
   const { to } = (await req.json().catch(() => ({}))) as { to?: string };
   const recipient = to || "ben@usagummies.com";
 
-  // Step 1: Try Gmail API directly
-  const gmailApiResult = await sendViaGmailApi({
+  // Step 1: Try Gmail API directly with full diagnostic
+  const diag = await testGmailApiSendDiagnostic({
     to: recipient,
-    subject: `[Abra Health Check] Gmail API send test — ${new Date().toISOString()}`,
-    body: `This is an automated health check from Abra's email system.\n\nIf you received this, the Gmail API send is working correctly and emails appear in your Sent folder.\n\nTimestamp: ${new Date().toISOString()}`,
+    subject: `[Abra Health Check] Gmail API test — ${new Date().toISOString()}`,
+    body: `Automated health check.\nIf received, Gmail API send is working and email appears in Sent folder.\nTimestamp: ${new Date().toISOString()}`,
   });
 
-  if (gmailApiResult) {
+  if (diag.ok) {
     return NextResponse.json({
       ok: true,
       method: "Gmail API",
       saved_to_sent: true,
+      message_id: diag.messageId,
       message: `Test email sent to ${recipient} via Gmail API — check Sent folder`,
     });
   }
 
-  // Step 2: If Gmail API failed, try full sendOpsEmail (which includes SMTP fallback)
-  const opsResult = await sendOpsEmail({
-    to: recipient,
-    subject: `[Abra Health Check] SMTP fallback test — ${new Date().toISOString()}`,
-    body: `This is an automated health check from Abra's email system.\n\nWARNING: This email was sent via SMTP, NOT the Gmail API. It will NOT appear in your Sent folder.\n\nThe Gmail API send failed. Check Vercel logs for details.\n\nTimestamp: ${new Date().toISOString()}`,
-  });
-
+  // Gmail API failed — return the error details without trying SMTP
   return NextResponse.json({
-    ok: opsResult.ok,
-    method: "SMTP (fallback)",
-    saved_to_sent: false,
-    gmail_api_failed: true,
-    warning: "Gmail API send failed — email sent via SMTP but will NOT appear in Sent folder",
-    smtp_result: opsResult.message,
+    ok: false,
+    method: "NONE",
+    gmail_api_error: diag.error,
+    gmail_api_error_code: diag.errorCode,
+    gmail_api_error_detail: diag.errorDetail,
+    client_available: diag.clientAvailable,
+    message: `Gmail API send failed: ${diag.error}`,
   });
 }

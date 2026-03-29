@@ -602,3 +602,54 @@ export async function sendViaGmailApi(opts: SendGmailOpts): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Diagnostic version of sendViaGmailApi — returns detailed error info instead of boolean.
+ */
+export async function testGmailApiSendDiagnostic(opts: SendGmailOpts): Promise<{
+  ok: boolean;
+  messageId?: string;
+  clientAvailable: boolean;
+  error?: string;
+  errorCode?: number;
+  errorDetail?: string;
+}> {
+  const gmail = getGmailSendClient();
+  if (!gmail) {
+    return { ok: false, clientAvailable: false, error: "No Gmail send client — OAuth credentials missing or invalid" };
+  }
+
+  try {
+    const raw = buildRawEmail(opts);
+    const response = await gmail.users.messages.send({
+      userId: "me",
+      requestBody: { raw },
+    });
+    return { ok: true, clientAvailable: true, messageId: response.data?.id || undefined };
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    let errorCode: number | undefined;
+    let errorDetail: string | undefined;
+
+    if (err && typeof err === "object") {
+      const errObj = err as Record<string, unknown>;
+      if (errObj.code) errorCode = Number(errObj.code);
+      if (errObj.response && typeof errObj.response === "object") {
+        const resp = errObj.response as Record<string, unknown>;
+        errorCode = errorCode || (resp.status ? Number(resp.status) : undefined);
+        errorDetail = JSON.stringify(resp.data ?? resp.statusText ?? "").slice(0, 1000);
+      }
+      if (errObj.errors) {
+        errorDetail = (errorDetail || "") + " | errors: " + JSON.stringify(errObj.errors).slice(0, 500);
+      }
+    }
+
+    return {
+      ok: false,
+      clientAvailable: true,
+      error: errMsg,
+      errorCode,
+      errorDetail,
+    };
+  }
+}
