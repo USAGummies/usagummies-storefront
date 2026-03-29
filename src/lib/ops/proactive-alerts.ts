@@ -14,7 +14,7 @@
  * Deduplication via Vercel KV state to prevent alert fatigue.
  */
 
-import { readState, writeState } from "@/lib/ops/state";
+import { acquireKVLock, readState, releaseKVLock, writeState } from "@/lib/ops/state";
 import { notify } from "@/lib/ops/notify";
 import { getRecentErrors, type TrackedError } from "@/lib/ops/error-tracker";
 
@@ -58,6 +58,7 @@ type SignalPostEntry = {
 };
 type SignalPostState = Record<string, number | SignalPostEntry>;
 const SIGNAL_POST_STATE_KEY = "abra:signal_posts" as never;
+const PROACTIVE_ALERT_SCAN_LOCK_KEY = "operator:proactive_alert_scan:lock" as const;
 
 // ---------------------------------------------------------------------------
 // Supabase helpers (matches codebase convention — raw fetch, no SDK)
@@ -445,79 +446,90 @@ function formatAlertForSlack(alert: ProactiveAlert): string {
 // ---------------------------------------------------------------------------
 
 export async function runProactiveAlertScan(): Promise<ProactiveScanResult> {
-  // Run all checks in parallel
-  const results = await Promise.allSettled([
-    checkRevenueDrop(),
-    checkApprovalBacklog(),
-    checkNoOrdersToday(),
-    checkAgentFailureSpike(),
-    checkCashFlowWarning(),
-  ]);
-
-  // Collect non-null alerts
-  const alerts: ProactiveAlert[] = [];
-  for (const result of results) {
-    if (result.status === "fulfilled" && result.value) {
-      alerts.push(result.value);
-    } else if (result.status === "rejected") {
-      console.error("[proactive-alerts] Check failed:", result.reason);
-    }
+  const acquired = await acquireKVLock(
+    PROACTIVE_ALERT_SCAN_LOCK_KEY,
+    { startedAt: Date.now() },
+    55_000,
+  );
+  if (!acquired) {
+    return { alerts: [], sent: 0, suppressed: 0 };
   }
 
-  // Deduplication
-  const dedupMap = await loadDedupMap();
-  const signalPostState = await loadSignalPostState();
-  let sent = 0;
-  let suppressed = 0;
+  try {
+    // Run all checks in parallel
+    const results = await Promise.allSettled([
+      checkRevenueDrop(),
+      checkApprovalBacklog(),
+      checkNoOrdersToday(),
+      checkAgentFailureSpike(),
+      checkCashFlowWarning(),
+    ]);
 
-  // Clean expired entries from dedup map
-  const now = Date.now();
-  const currentDay = getDateStringET(0);
-  for (const [key, ts] of Object.entries(dedupMap)) {
-    // Remove entries older than 24h regardless of TTL
-    if (now - ts > 24 * 60 * 60 * 1000) {
-      delete dedupMap[key];
+    // Collect non-null alerts
+    const alerts: ProactiveAlert[] = [];
+    for (const result of results) {
+      if (result.status === "fulfilled" && result.value) {
+        alerts.push(result.value);
+      } else if (result.status === "rejected") {
+        console.error("[proactive-alerts] Check failed:", result.reason);
+      }
     }
+
+    // Deduplication
+    const dedupMap = await loadDedupMap();
+    const signalPostState = await loadSignalPostState();
+    let sent = 0;
+    let suppressed = 0;
+
+    // Clean expired entries from dedup map
+    const now = Date.now();
+    const currentDay = getDateStringET(0);
+    for (const [key, ts] of Object.entries(dedupMap)) {
+      // Remove entries older than 24h regardless of TTL
+      if (now - ts > 24 * 60 * 60 * 1000) {
+        delete dedupMap[key];
+      }
+    }
+    for (const [key, entry] of Object.entries(signalPostState)) {
+      const ts = typeof entry === "number" ? entry : entry.ts;
+      if (now - ts > 24 * 60 * 60 * 1000) {
+        delete signalPostState[key];
+      }
+    }
+
+    for (const alert of alerts) {
+      if (isDuplicate(alert.dedupKey, alert.dedupTtlHours, dedupMap)) {
+        suppressed++;
+        continue;
+      }
+      const signalKey = `${alert.type}|proactive-alerts`;
+      const signature = buildProactiveAlertSignature(alert);
+      const lastSignalEntry = signalPostState[signalKey];
+      if (shouldSuppressSignalPost(lastSignalEntry, currentDay, signature, now)) {
+        suppressed++;
+        continue;
+      }
+
+      // Reserve the send before notifying so overlapping scans cannot double-post.
+      dedupMap[alert.dedupKey] = now;
+      signalPostState[signalKey] = { ts: now, day: currentDay, signature };
+      await saveDedupMap(dedupMap);
+      await saveSignalPostState(signalPostState);
+
+      const slackText = formatAlertForSlack(alert);
+      await notify({
+        channel: "alerts",
+        text: slackText,
+        sms: alert.severity === "critical",
+      }).catch((err) => {
+        console.error("[proactive-alerts] Slack send failed:", err);
+      });
+
+      sent++;
+    }
+
+    return { alerts, sent, suppressed };
+  } finally {
+    await releaseKVLock(PROACTIVE_ALERT_SCAN_LOCK_KEY);
   }
-  for (const [key, entry] of Object.entries(signalPostState)) {
-    const ts = typeof entry === "number" ? entry : entry.ts;
-    if (now - ts > 24 * 60 * 60 * 1000) {
-      delete signalPostState[key];
-    }
-  }
-
-  for (const alert of alerts) {
-    if (isDuplicate(alert.dedupKey, alert.dedupTtlHours, dedupMap)) {
-      suppressed++;
-      continue;
-    }
-    const signalKey = `${alert.type}|proactive-alerts`;
-    const signature = buildProactiveAlertSignature(alert);
-    const lastSignalEntry = signalPostState[signalKey];
-    if (shouldSuppressSignalPost(lastSignalEntry, currentDay, signature, now)) {
-      suppressed++;
-      continue;
-    }
-
-    // Send to Slack
-    const slackText = formatAlertForSlack(alert);
-    await notify({
-      channel: "alerts",
-      text: slackText,
-      sms: alert.severity === "critical",
-    }).catch((err) => {
-      console.error("[proactive-alerts] Slack send failed:", err);
-    });
-
-    // Mark as sent in dedup map
-    dedupMap[alert.dedupKey] = now;
-    signalPostState[signalKey] = { ts: now, day: currentDay, signature };
-    sent++;
-  }
-
-  // Persist updated dedup map
-  await saveDedupMap(dedupMap);
-  await saveSignalPostState(signalPostState);
-
-  return { alerts, sent, suppressed };
 }

@@ -25,8 +25,6 @@ export function buildBankFeedSweepSignature(
   executeErrors: number,
 ): string {
   return JSON.stringify({
-    total: result.total,
-    applied: result.applied,
     lowConfidence: result.lowConfidence,
     investorTransfers: result.investorTransfers,
     executeErrors,
@@ -132,8 +130,11 @@ export async function runBankFeedSweep(): Promise<BankFeedSweepResult> {
     investorTransfers: reneTransfers,
   };
 
-  // Step 3: Post interactive Slack report with batch approval button
-  if (result.total > 0) {
+  const needsHumanAttention =
+    result.lowConfidence > 0 || result.investorTransfers > 0 || executeErrors > 0;
+
+  // Step 3: Post interactive Slack report only when there is something actionable
+  if (result.total > 0 && needsHumanAttention) {
     const currentDate = todayIso();
     const signature = buildBankFeedSweepSignature(result, executeErrors);
     const lastPosted = await readState<BankFeedSweepPostState | null>(BANK_FEED_SWEEP_POST_STATE_KEY, null);

@@ -51,7 +51,7 @@ describe("bank feed sweep dedup", () => {
     expect(shouldPostBankFeedSweepUpdate(previous, "2026-03-28", signature)).toBe(false);
   });
 
-  it("allows reposting when the counts change or the day changes", async () => {
+  it("allows reposting when the actionable review burden changes or the day changes", async () => {
     const { buildBankFeedSweepSignature, shouldPostBankFeedSweepUpdate } = await import("@/lib/ops/sweeps/bank-feed-sweep");
     const result = {
       total: 41,
@@ -61,10 +61,30 @@ describe("bank feed sweep dedup", () => {
       investorTransfers: 0,
     };
     const signature = buildBankFeedSweepSignature(result, 0);
-    const changed = buildBankFeedSweepSignature({ ...result, applied: 1 }, 0);
+    const changed = buildBankFeedSweepSignature({ ...result, lowConfidence: 40 }, 0);
     const previous = { date: "2026-03-28", signature };
 
     expect(shouldPostBankFeedSweepUpdate(previous, "2026-03-28", changed)).toBe(true);
     expect(shouldPostBankFeedSweepUpdate(previous, "2026-03-29", signature)).toBe(true);
+  });
+
+  it("ignores harmless total/applied changes when the manual-review burden is unchanged", async () => {
+    const { buildBankFeedSweepSignature } = await import("@/lib/ops/sweeps/bank-feed-sweep");
+    const first = buildBankFeedSweepSignature({
+      total: 41,
+      highConfidence: 3,
+      lowConfidence: 41,
+      applied: 3,
+      investorTransfers: 0,
+    }, 0);
+    const second = buildBankFeedSweepSignature({
+      total: 38,
+      highConfidence: 6,
+      lowConfidence: 41,
+      applied: 6,
+      investorTransfers: 0,
+    }, 0);
+
+    expect(second).toBe(first);
   });
 });

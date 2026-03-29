@@ -255,39 +255,6 @@ function buildThreadConstraintBlock(
   return `[THREAD CONSTRAINTS]\n${constraints.map((item) => `- ${item}`).join("\n")}\n\n`;
 }
 
-function latestAssistantSummary(history: Array<{ role: "user" | "assistant"; content: string }>): string | null {
-  const latest = [...history].reverse().find((item) => item.role === "assistant" && item.content.trim());
-  if (!latest) return null;
-  const normalized = normalizeConstraintText(latest.content).replace(/^:brain:\s*abra:\s*/i, "");
-  const sentence = normalized.split(/(?<=[.!?])\s+/)[0]?.trim() || normalized;
-  return sentence.slice(0, 220);
-}
-
-function maybeHandleKnownThreadGuardrails(
-  message: string,
-  history: Array<{ role: "user" | "assistant"; content: string }>,
-): string | null {
-  const normalized = normalizeConstraintText(message).toLowerCase();
-
-  if (
-    /\b(found|bank statements?|statement export)\b/i.test(message) &&
-    (/\bexcel\b/i.test(message) || /\bcsv\b/i.test(message))
-  ) {
-    return "I can organize CSV exports from Found or BofA. If you upload a text-based PDF, I can extract it; if the statement is scanned/image-only, it still needs OCR or CSV.";
-  }
-
-  if (/\bpdf\b/i.test(message) && (/\bexcel\b/i.test(message) || /\bcsv\b/i.test(message))) {
-    return "CSV is the safest path. I can read text-based PDFs, but scanned/image-only PDFs still need OCR before I can convert them reliably.";
-  }
-
-  if ((normalized.startsWith("ben,") || normalized.startsWith("ben ")) && history.some((item) => item.role === "assistant")) {
-    const summary = latestAssistantSummary(history);
-    return summary ? `For Ben: ${summary}` : "For Ben: current blocker is still being investigated.";
-  }
-
-  return null;
-}
-
 type ChatRouteUpload = { name: string; mimeType: string; buffer: Buffer };
 
 export async function buildReadOnlyChatRouteRequest(payload: {
@@ -473,13 +440,6 @@ export async function POST(req: Request) {
       }
 
       const normalizedMessage = stripAbraMention(messageText || "(file attachment — see attached files above)");
-      const guardrailReply = maybeHandleKnownThreadGuardrails(normalizedMessage, history);
-      if (guardrailReply) {
-        await postSlackMessage(channel, guardrailReply, {
-          threadTs: rootThreadTs,
-        });
-        return;
-      }
       const routed = routeMessage(normalizedMessage, user, {
         history,
       });

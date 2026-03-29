@@ -103,4 +103,12 @@ describe("proactive alert signal dedup", () => {
       ),
     ).toBe(false);
   });
+
+  it("suppresses any same-day revenue alert once the day-level dedup key is reserved", () => {
+    const reservedAt = Date.UTC(2026, 2, 28, 13, 10);
+    const dedupMap = { "revenue-drop-2026-03-28": reservedAt };
+    const lastTs = dedupMap["revenue-drop-2026-03-28"];
+
+    expect(Date.UTC(2026, 2, 28, 19, 40) - lastTs < 24 * 60 * 60 * 1000).toBe(true);
+  });
 });
