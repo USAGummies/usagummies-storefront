@@ -87,4 +87,18 @@ describe("bank feed sweep dedup", () => {
 
     expect(second).toBe(first);
   });
+
+  it("suppresses same-day reposts when another sweep already reserved the post", async () => {
+    const { shouldPostBankFeedSweepUpdate } = await import("@/lib/ops/sweeps/bank-feed-sweep");
+    const reserved = {
+      date: "2026-03-28",
+      signature: JSON.stringify({
+        lowConfidence: 41,
+        investorTransfers: 0,
+        executeErrors: 0,
+      }),
+    };
+
+    expect(shouldPostBankFeedSweepUpdate(reserved, "2026-03-28", reserved.signature)).toBe(false);
+  });
 });

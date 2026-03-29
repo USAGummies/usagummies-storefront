@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { buildReadOnlyChatRouteRequest } from "@/app/api/ops/slack/events/route";
-import { buildProactiveAlertSignature, shouldSuppressSignalPost } from "@/lib/ops/proactive-alerts";
+import {
+  buildProactiveAlertSignature,
+  shouldSuppressSameDayAlertType,
+  shouldSuppressSignalPost,
+} from "@/lib/ops/proactive-alerts";
 import { buildSlackEventDedupKey } from "@/lib/ops/slack-dedup";
 
 vi.mock("server-only", () => ({}));
@@ -105,10 +109,17 @@ describe("proactive alert signal dedup", () => {
   });
 
   it("suppresses any same-day revenue alert once the day-level dedup key is reserved", () => {
-    const reservedAt = Date.UTC(2026, 2, 28, 13, 10);
-    const dedupMap = { "revenue-drop-2026-03-28": reservedAt };
-    const lastTs = dedupMap["revenue-drop-2026-03-28"];
-
-    expect(Date.UTC(2026, 2, 28, 19, 40) - lastTs < 24 * 60 * 60 * 1000).toBe(true);
+    expect(
+      shouldSuppressSameDayAlertType(
+        "revenue_drop",
+        {
+          ts: Date.UTC(2026, 2, 28, 13, 10),
+          day: "2026-03-28",
+          signature: "one",
+        },
+        "2026-03-28",
+        Date.UTC(2026, 2, 28, 19, 40),
+      ),
+    ).toBe(true);
   });
 });

@@ -1,5 +1,5 @@
 import { proactiveMessage } from "@/lib/ops/abra-slack-responder";
-import { readState, writeState } from "@/lib/ops/state";
+import { acquireKVLock, readState, releaseKVLock, writeState } from "@/lib/ops/state";
 
 export type BankFeedSweepResult = {
   total: number;
@@ -15,6 +15,7 @@ type BankFeedSweepPostState = {
 };
 
 const BANK_FEED_SWEEP_POST_STATE_KEY = "operator:bank_feed_sweep:last_posted" as const;
+const BANK_FEED_SWEEP_POST_LOCK_KEY = "operator:bank_feed_sweep:post_lock" as const;
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -137,109 +138,125 @@ export async function runBankFeedSweep(): Promise<BankFeedSweepResult> {
   if (result.total > 0 && needsHumanAttention) {
     const currentDate = todayIso();
     const signature = buildBankFeedSweepSignature(result, executeErrors);
-    const lastPosted = await readState<BankFeedSweepPostState | null>(BANK_FEED_SWEEP_POST_STATE_KEY, null);
-    if (!shouldPostBankFeedSweepUpdate(lastPosted, currentDate, signature)) {
+    const acquired = await acquireKVLock(
+      BANK_FEED_SWEEP_POST_LOCK_KEY,
+      { startedAt: Date.now() },
+      30_000,
+    );
+    if (!acquired) {
       return result;
     }
 
-    const botToken = process.env.SLACK_BOT_TOKEN;
-    const channel = process.env.SLACK_CHANNEL_ALERTS || "C0ALS6W7VB4";
+    try {
+      const lastPosted = await readState<BankFeedSweepPostState | null>(
+        BANK_FEED_SWEEP_POST_STATE_KEY,
+        null,
+      );
+      if (!shouldPostBankFeedSweepUpdate(lastPosted, currentDate, signature)) {
+        return result;
+      }
 
-    const summaryText = [
-      `🏦 *Bank Feed Reconciliation — ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })}*`,
-      "",
-      `• *${result.applied}* transactions auto-categorized`,
-      result.lowConfidence > 0
-        ? `• *${result.lowConfidence}* need manual review`
-        : null,
-      result.investorTransfers > 0
-        ? `• 🔴 *${result.investorTransfers}* investor transfer${result.investorTransfers === 1 ? "" : "s"} from Rene flagged → QBO Account 2300 (Liability)`
-        : null,
-      executeErrors > 0
-        ? `• ⚠️ ${executeErrors} categorization error${executeErrors === 1 ? "" : "s"}`
-        : null,
-      "",
-      result.lowConfidence > 0
-        ? `_Rene: tap Approve to accept the batch, or Review to see individual items._`
-        : `_All transactions categorized with high confidence._`,
-    ].filter(Boolean).join("\n");
+      await writeState(BANK_FEED_SWEEP_POST_STATE_KEY, {
+        date: currentDate,
+        signature,
+      });
 
-    if (botToken && result.lowConfidence > 0) {
-      // Post with interactive buttons for batch approval
-      await fetch("https://slack.com/api/chat.postMessage", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${botToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          channel,
-          text: summaryText,
-          blocks: [
-            {
-              type: "section",
-              text: { type: "mrkdwn", text: summaryText },
-            },
-            {
-              type: "actions",
-              elements: [
-                {
-                  type: "button",
-                  text: { type: "plain_text", text: `✅ Approve Batch (${result.applied} items)` },
-                  style: "primary",
-                  action_id: "approve_batch_categorize",
-                  value: JSON.stringify({ applied: result.applied, date: new Date().toISOString() }),
-                },
-                {
-                  type: "button",
-                  text: { type: "plain_text", text: "📋 Review Items" },
-                  action_id: "review_batch_categorize",
-                  value: "review",
-                },
-                {
-                  type: "button",
-                  text: { type: "plain_text", text: "❌ Reject" },
-                  style: "danger",
-                  action_id: "reject_batch_categorize",
-                  value: "reject",
-                },
-              ],
-            },
-          ],
-        }),
-        signal: AbortSignal.timeout(8000),
-      }).catch(() => {});
-    } else {
-      // Fallback: simple text message
-      await proactiveMessage({
-        target: "channel",
-        channelOrUserId: channel,
-        message: summaryText,
-        requiresResponse: result.lowConfidence > 0 || result.investorTransfers > 0,
-      }).catch(() => {});
+      const botToken = process.env.SLACK_BOT_TOKEN;
+      const channel = process.env.SLACK_CHANNEL_ALERTS || "C0ALS6W7VB4";
+
+      const summaryText = [
+        `🏦 *Bank Feed Reconciliation — ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })}*`,
+        "",
+        `• *${result.applied}* transactions auto-categorized`,
+        result.lowConfidence > 0
+          ? `• *${result.lowConfidence}* need manual review`
+          : null,
+        result.investorTransfers > 0
+          ? `• 🔴 *${result.investorTransfers}* investor transfer${result.investorTransfers === 1 ? "" : "s"} from Rene flagged → QBO Account 2300 (Liability)`
+          : null,
+        executeErrors > 0
+          ? `• ⚠️ ${executeErrors} categorization error${executeErrors === 1 ? "" : "s"}`
+          : null,
+        "",
+        result.lowConfidence > 0
+          ? `_Rene: tap Approve to accept the batch, or Review to see individual items._`
+          : `_All transactions categorized with high confidence._`,
+      ].filter(Boolean).join("\n");
+
+      if (botToken && result.lowConfidence > 0) {
+        // Post with interactive buttons for batch approval
+        await fetch("https://slack.com/api/chat.postMessage", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${botToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            channel,
+            text: summaryText,
+            blocks: [
+              {
+                type: "section",
+                text: { type: "mrkdwn", text: summaryText },
+              },
+              {
+                type: "actions",
+                elements: [
+                  {
+                    type: "button",
+                    text: { type: "plain_text", text: `✅ Approve Batch (${result.applied} items)` },
+                    style: "primary",
+                    action_id: "approve_batch_categorize",
+                    value: JSON.stringify({ applied: result.applied, date: new Date().toISOString() }),
+                  },
+                  {
+                    type: "button",
+                    text: { type: "plain_text", text: "📋 Review Items" },
+                    action_id: "review_batch_categorize",
+                    value: "review",
+                  },
+                  {
+                    type: "button",
+                    text: { type: "plain_text", text: "❌ Reject" },
+                    style: "danger",
+                    action_id: "reject_batch_categorize",
+                    value: "reject",
+                  },
+                ],
+              },
+            ],
+          }),
+          signal: AbortSignal.timeout(8000),
+        }).catch(() => {});
+      } else {
+        // Fallback: simple text message
+        await proactiveMessage({
+          target: "channel",
+          channelOrUserId: channel,
+          message: summaryText,
+          requiresResponse: result.lowConfidence > 0 || result.investorTransfers > 0,
+        }).catch(() => {});
+      }
+
+      // Also DM Rene if there are items needing review
+      if (botToken && (result.lowConfidence > 0 || result.investorTransfers > 0)) {
+        const RENE_ID = "U0ALL27JM38";
+        await fetch("https://slack.com/api/chat.postMessage", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${botToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            channel: RENE_ID,
+            text: `📋 *${result.lowConfidence} QBO transactions need your review*${result.investorTransfers > 0 ? ` + ${result.investorTransfers} investor transfer(s) flagged` : ""}. Check #abra-control for the batch approval.`,
+          }),
+          signal: AbortSignal.timeout(5000),
+        }).catch(() => {});
+      }
+    } finally {
+      await releaseKVLock(BANK_FEED_SWEEP_POST_LOCK_KEY);
     }
-
-    // Also DM Rene if there are items needing review
-    if (botToken && (result.lowConfidence > 0 || result.investorTransfers > 0)) {
-      const RENE_ID = "U0ALL27JM38";
-      await fetch("https://slack.com/api/chat.postMessage", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${botToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          channel: RENE_ID,
-          text: `📋 *${result.lowConfidence} QBO transactions need your review*${result.investorTransfers > 0 ? ` + ${result.investorTransfers} investor transfer(s) flagged` : ""}. Check #abra-control for the batch approval.`,
-        }),
-        signal: AbortSignal.timeout(5000),
-      }).catch(() => {});
-    }
-
-    await writeState(BANK_FEED_SWEEP_POST_STATE_KEY, {
-      date: currentDate,
-      signature,
-    });
   }
 
   return result;

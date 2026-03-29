@@ -217,6 +217,20 @@ export function shouldSuppressSignalPost(
   return nowMs - entry.ts < ttlHours * 60 * 60 * 1000 && entry.signature === signature;
 }
 
+export function shouldSuppressSameDayAlertType(
+  type: ProactiveAlertType,
+  entry: number | SignalPostEntry | undefined,
+  currentDay: string,
+  nowMs: number,
+): boolean {
+  if (type !== "revenue_drop") return false;
+  if (!entry) return false;
+  if (typeof entry === "number") {
+    return nowMs - entry < 24 * 60 * 60 * 1000;
+  }
+  return entry.day === currentDay;
+}
+
 // ---------------------------------------------------------------------------
 // ET time helper
 // ---------------------------------------------------------------------------
@@ -505,6 +519,10 @@ export async function runProactiveAlertScan(): Promise<ProactiveScanResult> {
       const signalKey = `${alert.type}|proactive-alerts`;
       const signature = buildProactiveAlertSignature(alert);
       const lastSignalEntry = signalPostState[signalKey];
+      if (shouldSuppressSameDayAlertType(alert.type, lastSignalEntry, currentDay, now)) {
+        suppressed++;
+        continue;
+      }
       if (shouldSuppressSignalPost(lastSignalEntry, currentDay, signature, now)) {
         suppressed++;
         continue;
