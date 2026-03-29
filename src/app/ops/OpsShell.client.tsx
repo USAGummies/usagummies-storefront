@@ -80,13 +80,18 @@ function OpsNav({
 
     async function loadBadge() {
       try {
-        const res = await fetch("/api/ops/abra/approvals?status=pending", {
+        const res = await fetch("/api/ops/approvals?status=pending", {
           cache: "no-store",
         });
         if (!res.ok) return;
         const data = await res.json();
         if (cancelled) return;
-        const count = typeof data?.count === "number" ? data.count : 0;
+        const count =
+          typeof data?.totalPending === "number"
+            ? data.totalPending
+            : typeof data?.count === "number"
+              ? data.count
+              : 0;
         setPendingApprovals(Math.max(0, count));
       } catch {
         // Best-effort

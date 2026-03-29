@@ -68,7 +68,8 @@ export default function ApprovalsPage() {
     setError(null);
 
     try {
-      const res = await fetch(`/api/ops/abra/approvals?status=${nextTab}`, {
+      const statusParam = nextTab === "rejected" ? "denied" : nextTab;
+      const res = await fetch(`/api/ops/approvals?status=${statusParam}`, {
         cache: "no-store",
       });
       const data = await res.json().catch(() => ({}));
@@ -97,13 +98,13 @@ export default function ApprovalsPage() {
     setError(null);
 
     try {
-      const res = await fetch("/api/ops/abra/approvals", {
-        method: "PATCH",
+      const res = await fetch("/api/ops/approvals", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          id,
-          decision,
-          comment: commentById[id] || "",
+          approvalId: id,
+          decision: decision === "rejected" ? "denied" : "approved",
+          reasoning: commentById[id] || "",
         }),
       });
 
@@ -131,10 +132,14 @@ export default function ApprovalsPage() {
 
     for (const id of selected) {
       try {
-        const res = await fetch("/api/ops/abra/approvals", {
-          method: "PATCH",
+        const res = await fetch("/api/ops/approvals", {
+          method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id, decision, comment: "Bulk action from dashboard" }),
+          body: JSON.stringify({
+            approvalId: id,
+            decision: decision === "rejected" ? "denied" : "approved",
+            reasoning: "Bulk action from dashboard",
+          }),
         });
         if (!res.ok) failCount++;
       } catch {

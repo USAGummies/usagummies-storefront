@@ -65,6 +65,8 @@ type ApprovalsPayload = {
   generatedAt: string;
 };
 
+type ApprovalStatusFilter = "pending" | "approved" | "denied" | "modified" | "all";
+
 type CacheEnvelope<T> = {
   data: T;
   cachedAt: number;
@@ -318,9 +320,23 @@ async function resolveDeciderUserId(email: string | null | undefined): Promise<s
   return rows[0].id;
 }
 
-async function fetchPendingApprovals(): Promise<ApprovalsPayload> {
+function normalizeApprovalStatusFilter(raw: string | null): ApprovalStatusFilter {
+  const value = (raw || "pending").trim().toLowerCase();
+  if (value === "rejected") return "denied";
+  if (value === "approved" || value === "denied" || value === "modified" || value === "all") {
+    return value;
+  }
+  return "pending";
+}
+
+async function fetchApprovals(status: ApprovalStatusFilter): Promise<(ApprovalsPayload & { count: number; status: ApprovalStatusFilter })> {
+  const statusFilter =
+    status === "all"
+      ? ""
+      : `&status=eq.${encodeURIComponent(status)}`;
+
   const approvals = (await sbFetch(
-    "/rest/v1/approvals?select=id,requesting_agent_id,action_type,target_entity_type,target_entity_id,summary,supporting_data,confidence,risk_level,permission_tier,status,requested_at,approval_trigger,action_proposed,confidence_level,risk_assessment&status=eq.pending&order=permission_tier.desc,requested_at.asc&limit=100",
+    `/rest/v1/approvals?select=id,requesting_agent_id,action_type,target_entity_type,target_entity_id,summary,supporting_data,confidence,risk_level,permission_tier,status,requested_at,approval_trigger,action_proposed,confidence_level,risk_assessment&order=requested_at.desc&limit=100${statusFilter}`,
   )) as ApprovalRow[];
 
   const agentIds = Array.from(new Set(compact(approvals.map((a) => a.requesting_agent_id))));
@@ -348,8 +364,10 @@ async function fetchPendingApprovals(): Promise<ApprovalsPayload> {
 
   return {
     approvals: enriched,
-    totalPending: enriched.length,
+    totalPending: status === "pending" ? enriched.length : 0,
+    count: enriched.length,
     generatedAt: new Date().toISOString(),
+    status,
   };
 }
 
@@ -360,17 +378,22 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const status = normalizeApprovalStatusFilter(req.nextUrl.searchParams.get("status"));
     const circuitCheck = await canUseSupabase();
     if (!circuitCheck.allowed) {
-      const cached = await readApprovalsCache(APPROVALS_STALE_MAX_AGE);
-      if (cached) {
-        return NextResponse.json({
-          ...cached,
-          degraded: true,
-          source: "cache",
-          circuitOpen: true,
-          cacheAgeMinutes: cached.cacheAgeMinutes,
-        });
+      if (status === "pending") {
+        const cached = await readApprovalsCache(APPROVALS_STALE_MAX_AGE);
+        if (cached) {
+          return NextResponse.json({
+            ...cached,
+            count: cached.approvals.length,
+            status,
+            degraded: true,
+            source: "cache",
+            circuitOpen: true,
+            cacheAgeMinutes: cached.cacheAgeMinutes,
+          });
+        }
       }
 
       return NextResponse.json(
@@ -383,8 +406,14 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const payload = await fetchPendingApprovals();
-    await writeApprovalsCache(payload);
+    const payload = await fetchApprovals(status);
+    if (status === "pending") {
+      await writeApprovalsCache({
+        approvals: payload.approvals,
+        totalPending: payload.totalPending,
+        generatedAt: payload.generatedAt,
+      });
+    }
     await markSupabaseSuccess();
 
     return NextResponse.json({
@@ -396,16 +425,21 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     if (isSupabaseRelatedError(error)) {
       const state = await markSupabaseFailure(error);
-      const cached = await readApprovalsCache(APPROVALS_STALE_MAX_AGE);
-      if (cached) {
-        return NextResponse.json({
-          ...cached,
-          degraded: true,
-          source: "cache",
-          circuitOpen: isCircuitOpen(state),
-          cacheAgeMinutes: cached.cacheAgeMinutes,
-          warning: "Serving cached approvals due to Supabase failure.",
-        });
+      const status = normalizeApprovalStatusFilter(req.nextUrl.searchParams.get("status"));
+      if (status === "pending") {
+        const cached = await readApprovalsCache(APPROVALS_STALE_MAX_AGE);
+        if (cached) {
+          return NextResponse.json({
+            ...cached,
+            count: cached.approvals.length,
+            status,
+            degraded: true,
+            source: "cache",
+            circuitOpen: isCircuitOpen(state),
+            cacheAgeMinutes: cached.cacheAgeMinutes,
+            warning: "Serving cached approvals due to Supabase failure.",
+          });
+        }
       }
 
       return NextResponse.json(

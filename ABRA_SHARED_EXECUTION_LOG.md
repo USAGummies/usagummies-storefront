@@ -2645,3 +2645,13 @@ Validation:
 - Result: `22/22` passed
 - Ran: `npm run build`
 - Result: passed
+
+## 2026-03-29 01:31 PT — Codex approvals surface unification
+- Switched `/ops/approvals` UI from legacy `/api/ops/abra/approvals` to canonical `/api/ops/approvals`.
+- Extended canonical approvals GET to accept `status=pending|approved|denied|modified|all` with `rejected` normalized to `denied`.
+- Updated approvals dashboard POST decisions to canonical payload shape (`approvalId`, `decision`, `reasoning`).
+- Updated ops shell pending-approvals badge to read from `/api/ops/approvals?status=pending`.
+- Validation:
+  - `npm test -- src/lib/ops/__tests__/approvals-route.test.ts src/lib/ops/__tests__/control-plane-route.test.ts` ✅
+  - `npm run build` ✅
+- Rationale: remove remaining dashboard split-brain between legacy approvals API and canonical control-plane approvals API before Monday.
