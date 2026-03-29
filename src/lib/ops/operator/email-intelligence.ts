@@ -759,9 +759,8 @@ async function processSingleEmail(
         note: "Rene financial training data — ingested into Abra brain for accounting knowledge.",
       }).catch(() => null);
 
-      // ── Auto-reply to Rene confirming what was learned ──
+      // ── Summarize what was learned ──
       const learnedItems: string[] = [];
-      // Summarize what we extracted from the email body
       const bodyPreview = normalizeText(combinedText).slice(0, 300);
       if (bodyPreview.length > 50) {
         learnedItems.push(`Email content (${Math.round(combinedText.length / 100) * 100}+ characters of text)`);
@@ -775,47 +774,27 @@ async function processSingleEmail(
         }
       }
 
-      const replyBody = [
-        `Hey Rene,`,
-        ``,
-        `Got it — I've captured everything from your email "${normalizeSubject(subject) || "(no subject)"}".`,
-        ``,
-        `Here's what I ingested into our financial knowledge base:`,
-        ...learnedItems.map((item) => `  • ${item}`),
-        ``,
-        `This is now stored in Abra's brain and will inform how we handle accounting, ` +
-          `categorization, and financial operations going forward.`,
-        ``,
-        `If anything needs correction or you want to add more detail, just reply to this ` +
-          `email or send a new one — I'll pick it up automatically.`,
-        ``,
-        `— Abra (USA Gummies AI Assistant)`,
-      ].join("\n");
+      // NOTE: Auto-reply is DISABLED. Claude Code handles Rene replies directly
+      // until the system is stabilized. Abra only ingests — does NOT reply.
+      // To re-enable: uncomment the sendViaGmailApi block below.
+      //
+      // const reneEmail = extractEmailAddress(message.from);
+      // await sendViaGmailApi({ to: reneEmail, subject: `Re: ${subject}`, body: replyBody, threadId: message.threadId || undefined });
 
-      const reneEmail = extractEmailAddress(message.from);
-      await sendViaGmailApi({
-        to: reneEmail,
-        subject: `Re: ${subject}`,
-        body: replyBody,
-        threadId: message.threadId || undefined,
-      }).catch((err) =>
-        console.error("[financial-training] Auto-reply to Rene failed:", err),
-      );
-
-      // Post to Slack #financials so Ben sees it too
+      // Post to Slack #financials so Ben/Claude Code sees what was ingested
       await postSlackMessage(
         FINANCIALS_CHANNEL_ID,
         `📚 *Rene Financial Training Ingested*\n` +
           `Subject: ${subject}\n` +
           `Items learned:\n${learnedItems.map((i) => `  • ${i}`).join("\n")}\n` +
-          `Auto-reply sent to ${reneEmail} ✅`,
+          `⚠️ Auto-reply DISABLED — Claude Code is handling Rene directly`,
       ).catch(() => null);
 
       return {
         messageId: message.id,
         subject,
         type,
-        action: `Ingested financial training from Rene — ${learnedItems.length} items stored, auto-reply sent`,
+        action: `Ingested financial training from Rene — ${learnedItems.length} items stored. NO auto-reply (Claude Code handles directly).`,
       };
     }
     case "LEGAL_TRADEMARK": {
