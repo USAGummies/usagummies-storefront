@@ -1121,3 +1121,70 @@ What Claude should do next:
 - Retry `GET /api/ops/approvals` from the Paperclip agent workspace using the existing `CRON_SECRET` bearer token.
 - Log the exact response shape and whether the approval inbox is now readable end to end.
 - If approvals read succeeds, the remaining blocker is Paperclip inbox routing, not backend auth.
+
+---
+
+## E2E Validation — 2026-03-28 18:50 PDT
+Owner: Claude Code
+Area: Approvals auth unblock + full endpoint suite
+
+### Deploy
+- Commit `4e4a1e0`: control-plane adapter, approvals auth fix, PM-007 dedup, E2E validation
+- Commit `625877c`: middleware fix — added `/api/ops/approvals` to `SELF_AUTHENTICATED_PREFIXES`
+- Both pushed to `main`, Vercel deploy triggered.
+
+### Root Cause of Initial 401
+Codex's route-level auth fix (`hasApprovalsReadAccess` with `isCronAuthorized` fallback) was correct, but **middleware** (`src/middleware.ts`) was rejecting the request before it reached the route handler. The middleware blocks all `/api/ops/*` routes without a NextAuth session unless the path is in `SELF_AUTHENTICATED_PREFIXES`. `/api/ops/approvals` was not listed.
+
+**Fix**: Added `"/api/ops/approvals"` to `SELF_AUTHENTICATED_PREFIXES` with comment noting it uses `hasApprovalsReadAccess` (session + CRON_SECRET) for GET, session-only for POST.
+
+### Approvals E2E Result: ✅ PASS
+```
+Request:  GET http://localhost:4000/api/ops/approvals
+Header:   Authorization: Bearer 5c7a6710...
+Response: HTTP 200
+Body: {
+  "approvals": [],
+  "totalPending": 0,
+  "generatedAt": "2026-03-29T01:50:34.365Z",
+  "degraded": false,
+  "source": "supabase",
+  "circuitOpen": false
+}
+```
+
+### Full 5/5 Endpoint Suite: ✅ ALL PASS
+From Operations agent workspace (`source $AGENT_HOME/.env`):
+
+| # | Endpoint | Operation | HTTP | Result |
+|---|----------|-----------|------|--------|
+| 1 | `control-plane` | `po.summary` | 200 | openCount=2, revenue=$1,738.80 |
+| 2 | `control-plane` | `po.list` | 200 | 2 POs (received, delivered) |
+| 3 | `control-plane` | `po.get` | 200 | PO 140812, Glacier Wholesalers |
+| 4 | `control-plane` | `email_intelligence.summary` | 200 | Last sweep 2026-03-27 |
+| 5 | `approvals` | GET | 200 | 0 pending, from Supabase |
+
+**Backend auth is no longer blocking the control plane.** All read operations from Paperclip agents work with Bearer CRON_SECRET.
+
+### Remaining Blocker: Paperclip Inbox Routing
+
+**Problem**: When a Paperclip issue is checked out to an agent and the heartbeat runs, the agent's `inbox-lite` endpoint returns `[]`. The agent sees no work, reports "all done", and Paperclip auto-marks the issue as `done`.
+
+**Evidence**:
+- USA-7: Created (backlog) → updated to `todo` → heartbeat ran → inbox empty → agent hallucinated completion → status: `done`
+- USA-8: Created → checked out (`in_progress`, `checkoutRunId` set) → heartbeat ran → inbox empty → agent hallucinated completion → status: `done`
+
+**Root cause**: The `inbox-lite` API likely filters by `checkoutRunId` matching the current heartbeat's `PAPERCLIP_RUN_ID`. Since `checkout` creates its own implicit run, and `heartbeat run` creates a separate run, they have different IDs — so the issue is invisible.
+
+**Impact**: Agents cannot discover their assigned work through Paperclip's native issue routing. They CAN execute backend calls (proven above), but they don't know WHAT to execute.
+
+**Workaround options**:
+1. Embed the work instructions directly in the heartbeat prompt (via HEARTBEAT.md time-gated logic) instead of relying on issue-based routing
+2. Use `heartbeat run --source assignment` which may auto-checkout and match run IDs
+3. Investigate Paperclip's built-in scheduler/auto-assignment rather than manual checkout
+
+### Next Steps
+1. **Paperclip inbox fix**: Try creating issues via the Paperclip skill from within an agent's session (not externally), which may correctly associate the run
+2. **Test HEARTBEAT.md-driven workflow**: Instead of issue routing, let the Operations agent's heartbeat routine call the control-plane endpoints directly during its 9 AM window — bypasses inbox routing entirely
+3. **QBO query E2E**: Test `/api/ops/qbo/query` from Finance workspace
+4. **PM-007 re-test**: Verify Codex's Slack dedup fix in production after deploy
