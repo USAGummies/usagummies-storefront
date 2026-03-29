@@ -61,13 +61,19 @@ export async function POST(req: Request) {
   }
 
   try {
-    await sendOpsEmail({
+    const result = await sendOpsEmail({
       to,
       subject: subject || "Re: (no subject)",
       body: emailBody,
       from: "Ben Stutman <ben@usagummies.com>",
     });
-    return NextResponse.json({ ok: true, message: `Email sent to ${to}` });
+    if (!result.ok) {
+      return NextResponse.json(
+        { ok: false, error: result.message, blocked: result.blocked },
+        { status: result.blocked ? 429 : 500 },
+      );
+    }
+    return NextResponse.json({ ok: true, message: result.message });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: msg }, { status: 500 });

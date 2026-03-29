@@ -112,12 +112,12 @@ function getGmailSendClient(): ReturnType<typeof google.gmail> | null {
   if (_gmailSend) return _gmailSend;
 
   // OAuth2 refresh token — scopes are baked in from when the token was created.
-  // If the token was created with gmail.send scope, this will work.
   const clientId = process.env.GMAIL_OAUTH_CLIENT_ID || process.env.GCP_GMAIL_OAUTH_CLIENT_ID;
   const clientSecret = process.env.GMAIL_OAUTH_CLIENT_SECRET || process.env.GCP_GMAIL_OAUTH_CLIENT_SECRET;
   const refreshToken = process.env.GMAIL_OAUTH_REFRESH_TOKEN || process.env.GCP_GMAIL_OAUTH_REFRESH_TOKEN;
 
   if (clientId && clientSecret && refreshToken) {
+    console.log("[gmail-reader] getGmailSendClient: OAuth2 credentials found, creating client");
     const oauth2 = new google.auth.OAuth2(clientId, clientSecret);
     oauth2.setCredentials({ refresh_token: refreshToken });
     _gmailSend = google.gmail({ version: "v1", auth: oauth2 });
@@ -127,6 +127,7 @@ function getGmailSendClient(): ReturnType<typeof google.gmail> | null {
   // Service account with send scope
   const saJson = process.env.GMAIL_SERVICE_ACCOUNT_JSON;
   if (saJson) {
+    console.log("[gmail-reader] getGmailSendClient: Service account found, creating client");
     const creds = JSON.parse(saJson);
     const auth = new google.auth.GoogleAuth({
       credentials: creds,
@@ -142,6 +143,16 @@ function getGmailSendClient(): ReturnType<typeof google.gmail> | null {
     return _gmailSend;
   }
 
+  console.warn(
+    "[gmail-reader] getGmailSendClient: NO credentials found. " +
+    `Checked: GMAIL_OAUTH_CLIENT_ID=${!!process.env.GMAIL_OAUTH_CLIENT_ID}, ` +
+    `GCP_GMAIL_OAUTH_CLIENT_ID=${!!process.env.GCP_GMAIL_OAUTH_CLIENT_ID}, ` +
+    `GMAIL_OAUTH_CLIENT_SECRET=${!!process.env.GMAIL_OAUTH_CLIENT_SECRET}, ` +
+    `GCP_GMAIL_OAUTH_CLIENT_SECRET=${!!process.env.GCP_GMAIL_OAUTH_CLIENT_SECRET}, ` +
+    `GMAIL_OAUTH_REFRESH_TOKEN=${!!process.env.GMAIL_OAUTH_REFRESH_TOKEN}, ` +
+    `GCP_GMAIL_OAUTH_REFRESH_TOKEN=${!!process.env.GCP_GMAIL_OAUTH_REFRESH_TOKEN}, ` +
+    `GMAIL_SERVICE_ACCOUNT_JSON=${!!process.env.GMAIL_SERVICE_ACCOUNT_JSON}`
+  );
   return null;
 }
 
@@ -562,22 +573,31 @@ function buildRawEmail(opts: SendGmailOpts): string {
  */
 export async function sendViaGmailApi(opts: SendGmailOpts): Promise<boolean> {
   const gmail = getGmailSendClient();
-  if (!gmail) return false;
+  if (!gmail) {
+    console.warn("[gmail-reader] sendViaGmailApi: No Gmail send client available — will fall back to SMTP");
+    return false;
+  }
 
   try {
     const raw = buildRawEmail(opts);
-    await gmail.users.messages.send({
+    console.log(`[gmail-reader] sendViaGmailApi: Sending to ${opts.to}, subject: "${opts.subject?.slice(0, 60)}"`);
+    const response = await gmail.users.messages.send({
       userId: "me",
       requestBody: {
         raw,
         ...(opts.threadId ? { threadId: opts.threadId } : {}),
       },
     });
+    console.log(`[gmail-reader] sendViaGmailApi: SUCCESS — message ID: ${response.data?.id}, threadId: ${response.data?.threadId}`);
     return true;
   } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    const errDetail = err instanceof Error && "response" in err
+      ? JSON.stringify((err as Record<string, unknown>).response ?? "").slice(0, 500)
+      : "";
     console.error(
-      "[gmail-reader] sendViaGmailApi failed (will fall back to SMTP):",
-      err instanceof Error ? err.message : err,
+      `[gmail-reader] sendViaGmailApi FAILED (will fall back to SMTP): ${errMsg}`,
+      errDetail ? `\nResponse detail: ${errDetail}` : "",
     );
     return false;
   }
