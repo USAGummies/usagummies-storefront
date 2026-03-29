@@ -1,0 +1,15 @@
+.git
+.github
+.vercel
+.next
+.next_prev_*
+node_modules
+coverage
+artifacts
+build
+output
+tmp
+.claude
+.state
+*.log
+*.tsbuildinfo

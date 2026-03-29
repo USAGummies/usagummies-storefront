@@ -2597,3 +2597,15 @@ For tomorrow:
 - Paperclip is the only autonomous posting/scheduling system
 - old Abra backend remains for direct Slack interaction + backend APIs
 - legacy cron routes are intentionally no-op unless `ABRA_LEGACY_AUTONOMOUS_DISABLED=0`
+
+### Production Verification — 2026-03-29 01:11 PT
+
+Forced production deploy completed via Vercel CLI after the Git webhook lagged behind the push.
+
+Verified live on `https://www.usagummies.com` with authenticated requests:
+- `/api/ops/scheduler/master` → `disabled: true`
+- `/api/ops/abra/scheduler` → `disabled: true`
+- `/api/ops/abra/cron/sweep?name=bank-feed-sweep` → `disabled: true`
+- `/api/ops/abra/cron/signal-scan` → `disabled: true`
+
+Result: legacy Vercel/QStash Abra automation is no longer live in production. Paperclip is now the sole autonomous control plane.
