@@ -18,6 +18,7 @@ import type { OperatorTaskInsert } from "@/lib/ops/operator/gap-detectors/qbo";
 import { receivePO } from "@/lib/ops/operator/po-pipeline";
 import { readState, writeState } from "@/lib/ops/state";
 import { createQBOBill, createQBOVendor, getQBOAccounts, getQBOVendors } from "@/lib/ops/qbo-client";
+import { sendViaGmailApi } from "@/lib/ops/gmail-reader";
 
 type EmailIntelligenceType =
   | "INVOICE"
@@ -25,6 +26,7 @@ type EmailIntelligenceType =
   | "SHIPPING_TRACKING"
   | "VENDOR_QUESTION"
   | "INVESTOR_COMMUNICATION"
+  | "FINANCIAL_TRAINING"
   | "LEGAL_TRADEMARK"
   | "MEDIA_PR"
   | "MARKETPLACE_UPDATE"
@@ -326,7 +328,9 @@ function classifyEmail(
   if (/coverdash|insurance|policy|coi\b/i.test(haystack)) return "INSURANCE";
   if (/rangeme/i.test(haystack)) return "MARKETPLACE_UPDATE";
   if (/rene|gonzalez/i.test(message.from) || (/\b(payment terms|investor|loan)\b/i.test(haystack) && /rene|gonzalez/i.test(haystack))) {
-    return "INVESTOR_COMMUNICATION";
+    // Rene's emails are financial training data — he teaches Abra accounting concepts,
+    // sends voice memo transcripts, Excel files, and financial documents.
+    return "FINANCIAL_TRAINING";
   }
   if (/fox\.com/i.test(`${message.from} ${message.to}`) || /media inquiry/i.test(normalizedSubject)) {
     return "MEDIA_PR";
@@ -696,22 +700,122 @@ async function processSingleEmail(
     case "INVESTOR_COMMUNICATION": {
       await recordBrainEntry(
         `Investor communication — ${message.from}`,
-        `${subject}\n${combinedText}\n\nNote: Ben and Rene will discuss the payment-terms preference in person on Sunday.`,
-        ["email", "investor", "rene"],
+        `${subject}\n${combinedText}`,
+        ["email", "investor"],
       );
-      await updateEntityFromEvent("Rene Gonzalez", {
-        type: "email_received",
-        entity_type: "investor",
-        summary: `${subject} — logged 10-day payment term preference`,
-        date: parseDate(message.date, message.date) || new Date().toISOString().slice(0, 10),
-        channel: "email",
-        note: "Rene wants 10-day payment terms. Ben and Rene will discuss in person Sunday.",
-      }).catch(() => null);
       return {
         messageId: message.id,
         subject,
         type,
-        action: "Logged Rene's 10-day payment-term preference for Sunday discussion",
+        action: `Logged investor communication from ${message.from}`,
+      };
+    }
+    case "FINANCIAL_TRAINING": {
+      // ── Rene Email Training Feature ──
+      // Rene sends voice memo transcripts, Excel files, financial documents, and
+      // accounting instruction to teach Abra. We ingest EVERYTHING into the brain
+      // as high-priority finance knowledge and auto-reply to confirm what was learned.
+      const attachmentNames = attachments
+        .filter((a) => a.filename && a.filename !== "noname")
+        .map((a) => a.filename);
+      const attachmentDescriptions = attachmentNames.length > 0
+        ? `\nAttachments ingested: ${attachmentNames.join(", ")}`
+        : "";
+
+      // Store the main email body + all attachment text as a brain entry
+      await createBrainEntry({
+        title: `Financial Training from Rene — ${normalizeSubject(subject) || "voice memo / document"}`,
+        raw_text: combinedText.slice(0, 50_000),
+        source_type: "agent",
+        source_ref: `email:${message.id}`,
+        category: "financial",
+        department: "finance",
+        priority: "high",
+        tags: ["rene-training", "finance", "accounting", ...attachmentNames.map((n) => n.toLowerCase())],
+      }).catch((err) => console.error("[financial-training] Brain entry failed:", err));
+
+      // If there are substantial attachments, store each one as its own brain entry too
+      for (const att of attachments) {
+        const attText = normalizeText(att.textContent);
+        if (attText.length < 100) continue;
+        await createBrainEntry({
+          title: `Rene attachment — ${att.filename}`,
+          raw_text: attText.slice(0, 50_000),
+          source_type: "agent",
+          source_ref: `email:${message.id}:attachment:${att.filename}`,
+          category: "financial",
+          department: "finance",
+          priority: "high",
+          tags: ["rene-training", "finance", "attachment", att.filename.toLowerCase()],
+        }).catch(() => null);
+      }
+
+      await updateEntityFromEvent("Rene Gonzalez", {
+        type: "email_received",
+        entity_type: "partner",
+        summary: `Financial training: ${normalizeSubject(subject)}${attachmentDescriptions}`,
+        date: parseDate(message.date, message.date) || new Date().toISOString().slice(0, 10),
+        channel: "email",
+        note: "Rene financial training data — ingested into Abra brain for accounting knowledge.",
+      }).catch(() => null);
+
+      // ── Auto-reply to Rene confirming what was learned ──
+      const learnedItems: string[] = [];
+      // Summarize what we extracted from the email body
+      const bodyPreview = normalizeText(combinedText).slice(0, 300);
+      if (bodyPreview.length > 50) {
+        learnedItems.push(`Email content (${Math.round(combinedText.length / 100) * 100}+ characters of text)`);
+      }
+      for (const att of attachments) {
+        const attText = normalizeText(att.textContent);
+        if (attText.length >= 100) {
+          learnedItems.push(`${att.filename} (${Math.round(attText.length / 100) * 100}+ characters extracted)`);
+        } else if (att.filename && att.filename !== "noname") {
+          learnedItems.push(`${att.filename} (filed, but text extraction was limited)`);
+        }
+      }
+
+      const replyBody = [
+        `Hey Rene,`,
+        ``,
+        `Got it — I've captured everything from your email "${normalizeSubject(subject) || "(no subject)"}".`,
+        ``,
+        `Here's what I ingested into our financial knowledge base:`,
+        ...learnedItems.map((item) => `  • ${item}`),
+        ``,
+        `This is now stored in Abra's brain and will inform how we handle accounting, ` +
+          `categorization, and financial operations going forward.`,
+        ``,
+        `If anything needs correction or you want to add more detail, just reply to this ` +
+          `email or send a new one — I'll pick it up automatically.`,
+        ``,
+        `— Abra (USA Gummies AI Assistant)`,
+      ].join("\n");
+
+      const reneEmail = extractEmailAddress(message.from);
+      await sendViaGmailApi({
+        to: reneEmail,
+        subject: `Re: ${subject}`,
+        body: replyBody,
+        threadId: message.threadId || undefined,
+      }).catch((err) =>
+        console.error("[financial-training] Auto-reply to Rene failed:", err),
+      );
+
+      // Post to Slack #financials so Ben sees it too
+      await postSlackMessage(
+        FINANCIALS_CHANNEL_ID,
+        `📚 *Rene Financial Training Ingested*\n` +
+          `Subject: ${subject}\n` +
+          `Items learned:\n${learnedItems.map((i) => `  • ${i}`).join("\n")}\n` +
+          `Auto-reply sent to ${reneEmail} ✅`,
+      ).catch(() => null);
+
+      return {
+        messageId: message.id,
+        subject,
+        type,
+        action: `Ingested financial training from Rene — ${learnedItems.length} items stored, auto-reply sent`,
       };
     }
     case "LEGAL_TRADEMARK": {

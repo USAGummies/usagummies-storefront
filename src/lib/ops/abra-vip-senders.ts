@@ -110,22 +110,37 @@ export const VIP_SENDERS: Record<string, VipSender> = {
     name: "Rene Gonzalez",
     category: "finance",
     priority: "important",
-    suggestedAction: "Respond to Rene — finance team member building the books",
+    suggestedAction: "Ingest as financial training data — Rene is teaching Abra accounting",
     relationship: "team",
     draftingContext:
-      "Rene Gonzalez is USA Gummies' bookkeeper — he is building the company's books from scratch. " +
-      "This is an ongoing accounting engagement, not one-off requests. He needs: vendor lists, " +
-      "chart of accounts, transaction history, bills, invoices, bank reconciliation data, P&L inputs. " +
+      "Rene Gonzalez is USA Gummies' bookkeeper and financial architect. He is building the company's " +
+      "books from scratch and actively TRAINING Abra via email. His emails contain voice memo transcripts, " +
+      "Excel spreadsheets, financial documents, and accounting instruction. " +
+      "EVERYTHING Rene sends should be ingested into Abra's brain as high-priority finance knowledge. " +
       "He is an internal team member. Write casually like a coworker. " +
       "CRITICAL RULES FOR RENE: " +
       "1. NEVER ask clarifying questions — look up the data yourself and deliver it. " +
-      "2. When creating data deliverables, create them as Notion pages (not inline email text) " +
+      "2. Auto-reply to confirm what was ingested and learned from his email. " +
+      "3. When creating data deliverables, create them as Notion pages (not inline email text) " +
       "   and send Rene the Notion link. This lets him export to CSV and work with the data. " +
-      "3. His master workspace is the Bookkeeping Hub: https://www.notion.so/3264c0c42c2e81b7b2fac6c4b812a170 " +
-      "4. All new accounting pages should be created under the Bookkeeping Hub as children. " +
-      "5. Use the query_notion_database tool to pull real data from: cash_transactions, " +
+      "4. His master workspace is the Bookkeeping Hub: https://www.notion.so/3264c0c42c2e81b7b2fac6c4b812a170 " +
+      "5. All new accounting pages should be created under the Bookkeeping Hub as children. " +
+      "6. Use the query_notion_database tool to pull real data from: cash_transactions, " +
       "   b2b_prospects, distributor_prospects, repacker_list, inventory. " +
-      "6. Include export instructions: Notion > ••• menu > Export > Markdown & CSV.",
+      "7. Include export instructions: Notion > ••• menu > Export > Markdown & CSV. " +
+      "8. Rene is brilliant at accounting but new to AI — always confirm actions match intent, " +
+      "   offer options for automations he may not know exist, and summarize clearly.",
+  },
+  "rene@usagummies.com": {
+    name: "Rene Gonzalez",
+    category: "finance",
+    priority: "important",
+    suggestedAction: "Ingest as financial training data — Rene is teaching Abra accounting",
+    relationship: "team",
+    draftingContext:
+      "Rene Gonzalez (USA Gummies email). Same person as gonz1rene@outlook.com. " +
+      "Bookkeeper and financial architect. All emails should be ingested as financial training data " +
+      "and auto-replied with confirmation of what was learned.",
   },
   "ben@usagummies.com": {
     name: "Ben Stutman",
