@@ -7,6 +7,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
+const legacyAutonomousAbraDisabled =
+  (process.env.ABRA_LEGACY_AUTONOMOUS_DISABLED || "1").trim() !== "0";
+
 function getPTNow(): Date {
   const now = new Date();
   const pt = now.toLocaleString("en-US", { timeZone: "America/Los_Angeles" });
@@ -21,6 +24,15 @@ function inMorningWindow(date: Date): boolean {
 export async function POST(req: Request) {
   if (!isCronAuthorized(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (legacyAutonomousAbraDisabled) {
+    return NextResponse.json({
+      ok: true,
+      disabled: true,
+      reason: "Legacy Abra scheduler disabled; Paperclip is the active control plane.",
+      timestamp: new Date().toISOString(),
+    });
   }
 
   const nowPT = getPTNow();

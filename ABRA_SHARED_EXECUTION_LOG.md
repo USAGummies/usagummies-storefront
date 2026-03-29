@@ -2551,3 +2551,49 @@ Impact:
 
 ### Summary
 The `isRedundantMentionMirrorEvent` fix is confirmed working in production. The first test hit a warm function with pre-deploy code (normal Vercel behavior — serverless functions don't instant-swap). The second test, after the old function expired, produced exactly one reply with correct BofA-primary framing.
+
+## Codex Handoff — 2026-03-29 01:20 PT
+
+### Scope: Single-Control-Plane Cutover
+
+Objective: eliminate the remaining architecture conflict where legacy Vercel/QStash Abra automation could still post alongside the Paperclip control plane.
+
+### Files Changed
+- `src/app/api/ops/abra/cron/signal-scan/route.ts`
+- `src/app/api/ops/abra/cron/sweep/route.ts`
+- `src/app/api/ops/abra/scheduler/route.ts`
+- `src/app/api/ops/scheduler/master/route.ts`
+- `src/app/api/ops/abra/cron/self-monitor/route.ts`
+- `src/app/api/ops/abra/cron/dashboard-push/route.ts`
+
+### What Changed
+Added a runtime disable gate to all legacy autonomous cron/scheduler entrypoints:
+- default behavior is disabled (`ABRA_LEGACY_AUTONOMOUS_DISABLED=1` by default)
+- route returns `{ ok: true, disabled: true, reason: ... }`
+- no unreachable-code lint violations
+- manual/backend routes remain intact
+- Paperclip remains the only intended autonomous posting/scheduling control plane
+
+### Why This Matters
+This cuts off the last major source of overlapping autonomous behavior:
+- legacy Vercel cron → master scheduler
+- legacy Abra scheduler
+- legacy sweep dispatcher
+- legacy signal scan
+- legacy self-monitor
+- legacy dashboard push
+
+Tomorrow's autonomous behavior should now come from one system, not two.
+
+### Validation
+Ran:
+- `npm run build`
+
+Result:
+- build passed
+
+### Operational Rule
+For tomorrow:
+- Paperclip is the only autonomous posting/scheduling system
+- old Abra backend remains for direct Slack interaction + backend APIs
+- legacy cron routes are intentionally no-op unless `ABRA_LEGACY_AUTONOMOUS_DISABLED=0`

@@ -22,6 +22,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 55;
 
+const legacyAutonomousAbraDisabled =
+  (process.env.ABRA_LEGACY_AUTONOMOUS_DISABLED || "1").trim() !== "0";
+
 type CheckResult = {
   name: string;
   ok: boolean;
@@ -384,6 +387,14 @@ function formatSlackReport(result: Awaited<ReturnType<typeof runSelfMonitor>>): 
 async function handler(req: Request) {
   if (!isCronAuthorized(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (legacyAutonomousAbraDisabled) {
+    return NextResponse.json({
+      ok: true,
+      disabled: true,
+      reason: "Legacy Abra self-monitor disabled; Paperclip health checks are primary.",
+    });
   }
 
   const result = await runSelfMonitor();

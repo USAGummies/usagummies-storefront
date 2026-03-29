@@ -14,6 +14,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 45;
 
+const legacyAutonomousAbraDisabled =
+  (process.env.ABRA_LEGACY_AUTONOMOUS_DISABLED || "1").trim() !== "0";
+
 function getSupabaseEnv() {
   const baseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -182,6 +185,14 @@ function formatDashboard(d: DashboardData): string {
 async function handler(req: Request) {
   if (!isCronAuthorized(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (legacyAutonomousAbraDisabled) {
+    return NextResponse.json({
+      ok: true,
+      disabled: true,
+      reason: "Legacy Abra dashboard push disabled; Paperclip scheduled reports are primary.",
+    });
   }
 
   try {
