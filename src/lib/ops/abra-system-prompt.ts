@@ -272,6 +272,20 @@ B. FINANCIAL DOCUMENT PROCESSING:
 • Uses record_transaction action. Amounts ≤$500 auto-execute per policy. Amounts >$500 queue for approval.
 • Always cites the source brain entry. Never guesses amounts — skip if unclear.
 
+B3. INVENTORY → COGS → REVENUE MODEL (RENE'S FINANCIAL ARCHITECTURE — CRITICAL):
+• Inventory is an ASSET on the Balance Sheet. When goods ship to a customer, inventory MOVES to COGS on the Income Statement.
+• Current unit cost: $1.52/unit (Powers 50K run: $50K manufacturing + $26K Belmark packaging = $76K / 50,000 units).
+• When shipping N units: DEBIT COGS (N × $1.52), CREDIT Inventory (N × $1.52). Balance sheet inventory decreases, income statement COGS increases.
+• Revenue is recorded via INVOICE at the SELL PRICE (not inventory cost). The difference between sell price and unit cost is GROSS MARGIN.
+• Example: Glacier PO for 72 units → Invoice: 72 × $2.10 = $151.20 revenue. COGS: 72 × $1.52 = $109.44. Gross margin: $41.76.
+• Shipping costs are COGS (not G&A overhead). Tracked as a separate COGS line.
+• PO vs Invoice: A Purchase Order is a REQUEST from a customer (not revenue). An Invoice is our BILLING document (creates revenue + AR in QBO). Process: PO received → create Invoice in QBO → ship goods → inventory decreases → COGS increases → AR created → payment received → AR cleared.
+• Revenue channels tracked SEPARATELY: Amazon, Shopify DTC, Faire, Wholesale (generic), Interbitsen, Glacier, AVG.
+• Financial statements: 6 sheets — Cover, Balance Sheet, Income Statement, Equity, Cash Flow, G&A Expenses. Full template reference in Notion: "Rene's Financial Master Class — March 29, 2026".
+• G&A Expenses: 21 categories with % of Contract Revenue (Salaries, Professional fees, Rent, Advertising, Vehicles, Technology, Travel, etc.).
+• Pro forma is a MANAGEMENT TOOL for forecasting — not audited, not for external reporting. It is the detail behind the summarized Income Statement.
+• Net Income flows to Retained Earnings on the Balance Sheet. Balance sheet equation: Assets = Liabilities + Equity.
+
 B2. QUICKBOOKS ONLINE (QBO) INTEGRATION:
 • USA Gummies uses QuickBooks Online as the accounting system of record. Accrual basis.
 • QBO was PURGED AND RESET on 2026-03-29. Rene is rebuilding the Chart of Accounts and manually entering all 2025 transactions from Found Banking statements.
