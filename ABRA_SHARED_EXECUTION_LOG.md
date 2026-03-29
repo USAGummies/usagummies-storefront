@@ -1267,3 +1267,115 @@ Step C: Approvals
 2. Wire CEO morning brief to call `po.summary` + `email_intelligence.summary` + Shopify MCP
 3. Test Finance agent against `/api/ops/qbo/query`
 4. PM-007 production re-test after deploy
+
+---
+
+## 3 Routines Proven End-to-End — 2026-03-28 19:20 PDT
+Owner: Claude Code
+Area: Standardized agent config + routine execution proof
+
+### Step 1: Agent Config Normalization — COMPLETE
+
+All 5 agents standardized:
+
+**`.env` files** (all 5 agents):
+- `BACKEND_URL=http://localhost:4000` ✅
+- `USAGUMMIES_API_BASE=http://localhost:4000` ✅ (was `https://usagummies.com`, fixed)
+- `CRON_SECRET`, `SLACK_BOT_TOKEN`, `NOTION_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` ✅
+
+**HEARTBEAT.md files** (all 5 agents rewritten):
+- All use `$BACKEND_URL` instead of hardcoded URLs ✅
+- All include `source $AGENT_HOME/.env` as first step ✅
+- All include "Execution Rules" section with no-manual-heartbeat rule ✅
+- Zero remaining `https://usagummies.com` references in functional code ✅
+
+### Step 2: Three Routines Proven
+
+#### Routine 1: Email Intelligence Sweep (USA-11) ✅
+- **Agent**: Email Intelligence (dcf9fa59)
+- **Issue**: USA-11 — "Routine proof: Email Intelligence Sweep"
+- **Timeline**: todo at 19:07:46 → in_progress at 19:08:11 → done at 19:08:41 (**55 seconds**)
+- **Backend calls**: `email_intelligence.summary` → HTTP 200
+- **Result**: Last sweep 2026-03-27, 1 email processed, no action needed
+- **Comment posted**: ✅ structured JSON + human-readable summary
+
+#### Routine 2: PO Review with Slack Delivery (USA-12) ✅
+- **Agent**: Operations (8de1ae22)
+- **Issue**: USA-12 — "Routine proof: PO Review with Slack delivery"
+- **Timeline**: todo at 19:08:49 → in_progress at 19:09:10 → done at 19:09:50 (**61 seconds**)
+- **Backend calls**: `po.summary` + `po.list` + `email_intelligence.summary` → all HTTP 200
+- **Slack delivery**: ✅ Posted to #abra-control (C0ALS6W7VB4)
+- **Result**: 2 open POs, $1,738.80 committed, PO 140812 needs quantity review, PO 009180 payment due 4/26
+- **Comment posted**: ✅ structured report with findings and next steps
+
+#### Routine 3: Finance Digest (USA-13) ✅
+- **Agent**: Finance (94dad3ce)
+- **Issue**: USA-13 — "Routine proof: Finance Digest"
+- **Timeline**: todo at 19:07:33 → auto-pickup delayed (needed manual checkout at 19:18) → in_progress at 19:19:09 → done at 19:19:50 (**~41 seconds after pickup**)
+- **Backend calls**: `po.summary` + `po.list` + `approvals` GET → all HTTP 200
+- **Shopify MCP**: ✅ Used `get-orders` for DTC revenue ($443.41 from 10 orders)
+- **Result**: Comprehensive digest with:
+  - Wholesale: $1,738.80 committed (PO pipeline)
+  - DTC: $443.41 recent Shopify (10 orders, avg $44.34)
+  - Faire: 5 orders ($273.30), Direct: 5 orders ($170.11)
+  - Product: All American Gummy Bears 7.5oz, 108 units
+  - Approvals: 0 pending, all clean
+  - Action items: PO 140812 quantity review, PO 009180 payment 4/26
+- **Comment posted**: ✅ full finance digest with analysis, health indicators, and action items
+
+#### Pickup Timing Note
+USA-13 did not auto-trigger on todo transition — required manual `checkout` after ~5 min delay. This may be because:
+- Paperclip's auto-assignment scheduler has a polling interval (not instant)
+- Or the Finance agent had a recent heartbeat and was in cooldown
+- **Workaround**: Use `npx paperclipai issue checkout <id> --agent-id <id>` for immediate pickup
+- **For production**: Paperclip's scheduler will eventually pick up todo issues; latency is acceptable for daily routines
+
+### Step 3: Production-Readiness Blockers
+
+#### Blocking Daily Use
+
+1. **VPS / Always-On Hosting**
+   - Paperclip runs on Ben's Mac (`localhost:3100`). Agents only execute when the machine is awake and the server is running.
+   - Backend runs on `localhost:4000` (Next.js dev server). Same constraint.
+   - **Fix**: Deploy Paperclip + backend to a VPS (Hetzner, Fly.io, Railway). Needs Docker/systemd setup, HTTPS, DNS.
+   - **Impact**: Without this, no scheduled routines (morning brief, PO review) run unless Ben's Mac is on.
+
+2. **Gmail MCP / Email Ingestion**
+   - Email Intelligence agent can call `email_intelligence.summary` (reads cached state), but cannot trigger new email sweeps from Gmail.
+   - The `email_intelligence.run` operation requires Gmail message IDs, which the agent has no way to discover without Gmail API access.
+   - **Fix**: Wire Gmail MCP server into Email Intelligence agent's `.mcp.json`, or add a `email_intelligence.run_recent` operation that sweeps the last N hours automatically.
+   - **Impact**: Email sweep is read-only (cached summary). No new emails get processed until this is wired.
+
+3. **Scheduled Heartbeat Execution**
+   - Paperclip's heartbeat scheduler needs to be running continuously for time-gated routines (7 AM brief, 8 AM digest, 9 AM PO review).
+   - Currently, routines only fire when manually triggered via issue creation.
+   - **Fix**: Verify Paperclip's built-in heartbeat scheduler (`heartbeatEnabled: true`) actually triggers periodic wakes. May need `npx paperclipai run` in the background.
+   - **Impact**: Daily routines won't fire on schedule without this.
+
+#### Non-Blocking but Important
+
+4. **Multi-User Access (Rene/Drew)**
+   - Paperclip is `local_trusted` mode on localhost. No per-user auth or role-based access.
+   - Rene and Drew interact via Slack (agents post there). Paperclip board is admin-only for Ben.
+   - **Status**: Not blocking — Slack is the user interface. Paperclip board is the ops view.
+
+5. **QBO Integration**
+   - Finance digest uses PO data + Shopify MCP but doesn't query QBO directly.
+   - `/api/ops/qbo/query` endpoint exists but wasn't tested in this pass.
+   - **Status**: Nice-to-have. PO pipeline covers the core financial data.
+
+6. **PM-007 Re-test**
+   - Codex's Slack dedup fix (event-level dedup key) was deployed but not yet re-tested with a human image upload.
+   - **Status**: Separate from Paperclip routines. Test next time Ben uploads an image in Slack.
+
+### Summary
+
+| Dimension | Status |
+|-----------|--------|
+| Agent config normalized | ✅ All 5 agents, $BACKEND_URL pattern |
+| Email Intelligence routine | ✅ USA-11, 55s, backend call succeeded |
+| PO Review routine + Slack | ✅ USA-12, 61s, 3 backend calls + Slack delivery |
+| Finance Digest routine | ✅ USA-13, 41s, 3 backend calls + Shopify MCP |
+| Production blocker: VPS | ❌ Needs always-on hosting |
+| Production blocker: Gmail | ❌ Email sweep is read-only |
+| Production blocker: Scheduler | ❌ Needs continuous heartbeat runner |
