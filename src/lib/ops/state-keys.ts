@@ -138,6 +138,7 @@ export const STATE_KEYS = {
   "operator:report_cycle_dedup": "operator-report-cycle-dedup.json",
   "operator:bank_feed_sweep:post_lock": "operator-bank-feed-sweep-post.lock",
   "operator:bank_feed_sweep:last_posted": "operator-bank-feed-sweep-last-posted.json",
+  "operator:financial_import_plans": "operator-financial-import-plans.json",
   "operator:proactive_alert_scan:lock": "operator-proactive-alert-scan.lock",
   "operator:step:qbo_gap:last_run": "operator-step-qbo-gap-last-run.json",
   "operator:step:qbo_gap:summary": "operator-step-qbo-gap-summary.json",

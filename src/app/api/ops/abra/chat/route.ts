@@ -53,6 +53,8 @@ import { executeRoutedAction, renderRoutedActionResponse } from "@/lib/ops/opera
 import { routeMessage } from "@/lib/ops/operator/deterministic-router";
 import { getPromptVersion } from "@/lib/ops/prompt-version";
 import { analyzePipeline } from "@/lib/ops/abra-pipeline-intelligence";
+import { stripActionBlocks } from "@/lib/ops/abra-actions";
+import { executeActions } from "@/lib/ops/abra-action-executor";
 import { EMAIL_EXTRACTION_SKILL } from "@/lib/ops/abra-skill-email-data-extraction";
 import { DEAL_CALCULATOR_SKILL } from "@/lib/ops/abra-skill-deal-calculator";
 import { buildCrossDepartmentStrategy } from "@/lib/ops/abra-strategy-orchestrator";
@@ -645,8 +647,12 @@ export async function POST(req: Request) {
         history: (() => { try { return JSON.parse(formData.get("history") as string || "[]"); } catch { return []; } })(),
         thread_id: formData.get("thread_id") as string | null,
         actor_label: formData.get("actor_label") as string | null,
+        actor_context: formData.get("actor_context") as string | null,
         channel: formData.get("channel") as string | null,
+        slack_channel_id: formData.get("slack_channel_id") as string | null,
+        slack_thread_ts: formData.get("slack_thread_ts") as string | null,
       };
+      const formSlackChannelId = String(formData.get("slack_channel_id") || "").trim();
       const file = formData.get("file");
       if (file instanceof File && file.size > 0) {
         if (file.size > MAX_FILE_SIZE_BYTES) {
@@ -660,7 +666,11 @@ export async function POST(req: Request) {
             mediaType: file.type || "image/png",
             fileName: file.name,
           };
-          uploadedFileContext = `\n\n--- ATTACHED IMAGE: ${file.name} ---\nDescribe and analyze the attached image if it is relevant to the user's request.\n--- END IMAGE ---\n`;
+          const receiptInstruction =
+            formSlackChannelId === "C0APYNE9E73"
+              ? "This image came from #receipts-capture. You CAN read the attached image directly. OCR it and extract vendor name, date, amount, payment method, and likely expense category. Do not claim you cannot read images."
+              : "You CAN read the attached image directly. Analyze what is visible in the image. Do not say you have a known gap or that you cannot read images.";
+          uploadedFileContext = `\n\n--- ATTACHED IMAGE: ${file.name} ---\n${receiptInstruction}\n--- END IMAGE ---\n`;
         } else {
           const fileText = await extractFileText(file);
           if (fileText) {
@@ -1957,7 +1967,16 @@ export async function POST(req: Request) {
     const isFinanceConversation = isFinanceQuestion(message);
     const signalsContext = isFinanceConversation ? "" : buildSignalsContext(signals);
 
-    const availableActions: string[] = [];
+    const availableActions = [
+      "create_task",
+      "record_transaction",
+      "query_qbo",
+      "read_email",
+      "search_email",
+      "update_notion",
+      "create_brain_entry",
+      "generate_file",
+    ];
 
     // If temporal range was detected, augment the message with date context
     const temporalHint = temporalRange
@@ -2007,12 +2026,21 @@ export async function POST(req: Request) {
       });
     // Track Anthropic API success in capability registry
     void capMarkSuccess("anthropic").catch(() => {});
-    const actionNotices: string[] = [];
     const baseReply = claudeResult.reply;
+    const actionExecution = await executeActions(baseReply, {
+      slackChannelId: slackChannelId || undefined,
+      slackThreadTs: slackThreadTs || undefined,
+      deadlineMs: DEADLINE_MS - (Date.now() - startMs),
+    });
+    const actionNotices = actionExecution.actionNotices;
+    const replyWithReadOnlyResults = [
+      actionExecution.cleanReply,
+      actionExecution.readOnlyResults.length > 0 ? actionExecution.readOnlyResults.join("\n\n") : "",
+    ].filter(Boolean).join("\n\n");
 
     // Safety: always strip any remaining <action>, <tool_call>, <tool_response>, code-fenced action blocks, or bare JSON action objects before returning to the user
     console.log(`[chat] Pre-strip baseReply length: ${baseReply.length}, actionNotices: ${actionNotices.length}`);
-    let strippedReply = baseReply
+    let strippedReply = stripActionBlocks(replyWithReadOnlyResults)
       .replace(/<action>\s*[\s\S]*?\s*<\/action>/gi, "")
       .replace(/<tool_call>\s*[\s\S]*?\s*<\/tool_call>/gi, "")
       .replace(/<tool_response>\s*[\s\S]*?\s*<\/tool_response>/gi, "")

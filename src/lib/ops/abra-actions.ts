@@ -4063,6 +4063,51 @@ export const KNOWN_ACTION_TYPES = new Set([
   "generate_file",
 ]);
 
+function normalizeLooseActionKey(key: string): string {
+  return key.trim().toLowerCase().replace(/[\s-]+/g, "_");
+}
+
+function parseLooseScalar(raw: string): unknown {
+  const value = raw.trim().replace(/^["'`]+|["'`]+$/g, "");
+  if (/^(true|false)$/i.test(value)) return value.toLowerCase() === "true";
+  if (/^-?\d+(?:\.\d+)?$/.test(value)) return Number(value);
+  return value;
+}
+
+function parseLooseActionBody(body: string, actionType: string): Record<string, unknown> {
+  const trimmed = body.trim();
+  if (!trimmed) return {};
+
+  try {
+    const parsed = JSON.parse(trimmed) as unknown;
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    // fall through to line parsing
+  }
+
+  const result: Record<string, unknown> = {};
+  const lines = trimmed
+    .split("\n")
+    .map((line) => line.replace(/^[\s•*-]+/, "").trim())
+    .filter(Boolean);
+
+  for (const line of lines) {
+    const match = line.match(/^([A-Za-z][A-Za-z0-9_ -]{0,60})\s*:\s*(.+)$/);
+    if (!match) continue;
+    result[normalizeLooseActionKey(match[1])] = parseLooseScalar(match[2]);
+  }
+
+  if (Object.keys(result).length > 0) return result;
+
+  if (actionType === "create_task") {
+    return { title: trimmed };
+  }
+
+  return { text: trimmed };
+}
+
 /** When Claude emits action JSON without a nested "params" key, gather top-level
  *  non-standard keys as implicit params (e.g. query_type, period_start, etc.) */
 function extractImplicitParams(obj: Record<string, unknown>, _actionType: string): Record<string, unknown> {
@@ -4168,6 +4213,13 @@ export function parseActionDirectives(reply: string): {
   actions: ActionDirective[];
   cleanReply: string;
 } {
+  const KNOWN_ACTION_TYPES = new Set([
+    "query_qbo", "read_email", "search_email", "query_ledger", "send_slack",
+    "create_brain_entry", "create_task", "update_notion", "create_notion_page",
+    "categorize_qbo_transaction", "batch_categorize_qbo", "create_qbo_invoice",
+    "record_transaction", "log_production_run", "record_vendor_quote", "run_scenario",
+    "correct_claim", "update_shopify_inventory", "create_shopify_discount", "generate_file",
+  ]);
   const pattern = /<action>\s*([\s\S]*?)\s*<\/action>/gi;
   const actions: ActionDirective[] = [];
   let cleanReply = reply;
@@ -4193,15 +4245,30 @@ export function parseActionDirectives(reply: string): {
   // (e.g., function-call style like <action>read_email({...})</action>)
   cleanReply = cleanReply.replace(/<action>\s*[\s\S]*?\s*<\/action>/gi, "").trim();
 
+  const genericPattern = /<([a-z_][a-z0-9_]*)>\s*([\s\S]*?)\s*<\/\1>/gi;
+  let genericMatch: RegExpExecArray | null;
+  while ((genericMatch = genericPattern.exec(reply)) !== null) {
+    const actionType = String(genericMatch[1] || "").trim().toLowerCase();
+    if (!KNOWN_ACTION_TYPES.has(actionType)) continue;
+    const block = genericMatch[0];
+    const payload = parseLooseActionBody(genericMatch[2] || "", actionType);
+    cleanReply = cleanReply.replace(block, "");
+    const action = normalizeActionDirective({
+      action_type: actionType,
+      ...payload,
+      params:
+        payload.params && typeof payload.params === "object" && !Array.isArray(payload.params)
+          ? payload.params
+          : undefined,
+      risk_level: "low",
+    });
+    if (action) {
+      actions.push({ action, raw: block });
+    }
+  }
+
   // Also parse markdown fenced code blocks like ```query_qbo\nkey: "value"\n```
   // Claude sometimes emits actions as fenced code blocks instead of <action> tags.
-  const KNOWN_ACTION_TYPES = new Set([
-    "query_qbo", "read_email", "search_email", "query_ledger", "send_slack",
-    "create_brain_entry", "create_task", "update_notion", "create_notion_page",
-    "categorize_qbo_transaction", "batch_categorize_qbo", "create_qbo_invoice",
-    "record_transaction", "log_production_run", "record_vendor_quote", "run_scenario",
-    "correct_claim", "update_shopify_inventory", "create_shopify_discount", "generate_file",
-  ]);
   const codeBlockPattern = /```(\w+)\n([\s\S]*?)```/g;
   let cbMatch: RegExpExecArray | null;
   while ((cbMatch = codeBlockPattern.exec(reply)) !== null) {
@@ -4259,7 +4326,13 @@ export function parseActionDirectives(reply: string): {
 
 /** Strip <action>...</action> blocks from text for user-facing display */
 export function stripActionBlocks(text: string): string {
-  return text.replace(/<action>\s*[\s\S]*?\s*<\/action>/gi, "").trim();
+  return text
+    .replace(/<action>\s*[\s\S]*?\s*<\/action>/gi, "")
+    .replace(
+      /<((?:create_task|record_transaction|query_qbo|create_brain_entry|acknowledge_signal|send_slack|create_notion_page|query_ledger|correct_claim|send_email|update_notion|pause_initiative|log_production_run|record_vendor_quote|run_scenario|read_email|search_email|draft_email_reply|qbo_setup_assessment|categorize_qbo_transaction|batch_categorize_qbo|create_qbo_invoice|update_shopify_inventory|create_shopify_discount|query_shopify_orders|reconcile_transactions|start_workflow|resume_workflow|calculate_deal|create_wholesale_draft_order|create_shopify_product_draft|store_brain_entry|update_brain_entry|search_brain|log_metric|run_monthly_close|generate_file))>\s*[\s\S]*?\s*<\/\1>/gi,
+      "",
+    )
+    .trim();
 }
 
 /**

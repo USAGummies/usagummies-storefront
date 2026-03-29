@@ -38,14 +38,14 @@ function extractConversationText(history: RouteHistoryItem[] | undefined): strin
 }
 
 function looksLikeMeetingCorrection(msg: string, conversation: string): boolean {
-  if (!/\b(meeting|calendar|spokane|powers|greg)\b/.test(`${msg}\n${conversation}`)) return false;
+  if (!/\b(meeting|calendar|schedule|appointment|call(?:\s+with)?|spokane|powers|greg)\b/.test(`${msg}\n${conversation}`)) return false;
   return /\b(you know|it was|was the|how is today|not today|wrong day)\b/.test(msg);
 }
 
 function looksLikeMeetingLookup(msg: string, conversation: string): boolean {
   const combined = `${msg}\n${conversation}`;
-  const mentionsMeeting = /\b(meeting|calendar|spokane|powers|greg)\b/.test(combined);
-  const asksForDate = /\b(what day|which day|when is|when was|verify from my email|verify from email|check my email|from my emails?|from email)\b/.test(msg);
+  const mentionsMeeting = /\b(meeting|calendar|schedule|appointment|call(?:\s+with)?|spokane|powers|greg)\b/.test(combined);
+  const asksForDate = /\b(what day|which day|what time|when is|when was|meeting day|schedule|appointment|call with|verify from my email|verify from email|check my email|from my emails?|from email)\b/.test(msg);
   return mentionsMeeting && asksForDate;
 }
 

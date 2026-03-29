@@ -2656,3 +2656,65 @@ Validation:
   - `npm run build` ✅
 - Rationale: remove remaining dashboard split-brain between legacy approvals API and canonical control-plane approvals API before Monday.
 - Production verification (post-deploy `c681694`): `GET /api/ops/approvals?status=approved` on `https://www.usagummies.com` now returns canonical filtered data with `count` and `status` fields. Dashboard/control-plane approvals split is closed in production.
+
+## 2026-03-29 14:58 PT — Codex reliability sprint (4 bug lock-down)
+
+Scope: fix exactly four active trust bugs without refactoring.
+
+Files changed:
+- `src/lib/ops/abra-actions.ts`
+- `src/app/api/ops/abra/chat/route.ts`
+- `src/lib/ops/abra-slack-responder.ts`
+- `src/lib/ops/operator/deterministic-router.ts`
+- `src/app/api/ops/slack/events/route.ts`
+- `src/lib/ops/state-keys.ts`
+- `src/lib/ops/__tests__/abra-action-helpers.test.ts`
+- `src/lib/ops/__tests__/router-and-sweep.test.ts`
+
+### Bug 1 — task/action XML leaking into Slack
+- Extended action parsing to recognize loose raw action tags like `<create_task>...</create_task>`.
+- Chat route now runs `executeActions(...)` before forming the final reply.
+- Chat route and Slack posting layer both strip generic action tags before user-visible delivery.
+- Result: action markup is no longer allowed to leak into Slack messages, while actions still execute separately.
+
+### Bug 2 — image reading claiming a fake "known gap"
+- Multipart chat route now preserves `actor_context`, `slack_channel_id`, and `slack_thread_ts` from Slack uploads.
+- Image uploads now inject explicit multimodal instructions: Abra can read the attached image directly and must not claim it cannot read images.
+- `#receipts-capture` images now get a stronger receipt/OCR extraction instruction at the chat route boundary.
+
+### Bug 3 — meeting/date lookup routed into finance/transactions
+- Strengthened deterministic meeting lookup/correction rules to prioritize temporal scheduling phrases:
+  - `schedule`
+  - `appointment`
+  - `call with`
+  - `what time`
+  - `meeting day`
+- Meeting/date queries now stay on the meeting/email/brain path even when vendor names like Powers or Greg appear.
+
+### Bug 4 — Excel/CSV uploads in `#financials`
+- Added deterministic spreadsheet ingestion path inside Slack events for `#financials`.
+- Supported upload handling now:
+  - `.xlsx`
+  - `.xls`
+  - `.csv`
+- Abra now:
+  - downloads spreadsheet from Slack
+  - parses rows
+  - classifies file as chart of accounts / vendor list / transaction list / unknown
+  - posts a preview in-thread
+  - stores an import plan keyed by Slack thread
+  - on `import all` / confirmation in-thread, imports via existing APIs:
+    - COA -> `/api/ops/qbo/accounts`
+    - vendors -> `/api/ops/qbo/vendor`
+    - transaction lists -> `/api/ops/qbo/import-batch` when account references resolve cleanly
+
+Validation:
+- Ran: `npm test -- src/lib/ops/__tests__/abra-action-helpers.test.ts src/lib/ops/__tests__/router-and-sweep.test.ts`
+- Result: `13/13` passed
+- Ran: `npm run build`
+- Result: passed
+
+Notes:
+- No new routes were added.
+- No scheduler/heartbeat/QBO auth changes were made.
+- This pass only hardens the active reliability failures requested by Ben/Rene.

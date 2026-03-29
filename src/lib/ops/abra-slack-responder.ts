@@ -2112,6 +2112,10 @@ export async function getSlackDisplayName(userId: string): Promise<string> {
 function stripActionTags(value: string): string {
   let result = value
     .replace(/<action>\s*[\s\S]*?\s*<\/action>/gi, "")
+    .replace(
+      /<((?:create_task|record_transaction|query_qbo|create_brain_entry|acknowledge_signal|send_slack|create_notion_page|query_ledger|correct_claim|send_email|update_notion|pause_initiative|log_production_run|record_vendor_quote|run_scenario|read_email|search_email|draft_email_reply|qbo_setup_assessment|categorize_qbo_transaction|batch_categorize_qbo|create_qbo_invoice|update_shopify_inventory|create_shopify_discount|query_shopify_orders|reconcile_transactions|start_workflow|resume_workflow|calculate_deal|create_wholesale_draft_order|create_shopify_product_draft|store_brain_entry|update_brain_entry|search_brain|log_metric|run_monthly_close|generate_file))>\s*[\s\S]*?\s*<\/\1>/gi,
+      "",
+    )
     .replace(/<tool_call>\s*[\s\S]*?\s*<\/tool_call>/gi, "")
     .replace(/<tool_response>\s*[\s\S]*?\s*<\/tool_response>/gi, "")
     .replace(/<tool>\s*[\s\S]*?\s*<\/tool>/gi, "")

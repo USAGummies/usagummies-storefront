@@ -19,6 +19,21 @@ describe("deterministic router meeting intent", () => {
     expect(routed?.intent).toBe("meeting_lookup");
   });
 
+  it("prioritizes schedule and call-with phrasing as meeting lookups", () => {
+    const routed = routeMessage(
+      "when is my call with Powers scheduled?",
+      "Ben",
+      {
+        history: [
+          { role: "assistant", content: "Let me check the thread." },
+        ],
+      },
+    );
+
+    expect(routed?.action).toBe("query_meeting_context");
+    expect(routed?.intent).toBe("meeting_lookup");
+  });
+
   it("routes meeting-date corrections to acknowledgment instead of transaction work", () => {
     const routed = routeMessage(
       "you know my meeting with powers was the 25th from the information in my emails. So how is today the powers meeting day?",
