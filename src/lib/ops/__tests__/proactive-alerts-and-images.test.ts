@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { buildReadOnlyChatRouteRequest } from "@/app/api/ops/slack/events/route";
+import {
+  buildReadOnlyChatRouteRequest,
+  isRedundantMentionMirrorEvent,
+} from "@/app/api/ops/slack/events/route";
 import {
   buildProactiveAlertSignature,
   shouldSuppressSameDayAlertType,
@@ -53,6 +56,22 @@ describe("Slack image upload handoff", () => {
     });
 
     expect(mentionKey).toBe(messageKey);
+  });
+
+  it("drops the redundant message mirror for a direct @Abra mention", () => {
+    expect(
+      isRedundantMentionMirrorEvent({
+        type: "message",
+        text: "<@U0AKMSTL0GL> what is our BofA balance?",
+      }),
+    ).toBe(true);
+
+    expect(
+      isRedundantMentionMirrorEvent({
+        type: "app_mention",
+        text: "<@U0AKMSTL0GL> what is our BofA balance?",
+      }),
+    ).toBe(false);
   });
 });
 

@@ -223,6 +223,14 @@ function stripAbraMention(text: string): string {
   return text.replace(/<@U0AKMSTL0GL>\s*/g, "").trim();
 }
 
+export function isRedundantMentionMirrorEvent(event: {
+  type?: string;
+  text?: string;
+}): boolean {
+  if (event.type !== "message") return false;
+  return /<@U0AKMSTL0GL>/.test(event.text || "");
+}
+
 function normalizeConstraintText(value: string): string {
   return String(value || "").replace(/\s+/g, " ").trim();
 }
@@ -365,6 +373,9 @@ export async function POST(req: Request) {
 
   const { text, user, channel, ts, thread_ts, bot_id, subtype, files } = event;
   if (bot_id || subtype === "bot_message") {
+    return NextResponse.json({ ok: true });
+  }
+  if (isRedundantMentionMirrorEvent(event)) {
     return NextResponse.json({ ok: true });
   }
   // Accept messages with text OR files (file-only messages have empty text)
