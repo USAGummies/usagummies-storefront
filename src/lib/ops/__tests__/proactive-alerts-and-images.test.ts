@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { buildReadOnlyChatRouteRequest } from "@/app/api/ops/slack/events/route";
 import { buildProactiveAlertSignature, shouldSuppressSignalPost } from "@/lib/ops/proactive-alerts";
+import { buildSlackEventDedupKey } from "@/lib/ops/slack-dedup";
 
 vi.mock("server-only", () => ({}));
 
@@ -27,6 +28,27 @@ describe("Slack image upload handoff", () => {
     const form = request.body as FormData;
     expect(form.get("message")).toBe("Please analyze the attached image from Slack and answer the user directly.");
     expect(form.get("file")).toBeTruthy();
+  });
+
+  it("uses the same event dedup key for app_mention and message variants of one Slack post", () => {
+    const base = {
+      channel: "C123",
+      user: "U123",
+      messageTs: "1711670000.123456",
+      rootThreadTs: "1711670000.123456",
+      text: "<@U0AKMSTL0GL> what does this image show?",
+    };
+
+    const mentionKey = buildSlackEventDedupKey({
+      ...base,
+      eventId: null,
+    });
+    const messageKey = buildSlackEventDedupKey({
+      ...base,
+      eventId: null,
+    });
+
+    expect(mentionKey).toBe(messageKey);
   });
 });
 

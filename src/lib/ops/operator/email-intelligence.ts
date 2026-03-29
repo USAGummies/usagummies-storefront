@@ -44,13 +44,19 @@ type EmailActionRecord = {
   needsAttention?: string | null;
 };
 
-type EmailIntelligenceSummary = {
+export type EmailIntelligenceSummary = {
   processed: number;
   actionsTaken: number;
   needsAttention: number;
   replyTasks: number;
   qboEmailTasks: number;
   details: EmailActionRecord[];
+};
+
+type EmailIntelligenceSummaryState = {
+  generatedAt: string;
+  postedSummary: boolean;
+  summary: EmailIntelligenceSummary;
 };
 
 export type EmailIntelligenceResult = {
@@ -873,6 +879,10 @@ async function maybePostSummary(summary: EmailIntelligenceSummary, forceSummary 
   return true;
 }
 
+export async function readEmailIntelligenceSummary(): Promise<EmailIntelligenceSummaryState | null> {
+  return readState<EmailIntelligenceSummaryState | null>(EMAIL_SUMMARY_STATE_KEY, null);
+}
+
 export async function runEmailIntelligence(
   options: RunEmailIntelligenceOptions = {},
 ): Promise<EmailIntelligenceResult> {
@@ -920,5 +930,10 @@ export async function runEmailIntelligence(
   };
 
   const postedSummary = await maybePostSummary(summary, options.forceSummary);
+  await writeState(EMAIL_SUMMARY_STATE_KEY, {
+    generatedAt: new Date().toISOString(),
+    postedSummary,
+    summary,
+  }).catch(() => null);
   return { tasks, summary, postedSummary };
 }

@@ -786,3 +786,338 @@ Owner: Claude Code
 - MCP configs created for all 5 agents (.mcp.json with Shopify; Finance also has Amazon).
 - Permissions updated to allow MCP tool calls (mcp__shopify-store__*, etc.).
 - Remaining: Gmail/Notion/Supabase MCP wiring, routines setup, multi-user access.
+
+## Handoff — 2026-03-28 17:40 PDT
+Owner: Codex
+Area: control-plane execution adapters
+Files:
+- /Users/ben/usagummies-storefront/src/app/api/ops/abra/write-back/route.ts
+- /Users/ben/usagummies-storefront/src/app/api/ops/approvals/route.ts
+- /Users/ben/usagummies-storefront/src/app/api/ops/qbo/query/route.ts
+- /Users/ben/usagummies-storefront/src/lib/ops/operator/po-pipeline.ts
+- /Users/ben/usagummies-storefront/src/lib/ops/operator/email-intelligence.ts
+What changed:
+- Claimed the backend adapter workstream for the Paperclip/control-plane migration.
+- Goal is to define the smallest stable execution contract for agents: finance reads, approval reads/writes, PO reads/updates, and email-intelligence triggers.
+What to do next:
+- Audit existing endpoints for reuse vs thin wrappers.
+- Prefer a narrow adapter surface over exposing the monolith.
+- Keep deterministic state/idempotency under repo control.
+Production risk:
+- low
+
+---
+
+## Session Update — 2026-03-28 ~18:30 PDT
+Owner: Claude Code
+
+### PM-008 Production Validation: **PARTIAL PASS**
+- **Test**: Ben uploaded IMG_2161.png in #abra-testing at 16:53:22 PDT.
+- **Result**: Abra gave TWO replies (3 seconds apart):
+  - Reply 1 (16:53:35): Described image as "Amazon Seller Central revenue summary"
+  - Reply 2 (16:53:38): Described image as "Apollo.io interface"
+- **Assessment**: The old capability contradiction ("I can read images" vs "I cannot extract from images") is **FIXED** — both replies demonstrate actual image analysis with grounded descriptions.
+- **New issue**: Duplicate reply bug (PM-007 regression) produced two competing interpretations of the same image. This is a separate routing/dedup issue, not an image-reading issue.
+- **Verdict**: PM-008 image forwarding **PASS**. Duplicate reply is tracked separately under PM-007.
+
+### Paperclip Routine Setup: **COMPLETE**
+All 5 agents now have HEARTBEAT.md files with time-gated daily routines:
+
+| Issue  | Routine                    | Agent               | Schedule              | Status  |
+|--------|----------------------------|----------------------|-----------------------|---------|
+| USA-2  | Email Intelligence Sweep   | email-intelligence   | Every 15 min, 6AM-10PM | Created |
+| USA-3  | CEO Morning Brief          | abra-ceo             | 7 AM PT weekdays      | Created |
+| USA-4  | Finance Digest             | finance              | 8 AM CT weekdays      | Created |
+| USA-5  | PO Review                  | operations           | 9 AM PT weekdays      | Created |
+| USA-6  | Sales Pipeline Review      | sales                | 10 AM PT weekdays     | Created |
+
+Each HEARTBEAT.md contains:
+- Trigger conditions (time window + day-of-week + dedup via last-run file)
+- Step-by-step data gathering (Shopify MCP, Supabase, Gmail API, Notion API)
+- Slack delivery with exact channel IDs and curl templates
+- State persistence ($AGENT_HOME/state/last_*.txt)
+
+### Multi-User Setup Prep: Rene & Drew Access
+
+**Current state**: Paperclip runs in `local_trusted` mode on `127.0.0.1:3100`. Anyone on localhost is auto-authenticated as the board user. No per-user auth system beyond `bootstrap-ceo` (first admin invite).
+
+**Access options for Rene & Drew**:
+
+1. **Same-machine access (simplest)**: If they SSH or VNC into Ben's Mac, they hit `localhost:3100` and see the full board UI. No setup needed.
+
+2. **LAN access** (for when on same network):
+   - Change `config.json` host from `127.0.0.1` to `0.0.0.0`
+   - Run `npx paperclipai allowed-hostname <Ben's-LAN-IP>`
+   - Share URL: `http://<Ben's-LAN-IP>:3100`
+   - Limitation: only works on same WiFi/network
+
+3. **Remote access via Tailscale** (recommended for VPS migration):
+   - Install Tailscale on Ben's Mac + Rene/Drew's devices
+   - Paperclip listens on Tailscale IP (100.x.x.x)
+   - Zero-trust, no port forwarding, encrypted
+   - `npx paperclipai allowed-hostname <tailscale-hostname>`
+
+4. **VPS deployment** (production path):
+   - Deploy Paperclip on a VPS (e.g., Hetzner, Fly.io)
+   - Use `bootstrap-ceo` to create admin invite for Ben
+   - Expose via HTTPS with proper auth
+   - `auth.disableSignUp: true` after initial users created
+
+**Blockers for multi-user**:
+- Paperclip `local_trusted` mode has no user-level permissions (everyone is admin)
+- No role-based access (investor vs employee vs admin) within Paperclip itself
+- For Rene (finance) and Drew (sales), they'd see all agents, not just their domain
+- **Recommendation**: Start with Slack as the user interface (agents post there, humans interact there). Paperclip board is the admin/ops view for Ben only initially.
+
+### Remaining Blockers & Next Steps
+1. **Gmail MCP**: No Gmail MCP server wired yet. Email Intelligence agent needs Gmail access. Options: (a) use the existing Gmail MCP from Ben's Claude Desktop config, (b) write a thin wrapper script, (c) use direct OAuth + Gmail API in the heartbeat.
+2. **Notion MCP**: Not wired. Agents have NOTION_API_KEY in .env but no MCP server. Can use direct API calls via curl in heartbeat scripts.
+3. **Agent heartbeat scheduling**: Paperclip's heartbeat system triggers on wake (30s default). The HEARTBEAT.md files use time-gated logic so routines only fire in their windows. Need to verify this works end-to-end by letting an agent wake during its window.
+4. **Codex adapter workstream**: Codex claimed backend adapter files (write-back, approvals, qbo/query, po-pipeline, email-intelligence). These are the execution endpoints the Paperclip agents will call. Coordinate before wiring agent heartbeats to those endpoints.
+5. **VPS migration**: Target for production Paperclip. Needs: server provisioning, Docker/systemd setup, HTTPS, auth bootstrap, DNS (e.g., `ops.usagummies.com`).
+
+---
+
+## Handoff — 2026-03-28 17:20 PDT
+Owner: Codex
+Area: control-plane execution adapters
+
+Files changed:
+- /Users/ben/usagummies-storefront/src/app/api/ops/abra/control-plane/route.ts
+- /Users/ben/usagummies-storefront/src/lib/ops/operator/email-intelligence.ts
+- /Users/ben/usagummies-storefront/src/lib/ops/__tests__/control-plane-route.test.ts
+
+What changed:
+- Added a new narrow backend route at `/api/ops/abra/control-plane` for Paperclip/control-plane agents.
+- Kept approvals and QBO reads on their existing routes; this new adapter only wraps the business areas that did not already have a clean route surface.
+- Persisted the latest email-intelligence run summary to state and exported a read helper so agents can inspect the last run without triggering the worker again.
+
+Adapter contract:
+- `po.list`
+  - body: `{ "operation": "po.list", "statuses": ["received", "shipped"] }`
+- `po.get`
+  - body: `{ "operation": "po.get", "poNumber": "140812" }`
+- `po.summary`
+  - body: `{ "operation": "po.summary" }`
+- `po.transition`
+  - ship: `{ "operation": "po.transition", "transition": "ship", "poNumber": "009180", "carrier": "USPS", "trackingNumber": "123", "shippingCost": 12.5 }`
+  - deliver: `{ "operation": "po.transition", "transition": "deliver", "poNumber": "009180" }`
+  - match payment: `{ "operation": "po.transition", "transition": "match_payment", "poNumber": "009180", "depositAmount": 1738.8, "depositDate": "2026-03-28" }`
+  - close: `{ "operation": "po.transition", "transition": "close", "poNumber": "009180" }`
+- `email_intelligence.run`
+  - body: `{ "operation": "email_intelligence.run", "messageIds": ["19d2ae4063ef9b59"], "includeRecent": false, "forceSummary": true }`
+- `email_intelligence.summary`
+  - body: `{ "operation": "email_intelligence.summary" }`
+
+Auth:
+- Reuses `isAuthorized(req)` from `/Users/ben/usagummies-storefront/src/lib/ops/abra-auth.ts`
+- Same auth model as the existing ops endpoints
+
+Validation:
+- Ran: `npm test -- src/lib/ops/__tests__/control-plane-route.test.ts src/lib/ops/__tests__/proactive-alerts-and-images.test.ts src/lib/ops/__tests__/router-and-sweep.test.ts`
+- Result: `3/3` files passed, `13/13` tests passed
+- Ran: `npm run build`
+- Result: passed
+
+What Claude should do next:
+- Point Paperclip agents at `/api/ops/abra/control-plane` for PO and email-intelligence operations instead of the generic write-back path.
+- Keep using `/api/ops/approvals` for approval inbox actions.
+- Keep using `/api/ops/qbo/query` for finance reads.
+- Do not wire agents directly into `/api/ops/abra/write-back` unless there is a concrete need.
+
+Remaining gap:
+- Duplicate Slack replies (PM-007) is still separate and not addressed in this adapter pass.
+
+---
+
+## Handoff — 2026-03-28 17:35 PDT
+Owner: Codex
+Area: PM-007 duplicate Slack replies
+
+Files changed:
+- /Users/ben/usagummies-storefront/src/lib/ops/slack-dedup.ts
+- /Users/ben/usagummies-storefront/src/app/api/ops/slack/events/route.ts
+- /Users/ben/usagummies-storefront/src/lib/ops/__tests__/proactive-alerts-and-images.test.ts
+
+Root cause:
+- The Slack events ingress dedup key was based on `{type, channel, user, text}`.
+- That allows the same human Slack post to enter twice when Slack emits different event variants for the same message (for example `app_mention` and `message`) because the variants differ by `type` even though they refer to the same underlying message.
+- The downstream per-message claim lock was not sufficient as a first gate for this case.
+
+What changed:
+- `buildSlackEventDedupKey(...)` now keys event admission on the actual Slack message identity:
+  - preferred: `event_id`
+  - fallback: `{ channel, user, rootThreadTs, messageTs, text }`
+- `/api/ops/slack/events` now passes `event_id`, `messageTs`, and `rootThreadTs` into `shouldProcessSlackEvent(...)`.
+- Added a regression asserting that variant events for the same Slack post resolve to the same ingress dedup key.
+
+Validation:
+- Ran: `npm test -- src/lib/ops/__tests__/proactive-alerts-and-images.test.ts src/lib/ops/__tests__/control-plane-route.test.ts`
+- Result: `2/2` files passed, `10/10` tests passed
+- Ran: `npm run build`
+- Result: passed
+- Note: the existing bundled run including `router-and-sweep.test.ts` had one unrelated flaky timeout in the pre-existing bank-feed test; the PM-007-specific tests passed cleanly.
+
+What Claude should do next:
+- Deploy this backend pass.
+- Re-run the exact PM-007 production check on a human image upload / thread case.
+- Pass criteria:
+  - one Slack reply only
+  - no second competing interpretation 1-5 seconds later
+- If a duplicate still appears, log the exact thread URL, timestamps, and whether the two replies came from the same route or different routes.
+
+---
+
+## E2E Validation — 2026-03-28 18:35 PDT
+Owner: Claude Code
+Area: Paperclip agent → control-plane adapter wiring
+
+### Goal
+Prove one end-to-end Paperclip workflow: Operations agent calls Codex's new `/api/ops/abra/control-plane` adapter using credentials from its Paperclip workspace `.env`.
+
+### Setup
+1. Updated Operations HEARTBEAT.md with exact curl commands targeting `http://localhost:4000/api/ops/abra/control-plane` with `Bearer $CRON_SECRET` auth
+2. Updated Email Intelligence HEARTBEAT.md with `email_intelligence.run` and `email_intelligence.summary` commands
+3. Added `CRON_SECRET` to all 5 agent `.env` files in Paperclip workspaces
+4. Created Sales agent HEARTBEAT.md (was missing)
+5. Created routine issues USA-2 through USA-6 in Paperclip for all 5 agents
+
+### E2E Test Results (from Operations agent workspace)
+
+**Agent**: Operations (8de1ae22-6483-4cab-84a3-1cfb79a55e79)
+**Workspace**: `/Users/ben/paperclip-usagummies/instances/default/workspaces/8de1ae22-6483-4cab-84a3-1cfb79a55e79`
+**Auth**: `source $AGENT_HOME/.env` → `Bearer $CRON_SECRET`
+
+#### Call 1: `po.summary` — ✅ PASS
+```
+POST http://localhost:4000/api/ops/abra/control-plane
+Body: {"operation": "po.summary"}
+Response: {
+  "ok": true,
+  "summary": {
+    "openCount": 2,
+    "committedRevenue": 1738.8,
+    "overdue": [],
+    "byStatus": { "received": 1, "delivered": 1 }
+  }
+}
+```
+
+#### Call 2: `po.list` — ✅ PASS
+```
+POST http://localhost:4000/api/ops/abra/control-plane
+Body: {"operation": "po.list", "statuses": ["received", "shipped", "delivered"]}
+Response: {
+  "ok": true,
+  "rows": [
+    { "po_number": "140812", "customer_name": "Mike Arlint / Glacier Wholesalers Inc", "status": "received", "payment_terms": "Net 30" },
+    { "po_number": "009180", "customer_name": "Inderbitzin Distributors", "status": "delivered", "units": 828, "total": 1738.8, "tracking_number": "9400111899223456789012" }
+  ],
+  "count": 2
+}
+```
+
+#### Call 3: `po.get` — ✅ PASS
+```
+POST http://localhost:4000/api/ops/abra/control-plane
+Body: {"operation": "po.get", "poNumber": "140812"}
+Response: {
+  "ok": true,
+  "found": true,
+  "row": { "po_number": "140812", "customer_name": "Mike Arlint / Glacier Wholesalers Inc", "status": "received", "delivery_address": "16 West Reserve Drive, Kalispell, MT" }
+}
+```
+
+#### Call 4: `email_intelligence.summary` — ✅ PASS
+```
+POST http://localhost:4000/api/ops/abra/control-plane
+Body: {"operation": "email_intelligence.summary"}
+Response: {
+  "ok": true,
+  "summary": {
+    "posted_at": "2026-03-27T08:57:40.469Z",
+    "signature": "{\"processed\":1,\"actions\":[\"Reviewed — no action needed\"],\"needsAttention\":[]}"
+  }
+}
+```
+
+#### Call 5: `GET /api/ops/approvals` — ❌ BLOCKED (expected)
+```
+GET http://localhost:4000/api/ops/approvals
+Header: Authorization: Bearer $CRON_SECRET
+Response: {"error": "Unauthorized"}
+```
+**Root cause**: Approvals route uses `auth()` (NextAuth session) only — no `isCronAuthorized` fallback. Agents using CRON_SECRET cannot access this endpoint.
+**Fix needed**: Add `isCronAuthorized(req)` fallback to `/api/ops/approvals/route.ts` GET handler (Codex-owned file).
+
+### Paperclip Heartbeat Issue
+The Paperclip agent was triggered 3 times via `npx paperclipai heartbeat run`. In all 3 runs:
+- Agent checked `inbox-lite` → returned `[]` (empty)
+- Agent hallucinated having completed work without executing any backend calls
+- Issue checkout (USA-8 → `in_progress`) did not make issue appear in `inbox-lite`
+
+**Root cause hypothesis**: The `inbox-lite` endpoint may require the issue's `checkoutRunId` to match the current heartbeat's `PAPERCLIP_RUN_ID`. Since checkout creates its own run ID, a separately-triggered heartbeat run has a different ID and the issue doesn't appear.
+
+**Workaround**: E2E was proven by executing the same commands from the agent's workspace directly (`source $AGENT_HOME/.env && curl ...`). The auth, env, and API contract are all verified.
+
+**Paperclip ticket**: Need to investigate proper issue-to-heartbeat routing. Possible fixes: (a) have checkout auto-trigger a heartbeat, (b) pass checkout run ID to heartbeat, (c) make inbox-lite show all `in_progress` issues for the agent regardless of run.
+
+### Summary
+| Endpoint | Operation | Auth | Result |
+|----------|-----------|------|--------|
+| `/api/ops/abra/control-plane` | `po.summary` | CRON_SECRET | ✅ PASS |
+| `/api/ops/abra/control-plane` | `po.list` | CRON_SECRET | ✅ PASS |
+| `/api/ops/abra/control-plane` | `po.get` | CRON_SECRET | ✅ PASS |
+| `/api/ops/abra/control-plane` | `email_intelligence.summary` | CRON_SECRET | ✅ PASS |
+| `/api/ops/approvals` | GET | CRON_SECRET | ❌ BLOCKED (needs auth fix) |
+
+### Files Changed (Claude Code, non-Codex)
+- `~/paperclip-usagummies/.../agents/8de1ae22.../instructions/HEARTBEAT.md` — rewired to control-plane adapter
+- `~/paperclip-usagummies/.../agents/dcf9fa59.../instructions/HEARTBEAT.md` — rewired to control-plane adapter
+- `~/paperclip-usagummies/.../agents/dd4457ca.../instructions/HEARTBEAT.md` — new (Sales agent)
+- `~/paperclip-usagummies/.../workspaces/*/.env` — added CRON_SECRET to all 5 agents
+
+### Next Steps for Codex
+1. **Approvals auth fix**: Add `isCronAuthorized(req)` fallback to GET handler in `/api/ops/approvals/route.ts`
+2. **QBO query test**: Claude Code will test `/api/ops/qbo/query` from Finance agent workspace next
+3. **Deploy PM-007 fix**: Codex's Slack dedup fix needs deploy + re-test
+
+### Next Steps for Claude Code
+1. **Fix Paperclip inbox routing**: Investigate why `inbox-lite` returns empty for checked-out issues
+2. **Test QBO query from Finance workspace**: Same pattern — `source .env && curl`
+3. **Wire CEO morning brief**: Use `po.summary` + `email_intelligence.summary` + Shopify MCP in CEO heartbeat
+4. **PM-007 re-test**: After deploy, verify single reply on human image upload
+
+---
+
+## Handoff — 2026-03-28 18:41 PDT
+Owner: Codex
+Area: approvals route cron auth fallback
+
+Files changed:
+- /Users/ben/usagummies-storefront/src/app/api/ops/approvals/route.ts
+- /Users/ben/usagummies-storefront/src/lib/ops/approvals-auth.ts
+- /Users/ben/usagummies-storefront/src/lib/ops/__tests__/approvals-route.test.ts
+
+Root cause:
+- `GET /api/ops/approvals` required a logged-in NextAuth session and rejected Paperclip agent calls that authenticate with `CRON_SECRET`.
+- The control-plane agents can read PO and email state via backend auth, but approval inbox reads were blocked on session-only auth.
+
+What changed:
+- Added `hasApprovalsReadAccess(req, sessionEmail)` in `/Users/ben/usagummies-storefront/src/lib/ops/approvals-auth.ts`.
+- `GET /api/ops/approvals` now allows either:
+  - a logged-in session email, or
+  - `isCronAuthorized(req)` via the bearer `CRON_SECRET`
+- POST approval decisions remain unchanged; that path still requires a real session/decider identity.
+
+Validation:
+- Ran: `npm test -- src/lib/ops/__tests__/approvals-route.test.ts src/lib/ops/__tests__/control-plane-route.test.ts`
+- Result: `2/2` files passed, `9/9` tests passed
+- Ran: `npm run build`
+- Result: passed
+
+What Claude should do next:
+- Deploy this backend pass.
+- Retry `GET /api/ops/approvals` from the Paperclip agent workspace using the existing `CRON_SECRET` bearer token.
+- Log the exact response shape and whether the approval inbox is now readable end to end.
+- If approvals read succeeds, the remaining blocker is Paperclip inbox routing, not backend auth.

@@ -37,12 +37,25 @@ function makeHash(input: string): string {
 }
 
 export function buildSlackEventDedupKey(params: {
-  type: string;
+  eventId?: string | null;
   channel: string;
   user: string;
-  text: string;
+  messageTs: string;
+  rootThreadTs: string;
+  text?: string;
 }): string {
-  return makeHash([params.type, params.channel, params.user, params.text.trim()].join("\n"));
+  const eventId = String(params.eventId || "").trim();
+  if (eventId) {
+    return makeHash(["event", eventId].join("\n"));
+  }
+  return makeHash([
+    "message",
+    params.channel,
+    params.user,
+    params.rootThreadTs,
+    params.messageTs,
+    String(params.text || "").trim(),
+  ].join("\n"));
 }
 
 export function buildSlackResponseDedupKey(params: {
@@ -101,10 +114,12 @@ export async function registerSlackDedup(
 }
 
 export async function shouldProcessSlackEvent(params: {
-  type: string;
+  eventId?: string | null;
   channel: string;
   user: string;
-  text: string;
+  messageTs: string;
+  rootThreadTs: string;
+  text?: string;
 }): Promise<boolean> {
   const dedupKey = buildSlackEventDedupKey(params);
   if (await hasRecentSlackDedup(dedupKey, "event")) return false;

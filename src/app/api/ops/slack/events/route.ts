@@ -409,7 +409,6 @@ export async function POST(req: Request) {
 
   // Capture idempotency values before entering after() — the request object
   // may not be readable inside the background callback.
-  const eventId = body.event_id || "";
   const isRetry = Boolean(req.headers.get("x-slack-retry-num"));
 
   // Return 200 IMMEDIATELY so Slack never times out and retries.
@@ -420,9 +419,11 @@ export async function POST(req: Request) {
     if (isRetry) return;
 
     if (!(await shouldProcessSlackEvent({
-      type: event.type || "",
+      eventId: body.event_id || null,
       channel,
       user,
+      messageTs: ts,
+      rootThreadTs: thread_ts || ts,
       text: text || "",
     }))) {
       return;

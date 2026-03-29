@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { auth } from "@/lib/auth/config";
+import { hasApprovalsReadAccess } from "@/lib/ops/approvals-auth";
 import { sendOpsEmail } from "@/lib/ops/email";
 import { readState, writeState } from "@/lib/ops/state";
 import {
@@ -352,10 +353,10 @@ async function fetchPendingApprovals(): Promise<ApprovalsPayload> {
   };
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const session = await auth();
-    if (!session?.user?.email) {
+    if (!hasApprovalsReadAccess(req, session?.user?.email)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
