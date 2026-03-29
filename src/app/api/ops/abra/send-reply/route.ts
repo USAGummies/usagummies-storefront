@@ -36,10 +36,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { to, subject, body } = (await req.json()) as {
+  const { to, subject, body, allowRepeat } = (await req.json()) as {
     to?: string;
     subject?: string;
     body?: string;
+    allowRepeat?: boolean;
   };
 
   if (!to || !body) {
@@ -66,6 +67,7 @@ export async function POST(req: Request) {
       subject: subject || "Re: (no subject)",
       body: emailBody,
       from: "Ben Stutman <ben@usagummies.com>",
+      allowRepeat: allowRepeat || false,
     });
     if (!result.ok) {
       return NextResponse.json(
