@@ -109,6 +109,9 @@ async function fetchInternalJson(path: string): Promise<Record<string, unknown> 
     cache: "no-store",
     signal: AbortSignal.timeout(20000),
   });
+  if (res.status === 401) {
+    throw new Error("QBO authentication expired — token may need refresh");
+  }
   if (!res.ok) return null;
   return (await res.json().catch(() => null)) as Record<string, unknown> | null;
 }
@@ -669,7 +672,7 @@ export async function executeRoutedAction(
       case "query_qbo_pnl": {
         const data = await fetchInternalJson("/api/ops/qbo/query?type=pnl");
         if (!data?.summary) {
-          action.result = { reply: "QBO is currently unavailable" } satisfies RenderedResult;
+          action.result = { reply: "I couldn't load P&L data from QBO right now. Let me know if you want me to retry." } satisfies RenderedResult;
           break;
         }
         const summary = data.summary as Record<string, unknown>;
@@ -686,17 +689,29 @@ export async function executeRoutedAction(
         const data = await fetchInternalJson("/api/ops/plaid/balance");
         const accounts = Array.isArray(data?.accounts) ? (data.accounts as Array<Record<string, unknown>>) : [];
         if (!accounts.length) {
-          action.result = { reply: "Plaid balance currently unavailable" } satisfies RenderedResult;
+          action.result = { reply: "I can't reach Plaid right now — balance data unavailable. Let me know if you want me to retry." } satisfies RenderedResult;
           break;
         }
-        const balance = accounts.reduce((sum, account) => {
+        // Primary bank is Bank of America — show it first and separately
+        const boaAccount = accounts.find((a) => /bank of america|bofa|boa/i.test(String(a.name || "")));
+        const foundAccount = accounts.find((a) => /found/i.test(String(a.name || "")));
+        const getBalance = (account: Record<string, unknown>) => {
           const balances = account.balances && typeof account.balances === "object"
             ? (account.balances as Record<string, unknown>)
             : {};
-          return sum + Number(balances.current ?? balances.available ?? 0);
-        }, 0);
+          return Number(balances.current ?? balances.available ?? 0);
+        };
+        const totalBalance = accounts.reduce((sum, account) => sum + getBalance(account), 0);
+        const lines: string[] = [];
+        if (boaAccount) {
+          lines.push(`Bank of America (primary): ${compactCurrency(getBalance(boaAccount))}`);
+        }
+        if (foundAccount) {
+          lines.push(`Found Banking: ${compactCurrency(getBalance(foundAccount))}`);
+        }
+        lines.push(`Total cash position: ${compactCurrency(totalBalance)} (Plaid live)`);
         action.result = {
-          reply: `Cash: ${compactCurrency(balance)} (Plaid live)`,
+          reply: lines.join("\n"),
         } satisfies RenderedResult;
         break;
       }
@@ -707,7 +722,7 @@ export async function executeRoutedAction(
           `/rest/v1/kpi_timeseries?window_type=eq.daily&metric_name=in.(daily_revenue_amazon,daily_revenue_shopify,daily_revenue_total_unified)&captured_for_date=gte.${monthStart}&select=metric_name,captured_for_date,value&limit=120`,
         ).catch(() => []);
         if (!Array.isArray(rows) || rows.length === 0) {
-          action.result = { reply: "Revenue data currently unavailable" } satisfies RenderedResult;
+          action.result = { reply: "I couldn't load revenue data right now. Let me know if you want me to retry." } satisfies RenderedResult;
           break;
         }
         let amazonToday = 0;
@@ -744,7 +759,7 @@ export async function executeRoutedAction(
         const data = await fetchInternalJson("/api/ops/qbo/query?type=vendors");
         const vendors = Array.isArray(data?.vendors) ? (data.vendors as QboVendor[]) : [];
         if (!vendors.length) {
-          action.result = { reply: "QBO vendor list is currently unavailable" } satisfies RenderedResult;
+          action.result = { reply: "I couldn't load the vendor list from QBO right now. Let me know if you want me to retry." } satisfies RenderedResult;
           break;
         }
         const names = vendors.map((vendor) => String(vendor.Name || "")).filter(Boolean);
@@ -759,7 +774,7 @@ export async function executeRoutedAction(
         const data = await fetchInternalJson("/api/ops/qbo/query?type=purchases&limit=10");
         const purchases = Array.isArray(data?.purchases) ? (data.purchases as QboPurchase[]) : [];
         if (!purchases.length) {
-          action.result = { reply: "QBO purchases are currently unavailable" } satisfies RenderedResult;
+          action.result = { reply: "I couldn't load recent purchases from QBO right now. Let me know if you want me to retry." } satisfies RenderedResult;
           break;
         }
         action.result = {
@@ -776,7 +791,7 @@ export async function executeRoutedAction(
         const data = await fetchInternalJson("/api/ops/qbo/query?type=purchases&limit=200");
         const purchases = Array.isArray(data?.purchases) ? (data.purchases as QboPurchase[]) : [];
         if (!purchases.length) {
-          action.result = { reply: "QBO is currently unavailable" } satisfies RenderedResult;
+          action.result = { reply: "I couldn't reach QBO right now. Let me know if you want me to retry." } satisfies RenderedResult;
           break;
         }
         const review = purchases.filter(isUncategorized);
@@ -830,7 +845,7 @@ export async function executeRoutedAction(
           "/rest/v1/abra_purchase_orders?status=neq.closed&select=po_number,customer_name,units,total,status&order=created_at.asc",
         ).catch(() => []);
         if (!Array.isArray(orders)) {
-          action.result = { reply: "PO pipeline is currently unavailable" } satisfies RenderedResult;
+          action.result = { reply: "I couldn't load the PO pipeline right now. Let me know if you want me to retry." } satisfies RenderedResult;
           break;
         }
         const total = orders.reduce((sum, order) => sum + Number(order.total || 0), 0);
@@ -848,7 +863,7 @@ export async function executeRoutedAction(
         const emails = await listEmails({ query: "newer_than:1d", count: 20 }).catch(() => []);
         const actionable = emails.filter(isActionableEmail);
         if (!actionable.length) {
-          action.result = { reply: "Email is currently unavailable" } satisfies RenderedResult;
+          action.result = { reply: "I couldn't reach email right now. Let me know if you want me to retry." } satisfies RenderedResult;
           break;
         }
         const visible = actionable.slice(0, 5);
@@ -926,7 +941,7 @@ export async function executeRoutedAction(
           "/rest/v1/abra_operator_tasks?status=eq.pending&select=id,title,task_type,status&order=created_at.asc&limit=5",
         ).catch(() => []);
         if (!Array.isArray(tasks)) {
-          action.result = { reply: "Operator tasks are currently unavailable" } satisfies RenderedResult;
+          action.result = { reply: "I couldn't load operator tasks right now. Let me know if you want me to retry." } satisfies RenderedResult;
           break;
         }
         action.result = {
@@ -941,7 +956,7 @@ export async function executeRoutedAction(
           "/rest/v1/approvals?status=eq.pending&select=id,summary&order=requested_at.asc&limit=5",
         ).catch(() => []);
         if (!Array.isArray(approvals)) {
-          action.result = { reply: "Approvals are currently unavailable" } satisfies RenderedResult;
+          action.result = { reply: "I couldn't load pending approvals right now. Let me know if you want me to retry." } satisfies RenderedResult;
           break;
         }
         action.result = {
@@ -1097,6 +1112,8 @@ export function renderRoutedActionResponse(action: RoutedAction): RenderedResult
     return action.result as RenderedResult;
   }
   return {
-    reply: action.error || "That command is currently unavailable.",
+    reply: action.error
+      ? `I hit an error on this one — ${action.error}. Let me know if you want me to retry.`
+      : "That command is currently unavailable.",
   };
 }

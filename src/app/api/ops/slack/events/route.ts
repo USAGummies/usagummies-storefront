@@ -309,7 +309,10 @@ async function parseSpreadsheetRowsFromBuffer(buffer: Buffer, fileName: string):
 function classifySpreadsheet(rows: SpreadsheetRow[]): FinancialImportPlanKind {
   const headers = Array.from(new Set(rows.flatMap((row) => Object.keys(row).map(normalizeHeader))));
   const has = (...keys: string[]) => keys.some((key) => headers.includes(normalizeHeader(key)));
-  if ((has("account_name", "name") && has("account_number", "number", "acctnum")) || (has("account_name", "name") && has("type", "account_type"))) {
+  if (
+    (has("account_name", "name", "description") && has("account_number", "number", "acctnum", "gl_account")) ||
+    (has("account_name", "name", "description") && has("type", "account_type"))
+  ) {
     return "chart_of_accounts";
   }
   if (has("vendor_name", "name") && has("email", "phone", "company_name", "address")) {
@@ -328,6 +331,79 @@ function previewLinesFromRows(rows: SpreadsheetRow[], limit = 5): string[] {
       .map(([key, value]) => `${key}: ${String(value || "").slice(0, 60)}`);
     return `${index + 1}. ${cells.join(" | ")}`;
   });
+}
+
+/**
+ * Map single-letter account type codes (A/L/C/P/I/E) used in Rene's
+ * spreadsheets to QBO AccountType + AccountSubType. Also handles full QBO
+ * type names passed through unchanged.
+ */
+function mapAccountTypeCode(
+  rawType: string,
+  name: string,
+  number?: string,
+): { type: string; sub_type?: string } {
+  const code = rawType.trim().toUpperCase();
+  const nameLower = (name || "").toLowerCase();
+  const num = number || "";
+
+  // If already a full QBO type name, pass through
+  if (rawType.length > 2) return { type: rawType };
+
+  switch (code) {
+    case "A": {
+      // Asset — determine subtype from name/number patterns
+      if (/checking|bank of america/i.test(name)) return { type: "Bank", sub_type: "Checking" };
+      if (/banking|found/i.test(name)) return { type: "Bank", sub_type: "Checking" };
+      if (/money market/i.test(name)) return { type: "Bank", sub_type: "CashOnHand" };
+      if (/certificate/i.test(name)) return { type: "Other Current Asset", sub_type: "EmployeeCashAdvances" };
+      if (/accounts receivable|a\/?r/i.test(name)) return { type: "Accounts Receivable", sub_type: "AccountsReceivable" };
+      if (/inventory/i.test(name)) return { type: "Other Current Asset", sub_type: "Inventory" };
+      if (/allowance.*bad/i.test(name)) return { type: "Other Current Asset", sub_type: "AllowanceForBadDebts" };
+      if (/prepaid/i.test(name)) return { type: "Other Current Asset", sub_type: "PrepaidExpenses" };
+      if (/deposit/i.test(name)) return { type: "Other Current Asset", sub_type: "PrepaidExpenses" };
+      if (/property tax/i.test(name)) return { type: "Other Current Asset", sub_type: "PrepaidExpenses" };
+      if (num.startsWith("1")) return { type: "Other Current Asset", sub_type: "OtherCurrentAssets" };
+      return { type: "Other Current Asset", sub_type: "OtherCurrentAssets" };
+    }
+    case "L": {
+      if (/accounts payable|a\/?p/i.test(name)) return { type: "Accounts Payable", sub_type: "AccountsPayable" };
+      if (/suspense/i.test(name)) return { type: "Other Current Liability", sub_type: "OtherCurrentLiabilities" };
+      if (/long.?term|ltl/i.test(name) || num.startsWith("28") || num.startsWith("29")) return { type: "Long Term Liability", sub_type: "NotesPayable" };
+      return { type: "Other Current Liability", sub_type: "OtherCurrentLiabilities" };
+    }
+    case "C": {
+      if (/retained earnings/i.test(name)) return { type: "Equity", sub_type: "RetainedEarnings" };
+      if (/distribution/i.test(name)) return { type: "Equity", sub_type: "PersonalIncome" };
+      return { type: "Equity", sub_type: "CommonStock" };
+    }
+    case "P":
+      // "P" = Equity/Prior period — typically retained earnings
+      return { type: "Equity", sub_type: "RetainedEarnings" };
+    case "I": {
+      if (/interest income/i.test(name) || /discount/i.test(name) || /miscellaneous/i.test(name)) return { type: "Other Income", sub_type: "InterestEarned" };
+      return { type: "Income", sub_type: "SalesOfProductIncome" };
+    }
+    case "E": {
+      if (/cost of goods|cogs/i.test(name) || num.startsWith("5")) return { type: "Cost of Goods Sold", sub_type: "SuppliesMaterialsCogs" };
+      if (/interest expense/i.test(name)) return { type: "Expense", sub_type: "InterestPaid" };
+      if (/rent|lease/i.test(nameLower)) return { type: "Expense", sub_type: "RentOrLeaseOfBuildings" };
+      if (/insurance/i.test(name)) return { type: "Expense", sub_type: "Insurance" };
+      if (/vehicle|auto|fuel|car|truck/i.test(name)) return { type: "Expense", sub_type: "Auto" };
+      if (/travel|air|lodging|parking/i.test(name)) return { type: "Expense", sub_type: "Travel" };
+      if (/meal/i.test(name)) return { type: "Expense", sub_type: "Travel" };
+      if (/office.*equip|furniture|supplies|stationary|printing.*copy|blue print/i.test(name)) return { type: "Expense", sub_type: "OfficeGeneralAdministrativeExpenses" };
+      if (/postage|shipping|courier/i.test(name)) return { type: "Expense", sub_type: "ShippingFreightDelivery" };
+      if (/utility/i.test(name)) return { type: "Expense", sub_type: "Utilities" };
+      if (/software|computer|subscription/i.test(name)) return { type: "Expense", sub_type: "OtherMiscellaneousServiceCost" };
+      if (/promotion|entertainment|sponsor|advertis|market|website|digital|photo/i.test(name)) return { type: "Expense", sub_type: "PromotionalMeals" };
+      if (/legal|accounting|professional|license|fee|bank charge|hr|dues|charitable/i.test(name)) return { type: "Expense", sub_type: "LegalProfessionalFees" };
+      if (/cellular|phone|safety|conference|seminar|meeting|pantry|swag/i.test(name)) return { type: "Expense", sub_type: "OtherBusinessExpenses" };
+      return { type: "Expense", sub_type: "OtherMiscellaneousServiceCost" };
+    }
+    default:
+      return { type: rawType };
+  }
 }
 
 function buildFinancialImportPlan(
@@ -352,13 +428,22 @@ function buildFinancialImportPlan(
 
   if (kind === "chart_of_accounts") {
     plan.accounts = rows
-      .map((row) => ({
-        name: firstValue(row, ["Account Name", "Name"]),
-        type: firstValue(row, ["Type", "Account Type"]),
-        number: firstValue(row, ["Account Number", "Number", "AcctNum"]) || undefined,
-        sub_type: firstValue(row, ["Sub Type", "Subtype", "Account SubType"]) || undefined,
-        description: firstValue(row, ["Description", "Detail"]) || undefined,
-      }))
+      .map((row) => {
+        const rawName = firstValue(row, ["Account Name", "Name", "Description"]);
+        const rawType = firstValue(row, ["Type", "Account Type"]);
+        const number = firstValue(row, ["Account Number", "Number", "AcctNum", "GL Account"]) || undefined;
+        const sub_type = firstValue(row, ["Sub Type", "Subtype", "Account SubType"]) || undefined;
+        const description = firstValue(row, ["Description", "Detail"]) || undefined;
+        // Map single-letter type codes (A/L/C/P/I/E) to QBO AccountType
+        const mapped = mapAccountTypeCode(rawType, rawName, number);
+        return {
+          name: rawName,
+          type: mapped.type || rawType,
+          number,
+          sub_type: sub_type || mapped.sub_type || undefined,
+          description: description !== rawName ? description : undefined,
+        };
+      })
       .filter((row) => row.name && row.type);
   } else if (kind === "vendor_list") {
     plan.vendors = rows
@@ -455,9 +540,26 @@ async function importFinancialPlan(plan: FinancialImportPlan): Promise<string> {
   const baseUrl = getInternalBaseUrl();
   if (plan.kind === "chart_of_accounts") {
     const accounts = plan.accounts || [];
+    // Fetch existing accounts to avoid duplicates
+    const existingRes = await fetch(`${baseUrl}/api/ops/qbo/accounts`, {
+      headers: getInternalAuthHeaders(false),
+      signal: AbortSignal.timeout(30000),
+    });
+    const existingPayload = (await existingRes.json().catch(() => ({}))) as {
+      accounts?: Array<{ AcctNum?: string; Name?: string }>;
+    };
+    const existingNums = new Set((existingPayload.accounts || []).map((a) => String(a.AcctNum || "")).filter(Boolean));
+    const existingNames = new Set((existingPayload.accounts || []).map((a) => (a.Name || "").toLowerCase()).filter(Boolean));
+
     let created = 0;
+    let skipped = 0;
     const failures: string[] = [];
     for (const account of accounts) {
+      // Skip if account already exists (by number or exact name)
+      if ((account.number && existingNums.has(account.number)) || existingNames.has(account.name.toLowerCase())) {
+        skipped += 1;
+        continue;
+      }
       const res = await fetch(`${baseUrl}/api/ops/qbo/accounts`, {
         method: "POST",
         headers: getInternalAuthHeaders(),
@@ -466,13 +568,17 @@ async function importFinancialPlan(plan: FinancialImportPlan): Promise<string> {
       });
       if (res.ok) {
         created += 1;
+        // Track newly created to avoid creating dupes within same batch
+        if (account.number) existingNums.add(account.number);
+        existingNames.add(account.name.toLowerCase());
       } else {
         failures.push(account.name);
       }
     }
-    return failures.length > 0
-      ? `Imported ${created}/${accounts.length} accounts into QuickBooks. Failed: ${failures.slice(0, 5).join(", ")}`
-      : `Imported all ${created} accounts into QuickBooks.`;
+    const parts = [`Created ${created} new accounts in QuickBooks.`];
+    if (skipped > 0) parts.push(`Skipped ${skipped} that already existed.`);
+    if (failures.length > 0) parts.push(`Failed: ${failures.slice(0, 5).join(", ")}`);
+    return parts.join(" ");
   }
 
   if (plan.kind === "vendor_list") {
