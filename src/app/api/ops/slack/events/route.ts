@@ -934,30 +934,26 @@ export async function POST(req: Request) {
         return;
       }
 
-      const conversationMessage = `${buildThreadConstraintBlock(normalizedMessage, history, fileContext)}${normalizedMessage}`.trim();
-      const chatResult = await callReadOnlyChatRoute({
-        message: conversationMessage,
-        history,
-        actorLabel: displayName,
-        channel: "slack",
-        slackChannelId: channel,
-        slackThreadTs: rootThreadTs,
-        uploadedFiles,
+      // If the router didn’t catch this message, respond with what we CAN do
+      // rather than falling through to the unreliable LLM chat route.
+      // Complex questions should be asked in Claude Code where full capabilities exist.
+      const fallbackLines = [
+        "I can help with these right now:",
+        "• *cash* / *balance* — Bank of America live balance",
+        "• *invoices* — QBO invoices (drafts vs sent)",
+        "• *pnl* / *p&l* — Profit & Loss report",
+        "• *vendors* — QBO vendor list",
+        "• *transactions* — recent purchases/expenses",
+        "• *pos* / *orders* — open wholesale pipeline",
+        "• *emails* — recent actionable emails",
+        "• *overview* / *recap* — full company status",
+        "• *review* — uncategorized transactions needing attention",
+        "",
+        "For complex questions, analysis, or anything else — ask in Claude Code where I have full capabilities.",
+      ];
+      await postSlackMessage(channel, fallbackLines.join("\n"), {
+        threadTs: rootThreadTs,
       });
-
-      if (chatResult?.reply) {
-        await postSlackMessage(channel, chatResult.reply, {
-          threadTs: rootThreadTs,
-          blocks: chatResult.blocks,
-        });
-        return;
-      }
-
-      await postSlackMessage(
-        channel,
-        "I hit an error while processing that. Send the next instruction and I’ll continue.",
-        { threadTs: rootThreadTs },
-      );
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Unknown Slack events processing error";
