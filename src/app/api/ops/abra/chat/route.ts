@@ -106,6 +106,24 @@ const DEFAULT_CLAUDE_MODEL =
 const MAX_MESSAGE_LENGTH = 5000;
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
 
+/** Build auth headers for internal API calls (QBO, Plaid, etc.) */
+function internalAuthHeaders(timeout = 10_000): { headers: Record<string, string>; signal: AbortSignal } {
+  const cronSecret = (process.env.CRON_SECRET || "").trim();
+  return {
+    headers: {
+      ...(cronSecret ? { Authorization: `Bearer ${cronSecret}` } : {}),
+      "Content-Type": "application/json",
+    },
+    signal: AbortSignal.timeout(timeout),
+  };
+}
+
+/** Fetch internal API with auth */
+async function fetchInternalWithAuth(url: string, timeout = 10_000): Promise<Response> {
+  const { headers, signal } = internalAuthHeaders(timeout);
+  return fetch(url, { headers, signal, cache: "no-store" });
+}
+
 function stripInjectedSlackContext(message: string): string {
   const trimmed = message.trim();
   if (!trimmed) return trimmed;
@@ -1161,10 +1179,9 @@ export async function POST(req: Request) {
     if (isDirectQBOQuery) {
       let financeData = "";
       try {
-        // Fetch QBO accounts directly via our own API
-        const qboRes = await fetch(
+        // Fetch QBO accounts directly via our own API (with auth)
+        const qboRes = await fetchInternalWithAuth(
           `${process.env.NEXT_PUBLIC_BASE_URL || "https://www.usagummies.com"}/api/ops/qbo/accounts`,
-          { signal: AbortSignal.timeout(10_000) },
         );
         if (qboRes.ok) {
           const qboJson = (await qboRes.json()) as {
@@ -1291,16 +1308,16 @@ export async function POST(req: Request) {
 
       const extraFetches = await Promise.allSettled([
         wantsVendors
-          ? fetch(`${qboBase}/api/ops/qbo/query?type=vendors`, { signal: AbortSignal.timeout(8_000) }).then(r => r.ok ? r.json() : null)
+          ? fetchInternalWithAuth(`${qboBase}/api/ops/qbo/query?type=vendors`, 8_000).then(r => r.ok ? r.json() : null)
           : Promise.resolve(null),
         wantsPnl
-          ? fetch(`${qboBase}/api/ops/qbo/query?type=pnl`, { signal: AbortSignal.timeout(8_000) }).then(r => r.ok ? r.json() : null)
+          ? fetchInternalWithAuth(`${qboBase}/api/ops/qbo/query?type=pnl`, 8_000).then(r => r.ok ? r.json() : null)
           : Promise.resolve(null),
         wantsPurchases
-          ? fetch(`${qboBase}/api/ops/qbo/query?type=purchases&limit=${/every|all|last 30/i.test(message) ? 100 : 25}`, { signal: AbortSignal.timeout(8_000) }).then(r => r.ok ? r.json() : null)
+          ? fetchInternalWithAuth(`${qboBase}/api/ops/qbo/query?type=purchases&limit=${/every|all|last 30/i.test(message) ? 100 : 25}`, 8_000).then(r => r.ok ? r.json() : null)
           : Promise.resolve(null),
         wantsBalanceSheet
-          ? fetch(`${qboBase}/api/ops/qbo/query?type=balance_sheet`, { signal: AbortSignal.timeout(8_000) }).then(r => r.ok ? r.json() : null)
+          ? fetchInternalWithAuth(`${qboBase}/api/ops/qbo/query?type=balance_sheet`, 8_000).then(r => r.ok ? r.json() : null)
           : Promise.resolve(null),
       ]);
 
@@ -1900,8 +1917,8 @@ export async function POST(req: Request) {
           try {
             const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://www.usagummies.com";
             const [vendorsRes, accountsRes] = await Promise.all([
-              fetch(`${baseUrl}/api/ops/qbo/query?type=vendors`, { signal: AbortSignal.timeout(8000) }),
-              fetch(`${baseUrl}/api/ops/qbo/accounts`, { signal: AbortSignal.timeout(8000) }),
+              fetchInternalWithAuth(`${baseUrl}/api/ops/qbo/query?type=vendors`, 8000),
+              fetchInternalWithAuth(`${baseUrl}/api/ops/qbo/accounts`, 8000),
             ]);
             const parts: string[] = [];
             if (vendorsRes.ok) {
