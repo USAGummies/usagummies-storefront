@@ -54,6 +54,7 @@ export function routeMessage(message: string, _actor: string, context: RouteCont
   const msg = trimmed.toLowerCase();
   const conversation = extractConversationText(context.history);
 
+  // ── Exact keyword shortcuts ──
   if (msg === "pnl" || msg === "p&l") return buildAction("pnl", "query_qbo_pnl");
   if (msg === "cash") return buildAction("cash", "query_plaid_balance");
   if (msg === "rev" || msg === "revenue") return buildAction("revenue", "query_kpi_revenue");
@@ -65,6 +66,40 @@ export function routeMessage(message: string, _actor: string, context: RouteCont
   if (msg === "help") return buildAction("help", "show_help");
   if (msg === "tasks") return buildAction("tasks", "query_operator_tasks");
   if (msg === "approve") return buildAction("approve", "query_pending_approvals");
+
+  // ── Natural language pattern matching ──
+  // Cash / balance / bank questions → Plaid balance (BoA primary)
+  if (/\b(cash position|cash balance|bank balance|how much cash|what'?s? (?:our |the )?(?:cash|balance|bank)|bofa|boa|bank of america|checking balance|money (?:do we|in the))\b/i.test(msg)) {
+    return buildAction("cash", "query_plaid_balance");
+  }
+  // P&L / profit / income statement questions
+  if (/\b(profit.?(?:and|&)?.?loss|income statement|how.?(?:are|is) (?:we|the company) doing|net income|gross (?:margin|profit)|how much (?:did we|have we) (?:made|earned|spent))\b/i.test(msg)) {
+    return buildAction("pnl", "query_qbo_pnl");
+  }
+  // Invoice questions → QBO invoices (our invoices to customers)
+  if (/\b(invoices?|what (?:invoices|bills)|outstanding invoices|ar\b|accounts? receivable|who owes|owed to us|sent invoices)\b/i.test(msg) && !/\bfrom\s+(?:powers|belmark|albanese)\b/i.test(msg)) {
+    return buildAction("invoices", "query_qbo_invoices");
+  }
+  // Vendor / supplier questions
+  if (/\b(vendors?|suppliers?|who do we (?:buy|pay|owe)|accounts? payable|ap\b|what do we owe|bills? (?:we|to pay))\b/i.test(msg)) {
+    return buildAction("vendors", "query_qbo_vendors");
+  }
+  // Revenue questions
+  if (/\b(revenue|sales|how much (?:did we|have we) (?:sold|made)|daily sales|monthly sales|mtd|month to date)\b/i.test(msg)) {
+    return buildAction("revenue", "query_kpi_revenue");
+  }
+  // Purchase / expense / transaction questions
+  if (/\b(transactions?|purchases?|expenses?|what (?:did we|have we) (?:bought|spent|purchased)|recent (?:charges|spending))\b/i.test(msg)) {
+    return buildAction("transactions", "query_qbo_purchases");
+  }
+  // PO / order / pipeline questions
+  if (/\b(purchase orders?|p\.?o\.?s?\b|open orders?|pipeline|wholesale orders?|what.?(?:are|is) (?:we|the) waiting|pending orders?)\b/i.test(msg)) {
+    return buildAction("open_pos", "query_open_pos");
+  }
+  // Email questions
+  if (/\b(emails?|inbox|what (?:emails?|mail)|check (?:my |our )?(?:email|inbox|mail)|actionable (?:emails?|mail))\b/i.test(msg)) {
+    return buildAction("emails", "search_recent_email");
+  }
 
   if (looksLikeMeetingCorrection(msg, conversation)) {
     return buildAction("meeting_correction", "acknowledge_meeting_correction", {

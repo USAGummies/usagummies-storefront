@@ -787,6 +787,39 @@ export async function executeRoutedAction(
         } satisfies RenderedResult;
         break;
       }
+      case "query_qbo_invoices": {
+        const data = await fetchInternalJson("/api/ops/qbo/query?type=invoices");
+        const invoices = Array.isArray(data?.invoices) ? (data.invoices as Array<Record<string, unknown>>) : [];
+        if (!invoices.length) {
+          action.result = { reply: "No invoices found in QBO." } satisfies RenderedResult;
+          break;
+        }
+        const sent = invoices.filter((inv) => String(inv.Status || "") === "outstanding");
+        const drafts = invoices.filter((inv) => String(inv.Status || "") === "draft");
+        const paid = invoices.filter((inv) => String(inv.Status || "") === "paid");
+        const lines: string[] = [];
+        if (sent.length > 0) {
+          const sentTotal = sent.reduce((sum, inv) => sum + Number(inv.Balance || 0), 0);
+          lines.push(`*Accounts Receivable:* ${compactCurrency(sentTotal)} (${sent.length} sent invoice${sent.length === 1 ? "" : "s"})`);
+          for (const inv of sent.slice(0, 5)) {
+            lines.push(`  • ${inv.Customer || "Unknown"} #${inv.DocNumber || inv.Id}: ${compactCurrency(Number(inv.Balance || 0))}`);
+          }
+        } else {
+          lines.push("*Accounts Receivable:* $0 — no sent invoices outstanding");
+        }
+        if (drafts.length > 0) {
+          const draftTotal = drafts.reduce((sum, inv) => sum + Number(inv.Balance || 0), 0);
+          lines.push(`*Drafts (not yet AR):* ${compactCurrency(draftTotal)} (${drafts.length} unsent invoice${drafts.length === 1 ? "" : "s"})`);
+          for (const inv of drafts.slice(0, 5)) {
+            lines.push(`  • ${inv.Customer || "Unknown"} #${inv.DocNumber || inv.Id}: ${compactCurrency(Number(inv.Balance || 0))} (draft)`);
+          }
+        }
+        if (paid.length > 0) {
+          lines.push(`*Paid:* ${paid.length} invoice${paid.length === 1 ? "" : "s"} collected`);
+        }
+        action.result = { reply: lines.join("\n") } satisfies RenderedResult;
+        break;
+      }
       case "show_review_transactions": {
         const data = await fetchInternalJson("/api/ops/qbo/query?type=purchases&limit=200");
         const purchases = Array.isArray(data?.purchases) ? (data.purchases as QboPurchase[]) : [];
