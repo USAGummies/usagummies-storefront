@@ -1027,18 +1027,22 @@ export async function buildCompactBenBrief(): Promise<string> {
     lines.push(`• Revenue: yesterday ${compactCurrency(dayRevenue.total_revenue, 2)} | MTD ${compactCurrency(monthRevenue.total_revenue, 0)}`);
   }
 
-  // AR
-  const invoices = Array.isArray((arData || {}).invoices)
-    ? ((arData || {}).invoices as Array<Record<string, unknown>>).filter((inv) => String(inv.Status || "").toLowerCase() !== "paid")
-    : [];
-  const arTotal = invoices.reduce((sum, inv) => sum + numberValue(inv.Balance), 0);
+  // AR: only SENT invoices are real AR — drafts are not yet receivable
+  const allInvoices = Array.isArray((arData || {}).invoices) ? (arData || {}).invoices as Array<Record<string, unknown>> : [];
+  const sentInvoices = allInvoices.filter((inv) => String(inv.Status || "").toLowerCase() === "outstanding");
+  const draftInvoices = allInvoices.filter((inv) => String(inv.Status || "").toLowerCase() === "draft");
+  const arTotal = sentInvoices.reduce((sum, inv) => sum + numberValue(inv.Balance), 0);
+  const draftTotal = draftInvoices.reduce((sum, inv) => sum + numberValue(inv.Balance), 0);
   if (arTotal > 0) {
-    lines.push(`• AR: ${compactCurrency(arTotal, 2)} outstanding (${compactCountLabel(invoices.length, "invoice")})`);
-    for (const inv of invoices.slice(0, 3)) {
+    lines.push(`• AR: ${compactCurrency(arTotal, 2)} outstanding (${compactCountLabel(sentInvoices.length, "sent invoice")})`);
+    for (const inv of sentInvoices.slice(0, 3)) {
       lines.push(`  - ${inv.Customer || "Unknown"} #${inv.DocNumber || inv.Id}: ${compactCurrency(numberValue(inv.Balance), 2)}`);
     }
   } else {
     lines.push("• AR: $0 outstanding");
+  }
+  if (draftTotal > 0) {
+    lines.push(`• Drafts: ${compactCurrency(draftTotal, 2)} in ${compactCountLabel(draftInvoices.length, "unsent invoice")} (not yet AR)`);
   }
 
   // AP
@@ -1123,18 +1127,25 @@ export async function buildCompactReneBrief(): Promise<string> {
   }
   lines.push("");
 
-  // 📄 Accounts Receivable (detail)
-  const invoices = Array.isArray((arData || {}).invoices)
-    ? ((arData || {}).invoices as Array<Record<string, unknown>>).filter((inv) => String(inv.Status || "").toLowerCase() !== "paid")
-    : [];
-  const arTotal = invoices.reduce((sum, inv) => sum + numberValue(inv.Balance), 0);
-  lines.push(`*📄 Accounts Receivable* — ${compactCurrency(arTotal, 2)} (${compactCountLabel(invoices.length, "invoice")})`);
-  if (invoices.length > 0) {
-    for (const inv of invoices.slice(0, 8)) {
+  // 📄 Accounts Receivable — only SENT invoices are real AR
+  const reneAllInvoices = Array.isArray((arData || {}).invoices) ? (arData || {}).invoices as Array<Record<string, unknown>> : [];
+  const reneSentInvoices = reneAllInvoices.filter((inv) => String(inv.Status || "").toLowerCase() === "outstanding");
+  const reneDraftInvoices = reneAllInvoices.filter((inv) => String(inv.Status || "").toLowerCase() === "draft");
+  const reneArTotal = reneSentInvoices.reduce((sum, inv) => sum + numberValue(inv.Balance), 0);
+  lines.push(`*📄 Accounts Receivable* — ${compactCurrency(reneArTotal, 2)} (${compactCountLabel(reneSentInvoices.length, "sent invoice")})`);
+  if (reneSentInvoices.length > 0) {
+    for (const inv of reneSentInvoices.slice(0, 8)) {
       const dueStr = String(inv.DueDate || "").slice(0, 10);
       const days = dueStr ? Math.floor((Date.now() - new Date(`${dueStr}T00:00:00Z`).getTime()) / 86400000) : 0;
       const status = days > 0 ? `⚠️ ${days}d overdue` : `due ${dueStr}`;
       lines.push(`  • ${inv.Customer || "Unknown"} #${inv.DocNumber || inv.Id}: ${compactCurrency(numberValue(inv.Balance), 2)} (${status})`);
+    }
+  }
+  if (reneDraftInvoices.length > 0) {
+    const draftTotal = reneDraftInvoices.reduce((sum, inv) => sum + numberValue(inv.Balance), 0);
+    lines.push(`*📝 Draft Invoices* — ${compactCurrency(draftTotal, 2)} (${compactCountLabel(reneDraftInvoices.length, "unsent invoice")} — not yet AR)`);
+    for (const inv of reneDraftInvoices.slice(0, 5)) {
+      lines.push(`  • ${inv.Customer || "Unknown"} #${inv.DocNumber || inv.Id}: ${compactCurrency(numberValue(inv.Balance), 2)} (draft, not sent)`);
     }
   }
   lines.push("");

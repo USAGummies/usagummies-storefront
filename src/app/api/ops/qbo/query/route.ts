@@ -325,19 +325,35 @@ export async function GET(req: NextRequest) {
               Balance?: number;
               CustomerRef?: { name?: string };
               DocNumber?: string;
+              EmailStatus?: string;
+              PrintStatus?: string;
+              DeliveryInfo?: { DeliveryType?: string };
             }>;
           };
         }>(realmId, accessToken, `SELECT * FROM Invoice${whereClause} ORDERBY TxnDate DESC MAXRESULTS 100`);
-        const invoices = (result?.QueryResponse?.Invoice || []).map((inv) => ({
-          Id: inv.Id,
-          Date: inv.TxnDate,
-          DueDate: inv.DueDate || null,
-          Amount: inv.TotalAmt || 0,
-          Balance: inv.Balance || 0,
-          Customer: inv.CustomerRef?.name || null,
-          DocNumber: inv.DocNumber || null,
-          Status: (inv.Balance || 0) > 0 ? "outstanding" : "paid",
-        }));
+        const invoices = (result?.QueryResponse?.Invoice || []).map((inv) => {
+          const balance = inv.Balance || 0;
+          const wasSent = inv.EmailStatus === "EmailSent" || inv.PrintStatus === "PrintComplete" || inv.DeliveryInfo?.DeliveryType === "Email";
+          // AR status: draft (not sent) → sent (AR, customer owes us) → paid (collected)
+          let status: string;
+          if (balance <= 0) {
+            status = "paid";
+          } else if (wasSent) {
+            status = "outstanding"; // Sent to customer — this is real AR
+          } else {
+            status = "draft"; // Not sent yet — NOT AR
+          }
+          return {
+            Id: inv.Id,
+            Date: inv.TxnDate,
+            DueDate: inv.DueDate || null,
+            Amount: inv.TotalAmt || 0,
+            Balance: balance,
+            Customer: inv.CustomerRef?.name || null,
+            DocNumber: inv.DocNumber || null,
+            Status: status,
+          };
+        });
         return NextResponse.json({ type: "invoices", count: invoices.length, invoices });
       }
 
