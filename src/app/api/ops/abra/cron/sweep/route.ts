@@ -52,6 +52,17 @@ const SWEEP_REGISTRY: Record<string, () => Promise<unknown>> = {
     const { runEveningRecon } = await import("@/lib/ops/sweeps/evening-recon");
     return runEveningRecon();
   },
+  "evening-brief": async () => {
+    // 9 PM company overview — same format as morning brief
+    const host = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : process.env.NEXT_PUBLIC_SITE_URL || "https://www.usagummies.com";
+    const cs = (process.env.CRON_SECRET || "").trim();
+    const res = await fetch(`${host}/api/ops/abra/morning-brief`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${cs}` },
+      signal: AbortSignal.timeout(50000),
+    });
+    return res.json();
+  },
   "vendor-followup": async () => {
     const { runVendorFollowUpSweep } = await import("@/lib/ops/sweeps/vendor-followup");
     return runVendorFollowUpSweep();

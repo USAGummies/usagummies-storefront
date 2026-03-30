@@ -832,7 +832,9 @@ const MORNING_BRIEF_HOLD_KEY = "abra:morning_brief_hold" as never;
 const MORNING_BRIEF_HELD_KEY = "abra:morning_brief_held" as never;
 const BEN_LAST_SEEN_KEY = "abra:ben_last_seen" as never;
 const BEN_BRIEF_SENT_KEY = "abra:morning_brief_ben_sent" as never;
+const BEN_EVENING_SENT_KEY = "abra:evening_brief_ben_sent" as never;
 const RENE_BRIEF_SENT_KEY = "abra:morning_brief_rene_sent" as never;
+const RENE_EVENING_SENT_KEY = "abra:evening_brief_rene_sent" as never;
 
 type HeldMorningBrief = {
   date: string;
@@ -997,123 +999,182 @@ async function buildPowersMeetingBenBrief(): Promise<MeetingTodayBrief> {
 }
 
 export async function buildCompactBenBrief(): Promise<string> {
-  const [dayRevenue, monthRevenue, cashBalance, qboHealth, awaiting, openPo, vendorPay, arData] = await Promise.all([
+  const isEvening = new Date().toLocaleTimeString("en-US", { timeZone: "America/Los_Angeles", hour: "numeric", hour12: false }) >= "17";
+  const greeting = isEvening ? "End of day recap" : "Good morning";
+  const dateLabel = new Date().toLocaleDateString("en-US", { timeZone: "America/Los_Angeles", weekday: "long", month: "short", day: "numeric" });
+
+  const [dayRevenue, monthRevenue, cashBalance, qboHealth, awaiting, openPOs, vendorPay, arData, recentEmails] = await Promise.all([
     getRevenueSnapshot("day").catch(() => null),
     getCalendarMonthRevenue().catch(() => null),
     getLiveCashBalance().catch(() => null),
     getLiveQboHealth().catch(() => null),
     detectAwaitingReplies({ sentCount: 30, lookbackHours: 72 }).catch(() => []),
-    getPurchaseOrderSummary().catch(() => null),
+    getOpenPurchaseOrders().catch(() => []),
     getVendorPaymentBrief().catch(() => ({ dueSoonCount: 0, dueSoonAmount: 0, overdueCount: 0, overdueAmount: 0 })),
     fetchInternalOpsJson("/api/ops/qbo/query?type=invoices").catch(() => null),
+    listEmails({ query: "newer_than:1d", count: 15 }).catch(() => []),
   ]);
 
-  const revenueLine = dayRevenue && monthRevenue
-    ? `Revenue: yesterday ${compactCurrency(dayRevenue.total_revenue, 2)} | MTD ${compactCurrency(monthRevenue.total_revenue, 0)}`
-    : "Revenue data unavailable";
-  const cashLine = cashBalance !== null
-    ? `Cash: ${compactCurrency(cashBalance, 0)}`
-    : "Cash data unavailable";
-  const qboLine = qboHealth
-    ? `QBO: ${qboHealth.pct}% categorized | ${qboHealth.uncategorized} review`
-    : "QBO unavailable";
-  const poLine = openPo
-    ? `Open POs: ${openPo.openCount} orders, ${compactCurrency(openPo.committedRevenue, 0)}`
-    : "Open POs unavailable";
-  const emailLine = `Emails: ${Array.isArray(awaiting) ? awaiting.length : 0} need response`;
+  const lines: string[] = [];
+  lines.push(`*${greeting} <@${BEN_SLACK_USER_ID}> — ${dateLabel}*`);
+  lines.push("");
 
-  // AR: outstanding invoices
+  // 💰 Financial Position
+  lines.push("*💰 Financial Position*");
+  const cashStr = cashBalance !== null ? compactCurrency(cashBalance, 2) : "unavailable";
+  lines.push(`• Bank of America (primary): ${cashStr}`);
+  if (dayRevenue && monthRevenue) {
+    lines.push(`• Revenue: yesterday ${compactCurrency(dayRevenue.total_revenue, 2)} | MTD ${compactCurrency(monthRevenue.total_revenue, 0)}`);
+  }
+
+  // AR
   const invoices = Array.isArray((arData || {}).invoices)
     ? ((arData || {}).invoices as Array<Record<string, unknown>>).filter((inv) => String(inv.Status || "").toLowerCase() !== "paid")
     : [];
   const arTotal = invoices.reduce((sum, inv) => sum + numberValue(inv.Balance), 0);
-  const arLine = arTotal > 0
-    ? `AR: ${compactCurrency(arTotal, 2)} outstanding (${compactCountLabel(invoices.length, "invoice")})`
-    : "AR: $0 outstanding";
+  if (arTotal > 0) {
+    lines.push(`• AR: ${compactCurrency(arTotal, 2)} outstanding (${compactCountLabel(invoices.length, "invoice")})`);
+    for (const inv of invoices.slice(0, 3)) {
+      lines.push(`  - ${inv.Customer || "Unknown"} #${inv.DocNumber || inv.Id}: ${compactCurrency(numberValue(inv.Balance), 2)}`);
+    }
+  } else {
+    lines.push("• AR: $0 outstanding");
+  }
 
-  // AP: vendor bills
-  const apParts: string[] = [];
-  if (vendorPay.overdueCount > 0) apParts.push(`${compactCurrency(vendorPay.overdueAmount, 0)} overdue`);
-  if (vendorPay.dueSoonCount > 0) apParts.push(`${compactCurrency(vendorPay.dueSoonAmount, 0)} due ≤5 days`);
-  const apLine = apParts.length > 0
-    ? `AP: ${apParts.join(", ")}`
-    : "AP: nothing due";
+  // AP
+  if (vendorPay.overdueCount > 0 || vendorPay.dueSoonCount > 0) {
+    const parts: string[] = [];
+    if (vendorPay.overdueCount > 0) parts.push(`${compactCurrency(vendorPay.overdueAmount, 0)} overdue`);
+    if (vendorPay.dueSoonCount > 0) parts.push(`${compactCurrency(vendorPay.dueSoonAmount, 0)} due soon`);
+    lines.push(`• AP: ${parts.join(", ")}`);
+  } else {
+    lines.push("• AP: nothing due");
+  }
+  lines.push("");
 
-  return [
-    `Good morning <@${BEN_SLACK_USER_ID}>`,
-    `${revenueLine} | ${cashLine}`,
-    `${qboLine} | ${poLine}`,
-    `${arLine} | ${apLine}`,
-    emailLine,
-    `Reply "emails", "pos", "review", or "help".`,
-  ].join("\n").slice(0, 600);
+  // 📦 Wholesale Pipeline
+  const openList = Array.isArray(openPOs) ? openPOs : [];
+  if (openList.length > 0) {
+    const totalPipelineRev = openList.reduce((sum, po) => sum + Number(po.total || po.subtotal || 0), 0);
+    lines.push(`*📦 Wholesale Pipeline* — ${openList.length} open, ${compactCurrency(totalPipelineRev, 0)} committed`);
+    for (const po of openList.slice(0, 5)) {
+      const status = String(po.status || "open").replace(/_/g, " ");
+      // Context-aware status: if we're waiting on inventory (Powers production), say so
+      const isAwaitingInventory = /invoice_draft|pending|open|confirmed/i.test(status);
+      const contextStatus = isAwaitingInventory ? "awaiting inventory (Powers production)" : status;
+      const units = po.units ? `${po.units} units` : "";
+      const amount = po.total ? compactCurrency(Number(po.total), 2) : "";
+      lines.push(`  • ${po.customer_name || "Unknown"} #${po.po_number || "?"} — ${[units, amount].filter(Boolean).join(", ")} (${contextStatus})`);
+    }
+  } else {
+    lines.push("*📦 Wholesale Pipeline* — no open POs");
+  }
+  lines.push("");
+
+  // 📧 Email
+  const emailList = Array.isArray(recentEmails) ? recentEmails : [];
+  const awaitingList = Array.isArray(awaiting) ? awaiting : [];
+  if (emailList.length > 0 || awaitingList.length > 0) {
+    lines.push(`*📧 Email* — ${emailList.length} received today, ${awaitingList.length} awaiting reply`);
+    for (const email of emailList.slice(0, 5)) {
+      const from = shortEmailName(String((email as Record<string, unknown>).from || (email as Record<string, unknown>).sender || "Unknown"));
+      const subject = String((email as Record<string, unknown>).subject || "").slice(0, 60);
+      lines.push(`  • ${from}: _${subject}_`);
+    }
+    if (awaitingList.length > 0) {
+      lines.push(`  ⚠️ ${awaitingList.length} sent emails still need a response`);
+    }
+  }
+  lines.push("");
+
+  // 📋 QBO Health
+  if (qboHealth) {
+    lines.push(`*📋 QBO* — ${qboHealth.pct}% categorized, ${qboHealth.uncategorized} need review`);
+  }
+
+  return lines.join("\n").slice(0, 1500);
 }
 
 export async function buildCompactReneBrief(): Promise<string> {
-  const [dayRevenue, monthRevenue, cashBalance, qboHealth, openPo, vendorPay, arData] = await Promise.all([
+  const isEvening = new Date().toLocaleTimeString("en-US", { timeZone: "America/Los_Angeles", hour: "numeric", hour12: false }) >= "17";
+  const greeting = isEvening ? "End of day recap" : "Good morning";
+  const dateLabel = new Date().toLocaleDateString("en-US", { timeZone: "America/Los_Angeles", weekday: "long", month: "short", day: "numeric" });
+
+  const [dayRevenue, monthRevenue, cashBalance, qboHealth, openPOs, vendorPay, arData, billsData] = await Promise.all([
     getRevenueSnapshot("day").catch(() => null),
     getCalendarMonthRevenue().catch(() => null),
     getLiveCashBalance().catch(() => null),
     getLiveQboHealth().catch(() => null),
-    getPurchaseOrderSummary().catch(() => null),
+    getOpenPurchaseOrders().catch(() => []),
     getVendorPaymentBrief().catch(() => ({ dueSoonCount: 0, dueSoonAmount: 0, overdueCount: 0, overdueAmount: 0 })),
     fetchInternalOpsJson("/api/ops/qbo/query?type=invoices").catch(() => null),
+    fetchInternalOpsJson("/api/ops/qbo/query?type=bills").catch(() => null),
   ]);
 
-  const revenueLine = dayRevenue && monthRevenue
-    ? `Revenue: yesterday ${compactCurrency(dayRevenue.total_revenue, 2)} | MTD ${compactCurrency(monthRevenue.total_revenue, 0)}`
-    : "Revenue data unavailable";
-  const cashLine = cashBalance !== null
-    ? `Cash (BoA): ${compactCurrency(cashBalance, 0)}`
-    : "Cash data unavailable";
-  const qboLine = qboHealth
-    ? `QBO: ${qboHealth.pct}% categorized | ${qboHealth.uncategorized} to review`
-    : "QBO unavailable";
-  const poLine = openPo
-    ? `Open POs: ${openPo.openCount} orders, ${compactCurrency(openPo.committedRevenue, 0)}`
-    : "Open POs unavailable";
+  const lines: string[] = [];
+  lines.push(`*${greeting} <@${RENE_SLACK_USER_ID}> — ${dateLabel}*`);
+  lines.push("");
 
-  // AR detail for Rene
+  // 💰 Cash & Revenue
+  lines.push("*💰 Cash & Revenue*");
+  lines.push(`• Bank of America (primary): ${cashBalance !== null ? compactCurrency(cashBalance, 2) : "unavailable"}`);
+  if (dayRevenue && monthRevenue) {
+    lines.push(`• Revenue: yesterday ${compactCurrency(dayRevenue.total_revenue, 2)} | MTD ${compactCurrency(monthRevenue.total_revenue, 0)}`);
+  }
+  lines.push("");
+
+  // 📄 Accounts Receivable (detail)
   const invoices = Array.isArray((arData || {}).invoices)
     ? ((arData || {}).invoices as Array<Record<string, unknown>>).filter((inv) => String(inv.Status || "").toLowerCase() !== "paid")
     : [];
   const arTotal = invoices.reduce((sum, inv) => sum + numberValue(inv.Balance), 0);
-  const arLines: string[] = [];
+  lines.push(`*📄 Accounts Receivable* — ${compactCurrency(arTotal, 2)} (${compactCountLabel(invoices.length, "invoice")})`);
   if (invoices.length > 0) {
-    arLines.push(`*Accounts Receivable:* ${compactCurrency(arTotal, 2)} (${compactCountLabel(invoices.length, "invoice")})`);
-    for (const inv of invoices.slice(0, 5)) {
-      const days = inv.DueDate ? Math.floor((Date.now() - new Date(String(inv.DueDate)).getTime()) / 86400000) : 0;
-      const status = days > 0 ? `⚠️ ${days}d overdue` : `due ${String(inv.DueDate || "").slice(0, 10)}`;
-      arLines.push(`  • ${inv.Customer || "Unknown"} #${inv.DocNumber || inv.Id} — ${compactCurrency(numberValue(inv.Balance), 2)} (${status})`);
+    for (const inv of invoices.slice(0, 8)) {
+      const dueStr = String(inv.DueDate || "").slice(0, 10);
+      const days = dueStr ? Math.floor((Date.now() - new Date(`${dueStr}T00:00:00Z`).getTime()) / 86400000) : 0;
+      const status = days > 0 ? `⚠️ ${days}d overdue` : `due ${dueStr}`;
+      lines.push(`  • ${inv.Customer || "Unknown"} #${inv.DocNumber || inv.Id}: ${compactCurrency(numberValue(inv.Balance), 2)} (${status})`);
     }
-  } else {
-    arLines.push("*Accounts Receivable:* $0 outstanding");
+  }
+  lines.push("");
+
+  // 📋 Accounts Payable (detail)
+  const bills = Array.isArray((billsData || {}).bills)
+    ? ((billsData || {}).bills as Array<Record<string, unknown>>).filter((b) => numberValue(b.Balance) > 0)
+    : [];
+  const apTotal = bills.reduce((sum, b) => sum + numberValue(b.Balance), 0);
+  lines.push(`*📋 Accounts Payable* — ${compactCurrency(apTotal, 2)} (${compactCountLabel(bills.length, "bill")})`);
+  if (bills.length > 0) {
+    for (const bill of bills.slice(0, 8)) {
+      const dueStr = String(bill.DueDate || bill.Date || "").slice(0, 10);
+      const days = dueStr ? Math.floor((Date.now() - new Date(`${dueStr}T00:00:00Z`).getTime()) / 86400000) : 0;
+      const status = days > 0 ? `⚠️ ${days}d overdue` : `due ${dueStr}`;
+      lines.push(`  • ${bill.Vendor || "Unknown"}: ${compactCurrency(numberValue(bill.Balance), 2)} (${status})`);
+    }
+  }
+  lines.push("");
+
+  // 📦 Wholesale POs
+  const openList = Array.isArray(openPOs) ? openPOs : [];
+  if (openList.length > 0) {
+    const totalRev = openList.reduce((sum, po) => sum + Number(po.total || po.subtotal || 0), 0);
+    lines.push(`*📦 Wholesale Pipeline* — ${openList.length} open, ${compactCurrency(totalRev, 0)} committed`);
+    for (const po of openList.slice(0, 5)) {
+      const status = String(po.status || "open").replace(/_/g, " ");
+      const isAwaitingInventory = /invoice_draft|pending|open|confirmed/i.test(status);
+      const contextStatus = isAwaitingInventory ? "awaiting inventory" : status;
+      lines.push(`  • ${po.customer_name || "Unknown"} #${po.po_number || "?"}: ${po.units || "?"} units, ${compactCurrency(Number(po.total || 0), 2)} (${contextStatus})`);
+    }
+    lines.push("");
   }
 
-  // AP detail for Rene
-  const apLines: string[] = [];
-  const apTotal = vendorPay.overdueAmount + vendorPay.dueSoonAmount;
-  if (apTotal > 0) {
-    const parts: string[] = [];
-    if (vendorPay.overdueCount > 0) parts.push(`${compactCurrency(vendorPay.overdueAmount, 2)} overdue (${vendorPay.overdueCount})`);
-    if (vendorPay.dueSoonCount > 0) parts.push(`${compactCurrency(vendorPay.dueSoonAmount, 2)} due ≤5 days (${vendorPay.dueSoonCount})`);
-    apLines.push(`*Accounts Payable:* ${parts.join(" | ")}`);
-  } else {
-    apLines.push("*Accounts Payable:* nothing due");
+  // QBO Health
+  if (qboHealth) {
+    lines.push(`*🔧 QBO Health* — ${qboHealth.pct}% categorized, ${qboHealth.uncategorized} transactions need review`);
   }
 
-  return [
-    `Good morning <@${RENE_SLACK_USER_ID}>`,
-    revenueLine,
-    cashLine,
-    qboLine,
-    poLine,
-    "",
-    ...arLines,
-    ...apLines,
-    "",
-    `Reply "review", "transactions", or "help".`,
-  ].join("\n").slice(0, 800);
+  return lines.join("\n").slice(0, 1800);
 }
 
 function thresholdForDays(days: number): "healthy" | "info" | "warning" | "critical" {
@@ -1189,17 +1250,27 @@ async function getVendorPaymentBrief(): Promise<{
 
 export async function sendMorningBrief(): Promise<void> {
   const today = pacificDateLabel();
-  const holdEnabled = await readState<boolean>(MORNING_BRIEF_HOLD_KEY, true).catch(() => true);
+  const ptHour = parseInt(new Date().toLocaleTimeString("en-US", { timeZone: "America/Los_Angeles", hour: "numeric", hour12: false }), 10);
+  const isEvening = ptHour >= 17;
+  const period = isEvening ? "evening" : "morning";
+
+  // Dedup: allow one morning send + one evening send per day
+  const benSentKey = isEvening ? BEN_EVENING_SENT_KEY : BEN_BRIEF_SENT_KEY;
+  const reneSentKey = isEvening ? RENE_EVENING_SENT_KEY : RENE_BRIEF_SENT_KEY;
+  const benSent = await readState<{ date?: string } | null>(benSentKey, null).catch(() => null);
+  const reneSent = await readState<{ date?: string } | null>(reneSentKey, null).catch(() => null);
+  const botToken = process.env.SLACK_BOT_TOKEN;
+
+  // For morning briefs, respect hold logic. Evening briefs always send immediately.
+  const holdEnabled = isEvening ? false : await readState<boolean>(MORNING_BRIEF_HOLD_KEY, true).catch(() => true);
   const benLastSeen = await readState<{ ts?: string } | null>(BEN_LAST_SEEN_KEY, null).catch(() => null);
   const lastSeenTs = benLastSeen?.ts || null;
   const benSeenRecently = lastSeenTs
     ? Number.isFinite(Date.parse(lastSeenTs)) && Date.now() - Date.parse(lastSeenTs) <= 30 * 60 * 1000
     : false;
   const benSeenToday = isSamePacificDay(lastSeenTs);
-  const benSent = await readState<{ date?: string } | null>(BEN_BRIEF_SENT_KEY, null).catch(() => null);
-  const reneSent = await readState<{ date?: string } | null>(RENE_BRIEF_SENT_KEY, null).catch(() => null);
-  const botToken = process.env.SLACK_BOT_TOKEN;
-  if ((!benSent || benSent.date !== today)) {
+
+  if (!benSent || benSent.date !== today) {
     const brief = await buildCompactBenBrief();
     if (holdEnabled && (!benSeenRecently || !benSeenToday)) {
       await writeState<HeldMorningBrief>(MORNING_BRIEF_HELD_KEY, {
@@ -1207,36 +1278,24 @@ export async function sendMorningBrief(): Promise<void> {
         content: brief,
         held_at: new Date().toISOString(),
       }).catch(() => {});
-      console.log("[morning-brief] Holding Ben brief until Ben pings Abra");
+      console.log(`[${period}-brief] Holding Ben brief until Ben pings`);
     } else if (botToken) {
       try {
-        const dmRes = await fetch("https://slack.com/api/conversations.open", {
+        // Post to #abra-control instead of DM for company-wide visibility
+        const channelId = "C0ALS6W7VB4"; // #abra-control
+        await fetch("https://slack.com/api/chat.postMessage", {
           method: "POST",
           headers: { Authorization: `Bearer ${botToken}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ users: BEN_SLACK_USER_ID }),
-          signal: AbortSignal.timeout(5000),
+          body: JSON.stringify({
+            channel: channelId,
+            text: brief,
+            mrkdwn: true,
+            unfurl_links: false,
+          }),
+          signal: AbortSignal.timeout(10000),
         });
-        const dmData = (await dmRes.json()) as { ok: boolean; channel?: { id: string } };
-        if (dmData.ok && dmData.channel?.id) {
-          await fetch("https://slack.com/api/chat.postMessage", {
-            method: "POST",
-            headers: { Authorization: `Bearer ${botToken}`, "Content-Type": "application/json" },
-            body: JSON.stringify({
-              channel: dmData.channel.id,
-              text: brief,
-              mrkdwn: true,
-            }),
-            signal: AbortSignal.timeout(10000),
-          });
-          await writeState(BEN_BRIEF_SENT_KEY, { date: today }).catch(() => {});
-          console.log("[morning-brief] DM sent to Ben");
-        } else {
-          await writeState<HeldMorningBrief>(MORNING_BRIEF_HELD_KEY, {
-            date: today,
-            content: brief,
-            held_at: new Date().toISOString(),
-          }).catch(() => {});
-        }
+        await writeState(benSentKey, { date: today }).catch(() => {});
+        console.log(`[${period}-brief] Posted to #abra-control`);
       } catch {
         await writeState<HeldMorningBrief>(MORNING_BRIEF_HELD_KEY, {
           date: today,
@@ -1250,9 +1309,9 @@ export async function sendMorningBrief(): Promise<void> {
   if (!reneSent || reneSent.date !== today) {
     try {
       await sendReneMorningDM();
-      await writeState(RENE_BRIEF_SENT_KEY, { date: today }).catch(() => {});
+      await writeState(reneSentKey, { date: today }).catch(() => {});
     } catch (err) {
-      console.warn("[morning-brief] Rene DM failed:", err instanceof Error ? err.message : err);
+      console.warn(`[${period}-brief] Rene brief failed:`, err instanceof Error ? err.message : err);
     }
   }
 }
