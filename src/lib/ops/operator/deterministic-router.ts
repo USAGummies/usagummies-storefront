@@ -100,6 +100,10 @@ export function routeMessage(message: string, _actor: string, context: RouteCont
   if (/\b(emails?|inbox|what (?:emails?|mail)|check (?:my |our )?(?:email|inbox|mail)|actionable (?:emails?|mail))\b/i.test(msg)) {
     return buildAction("emails", "search_recent_email");
   }
+  // Daily overview / recap / status / what's happening
+  if (/\b(overview|recap|summary|status update|what'?s? (?:been )?(?:done|happened|going on)|where (?:do we|are we) stand|daily (?:brief|update|report)|bring me up to speed|catch me up|what (?:do we|should we|need to) (?:do|execute|pay|focus))\b/i.test(msg)) {
+    return buildAction("overview", "daily_overview");
+  }
 
   if (looksLikeMeetingCorrection(msg, conversation)) {
     return buildAction("meeting_correction", "acknowledge_meeting_correction", {

@@ -787,6 +787,99 @@ export async function executeRoutedAction(
         } satisfies RenderedResult;
         break;
       }
+      case "daily_overview": {
+        // Comprehensive daily overview — pull all live data sources in parallel
+        const [balanceData, pnlData, invoiceData, purchaseData, poData, emailData] = await Promise.all([
+          fetchInternalJson("/api/ops/plaid/balance").catch(() => null),
+          fetchInternalJson("/api/ops/qbo/query?type=pnl").catch(() => null),
+          fetchInternalJson("/api/ops/qbo/query?type=invoices").catch(() => null),
+          fetchInternalJson("/api/ops/qbo/query?type=purchases&limit=10").catch(() => null),
+          fetchInternalJson("/api/ops/qbo/query?type=bills").catch(() => null),
+          fetchInternalJson("/api/ops/qbo/query?type=vendors").catch(() => null),
+        ]);
+
+        const lines: string[] = [];
+        const today = new Date().toLocaleDateString("en-US", { timeZone: "America/Los_Angeles", weekday: "long", month: "short", day: "numeric" });
+        lines.push(`*Company Overview — ${today}*`);
+        lines.push("");
+
+        // Cash Position
+        const accounts = Array.isArray((balanceData as Record<string, unknown>)?.accounts)
+          ? ((balanceData as Record<string, unknown>).accounts as Array<Record<string, unknown>>)
+          : [];
+        if (accounts.length > 0) {
+          const boaAcct = accounts.find((a) => /bank of america|bofa|business/i.test(String(a.name || "")));
+          const bal = boaAcct
+            ? (boaAcct.balances as Record<string, unknown>)?.current ?? (boaAcct.balances as Record<string, unknown>)?.available ?? 0
+            : 0;
+          lines.push(`*💰 Cash Position*`);
+          lines.push(`• Bank of America: ${compactCurrency(Number(bal))}`);
+        } else {
+          lines.push(`*💰 Cash Position:* unavailable`);
+        }
+        lines.push("");
+
+        // Invoices (AR)
+        const allInv = Array.isArray((invoiceData as Record<string, unknown>)?.invoices)
+          ? ((invoiceData as Record<string, unknown>).invoices as Array<Record<string, unknown>>)
+          : [];
+        const sentInv = allInv.filter((inv) => String(inv.Status || "") === "outstanding");
+        const draftInv = allInv.filter((inv) => String(inv.Status || "") === "draft");
+        const arTotal = sentInv.reduce((s, inv) => s + Number(inv.Balance || 0), 0);
+        const draftTotal = draftInv.reduce((s, inv) => s + Number(inv.Balance || 0), 0);
+        lines.push(`*📄 Invoices*`);
+        if (sentInv.length > 0) {
+          lines.push(`• AR (sent): ${compactCurrency(arTotal)} — ${sentInv.length} outstanding`);
+        }
+        if (draftInv.length > 0) {
+          lines.push(`• Drafts (not sent): ${compactCurrency(draftTotal)} — ${draftInv.length} awaiting send`);
+          for (const inv of draftInv) {
+            lines.push(`  - ${inv.Customer || "Unknown"} #${inv.DocNumber || inv.Id}: ${compactCurrency(Number(inv.Balance || 0))}`);
+          }
+        }
+        if (sentInv.length === 0 && draftInv.length === 0) {
+          lines.push(`• No invoices in QBO`);
+        }
+        lines.push("");
+
+        // Bills (AP)
+        const allBills = Array.isArray((purchaseData as Record<string, unknown>)?.bills)
+          ? ((purchaseData as Record<string, unknown>).bills as Array<Record<string, unknown>>)
+          : [];
+        const openBills = allBills.filter((b) => Number(b.Balance || 0) > 0);
+        if (openBills.length > 0) {
+          const apTotal = openBills.reduce((s, b) => s + Number(b.Balance || 0), 0);
+          lines.push(`*📋 Accounts Payable:* ${compactCurrency(apTotal)} across ${openBills.length} open bills`);
+        } else {
+          lines.push(`*📋 Accounts Payable:* nothing due`);
+        }
+        lines.push("");
+
+        // Production status — hardcoded current state since this is operational context
+        lines.push(`*📦 Production*`);
+        lines.push(`• Powers Confections: ~50K unit run. Film arrived today. Gummies in transit.`);
+        lines.push(`• Status: awaiting all materials at Powers to schedule production date`);
+        lines.push(`• Greg Kroetch offered to split into two 25K runs if needed for cash flow`);
+        lines.push("");
+
+        // What needs to happen
+        lines.push(`*✅ Action Items*`);
+        lines.push(`• Confirm production split (25K now / 25K in 30-45 days) or full 50K with Powers`);
+        lines.push(`• Follow up on Operation Souvenir Shelf applications (Buc-ee's, Event Network, Paradies Lagardère, AAFES, Airport Retail Group)`);
+        lines.push(`• Send Glacier PO #140812 invoice once inventory available`);
+        if (draftInv.length > 0) {
+          lines.push(`• ${draftInv.length} draft invoice(s) in QBO need to be reviewed and sent`);
+        }
+        lines.push("");
+
+        // Payments due
+        lines.push(`*💳 Payments Due*`);
+        lines.push(`• Powers: $50,000 for full run (or $25,000 for first half) — due when production starts`);
+        lines.push(`• Monthly subscriptions (Shopify $105, Slack, RangeMe $175, etc.) — on credit card`);
+
+        action.result = { reply: lines.join("\n") } satisfies RenderedResult;
+        break;
+      }
       case "query_qbo_invoices": {
         const data = await fetchInternalJson("/api/ops/qbo/query?type=invoices");
         const invoices = Array.isArray(data?.invoices) ? (data.invoices as Array<Record<string, unknown>>) : [];
