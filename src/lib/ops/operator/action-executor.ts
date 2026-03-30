@@ -855,27 +855,23 @@ export async function executeRoutedAction(
         }
         lines.push("");
 
-        // Production status — hardcoded current state since this is operational context
-        lines.push(`*📦 Production*`);
-        lines.push(`• Powers Confections: ~50K unit run. Film arrived today. Gummies in transit.`);
-        lines.push(`• Status: awaiting all materials at Powers to schedule production date`);
-        lines.push(`• Greg Kroetch offered to split into two 25K runs if needed for cash flow`);
-        lines.push("");
-
-        // What needs to happen
-        lines.push(`*✅ Action Items*`);
-        lines.push(`• Confirm production split (25K now / 25K in 30-45 days) or full 50K with Powers`);
-        lines.push(`• Follow up on Operation Souvenir Shelf applications (Buc-ee's, Event Network, Paradies Lagardère, AAFES, Airport Retail Group)`);
-        lines.push(`• Send Glacier PO #140812 invoice once inventory available`);
+        // Action items based on data
         if (draftInv.length > 0) {
+          lines.push(`*✅ Needs Attention*`);
           lines.push(`• ${draftInv.length} draft invoice(s) in QBO need to be reviewed and sent`);
+          lines.push("");
         }
-        lines.push("");
 
-        // Payments due
-        lines.push(`*💳 Payments Due*`);
-        lines.push(`• Powers: $50,000 for full run (or $25,000 for first half) — due when production starts`);
-        lines.push(`• Monthly subscriptions (Shopify $105, Slack, RangeMe $175, etc.) — on credit card`);
+        // Payments due — only from QBO bills (verified data)
+        if (openBills.length > 0) {
+          const apTotal = openBills.reduce((s, b) => s + Number(b.Balance || 0), 0);
+          lines.push(`*💳 Payments Due*`);
+          for (const bill of openBills.slice(0, 5)) {
+            lines.push(`• ${bill.Vendor || "Unknown"}: ${compactCurrency(Number(bill.Balance || 0))}`);
+          }
+        } else {
+          lines.push(`*💳 Payments Due:* No bills entered in QBO yet. Check email for any outstanding vendor invoices.`);
+        }
 
         action.result = { reply: lines.join("\n") } satisfies RenderedResult;
         break;
