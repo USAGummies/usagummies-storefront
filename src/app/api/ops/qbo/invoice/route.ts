@@ -19,6 +19,8 @@ const RequestSchema = z.object({
   dueDate: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   memo: z.string().trim().max(1000).optional(),
   sendEmail: z.boolean().optional().default(false),
+  itemId: z.string().trim().optional(),
+  itemName: z.string().trim().optional(),
 });
 
 type QBOCustomer = {
@@ -168,7 +170,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Failed to resolve or create QBO customer" }, { status: 500 });
   }
 
-  const item = await resolveInvoiceItem(realmId, accessToken);
+  // Use specified item if provided, otherwise fall back to resolving
+  const item = parsed.data.itemId
+    ? { Id: parsed.data.itemId, Name: parsed.data.itemName || "Product" }
+    : await resolveInvoiceItem(realmId, accessToken);
   if (!item?.Id) {
     return NextResponse.json({ error: "No QBO invoice item available for line items" }, { status: 500 });
   }
