@@ -997,13 +997,15 @@ async function buildPowersMeetingBenBrief(): Promise<MeetingTodayBrief> {
 }
 
 export async function buildCompactBenBrief(): Promise<string> {
-  const [dayRevenue, monthRevenue, cashBalance, qboHealth, awaiting, openPo] = await Promise.all([
+  const [dayRevenue, monthRevenue, cashBalance, qboHealth, awaiting, openPo, vendorPay, arData] = await Promise.all([
     getRevenueSnapshot("day").catch(() => null),
     getCalendarMonthRevenue().catch(() => null),
     getLiveCashBalance().catch(() => null),
     getLiveQboHealth().catch(() => null),
     detectAwaitingReplies({ sentCount: 30, lookbackHours: 72 }).catch(() => []),
     getPurchaseOrderSummary().catch(() => null),
+    getVendorPaymentBrief().catch(() => ({ dueSoonCount: 0, dueSoonAmount: 0, overdueCount: 0, overdueAmount: 0 })),
+    fetchInternalOpsJson("/api/ops/qbo/query?type=invoices").catch(() => null),
   ]);
 
   const revenueLine = dayRevenue && monthRevenue
@@ -1020,40 +1022,98 @@ export async function buildCompactBenBrief(): Promise<string> {
     : "Open POs unavailable";
   const emailLine = `Emails: ${Array.isArray(awaiting) ? awaiting.length : 0} need response`;
 
+  // AR: outstanding invoices
+  const invoices = Array.isArray((arData || {}).invoices)
+    ? ((arData || {}).invoices as Array<Record<string, unknown>>).filter((inv) => String(inv.Status || "").toLowerCase() !== "paid")
+    : [];
+  const arTotal = invoices.reduce((sum, inv) => sum + numberValue(inv.Balance), 0);
+  const arLine = arTotal > 0
+    ? `AR: ${compactCurrency(arTotal, 2)} outstanding (${compactCountLabel(invoices.length, "invoice")})`
+    : "AR: $0 outstanding";
+
+  // AP: vendor bills
+  const apParts: string[] = [];
+  if (vendorPay.overdueCount > 0) apParts.push(`${compactCurrency(vendorPay.overdueAmount, 0)} overdue`);
+  if (vendorPay.dueSoonCount > 0) apParts.push(`${compactCurrency(vendorPay.dueSoonAmount, 0)} due ≤5 days`);
+  const apLine = apParts.length > 0
+    ? `AP: ${apParts.join(", ")}`
+    : "AP: nothing due";
+
   return [
     `Good morning <@${BEN_SLACK_USER_ID}>`,
     `${revenueLine} | ${cashLine}`,
     `${qboLine} | ${poLine}`,
+    `${arLine} | ${apLine}`,
     emailLine,
-    `Reply "emails", "pos", or "help".`,
-  ].join("\n").slice(0, 500);
+    `Reply "emails", "pos", "review", or "help".`,
+  ].join("\n").slice(0, 600);
 }
 
 export async function buildCompactReneBrief(): Promise<string> {
-  const [dayRevenue, monthRevenue, qboHealth, openPo] = await Promise.all([
+  const [dayRevenue, monthRevenue, cashBalance, qboHealth, openPo, vendorPay, arData] = await Promise.all([
     getRevenueSnapshot("day").catch(() => null),
     getCalendarMonthRevenue().catch(() => null),
+    getLiveCashBalance().catch(() => null),
     getLiveQboHealth().catch(() => null),
     getPurchaseOrderSummary().catch(() => null),
+    getVendorPaymentBrief().catch(() => ({ dueSoonCount: 0, dueSoonAmount: 0, overdueCount: 0, overdueAmount: 0 })),
+    fetchInternalOpsJson("/api/ops/qbo/query?type=invoices").catch(() => null),
   ]);
 
   const revenueLine = dayRevenue && monthRevenue
     ? `Revenue: yesterday ${compactCurrency(dayRevenue.total_revenue, 2)} | MTD ${compactCurrency(monthRevenue.total_revenue, 0)}`
     : "Revenue data unavailable";
+  const cashLine = cashBalance !== null
+    ? `Cash (BoA): ${compactCurrency(cashBalance, 0)}`
+    : "Cash data unavailable";
   const qboLine = qboHealth
-    ? `QBO: ${qboHealth.pct}% categorized | ${qboHealth.uncategorized} review`
+    ? `QBO: ${qboHealth.pct}% categorized | ${qboHealth.uncategorized} to review`
     : "QBO unavailable";
   const poLine = openPo
     ? `Open POs: ${openPo.openCount} orders, ${compactCurrency(openPo.committedRevenue, 0)}`
     : "Open POs unavailable";
 
+  // AR detail for Rene
+  const invoices = Array.isArray((arData || {}).invoices)
+    ? ((arData || {}).invoices as Array<Record<string, unknown>>).filter((inv) => String(inv.Status || "").toLowerCase() !== "paid")
+    : [];
+  const arTotal = invoices.reduce((sum, inv) => sum + numberValue(inv.Balance), 0);
+  const arLines: string[] = [];
+  if (invoices.length > 0) {
+    arLines.push(`*Accounts Receivable:* ${compactCurrency(arTotal, 2)} (${compactCountLabel(invoices.length, "invoice")})`);
+    for (const inv of invoices.slice(0, 5)) {
+      const days = inv.DueDate ? Math.floor((Date.now() - new Date(String(inv.DueDate)).getTime()) / 86400000) : 0;
+      const status = days > 0 ? `⚠️ ${days}d overdue` : `due ${String(inv.DueDate || "").slice(0, 10)}`;
+      arLines.push(`  • ${inv.Customer || "Unknown"} #${inv.DocNumber || inv.Id} — ${compactCurrency(numberValue(inv.Balance), 2)} (${status})`);
+    }
+  } else {
+    arLines.push("*Accounts Receivable:* $0 outstanding");
+  }
+
+  // AP detail for Rene
+  const apLines: string[] = [];
+  const apTotal = vendorPay.overdueAmount + vendorPay.dueSoonAmount;
+  if (apTotal > 0) {
+    const parts: string[] = [];
+    if (vendorPay.overdueCount > 0) parts.push(`${compactCurrency(vendorPay.overdueAmount, 2)} overdue (${vendorPay.overdueCount})`);
+    if (vendorPay.dueSoonCount > 0) parts.push(`${compactCurrency(vendorPay.dueSoonAmount, 2)} due ≤5 days (${vendorPay.dueSoonCount})`);
+    apLines.push(`*Accounts Payable:* ${parts.join(" | ")}`);
+  } else {
+    apLines.push("*Accounts Payable:* nothing due");
+  }
+
   return [
     `Good morning <@${RENE_SLACK_USER_ID}>`,
     revenueLine,
+    cashLine,
     qboLine,
     poLine,
+    "",
+    ...arLines,
+    ...apLines,
+    "",
     `Reply "review", "transactions", or "help".`,
-  ].join("\n").slice(0, 500);
+  ].join("\n").slice(0, 800);
 }
 
 function thresholdForDays(days: number): "healthy" | "info" | "warning" | "critical" {
