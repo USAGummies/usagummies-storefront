@@ -22,8 +22,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 55;
 
-const legacyAutonomousAbraDisabled =
-  (process.env.ABRA_LEGACY_AUTONOMOUS_DISABLED || "1").trim() !== "0";
+// Self-monitor disabled — spams #abra-control with "Readiness Suite detected
+// failures" alerts that are noise and undermine trust.
+const legacyAutonomousAbraDisabled = true;
 
 type CheckResult = {
   name: string;

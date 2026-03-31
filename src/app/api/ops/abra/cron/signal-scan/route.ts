@@ -13,8 +13,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
-const legacyAutonomousAbraDisabled =
-  (process.env.ABRA_LEGACY_AUTONOMOUS_DISABLED || "1").trim() !== "0";
+// Signal scan disabled — reads from stale Supabase KPI data and posts
+// contradictory alerts (e.g., "+400% revenue spike" while dashboard shows $0).
+const legacyAutonomousAbraDisabled = true;
 
 async function handler(req: Request) {
   if (!isCronAuthorized(req)) {

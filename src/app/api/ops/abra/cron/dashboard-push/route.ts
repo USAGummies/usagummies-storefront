@@ -14,8 +14,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 45;
 
-const legacyAutonomousAbraDisabled =
-  (process.env.ABRA_LEGACY_AUTONOMOUS_DISABLED || "1").trim() !== "0";
+// Dashboard push disabled — it reads from stale KPI timeseries in Supabase
+// and posts contradictory data to #abra-control (e.g., "$0 revenue" when
+// real sales exist). All dashboard data should come from live QBO/Plaid/Shopify.
+const legacyAutonomousAbraDisabled = true;
 
 function getSupabaseEnv() {
   const baseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
