@@ -934,26 +934,83 @@ export async function POST(req: Request) {
         return;
       }
 
-      // If the router didn’t catch this message, respond with what we CAN do
-      // rather than falling through to the unreliable LLM chat route.
-      // Complex questions should be asked in Claude Code where full capabilities exist.
-      const fallbackLines = [
-        "I can help with these right now:",
-        "• *cash* / *balance* — Bank of America live balance",
-        "• *invoices* — QBO invoices (drafts vs sent)",
-        "• *pnl* / *p&l* — Profit & Loss report",
-        "• *vendors* — QBO vendor list",
-        "• *transactions* — recent purchases/expenses",
-        "• *pos* / *orders* — open wholesale pipeline",
-        "• *emails* — recent actionable emails",
-        "• *overview* / *recap* — full company status",
-        "• *review* — uncategorized transactions needing attention",
-        "",
-        "For complex questions, analysis, or anything else — ask in Claude Code where I have full capabilities.",
-      ];
-      await postSlackMessage(channel, fallbackLines.join("\n"), {
-        threadTs: rootThreadTs,
-      });
+      // Direct Claude API call — no brain entries, no action parsing, just clean LLM
+      // with verified live data context. This replaces the broken chat route fallback.
+      try {
+        const anthropicKey = process.env.ANTHROPIC_API_KEY;
+        if (!anthropicKey) throw new Error("No ANTHROPIC_API_KEY");
+
+        // Gather live data in parallel — only verified sources
+        const cronSecret = (process.env.CRON_SECRET || "").trim();
+        const internalBase = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXTAUTH_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://www.usagummies.com");
+        const authH = cronSecret ? { Authorization: `Bearer ${cronSecret}`, "Content-Type": "application/json" } : { "Content-Type": "application/json" };
+        const fetchLive = async (path: string) => {
+          try {
+            const r = await fetch(`${internalBase}${path}`, { headers: authH, signal: AbortSignal.timeout(8000), cache: "no-store" });
+            return r.ok ? await r.json() : null;
+          } catch { return null; }
+        };
+
+        const [balData, invData, pnlData, billData] = await Promise.all([
+          fetchLive("/api/ops/plaid/balance"),
+          fetchLive("/api/ops/qbo/query?type=invoices"),
+          fetchLive("/api/ops/qbo/query?type=pnl"),
+          fetchLive("/api/ops/qbo/query?type=bills"),
+        ]);
+
+        // Build minimal verified context
+        const contextParts: string[] = [];
+        if (balData?.accounts) {
+          const accts = balData.accounts as Array<Record<string, unknown>>;
+          for (const a of accts) {
+            const b = a.balances as Record<string, unknown> | undefined;
+            contextParts.push(`Bank: ${a.name} — $${b?.current ?? b?.available ?? 0} [source: Plaid live]`);
+          }
+        }
+        if (invData?.invoices) {
+          const invs = invData.invoices as Array<Record<string, unknown>>;
+          const drafts = invs.filter((i: Record<string, unknown>) => i.Status === "draft");
+          const sent = invs.filter((i: Record<string, unknown>) => i.Status === "outstanding");
+          if (sent.length) contextParts.push(`AR (sent invoices): ${sent.map((i: Record<string, unknown>) => `${i.Customer} #${i.DocNumber} $${i.Balance}`).join(", ")} [source: QBO]`);
+          if (drafts.length) contextParts.push(`Draft invoices (NOT AR): ${drafts.map((i: Record<string, unknown>) => `${i.Customer} #${i.DocNumber} $${i.Balance}`).join(", ")} [source: QBO]`);
+        }
+        if (pnlData?.summary) contextParts.push(`P&L MTD: ${JSON.stringify(pnlData.summary)} [source: QBO]`);
+
+        const liveContext = contextParts.length > 0 ? `\n\nLIVE VERIFIED DATA:\n${contextParts.join("\n")}` : "";
+        const historyMsgs = history.slice(-6).map((h) => ({ role: h.role as "user" | "assistant", content: h.content }));
+
+        const systemPrompt = `You are the AI operations officer for USA Gummies — a dye-free gummy candy company. You are an operator, not an advisor. Keep answers SHORT (2-3 sentences for simple questions). Every dollar figure needs a source citation [source: QBO] or [source: Plaid]. If you don’t have data, say "I don’t have that data" — never fabricate. Primary bank is Bank of America. Draft invoices are NOT accounts receivable — only sent invoices count as AR. Today is ${new Date().toLocaleDateString("en-US", { timeZone: "America/Los_Angeles" })}.${liveContext}`;
+
+        const res = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-api-key": anthropicKey, "anthropic-version": "2023-06-01" },
+          body: JSON.stringify({
+            model: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6",
+            max_tokens: 1500,
+            temperature: 0.2,
+            system: systemPrompt,
+            messages: [...historyMsgs, { role: "user", content: normalizedMessage }],
+          }),
+          signal: AbortSignal.timeout(25000),
+        });
+
+        if (!res.ok) throw new Error(`Claude API ${res.status}`);
+        const data = (await res.json()) as { content: Array<{ type: string; text?: string }> };
+        const reply = data.content?.filter((b) => b.type === "text").map((b) => b.text || "").join("\n").trim();
+
+        if (reply) {
+          await postSlackMessage(channel, reply, { threadTs: rootThreadTs });
+          return;
+        }
+      } catch (err) {
+        console.error("[ops/slack/events] direct Claude fallback failed:", err instanceof Error ? err.message : err);
+      }
+
+      await postSlackMessage(
+        channel,
+        "I hit an error on this one. Try asking a more specific question, or ask in Claude Code for full capabilities.",
+        { threadTs: rootThreadTs },
+      );
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Unknown Slack events processing error";
