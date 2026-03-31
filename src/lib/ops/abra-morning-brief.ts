@@ -1024,7 +1024,7 @@ export async function buildCompactBenBrief(): Promise<string> {
   const cashStr = cashBalance !== null ? compactCurrency(cashBalance, 2) : "unavailable";
   lines.push(`• Bank of America (primary): ${cashStr}`);
   if (dayRevenue && monthRevenue) {
-    lines.push(`• Revenue: yesterday ${compactCurrency(dayRevenue.total_revenue, 2)} | MTD ${compactCurrency(monthRevenue.total_revenue, 0)}`);
+    lines.push(`• Revenue: yesterday ${compactCurrency(dayRevenue.total_revenue, 2)} (Amazon ${compactCurrency(dayRevenue.amazon_revenue, 2)} / Shopify ${compactCurrency(dayRevenue.shopify_revenue, 2)}) | MTD ${compactCurrency(monthRevenue.total_revenue, 0)} (Amazon ${compactCurrency(monthRevenue.amazon_revenue, 0)} / Shopify ${compactCurrency(monthRevenue.shopify_revenue, 0)})`);
   }
 
   // AR: only SENT invoices are real AR — drafts are not yet receivable
@@ -1123,7 +1123,7 @@ export async function buildCompactReneBrief(): Promise<string> {
   lines.push("*💰 Cash & Revenue*");
   lines.push(`• Bank of America (primary): ${cashBalance !== null ? compactCurrency(cashBalance, 2) : "unavailable"}`);
   if (dayRevenue && monthRevenue) {
-    lines.push(`• Revenue: yesterday ${compactCurrency(dayRevenue.total_revenue, 2)} | MTD ${compactCurrency(monthRevenue.total_revenue, 0)}`);
+    lines.push(`• Revenue: yesterday ${compactCurrency(dayRevenue.total_revenue, 2)} (Amazon ${compactCurrency(dayRevenue.amazon_revenue, 2)} / Shopify ${compactCurrency(dayRevenue.shopify_revenue, 2)}) | MTD ${compactCurrency(monthRevenue.total_revenue, 0)} (Amazon ${compactCurrency(monthRevenue.amazon_revenue, 0)} / Shopify ${compactCurrency(monthRevenue.shopify_revenue, 0)})`);
   }
   lines.push("");
 
