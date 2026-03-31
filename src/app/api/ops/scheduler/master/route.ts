@@ -22,8 +22,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 30; // Scheduler itself is lightweight
 
-const legacyAutonomousAbraDisabled =
-  (process.env.ABRA_LEGACY_AUTONOMOUS_DISABLED || "1").trim() !== "0";
+// ALL autonomous scheduling killed. No sweeps, no agents, no QStash dispatch.
+// Interactive Slack responses and morning/evening briefs remain functional
+// via their dedicated routes only when explicitly triggered.
+const legacyAutonomousAbraDisabled = true;
 
 // ---------------------------------------------------------------------------
 // QStash client (lazy init)

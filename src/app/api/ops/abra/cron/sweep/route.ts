@@ -16,8 +16,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 55;
 
-const legacyAutonomousAbraDisabled =
-  (process.env.ABRA_LEGACY_AUTONOMOUS_DISABLED || "1").trim() !== "0";
+// ALL sweeps killed. No autonomous posting to Slack channels.
+const legacyAutonomousAbraDisabled = true;
 
 type SweepResult = {
   name: string;
