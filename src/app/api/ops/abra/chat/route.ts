@@ -616,17 +616,30 @@ MARGIN & COST CLAIM VERIFICATION (applies when user asserts financial metrics):
 
 // ─── POST Handler ───
 
-export async function POST(req: Request) {
-  const authorized = await isAuthorized(req);
+export async function POST(_req: Request) {
+  // ABRA CHAT ROUTE DISABLED — Claude Code operates directly via Slack MCP.
+  // This route existed for the legacy Abra agent system which has been retired.
+  // The Slack events webhook now calls Claude API directly for fallback responses.
+  // All QBO operations go through Claude Code with user present.
+  return NextResponse.json({
+    reply: "Abra's chat system has been upgraded. Ask me directly in Slack or use Claude Code.",
+    confidence: "high",
+  });
+
+  // Original code preserved below for reference — do not execute.
+  const _disabled = true;
+  if (_disabled) return NextResponse.json({ reply: "disabled" });
+
+  const authorized = await isAuthorized(_req);
   if (!authorized) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   // Rate limit public callers, but never throttle authorized internal automation.
-  const hasBearerAuth = Boolean(req.headers.get("authorization")?.trim());
+  const hasBearerAuth = Boolean(_req.headers.get("authorization")?.trim());
   if (!hasBearerAuth) {
     const { checkRateLimit } = await import("@/lib/ops/rate-limit");
-    const rl = await checkRateLimit(req, "strict");
+    const rl = await checkRateLimit(_req, "strict");
     if (rl.limited) return rl.response!;
   }
 
