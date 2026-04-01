@@ -847,20 +847,10 @@ export async function POST(req: Request) {
       ]);
       const rootThreadTs = thread_ts || ts;
 
-      if (channel === FINANCIALS_CHANNEL_ID && text?.trim() && looksLikeFinancialImportConfirmation(text)) {
-        const planKey = buildFinancialPlanKey(channel, rootThreadTs);
-        const plans = await readFinancialImportPlans();
-        const pendingPlan = plans[planKey];
-        if (pendingPlan) {
-          const importReply = await importFinancialPlan(pendingPlan);
-          delete plans[planKey];
-          await writeFinancialImportPlans(plans);
-          await postSlackMessage(channel, importReply, {
-            threadTs: rootThreadTs,
-          });
-          return;
-        }
-      }
+      // QBO WRITE OPERATIONS DISABLED FROM SLACK
+      // The Slack bot is READ-ONLY. It can look at data and answer questions.
+      // It CANNOT create invoices, accounts, transactions, or modify QBO in any way.
+      // All QBO writes must be done through Claude Code directly with Ben present.
 
       // If files are attached, download and extract their content
       let fileContext = "";
@@ -876,18 +866,9 @@ export async function POST(req: Request) {
         uploadedFiles = images.filter((value): value is { name: string; mimeType: string; buffer: Buffer } => Boolean(value));
       }
 
-      if (channel === FINANCIALS_CHANNEL_ID && hasFiles) {
-        const financialPlan = await maybeBuildFinancialImportPlan(files || [], channel, rootThreadTs);
-        if (financialPlan) {
-          const plans = await readFinancialImportPlans();
-          plans[buildFinancialPlanKey(channel, rootThreadTs)] = financialPlan;
-          await writeFinancialImportPlans(plans);
-          await postSlackMessage(channel, buildFinancialImportPreview(financialPlan), {
-            threadTs: rootThreadTs,
-          });
-          return;
-        }
-      }
+      // FILE-TO-QBO IMPORT DISABLED FROM SLACK
+      // File uploads are still extracted for context (so the bot can read/discuss them)
+      // but NO automatic QBO imports. All QBO writes through Claude Code only.
 
       // Build the message text — include file context if present
       const explicitText = text?.trim() || "";
@@ -914,28 +895,10 @@ export async function POST(req: Request) {
       }
 
       const normalizedMessage = stripAbraMention(messageText || "(file attachment — see attached files above)");
-      const routed = routeMessage(normalizedMessage, user, {
-        history,
-      });
 
-      if (routed) {
-        const executed = await executeRoutedAction(routed, {
-          actor: displayName,
-          slackChannelId: channel,
-          slackThreadTs: rootThreadTs,
-          slackUserId: user,
-          history,
-        });
-        const rendered = renderRoutedActionResponse(executed);
-        await postSlackMessage(channel, rendered.reply, {
-          threadTs: rootThreadTs,
-          blocks: rendered.blocks,
-        });
-        return;
-      }
-
-      // Direct Claude API call — no brain entries, no action parsing, just clean LLM
-      // with verified live data context. This replaces the broken chat route fallback.
+      // SINGLE PATH: Direct Claude API call with read-only live data.
+      // No deterministic router. No action executor. No QBO writes.
+      // Claude answers questions using verified data. That's it.
       try {
         const anthropicKey = process.env.ANTHROPIC_API_KEY;
         if (!anthropicKey) throw new Error("No ANTHROPIC_API_KEY");
@@ -979,7 +942,20 @@ export async function POST(req: Request) {
         const liveContext = contextParts.length > 0 ? `\n\nLIVE VERIFIED DATA:\n${contextParts.join("\n")}` : "";
         const historyMsgs = history.slice(-6).map((h) => ({ role: h.role as "user" | "assistant", content: h.content }));
 
-        const systemPrompt = `You are the AI operations officer for USA Gummies — a dye-free gummy candy company. You are an operator, not an advisor. Keep answers SHORT (2-3 sentences for simple questions). Every dollar figure needs a source citation [source: QBO] or [source: Plaid]. If you don’t have data, say "I don’t have that data" — never fabricate. Primary bank is Bank of America. Draft invoices are NOT accounts receivable — only sent invoices count as AR. Today is ${new Date().toLocaleDateString("en-US", { timeZone: "America/Los_Angeles" })}.${liveContext}`;
+        const systemPrompt = `You are Claude, the AI operations officer for USA Gummies — a dye-free gummy candy company. You answer questions using verified data. You are READ-ONLY in this context — you CANNOT create, modify, or delete anything in QuickBooks, Notion, or any other system. You can only READ data and ANSWER questions.
+
+RULES:
+- Keep answers SHORT (2-3 sentences for simple questions).
+- Every dollar figure needs a source citation [source: QBO] or [source: Plaid].
+- If you don’t have data, say "I don’t have that data" — never fabricate.
+- Primary bank is Bank of America.
+- Draft invoices are NOT accounts receivable — only sent invoices count as AR.
+- NEVER say you will create an invoice, record a transaction, or modify any system. You cannot. Say "That needs to be done in Claude Code directly."
+- NEVER emit action blocks, JSON commands, or XML directives. You are a conversational responder only.
+- Today is ${new Date().toLocaleDateString("en-US", { timeZone: "America/Los_Angeles" })}.
+
+The team: Ben Stutman (CEO, WA/Pacific — wants executive summaries), Drew Slater (Ops, PA/Eastern), Rene Gonzalez (Finance, TX/Central — wants accounting detail).
+${liveContext}`;
 
         const res = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
