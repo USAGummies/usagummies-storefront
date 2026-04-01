@@ -793,14 +793,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ challenge: body.challenge || "" });
   }
 
-  // WEBHOOK DISABLED — Claude Code operates directly via Slack MCP tools.
-  // The webhook only handles url_verification (required by Slack) and returns
-  // 200 OK for everything else without processing.
-  // All Slack interaction is handled by the slack-monitor scheduled task
-  // which polls channels and responds via MCP.
-  return NextResponse.json({ ok: true });
-
-  // Dead code below — preserved for reference only
   const event = body.event;
   const supportedEvent =
     body.type === "event_callback" &&
