@@ -626,10 +626,10 @@ export async function POST(_req: Request) {
     confidence: "high",
   });
 
-  // Original code preserved below for reference — do not execute.
-  const _disabled = true;
-  if (_disabled) return NextResponse.json({ reply: "disabled" });
+}
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function _DISABLED_POST_HANDLER(_req: Request) {
   const authorized = await isAuthorized(_req);
   if (!authorized) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
