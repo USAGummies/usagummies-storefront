@@ -11,6 +11,7 @@ import {
   getBalances,
   getTransactions,
 } from "@/lib/finance/plaid";
+import { isCronAuthorized } from "@/lib/ops/abra-auth";
 import { readState, writeState } from "@/lib/ops/state";
 import type { CacheEnvelope } from "@/lib/amazon/types";
 import type { PlaidAccount, PlaidTransaction } from "@/lib/finance/types";
@@ -26,7 +27,10 @@ type PlaidBalanceCache = {
   lastUpdated: string;
 };
 
-export async function GET() {
+export async function GET(req: Request) {
+  if (!isCronAuthorized(req)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   if (!isPlaidConfigured()) {
     return NextResponse.json({ connected: false, error: "Plaid not configured" });
   }

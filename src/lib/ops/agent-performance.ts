@@ -354,7 +354,7 @@ export async function isAgentDisabled(
 function resolveAgentName(engineId: string, agentKey: string): string {
   for (const engine of ENGINE_REGISTRY) {
     if (engine.id === engineId) {
-      const agent = engine.agents.find((a) => a.key === agentKey);
+      const agent = engine.agents.find((a: any) => a.key === agentKey);
       if (agent) return agent.name;
     }
   }

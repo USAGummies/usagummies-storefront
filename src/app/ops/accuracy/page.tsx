@@ -148,7 +148,7 @@ export default async function AccuracyPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {report.byDepartment.map((row) => {
+                    {report.byDepartment.map((row: any) => {
                       const rate = (row.correction_rate || 0) * 100;
                       return (
                         <tr key={row.department} className="border-b border-slate-100 last:border-0">
