@@ -645,7 +645,7 @@ async function _DISABLED_POST_HANDLER(_req: Request) {
 
   const session = await auth();
   const actorEmail = session?.user?.email || "cron@system";
-  const url = new URL(req.url);
+  const url = new URL(_req.url);
   const mode = (url.searchParams.get("mode") || "").toLowerCase();
   const healthMode = mode === "health" || mode === "quick";
 
@@ -669,10 +669,10 @@ async function _DISABLED_POST_HANDLER(_req: Request) {
     fileName: string;
   } | null = null;
 
-  const contentType = req.headers.get("content-type") || "";
+  const contentType = _req.headers.get("content-type") || "";
   if (contentType.includes("multipart/form-data")) {
     try {
-      const formData = await req.formData();
+      const formData = await _req.formData();
       payload = {
         message: formData.get("message") as string | null,
         history: (() => { try { return JSON.parse(formData.get("history") as string || "[]"); } catch { return []; } })(),
@@ -717,7 +717,7 @@ async function _DISABLED_POST_HANDLER(_req: Request) {
     }
   } else {
     try {
-      payload = await req.json();
+      payload = await _req.json();
     } catch {
       return NextResponse.json(
         { error: "Invalid JSON payload" },
@@ -1535,7 +1535,7 @@ async function _DISABLED_POST_HANDLER(_req: Request) {
         (process.env.VERCEL_URL
           ? `https://${process.env.VERCEL_URL}`
           : "http://localhost:3000");
-      const cookie = req.headers.get("cookie") || "";
+      const cookie = _req.headers.get("cookie") || "";
 
       const strategy = await buildCrossDepartmentStrategy({
         objective: intent.objective,
@@ -1634,7 +1634,7 @@ async function _DISABLED_POST_HANDLER(_req: Request) {
         (process.env.VERCEL_URL
           ? `https://${process.env.VERCEL_URL}`
           : "http://localhost:3000");
-      const cookie = req.headers.get("cookie") || "";
+      const cookie = _req.headers.get("cookie") || "";
 
       try {
         const patchRes = await fetch(`${host}/api/ops/abra/initiative`, {
@@ -1778,7 +1778,7 @@ async function _DISABLED_POST_HANDLER(_req: Request) {
         (process.env.VERCEL_URL
           ? `https://${process.env.VERCEL_URL}`
           : "http://localhost:3000");
-      const cookie = req.headers.get("cookie") || "";
+      const cookie = _req.headers.get("cookie") || "";
 
       try {
         const initRes = await fetch(`${host}/api/ops/abra/initiative`, {
@@ -1844,7 +1844,7 @@ async function _DISABLED_POST_HANDLER(_req: Request) {
         (process.env.VERCEL_URL
           ? `https://${process.env.VERCEL_URL}`
           : "http://localhost:3000");
-      const cookie = req.headers.get("cookie") || "";
+      const cookie = _req.headers.get("cookie") || "";
 
       try {
         const sessRes = await fetch(`${host}/api/ops/abra/session`, {
