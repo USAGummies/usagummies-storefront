@@ -9,6 +9,6 @@ export async function POST(req: Request) {
     if (body?.type === "url_verification") {
       return NextResponse.json({ challenge: body.challenge || "" });
     }
-  } catch {}
+  } catch { /* ignore */ }
   return NextResponse.json({ ok: true });
 }
