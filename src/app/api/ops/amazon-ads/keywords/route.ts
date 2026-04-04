@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isCronAuthorized } from "@/lib/ops/abra-auth";
+import { isAuthorized } from "@/lib/ops/abra-auth";
 import { listKeywords } from "@/lib/amazon/ads-client";
 
 export const runtime = "nodejs";
@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 /** GET /api/ops/amazon-ads/keywords — list keyword/target performance */
 export async function GET(req: Request) {
-  if (!isCronAuthorized(req)) {
+  if (!(await isAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isCronAuthorized } from "@/lib/ops/abra-auth";
+import { isAuthorized } from "@/lib/ops/abra-auth";
 import { listCampaigns, updateCampaignBudget } from "@/lib/amazon/ads-client";
 
 export const runtime = "nodejs";
@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 /** GET /api/ops/amazon-ads/campaigns — list all SP campaigns */
 export async function GET(req: Request) {
-  if (!isCronAuthorized(req)) {
+  if (!(await isAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -21,7 +21,7 @@ export async function GET(req: Request) {
 
 /** PUT /api/ops/amazon-ads/campaigns — update campaign budget */
 export async function PUT(req: Request) {
-  if (!isCronAuthorized(req)) {
+  if (!(await isAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

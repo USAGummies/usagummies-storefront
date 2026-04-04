@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isCronAuthorized } from "@/lib/ops/abra-auth";
+import { isAuthorized } from "@/lib/ops/abra-auth";
 import { updateBid } from "@/lib/amazon/ads-client";
 
 export const runtime = "nodejs";
@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 /** POST /api/ops/amazon-ads/bid — adjust a keyword bid */
 export async function POST(req: Request) {
-  if (!isCronAuthorized(req)) {
+  if (!(await isAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
