@@ -651,3 +651,113 @@ export async function createQBOCustomer(
     body: JSON.stringify(customer),
   });
 }
+
+// ---------------------------------------------------------------------------
+// WRITE: Deposit (bank deposit)
+// ---------------------------------------------------------------------------
+
+export type QBODepositInput = {
+  DepositToAccountRef: { value: string };
+  TxnDate?: string;
+  PrivateNote?: string;
+  Line: Array<{
+    Amount: number;
+    DetailType: "DepositLineDetail";
+    DepositLineDetail: {
+      AccountRef: { value: string };
+      Entity?: { value: string; type?: string };
+    };
+    Description?: string;
+  }>;
+};
+
+export async function createQBODeposit(
+  deposit: QBODepositInput,
+): Promise<QBOEntity | null> {
+  return qboFetch<QBOEntity>("/deposit", {
+    method: "POST",
+    body: JSON.stringify(deposit),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// WRITE: Purchase (expense / check / credit card charge)
+// ---------------------------------------------------------------------------
+
+export type QBOPurchaseInput = {
+  AccountRef: { value: string };
+  PaymentType: "Cash" | "Check" | "CreditCard";
+  TxnDate?: string;
+  DocNumber?: string;
+  PrivateNote?: string;
+  EntityRef?: { value: string; type?: string };
+  Line: Array<{
+    Amount: number;
+    DetailType: "AccountBasedExpenseLineDetail";
+    AccountBasedExpenseLineDetail: {
+      AccountRef: { value: string };
+    };
+    Description?: string;
+  }>;
+};
+
+export async function createQBOPurchase(
+  purchase: QBOPurchaseInput,
+): Promise<QBOEntity | null> {
+  return qboFetch<QBOEntity>("/purchase", {
+    method: "POST",
+    body: JSON.stringify(purchase),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// WRITE: Transfer (bank-to-bank transfer)
+// ---------------------------------------------------------------------------
+
+export type QBOTransferInput = {
+  FromAccountRef: { value: string };
+  ToAccountRef: { value: string };
+  Amount: number;
+  TxnDate?: string;
+  PrivateNote?: string;
+};
+
+export async function createQBOTransfer(
+  transfer: QBOTransferInput,
+): Promise<QBOEntity | null> {
+  return qboFetch<QBOEntity>("/transfer", {
+    method: "POST",
+    body: JSON.stringify(transfer),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// WRITE: Bill Payment
+// ---------------------------------------------------------------------------
+
+export type QBOBillPaymentInput = {
+  VendorRef: { value: string };
+  TotalAmt: number;
+  PayType: "Check" | "CreditCard";
+  CheckPayment?: {
+    BankAccountRef: { value: string };
+  };
+  CreditCardPayment?: {
+    CCAccountRef: { value: string };
+  };
+  Line: Array<{
+    Amount: number;
+    LinkedTxn: Array<{ TxnId: string; TxnType: "Bill" }>;
+  }>;
+  TxnDate?: string;
+  PrivateNote?: string;
+};
+
+export async function createQBOBillPayment(
+  payment: QBOBillPaymentInput,
+): Promise<QBOEntity | null> {
+  return qboFetch<QBOEntity>("/billpayment", {
+    method: "POST",
+    body: JSON.stringify(payment),
+  });
+}
