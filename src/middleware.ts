@@ -31,6 +31,7 @@ const SELF_AUTHENTICATED_PREFIXES = [
   "/api/ops/plaid/", // Plaid endpoints — balance used by Abra crons, webhook verified by item_id
   "/api/ops/gmail-callback", // One-time OAuth callback for Gmail setup
   "/api/ops/qbo/", // QBO OAuth flow + setup (authorize, callback, setup)
+  "/api/ops/amazon-ads/", // Amazon Advertising API — uses isAuthorized() (CRON_SECRET)
   "/api/ops/puzzle/", // Puzzle OAuth flow
   "/api/ops/sweeps/", // Sweep runners — auth via CRON_SECRET or QStash signature
   "/api/ops/workflows/", // Workflow engine — auth handled in route
