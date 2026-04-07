@@ -761,3 +761,29 @@ export async function createQBOBillPayment(
     body: JSON.stringify(payment),
   });
 }
+
+// ---------------------------------------------------------------------------
+// WRITE: Receive Payment (customer payment against invoices)
+// ---------------------------------------------------------------------------
+
+export type QBOPaymentInput = {
+  TotalAmt: number;
+  CustomerRef: { value: string; name?: string };
+  DepositToAccountRef?: { value: string };
+  PaymentMethodRef?: { value: string };
+  TxnDate?: string;
+  PrivateNote?: string;
+  Line?: {
+    Amount: number;
+    LinkedTxn: { TxnId: string; TxnType: "Invoice" }[];
+  }[];
+};
+
+export async function createQBOPayment(
+  payment: QBOPaymentInput,
+): Promise<QBOEntity | null> {
+  return qboFetch<QBOEntity>("/payment", {
+    method: "POST",
+    body: JSON.stringify(payment),
+  });
+}
