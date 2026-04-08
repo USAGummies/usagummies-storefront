@@ -44,6 +44,8 @@ const SELF_AUTHENTICATED_PREFIXES = [
   "/api/ops/inventory/", // INVENTORY — Batch register, unit costs, on-hand (isAuthorized)
   "/api/ops/orders/", // ORDER DESK — Order log, fulfillment, samples (isAuthorized)
   "/api/ops/docs/", // DOCS — Document extraction, transcription, receipts (isAuthorized)
+  "/api/ops/pipeline/", // PIPELINE — Sales CRM, follow-ups, lead scoring (isAuthorized)
+  "/api/ops/amazon/", // AMAZON — FBA inventory, restock, PPC, listing health (isAuthorized)
 ];
 
 function isSelfAuthenticated(pathname: string): boolean {

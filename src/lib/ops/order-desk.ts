@@ -337,9 +337,10 @@ export async function checkMargin(input: {
 
     const active = batches.filter((b) => b.status !== "depleted");
     if (active.length > 0) {
+      // Use pre-calculated cost_per_unit (weighted average across active batches)
       const totalUnits = active.reduce((sum, b) => sum + b.unit_count, 0);
-      const totalCost = active.reduce((sum, b) => sum + b.landed_cost, 0);
-      unitCost = totalUnits > 0 ? totalCost / totalUnits : 0;
+      const weightedCost = active.reduce((sum, b) => sum + (b.cost_per_unit * b.unit_count), 0);
+      unitCost = totalUnits > 0 ? weightedCost / totalUnits : 0;
     } else {
       warnings.push("No active batches in INVENTORY — using $0 unit cost");
     }
@@ -432,8 +433,8 @@ export async function getChannelHealth(): Promise<ChannelHealth[]> {
     const active = batches.filter((b) => b.status !== "depleted");
     if (active.length > 0) {
       const totalUnits = active.reduce((sum, b) => sum + b.unit_count, 0);
-      const totalCost = active.reduce((sum, b) => sum + b.landed_cost, 0);
-      unitCost = totalUnits > 0 ? totalCost / totalUnits : 0;
+      const weightedCost = active.reduce((sum, b) => sum + (b.cost_per_unit * b.unit_count), 0);
+      unitCost = totalUnits > 0 ? weightedCost / totalUnits : 0;
     }
   } catch { /* ignore */ }
 
