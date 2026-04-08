@@ -159,24 +159,20 @@ async function notionRowExists(
   databaseId: string,
   uniqueKey: string,
 ): Promise<boolean> {
-  try {
-    const results = await notionQueryDatabase(databaseId, {
-      property: "unique_key",
-      rich_text: { equals: uniqueKey },
-    });
-    return results.length > 0;
-  } catch {
-    // If the property doesn't exist, try title filter
+  // Try common title property names for dedup
+  for (const prop of ["unique_key", "Name", "Week"]) {
     try {
+      const filterType = prop === "unique_key" ? "rich_text" : "title";
       const results = await notionQueryDatabase(databaseId, {
-        property: "Name",
-        title: { equals: uniqueKey },
+        property: prop,
+        [filterType]: { equals: uniqueKey },
       });
-      return results.length > 0;
+      if (results.length > 0) return true;
     } catch {
-      return false;
+      // Property doesn't exist in this DB — try next
     }
   }
+  return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -398,20 +394,15 @@ export async function syncQBOToNotion(): Promise<SyncResult> {
     }
 
     await notionCreatePage(dbId, {
-      Name: { title: [{ text: { content: weekKey } }] },
-      "Week Of": { date: { start: weekStart.toISOString().split("T")[0] } },
-      Revenue: { number: totalRevenue },
-      Expenses: { number: totalExpenses },
-      "Net Income": { number: netIncome },
-      "Cash Position": { number: cashPosition },
-      "P&L Summary": {
-        rich_text: [{ text: { content: pnlSummary.slice(0, 2000) } }],
-      },
-      "Balance Sheet Summary": {
-        rich_text: [{ text: { content: bsSummary.slice(0, 2000) } }],
-      },
-      "Synced At": {
-        rich_text: [{ text: { content: new Date().toISOString() } }],
+      Week: { title: [{ text: { content: weekKey } }] },
+      "Week Start": { date: { start: weekStart.toISOString().split("T")[0] } },
+      "Revenue ($)": { number: totalRevenue },
+      "Operating Expenses ($)": { number: totalExpenses },
+      "Net Income ($)": { number: netIncome },
+      "Cash Balance ($)": { number: cashPosition },
+      Source: { select: { name: "QBO" } },
+      Notes: {
+        rich_text: [{ text: { content: `${pnlSummary} | ${bsSummary}`.slice(0, 2000) } }],
       },
     });
 
