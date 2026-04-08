@@ -36,6 +36,10 @@ const SELF_AUTHENTICATED_PREFIXES = [
   "/api/ops/sweeps/", // Sweep runners — auth via CRON_SECRET or QStash signature
   "/api/ops/workflows/", // Workflow engine — auth handled in route
   "/api/ops/approvals", // Approvals — GET uses hasApprovalsReadAccess (session + CRON_SECRET), POST requires session
+  "/api/ops/forge/", // FORGE — Production & Supply Chain tracking (isAuthorized)
+  "/api/ops/archive/", // ARCHIVE — Data backup & Notion sync (isAuthorized)
+  "/api/ops/freight/", // FREIGHT — Shipping & Logistics tracking (isAuthorized)
+  "/api/ops/pulse/", // PULSE — Fleet health monitoring (isAuthorized)
 ];
 
 function isSelfAuthenticated(pathname: string): boolean {
