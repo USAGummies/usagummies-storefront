@@ -254,6 +254,13 @@ export async function upsertProspect(
   return prospect;
 }
 
+export async function deleteProspect(id: string): Promise<{ deleted: boolean }> {
+  const existing = await getProspectById(id);
+  if (!existing) return { deleted: false };
+  await kv.hdel(KV_PROSPECTS_HASH, id);
+  return { deleted: true };
+}
+
 // ---------------------------------------------------------------------------
 // Contact Dedup Check (OUTREACH DEDUP)
 // ---------------------------------------------------------------------------
@@ -417,7 +424,7 @@ export async function handleReplyDetected(input: {
   from_name?: string;
   subject: string;
   snippet?: string;
-  date: string; // ISO datetime
+  date: string; // ISO datetime or RFC 2822 (e.g. "Wed, 08 Apr 2026 18:58:22 +0000")
   gmail_message_id?: string;
 }): Promise<{
   matched: boolean;
@@ -425,6 +432,15 @@ export async function handleReplyDetected(input: {
   touch?: TouchRecord;
   action_taken?: string;
 }> {
+  // Normalize date — handle RFC 2822 ("Wed, 08 Apr 2026 ...") and ISO
+  let normalizedDate = input.date;
+  try {
+    const parsed = new Date(input.date);
+    if (!isNaN(parsed.getTime())) {
+      normalizedDate = parsed.toISOString();
+    }
+  } catch { /* keep original */ }
+
   const all = await getAllProspects();
   const email = input.from_email.toLowerCase();
 
@@ -451,7 +467,7 @@ export async function handleReplyDetected(input: {
     id: touchId,
     prospect_id: match.id,
     type: "reply_received",
-    date: input.date,
+    date: normalizedDate,
     subject: input.subject,
     summary: input.snippet
       ? `Reply detected by SENTINEL: "${input.snippet.slice(0, 200)}"`

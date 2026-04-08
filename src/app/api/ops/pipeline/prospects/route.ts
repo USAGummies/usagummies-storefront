@@ -5,7 +5,7 @@
 
 import { NextResponse } from "next/server";
 import { isAuthorized } from "@/lib/ops/abra-auth";
-import { listProspects, upsertProspect } from "@/lib/ops/pipeline";
+import { listProspects, upsertProspect, deleteProspect } from "@/lib/ops/pipeline";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,4 +48,30 @@ export async function POST(req: Request) {
       { status: 400 },
     );
   }
+}
+
+export async function DELETE(req: Request) {
+  if (!(await isAuthorized(req))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const url = new URL(req.url);
+  const id = url.searchParams.get("id");
+
+  if (!id) {
+    return NextResponse.json(
+      { error: "Required query param: id" },
+      { status: 400 },
+    );
+  }
+
+  const result = await deleteProspect(id);
+  if (!result.deleted) {
+    return NextResponse.json(
+      { error: `Prospect not found: ${id}` },
+      { status: 404 },
+    );
+  }
+
+  return NextResponse.json({ deleted: true, id });
 }
