@@ -388,6 +388,211 @@ export function generateFleetReport(health: FleetHealth): string {
   return lines.join("\n");
 }
 
+/* ------------------------------------------------------------------ */
+/*  COMMITMENTS TRACKER                                                */
+/* ------------------------------------------------------------------ */
+
+export type CommitmentStatus = "committed" | "in_progress" | "completed" | "missed" | "withdrawn";
+
+export interface Commitment {
+  id: string;
+  owner: string; // who committed (e.g. "Viktor", "Ben")
+  description: string;
+  deadline?: string; // ISO date
+  source_channel?: string;
+  source_thread?: string;
+  status: CommitmentStatus;
+  created_at: string;
+  updated_at: string;
+  completed_at?: string;
+  notes?: string;
+}
+
+const KV_COMMITMENTS = "pulse:commitments";
+
+export async function listCommitments(
+  filters?: { owner?: string; status?: CommitmentStatus }
+): Promise<Commitment[]> {
+  const all = (await kv.get<Commitment[]>(KV_COMMITMENTS)) || [];
+  let filtered = all;
+  if (filters?.owner) {
+    const o = filters.owner.toLowerCase();
+    filtered = filtered.filter((c) => c.owner.toLowerCase().includes(o));
+  }
+  if (filters?.status) {
+    filtered = filtered.filter((c) => c.status === filters.status);
+  }
+  return filtered;
+}
+
+export async function upsertCommitment(
+  input: Omit<Commitment, "created_at" | "updated_at"> & { created_at?: string; updated_at?: string }
+): Promise<Commitment> {
+  const all = (await kv.get<Commitment[]>(KV_COMMITMENTS)) || [];
+  const now = new Date().toISOString();
+  const idx = all.findIndex((c) => c.id === input.id);
+
+  const commitment: Commitment = {
+    ...input,
+    created_at: idx >= 0 ? all[idx].created_at : (input.created_at || now),
+    updated_at: now,
+  };
+
+  if (idx >= 0) {
+    all[idx] = commitment;
+  } else {
+    all.push(commitment);
+  }
+
+  if (all.length > 500) all.splice(0, all.length - 500);
+  await kv.set(KV_COMMITMENTS, all);
+  return commitment;
+}
+
+export async function completeCommitment(id: string): Promise<Commitment | null> {
+  const all = (await kv.get<Commitment[]>(KV_COMMITMENTS)) || [];
+  const idx = all.findIndex((c) => c.id === id);
+  if (idx < 0) return null;
+
+  all[idx].status = "completed";
+  all[idx].completed_at = new Date().toISOString();
+  all[idx].updated_at = new Date().toISOString();
+  await kv.set(KV_COMMITMENTS, all);
+  return all[idx];
+}
+
+/* ------------------------------------------------------------------ */
+/*  ESCALATION ENGINE                                                  */
+/* ------------------------------------------------------------------ */
+
+export type EscalationType =
+  | "stale_question"
+  | "missed_commitment"
+  | "stale_entry"
+  | "stale_specialist"
+  | "missing_coa_route";
+
+export interface Escalation {
+  type: EscalationType;
+  severity: "info" | "warning" | "critical";
+  message: string;
+  target_person?: string; // who should act
+  source_id?: string; // linked record ID
+  age_hours: number;
+}
+
+export async function checkEscalations(): Promise<Escalation[]> {
+  const escalations: Escalation[] = [];
+  const now = Date.now();
+
+  // 1. Check pending questions > 72 hours
+  try {
+    const questions = (await kv.get<Array<{
+      id: string; question: string; asked_to: string; asked_at: string; status: string;
+    }>>("ledger:pending_questions")) || [];
+
+    for (const q of questions) {
+      if (q.status !== "waiting") continue;
+      const ageHrs = (now - new Date(q.asked_at).getTime()) / (1000 * 60 * 60);
+      if (ageHrs > 72) {
+        escalations.push({
+          type: "stale_question",
+          severity: "warning",
+          message: `Pending question for ${q.asked_to}: "${q.question.slice(0, 80)}..." (${Math.round(ageHrs)}h old)`,
+          target_person: q.asked_to,
+          source_id: q.id,
+          age_hours: Math.round(ageHrs),
+        });
+      }
+    }
+  } catch { /* ignore */ }
+
+  // 2. Check missed commitments
+  try {
+    const commitments = (await kv.get<Commitment[]>(KV_COMMITMENTS)) || [];
+    for (const c of commitments) {
+      if (c.status !== "committed" && c.status !== "in_progress") continue;
+
+      if (c.deadline) {
+        const deadlineMs = new Date(c.deadline).getTime();
+        if (now > deadlineMs) {
+          const overHrs = (now - deadlineMs) / (1000 * 60 * 60);
+          escalations.push({
+            type: "missed_commitment",
+            severity: overHrs > 48 ? "critical" : "warning",
+            message: `${c.owner} committed to: "${c.description.slice(0, 80)}..." — deadline missed by ${Math.round(overHrs)}h`,
+            target_person: c.owner,
+            source_id: c.id,
+            age_hours: Math.round(overHrs),
+          });
+        }
+      } else {
+        // No deadline — check if it's been sitting for > 48 hours
+        const ageHrs = (now - new Date(c.created_at).getTime()) / (1000 * 60 * 60);
+        if (ageHrs > 48) {
+          escalations.push({
+            type: "missed_commitment",
+            severity: "info",
+            message: `${c.owner} committed to: "${c.description.slice(0, 80)}..." — ${Math.round(ageHrs)}h ago, no deadline set, status: ${c.status}`,
+            target_person: c.owner,
+            source_id: c.id,
+            age_hours: Math.round(ageHrs),
+          });
+        }
+      }
+    }
+  } catch { /* ignore */ }
+
+  // 3. Check LEDGER entries stuck in pending_review > 48 hours
+  try {
+    const entries = (await kv.get<Array<{
+      id: string; description: string; status: string; created_at: string;
+    }>>("ledger:entries")) || [];
+
+    for (const e of entries) {
+      if (e.status !== "pending_review") continue;
+      const ageHrs = (now - new Date(e.created_at).getTime()) / (1000 * 60 * 60);
+      if (ageHrs > 48) {
+        escalations.push({
+          type: "stale_entry",
+          severity: "warning",
+          message: `LEDGER entry pending review: "${e.description.slice(0, 80)}..." (${Math.round(ageHrs)}h waiting)`,
+          target_person: "Rene",
+          source_id: e.id,
+          age_hours: Math.round(ageHrs),
+        });
+      }
+    }
+  } catch { /* ignore */ }
+
+  // Sort by severity (critical first)
+  const severityOrder: Record<string, number> = { critical: 0, warning: 1, info: 2 };
+  escalations.sort((a, b) => (severityOrder[a.severity] || 2) - (severityOrder[b.severity] || 2));
+
+  return escalations;
+}
+
+export async function generateEscalationReport(escalations: Escalation[]): Promise<string> {
+  if (escalations.length === 0) return "🟢 No escalations — all clear.";
+
+  const icons = { critical: "🔴", warning: "🟡", info: "🔵" };
+  const lines = ["🚨 Escalation Report", ""];
+
+  for (const e of escalations) {
+    lines.push(`${icons[e.severity]} [${e.type}] ${e.message}`);
+  }
+
+  const critical = escalations.filter((e) => e.severity === "critical").length;
+  const warning = escalations.filter((e) => e.severity === "warning").length;
+  lines.push("", `Summary: ${critical} critical, ${warning} warnings, ${escalations.length} total`);
+
+  return lines.join("\n");
+}
+
+/* ------------------------------------------------------------------ */
+/*  Health Snapshot Storage                                            */
+/* ------------------------------------------------------------------ */
+
 export async function storeHealthSnapshot(
   health: FleetHealth,
 ): Promise<void> {

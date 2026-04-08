@@ -279,6 +279,199 @@ export async function reviewEntry(
 }
 
 // ---------------------------------------------------------------------------
+// Format Templates (Rene's preferred output formats)
+// ---------------------------------------------------------------------------
+
+export interface FormatTemplate {
+  id: string;
+  name: string; // e.g. "pnl_format", "freight_breakdown", "order_sheet"
+  description: string;
+  format_spec: string; // the actual format — markdown, JSON structure, etc.
+  created_by: string;
+  reference_url?: string; // link to original screenshot/example
+  created_at: string;
+  updated_at: string;
+}
+
+const KV_TEMPLATES = "ledger:templates";
+
+export async function listTemplates(): Promise<FormatTemplate[]> {
+  return (await kv.get<FormatTemplate[]>(KV_TEMPLATES)) || [];
+}
+
+export async function getTemplate(name: string): Promise<FormatTemplate | null> {
+  const all = (await kv.get<FormatTemplate[]>(KV_TEMPLATES)) || [];
+  return all.find((t) => t.name.toLowerCase() === name.toLowerCase()) || null;
+}
+
+export async function upsertTemplate(
+  input: Omit<FormatTemplate, "created_at" | "updated_at"> & { created_at?: string; updated_at?: string }
+): Promise<FormatTemplate> {
+  const all = (await kv.get<FormatTemplate[]>(KV_TEMPLATES)) || [];
+  const now = new Date().toISOString();
+  const idx = all.findIndex((t) => t.id === input.id || t.name.toLowerCase() === input.name.toLowerCase());
+
+  const template: FormatTemplate = {
+    ...input,
+    created_at: idx >= 0 ? all[idx].created_at : (input.created_at || now),
+    updated_at: now,
+  };
+
+  if (idx >= 0) {
+    all[idx] = template;
+  } else {
+    all.push(template);
+  }
+
+  await kv.set(KV_TEMPLATES, all);
+  return template;
+}
+
+// ---------------------------------------------------------------------------
+// Entry History / Versioning
+// ---------------------------------------------------------------------------
+
+export interface EntryVersion {
+  entry_id: string;
+  version: number;
+  snapshot: LedgerEntry;
+  changed_by: string;
+  change_reason?: string;
+  timestamp: string;
+}
+
+const KV_ENTRY_HISTORY = "ledger:entry_history";
+
+export async function getEntryHistory(entryId: string): Promise<EntryVersion[]> {
+  const all = (await kv.get<EntryVersion[]>(KV_ENTRY_HISTORY)) || [];
+  return all.filter((v) => v.entry_id === entryId).sort((a, b) => a.version - b.version);
+}
+
+export async function recordEntryVersion(
+  entry: LedgerEntry,
+  changed_by: string,
+  change_reason?: string,
+): Promise<EntryVersion> {
+  const all = (await kv.get<EntryVersion[]>(KV_ENTRY_HISTORY)) || [];
+
+  // Find the next version number for this entry
+  const existing = all.filter((v) => v.entry_id === entry.id);
+  const nextVersion = existing.length > 0 ? Math.max(...existing.map((v) => v.version)) + 1 : 1;
+
+  const version: EntryVersion = {
+    entry_id: entry.id,
+    version: nextVersion,
+    snapshot: { ...entry },
+    changed_by,
+    change_reason,
+    timestamp: new Date().toISOString(),
+  };
+
+  all.push(version);
+  if (all.length > 2000) all.splice(0, all.length - 2000);
+  await kv.set(KV_ENTRY_HISTORY, all);
+
+  return version;
+}
+
+// ---------------------------------------------------------------------------
+// Reconciler (QBO vs Bank diff)
+// ---------------------------------------------------------------------------
+
+export interface ReconciliationResult {
+  id: string;
+  date: string;
+  period_start: string;
+  period_end: string;
+  bank_balance?: number;
+  qbo_balance?: number;
+  difference?: number;
+  unmatched_bank: Array<{ date: string; description: string; amount: number }>;
+  unmatched_qbo: Array<{ date: string; description: string; amount: number }>;
+  status: "clean" | "discrepancies_found" | "error";
+  error_message?: string;
+  run_at: string;
+}
+
+const KV_RECONCILIATIONS = "ledger:reconciliations";
+
+export async function runReconciliation(): Promise<ReconciliationResult> {
+  const now = new Date();
+  const id = `recon-${now.toISOString().split("T")[0]}`;
+  const periodEnd = now.toISOString().split("T")[0];
+  const periodStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+
+  const result: ReconciliationResult = {
+    id,
+    date: periodEnd,
+    period_start: periodStart,
+    period_end: periodEnd,
+    unmatched_bank: [],
+    unmatched_qbo: [],
+    status: "clean",
+    run_at: now.toISOString(),
+  };
+
+  const cronSecret = process.env.CRON_SECRET?.trim();
+  if (!cronSecret) {
+    result.status = "error";
+    result.error_message = "CRON_SECRET not configured";
+    return result;
+  }
+
+  const baseUrl = process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : process.env.NEXTAUTH_URL || "http://localhost:3000";
+
+  const headers = {
+    Authorization: `Bearer ${cronSecret}`,
+    "Content-Type": "application/json",
+  };
+
+  try {
+    // Fetch bank balance from Plaid
+    const [bankRes, qboRes] = await Promise.all([
+      fetch(`${baseUrl}/api/ops/plaid/balance`, { headers, signal: AbortSignal.timeout(30000) }),
+      fetch(`${baseUrl}/api/ops/qbo/query?type=pnl&start=${periodStart}&end=${periodEnd}`, {
+        headers, signal: AbortSignal.timeout(30000),
+      }),
+    ]);
+
+    if (bankRes.ok) {
+      const bankData = (await bankRes.json()) as { accounts?: Array<{ current?: number; name?: string }> };
+      const checking = bankData.accounts?.find((a) => a.name?.toLowerCase().includes("checking"));
+      if (checking) result.bank_balance = checking.current;
+    }
+
+    if (qboRes.ok) {
+      const qboData = (await qboRes.json()) as { netIncome?: number; totalRevenue?: number; totalExpenses?: number };
+      result.qbo_balance = qboData.netIncome;
+    }
+
+    if (result.bank_balance !== undefined && result.qbo_balance !== undefined) {
+      result.difference = Math.round((result.bank_balance - result.qbo_balance) * 100) / 100;
+      result.status = Math.abs(result.difference) < 1 ? "clean" : "discrepancies_found";
+    }
+  } catch (err) {
+    result.status = "error";
+    result.error_message = err instanceof Error ? err.message : String(err);
+  }
+
+  // Persist
+  const history = (await kv.get<ReconciliationResult[]>(KV_RECONCILIATIONS)) || [];
+  history.push(result);
+  if (history.length > 90) history.splice(0, history.length - 90);
+  await kv.set(KV_RECONCILIATIONS, history);
+
+  return result;
+}
+
+export async function getReconciliationHistory(limit = 30): Promise<ReconciliationResult[]> {
+  const all = (await kv.get<ReconciliationResult[]>(KV_RECONCILIATIONS)) || [];
+  return all.slice(-limit);
+}
+
+// ---------------------------------------------------------------------------
 // Notion Sync
 // ---------------------------------------------------------------------------
 

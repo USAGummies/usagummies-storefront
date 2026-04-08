@@ -43,6 +43,7 @@ const SELF_AUTHENTICATED_PREFIXES = [
   "/api/ops/ledger/", // LEDGER — Bookkeeping, decisions, COA routing (isAuthorized)
   "/api/ops/inventory/", // INVENTORY — Batch register, unit costs, on-hand (isAuthorized)
   "/api/ops/orders/", // ORDER DESK — Order log, fulfillment, samples (isAuthorized)
+  "/api/ops/docs/", // DOCS — Document extraction, transcription, receipts (isAuthorized)
 ];
 
 function isSelfAuthenticated(pathname: string): boolean {

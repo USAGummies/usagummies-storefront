@@ -290,6 +290,185 @@ export async function getSampleSummary(): Promise<{
 }
 
 // ---------------------------------------------------------------------------
+// Margin Check (Pre-invoice gate)
+// ---------------------------------------------------------------------------
+
+export interface MarginCheckResult {
+  order_ref: string;
+  channel: Channel;
+  customer: string;
+  units: number;
+  unit_price: number;
+  revenue: number;
+  unit_cost: number;
+  total_cogs: number;
+  estimated_freight: number;
+  gross_profit: number;
+  gross_margin_pct: number;
+  flag: "green" | "yellow" | "red";
+  coa_routing?: {
+    revenue_acct: string;
+    cogs_acct: string;
+    freight_acct: string;
+  };
+  warnings: string[];
+  checked_at: string;
+}
+
+export async function checkMargin(input: {
+  order_ref: string;
+  channel: Channel;
+  customer: string;
+  units: number;
+  unit_price: number;
+  ship_to?: string;
+  freight_estimate?: number;
+}): Promise<MarginCheckResult> {
+  const kv = (await import("@vercel/kv")).kv;
+  const warnings: string[] = [];
+  const now = new Date().toISOString();
+
+  // Pull unit cost from INVENTORY
+  let unitCost = 0;
+  try {
+    const batches = (await kv.get<Array<{
+      batch_id: string; cost_per_unit: number; status: string; unit_count: number; landed_cost: number;
+    }>>("inventory:batches")) || [];
+
+    const active = batches.filter((b) => b.status !== "depleted");
+    if (active.length > 0) {
+      const totalUnits = active.reduce((sum, b) => sum + b.unit_count, 0);
+      const totalCost = active.reduce((sum, b) => sum + b.landed_cost, 0);
+      unitCost = totalUnits > 0 ? totalCost / totalUnits : 0;
+    } else {
+      warnings.push("No active batches in INVENTORY — using $0 unit cost");
+    }
+  } catch {
+    warnings.push("Failed to read INVENTORY — unit cost unknown");
+  }
+
+  // Pull COA routing from LEDGER
+  let coaRouting: MarginCheckResult["coa_routing"];
+  try {
+    const routes = (await kv.get<Array<{
+      channel: string; revenue_acct: string; cogs_acct: string; freight_acct: string;
+    }>>("ledger:coa_map")) || [];
+
+    const match = routes.find((r) => r.channel.toLowerCase() === input.channel.toLowerCase());
+    if (match) {
+      coaRouting = {
+        revenue_acct: match.revenue_acct,
+        cogs_acct: match.cogs_acct,
+        freight_acct: match.freight_acct,
+      };
+    } else {
+      warnings.push(`No COA routing found for channel: ${input.channel}`);
+    }
+  } catch {
+    warnings.push("Failed to read LEDGER COA map");
+  }
+
+  const revenue = input.units * input.unit_price;
+  const totalCogs = input.units * unitCost;
+  const freightEstimate = input.freight_estimate || 0;
+  const grossProfit = revenue - totalCogs - freightEstimate;
+  const grossMarginPct = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
+
+  let flag: "green" | "yellow" | "red";
+  if (grossMarginPct >= 30) flag = "green";
+  else if (grossMarginPct >= 15) flag = "yellow";
+  else flag = "red";
+
+  if (flag === "red") warnings.push(`⚠️ Gross margin below 15% — review before invoicing`);
+  if (flag === "yellow") warnings.push(`Margin between 15-30% — acceptable but watch freight costs`);
+  if (!input.freight_estimate) warnings.push("No freight estimate provided — margin may be overstated");
+
+  return {
+    order_ref: input.order_ref,
+    channel: input.channel,
+    customer: input.customer,
+    units: input.units,
+    unit_price: input.unit_price,
+    revenue,
+    unit_cost: Math.round(unitCost * 10000) / 10000,
+    total_cogs: Math.round(totalCogs * 100) / 100,
+    estimated_freight: freightEstimate,
+    gross_profit: Math.round(grossProfit * 100) / 100,
+    gross_margin_pct: Math.round(grossMarginPct * 100) / 100,
+    flag,
+    coa_routing: coaRouting,
+    warnings,
+    checked_at: now,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Channel Intelligence (per-channel health dashboard)
+// ---------------------------------------------------------------------------
+
+export interface ChannelHealth {
+  channel: Channel;
+  total_orders: number;
+  total_units: number;
+  total_revenue: number;
+  avg_order_value: number;
+  avg_units_per_order: number;
+  estimated_cogs: number;
+  estimated_margin_pct: number;
+  first_order_date?: string;
+  last_order_date?: string;
+}
+
+export async function getChannelHealth(): Promise<ChannelHealth[]> {
+  const orders = (await kv.get<Order[]>(KV_ORDERS)) || [];
+
+  // Pull unit cost from INVENTORY for margin estimates
+  let unitCost = 0;
+  try {
+    const batches = (await kv.get<Array<{
+      cost_per_unit: number; status: string; unit_count: number; landed_cost: number;
+    }>>("inventory:batches")) || [];
+
+    const active = batches.filter((b) => b.status !== "depleted");
+    if (active.length > 0) {
+      const totalUnits = active.reduce((sum, b) => sum + b.unit_count, 0);
+      const totalCost = active.reduce((sum, b) => sum + b.landed_cost, 0);
+      unitCost = totalUnits > 0 ? totalCost / totalUnits : 0;
+    }
+  } catch { /* ignore */ }
+
+  const byChannel: Record<string, { orders: Order[] }> = {};
+  for (const o of orders) {
+    if (!byChannel[o.channel]) byChannel[o.channel] = { orders: [] };
+    byChannel[o.channel].orders.push(o);
+  }
+
+  const results: ChannelHealth[] = [];
+  for (const [channel, data] of Object.entries(byChannel)) {
+    const totalRevenue = data.orders.reduce((sum, o) => sum + o.total, 0);
+    const totalUnits = data.orders.reduce((sum, o) => sum + o.units, 0);
+    const estimatedCogs = totalUnits * unitCost;
+    const dates = data.orders.map((o) => o.date).sort();
+
+    results.push({
+      channel: channel as Channel,
+      total_orders: data.orders.length,
+      total_units: totalUnits,
+      total_revenue: Math.round(totalRevenue * 100) / 100,
+      avg_order_value: data.orders.length > 0 ? Math.round((totalRevenue / data.orders.length) * 100) / 100 : 0,
+      avg_units_per_order: data.orders.length > 0 ? Math.round((totalUnits / data.orders.length) * 10) / 10 : 0,
+      estimated_cogs: Math.round(estimatedCogs * 100) / 100,
+      estimated_margin_pct: totalRevenue > 0 ? Math.round(((totalRevenue - estimatedCogs) / totalRevenue) * 10000) / 100 : 0,
+      first_order_date: dates[0],
+      last_order_date: dates[dates.length - 1],
+    });
+  }
+
+  results.sort((a, b) => b.total_revenue - a.total_revenue);
+  return results;
+}
+
+// ---------------------------------------------------------------------------
 // Notion Sync
 // ---------------------------------------------------------------------------
 
