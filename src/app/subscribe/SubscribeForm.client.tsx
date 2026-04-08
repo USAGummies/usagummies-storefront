@@ -148,8 +148,8 @@ export function SubscribeForm() {
                 <div className="flex items-center gap-2">
                   <div className="relative h-10 w-10 flex-shrink-0">
                     <Image
-                      src="/brand/gallery/bag-flag-bears.jpg"
-                      alt=""
+                      src="/brand/americana/bag-dramatic-smoke.jpg"
+                      alt="USA Gummies bag"
                       fill
                       sizes="40px"
                       className="rounded-lg object-cover"

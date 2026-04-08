@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { BlogArchive } from "@/components/blog/BlogArchive";
 import { getAllPosts, paginatePosts, resolveSiteUrl } from "@/lib/blog";
 
-const PAGE_TITLE = "Blog | USA Gummies";
+const PAGE_TITLE = "Blog";
 const PAGE_DESCRIPTION =
   "Dye-free and made in USA candy stories from USA Gummies, with patriotic gummy tips.";
 

@@ -8,7 +8,6 @@ import ReviewsSection from "@/components/home/ReviewsSection";
 import { getBundleVariants } from "@/lib/bundles/getBundleVariants";
 import { BASE_PRICE, FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import { SINGLE_BAG_SKU } from "@/lib/bundles/atomic";
-import { BRAND_STORY_HEADLINE, BRAND_STORY_PARAGRAPHS } from "@/data/brandStory";
 import { DETAIL_BULLETS } from "@/data/productDetails";
 import { getReviewAggregate } from "@/lib/reviews/aggregate";
 import { ProductJsonLd } from "@/components/seo/ProductJsonLd";
@@ -181,36 +180,6 @@ export default async function HomePage() {
       .find((variant: any) => variant?.sku)?.sku ||
     bundleVariants?.singleBagSku ||
     SINGLE_BAG_SKU;
-
-  const whyCards = [
-    {
-      title: "Made in the USA",
-      copy: "Proudly sourced, manufactured, and packed entirely in America.",
-      icon: (
-        <span className="text-lg" aria-hidden="true">
-          🇺🇸
-        </span>
-      ),
-    },
-    {
-      title: "No artificial dyes",
-      copy: "Colored naturally using real fruit and vegetable extracts.",
-      icon: (
-        <span className="text-lg" aria-hidden="true">
-          🌿
-        </span>
-      ),
-    },
-    {
-      title: "Classic gummy bear flavor",
-      copy: "Chewy, fruity flavor without artificial ingredients or harsh aftertaste.",
-      icon: (
-        <span className="text-lg" aria-hidden="true">
-          🍬
-        </span>
-      ),
-    },
-  ];
 
   return (
     <main className="relative overflow-hidden min-h-screen pb-12 lg:pb-0 home-candy text-[var(--text)]">
@@ -395,9 +364,9 @@ export default async function HomePage() {
                   />
                   <span>USA Gummies</span>
                 </div>
-                <h1 className="text-balance text-[32px] font-black leading-[1.05] tracking-tight text-[#1B2A4A] sm:text-4xl lg:text-5xl">
+                <h2 className="text-balance text-[32px] font-black leading-[1.05] tracking-tight text-[#1B2A4A] sm:text-4xl lg:text-5xl">
                   All-American Gummy Bears
-                </h1>
+                </h2>
                 <p className="text-pretty text-[12px] text-[#1B2A4A]/85 sm:text-sm">
                   Classic gummy bears, made in the USA.
                 </p>
@@ -538,8 +507,8 @@ export default async function HomePage() {
           <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:gap-4">
             <div className="relative aspect-[4/5] overflow-hidden rounded-2xl shadow-md">
               <Image
-                src="/brand/gallery/bag-flag-hero.jpg"
-                alt="USA Gummies bag with American flag backdrop and gummy bears"
+                src="/brand/americana/bag-dramatic-smoke.jpg"
+                alt="USA Gummies bag with dramatic lighting"
                 fill
                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 320px"
                 className="object-cover transition duration-500 hover:scale-105"
@@ -556,8 +525,8 @@ export default async function HomePage() {
             </div>
             <div className="relative aspect-[4/5] overflow-hidden rounded-2xl shadow-md">
               <Image
-                src="/brand/gallery/neon-sign.jpg"
-                alt="USA Gummies neon sign on brick wall"
+                src="/brand/americana/washington-crossing.jpg"
+                alt="Washington crossing the Delaware with USA Gummies"
                 fill
                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 320px"
                 className="object-cover transition duration-500 hover:scale-105"
@@ -565,8 +534,8 @@ export default async function HomePage() {
             </div>
             <div className="relative aspect-[4/5] overflow-hidden rounded-2xl shadow-md">
               <Image
-                src="/brand/gallery/bears-lineup-flag.jpg"
-                alt="Five gummy bears in a row with American flag"
+                src="/brand/americana/founding-fathers-fireside.jpg"
+                alt="Founding fathers sharing USA Gummies by the fireplace"
                 fill
                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 320px"
                 className="object-cover transition duration-500 hover:scale-105"
@@ -583,8 +552,8 @@ export default async function HomePage() {
             </div>
             <div className="relative aspect-[4/5] overflow-hidden rounded-2xl shadow-md">
               <Image
-                src="/brand/gallery/bag-flag-bears.jpg"
-                alt="USA Gummies — Real Fruit Colors, Zero Artificial Dyes"
+                src="/brand/americana/declaration-freedom.jpg"
+                alt="Declaration of freedom with USA Gummies"
                 fill
                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 320px"
                 className="object-cover transition duration-500 hover:scale-105"
@@ -872,183 +841,60 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="bg-[var(--surface-strong)]" data-zone="BENEFITS">
-        <div className="mx-auto max-w-6xl px-4 pb-5">
-          <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
-            <div className="flex items-end justify-start">
-              <Image
-                src="/website%20assets/Jeep.png"
-                alt="Vintage Jeep illustration"
-                aria-hidden="true"
-                width={1041}
-                height={701}
-                sizes="(max-width: 640px) 160px, (max-width: 1024px) 220px, 280px"
-                className="brand-touch h-auto w-full max-w-[180px] sm:max-w-[220px] lg:max-w-[280px] object-contain"
-              />
-            </div>
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {whyCards.map((card) => (
-                <div
-                  key={card.title}
-                  className="candy-panel relative overflow-hidden rounded-2xl p-2.5 sm:p-3 transition-transform duration-200 hover:-translate-y-1"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--surface-strong)]">
-                      {card.icon}
-                    </div>
-                    <div className="text-base font-black text-[var(--text)]">{card.title}</div>
-                  </div>
-                  <p className="mt-2 text-sm text-[var(--muted)]">{card.copy}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
 
       <section className="bg-[#f8f5ef]" data-zone="EMAIL">
-        <div className="mx-auto max-w-6xl px-4 py-6 lg:py-8 reveal-up">
-          <div className="grid gap-3 lg:grid-cols-[1.1fr_0.9fr]">
-              <div className="candy-panel americana-panel rounded-[28px] p-3 sm:p-4 shadow-none bg-[var(--surface-strong)] border border-[rgba(15,27,45,0.12)]">
-                <div className="flex flex-wrap items-end justify-between gap-4">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <Image
-                        src="/brand/logo.png"
-                        alt="USA Gummies logo"
-                        aria-hidden="true"
-                        width={64}
-                        height={20}
-                        className="brand-logo-mark"
-                      />
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-                        Follow the fun
-                      </div>
-                    </div>
-                    <h2 className="mt-1 text-2xl font-black text-[var(--text)]">
-                      Follow along with USA Gummies
-                    </h2>
-                    <div className="mt-2 text-sm text-[var(--muted)]">
-                      Behind-the-scenes drops, customer moments, and fresh gummy goodness.
-                    </div>
-                  </div>
-                  <Link
-                    href="https://www.instagram.com/usagummies/"
+        <div className="mx-auto max-w-xl px-4 py-8 lg:py-10 reveal-up">
+          <div className="candy-panel americana-panel relative overflow-hidden rounded-[28px] p-4 sm:p-5 shadow-none bg-[var(--surface-strong)] border border-[rgba(15,27,45,0.12)]">
+            <div className="space-y-3 text-center">
+              <div className="flex items-center justify-center gap-2">
+                <Image
+                  src="/brand/logo.png"
+                  alt="USA Gummies logo"
+                  aria-hidden="true"
+                  width={64}
+                  height={20}
+                  className="brand-logo-mark"
+                />
+                <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+                  Get updates
+                </div>
+              </div>
+              <h2 className="text-xl font-black text-[var(--text)] sm:text-2xl">
+                Unlock early access + member-only drops
+              </h2>
+              <p className="text-sm text-[var(--muted)]">
+                First dibs on limited drops, restocks, and member-only savings alerts.
+              </p>
+              <form className="flex flex-wrap gap-3 items-center rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-1.5">
+                <input
+                  type="email"
+                  name="email"
+                  placeholder="Enter your email"
+                  className="flex-1 min-w-[200px] rounded-full border border-[rgba(15,27,45,0.15)] bg-white px-4 py-3 text-sm text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[rgba(239,59,59,0.35)]"
+                  aria-label="Enter your email for updates"
+                  required
+                />
+                <button type="submit" className="btn btn-outline pressable px-5 py-3 font-semibold w-full sm:w-auto">
+                  Sign me up
+                </button>
+              </form>
+              <div className="text-[11px] text-[var(--muted)]">
+                No spam. Just drops, restocks, and savings alerts.
+              </div>
+              <div className="flex items-center justify-center gap-4 pt-2">
+                {SOCIAL_LINKS.map((social) => (
+                  <a
+                    key={social.name}
+                    href={social.href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="btn btn-outline"
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-[rgba(15,27,45,0.12)] bg-white text-[var(--text)] transition hover:bg-[var(--surface-strong)]"
+                    aria-label={`Follow USA Gummies on ${social.name}`}
                   >
-                    Follow
-                  </Link>
-                </div>
-
-                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-2">
-                  {SOCIAL_LINKS.map((social) => (
-                    <a
-                      key={social.name}
-                      href={social.href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="group flex items-center gap-3 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-3 transition hover:border-[rgba(15,27,45,0.2)] hover:shadow-[0_10px_24px_rgba(15,27,45,0.12)]"
-                      aria-label={`Follow USA Gummies on ${social.name}`}
-                    >
-                      <span className="flex h-9 w-9 items-center justify-center rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] text-[var(--text)]">
-                        {social.icon}
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block text-sm font-semibold text-[var(--text)]">
-                          {social.name}
-                        </span>
-                        <span className="block text-[11px] text-[var(--muted)]">{social.label}</span>
-                      </span>
-                    </a>
-                  ))}
-                </div>
-
-                <div className="mt-3 text-xs text-[var(--muted)]">
-                  Tap any channel to follow and stay in the loop.
-                </div>
+                    {social.icon}
+                  </a>
+                ))}
               </div>
-              <div className="candy-panel americana-panel relative overflow-hidden rounded-[28px] p-3 sm:p-4 shadow-none bg-[var(--surface-strong)] border border-[rgba(15,27,45,0.12)]">
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Image
-                      src="/brand/logo.png"
-                      alt="USA Gummies logo"
-                      aria-hidden="true"
-                      width={64}
-                      height={20}
-                      className="brand-logo-mark"
-                    />
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-                      Get updates
-                    </div>
-                  </div>
-                  <h2 className="text-xl font-black text-[var(--text)] sm:text-2xl">
-                    Unlock early access + member-only drops
-                  </h2>
-                  <p className="text-sm text-[var(--muted)]">
-                    First dibs on limited drops, restocks, and member-only savings alerts.
-                  </p>
-                  <div className="inline-flex items-center gap-2 rounded-full border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] px-3 py-1 text-[11px] font-semibold text-[var(--text)] w-fit">
-                    VIP early access • limited-batch alerts
-                  </div>
-                  <form className="flex flex-wrap gap-3 items-center rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-1.5">
-                    <input
-                      type="email"
-                      name="email"
-                      placeholder="Enter your email"
-                      className="flex-1 min-w-[220px] rounded-full border border-[rgba(15,27,45,0.15)] bg-white px-4 py-3 text-sm text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[rgba(239,59,59,0.35)]"
-                      aria-label="Enter your email for updates"
-                      required
-                    />
-                    <button type="submit" className="btn btn-outline pressable px-5 py-3 font-semibold w-full sm:w-auto">
-                      Sign me up
-                    </button>
-                  </form>
-                  <div className="text-[11px] text-[var(--muted)]">
-                    No spam. Just drops, restocks, and savings alerts.
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-      </section>
-
-      <section className="bg-transparent" data-zone="STORY">
-        <div className="mx-auto max-w-6xl px-4 py-5">
-          <div className="candy-panel americana-panel rounded-[36px] border border-[var(--border)] p-4 sm:p-5">
-            <div className="flex items-center gap-2">
-              <Image
-                src="/brand/logo.png"
-                alt="USA Gummies logo"
-                aria-hidden="true"
-                width={64}
-                height={20}
-                className="brand-logo-mark"
-              />
-              <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-                Our story
-              </div>
-            </div>
-            <h2 className="text-balance mt-2 text-2xl font-black text-[var(--text)] sm:text-3xl">
-              {BRAND_STORY_HEADLINE}
-            </h2>
-            <div className="mt-3 copy-stack copy-stack--rail text-sm text-[var(--muted)] text-pretty">
-              {BRAND_STORY_PARAGRAPHS.map((paragraph) => (
-                <p key={paragraph}>{paragraph}</p>
-              ))}
-            </div>
-            <div className="mt-3 flex flex-wrap gap-3">
-              <Link
-                href="/about"
-                className="text-sm font-semibold text-[var(--muted)] underline underline-offset-4 hover:text-[var(--text)] focus-ring"
-              >
-                Read our story
-              </Link>
-              <Link href="/shop" className="btn btn-candy">
-                Shop now
-              </Link>
             </div>
           </div>
         </div>

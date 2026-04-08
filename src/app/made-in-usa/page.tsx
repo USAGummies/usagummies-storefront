@@ -20,7 +20,7 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "Made in USA Candy | USA Gummies";
+const PAGE_TITLE = "Made in USA Candy";
 const PAGE_DESCRIPTION =
   "Learn how our gummies are crafted in the USA, with dye-free recipes and no artificial dyes for a patriotic candy you can trust.";
 const OG_IMAGE = "/opengraph-image";

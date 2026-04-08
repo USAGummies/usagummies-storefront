@@ -20,7 +20,7 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "Ingredients: No Artificial Dyes | USA Gummies";
+const PAGE_TITLE = "Ingredients: No Artificial Dyes";
 const PAGE_DESCRIPTION =
   "See what's inside our dye-free gummies and made in USA candy, plus the flavors and ingredients we avoid.";
 const ARTICLE_HEADLINE = "Ingredients and nutrition facts for USA Gummies";
