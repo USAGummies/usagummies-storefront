@@ -160,7 +160,7 @@ async function notionRowExists(
   uniqueKey: string,
 ): Promise<boolean> {
   // Try common title property names for dedup
-  for (const prop of ["unique_key", "Name", "Week"]) {
+  for (const prop of ["unique_key", "Name", "Order Number", "Week"]) {
     try {
       const filterType = prop === "unique_key" ? "rich_text" : "title";
       const results = await notionQueryDatabase(databaseId, {
@@ -237,7 +237,7 @@ export async function syncShopifyToNotion(): Promise<SyncResult> {
     let skipped = 0;
 
     for (const order of data.orders || []) {
-      const uniqueKey = `shopify-${order.id}`;
+      const uniqueKey = order.name; // e.g. "#1042"
       const exists = await notionRowExists(dbId, uniqueKey);
 
       if (exists) {
@@ -254,9 +254,8 @@ export async function syncShopifyToNotion(): Promise<SyncResult> {
         .join(", ");
 
       await notionCreatePage(dbId, {
-        Name: { title: [{ text: { content: uniqueKey } }] },
-        "Order Number": { rich_text: [{ text: { content: order.name } }] },
-        Date: { date: { start: order.created_at.split("T")[0] } },
+        "Order Number": { title: [{ text: { content: order.name } }] },
+        "Order Date": { date: { start: order.created_at.split("T")[0] } },
         Total: { number: parseFloat(order.total_price) },
         "Financial Status": {
           select: { name: order.financial_status || "unknown" },
@@ -264,8 +263,8 @@ export async function syncShopifyToNotion(): Promise<SyncResult> {
         "Fulfillment Status": {
           select: { name: order.fulfillment_status || "unfulfilled" },
         },
-        Customer: { rich_text: [{ text: { content: customerName } }] },
-        Items: {
+        "Customer Name": { rich_text: [{ text: { content: customerName } }] },
+        "Line Items": {
           rich_text: [{ text: { content: lineItemSummary.slice(0, 2000) } }],
         },
       });
@@ -396,10 +395,10 @@ export async function syncQBOToNotion(): Promise<SyncResult> {
     await notionCreatePage(dbId, {
       Week: { title: [{ text: { content: weekKey } }] },
       "Week Start": { date: { start: weekStart.toISOString().split("T")[0] } },
-      "Revenue ($)": { number: totalRevenue },
-      "Operating Expenses ($)": { number: totalExpenses },
-      "Net Income ($)": { number: netIncome },
-      "Cash Balance ($)": { number: cashPosition },
+      Revenue: { number: totalRevenue },
+      "Operating Expenses": { number: totalExpenses },
+      "Net Income": { number: netIncome },
+      "Cash Balance": { number: cashPosition },
       Source: { select: { name: "QBO" } },
       Notes: {
         rich_text: [{ text: { content: `${pnlSummary} | ${bsSummary}`.slice(0, 2000) } }],
