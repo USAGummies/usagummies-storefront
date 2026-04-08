@@ -58,9 +58,11 @@ export type SyncHealthReport = {
 
 const NOTION_VERSION = "2022-06-28";
 
-// Hard-coded Notion DB IDs from Viktor
-const NOTION_DB_FINANCE_WEEKLY = "e450a386-95d7-4da0-97c7-bf503e0cbbaa";
-const NOTION_DB_SALES_ACTIVITY = "e561190e-e045-428f-9644-1bd244eb686c";
+// Notion DB IDs — from env vars or Viktor-provided defaults
+const NOTION_DB_FINANCE_WEEKLY =
+  process.env.NOTION_DB_QBO_FINANCIAL || "e450a386-95d7-4da0-97c7-bf503e0cbbaa";
+const NOTION_DB_SALES_ACTIVITY =
+  process.env.NOTION_DB_SALES_ACTIVITY || "e561190e-e045-428f-9644-1bd244eb686c";
 
 // Optional DB IDs — skip sync if not configured
 function getNotionDbId(source: SyncSource): string | null {
@@ -257,17 +259,17 @@ export async function syncShopifyToNotion(): Promise<SyncResult> {
 
       await notionCreatePage(dbId, {
         Name: { title: [{ text: { content: uniqueKey } }] },
-        order_number: { rich_text: [{ text: { content: order.name } }] },
-        date: { date: { start: order.created_at.split("T")[0] } },
-        total: { number: parseFloat(order.total_price) },
-        status: {
+        "Order Number": { rich_text: [{ text: { content: order.name } }] },
+        Date: { date: { start: order.created_at.split("T")[0] } },
+        Total: { number: parseFloat(order.total_price) },
+        "Financial Status": {
           select: { name: order.financial_status || "unknown" },
         },
-        fulfillment: {
+        "Fulfillment Status": {
           select: { name: order.fulfillment_status || "unfulfilled" },
         },
-        customer: { rich_text: [{ text: { content: customerName } }] },
-        items: {
+        Customer: { rich_text: [{ text: { content: customerName } }] },
+        Items: {
           rich_text: [{ text: { content: lineItemSummary.slice(0, 2000) } }],
         },
       });
@@ -300,7 +302,18 @@ export async function syncShopifyToNotion(): Promise<SyncResult> {
 
 export async function syncQBOToNotion(): Promise<SyncResult> {
   const ts = new Date().toISOString();
-  const dbId = NOTION_DB_FINANCE_WEEKLY;
+  const dbId = getNotionDbId("qbo");
+
+  if (!dbId) {
+    return {
+      source: "qbo",
+      status: "error",
+      rows_written: 0,
+      rows_skipped: 0,
+      error_message: "No QBO Notion DB configured — set NOTION_DB_QBO_FINANCIAL or use default",
+      timestamp: ts,
+    };
+  }
 
   const cronSecret = process.env.CRON_SECRET?.trim();
   if (!cronSecret) {
@@ -386,18 +399,18 @@ export async function syncQBOToNotion(): Promise<SyncResult> {
 
     await notionCreatePage(dbId, {
       Name: { title: [{ text: { content: weekKey } }] },
-      week_of: { date: { start: weekStart.toISOString().split("T")[0] } },
-      revenue: { number: totalRevenue },
-      expenses: { number: totalExpenses },
-      net_income: { number: netIncome },
-      cash_position: { number: cashPosition },
-      pnl_summary: {
+      "Week Of": { date: { start: weekStart.toISOString().split("T")[0] } },
+      Revenue: { number: totalRevenue },
+      Expenses: { number: totalExpenses },
+      "Net Income": { number: netIncome },
+      "Cash Position": { number: cashPosition },
+      "P&L Summary": {
         rich_text: [{ text: { content: pnlSummary.slice(0, 2000) } }],
       },
-      bs_summary: {
+      "Balance Sheet Summary": {
         rich_text: [{ text: { content: bsSummary.slice(0, 2000) } }],
       },
-      synced_at: {
+      "Synced At": {
         rich_text: [{ text: { content: new Date().toISOString() } }],
       },
     });
@@ -482,11 +495,11 @@ async function syncSalesActivityToNotion(): Promise<SyncResult> {
 
       await notionCreatePage(dbId, {
         Name: { title: [{ text: { content: uniqueKey } }] },
-        channel: { select: { name: "Shopify DTC" } },
-        order_ref: { rich_text: [{ text: { content: order.name } }] },
-        date: { date: { start: order.created_at.split("T")[0] } },
-        amount: { number: parseFloat(order.total_price) },
-        status: {
+        Channel: { select: { name: "Shopify DTC" } },
+        "Order Ref": { rich_text: [{ text: { content: order.name } }] },
+        Date: { date: { start: order.created_at.split("T")[0] } },
+        Amount: { number: parseFloat(order.total_price) },
+        "Financial Status": {
           select: { name: order.financial_status || "unknown" },
         },
       });
