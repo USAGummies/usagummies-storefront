@@ -196,14 +196,14 @@ export async function syncShopifyToNotion(): Promise<SyncResult> {
     };
   }
 
-  const token = process.env.SHOPIFY_ADMIN_API_ACCESS_TOKEN;
+  const token = process.env.SHOPIFY_ADMIN_TOKEN;
   if (!token) {
     return {
       source: "shopify",
       status: "error",
       rows_written: 0,
       rows_skipped: 0,
-      error_message: "SHOPIFY_ADMIN_API_ACCESS_TOKEN not configured",
+      error_message: "SHOPIFY_ADMIN_TOKEN not configured",
       timestamp: ts,
     };
   }
@@ -433,14 +433,14 @@ async function syncSalesActivityToNotion(): Promise<SyncResult> {
     // For now, sales activity is synced from Shopify orders into the
     // Sales Activity Log DB as well, but with channel tagging.
     // Future: merge Amazon, Faire, wholesale data here.
-    const token = process.env.SHOPIFY_ADMIN_API_ACCESS_TOKEN;
+    const token = process.env.SHOPIFY_ADMIN_TOKEN;
     if (!token) {
       return {
         source: "shopify",
         status: "error",
         rows_written: 0,
         rows_skipped: 0,
-        error_message: "SHOPIFY_ADMIN_API_ACCESS_TOKEN not configured",
+        error_message: "SHOPIFY_ADMIN_TOKEN not configured",
         timestamp: ts,
       };
     }
