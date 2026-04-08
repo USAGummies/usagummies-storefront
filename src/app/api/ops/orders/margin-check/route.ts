@@ -19,6 +19,7 @@ export async function POST(req: Request) {
       order_ref: body.order_ref, channel: body.channel, customer: body.customer,
       units: body.units, unit_price: body.unit_price,
       ship_to: body.ship_to, freight_estimate: body.freight_estimate,
+      batch_id: body.batch_id, // optional: use specific batch cost instead of weighted avg
     });
     return NextResponse.json({ ok: true, margin_check: result });
   } catch (error) {

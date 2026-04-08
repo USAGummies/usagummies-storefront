@@ -301,6 +301,7 @@ export interface MarginCheckResult {
   unit_price: number;
   revenue: number;
   unit_cost: number;
+  cost_source: string; // e.g. "batch:DV-R1-2736" or "weighted_avg:POWERS-R1-25K"
   total_cogs: number;
   estimated_freight: number;
   gross_profit: number;
@@ -323,27 +324,21 @@ export async function checkMargin(input: {
   unit_price: number;
   ship_to?: string;
   freight_estimate?: number;
+  batch_id?: string; // optional: use a specific batch's cost instead of weighted average
 }): Promise<MarginCheckResult> {
   const kv = (await import("@vercel/kv")).kv;
   const warnings: string[] = [];
   const now = new Date().toISOString();
 
-  // Pull unit cost from INVENTORY
+  // Pull unit cost from INVENTORY (supports batch-specific or weighted average)
   let unitCost = 0;
+  let costSource = "unknown";
   try {
-    const batches = (await kv.get<Array<{
-      batch_id: string; cost_per_unit: number; status: string; unit_count: number; landed_cost: number;
-    }>>("inventory:batches")) || [];
-
-    const active = batches.filter((b) => b.status !== "depleted");
-    if (active.length > 0) {
-      // Use pre-calculated cost_per_unit (weighted average across active batches)
-      const totalUnits = active.reduce((sum, b) => sum + b.unit_count, 0);
-      const weightedCost = active.reduce((sum, b) => sum + (b.cost_per_unit * b.unit_count), 0);
-      unitCost = totalUnits > 0 ? weightedCost / totalUnits : 0;
-    } else {
-      warnings.push("No active batches in INVENTORY — using $0 unit cost");
-    }
+    const { getActiveCostPerUnit } = await import("@/lib/ops/inventory");
+    const result = await getActiveCostPerUnit(input.batch_id);
+    unitCost = result.unit_cost;
+    costSource = result.source;
+    warnings.push(...result.warnings);
   } catch {
     warnings.push("Failed to read INVENTORY — unit cost unknown");
   }
@@ -392,6 +387,7 @@ export async function checkMargin(input: {
     unit_price: input.unit_price,
     revenue,
     unit_cost: Math.round(unitCost * 10000) / 10000,
+    cost_source: costSource,
     total_cogs: Math.round(totalCogs * 100) / 100,
     estimated_freight: freightEstimate,
     gross_profit: Math.round(grossProfit * 100) / 100,
@@ -426,16 +422,9 @@ export async function getChannelHealth(): Promise<ChannelHealth[]> {
   // Pull unit cost from INVENTORY for margin estimates
   let unitCost = 0;
   try {
-    const batches = (await kv.get<Array<{
-      cost_per_unit: number; status: string; unit_count: number; landed_cost: number;
-    }>>("inventory:batches")) || [];
-
-    const active = batches.filter((b) => b.status !== "depleted");
-    if (active.length > 0) {
-      const totalUnits = active.reduce((sum, b) => sum + b.unit_count, 0);
-      const weightedCost = active.reduce((sum, b) => sum + (b.cost_per_unit * b.unit_count), 0);
-      unitCost = totalUnits > 0 ? weightedCost / totalUnits : 0;
-    }
+    const { getActiveCostPerUnit } = await import("@/lib/ops/inventory");
+    const result = await getActiveCostPerUnit();
+    unitCost = result.unit_cost;
   } catch { /* ignore */ }
 
   const byChannel: Record<string, { orders: Order[] }> = {};

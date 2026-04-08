@@ -5,6 +5,9 @@
  * levels by location, and allocation tracking. Prevents cost drift
  * by storing computed unit costs as facts, not re-deriving each session.
  *
+ * STORAGE: Batches use Redis hash (HSET/HGET/HGETALL) keyed by batch_id.
+ * Same atomic-write pattern as PIPELINE to prevent race conditions.
+ *
  * Data persisted in Vercel KV under inventory:* keys.
  * Syncs to Notion Batch Register DB.
  */
@@ -78,9 +81,32 @@ export interface AllocationRecord {
 // KV Keys
 // ---------------------------------------------------------------------------
 
-const KV_BATCHES = "inventory:batches";
+// Batches: Redis hash — each field is batch_id → Batch object
+const KV_BATCHES_HASH = "inventory:batches:h";
 const KV_LOCATIONS = "inventory:locations";
 const KV_ALLOCATIONS = "inventory:allocations";
+
+// ---------------------------------------------------------------------------
+// Batch hash helpers (atomic per-batch writes)
+// ---------------------------------------------------------------------------
+
+/** Get all batches from the hash map. */
+async function getAllBatches(): Promise<Batch[]> {
+  const hash = await kv.hgetall<Record<string, Batch>>(KV_BATCHES_HASH);
+  if (!hash) return [];
+  return Object.values(hash);
+}
+
+/** Get a single batch by ID. */
+async function getBatchById(batchId: string): Promise<Batch | null> {
+  const b = await kv.hget<Batch>(KV_BATCHES_HASH, batchId);
+  return b || null;
+}
+
+/** Atomically write a single batch. */
+async function setBatch(batch: Batch): Promise<void> {
+  await kv.hset(KV_BATCHES_HASH, { [batch.batch_id]: batch });
+}
 
 // ---------------------------------------------------------------------------
 // Batches
@@ -89,43 +115,35 @@ const KV_ALLOCATIONS = "inventory:allocations";
 export async function listBatches(
   filters?: { status?: BatchStatus; vendor?: string }
 ): Promise<Batch[]> {
-  const all = (await kv.get<Batch[]>(KV_BATCHES)) || [];
-  let filtered = all;
+  let all = await getAllBatches();
   if (filters?.status) {
-    filtered = filtered.filter((b) => b.status === filters.status);
+    all = all.filter((b) => b.status === filters.status);
   }
   if (filters?.vendor) {
     const v = filters.vendor.toLowerCase();
-    filtered = filtered.filter((b) => b.vendor.toLowerCase().includes(v));
+    all = all.filter((b) => b.vendor.toLowerCase().includes(v));
   }
-  return filtered;
+  return all;
 }
 
 export async function getBatch(batchId: string): Promise<Batch | null> {
-  const all = (await kv.get<Batch[]>(KV_BATCHES)) || [];
-  return all.find((b) => b.batch_id === batchId) || null;
+  return getBatchById(batchId);
 }
 
 export async function upsertBatch(
   input: Omit<Batch, "created_at" | "updated_at"> & { created_at?: string; updated_at?: string }
 ): Promise<Batch> {
-  const all = (await kv.get<Batch[]>(KV_BATCHES)) || [];
   const now = new Date().toISOString();
-  const idx = all.findIndex((b) => b.batch_id === input.batch_id);
+  const existing = await getBatchById(input.batch_id);
 
   const batch: Batch = {
     ...input,
-    created_at: idx >= 0 ? all[idx].created_at : (input.created_at || now),
+    created_at: existing ? existing.created_at : (input.created_at || now),
     updated_at: now,
   };
 
-  if (idx >= 0) {
-    all[idx] = batch;
-  } else {
-    all.push(batch);
-  }
-
-  await kv.set(KV_BATCHES, all);
+  // Atomic write — only touches this batch's hash field
+  await setBatch(batch);
   return batch;
 }
 
@@ -137,7 +155,7 @@ export async function getUnitCost(batchId: string): Promise<{
   unit_count: number;
   waste_rate?: number;
 } | null> {
-  const batch = await getBatch(batchId);
+  const batch = await getBatchById(batchId);
   if (!batch) return null;
 
   return {
@@ -147,6 +165,49 @@ export async function getUnitCost(batchId: string): Promise<{
     components: batch.component_costs,
     unit_count: batch.unit_count,
     waste_rate: batch.waste_rate,
+  };
+}
+
+/**
+ * Get weighted average cost across active batches, or a specific batch's cost.
+ * Used by MARGIN CHECK and CHANNEL HEALTH.
+ */
+export async function getActiveCostPerUnit(batchId?: string): Promise<{
+  unit_cost: number;
+  source: string;
+  warnings: string[];
+}> {
+  const warnings: string[] = [];
+
+  // If a specific batch is requested, return its cost directly
+  if (batchId) {
+    const batch = await getBatchById(batchId);
+    if (batch) {
+      return {
+        unit_cost: batch.cost_per_unit,
+        source: `batch:${batch.batch_id}`,
+        warnings: [],
+      };
+    }
+    warnings.push(`Batch ${batchId} not found — falling back to weighted average`);
+  }
+
+  // Weighted average across all active (non-depleted) batches
+  const all = await getAllBatches();
+  const active = all.filter((b) => b.status !== "depleted");
+
+  if (active.length === 0) {
+    return { unit_cost: 0, source: "none", warnings: ["No active batches in INVENTORY"] };
+  }
+
+  const totalUnits = active.reduce((sum, b) => sum + b.unit_count, 0);
+  const weightedCost = active.reduce((sum, b) => sum + (b.cost_per_unit * b.unit_count), 0);
+  const unitCost = totalUnits > 0 ? weightedCost / totalUnits : 0;
+
+  return {
+    unit_cost: unitCost,
+    source: `weighted_avg:${active.map((b) => b.batch_id).join("+")}`,
+    warnings: [],
   };
 }
 
