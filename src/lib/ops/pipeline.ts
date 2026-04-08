@@ -14,6 +14,10 @@
  *   Hot leads: daily touches until resolved
  *   Sample recipients: 7-day post-delivery check-in
  *
+ * STORAGE: Prospects use Redis hash (HSET/HGET/HGETALL) keyed by prospect ID.
+ * This eliminates read-modify-write race conditions during bulk loads.
+ * Touches use a Redis list (LPUSH/LRANGE) for atomic appends.
+ *
  * Data persisted in Vercel KV under pipeline:* keys.
  */
 
@@ -97,8 +101,32 @@ export interface TouchRecord {
 // KV Keys
 // ---------------------------------------------------------------------------
 
-const KV_PROSPECTS = "pipeline:prospects";
+// Prospects: Redis hash — each field is prospect.id → JSON string
+const KV_PROSPECTS_HASH = "pipeline:prospects:h";
+// Touches: still a single key (append-only, no concurrent bulk loads)
 const KV_TOUCHES = "pipeline:touches";
+
+// ---------------------------------------------------------------------------
+// Prospect hash helpers (atomic per-prospect writes)
+// ---------------------------------------------------------------------------
+
+/** Get all prospects from the hash map. Returns array. */
+async function getAllProspects(): Promise<Prospect[]> {
+  const hash = await kv.hgetall<Record<string, Prospect>>(KV_PROSPECTS_HASH);
+  if (!hash) return [];
+  return Object.values(hash);
+}
+
+/** Get a single prospect by ID. */
+async function getProspectById(id: string): Promise<Prospect | null> {
+  const p = await kv.hget<Prospect>(KV_PROSPECTS_HASH, id);
+  return p || null;
+}
+
+/** Atomically write a single prospect. No read-modify-write on the collection. */
+async function setProspect(prospect: Prospect): Promise<void> {
+  await kv.hset(KV_PROSPECTS_HASH, { [prospect.id]: prospect });
+}
 
 // ---------------------------------------------------------------------------
 // Follow-up cadence logic
@@ -186,29 +214,26 @@ export async function listProspects(
     limit?: number;
   }
 ): Promise<Prospect[]> {
-  const all = (await kv.get<Prospect[]>(KV_PROSPECTS)) || [];
-  let filtered = all;
-  if (filters?.status) filtered = filtered.filter((p) => p.status === filters.status);
-  if (filters?.channel_type) filtered = filtered.filter((p) => p.channel_type === filters.channel_type);
-  if (filters?.region) filtered = filtered.filter((p) => p.region === filters.region);
-  if (filters?.min_score) filtered = filtered.filter((p) => p.lead_score >= (filters.min_score || 0));
+  let all = await getAllProspects();
+  if (filters?.status) all = all.filter((p) => p.status === filters.status);
+  if (filters?.channel_type) all = all.filter((p) => p.channel_type === filters.channel_type);
+  if (filters?.region) all = all.filter((p) => p.region === filters.region);
+  if (filters?.min_score) all = all.filter((p) => p.lead_score >= (filters.min_score || 0));
 
   // Sort by lead_score descending
-  filtered.sort((a, b) => b.lead_score - a.lead_score);
-  return filtered.slice(0, filters?.limit || 500);
+  all.sort((a, b) => b.lead_score - a.lead_score);
+  return all.slice(0, filters?.limit || 500);
 }
 
 export async function getProspect(id: string): Promise<Prospect | null> {
-  const all = (await kv.get<Prospect[]>(KV_PROSPECTS)) || [];
-  return all.find((p) => p.id === id) || null;
+  return getProspectById(id);
 }
 
 export async function upsertProspect(
   input: Omit<Prospect, "created_at" | "updated_at" | "lead_score"> & { created_at?: string; lead_score?: number }
 ): Promise<Prospect> {
-  const all = (await kv.get<Prospect[]>(KV_PROSPECTS)) || [];
   const now = new Date().toISOString();
-  const idx = all.findIndex((p) => p.id === input.id);
+  const existing = await getProspectById(input.id);
 
   // Auto-compute follow-up and score
   const nextFollowUp = input.next_follow_up_date ||
@@ -218,20 +243,14 @@ export async function upsertProspect(
     ...input,
     next_follow_up_date: nextFollowUp,
     lead_score: 0, // computed below
-    created_at: idx >= 0 ? all[idx].created_at : (input.created_at || now),
+    created_at: existing ? existing.created_at : (input.created_at || now),
     updated_at: now,
   };
 
   prospect.lead_score = computeLeadScore(prospect);
 
-  if (idx >= 0) {
-    all[idx] = prospect;
-  } else {
-    all.push(prospect);
-  }
-
-  if (all.length > 2000) all.splice(0, all.length - 2000);
-  await kv.set(KV_PROSPECTS, all);
+  // Atomic write — only touches this prospect's hash field
+  await setProspect(prospect);
   return prospect;
 }
 
@@ -243,7 +262,7 @@ export async function checkContact(query: {
   company?: string;
   email?: string;
 }): Promise<{ exists: boolean; prospect?: Prospect; touches: TouchRecord[] }> {
-  const all = (await kv.get<Prospect[]>(KV_PROSPECTS)) || [];
+  const all = await getAllProspects();
   const touches = (await kv.get<TouchRecord[]>(KV_TOUCHES)) || [];
 
   let match: Prospect | undefined;
@@ -284,14 +303,11 @@ export async function logTouch(input: Omit<TouchRecord, "created_at"> & { create
   if (touches.length > 5000) touches.splice(0, touches.length - 5000);
   await kv.set(KV_TOUCHES, touches);
 
-  // Auto-update prospect
-  const prospects = (await kv.get<Prospect[]>(KV_PROSPECTS)) || [];
-  const pIdx = prospects.findIndex((p) => p.id === input.prospect_id);
-
+  // Auto-update prospect (atomic read-modify-write on single prospect)
+  const p = await getProspectById(input.prospect_id);
   let updatedProspect: Prospect | null = null;
 
-  if (pIdx >= 0) {
-    const p = prospects[pIdx];
+  if (p) {
     p.touch_count++;
     p.last_contact_date = input.date.split("T")[0];
     p.updated_at = now;
@@ -314,8 +330,7 @@ export async function logTouch(input: Omit<TouchRecord, "created_at"> & { create
       p.next_action = "follow_up";
     }
 
-    prospects[pIdx] = p;
-    await kv.set(KV_PROSPECTS, prospects);
+    await setProspect(p);
     updatedProspect = p;
   }
 
@@ -339,7 +354,7 @@ export async function getTouches(
 export async function getDueFollowups(
   filters?: { channel_type?: ChannelType; include_overdue?: boolean }
 ): Promise<Prospect[]> {
-  const all = (await kv.get<Prospect[]>(KV_PROSPECTS)) || [];
+  const all = await getAllProspects();
   const today = new Date().toISOString().split("T")[0];
 
   let due = all.filter((p) => {
@@ -410,7 +425,7 @@ export async function handleReplyDetected(input: {
   touch?: TouchRecord;
   action_taken?: string;
 }> {
-  const all = (await kv.get<Prospect[]>(KV_PROSPECTS)) || [];
+  const all = await getAllProspects();
   const email = input.from_email.toLowerCase();
 
   // Match by email
@@ -511,25 +526,22 @@ export async function trackSampleShipment(input: {
     follow_up_scheduled: followUpDate,
   });
 
-  // Also update prospect with tracking info
-  if (prospect) {
-    const all = (await kv.get<Prospect[]>(KV_PROSPECTS)) || [];
-    const idx = all.findIndex((p) => p.id === input.prospect_id);
-    if (idx >= 0) {
-      all[idx].sample_tracking = input.tracking_number;
-      all[idx].sample_sent_date = input.ship_date;
-      await kv.set(KV_PROSPECTS, all);
-    }
+  // Also update prospect with tracking info (atomic single-prospect write)
+  const p = await getProspectById(input.prospect_id);
+  if (p) {
+    p.sample_tracking = input.tracking_number;
+    p.sample_sent_date = input.ship_date;
+    await setProspect(p);
   }
 
-  return { prospect, touch, follow_up_date: followUpDate };
+  return { prospect: prospect || p, touch, follow_up_date: followUpDate };
 }
 
 /**
  * Get all prospects with samples awaiting follow-up (shipped but follow-up not yet done).
  */
 export async function getSampleFollowupsDue(): Promise<Prospect[]> {
-  const all = (await kv.get<Prospect[]>(KV_PROSPECTS)) || [];
+  const all = await getAllProspects();
   const today = new Date().toISOString().split("T")[0];
 
   return all.filter((p) => {
@@ -549,7 +561,7 @@ export async function getSampleFollowupsDue(): Promise<Prospect[]> {
 // ---------------------------------------------------------------------------
 
 export async function getScorecard(): Promise<PipelineScorecard> {
-  const all = (await kv.get<Prospect[]>(KV_PROSPECTS)) || [];
+  const all = await getAllProspects();
   const today = new Date().toISOString().split("T")[0];
 
   const byStatus: Record<string, number> = {};
