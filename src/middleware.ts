@@ -40,6 +40,9 @@ const SELF_AUTHENTICATED_PREFIXES = [
   "/api/ops/archive/", // ARCHIVE — Data backup & Notion sync (isAuthorized)
   "/api/ops/freight/", // FREIGHT — Shipping & Logistics tracking (isAuthorized)
   "/api/ops/pulse/", // PULSE — Fleet health monitoring (isAuthorized)
+  "/api/ops/ledger/", // LEDGER — Bookkeeping, decisions, COA routing (isAuthorized)
+  "/api/ops/inventory/", // INVENTORY — Batch register, unit costs, on-hand (isAuthorized)
+  "/api/ops/orders/", // ORDER DESK — Order log, fulfillment, samples (isAuthorized)
 ];
 
 function isSelfAuthenticated(pathname: string): boolean {

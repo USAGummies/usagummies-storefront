@@ -204,10 +204,15 @@ async function checkFreight(): Promise<SpecialistHealth> {
 
 async function checkLedger(): Promise<SpecialistHealth> {
   try {
-    const lastSync = await kv.get<Record<string, unknown>>("ledger:last_sync");
+    const decisions = (await kv.get<Record<string, unknown>[]>("ledger:decisions")) ?? [];
+    const questions = (await kv.get<Record<string, unknown>[]>("ledger:pending_questions")) ?? [];
+    const entries = (await kv.get<Record<string, unknown>[]>("ledger:entries")) ?? [];
 
-    const lastRun = (lastSync?.timestamp as string) ?? (lastSync?.synced_at as string) ?? null;
-    const rowsTotal = (lastSync?.rows_written as number) ?? 0;
+    const lastDecision = latestTimestamp(decisions, "updated_at");
+    const lastQuestion = latestTimestamp(questions, "asked_at");
+    const lastEntry = latestTimestamp(entries, "created_at");
+    const lastRun = [lastDecision, lastQuestion, lastEntry].filter(Boolean).sort().pop() ?? null;
+
     const staleness = hoursAgo(lastRun);
 
     return {
@@ -215,13 +220,81 @@ async function checkLedger(): Promise<SpecialistHealth> {
       status: statusFromStaleness(staleness),
       last_run: lastRun,
       last_success: lastRun,
-      rows_total: rowsTotal,
-      rows_last_24h: staleness < 24 ? rowsTotal : 0,
+      rows_total: decisions.length + questions.length + entries.length,
+      rows_last_24h: countRecent(decisions, "updated_at") + countRecent(entries, "created_at"),
       staleness_hours: Math.round(staleness * 10) / 10,
     };
   } catch (err) {
     return {
       name: "LEDGER",
+      status: "critical",
+      last_run: null,
+      last_success: null,
+      rows_total: 0,
+      rows_last_24h: 0,
+      staleness_hours: Infinity,
+      error_message: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+async function checkInventory(): Promise<SpecialistHealth> {
+  try {
+    const batches = (await kv.get<Record<string, unknown>[]>("inventory:batches")) ?? [];
+    const locations = (await kv.get<Record<string, unknown>[]>("inventory:locations")) ?? [];
+
+    const lastBatch = latestTimestamp(batches, "updated_at") ?? latestTimestamp(batches, "created_at");
+    const lastLoc = latestTimestamp(locations, "last_updated");
+    const lastRun = [lastBatch, lastLoc].filter(Boolean).sort().pop() ?? null;
+
+    const staleness = hoursAgo(lastRun);
+
+    return {
+      name: "INVENTORY",
+      status: statusFromStaleness(staleness),
+      last_run: lastRun,
+      last_success: lastRun,
+      rows_total: batches.length + locations.length,
+      rows_last_24h: countRecent(batches, "updated_at"),
+      staleness_hours: Math.round(staleness * 10) / 10,
+    };
+  } catch (err) {
+    return {
+      name: "INVENTORY",
+      status: "critical",
+      last_run: null,
+      last_success: null,
+      rows_total: 0,
+      rows_last_24h: 0,
+      staleness_hours: Infinity,
+      error_message: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+async function checkOrderDesk(): Promise<SpecialistHealth> {
+  try {
+    const orders = (await kv.get<Record<string, unknown>[]>("orders:log")) ?? [];
+    const fulfillments = (await kv.get<Record<string, unknown>[]>("orders:fulfillments")) ?? [];
+
+    const lastOrder = latestTimestamp(orders, "updated_at") ?? latestTimestamp(orders, "created_at");
+    const lastFulfill = latestTimestamp(fulfillments, "created_at");
+    const lastRun = [lastOrder, lastFulfill].filter(Boolean).sort().pop() ?? null;
+
+    const staleness = hoursAgo(lastRun);
+
+    return {
+      name: "ORDER DESK",
+      status: statusFromStaleness(staleness),
+      last_run: lastRun,
+      last_success: lastRun,
+      rows_total: orders.length + fulfillments.length,
+      rows_last_24h: countRecent(orders, "updated_at") + countRecent(fulfillments, "created_at"),
+      staleness_hours: Math.round(staleness * 10) / 10,
+    };
+  } catch (err) {
+    return {
+      name: "ORDER DESK",
       status: "critical",
       last_run: null,
       last_success: null,
@@ -243,6 +316,8 @@ export async function checkFleetHealth(): Promise<FleetHealth> {
     checkForge(),
     checkFreight(),
     checkLedger(),
+    checkInventory(),
+    checkOrderDesk(),
   ]);
 
   const alerts: string[] = [];
