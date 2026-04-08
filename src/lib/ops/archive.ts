@@ -254,7 +254,8 @@ export async function syncShopifyToNotion(): Promise<SyncResult> {
         .join(", ");
 
       await notionCreatePage(dbId, {
-        "Order Number": { title: [{ text: { content: order.name } }] },
+        Name: { title: [{ text: { content: order.name } }] },
+        "Order Number": { rich_text: [{ text: { content: order.name } }] },
         "Order Date": { date: { start: order.created_at.split("T")[0] } },
         Total: { number: parseFloat(order.total_price) },
         "Financial Status": {
