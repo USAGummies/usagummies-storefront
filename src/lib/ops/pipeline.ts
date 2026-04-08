@@ -386,6 +386,168 @@ export interface PipelineScorecard {
   generated_at: string;
 }
 
+// ---------------------------------------------------------------------------
+// SENTINEL → PIPELINE Write-back
+// ---------------------------------------------------------------------------
+
+/**
+ * Called by Viktor when SENTINEL detects a reply in Gmail.
+ * Looks up the prospect by email, logs the reply as a touch,
+ * auto-transitions status, and recomputes follow-up date.
+ *
+ * Returns { matched, prospect, touch } or { matched: false } if no prospect found.
+ */
+export async function handleReplyDetected(input: {
+  from_email: string;
+  from_name?: string;
+  subject: string;
+  snippet?: string;
+  date: string; // ISO datetime
+  gmail_message_id?: string;
+}): Promise<{
+  matched: boolean;
+  prospect?: Prospect;
+  touch?: TouchRecord;
+  action_taken?: string;
+}> {
+  const all = (await kv.get<Prospect[]>(KV_PROSPECTS)) || [];
+  const email = input.from_email.toLowerCase();
+
+  // Match by email
+  let match = all.find((p) => p.email.toLowerCase() === email);
+
+  // Fallback: match by from_name against company
+  if (!match && input.from_name) {
+    const name = input.from_name.toLowerCase();
+    match = all.find(
+      (p) =>
+        p.company.toLowerCase().includes(name) ||
+        p.contact_name.toLowerCase().includes(name),
+    );
+  }
+
+  if (!match) {
+    return { matched: false };
+  }
+
+  // Log the reply as a touch
+  const touchId = `touch-sentinel-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  const { touch, prospect } = await logTouch({
+    id: touchId,
+    prospect_id: match.id,
+    type: "reply_received",
+    date: input.date,
+    subject: input.subject,
+    summary: input.snippet
+      ? `Reply detected by SENTINEL: "${input.snippet.slice(0, 200)}"`
+      : `Reply detected by SENTINEL. Subject: ${input.subject}`,
+    direction: "inbound",
+    channel: "Gmail",
+  });
+
+  let actionTaken = `Logged reply from ${input.from_email}.`;
+  if (prospect && prospect.status === "Replied") {
+    actionTaken += " Status auto-transitioned to Replied.";
+  }
+  if (prospect) {
+    actionTaken += ` Next follow-up: ${prospect.next_follow_up_date || "none"}.`;
+  }
+
+  return { matched: true, prospect: prospect || undefined, touch, action_taken: actionTaken };
+}
+
+// ---------------------------------------------------------------------------
+// SAMPLE TRACKER — Auto Follow-up Creation
+// ---------------------------------------------------------------------------
+
+/**
+ * Called when a sample is shipped. Links sample to prospect in PIPELINE,
+ * auto-creates a follow-up touch scheduled for 7 days post-delivery.
+ *
+ * If delivery_date is not provided, estimates delivery as ship_date + 5 days.
+ */
+export async function trackSampleShipment(input: {
+  prospect_id: string;
+  tracking_number?: string;
+  carrier?: string;
+  ship_date: string; // ISO date
+  estimated_delivery_date?: string; // ISO date
+  units: number;
+  notes?: string;
+}): Promise<{
+  prospect: Prospect | null;
+  touch: TouchRecord;
+  follow_up_date: string;
+}> {
+  // Estimate delivery: ship_date + 5 business days if not provided
+  const deliveryDate = input.estimated_delivery_date ||
+    new Date(new Date(input.ship_date).getTime() + 5 * 24 * 60 * 60 * 1000)
+      .toISOString().split("T")[0];
+
+  // Follow-up = 7 days after estimated delivery
+  const followUpDate = new Date(
+    new Date(deliveryDate).getTime() + 7 * 24 * 60 * 60 * 1000,
+  ).toISOString().split("T")[0];
+
+  // Log sample touch with scheduled follow-up
+  const touchId = `touch-sample-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  const summary = [
+    `Sample shipped: ${input.units} units`,
+    input.carrier ? `via ${input.carrier}` : null,
+    input.tracking_number ? `(${input.tracking_number})` : null,
+    `Est. delivery: ${deliveryDate}`,
+    input.notes || null,
+  ].filter(Boolean).join(". ");
+
+  const { touch, prospect } = await logTouch({
+    id: touchId,
+    prospect_id: input.prospect_id,
+    type: "sample",
+    date: input.ship_date,
+    subject: "Sample Shipment",
+    summary,
+    direction: "outbound",
+    channel: input.carrier || "Pirate Ship",
+    follow_up_scheduled: followUpDate,
+  });
+
+  // Also update prospect with tracking info
+  if (prospect) {
+    const all = (await kv.get<Prospect[]>(KV_PROSPECTS)) || [];
+    const idx = all.findIndex((p) => p.id === input.prospect_id);
+    if (idx >= 0) {
+      all[idx].sample_tracking = input.tracking_number;
+      all[idx].sample_sent_date = input.ship_date;
+      await kv.set(KV_PROSPECTS, all);
+    }
+  }
+
+  return { prospect, touch, follow_up_date: followUpDate };
+}
+
+/**
+ * Get all prospects with samples awaiting follow-up (shipped but follow-up not yet done).
+ */
+export async function getSampleFollowupsDue(): Promise<Prospect[]> {
+  const all = (await kv.get<Prospect[]>(KV_PROSPECTS)) || [];
+  const today = new Date().toISOString().split("T")[0];
+
+  return all.filter((p) => {
+    if (p.status !== "Sample Sent") return false;
+    if (!p.next_follow_up_date) return false;
+    return p.next_follow_up_date <= today;
+  }).sort((a, b) => {
+    // Oldest due first
+    if (a.next_follow_up_date! < b.next_follow_up_date!) return -1;
+    if (a.next_follow_up_date! > b.next_follow_up_date!) return 1;
+    return b.lead_score - a.lead_score;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Pipeline Scorecard
+// ---------------------------------------------------------------------------
+
 export async function getScorecard(): Promise<PipelineScorecard> {
   const all = (await kv.get<Prospect[]>(KV_PROSPECTS)) || [];
   const today = new Date().toISOString().split("T")[0];
