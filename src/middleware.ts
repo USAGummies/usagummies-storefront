@@ -47,6 +47,8 @@ const SELF_AUTHENTICATED_PREFIXES = [
   "/api/ops/pipeline/", // PIPELINE — Sales CRM, follow-ups, lead scoring (isAuthorized)
   "/api/ops/amazon/", // AMAZON — FBA inventory, restock, PPC, listing health (isAuthorized)
   "/api/ops/alerts/", // ALERTS — Dedup registry (isAuthorized)
+  "/api/ops/claims/", // CLAIMS — Product claim verification gate (isAuthorized)
+  "/api/ops/pulse/", // PULSE — Fleet health monitoring (isAuthorized)
 ];
 
 function isSelfAuthenticated(pathname: string): boolean {

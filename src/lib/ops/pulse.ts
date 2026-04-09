@@ -240,7 +240,10 @@ async function checkLedger(): Promise<SpecialistHealth> {
 
 async function checkInventory(): Promise<SpecialistHealth> {
   try {
-    const batches = (await kv.get<Record<string, unknown>[]>("inventory:batches")) ?? [];
+    // Inventory uses Redis hash (inventory:batches:h) since race-condition fix.
+    // Fall back to old array key for backwards compatibility.
+    const hash = await kv.hgetall<Record<string, Record<string, unknown>>>("inventory:batches:h");
+    const batches: Record<string, unknown>[] = hash ? Object.values(hash) : (await kv.get<Record<string, unknown>[]>("inventory:batches")) ?? [];
     const locations = (await kv.get<Record<string, unknown>[]>("inventory:locations")) ?? [];
 
     const lastBatch = latestTimestamp(batches, "updated_at") ?? latestTimestamp(batches, "created_at");

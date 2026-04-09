@@ -43,8 +43,9 @@ type LineInput = {
   item_id: string;
   item_name?: string;
   qty?: number;
+  quantity?: number; // alias for qty (Viktor sends this)
   unit_price?: number;
-  amount: number;
+  amount?: number; // optional — computed from qty * unit_price if missing
   description?: string;
   customer_id?: string;
 };
@@ -90,17 +91,23 @@ export async function POST(req: Request) {
 
     const payload: Parameters<typeof createQBOPurchaseOrder>[0] = {
       VendorRef: { value: body.vendor_id },
-      Line: (body.lines as LineInput[]).map((l) => ({
-        Amount: l.amount,
-        DetailType: "ItemBasedExpenseLineDetail" as const,
-        ItemBasedExpenseLineDetail: {
-          ItemRef: { value: l.item_id, ...(l.item_name ? { name: l.item_name } : {}) },
-          ...(l.qty !== undefined ? { Qty: l.qty } : {}),
-          ...(l.unit_price !== undefined ? { UnitPrice: l.unit_price } : {}),
-          ...(l.customer_id ? { CustomerRef: { value: l.customer_id } } : {}),
-        },
-        ...(l.description ? { Description: l.description } : {}),
-      })),
+      Line: (body.lines as LineInput[]).map((l) => {
+        const qty = l.qty ?? l.quantity; // accept both qty and quantity
+        const unitPrice = l.unit_price;
+        const amount = l.amount ?? (qty && unitPrice ? Number((qty * unitPrice).toFixed(2)) : 0);
+
+        return {
+          Amount: amount,
+          DetailType: "ItemBasedExpenseLineDetail" as const,
+          ItemBasedExpenseLineDetail: {
+            ItemRef: { value: l.item_id, ...(l.item_name ? { name: l.item_name } : {}) },
+            ...(qty !== undefined ? { Qty: qty } : {}),
+            ...(unitPrice !== undefined ? { UnitPrice: unitPrice } : {}),
+            ...(l.customer_id ? { CustomerRef: { value: l.customer_id } } : {}),
+          },
+          ...(l.description ? { Description: l.description } : {}),
+        };
+      }),
       ...(body.date ? { TxnDate: body.date } : {}),
       ...(body.due_date ? { DueDate: body.due_date } : {}),
       ...(body.ref_number ? { DocNumber: body.ref_number } : {}),

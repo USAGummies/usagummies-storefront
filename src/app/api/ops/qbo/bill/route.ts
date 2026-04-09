@@ -23,16 +23,48 @@ export async function POST(req: Request) {
     const result = await createQBOBill({
       VendorRef: { value: body.vendor_id },
       DueDate: body.due_date,
-      DocNumber: body.ref_number,
-      TxnDate: body.date,
-      Line: body.lines.map((l: { amount: number; expense_account_id: string; description?: string }) => ({
-        Amount: l.amount,
-        DetailType: "AccountBasedExpenseLineDetail" as const,
-        AccountBasedExpenseLineDetail: {
-          AccountRef: { value: l.expense_account_id },
-        },
-        Description: l.description,
-      })),
+      DocNumber: body.ref_number || body.doc_number,
+      TxnDate: body.date || body.txn_date,
+      ...(body.memo ? { PrivateNote: body.memo } : {}),
+      Line: body.lines.map((l: {
+        amount: number;
+        expense_account_id?: string;
+        account_id?: string; // alias for expense_account_id (Viktor sends this)
+        item_id?: string;
+        quantity?: number;
+        unit_price?: number;
+        description?: string;
+      }) => {
+        const accountId = l.expense_account_id || l.account_id;
+
+        // If item_id is provided, use ItemBasedExpenseLineDetail
+        if (l.item_id) {
+          const qty = l.quantity ?? 1;
+          const unitPrice = l.unit_price ?? l.amount;
+          const lineAmount = l.amount ?? Number((qty * unitPrice).toFixed(2));
+          return {
+            Amount: lineAmount,
+            DetailType: "ItemBasedExpenseLineDetail" as const,
+            ItemBasedExpenseLineDetail: {
+              ItemRef: { value: l.item_id },
+              Qty: qty,
+              UnitPrice: unitPrice,
+              ...(accountId ? { AccountRef: { value: accountId } } : {}),
+            },
+            ...(l.description ? { Description: l.description } : {}),
+          };
+        }
+
+        // Default: AccountBasedExpenseLineDetail
+        return {
+          Amount: l.amount,
+          DetailType: "AccountBasedExpenseLineDetail" as const,
+          AccountBasedExpenseLineDetail: {
+            AccountRef: { value: accountId },
+          },
+          ...(l.description ? { Description: l.description } : {}),
+        };
+      }),
     });
 
     if (!result) {

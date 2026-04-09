@@ -255,9 +255,17 @@ export async function upsertProspect(
 }
 
 export async function deleteProspect(id: string): Promise<{ deleted: boolean }> {
-  const existing = await getProspectById(id);
+  // Try direct ID lookup first
+  let existing = await getProspectById(id);
+
+  // If not found, try email-based lookup (Viktor passes email as ID)
+  if (!existing) {
+    const all = await getAllProspects();
+    existing = all.find((p) => p.email === id) ?? null;
+  }
+
   if (!existing) return { deleted: false };
-  await kv.hdel(KV_PROSPECTS_HASH, id);
+  await kv.hdel(KV_PROSPECTS_HASH, existing.id);
   return { deleted: true };
 }
 

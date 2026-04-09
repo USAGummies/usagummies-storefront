@@ -10,6 +10,8 @@ const LineItemSchema = z.object({
   description: z.string().trim().min(1).max(200),
   quantity: z.number().positive().max(100000),
   unitPrice: z.number().min(0).max(1000000),
+  itemId: z.string().trim().optional(),   // per-line QBO Item ID
+  itemName: z.string().trim().optional(),  // per-line QBO Item name
 });
 
 const RequestSchema = z.object({
@@ -17,10 +19,12 @@ const RequestSchema = z.object({
   customerEmail: z.string().trim().email().optional(),
   lineItems: z.array(LineItemSchema).min(1).max(50),
   dueDate: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  docNumber: z.string().trim().max(21).optional(), // QBO DocNumber (invoice #)
+  txnDate: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), // transaction date
   memo: z.string().trim().max(1000).optional(),
   sendEmail: z.boolean().optional().default(false),
-  itemId: z.string().trim().optional(),
-  itemName: z.string().trim().optional(),
+  itemId: z.string().trim().optional(),   // fallback item ID for all lines
+  itemName: z.string().trim().optional(), // fallback item name for all lines
 });
 
 type QBOCustomer = {
@@ -170,15 +174,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Failed to resolve or create QBO customer" }, { status: 500 });
   }
 
-  // Use specified item if provided, otherwise fall back to resolving
-  const item = parsed.data.itemId
+  // Resolve fallback item if no per-line itemId is provided anywhere
+  const hasPerLineItems = parsed.data.lineItems.some((l) => l.itemId);
+  const fallbackItem = parsed.data.itemId
     ? { Id: parsed.data.itemId, Name: parsed.data.itemName || "Product" }
-    : await resolveInvoiceItem(realmId, accessToken);
-  if (!item?.Id) {
+    : (!hasPerLineItems ? await resolveInvoiceItem(realmId, accessToken) : null);
+
+  if (!hasPerLineItems && !fallbackItem?.Id) {
     return NextResponse.json({ error: "No QBO invoice item available for line items" }, { status: 500 });
   }
 
   const today = new Date().toISOString().slice(0, 10);
+  const txnDate = parsed.data.txnDate || today;
   const dueDate = parsed.data.dueDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const total = parsed.data.lineItems.reduce((sum, itemRow) => sum + (itemRow.quantity * itemRow.unitPrice), 0);
 
@@ -186,19 +193,26 @@ export async function POST(req: Request) {
     method: "POST",
     body: JSON.stringify({
       CustomerRef: { value: customer.Id },
-      TxnDate: today,
+      TxnDate: txnDate,
       DueDate: dueDate,
+      ...(parsed.data.docNumber ? { DocNumber: parsed.data.docNumber } : {}),
       ...(parsed.data.memo ? { PrivateNote: parsed.data.memo } : {}),
-      Line: parsed.data.lineItems.map((itemRow) => ({
-        Amount: Number((itemRow.quantity * itemRow.unitPrice).toFixed(2)),
-        Description: itemRow.description,
-        DetailType: "SalesItemLineDetail",
-        SalesItemLineDetail: {
-          Qty: itemRow.quantity,
-          UnitPrice: Number(itemRow.unitPrice.toFixed(2)),
-          ItemRef: { value: item.Id, name: item.Name },
-        },
-      })),
+      Line: parsed.data.lineItems.map((itemRow) => {
+        // Per-line itemId takes priority, then fallback
+        const lineItemId = itemRow.itemId || fallbackItem?.Id || "";
+        const lineItemName = itemRow.itemName || fallbackItem?.Name || "Product";
+
+        return {
+          Amount: Number((itemRow.quantity * itemRow.unitPrice).toFixed(2)),
+          Description: itemRow.description,
+          DetailType: "SalesItemLineDetail",
+          SalesItemLineDetail: {
+            Qty: itemRow.quantity,
+            UnitPrice: Number(itemRow.unitPrice.toFixed(2)),
+            ItemRef: { value: lineItemId, name: lineItemName },
+          },
+        };
+      }),
     }),
   });
 

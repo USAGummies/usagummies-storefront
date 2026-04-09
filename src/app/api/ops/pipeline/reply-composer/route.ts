@@ -4,13 +4,20 @@
  * Pulls prospect data + touch history from PIPELINE, then generates
  * a context-aware follow-up email draft.
  *
+ * ** INCLUDES CLAIM VERIFICATION GATE **
+ * Every generated email is scanned against the product claims registry.
+ * If any unverified or false claims are found, the email is blocked.
+ *
  * Body: { prospect_id, tone?: "friendly" | "professional" | "urgent", context?: string }
- * Returns: { subject, body, prospect, touch_count, reasoning }
+ * Returns: { subject, body, prospect, touch_count, reasoning, claims_check }
+ *
+ * If claims_check.safe is false, the email MUST NOT be sent as-is.
  */
 
 import { NextResponse } from "next/server";
 import { isAuthorized } from "@/lib/ops/abra-auth";
 import { getProspect, getTouches } from "@/lib/ops/pipeline";
+import { validateOutreachClaims } from "@/lib/ops/product-claims";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,6 +48,21 @@ function buildPrompt(prospect: NonNullable<Awaited<ReturnType<typeof getProspect
     touchSummary || "(no touches logged)",
     "",
     context ? `ADDITIONAL CONTEXT: ${context}` : null,
+    "",
+    "VERIFIED PRODUCT CLAIMS YOU MAY USE:",
+    "- Dye-free gummy candy (verified)",
+    "- Made with natural flavors (verified — Albanese spec sheet)",
+    "- Gluten free (verified)",
+    "- Fat free (verified)",
+    "- Made in the USA (verified)",
+    "- Co-packed by a veteran-owned facility in Spokane, WA (verified)",
+    "- MSRP $4.99 / Amazon $5.99 (verified)",
+    "",
+    "CLAIMS YOU MUST NOT MAKE:",
+    "- Do NOT claim Halal certified (unverified)",
+    "- Do NOT claim Kosher certified (unverified)",
+    "- Do NOT mention Layton, Utah (false — we have no connection to Layton)",
+    "- Do NOT make any health/dietary claims not listed above",
     "",
     "Write a short, natural follow-up email. Include:",
     "- A subject line (prefix with 'Subject: ')",
@@ -133,6 +155,10 @@ export async function POST(req: Request) {
     const subject = subjectMatch ? subjectMatch[1].trim() : "Following up — USA Gummies";
     const emailBody = reply.replace(/^Subject:\s*.+\n\n?/m, "").trim();
 
+    // ── CLAIM VERIFICATION GATE ──
+    // Scan the generated email for any unverified or false claims
+    const claimsCheck = await validateOutreachClaims(subject + "\n" + emailBody);
+
     return NextResponse.json({
       subject,
       body: emailBody,
@@ -145,6 +171,8 @@ export async function POST(req: Request) {
       },
       touch_count: touches.length,
       tone,
+      // Claim verification results — caller MUST check claims_check.safe
+      claims_check: claimsCheck,
     });
   } catch (err) {
     return NextResponse.json(
