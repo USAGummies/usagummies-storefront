@@ -625,6 +625,95 @@ export async function createQBOBill(
 }
 
 // ---------------------------------------------------------------------------
+// WRITE: Purchase Order
+// ---------------------------------------------------------------------------
+
+export type QBOPurchaseOrderLine = {
+  Amount: number;
+  DetailType: "ItemBasedExpenseLineDetail";
+  ItemBasedExpenseLineDetail: {
+    ItemRef: { value: string; name?: string };
+    Qty?: number;
+    UnitPrice?: number;
+    CustomerRef?: { value: string };
+  };
+  Description?: string;
+};
+
+export type QBOPurchaseOrderInput = {
+  VendorRef: { value: string };
+  APAccountRef?: { value: string };
+  Line: QBOPurchaseOrderLine[];
+  TxnDate?: string;
+  DueDate?: string;
+  DocNumber?: string;
+  Memo?: string;
+  ShipAddr?: {
+    Line1?: string;
+    City?: string;
+    CountrySubDivisionCode?: string;
+    PostalCode?: string;
+  };
+};
+
+/**
+ * Create a Purchase Order in QBO.
+ * POST /purchaseorder
+ */
+export async function createQBOPurchaseOrder(
+  po: QBOPurchaseOrderInput,
+): Promise<QBOEntity | null> {
+  return qboFetch<QBOEntity>("/purchaseorder", {
+    method: "POST",
+    body: JSON.stringify(po),
+  });
+}
+
+/**
+ * Read a Purchase Order by ID.
+ * GET /purchaseorder/{id}
+ */
+export async function getQBOPurchaseOrder(
+  id: string,
+): Promise<QBOEntity | null> {
+  return qboFetch<QBOEntity>(`/purchaseorder/${id}`);
+}
+
+/**
+ * Update a Purchase Order (sparse update).
+ * POST /purchaseorder (with Id and SyncToken)
+ */
+export async function updateQBOPurchaseOrder(
+  po: QBOEntity,
+): Promise<QBOEntity | null> {
+  return qboFetch<QBOEntity>("/purchaseorder", {
+    method: "POST",
+    body: JSON.stringify(po),
+  });
+}
+
+/**
+ * Query Purchase Orders.
+ * GET /query?query=SELECT * FROM PurchaseOrder ...
+ */
+export async function getQBOPurchaseOrders(
+  startDate?: string,
+  endDate?: string,
+): Promise<QBOEntity[]> {
+  let sql = "SELECT * FROM PurchaseOrder";
+  const conditions: string[] = [];
+  if (startDate) conditions.push(`TxnDate >= '${startDate}'`);
+  if (endDate) conditions.push(`TxnDate <= '${endDate}'`);
+  if (conditions.length > 0) sql += ` WHERE ${conditions.join(" AND ")}`;
+  sql += " MAXRESULTS 100";
+
+  const res = await qboFetch<{ QueryResponse?: { PurchaseOrder?: QBOEntity[] } }>(
+    `/query?query=${encodeURIComponent(sql)}`,
+  );
+  return res?.QueryResponse?.PurchaseOrder || [];
+}
+
+// ---------------------------------------------------------------------------
 // WRITE: Customer Management
 // ---------------------------------------------------------------------------
 
