@@ -1,52 +1,76 @@
 const PRODUCT_FAQS = [
   {
-    question: "What flavors are included?",
+    question: "What flavors are in USA Gummies?",
     answer:
-      "Every bag includes five classic flavors: Cherry, Lemon, Green Apple, Orange, and Watermelon — all colored naturally with fruit and vegetable extracts.",
+      "Our All American Gummy Bears come in 5 all-natural flavors: Cherry, Lemon, Green Apple, Orange, and Watermelon.",
   },
   {
-    question: "Are these really dye-free?",
+    question: "Are USA Gummies dye-free?",
     answer:
-      "Yes. USA Gummies contain zero artificial dyes or synthetic colors. All colors come from real fruit and vegetable extracts like black carrot, turmeric, and spirulina.",
+      "Yes! We use fruit and vegetable extracts for color instead of artificial dyes like Red 40 or Yellow 5. No petroleum-based dyes, ever.",
   },
   {
-    question: "Where are they made?",
+    question: "Where are USA Gummies made?",
     answer:
-      "100% sourced, manufactured, and packed in the USA in FDA-registered facilities. We never outsource production overseas.",
+      "Every bag is sourced, manufactured, and packed in the United States in FDA-registered facilities.",
   },
   {
-    question: "How should I store them?",
+    question: "Are USA Gummies gluten-free?",
     answer:
-      "Keep them in a cool, dry place away from direct sunlight. Reseal the bag after opening to maintain freshness and texture.",
+      "Yes, our gummy bears are gluten-free. They contain gelatin, cane sugar, corn syrup, citric acid, natural flavors, fruit and vegetable extracts, and carnauba wax.",
   },
   {
-    question: "What's your return policy?",
+    question: "What is the 5-pack deal?",
     answer:
-      "We offer a 30-day satisfaction guarantee. If you're not happy with your gummies, contact us and we'll make it right.",
+      "The 5-pack is $25.00 ($5.00 per bag) with FREE shipping included. That's over 15% off the single-bag retail price.",
   },
   {
-    question: "Do you offer bulk or wholesale pricing?",
+    question: "How should I store gummy bears?",
     answer:
-      "Yes! Bundle pricing starts at 5 bags on our site. For larger wholesale orders, visit our wholesale page or contact us directly.",
+      "Store in a cool, dry place. Unopened bags stay fresh for months. Once opened, seal the bag and consume within 2 weeks for best quality.",
+  },
+  {
+    question: "Do you ship to all 50 states?",
+    answer:
+      "Yes! We ship to all 50 states. Orders of $22.50+ get free shipping. Alaska, Hawaii, and Puerto Rico have a flat $13.99 shipping rate.",
   },
 ];
 
 export default function ProductFaqAccordion() {
+  const faqJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: PRODUCT_FAQS.map((item) => ({
+      "@type": "Question",
+      name: item.question,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: item.answer,
+      },
+    })),
+  };
+
   return (
-    <div className="divide-y divide-[var(--border,rgba(15,27,45,0.1))] rounded-2xl border border-[var(--border,rgba(15,27,45,0.1))] bg-white">
-      {PRODUCT_FAQS.map((faq) => (
-        <details key={faq.question} className="group">
-          <summary className="flex cursor-pointer items-center justify-between gap-4 px-5 py-4 text-sm font-bold text-[var(--text)] hover:bg-[var(--surface-strong)] transition-colors [&::-webkit-details-marker]:hidden">
-            <span>{faq.question}</span>
-            <span className="shrink-0 text-[var(--muted)] transition-transform group-open:rotate-45">
-              +
-            </span>
-          </summary>
-          <div className="px-5 pb-4 text-sm text-[var(--muted)] leading-relaxed">
-            {faq.answer}
-          </div>
-        </details>
-      ))}
-    </div>
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+      />
+      <div className="divide-y divide-[var(--border,rgba(15,27,45,0.1))] rounded-2xl border border-[var(--border,rgba(15,27,45,0.1))] bg-white">
+        {PRODUCT_FAQS.map((faq) => (
+          <details key={faq.question} className="group">
+            <summary className="flex cursor-pointer items-center justify-between gap-4 px-5 py-4 text-sm font-bold text-[var(--text)] hover:bg-[var(--surface-strong)] transition-colors [&::-webkit-details-marker]:hidden">
+              <span>{faq.question}</span>
+              <span className="shrink-0 text-[var(--muted)] transition-transform group-open:rotate-45">
+                +
+              </span>
+            </summary>
+            <div className="px-5 pb-4 text-sm text-[var(--muted)] leading-relaxed">
+              {faq.answer}
+            </div>
+          </details>
+        ))}
+      </div>
+    </>
   );
 }

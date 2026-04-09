@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
+import { getLearnPosts, formatLearnDate } from "@/lib/learn";
 
 export const metadata: Metadata = {
   title: "Learn About Dye-Free Gummies",
@@ -56,6 +57,43 @@ const LEARN_LINKS = [
   },
 ];
 
+function LearnPostsSection() {
+  const posts = getLearnPosts();
+  if (!posts.length) return null;
+
+  return (
+    <section className="mx-auto max-w-4xl px-4 pt-12 pb-8">
+      <h2 className="mb-6 text-center text-2xl font-black text-[var(--text)]">
+        Latest Articles
+      </h2>
+      <div className="grid gap-4 sm:grid-cols-2">
+        {posts.map((post) => (
+          <Link
+            key={post.slug}
+            href={`/learn/${post.slug}`}
+            className="group flex flex-col gap-2 rounded-2xl border border-[rgba(15,27,45,0.1)] bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
+          >
+            <span className="inline-block self-start rounded-full bg-[#1B2A4A]/10 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider text-[#1B2A4A]">
+              {post.category}
+            </span>
+            <span className="text-base font-black text-[var(--text)] group-hover:text-[#c7362c]">
+              {post.title}
+            </span>
+            <span className="line-clamp-2 text-sm text-[var(--muted)]">
+              {post.description}
+            </span>
+            <span className="mt-auto flex items-center gap-2 pt-2 text-xs text-[var(--muted)]">
+              <span>{formatLearnDate(post.date)}</span>
+              <span aria-hidden="true">&middot;</span>
+              <span>{post.readingTime}</span>
+            </span>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export default function LearnPage() {
   return (
     <main className="min-h-screen bg-[var(--surface-strong)] text-[var(--text)]">
@@ -95,6 +133,9 @@ export default function LearnPage() {
         </div>
       </section>
 
+      {/* ── LEARN POSTS ── */}
+      <LearnPostsSection />
+
       {/* ── LOGO DIVIDER ── */}
       <div
         className="flex items-center justify-center gap-4 py-6 bg-[var(--surface-strong)]"
@@ -114,6 +155,9 @@ export default function LearnPage() {
 
       {/* ── LINK GRID ── */}
       <section className="mx-auto max-w-4xl px-4 pb-16">
+        <h2 className="mb-6 text-center text-2xl font-black text-[var(--text)]">
+          Quick Links
+        </h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {LEARN_LINKS.map((link) => (
             <Link

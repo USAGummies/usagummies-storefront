@@ -89,6 +89,88 @@ export function trackEvent(event: string, payload: EventPayload = {}) {
   }
 }
 
+/* ── Meta Pixel helpers ── */
+declare global {
+  interface Window {
+    fbq?: (...args: any[]) => void;
+  }
+}
+
+function fbq(...args: any[]) {
+  if (typeof window !== "undefined" && typeof window.fbq === "function") {
+    window.fbq(...args);
+  }
+}
+
+export function trackViewContent(item: { id: string; name: string; price: number; currency?: string }) {
+  const currency = item.currency || "USD";
+
+  // Meta Pixel: ViewContent
+  fbq("track", "ViewContent", {
+    content_ids: [item.id],
+    content_name: item.name,
+    content_type: "product",
+    value: item.price,
+    currency,
+  });
+
+  // GA4: view_item
+  if (typeof window !== "undefined" && typeof window.gtag === "function") {
+    window.gtag("event", "view_item", {
+      currency,
+      value: item.price,
+      items: [{ item_id: item.id, item_name: item.name, price: item.price, quantity: 1 }],
+    });
+  }
+}
+
+export function trackAddToCart(item: { id: string; name: string; price: number; quantity: number; currency?: string }) {
+  const currency = item.currency || "USD";
+  const value = item.price * item.quantity;
+
+  // Meta Pixel: AddToCart
+  fbq("track", "AddToCart", {
+    content_ids: [item.id],
+    content_name: item.name,
+    content_type: "product",
+    value,
+    currency,
+    num_items: item.quantity,
+  });
+
+  // GA4: add_to_cart
+  if (typeof window !== "undefined" && typeof window.gtag === "function") {
+    window.gtag("event", "add_to_cart", {
+      currency,
+      value,
+      items: [{ item_id: item.id, item_name: item.name, price: item.price, quantity: item.quantity }],
+    });
+  }
+}
+
+export function trackPurchase(order: { id: string; value: number; currency?: string; items?: Array<{ id: string; name: string; price: number; quantity: number }> }) {
+  const currency = order.currency || "USD";
+
+  // Meta Pixel: Purchase
+  fbq("track", "Purchase", {
+    value: order.value,
+    currency,
+    content_ids: order.items?.map((i) => i.id) || [],
+    content_type: "product",
+    num_items: order.items?.reduce((sum, i) => sum + i.quantity, 0) || 1,
+  });
+
+  // GA4: purchase
+  if (typeof window !== "undefined" && typeof window.gtag === "function") {
+    window.gtag("event", "purchase", {
+      transaction_id: order.id,
+      value: order.value,
+      currency,
+      items: order.items?.map((i) => ({ item_id: i.id, item_name: i.name, price: i.price, quantity: i.quantity })) || [],
+    });
+  }
+}
+
 export function applyExperimentFromUrl(param = "exp") {
   if (typeof window === "undefined") return null;
   let stored: string | null = null;

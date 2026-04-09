@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Reveal } from "@/components/ui/Reveal";
 import { LeadCapture } from "@/components/marketing/LeadCapture.client";
+import PurchaseTracker from "@/components/tracking/PurchaseTracker.client";
 // SubscriptionUnlock removed — replaced with direct subscription CTA
 
 function resolveSiteUrl() {
@@ -54,6 +55,7 @@ export const metadata: Metadata = {
 export default function ThankYouPage() {
   return (
     <main className="relative overflow-hidden text-[var(--text)] min-h-screen home-candy pb-16">
+      <PurchaseTracker />
       <div className="mx-auto max-w-6xl px-4 pt-10">
         <Reveal className="candy-panel rounded-3xl border border-[var(--border)] p-6 space-y-3 text-[var(--text)]">
           <div className="text-xs font-semibold tracking-[0.22em] text-[var(--muted)] uppercase">

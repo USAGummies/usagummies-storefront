@@ -261,6 +261,12 @@ export default function BagSlider({
     setBusy(true);
     trackEvent("bag_slider_add_to_cart", { qty, per_bag: perBag, total });
 
+    // Fire Meta Pixel + GA4 enhanced ecommerce
+    try {
+      const { trackAddToCart } = await import("@/lib/analytics");
+      trackAddToCart({ id: "all-american-gummy-bears", name: "All American Gummy Bears", price: perBag, quantity: qty });
+    } catch { /* silent */ }
+
     try {
       const existingCartId = getStoredCartId();
       const res = await fetch("/api/cart", {

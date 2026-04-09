@@ -16,6 +16,7 @@ import ReviewsSection from "@/components/home/ReviewsSection";
 import { TrustBar, GuaranteeBadge } from "@/components/social-proof/TrustBar";
 import ProductFaqAccordion from "./ProductFaqAccordion";
 import { getReviewAggregate } from "@/lib/reviews/aggregate";
+import ProductViewTracker from "@/components/tracking/ProductViewTracker.client";
 
 export const revalidate = 3600;
 
@@ -148,6 +149,12 @@ export default async function ProductPage({ params }: PageProps) {
 
   return (
     <main className="min-h-screen bg-white text-[var(--text)]">
+      <ProductViewTracker
+        productId={product.handle}
+        productName={product.title}
+        price={Number(priceAmount) || 5.99}
+        currency={priceCurrency}
+      />
       <FocusBundles targetSelector="#product-bundles" />
 
       <BreadcrumbJsonLd
