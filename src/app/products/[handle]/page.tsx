@@ -15,6 +15,7 @@ import { DETAIL_BULLETS } from "@/data/productDetails";
 import ReviewsSection from "@/components/home/ReviewsSection";
 import { TrustBar, GuaranteeBadge } from "@/components/social-proof/TrustBar";
 import ProductFaqAccordion from "./ProductFaqAccordion";
+import { getReviewAggregate } from "@/lib/reviews/aggregate";
 
 export const revalidate = 3600;
 
@@ -123,6 +124,8 @@ export default async function ProductPage({ params }: PageProps) {
   } catch {
     bundleVariants = null;
   }
+
+  const reviewAggregate = await getReviewAggregate();
 
   const productImages = (product.images?.edges || []).map((edge: any) => edge?.node).filter(Boolean);
   const productImageUrls = productImages.map((img: any) => img?.url).filter(Boolean);
@@ -274,6 +277,14 @@ export default async function ProductPage({ params }: PageProps) {
         brandName="USA Gummies"
         siteUrl={resolveSiteUrl()}
         availability={bundleVariants?.availableForSale === false ? "OutOfStock" : "InStock"}
+        aggregateRating={
+          reviewAggregate
+            ? {
+                ratingValue: reviewAggregate.ratingValue,
+                reviewCount: reviewAggregate.reviewCount,
+              }
+            : null
+        }
       />
     </main>
   );

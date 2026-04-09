@@ -21,9 +21,16 @@ export default function ExitIntentPopup() {
   const popupRef = useRef<HTMLDivElement>(null);
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
 
-  // Check if previously dismissed or already submitted
+  // Check if previously dismissed, already submitted, or paid ad traffic
   const wasDismissed = useCallback(() => {
     try {
+      // Suppress popup for paid ad traffic
+      if (typeof window !== "undefined") {
+        const params = new URLSearchParams(window.location.search);
+        const src = params.get("utm_source")?.toLowerCase() ?? "";
+        const med = params.get("utm_medium")?.toLowerCase() ?? "";
+        if (src === "google" || med === "cpc" || med === "ppc") return true;
+      }
       if (localStorage.getItem(SUBMITTED_KEY) === "true") return true;
       const ts = localStorage.getItem(STORAGE_KEY);
       if (!ts) return false;

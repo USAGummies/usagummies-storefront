@@ -231,7 +231,8 @@ export default function BagSlider({
   const [busy, setBusy] = useState(false);
   const trackRef = useRef<HTMLDivElement>(null);
 
-  const isAmazon = qty < DISCOUNT_START_QTY;
+  // DTC site: always show add-to-cart, never redirect to Amazon
+  const isAmazon = false;
   const { perBag, total } = pricingForQty(qty);
   const retailTotal = BASE_PRICE * qty;
   const savings = retailTotal - total;
@@ -360,21 +361,10 @@ export default function BagSlider({
               }
             }}
             disabled={busy}
-            className={`flex-[1.2] py-3 bg-[#c7362c] text-white font-display text-sm tracking-[1px] uppercase rounded-xl text-center transition-all hover:-translate-y-px hover:bg-[#a82920] ${busy ? "opacity-60 pointer-events-none" : ""}`}
+            className={`flex-1 py-3 bg-[#c7362c] text-white font-display text-sm tracking-[1px] uppercase rounded-xl text-center transition-all hover:-translate-y-px hover:bg-[#a82920] ${busy ? "opacity-60 pointer-events-none" : ""}`}
           >
-            {busy ? "Adding\u2026" : isAmazon ? `5 BAGS \u2014 ${money(pricingForQty(5).total)}` : `${qty} BAGS \u2014 ${money(total)}`}
+            {busy ? "Adding\u2026" : `${qty} BAGS \u2014 ${money(total)}`}
           </button>
-
-          {/* Secondary: Amazon CTA */}
-          <a
-            href={AMAZON_LISTING_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => trackEvent("bag_slider_sticky_amazon", { qty })}
-            className="flex-1 py-3 bg-white border-2 border-[#1B2A4A] text-[#1B2A4A] font-display text-sm tracking-[1px] uppercase rounded-xl text-center transition-all hover:-translate-y-px hover:border-[#c7362c] hover:bg-[#f0ede6]"
-          >
-            AMAZON
-          </a>
           </div>
         </div>
       </div>
