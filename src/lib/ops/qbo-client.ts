@@ -109,7 +109,9 @@ async function qboFetch<T>(
   }
 
   const baseUrl = getBaseUrl(realmId);
-  const url = `${baseUrl}${path}`;
+  // Always include minorversion to ensure newer fields (AcctNum, etc.) are accepted
+  const separator = path.includes("?") ? "&" : "?";
+  const url = `${baseUrl}${path}${separator}minorversion=73`;
 
   try {
     const res = await fetch(url, {
