@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { isAuthorized } from "@/lib/ops/abra-auth";
-import { createQBOBillPayment } from "@/lib/ops/qbo-client";
+import { createQBOBillPayment, voidQBOBillPayment } from "@/lib/ops/qbo-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -59,5 +59,42 @@ export async function POST(req: Request) {
   } catch (error) {
     console.error("[qbo/bill-payment] POST failed:", error instanceof Error ? error.message : error);
     return NextResponse.json({ error: "Bill payment creation failed" }, { status: 500 });
+  }
+}
+
+/**
+ * DELETE /api/ops/qbo/bill-payment — Void a bill payment
+ *
+ * Body: { id, sync_token }
+ */
+export async function DELETE(req: Request) {
+  if (!(await isAuthorized(req))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const body = await req.json();
+
+    if (!body.id || body.sync_token === undefined) {
+      return NextResponse.json(
+        { error: "id and sync_token are required" },
+        { status: 400 },
+      );
+    }
+
+    const result = await voidQBOBillPayment(body.id, body.sync_token);
+
+    if (!result) {
+      return NextResponse.json(
+        { error: `Failed to void bill payment ${body.id}` },
+        { status: 500 },
+      );
+    }
+
+    const data = (result as Record<string, unknown>).BillPayment || result;
+    return NextResponse.json({ ok: true, voided: true, bill_payment: data });
+  } catch (error) {
+    console.error("[qbo/bill-payment] DELETE failed:", error instanceof Error ? error.message : error);
+    return NextResponse.json({ error: "Bill payment void failed" }, { status: 500 });
   }
 }

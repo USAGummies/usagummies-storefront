@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { isAuthorized } from "@/lib/ops/abra-auth";
-import { createQBOBill } from "@/lib/ops/qbo-client";
+import { createQBOBill, deleteQBOBill } from "@/lib/ops/qbo-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,5 +44,42 @@ export async function POST(req: Request) {
   } catch (error) {
     console.error("[qbo/bill] POST failed:", error instanceof Error ? error.message : error);
     return NextResponse.json({ error: "Bill creation failed" }, { status: 500 });
+  }
+}
+
+/**
+ * DELETE /api/ops/qbo/bill — Delete a bill
+ *
+ * Body: { id, sync_token }
+ * Note: QBO bills can only be deleted, not voided.
+ */
+export async function DELETE(req: Request) {
+  if (!(await isAuthorized(req))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const body = await req.json();
+
+    if (!body.id || body.sync_token === undefined) {
+      return NextResponse.json(
+        { error: "id and sync_token are required" },
+        { status: 400 },
+      );
+    }
+
+    const result = await deleteQBOBill(body.id, body.sync_token);
+
+    if (!result) {
+      return NextResponse.json(
+        { error: `Failed to delete bill ${body.id}` },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json({ ok: true, deleted: true, id: body.id });
+  } catch (error) {
+    console.error("[qbo/bill] DELETE failed:", error instanceof Error ? error.message : error);
+    return NextResponse.json({ error: "Bill deletion failed" }, { status: 500 });
   }
 }

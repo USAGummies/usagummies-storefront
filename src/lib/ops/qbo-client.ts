@@ -878,3 +878,140 @@ export async function createQBOPayment(
     body: JSON.stringify(payment),
   });
 }
+
+/**
+ * Void a payment in QBO.
+ * POST /payment?operation=void (requires Id + SyncToken)
+ */
+export async function voidQBOPayment(
+  id: string,
+  syncToken: string,
+): Promise<QBOEntity | null> {
+  return qboFetch<QBOEntity>("/payment?operation=void", {
+    method: "POST",
+    body: JSON.stringify({ Id: id, SyncToken: syncToken, sparse: true }),
+  });
+}
+
+/**
+ * Delete a payment in QBO.
+ * POST /payment?operation=delete (requires Id + SyncToken)
+ */
+export async function deleteQBOPayment(
+  id: string,
+  syncToken: string,
+): Promise<QBOEntity | null> {
+  return qboFetch<QBOEntity>("/payment?operation=delete", {
+    method: "POST",
+    body: JSON.stringify({ Id: id, SyncToken: syncToken }),
+  });
+}
+
+/**
+ * Void a bill payment in QBO.
+ * POST /billpayment?operation=void
+ */
+export async function voidQBOBillPayment(
+  id: string,
+  syncToken: string,
+): Promise<QBOEntity | null> {
+  return qboFetch<QBOEntity>("/billpayment?operation=void", {
+    method: "POST",
+    body: JSON.stringify({ Id: id, SyncToken: syncToken, sparse: true }),
+  });
+}
+
+/**
+ * Delete a bill in QBO.
+ * POST /bill?operation=delete
+ */
+export async function deleteQBOBill(
+  id: string,
+  syncToken: string,
+): Promise<QBOEntity | null> {
+  return qboFetch<QBOEntity>("/bill?operation=delete", {
+    method: "POST",
+    body: JSON.stringify({ Id: id, SyncToken: syncToken }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// WRITE: Estimate (QBO's Sales Order equivalent)
+// ---------------------------------------------------------------------------
+
+export type QBOEstimateInput = {
+  CustomerRef: { value: string; name?: string };
+  Line: Array<{
+    Amount: number;
+    DetailType: "SalesItemLineDetail";
+    SalesItemLineDetail: {
+      ItemRef: { value: string; name?: string };
+      Qty?: number;
+      UnitPrice?: number;
+    };
+    Description?: string;
+  }>;
+  TxnDate?: string;
+  ExpirationDate?: string;
+  DocNumber?: string;
+  CustomerMemo?: { value: string };
+  BillEmail?: { Address: string };
+  PrivateNote?: string;
+  TxnStatus?: "Pending" | "Accepted" | "Closed" | "Rejected";
+};
+
+/**
+ * Create an Estimate (Sales Order) in QBO.
+ * POST /estimate
+ */
+export async function createQBOEstimate(
+  estimate: QBOEstimateInput,
+): Promise<QBOEntity | null> {
+  return qboFetch<QBOEntity>("/estimate", {
+    method: "POST",
+    body: JSON.stringify(estimate),
+  });
+}
+
+/**
+ * Read an Estimate by ID.
+ * GET /estimate/{id}
+ */
+export async function getQBOEstimate(
+  id: string,
+): Promise<QBOEntity | null> {
+  return qboFetch<QBOEntity>(`/estimate/${id}`);
+}
+
+/**
+ * Update an Estimate (sparse update).
+ * POST /estimate (with Id and SyncToken)
+ */
+export async function updateQBOEstimate(
+  estimate: QBOEntity,
+): Promise<QBOEntity | null> {
+  return qboFetch<QBOEntity>("/estimate", {
+    method: "POST",
+    body: JSON.stringify(estimate),
+  });
+}
+
+/**
+ * Query Estimates.
+ */
+export async function getQBOEstimates(
+  startDate?: string,
+  endDate?: string,
+): Promise<QBOEntity[]> {
+  let sql = "SELECT * FROM Estimate";
+  const conditions: string[] = [];
+  if (startDate) conditions.push(`TxnDate >= '${startDate}'`);
+  if (endDate) conditions.push(`TxnDate <= '${endDate}'`);
+  if (conditions.length > 0) sql += ` WHERE ${conditions.join(" AND ")}`;
+  sql += " MAXRESULTS 100";
+
+  const res = await qboFetch<{ QueryResponse?: { Estimate?: QBOEntity[] } }>(
+    `/query?query=${encodeURIComponent(sql)}`,
+  );
+  return res?.QueryResponse?.Estimate || [];
+}

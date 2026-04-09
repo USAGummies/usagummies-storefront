@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { isAuthorized } from "@/lib/ops/abra-auth";
-import { createQBOPayment } from "@/lib/ops/qbo-client";
+import { createQBOPayment, voidQBOPayment, deleteQBOPayment } from "@/lib/ops/qbo-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -65,5 +65,50 @@ export async function POST(req: Request) {
       { error: "Payment creation failed" },
       { status: 500 },
     );
+  }
+}
+
+/**
+ * DELETE /api/ops/qbo/payment — Void or delete a payment
+ *
+ * Body: { id, sync_token, action?: "void" | "delete" }
+ * Default action is "void" (safer — leaves audit trail in QBO)
+ */
+export async function DELETE(req: Request) {
+  if (!(await isAuthorized(req))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const body = await req.json();
+
+    if (!body.id || body.sync_token === undefined) {
+      return NextResponse.json(
+        { error: "id and sync_token are required" },
+        { status: 400 },
+      );
+    }
+
+    const action = body.action || "void";
+
+    let result;
+    if (action === "delete") {
+      result = await deleteQBOPayment(body.id, body.sync_token);
+    } else {
+      result = await voidQBOPayment(body.id, body.sync_token);
+    }
+
+    if (!result) {
+      return NextResponse.json(
+        { error: `Failed to ${action} payment ${body.id}` },
+        { status: 500 },
+      );
+    }
+
+    const data = (result as Record<string, unknown>).Payment || result;
+    return NextResponse.json({ ok: true, action, payment: data });
+  } catch (error) {
+    console.error("[qbo/payment] DELETE failed:", error instanceof Error ? error.message : error);
+    return NextResponse.json({ error: "Payment void/delete failed" }, { status: 500 });
   }
 }
