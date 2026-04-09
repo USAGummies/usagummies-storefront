@@ -204,7 +204,8 @@ function BagStack({ qty }: { qty: number }): React.ReactElement {
         >
           <Image
             src={BAG_IMAGE_SRC}
-            alt=""
+            alt="Gummy bear bag"
+            aria-hidden="true"
             width={sizePx}
             height={sizePx}
             className="drop-shadow-md pointer-events-none w-[44px] md:w-[56px] h-auto"

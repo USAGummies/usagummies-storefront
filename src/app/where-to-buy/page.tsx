@@ -87,8 +87,8 @@ export default function WhereToBuyPage() {
       {/* Hero */}
       <div className="relative w-full h-[280px] sm:h-[340px] lg:h-[400px] overflow-hidden">
         <Image
-          src="/brand/gallery/bag-shelf-space.jpg"
-          alt="USA Gummies bags displayed on a retail shelf"
+          src="/brand/americana/declaration-freedom.jpg"
+          alt="USA Gummies patriotic brand imagery"
           fill
           sizes="100vw"
           className="object-cover"

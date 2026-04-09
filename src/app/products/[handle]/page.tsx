@@ -12,6 +12,9 @@ import { BASE_PRICE, FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import { buildCanonicalUrl, resolveSiteUrl } from "@/lib/seo/canonical";
 import { getProductByHandle } from "@/lib/storefront";
 import { DETAIL_BULLETS } from "@/data/productDetails";
+import ReviewsSection from "@/components/home/ReviewsSection";
+import { TrustBar, GuaranteeBadge } from "@/components/social-proof/TrustBar";
+import ProductFaqAccordion from "./ProductFaqAccordion";
 
 export const revalidate = 3600;
 
@@ -20,7 +23,7 @@ const PRODUCT_TITLE_FALLBACK = "Dye-Free Gummies Made in USA";
 const PRODUCT_DESCRIPTION_FALLBACK =
   "Shop USA Gummies made in USA candy with no artificial dyes. Dye-free gummies for patriotic parties and gifts.";
 const PRODUCT_TITLE_SUFFIX = " | Dye-Free Gummies Made in USA";
-const PRODUCT_TITLE_MAX = 60;
+const PRODUCT_TITLE_MAX = 70;
 const PRODUCT_DESCRIPTION_PREFIX = "Shop ";
 const PRODUCT_DESCRIPTION_SUFFIX =
   ", a made in USA candy with no artificial dyes. Dye-free gummies for patriotic parties and gifts.";
@@ -197,6 +200,64 @@ export default async function ProductPage({ params }: PageProps) {
               <BagSlider variant="full" defaultQty={5} />
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* ── REVIEWS ── */}
+      <section className="bg-[var(--surface-strong)]">
+        <div className="mx-auto max-w-6xl px-4 py-10 lg:py-14">
+          <ReviewsSection />
+        </div>
+      </section>
+
+      {/* ── PRODUCT FAQ ── */}
+      <section className="bg-white">
+        <div className="mx-auto max-w-3xl px-4 py-10 lg:py-14">
+          <div className="text-center mb-6">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+              Common questions
+            </div>
+            <h2 className="mt-1 text-2xl font-black text-[var(--text)] sm:text-3xl">
+              Product FAQ
+            </h2>
+          </div>
+          <ProductFaqAccordion />
+        </div>
+      </section>
+
+      {/* ── TRUST & QUALITY ── */}
+      <section className="bg-[var(--surface-strong)]">
+        <div className="mx-auto max-w-4xl px-4 py-10 lg:py-14">
+          <div className="text-center mb-6">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+              Quality promise
+            </div>
+            <h2 className="mt-1 text-2xl font-black text-[var(--text)] sm:text-3xl">
+              Why USA Gummies
+            </h2>
+          </div>
+          <TrustBar variant="full" />
+          <div className="mt-4 flex justify-center">
+            <GuaranteeBadge />
+          </div>
+        </div>
+      </section>
+
+      {/* ── BUNDLE UPSELL ── */}
+      <section className="bg-white">
+        <div className="mx-auto max-w-4xl px-4 py-10 lg:py-14">
+          <div className="text-center mb-6">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+              Save more
+            </div>
+            <h2 className="mt-1 text-2xl font-black text-[var(--text)] sm:text-3xl">
+              Bundle &amp; save
+            </h2>
+            <p className="mt-2 text-sm text-[var(--muted)]">
+              Lower the per-bag price with bundles. {FREE_SHIPPING_PHRASE}.
+            </p>
+          </div>
+          <BagSlider variant="full" defaultQty={5} />
         </div>
       </section>
 

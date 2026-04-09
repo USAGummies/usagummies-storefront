@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import ContactForm from "@/components/forms/ContactForm";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 
@@ -50,27 +51,39 @@ export default function ContactPage() {
           { name: "Contact", href: "/contact" },
         ]}
       />
-      <div className="mx-auto max-w-4xl px-4 py-10">
-        <div className="mb-6 flex items-center justify-between gap-3">
-          <Link
-            href="/"
-            className="rounded-full border border-[var(--border)] bg-white px-3 py-1 text-sm text-[var(--text)] hover:bg-[var(--surface-strong)]"
-          >
-            Home
-          </Link>
-          <Link
-            href="/shop"
-            className="rounded-full border border-[var(--border)] bg-white px-3 py-1 text-sm text-[var(--text)] hover:bg-[var(--surface-strong)]"
-          >
-            Shop USA Gummies
-          </Link>
-        </div>
 
+      {/* ── HERO ── */}
+      <section className="relative flex min-h-[260px] items-center justify-center overflow-hidden bg-[#1B2A4A] sm:min-h-[320px]">
+        <Image
+          src="/brand/americana/crossing-freedom.jpg"
+          alt="USA Gummies brand background"
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover opacity-30"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#1B2A4A]/50 to-[#1B2A4A]/80" />
+        <div className="relative z-10 flex flex-col items-center gap-3 px-4 text-center">
+          <Image
+            src="/brand/logo-full.png"
+            alt="USA Gummies logo"
+            width={180}
+            height={115}
+            className="h-auto w-[120px] sm:w-[160px]"
+          />
+          <h1 className="font-display text-3xl font-black text-white sm:text-4xl lg:text-5xl">
+            Contact Us
+          </h1>
+          <p className="max-w-md text-sm text-white/80">
+            We reply within one business day.
+          </p>
+        </div>
+      </section>
+
+      <div className="mx-auto max-w-4xl px-4 py-10">
         <section className="candy-panel p-7">
-          <h1 className="text-3xl font-semibold tracking-tight">Contact</h1>
-          <p className="mt-3 text-[var(--muted)]">
+          <p className="text-[var(--muted)]">
             Customer support or business inquiries — send a message below.
-            We respond within one business day.
           </p>
 
           <div className="mt-6 grid gap-3 sm:grid-cols-3">
