@@ -314,6 +314,9 @@ export async function PATCH(req: Request) {
       }
     }
 
+    // Log exact payload for debugging QBO field passthrough
+    console.log("[qbo/purchaseorder] PATCH payload:", JSON.stringify(payload));
+
     const result = await updateQBOPurchaseOrder(payload);
 
     if (!result) {
@@ -323,6 +326,9 @@ export async function PATCH(req: Request) {
       );
     }
 
+    // Log raw QBO response to see what came back
+    console.log("[qbo/purchaseorder] PATCH result:", JSON.stringify(result).slice(0, 500));
+
     const data = (result as Record<string, unknown>).PurchaseOrder || result;
     const po = data as Record<string, unknown>;
     return NextResponse.json({
@@ -330,6 +336,7 @@ export async function PATCH(req: Request) {
       purchase_order: data,
       message: `Updated PO ID ${id}`,
       _debug: {
+        sent_payload: payload,
         sent_fields: Object.keys(payload).filter((k) => k !== "Id" && k !== "SyncToken" && k !== "sparse"),
         sync_token_sent: String(syncToken),
         sync_token_returned: po.SyncToken,
