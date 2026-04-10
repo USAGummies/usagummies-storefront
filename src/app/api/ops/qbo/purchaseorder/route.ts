@@ -42,6 +42,7 @@ import {
   getQBOPurchaseOrders,
   updateQBOPurchaseOrder,
 } from "@/lib/ops/qbo-client";
+import { validateQBOWrite, logQBOAudit } from "@/lib/ops/qbo-guardrails";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -133,6 +134,46 @@ export async function POST(req: Request) {
       // Note: vendor_email is set on the Vendor record (PUT /vendor), not on the PO
     };
 
+    // ── GUARDRAIL: Validate before writing ──
+    const isDryRun = body.dry_run === true;
+    const validation = await validateQBOWrite(
+      "purchaseorder",
+      payload as unknown as Record<string, unknown>,
+      { dry_run: isDryRun, caller: body.caller || "viktor" },
+    );
+
+    // Log the attempt regardless
+    await logQBOAudit({
+      entity_type: "purchaseorder",
+      action: "create",
+      endpoint: "/api/ops/qbo/purchaseorder",
+      amount: validation.amount,
+      vendor_or_customer: `vendor:${body.vendor_id}`,
+      ref_number: body.ref_number,
+      dry_run: isDryRun,
+      validation_passed: validation.valid,
+      issues: validation.issues,
+      caller: body.caller || "viktor",
+    });
+
+    // Block if validation fails or dry run
+    if (!validation.valid) {
+      return NextResponse.json({
+        ok: false,
+        blocked: true,
+        validation,
+        message: validation.summary,
+      }, { status: 422 });
+    }
+    if (isDryRun) {
+      return NextResponse.json({
+        ok: true,
+        dry_run: true,
+        validation,
+        message: validation.summary,
+      });
+    }
+
     const result = await createQBOPurchaseOrder(payload);
 
     if (!result) {
@@ -144,6 +185,21 @@ export async function POST(req: Request) {
 
     const data = (result as Record<string, unknown>).PurchaseOrder || result;
     const po = data as Record<string, unknown>;
+
+    // Log successful write with result ID
+    await logQBOAudit({
+      entity_type: "purchaseorder",
+      action: "create",
+      endpoint: "/api/ops/qbo/purchaseorder",
+      amount: validation.amount,
+      vendor_or_customer: `vendor:${body.vendor_id}`,
+      ref_number: po.DocNumber as string | undefined,
+      dry_run: false,
+      validation_passed: true,
+      issues: validation.issues,
+      result_id: po.Id as string | undefined,
+      caller: body.caller || "viktor",
+    });
 
     return NextResponse.json({
       ok: true,
@@ -157,6 +213,12 @@ export async function POST(req: Request) {
         POStatus: po.POStatus,
         SyncToken: po.SyncToken,
         Line: po.Line,
+        ShipAddr: po.ShipAddr,
+        ShipMethodRef: po.ShipMethodRef,
+      },
+      validation: {
+        issues: validation.issues,
+        summary: validation.summary,
       },
       message: `Created PO${po.DocNumber ? ` #${po.DocNumber}` : ""} for $${po.TotalAmt} — ID: ${po.Id}`,
     });

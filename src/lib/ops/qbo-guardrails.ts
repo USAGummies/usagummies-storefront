@@ -187,6 +187,46 @@ function validateRequiredFields(body: Record<string, unknown>, entityType: QBOEn
     }
   }
 
+  // ── PO-SPECIFIC REQUIRED FIELDS (per Rene's process gates) ──
+  if (entityType === "purchaseorder") {
+    if (!body.DueDate) {
+      issues.push({
+        severity: "error",
+        code: "PO_MISSING_DUE_DATE",
+        message: "POs require a DueDate (expected delivery date). Calculate from terms or set explicitly.",
+        field: "DueDate",
+      });
+    }
+    if (!body.ShipAddr) {
+      issues.push({
+        severity: "error",
+        code: "PO_MISSING_SHIP_TO",
+        message: "POs require a ship-to address. Where is this being delivered?",
+        field: "ShipAddr",
+      });
+    }
+    if (!body.Memo && !body.CustomerMemo) {
+      issues.push({
+        severity: "warning",
+        code: "PO_MISSING_MEMO",
+        message: "POs should include a memo with payment terms and reference to the vendor email/agreement.",
+        field: "Memo",
+      });
+    }
+  }
+
+  // ── INVOICE-SPECIFIC FIELDS ──
+  if (entityType === "invoice") {
+    if (!body.DueDate) {
+      issues.push({
+        severity: "warning",
+        code: "INVOICE_MISSING_DUE_DATE",
+        message: "Invoice should have a DueDate for AR tracking. Defaults to Net 30 if unset.",
+        field: "DueDate",
+      });
+    }
+  }
+
   return issues;
 }
 

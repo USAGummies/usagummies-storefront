@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isAuthorized } from "@/lib/ops/abra-auth";
 import { createQBOBill, deleteQBOBill } from "@/lib/ops/qbo-client";
+import { validateQBOWrite, logQBOAudit } from "@/lib/ops/qbo-guardrails";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,7 +21,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "lines array is required" }, { status: 400 });
     }
 
-    const result = await createQBOBill({
+    const billPayload = {
       VendorRef: { value: body.vendor_id },
       DueDate: body.due_date,
       DocNumber: body.ref_number || body.doc_number,
@@ -65,14 +66,54 @@ export async function POST(req: Request) {
           ...(l.description ? { Description: l.description } : {}),
         };
       }),
+    };
+
+    // ── GUARDRAIL: Validate before writing ──
+    const isDryRun = body.dry_run === true;
+    const validation = await validateQBOWrite(
+      "bill",
+      billPayload as unknown as Record<string, unknown>,
+      { dry_run: isDryRun, caller: body.caller || "viktor" },
+    );
+
+    await logQBOAudit({
+      entity_type: "bill",
+      action: "create",
+      endpoint: "/api/ops/qbo/bill",
+      amount: validation.amount,
+      vendor_or_customer: `vendor:${body.vendor_id}`,
+      ref_number: body.ref_number || body.doc_number,
+      dry_run: isDryRun,
+      validation_passed: validation.valid,
+      issues: validation.issues,
+      caller: body.caller || "viktor",
     });
+
+    if (!validation.valid) {
+      return NextResponse.json({
+        ok: false, blocked: true, validation,
+        message: validation.summary,
+      }, { status: 422 });
+    }
+    if (isDryRun) {
+      return NextResponse.json({
+        ok: true, dry_run: true, validation,
+        message: validation.summary,
+      });
+    }
+
+    const result = await createQBOBill(billPayload);
 
     if (!result) {
       return NextResponse.json({ error: "QBO bill creation failed" }, { status: 500 });
     }
 
     const data = (result as Record<string, unknown>).Bill || result;
-    return NextResponse.json({ ok: true, bill: data });
+    return NextResponse.json({
+      ok: true,
+      bill: data,
+      validation: { issues: validation.issues, summary: validation.summary },
+    });
   } catch (error) {
     console.error("[qbo/bill] POST failed:", error instanceof Error ? error.message : error);
     return NextResponse.json({ error: "Bill creation failed" }, { status: 500 });
