@@ -25,9 +25,9 @@
  *   memo?,                 // header memo
  *   vendor_message?,       // message to vendor (prints on PO)
  *   ap_account_id?,        // AP account override
- *   ship_to?: { line1, city, state, zip },
- *   ship_via?,             // shipping method / carrier
- *   vendor_email?          // vendor email for PO delivery
+ *   ship_to?: { line1, city, state, zip } | { Line1, City, CountrySubDivisionCode, PostalCode },
+ *   ship_via?              // shipping method / carrier (free text, auto-creates in QBO)
+ *   // Note: vendor email is set via PUT /api/ops/qbo/vendor, not on the PO
  * }
  *
  * DELETE body: { id, sync_token }
@@ -122,15 +122,15 @@ export async function POST(req: Request) {
       ...(body.ap_account_id ? { APAccountRef: { value: body.ap_account_id } } : {}),
       ...(body.ship_to ? {
         ShipAddr: {
-          Line1: body.ship_to.line1,
-          City: body.ship_to.city,
-          CountrySubDivisionCode: body.ship_to.state,
-          PostalCode: body.ship_to.zip,
+          Line1: body.ship_to.line1 || body.ship_to.Line1,
+          City: body.ship_to.city || body.ship_to.City,
+          CountrySubDivisionCode: body.ship_to.state || body.ship_to.CountrySubDivisionCode,
+          PostalCode: body.ship_to.zip || body.ship_to.PostalCode,
         },
       } : {}),
-      ...(body.ship_via ? { ShipMethodRef: { value: body.ship_via } } : {}),
-      ...(body.vendor_message ? { Memo: body.memo, CustomerMemo: { value: body.vendor_message } } : {}),
-      ...(body.vendor_email ? { POEmail: { Address: body.vendor_email } } : {}),
+      ...(body.ship_via ? { ShipMethodRef: { value: body.ship_via, name: body.ship_via } } : {}),
+      ...(body.vendor_message ? { CustomerMemo: { value: body.vendor_message } } : {}),
+      // Note: vendor_email is set on the Vendor record (PUT /vendor), not on the PO
     };
 
     const result = await createQBOPurchaseOrder(payload);
@@ -195,15 +195,17 @@ export async function PATCH(req: Request) {
     if (body.date !== undefined) payload.TxnDate = body.date;
     if (body.ref_number !== undefined) payload.DocNumber = body.ref_number;
     if (body.po_status !== undefined) payload.POStatus = body.po_status; // "Open" or "Closed"
-    if (body.ship_via !== undefined) payload.ShipMethodRef = { value: body.ship_via };
-    if (body.vendor_email !== undefined) payload.POEmail = { Address: body.vendor_email };
+    if (body.ship_via !== undefined) payload.ShipMethodRef = { value: body.ship_via, name: body.ship_via };
     if (body.vendor_message !== undefined) payload.CustomerMemo = { value: body.vendor_message };
+    // Note: vendor_email is set on the Vendor record (PUT /api/ops/qbo/vendor), not on the PO itself
     if (body.ship_to !== undefined) {
+      const s = body.ship_to;
       payload.ShipAddr = {
-        Line1: body.ship_to.line1,
-        City: body.ship_to.city,
-        CountrySubDivisionCode: body.ship_to.state,
-        PostalCode: body.ship_to.zip,
+        // Accept both snake_case (line1, city, state, zip) and QBO PascalCase (Line1, City, etc.)
+        Line1: s.line1 || s.Line1,
+        City: s.city || s.City,
+        CountrySubDivisionCode: s.state || s.CountrySubDivisionCode,
+        PostalCode: s.zip || s.PostalCode,
       };
     }
     if (body.lines && Array.isArray(body.lines) && body.lines.length > 0) {
