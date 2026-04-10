@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isAuthorized } from "@/lib/ops/abra-auth";
 import { createQBOPurchase } from "@/lib/ops/qbo-client";
+import { validateQBOWrite, logQBOAudit } from "@/lib/ops/qbo-guardrails";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,7 +24,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "lines array is required" }, { status: 400 });
     }
 
-    const result = await createQBOPurchase({
+    const purchasePayload = {
       AccountRef: { value: body.account_id },
       PaymentType: body.payment_type,
       TxnDate: body.date,
@@ -38,14 +39,53 @@ export async function POST(req: Request) {
         },
         Description: l.description,
       })),
+    };
+
+    // ── GUARDRAIL: Validate before writing ──
+    const isDryRun = body.dry_run === true;
+    const validation = await validateQBOWrite(
+      "purchase",
+      purchasePayload as unknown as Record<string, unknown>,
+      { dry_run: isDryRun, caller: body.caller || "viktor" },
+    );
+
+    await logQBOAudit({
+      entity_type: "purchase",
+      action: "create",
+      endpoint: "/api/ops/qbo/purchase",
+      amount: validation.amount,
+      vendor_or_customer: body.vendor_id ? `vendor:${body.vendor_id}` : undefined,
+      ref_number: body.ref_number,
+      dry_run: isDryRun,
+      validation_passed: validation.valid,
+      issues: validation.issues,
+      caller: body.caller || "viktor",
     });
+
+    if (!validation.valid) {
+      return NextResponse.json({
+        ok: false, blocked: true, validation,
+        message: validation.summary,
+      }, { status: 422 });
+    }
+    if (isDryRun) {
+      return NextResponse.json({
+        ok: true, dry_run: true, validation,
+        message: validation.summary,
+      });
+    }
+
+    const result = await createQBOPurchase(purchasePayload);
 
     if (!result) {
       return NextResponse.json({ error: "QBO purchase creation failed" }, { status: 500 });
     }
 
     const data = (result as Record<string, unknown>).Purchase || result;
-    return NextResponse.json({ ok: true, purchase: data });
+    return NextResponse.json({
+      ok: true, purchase: data,
+      validation: { issues: validation.issues, summary: validation.summary },
+    });
   } catch (error) {
     console.error("[qbo/purchase] POST failed:", error instanceof Error ? error.message : error);
     return NextResponse.json({ error: "Purchase creation failed" }, { status: 500 });

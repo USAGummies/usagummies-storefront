@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { isAuthorized } from "@/lib/ops/abra-auth";
 import { getRealmId, getValidAccessToken } from "@/lib/ops/qbo-auth";
+import { validateQBOWrite, logQBOAudit } from "@/lib/ops/qbo-guardrails";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -153,7 +154,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const parsed = RequestSchema.safeParse(await req.json().catch(() => ({})));
+  const rawBody = await req.json().catch(() => ({}));
+  const isDryRun = rawBody.dry_run === true;
+  const caller = rawBody.caller || "viktor";
+
+  const parsed = RequestSchema.safeParse(rawBody);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues.map((issue) => issue.message).join("; ") }, { status: 400 });
   }
@@ -189,31 +194,66 @@ export async function POST(req: Request) {
   const dueDate = parsed.data.dueDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const total = parsed.data.lineItems.reduce((sum, itemRow) => sum + (itemRow.quantity * itemRow.unitPrice), 0);
 
+  const invoicePayload = {
+    CustomerRef: { value: customer.Id },
+    TxnDate: txnDate,
+    DueDate: dueDate,
+    ...(parsed.data.docNumber ? { DocNumber: parsed.data.docNumber } : {}),
+    ...(parsed.data.memo ? { PrivateNote: parsed.data.memo } : {}),
+    Line: parsed.data.lineItems.map((itemRow) => {
+      // Per-line itemId takes priority, then fallback
+      const lineItemId = itemRow.itemId || fallbackItem?.Id || "";
+      const lineItemName = itemRow.itemName || fallbackItem?.Name || "Product";
+
+      return {
+        Amount: Number((itemRow.quantity * itemRow.unitPrice).toFixed(2)),
+        Description: itemRow.description,
+        DetailType: "SalesItemLineDetail",
+        SalesItemLineDetail: {
+          Qty: itemRow.quantity,
+          UnitPrice: Number(itemRow.unitPrice.toFixed(2)),
+          ItemRef: { value: lineItemId, name: lineItemName },
+        },
+      };
+    }),
+  };
+
+  // ── GUARDRAIL: Validate before writing ──
+  const validation = await validateQBOWrite(
+    "invoice",
+    invoicePayload as unknown as Record<string, unknown>,
+    { dry_run: isDryRun, caller },
+  );
+
+  await logQBOAudit({
+    entity_type: "invoice",
+    action: "create",
+    endpoint: "/api/ops/qbo/invoice",
+    amount: validation.amount ?? total,
+    vendor_or_customer: `customer:${customer.Id}`,
+    ref_number: parsed.data.docNumber,
+    dry_run: isDryRun,
+    validation_passed: validation.valid,
+    issues: validation.issues,
+    caller,
+  });
+
+  if (!validation.valid) {
+    return NextResponse.json({
+      ok: false, blocked: true, validation,
+      message: validation.summary,
+    }, { status: 422 });
+  }
+  if (isDryRun) {
+    return NextResponse.json({
+      ok: true, dry_run: true, validation,
+      message: validation.summary,
+    });
+  }
+
   const invoice = await qboFetch<InvoiceResponse>(realmId, accessToken, "/invoice?minorversion=73", {
     method: "POST",
-    body: JSON.stringify({
-      CustomerRef: { value: customer.Id },
-      TxnDate: txnDate,
-      DueDate: dueDate,
-      ...(parsed.data.docNumber ? { DocNumber: parsed.data.docNumber } : {}),
-      ...(parsed.data.memo ? { PrivateNote: parsed.data.memo } : {}),
-      Line: parsed.data.lineItems.map((itemRow) => {
-        // Per-line itemId takes priority, then fallback
-        const lineItemId = itemRow.itemId || fallbackItem?.Id || "";
-        const lineItemName = itemRow.itemName || fallbackItem?.Name || "Product";
-
-        return {
-          Amount: Number((itemRow.quantity * itemRow.unitPrice).toFixed(2)),
-          Description: itemRow.description,
-          DetailType: "SalesItemLineDetail",
-          SalesItemLineDetail: {
-            Qty: itemRow.quantity,
-            UnitPrice: Number(itemRow.unitPrice.toFixed(2)),
-            ItemRef: { value: lineItemId, name: lineItemName },
-          },
-        };
-      }),
-    }),
+    body: JSON.stringify(invoicePayload),
   });
 
   const invoiceId = invoice?.Invoice?.Id;
@@ -234,6 +274,7 @@ export async function POST(req: Request) {
     pdfUrl: `${getBaseUrl(realmId)}/invoice/${invoiceId}/pdf?minorversion=73`,
     emailSent,
     customerId: customer.Id,
+    validation: { issues: validation.issues, summary: validation.summary },
   });
 }
 
