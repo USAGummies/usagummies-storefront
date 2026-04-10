@@ -1,7 +1,8 @@
 /**
- * GET  /api/ops/qbo/purchaseorder — List POs (optional date filters)
- * POST /api/ops/qbo/purchaseorder — Create a Purchase Order
- * PATCH /api/ops/qbo/purchaseorder — Update an existing PO (sparse)
+ * GET    /api/ops/qbo/purchaseorder — List POs (optional date filters)
+ * POST   /api/ops/qbo/purchaseorder — Create a Purchase Order
+ * PATCH  /api/ops/qbo/purchaseorder — Update an existing PO (sparse)
+ * DELETE /api/ops/qbo/purchaseorder — Delete a Purchase Order
  *
  * GET query params: ?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD&id=<po_id>
  *   - With id: returns a single PO by ID
@@ -22,15 +23,21 @@
  *   due_date?,             // expected delivery/due
  *   ref_number?,           // PO number (DocNumber)
  *   memo?,                 // header memo
+ *   vendor_message?,       // message to vendor (prints on PO)
  *   ap_account_id?,        // AP account override
- *   ship_to?: { line1, city, state, zip }
+ *   ship_to?: { line1, city, state, zip },
+ *   ship_via?,             // shipping method / carrier
+ *   vendor_email?          // vendor email for PO delivery
  * }
+ *
+ * DELETE body: { id, sync_token }
  */
 
 import { NextResponse } from "next/server";
 import { isAuthorized } from "@/lib/ops/abra-auth";
 import {
   createQBOPurchaseOrder,
+  deleteQBOPurchaseOrder,
   getQBOPurchaseOrder,
   getQBOPurchaseOrders,
   updateQBOPurchaseOrder,
@@ -121,6 +128,9 @@ export async function POST(req: Request) {
           PostalCode: body.ship_to.zip,
         },
       } : {}),
+      ...(body.ship_via ? { ShipMethodRef: { value: body.ship_via } } : {}),
+      ...(body.vendor_message ? { Memo: body.memo, CustomerMemo: { value: body.vendor_message } } : {}),
+      ...(body.vendor_email ? { POEmail: { Address: body.vendor_email } } : {}),
     };
 
     const result = await createQBOPurchaseOrder(payload);
@@ -182,8 +192,46 @@ export async function PATCH(req: Request) {
 
     if (body.memo !== undefined) payload.Memo = body.memo;
     if (body.due_date !== undefined) payload.DueDate = body.due_date;
+    if (body.date !== undefined) payload.TxnDate = body.date;
     if (body.ref_number !== undefined) payload.DocNumber = body.ref_number;
     if (body.po_status !== undefined) payload.POStatus = body.po_status; // "Open" or "Closed"
+    if (body.ship_via !== undefined) payload.ShipMethodRef = { value: body.ship_via };
+    if (body.vendor_email !== undefined) payload.POEmail = { Address: body.vendor_email };
+    if (body.vendor_message !== undefined) payload.CustomerMemo = { value: body.vendor_message };
+    if (body.ship_to !== undefined) {
+      payload.ShipAddr = {
+        Line1: body.ship_to.line1,
+        City: body.ship_to.city,
+        CountrySubDivisionCode: body.ship_to.state,
+        PostalCode: body.ship_to.zip,
+      };
+    }
+    if (body.lines && Array.isArray(body.lines) && body.lines.length > 0) {
+      payload.Line = (body.lines as LineInput[]).map((l) => {
+        const qty = l.qty ?? l.quantity;
+        const unitPrice = l.unit_price;
+        const amount = l.amount ?? (qty && unitPrice ? Number((qty * unitPrice).toFixed(2)) : 0);
+        return {
+          Amount: amount,
+          DetailType: "ItemBasedExpenseLineDetail" as const,
+          ItemBasedExpenseLineDetail: {
+            ItemRef: { value: l.item_id, ...(l.item_name ? { name: l.item_name } : {}) },
+            ...(qty !== undefined ? { Qty: qty } : {}),
+            ...(unitPrice !== undefined ? { UnitPrice: unitPrice } : {}),
+            ...(l.customer_id ? { CustomerRef: { value: l.customer_id } } : {}),
+          },
+          ...(l.description ? { Description: l.description } : {}),
+        };
+      });
+      // When updating lines, must NOT use sparse — QBO requires full payload for line replacement
+      payload.sparse = false;
+      // Need VendorRef for non-sparse update — fetch existing PO to get it
+      const existing = await getQBOPurchaseOrder(body.id);
+      if (existing) {
+        const poData = (existing as Record<string, unknown>).PurchaseOrder || existing;
+        payload.VendorRef = (poData as Record<string, unknown>).VendorRef;
+      }
+    }
 
     const result = await updateQBOPurchaseOrder(payload);
 
@@ -200,6 +248,45 @@ export async function PATCH(req: Request) {
     console.error("[qbo/purchaseorder] PATCH failed:", error instanceof Error ? error.message : error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "PO update failed" },
+      { status: 500 },
+    );
+  }
+}
+
+/**
+ * DELETE /api/ops/qbo/purchaseorder — Delete a Purchase Order
+ *
+ * Body: { id, sync_token }
+ */
+export async function DELETE(req: Request) {
+  if (!(await isAuthorized(req))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const body = await req.json();
+
+    if (!body.id || body.sync_token === undefined) {
+      return NextResponse.json(
+        { error: "id and sync_token are required" },
+        { status: 400 },
+      );
+    }
+
+    const result = await deleteQBOPurchaseOrder(body.id, body.sync_token);
+
+    if (!result) {
+      return NextResponse.json(
+        { error: `Failed to delete PO ${body.id}` },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json({ ok: true, deleted: true, id: body.id });
+  } catch (error) {
+    console.error("[qbo/purchaseorder] DELETE failed:", error instanceof Error ? error.message : error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "PO deletion failed" },
       { status: 500 },
     );
   }

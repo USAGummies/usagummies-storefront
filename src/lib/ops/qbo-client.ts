@@ -693,6 +693,20 @@ export async function updateQBOPurchaseOrder(
 }
 
 /**
+ * Delete a Purchase Order in QBO.
+ * POST /purchaseorder?operation=delete
+ */
+export async function deleteQBOPurchaseOrder(
+  id: string,
+  syncToken: string,
+): Promise<QBOEntity | null> {
+  return qboFetch<QBOEntity>("/purchaseorder?operation=delete", {
+    method: "POST",
+    body: JSON.stringify({ Id: id, SyncToken: syncToken }),
+  });
+}
+
+/**
  * Query Purchase Orders.
  * GET /query?query=SELECT * FROM PurchaseOrder ...
  */
