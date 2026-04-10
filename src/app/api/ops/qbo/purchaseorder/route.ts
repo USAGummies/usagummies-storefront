@@ -177,7 +177,9 @@ export async function PATCH(req: Request) {
   try {
     const body = await req.json();
 
-    if (!body.id || body.sync_token === undefined) {
+    const id = body.id || body.Id;
+    const syncToken = body.sync_token ?? body.SyncToken ?? body.sync_Token;
+    if (!id || syncToken === undefined) {
       return NextResponse.json(
         { error: "id and sync_token are required" },
         { status: 400 },
@@ -185,18 +187,33 @@ export async function PATCH(req: Request) {
     }
 
     const payload: Record<string, unknown> = {
-      Id: body.id,
-      SyncToken: body.sync_token,
+      Id: id,
+      SyncToken: String(syncToken),
       sparse: true,
     };
 
-    if (body.memo !== undefined) payload.Memo = body.memo;
-    if (body.due_date !== undefined) payload.DueDate = body.due_date;
-    if (body.date !== undefined) payload.TxnDate = body.date;
-    if (body.ref_number !== undefined) payload.DocNumber = body.ref_number;
-    if (body.po_status !== undefined) payload.POStatus = body.po_status; // "Open" or "Closed"
-    if (body.ship_via !== undefined) payload.ShipMethodRef = { value: body.ship_via, name: body.ship_via };
-    if (body.vendor_message !== undefined) payload.CustomerMemo = { value: body.vendor_message };
+    // Accept both snake_case and PascalCase for all fields
+    const memo = body.memo ?? body.Memo;
+    const dueDate = body.due_date ?? body.DueDate;
+    const txnDate = body.date ?? body.TxnDate;
+    const refNumber = body.ref_number ?? body.DocNumber;
+    const poStatus = body.po_status ?? body.POStatus;
+    const shipVia = body.ship_via ?? body.ShipMethodRef;
+    const vendorMessage = body.vendor_message ?? body.CustomerMemo;
+
+    if (memo !== undefined) payload.Memo = memo;
+    if (dueDate !== undefined) payload.DueDate = dueDate;
+    if (txnDate !== undefined) payload.TxnDate = txnDate;
+    if (refNumber !== undefined) payload.DocNumber = refNumber;
+    if (poStatus !== undefined) payload.POStatus = poStatus; // "Open" or "Closed"
+    if (shipVia !== undefined) {
+      const name = typeof shipVia === "string" ? shipVia : shipVia?.value || shipVia?.name;
+      payload.ShipMethodRef = { value: name, name };
+    }
+    if (vendorMessage !== undefined) {
+      const msg = typeof vendorMessage === "string" ? vendorMessage : vendorMessage?.value;
+      payload.CustomerMemo = { value: msg };
+    }
     // Note: vendor_email is set on the Vendor record (PUT /api/ops/qbo/vendor), not on the PO itself
     if (body.ship_to !== undefined) {
       const s = body.ship_to;
@@ -245,7 +262,18 @@ export async function PATCH(req: Request) {
     }
 
     const data = (result as Record<string, unknown>).PurchaseOrder || result;
-    return NextResponse.json({ ok: true, purchase_order: data, message: `Updated PO ID ${body.id}` });
+    const po = data as Record<string, unknown>;
+    return NextResponse.json({
+      ok: true,
+      purchase_order: data,
+      message: `Updated PO ID ${id}`,
+      _debug: {
+        sent_fields: Object.keys(payload).filter((k) => k !== "Id" && k !== "SyncToken" && k !== "sparse"),
+        sync_token_sent: String(syncToken),
+        sync_token_returned: po.SyncToken,
+        due_date_returned: po.DueDate ?? null,
+      },
+    });
   } catch (error) {
     console.error("[qbo/purchaseorder] PATCH failed:", error instanceof Error ? error.message : error);
     return NextResponse.json(
