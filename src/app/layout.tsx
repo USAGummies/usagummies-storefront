@@ -8,6 +8,8 @@ import { AppShell } from "@/components/layout/AppShell.client";
 import { AMAZON_LISTING_URL } from "@/lib/amazon";
 
 const GA4_ID = process.env.NEXT_PUBLIC_GA4_ID?.trim() || "G-31X673PSVY";
+const GOOGLE_ADS_ID = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID?.trim() || "";
+const GOOGLE_ADS_CONVERSION_LABEL = process.env.NEXT_PUBLIC_GOOGLE_ADS_CONVERSION_LABEL?.trim() || "";
 const GOOGLE_SITE_VERIFICATION = process.env.NEXT_PUBLIC_GSC_VERIFICATION?.trim();
 const META_PIXEL_ID = "26033875762978520";
 const CLARITY_ID = process.env.NEXT_PUBLIC_CLARITY_ID?.trim();
@@ -33,6 +35,8 @@ function GoogleAnalytics() {
               accept_incoming: true,
             },
           });
+          ${GOOGLE_ADS_ID ? `gtag('config', '${GOOGLE_ADS_ID}', { allow_enhanced_conversions: true });` : ""}
+          ${GOOGLE_ADS_ID && GOOGLE_ADS_CONVERSION_LABEL ? `window.__usaGadsConversionId = '${GOOGLE_ADS_ID}/${GOOGLE_ADS_CONVERSION_LABEL}';` : ""}
         `}
       </Script>
     </>

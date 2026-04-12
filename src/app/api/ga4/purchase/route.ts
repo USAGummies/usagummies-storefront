@@ -7,6 +7,8 @@ const GA4_MEASUREMENT_ID =
   process.env.NEXT_PUBLIC_GA4_ID?.trim() || "G-31X673PSVY";
 const GA4_API_SECRET = process.env.GA4_API_SECRET?.trim();
 const SHOPIFY_WEBHOOK_SECRET = process.env.SHOPIFY_WEBHOOK_SECRET?.trim();
+const META_PIXEL_ID = "26033875762978520";
+const META_CAPI_ACCESS_TOKEN = process.env.META_CAPI_ACCESS_TOKEN?.trim();
 
 type ShopifyLineItem = {
   id?: number | string;
@@ -138,6 +140,42 @@ export async function POST(req: Request) {
   if (!res.ok) {
     const error = await res.text().catch(() => "GA4 request failed.");
     return json({ ok: false, error }, 502);
+  }
+
+  // ── Meta Conversions API (CAPI) — server-side purchase event ──
+  // Fires alongside GA4 MP so Meta gets server-side conversion data
+  // even when client-side pixel is blocked (iOS 14.5+, ad blockers).
+  // Requires META_CAPI_ACCESS_TOKEN env var to be set.
+  if (META_CAPI_ACCESS_TOKEN) {
+    const capiEventId = `pu_${transactionId}_server`;
+    const capiPayload = {
+      data: [
+        {
+          event_name: "Purchase",
+          event_time: Math.floor(Date.now() / 1000),
+          event_id: capiEventId,
+          event_source_url: "https://www.usagummies.com/thank-you",
+          action_source: "website",
+          custom_data: {
+            currency,
+            value: Number.isFinite(total) ? Number(total.toFixed(2)) : 0,
+            content_ids: items.map((i) => i.item_id),
+            content_type: "product",
+            num_items: items.reduce((sum, i) => sum + i.quantity, 0),
+            order_id: transactionId,
+          },
+        },
+      ],
+    };
+
+    fetch(
+      `https://graph.facebook.com/v21.0/${META_PIXEL_ID}/events?access_token=${META_CAPI_ACCESS_TOKEN}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(capiPayload),
+      },
+    ).catch(() => {});
   }
 
   return json({ ok: true });

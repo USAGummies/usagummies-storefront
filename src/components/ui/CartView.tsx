@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { cn } from "@/lib/cn";
 import { pricingForQty, BASE_PRICE, FREE_SHIP_QTY, MIN_PER_BAG, SHIPPING_COST, shippingForQty } from "@/lib/bundles/pricing";
 import { SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
-import { trackEvent } from "@/lib/analytics";
+import { trackEvent, trackInitiateCheckout } from "@/lib/analytics";
 import { getSafeCheckoutUrl, normalizeCheckoutUrl } from "@/lib/checkout";
 import { ReviewHighlights } from "@/components/reviews/ReviewHighlights";
 import { AMAZON_REVIEWS } from "@/data/amazonReviews";
@@ -457,12 +457,20 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
       window.location.href = safeCheckoutUrl;
     }
     const fallbackSubtotal = Number(localCart?.cost?.subtotalAmount?.amount || 0);
-    trackEvent("begin_checkout", {
+    const checkoutValue = Number.isFinite(subtotalNumber) ? Number(subtotalNumber.toFixed(2)) : fallbackSubtotal;
+
+    // Meta Pixel: InitiateCheckout + GA4: begin_checkout (unified)
+    trackInitiateCheckout({
+      value: checkoutValue,
       currency: summaryCurrency,
-      value: Number.isFinite(subtotalNumber) ? Number(subtotalNumber.toFixed(2)) : fallbackSubtotal,
-      items: gaItems,
-      checkout_method: method,
+      items: gaItems.map((i: any) => ({
+        id: i.item_id || "",
+        name: i.item_name || "",
+        price: i.price || 0,
+        quantity: i.quantity || 1,
+      })),
     });
+
     trackEvent("checkout_click", {
       context: cartContext,
       totalBags,

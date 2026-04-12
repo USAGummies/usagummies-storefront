@@ -9,6 +9,7 @@ declare global {
     dataLayer?: Array<Record<string, unknown>>;
     gtag?: (...args: any[]) => void;
     __usaEvents?: Array<Record<string, unknown>>;
+    __usaGadsConversionId?: string;
   }
 }
 
@@ -148,8 +149,46 @@ export function trackAddToCart(item: { id: string; name: string; price: number; 
   }
 }
 
+export function trackInitiateCheckout(cart: {
+  value: number;
+  currency?: string;
+  items?: Array<{ id: string; name: string; price: number; quantity: number }>;
+}) {
+  const currency = cart.currency || "USD";
+  const eventId = `ic_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+  // Meta Pixel: InitiateCheckout (standard event for funnel optimization)
+  fbq("track", "InitiateCheckout", {
+    value: cart.value,
+    currency,
+    content_ids: cart.items?.map((i) => i.id) || [],
+    content_type: "product",
+    num_items: cart.items?.reduce((sum, i) => sum + i.quantity, 0) || 1,
+    event_id: eventId,
+  });
+
+  // GA4: begin_checkout
+  if (typeof window !== "undefined" && typeof window.gtag === "function") {
+    window.gtag("event", "begin_checkout", {
+      currency,
+      value: cart.value,
+      items:
+        cart.items?.map((i) => ({
+          item_id: i.id,
+          item_name: i.name,
+          price: i.price,
+          quantity: i.quantity,
+        })) || [],
+    });
+  }
+
+  // Beacon to server for CAPI dedup
+  trackEvent("initiate_checkout", { value: cart.value, currency, event_id: eventId });
+}
+
 export function trackPurchase(order: { id: string; value: number; currency?: string; items?: Array<{ id: string; name: string; price: number; quantity: number }> }) {
   const currency = order.currency || "USD";
+  const eventId = `pu_${order.id}_${Date.now()}`;
 
   // Meta Pixel: Purchase
   fbq("track", "Purchase", {
@@ -158,6 +197,7 @@ export function trackPurchase(order: { id: string; value: number; currency?: str
     content_ids: order.items?.map((i) => i.id) || [],
     content_type: "product",
     num_items: order.items?.reduce((sum, i) => sum + i.quantity, 0) || 1,
+    event_id: eventId,
   });
 
   // GA4: purchase
@@ -168,7 +208,18 @@ export function trackPurchase(order: { id: string; value: number; currency?: str
       currency,
       items: order.items?.map((i) => ({ item_id: i.id, item_name: i.name, price: i.price, quantity: i.quantity })) || [],
     });
+
+    // Google Ads conversion (fires if AW-* ID configured)
+    window.gtag("event", "conversion", {
+      send_to: window.__usaGadsConversionId || "",
+      transaction_id: order.id,
+      value: order.value,
+      currency,
+    });
   }
+
+  // Beacon to server for CAPI
+  trackEvent("purchase_complete", { transaction_id: order.id, value: order.value, currency, event_id: eventId });
 }
 
 export function applyExperimentFromUrl(param = "exp") {

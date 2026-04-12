@@ -23,13 +23,24 @@ export default function PurchaseTracker() {
     const params = new URLSearchParams(window.location.search);
     const orderId = params.get("order") || params.get("order_id") || `order_${Date.now()}`;
     const value = Number(params.get("total") || params.get("value")) || 25.0;
+    const qty = Math.round(value / 5.99) || 1;
 
     trackPurchase({
       id: orderId,
       value,
       currency: "USD",
-      items: [{ id: "all-american-gummy-bears", name: "All American Gummy Bears", price: 5.99, quantity: Math.round(value / 5.99) || 1 }],
+      items: [{ id: "all-american-gummy-bears", name: "All American Gummy Bears", price: 5.99, quantity: qty }],
     });
+
+    // Google Ads conversion (fires only if AW-* ID is configured via env)
+    if (typeof window !== "undefined" && typeof window.gtag === "function" && window.__usaGadsConversionId) {
+      window.gtag("event", "conversion", {
+        send_to: window.__usaGadsConversionId,
+        transaction_id: orderId,
+        value,
+        currency: "USD",
+      });
+    }
   }, []);
 
   return null;

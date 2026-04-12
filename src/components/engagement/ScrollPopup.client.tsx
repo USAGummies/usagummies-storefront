@@ -21,12 +21,12 @@ export default function ScrollPopup() {
 
   const wasDismissed = useCallback(() => {
     try {
-      // Suppress popup for paid ad traffic
+      // Suppress popup for all paid ad traffic (Google, Meta, TikTok, etc.)
       if (typeof window !== "undefined") {
         const params = new URLSearchParams(window.location.search);
-        const src = params.get("utm_source")?.toLowerCase() ?? "";
         const med = params.get("utm_medium")?.toLowerCase() ?? "";
-        if (src === "google" || med === "cpc" || med === "ppc") return true;
+        if (med === "cpc" || med === "ppc" || med === "paid" || med === "paidsocial"
+          || params.has("gclid") || params.has("fbclid") || params.has("ttclid") || params.has("msclkid")) return true;
       }
       if (localStorage.getItem(SUBMITTED_KEY) === "true") return true;
       const ts = localStorage.getItem(STORAGE_KEY);
