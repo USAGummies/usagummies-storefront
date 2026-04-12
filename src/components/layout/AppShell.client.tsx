@@ -10,7 +10,7 @@ import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import { AMAZON_LISTING_URL } from "@/lib/amazon";
 import { applyExperimentFromUrl, trackEvent } from "@/lib/analytics";
 import { LeadCapture } from "@/components/marketing/LeadCapture.client";
-import { SubscriptionUnlock } from "@/components/marketing/SubscriptionUnlock.client";
+// SubscriptionUnlock removed — subscriptions not live in Shopify
 import { getCartToastMessage, readLastAdd } from "@/lib/cartFeedback";
 import { SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
 import { ExperienceBand } from "@/components/brand/ExperienceBand";
@@ -582,7 +582,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               emphasis="quiet"
               showSms
             />
-            <SubscriptionUnlock source="footer" variant="light" />
+            {/* Subscription references removed — not live in Shopify */}
           </div>
 
           <div className="flex flex-col items-center gap-4 rounded-2xl border border-[var(--border)] bg-[var(--bg,#f8f5ef)]/60 px-6 py-5">

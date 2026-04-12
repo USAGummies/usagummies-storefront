@@ -286,12 +286,12 @@ export default function ReviewsSectionClient({ reviews }: Props) {
               </div>
 
               <div className="space-y-1.5">
-                <p className="text-sm text-[var(--muted)] sm:text-base">
-                  Verified buyer feedback, straight from customers.
-                </p>
                 <h2 className="text-xl font-bold text-[var(--text)] sm:text-2xl">
                   Made in the USA. Real reviews.
                 </h2>
+                <p className="text-sm text-[var(--muted)] sm:text-base">
+                  Verified buyer feedback, straight from customers.
+                </p>
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
@@ -325,7 +325,7 @@ export default function ReviewsSectionClient({ reviews }: Props) {
               />
             </div>
 
-            <div className="hidden lg:grid gap-3">
+            <div className="grid gap-3">
               {verified.slice(0, 2).map((r) => (
                 <div
                   key={r.id}

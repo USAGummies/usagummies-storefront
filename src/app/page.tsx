@@ -16,6 +16,7 @@ import LazyHeroCTAWatcher from "@/components/home/LazyHeroCTAWatcher.client";
 import { LatestFromBlog } from "@/components/blog/LatestFromBlog";
 import { DyeFreeNewsBanner } from "@/components/marketing/DyeFreeNewsBanner";
 import { TrustBar, GuaranteeBadge, SocialProofStat } from "@/components/social-proof/TrustBar";
+import EmailSignupForm from "@/components/marketing/EmailSignupForm.client";
 import styles from "./homepage-scenes.module.css";
 
 function resolveSiteUrl() {
@@ -381,10 +382,10 @@ export default async function HomePage() {
                     Lower the per-bag price at 4+ bags.
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <Link href="#bundle-pricing" className="btn btn-candy">
+                    <Link href="#hero-primary-cta" className="btn btn-candy">
                       Shop &amp; save
                     </Link>
-                    <a href="#bundle-pricing" className="hero-scroll-link" data-hero-scroll>
+                    <a href="#hero-primary-cta" className="hero-scroll-link" data-hero-scroll>
                       Jump to bundle pricing
                     </a>
                   </div>
@@ -791,7 +792,7 @@ export default async function HomePage() {
                     dyes or synthetic colors. Classic gummy bear flavor — done right.
                   </p>
                   <div className="flex flex-wrap items-center gap-3 pt-0.5">
-                    <a href="#bundle-pricing" className="btn btn-candy">
+                    <a href="#hero-primary-cta" className="btn btn-candy">
                       Shop now
                     </a>
                     <Link
@@ -865,19 +866,7 @@ export default async function HomePage() {
               <p className="text-sm text-[var(--muted)]">
                 First dibs on limited drops, restocks, and member-only savings alerts.
               </p>
-              <form className="flex flex-wrap gap-3 items-center rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-1.5">
-                <input
-                  type="email"
-                  name="email"
-                  placeholder="Enter your email"
-                  className="flex-1 min-w-[200px] rounded-full border border-[rgba(15,27,45,0.15)] bg-white px-4 py-3 text-sm text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[rgba(239,59,59,0.35)]"
-                  aria-label="Enter your email for updates"
-                  required
-                />
-                <button type="submit" className="btn btn-outline pressable px-5 py-3 font-semibold w-full sm:w-auto">
-                  Sign me up
-                </button>
-              </form>
+              <EmailSignupForm />
               <div className="text-[11px] text-[var(--muted)]">
                 No spam. Just drops, restocks, and savings alerts.
               </div>
