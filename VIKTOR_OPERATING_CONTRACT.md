@@ -184,6 +184,12 @@ DELETE /api/ops/qbo/salesreceipt      — Delete sales receipt (id + sync_token)
 GET    /api/ops/qbo/query?type=X      — Reports (pnl, balance_sheet, purchases, invoices, 
                                          bills, vendors, customers, accounts, cash_flow, metrics)
 GET    /api/ops/plaid/balance          — Bank balances via Plaid
+
+# Amazon Settlement Data (SP-API)
+GET    /api/ops/amazon/settlements?action=groups   — List financial event groups (settlement periods)
+GET    /api/ops/amazon/settlements?action=revenue&start_date=YYYY-MM-DD&end_date=YYYY-MM-DD
+                                                    — Accurate revenue report (takes 30-120s, polls SP-API)
+GET    /api/ops/amazon/settlements?action=status    — SP-API connection health check
 ```
 
 Auth: Bearer token using CRON_SECRET. Base URL: `https://www.usagummies.com`
@@ -191,4 +197,5 @@ Auth: Bearer token using CRON_SECRET. Base URL: `https://www.usagummies.com`
 ---
 
 ## Version History
+- 2026-04-12: Added Amazon settlements endpoint (`/api/ops/amazon/settlements`)
 - 2026-04-12: Created — Viktor restructured from execution agent to management agent
