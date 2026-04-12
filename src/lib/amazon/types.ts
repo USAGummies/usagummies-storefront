@@ -245,6 +245,97 @@ export type FinancialEventGroup = {
 };
 
 // ---------------------------------------------------------------------------
+// Financial Events (per-order fee breakdowns from Finances API)
+// ---------------------------------------------------------------------------
+
+export type CurrencyAmount = {
+  CurrencyCode: string;
+  CurrencyAmount: number;
+};
+
+export type FeeComponent = {
+  FeeType: string;
+  FeeAmount: CurrencyAmount;
+};
+
+export type ChargeComponent = {
+  ChargeType: string;
+  ChargeAmount: CurrencyAmount;
+};
+
+export type PromotionComponent = {
+  PromotionType: string;
+  PromotionId: string;
+  PromotionAmount: CurrencyAmount;
+};
+
+export type ShipmentItem = {
+  SellerSKU: string;
+  OrderItemId: string;
+  QuantityShipped: number;
+  ItemChargeList?: ChargeComponent[];
+  ItemFeeList?: FeeComponent[];
+  PromotionList?: PromotionComponent[];
+  ItemChargeAdjustmentList?: ChargeComponent[];
+  ItemFeeAdjustmentList?: FeeComponent[];
+};
+
+export type ShipmentEvent = {
+  AmazonOrderId: string;
+  SellerOrderId?: string;
+  MarketplaceName?: string;
+  PostedDate?: string;
+  ShipmentItemList?: ShipmentItem[];
+};
+
+export type RefundEvent = {
+  AmazonOrderId: string;
+  SellerOrderId?: string;
+  MarketplaceName?: string;
+  PostedDate?: string;
+  ShipmentItemAdjustmentList?: ShipmentItem[];
+};
+
+export type ServiceFeeEvent = {
+  AmazonOrderId?: string;
+  FeeReason?: string;
+  FeeList?: FeeComponent[];
+};
+
+export type FinancialEvents = {
+  ShipmentEventList?: ShipmentEvent[];
+  RefundEventList?: RefundEvent[];
+  ServiceFeeEventList?: ServiceFeeEvent[];
+};
+
+/** Aggregated fee breakdown for a settlement period */
+export type SettlementFeeBreakdown = {
+  period: { start: string; end: string; group_id: string };
+  totals: {
+    gross_revenue: number;
+    referral_fees: number;
+    fba_fees: number;
+    other_fees: number;
+    refunds: number;
+    promotions: number;
+    service_fees: number;
+    net_proceeds: number;
+  };
+  order_count: number;
+  refund_count: number;
+  orders: Array<{
+    order_id: string;
+    posted_date: string;
+    gross: number;
+    referral_fee: number;
+    fba_fee: number;
+    other_fees: number;
+    promotions: number;
+    net: number;
+  }>;
+};
+
+// ---------------------------------------------------------------------------
 // Cache envelope
 // ---------------------------------------------------------------------------
 

@@ -189,6 +189,9 @@ GET    /api/ops/plaid/balance          — Bank balances via Plaid
 GET    /api/ops/amazon/settlements?action=groups   — List financial event groups (settlement periods)
 GET    /api/ops/amazon/settlements?action=revenue&start_date=YYYY-MM-DD&end_date=YYYY-MM-DD
                                                     — Accurate revenue report (takes 30-120s, polls SP-API)
+GET    /api/ops/amazon/settlements?action=fees&start_date=YYYY-MM-DD&end_date=YYYY-MM-DD
+                                                    — Per-order fee breakdown (referral, FBA, refunds, promotions)
+                                                      Returns COA-mapped totals ready for SR decomposition
 GET    /api/ops/amazon/settlements?action=status    — SP-API connection health check
 ```
 
@@ -197,5 +200,6 @@ Auth: Bearer token using CRON_SECRET. Base URL: `https://www.usagummies.com`
 ---
 
 ## Version History
+- 2026-04-12: Added `?action=fees` to settlements endpoint — per-order fee breakdown for SR decomposition
 - 2026-04-12: Added Amazon settlements endpoint (`/api/ops/amazon/settlements`)
 - 2026-04-12: Created — Viktor restructured from execution agent to management agent

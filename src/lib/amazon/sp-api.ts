@@ -15,6 +15,8 @@ import type {
   FBAInventorySummary,
   FeeEstimate,
   FinancialEventGroup,
+  FinancialEvents,
+  SettlementFeeBreakdown,
 } from "./types";
 import { getCachedInventory, setCachedInventory, getCachedKPIs as getCachedKPIsFromCache } from "./cache";
 
@@ -610,6 +612,219 @@ export async function fetchFinancialEventGroups(
     console.error("[amazon] Financial event groups fetch failed:", err);
     return [];
   }
+}
+
+// ---------------------------------------------------------------------------
+// Finances API — Per-Order Fee Breakdowns
+// ---------------------------------------------------------------------------
+
+type FinancialEventsResponse = {
+  payload?: {
+    FinancialEvents: FinancialEvents;
+    NextToken?: string;
+  };
+  errors?: { code: string; message: string }[];
+};
+
+/**
+ * Fetch financial events for a specific event group (settlement period).
+ * Returns per-order fee breakdowns including referral fees, FBA fees, refunds.
+ * Handles pagination via NextToken.
+ */
+export async function fetchFinancialEvents(
+  financialEventGroupId: string,
+): Promise<FinancialEvents> {
+  const merged: FinancialEvents = {
+    ShipmentEventList: [],
+    RefundEventList: [],
+    ServiceFeeEventList: [],
+  };
+
+  let nextToken: string | undefined;
+
+  do {
+    const params: Record<string, string> = nextToken
+      ? { NextToken: nextToken }
+      : { MaxResultsPerPage: "100" };
+
+    const res = await spApiGet<FinancialEventsResponse>(
+      `/finances/v0/financialEventGroups/${financialEventGroupId}/financialEvents`,
+      params,
+    );
+
+    if (res.errors?.length) {
+      console.error("[amazon] Financial events API errors:", JSON.stringify(res.errors));
+      break;
+    }
+
+    const events = res.payload?.FinancialEvents;
+    if (events) {
+      if (events.ShipmentEventList) merged.ShipmentEventList!.push(...events.ShipmentEventList);
+      if (events.RefundEventList) merged.RefundEventList!.push(...events.RefundEventList);
+      if (events.ServiceFeeEventList) merged.ServiceFeeEventList!.push(...events.ServiceFeeEventList);
+    }
+
+    nextToken = res.payload?.NextToken;
+    if (nextToken) await sleep(2000); // Rate limit
+  } while (nextToken);
+
+  return merged;
+}
+
+/**
+ * Aggregate financial events into a fee breakdown for SR decomposition.
+ * Groups fees by type and calculates per-order and total breakdowns.
+ */
+export function aggregateFinancialEvents(
+  events: FinancialEvents,
+  groupId: string,
+  periodStart: string,
+  periodEnd: string,
+): SettlementFeeBreakdown {
+  const orders: SettlementFeeBreakdown["orders"] = [];
+  let totalGross = 0;
+  let totalReferral = 0;
+  let totalFba = 0;
+  let totalOther = 0;
+  let totalPromotions = 0;
+  let totalRefunds = 0;
+  let totalServiceFees = 0;
+
+  // Process shipment events (sales)
+  for (const shipment of events.ShipmentEventList || []) {
+    let orderGross = 0;
+    let orderReferral = 0;
+    let orderFba = 0;
+    let orderOther = 0;
+    let orderPromotions = 0;
+
+    for (const item of shipment.ShipmentItemList || []) {
+      // Charges = revenue components (Principal, Tax, Shipping, etc.)
+      for (const charge of item.ItemChargeList || []) {
+        if (charge.ChargeType === "Principal") {
+          orderGross += charge.ChargeAmount?.CurrencyAmount || 0;
+        }
+        // Shipping, GiftWrap, etc. also count as gross
+        else if (["Shipping", "ShippingTax", "GiftWrap"].includes(charge.ChargeType)) {
+          orderGross += charge.ChargeAmount?.CurrencyAmount || 0;
+        }
+      }
+
+      // Fees = Amazon's cut
+      for (const fee of item.ItemFeeList || []) {
+        const amt = Math.abs(fee.FeeAmount?.CurrencyAmount || 0);
+        if (fee.FeeType === "FBAPerUnitFulfillmentFee" || fee.FeeType === "FBAPerOrderFulfillmentFee" || fee.FeeType.startsWith("FBA")) {
+          orderFba += amt;
+        } else if (fee.FeeType === "Commission" || fee.FeeType === "ReferralFee") {
+          orderReferral += amt;
+        } else {
+          orderOther += amt;
+        }
+      }
+
+      // Promotions
+      for (const promo of item.PromotionList || []) {
+        orderPromotions += Math.abs(promo.PromotionAmount?.CurrencyAmount || 0);
+      }
+    }
+
+    const orderNet = orderGross - orderReferral - orderFba - orderOther - orderPromotions;
+
+    orders.push({
+      order_id: shipment.AmazonOrderId,
+      posted_date: shipment.PostedDate || "",
+      gross: round2(orderGross),
+      referral_fee: round2(orderReferral),
+      fba_fee: round2(orderFba),
+      other_fees: round2(orderOther),
+      promotions: round2(orderPromotions),
+      net: round2(orderNet),
+    });
+
+    totalGross += orderGross;
+    totalReferral += orderReferral;
+    totalFba += orderFba;
+    totalOther += orderOther;
+    totalPromotions += orderPromotions;
+  }
+
+  // Process refund events
+  for (const refund of events.RefundEventList || []) {
+    for (const item of refund.ShipmentItemAdjustmentList || []) {
+      for (const charge of item.ItemChargeAdjustmentList || []) {
+        totalRefunds += Math.abs(charge.ChargeAmount?.CurrencyAmount || 0);
+      }
+    }
+  }
+
+  // Process service fee events (subscription fees, etc.)
+  for (const svc of events.ServiceFeeEventList || []) {
+    for (const fee of svc.FeeList || []) {
+      totalServiceFees += Math.abs(fee.FeeAmount?.CurrencyAmount || 0);
+    }
+  }
+
+  const netProceeds = totalGross - totalReferral - totalFba - totalOther - totalPromotions - totalRefunds - totalServiceFees;
+
+  return {
+    period: { start: periodStart, end: periodEnd, group_id: groupId },
+    totals: {
+      gross_revenue: round2(totalGross),
+      referral_fees: round2(totalReferral),
+      fba_fees: round2(totalFba),
+      other_fees: round2(totalOther),
+      refunds: round2(totalRefunds),
+      promotions: round2(totalPromotions),
+      service_fees: round2(totalServiceFees),
+      net_proceeds: round2(netProceeds),
+    },
+    order_count: orders.length,
+    refund_count: (events.RefundEventList || []).length,
+    orders,
+  };
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+/**
+ * Full pipeline: find settlement group → fetch events → aggregate fees.
+ * Returns a complete fee breakdown ready for SR decomposition into QBO.
+ */
+export async function fetchSettlementFeeBreakdown(
+  startDate: string,
+  endDate: string,
+): Promise<SettlementFeeBreakdown[]> {
+  // Get settlement groups that overlap the date range
+  const groups = await fetchFinancialEventGroups(
+    `${startDate}T00:00:00Z`,
+    `${endDate}T23:59:59Z`,
+  );
+
+  if (groups.length === 0) {
+    return [];
+  }
+
+  const breakdowns: SettlementFeeBreakdown[] = [];
+
+  for (const group of groups) {
+    const events = await fetchFinancialEvents(group.FinancialEventGroupId);
+    const breakdown = aggregateFinancialEvents(
+      events,
+      group.FinancialEventGroupId,
+      group.FinancialEventGroupStart || startDate,
+      group.FinancialEventGroupEnd || endDate,
+    );
+    breakdowns.push(breakdown);
+
+    // Rate limit between groups
+    if (groups.indexOf(group) < groups.length - 1) {
+      await sleep(2000);
+    }
+  }
+
+  return breakdowns;
 }
 
 // ---------------------------------------------------------------------------

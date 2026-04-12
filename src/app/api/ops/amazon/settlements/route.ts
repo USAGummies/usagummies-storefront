@@ -6,6 +6,7 @@
  * GET  ?action=groups                          — List financial event groups (settlement periods)
  * GET  ?action=groups&started_after=&started_before=  — Filter by date range
  * GET  ?action=revenue&start_date=&end_date=   — Accurate revenue report (requests + polls SP-API report)
+ * GET  ?action=fees&start_date=&end_date=       — Per-order fee breakdown (referral, FBA, refunds)
  * GET  ?action=status                          — Check SP-API connection health
  *
  * Revenue report can take 30-120 seconds (Amazon generates the report async).
@@ -18,6 +19,7 @@ import {
   isAmazonConfigured,
   fetchFinancialEventGroups,
   fetchAccurateRevenue,
+  fetchSettlementFeeBreakdown,
   testAmazonConnection,
 } from "@/lib/amazon/sp-api";
 
@@ -77,6 +79,71 @@ export async function GET(req: Request) {
         });
       }
 
+      case "fees": {
+        const feeStart = url.searchParams.get("start_date");
+        const feeEnd = url.searchParams.get("end_date");
+
+        if (!feeStart || !feeEnd) {
+          return NextResponse.json(
+            { error: "start_date and end_date are required (YYYY-MM-DD)" },
+            { status: 400 },
+          );
+        }
+
+        const breakdowns = await fetchSettlementFeeBreakdown(feeStart, feeEnd);
+
+        // Aggregate across all settlement groups
+        const combined = {
+          gross_revenue: 0,
+          referral_fees: 0,
+          fba_fees: 0,
+          other_fees: 0,
+          refunds: 0,
+          promotions: 0,
+          service_fees: 0,
+          net_proceeds: 0,
+        };
+        let totalOrders = 0;
+        let totalRefunds = 0;
+
+        for (const b of breakdowns) {
+          combined.gross_revenue += b.totals.gross_revenue;
+          combined.referral_fees += b.totals.referral_fees;
+          combined.fba_fees += b.totals.fba_fees;
+          combined.other_fees += b.totals.other_fees;
+          combined.refunds += b.totals.refunds;
+          combined.promotions += b.totals.promotions;
+          combined.service_fees += b.totals.service_fees;
+          combined.net_proceeds += b.totals.net_proceeds;
+          totalOrders += b.order_count;
+          totalRefunds += b.refund_count;
+        }
+
+        // Round combined totals
+        for (const key of Object.keys(combined) as (keyof typeof combined)[]) {
+          combined[key] = Math.round(combined[key] * 100) / 100;
+        }
+
+        return NextResponse.json({
+          ok: true,
+          period: { start_date: feeStart, end_date: feeEnd },
+          settlement_groups: breakdowns.length,
+          total_orders: totalOrders,
+          total_refunds: totalRefunds,
+          combined_totals: combined,
+          breakdowns,
+          source: "sp-api-finances",
+          coa_mapping: {
+            gross_revenue: "400015.xx (Revenue by channel — Amazon)",
+            referral_fees: "500040.xx (Marketplace Selling Fees — COGS)",
+            fba_fees: "500040.xx (FBA Fulfillment Fees — COGS)",
+            refunds: "400025.xx (Returns by channel — Amazon)",
+            service_fees: "660020 (Marketing/Overhead — NOT COGS)",
+            net_proceeds: "Matches bank deposit",
+          },
+        });
+      }
+
       case "status": {
         const health = await testAmazonConnection();
         return NextResponse.json({ ok: true, ...health });
@@ -84,7 +151,7 @@ export async function GET(req: Request) {
 
       default:
         return NextResponse.json(
-          { error: `Unknown action "${action}". Use: groups, revenue, status` },
+          { error: `Unknown action "${action}". Use: groups, revenue, fees, status` },
           { status: 400 },
         );
     }
