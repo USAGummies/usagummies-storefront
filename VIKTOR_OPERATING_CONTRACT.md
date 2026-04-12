@@ -178,6 +178,9 @@ DELETE /api/ops/qbo/purchaseorder     — Delete PO
 POST   /api/ops/qbo/invoice           — Create invoice (DRAFT only)
 GET    /api/ops/qbo/items             — List items/products
 GET    /api/ops/qbo/company           — Company profile
+GET    /api/ops/qbo/salesreceipt       — List/get sales receipts
+POST   /api/ops/qbo/salesreceipt      — Create sales receipt (settlement decomposition)
+DELETE /api/ops/qbo/salesreceipt      — Delete sales receipt (id + sync_token)
 GET    /api/ops/qbo/query?type=X      — Reports (pnl, balance_sheet, purchases, invoices, 
                                          bills, vendors, customers, accounts, cash_flow, metrics)
 GET    /api/ops/plaid/balance          — Bank balances via Plaid

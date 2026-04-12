@@ -950,6 +950,107 @@ export async function deleteQBOBill(
 }
 
 // ---------------------------------------------------------------------------
+// WRITE: Sales Receipt (point-of-sale / settlement receipts)
+// ---------------------------------------------------------------------------
+
+export type QBOSalesReceiptLineInput = {
+  Amount: number;
+  DetailType: "SalesItemLineDetail";
+  SalesItemLineDetail: {
+    ItemRef: { value: string; name?: string };
+    Qty?: number;
+    UnitPrice?: number;
+  };
+  Description?: string;
+};
+
+export type QBOSalesReceiptInput = {
+  CustomerRef: { value: string; name?: string };
+  Line: QBOSalesReceiptLineInput[];
+  TxnDate?: string;
+  DocNumber?: string;
+  PrivateNote?: string;
+  DepositToAccountRef?: { value: string }; // bank account to deposit to
+  PaymentMethodRef?: { value: string };
+  CustomerMemo?: { value: string };
+};
+
+/**
+ * Create a Sales Receipt in QBO.
+ * POST /salesreceipt
+ *
+ * Sales Receipts record point-of-sale transactions where payment is received
+ * immediately. For USA Gummies, these are used to decompose marketplace
+ * settlement deposits (Amazon, Shopify, Faire) into gross revenue, fees,
+ * and refunds per COA structure.
+ */
+export async function createQBOSalesReceipt(
+  receipt: QBOSalesReceiptInput,
+): Promise<QBOEntity | null> {
+  return qboFetch<QBOEntity>("/salesreceipt", {
+    method: "POST",
+    body: JSON.stringify(receipt),
+  });
+}
+
+/**
+ * Read a Sales Receipt by ID.
+ * GET /salesreceipt/{id}
+ */
+export async function getQBOSalesReceipt(
+  id: string,
+): Promise<QBOEntity | null> {
+  return qboFetch<QBOEntity>(`/salesreceipt/${id}`);
+}
+
+/**
+ * Update a Sales Receipt (sparse update).
+ * POST /salesreceipt (with Id and SyncToken)
+ */
+export async function updateQBOSalesReceipt(
+  receipt: QBOEntity,
+): Promise<QBOEntity | null> {
+  return qboFetch<QBOEntity>("/salesreceipt", {
+    method: "POST",
+    body: JSON.stringify(receipt),
+  });
+}
+
+/**
+ * Delete a Sales Receipt.
+ * POST /salesreceipt?operation=delete
+ */
+export async function deleteQBOSalesReceipt(
+  id: string,
+  syncToken: string,
+): Promise<QBOEntity | null> {
+  return qboFetch<QBOEntity>("/salesreceipt?operation=delete", {
+    method: "POST",
+    body: JSON.stringify({ Id: id, SyncToken: syncToken }),
+  });
+}
+
+/**
+ * Query Sales Receipts with optional date filter.
+ */
+export async function getQBOSalesReceipts(
+  startDate?: string,
+  endDate?: string,
+): Promise<QBOEntity[]> {
+  let sql = "SELECT * FROM SalesReceipt";
+  const conditions: string[] = [];
+  if (startDate) conditions.push(`TxnDate >= '${startDate}'`);
+  if (endDate) conditions.push(`TxnDate <= '${endDate}'`);
+  if (conditions.length > 0) sql += ` WHERE ${conditions.join(" AND ")}`;
+  sql += " MAXRESULTS 200";
+
+  const res = await qboFetch<{ QueryResponse?: { SalesReceipt?: QBOEntity[] } }>(
+    `/query?query=${encodeURIComponent(sql)}`,
+  );
+  return res?.QueryResponse?.SalesReceipt || [];
+}
+
+// ---------------------------------------------------------------------------
 // WRITE: Estimate (QBO's Sales Order equivalent)
 // ---------------------------------------------------------------------------
 

@@ -29,7 +29,8 @@ export type QBOEntityType =
   | "deposit"
   | "transfer"
   | "purchase"
-  | "account";
+  | "account"
+  | "salesreceipt";
 
 export type ValidationSeverity = "error" | "warning" | "info";
 
@@ -156,7 +157,7 @@ function validateRequiredFields(body: Record<string, unknown>, entityType: QBOEn
   const issues: ValidationIssue[] = [];
 
   const vendorEntities: QBOEntityType[] = ["bill", "bill-payment", "purchaseorder"];
-  const customerEntities: QBOEntityType[] = ["invoice", "payment", "estimate"];
+  const customerEntities: QBOEntityType[] = ["invoice", "payment", "estimate", "salesreceipt"];
 
   if (vendorEntities.includes(entityType) && !body.VendorRef) {
     issues.push({
@@ -176,7 +177,7 @@ function validateRequiredFields(body: Record<string, unknown>, entityType: QBOEn
     });
   }
 
-  if (["invoice", "bill", "purchaseorder", "estimate"].includes(entityType)) {
+  if (["invoice", "bill", "purchaseorder", "estimate", "salesreceipt"].includes(entityType)) {
     if (!Array.isArray(body.Line) || body.Line.length === 0) {
       issues.push({
         severity: "error",
