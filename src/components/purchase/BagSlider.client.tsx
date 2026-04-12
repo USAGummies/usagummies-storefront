@@ -12,7 +12,7 @@ import {
 } from "@/lib/bundles/pricing";
 import { SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
 import { AMAZON_LISTING_URL } from "@/lib/amazon";
-import { trackEvent } from "@/lib/analytics";
+import { trackEvent, trackAddToCart } from "@/lib/analytics";
 import { fireCartToast } from "@/lib/cartFeedback";
 import { storeCartId, getStoredCartId } from "@/lib/cartClientUtils";
 
@@ -261,11 +261,8 @@ export default function BagSlider({
     setBusy(true);
     trackEvent("bag_slider_add_to_cart", { qty, per_bag: perBag, total });
 
-    // Fire Meta Pixel + GA4 enhanced ecommerce
-    try {
-      const { trackAddToCart } = await import("@/lib/analytics");
-      trackAddToCart({ id: "all-american-gummy-bears", name: "All American Gummy Bears", price: perBag, quantity: qty });
-    } catch { /* silent */ }
+    // Fire Meta Pixel (AddToCart) + GA4 (add_to_cart) — direct import, no dynamic import
+    trackAddToCart({ id: "all-american-gummy-bears", name: "All American Gummy Bears", price: perBag, quantity: qty });
 
     try {
       const existingCartId = getStoredCartId();
@@ -343,6 +340,7 @@ export default function BagSlider({
                 setQty(5);
                 setBusy(true);
                 trackEvent("bag_slider_sticky_upgrade", { from_qty: qty, to_qty: 5 });
+                trackAddToCart({ id: "all-american-gummy-bears", name: "All American Gummy Bears", price: pricingForQty(5).perBag, quantity: 5 });
                 try {
                   const existingCartId = getStoredCartId();
                   const res = await fetch("/api/cart", {
