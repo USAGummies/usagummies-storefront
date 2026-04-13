@@ -83,10 +83,17 @@ export async function POST(req: Request) {
  *   name?,                 // display name
  *   company_name?,         // company name
  *   email?,                // primary email
- *   phone?,                // primary phone
+ *   phone?,                // primary phone (landline)
+ *   mobile?,               // mobile phone
  *   fax?,                  // fax number
  *   website?,              // web URL
  *   notes?,                // internal notes
+ *   given_name?,           // contact first name
+ *   family_name?,          // contact last name
+ *   middle_name?,          // contact middle name
+ *   title?,                // contact title (e.g., "Trustee")
+ *   suffix?,               // contact suffix
+ *   print_on_check_name?,  // payee name on checks
  *   address?,              // billing address line 1
  *   city?, state?, zip?,   // billing address parts
  *   acct_num?,             // vendor's account number for us
@@ -136,9 +143,16 @@ export async function PUT(req: Request) {
       ...(body.company_name ? { CompanyName: body.company_name } : {}),
       ...(body.email ? { PrimaryEmailAddr: { Address: body.email } } : {}),
       ...(body.phone ? { PrimaryPhone: { FreeFormNumber: body.phone } } : {}),
+      ...(body.mobile ? { Mobile: { FreeFormNumber: body.mobile } } : {}),
       ...(body.fax ? { Fax: { FreeFormNumber: body.fax } } : {}),
       ...(body.website ? { WebAddr: { URI: body.website } } : {}),
       ...(body.notes ? { Notes: body.notes } : {}),
+      ...(body.given_name ? { GivenName: body.given_name } : {}),
+      ...(body.family_name ? { FamilyName: body.family_name } : {}),
+      ...(body.middle_name ? { MiddleName: body.middle_name } : {}),
+      ...(body.title ? { Title: body.title } : {}),
+      ...(body.suffix ? { Suffix: body.suffix } : {}),
+      ...(body.print_on_check_name ? { PrintOnCheckName: body.print_on_check_name } : {}),
       ...(body.acct_num ? { AcctNum: body.acct_num } : {}),
       ...(body.tax_id ? { TaxIdentifier: body.tax_id } : {}),
       ...(body.terms_id ? { TermRef: { value: body.terms_id } } : {}),
@@ -178,13 +192,19 @@ export async function PUT(req: Request) {
       vendor_id: updated.Id,
       name: updated.DisplayName,
       company: updated.CompanyName,
+      given_name: updated.GivenName,
+      family_name: updated.FamilyName,
+      title: updated.Title,
+      print_on_check_name: updated.PrintOnCheckName,
       email: updated.PrimaryEmailAddr?.Address,
       phone: updated.PrimaryPhone?.FreeFormNumber,
+      mobile: updated.Mobile?.FreeFormNumber,
       fax: updated.Fax?.FreeFormNumber,
       website: updated.WebAddr?.URI,
       billAddress: updated.BillAddr,
       notes: updated.Notes,
       acctNum: updated.AcctNum,
+      terms: updated.TermRef,
       active: updated.Active,
       message: `Updated vendor "${updated.DisplayName}" (ID: ${updated.Id})`,
     });
