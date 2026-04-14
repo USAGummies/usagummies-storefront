@@ -736,7 +736,14 @@ export type QBOCustomerInput = {
   CompanyName?: string;
   PrimaryEmailAddr?: { Address: string };
   PrimaryPhone?: { FreeFormNumber: string };
+  Notes?: string;
   BillAddr?: {
+    Line1?: string;
+    City?: string;
+    CountrySubDivisionCode?: string;
+    PostalCode?: string;
+  };
+  ShipAddr?: {
     Line1?: string;
     City?: string;
     CountrySubDivisionCode?: string;

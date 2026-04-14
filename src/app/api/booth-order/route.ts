@@ -59,6 +59,23 @@ export async function POST(req: Request) {
       ? "FREE SHIPPING (included)"
       : "FREIGHT — buyer pays shipping";
 
+    // Build order details string for QBO Notes field (so Viktor can see order info)
+    const orderDate = new Date().toLocaleString("en-US", { timeZone: "America/Los_Angeles" });
+    const qboNotes = [
+      `=== BOOTH ORDER - The Reunion 2026 ===`,
+      `Submitted: ${orderDate} PT`,
+      ``,
+      `QUANTITY: ${qty} Master Case${qty > 1 ? "s" : ""} (${totalBags} bags total)`,
+      `PRICING: $${pricePerBag.toFixed(2)}/bag${tier === "pallet" ? " (Pallet tier)" : " (Show Deal)"}`,
+      `SUBTOTAL: $${subtotal.toFixed(2)}`,
+      `SHIPPING: ${tier === "standard" || isShowDeal ? "FREE (show on invoice at standard rate, then 100% discount)" : "Buyer pays freight"}`,
+      isShowDeal ? `SHOW DEAL: YES - freight absorbed` : null,
+      `INVOICE TOTAL: $${subtotal.toFixed(2)}`,
+      ``,
+      `Contact: ${contact_name}${phone ? ` | ${phone}` : ""}`,
+      notes ? `Customer notes: ${notes}` : null,
+    ].filter(Boolean).join("\n");
+
     // Create QBO customer if QBO is connected
     let qboCustomerId: string | null = null;
     if (await isQBOConfigured()) {
@@ -66,6 +83,7 @@ export async function POST(req: Request) {
         const result = await createQBOCustomer({
           DisplayName: company_name.trim(),
           CompanyName: company_name.trim(),
+          Notes: qboNotes,
           ...(email ? { PrimaryEmailAddr: { Address: email.trim() } } : {}),
           ...(phone ? { PrimaryPhone: { FreeFormNumber: phone.trim() } } : {}),
           ...(ship_address ? {
