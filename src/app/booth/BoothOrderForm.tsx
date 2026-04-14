@@ -286,6 +286,11 @@ export function BoothOrderForm() {
             <span className="text-gray-600">Shipping</span>
             <span className="font-medium text-[#0a1e3d]">{freightNote}</span>
           </div>
+          {(pricingTier === "standard" || showDeal) && (
+            <div className="text-xs text-green-700 text-right">
+              Show special — shipping shown on invoice at 100% discount
+            </div>
+          )}
         </div>
       </div>
 
