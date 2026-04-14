@@ -119,14 +119,18 @@ export async function POST(req: Request) {
       `4. Payment received → ship order`,
     ].filter(Boolean).join("\n");
 
-    // Post to Slack
+    // Post to Slack (must await — serverless function exits before fire-and-forget completes)
     const webhookUrl = process.env.SLACK_SUPPORT_WEBHOOK_URL;
     if (webhookUrl) {
-      fetch(webhookUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: orderSummary }),
-      }).catch(() => { /* best effort */ });
+      try {
+        await fetch(webhookUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: orderSummary }),
+        });
+      } catch {
+        console.error("[booth-order] Slack webhook failed");
+      }
     }
 
     return NextResponse.json({

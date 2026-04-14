@@ -26,6 +26,8 @@ export default function ExitIntentPopup() {
     try {
       // Suppress popup for all paid ad traffic (Google, Meta, TikTok, etc.)
       if (typeof window !== "undefined") {
+        // Suppress on booth order page — QR code scanners shouldn't see newsletter popup
+        if (window.location.pathname.startsWith("/booth")) return true;
         const params = new URLSearchParams(window.location.search);
         const med = params.get("utm_medium")?.toLowerCase() ?? "";
         if (med === "cpc" || med === "ppc" || med === "paid" || med === "paidsocial"
