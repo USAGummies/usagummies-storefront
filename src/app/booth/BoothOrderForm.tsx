@@ -38,7 +38,7 @@ export function BoothOrderForm() {
     setErrorMsg("");
 
     try {
-      const res = await fetch("/api/ops/booth-order", {
+      const res = await fetch("/api/booth-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
