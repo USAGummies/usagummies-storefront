@@ -263,18 +263,36 @@ export function BoothOrderForm() {
           </div>
         </div>
 
-        {/* Show Deal Toggle */}
-        <label className="flex items-center gap-3 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={showDeal}
-            onChange={(e) => setShowDeal(e.target.checked)}
-            className="w-5 h-5 rounded border-gray-300 text-[#b22234] focus:ring-[#b22234]"
-          />
-          <span className="text-sm text-gray-700">
-            Show deal — freight absorbed
-          </span>
-        </label>
+        {/* Show Deal CTA */}
+        <button
+          type="button"
+          onClick={() => setShowDeal(!showDeal)}
+          className={`w-full p-4 rounded-lg border-2 text-left transition-colors ${
+            showDeal
+              ? "border-green-600 bg-green-50"
+              : "border-gray-200 hover:border-green-400 bg-white"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-bold text-[#0a1e3d]">
+                🎪 Show Special — FREE Shipping
+              </div>
+              <div className="text-xs text-gray-500 mt-0.5">
+                Freight absorbed on all show orders
+              </div>
+            </div>
+            <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
+              showDeal ? "bg-green-600" : "bg-gray-200"
+            }`}>
+              {showDeal && (
+                <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+            </div>
+          </div>
+        </button>
 
         {/* Order Summary */}
         <div className="bg-[#f8f5f0] rounded-lg p-4 space-y-2">
