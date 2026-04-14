@@ -149,6 +149,76 @@ async function sendInvoiceEmail(
   return res.ok;
 }
 
+// ── GET: List / read invoices ──
+export async function GET(req: Request) {
+  if (!(await isAuthorized(req))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const accessToken = await getValidAccessToken();
+  const realmId = await getRealmId();
+  if (!accessToken || !realmId) {
+    return NextResponse.json({ error: "QBO is not connected" }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(req.url);
+  const id = searchParams.get("id");
+  const status = searchParams.get("status"); // Draft, Unpaid, Paid, Overdue
+  const customer = searchParams.get("customer");
+  const limit = Math.min(Number(searchParams.get("limit") || 100), 1000);
+
+  // Single invoice by ID
+  if (id) {
+    const result = await queryOne<{ QueryResponse?: { Invoice?: Record<string, unknown>[] } }>(
+      realmId, accessToken,
+      `SELECT * FROM Invoice WHERE Id = '${id.replace(/'/g, "\\'")}' MAXRESULTS 1`,
+    );
+    const inv = result?.QueryResponse?.Invoice?.[0];
+    if (!inv) return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+    return NextResponse.json({ ok: true, invoice: inv });
+  }
+
+  // Build query with optional filters
+  let query = "SELECT * FROM Invoice";
+  const conditions: string[] = [];
+
+  if (customer) {
+    conditions.push(`CustomerRef = '${customer.replace(/'/g, "\\'")}'`);
+  }
+  if (status === "Unpaid" || status === "Draft") {
+    conditions.push("Balance > '0'");
+  } else if (status === "Paid") {
+    conditions.push("Balance = '0'");
+  }
+
+  if (conditions.length > 0) {
+    query += ` WHERE ${conditions.join(" AND ")}`;
+  }
+  query += ` ORDERBY MetaData.LastUpdatedTime DESC MAXRESULTS ${limit}`;
+
+  const result = await queryOne<{ QueryResponse?: { Invoice?: Record<string, unknown>[]; totalCount?: number } }>(
+    realmId, accessToken, query,
+  );
+  const invoices = result?.QueryResponse?.Invoice || [];
+
+  return NextResponse.json({
+    ok: true,
+    count: invoices.length,
+    invoices: invoices.map((inv) => ({
+      id: inv.Id,
+      docNumber: inv.DocNumber,
+      txnDate: inv.TxnDate,
+      dueDate: inv.DueDate,
+      total: inv.TotalAmt,
+      balance: inv.Balance,
+      status: Number(inv.Balance) === 0 ? "Paid" : "Unpaid",
+      customerRef: inv.CustomerRef,
+      emailStatus: inv.EmailStatus,
+      privateNote: inv.PrivateNote,
+    })),
+  });
+}
+
 export async function POST(req: Request) {
   if (!(await isAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

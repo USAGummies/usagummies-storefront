@@ -3,7 +3,7 @@
  *
  * Upload file attachments to QBO entities (vendors, invoices, bills, etc.)
  *
- * POST  — Upload attachment (multipart form data or JSON with base64)
+ * POST  — Upload attachment (JSON with base64 or multipart form-data)
  *   Body (JSON): {
  *     entity_type: "Vendor" | "Invoice" | "Bill" | "PurchaseOrder" | "SalesReceipt",
  *     entity_id: string,          // QBO entity ID to attach to

@@ -41,7 +41,7 @@ export async function POST(req: Request) {
     }
 
     const jePayload = {
-      TxnDate: body.date,
+      TxnDate: body.txn_date || body.date || new Date().toISOString().slice(0, 10),
       PrivateNote: body.memo,
       Line: body.lines.map(
         (l: {
