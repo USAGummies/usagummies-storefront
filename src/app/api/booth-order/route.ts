@@ -15,6 +15,7 @@
 import { NextResponse } from "next/server";
 import { createQBOCustomer } from "@/lib/ops/qbo-client";
 import { isQBOConfigured } from "@/lib/ops/qbo-client";
+import { sendOpsEmail } from "@/lib/ops/email";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -109,6 +110,53 @@ export async function POST(req: Request) {
       }
     }
 
+    // ── Customer welcome email (the "trigger" into Rene+Viktor onboarding sequence) ──
+    // Fires on submit. Tells the customer what's next and gives them the NCS-001 upload link.
+    let welcomeEmailSent = false;
+    try {
+      const customerSubject = `USA Gummies — Order confirmation from The Reunion (${company_name.trim()})`;
+      const customerBody = [
+        `Hi ${contact_name.split(/\s+/)[0] || contact_name},`,
+        ``,
+        `Thanks for stopping by the USA Gummies booth at The Reunion! This email confirms we received your order request.`,
+        ``,
+        `── Order summary ──`,
+        `Product: All American Gummy Bears — 7.5 oz bag`,
+        `Quantity: ${qty} Master Case${qty > 1 ? "s" : ""} (${totalBags} bags total)`,
+        `Price: $${pricePerBag.toFixed(2)}/bag${isShowDeal || tier === "standard" ? " (Show Special)" : " (Pallet)"}`,
+        `Subtotal: $${subtotal.toFixed(2)}`,
+        `Shipping: ${tier === "standard" || isShowDeal ? "FREE (100% show discount)" : "Buyer pays freight"}`,
+        `Invoice total: $${subtotal.toFixed(2)}`,
+        ``,
+        `── What happens next ──`,
+        `1. Ben confirms your pricing and approves the order.`,
+        `2. You'll receive a formal invoice from our bookkeeper (Rene Gonzalez) with ACH payment details.`,
+        `3. To speed up payment and shipping, please complete our short New Customer Setup form (NCS-001) and upload it here:`,
+        `   https://www.usagummies.com/upload/ncs`,
+        `4. Once payment is received, we'll ship as soon as Ben returns from the show (week of April 21).`,
+        ``,
+        `Questions? Reply to this email — it goes straight to Ben.`,
+        ``,
+        `Thanks again,`,
+        `Ben Stutman`,
+        `Founder, USA Gummies`,
+        `ben@usagummies.com  |  (307) 209-4928`,
+      ].join("\n");
+
+      const result = await sendOpsEmail({
+        to: email.trim(),
+        subject: customerSubject,
+        body: customerBody,
+        allowRepeat: true, // first-touch customer email, not throttled
+      });
+      welcomeEmailSent = result.ok;
+      if (!result.ok) {
+        console.error("[booth-order] welcome email failed:", result.message);
+      }
+    } catch (err) {
+      console.error("[booth-order] welcome email threw:", err instanceof Error ? err.message : err);
+    }
+
     // Build Slack notification
     const orderSummary = [
       `🎪 *NEW BOOTH ORDER — The Reunion*`,
@@ -129,12 +177,13 @@ export async function POST(req: Request) {
       notes ? `*Notes:* ${notes}` : null,
       ``,
       qboCustomerId ? `*QBO Customer ID:* ${qboCustomerId}` : `⚠️ QBO customer not created — needs manual setup`,
+      welcomeEmailSent ? `*✉️ Welcome email sent to ${email}* (with NCS-001 upload link)` : `⚠️ Welcome email NOT sent to ${email} — send manually`,
       ``,
       `*Next steps:*`,
       `1. Ben confirms pricing + approves`,
-      `2. Viktor creates invoice (show shipping line → 100% discount)`,
-      `3. Welcome packet + NCS-001 sent to customer`,
-      `4. Payment received → ship order`,
+      `2. Viktor creates invoice using Trade Show item (ID 15, account 400015.15)`,
+      `3. Customer uploads NCS-001 at usagummies.com/upload/ncs`,
+      `4. Payment received → ship order when Ben returns from show`,
     ].filter(Boolean).join("\n");
 
     // Post to Slack (must await — serverless function exits before fire-and-forget completes)
@@ -163,7 +212,8 @@ export async function POST(req: Request) {
       show_deal: isShowDeal,
       freight: freightNote,
       qbo_customer_id: qboCustomerId,
-      message: "Order submitted successfully. Our team will follow up shortly.",
+      welcome_email_sent: welcomeEmailSent,
+      message: "Order submitted successfully. Check your email for a confirmation and the customer setup link.",
     });
   } catch (error) {
     console.error("[booth-order] POST failed:", error instanceof Error ? error.message : error);
