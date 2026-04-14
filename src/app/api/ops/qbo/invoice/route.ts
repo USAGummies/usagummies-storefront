@@ -15,17 +15,36 @@ const LineItemSchema = z.object({
   itemName: z.string().trim().optional(),  // per-line QBO Item name
 });
 
+const AddressSchema = z.object({
+  line1: z.string().trim().max(500),
+  line2: z.string().trim().max(500).optional(),
+  city: z.string().trim().max(255).optional(),
+  state: z.string().trim().max(255).optional(),
+  zip: z.string().trim().max(30).optional(),
+  country: z.string().trim().max(255).optional(),
+}).optional();
+
 const RequestSchema = z.object({
   customerName: z.string().trim().min(1).max(200),
   customerEmail: z.string().trim().email().optional(),
   lineItems: z.array(LineItemSchema).min(1).max(50),
   dueDate: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  docNumber: z.string().trim().max(21).optional(), // QBO DocNumber (invoice #)
-  txnDate: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), // transaction date
+  docNumber: z.string().trim().max(21).optional(),
+  txnDate: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   memo: z.string().trim().max(1000).optional(),
   sendEmail: z.boolean().optional().default(false),
-  itemId: z.string().trim().optional(),   // fallback item ID for all lines
-  itemName: z.string().trim().optional(), // fallback item name for all lines
+  itemId: z.string().trim().optional(),
+  itemName: z.string().trim().optional(),
+  // ── New fields for complete invoices ──
+  billEmail: z.string().trim().email().optional(),
+  billAddr: AddressSchema,
+  shipAddr: AddressSchema,
+  terms: z.string().trim().max(50).optional(),       // e.g. "Net 10", "Due on receipt"
+  customerMemo: z.string().trim().max(1000).optional(), // message visible on invoice
+  shipMethod: z.string().trim().max(100).optional(),    // e.g. "FedEx Ground"
+  shipDate: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  trackingNum: z.string().trim().max(100).optional(),
+  customerId: z.string().trim().optional(),  // pass QBO customer ID directly (skips lookup)
 });
 
 type QBOCustomer = {
@@ -239,12 +258,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "QBO is not connected" }, { status: 401 });
   }
 
-  const customer = await resolveCustomer(
-    realmId,
-    accessToken,
-    parsed.data.customerName,
-    parsed.data.customerEmail,
-  );
+  // If customerId is provided directly, use it; otherwise resolve by name/email
+  let customer: QBOCustomer | null = null;
+  if (parsed.data.customerId) {
+    customer = { Id: parsed.data.customerId };
+  } else {
+    customer = await resolveCustomer(
+      realmId,
+      accessToken,
+      parsed.data.customerName,
+      parsed.data.customerEmail,
+    );
+  }
   if (!customer?.Id) {
     return NextResponse.json({ error: "Failed to resolve or create QBO customer" }, { status: 500 });
   }
@@ -264,12 +289,47 @@ export async function POST(req: Request) {
   const dueDate = parsed.data.dueDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const total = parsed.data.lineItems.reduce((sum, itemRow) => sum + (itemRow.quantity * itemRow.unitPrice), 0);
 
+  // Build QBO address object from our schema
+  const toQBOAddr = (a?: { line1: string; line2?: string; city?: string; state?: string; zip?: string; country?: string }) => {
+    if (!a) return undefined;
+    return {
+      Line1: a.line1,
+      ...(a.line2 ? { Line2: a.line2 } : {}),
+      City: a.city || "",
+      CountrySubDivisionCode: a.state || "",
+      PostalCode: a.zip || "",
+      Country: a.country || "US",
+    };
+  };
+
+  // Resolve QBO SalesTermRef from term name (e.g. "Net 10" → lookup ID)
+  let salesTermRef: { value: string; name?: string } | undefined;
+  if (parsed.data.terms) {
+    const termName = parsed.data.terms.replace(/'/g, "\\'");
+    const termResult = await queryOne<{ QueryResponse?: { Term?: { Id: string; Name: string }[] } }>(
+      realmId, accessToken,
+      `SELECT * FROM Term WHERE Name = '${termName}' MAXRESULTS 1`,
+    );
+    const term = termResult?.QueryResponse?.Term?.[0];
+    if (term) {
+      salesTermRef = { value: term.Id, name: term.Name };
+    }
+  }
+
   const invoicePayload = {
     CustomerRef: { value: customer.Id },
     TxnDate: txnDate,
     DueDate: dueDate,
     ...(parsed.data.docNumber ? { DocNumber: parsed.data.docNumber } : {}),
     ...(parsed.data.memo ? { PrivateNote: parsed.data.memo } : {}),
+    ...(parsed.data.billEmail ? { BillEmail: { Address: parsed.data.billEmail } } : {}),
+    ...(parsed.data.billAddr ? { BillAddr: toQBOAddr(parsed.data.billAddr) } : {}),
+    ...(parsed.data.shipAddr ? { ShipAddr: toQBOAddr(parsed.data.shipAddr) } : {}),
+    ...(salesTermRef ? { SalesTermRef: salesTermRef } : {}),
+    ...(parsed.data.customerMemo ? { CustomerMemo: { value: parsed.data.customerMemo } } : {}),
+    ...(parsed.data.shipMethod ? { ShipMethodRef: { value: parsed.data.shipMethod } } : {}),
+    ...(parsed.data.shipDate ? { ShipDate: parsed.data.shipDate } : {}),
+    ...(parsed.data.trackingNum ? { TrackingNum: parsed.data.trackingNum } : {}),
     Line: parsed.data.lineItems.map((itemRow) => {
       // Per-line itemId takes priority, then fallback
       const lineItemId = itemRow.itemId || fallbackItem?.Id || "";
@@ -345,6 +405,92 @@ export async function POST(req: Request) {
     emailSent,
     customerId: customer.Id,
     validation: { issues: validation.issues, summary: validation.summary },
+  });
+}
+
+// ── PUT: Update existing invoice (sparse merge) ──
+export async function PUT(req: Request) {
+  if (!(await isAuthorized(req))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const accessToken = await getValidAccessToken();
+  const realmId = await getRealmId();
+  if (!accessToken || !realmId) {
+    return NextResponse.json({ error: "QBO is not connected" }, { status: 401 });
+  }
+
+  const body = await req.json().catch(() => ({})) as Record<string, unknown>;
+  const invoiceId = String(body.id || body.invoiceId || "").trim();
+  if (!invoiceId) {
+    return NextResponse.json({ error: "id is required" }, { status: 400 });
+  }
+
+  // Fetch existing invoice for SyncToken
+  const existing = await queryOne<{ QueryResponse?: { Invoice?: Record<string, unknown>[] } }>(
+    realmId, accessToken,
+    `SELECT * FROM Invoice WHERE Id = '${invoiceId.replace(/'/g, "\\'")}' MAXRESULTS 1`,
+  );
+  const invoice = existing?.QueryResponse?.Invoice?.[0];
+  if (!invoice?.Id || !invoice.SyncToken) {
+    return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+  }
+
+  // Build QBO address from flat fields
+  const toAddr = (a: Record<string, unknown>) => ({
+    Line1: a.line1 || a.Line1 || "",
+    ...(a.line2 || a.Line2 ? { Line2: a.line2 || a.Line2 } : {}),
+    City: a.city || a.City || "",
+    CountrySubDivisionCode: a.state || a.CountrySubDivisionCode || "",
+    PostalCode: a.zip || a.PostalCode || "",
+    Country: a.country || a.Country || "US",
+  });
+
+  // Sparse merge — only include fields that were sent
+  const updatePayload: Record<string, unknown> = {
+    ...invoice, // full existing record
+  };
+
+  if (body.docNumber) updatePayload.DocNumber = body.docNumber;
+  if (body.txnDate) updatePayload.TxnDate = body.txnDate;
+  if (body.dueDate) updatePayload.DueDate = body.dueDate;
+  if (body.memo) updatePayload.PrivateNote = body.memo;
+  if (body.billEmail) updatePayload.BillEmail = { Address: body.billEmail };
+  if (body.billAddr && typeof body.billAddr === "object") updatePayload.BillAddr = toAddr(body.billAddr as Record<string, unknown>);
+  if (body.shipAddr && typeof body.shipAddr === "object") updatePayload.ShipAddr = toAddr(body.shipAddr as Record<string, unknown>);
+  if (body.customerMemo) updatePayload.CustomerMemo = { value: body.customerMemo };
+  if (body.shipMethod) updatePayload.ShipMethodRef = { value: body.shipMethod };
+  if (body.shipDate) updatePayload.ShipDate = body.shipDate;
+  if (body.trackingNum) updatePayload.TrackingNum = body.trackingNum;
+
+  // Resolve terms if provided
+  if (body.terms && typeof body.terms === "string") {
+    const termName = body.terms.replace(/'/g, "\\'");
+    const termResult = await queryOne<{ QueryResponse?: { Term?: { Id: string; Name: string }[] } }>(
+      realmId, accessToken,
+      `SELECT * FROM Term WHERE Name = '${termName}' MAXRESULTS 1`,
+    );
+    const term = termResult?.QueryResponse?.Term?.[0];
+    if (term) updatePayload.SalesTermRef = { value: term.Id, name: term.Name };
+  }
+
+  const updated = await qboFetch<{ Invoice?: Record<string, unknown> }>(
+    realmId, accessToken, "/invoice?minorversion=73",
+    { method: "POST", body: JSON.stringify(updatePayload) },
+  );
+
+  if (!updated?.Invoice) {
+    return NextResponse.json({ error: "Invoice update failed" }, { status: 502 });
+  }
+
+  return NextResponse.json({
+    ok: true,
+    invoiceId: updated.Invoice.Id,
+    docNumber: updated.Invoice.DocNumber,
+    total: updated.Invoice.TotalAmt,
+    dueDate: updated.Invoice.DueDate,
+    balance: updated.Invoice.Balance,
+    message: `Updated invoice ${updated.Invoice.DocNumber || updated.Invoice.Id}`,
   });
 }
 
