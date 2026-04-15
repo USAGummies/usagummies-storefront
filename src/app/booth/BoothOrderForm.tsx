@@ -74,8 +74,20 @@ export function BoothOrderForm() {
       }
       // If Pay Now, the API returns a Shop Pay checkout URL — redirect the
       // browser immediately so the customer can complete payment.
-      if (paymentMethod === "pay_now" && data.payment_url) {
-        window.location.href = data.payment_url;
+      if (paymentMethod === "pay_now") {
+        if (data.payment_url) {
+          window.location.href = data.payment_url;
+          return;
+        }
+        // Pay Now selected but Shopify draft-order creation failed (scope
+        // missing, store offline, etc). Fall back to the Invoice Me flow
+        // gracefully so the customer isn't stuck: the order IS saved in
+        // HubSpot + QBO + welcome email already fired. Surface the fallback
+        // clearly so the customer isn't confused.
+        setErrorMsg(
+          "Card checkout is temporarily unavailable. We've saved your order and will send an invoice instead — check your email for next steps.",
+        );
+        setState("error");
         return;
       }
       setState("success");
