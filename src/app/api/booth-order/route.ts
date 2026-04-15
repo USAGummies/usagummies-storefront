@@ -16,6 +16,15 @@ import { NextResponse } from "next/server";
 import { createQBOCustomer } from "@/lib/ops/qbo-client";
 import { isQBOConfigured } from "@/lib/ops/qbo-client";
 import { sendOpsEmail } from "@/lib/ops/email";
+import {
+  isHubSpotConfigured,
+  upsertContactByEmail,
+  createDeal,
+  logEmail,
+  createNote,
+  splitName,
+  HUBSPOT,
+} from "@/lib/ops/hubspot-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,6 +45,7 @@ export async function POST(req: Request) {
       pricing_tier,
       show_deal,
       notes,
+      payment_method, // "pay_now" | "invoice_me" (optional; default "invoice_me")
     } = body;
 
     // Validate required fields
@@ -53,8 +63,15 @@ export async function POST(req: Request) {
     const tier = pricing_tier === "pallet" ? "pallet" : "standard";
     const bagsPerCase = 36; // 6 cases × 6 bags
     const totalBags = qty * bagsPerCase;
-    const pricePerBag = tier === "pallet" ? 3.00 : 3.25;
-    const subtotal = totalBags * pricePerBag;
+    const basePrice = tier === "pallet" ? 3.00 : 3.25;
+    const paymentMethod: "pay_now" | "invoice_me" =
+      payment_method === "pay_now" ? "pay_now" : "invoice_me";
+    // Pay-Now customers get a 5% prepay discount on the standard tier.
+    // Pallet tier already reflects volume pricing; no extra prepay discount.
+    const prepayMultiplier =
+      paymentMethod === "pay_now" && tier === "standard" ? 0.95 : 1;
+    const pricePerBag = Number((basePrice * prepayMultiplier).toFixed(4));
+    const subtotal = Number((totalBags * pricePerBag).toFixed(2));
     const isShowDeal = show_deal === true;
     const freightNote = tier === "standard" || isShowDeal
       ? "FREE SHIPPING (included)"
@@ -110,30 +127,116 @@ export async function POST(req: Request) {
       }
     }
 
-    // ── Customer welcome email (the "trigger" into Rene+Viktor onboarding sequence) ──
-    // Fires on submit. Tells the customer what's next and gives them the NCS-001 upload link.
+    // ── HubSpot: upsert contact + create B2B Wholesale deal at PO Received ──
+    // Mirror of the Bryce gold-standard workflow: every booth submit lands in
+    // HubSpot with a deal gated on payment + onboarding. Ben is the owner.
+    let hubspotContactId: string | null = null;
+    let hubspotDealId: string | null = null;
+    if (isHubSpotConfigured()) {
+      try {
+        const { firstname, lastname } = splitName(contact_name);
+        const contact = await upsertContactByEmail({
+          email: email.trim(),
+          firstname,
+          lastname,
+          company: company_name.trim(),
+          phone: phone?.trim(),
+          address: ship_address?.trim(),
+          city: ship_city?.trim(),
+          state: ship_state?.trim(),
+          zip: ship_zip?.trim(),
+          lifecyclestage: "opportunity",
+          hs_lead_status: "IN_PROGRESS",
+        });
+        if (contact) {
+          hubspotContactId = contact.id;
+          // Close date: 14 days out for Invoice Me, 7 days for Pay Now (faster path).
+          const closeDays = paymentMethod === "pay_now" ? 7 : 14;
+          const closeDate = new Date(Date.now() + closeDays * 86400000)
+            .toISOString().slice(0, 10);
+          const dealName = `Wholesale — ${company_name.trim()} (${
+            isShowDeal ? "The Reunion 2026" : "Booth Order"
+          })`;
+          hubspotDealId = await createDeal({
+            dealname: dealName,
+            amount: subtotal,
+            dealstage: HUBSPOT.STAGE_PO_RECEIVED,
+            closedate: closeDate,
+            contactId: contact.id,
+            payment_method: paymentMethod,
+            onboarding_complete: false,
+            payment_received: false,
+            description: [
+              `Booth order via usagummies.com/booth, submitted ${orderDate} PT`,
+              `${qty} Master Case${qty > 1 ? "s" : ""} (${totalBags} bags) × $${pricePerBag.toFixed(2)}`,
+              `Subtotal: $${subtotal.toFixed(2)}`,
+              `Payment method: ${paymentMethod === "pay_now" ? "Pay Now by card (5% prepay discount applied)" : "Invoice Me / Net 10"}`,
+              `Pricing tier: ${tier === "pallet" ? "Pallet" : "Standard"}${isShowDeal ? " + Show Special (free shipping)" : ""}`,
+              qboCustomerId ? `QBO Customer ID: ${qboCustomerId}` : "⚠ QBO customer not created",
+              "",
+              "Ship gate: onboarding_complete=false + payment_received=false. No ship until both flip true.",
+            ].filter(Boolean).join("\n"),
+          });
+          if (hubspotDealId) {
+            await createNote({
+              body: [
+                "<p><b>Booth order submitted</b></p>",
+                `<p>Quantity: <b>${qty} MC (${totalBags} bags)</b><br/>`,
+                `Price: <b>$${pricePerBag.toFixed(2)}/bag</b> × ${totalBags} = <b>$${subtotal.toFixed(2)}</b><br/>`,
+                `Payment: <b>${paymentMethod === "pay_now" ? "Pay Now by card" : "Invoice Me / Net 10"}</b><br/>`,
+                `Ship to: ${ship_address || "—"}${ship_city ? `, ${ship_city}` : ""}${ship_state ? ` ${ship_state}` : ""}${ship_zip ? ` ${ship_zip}` : ""}</p>`,
+                qboCustomerId ? `<p>QBO Customer: <code>${qboCustomerId}</code></p>` : "",
+                notes ? `<p>Customer notes: ${notes.replace(/[<>]/g, "")}</p>` : "",
+              ].filter(Boolean).join(""),
+              contactId: contact.id,
+              dealId: hubspotDealId,
+            });
+          }
+        }
+      } catch (err) {
+        console.error("[booth-order] HubSpot sync failed:", err instanceof Error ? err.message : err);
+        // Continue — order already in QBO + Slack; HubSpot is non-blocking
+      }
+    }
+
+    // ── Customer welcome email ──
+    // Single link to the /onboarding/[dealId] portal. Inline web forms, no PDFs.
+    // Portal shows the order summary + required info checklist + live ship status.
     let welcomeEmailSent = false;
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "")
+      || "https://www.usagummies.com";
+    const onboardingUrl = hubspotDealId
+      ? `${siteUrl}/onboarding/${hubspotDealId}`
+      : `${siteUrl}/wholesale`;
     try {
-      const customerSubject = `USA Gummies — Order confirmation from The Reunion (${company_name.trim()})`;
+      const firstName = contact_name.split(/\s+/)[0] || contact_name;
+      const customerSubject = `USA Gummies — Order received (${company_name.trim()})`;
+      const payNowSuffix = paymentMethod === "pay_now"
+        ? " (5% prepay discount applied)" : "";
       const customerBody = [
-        `Hi ${contact_name.split(/\s+/)[0] || contact_name},`,
+        `Hi ${firstName},`,
         ``,
-        `Thanks for stopping by the USA Gummies booth at The Reunion! This email confirms we received your order request.`,
+        `Thanks for your order${isShowDeal ? " from The Reunion" : ""}! We received it and we're on it.`,
         ``,
         `── Order summary ──`,
         `Product: All American Gummy Bears — 7.5 oz bag`,
         `Quantity: ${qty} Master Case${qty > 1 ? "s" : ""} (${totalBags} bags total)`,
-        `Price: $${pricePerBag.toFixed(2)}/bag${isShowDeal || tier === "standard" ? " (Show Special)" : " (Pallet)"}`,
+        `Price: $${pricePerBag.toFixed(2)}/bag${payNowSuffix}`,
         `Subtotal: $${subtotal.toFixed(2)}`,
-        `Shipping: ${tier === "standard" || isShowDeal ? "FREE (100% show discount)" : "Buyer pays freight"}`,
-        `Invoice total: $${subtotal.toFixed(2)}`,
+        `Shipping: ${tier === "standard" || isShowDeal ? "FREE" : "Buyer pays freight"}`,
+        `Order total: $${subtotal.toFixed(2)}`,
+        `Payment: ${paymentMethod === "pay_now" ? "Paid by card — thank you!" : "Invoice will arrive shortly (Net 10)"}`,
         ``,
-        `── What happens next ──`,
-        `1. Ben confirms your pricing and approves the order.`,
-        `2. You'll receive a formal invoice from our bookkeeper (Rene Gonzalez) with ACH payment details.`,
-        `3. To speed up payment and shipping, please complete our short New Customer Setup form (NCS-001) and upload it here:`,
-        `   https://www.usagummies.com/upload/ncs`,
-        `4. Once payment is received, we'll ship as soon as Ben returns from the show (week of April 21).`,
+        `── One quick step ──`,
+        paymentMethod === "pay_now"
+          ? `We just need 5 fast details (30 seconds) so we can get this on the truck. Click here to finish your setup:`
+          : `We just need a quick customer info form so we can send your invoice and get this shipped. Click here to continue:`,
+        ``,
+        `${onboardingUrl}`,
+        ``,
+        paymentMethod === "pay_now"
+          ? `We ship within 2 business days of receiving your info.`
+          : `We'll email your invoice once you complete the form. Ship happens after payment clears.`,
         ``,
         `Questions? Reply to this email — it goes straight to Ben.`,
         ``,
@@ -157,9 +260,25 @@ export async function POST(req: Request) {
       console.error("[booth-order] welcome email threw:", err instanceof Error ? err.message : err);
     }
 
+    // Log the welcome email engagement on the HubSpot contact + deal timeline
+    if (welcomeEmailSent && hubspotContactId) {
+      try {
+        await logEmail({
+          subject: `USA Gummies — Order received (${company_name.trim()})`,
+          body: `Welcome email sent. Onboarding portal: ${onboardingUrl}. Payment method: ${paymentMethod}. Order total: $${subtotal.toFixed(2)}.`,
+          to: email.trim(),
+          contactId: hubspotContactId,
+          dealId: hubspotDealId ?? undefined,
+        });
+      } catch {
+        // non-fatal
+      }
+    }
+
     // Build Slack notification
+    const methodTag = paymentMethod === "pay_now" ? "💳 PAY NOW" : "📄 INVOICE";
     const orderSummary = [
-      `🎪 *NEW BOOTH ORDER — The Reunion*`,
+      `🎪 *NEW BOOTH ORDER — ${methodTag}*`,
       ``,
       `*Company:* ${company_name}`,
       `*Contact:* ${contact_name}`,
@@ -167,23 +286,27 @@ export async function POST(req: Request) {
       phone ? `*Phone:* ${phone}` : null,
       ``,
       `*Order:* ${qty} Master Case${qty > 1 ? "s" : ""} (${totalBags} bags)`,
-      `*Price:* $${pricePerBag.toFixed(2)}/bag${tier === "pallet" ? " (Pallet)" : " (Show Deal)"}`,
+      `*Price:* $${pricePerBag.toFixed(2)}/bag${tier === "pallet" ? " (Pallet)" : paymentMethod === "pay_now" ? " (Pay Now, 5% prepay discount)" : " (Standard)"}`,
       `*Product Subtotal:* $${subtotal.toFixed(2)}`,
-      `*Shipping:* Show on invoice at standard rate, then 100% show discount`,
       isShowDeal ? `*🎪 SHOW DEAL — Freight absorbed*` : null,
-      `*Invoice Total:* $${subtotal.toFixed(2)} (shipping $0 after discount)`,
+      `*Order Total:* $${subtotal.toFixed(2)}${tier === "standard" || isShowDeal ? " (ship $0)" : ""}`,
       ``,
       ship_address ? `*Ship To:* ${ship_address}, ${ship_city || ""} ${ship_state || ""} ${ship_zip || ""}` : null,
       notes ? `*Notes:* ${notes}` : null,
       ``,
       qboCustomerId ? `*QBO Customer ID:* ${qboCustomerId}` : `⚠️ QBO customer not created — needs manual setup`,
-      welcomeEmailSent ? `*✉️ Welcome email sent to ${email}* (with NCS-001 upload link)` : `⚠️ Welcome email NOT sent to ${email} — send manually`,
+      hubspotDealId ? `*HubSpot Deal:* ${hubspotDealId} (B2B Wholesale → PO Received)` : `⚠️ HubSpot deal not created`,
+      welcomeEmailSent ? `*✉️ Welcome email sent* → onboarding at <${onboardingUrl}|${onboardingUrl}>` : `⚠️ Welcome email NOT sent — follow up manually`,
       ``,
       `*Next steps:*`,
-      `1. Ben confirms pricing + approves`,
-      `2. Viktor creates invoice using Trade Show item (ID 15, account 400015.15)`,
-      `3. Customer uploads NCS-001 at usagummies.com/upload/ncs`,
-      `4. Payment received → ship order when Ben returns from show`,
+      paymentMethod === "pay_now"
+        ? `1. Customer completes 5-field Quick Ship form at onboarding portal`
+        : `1. Customer completes Full Setup form at onboarding portal`,
+      `2. Onboarding gate flips green in HubSpot`,
+      paymentMethod === "pay_now"
+        ? `3. Payment already collected by card ✅`
+        : `3. Viktor creates invoice using Trade Show item (ID 15, account 400015.15); customer pays invoice`,
+      `4. Both gates green → Drew gets ship prep ping + pack sheet`,
     ].filter(Boolean).join("\n");
 
     // Post to Slack (must await — serverless function exits before fire-and-forget completes)
@@ -211,9 +334,13 @@ export async function POST(req: Request) {
       pricing_tier: tier,
       show_deal: isShowDeal,
       freight: freightNote,
+      payment_method: paymentMethod,
       qbo_customer_id: qboCustomerId,
+      hubspot_contact_id: hubspotContactId,
+      hubspot_deal_id: hubspotDealId,
       welcome_email_sent: welcomeEmailSent,
-      message: "Order submitted successfully. Check your email for a confirmation and the customer setup link.",
+      onboarding_url: onboardingUrl,
+      message: "Order submitted successfully. Check your email for the onboarding link.",
     });
   } catch (error) {
     console.error("[booth-order] POST failed:", error instanceof Error ? error.message : error);
