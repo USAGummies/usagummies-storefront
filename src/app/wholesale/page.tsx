@@ -112,6 +112,49 @@ export default function WholesalePage() {
         />
         <JsonLd data={pageJsonLd} />
 
+        {/* Primary action band — place an order or check status */}
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <Link
+            href="/booth"
+            className="group rounded-2xl border-2 border-[var(--red)] bg-white p-6 shadow-[0_10px_32px_rgba(178,34,52,0.15)] hover:shadow-[0_14px_40px_rgba(178,34,52,0.25)] transition-shadow"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--red)]">
+                  Place a wholesale order
+                </div>
+                <div className="mt-2 text-xl font-black text-[var(--text)]">
+                  Order now →
+                </div>
+                <div className="mt-1 text-sm text-[var(--muted)]">
+                  Pay by card or on invoice (Net 10). MOQ 1 master carton · $117.
+                </div>
+              </div>
+              <div className="text-3xl">🛒</div>
+            </div>
+          </Link>
+
+          <Link
+            href="/wholesale/status"
+            className="group rounded-2xl border-2 border-[var(--border)] bg-white p-6 hover:border-[var(--navy)] transition-colors"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+                  Already ordered?
+                </div>
+                <div className="mt-2 text-xl font-black text-[var(--text)]">
+                  Check my order status →
+                </div>
+                <div className="mt-1 text-sm text-[var(--muted)]">
+                  Enter your email to see payment + shipping state.
+                </div>
+              </div>
+              <div className="text-3xl">📦</div>
+            </div>
+          </Link>
+        </div>
+
         <div className="flex justify-center py-6">
           <div className="relative w-40 h-20">
             <Image src="/brand/logo-full.png" alt="USA Gummies" fill sizes="160px" className="object-contain" />
