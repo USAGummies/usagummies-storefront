@@ -49,6 +49,8 @@ shopify/
 usagummies-storefront/
 !src/lib/shopify/
 !src/lib/shopify/**
+!src/app/api/webhooks/shopify/
+!src/app/api/webhooks/shopify/**
 
 node_modules/
 .env*
