@@ -29,10 +29,12 @@ export function BoothOrderForm() {
   const totalBags = qty * bagsPerCase;
   const basePrice = pricingTier === "pallet" ? 3.0 : 3.25;
   // Pay-Now customers get a 5% prepay discount on the standard tier. Pallet
-  // already has volume pricing so no extra discount.
+  // already has volume pricing so no extra discount. Rounded to 2 decimals
+  // so the displayed per-bag price × quantity == displayed total (customer
+  // can verify the math on their own).
   const prepayMultiplier =
     paymentMethod === "pay_now" && pricingTier === "standard" ? 0.95 : 1;
-  const pricePerBag = Number((basePrice * prepayMultiplier).toFixed(4));
+  const pricePerBag = Math.round(basePrice * prepayMultiplier * 100) / 100;
   const subtotal = Number((totalBags * pricePerBag).toFixed(2));
   const freightNote =
     pricingTier === "standard" || showDeal

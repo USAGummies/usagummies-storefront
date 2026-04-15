@@ -68,9 +68,10 @@ export async function POST(req: Request) {
       payment_method === "pay_now" ? "pay_now" : "invoice_me";
     // Pay-Now customers get a 5% prepay discount on the standard tier.
     // Pallet tier already reflects volume pricing; no extra prepay discount.
+    // Rounded to 2 decimals so displayed per-bag × quantity == displayed total.
     const prepayMultiplier =
       paymentMethod === "pay_now" && tier === "standard" ? 0.95 : 1;
-    const pricePerBag = Number((basePrice * prepayMultiplier).toFixed(4));
+    const pricePerBag = Math.round(basePrice * prepayMultiplier * 100) / 100;
     const subtotal = Number((totalBags * pricePerBag).toFixed(2));
     const isShowDeal = show_deal === true;
     const freightNote = tier === "standard" || isShowDeal
