@@ -1,5 +1,9 @@
 /**
- * Onboarding API — /api/ops/onboarding
+ * Onboarding API — /api/onboarding
+ *
+ * Public customer-facing route. Intentionally lives OUTSIDE /api/ops/* so it
+ * bypasses the ops-session middleware — the customer submitting their
+ * onboarding form does not have a NextAuth session.
  *
  * GET  ?dealId=XXX    — Fetch order summary + current onboarding state for a deal.
  *                       Public endpoint (no auth) so the customer-facing portal

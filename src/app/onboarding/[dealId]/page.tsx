@@ -13,7 +13,7 @@ async function fetchDeal(dealId: string) {
     process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://www.usagummies.com");
   const res = await fetch(
-    `${site}/api/ops/onboarding?dealId=${encodeURIComponent(dealId)}`,
+    `${site}/api/onboarding?dealId=${encodeURIComponent(dealId)}`,
     { cache: "no-store" },
   );
   if (!res.ok) return null;

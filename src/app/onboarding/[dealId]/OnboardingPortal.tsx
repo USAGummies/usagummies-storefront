@@ -112,7 +112,7 @@ export function OnboardingPortal({ dealId, deal, contact }: Props) {
     setErrorMsg("");
 
     try {
-      const res = await fetch("/api/ops/onboarding", {
+      const res = await fetch("/api/onboarding", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
