@@ -58,7 +58,7 @@ export function OnboardingPortal({ dealId, deal, contact }: Props) {
   const [shipContactName, setShipContactName] = useState(
     [contact?.firstname, contact?.lastname].filter(Boolean).join(" "),
   );
-  const [shipContactPhone, setShipContactPhone] = useState(contact?.phone ?? "");
+  const [shipContactPhone, setShipContactPhone] = useState(formatPhone(contact?.phone ?? ""));
   const [resaleCertNumber, setResaleCertNumber] = useState("");
   const [taxExemptState, setTaxExemptState] = useState("");
 
@@ -234,6 +234,7 @@ export function OnboardingPortal({ dealId, deal, contact }: Props) {
             <input
               type="text"
               required
+              autoComplete="organization"
               value={legalBusinessName}
               onChange={(e) => setLegalBusinessName(e.target.value)}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg text-base focus:ring-2 focus:ring-[#b22234] focus:border-transparent outline-none"
@@ -248,6 +249,7 @@ export function OnboardingPortal({ dealId, deal, contact }: Props) {
               type="text"
               required
               inputMode="numeric"
+              autoComplete="off"
               value={ein}
               onChange={(e) => setEin(e.target.value)}
               placeholder="XX-XXXXXXX"
@@ -260,6 +262,7 @@ export function OnboardingPortal({ dealId, deal, contact }: Props) {
               <input
                 type="text"
                 required
+                autoComplete="name"
                 value={shipContactName}
                 onChange={(e) => setShipContactName(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg text-base focus:ring-2 focus:ring-[#b22234] focus:border-transparent outline-none"
@@ -268,9 +271,12 @@ export function OnboardingPortal({ dealId, deal, contact }: Props) {
             <Field label="Phone *">
               <input
                 type="tel"
+                inputMode="tel"
+                autoComplete="tel"
                 required
                 value={shipContactPhone}
                 onChange={(e) => setShipContactPhone(e.target.value)}
+                onBlur={(e) => setShipContactPhone(formatPhone(e.target.value))}
                 placeholder="(555) 123-4567"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg text-base focus:ring-2 focus:ring-[#b22234] focus:border-transparent outline-none"
               />
@@ -281,6 +287,7 @@ export function OnboardingPortal({ dealId, deal, contact }: Props) {
             <Field label="Resale cert # (optional)" hint="If you have one">
               <input
                 type="text"
+                autoComplete="off"
                 value={resaleCertNumber}
                 onChange={(e) => setResaleCertNumber(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg text-base focus:ring-2 focus:ring-[#b22234] focus:border-transparent outline-none"
@@ -313,6 +320,7 @@ export function OnboardingPortal({ dealId, deal, contact }: Props) {
                 <input
                   type="text"
                   required
+                  autoComplete="name"
                   value={apContactName}
                   onChange={(e) => setApContactName(e.target.value)}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg text-base focus:ring-2 focus:ring-[#b22234] focus:border-transparent outline-none"
@@ -321,6 +329,8 @@ export function OnboardingPortal({ dealId, deal, contact }: Props) {
               <Field label="AP email *">
                 <input
                   type="email"
+                  inputMode="email"
+                  autoComplete="email"
                   required
                   value={apContactEmail}
                   onChange={(e) => setApContactEmail(e.target.value)}
@@ -335,6 +345,7 @@ export function OnboardingPortal({ dealId, deal, contact }: Props) {
             >
               <input
                 type="text"
+                autoComplete="street-address"
                 value={billingAddress}
                 onChange={(e) => setBillingAddress(e.target.value)}
                 placeholder="Street, City, State, ZIP"
@@ -369,33 +380,41 @@ export function OnboardingPortal({ dealId, deal, contact }: Props) {
                 <div className="grid grid-cols-2 gap-3">
                   <input
                     type="text"
+                    autoComplete="organization"
                     value={tradeRef1Company}
                     onChange={(e) => setTradeRef1Company(e.target.value)}
                     placeholder="Reference 1 — company"
-                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#b22234] focus:border-transparent outline-none"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg text-base focus:ring-2 focus:ring-[#b22234] focus:border-transparent outline-none"
                   />
                   <input
                     type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
                     value={tradeRef1Phone}
                     onChange={(e) => setTradeRef1Phone(e.target.value)}
+                    onBlur={(e) => setTradeRef1Phone(formatPhone(e.target.value))}
                     placeholder="Phone"
-                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#b22234] focus:border-transparent outline-none"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg text-base focus:ring-2 focus:ring-[#b22234] focus:border-transparent outline-none"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <input
                     type="text"
+                    autoComplete="organization"
                     value={tradeRef2Company}
                     onChange={(e) => setTradeRef2Company(e.target.value)}
                     placeholder="Reference 2 — company"
-                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#b22234] focus:border-transparent outline-none"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg text-base focus:ring-2 focus:ring-[#b22234] focus:border-transparent outline-none"
                   />
                   <input
                     type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
                     value={tradeRef2Phone}
                     onChange={(e) => setTradeRef2Phone(e.target.value)}
+                    onBlur={(e) => setTradeRef2Phone(formatPhone(e.target.value))}
                     placeholder="Phone"
-                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#b22234] focus:border-transparent outline-none"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg text-base focus:ring-2 focus:ring-[#b22234] focus:border-transparent outline-none"
                   />
                 </div>
               </div>
@@ -406,6 +425,7 @@ export function OnboardingPortal({ dealId, deal, contact }: Props) {
                 <input
                   type="text"
                   required
+                  autoComplete="name"
                   value={signerName}
                   onChange={(e) => setSignerName(e.target.value)}
                   placeholder="Your full name"
@@ -416,6 +436,7 @@ export function OnboardingPortal({ dealId, deal, contact }: Props) {
                 <input
                   type="text"
                   required
+                  autoComplete="organization-title"
                   value={signerTitle}
                   onChange={(e) => setSignerTitle(e.target.value)}
                   placeholder="e.g. Owner, CFO, Buyer"
@@ -483,4 +504,23 @@ function Field({
       {hint && <div className="text-xs text-gray-500 mt-1">{hint}</div>}
     </div>
   );
+}
+
+/**
+ * Best-effort format a US phone number into (NNN) NNN-NNNN display form.
+ * Accepts raw digits, +1-prefixed, or already-formatted. Non-US numbers
+ * pass through unchanged.
+ */
+function formatPhone(raw: string): string {
+  if (!raw) return "";
+  const digits = raw.replace(/\D/g, "");
+  // Strip leading 1 if 11 digits (US country code)
+  const d = digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
+  if (d.length === 10) {
+    return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
+  }
+  if (d.length === 7) {
+    return `${d.slice(0, 3)}-${d.slice(3)}`;
+  }
+  return raw;
 }

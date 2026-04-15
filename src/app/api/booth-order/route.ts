@@ -127,6 +127,92 @@ export async function POST(req: Request) {
       }
     }
 
+    // ── Shopify Draft Order (Pay Now only) ──
+    // For Pay Now orders, create a Shopify Draft Order with a custom line item
+    // at the prepay-discounted price and capture the hosted checkout URL so the
+    // client can redirect the customer to Shop Pay / CC / ACH right after submit.
+    let shopifyDraftOrderId: string | null = null;
+    let shopifyInvoiceUrl: string | null = null;
+    const shopifyDomain = process.env.SHOPIFY_STORE_DOMAIN?.replace(/^https?:\/\//, "").replace(/\/$/, "");
+    const shopifyToken = process.env.SHOPIFY_ADMIN_TOKEN;
+    if (paymentMethod === "pay_now" && shopifyDomain && shopifyToken) {
+      try {
+        const pricePerMC = Number((totalBags * pricePerBag / qty).toFixed(2));
+        const CREATE_DRAFT = `
+          mutation draftOrderCreate($input: DraftOrderInput!) {
+            draftOrderCreate(input: $input) {
+              draftOrder { id name invoiceUrl totalPriceSet { shopMoney { amount currencyCode } } }
+              userErrors { field message }
+            }
+          }
+        `;
+        const firstName = contact_name.split(/\s+/)[0] || contact_name;
+        const lastName = contact_name.split(/\s+/).slice(1).join(" ") || "";
+        const draftInput: Record<string, unknown> = {
+          email: email.trim(),
+          note: `Booth order (Pay Now). ${qty} MC × ${totalBags / qty} bags @ $${pricePerBag.toFixed(2)}/bag (5% prepay on standard tier). QBO customer: ${qboCustomerId || "pending"}.`,
+          tags: ["wholesale", "booth", "pay_now", isShowDeal ? "show_special" : "standard"],
+          lineItems: [
+            {
+              title: `USA Gummies — All American Gummy Bears Master Carton (${totalBags / qty} bags)`,
+              originalUnitPriceWithCurrency: { amount: pricePerMC.toFixed(2), currencyCode: "USD" },
+              quantity: qty,
+              requiresShipping: true,
+              taxable: true,
+            },
+          ],
+          // Free shipping on standard tier / show deal; freight collect otherwise
+          shippingLine:
+            tier === "standard" || isShowDeal
+              ? { title: "FREE SHIPPING (Show Special)", price: "0.00" }
+              : { title: "Freight — invoiced separately", price: "0.00" },
+        };
+        if (ship_address) {
+          draftInput.shippingAddress = {
+            firstName,
+            lastName,
+            company: company_name.trim(),
+            address1: ship_address.trim(),
+            city: ship_city?.trim() || "",
+            province: ship_state?.trim() || "",
+            zip: ship_zip?.trim() || "",
+            country: "United States",
+            phone: phone?.trim() || "",
+          };
+        }
+
+        const endpoint = `https://${shopifyDomain}/admin/api/2025-01/graphql.json`;
+        const res = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Shopify-Access-Token": shopifyToken,
+          },
+          body: JSON.stringify({ query: CREATE_DRAFT, variables: { input: draftInput } }),
+        });
+        const json = await res.json() as {
+          data?: {
+            draftOrderCreate?: {
+              draftOrder?: { id: string; name: string; invoiceUrl: string };
+              userErrors?: { field: string[]; message: string }[];
+            };
+          };
+        };
+        const errs = json.data?.draftOrderCreate?.userErrors ?? [];
+        if (errs.length) {
+          console.error("[booth-order] Shopify draft order userErrors:", errs);
+        } else {
+          shopifyDraftOrderId = json.data?.draftOrderCreate?.draftOrder?.id ?? null;
+          shopifyInvoiceUrl = json.data?.draftOrderCreate?.draftOrder?.invoiceUrl ?? null;
+        }
+      } catch (err) {
+        console.error("[booth-order] Shopify draft order failed:", err instanceof Error ? err.message : err);
+        // Fall through — customer still gets a confirmation and HubSpot deal.
+        // We'll surface the failure in the response so the UI can show an error
+        // and the customer can choose Invoice Me as a fallback.
+      }
+    }
+
     // ── HubSpot: upsert contact + create B2B Wholesale deal at PO Received ──
     // Mirror of the Bryce gold-standard workflow: every booth submit lands in
     // HubSpot with a deal gated on payment + onboarding. Ben is the owner.
@@ -296,6 +382,11 @@ export async function POST(req: Request) {
       ``,
       qboCustomerId ? `*QBO Customer ID:* ${qboCustomerId}` : `⚠️ QBO customer not created — needs manual setup`,
       hubspotDealId ? `*HubSpot Deal:* ${hubspotDealId} (B2B Wholesale → PO Received)` : `⚠️ HubSpot deal not created`,
+      paymentMethod === "pay_now"
+        ? (shopifyInvoiceUrl
+            ? `*💳 Shop Pay checkout:* <${shopifyInvoiceUrl}|${shopifyInvoiceUrl}>`
+            : `⚠️ Pay Now requested but Shopify draft order FAILED — follow up manually`)
+        : null,
       welcomeEmailSent ? `*✉️ Welcome email sent* → onboarding at <${onboardingUrl}|${onboardingUrl}>` : `⚠️ Welcome email NOT sent — follow up manually`,
       ``,
       `*Next steps:*`,
@@ -340,7 +431,12 @@ export async function POST(req: Request) {
       hubspot_deal_id: hubspotDealId,
       welcome_email_sent: welcomeEmailSent,
       onboarding_url: onboardingUrl,
-      message: "Order submitted successfully. Check your email for the onboarding link.",
+      // Pay Now path — Shopify Draft Order + checkout URL
+      shopify_draft_order_id: shopifyDraftOrderId,
+      payment_url: shopifyInvoiceUrl,
+      message: shopifyInvoiceUrl
+        ? "Order received. Redirecting you to secure checkout…"
+        : "Order submitted successfully. Check your email for the onboarding link.",
     });
   } catch (error) {
     console.error("[booth-order] POST failed:", error instanceof Error ? error.message : error);
