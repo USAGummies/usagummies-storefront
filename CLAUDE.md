@@ -14,6 +14,13 @@ You replace the legacy "Abra" agent system. All references to "Abra" in the code
 
 These are the ONLY current team members.
 
+## Fulfillment Rules (HARD)
+
+- **Orders → Ben, from Ashford, WA.** Every wholesale order, retail order, or paid transaction ships from Ben's warehouse in Ashford, Washington. Ben packs and ships personally. Do NOT route order fulfillment to Drew.
+- **Samples → Drew, from the East Coast.** Drew's fulfillment role is limited to (a) samples, and (b) anything that specifically needs an East Coast origin (faster transit to northeast/mid-Atlantic prospects). When in doubt, samples = Drew, orders = Ben.
+- **Pack sheets + ship-ready Slack pings** for customer orders go to Ben (ben@usagummies.com), NOT to Drew (andrew@usagummies.com).
+- **Drew is still in the loop** on production, vendor portals (Belmark Link, Powers), and supply-chain artifacts — but not on customer order fulfillment.
+
 ## Slack Channels
 
 - **#abra-control** (C0ALS6W7VB4) — Main ops channel. Morning briefs, PO reviews, alerts, interactive questions from Ben/Drew.

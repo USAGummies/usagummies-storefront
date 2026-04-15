@@ -322,8 +322,8 @@ export async function POST(req: Request) {
         `${onboardingUrl}`,
         ``,
         paymentMethod === "pay_now"
-          ? `We ship within 2 business days of receiving your info.`
-          : `We'll email your invoice once you complete the form. Ship happens after payment clears.`,
+          ? `I pack and ship your order personally from our warehouse in Ashford, WA within 2 business days of receiving your info.`
+          : `We'll email your invoice once you complete the form. I pack and ship from Ashford, WA as soon as payment clears.`,
         ``,
         `Questions? Reply to this email — it goes straight to Ben.`,
         ``,
@@ -398,7 +398,7 @@ export async function POST(req: Request) {
       paymentMethod === "pay_now"
         ? `3. Payment already collected by card ✅`
         : `3. Viktor creates invoice using Trade Show item (ID 15, account 400015.15); customer pays invoice`,
-      `4. Both gates green → Drew gets ship prep ping + pack sheet`,
+      `4. Both gates green → Ben packs and ships from Ashford, WA`,
     ].filter(Boolean).join("\n");
 
     // Post to Slack (must await — serverless function exits before fire-and-forget completes)
