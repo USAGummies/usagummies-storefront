@@ -24,10 +24,43 @@ export function cronSecretOrDie() {
   return s.trim();
 }
 
+export function adminSecretOrDie() {
+  const s = process.env.CONTROL_PLANE_ADMIN_SECRET;
+  if (!s || !s.trim()) {
+    console.error(
+      "[scripts/ops] CONTROL_PLANE_ADMIN_SECRET is not set. This secret is REQUIRED for admin-tier routes like unpause — CRON_SECRET is not accepted for those. Export it:\n  export CONTROL_PLANE_ADMIN_SECRET=$(vercel env pull | grep CONTROL_PLANE_ADMIN_SECRET | cut -d= -f2)",
+    );
+    process.exit(2);
+  }
+  return s.trim();
+}
+
 export async function callJson(path, init = {}) {
   const url = `${baseUrl()}${path}`;
   const headers = new Headers(init.headers);
   headers.set("authorization", `Bearer ${cronSecretOrDie()}`);
+  if (init.body && !headers.has("content-type")) {
+    headers.set("content-type", "application/json");
+  }
+  const res = await fetch(url, { ...init, headers });
+  const text = await res.text();
+  let parsed = null;
+  try {
+    parsed = text ? JSON.parse(text) : null;
+  } catch {
+    parsed = { raw: text };
+  }
+  return { status: res.status, ok: res.ok, body: parsed };
+}
+
+/**
+ * Admin-tier request. Uses the SEPARATE X-Admin-Authorization header and
+ * CONTROL_PLANE_ADMIN_SECRET. Do not use for routine CRON_SECRET calls.
+ */
+export async function callAdminJson(path, init = {}) {
+  const url = `${baseUrl()}${path}`;
+  const headers = new Headers(init.headers);
+  headers.set("x-admin-authorization", `Bearer ${adminSecretOrDie()}`);
   if (init.body && !headers.has("content-type")) {
     headers.set("content-type", "application/json");
   }

@@ -54,6 +54,23 @@ export async function GET(req: Request): Promise<Response> {
     ? { status: "ready", detail: "CRON_SECRET is configured" }
     : { status: "unready", detail: "CRON_SECRET missing — this very request should have failed auth; if you see this you are running in test-mode" };
 
+  // ---- CONTROL_PLANE_ADMIN_SECRET presence ----
+  //
+  // Distinct from CRON_SECRET. Required for the admin-tier unpause
+  // route (and any future admin-only mutations). Missing → admin routes
+  // fail-closed 401 on every call. See admin-auth.ts.
+  components.controlPlaneAdminSecret = process.env.CONTROL_PLANE_ADMIN_SECRET?.trim()
+    ? {
+        status: "ready",
+        detail:
+          "CONTROL_PLANE_ADMIN_SECRET is configured — admin-tier routes (unpause) are authenticable.",
+      }
+    : {
+        status: "unready",
+        detail:
+          "CONTROL_PLANE_ADMIN_SECRET missing — /api/ops/control-plane/unpause returns 401 on every call. Set it in Vercel env; it MUST be a different value from CRON_SECRET (never reuse).",
+      };
+
   // ---- Approval store ----
   components.approvalStore = await probe(async () => {
     const pending = await approvalStore().listPending();
@@ -169,6 +186,27 @@ export async function GET(req: Request): Promise<Response> {
       };
     }
     return { status: "ready" as const, detail: "CRON_SECRET + SLACK_BOT_TOKEN both present" };
+  })();
+
+  // ---- Unpause route readiness ----
+  //
+  // Depends on both admin secret (auth) AND the pause sink (for the
+  // isPaused + unpauseAgent operations the route performs).
+  components.unpauseRoute = (() => {
+    if (components.controlPlaneAdminSecret.status !== "ready") {
+      return {
+        status: "unready" as const,
+        detail:
+          "CONTROL_PLANE_ADMIN_SECRET missing → route will 401 every caller. Set it in Vercel.",
+      };
+    }
+    if (components.pauseSink.status !== "ready") {
+      return {
+        status: "unready" as const,
+        detail: "pause sink unreachable → unpause cannot modify state.",
+      };
+    }
+    return { status: "ready" as const, detail: "admin secret configured, pause sink reachable" };
   })();
 
   // ---- Drift audit route readiness ----

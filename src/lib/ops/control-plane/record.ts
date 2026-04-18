@@ -34,6 +34,14 @@ import type {
 import { auditStore, approvalStore, pauseSink } from "./stores";
 import { auditSurface, approvalSurface } from "./slack";
 
+function guardDeps() {
+  return {
+    pauseSink: pauseSink(),
+    auditStore: auditStore(),
+    auditSurface: auditSurface(),
+  };
+}
+
 // ---- Class A: record an autonomous write ---------------------------------
 
 export interface RecordFields {
@@ -79,9 +87,10 @@ export async function record(
 
   // Runtime pause guard. Fails closed with PausedAgentError if the agent
   // is in the PauseSink's paused set or if the sink is unreachable.
-  // Writes `runtime.blocked-paused` to the audit store so refusals are
-  // observable, not silent. Governance §5.
-  await guardAgent(run, { pauseSink: pauseSink(), auditStore: auditStore() });
+  // Writes `runtime.blocked-paused` to the audit store AND best-effort
+  // mirrors to #ops-audit via the Slack surface, so refusals are
+  // observable in both stream + channel. Governance §5.
+  await guardAgent(run, guardDeps());
 
   const entry = buildAuditEntry(run, {
     action: fields.actionSlug,
@@ -138,7 +147,7 @@ export async function requestApproval(
   // Guard first — a paused agent cannot open new approvals either.
   // Approvals already in flight proceed normally (they were validated
   // when opened). Only NEW requests are blocked.
-  await guardAgent(run, { pauseSink: pauseSink(), auditStore: auditStore() });
+  await guardAgent(run, guardDeps());
 
   const approval = await openApproval(approvalStore(), approvalSurface(), {
     ...params,

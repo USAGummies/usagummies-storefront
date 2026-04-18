@@ -2,28 +2,31 @@
  * POST /api/ops/control-plane/unpause
  *
  * Remove an agent from the paused set. Ben is the only human who may
- * unpause (blueprint §6.2). This route does NOT enforce that — the
- * auth gate is CRON_SECRET — so it's intended for the Ben-authored
- * unpause script. When the Slack approval route is wired for unpause
- * (Class B `agent.unpause` slug, not registered yet), callers should
- * move to that path.
+ * unpause per /contracts/governance.md §6.2 (graduation / pause lifecycle).
+ *
+ * Auth (tier 2):
+ *   `X-Admin-Authorization: Bearer <CONTROL_PLANE_ADMIN_SECRET>`
+ *   (NOT the scheduled-job CRON_SECRET — see admin-auth.ts for the rationale).
+ *   Fail-closed 401 if the admin secret env var is missing or the
+ *   header is absent/wrong.
  *
  * Body: { agentId: string, reason: string }
+ *   A caller-supplied `actor` field is IGNORED. Unpause is always
+ *   attributed to "Ben" because that is the only human who holds the
+ *   admin secret; trusting a body-supplied actor would let any caller
+ *   with the admin secret attribute the action to Rene or Drew.
  *
  * Side effects:
  *   1. pauseSink.unpauseAgent(agentId, reason)
- *   2. Writes a runtime.agent-unpaused audit entry with before/after
- *      metadata so the unpause is observable, not silent.
- *
- * Auth: bearer CRON_SECRET.
+ *   2. Writes a runtime.agent-unpaused human audit entry (actorId=Ben)
+ *      so the unpause is observable + attributable.
  */
 
 import { NextResponse } from "next/server";
 
 import { buildHumanAuditEntry } from "@/lib/ops/control-plane/audit";
 import { auditStore, pauseSink } from "@/lib/ops/control-plane/stores";
-import { isCronAuthorized, unauthorized } from "@/lib/ops/control-plane/admin-auth";
-import type { HumanOwner } from "@/lib/ops/control-plane/types";
+import { isAdminAuthorized, unauthorized } from "@/lib/ops/control-plane/admin-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,11 +34,15 @@ export const dynamic = "force-dynamic";
 type Body = {
   agentId?: string;
   reason?: string;
-  actor?: HumanOwner;
+  // `actor` is deliberately not part of the type — body-supplied actor
+  // is ignored by the route. If someone sends one, the server pretends
+  // it isn't there.
 };
 
+const AUTHORIZED_ACTOR = "Ben" as const;
+
 export async function POST(req: Request): Promise<Response> {
-  if (!isCronAuthorized(req)) return unauthorized();
+  if (!isAdminAuthorized(req)) return unauthorized();
 
   let body: Body;
   try {
@@ -54,7 +61,7 @@ export async function POST(req: Request): Promise<Response> {
     );
   }
 
-  const actor: HumanOwner = body.actor ?? "Ben";
+  const actor = AUTHORIZED_ACTOR;
   const sink = pauseSink();
 
   let wasPaused = false;
@@ -98,7 +105,9 @@ export async function POST(req: Request): Promise<Response> {
     );
   }
 
-  // Audit — human-authored since unpause is an explicit human decision.
+  // Audit — human-authored. actorId is hardcoded "Ben" regardless of
+  // body content; admin-tier auth is the evidence that Ben (or his
+  // delegate with the admin secret) initiated this.
   try {
     await auditStore().append(
       buildHumanAuditEntry({

@@ -19,6 +19,7 @@ import type { PolicyViolation } from "../types";
 const PRIOR_CRON = process.env.CRON_SECRET;
 const PRIOR_BOT = process.env.SLACK_BOT_TOKEN;
 const PRIOR_SIG = process.env.SLACK_SIGNING_SECRET;
+const PRIOR_ADMIN = process.env.CONTROL_PLANE_ADMIN_SECRET;
 
 let approvalStoreRef: InMemoryApprovalStore;
 let auditStoreRef: InMemoryAuditStore;
@@ -30,6 +31,9 @@ beforeEach(() => {
   process.env.CRON_SECRET = "test-secret";
   delete process.env.SLACK_BOT_TOKEN;
   delete process.env.SLACK_SIGNING_SECRET;
+  // Admin secret defaults to absent; individual tests flip it on when
+  // they want to assert the ready state.
+  delete process.env.CONTROL_PLANE_ADMIN_SECRET;
   approvalStoreRef = new InMemoryApprovalStore();
   auditStoreRef = new InMemoryAuditStore();
   pauseSinkRef = new InMemoryPauseSink();
@@ -50,6 +54,8 @@ afterEach(() => {
   else process.env.CRON_SECRET = PRIOR_CRON;
   if (PRIOR_BOT === undefined) delete process.env.SLACK_BOT_TOKEN;
   else process.env.SLACK_BOT_TOKEN = PRIOR_BOT;
+  if (PRIOR_ADMIN === undefined) delete process.env.CONTROL_PLANE_ADMIN_SECRET;
+  else process.env.CONTROL_PLANE_ADMIN_SECRET = PRIOR_ADMIN;
   if (PRIOR_SIG === undefined) delete process.env.SLACK_SIGNING_SECRET;
   else process.env.SLACK_SIGNING_SECRET = PRIOR_SIG;
   __resetStores();
@@ -95,9 +101,10 @@ describe("GET /api/ops/control-plane/health", () => {
     expect(body.components.cronSecret.status).toBe("ready");
   });
 
-  it("with Slack fully configured + stores seeded → ready + 200 + not degraded", async () => {
+  it("with Slack + admin secret fully configured + stores seeded → ready + 200 + not degraded", async () => {
     process.env.SLACK_BOT_TOKEN = "xoxb-stub";
     process.env.SLACK_SIGNING_SECRET = "stub-sig";
+    process.env.CONTROL_PLANE_ADMIN_SECRET = "stub-admin";
     await violationStoreRef.append(violation("viktor"));
     await correctionStoreRef.append({
       id: "c",
@@ -115,10 +122,36 @@ describe("GET /api/ops/control-plane/health", () => {
     expect(body.components.slackConfig.status).toBe("ready");
     expect(body.components.violationStore.status).toBe("ready");
     expect(body.components.correctionStore.status).toBe("ready");
+    expect(body.components.controlPlaneAdminSecret.status).toBe("ready");
+    expect(body.components.unpauseRoute.status).toBe("ready");
+  });
+
+  it("admin secret missing → unready + unpauseRoute unready + 503", async () => {
+    process.env.SLACK_BOT_TOKEN = "xoxb-stub";
+    process.env.SLACK_SIGNING_SECRET = "stub-sig";
+    delete process.env.CONTROL_PLANE_ADMIN_SECRET;
+    await violationStoreRef.append(violation("viktor"));
+    await correctionStoreRef.append({
+      id: "c",
+      at: new Date().toISOString(),
+      agentId: "viktor",
+      division: "sales",
+      correctedBy: "Ben",
+    });
+    const res = await GET(req());
+    expect(res.status).toBe(503);
+    const body = await res.json();
+    expect(body.ok).toBe(false);
+    expect(body.components.controlPlaneAdminSecret.status).toBe("unready");
+    expect(body.components.controlPlaneAdminSecret.detail).toContain(
+      "different value from CRON_SECRET",
+    );
+    expect(body.components.unpauseRoute.status).toBe("unready");
   });
 
   it("Slack signing secret present but bot token absent → degraded (approvals still verify; posts no-op)", async () => {
     process.env.SLACK_SIGNING_SECRET = "stub-sig";
+    process.env.CONTROL_PLANE_ADMIN_SECRET = "stub-admin";
     await violationStoreRef.append(violation("viktor"));
     await correctionStoreRef.append({
       id: "c",

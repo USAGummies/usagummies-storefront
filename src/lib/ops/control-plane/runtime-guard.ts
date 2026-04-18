@@ -24,7 +24,7 @@
  * + §6 (correction protocol).
  */
 
-import type { AuditStore } from "./audit";
+import type { AuditStore, AuditSlackSurface } from "./audit";
 import type { PauseSink } from "./enforcement";
 import type { RunContext } from "./types";
 import { buildAuditEntry } from "./audit";
@@ -50,15 +50,25 @@ export interface GuardDeps {
   /**
    * Audit store — used to record the blocked-by-pause event.
    * Optional so tests can elide it, but production callers MUST pass the
-   * factory-backed store so every refusal lands in #ops-audit.
+   * factory-backed store so every refusal is persisted.
    */
   auditStore?: AuditStore;
+  /**
+   * Slack audit surface — best-effort mirror of the blocked-by-pause
+   * entry to `#ops-audit`. Optional; failures are swallowed. When
+   * production call sites (record.ts) pass the factory-backed surface,
+   * operators see the refusal in Slack as well as the audit store —
+   * aligning runtime behavior with the doc claim that refusals "land
+   * in #ops-audit."
+   */
+  auditSurface?: AuditSlackSurface | null;
 }
 
 /**
  * Throws PausedAgentError if the agent is paused. Otherwise returns.
- * Records a `runtime.blocked-paused` audit entry on refusal — the block
- * must itself be observable in the audit trail, not silent.
+ * Records a `runtime.blocked-paused` audit entry on refusal and
+ * best-effort-mirrors it to #ops-audit so the block is observable in
+ * both the audit store and Slack.
  */
 export async function guardAgent(run: RunContext, deps: GuardDeps): Promise<void> {
   let paused = false;
@@ -75,7 +85,7 @@ export async function guardAgent(run: RunContext, deps: GuardDeps): Promise<void
       run.runId,
     );
     wrapped.message = `${wrapped.message} (fail-closed: pause-sink unavailable: ${message})`;
-    await tryAuditBlocked(run, deps.auditStore, {
+    await tryAuditBlocked(run, deps.auditStore, deps.auditSurface, {
       reason: "pause-sink-unavailable",
       detail: message,
     });
@@ -83,7 +93,7 @@ export async function guardAgent(run: RunContext, deps: GuardDeps): Promise<void
   }
 
   if (paused) {
-    await tryAuditBlocked(run, deps.auditStore, {
+    await tryAuditBlocked(run, deps.auditStore, deps.auditSurface, {
       reason: "agent-paused",
       detail: `agent ${run.agentId} is in the PauseSink`,
     });
@@ -108,11 +118,13 @@ export async function runWithGuard<T>(
 async function tryAuditBlocked(
   run: RunContext,
   auditStore: AuditStore | undefined,
+  auditSurface: AuditSlackSurface | null | undefined,
   details: { reason: string; detail: string },
 ): Promise<void> {
   if (!auditStore) return;
+  let entry: ReturnType<typeof buildAuditEntry> | null = null;
   try {
-    const entry = buildAuditEntry(run, {
+    entry = buildAuditEntry(run, {
       action: "runtime.blocked-paused",
       entityType: "agent",
       entityId: run.agentId,
@@ -127,8 +139,18 @@ async function tryAuditBlocked(
   } catch {
     // Audit append failing is non-fatal for the guard decision itself —
     // the caller will still get PausedAgentError — but it does mean the
-    // refusal won't show up in #ops-audit for this invocation. That is
-    // a degraded-mode event and is captured by the health endpoint's
-    // audit-store health check, not here.
+    // refusal won't show up in the store for this invocation. The health
+    // endpoint's audit-store probe surfaces persistent failures.
+    return;
+  }
+  // Best-effort Slack mirror. Store is authoritative; surface is a
+  // mirror. A Slack failure cannot change the guard outcome.
+  if (auditSurface && entry) {
+    try {
+      await auditSurface.mirror(entry);
+    } catch {
+      // swallowed — degraded-mode is an expected condition on a
+      // freshly-provisioned workspace before SLACK_BOT_TOKEN is set.
+    }
   }
 }

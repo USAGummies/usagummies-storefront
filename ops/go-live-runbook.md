@@ -14,7 +14,8 @@ Required on Vercel production:
 
 | Env var | Purpose | Status check |
 |---|---|---|
-| `CRON_SECRET` | every admin route auth | `GET /api/ops/control-plane/health` → `components.cronSecret.status` |
+| `CRON_SECRET` | scheduled + low-authority admin routes (daily brief, drift audit, violations, corrections, inspect endpoints) | `components.cronSecret.status` |
+| `CONTROL_PLANE_ADMIN_SECRET` | **admin-tier mutations only — unpause.** Must be a DIFFERENT value from `CRON_SECRET`. Uses header `X-Admin-Authorization: Bearer …` (not `Authorization`). | `components.controlPlaneAdminSecret.status` + `components.unpauseRoute.status` |
 | `KV_REST_API_URL` + `KV_REST_API_TOKEN` | approval/audit/enforcement stores | `components.approvalStore`/`auditStore`/`pauseSink` = ready |
 | `PLAID_CLIENT_ID` + `PLAID_SECRET` | daily-brief cash position | shows up as degraded-but-functional when Plaid isn't yet connected |
 | `SLACK_BOT_TOKEN` | outbound Slack posts | `components.slackConfig` needs this to be ready |

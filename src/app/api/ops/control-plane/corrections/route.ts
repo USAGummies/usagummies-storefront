@@ -4,7 +4,10 @@
  * POST — append a correction. Schema is CorrectionEvent. Used by Ben /
  *        Rene / Drew when they correct an agent (per /contracts/governance.md §6).
  *
- * GET  — count corrections in a window, optional agent filter.
+ * GET  — count corrections in a window. No agent filter at this route —
+ *        CorrectionStore.countInWindow() exposes total count only. If
+ *        per-agent correction tracking is needed later, extend the
+ *        store interface (listInWindow or countByAgent) first.
  *
  * Auth: bearer CRON_SECRET.
  */

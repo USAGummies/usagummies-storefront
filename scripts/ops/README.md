@@ -2,17 +2,24 @@
 
 Thin wrappers over `/api/ops/control-plane/*` for humans and for Make.com scenarios.
 
-All scripts require `CRON_SECRET` in the environment. Override `CONTROL_PLANE_BASE_URL` (default `https://www.usagummies.com`) for local dev.
+## Auth tiers
+
+Two distinct secrets — do not reuse them as the same value:
+
+- **`CRON_SECRET`** — required for every routine operator script (violations, corrections, list-paused, daily brief, drift audit, all inspect endpoints). Header: `Authorization: Bearer`.
+- **`CONTROL_PLANE_ADMIN_SECRET`** — required ONLY for admin-tier mutations (currently: `unpause-agent.mjs`). Header: `X-Admin-Authorization: Bearer`. Ben-only. Possession of this secret IS the authorization — the unpause route always attributes to "Ben" regardless of body content, so body-supplied `actor` is ignored.
+
+Override `CONTROL_PLANE_BASE_URL` (default `https://www.usagummies.com`) for local dev.
 
 ## Scripts
 
-| Script | What | Route |
+| Script | Secret | Route |
 |---|---|---|
-| `append-violation.mjs` | Seed a `PolicyViolation` (so the weekly drift audit has real input). | `POST /api/ops/control-plane/violations` |
-| `append-correction.mjs` | Record a Ben/Rene/Drew correction per governance §6. | `POST /api/ops/control-plane/corrections` |
-| `unpause-agent.mjs` | Unpause an auto-paused agent with an audit-captured reason. | `POST /api/ops/control-plane/unpause` |
-| `list-paused.mjs` | List currently paused agents. | `GET /api/ops/control-plane/paused` |
-| `control-plane.mjs` | Shared helpers (not invoked directly). | — |
+| `append-violation.mjs` | `CRON_SECRET` | `POST /api/ops/control-plane/violations` |
+| `append-correction.mjs` | `CRON_SECRET` | `POST /api/ops/control-plane/corrections` |
+| `list-paused.mjs` | `CRON_SECRET` | `GET /api/ops/control-plane/paused` |
+| `unpause-agent.mjs` | **`CONTROL_PLANE_ADMIN_SECRET`** | `POST /api/ops/control-plane/unpause` |
+| `control-plane.mjs` | — | Shared helpers (not invoked directly). |
 
 ## Inspection (no dedicated script; curl the endpoints directly)
 

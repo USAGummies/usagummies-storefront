@@ -137,6 +137,82 @@ describe("guardAgent()", () => {
       guardAgent(baseRun("viktor"), { pauseSink }),
     ).rejects.toBeInstanceOf(PausedAgentError);
   });
+
+  it("mirrors the runtime.blocked-paused entry to the audit Slack surface when one is provided", async () => {
+    await pauseSink.pauseAgent(pausedRecord("viktor"));
+    const mirrored: Array<{ action: string; entityId?: string }> = [];
+    const surface = {
+      async mirror(entry: { action: string; entityId?: string }) {
+        mirrored.push(entry);
+      },
+    };
+    await expect(
+      guardAgent(baseRun("viktor"), {
+        pauseSink,
+        auditStore: auditStoreRef,
+        auditSurface: surface,
+      }),
+    ).rejects.toBeInstanceOf(PausedAgentError);
+    expect(mirrored).toHaveLength(1);
+    expect(mirrored[0].action).toBe("runtime.blocked-paused");
+    expect(mirrored[0].entityId).toBe("viktor");
+  });
+
+  it("a Slack surface failure does not suppress the PausedAgentError", async () => {
+    await pauseSink.pauseAgent(pausedRecord("viktor"));
+    const failingSurface = {
+      async mirror() {
+        throw new Error("slack down");
+      },
+    };
+    await expect(
+      guardAgent(baseRun("viktor"), {
+        pauseSink,
+        auditStore: auditStoreRef,
+        auditSurface: failingSurface,
+      }),
+    ).rejects.toBeInstanceOf(PausedAgentError);
+    // Store still captured the entry.
+    const recent = await auditStoreRef.recent(10);
+    expect(recent.some((e) => e.action === "runtime.blocked-paused")).toBe(true);
+  });
+
+  it("does not attempt a mirror when the audit store failed (nothing to mirror)", async () => {
+    await pauseSink.pauseAgent(pausedRecord("viktor"));
+    const brokenAudit = {
+      async append() {
+        throw new Error("audit KV down");
+      },
+      async recent() {
+        return [];
+      },
+      async byRun() {
+        return [];
+      },
+      async byAgent() {
+        return [];
+      },
+      async byAction() {
+        return [];
+      },
+    };
+    const mirrored: unknown[] = [];
+    const surface = {
+      async mirror(entry: unknown) {
+        mirrored.push(entry);
+      },
+    };
+    await expect(
+      guardAgent(baseRun("viktor"), {
+        pauseSink,
+        auditStore: brokenAudit,
+        auditSurface: surface,
+      }),
+    ).rejects.toBeInstanceOf(PausedAgentError);
+    // When the store fails, the mirror is skipped — the entry never
+    // existed to mirror. The refusal still propagates.
+    expect(mirrored).toHaveLength(0);
+  });
 });
 
 // ---- runWithGuard() ---------------------------------------------------

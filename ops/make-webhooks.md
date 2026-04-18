@@ -18,6 +18,7 @@ SLACK_SIGNING_SECRET         ← approval route verification (required before wi
 SLACK_USER_BEN / _RENE / _DREW  ← override paperclip-era defaults (optional)
 KV_REST_API_URL              ← KV-backed stores (production)
 KV_REST_API_TOKEN            ← same
+CONTROL_PLANE_ADMIN_SECRET   ← REQUIRED for admin-tier routes (unpause). MUST differ from CRON_SECRET.
 ```
 
 Check readiness first:
@@ -153,18 +154,27 @@ POST https://www.usagummies.com/api/ops/control-plane/corrections
 
 Allowed `correctedBy`: `Ben`, `Rene`, `Drew`.
 
-### 2.3 Unpause an agent
+### 2.3 Unpause an agent — ADMIN-TIER auth
+
+Unpause is governance-critical (blueprint §6.2 — "Ben is the only human who may unpause"). This route does NOT accept `CRON_SECRET`. It requires a **separate** admin secret sent on a **different** header, and ignores any caller-supplied `actor` — the audit entry always records actorId = "Ben".
 
 ```
 POST https://www.usagummies.com/api/ops/control-plane/unpause
+X-Admin-Authorization: Bearer <CONTROL_PLANE_ADMIN_SECRET>
+Content-Type: application/json
+
 {
   "agentId": "viktor",
-  "reason": "Reviewed drift-audit sc-xxx; prompts tightened",
-  "actor": "Ben"
+  "reason": "Reviewed drift-audit sc-xxx; prompts tightened"
 }
 ```
 
-409 if the agent isn't paused. Writes a `runtime.agent-unpaused` human audit entry on success.
+- 401 if `X-Admin-Authorization` is missing or wrong OR if `CONTROL_PLANE_ADMIN_SECRET` is unset server-side.
+- 401 if the caller sends only `Authorization: Bearer <CRON_SECRET>` — cron-tier callers cannot unpause.
+- 409 if the agent isn't paused.
+- 200 + `actor: "Ben"` on success. A `runtime.agent-unpaused` human audit entry is written regardless of what the body contained.
+
+**Do not wire this into a scheduled Make.com scenario.** Unpause is a manual, audited human action.
 
 ---
 

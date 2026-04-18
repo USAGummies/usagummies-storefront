@@ -27,6 +27,7 @@ import { __resetSurfaces, __setSurfacesForTest } from "../slack";
 // ---- Fixture plumbing --------------------------------------------------
 
 const PRIOR_CRON = process.env.CRON_SECRET;
+const PRIOR_ADMIN = process.env.CONTROL_PLANE_ADMIN_SECRET;
 
 let approvalStoreRef: InMemoryApprovalStore;
 let auditStoreRef: InMemoryAuditStore;
@@ -36,6 +37,7 @@ let correctionStoreRef: InMemoryCorrectionStore;
 
 beforeEach(() => {
   process.env.CRON_SECRET = "test-secret";
+  process.env.CONTROL_PLANE_ADMIN_SECRET = "test-admin-secret";
   approvalStoreRef = new InMemoryApprovalStore();
   auditStoreRef = new InMemoryAuditStore();
   pauseSinkRef = new InMemoryPauseSink();
@@ -56,6 +58,8 @@ beforeEach(() => {
 afterEach(() => {
   if (PRIOR_CRON === undefined) delete process.env.CRON_SECRET;
   else process.env.CRON_SECRET = PRIOR_CRON;
+  if (PRIOR_ADMIN === undefined) delete process.env.CONTROL_PLANE_ADMIN_SECRET;
+  else process.env.CONTROL_PLANE_ADMIN_SECRET = PRIOR_ADMIN;
   __resetStores();
   __resetSurfaces();
 });
@@ -63,6 +67,19 @@ afterEach(() => {
 function authed(url: string, init: RequestInit = {}): Request {
   const headers = new Headers(init.headers);
   headers.set("authorization", "Bearer test-secret");
+  if (init.body && !headers.has("content-type")) {
+    headers.set("content-type", "application/json");
+  }
+  return new Request(url, { ...init, headers });
+}
+
+/**
+ * Admin-tier authed request — uses X-Admin-Authorization with the
+ * admin secret, NOT Authorization with CRON_SECRET.
+ */
+function adminAuthed(url: string, init: RequestInit = {}): Request {
+  const headers = new Headers(init.headers);
+  headers.set("x-admin-authorization", "Bearer test-admin-secret");
   if (init.body && !headers.has("content-type")) {
     headers.set("content-type", "application/json");
   }
@@ -267,27 +284,9 @@ describe("GET /api/ops/control-plane/paused + POST /unpause", () => {
     expect(body.paused[0].agentId).toBe("viktor");
   });
 
-  it("unpause requires reason", async () => {
-    const res = await postUnpause(
-      authed(`${BASE}/api/ops/control-plane/unpause`, {
-        method: "POST",
-        body: JSON.stringify({ agentId: "viktor" }),
-      }),
-    );
-    expect(res.status).toBe(400);
-  });
-
-  it("unpause returns 409 when agent is not paused", async () => {
-    const res = await postUnpause(
-      authed(`${BASE}/api/ops/control-plane/unpause`, {
-        method: "POST",
-        body: JSON.stringify({ agentId: "viktor", reason: "r" }),
-      }),
-    );
-    expect(res.status).toBe(409);
-  });
-
-  it("unpause removes the agent and records a runtime.agent-unpaused audit entry", async () => {
+  it("unpause rejects CRON_SECRET-only callers (401) — admin tier required", async () => {
+    // CRON_SECRET holder sends Authorization: Bearer test-secret. Must 401
+    // because unpause requires X-Admin-Authorization with CONTROL_PLANE_ADMIN_SECRET.
     await pauseSinkRef.pauseAgent({
       agentId: "viktor",
       division: "sales",
@@ -301,16 +300,119 @@ describe("GET /api/ops/control-plane/paused + POST /unpause", () => {
     const res = await postUnpause(
       authed(`${BASE}/api/ops/control-plane/unpause`, {
         method: "POST",
+        body: JSON.stringify({ agentId: "viktor", reason: "should fail" }),
+      }),
+    );
+    expect(res.status).toBe(401);
+    // Side-effect: agent is STILL paused. No state was mutated.
+    expect(await pauseSinkRef.isPaused("viktor")).toBe(true);
+  });
+
+  it("unpause rejects callers whose admin secret is wrong (401)", async () => {
+    await pauseSinkRef.pauseAgent({
+      agentId: "viktor",
+      division: "sales",
+      reason: "2 violations",
+      violationsInWindow: 2,
+      windowStart: new Date().toISOString(),
+      windowEnd: new Date().toISOString(),
+      scorecardId: "sc-1",
+      pausedAt: new Date().toISOString(),
+    });
+    const req = new Request(`${BASE}/api/ops/control-plane/unpause`, {
+      method: "POST",
+      headers: {
+        "x-admin-authorization": "Bearer wrong-admin-secret",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ agentId: "viktor", reason: "r" }),
+    });
+    const res = await postUnpause(req);
+    expect(res.status).toBe(401);
+    expect(await pauseSinkRef.isPaused("viktor")).toBe(true);
+  });
+
+  it("unpause rejects when admin secret env is unset (fail-closed)", async () => {
+    delete process.env.CONTROL_PLANE_ADMIN_SECRET;
+    const res = await postUnpause(
+      adminAuthed(`${BASE}/api/ops/control-plane/unpause`, {
+        method: "POST",
+        body: JSON.stringify({ agentId: "viktor", reason: "r" }),
+      }),
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("unpause rejects admin secret sent on the WRONG header (Authorization, not X-Admin-Authorization)", async () => {
+    // Even if the caller knows the admin secret, sending it on
+    // `Authorization` instead of `X-Admin-Authorization` must fail.
+    await pauseSinkRef.pauseAgent({
+      agentId: "viktor",
+      division: "sales",
+      reason: "2 violations",
+      violationsInWindow: 2,
+      windowStart: new Date().toISOString(),
+      windowEnd: new Date().toISOString(),
+      scorecardId: "sc-1",
+      pausedAt: new Date().toISOString(),
+    });
+    const req = new Request(`${BASE}/api/ops/control-plane/unpause`, {
+      method: "POST",
+      headers: {
+        authorization: "Bearer test-admin-secret",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ agentId: "viktor", reason: "r" }),
+    });
+    const res = await postUnpause(req);
+    expect(res.status).toBe(401);
+    expect(await pauseSinkRef.isPaused("viktor")).toBe(true);
+  });
+
+  it("unpause requires reason (admin-authed 400)", async () => {
+    const res = await postUnpause(
+      adminAuthed(`${BASE}/api/ops/control-plane/unpause`, {
+        method: "POST",
+        body: JSON.stringify({ agentId: "viktor" }),
+      }),
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("unpause returns 409 when agent is not paused (admin-authed)", async () => {
+    const res = await postUnpause(
+      adminAuthed(`${BASE}/api/ops/control-plane/unpause`, {
+        method: "POST",
+        body: JSON.stringify({ agentId: "viktor", reason: "r" }),
+      }),
+    );
+    expect(res.status).toBe(409);
+  });
+
+  it("admin-authed unpause removes the agent and records actorId=Ben", async () => {
+    await pauseSinkRef.pauseAgent({
+      agentId: "viktor",
+      division: "sales",
+      reason: "2 violations",
+      violationsInWindow: 2,
+      windowStart: new Date().toISOString(),
+      windowEnd: new Date().toISOString(),
+      scorecardId: "sc-1",
+      pausedAt: new Date().toISOString(),
+    });
+    const res = await postUnpause(
+      adminAuthed(`${BASE}/api/ops/control-plane/unpause`, {
+        method: "POST",
         body: JSON.stringify({
           agentId: "viktor",
           reason: "Reviewed scorecard sc-1",
-          actor: "Ben",
         }),
       }),
     );
     const body = await res.json();
     expect(res.status).toBe(200);
     expect(body.ok).toBe(true);
+    expect(body.actor).toBe("Ben");
     expect(await pauseSinkRef.isPaused("viktor")).toBe(false);
     const audit = await auditStoreRef.recent(10);
     const unpauseEntry = audit.find((e) => e.action === "runtime.agent-unpaused");
@@ -318,6 +420,35 @@ describe("GET /api/ops/control-plane/paused + POST /unpause", () => {
     expect(unpauseEntry?.actorType).toBe("human");
     expect(unpauseEntry?.actorId).toBe("Ben");
     expect(unpauseEntry?.entityId).toBe("viktor");
+  });
+
+  it("actor spoofing is ignored — body 'actor: Rene' still records actorId=Ben", async () => {
+    await pauseSinkRef.pauseAgent({
+      agentId: "viktor",
+      division: "sales",
+      reason: "2 violations",
+      violationsInWindow: 2,
+      windowStart: new Date().toISOString(),
+      windowEnd: new Date().toISOString(),
+      scorecardId: "sc-1",
+      pausedAt: new Date().toISOString(),
+    });
+    const res = await postUnpause(
+      adminAuthed(`${BASE}/api/ops/control-plane/unpause`, {
+        method: "POST",
+        body: JSON.stringify({
+          agentId: "viktor",
+          reason: "trying to spoof attribution",
+          actor: "Rene", // <-- attempted spoof; must be ignored
+        }),
+      }),
+    );
+    const body = await res.json();
+    expect(res.status).toBe(200);
+    expect(body.actor).toBe("Ben"); // server ignored the body-supplied actor
+    const audit = await auditStoreRef.recent(10);
+    const unpauseEntry = audit.find((e) => e.action === "runtime.agent-unpaused");
+    expect(unpauseEntry?.actorId).toBe("Ben");
   });
 });
 
