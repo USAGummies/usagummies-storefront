@@ -122,6 +122,9 @@ describe("guardAgent()", () => {
       async byAgent() {
         return [];
       },
+      async byAction() {
+        return [];
+      },
     };
     await expect(
       guardAgent(baseRun("viktor"), { pauseSink, auditStore: brokenAudit }),

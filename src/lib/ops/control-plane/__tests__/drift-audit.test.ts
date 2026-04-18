@@ -184,6 +184,7 @@ describe("runDriftAudit()", () => {
       recent: store.recent.bind(store),
       byRun: store.byRun.bind(store),
       byAgent: store.byAgent.bind(store),
+      byAction: store.byAction.bind(store),
       append: async (entry: AuditLogEntry) => {
         if (entry.action === "drift-audit.scorecard") {
           throw new Error("KV down");

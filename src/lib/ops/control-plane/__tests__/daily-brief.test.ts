@@ -405,11 +405,45 @@ describe("POST /api/ops/daily-brief", () => {
     expect(blocksText).toContain("enforcement=");
     // The scorecard id is stable, so the summary surfaced ties back to
     // the exact run — not a stubbed fixture.
-    const stored = (await auditStoreRef.recent(100)).filter(
-      (e) => e.action === "drift-audit.scorecard",
-    );
+    const stored = await auditStoreRef.byAction("drift-audit.scorecard", 10);
     expect(stored).toHaveLength(1);
     expect(stored[0].entityId).toBe(sc.id);
+  });
+
+  it("daily brief still surfaces the scorecard summary when flooded by 600 newer non-scorecard entries", async () => {
+    // Scorecard first.
+    const driftRun = newRunContext({ agentId: "drift-audit", division: "executive-control", source: "scheduled" });
+    await auditStoreRef.append(
+      buildAuditEntry(
+        driftRun,
+        {
+          action: "drift-audit.scorecard",
+          entityType: "scorecard",
+          entityId: "sc-flooded",
+          after: "samples=8/30 | enforcement=enforced | auto_paused=none",
+          result: "ok",
+        },
+        new Date(2026, 0, 1),
+      ),
+    );
+    // Then 600 newer high-volume non-scorecard audit entries — the old
+    // recent(500) + filter path would have lost the scorecard here.
+    const viktorRun = newRunContext({ agentId: "viktor", division: "sales", source: "on-demand" });
+    for (let i = 0; i < 600; i++) {
+      await auditStoreRef.append(
+        buildAuditEntry(
+          viktorRun,
+          { action: "hubspot.task.create", entityType: "task", result: "ok" },
+          new Date(2026, 3, 1, 0, 0, i),
+        ),
+      );
+    }
+    const res = await POST(authed("https://example.test/api/ops/daily-brief?post=false"));
+    const body = await res.json();
+    const blocksText = JSON.stringify(body.brief.blocks);
+    expect(blocksText).toContain("Last drift audit");
+    expect(blocksText).toContain("samples=8/30");
+    expect(blocksText).toContain("enforcement=enforced");
   });
 
   // Consume unused import warnings.
@@ -495,6 +529,157 @@ describe("POST /api/ops/daily-brief", () => {
     });
     const res = await POST(req);
     expect(res.status).toBe(400);
+  });
+
+  it("rejects a revenue line with amountUsd but no source (400 with explicit reason)", async () => {
+    const req = new Request("https://example.test/api/ops/daily-brief", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer test-secret",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        revenueYesterday: [{ channel: "Shopify DTC", amountUsd: 444.96 }],
+      }),
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe("Invalid override body");
+    expect(body.reason).toContain("source.system and source.retrievedAt");
+    expect(body.problems).toEqual(
+      expect.arrayContaining([expect.stringContaining("source is missing")]),
+    );
+  });
+
+  it("rejects a revenue line with amountUsd but source missing retrievedAt", async () => {
+    const req = new Request("https://example.test/api/ops/daily-brief", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer test-secret",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        revenueYesterday: [
+          { channel: "Amazon", amountUsd: 100, source: { system: "sp-api" } },
+        ],
+      }),
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.problems).toEqual(
+      expect.arrayContaining([expect.stringContaining("source.retrievedAt must be a non-empty string")]),
+    );
+  });
+
+  it("rejects a revenue line with null amount but no unavailableReason", async () => {
+    const req = new Request("https://example.test/api/ops/daily-brief", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer test-secret",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        revenueYesterday: [{ channel: "Amazon", amountUsd: null }],
+      }),
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.problems).toEqual(
+      expect.arrayContaining([expect.stringContaining("unavailableReason is required")]),
+    );
+  });
+
+  it("rejects cashPosition with amount but no source", async () => {
+    const req = new Request("https://example.test/api/ops/daily-brief", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer test-secret",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        cashPosition: { amountUsd: 9999.99 },
+      }),
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.problems).toEqual(
+      expect.arrayContaining([expect.stringContaining("cashPosition: amountUsd")]),
+    );
+  });
+
+  it("rejects a revenue line with wrong types (amountUsd string, not number|null)", async () => {
+    const req = new Request("https://example.test/api/ops/daily-brief", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer test-secret",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        revenueYesterday: [{ channel: "Shopify", amountUsd: "444.96" }],
+      }),
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.problems).toEqual(
+      expect.arrayContaining([expect.stringContaining("must be a finite number or null")]),
+    );
+  });
+
+  it("rejects revenueYesterday when it isn't an array", async () => {
+    const req = new Request("https://example.test/api/ops/daily-brief", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer test-secret",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ revenueYesterday: { not: "an array" } }),
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+  });
+
+  it("accepts a valid sourced override (happy path after validation tightened)", async () => {
+    const req = new Request("https://example.test/api/ops/daily-brief?post=false", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer test-secret",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        revenueYesterday: [
+          {
+            channel: "Shopify DTC",
+            amountUsd: 100,
+            source: {
+              system: "shopify",
+              id: "order-x",
+              retrievedAt: "2026-04-20T00:00:00Z",
+            },
+          },
+          {
+            channel: "Amazon",
+            amountUsd: null,
+            unavailableReason: "settlement not closed",
+          },
+        ],
+        cashPosition: {
+          amountUsd: 12345.67,
+          source: { system: "plaid-override", retrievedAt: "2026-04-20T00:00:00Z" },
+        },
+      }),
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    const blocks = JSON.stringify(body.brief.blocks);
+    expect(blocks).toContain("100.00");
+    expect(blocks).toContain("12345.67");
+    expect(blocks).toContain("settlement not closed");
   });
 
   it("override cash position takes precedence over Plaid (no Plaid call attempted)", async () => {

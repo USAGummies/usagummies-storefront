@@ -358,6 +358,48 @@ describe("GET /api/ops/control-plane/scorecards", () => {
     expect(body.count).toBe(2);
     expect(body.scorecards.every((s: { scorecardId: string }) => s.scorecardId.startsWith("sc-"))).toBe(true);
   });
+
+  it("finds the latest scorecard even when swamped by 600 newer non-scorecard entries (byAction index)", async () => {
+    const driftRun = newRunContext({
+      agentId: "drift-audit",
+      division: "executive-control",
+      source: "scheduled",
+    });
+    await auditStoreRef.append(
+      buildAuditEntry(
+        driftRun,
+        {
+          action: "drift-audit.scorecard",
+          entityType: "scorecard",
+          entityId: "sc-old",
+          after: "samples=10/34 | enforcement=enforced",
+          result: "ok",
+        },
+        new Date(2026, 0, 1),
+      ),
+    );
+    const viktorRun = newRunContext({
+      agentId: "viktor",
+      division: "sales",
+      source: "on-demand",
+    });
+    for (let i = 0; i < 600; i++) {
+      await auditStoreRef.append(
+        buildAuditEntry(
+          viktorRun,
+          { action: "hubspot.task.create", entityType: "task", result: "ok" },
+          new Date(2026, 3, 1, 0, 0, i),
+        ),
+      );
+    }
+    const res = await getScorecards(
+      authed(`${BASE}/api/ops/control-plane/scorecards?limit=5`),
+    );
+    const body = await res.json();
+    expect(body.count).toBe(1);
+    expect(body.scorecards[0].scorecardId).toBe("sc-old");
+    expect(body.scorecards[0].summary).toContain("samples=");
+  });
 });
 
 describe("GET /api/ops/control-plane/approvals", () => {

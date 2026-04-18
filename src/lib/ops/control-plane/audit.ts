@@ -22,6 +22,14 @@ export interface AuditStore {
   byRun(runId: string): Promise<AuditLogEntry[]>;
   /** Entries by agent over a time window — for graduation scoring. */
   byAgent(agentId: string, sinceISO: string): Promise<AuditLogEntry[]>;
+  /**
+   * Entries by action slug, newest-first, up to `limit`. Reliable even
+   * when the action is rare relative to total audit volume — the KV
+   * implementation maintains a per-action secondary index so the latest
+   * drift-audit.scorecard (weekly) is always findable regardless of how
+   * many other entries landed after it.
+   */
+  byAction(action: string, limit: number): Promise<AuditLogEntry[]>;
 }
 
 export interface AuditSlackSurface {

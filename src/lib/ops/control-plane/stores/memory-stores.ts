@@ -81,6 +81,15 @@ export class InMemoryAuditStore implements AuditStore {
       .map((e) => structuredClone(e));
   }
 
+  async byAction(action: string, limit: number): Promise<AuditLogEntry[]> {
+    return this.entries
+      .filter((e) => e.action === action)
+      .slice()
+      .reverse() // newest-first
+      .slice(0, Math.max(0, limit))
+      .map((e) => structuredClone(e));
+  }
+
   // test helper
   _clear(): void {
     this.entries.length = 0;

@@ -33,6 +33,7 @@ const K = {
   auditRecent: `${NS}:audit:recent`, // LIST, LPUSH on append, LRANGE 0 N-1 for newest-first
   auditByRun: (runId: string) => `${NS}:audit:run:${runId}`, // LIST
   auditByAgent: (agentId: string) => `${NS}:audit:agent:${agentId}`, // ZSET, score = createdAt epoch ms
+  auditByAction: (action: string) => `${NS}:audit:action:${action}`, // LIST, newest-first, cap 1000
 } as const;
 
 // ---- Client surface ---------------------------------------------------
@@ -167,6 +168,14 @@ export class KvAuditStore implements AuditStore {
     tx.ltrim(K.auditRecent, 0, 9_999);
     tx.lpush(K.auditByRun(entry.runId), entry.id);
     tx.zadd(K.auditByAgent(entry.actorId), { score, member: entry.id });
+    // Per-action secondary index — newest-first, cap 1000 per action.
+    // Guarantees that the latest drift-audit.scorecard (weekly) is
+    // findable regardless of how much high-volume activity lands after
+    // it in auditRecent. 1000 weekly scorecards = ~19 years of history
+    // per action; anything coarser-grained than weekly cap-hits
+    // similarly far out.
+    tx.lpush(K.auditByAction(entry.action), entry.id);
+    tx.ltrim(K.auditByAction(entry.action), 0, 999);
     await tx.exec();
   }
 
@@ -192,6 +201,17 @@ export class KvAuditStore implements AuditStore {
     if (!ids || ids.length === 0) return [];
     const entries = await hydrateEntries(r, ids);
     return entries.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  }
+
+  async byAction(action: string, limit: number): Promise<AuditLogEntry[]> {
+    const r = client();
+    const ids = await r.lrange(
+      K.auditByAction(action),
+      0,
+      Math.max(0, limit - 1),
+    );
+    if (!ids || ids.length === 0) return [];
+    return hydrateEntries(r, ids);
   }
 }
 

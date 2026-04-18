@@ -2,8 +2,12 @@
  * GET /api/ops/control-plane/scorecards
  *
  * Inspect recent drift-audit scorecards. Implemented on top of
- * auditStore.recent() — drift-audit persists its scorecard as a
- * `drift-audit.scorecard` audit entry (see drift-audit.ts).
+ * auditStore.byAction() — a dedicated per-action index so the latest
+ * weekly scorecard is always findable regardless of how much other
+ * audit volume has landed since it was persisted. (Previously this
+ * route scanned a bounded recent window; under real volume the newest
+ * scorecard could fall off the end. See audit.ts AuditStore.byAction
+ * + kv-stores.ts 3.0:audit:action:* secondary index.)
  *
  * Query params:
  *   limit — how many to return (default 10, max 50)
@@ -25,16 +29,13 @@ export async function GET(req: Request): Promise<Response> {
   const limit = clampInt(url.searchParams.get("limit"), 1, 50, 10);
 
   try {
-    const recent = await auditStore().recent(Math.max(limit * 50, 200));
-    const scorecards = recent
-      .filter((e) => e.action === "drift-audit.scorecard")
-      .slice(0, limit)
-      .map((e) => ({
-        scorecardId: e.entityId,
-        runId: e.runId,
-        createdAt: e.createdAt,
-        summary: typeof e.after === "string" ? e.after : null,
-      }));
+    const entries = await auditStore().byAction("drift-audit.scorecard", limit);
+    const scorecards = entries.map((e) => ({
+      scorecardId: e.entityId,
+      runId: e.runId,
+      createdAt: e.createdAt,
+      summary: typeof e.after === "string" ? e.after : null,
+    }));
     return NextResponse.json({
       ok: true,
       count: scorecards.length,

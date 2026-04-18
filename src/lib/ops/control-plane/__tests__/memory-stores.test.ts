@@ -136,6 +136,73 @@ describe("InMemoryAuditStore", () => {
     expect(result.map((e) => e.id)).toEqual([fresh.id]);
   });
 
+  it("byAction filters by action slug newest-first + honors limit", async () => {
+    const run = newRunContext({ agentId: "drift-audit", division: "executive-control", source: "scheduled" });
+    const noise = newRunContext({ agentId: "viktor", division: "sales", source: "on-demand" });
+    for (let i = 0; i < 3; i++) {
+      await store.append(
+        buildAuditEntry(
+          run,
+          { action: "drift-audit.scorecard", entityType: "scorecard", entityId: `sc-${i}`, result: "ok" },
+          new Date(2026, 0, 1 + i),
+        ),
+      );
+    }
+    // Interleave noise — byAction must ignore everything that doesn't match.
+    for (let i = 0; i < 5; i++) {
+      await store.append(
+        buildAuditEntry(noise, {
+          action: "hubspot.task.create",
+          entityType: "task",
+          result: "ok",
+        }),
+      );
+    }
+    const hits = await store.byAction("drift-audit.scorecard", 2);
+    expect(hits).toHaveLength(2);
+    expect(hits[0].entityId).toBe("sc-2"); // newest-first
+    expect(hits[1].entityId).toBe("sc-1");
+    // Limit 0 is valid and returns []
+    expect(await store.byAction("drift-audit.scorecard", 0)).toEqual([]);
+    // Unknown action returns []
+    expect(await store.byAction("does-not-exist", 10)).toEqual([]);
+  });
+
+  it("byAction surfaces the latest scorecard even when swamped by newer non-scorecard entries", async () => {
+    // The scale regression the new index closes: scorecard at t0,
+    // then 1,000 newer non-scorecard entries. Old code that filtered
+    // recent(500) or recent(Nx50) would have lost the scorecard; the
+    // per-action index returns it directly.
+    const driftRun = newRunContext({ agentId: "drift-audit", division: "executive-control", source: "scheduled" });
+    await store.append(
+      buildAuditEntry(
+        driftRun,
+        {
+          action: "drift-audit.scorecard",
+          entityType: "scorecard",
+          entityId: "sc-old",
+          after: "samples=10/34 | enforcement=enforced",
+          result: "ok",
+        },
+        new Date(2026, 0, 1),
+      ),
+    );
+    const viktorRun = newRunContext({ agentId: "viktor", division: "sales", source: "on-demand" });
+    for (let i = 0; i < 1_000; i++) {
+      await store.append(
+        buildAuditEntry(
+          viktorRun,
+          { action: "hubspot.task.create", entityType: "task", result: "ok" },
+          new Date(2026, 3, 1, 0, 0, i),
+        ),
+      );
+    }
+    const [latest] = await store.byAction("drift-audit.scorecard", 1);
+    expect(latest).toBeDefined();
+    expect(latest.entityId).toBe("sc-old");
+    expect(latest.after).toContain("samples=");
+  });
+
   it("cloning prevents external mutation of persisted state", async () => {
     const entry = buildAuditEntry(run, {
       action: "hubspot.deal.stage.move",

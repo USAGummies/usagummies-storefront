@@ -149,12 +149,23 @@ export function composeDailyBrief(input: BriefInput): BriefOutput {
   if (input.revenueYesterday && input.revenueYesterday.length > 0) {
     const rows = input.revenueYesterday
       .map((r) => {
-        if (r.amountUsd != null) {
-          const srcParts = r.source
-            ? [r.source.system, r.source.id, r.source.retrievedAt].filter((x): x is string => !!x)
-            : [];
-          const src = srcParts.length > 0 ? ` _(${srcParts.join(", ")})_` : "";
+        // Defensive coercion: if amountUsd is non-null but source is
+        // missing system OR retrievedAt, refuse to render the number.
+        // The route validates the same rule at the boundary (400), but
+        // direct composer callers (tests, future code) get the same
+        // protection here. Blueprint non-negotiable #2: every output
+        // carries source + timestamp + confidence.
+        const hasValidSource =
+          !!r.source && !!r.source.system && !!r.source.retrievedAt;
+        if (r.amountUsd != null && hasValidSource) {
+          const srcParts = [r.source!.system, r.source!.id, r.source!.retrievedAt].filter(
+            (x): x is string => !!x,
+          );
+          const src = ` _(${srcParts.join(", ")})_`;
           return `• *${r.channel}:* $${r.amountUsd.toFixed(2)}${src}`;
+        }
+        if (r.amountUsd != null && !hasValidSource) {
+          return `• *${r.channel}:* unavailable — amount=${r.amountUsd} suppressed: missing source.system or source.retrievedAt (no-fabrication rule)`;
         }
         return `• *${r.channel}:* unavailable — ${r.unavailableReason ?? "no reason given"}`;
       })
@@ -175,15 +186,23 @@ export function composeDailyBrief(input: BriefInput): BriefOutput {
 
   // ---- Cash position ----
   if (input.cashPosition) {
-    if (input.cashPosition.amountUsd != null) {
-      const src = input.cashPosition.source
-        ? ` _(${input.cashPosition.source.system}, ${input.cashPosition.source.retrievedAt})_`
-        : "";
+    const cp = input.cashPosition;
+    const hasValidSource = !!cp.source && !!cp.source.system && !!cp.source.retrievedAt;
+    if (cp.amountUsd != null && hasValidSource) {
+      const src = ` _(${cp.source!.system}, ${cp.source!.retrievedAt})_`;
       blocks.push({
         type: "section",
         text: {
           type: "mrkdwn",
-          text: `*Cash (BoA checking 7020)*  $${input.cashPosition.amountUsd.toFixed(2)}${src}`,
+          text: `*Cash (BoA checking 7020)*  $${cp.amountUsd.toFixed(2)}${src}`,
+        },
+      });
+    } else if (cp.amountUsd != null && !hasValidSource) {
+      blocks.push({
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: `*Cash (BoA checking 7020)*  unavailable — amount=${cp.amountUsd} suppressed: missing source.system or source.retrievedAt (no-fabrication rule)`,
         },
       });
     } else {
@@ -191,7 +210,7 @@ export function composeDailyBrief(input: BriefInput): BriefOutput {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: `*Cash (BoA checking 7020)*  unavailable — ${input.cashPosition.unavailableReason ?? "no reason given"}`,
+          text: `*Cash (BoA checking 7020)*  unavailable — ${cp.unavailableReason ?? "no reason given"}`,
         },
       });
     }

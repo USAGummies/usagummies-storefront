@@ -71,12 +71,27 @@ export async function POST(req: Request): Promise<Response> {
   const postToSlack = url.searchParams.get("post") !== "false";
 
   // Optional JSON body with caller-supplied revenue / cash overrides.
+  // Every amountUsd != null MUST carry { source.system, source.retrievedAt }
+  // per the contract in ops/make-webhooks.md §5 — no naked numbers through.
   let overrides: BriefBodyOverrides = {};
   if (req.headers.get("content-type")?.includes("application/json")) {
     try {
       const raw = await req.text();
       if (raw.trim().length > 0) {
-        overrides = JSON.parse(raw) as BriefBodyOverrides;
+        const parsed = JSON.parse(raw) as unknown;
+        const validated = validateOverrides(parsed);
+        if (!validated.ok) {
+          return NextResponse.json(
+            {
+              error: "Invalid override body",
+              reason:
+                "Every amountUsd != null must include source.system and source.retrievedAt. Every null amountUsd must include unavailableReason.",
+              problems: validated.problems,
+            },
+            { status: 400 },
+          );
+        }
+        overrides = validated.overrides;
       }
     } catch {
       return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
@@ -114,7 +129,19 @@ export async function POST(req: Request): Promise<Response> {
     );
   }
 
-  const lastDriftAuditSummary = findLastDriftAuditSummary(recentAudit);
+  // Use the dedicated per-action index so the latest weekly scorecard
+  // is always found regardless of audit volume. Previously we scanned
+  // recent(500) and filtered, which silently dropped the last summary
+  // once volume grew past the window.
+  let lastDriftAuditSummary: string | undefined;
+  try {
+    const [last] = await auditStore().byAction("drift-audit.scorecard", 1);
+    if (last && typeof last.after === "string") {
+      lastDriftAuditSummary = last.after;
+    }
+  } catch {
+    // audit store unavailability already captured above
+  }
 
   // ---- Divisions ----
   const activeDivisions = listDivisions("active").map((d) => ({
@@ -192,11 +219,125 @@ export async function POST(req: Request): Promise<Response> {
   });
 }
 
-function findLastDriftAuditSummary(entries: readonly { action: string; after?: unknown }[]): string | undefined {
-  // auditStore.recent returns newest-first.
-  const hit = entries.find((e) => e.action === "drift-audit.scorecard");
-  if (!hit) return undefined;
-  return typeof hit.after === "string" ? hit.after : undefined;
+// ---- Override validation --------------------------------------------------
+//
+// Enforces the daily-brief source contract at the route boundary. Every
+// revenue line and the cash position either carries a real amount with
+// { source.system, source.retrievedAt } OR amountUsd:null with an
+// unavailableReason. No naked numbers.
+
+interface ValidatedOverrides {
+  ok: true;
+  overrides: BriefBodyOverrides;
+}
+interface InvalidOverrides {
+  ok: false;
+  problems: string[];
+}
+
+function validateOverrides(raw: unknown): ValidatedOverrides | InvalidOverrides {
+  if (raw === null || typeof raw !== "object") {
+    return { ok: false, problems: ["body must be a JSON object"] };
+  }
+  const body = raw as Record<string, unknown>;
+  const problems: string[] = [];
+
+  const revenueYesterday = body.revenueYesterday;
+  if (revenueYesterday !== undefined) {
+    if (!Array.isArray(revenueYesterday)) {
+      problems.push("revenueYesterday must be an array when supplied");
+    } else {
+      revenueYesterday.forEach((line, i) => {
+        validateRevenueLine(line, i, problems);
+      });
+    }
+  }
+
+  const cashPosition = body.cashPosition;
+  if (cashPosition !== undefined) {
+    validateCashPosition(cashPosition, problems);
+  }
+
+  if (problems.length > 0) {
+    return { ok: false, problems };
+  }
+  return { ok: true, overrides: body as BriefBodyOverrides };
+}
+
+function validateRevenueLine(line: unknown, i: number, problems: string[]): void {
+  const here = `revenueYesterday[${i}]`;
+  if (line === null || typeof line !== "object") {
+    problems.push(`${here}: must be an object`);
+    return;
+  }
+  const l = line as Record<string, unknown>;
+  if (typeof l.channel !== "string" || l.channel.trim() === "") {
+    problems.push(`${here}: channel must be a non-empty string`);
+  }
+  const amount = l.amountUsd;
+  if (amount === undefined) {
+    problems.push(`${here}: amountUsd is required (number | null)`);
+    return;
+  }
+  if (amount !== null && (typeof amount !== "number" || !Number.isFinite(amount))) {
+    problems.push(`${here}: amountUsd must be a finite number or null`);
+    return;
+  }
+  if (amount === null) {
+    if (typeof l.unavailableReason !== "string" || l.unavailableReason.trim() === "") {
+      problems.push(`${here}: amountUsd is null so unavailableReason is required (non-empty string)`);
+    }
+    return;
+  }
+  // amount is a real number — source MUST be present + well-formed.
+  const source = l.source;
+  if (source === undefined || source === null || typeof source !== "object") {
+    problems.push(`${here}: amountUsd=${amount} but source is missing. Every non-null amount requires source.`);
+    return;
+  }
+  const s = source as Record<string, unknown>;
+  if (typeof s.system !== "string" || s.system.trim() === "") {
+    problems.push(`${here}: source.system must be a non-empty string`);
+  }
+  if (typeof s.retrievedAt !== "string" || s.retrievedAt.trim() === "") {
+    problems.push(`${here}: source.retrievedAt must be a non-empty string (ISO 8601)`);
+  }
+}
+
+function validateCashPosition(pos: unknown, problems: string[]): void {
+  const here = "cashPosition";
+  if (pos === null || typeof pos !== "object") {
+    problems.push(`${here}: must be an object`);
+    return;
+  }
+  const p = pos as Record<string, unknown>;
+  const amount = p.amountUsd;
+  if (amount === undefined) {
+    problems.push(`${here}: amountUsd is required (number | null)`);
+    return;
+  }
+  if (amount !== null && (typeof amount !== "number" || !Number.isFinite(amount))) {
+    problems.push(`${here}: amountUsd must be a finite number or null`);
+    return;
+  }
+  if (amount === null) {
+    if (typeof p.unavailableReason !== "string" || p.unavailableReason.trim() === "") {
+      problems.push(`${here}: amountUsd is null so unavailableReason is required (non-empty string)`);
+    }
+    return;
+  }
+  const source = p.source;
+  if (source === undefined || source === null || typeof source !== "object") {
+    problems.push(`${here}: amountUsd=${amount} but source is missing. Every non-null amount requires source.`);
+    return;
+  }
+  const s = source as Record<string, unknown>;
+  if (typeof s.system !== "string" || s.system.trim() === "") {
+    problems.push(`${here}: source.system must be a non-empty string`);
+  }
+  if (typeof s.retrievedAt !== "string" || s.retrievedAt.trim() === "") {
+    problems.push(`${here}: source.retrievedAt must be a non-empty string (ISO 8601)`);
+  }
 }
 
 /**
