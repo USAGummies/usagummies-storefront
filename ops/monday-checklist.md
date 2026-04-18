@@ -35,7 +35,7 @@ Strike through each line as completed. Drop the run evidence (link, screenshot, 
 ### Monday sign-off sub-check
 
 - [ ] Canonical blueprint approved (M1)
-- [ ] Paperclip unloaded, 2 Make scenarios deleted, dead repo files removed (M2a–M2d)
+- [ ] Paperclip unloaded, 2 Make scenarios deleted, dead repo files deprecated-and-forwarded (M2a–M2d)
 - [ ] 6 secret locations rotated, Open Brain key removed from Notion (M3a–M3f)
 - [ ] Viktor has exactly one live contract (M4)
 - [ ] 9 Slack channels live; legacy channels archived (M5a–M5c)

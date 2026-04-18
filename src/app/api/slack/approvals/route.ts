@@ -28,7 +28,7 @@ import {
   verifySlackSignature,
 } from "@/lib/ops/control-plane/slack";
 import { recordDecision } from "@/lib/ops/control-plane/approvals";
-import { buildAuditEntry } from "@/lib/ops/control-plane/audit";
+import { buildHumanAuditEntry } from "@/lib/ops/control-plane/audit";
 import type { ApprovalDecision, DivisionId } from "@/lib/ops/control-plane/types";
 
 export const runtime = "nodejs";
@@ -131,26 +131,23 @@ export async function POST(req: Request): Promise<Response> {
     );
   }
 
-  // Mirror to audit log. Store is authoritative; Slack mirror is best-effort.
-  const auditEntry = buildAuditEntry(
-    {
-      runId: existing.runId,
-      agentId: `human:${approver}`,
-      division: existing.division as DivisionId,
-      startedAt: new Date().toISOString(),
-      source: "human-invoked",
-    },
-    {
-      action: `approval.${decisionKind}`,
-      entityType: "approval",
-      entityId: approvalId,
-      before: { status: existing.status, decisions: existing.decisions.length },
-      after: { status: next.status, decisions: next.decisions.length },
-      result: "ok",
-      approvalId,
-      sourceCitations: [{ system: "slack", id: payload.user?.id }],
-    },
-  );
+  // Mirror to audit log as a HUMAN action (actorType: "human"). Store is
+  // authoritative; Slack mirror is best-effort. The original approval's
+  // runId is preserved so the audit trail links the click back to the
+  // agent run that opened the approval.
+  const auditEntry = buildHumanAuditEntry({
+    runId: existing.runId,
+    division: existing.division as DivisionId,
+    actorId: approver,
+    action: `approval.${decisionKind}`,
+    entityType: "approval",
+    entityId: approvalId,
+    before: { status: existing.status, decisions: existing.decisions.length },
+    after: { status: next.status, decisions: next.decisions.length },
+    result: "ok",
+    approvalId,
+    sourceCitations: [{ system: "slack", id: payload.user?.id }],
+  });
   await auditStore().append(auditEntry);
   await auditSurface().mirror(auditEntry).catch(() => void 0);
 

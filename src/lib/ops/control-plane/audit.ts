@@ -70,6 +70,55 @@ export function buildAuditEntry(
 }
 
 /**
+ * Build an audit entry for a HUMAN action (Slack interactive click, UI
+ * confirmation, direct manual intervention). Must be used instead of
+ * buildAuditEntry() whenever a human initiated the write — otherwise the
+ * audit log hardcodes `actorType: "agent"` which is a factual error
+ * and distorts graduation metrics (human corrections vs agent activity).
+ *
+ * runId ties the human action back to the originating agent run (e.g. the
+ * approval whose button was clicked). actorId is the HumanOwner
+ * ("Ben" | "Rene" | "Drew").
+ */
+export function buildHumanAuditEntry(
+  params: {
+    runId: string;
+    division: DivisionId;
+    actorId: "Ben" | "Rene" | "Drew";
+    action: string;
+    entityType: string;
+    entityId?: string;
+    before?: unknown;
+    after?: unknown;
+    result: AuditLogEntry["result"];
+    approvalId?: string;
+    sourceCitations?: AuditLogEntry["sourceCitations"];
+    confidence?: number;
+    error?: AuditLogEntry["error"];
+  },
+  now: Date = new Date(),
+): AuditLogEntry {
+  return {
+    id: randomUUID(),
+    runId: params.runId,
+    division: params.division,
+    actorType: "human",
+    actorId: params.actorId,
+    action: params.action,
+    entityType: params.entityType,
+    entityId: params.entityId,
+    before: params.before,
+    after: params.after,
+    result: params.result,
+    approvalId: params.approvalId,
+    error: params.error,
+    sourceCitations: params.sourceCitations ?? [],
+    confidence: params.confidence,
+    createdAt: now.toISOString(),
+  };
+}
+
+/**
  * Log a write and (best-effort) mirror to Slack. Storage is authoritative;
  * Slack is a mirror. A Slack failure is non-fatal.
  */

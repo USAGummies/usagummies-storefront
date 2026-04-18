@@ -35,11 +35,43 @@ const K = {
   auditByAgent: (agentId: string) => `${NS}:audit:agent:${agentId}`, // ZSET, score = createdAt epoch ms
 } as const;
 
-// ---- Lazy client -------------------------------------------------------
+// ---- Client surface ---------------------------------------------------
+//
+// A small structural interface covering only the Redis methods this module
+// uses. Declaring it locally — rather than deriving it from the Redis class
+// with Pick<> — decouples us from the exact upstream method signatures (the
+// @upstash/redis types bake in some variadic forms that make in-process
+// fakes painful to type), while still letting a real `Redis` satisfy it
+// structurally because TypeScript uses structural compatibility for
+// interface members.
 
-let clientRef: Redis | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type RedisPipeline = any;
 
-function client(): Redis {
+export interface RedisLike {
+  get<T = unknown>(key: string): Promise<T | null>;
+  set(key: string, value: string): Promise<unknown>;
+  mget<T = unknown>(...keys: string[]): Promise<(T | null)[]>;
+  lpush(key: string, ...values: string[]): Promise<number>;
+  lrem(key: string, count: number, value: string): Promise<number>;
+  ltrim(key: string, start: number, stop: number): Promise<unknown>;
+  lrange(key: string, start: number, stop: number): Promise<string[]>;
+  sadd(key: string, value: string): Promise<number>;
+  srem(key: string, value: string): Promise<number>;
+  smembers(key: string): Promise<string[]>;
+  zadd(key: string, entry: { score: number; member: string }): Promise<number>;
+  zrange<T = string>(
+    key: string,
+    min: number | string,
+    max: number | string,
+    opts?: { byScore?: boolean },
+  ): Promise<T[]>;
+  multi(): RedisPipeline;
+}
+
+let clientRef: RedisLike | null = null;
+
+function client(): RedisLike {
   if (clientRef) return clientRef;
   const url = process.env.KV_REST_API_URL ?? process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.KV_REST_API_TOKEN ?? process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -48,13 +80,21 @@ function client(): Redis {
       "KV not configured. Set KV_REST_API_URL and KV_REST_API_TOKEN (or the UPSTASH_* equivalents). For tests and local dev, use InMemoryApprovalStore / InMemoryAuditStore from memory-stores.ts.",
     );
   }
-  clientRef = new Redis({ url, token });
+  // Cast via `unknown` because Upstash's `Redis` exposes richer overloads
+  // than our narrow RedisLike interface. Structurally compatible at runtime;
+  // the cast just tells TypeScript we intentionally use the subset.
+  clientRef = new Redis({ url, token }) as unknown as RedisLike;
   return clientRef;
 }
 
 // Reset for tests (the factory in index.ts picks memory stores in non-cloud anyway).
 export function __resetKvClient(): void {
   clientRef = null;
+}
+
+/** Inject a test-double Redis client. Production code must not call this. */
+export function __setKvClientForTest(c: RedisLike): void {
+  clientRef = c;
 }
 
 // ---- Approval store ----------------------------------------------------
@@ -69,7 +109,12 @@ export class KvApprovalStore implements ApprovalStore {
     } else {
       tx.srem(K.approvalsPending, request.id);
     }
-    // Track recent-by-agent. LPUSH makes newest-first; cap at 500 to avoid unbounded growth.
+    // Track recent-by-agent. Remove any prior occurrence of this id first so
+    // successive put() calls for the same approval id produce exactly one
+    // list entry (dedup). LREM count=0 removes all occurrences. LPUSH then
+    // sets this id at the head → list stays newest-first across updates.
+    // LTRIM caps the list at 500 so it cannot grow unbounded.
+    tx.lrem(K.approvalsByAgent(request.actorAgentId), 0, request.id);
     tx.lpush(K.approvalsByAgent(request.actorAgentId), request.id);
     tx.ltrim(K.approvalsByAgent(request.actorAgentId), 0, 499);
     await tx.exec();
@@ -85,7 +130,7 @@ export class KvApprovalStore implements ApprovalStore {
     const r = client();
     const ids = await r.smembers(K.approvalsPending);
     if (!ids || ids.length === 0) return [];
-    const raws = await r.mget<(string | ApprovalRequest | null)[]>(...ids.map(K.approval));
+    const raws = await r.mget<string | ApprovalRequest>(...ids.map(K.approval));
     const requests = raws
       .map((raw) => {
         if (raw == null) return null;
@@ -99,7 +144,7 @@ export class KvApprovalStore implements ApprovalStore {
     const r = client();
     const ids = await r.lrange(K.approvalsByAgent(agentId), 0, Math.max(0, limit - 1));
     if (!ids || ids.length === 0) return [];
-    const raws = await r.mget<(string | ApprovalRequest | null)[]>(...ids.map(K.approval));
+    const raws = await r.mget<string | ApprovalRequest>(...ids.map(K.approval));
     return raws
       .map((raw) => {
         if (raw == null) return null;
@@ -141,7 +186,7 @@ export class KvAuditStore implements AuditStore {
   async byAgent(agentId: string, sinceISO: string): Promise<AuditLogEntry[]> {
     const r = client();
     const min = new Date(sinceISO).getTime();
-    const ids = await r.zrange<string[]>(K.auditByAgent(agentId), min, "+inf", {
+    const ids = await r.zrange<string>(K.auditByAgent(agentId), min, "+inf", {
       byScore: true,
     });
     if (!ids || ids.length === 0) return [];
@@ -150,9 +195,9 @@ export class KvAuditStore implements AuditStore {
   }
 }
 
-async function hydrateEntries(r: Redis, ids: string[]): Promise<AuditLogEntry[]> {
+async function hydrateEntries(r: RedisLike, ids: string[]): Promise<AuditLogEntry[]> {
   if (!ids || ids.length === 0) return [];
-  const raws = await r.mget<(string | AuditLogEntry | null)[]>(...ids.map(K.audit));
+  const raws = await r.mget<string | AuditLogEntry | null>(...ids.map(K.audit));
   return raws
     .map((raw) => {
       if (raw == null) return null;

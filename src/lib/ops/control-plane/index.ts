@@ -62,6 +62,7 @@ export {
 
 export {
   buildAuditEntry,
+  buildHumanAuditEntry,
   logWrite,
   logHumanWrite,
   type AuditStore,
