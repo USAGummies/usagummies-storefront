@@ -9,7 +9,7 @@
 - If a secret was previously pasted here, it was redacted on **2026-04-18**. Assume leak; treat rotation as already-overdue.
 
 ## P0 manual tasks (tracked, not a build-pause)
-Items **B-3..B-8** (secret rotations + Paperclip Slack-bot revoke) are **P0 manual** for Ben. They gate Monday go-live sign-off per blueprint §15.5, but the control-plane build continues in parallel.
+Items **B-3..B-8** and **B-12** (secret rotations + Paperclip Slack-bot revoke + admin-tier secret provisioning) are **P0 manual** for Ben. They gate Monday go-live sign-off per blueprint §15.5, but the control-plane build continues in parallel.
 
 ## Code-complete status — 2026-04-18
 
@@ -92,6 +92,23 @@ printf '%s' "$NEW" | vercel env add CRON_SECRET development
 ### B-8 (M3f) — Revoke Paperclip Slack bot
 - **Where:** https://api.slack.com/apps → the Paperclip app → Install App → Revoke / Uninstall.
 - **Why:** bot is already `account_inactive`; revoke so the workspace cannot be re-installed silently.
+
+### B-12 (M3g) — Provision CONTROL_PLANE_ADMIN_SECRET  **[P0]**
+Admin-tier secret used by `/api/ops/control-plane/unpause` on the `X-Admin-Authorization` header. MUST be a different value from `CRON_SECRET` — the health endpoint refuses to mark `controlPlaneAdminSecret` ready if they match (that defeats the two-tier split).
+
+```bash
+NEW_ADMIN=$(openssl rand -hex 32)
+# Sanity: make sure it isn't equal to CRON_SECRET
+[ "$NEW_ADMIN" = "$CRON_SECRET" ] && echo "REGENERATE — equal to CRON_SECRET" && exit 1
+printf '%s' "$NEW_ADMIN" | vercel env add CONTROL_PLANE_ADMIN_SECRET production
+printf '%s' "$NEW_ADMIN" | vercel env add CONTROL_PLANE_ADMIN_SECRET preview
+printf '%s' "$NEW_ADMIN" | vercel env add CONTROL_PLANE_ADMIN_SECRET development
+# store locally for smoke-tests.md §A.4 / C.6 / D.3 cleanup
+echo "CONTROL_PLANE_ADMIN_SECRET=$NEW_ADMIN" >> .env.local
+```
+
+- **Verify:** after deploy, `curl -sH "Authorization: Bearer $CRON_SECRET" $BASE/api/ops/control-plane/health | jq '.components.controlPlaneAdminSecret.status, .components.unpauseRoute.status'` → both `"ready"`.
+- **Storage:** only Ben holds this. Do NOT share in Slack or Notion — it grants unilateral agent-unpause authority.
 
 ### B-9 (M4) — Publish the canonical Viktor prompt
 - **Where:** https://getviktor.com → settings → system prompt

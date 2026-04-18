@@ -16,7 +16,8 @@
 | Sun 20:00 PT | Step 1 — rotate all leaked secrets (`blocked-items.md` B-3..B-8) | `git grep -nE 'shpat_[a-f0-9]{16,}\|AKIA[0-9A-Z]{16}'` → empty |
 | Sun 20:15 PT | Step 2 — unload Paperclip launchd | `launchctl list \| grep usagummies` shows no paperclip-* |
 | Sun 20:30 PT | Step 3 — provision new Slack app + set SLACK_BOT_TOKEN + SLACK_SIGNING_SECRET in Vercel | deploy picks up new env |
-| Sun 20:45 PT | `curl /api/ops/control-plane/health` | `components.slackConfig.status = "ready"` |
+| Sun 20:40 PT | Step 3a — generate `CONTROL_PLANE_ADMIN_SECRET` (fresh value, DIFFERENT from `CRON_SECRET`) and set in Vercel env | deploy picks up new env |
+| Sun 20:45 PT | `curl /api/ops/control-plane/health` | `components.slackConfig.status` + `components.controlPlaneAdminSecret.status` + `components.unpauseRoute.status` all `"ready"` |
 | Sun 21:00 PT | Confirm KV + Plaid env vars set in Vercel | health shows all stores ready |
 
 **Gate to cutover:** health endpoint returns `ok:true`. If not, resolve the specific `components.*.detail` message before Monday.

@@ -5,6 +5,9 @@
 **Prereq:**
 ```bash
 export CRON_SECRET=<from Vercel env>
+# Required ONLY if you run section A.4 / C.6 / D.3 cleanup (anything that
+# calls /unpause). Admin tier; different value from CRON_SECRET.
+export CONTROL_PLANE_ADMIN_SECRET=<from Vercel env>
 export BASE=https://www.usagummies.com   # or http://localhost:3000 for local
 ```
 
@@ -32,6 +35,38 @@ curl -s -w '\n%{http_code}\n' -o /dev/null \
   -H "Authorization: Bearer not-the-right-token" \
   "$BASE/api/ops/control-plane/health"
 # expect: 401
+```
+
+### A.4 — Admin-tier auth is SEPARATE from cron auth (governance gate)
+
+Unpause must reject callers who present only `CRON_SECRET` on the normal
+`Authorization` header. It requires `X-Admin-Authorization` with
+`CONTROL_PLANE_ADMIN_SECRET`.
+
+```bash
+# CRON_SECRET on Authorization → 401 (cron caller cannot unpause)
+curl -s -w '\n%{http_code}\n' -o /dev/null -X POST \
+  -H "Authorization: Bearer $CRON_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{"agentId":"__none__","reason":"smoke"}' \
+  "$BASE/api/ops/control-plane/unpause"
+# expect: 401
+
+# Admin secret on WRONG header (Authorization) → 401
+curl -s -w '\n%{http_code}\n' -o /dev/null -X POST \
+  -H "Authorization: Bearer $CONTROL_PLANE_ADMIN_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{"agentId":"__none__","reason":"smoke"}' \
+  "$BASE/api/ops/control-plane/unpause"
+# expect: 401
+
+# Admin secret on correct header → 409 (agent isn't paused, but auth passed)
+curl -s -w '\n%{http_code}\n' -X POST \
+  -H "X-Admin-Authorization: Bearer $CONTROL_PLANE_ADMIN_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{"agentId":"__none__","reason":"smoke"}' \
+  "$BASE/api/ops/control-plane/unpause"
+# expect: HTTP 409 (NOT 401). Body: { ok:false, error:"not-paused", ... }
 ```
 
 ---
@@ -94,9 +129,13 @@ curl -sH "Authorization: Bearer $CRON_SECRET" \
 ```
 
 ### C.6 — Unpause a non-paused agent returns 409 (no-op safety)
+
+Note: `/unpause` is ADMIN-TIER — uses `X-Admin-Authorization`, not
+`Authorization`. Cron callers get 401 (see A.4).
+
 ```bash
-curl -s -w '\n%{http_code}\n' \
-  -H "Authorization: Bearer $CRON_SECRET" \
+curl -s -w '\n%{http_code}\n' -X POST \
+  -H "X-Admin-Authorization: Bearer $CONTROL_PLANE_ADMIN_SECRET" \
   -H "Content-Type: application/json" \
   -d '{"agentId":"not-really-paused","reason":"smoke test"}' \
   "$BASE/api/ops/control-plane/unpause"
@@ -137,8 +176,13 @@ curl -X POST -sH "Authorization: Bearer $CRON_SECRET" \
 curl -sH "Authorization: Bearer $CRON_SECRET" "$BASE/api/ops/control-plane/paused" | jq .
 # expect: count >= 1, paused[].agentId includes "viktor-smoke"
 
-# Clean up (unpause so live operations aren't affected by smoke test):
-node scripts/ops/unpause-agent.mjs --agentId viktor-smoke --reason "smoke test cleanup" --actor Ben
+# Clean up (unpause so live operations aren't affected by smoke test).
+# Requires CONTROL_PLANE_ADMIN_SECRET in the environment (NOT CRON_SECRET).
+# The server hardcodes actorId="Ben" regardless of any --actor flag, so
+# don't pass one.
+node scripts/ops/unpause-agent.mjs \
+  --agentId viktor-smoke \
+  --reason "smoke test cleanup"
 ```
 
 ---

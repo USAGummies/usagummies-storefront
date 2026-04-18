@@ -41,7 +41,7 @@ Expected green state: `ok:true`, `degraded:false`, `summary: "READY — all comp
 
 ## Step 1 — Secret rotation (P0, Ben, ~30 min)
 
-Per [`ops/blocked-items.md`](blocked-items.md) §"P0 manual tasks". Do these first — the AWS IAM key, Shopify admin token, and Open Brain MCP key were leaked in historical files and must be rotated before go-live. Exact commands in `blocked-items.md` B-3 through B-8.
+Per [`ops/blocked-items.md`](blocked-items.md) §"P0 manual tasks". Do these first — the AWS IAM key, Shopify admin token, and Open Brain MCP key were leaked in historical files and must be rotated before go-live. Exact commands in `blocked-items.md` B-3 through B-8. Also do **B-12** (provision `CONTROL_PLANE_ADMIN_SECRET`) — without it the health endpoint reports `unpauseRoute: unready` and blocks go-live.
 
 Confirm complete by re-checking that no `shpat_` / `AKIA` full-value string exists in the tree:
 

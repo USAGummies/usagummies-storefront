@@ -238,7 +238,7 @@ Not accepted by the current endpoint — no-op if supplied. Tracked for a future
 ## 5. Contract rules (all scenarios)
 
 1. Every call uses `Authorization: Bearer <CRON_SECRET>`. No alternative auth accepted.
-2. Every `amountUsd` in the body either has a `source` with `retrievedAt` or `amountUsd: null` with an `unavailableReason`. Never a naked number. This is enforced by the composer: an entry with `amountUsd` set but no `source` will render without attribution and violate governance §1 non-negotiable #2.
+2. Every `amountUsd` in the body either has a `source` with `retrievedAt` or `amountUsd: null` with an `unavailableReason`. Never a naked number. This is enforced by the composer: an entry with `amountUsd` set but no `source.system` + `source.retrievedAt` is rendered as `unavailable — amount=<N> suppressed: missing source.system or source.retrievedAt (no-fabrication rule)`. The naked number never appears.
 3. Retries: Make scenarios should retry on 5xx. Retry should NOT re-fetch the upstream source — re-send the same body so idempotency is preserved.
 4. Timeouts: set Make scenario timeouts ≥ 30s for daily brief (Plaid call + composition); ≥ 180s for Amazon settlements pre-fetch; ≥ 120s for drift audit (sampling + Slack mirror).
 5. Alerting: alarm only on HTTP `5xx` or `!body.ok`. `degraded: true` is a normal operational state until all P0 manual items are complete.
