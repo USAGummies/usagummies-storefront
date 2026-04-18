@@ -26,6 +26,8 @@ const SELF_AUTHENTICATED_PREFIXES = [
   "/api/ops/engine/",
   "/api/ops/notify",
   "/api/ops/slack/",
+  "/api/ops/control-plane/", // 3.0 control plane — isCronAuthorized() (Bearer CRON_SECRET) on reads + low-auth writes; isAdminAuthorized() (X-Admin-Authorization) on /unpause
+  "/api/ops/daily-brief", // 3.0 daily brief — isCronAuthorized() (Bearer CRON_SECRET); scheduled by Make.com
   "/api/ops/abra/", // All Abra routes use isAuthorized() from abra-auth.ts (session + CRON_SECRET)
   "/api/ops/department/", // Department API uses isAuthorized() (session + CRON_SECRET)
   "/api/ops/plaid/", // Plaid endpoints — balance used by Abra crons, webhook verified by item_id
