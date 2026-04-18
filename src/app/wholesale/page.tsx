@@ -1,4 +1,3 @@
-import Link from "next/link";
 import Image from "next/image";
 import type { Metadata } from "next";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
@@ -19,9 +18,9 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "Wholesale Candy | USA Gummies";
+const PAGE_TITLE = "Wholesale | USA Gummies";
 const PAGE_DESCRIPTION =
-  "Wholesale made in USA candy and dye-free gummies for retailers, teams, and events. No artificial dyes, easy ordering.";
+  "Request wholesale pricing for USA Gummies — premium dye-free gummy candy made in America. For retailers, distributors, and bulk buyers.";
 
 export const metadata: Metadata = {
   title: PAGE_TITLE,
@@ -43,16 +42,16 @@ export const metadata: Metadata = {
 };
 
 const VALUE_BULLETS = [
-  "All natural gummy bears with no artificial dyes.",
-  "Made in the USA and packed in FDA-registered facilities.",
-  "7.5 oz bags with classic gummy bear flavor and five fruit flavors.",
-  "Patriotic packaging that stands out on shelf and in gift sets.",
+  "All-natural gummy bears with no artificial dyes.",
+  "Made in the USA at FDA-registered, cGMP-certified facilities.",
+  "7.5 oz bags — classic gummy bear flavor, five fruit flavors.",
+  "Patriotic packaging built for shelf and gift sets.",
 ];
 
 const PROOF_ITEMS = [
   {
     title: "Shelf-ready format",
-    detail: "Clean branding, bold USA cues, and easy price‑pointing.",
+    detail: "Clean branding, bold USA cues, easy price-pointing.",
   },
   {
     title: "Repeat-friendly",
@@ -103,7 +102,7 @@ export default function WholesalePage() {
         </div>
       </div>
 
-      <section className="mx-auto max-w-6xl px-4 py-8 lg:py-10">
+      <section className="mx-auto max-w-5xl px-4 py-10 lg:py-12">
         <BreadcrumbJsonLd
           items={[
             { name: "Home", href: "/" },
@@ -112,68 +111,20 @@ export default function WholesalePage() {
         />
         <JsonLd data={pageJsonLd} />
 
-        {/* Primary action band — place an order or check status */}
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <Link
-            href="/booth"
-            className="group rounded-2xl border-2 border-[var(--red)] bg-white p-6 shadow-[0_10px_32px_rgba(178,34,52,0.15)] hover:shadow-[0_14px_40px_rgba(178,34,52,0.25)] transition-shadow"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--red)]">
-                  Place a wholesale order
-                </div>
-                <div className="mt-2 text-xl font-black text-[var(--text)]">
-                  Order now →
-                </div>
-                <div className="mt-1 text-sm text-[var(--muted)]">
-                  Pay by card or on invoice (Net 10). MOQ 1 master carton · $117.
-                </div>
-              </div>
-              <div className="text-3xl">🛒</div>
-            </div>
-          </Link>
-
-          <Link
-            href="/wholesale/status"
-            className="group rounded-2xl border-2 border-[var(--border)] bg-white p-6 hover:border-[var(--navy)] transition-colors"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-                  Already ordered?
-                </div>
-                <div className="mt-2 text-xl font-black text-[var(--text)]">
-                  Check my order status →
-                </div>
-                <div className="mt-1 text-sm text-[var(--muted)]">
-                  Enter your email to see payment + shipping state.
-                </div>
-              </div>
-              <div className="text-3xl">📦</div>
-            </div>
-          </Link>
-        </div>
-
-        <div className="flex justify-center py-6">
-          <div className="relative w-40 h-20">
-            <Image src="/brand/logo-full.png" alt="USA Gummies" fill sizes="160px" className="object-contain" />
-          </div>
-        </div>
-
-        <div className="candy-panel rounded-[36px] p-6 sm:p-7">
-          <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
-            <div className="space-y-4">
+        <div className="candy-panel rounded-[36px] p-6 sm:p-8">
+          <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
+            <div className="space-y-5">
               <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
                 Wholesale USA Gummies
               </div>
               <h2 className="text-3xl font-black text-[var(--text)] sm:text-4xl">
-                Bring USA Gummies to your shelves.
+                Request wholesale pricing.
               </h2>
               <p className="text-sm text-[var(--muted)] sm:text-base max-w-prose">
-                Built for retail partners who want clean ingredients, made‑in‑USA credibility, and
-                a bold patriotic brand story. Request a starter case or samples and we will follow up
-                with wholesale terms.
+                Built for retail partners who want clean ingredients, made-in-USA
+                credibility, and a bold patriotic brand story. Tell us a little
+                about your business and we&rsquo;ll send wholesale pricing,
+                MOQs, and lead times within one business day.
               </p>
 
               <ul className="grid gap-2 text-sm text-[var(--text)]">
@@ -185,134 +136,29 @@ export default function WholesalePage() {
                 ))}
               </ul>
 
-              <div className="flex flex-wrap items-center gap-3 pt-2">
-                <a href="#wholesale-form" className="btn btn-candy pressable">
-                  Request starter case
-                </a>
-                <a href="#wholesale-form" className="btn btn-outline pressable">
-                  Request the one‑pager
-                </a>
+              <div className="rounded-3xl border border-[var(--border)] bg-white p-5 shadow-[0_18px_44px_rgba(15,27,45,0.08)]">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+                  Retailer snapshot
+                </div>
+                <div className="mt-2 text-base font-black text-[var(--text)]">
+                  Wholesale-ready at a glance
+                </div>
+                <div className="mt-3 grid gap-2">
+                  {PROOF_ITEMS.map((item) => (
+                    <div key={item.title} className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-3">
+                      <div className="text-sm font-black text-[var(--text)]">{item.title}</div>
+                      <div className="text-xs text-[var(--muted)]">{item.detail}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
 
-            <div className="space-y-4">
-              <div className="rounded-3xl border border-[var(--border)] bg-white p-2 shadow-[0_18px_44px_rgba(15,27,45,0.12)]">
-                <div className="relative aspect-[5/4] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-3">
-                  <Image
-                    src="/brand/usa-gummies-family.webp"
-                    alt="Assorted USA Gummies gummy bear bags"
-                    fill
-                    sizes="(max-width: 768px) 90vw, 420px"
-                    className="object-contain"
-                  />
-                </div>
-              </div>
-              <div className="grid gap-4 lg:grid-cols-[1fr_1fr] lg:items-start">
-                <div className="relative aspect-[4/5] overflow-hidden rounded-2xl border border-[var(--border)]">
-                  <Image
-                    src="/brand/gallery/bag-shelf-space.jpg"
-                    alt="USA Gummies taking shelf space in a retail store"
-                    fill
-                    sizes="(max-width: 1024px) 90vw, 280px"
-                    className="object-cover"
-                  />
-                </div>
-                <div id="wholesale-form">
-                  <WholesaleForm />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-6 grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
-          <div className="rounded-3xl border border-[var(--border)] bg-white p-5 shadow-[0_18px_44px_rgba(15,27,45,0.12)]">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-              Retailer snapshot
-            </div>
-            <div className="mt-2 text-xl font-black text-[var(--text)]">
-              Wholesale-ready at a glance
-            </div>
-            <div className="mt-4 grid gap-3">
-              {PROOF_ITEMS.map((item) => (
-                <div key={item.title} className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-3">
-                  <div className="text-sm font-black text-[var(--text)]">{item.title}</div>
-                  <div className="text-xs text-[var(--muted)]">{item.detail}</div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-4 flex items-center gap-3 text-xs text-[var(--muted)]">
-              <Image
-                src="/brand/logo.png"
-                alt="USA Gummies logo"
-                width={72}
-                height={26}
-                className="h-auto w-16 object-contain"
-              />
-              <span>Made in the USA • All natural • No artificial dyes</span>
-            </div>
-          </div>
-          <div className="space-y-4">
-            <div className="rounded-3xl border border-[var(--border)] bg-white p-5">
-              <div className="text-sm font-black text-[var(--text)]">Wholesale resources</div>
-              <ul className="mt-3 space-y-2 text-sm text-[var(--muted)]">
-                <li>• Case‑pack details and core bundle pricing</li>
-                <li>• Ingredient and allergen overview</li>
-                <li>• Merchandising tips + brand assets</li>
-              </ul>
-              <div className="mt-4 text-xs font-semibold text-[var(--muted)]">
-                Wholesale one‑pager available upon request.
-              </div>
-            </div>
-
-            <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface-strong)] p-5 text-sm text-[var(--muted)]">
-              <div className="text-sm font-black text-[var(--text)]">Need something custom?</div>
-              <p className="mt-2">
-                Send us your store location and preferred case quantity. We will reply with
-                availability, lead times, and wholesale terms.
+            <div id="wholesale-form" className="lg:sticky lg:top-6">
+              <WholesaleForm />
+              <p className="mt-3 text-center text-xs text-[var(--muted)]">
+                Pricing, MOQs, and lead times sent to your inbox within one business day.
               </p>
-              <Link href="/contact" className="mt-3 inline-flex text-sm font-semibold text-[var(--navy)] underline underline-offset-4">
-                Contact wholesale support
-              </Link>
-            </div>
-          </div>
-        </div>
-
-        {/* Faire storefront */}
-        <div id="faire" className="mt-10">
-          <div className="candy-panel rounded-[36px] p-6 sm:p-8">
-            <div className="text-center space-y-3 mb-6">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-                Also available on
-              </div>
-              <h2 className="text-2xl font-black text-[var(--text)] sm:text-3xl">
-                Order on Faire
-              </h2>
-              <p className="text-sm text-[var(--muted)] max-w-lg mx-auto">
-                Already on Faire? Browse our full catalog and place wholesale orders directly
-                with net‑60 terms, free returns, and no minimums for your first order.
-              </p>
-            </div>
-            <div className="flex justify-center">
-              <iframe
-                src="https://www.faire.com/embed/bw_cqd5dvfzqu"
-                width="900"
-                height="600"
-                scrolling="no"
-                title="USA Gummies on Faire"
-                className="border-none block max-w-full"
-                style={{ width: 900, height: 600 }}
-              />
-            </div>
-            <div className="text-center mt-4">
-              <a
-                href="https://www.faire.com/brand/bw_cqd5dvfzqu"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn btn-candy pressable"
-              >
-                View full catalog on Faire
-              </a>
             </div>
           </div>
         </div>

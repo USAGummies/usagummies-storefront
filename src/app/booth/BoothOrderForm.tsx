@@ -37,11 +37,17 @@ export function BoothOrderForm() {
 
   const qty = Math.max(1, Number(quantityCases) || 1);
   const bagsPerCase = 36;
-  const totalBags = qty * bagsPerCase;
+  const masterCasesPerPallet = 25;
+  // Pallet tier sells in PALLETS (25 master cases / 900 bags each), priced
+  // landed — freight is rolled into the $3/bag and absorbed by us. Standard
+  // tier sells in master cases (36 bags each) with UPS Ground freight billed
+  // separately on top.
+  const masterCasesCount =
+    pricingTier === "pallet" ? qty * masterCasesPerPallet : qty;
+  const totalBags = masterCasesCount * bagsPerCase;
   const basePrice = pricingTier === "pallet" ? 3.0 : 3.25;
   // Pay-Now customers get a 5% prepay discount on the standard tier. Pallet
-  // already has volume pricing so no extra discount. Rounded to 2 decimals
-  // so the displayed per-bag price × quantity == displayed total.
+  // already has volume + landed pricing so no extra discount.
   const prepayMultiplier =
     paymentMethod === "pay_now" && pricingTier === "standard" ? 0.95 : 1;
   const pricePerBag = Math.round(basePrice * prepayMultiplier * 100) / 100;
@@ -49,8 +55,8 @@ export function BoothOrderForm() {
   const freightAmount = freight.kind === "ok" ? freight.quote.rate : 0;
   const orderTotal = Number((subtotal + freightAmount).toFixed(2));
 
-  // Pallet tier ships LTL freight collect — buyer arranges. Only quote UPS
-  // for standard (master-carton) orders.
+  // Pallet tier is landed pricing — no freight quote needed. Only standard
+  // (master-carton) orders ship UPS Ground with freight billed on top.
   const wantsFreightQuote = pricingTier === "standard";
   const stateOk = /^[A-Z]{2}$/.test(shipState);
   const zipOk = /^\d{5}$/.test(shipZip);
@@ -303,7 +309,9 @@ export function BoothOrderForm() {
         {/* Quantity */}
         <div>
           <label htmlFor="quantity" className="block text-sm font-medium text-gray-700 mb-1">
-            Master Cases (36 bags each)
+            {pricingTier === "pallet"
+              ? `Pallets (${masterCasesPerPallet} master cases · ${masterCasesPerPallet * bagsPerCase} bags each)`
+              : `Master Cases (${bagsPerCase} bags each)`}
           </label>
           <div className="flex items-center gap-3">
             <button
@@ -328,7 +336,11 @@ export function BoothOrderForm() {
             >
               +
             </button>
-            <span className="text-sm text-gray-500">{totalBags} bags</span>
+            <span className="text-sm text-gray-500">
+              {pricingTier === "pallet"
+                ? `${masterCasesCount} cases · ${totalBags} bags`
+                : `${totalBags} bags`}
+            </span>
           </div>
         </div>
 
@@ -362,7 +374,7 @@ export function BoothOrderForm() {
             >
               <div className="text-sm font-semibold text-[#0a1e3d]">Pallet</div>
               <div className="text-lg font-bold text-[#b22234]">$3.00/bag</div>
-              <div className="text-xs text-gray-500 mt-1">Buyer arranges LTL freight</div>
+              <div className="text-xs text-gray-500 mt-1">25 MCs · LTL freight included</div>
             </button>
           </div>
         </div>
@@ -440,10 +452,12 @@ export function BoothOrderForm() {
             <span className="font-semibold text-[#0a1e3d]">${subtotal.toFixed(2)}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-gray-600">Shipping (UPS Ground)</span>
+            <span className="text-gray-600">
+              {pricingTier === "pallet" ? "Shipping (LTL)" : "Shipping (UPS Ground)"}
+            </span>
             <span className="font-medium text-[#0a1e3d] text-right">
               {pricingTier === "pallet" ? (
-                "Buyer arranges LTL"
+                <span className="text-green-700">Included · landed price</span>
               ) : freight.kind === "ok" ? (
                 <>
                   ${freight.quote.rate.toFixed(2)}
@@ -464,9 +478,6 @@ export function BoothOrderForm() {
             <span className="text-sm font-semibold text-[#0a1e3d]">Order total</span>
             <span className="text-lg font-bold text-[#0a1e3d]">
               ${orderTotal.toFixed(2)}
-              {pricingTier === "pallet" ? (
-                <span className="text-xs font-normal text-gray-500"> + freight</span>
-              ) : null}
             </span>
           </div>
         </div>

@@ -69,7 +69,13 @@ export async function POST(req: Request) {
     const qty = Number(quantity_cases) || 1;
     const tier = pricing_tier === "pallet" ? "pallet" : "standard";
     const bagsPerCase = 36; // 6 inner cases × 6 bags
-    const totalBags = qty * bagsPerCase;
+    const masterCasesPerPallet = 25;
+    // Pallet tier sells in PALLETS (qty = pallets, 25 MCs / 900 bags each)
+    // at $3/bag LANDED — freight is rolled into price. Standard sells in
+    // master cases (qty = MCs, 36 bags) at $3.25/bag + UPS Ground on top.
+    const masterCasesCount =
+      tier === "pallet" ? qty * masterCasesPerPallet : qty;
+    const totalBags = masterCasesCount * bagsPerCase;
     const basePrice = tier === "pallet" ? 3.00 : 3.25;
     const paymentMethod: "pay_now" | "invoice_me" =
       payment_method === "pay_now" ? "pay_now" : "invoice_me";
@@ -81,13 +87,14 @@ export async function POST(req: Request) {
     const subtotal = Number((totalBags * pricePerBag).toFixed(2));
 
     // ── Server-side freight re-quote (standard tier only) ──
-    // Pallet ships LTL freight collect — buyer arranges. For standard MC
-    // orders we re-quote UPS Ground server-side so the customer can't fudge
-    // the displayed number. If ShipStation is down we still accept the
-    // order and flag it for manual quote.
+    // Pallet is LANDED pricing — freight is rolled into $3/bag. We absorb
+    // the LTL cost. For standard MC orders we re-quote UPS Ground
+    // server-side so customers can't fudge the displayed number. If
+    // ShipStation is down we still accept the order and flag it for manual
+    // quote.
     let freightAmount = 0;
     let freightLabel = tier === "pallet"
-      ? "LTL freight — buyer arranges"
+      ? "Included in price (LTL landed)"
       : "UPS Ground (quote pending)";
     let freightCarrier: string | null = null;
     let freightService: string | null = null;
@@ -120,12 +127,13 @@ export async function POST(req: Request) {
 
     // Build order details string for QBO Notes field (so Viktor can see order info)
     const orderDate = new Date().toLocaleString("en-US", { timeZone: "America/Los_Angeles" });
+    const unitLabel = tier === "pallet" ? "Pallet" : "Master Case";
     const qboNotes = [
       `=== BOOTH ORDER ===`,
       `Submitted: ${orderDate} PT`,
       ``,
-      `QUANTITY: ${qty} Master Case${qty > 1 ? "s" : ""} (${totalBags} bags total)`,
-      `PRICING: $${pricePerBag.toFixed(2)}/bag${tier === "pallet" ? " (Pallet tier)" : " (Standard)"}`,
+      `QUANTITY: ${qty} ${unitLabel}${qty > 1 ? "s" : ""} (${masterCasesCount} master case${masterCasesCount > 1 ? "s" : ""} · ${totalBags} bags total)`,
+      `PRICING: $${pricePerBag.toFixed(2)}/bag${tier === "pallet" ? " (Pallet tier — landed)" : " (Standard)"}`,
       `SUBTOTAL: $${subtotal.toFixed(2)}`,
       `SHIPPING: ${freightLabel}`,
       freightError ? `⚠ FREIGHT QUOTE ERROR: ${freightError} — re-quote manually` : null,
@@ -180,7 +188,11 @@ export async function POST(req: Request) {
     const shopifyToken = process.env.SHOPIFY_ADMIN_TOKEN;
     if (paymentMethod === "pay_now" && shopifyDomain && shopifyToken) {
       try {
-        const pricePerMC = Number((totalBags * pricePerBag / qty).toFixed(2));
+        const bagsPerUnit = totalBags / qty; // 36 for standard MC, 900 for pallet
+        const pricePerUnit = Number((bagsPerUnit * pricePerBag).toFixed(2));
+        const lineItemTitle = tier === "pallet"
+          ? `USA Gummies — All American Gummy Bears Pallet (${masterCasesPerPallet} master cases / ${bagsPerUnit} bags · landed)`
+          : `USA Gummies — All American Gummy Bears Master Carton (${bagsPerUnit} bags)`;
         const CREATE_DRAFT = `
           mutation draftOrderCreate($input: DraftOrderInput!) {
             draftOrderCreate(input: $input) {
@@ -193,18 +205,18 @@ export async function POST(req: Request) {
         const lastName = contact_name.split(/\s+/).slice(1).join(" ") || "";
         const shippingTitle =
           tier === "pallet"
-            ? "LTL freight — invoiced separately"
+            ? `Pallet (LTL) — included in landed price`
             : freightAmount > 0
               ? `UPS Ground (${qty} master case${qty > 1 ? "s" : ""} from Ashford, WA)`
               : "Shipping — quote pending, billed on invoice";
         const draftInput: Record<string, unknown> = {
           email: email.trim(),
-          note: `Booth order (Pay Now). ${qty} MC × ${totalBags / qty} bags @ $${pricePerBag.toFixed(2)}/bag (5% prepay on standard tier). Freight: ${freightLabel}. QBO customer: ${qboCustomerId || "pending"}.`,
+          note: `Booth order (Pay Now). ${qty} ${unitLabel.toLowerCase()}${qty > 1 ? "s" : ""} (${masterCasesCount} MC · ${totalBags} bags) @ $${pricePerBag.toFixed(2)}/bag${tier === "pallet" ? " landed" : ""}. Freight: ${freightLabel}. QBO customer: ${qboCustomerId || "pending"}.`,
           tags: ["wholesale", "booth", "pay_now", tier],
           lineItems: [
             {
-              title: `USA Gummies — All American Gummy Bears Master Carton (${totalBags / qty} bags)`,
-              originalUnitPriceWithCurrency: { amount: pricePerMC.toFixed(2), currencyCode: "USD" },
+              title: lineItemTitle,
+              originalUnitPriceWithCurrency: { amount: pricePerUnit.toFixed(2), currencyCode: "USD" },
               quantity: qty,
               requiresShipping: true,
               taxable: true,
@@ -295,12 +307,12 @@ export async function POST(req: Request) {
             payment_received: false,
             description: [
               `Booth order via usagummies.com/booth, submitted ${orderDate} PT`,
-              `${qty} Master Case${qty > 1 ? "s" : ""} (${totalBags} bags) × $${pricePerBag.toFixed(2)}`,
+              `${qty} ${unitLabel}${qty > 1 ? "s" : ""} (${masterCasesCount} MC · ${totalBags} bags) × $${pricePerBag.toFixed(2)}/bag${tier === "pallet" ? " landed" : ""}`,
               `Subtotal: $${subtotal.toFixed(2)}`,
               `Shipping: ${freightLabel}`,
               `Order total: $${orderTotal.toFixed(2)}`,
               `Payment method: ${paymentMethod === "pay_now" ? "Pay Now by card (5% prepay discount applied)" : "Invoice Me / Net 10"}`,
-              `Pricing tier: ${tier === "pallet" ? "Pallet (LTL collect)" : "Standard (UPS Ground)"}`,
+              `Pricing tier: ${tier === "pallet" ? "Pallet (LTL freight included in price)" : "Standard (UPS Ground billed separately)"}`,
               qboCustomerId ? `QBO Customer ID: ${qboCustomerId}` : "⚠ QBO customer not created",
               freightError ? `⚠ Freight quote error: ${freightError}` : "",
               "",
@@ -311,8 +323,8 @@ export async function POST(req: Request) {
             await createNote({
               body: [
                 "<p><b>Booth order submitted</b></p>",
-                `<p>Quantity: <b>${qty} MC (${totalBags} bags)</b><br/>`,
-                `Price: <b>$${pricePerBag.toFixed(2)}/bag</b> × ${totalBags} = <b>$${subtotal.toFixed(2)}</b><br/>`,
+                `<p>Quantity: <b>${qty} ${unitLabel}${qty > 1 ? "s" : ""} (${masterCasesCount} MC · ${totalBags} bags)</b><br/>`,
+                `Price: <b>$${pricePerBag.toFixed(2)}/bag</b> × ${totalBags} = <b>$${subtotal.toFixed(2)}</b>${tier === "pallet" ? " <i>(landed)</i>" : ""}<br/>`,
                 `Shipping: <b>${freightLabel}</b><br/>`,
                 `Order total: <b>$${orderTotal.toFixed(2)}</b><br/>`,
                 `Payment: <b>${paymentMethod === "pay_now" ? "Pay Now by card" : "Invoice Me / Net 10"}</b><br/>`,
@@ -344,7 +356,7 @@ export async function POST(req: Request) {
       const payNowSuffix = paymentMethod === "pay_now"
         ? " (5% prepay discount applied)" : "";
       const shippingLine = tier === "pallet"
-        ? "Shipping: LTL freight — buyer arranges (separate quote)"
+        ? "Shipping: LTL freight — included in landed price"
         : freightAmount > 0
           ? `Shipping: $${freightAmount.toFixed(2)}${freightDays ? ` (UPS Ground, ~${freightDays} day${freightDays > 1 ? "s" : ""} from Ashford, WA)` : " (UPS Ground from Ashford, WA)"}`
           : "Shipping: UPS Ground from Ashford, WA — final freight on invoice";
@@ -355,11 +367,11 @@ export async function POST(req: Request) {
         ``,
         `── Order summary ──`,
         `Product: All American Gummy Bears — 7.5 oz bag`,
-        `Quantity: ${qty} Master Case${qty > 1 ? "s" : ""} (${totalBags} bags total)`,
-        `Price: $${pricePerBag.toFixed(2)}/bag${payNowSuffix}`,
+        `Quantity: ${qty} ${unitLabel}${qty > 1 ? "s" : ""} (${masterCasesCount} master case${masterCasesCount > 1 ? "s" : ""} · ${totalBags} bags total)`,
+        `Price: $${pricePerBag.toFixed(2)}/bag${tier === "pallet" ? " landed" : ""}${payNowSuffix}`,
         `Subtotal: $${subtotal.toFixed(2)}`,
         shippingLine,
-        `Order total: $${orderTotal.toFixed(2)}${tier === "pallet" ? " + freight (quoted separately)" : ""}`,
+        `Order total: $${orderTotal.toFixed(2)}`,
         `Payment: ${paymentMethod === "pay_now" ? "Paid by card — thank you!" : "Invoice will arrive shortly (Net 10)"}`,
         ``,
         `── One quick step ──`,
@@ -420,12 +432,12 @@ export async function POST(req: Request) {
       `*Email:* ${email}`,
       phone ? `*Phone:* ${phone}` : null,
       ``,
-      `*Order:* ${qty} Master Case${qty > 1 ? "s" : ""} (${totalBags} bags)`,
-      `*Price:* $${pricePerBag.toFixed(2)}/bag${tier === "pallet" ? " (Pallet)" : paymentMethod === "pay_now" ? " (Pay Now, 5% prepay discount)" : " (Standard)"}`,
+      `*Order:* ${qty} ${unitLabel}${qty > 1 ? "s" : ""} (${masterCasesCount} MC · ${totalBags} bags)`,
+      `*Price:* $${pricePerBag.toFixed(2)}/bag${tier === "pallet" ? " (Pallet — landed)" : paymentMethod === "pay_now" ? " (Pay Now, 5% prepay discount)" : " (Standard)"}`,
       `*Product Subtotal:* $${subtotal.toFixed(2)}`,
       `*Shipping:* ${freightLabel}`,
       freightError ? `⚠️ Freight quote failed: ${freightError} — re-quote manually` : null,
-      `*Order Total:* $${orderTotal.toFixed(2)}${tier === "pallet" ? " + LTL freight" : ""}`,
+      `*Order Total:* $${orderTotal.toFixed(2)}`,
       ``,
       ship_address ? `*Ship To:* ${ship_address}, ${ship_city || ""} ${ship_state || ""} ${ship_zip || ""}` : null,
       notes ? `*Notes:* ${notes}` : null,
@@ -447,7 +459,9 @@ export async function POST(req: Request) {
       paymentMethod === "pay_now"
         ? `3. Payment already collected by card ✅`
         : `3. Viktor creates invoice using Trade Show item (ID 15, account 400015.15); customer pays invoice`,
-      `4. Both gates green → Ben packs and ships from Ashford, WA via UPS Ground`,
+      tier === "pallet"
+        ? `4. Both gates green → Ben books LTL freight from Ashford, WA (cost absorbed in landed price)`
+        : `4. Both gates green → Ben packs and ships from Ashford, WA via UPS Ground`,
     ].filter(Boolean).join("\n");
 
     // Post to Slack (must await — serverless function exits before fire-and-forget completes)

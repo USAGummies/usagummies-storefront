@@ -1,9 +1,10 @@
 "use client";
 
 import { QRCodeSVG } from "qrcode.react";
+import { BOOTH_ACCESS_KEY } from "@/lib/booth/access";
 
 export function SalesSheet() {
-  const boothUrl = "https://www.usagummies.com/booth";
+  const boothUrl = `https://www.usagummies.com/booth?k=${BOOTH_ACCESS_KEY}`;
 
   return (
     <>
@@ -100,8 +101,8 @@ export function SalesSheet() {
                 <div style={{ border: "2px solid #0a1e3d", borderRadius: "12px", padding: "16px" }}>
                   <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em" }}>Pallet</div>
                   <div style={{ fontSize: "1.875rem", fontWeight: 900, color: "#b22234", marginTop: "4px" }}>$3.00<span style={{ fontSize: "1rem", fontWeight: 600 }}>/bag</span></div>
-                  <div style={{ fontSize: "0.875rem", color: "#6b7280", marginTop: "8px" }}>$108.00 per master case</div>
-                  <div style={{ fontSize: "0.875rem", color: "#6b7280", marginTop: "4px" }}>Buyer arranges LTL freight</div>
+                  <div style={{ fontSize: "0.875rem", color: "#6b7280", marginTop: "8px" }}>$2,700.00 per pallet (25 MCs · 900 bags)</div>
+                  <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "#15803d", marginTop: "4px" }}>LTL freight included — landed</div>
                 </div>
               </div>
             </div>

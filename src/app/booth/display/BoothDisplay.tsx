@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { QRCodeSVG } from "qrcode.react";
+import { BOOTH_ACCESS_KEY } from "@/lib/booth/access";
 
 export function BoothDisplay() {
   // Hide AppShell nav/footer so the display is truly fullscreen
@@ -93,7 +94,7 @@ export function BoothDisplay() {
             </p>
           </div>
 
-          {/* Show Deal Hero */}
+          {/* Show Hero */}
           <div
             style={{
               background: "#b22234",
@@ -112,7 +113,7 @@ export function BoothDisplay() {
                 letterSpacing: "1.5px",
               }}
             >
-              Show Special — The Reunion 2026
+              The Reunion 2026 — Wholesale
             </div>
             <div
               style={{
@@ -121,7 +122,7 @@ export function BoothDisplay() {
                 lineHeight: 1.1,
               }}
             >
-              $3.25/bag · FREE Shipping
+              From $3.00/bag · LTL freight included on pallets
             </div>
             <div
               style={{
@@ -130,7 +131,7 @@ export function BoothDisplay() {
                 opacity: 0.85,
               }}
             >
-              Any master carton order (36+ bags) · $117/MC
+              MC: $117 (UPS Ground billed at cost) · Pallet: $2,700 landed (25 MCs)
             </div>
           </div>
 
@@ -186,25 +187,10 @@ export function BoothDisplay() {
               }}
             >
               <div style={{ fontSize: "13px", color: "#666", fontWeight: 600, textTransform: "uppercase" }}>
-                Show Deal
+                Master Carton
               </div>
               <div style={{ fontSize: "28px", fontWeight: 800, color: "#b22234" }}>$3.25/bag</div>
-              <div style={{ fontSize: "13px", color: "#15803d", fontWeight: 600 }}>FREE SHIPPING</div>
-            </div>
-            <div
-              style={{
-                flex: 1,
-                background: "white",
-                borderRadius: "12px",
-                padding: "16px 20px",
-                border: "1px solid #ddd",
-              }}
-            >
-              <div style={{ fontSize: "13px", color: "#666", fontWeight: 600, textTransform: "uppercase" }}>
-                Volume (6+ MC)
-              </div>
-              <div style={{ fontSize: "28px", fontWeight: 800, color: "#0a1e3d" }}>$3.15/bag</div>
-              <div style={{ fontSize: "13px", color: "#666" }}>Net 15</div>
+              <div style={{ fontSize: "13px", color: "#666" }}>$117/MC · UPS Ground at cost</div>
             </div>
             <div
               style={{
@@ -219,7 +205,7 @@ export function BoothDisplay() {
                 Pallet (25 MC)
               </div>
               <div style={{ fontSize: "28px", fontWeight: 800, color: "#0a1e3d" }}>$3.00/bag</div>
-              <div style={{ fontSize: "13px", color: "#666" }}>Net 30</div>
+              <div style={{ fontSize: "13px", color: "#15803d", fontWeight: 600 }}>$2,700 landed · LTL freight included</div>
             </div>
           </div>
 
@@ -255,7 +241,7 @@ export function BoothDisplay() {
             }}
           >
             <QRCodeSVG
-              value="https://www.usagummies.com/booth"
+              value={`https://www.usagummies.com/booth?k=${BOOTH_ACCESS_KEY}`}
               size={280}
               level="H"
               bgColor="#ffffff"
