@@ -23,9 +23,12 @@ import { randomUUID } from "node:crypto";
 
 import type {
   AuditLogEntry,
+  DivisionId,
   PolicyViolation,
 } from "./types";
 import type { AuditStore, AuditSlackSurface } from "./audit";
+import type { PauseSink } from "./enforcement";
+import { buildAuditEntry } from "./audit";
 
 // ---- Types ----
 
@@ -65,8 +68,36 @@ export interface DriftAuditScorecard {
   totalViolations: number;
   /** Number of human corrections in the window (source: corrections store; caller-supplied). */
   correctionsCount: number;
-  /** Agents with ≥2 violations → auto-paused per /contracts/governance.md §5. */
+  /**
+   * Agents with ≥2 violations → auto-paused per /contracts/governance.md §5.
+   * Populated whether or not a PauseSink is wired; the `enforcement` block
+   * below records whether the pause was actually persisted.
+   */
   agentsAutoPaused: string[];
+  /**
+   * Agents whose auto-pause persistence failed (sink threw). The audit
+   * still succeeds — the run does not block on partial enforcement —
+   * but failed pauses are called out explicitly so they can be retried.
+   */
+  agentsPauseErrored: Array<{ agentId: string; error: string }>;
+  /**
+   * Enforcement telemetry. Captured per-run so downstream consumers
+   * (Notion archive, dashboards, incident review) can tell when the audit
+   * ran in degraded mode.
+   */
+  enforcement: {
+    /**
+     * `enforced` — PauseSink accepted every pause call for this run.
+     * `partial` — some agents were paused, some sink calls failed.
+     * `skipped` — no PauseSink was provided; scorecard is advisory only.
+     * `not-needed` — 0 agents met the threshold this run.
+     */
+    mode: "enforced" | "partial" | "skipped" | "not-needed";
+    pauseSinkPresent: boolean;
+    pausesApplied: number;
+    pausesFailed: number;
+    notes: string[];
+  };
 }
 
 export type Validator = (entry: AuditLogEntry) => Promise<{
@@ -77,6 +108,13 @@ export type Validator = (entry: AuditLogEntry) => Promise<{
 export interface DriftAuditInput {
   store: AuditStore;
   surface?: AuditSlackSurface | null;
+  /**
+   * Where auto-pause state is persisted. When omitted, the scorecard
+   * reports enforcement.mode = "skipped" so callers / archive consumers
+   * know the audit is advisory for this run. Provide a real PauseSink in
+   * production; provide an in-process sink in tests.
+   */
+  pauseSink?: PauseSink | null;
   /** Default 10. */
   sampleSize?: number;
   /** Default 7. */
@@ -84,7 +122,8 @@ export interface DriftAuditInput {
   now?: Date;
   /**
    * Violations recorded in the window. Caller fetches from wherever
-   * violations live (Open Brain, KV, etc.). Empty array if not wired yet.
+   * violations live (ViolationStore, Open Brain, etc.). Empty array if
+   * the violation store is not yet populated.
    */
   violations?: PolicyViolation[];
   /** Corrections count in window. Default 0 if not supplied. */
@@ -95,6 +134,13 @@ export interface DriftAuditInput {
   candidatePoolSize?: number;
   /** Randomness injection for tests. */
   rng?: () => number;
+  /**
+   * Division fallback for agents that do not appear in this run's audit
+   * entries (e.g. they violated but produced no writes). Defaults to
+   * "executive-control" so the PausedAgentRecord still gets a valid
+   * DivisionId. Callers should supply a lookup when they can resolve it.
+   */
+  resolveDivision?: (agentId: string) => DivisionId | undefined;
 }
 
 // ---- Runner ----
@@ -140,8 +186,85 @@ export async function runDriftAudit(input: DriftAuditInput): Promise<DriftAuditS
     .map(([agentId]) => agentId)
     .sort();
 
+  const scorecardId = randomUUID();
+  const agentsPauseErrored: DriftAuditScorecard["agentsPauseErrored"] = [];
+
+  // ---- Enforce auto-pause ----
+  //
+  // For each agent over threshold, persist a PausedAgentRecord via the
+  // sink. Failures are captured per-agent; the run continues so a
+  // single sink hiccup does not collapse the whole audit. Every pause
+  // action (success or failure) writes an audit entry under the
+  // synthetic actor "drift-audit" so the enforcement trail is queryable.
+  let pausesApplied = 0;
+  let pausesFailed = 0;
+  const enforcementNotes: string[] = [];
+
+  if (agentsAutoPaused.length === 0) {
+    enforcementNotes.push("0 agents met the auto-pause threshold this run.");
+  }
+
+  if (input.pauseSink && agentsAutoPaused.length > 0) {
+    for (const agentId of agentsAutoPaused) {
+      const division = resolveAgentDivision(agentId, eligible, input.resolveDivision);
+      const violationsCount = violationsByAgent[agentId] ?? 0;
+      const record = {
+        agentId,
+        division,
+        reason: `Auto-pause: ${violationsCount} violations in ${windowDays}-day window`,
+        violationsInWindow: violationsCount,
+        windowStart: windowStart.toISOString(),
+        windowEnd: windowEnd.toISOString(),
+        scorecardId,
+        pausedAt: now.toISOString(),
+      };
+      try {
+        await input.pauseSink.pauseAgent(record);
+        pausesApplied++;
+        await emitAuditEntry(input.store, {
+          id: scorecardId,
+          division,
+          action: "drift-audit.agent-paused",
+          entityType: "agent",
+          entityId: agentId,
+          after: record,
+          result: "ok",
+        });
+      } catch (err) {
+        pausesFailed++;
+        const message = err instanceof Error ? err.message : String(err);
+        agentsPauseErrored.push({ agentId, error: message });
+        await emitAuditEntry(input.store, {
+          id: scorecardId,
+          division,
+          action: "drift-audit.agent-pause-failed",
+          entityType: "agent",
+          entityId: agentId,
+          after: { ...record, error: message },
+          result: "error",
+          error: { message },
+        });
+      }
+    }
+  } else if (!input.pauseSink && agentsAutoPaused.length > 0) {
+    enforcementNotes.push(
+      `${agentsAutoPaused.length} agent(s) met the auto-pause threshold but no PauseSink was provided. Pause state NOT persisted — scorecard is advisory only for this run.`,
+    );
+  }
+
+  let mode: DriftAuditScorecard["enforcement"]["mode"];
+  if (agentsAutoPaused.length === 0) {
+    mode = "not-needed";
+  } else if (!input.pauseSink) {
+    mode = "skipped";
+  } else if (pausesFailed === 0) {
+    mode = "enforced";
+  } else {
+    mode = "partial";
+  }
+
   const scorecard: DriftAuditScorecard = {
-    id: randomUUID(),
+    id: scorecardId,
     generatedAt: now.toISOString(),
     windowStart: windowStart.toISOString(),
     windowEnd: windowEnd.toISOString(),
@@ -152,6 +275,14 @@ export async function runDriftAudit(input: DriftAuditInput): Promise<DriftAuditS
     totalViolations: inWindowViolations.length,
     correctionsCount: input.correctionsCount ?? 0,
     agentsAutoPaused,
+    agentsPauseErrored,
+    enforcement: {
+      mode,
+      pauseSinkPresent: !!input.pauseSink,
+      pausesApplied,
+      pausesFailed,
+      notes: enforcementNotes,
+    },
   };
 
   // Best-effort mirror to #ops-audit. Scorecard is the canonical record;
@@ -160,14 +291,14 @@ export async function runDriftAudit(input: DriftAuditInput): Promise<DriftAuditS
     const summary = renderScorecardSummary(scorecard);
     await input.surface
       .mirror({
-        id: scorecard.id,
-        runId: scorecard.id,
+        id: scorecardId,
+        runId: scorecardId,
         division: "executive-control",
         actorType: "agent",
         actorId: "drift-audit",
         action: "drift-audit.scorecard",
         entityType: "scorecard",
-        entityId: scorecard.id,
+        entityId: scorecardId,
         before: undefined,
         after: summary,
         result: "ok",
@@ -179,6 +310,65 @@ export async function runDriftAudit(input: DriftAuditInput): Promise<DriftAuditS
   }
 
   return scorecard;
+}
+
+/**
+ * Write a drift-audit audit entry via buildAuditEntry, using a synthetic
+ * RunContext that marks the actor as "drift-audit". Mirror failure is
+ * swallowed so one bad append can't crash the enforcement loop.
+ */
+async function emitAuditEntry(
+  store: AuditStore,
+  params: {
+    id: string;
+    division: DivisionId;
+    action: string;
+    entityType: string;
+    entityId?: string;
+    before?: unknown;
+    after?: unknown;
+    result: "ok" | "error" | "skipped" | "stood-down";
+    error?: { message: string; code?: string };
+  },
+): Promise<void> {
+  try {
+    const entry = buildAuditEntry(
+      {
+        runId: params.id,
+        agentId: "drift-audit",
+        division: params.division,
+        startedAt: new Date().toISOString(),
+        source: "scheduled",
+      },
+      {
+        action: params.action,
+        entityType: params.entityType,
+        entityId: params.entityId,
+        before: params.before,
+        after: params.after,
+        result: params.result,
+        error: params.error,
+        sourceCitations: [{ system: "drift-audit" }],
+      },
+    );
+    await store.append(entry);
+  } catch {
+    // Best effort. The scorecard itself captures the enforcement outcome.
+  }
+}
+
+function resolveAgentDivision(
+  agentId: string,
+  sampledEntries: AuditLogEntry[],
+  resolver: ((id: string) => DivisionId | undefined) | undefined,
+): DivisionId {
+  const resolved = resolver?.(agentId);
+  if (resolved) return resolved;
+  const fromEntry = sampledEntries.find((e) => e.actorId === agentId)?.division;
+  if (fromEntry) return fromEntry;
+  // Fallback: governance lives under executive-control, so attribute the
+  // pause there rather than pick an incorrect division.
+  return "executive-control";
 }
 
 // ---- Internals ----
@@ -252,6 +442,10 @@ function renderScorecardSummary(sc: DriftAuditScorecard): string {
     .slice(0, 5)
     .map(([agent, count]) => `${agent}=${count}`)
     .join(",") || "none";
+  const enforcementSummary =
+    `${sc.enforcement.mode}` +
+    (sc.enforcement.pausesApplied > 0 ? ` (applied ${sc.enforcement.pausesApplied})` : "") +
+    (sc.enforcement.pausesFailed > 0 ? ` (failed ${sc.enforcement.pausesFailed})` : "");
   return [
     `samples=${sc.sampleSize}/${sc.totalEligibleEntries}`,
     `window=${sc.windowStart}..${sc.windowEnd}`,
@@ -259,5 +453,6 @@ function renderScorecardSummary(sc: DriftAuditScorecard): string {
     `corrections=${sc.correctionsCount}`,
     `by_agent=${violationsSummary}`,
     `auto_paused=${paused}`,
+    `enforcement=${enforcementSummary}`,
   ].join(" | ");
 }

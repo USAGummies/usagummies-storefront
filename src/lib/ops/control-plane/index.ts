@@ -89,3 +89,18 @@ export {
   type DriftAssessment,
   type Validator as DriftValidator,
 } from "./drift-audit";
+
+// Enforcement primitives — PauseSink, ViolationStore, CorrectionStore.
+// Factory exports (`pauseSink()`, `violationStore()`, `correctionStore()`)
+// live on the stores barrel. See /contracts/governance.md §5 + §6.
+export {
+  type PauseSink,
+  type PausedAgentRecord,
+  type ViolationStore,
+  type CorrectionStore,
+  type CorrectionEvent,
+  InMemoryPauseSink,
+  InMemoryViolationStore,
+  InMemoryCorrectionStore,
+} from "./enforcement";
+export { pauseSink, violationStore, correctionStore } from "./stores";

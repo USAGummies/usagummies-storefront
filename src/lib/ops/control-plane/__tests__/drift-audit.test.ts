@@ -2,6 +2,7 @@ import { describe, expect, it, beforeEach } from "vitest";
 
 import { buildAuditEntry, buildHumanAuditEntry } from "../audit";
 import { runDriftAudit, type Validator } from "../drift-audit";
+import { InMemoryPauseSink, type PauseSink, type PausedAgentRecord } from "../enforcement";
 import { newRunContext } from "../run-id";
 import { InMemoryAuditStore } from "../stores/memory-stores";
 import type { PolicyViolation, AuditLogEntry } from "../types";
@@ -95,6 +96,12 @@ describe("runDriftAudit()", () => {
     expect(sc.totalViolations).toBe(4);
     expect(sc.violationsByAgent).toEqual({ viktor: 3, booke: 1 });
     expect(sc.agentsAutoPaused).toEqual(["viktor"]); // booke at 1 violation is under threshold
+    // No pauseSink provided → enforcement.mode is "skipped" and the
+    // scorecard explicitly warns that pause state was NOT persisted.
+    expect(sc.enforcement.mode).toBe("skipped");
+    expect(sc.enforcement.pauseSinkPresent).toBe(false);
+    expect(sc.enforcement.pausesApplied).toBe(0);
+    expect(sc.enforcement.notes.some((n) => /NOT persisted/.test(n))).toBe(true);
   });
 
   it("excludes out-of-window violations from counts", async () => {
@@ -171,5 +178,156 @@ describe("runDriftAudit()", () => {
     const a = await runDriftAudit({ store, sampleSize: 5, rng });
     const b = await runDriftAudit({ store, sampleSize: 5, rng });
     expect(a.samples.map((s) => s.entryId)).toEqual(b.samples.map((s) => s.entryId));
+  });
+});
+
+describe("runDriftAudit() — enforcement", () => {
+  it("with PauseSink wired, persists a PausedAgentRecord per auto-paused agent", async () => {
+    const store = new InMemoryAuditStore();
+    await store.append(entryAt("viktor", 30));
+    await store.append(entryAt("booke", 30));
+    const pauseSink = new InMemoryPauseSink();
+
+    const violations: PolicyViolation[] = [
+      violation("viktor", 5),
+      violation("viktor", 10),
+      violation("viktor", 15),
+      violation("booke", 5),
+    ];
+    const sc = await runDriftAudit({
+      store,
+      pauseSink,
+      violations,
+      sampleSize: 0,
+    });
+
+    expect(sc.enforcement.mode).toBe("enforced");
+    expect(sc.enforcement.pauseSinkPresent).toBe(true);
+    expect(sc.enforcement.pausesApplied).toBe(1);
+    expect(sc.enforcement.pausesFailed).toBe(0);
+    expect(sc.agentsPauseErrored).toEqual([]);
+
+    const paused = await pauseSink.listPaused();
+    expect(paused).toHaveLength(1);
+    expect(paused[0].agentId).toBe("viktor");
+    expect(paused[0].violationsInWindow).toBe(3);
+    expect(paused[0].scorecardId).toBe(sc.id);
+    expect(await pauseSink.isPaused("viktor")).toBe(true);
+    expect(await pauseSink.isPaused("booke")).toBe(false);
+  });
+
+  it("writes a drift-audit.agent-paused audit entry for each persisted pause", async () => {
+    const store = new InMemoryAuditStore();
+    await store.append(entryAt("viktor", 30));
+    const pauseSink = new InMemoryPauseSink();
+
+    await runDriftAudit({
+      store,
+      pauseSink,
+      violations: [violation("viktor", 5), violation("viktor", 10)],
+      sampleSize: 0,
+    });
+
+    const recent = await store.recent(100);
+    const pauseEntries = recent.filter((e) => e.action === "drift-audit.agent-paused");
+    expect(pauseEntries).toHaveLength(1);
+    expect(pauseEntries[0].actorId).toBe("drift-audit");
+    expect(pauseEntries[0].entityType).toBe("agent");
+    expect(pauseEntries[0].entityId).toBe("viktor");
+    expect(pauseEntries[0].result).toBe("ok");
+  });
+
+  it("captures per-agent pause failures without collapsing the run (enforcement.mode = 'partial')", async () => {
+    const store = new InMemoryAuditStore();
+    await store.append(entryAt("viktor", 30));
+    await store.append(entryAt("booke", 30));
+    // Sink that throws for viktor, succeeds for booke.
+    const okSink = new InMemoryPauseSink();
+    const sink: PauseSink = {
+      async pauseAgent(rec: PausedAgentRecord) {
+        if (rec.agentId === "viktor") throw new Error("KV timeout");
+        return okSink.pauseAgent(rec);
+      },
+      isPaused: (id) => okSink.isPaused(id),
+      listPaused: () => okSink.listPaused(),
+      unpauseAgent: (id, reason) => okSink.unpauseAgent(id, reason),
+    };
+
+    const sc = await runDriftAudit({
+      store,
+      pauseSink: sink,
+      violations: [
+        violation("viktor", 5),
+        violation("viktor", 10),
+        violation("booke", 5),
+        violation("booke", 10),
+      ],
+      sampleSize: 0,
+    });
+
+    expect(sc.agentsAutoPaused.sort()).toEqual(["booke", "viktor"]);
+    expect(sc.agentsPauseErrored).toHaveLength(1);
+    expect(sc.agentsPauseErrored[0].agentId).toBe("viktor");
+    expect(sc.agentsPauseErrored[0].error).toContain("KV timeout");
+    expect(sc.enforcement.mode).toBe("partial");
+    expect(sc.enforcement.pausesApplied).toBe(1);
+    expect(sc.enforcement.pausesFailed).toBe(1);
+
+    const recent = await store.recent(100);
+    expect(recent.some((e) => e.action === "drift-audit.agent-paused" && e.entityId === "booke")).toBe(true);
+    expect(
+      recent.some((e) => e.action === "drift-audit.agent-pause-failed" && e.entityId === "viktor" && e.result === "error"),
+    ).toBe(true);
+  });
+
+  it("enforcement.mode = 'not-needed' when no agent crosses the threshold", async () => {
+    const store = new InMemoryAuditStore();
+    await store.append(entryAt("viktor", 30));
+    const sc = await runDriftAudit({
+      store,
+      pauseSink: new InMemoryPauseSink(),
+      violations: [violation("viktor", 5)],
+      sampleSize: 0,
+    });
+    expect(sc.agentsAutoPaused).toEqual([]);
+    expect(sc.enforcement.mode).toBe("not-needed");
+    expect(sc.enforcement.pausesApplied).toBe(0);
+    expect(sc.enforcement.pausesFailed).toBe(0);
+  });
+
+  it("enforcement summary is present in the Slack mirror payload", async () => {
+    const store = new InMemoryAuditStore();
+    await store.append(entryAt("viktor", 30));
+    const mirrored: AuditLogEntry[] = [];
+    const surface = {
+      async mirror(entry: AuditLogEntry) {
+        mirrored.push(entry);
+      },
+    };
+    await runDriftAudit({
+      store,
+      pauseSink: new InMemoryPauseSink(),
+      violations: [violation("viktor", 5), violation("viktor", 10)],
+      sampleSize: 0,
+      surface,
+    });
+    const summary = String(mirrored[0].after);
+    expect(summary).toContain("enforcement=");
+    expect(summary).toContain("auto_paused=viktor");
+  });
+
+  it("resolveDivision override lets callers place a pause under the right division", async () => {
+    const store = new InMemoryAuditStore();
+    // The violating agent produced zero audit entries this window.
+    const pauseSink = new InMemoryPauseSink();
+    await runDriftAudit({
+      store,
+      pauseSink,
+      violations: [violation("finance-exception", 5), violation("finance-exception", 10)],
+      sampleSize: 0,
+      resolveDivision: (id) => (id === "finance-exception" ? "financials" : undefined),
+    });
+    const [rec] = await pauseSink.listPaused();
+    expect(rec.division).toBe("financials");
   });
 });
