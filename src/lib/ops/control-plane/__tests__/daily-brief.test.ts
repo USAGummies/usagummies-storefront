@@ -165,6 +165,8 @@ describe("composeDailyBrief()", () => {
 describe("POST /api/ops/daily-brief", () => {
   const PRIOR_CRON = process.env.CRON_SECRET;
   const PRIOR_TOKEN = process.env.SLACK_BOT_TOKEN;
+  const PRIOR_PLAID_ID = process.env.PLAID_CLIENT_ID;
+  const PRIOR_PLAID_SECRET = process.env.PLAID_SECRET;
 
   let approvalStoreRef: InMemoryApprovalStore;
   let auditStoreRef: InMemoryAuditStore;
@@ -174,6 +176,11 @@ describe("POST /api/ops/daily-brief", () => {
     process.env.CRON_SECRET = "test-secret";
     // Keep Slack in degraded mode so the route doesn't hit the real API.
     delete process.env.SLACK_BOT_TOKEN;
+    // Plaid unconfigured by default → resolvePlaidCashPosition returns
+    // an explicit "Plaid not configured" unavailable line, which the
+    // composer renders honestly. Individual tests can flip this on.
+    delete process.env.PLAID_CLIENT_ID;
+    delete process.env.PLAID_SECRET;
     approvalStoreRef = new InMemoryApprovalStore();
     auditStoreRef = new InMemoryAuditStore();
     pauseSinkRef = new InMemoryPauseSink();
@@ -192,6 +199,10 @@ describe("POST /api/ops/daily-brief", () => {
     else process.env.CRON_SECRET = PRIOR_CRON;
     if (PRIOR_TOKEN === undefined) delete process.env.SLACK_BOT_TOKEN;
     else process.env.SLACK_BOT_TOKEN = PRIOR_TOKEN;
+    if (PRIOR_PLAID_ID === undefined) delete process.env.PLAID_CLIENT_ID;
+    else process.env.PLAID_CLIENT_ID = PRIOR_PLAID_ID;
+    if (PRIOR_PLAID_SECRET === undefined) delete process.env.PLAID_SECRET;
+    else process.env.PLAID_SECRET = PRIOR_PLAID_SECRET;
   });
 
   function authed(url = "https://example.test/api/ops/daily-brief"): Request {
@@ -415,5 +426,110 @@ describe("POST /api/ops/daily-brief", () => {
     });
     const approved = applyDecision(req, { approver: "Ben", decision: "approve" });
     expect(approved.status).toBe("approved");
+  });
+
+  // ---- Body-override + Plaid operationalization ----
+
+  it("renders an explicit 'Plaid not configured' cash line when Plaid env is unset", async () => {
+    // Default beforeEach already deletes PLAID_CLIENT_ID / PLAID_SECRET.
+    const res = await POST(authed("https://example.test/api/ops/daily-brief?post=false"));
+    const body = await res.json();
+    const blocks = JSON.stringify(body.brief.blocks);
+    expect(blocks).toContain("Cash");
+    expect(blocks).toContain("Plaid not configured");
+    // No fabricated number.
+    expect(blocks).not.toMatch(/\$[0-9]+\.[0-9]{2}/);
+  });
+
+  it("accepts POST-body overrides for revenueYesterday + cashPosition", async () => {
+    const req = new Request("https://example.test/api/ops/daily-brief?post=false", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer test-secret",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        revenueYesterday: [
+          {
+            channel: "Shopify DTC",
+            amountUsd: 444.96,
+            source: {
+              system: "shopify",
+              id: "order-1016",
+              retrievedAt: "2026-04-20T06:00:00Z",
+            },
+          },
+          {
+            channel: "Amazon",
+            amountUsd: null,
+            unavailableReason: "SP-API settlement period not yet closed",
+          },
+        ],
+        cashPosition: {
+          amountUsd: 12345.67,
+          source: { system: "plaid-override", retrievedAt: "2026-04-20T06:00:00Z" },
+        },
+      }),
+    });
+    const res = await POST(req);
+    const body = await res.json();
+    expect(res.status).toBe(200);
+    const blocks = JSON.stringify(body.brief.blocks);
+    expect(blocks).toContain("Shopify DTC");
+    expect(blocks).toContain("444.96");
+    expect(blocks).toContain("order-1016");
+    expect(blocks).toContain("Amazon");
+    expect(blocks).toContain("SP-API settlement period not yet closed");
+    expect(blocks).toContain("12345.67");
+    expect(blocks).toContain("plaid-override");
+  });
+
+  it("rejects malformed JSON body with 400", async () => {
+    const req = new Request("https://example.test/api/ops/daily-brief", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer test-secret",
+        "content-type": "application/json",
+      },
+      body: "{not: json",
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+  });
+
+  it("override cash position takes precedence over Plaid (no Plaid call attempted)", async () => {
+    // Set Plaid env so the live path would fire if called.
+    process.env.PLAID_CLIENT_ID = "stub";
+    process.env.PLAID_SECRET = "stub";
+    // Stub fetch to throw so any Plaid call would explode — we'd catch the failure in cash-position unavailable.
+    const originalFetch = global.fetch;
+    global.fetch = (async () => {
+      throw new Error("should not be called when override present");
+    }) as typeof global.fetch;
+    try {
+      const req = new Request(
+        "https://example.test/api/ops/daily-brief?post=false",
+        {
+          method: "POST",
+          headers: {
+            authorization: "Bearer test-secret",
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            cashPosition: {
+              amountUsd: 9999.99,
+              source: { system: "override", retrievedAt: "2026-04-20T06:00:00Z" },
+            },
+          }),
+        },
+      );
+      const res = await POST(req);
+      const body = await res.json();
+      expect(res.status).toBe(200);
+      expect(JSON.stringify(body.brief.blocks)).toContain("9999.99");
+      expect(JSON.stringify(body.brief.blocks)).not.toContain("Plaid not configured");
+    } finally {
+      global.fetch = originalFetch;
+    }
   });
 });

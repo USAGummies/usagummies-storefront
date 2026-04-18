@@ -19,7 +19,11 @@
 
 import { NextResponse } from "next/server";
 
-import { composeDailyBrief, type BriefKind } from "@/lib/ops/control-plane/daily-brief";
+import {
+  composeDailyBrief,
+  type BriefKind,
+  type RevenueLine,
+} from "@/lib/ops/control-plane/daily-brief";
 import { listDivisions } from "@/lib/ops/control-plane/divisions";
 import { getChannel } from "@/lib/ops/control-plane/channels";
 import {
@@ -29,9 +33,34 @@ import {
 } from "@/lib/ops/control-plane/stores";
 import { postMessage } from "@/lib/ops/control-plane/slack";
 import { isCronAuthorized, unauthorized } from "@/lib/ops/control-plane/admin-auth";
+import {
+  getBalances,
+  isPlaidConfigured,
+  isPlaidConnected,
+} from "@/lib/finance/plaid";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+interface BriefBodyOverrides {
+  /**
+   * Caller-supplied revenue lines. Each line either has `amountUsd` with
+   * a `source` or an `unavailableReason`. See daily-brief.ts RevenueLine.
+   * Typical source: a Make.com scenario that polled Shopify/Amazon/Faire
+   * upstream and forwarded the result here. Refusing to fabricate is the
+   * contract — callers MUST provide a source when amountUsd is non-null.
+   */
+  revenueYesterday?: RevenueLine[];
+  /**
+   * Cash position override. If omitted, the route tries Plaid directly.
+   * Supply when Make.com pre-fetched or when Plaid is being rotated.
+   */
+  cashPosition?: {
+    amountUsd: number | null;
+    unavailableReason?: string;
+    source?: { system: string; retrievedAt: string };
+  };
+}
 
 export async function POST(req: Request): Promise<Response> {
   if (!isCronAuthorized(req)) return unauthorized();
@@ -40,6 +69,19 @@ export async function POST(req: Request): Promise<Response> {
   const kindParam = url.searchParams.get("kind");
   const kind: BriefKind = kindParam === "eod" ? "eod" : "morning";
   const postToSlack = url.searchParams.get("post") !== "false";
+
+  // Optional JSON body with caller-supplied revenue / cash overrides.
+  let overrides: BriefBodyOverrides = {};
+  if (req.headers.get("content-type")?.includes("application/json")) {
+    try {
+      const raw = await req.text();
+      if (raw.trim().length > 0) {
+        overrides = JSON.parse(raw) as BriefBodyOverrides;
+      }
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+  }
 
   const now = new Date();
   const degradations: string[] = [];
@@ -81,8 +123,16 @@ export async function POST(req: Request): Promise<Response> {
     humanOwner: d.humanOwner,
   }));
 
-  // First compose: store-level degradations only. This is the brief we
-  // attempt to deliver to Slack.
+  // ---- Resolve cash position ----
+  //
+  // Priority: caller-supplied override > live Plaid fetch > unavailable
+  // with a specific reason. We never fabricate a number. Plaid is the
+  // only external join currently wired server-side because it's the
+  // only one with a safe, proven in-repo helper (see /api/ops/plaid/
+  // balance for the existing pattern). All other revenue joins are
+  // caller-supplied via the request body per ops/make-webhooks.md.
+  const cashPosition = overrides.cashPosition ?? (await resolvePlaidCashPosition());
+
   const composeInput = {
     kind,
     asOf: now,
@@ -91,8 +141,8 @@ export async function POST(req: Request): Promise<Response> {
     pausedAgents,
     recentAudit,
     lastDriftAuditSummary,
-    // External revenue / cash joins are TODO — intentionally omitted so
-    // the composer renders explicit "unavailable" lines.
+    revenueYesterday: overrides.revenueYesterday,
+    cashPosition,
     degradations,
   } as const;
   let brief = composeDailyBrief(composeInput);
@@ -147,4 +197,65 @@ function findLastDriftAuditSummary(entries: readonly { action: string; after?: u
   const hit = entries.find((e) => e.action === "drift-audit.scorecard");
   if (!hit) return undefined;
   return typeof hit.after === "string" ? hit.after : undefined;
+}
+
+/**
+ * Resolve the BoA checking 7020 cash position via Plaid. Returns
+ * { amountUsd, source } on success, or { amountUsd: null,
+ * unavailableReason } when Plaid is unconfigured / unconnected / erroring.
+ * Never fabricates.
+ */
+async function resolvePlaidCashPosition(): Promise<{
+  amountUsd: number | null;
+  unavailableReason?: string;
+  source?: { system: string; retrievedAt: string };
+}> {
+  if (!isPlaidConfigured()) {
+    return {
+      amountUsd: null,
+      unavailableReason: "Plaid not configured (PLAID_CLIENT_ID / PLAID_SECRET unset).",
+    };
+  }
+  try {
+    if (!(await isPlaidConnected())) {
+      return {
+        amountUsd: null,
+        unavailableReason: "Plaid configured but no access token stored. Ben needs to complete the Plaid Link flow.",
+      };
+    }
+    const balances = await getBalances();
+    if (!balances || balances.length === 0) {
+      return {
+        amountUsd: null,
+        unavailableReason: "Plaid returned no accounts. Item may be disconnected or require re-auth.",
+      };
+    }
+    // Primary per blueprint / CLAUDE.md: Bank of America checking 7020.
+    // Match by name containing "checking" — fallback to the first
+    // depository account if no explicit checking is found.
+    const checking =
+      balances.find((b) =>
+        (b.name ?? "").toLowerCase().includes("checking") ||
+        (b.officialName ?? "").toLowerCase().includes("checking"),
+      ) ?? balances[0];
+    const available = checking.balances.available ?? checking.balances.current;
+    if (available == null) {
+      return {
+        amountUsd: null,
+        unavailableReason: `Plaid account '${checking.name}' returned no available or current balance.`,
+      };
+    }
+    return {
+      amountUsd: available,
+      source: {
+        system: "plaid",
+        retrievedAt: new Date().toISOString(),
+      },
+    };
+  } catch (err) {
+    return {
+      amountUsd: null,
+      unavailableReason: `Plaid getBalances failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
 }

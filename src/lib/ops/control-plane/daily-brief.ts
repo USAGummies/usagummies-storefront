@@ -150,7 +150,10 @@ export function composeDailyBrief(input: BriefInput): BriefOutput {
     const rows = input.revenueYesterday
       .map((r) => {
         if (r.amountUsd != null) {
-          const src = r.source ? ` _(${r.source.system}, ${r.source.retrievedAt})_` : "";
+          const srcParts = r.source
+            ? [r.source.system, r.source.id, r.source.retrievedAt].filter((x): x is string => !!x)
+            : [];
+          const src = srcParts.length > 0 ? ` _(${srcParts.join(", ")})_` : "";
           return `• *${r.channel}:* $${r.amountUsd.toFixed(2)}${src}`;
         }
         return `• *${r.channel}:* unavailable — ${r.unavailableReason ?? "no reason given"}`;
