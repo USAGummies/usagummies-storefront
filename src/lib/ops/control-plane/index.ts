@@ -104,3 +104,12 @@ export {
   InMemoryCorrectionStore,
 } from "./enforcement";
 export { pauseSink, violationStore, correctionStore } from "./stores";
+
+// Daily brief composer (blueprint §15.4 W3a).
+export {
+  composeDailyBrief,
+  type BriefInput,
+  type BriefOutput,
+  type BriefKind,
+  type RevenueLine,
+} from "./daily-brief";
