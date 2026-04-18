@@ -79,9 +79,19 @@ QBO was RESET on 2026-03-29. Rene is rebuilding Chart of Accounts. BofA debit ca
 - **Warehouse**: Temperature-controlled shared space (month-to-month)
 - **Motto**: "Leaner, lighter, meaner, faster." Every dollar must work.
 
-## Production Contract
+## Operating Contracts — USA Gummies 3.0
 
-See `ABRA_PRODUCTION_CONTRACT.md` for the 8 critical workflow contracts with hard pass/fail criteria. This is the governing contract for all operational behavior.
+The governing contracts live under [`/contracts/`](contracts/):
+
+- [`/contracts/governance.md`](contracts/governance.md) — system governance: non-negotiables, 6-layer stack, agent contract schema, graduation criteria, weekly drift audit, correction protocol, secret policy, doc canonicalization.
+- [`/contracts/approval-taxonomy.md`](contracts/approval-taxonomy.md) — Class A/B/C/D action registry with approvers.
+- [`/contracts/slack-operating.md`](contracts/slack-operating.md) — 9-channel map, thread rules, severity tiers.
+- [`/contracts/viktor.md`](contracts/viktor.md) — canonical Viktor contract (v3.0). Supersedes the old `/VIKTOR_OPERATING_CONTRACT.md`.
+- [`/contracts/divisions.json`](contracts/divisions.json) + [`/contracts/channels.json`](contracts/channels.json) — machine-readable division + channel registries.
+
+Canonical spec: [USA GUMMIES 3.0 — RESEARCH BLUEPRINT](https://www.notion.so/3454c0c42c2e81a1b6f4f35e20595c26) §14 + §15. Any behavior that conflicts with that blueprint or with `/contracts/` is a violation to be flagged, not followed.
+
+The old `ABRA_PRODUCTION_CONTRACT.md` referenced here was never committed; the 3.0 `/contracts/` directory replaces it. `SOUL.md`, `HEARTBEAT.md`, and `VIKTOR_OPERATING_CONTRACT.md` at the repo root are deprecated pointers kept only to preserve git history.
 
 ---
 

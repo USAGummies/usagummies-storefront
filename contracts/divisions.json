@@ -1,0 +1,157 @@
+{
+  "$schema": "https://usagummies.com/schemas/divisions.v1.json",
+  "version": "1.0",
+  "updated_at": "2026-04-17",
+  "source": "Notion blueprint §14.2 + §14.3 + §15.1",
+  "canonical_code_mirror": "src/lib/ops/control-plane/divisions.ts",
+  "active": [
+    {
+      "id": "executive-control",
+      "name": "Executive Control & Governance",
+      "human_owner": "Ben",
+      "primary_ai_layer": "Control plane + audit layer",
+      "primary_systems": [
+        "Notion canonical docs",
+        "Open Brain",
+        "approval queue",
+        "audit log"
+      ],
+      "visible_slack_channels": [
+        "ops-daily",
+        "ops-approvals",
+        "ops-audit",
+        "ops-alerts"
+      ],
+      "notes": "Division 1 by design. Governance is not buried."
+    },
+    {
+      "id": "sales",
+      "name": "Sales",
+      "human_owner": "Ben",
+      "primary_ai_layer": "Viktor + revenue support agents",
+      "primary_systems": ["HubSpot", "Gmail", "Shopify", "Amazon Seller Central"],
+      "visible_slack_channels": ["sales"],
+      "notes": "Includes B2B, DTC, and Amazon on day one. Viktor contract lives at contracts/viktor.md."
+    },
+    {
+      "id": "financials",
+      "name": "Financials",
+      "human_owner": "Rene",
+      "primary_ai_layer": "Booke + finance exception agent",
+      "primary_systems": ["QBO", "Plaid", "finance email"],
+      "visible_slack_channels": ["finance"],
+      "notes": "QBO is the accounting system of record. Booke categorizes; Rene approves."
+    },
+    {
+      "id": "production-supply-chain",
+      "name": "Production & Supply Chain",
+      "human_owner": "Drew",
+      "primary_ai_layer": "Ops / vendor / PO agent",
+      "primary_systems": [
+        "QBO POs",
+        "vendor email threads",
+        "ShipStation",
+        "inventory records"
+      ],
+      "visible_slack_channels": ["operations"],
+      "notes": "Vendors, POs, samples, inventory, freight, production coordination."
+    },
+    {
+      "id": "research-intelligence",
+      "name": "Research & Intelligence",
+      "human_owner": "Ben",
+      "primary_ai_layer": "Research Librarian + 7 research specialists (R-1..R-7)",
+      "primary_systems": [
+        "Open Brain",
+        "Notion research library",
+        "external research sources"
+      ],
+      "visible_slack_channels": ["research"],
+      "notes": "One visible division surface; seven specialist streams behind it. Findings tagged [R-1]..[R-7] in #research.",
+      "sub_streams": [
+        { "code": "R-1", "name": "Consumer research", "cadence": "weekly" },
+        { "code": "R-2", "name": "Market / category research", "cadence": "weekly" },
+        { "code": "R-3", "name": "Competitive intelligence", "cadence": "daily" },
+        { "code": "R-4", "name": "Channel research", "cadence": "weekly" },
+        { "code": "R-5", "name": "Regulatory research", "cadence": "daily (compliance-critical)" },
+        { "code": "R-6", "name": "Ingredient / supply-chain research", "cadence": "weekly" },
+        { "code": "R-7", "name": "Press & media research", "cadence": "weekly" }
+      ]
+    },
+    {
+      "id": "platform-data-automation",
+      "name": "Platform / Data / Automation",
+      "human_owner": "Ben",
+      "primary_ai_layer": "Claude Code + orchestration stack",
+      "primary_systems": [
+        "GitHub",
+        "Vercel",
+        "Make.com",
+        "Supabase",
+        "Slack admin",
+        "system configs"
+      ],
+      "visible_slack_channels": ["ops-alerts", "ops-audit"],
+      "notes": "Control plane, memory, routing, integrations, QA, drift prevention."
+    }
+  ],
+  "latent": [
+    {
+      "id": "marketing-brand",
+      "name": "Marketing — Brand",
+      "human_owner": "Ben",
+      "primary_ai_layer": "Content agent (draft-only)",
+      "primary_systems": ["Notion brand library", "blog MDX"],
+      "visible_slack_channels": [],
+      "activation_trigger": "First scheduled brand campaign OR publishing cadence > 1 post/week sustained for 2 weeks."
+    },
+    {
+      "id": "marketing-paid",
+      "name": "Marketing — Paid",
+      "human_owner": "Ben",
+      "primary_ai_layer": "Madgicx + Google Ads + Triple Whale",
+      "primary_systems": ["Meta Ads", "Google Ads", "Triple Whale"],
+      "visible_slack_channels": [],
+      "activation_trigger": "Monthly ad spend > $1,000 OR Triple Whale pixel installed."
+    },
+    {
+      "id": "trade-shows-field",
+      "name": "Trade Shows & Field",
+      "human_owner": "Ben",
+      "primary_ai_layer": "Trade show agent + booth pod",
+      "primary_systems": [
+        "Notion show tracker",
+        "HubSpot deals tagged referring_trade_show"
+      ],
+      "visible_slack_channels": [],
+      "activation_trigger": "Booth booked for a specific show (pod fires for that show only)."
+    },
+    {
+      "id": "outreach-partnerships-press",
+      "name": "Outreach / Partnerships / Press",
+      "human_owner": "Ben",
+      "primary_ai_layer": "PR agent (draft-only)",
+      "primary_systems": ["Notion PR tracker", "Gmail"],
+      "visible_slack_channels": [],
+      "activation_trigger": "Inbound press inquiries >= 5/month OR dedicated PR push launched."
+    },
+    {
+      "id": "customer-experience",
+      "name": "Customer Experience",
+      "human_owner": "Ben",
+      "primary_ai_layer": "Gorgias AI Tier 1",
+      "primary_systems": ["Gorgias", "Gmail AI/Customer Support label"],
+      "visible_slack_channels": [],
+      "activation_trigger": "DTC support tickets > 20/month sustained for 2 weeks."
+    },
+    {
+      "id": "product-packaging-rd",
+      "name": "Product / Packaging / R&D",
+      "human_owner": "Ben",
+      "primary_ai_layer": "Product agent + claims reviewer",
+      "primary_systems": ["Notion product library", "vendor test data"],
+      "visible_slack_channels": [],
+      "activation_trigger": "First new SKU or formulation decision started."
+    }
+  ]
+}

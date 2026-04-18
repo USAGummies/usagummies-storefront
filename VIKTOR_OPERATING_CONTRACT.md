@@ -1,5 +1,6 @@
-# VIKTOR OPERATING CONTRACT
+# DEPRECATED — 2026-04-17
 
+<<<<<<< HEAD
 ## Purpose
 Viktor is a **management agent**, not an execution agent. Viktor coordinates financial operations between Rene and the specialist systems. Viktor does not do the bookkeeping — Viktor manages the bookkeeping pipeline.
 
@@ -203,3 +204,15 @@ Auth: Bearer token using CRON_SECRET. Base URL: `https://www.usagummies.com`
 - 2026-04-12: Added `?action=fees` to settlements endpoint — per-order fee breakdown for SR decomposition
 - 2026-04-12: Added Amazon settlements endpoint (`/api/ops/amazon/settlements`)
 - 2026-04-12: Created — Viktor restructured from execution agent to management agent
+=======
+This contract (Apr 13 version) forbade **all** email sends from Viktor. That was the post-incident fix; the correct fix is **per-send approval gating** (Class B), not a total ban.
+
+**Canonical replacement:** [`/contracts/viktor.md`](contracts/viktor.md) v3.0 (2026-04-17).
+
+The v3.0 contract:
+- Reinstates `gmail.send` as a **Class B** action (per-send Ben approval) per `/contracts/approval-taxonomy.md`.
+- Absorbs the Apr 13 hard rules (thread-history check, 48h dedup, HOLD respect, HubSpot as source of truth) into §6.
+- Folds in the Notion "Viktor System Prompt v2.0 — Master Prompt" so there is one contract, not three.
+
+Kept in place (not deleted) so search tools hitting `VIKTOR_OPERATING_CONTRACT.md` get routed forward.
+>>>>>>> e6133f9 (USA Gummies 3.0 foundation: control-plane + canonical contracts + ops docs)

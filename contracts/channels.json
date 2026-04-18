@@ -1,0 +1,230 @@
+{
+  "$schema": "https://usagummies.com/schemas/channels.v1.json",
+  "version": "1.0",
+  "updated_at": "2026-04-17",
+  "source": "Notion blueprint §14.5 + §15.2",
+  "canonical_code_mirror": "src/lib/ops/control-plane/channels.ts",
+  "active": [
+    {
+      "id": "ops-daily",
+      "name": "#ops-daily",
+      "owning_division": "executive-control",
+      "purpose": "Daily control-tower brief and executive rollup",
+      "allowed": [
+        "morning brief",
+        "end-of-day summary",
+        "major decisions",
+        "company-wide priorities"
+      ],
+      "not_allowed": [
+        "raw firehose alerts",
+        "long discussions",
+        "duplicate status posts"
+      ]
+    },
+    {
+      "id": "ops-approvals",
+      "name": "#ops-approvals",
+      "owning_division": "executive-control",
+      "purpose": "Human approval gate for all Class B and Class C actions",
+      "allowed": [
+        "structured approve/reject requests",
+        "rationale attached to requests",
+        "final disposition line per request"
+      ],
+      "not_allowed": [
+        "open-ended brainstorming",
+        "unactionable summaries"
+      ]
+    },
+    {
+      "id": "ops-audit",
+      "name": "#ops-audit",
+      "owning_division": "executive-control",
+      "purpose": "Permanent audit trail of agent writes and policy events",
+      "allowed": [
+        "agent write logs",
+        "drift audit results",
+        "policy violations",
+        "postmortems"
+      ],
+      "not_allowed": ["general chat", "approvals", "duplicate alerts"]
+    },
+    {
+      "id": "ops-alerts",
+      "name": "#ops-alerts",
+      "owning_division": "platform-data-automation",
+      "purpose": "System health and incident firehose",
+      "allowed": [
+        "connector failures",
+        "degraded mode declarations",
+        "run failures",
+        "threshold breaches"
+      ],
+      "not_allowed": ["normal operating updates", "celebration posts"]
+    },
+    {
+      "id": "sales",
+      "name": "#sales",
+      "owning_division": "sales",
+      "purpose": "Revenue execution across B2B, DTC, and Amazon",
+      "allowed": [
+        "deal threads",
+        "outreach drafts awaiting approval",
+        "retailer/distributor movement",
+        "Amazon/DTC revenue issues"
+      ],
+      "not_allowed": [
+        "finance approvals",
+        "ops chatter not tied to revenue"
+      ]
+    },
+    {
+      "id": "finance",
+      "name": "#finance",
+      "owning_division": "financials",
+      "purpose": "Cash, accounting, reconciliation",
+      "allowed": [
+        "AP/AR",
+        "invoices",
+        "bills",
+        "reconciliations",
+        "exceptions",
+        "finance approvals"
+      ],
+      "not_allowed": [
+        "sales chatter",
+        "vendor chatter without financial consequence"
+      ]
+    },
+    {
+      "id": "operations",
+      "name": "#operations",
+      "owning_division": "production-supply-chain",
+      "purpose": "Production, supply, samples, shipping",
+      "allowed": [
+        "POs",
+        "vendors",
+        "freight",
+        "inventory",
+        "samples",
+        "production blockers"
+      ],
+      "not_allowed": ["marketing work", "finance-only debate"]
+    },
+    {
+      "id": "research",
+      "name": "#research",
+      "owning_division": "research-intelligence",
+      "purpose": "Research synthesis and intelligence routing",
+      "allowed": [
+        "findings tagged [R-1] through [R-7]",
+        "weekly Research Librarian synthesis",
+        "action-worthy intelligence"
+      ],
+      "not_allowed": ["unstructured link dumps without synthesis"]
+    },
+    {
+      "id": "receipts-capture",
+      "name": "#receipts-capture",
+      "owning_division": "financials",
+      "purpose": "Receipt intake",
+      "allowed": ["receipt images/files", "required metadata"],
+      "not_allowed": ["anything unrelated to receipt capture"]
+    }
+  ],
+  "latent": [
+    {
+      "id": "marketing",
+      "name": "#marketing",
+      "owning_division": "marketing-brand",
+      "activates_when": "marketing-brand OR marketing-paid activates",
+      "purpose": "Brand + paid marketing"
+    },
+    {
+      "id": "trade-shows",
+      "name": "#trade-shows",
+      "owning_division": "trade-shows-field",
+      "activates_when": "a show is booked (pod fires for that show)",
+      "purpose": "Trade show pod coordination"
+    },
+    {
+      "id": "outreach-pr",
+      "name": "#outreach-pr",
+      "owning_division": "outreach-partnerships-press",
+      "activates_when": "outreach-partnerships-press activates",
+      "purpose": "Outreach / partnerships / press"
+    },
+    {
+      "id": "cx",
+      "name": "#cx",
+      "owning_division": "customer-experience",
+      "activates_when": "customer-experience activates",
+      "purpose": "Customer experience"
+    },
+    {
+      "id": "product-rd",
+      "name": "#product-rd",
+      "owning_division": "product-packaging-rd",
+      "activates_when": "product-packaging-rd activates",
+      "purpose": "Product / packaging / R&D"
+    }
+  ],
+  "retired_day_one": [
+    {
+      "id": "abra-control",
+      "disposition": "archive",
+      "routes_to": {
+        "routines": "ops-daily",
+        "events": "<division channel>"
+      }
+    },
+    { "id": "abra-testing", "disposition": "archive" },
+    {
+      "id": "email-inbox",
+      "disposition": "fold",
+      "routes_to": { "default": "sales", "cx-specific": "cx (latent)" }
+    },
+    {
+      "id": "customer-feedback",
+      "disposition": "fold",
+      "routes_to": { "default": "sales" }
+    },
+    {
+      "id": "abandoned-carts",
+      "disposition": "fold",
+      "routes_to": { "default": "sales" }
+    },
+    {
+      "id": "wholesale-leads",
+      "disposition": "rename_or_archive",
+      "routes_to": { "default": "sales" }
+    }
+  ],
+  "severity_tiers": [
+    {
+      "tier": "info",
+      "emoji": "ℹ️",
+      "posts_to": "thread reply or division channel",
+      "mention": "none"
+    },
+    {
+      "tier": "action",
+      "emoji": "⚡",
+      "posts_to": "division channel",
+      "mention": "owner"
+    },
+    {
+      "tier": "warning",
+      "emoji": "⚠️",
+      "posts_to": "division channel + ops-alerts",
+      "mention": "@owner"
+    },
+    {
+      "tier": "critical",
+      "emoji": "🚨",
+      "posts_to": "ops-alerts + DM to Ben",
+      "mention": "@Ben + iMessage fallback"
+    }
+  ]
+}
