@@ -28,30 +28,13 @@ import {
   pauseSink,
 } from "@/lib/ops/control-plane/stores";
 import { postMessage } from "@/lib/ops/control-plane/slack";
+import { isCronAuthorized, unauthorized } from "@/lib/ops/control-plane/admin-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function isAuthorized(req: Request): boolean {
-  const expected = process.env.CRON_SECRET?.trim();
-  if (!expected) return false;
-  const header = req.headers.get("authorization") ?? "";
-  const supplied = header.startsWith("Bearer ")
-    ? header.slice("Bearer ".length).trim()
-    : header.trim();
-  if (!supplied) return false;
-  if (supplied.length !== expected.length) return false;
-  let diff = 0;
-  for (let i = 0; i < supplied.length; i++) {
-    diff |= supplied.charCodeAt(i) ^ expected.charCodeAt(i);
-  }
-  return diff === 0;
-}
-
 export async function POST(req: Request): Promise<Response> {
-  if (!isAuthorized(req)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!isCronAuthorized(req)) return unauthorized();
 
   const url = new URL(req.url);
   const kindParam = url.searchParams.get("kind");

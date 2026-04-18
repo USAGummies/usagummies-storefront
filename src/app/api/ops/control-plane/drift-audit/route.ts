@@ -21,33 +21,14 @@ import {
   violationStore,
 } from "@/lib/ops/control-plane/stores";
 import { auditSurface } from "@/lib/ops/control-plane/slack";
+import { isCronAuthorized, unauthorized } from "@/lib/ops/control-plane/admin-auth";
 import type { PolicyViolation } from "@/lib/ops/control-plane/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function isAuthorized(req: Request): boolean {
-  const expected = process.env.CRON_SECRET?.trim();
-  if (!expected) return false; // fail-closed if the secret isn't configured
-  const header = req.headers.get("authorization") ?? "";
-  // Accept both `Bearer <token>` and the raw token (some cron senders omit the scheme).
-  const supplied = header.startsWith("Bearer ")
-    ? header.slice("Bearer ".length).trim()
-    : header.trim();
-  if (!supplied) return false;
-  // Timing-safe compare.
-  if (supplied.length !== expected.length) return false;
-  let diff = 0;
-  for (let i = 0; i < supplied.length; i++) {
-    diff |= supplied.charCodeAt(i) ^ expected.charCodeAt(i);
-  }
-  return diff === 0;
-}
-
 export async function POST(req: Request): Promise<Response> {
-  if (!isAuthorized(req)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!isCronAuthorized(req)) return unauthorized();
 
   // Query params let the operator override defaults for ad-hoc runs.
   const url = new URL(req.url);
