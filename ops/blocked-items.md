@@ -11,6 +11,14 @@
 ## P0 manual tasks (tracked, not a build-pause)
 Items **B-3..B-8** (secret rotations + Paperclip Slack-bot revoke) are **P0 manual** for Ben. They gate Monday go-live sign-off per blueprint §15.5, but the control-plane build continues in parallel.
 
+## Code-complete status — 2026-04-18
+
+The control plane, stores, Slack surfaces, approval route, daily brief, drift audit, admin API, CLI tools, health endpoint, runtime pause guard, and canonical contracts are all code-complete and tested (139+ green vitest tests, 0 new tsc errors).
+
+What's left is strictly manual/admin work — the items below plus the cutover sequence in [`cutover-sequence.md`](cutover-sequence.md).
+
+**Recommended next human action:** go to [`go-live-runbook.md`](go-live-runbook.md) Step 1.
+
 ---
 
 ## Ben
