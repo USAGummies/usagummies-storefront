@@ -1,10 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type FormState = "idle" | "submitting" | "success" | "error";
 type PricingTier = "standard" | "pallet";
 type PaymentMethod = "pay_now" | "invoice_me";
+type FreightQuote = {
+  rate: number;
+  carrier: string;
+  service: string;
+  delivery_days: number | null;
+};
+type FreightStatus =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | { kind: "ok"; quote: FreightQuote }
+  | { kind: "error"; message: string };
 
 export function BoothOrderForm() {
   const [state, setState] = useState<FormState>("idle");
@@ -20,9 +31,9 @@ export function BoothOrderForm() {
   const [shipZip, setShipZip] = useState("");
   const [quantityCases, setQuantityCases] = useState("1");
   const [pricingTier, setPricingTier] = useState<PricingTier>("standard");
-  const [showDeal, setShowDeal] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("invoice_me");
   const [notes, setNotes] = useState("");
+  const [freight, setFreight] = useState<FreightStatus>({ kind: "idle" });
 
   const qty = Math.max(1, Number(quantityCases) || 1);
   const bagsPerCase = 36;
@@ -30,16 +41,67 @@ export function BoothOrderForm() {
   const basePrice = pricingTier === "pallet" ? 3.0 : 3.25;
   // Pay-Now customers get a 5% prepay discount on the standard tier. Pallet
   // already has volume pricing so no extra discount. Rounded to 2 decimals
-  // so the displayed per-bag price × quantity == displayed total (customer
-  // can verify the math on their own).
+  // so the displayed per-bag price × quantity == displayed total.
   const prepayMultiplier =
     paymentMethod === "pay_now" && pricingTier === "standard" ? 0.95 : 1;
   const pricePerBag = Math.round(basePrice * prepayMultiplier * 100) / 100;
   const subtotal = Number((totalBags * pricePerBag).toFixed(2));
-  const freightNote =
-    pricingTier === "standard" || showDeal
-      ? "Free shipping included"
-      : "Freight — buyer pays shipping";
+  const freightAmount = freight.kind === "ok" ? freight.quote.rate : 0;
+  const orderTotal = Number((subtotal + freightAmount).toFixed(2));
+
+  // Pallet tier ships LTL freight collect — buyer arranges. Only quote UPS
+  // for standard (master-carton) orders.
+  const wantsFreightQuote = pricingTier === "standard";
+  const stateOk = /^[A-Z]{2}$/.test(shipState);
+  const zipOk = /^\d{5}$/.test(shipZip);
+
+  useEffect(() => {
+    if (!wantsFreightQuote) {
+      setFreight({ kind: "idle" });
+      return;
+    }
+    if (!stateOk || !zipOk) {
+      setFreight({ kind: "idle" });
+      return;
+    }
+    let cancelled = false;
+    setFreight({ kind: "loading" });
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch("/api/booth-order/freight-quote", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ to_state: shipState, to_zip: shipZip, qty }),
+        });
+        const data = await res.json();
+        if (cancelled) return;
+        if (!res.ok || !data.ok) {
+          setFreight({
+            kind: "error",
+            message: data.error || "Freight quote unavailable",
+          });
+          return;
+        }
+        setFreight({
+          kind: "ok",
+          quote: {
+            rate: data.rate,
+            carrier: data.carrier,
+            service: data.service,
+            delivery_days: data.delivery_days,
+          },
+        });
+      } catch {
+        if (!cancelled) {
+          setFreight({ kind: "error", message: "Couldn't reach freight calculator" });
+        }
+      }
+    }, 450);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [wantsFreightQuote, stateOk, zipOk, shipState, shipZip, qty]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,7 +123,6 @@ export function BoothOrderForm() {
           ship_zip: shipZip.trim(),
           quantity_cases: qty,
           pricing_tier: pricingTier,
-          show_deal: showDeal,
           payment_method: paymentMethod,
           notes: notes.trim(),
         }),
@@ -79,11 +140,8 @@ export function BoothOrderForm() {
           window.location.href = data.payment_url;
           return;
         }
-        // Pay Now selected but Shopify draft-order creation failed (scope
-        // missing, store offline, etc). Fall back to the Invoice Me flow
-        // gracefully so the customer isn't stuck: the order IS saved in
-        // HubSpot + QBO + welcome email already fired. Surface the fallback
-        // clearly so the customer isn't confused.
+        // Pay Now selected but Shopify draft-order creation failed. Order is
+        // still saved in HubSpot + QBO + welcome email. Surface fallback.
         setErrorMsg(
           "Card checkout is temporarily unavailable. We've saved your order and will send an invoice instead — check your email for next steps.",
         );
@@ -113,6 +171,13 @@ export function BoothOrderForm() {
       </div>
     );
   }
+
+  // Submit gating: standard-tier orders must have a successful freight quote
+  // (or buyer needs to enter a valid ZIP). Pallet skips the gate (LTL).
+  const freightBlocking =
+    wantsFreightQuote &&
+    freight.kind !== "ok" &&
+    (freight.kind === "loading" || !(stateOk && zipOk));
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
@@ -284,7 +349,7 @@ export function BoothOrderForm() {
             >
               <div className="text-sm font-semibold text-[#0a1e3d]">Standard</div>
               <div className="text-lg font-bold text-[#b22234]">$3.25/bag</div>
-              <div className="text-xs text-gray-500 mt-1">Free shipping</div>
+              <div className="text-xs text-gray-500 mt-1">UPS Ground from Ashford, WA</div>
             </button>
             <button
               type="button"
@@ -297,41 +362,10 @@ export function BoothOrderForm() {
             >
               <div className="text-sm font-semibold text-[#0a1e3d]">Pallet</div>
               <div className="text-lg font-bold text-[#b22234]">$3.00/bag</div>
-              <div className="text-xs text-gray-500 mt-1">Buyer pays freight</div>
+              <div className="text-xs text-gray-500 mt-1">Buyer arranges LTL freight</div>
             </button>
           </div>
         </div>
-
-        {/* Show Deal CTA */}
-        <button
-          type="button"
-          onClick={() => setShowDeal(!showDeal)}
-          className={`w-full p-4 rounded-lg border-2 text-left transition-colors ${
-            showDeal
-              ? "border-green-600 bg-green-50"
-              : "border-gray-200 hover:border-green-400 bg-white"
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm font-bold text-[#0a1e3d]">
-                🎪 Show Special — FREE Shipping
-              </div>
-              <div className="text-xs text-gray-500 mt-0.5">
-                Freight absorbed on all show orders
-              </div>
-            </div>
-            <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
-              showDeal ? "bg-green-600" : "bg-gray-200"
-            }`}>
-              {showDeal && (
-                <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                </svg>
-              )}
-            </div>
-          </div>
-        </button>
 
         {/* Payment method picker */}
         <div>
@@ -406,17 +440,34 @@ export function BoothOrderForm() {
             <span className="font-semibold text-[#0a1e3d]">${subtotal.toFixed(2)}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-gray-600">Shipping</span>
-            <span className="font-medium text-[#0a1e3d]">{freightNote}</span>
+            <span className="text-gray-600">Shipping (UPS Ground)</span>
+            <span className="font-medium text-[#0a1e3d] text-right">
+              {pricingTier === "pallet" ? (
+                "Buyer arranges LTL"
+              ) : freight.kind === "ok" ? (
+                <>
+                  ${freight.quote.rate.toFixed(2)}
+                  {freight.quote.delivery_days
+                    ? ` · ~${freight.quote.delivery_days} day${freight.quote.delivery_days > 1 ? "s" : ""}`
+                    : ""}
+                </>
+              ) : freight.kind === "loading" ? (
+                <span className="text-gray-400">Calculating…</span>
+              ) : freight.kind === "error" ? (
+                <span className="text-red-600 text-xs">{freight.message}</span>
+              ) : (
+                <span className="text-gray-400 text-xs">Enter ZIP for quote</span>
+              )}
+            </span>
           </div>
-          {(pricingTier === "standard" || showDeal) && (
-            <div className="text-xs text-green-700 text-right">
-              Show special — shipping shown on invoice at 100% discount
-            </div>
-          )}
           <div className="border-t border-gray-200 pt-2 flex justify-between">
             <span className="text-sm font-semibold text-[#0a1e3d]">Order total</span>
-            <span className="text-lg font-bold text-[#0a1e3d]">${subtotal.toFixed(2)}</span>
+            <span className="text-lg font-bold text-[#0a1e3d]">
+              ${orderTotal.toFixed(2)}
+              {pricingTier === "pallet" ? (
+                <span className="text-xs font-normal text-gray-500"> + freight</span>
+              ) : null}
+            </span>
           </div>
         </div>
       </div>
@@ -446,16 +497,18 @@ export function BoothOrderForm() {
       {/* Submit */}
       <button
         type="submit"
-        disabled={state === "submitting"}
+        disabled={state === "submitting" || freightBlocking}
         className="w-full bg-[#b22234] text-white font-semibold py-4 px-6 rounded-lg hover:bg-[#8b1a29] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-base"
       >
         {state === "submitting"
           ? paymentMethod === "pay_now"
             ? "Opening secure checkout…"
             : "Submitting…"
-          : paymentMethod === "pay_now"
-            ? `Continue to payment · $${subtotal.toFixed(2)}`
-            : "Submit order"}
+          : freight.kind === "loading"
+            ? "Calculating freight…"
+            : paymentMethod === "pay_now"
+              ? `Continue to payment · $${orderTotal.toFixed(2)}`
+              : "Submit order"}
       </button>
 
       <p className="text-xs text-gray-400 text-center">
