@@ -79,3 +79,13 @@ export { listChannels, getChannel } from "./channels";
 export { record, requestApproval, type RecordFields, type RequestApprovalParams } from "./record";
 export { approvalStore, auditStore } from "./stores";
 export { approvalSurface, auditSurface } from "./slack";
+
+// Drift audit (weekly, Sunday 8 PM PT). /contracts/governance.md §5.
+export {
+  runDriftAudit,
+  type DriftAuditInput,
+  type DriftAuditScorecard,
+  type DriftAuditSample,
+  type DriftAssessment,
+  type Validator as DriftValidator,
+} from "./drift-audit";
