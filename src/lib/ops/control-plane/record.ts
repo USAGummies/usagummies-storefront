@@ -24,13 +24,14 @@ import {
   ProhibitedActionError,
 } from "./approvals";
 import { buildAuditEntry } from "./audit";
+import { guardAgent } from "./runtime-guard";
 import { classify, isProhibited, requiresApproval } from "./taxonomy";
 import type {
   ApprovalRequest,
   AuditLogEntry,
   RunContext,
 } from "./types";
-import { auditStore, approvalStore } from "./stores";
+import { auditStore, approvalStore, pauseSink } from "./stores";
 import { auditSurface, approvalSurface } from "./slack";
 
 // ---- Class A: record an autonomous write ---------------------------------
@@ -75,6 +76,12 @@ export async function record(
       `record(): action ${fields.actionSlug} is class ${spec.class} (requires approval). Call requestApproval() instead.`,
     );
   }
+
+  // Runtime pause guard. Fails closed with PausedAgentError if the agent
+  // is in the PauseSink's paused set or if the sink is unreachable.
+  // Writes `runtime.blocked-paused` to the audit store so refusals are
+  // observable, not silent. Governance §5.
+  await guardAgent(run, { pauseSink: pauseSink(), auditStore: auditStore() });
 
   const entry = buildAuditEntry(run, {
     action: fields.actionSlug,
@@ -128,6 +135,11 @@ export async function requestApproval(
   run: RunContext,
   params: RequestApprovalParams,
 ): Promise<ApprovalRequest> {
+  // Guard first — a paused agent cannot open new approvals either.
+  // Approvals already in flight proceed normally (they were validated
+  // when opened). Only NEW requests are blocked.
+  await guardAgent(run, { pauseSink: pauseSink(), auditStore: auditStore() });
+
   const approval = await openApproval(approvalStore(), approvalSurface(), {
     ...params,
     runId: run.runId,

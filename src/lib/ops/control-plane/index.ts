@@ -113,3 +113,12 @@ export {
   type BriefKind,
   type RevenueLine,
 } from "./daily-brief";
+
+// Runtime pause guard. Every agent entrypoint must call guardAgent()
+// before side-effects. Governance §5.
+export {
+  guardAgent,
+  runWithGuard,
+  PausedAgentError,
+  type GuardDeps,
+} from "./runtime-guard";
