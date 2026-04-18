@@ -286,7 +286,11 @@ export async function POST(req: Request) {
 
   const today = new Date().toISOString().slice(0, 10);
   const txnDate = parsed.data.txnDate || today;
-  const dueDate = parsed.data.dueDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  // If terms are "Due on receipt" (case-insensitive), dueDate defaults to txnDate.
+  // Otherwise default to +30 days.
+  const isDueOnReceipt = parsed.data.terms ? /receipt/i.test(parsed.data.terms) : false;
+  const dueDate = parsed.data.dueDate
+    || (isDueOnReceipt ? txnDate : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
   const total = parsed.data.lineItems.reduce((sum, itemRow) => sum + (itemRow.quantity * itemRow.unitPrice), 0);
 
   // Build QBO address object from our schema
