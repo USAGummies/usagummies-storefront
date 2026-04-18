@@ -16,34 +16,76 @@ Do not add behavior to this module that contradicts §15. If the blueprint chang
 | `taxonomy.ts` | Approval classes A/B/C/D + registered action specs. Fail-closed on unknown actions. |
 | `approvals.ts` | Pure state machine: build, apply decision, stand-down, check expiry, escalate. Storage adapter interface. |
 | `audit.ts` | Write + human-write loggers. Storage adapter interface. |
+| `record.ts` | Canonical agent write helpers: `record()` (Class A) + `requestApproval()` (Class B/C). Agents go through these; never store/surface directly. |
 | `run-id.ts` | Run identity helpers. Every agent invocation mints one run_id. |
 | `divisions.ts` | Typed registry of the 6 active + 6 latent divisions. |
 | `channels.ts` | Typed registry of the 9 active + 5 latent Slack channels. |
+| `stores/` | `InMemoryApprovalStore` + `InMemoryAuditStore` (tests/local); `KvApprovalStore` + `KvAuditStore` (production). Factory in `stores/index.ts` picks by `process.env.VERCEL`. |
+| `slack/` | `ApprovalSurface` + `AuditSurface` + minimal Slack Web API client. Degrades gracefully when `SLACK_BOT_TOKEN` is absent (store is authoritative). |
 | `index.ts` | Public exports. Import from here. |
 
-## Storage — currently TODO
+Also:
+- `src/app/api/slack/approvals/route.ts` — Slack interactivity webhook; verifies signing secret, resolves button clicks through `recordDecision()`, mirrors to `#ops-audit`.
 
-The control plane is storage-agnostic. Two adapters need to be implemented to go live:
+## Storage — wired
 
-- `ApprovalStore` (see `approvals.ts`) — persists approval requests and decisions.
-- `AuditStore` (see `audit.ts`) — appends audit entries, supports listing by run/agent/recency.
+- `InMemoryApprovalStore` + `InMemoryAuditStore` in `stores/memory-stores.ts` — tests + local dev
+- `KvApprovalStore` + `KvAuditStore` in `stores/kv-stores.ts` — production (Upstash Redis under the `3.0:` namespace)
+- `stores/index.ts` — factory `approvalStore()` / `auditStore()`; picks by `process.env.VERCEL`
 
-**Recommended backend:** Vercel KV for the first week (low latency, zero-setup, cheap), migrated to a dedicated Postgres schema by end of week 2 once volume and retention requirements firm up. The blueprint's §15.4 Tuesday step 5 gates this.
+## Slack surface — wired
 
-Stub implementations belong at `src/lib/ops/control-plane/stores/` when added.
+- `slack/approval-surface.ts` — block-kit approval message with Approve / Reject / Ask buttons; updates the same message on decision
+- `slack/audit-surface.ts` — one-line mirror for each audit entry
+- `slack/client.ts` — minimal Slack Web API wrapper; **degraded mode** when `SLACK_BOT_TOKEN` is absent (store is authoritative; surface is best-effort)
+- `slack/index.ts` — factory `approvalSurface()` / `auditSurface()`
+- `src/app/api/slack/approvals/route.ts` — Slack interactivity webhook; verifies signing secret, routes button clicks through `recordDecision()`
 
-## Slack surface — currently TODO
+## Canonical agent write path
 
-Two surfaces need implementation:
+Agents never call stores or surfaces directly. They call the two helpers in `record.ts`:
 
-- `ApprovalSlackSurface` (see `approvals.ts`) — posts approval requests to `#ops-approvals` with tap-to-approve buttons; updates the thread on decision.
-- `AuditSlackSurface` (see `audit.ts`) — mirrors every audit entry as a one-line post to `#ops-audit`.
+```ts
+import { record, requestApproval, newRunContext } from "@/lib/ops/control-plane";
 
-**Implementation note:** Slack writes failing must not invalidate persisted state. The store is authoritative; Slack is a mirror.
+const run = newRunContext({
+  agentId: "viktor",
+  division: "sales",
+  source: "on-demand",
+});
 
-Recommended location: `src/lib/ops/control-plane/slack/`.
+// Class A — autonomous. Returns AuditLogEntry. Mirrors to #ops-audit.
+await record(run, {
+  actionSlug: "hubspot.task.create",
+  entityType: "task",
+  entityId: "t-123",
+  result: "ok",
+  sourceCitations: [{ system: "hubspot", id: "deal-999" }],
+  confidence: 0.9,
+});
 
-The Slack interactive-message webhook handler at `src/app/api/slack/approvals/route.ts` is the other half — not yet built. §15.4 Tuesday step 6 ("Start posting all agent writes to #ops-audit") gates this.
+// Class B/C — gated. Returns ApprovalRequest. Surfaces to #ops-approvals.
+// Action does NOT execute yet; it runs after approvers decide.
+await requestApproval(run, {
+  actionSlug: "gmail.send",
+  targetSystem: "gmail",
+  payloadPreview: "Reply to Jungle Jim's vendor setup",
+  evidence: {
+    claim: "Warm lead asked for vendor packet on Apr 15",
+    sources: [{ system: "gmail", id: "thread-1", retrievedAt: new Date().toISOString() }],
+    confidence: 0.95,
+  },
+  rollbackPlan: "Recall within 30 minutes",
+});
+```
+
+Invariants guaranteed by these helpers:
+- Unknown action slug → throws (fail-closed).
+- Class D action slug → throws `ProhibitedActionError`.
+- Class B/C via `record()` → throws (must use `requestApproval()`).
+- Class A via `requestApproval()` → throws (must use `record()`).
+- Every successful autonomous write appends to the audit store **before** the Slack mirror is attempted.
+- Slack mirror failures do NOT fail the audit write. Store is authoritative per blueprint §15.2.
 
 ## What this module is NOT
 
@@ -61,13 +103,9 @@ Both are marked DEPRECATED (see file headers) but left in place so imports from 
 
 ## Tests
 
-`__tests__/approvals.test.ts` exercises the full state machine:
-- class-D rejection (ProhibitedActionError)
-- unknown action (UnknownActionError, fail-closed)
-- class-B single-approver happy path + reject + ask
-- class-C dual-approver: one approve stays pending, two approve → approved; single reject → rejected
-- approver authority check + no double decisions
-- stand-down
-- 24h escalation + 72h expiry windows
+4 vitest files, 42 tests total. Run with `npx vitest run src/lib/ops/control-plane/__tests__/`.
 
-Run with `npm test` (vitest is already in `vitest.config.ts`).
+- `__tests__/approvals.test.ts` (20) — state machine: class-D rejection, unknown-action fail-closed, B happy/reject/ask, post-ask approve/reject, repeat-ask allowed, C dual-approve flows, duplicate-decision guards, stand-down (no fake human rejection), 24h escalation + 72h expiry.
+- `__tests__/memory-stores.test.ts` (8) — store semantics: round-trip cloning, null on unknown id, pending-filter sort, by-agent newest-first + limit, audit recent cap, byRun chronological grouping, byAgent sinceISO cutoff, mutation isolation.
+- `__tests__/slack-rendering.test.ts` (4) — surface rendering across pending/approved/rejected/stood-down in degraded mode (no Slack token needed).
+- `__tests__/record.test.ts` (10) — end-to-end wiring: Class A → audit store + mirror; Class B/C → approval store + surface + audit approval.open entry; class-D and unknown fail-closed; Slack mirror failure does not fail the audit write; Ben-approves → terminal → `updateApproval` called.

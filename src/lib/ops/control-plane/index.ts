@@ -72,3 +72,9 @@ export {
 export { newRunId, newRunContext } from "./run-id";
 export { listDivisions, getDivision, isActive } from "./divisions";
 export { listChannels, getChannel } from "./channels";
+
+// Canonical agent write helpers. Agents import these — not the stores or
+// surfaces directly. See record.ts and /contracts/governance.md §9.
+export { record, requestApproval, type RecordFields, type RequestApprovalParams } from "./record";
+export { approvalStore, auditStore } from "./stores";
+export { approvalSurface, auditSurface } from "./slack";
