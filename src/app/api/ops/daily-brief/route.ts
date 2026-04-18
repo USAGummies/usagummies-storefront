@@ -112,18 +112,39 @@ export async function POST(req: Request): Promise<Response> {
   });
 
   // ---- Post to Slack ----
-  let postResult: { ok: boolean; ts?: string; error?: string } | null = null;
+  //
+  // If post=true and the Slack post either errors OR lands in degraded mode
+  // (bot token absent), the envelope must reflect that the brief was NOT
+  // delivered — not silently green. Blueprint non-negotiable #6: connector
+  // failure forces degraded-mode disclosure, not invented certainty.
+  let postResult: {
+    ok: boolean;
+    ts?: string;
+    error?: string;
+    degraded?: boolean;
+  } | null = null;
   if (postToSlack) {
     const channel = getChannel("ops-daily")?.name ?? "#ops-daily";
     const res = await postMessage({ channel, text: brief.text, blocks: brief.blocks });
-    postResult = { ok: res.ok, ts: res.ts, error: res.error };
+    postResult = { ok: res.ok, ts: res.ts, error: res.error, degraded: res.degraded };
+    if (!res.ok) {
+      const prefix = res.degraded ? "Slack post skipped" : "Slack post failed";
+      const reason = res.error ?? (res.degraded ? "SLACK_BOT_TOKEN not configured" : "unknown Slack error");
+      degradations.push(`${prefix}: ${reason}`);
+    }
   }
+
+  // Envelope-level `degraded` aggregates every degradation we detected:
+  // store unavailability (which also got surfaced inside the brief body)
+  // plus delivery failure. If either is true, the response is not healthy.
+  const envelopeDegraded = degradations.length > 0;
 
   return NextResponse.json({
     ok: true,
-    degraded: brief.meta.degraded,
+    degraded: envelopeDegraded,
+    degradedReasons: degradations,
     brief: {
-      meta: brief.meta,
+      meta: { ...brief.meta, degraded: envelopeDegraded },
       text: brief.text,
       blocks: brief.blocks,
     },

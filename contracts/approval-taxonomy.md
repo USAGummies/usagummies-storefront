@@ -47,6 +47,10 @@ One approver. Request lands in `#ops-approvals` with tap-to-approve UX.
 | `qbo.po.draft` | Create QBO PO draft (not send) | Drew |
 | `shipment.create` | Create sample/order shipment | Ben |
 | `content.publish` | Publish blog or social post | Ben |
+| `division.activate` | Activate a latent division. Downstream automation (flipping `divisions.json`, creating the channel, writing the agent contract) is still manual — see [`activation-triggers.md`](activation-triggers.md) §"What this actually automates." | Ben |
+| `division.deactivate` | Deactivate an active division back to latent. Same manual-followup caveat. | Ben |
+| `pod.trade-show.activate` | Activate a per-show Trade Shows pod. Channel + per-show agent contract creation still manual. | Ben |
+| `pod.trade-show.deactivate` | Deactivate a Trade Shows pod after the 14-day post-show wind-down. Manual follow-up to archive the channel. | Ben |
 
 ## Class C — Dual approval
 
@@ -84,4 +88,5 @@ Never autonomous. Agents must refuse and escalate if asked. Humans perform these
 
 ## Version history
 
+- **1.1 — 2026-04-18** — Registered the 4 activation slugs (`division.activate`, `division.deactivate`, `pod.trade-show.activate`, `pod.trade-show.deactivate`) so the approval queue can accept them. Downstream flip-the-JSON automation is still manual — see [`activation-triggers.md`](activation-triggers.md) §"What this actually automates."
 - **1.0 — 2026-04-17** — First canonical publication. Derived from blueprint §15.3.

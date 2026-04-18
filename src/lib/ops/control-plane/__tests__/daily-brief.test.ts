@@ -211,29 +211,75 @@ describe("POST /api/ops/daily-brief", () => {
     expect(res.status).toBe(401);
   });
 
-  it("renders a healthy brief when all stores are reachable and empty", async () => {
-    const res = await POST(authed());
+  it("renders a healthy brief when all stores are reachable, empty, and the Slack post is skipped", async () => {
+    // With SLACK_BOT_TOKEN absent, post=true would degrade the envelope.
+    // Isolate the store-health case by skipping the post.
+    const res = await POST(authed("https://example.test/api/ops/daily-brief?post=false"));
     const body = await res.json();
     expect(res.status).toBe(200);
     expect(body.ok).toBe(true);
     expect(body.degraded).toBe(false);
+    expect(body.degradedReasons).toEqual([]);
     expect(body.brief.meta.kind).toBe("morning");
     expect(body.brief.meta.pendingApprovalCount).toBe(0);
     expect(body.brief.meta.pausedAgentCount).toBe(0);
-    // Slack post ran but in degraded mode (no token) → ok:false, degraded flag from client.
+    expect(body.post).toBeNull();
+  });
+
+  it("marks the envelope degraded when post=true and SLACK_BOT_TOKEN is absent", async () => {
+    // Stores are healthy; delivery is not. Response must NOT be silently
+    // green — blueprint non-negotiable #6.
+    const res = await POST(authed());
+    const body = await res.json();
+    expect(res.status).toBe(200);
+    expect(body.ok).toBe(true);
+    expect(body.degraded).toBe(true);
+    expect(body.brief.meta.degraded).toBe(true);
+    expect(body.degradedReasons).toEqual(
+      expect.arrayContaining([expect.stringContaining("Slack post skipped")]),
+    );
     expect(body.post).not.toBeNull();
+    expect(body.post.ok).toBe(false);
+    expect(body.post.degraded).toBe(true);
+  });
+
+  it("marks the envelope degraded when the Slack post hard-fails", async () => {
+    // Configure a token so we exit degraded-mode, then stub fetch to fail
+    // so the Slack API call errors out.
+    process.env.SLACK_BOT_TOKEN = "xoxb-stub-for-test";
+    const originalFetch = global.fetch;
+    global.fetch = (async () => {
+      throw new Error("network unreachable");
+    }) as typeof global.fetch;
+    try {
+      const res = await POST(authed());
+      const body = await res.json();
+      expect(res.status).toBe(200);
+      expect(body.degraded).toBe(true);
+      expect(body.degradedReasons).toEqual(
+        expect.arrayContaining([expect.stringContaining("Slack post failed")]),
+      );
+      expect(body.post.ok).toBe(false);
+      expect(body.post.degraded).toBeFalsy();
+      expect(body.post.error).toContain("network unreachable");
+    } finally {
+      global.fetch = originalFetch;
+    }
   });
 
   it("kind=eod is honored via query param", async () => {
-    const res = await POST(authed("https://example.test/api/ops/daily-brief?kind=eod"));
+    // Skip the post so the envelope stays healthy regardless of Slack state.
+    const res = await POST(authed("https://example.test/api/ops/daily-brief?kind=eod&post=false"));
     const body = await res.json();
     expect(body.brief.meta.kind).toBe("eod");
+    expect(body.post).toBeNull();
   });
 
   it("skips Slack post when post=false", async () => {
     const res = await POST(authed("https://example.test/api/ops/daily-brief?post=false"));
     const body = await res.json();
     expect(body.post).toBeNull();
+    expect(body.degraded).toBe(false);
   });
 
   it("reflects pending approvals + paused agents in the meta block", async () => {
@@ -259,7 +305,8 @@ describe("POST /api/ops/daily-brief", () => {
       pausedAt: new Date().toISOString(),
     });
 
-    const res = await POST(authed());
+    // Skip Slack so we're testing brief composition, not delivery.
+    const res = await POST(authed("https://example.test/api/ops/daily-brief?post=false"));
     const body = await res.json();
     expect(body.brief.meta.pendingApprovalCount).toBe(1);
     expect(body.brief.meta.pausedAgentCount).toBe(1);
@@ -301,10 +348,43 @@ describe("POST /api/ops/daily-brief", () => {
         result: "ok",
       }),
     );
-    const res = await POST(authed());
+    const res = await POST(authed("https://example.test/api/ops/daily-brief?post=false"));
     const body = await res.json();
     expect(JSON.stringify(body.brief.blocks)).toContain("samples=5/12");
     expect(JSON.stringify(body.brief.blocks)).toContain("enforcement=not-needed");
+  });
+
+  it("end-to-end: runDriftAudit → daily brief surfaces the real scorecard summary", async () => {
+    // Seed one agent entry so the drift audit has something to sample.
+    const agentRun = newRunContext({ agentId: "viktor", division: "sales", source: "on-demand" });
+    await auditStoreRef.append(
+      buildAuditEntry(agentRun, {
+        action: "hubspot.task.create",
+        entityType: "task",
+        result: "ok",
+      }),
+    );
+
+    // Run the drift audit against the SAME auditStoreRef. With the Fix 1
+    // change, this now persists a drift-audit.scorecard entry the daily
+    // brief route can find via auditStore.recent().
+    const { runDriftAudit } = await import("../drift-audit");
+    const sc = await runDriftAudit({ store: auditStoreRef, sampleSize: 1 });
+
+    // Now call the daily brief and verify the summary made it through.
+    const res = await POST(authed("https://example.test/api/ops/daily-brief?post=false"));
+    const body = await res.json();
+    const blocksText = JSON.stringify(body.brief.blocks);
+    expect(blocksText).toContain("Last drift audit");
+    expect(blocksText).toContain("samples=");
+    expect(blocksText).toContain("enforcement=");
+    // The scorecard id is stable, so the summary surfaced ties back to
+    // the exact run — not a stubbed fixture.
+    const stored = (await auditStoreRef.recent(100)).filter(
+      (e) => e.action === "drift-audit.scorecard",
+    );
+    expect(stored).toHaveLength(1);
+    expect(stored[0].entityId).toBe(sc.id);
   });
 
   // Consume unused import warnings.

@@ -18,8 +18,24 @@ The 3.0 Monday stack has **6 active divisions** and **6 latent divisions**. Late
 1. **Trigger is measurable.** Every trigger is a specific number over a specific window, observable from a system of record — not a gut feeling.
 2. **Owner is named.** One human (Ben by default) owns the activation decision once a trigger fires.
 3. **Channels and agents are pre-staged.** The first-wave Slack channel, the first-wave agent contract, and the division row in `/contracts/divisions.json` are already written. Activation is a flip, not a design.
-4. **Activation is logged.** Every activation emits an `activation.division` audit entry with the triggering measurement + approval id; Ben's flip is a Class B `division.activate` approval.
-5. **Deactivation rule.** If the trigger metric drops below its activation threshold for 30 consecutive days, the division goes back to latent. Deactivation is a Class B `division.deactivate` approval.
+4. **Activation is logged.** Ben's flip is a Class B approval in the taxonomy (see §"What this actually automates" below for the exact runtime state).
+5. **Deactivation rule.** If the trigger metric drops below its activation threshold for 30 consecutive days, the division goes back to latent. Deactivation is a Class B approval.
+
+## What this actually automates (runtime reality)
+
+Keeping this section honest so nobody reads an activation checklist and assumes the listed slugs will turn into real runtime behavior on their own. Four status buckets — registered, audit-emittable, automated, or manual:
+
+| Capability | Status | Notes |
+|---|---|---|
+| `division.activate` / `division.deactivate` approval slugs | **Registered** in [`/contracts/approval-taxonomy.md`](approval-taxonomy.md) + [`src/lib/ops/control-plane/taxonomy.ts`](../src/lib/ops/control-plane/taxonomy.ts) as of 2026-04-18 v1.1. | Ben can open these via the existing `/api/slack/approvals` flow; `record()` / `requestApproval()` accept them without fail-closed. |
+| `pod.trade-show.activate` / `pod.trade-show.deactivate` | **Registered** alongside the division slugs. | Same approval flow. |
+| Approval events for activation → audit log | **Audit-emittable** by default. | Every approval decision already writes a `buildHumanAuditEntry()` with the approval id + before/after; the Slack approvals route at [`src/app/api/slack/approvals/route.ts`](../src/app/api/slack/approvals/route.ts) does this for every click. Scorecard-style `division.activate` entries (e.g. "division=marketing-paid → active, trigger=trailing-30d-ad-spend=$1250") ride on the existing audit path. |
+| Flipping `state` in `/contracts/divisions.json` + `/contracts/channels.json` | **Manual commit** by Claude Code after the approval is approved. | No runtime code flips these — they are source of truth; the TypeScript registries mirror them in lockstep and both update together. Blueprint §6.6 doc-canonicalization rule. |
+| Creating the first-wave Slack channel | **Manual** by Ben (Slack admin). | Slack channel-creation API calls are intentionally outside the control plane's write scope — workspace admin is Class D-adjacent territory. |
+| Writing the first-wave agent contract under `/contracts/agents/<name>.md` | **Manual commit** by Claude Code. | Contract schema + latent-division pointers already exist; the commit is the activation event. |
+| Announcement in `#ops-daily` after activation | **Manual** by Ben (or by the daily brief composer on the next tick). | The daily-brief endpoint ([`src/app/api/ops/daily-brief/route.ts`](../src/app/api/ops/daily-brief/route.ts)) surfaces the active-divisions roster from the `listDivisions("active")` registry, so an activation automatically shows up in the next brief once the JSON flip commit lands and is deployed. |
+
+**Net effect:** an activation is a four-step sequence (approve → commit → Slack channel create → agent-contract commit), not a single runtime flip. The approval slugs being registered is step one; the remaining three stay manual until there's enough activation volume to justify automating them.
 
 ---
 
@@ -195,12 +211,12 @@ The 3.0 Monday stack has **6 active divisions** and **6 latent divisions**. Late
 
 ## Activation audit trail
 
-Every activation and deactivation leaves a trail in four places:
+Every activation and deactivation leaves a trail in four places. The first two are automated; the last two are manual commits + Slack admin actions.
 
-1. **Approval queue:** `division.activate` / `division.deactivate` / `pod.trade-show.activate` / `pod.trade-show.deactivate` — Class B approvals registered in `/contracts/approval-taxonomy.md`.
-2. **Audit log (`#ops-audit` + audit store):** `activation.division` entry with trigger evidence, approval id, division id.
-3. **Canonical data:** `/contracts/divisions.json` and `/contracts/channels.json` flip their `state` field. Commits must include the Class B approval id in the message.
-4. **Slack:** one announcement in `#ops-daily`, one pinned message in the new division channel.
+1. **Approval queue (automated):** `division.activate` / `division.deactivate` / `pod.trade-show.activate` / `pod.trade-show.deactivate` — Class B approvals registered in [`/contracts/approval-taxonomy.md`](approval-taxonomy.md). Ben opens these via `/api/slack/approvals` or the approvals queue.
+2. **Audit log (automated, `#ops-audit` + audit store):** the approval decision event is logged by [`src/app/api/slack/approvals/route.ts`](../src/app/api/slack/approvals/route.ts) with approval id, before/after status, and the Slack user who clicked. No separate `activation.division` audit action is required — the `approval.approve` / `approval.reject` entry carries the approval id, and the approval payload itself encodes the target division + trigger evidence.
+3. **Canonical data (manual commit by Claude Code):** after approval, a commit flips the `state` field in `/contracts/divisions.json` and `/contracts/channels.json`. Commit message must include the Class B approval id. The TypeScript registry at `src/lib/ops/control-plane/divisions.ts` / `channels.ts` is updated in the same commit.
+4. **Slack (manual by Ben):** Ben (or a delegate with Slack admin) creates the new division channel and pins its purpose line from `channels.json`. This is outside the control-plane's write scope — see §"What this actually automates."
 
 ## Unregistered trigger = do nothing
 
@@ -208,4 +224,5 @@ If a scenario seems like it should activate a latent division but no trigger her
 
 ## Version history
 
+- **1.1 — 2026-04-18** — Added §"What this actually automates" split to call out which capabilities are runtime-real (approval slugs registered; approval decisions logged) versus which are manual (JSON flip commit; Slack channel create; agent-contract write; announcement). Approval-slug rows in `approval-taxonomy.md` updated to v1.1. No overclaiming: Ben opening a Class B approval no longer implies the division is automatically live.
 - **1.0 — 2026-04-18** — First canonical publication. Covers all 6 latent divisions per blueprint §14.3 + §15.4 W4.

@@ -122,6 +122,48 @@ export const SINGLE_APPROVAL_ACTIONS: ActionSpec[] = [
     irreversible: true,
     examples: ["MDX blog post", "IG post"],
   },
+  // ---- Activation / division lifecycle ----
+  // These slugs are registered so the approval flow can accept them. The
+  // downstream consequences — flipping `state` in contracts/divisions.json,
+  // emitting a division.activate audit action, creating the channel,
+  // writing the first-wave agent contract — are deliberately still manual
+  // until the first real activation happens. See /contracts/activation-
+  // triggers.md §"What this actually automates" for the split.
+  {
+    slug: "division.activate",
+    name: "Activate a latent division",
+    class: "B",
+    requiredApprovers: ["Ben"],
+    irreversible: false,
+    examples: [
+      "Marketing — Paid (trailing-30d ad spend > $1K)",
+      "Customer Experience (tickets > 20/mo sustained)",
+    ],
+  },
+  {
+    slug: "division.deactivate",
+    name: "Deactivate an active division back to latent",
+    class: "B",
+    requiredApprovers: ["Ben"],
+    irreversible: false,
+    examples: ["Marketing — Paid (spend < $500 for 30d)"],
+  },
+  {
+    slug: "pod.trade-show.activate",
+    name: "Activate a per-show Trade Shows pod",
+    class: "B",
+    requiredApprovers: ["Ben"],
+    irreversible: false,
+    examples: ["Sweets & Snacks Expo May 2026", "The Reunion April 2026"],
+  },
+  {
+    slug: "pod.trade-show.deactivate",
+    name: "Deactivate a Trade Shows pod after the show ends",
+    class: "B",
+    requiredApprovers: ["Ben"],
+    irreversible: false,
+    examples: ["14-day post-show wind-down"],
+  },
 ];
 
 // ---- Class C — Dual approval -------------------------------------------

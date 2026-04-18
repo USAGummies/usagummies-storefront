@@ -160,10 +160,17 @@ export async function runDriftAudit(input: DriftAuditInput): Promise<DriftAuditS
   const rng = input.rng ?? Math.random;
 
   // Pull recent agent-authored entries within the window.
+  //
+  // Exclude `drift-audit`'s own entries (scorecard summaries and pause
+  // actions) so the audit cannot sample itself. Without this filter,
+  // successive runs would feed their previous output back into the
+  // eligible pool, producing a noisy self-reinforcing loop + breaking
+  // determinism for tests that inject a fixed rng.
   const recent = await input.store.recent(pool);
   const eligible = recent.filter(
     (e) =>
       e.actorType === "agent" &&
+      e.actorId !== "drift-audit" &&
       new Date(e.createdAt).getTime() >= windowStart.getTime(),
   );
 
@@ -285,28 +292,41 @@ export async function runDriftAudit(input: DriftAuditInput): Promise<DriftAuditS
     },
   };
 
-  // Best-effort mirror to #ops-audit. Scorecard is the canonical record;
-  // callers typically also archive it to Notion/Open Brain out-of-band.
+  // Persist the scorecard to the audit store (authoritative) and mirror
+  // the same entry to #ops-audit (best-effort). The store append must run
+  // even when no Slack surface is wired, so downstream consumers — e.g.
+  // the daily-brief endpoint searching auditStore.recent() for the last
+  // drift-audit.scorecard entry — can actually find it.
+  const summary = renderScorecardSummary(scorecard);
+  const scorecardEntry = buildAuditEntry(
+    {
+      runId: scorecardId,
+      agentId: "drift-audit",
+      division: "executive-control",
+      startedAt: scorecard.generatedAt,
+      source: "scheduled",
+    },
+    {
+      action: "drift-audit.scorecard",
+      entityType: "scorecard",
+      entityId: scorecardId,
+      after: summary,
+      result: "ok",
+      sourceCitations: [{ system: "audit-log" }],
+      confidence: 1.0,
+    },
+    new Date(scorecard.generatedAt),
+  );
+  try {
+    await input.store.append(scorecardEntry);
+  } catch {
+    // Store append failure does not collapse the run — the scorecard return
+    // value remains the canonical response for this call — but it does mean
+    // the daily brief won't find this week's summary. Callers seeing this
+    // should also archive the scorecard out-of-band (Notion / Open Brain).
+  }
   if (input.surface) {
-    const summary = renderScorecardSummary(scorecard);
-    await input.surface
-      .mirror({
-        id: scorecardId,
-        runId: scorecardId,
-        division: "executive-control",
-        actorType: "agent",
-        actorId: "drift-audit",
-        action: "drift-audit.scorecard",
-        entityType: "scorecard",
-        entityId: scorecardId,
-        before: undefined,
-        after: summary,
-        result: "ok",
-        sourceCitations: [{ system: "audit-log" }],
-        confidence: 1.0,
-        createdAt: scorecard.generatedAt,
-      })
-      .catch(() => void 0);
+    await input.surface.mirror(scorecardEntry).catch(() => void 0);
   }
 
   return scorecard;

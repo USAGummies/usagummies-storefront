@@ -157,6 +157,53 @@ describe("runDriftAudit()", () => {
     expect(String(mirrored[0].after)).toContain("auto_paused=");
   });
 
+  it("persists the scorecard summary into the AuditStore (daily brief can find it)", async () => {
+    await store.append(entryAt("viktor", 30));
+    const sc = await runDriftAudit({ store, sampleSize: 1 });
+    // Even without a Slack surface, the scorecard entry must be persisted
+    // so auditStore.recent() returns it — that's the path the daily brief
+    // walks via findLastDriftAuditSummary().
+    const recent = await store.recent(100);
+    const summaries = recent.filter((e) => e.action === "drift-audit.scorecard");
+    expect(summaries).toHaveLength(1);
+    expect(summaries[0].entityType).toBe("scorecard");
+    expect(summaries[0].entityId).toBe(sc.id);
+    expect(summaries[0].actorType).toBe("agent");
+    expect(summaries[0].actorId).toBe("drift-audit");
+    expect(typeof summaries[0].after).toBe("string");
+    expect(String(summaries[0].after)).toContain("samples=");
+    expect(String(summaries[0].after)).toContain("enforcement=");
+  });
+
+  it("store-append failure does not collapse the run (Slack mirror still attempted)", async () => {
+    await store.append(entryAt("viktor", 30));
+    const mirrored: AuditLogEntry[] = [];
+    // Wrap the real store: the scorecard append fails once; all other
+    // appends (test seed + pause entries) pass through.
+    const wrappedStore = {
+      recent: store.recent.bind(store),
+      byRun: store.byRun.bind(store),
+      byAgent: store.byAgent.bind(store),
+      append: async (entry: AuditLogEntry) => {
+        if (entry.action === "drift-audit.scorecard") {
+          throw new Error("KV down");
+        }
+        return store.append(entry);
+      },
+    };
+    const surface = {
+      async mirror(entry: AuditLogEntry) {
+        mirrored.push(entry);
+      },
+    };
+    const sc = await runDriftAudit({ store: wrappedStore, sampleSize: 1, surface });
+    expect(sc).toBeDefined();
+    // Mirror still got called with the scorecard entry even though the
+    // store append failed.
+    expect(mirrored).toHaveLength(1);
+    expect(mirrored[0].action).toBe("drift-audit.scorecard");
+  });
+
   it("a surface failure does not fail the run", async () => {
     await store.append(entryAt("viktor", 30));
     const surface = {
