@@ -2,7 +2,7 @@
 
 **Status:** CANONICAL
 **Source:** Notion blueprint §15.3
-**Version:** 1.0 — 2026-04-17
+**Version:** 1.1 — 2026-04-18
 **Governing file:** Also defined in code at `src/lib/ops/control-plane/taxonomy.ts`. Code and this doc must stay in lockstep.
 
 ---

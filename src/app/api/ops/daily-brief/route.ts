@@ -98,7 +98,9 @@ export async function POST(req: Request): Promise<Response> {
     humanOwner: d.humanOwner,
   }));
 
-  const brief = composeDailyBrief({
+  // First compose: store-level degradations only. This is the brief we
+  // attempt to deliver to Slack.
+  const composeInput = {
     kind,
     asOf: now,
     activeDivisions,
@@ -109,7 +111,8 @@ export async function POST(req: Request): Promise<Response> {
     // External revenue / cash joins are TODO — intentionally omitted so
     // the composer renders explicit "unavailable" lines.
     degradations,
-  });
+  } as const;
+  let brief = composeDailyBrief(composeInput);
 
   // ---- Post to Slack ----
   //
@@ -131,6 +134,10 @@ export async function POST(req: Request): Promise<Response> {
       const prefix = res.degraded ? "Slack post skipped" : "Slack post failed";
       const reason = res.error ?? (res.degraded ? "SLACK_BOT_TOKEN not configured" : "unknown Slack error");
       degradations.push(`${prefix}: ${reason}`);
+      // Re-compose so the returned body matches the final degraded state.
+      // Without this, the caller would get the pre-failure (healthy-looking)
+      // text/blocks even though degradedReasons lists the delivery failure.
+      brief = composeDailyBrief({ ...composeInput, degradations });
     }
   }
 

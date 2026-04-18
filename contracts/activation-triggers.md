@@ -2,7 +2,7 @@
 
 **Status:** CANONICAL
 **Source:** Notion blueprint §14.3 (latent divisions) + §15.4 W4
-**Version:** 1.0 — 2026-04-18
+**Version:** 1.1 — 2026-04-18
 **Machine-readable mirror:** [`/contracts/divisions.json`](divisions.json) → `latent[].activation_trigger`
 
 ---

@@ -241,6 +241,13 @@ describe("POST /api/ops/daily-brief", () => {
     expect(body.post).not.toBeNull();
     expect(body.post.ok).toBe(false);
     expect(body.post.degraded).toBe(true);
+    // Response body must match the degraded state — the returned brief
+    // text/blocks include the Slack-skipped degradation, not the
+    // pre-failure (healthy-looking) composition.
+    expect(body.brief.text).toContain("DEGRADED");
+    const blocksText = JSON.stringify(body.brief.blocks);
+    expect(blocksText).toContain("Degraded brief");
+    expect(blocksText).toContain("Slack post skipped");
   });
 
   it("marks the envelope degraded when the Slack post hard-fails", async () => {
@@ -262,6 +269,13 @@ describe("POST /api/ops/daily-brief", () => {
       expect(body.post.ok).toBe(false);
       expect(body.post.degraded).toBeFalsy();
       expect(body.post.error).toContain("network unreachable");
+      // Returned body is the re-composed degraded brief, not the
+      // pre-failure version.
+      const blocksText = JSON.stringify(body.brief.blocks);
+      expect(blocksText).toContain("Degraded brief");
+      expect(blocksText).toContain("Slack post failed");
+      expect(blocksText).toContain("network unreachable");
+      expect(body.brief.text).toContain("DEGRADED");
     } finally {
       global.fetch = originalFetch;
     }
