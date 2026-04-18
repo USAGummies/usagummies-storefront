@@ -14,8 +14,10 @@ Single source of truth for live operating contracts in USA Gummies 3.0.
 | `governance.md` | System governance — non-negotiables, control plane, drift audit, secret policy, graduation. |
 | `slack-operating.md` | Slack operating contract — 9 active channels, thread rules, severity tiers. |
 | `approval-taxonomy.md` | Approval classes A/B/C/D with registered actions + approvers. |
+| `activation-triggers.md` | Measurable triggers + activation checklists for the 6 latent divisions. |
 | `divisions.json` | Machine-readable: 6 active + 6 latent divisions. |
 | `channels.json` | Machine-readable: 9 active + 5 latent Slack channels. |
+| `agents/` | Per-agent contracts (Booke, Finance Exception, Ops, Research Librarian, R-1..R-7, Viktor at `../viktor.md`). |
 
 ## Rules
 
