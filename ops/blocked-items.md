@@ -4,6 +4,13 @@
 
 **Convention:** items are keyed to Monday checklist IDs (M1, M2a…) where applicable.
 
+## Secret handling rule
+- **Never paste full secret values into this file or any tracked repo file.** Use prefix-only references (`shpat_…`, `AKIA…`, `xoxb-…`, `sk-…`) or the literal placeholder `<ROTATE_THIS_TOKEN>`.
+- If a secret was previously pasted here, it was redacted on **2026-04-18**. Assume leak; treat rotation as already-overdue.
+
+## P0 manual tasks (tracked, not a build-pause)
+Items **B-3..B-8** (secret rotations + Paperclip Slack-bot revoke) are **P0 manual** for Ben. They gate Monday go-live sign-off per blueprint §15.5, but the control-plane build continues in parallel.
+
 ---
 
 ## Ben
@@ -33,19 +40,20 @@ launchctl list | grep usagummies
 # should no longer show paperclip-heartbeat, paperclip-server, or session-archive-monday
 ```
 
-### B-3 (M3a) — Rotate Shopify Admin token
+### B-3 (M3a) — Rotate Shopify Admin token  **[P0]**
 - **Where:** Shopify Admin → Apps → Develop apps → your app → API credentials
-- **Action:** Revoke current token (`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`), generate new.
+- **Action:** Revoke the current `shpat_…` token (look it up in the console — never paste the full value here or anywhere in this repo), generate new.
 - **Update locations:**
   - `~/Library/Application Support/Claude/claude_desktop_config.json` → `shopify-store.env.SHOPIFY_ACCESS_TOKEN`
   - Vercel env: `SHOPIFY_ADMIN_TOKEN` and any related names (verify with `vercel env ls`).
   - Local `.env.local`.
+- **Placeholder in code/docs until replaced:** `<ROTATE_THIS_TOKEN>`.
 
-### B-4 (M3b) — Rotate AWS IAM keys (SP-API)
+### B-4 (M3b) — Rotate AWS IAM keys (SP-API)  **[P0]**
 - **Where:** AWS IAM console → Users → the IAM user backing SP-API → Security credentials → Access keys
-- **Action:** Delete `AKIAVJPBT5OJCCQ5LKKV`. Create new. Copy secret (shown once).
+- **Action:** Delete the existing `AKIA…` access key (look it up in the IAM console), create new, copy secret (shown once).
 - **Update location:** `~/Library/Application Support/Claude/claude_desktop_config.json` → `amazon-seller-central.env.AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
-- **Do NOT commit to git.**
+- **Do NOT commit the full key ID or secret into this repo, Notion, or Slack.**
 
 ### B-5 (M3c) — Rotate Amazon LWA refresh token
 - **Where:** Amazon Seller Central → Partner Network → Develop Apps (or reauth via your LWA OAuth flow).
