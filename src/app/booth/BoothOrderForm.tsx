@@ -3,19 +3,47 @@
 import { useEffect, useState } from "react";
 
 type FormState = "idle" | "submitting" | "success" | "error";
-type PricingTier = "standard" | "pallet";
+type PackagingType = "bag" | "case" | "master_carton";
 type PaymentMethod = "pay_now" | "invoice_me";
+type DeliveryMethod = "shipping" | "in_person";
+
 type FreightQuote = {
   rate: number;
   carrier: string;
   service: string;
   delivery_days: number | null;
 };
+
 type FreightStatus =
   | { kind: "idle" }
   | { kind: "loading" }
   | { kind: "ok"; quote: FreightQuote }
   | { kind: "error"; message: string };
+
+const PACK_LABELS: Record<PackagingType, string> = {
+  bag: "Bag",
+  case: "Case",
+  master_carton: "Master Carton",
+};
+
+const PACK_SUBLABELS: Record<PackagingType, string> = {
+  bag: "1 bag",
+  case: "6 bags",
+  master_carton: "36 bags",
+};
+
+const BAGS_PER_PACK: Record<PackagingType, number> = {
+  bag: 1,
+  case: 6,
+  master_carton: 36,
+};
+
+function getBasePrice(packagingType: PackagingType, qty: number) {
+  if (packagingType === "master_carton") {
+    return qty >= 6 ? 3.1 : 3.25;
+  }
+  return 3.49;
+}
 
 export function BoothOrderForm() {
   const [state, setState] = useState<FormState>("idle");
@@ -29,37 +57,31 @@ export function BoothOrderForm() {
   const [shipCity, setShipCity] = useState("");
   const [shipState, setShipState] = useState("");
   const [shipZip, setShipZip] = useState("");
-  const [quantityCases, setQuantityCases] = useState("1");
-  const [pricingTier, setPricingTier] = useState<PricingTier>("standard");
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("invoice_me");
+  const [quantity, setQuantity] = useState("1");
+  const [packagingType, setPackagingType] = useState<PackagingType>("case");
+  const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>("in_person");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("pay_now");
   const [notes, setNotes] = useState("");
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [freight, setFreight] = useState<FreightStatus>({ kind: "idle" });
 
-  const qty = Math.max(1, Number(quantityCases) || 1);
-  const bagsPerCase = 36;
-  const masterCasesPerPallet = 25;
-  // Pallet tier sells in PALLETS (25 master cases / 900 bags each), priced
-  // landed — freight is rolled into the $3/bag and absorbed by us. Standard
-  // tier sells in master cases (36 bags each) with UPS Ground freight billed
-  // separately on top.
-  const masterCasesCount =
-    pricingTier === "pallet" ? qty * masterCasesPerPallet : qty;
-  const totalBags = masterCasesCount * bagsPerCase;
-  const basePrice = pricingTier === "pallet" ? 3.0 : 3.25;
-  // Pay-Now customers get a 5% prepay discount on the standard tier. Pallet
-  // already has volume + landed pricing so no extra discount.
+  const qty = Math.max(1, Number(quantity) || 1);
+  const bagsPerPack = BAGS_PER_PACK[packagingType];
+  const totalBags = qty * bagsPerPack;
+  const basePrice = getBasePrice(packagingType, qty);
+  const prepayEligible = packagingType === "master_carton";
   const prepayMultiplier =
-    paymentMethod === "pay_now" && pricingTier === "standard" ? 0.95 : 1;
-  const pricePerBag = Math.round(basePrice * prepayMultiplier * 100) / 100;
+    paymentMethod === "pay_now" && prepayEligible ? 0.95 : 1;
+  const pricePerBag = Number((basePrice * prepayMultiplier).toFixed(2));
   const subtotal = Number((totalBags * pricePerBag).toFixed(2));
-  const freightAmount = freight.kind === "ok" ? freight.quote.rate : 0;
+  const freightAmount =
+    deliveryMethod === "shipping" && freight.kind === "ok"
+      ? freight.quote.rate
+      : 0;
   const orderTotal = Number((subtotal + freightAmount).toFixed(2));
-
-  // Pallet tier is landed pricing — no freight quote needed. Only standard
-  // (master-carton) orders ship UPS Ground with freight billed on top.
-  const wantsFreightQuote = pricingTier === "standard";
   const stateOk = /^[A-Z]{2}$/.test(shipState);
-  const zipOk = /^\d{5}$/.test(shipZip);
+  const zipOk = /^\d{5}(-\d{4})?$/.test(shipZip);
+  const wantsFreightQuote = deliveryMethod === "shipping";
 
   useEffect(() => {
     if (!wantsFreightQuote) {
@@ -77,7 +99,12 @@ export function BoothOrderForm() {
         const res = await fetch("/api/booth-order/freight-quote", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ to_state: shipState, to_zip: shipZip, qty }),
+          body: JSON.stringify({
+            to_state: shipState,
+            to_zip: shipZip,
+            qty,
+            packaging_type: packagingType,
+          }),
         });
         const data = await res.json();
         if (cancelled) return;
@@ -99,15 +126,19 @@ export function BoothOrderForm() {
         });
       } catch {
         if (!cancelled) {
-          setFreight({ kind: "error", message: "Couldn't reach freight calculator" });
+          setFreight({
+            kind: "error",
+            message: "Couldn't reach the shipping calculator",
+          });
         }
       }
-    }, 450);
+    }, 350);
+
     return () => {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [wantsFreightQuote, stateOk, zipOk, shipState, shipZip, qty]);
+  }, [wantsFreightQuote, stateOk, zipOk, shipState, shipZip, qty, packagingType]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -127,10 +158,12 @@ export function BoothOrderForm() {
           ship_city: shipCity.trim(),
           ship_state: shipState.trim(),
           ship_zip: shipZip.trim(),
-          quantity_cases: qty,
-          pricing_tier: pricingTier,
+          quantity: qty,
+          packaging_type: packagingType,
+          delivery_method: deliveryMethod,
           payment_method: paymentMethod,
           notes: notes.trim(),
+          agreed_to_terms: agreedToTerms,
         }),
       });
       const data = await res.json();
@@ -139,17 +172,13 @@ export function BoothOrderForm() {
         setState("error");
         return;
       }
-      // If Pay Now, the API returns a Shop Pay checkout URL — redirect the
-      // browser immediately so the customer can complete payment.
       if (paymentMethod === "pay_now") {
         if (data.payment_url) {
           window.location.href = data.payment_url;
           return;
         }
-        // Pay Now selected but Shopify draft-order creation failed. Order is
-        // still saved in HubSpot + QBO + welcome email. Surface fallback.
         setErrorMsg(
-          "Card checkout is temporarily unavailable. We've saved your order and will send an invoice instead — check your email for next steps.",
+          "Card checkout is temporarily unavailable. Switch to invoice terms or try again in a moment.",
         );
         setState("error");
         return;
@@ -171,23 +200,23 @@ export function BoothOrderForm() {
         </div>
         <h3 className="text-xl font-bold text-[#0a1e3d] mb-2">Order Submitted!</h3>
         <p className="text-sm text-gray-600 max-w-xs mx-auto">
-          Thank you! Our team has been notified and will follow up with a quote
-          and invoice. You&apos;ll hear from us shortly.
+          Your order is in our wholesale queue. No extra onboarding step is required.
+          Check your email for your invoice if you selected Net 10 terms.
         </p>
       </div>
     );
   }
 
-  // Submit gating: standard-tier orders must have a successful freight quote
-  // (or buyer needs to enter a valid ZIP). Pallet skips the gate (LTL).
   const freightBlocking =
     wantsFreightQuote &&
-    freight.kind !== "ok" &&
-    (freight.kind === "loading" || !(stateOk && zipOk));
+    (freight.kind !== "ok" || !(stateOk && zipOk));
+  const submitDisabled =
+    state === "submitting" ||
+    freightBlocking ||
+    !agreedToTerms;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      {/* Company Info */}
       <div className="space-y-4">
         <h3 className="text-sm font-semibold text-[#0a1e3d] uppercase tracking-wide">
           Your Info
@@ -203,7 +232,7 @@ export function BoothOrderForm() {
             autoComplete="organization"
             value={companyName}
             onChange={(e) => setCompanyName(e.target.value)}
-            placeholder="e.g. Jungle Jim's International Market"
+            placeholder="Store, hotel, event buyer, or distributor"
             className="w-full px-4 py-3 border border-gray-300 rounded-lg text-base focus:ring-2 focus:ring-[#b22234] focus:border-transparent outline-none"
           />
         </div>
@@ -255,68 +284,69 @@ export function BoothOrderForm() {
         </div>
       </div>
 
-      {/* Shipping Address */}
-      <div className="space-y-4">
-        <h3 className="text-sm font-semibold text-[#0a1e3d] uppercase tracking-wide">
-          Shipping Address
-        </h3>
-        <div>
-          <input
-            type="text"
-            autoComplete="street-address"
-            value={shipAddress}
-            onChange={(e) => setShipAddress(e.target.value)}
-            placeholder="Street address"
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg text-base focus:ring-2 focus:ring-[#b22234] focus:border-transparent outline-none"
-          />
-        </div>
-        <div className="grid grid-cols-5 gap-3">
-          <input
-            type="text"
-            autoComplete="address-level2"
-            value={shipCity}
-            onChange={(e) => setShipCity(e.target.value)}
-            placeholder="City"
-            className="col-span-2 px-4 py-3 border border-gray-300 rounded-lg text-base focus:ring-2 focus:ring-[#b22234] focus:border-transparent outline-none"
-          />
-          <input
-            type="text"
-            autoComplete="address-level1"
-            value={shipState}
-            onChange={(e) => setShipState(e.target.value.toUpperCase())}
-            placeholder="State"
-            maxLength={2}
-            className="col-span-1 px-4 py-3 border border-gray-300 rounded-lg text-base text-center uppercase focus:ring-2 focus:ring-[#b22234] focus:border-transparent outline-none"
-          />
-          <input
-            type="text"
-            inputMode="numeric"
-            autoComplete="postal-code"
-            value={shipZip}
-            onChange={(e) => setShipZip(e.target.value)}
-            placeholder="ZIP"
-            className="col-span-2 px-4 py-3 border border-gray-300 rounded-lg text-base focus:ring-2 focus:ring-[#b22234] focus:border-transparent outline-none"
-          />
-        </div>
-      </div>
-
-      {/* Order Details */}
       <div className="space-y-4">
         <h3 className="text-sm font-semibold text-[#0a1e3d] uppercase tracking-wide">
           Order
         </h3>
 
-        {/* Quantity */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Package
+          </label>
+          <div className="grid grid-cols-1 gap-3">
+            {(["bag", "case", "master_carton"] as PackagingType[]).map((option) => {
+              const selected = packagingType === option;
+              const optionQty = option === "master_carton" ? Math.max(qty, 1) : 1;
+              const optionBasePrice = getBasePrice(option, optionQty);
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => setPackagingType(option)}
+                  className={`p-4 rounded-lg border-2 text-left transition-colors ${
+                    selected
+                      ? "border-[#b22234] bg-red-50"
+                      : "border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className="text-sm font-semibold text-[#0a1e3d]">
+                        {PACK_LABELS[option]}
+                      </div>
+                      <div className="text-lg font-bold text-[#b22234]">
+                        ${optionBasePrice.toFixed(2)}/unit
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        {PACK_SUBLABELS[option]}
+                        {option === "master_carton"
+                          ? " · 6+ cartons drop to $3.10/unit"
+                          : " · One-off wholesale pricing"}
+                      </div>
+                    </div>
+                    <div
+                      className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                        selected ? "border-[#b22234]" : "border-gray-300"
+                      }`}
+                    >
+                      {selected && <div className="w-2.5 h-2.5 rounded-full bg-[#b22234]" />}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         <div>
           <label htmlFor="quantity" className="block text-sm font-medium text-gray-700 mb-1">
-            {pricingTier === "pallet"
-              ? `Pallets (${masterCasesPerPallet} master cases · ${masterCasesPerPallet * bagsPerCase} bags each)`
-              : `Master Cases (${bagsPerCase} bags each)`}
+            Quantity ({PACK_LABELS[packagingType]}
+            {qty === 1 ? "" : "s"})
           </label>
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => setQuantityCases(String(Math.max(1, qty - 1)))}
+              onClick={() => setQuantity(String(Math.max(1, qty - 1)))}
               className="w-12 h-12 rounded-lg border border-gray-300 text-xl font-bold text-gray-600 hover:bg-gray-50 flex items-center justify-center"
             >
               -
@@ -325,61 +355,135 @@ export function BoothOrderForm() {
               id="quantity"
               type="number"
               min="1"
-              value={quantityCases}
-              onChange={(e) => setQuantityCases(e.target.value)}
-              className="w-20 px-4 py-3 border border-gray-300 rounded-lg text-base text-center focus:ring-2 focus:ring-[#b22234] focus:border-transparent outline-none"
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              className="w-24 px-4 py-3 border border-gray-300 rounded-lg text-base text-center focus:ring-2 focus:ring-[#b22234] focus:border-transparent outline-none"
             />
             <button
               type="button"
-              onClick={() => setQuantityCases(String(qty + 1))}
+              onClick={() => setQuantity(String(qty + 1))}
               className="w-12 h-12 rounded-lg border border-gray-300 text-xl font-bold text-gray-600 hover:bg-gray-50 flex items-center justify-center"
             >
               +
             </button>
             <span className="text-sm text-gray-500">
-              {pricingTier === "pallet"
-                ? `${masterCasesCount} cases · ${totalBags} bags`
-                : `${totalBags} bags`}
+              {totalBags} total unit{totalBags === 1 ? "" : "s"}
             </span>
           </div>
         </div>
 
-        {/* Pricing Tier */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Pricing Tier
+            Delivery
           </label>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3">
             <button
               type="button"
-              onClick={() => setPricingTier("standard")}
+              onClick={() => setDeliveryMethod("in_person")}
               className={`p-4 rounded-lg border-2 text-left transition-colors ${
-                pricingTier === "standard"
+                deliveryMethod === "in_person"
                   ? "border-[#b22234] bg-red-50"
-                  : "border-gray-200 hover:border-gray-300"
+                  : "border-gray-200 hover:border-gray-300 bg-white"
               }`}
             >
-              <div className="text-sm font-semibold text-[#0a1e3d]">Standard</div>
-              <div className="text-lg font-bold text-[#b22234]">$3.25/bag</div>
-              <div className="text-xs text-gray-500 mt-1">UPS Ground from Ashford, WA</div>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <div className="text-sm font-semibold text-[#0a1e3d]">
+                    In-person delivery / handoff
+                  </div>
+                  <div className="text-xs text-gray-500 mt-0.5">
+                    No shipping charge when you have inventory on hand.
+                  </div>
+                </div>
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                  deliveryMethod === "in_person" ? "border-[#b22234]" : "border-gray-300"
+                }`}>
+                  {deliveryMethod === "in_person" && (
+                    <div className="w-2.5 h-2.5 rounded-full bg-[#b22234]" />
+                  )}
+                </div>
+              </div>
             </button>
             <button
               type="button"
-              onClick={() => setPricingTier("pallet")}
+              onClick={() => setDeliveryMethod("shipping")}
               className={`p-4 rounded-lg border-2 text-left transition-colors ${
-                pricingTier === "pallet"
+                deliveryMethod === "shipping"
                   ? "border-[#b22234] bg-red-50"
-                  : "border-gray-200 hover:border-gray-300"
+                  : "border-gray-200 hover:border-gray-300 bg-white"
               }`}
             >
-              <div className="text-sm font-semibold text-[#0a1e3d]">Pallet</div>
-              <div className="text-lg font-bold text-[#b22234]">$3.00/bag</div>
-              <div className="text-xs text-gray-500 mt-1">25 MCs · LTL freight included</div>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <div className="text-sm font-semibold text-[#0a1e3d]">
+                    Ship it
+                  </div>
+                  <div className="text-xs text-gray-500 mt-0.5">
+                    UPS Ground quote from Ashford, WA added live before submit.
+                  </div>
+                </div>
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                  deliveryMethod === "shipping" ? "border-[#b22234]" : "border-gray-300"
+                }`}>
+                  {deliveryMethod === "shipping" && (
+                    <div className="w-2.5 h-2.5 rounded-full bg-[#b22234]" />
+                  )}
+                </div>
+              </div>
             </button>
           </div>
         </div>
 
-        {/* Payment method picker */}
+        {deliveryMethod === "shipping" && (
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-[#0a1e3d] uppercase tracking-wide">
+              Shipping Address
+            </h3>
+            <div>
+              <input
+                type="text"
+                autoComplete="street-address"
+                required={deliveryMethod === "shipping"}
+                value={shipAddress}
+                onChange={(e) => setShipAddress(e.target.value)}
+                placeholder="Street address"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-base focus:ring-2 focus:ring-[#b22234] focus:border-transparent outline-none"
+              />
+            </div>
+            <div className="grid grid-cols-5 gap-3">
+              <input
+                type="text"
+                autoComplete="address-level2"
+                required={deliveryMethod === "shipping"}
+                value={shipCity}
+                onChange={(e) => setShipCity(e.target.value)}
+                placeholder="City"
+                className="col-span-2 px-4 py-3 border border-gray-300 rounded-lg text-base focus:ring-2 focus:ring-[#b22234] focus:border-transparent outline-none"
+              />
+              <input
+                type="text"
+                autoComplete="address-level1"
+                required={deliveryMethod === "shipping"}
+                value={shipState}
+                onChange={(e) => setShipState(e.target.value.toUpperCase())}
+                placeholder="State"
+                maxLength={2}
+                className="col-span-1 px-4 py-3 border border-gray-300 rounded-lg text-base text-center uppercase focus:ring-2 focus:ring-[#b22234] focus:border-transparent outline-none"
+              />
+              <input
+                type="text"
+                inputMode="numeric"
+                autoComplete="postal-code"
+                required={deliveryMethod === "shipping"}
+                value={shipZip}
+                onChange={(e) => setShipZip(e.target.value)}
+                placeholder="ZIP"
+                className="col-span-2 px-4 py-3 border border-gray-300 rounded-lg text-base focus:ring-2 focus:ring-[#b22234] focus:border-transparent outline-none"
+              />
+            </div>
+          </div>
+        )}
+
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             How would you like to pay?
@@ -394,13 +498,16 @@ export function BoothOrderForm() {
                   : "border-gray-200 hover:border-gray-300 bg-white"
               }`}
             >
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-4">
                 <div>
                   <div className="text-sm font-semibold text-[#0a1e3d]">
-                    💳 Pay now by card
+                    Pay now by card
                   </div>
                   <div className="text-xs text-gray-500 mt-0.5">
-                    Shop Pay · Visa · MC · Amex · ACH — 5% prepay discount
+                    Shop Pay · Visa · MC · Amex · ACH
+                    {prepayEligible
+                      ? " · 5% prepay discount on master-carton volume"
+                      : " · no upfront-pay discount on bags or cases"}
                   </div>
                 </div>
                 <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
@@ -421,13 +528,13 @@ export function BoothOrderForm() {
                   : "border-gray-200 hover:border-gray-300 bg-white"
               }`}
             >
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-4">
                 <div>
                   <div className="text-sm font-semibold text-[#0a1e3d]">
-                    📄 Invoice me, Net 10
+                    Invoice me, Net 10
                   </div>
                   <div className="text-xs text-gray-500 mt-0.5">
-                    We&apos;ll email an invoice — pay by ACH, check, or card link
+                    We&apos;ll email an invoice right away. No extra onboarding step.
                   </div>
                 </div>
                 <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
@@ -442,22 +549,35 @@ export function BoothOrderForm() {
           </div>
         </div>
 
-        {/* Order Summary */}
         <div className="bg-[#f8f5f0] rounded-lg p-4 space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-gray-600">
-              {totalBags} bags × ${pricePerBag.toFixed(2)}
-              {paymentMethod === "pay_now" && pricingTier === "standard" ? " (5% prepay)" : ""}
+              {qty} {PACK_LABELS[packagingType].toLowerCase()}
+              {qty === 1 ? "" : "s"} · {totalBags} total units
             </span>
-            <span className="font-semibold text-[#0a1e3d]">${subtotal.toFixed(2)}</span>
+            <span className="font-semibold text-[#0a1e3d]">
+              ${subtotal.toFixed(2)}
+            </span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-gray-600">
-              {pricingTier === "pallet" ? "Shipping (LTL)" : "Shipping (UPS Ground)"}
+              ${pricePerBag.toFixed(2)}/unit
             </span>
             <span className="font-medium text-[#0a1e3d] text-right">
-              {pricingTier === "pallet" ? (
-                <span className="text-green-700">Included · landed price</span>
+              {paymentMethod === "pay_now" && prepayEligible
+                ? "5% prepay discount applied"
+                : packagingType === "master_carton" && qty >= 6
+                  ? "6+ carton price break"
+                  : "Standard wholesale price"}
+            </span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-600">
+              {deliveryMethod === "in_person" ? "Delivery" : "Shipping"}
+            </span>
+            <span className="font-medium text-[#0a1e3d] text-right">
+              {deliveryMethod === "in_person" ? (
+                <span className="text-green-700">In person · no shipping charge</span>
               ) : freight.kind === "ok" ? (
                 <>
                   ${freight.quote.rate.toFixed(2)}
@@ -470,7 +590,7 @@ export function BoothOrderForm() {
               ) : freight.kind === "error" ? (
                 <span className="text-red-600 text-xs">{freight.message}</span>
               ) : (
-                <span className="text-gray-400 text-xs">Enter ZIP for quote</span>
+                <span className="text-gray-400 text-xs">Enter state + ZIP for quote</span>
               )}
             </span>
           </div>
@@ -483,7 +603,6 @@ export function BoothOrderForm() {
         </div>
       </div>
 
-      {/* Notes */}
       <div>
         <label htmlFor="notes" className="block text-sm font-medium text-gray-700 mb-1">
           Notes (optional)
@@ -493,39 +612,50 @@ export function BoothOrderForm() {
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           rows={2}
-          placeholder="Anything else we should know..."
+          placeholder="PO reference, handoff notes, or anything we should know..."
           className="w-full px-4 py-3 border border-gray-300 rounded-lg text-base focus:ring-2 focus:ring-[#b22234] focus:border-transparent outline-none resize-none"
         />
       </div>
 
-      {/* Error */}
+      <label className="flex items-start gap-3 rounded-lg border border-gray-200 bg-[#f8f5f0] px-4 py-3">
+        <input
+          type="checkbox"
+          required
+          checked={agreedToTerms}
+          onChange={(e) => setAgreedToTerms(e.target.checked)}
+          className="mt-1 h-4 w-4 rounded border-gray-300 text-[#b22234] focus:ring-[#b22234]"
+        />
+        <span className="text-sm text-gray-700">
+          I understand this is a real wholesale order. By submitting, USA Gummies can
+          begin processing it immediately, and no extra onboarding step is required
+          before shipment or in-person handoff.
+        </span>
+      </label>
+
       {state === "error" && errorMsg && (
         <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg">
           {errorMsg}
         </div>
       )}
 
-      {/* Submit */}
       <button
         type="submit"
-        disabled={state === "submitting" || freightBlocking}
+        disabled={submitDisabled}
         className="w-full bg-[#b22234] text-white font-semibold py-4 px-6 rounded-lg hover:bg-[#8b1a29] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-base"
       >
         {state === "submitting"
           ? paymentMethod === "pay_now"
             ? "Opening secure checkout…"
-            : "Submitting…"
-          : freight.kind === "loading"
-            ? "Calculating freight…"
-            : paymentMethod === "pay_now"
-              ? `Continue to payment · $${orderTotal.toFixed(2)}`
-              : "Submit order"}
+            : "Submitting order…"
+          : paymentMethod === "pay_now"
+            ? `Continue to payment · $${orderTotal.toFixed(2)}`
+            : `Submit wholesale order · $${orderTotal.toFixed(2)}`}
       </button>
 
       <p className="text-xs text-gray-400 text-center">
         {paymentMethod === "pay_now"
-          ? "You'll be redirected to a secure Shop Pay checkout to complete payment."
-          : "You'll receive a welcome email with a short form to finish setup. No charge yet."}
+          ? "You’ll be redirected to a secure checkout to complete payment."
+          : "Your order is committed when you submit. We’ll email your Net 10 invoice right away."}
       </p>
     </form>
   );

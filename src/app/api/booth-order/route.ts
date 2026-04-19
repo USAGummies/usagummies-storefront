@@ -1,18 +1,18 @@
 /**
  * Booth Order API — /api/booth-order
  *
- * POST — Submit a new wholesale order from the trade show booth or the
- * /booth landing page. Re-quotes UPS Ground freight server-side so the
- * customer can't tamper with the displayed rate. Creates QBO customer (if
- * new), notifies Slack with deal details, drops a HubSpot deal at PO
- * Received, fires the customer welcome email, and (Pay Now only) creates a
- * Shopify Draft Order with the real freight as a shipping line.
+ * POST — Submit a new wholesale quick order from /booth. Re-quotes UPS Ground
+ * freight server-side so the customer can't tamper with the displayed rate.
+ * Creates QBO customer + invoice (Invoice Me), mirrors the order into Shopify,
+ * logs the order into the internal queue, and notifies Slack + HubSpot.
  *
  * Body (JSON):
  *   company_name, contact_name, email, phone,
  *   ship_address, ship_city, ship_state, ship_zip,
- *   quantity_cases, pricing_tier ("standard" | "pallet"),
+ *   quantity, packaging_type ("bag" | "case" | "master_carton"),
+ *   delivery_method ("shipping" | "in_person"),
  *   payment_method ("pay_now" | "invoice_me"),
+ *   agreed_to_terms,
  *   notes
  */
 
@@ -40,6 +40,60 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const QBO_TRADE_SHOW_ITEM_ID = process.env.QBO_TRADE_SHOW_ITEM_ID?.trim() || "15";
+
+type PackagingType = "bag" | "case" | "master_carton";
+type DeliveryMethod = "shipping" | "in_person";
+type PaymentMethod = "pay_now" | "invoice_me";
+
+const PACKAGING: Record<
+  PackagingType,
+  {
+    label: string;
+    unitsPerPack: number;
+    packagingFormat: "singles" | "36-case" | "custom";
+    shopifyTitle: string;
+  }
+> = {
+  bag: {
+    label: "Bag",
+    unitsPerPack: 1,
+    packagingFormat: "singles",
+    shopifyTitle: "USA Gummies — Single Bag (1 bag)",
+  },
+  case: {
+    label: "Case",
+    unitsPerPack: 6,
+    packagingFormat: "custom",
+    shopifyTitle: "USA Gummies — Case (6 bags)",
+  },
+  master_carton: {
+    label: "Master Carton",
+    unitsPerPack: 36,
+    packagingFormat: "36-case",
+    shopifyTitle: "USA Gummies — Master Carton (36 bags)",
+  },
+};
+
+function getPackagingType(value: unknown): PackagingType {
+  return value === "bag" || value === "case" || value === "master_carton"
+    ? value
+    : "case";
+}
+
+function getDeliveryMethod(value: unknown): DeliveryMethod {
+  return value === "in_person" ? "in_person" : "shipping";
+}
+
+function getPaymentMethod(value: unknown): PaymentMethod {
+  return value === "pay_now" ? "pay_now" : "invoice_me";
+}
+
+function getBasePrice(packagingType: PackagingType, quantity: number): number {
+  if (packagingType === "master_carton") {
+    return quantity >= 6 ? 3.1 : 3.25;
+  }
+  return 3.49;
+}
 
 type ShopifyDraftCreateResponse = {
   data?: {
@@ -104,10 +158,12 @@ export async function POST(req: Request) {
       ship_city,
       ship_state,
       ship_zip,
-      quantity_cases,
-      pricing_tier,
+      quantity,
+      packaging_type,
+      delivery_method,
       notes,
-      payment_method, // "pay_now" | "invoice_me" (optional; default "invoice_me")
+      payment_method,
+      agreed_to_terms,
     } = body;
 
     // Validate required fields
@@ -121,77 +177,97 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
     }
 
-    const qty = Number(quantity_cases) || 1;
-    const tier = pricing_tier === "pallet" ? "pallet" : "standard";
-    const bagsPerCase = 36; // 6 inner cases × 6 bags
-    const masterCasesPerPallet = 25;
-    // Pallet tier sells in PALLETS (qty = pallets, 25 MCs / 900 bags each)
-    // at $3/bag LANDED — freight is rolled into price. Standard sells in
-    // master cases (qty = MCs, 36 bags) at $3.25/bag + UPS Ground on top.
-    const masterCasesCount =
-      tier === "pallet" ? qty * masterCasesPerPallet : qty;
-    const totalBags = masterCasesCount * bagsPerCase;
-    const basePrice = tier === "pallet" ? 3.00 : 3.25;
-    const paymentMethod: "pay_now" | "invoice_me" =
-      payment_method === "pay_now" ? "pay_now" : "invoice_me";
-    // Pay-Now customers get a 5% prepay discount on the standard tier.
-    // Pallet tier already reflects volume pricing; no extra prepay discount.
+    if (!agreed_to_terms) {
+      return NextResponse.json(
+        { error: "You must confirm that this is a real order before submitting." },
+        { status: 400 },
+      );
+    }
+
+    const qty = Math.max(1, Number(quantity) || 1);
+    const packagingType = getPackagingType(packaging_type);
+    const deliveryMethod = getDeliveryMethod(delivery_method);
+    const paymentMethod = getPaymentMethod(payment_method);
+    const pack = PACKAGING[packagingType];
+    const totalBags = qty * pack.unitsPerPack;
+    const basePrice = getBasePrice(packagingType, qty);
+    const prepayEligible = packagingType === "master_carton";
     const prepayMultiplier =
-      paymentMethod === "pay_now" && tier === "standard" ? 0.95 : 1;
+      paymentMethod === "pay_now" && prepayEligible ? 0.95 : 1;
     const pricePerBag = Math.round(basePrice * prepayMultiplier * 100) / 100;
     const subtotal = Number((totalBags * pricePerBag).toFixed(2));
 
-    // ── Server-side freight re-quote (standard tier only) ──
-    // Pallet is LANDED pricing — freight is rolled into $3/bag. We absorb
-    // the LTL cost. For standard MC orders we re-quote UPS Ground
-    // server-side so customers can't fudge the displayed number. If
-    // ShipStation is down we still accept the order and flag it for manual
-    // quote.
+    if (deliveryMethod === "shipping") {
+      if (!ship_address?.trim()) {
+        return NextResponse.json({ error: "Shipping address is required" }, { status: 400 });
+      }
+      if (!ship_city?.trim()) {
+        return NextResponse.json({ error: "Shipping city is required" }, { status: 400 });
+      }
+      if (!/^[A-Z]{2}$/.test(String(ship_state ?? "").trim().toUpperCase())) {
+        return NextResponse.json({ error: "Enter a valid 2-letter state code" }, { status: 400 });
+      }
+      if (!/^\d{5}(-\d{4})?$/.test(String(ship_zip ?? "").trim())) {
+        return NextResponse.json({ error: "Enter a valid ZIP code" }, { status: 400 });
+      }
+    }
+
+    // ── Server-side freight re-quote ──
+    // Shipping orders must have a real UPS Ground quote before we submit.
+    // In-person handoff skips freight entirely.
     let freightAmount = 0;
-    let freightLabel = tier === "pallet"
-      ? "Included in price (LTL landed)"
-      : "UPS Ground (quote pending)";
+    let freightLabel =
+      deliveryMethod === "in_person"
+        ? "In-person delivery / handoff"
+        : "UPS Ground";
     let freightCarrier: string | null = null;
     let freightService: string | null = null;
     let freightDays: number | null = null;
     let freightError: string | null = null;
-    if (tier === "standard" && ship_state?.trim() && ship_zip?.trim()) {
-      if (isShipStationConfigured()) {
-        const rateRes = await getUpsGroundRate({
-          toState: String(ship_state).trim().toUpperCase(),
-          toZip: String(ship_zip).trim(),
-          qtyMasterCases: qty,
-        });
-        if (rateRes.ok) {
-          freightAmount = rateRes.quote.rate;
-          freightCarrier = rateRes.quote.carrier;
-          freightService = rateRes.quote.service;
-          freightDays = rateRes.quote.delivery_days;
-          freightLabel = `${rateRes.quote.service} — $${freightAmount.toFixed(2)}${
-            freightDays ? ` (~${freightDays} day${freightDays > 1 ? "s" : ""})` : ""
-          }`;
-        } else {
-          freightError = rateRes.error;
-          console.error("[booth-order] freight re-quote failed:", rateRes.error);
-        }
-      } else {
-        freightError = "ShipStation not configured";
+    if (deliveryMethod === "shipping") {
+      if (!isShipStationConfigured()) {
+        return NextResponse.json(
+          { error: "Shipping quotes are temporarily unavailable. Please try again in a minute." },
+          { status: 503 },
+        );
       }
+
+      const rateRes = await getUpsGroundRate({
+        toState: String(ship_state).trim().toUpperCase(),
+        toZip: String(ship_zip).trim(),
+        packagingType,
+        quantity: qty,
+      });
+
+      if (!rateRes.ok) {
+        console.error("[booth-order] freight re-quote failed:", rateRes.error);
+        return NextResponse.json(
+          { error: rateRes.error || "Shipping quote unavailable" },
+          { status: 502 },
+        );
+      }
+
+      freightAmount = rateRes.quote.rate;
+      freightCarrier = rateRes.quote.carrier;
+      freightService = rateRes.quote.service;
+      freightDays = rateRes.quote.delivery_days;
+      freightLabel = `${rateRes.quote.service} — $${freightAmount.toFixed(2)}${
+        freightDays ? ` (~${freightDays} day${freightDays > 1 ? "s" : ""})` : ""
+      }`;
     }
     const orderTotal = Number((subtotal + freightAmount).toFixed(2));
 
     // Build order details string for QBO Notes field (so Viktor can see order info)
     const orderDate = new Date().toLocaleString("en-US", { timeZone: "America/Los_Angeles" });
-    const unitLabel = tier === "pallet" ? "Pallet" : "Master Case";
     const qboNotes = [
-      `=== BOOTH ORDER ===`,
+      `=== WHOLESALE QUICK ORDER ===`,
       `Submitted: ${orderDate} PT`,
       ``,
-      `QUANTITY: ${qty} ${unitLabel}${qty > 1 ? "s" : ""} (${masterCasesCount} master case${masterCasesCount > 1 ? "s" : ""} · ${totalBags} bags total)`,
-      `PRICING: $${pricePerBag.toFixed(2)}/bag${tier === "pallet" ? " (Pallet tier — landed)" : " (Standard)"}`,
+      `PACK: ${qty} ${pack.label}${qty > 1 ? "s" : ""} (${totalBags} bags total)`,
+      `DELIVERY: ${deliveryMethod === "in_person" ? "In-person handoff / local delivery" : freightLabel}`,
+      `PRICING: $${pricePerBag.toFixed(2)}/unit${prepayEligible && paymentMethod === "pay_now" ? " (5% prepay discount applied)" : ""}`,
       `SUBTOTAL: $${subtotal.toFixed(2)}`,
-      `SHIPPING: ${freightLabel}`,
-      freightError ? `⚠ FREIGHT QUOTE ERROR: ${freightError} — re-quote manually` : null,
+      `SHIPPING: ${deliveryMethod === "in_person" ? "N/A" : freightLabel}`,
       `INVOICE TOTAL: $${orderTotal.toFixed(2)}`,
       ``,
       `Contact: ${contact_name}${phone ? ` | ${phone}` : ""}`,
@@ -248,11 +324,7 @@ export async function POST(req: Request) {
     const shopifyToken = process.env.SHOPIFY_ADMIN_TOKEN;
     if (paymentMethod === "pay_now" && shopifyDomain && shopifyToken) {
       try {
-        const bagsPerUnit = totalBags / qty; // 36 for standard MC, 900 for pallet
-        const pricePerUnit = Number((bagsPerUnit * pricePerBag).toFixed(2));
-        const lineItemTitle = tier === "pallet"
-          ? `USA Gummies — All American Gummy Bears Pallet (${masterCasesPerPallet} master cases / ${bagsPerUnit} bags · landed)`
-          : `USA Gummies — All American Gummy Bears Master Carton (${bagsPerUnit} bags)`;
+        const pricePerPack = Number((pack.unitsPerPack * pricePerBag).toFixed(2));
         const CREATE_DRAFT = `
           mutation draftOrderCreate($input: DraftOrderInput!) {
             draftOrderCreate(input: $input) {
@@ -264,21 +336,21 @@ export async function POST(req: Request) {
         const firstName = contact_name.split(/\s+/)[0] || contact_name;
         const lastName = contact_name.split(/\s+/).slice(1).join(" ") || "";
         const shippingTitle =
-          tier === "pallet"
-            ? `Pallet (LTL) — included in landed price`
+          deliveryMethod === "in_person"
+            ? "In-person delivery / handoff"
             : freightAmount > 0
-              ? `UPS Ground (${qty} master case${qty > 1 ? "s" : ""} from Ashford, WA)`
-              : "Shipping — quote pending, billed on invoice";
+              ? `UPS Ground (${qty} ${pack.label.toLowerCase()}${qty > 1 ? "s" : ""} from Ashford, WA)`
+              : "Shipping";
         const draftInput: Record<string, unknown> = {
           email: email.trim(),
-          note: `Booth order (Pay Now). ${qty} ${unitLabel.toLowerCase()}${qty > 1 ? "s" : ""} (${masterCasesCount} MC · ${totalBags} bags) @ $${pricePerBag.toFixed(2)}/bag${tier === "pallet" ? " landed" : ""}. Freight: ${freightLabel}. QBO customer: ${qboCustomerId || "pending"}.`,
-          tags: ["wholesale", "booth", "pay_now", tier],
+          note: `Wholesale quick order (Pay Now). ${qty} ${pack.label.toLowerCase()}${qty > 1 ? "s" : ""} (${totalBags} bags) @ $${pricePerBag.toFixed(2)}/unit. Delivery: ${deliveryMethod === "in_person" ? "in-person handoff" : freightLabel}. QBO customer: ${qboCustomerId || "pending"}.`,
+          tags: ["wholesale", "quick_order", "pay_now", packagingType, deliveryMethod],
           lineItems: [
             {
-              title: lineItemTitle,
-              originalUnitPriceWithCurrency: { amount: pricePerUnit.toFixed(2), currencyCode: "USD" },
+              title: pack.shopifyTitle,
+              originalUnitPriceWithCurrency: { amount: pricePerPack.toFixed(2), currencyCode: "USD" },
               quantity: qty,
-              requiresShipping: true,
+              requiresShipping: deliveryMethod === "shipping",
               taxable: true,
             },
           ],
@@ -332,25 +404,18 @@ export async function POST(req: Request) {
     }
 
     // ── Shopify order (Invoice Me) ──
-    // Invoice-based booth orders need to appear in a real operational queue.
+    // Invoice-based quick orders need to appear in a real operational queue.
     // We create a draft, then complete it as payment-pending so it shows up
-    // in Shopify Orders while staying on ship hold until payment clears.
+    // in Shopify Orders while staying on a payment hold until payment clears.
     if (paymentMethod === "invoice_me" && shopifyDomain && shopifyToken) {
       try {
-        const lineItemTitle = tier === "pallet"
-          ? `USA Gummies — All American Gummy Bears Pallet (${masterCasesPerPallet} master cases / ${totalBags} bags · landed)`
-          : `USA Gummies — All American Gummy Bears Master Carton (${bagsPerCase} bags)`;
-        const pricePerUnit = tier === "pallet"
-          ? Number((masterCasesPerPallet * bagsPerCase * pricePerBag).toFixed(2))
-          : Number((bagsPerCase * pricePerBag).toFixed(2));
+        const pricePerPack = Number((pack.unitsPerPack * pricePerBag).toFixed(2));
         const firstName = contact_name.split(/\s+/)[0] || contact_name;
         const lastName = contact_name.split(/\s+/).slice(1).join(" ") || "";
         const shippingTitle =
-          tier === "pallet"
-            ? "Pallet (LTL) — included in landed price"
-            : freightAmount > 0
-              ? `UPS Ground (${qty} master case${qty > 1 ? "s" : ""} from Ashford, WA)`
-              : "Shipping — quote pending, billed on invoice";
+          deliveryMethod === "in_person"
+            ? "In-person delivery / handoff"
+            : `UPS Ground (${qty} ${pack.label.toLowerCase()}${qty > 1 ? "s" : ""} from Ashford, WA)`;
 
         const createDraftMutation = `
           mutation draftOrderCreate($input: DraftOrderInput!) {
@@ -364,22 +429,22 @@ export async function POST(req: Request) {
         const draftInput: Record<string, unknown> = {
           email: email.trim(),
           note: [
-            `Booth order (Invoice Me / Net 10).`,
-            `${qty} ${unitLabel.toLowerCase()}${qty > 1 ? "s" : ""} (${masterCasesCount} MC · ${totalBags} bags) @ $${pricePerBag.toFixed(2)}/bag${tier === "pallet" ? " landed" : ""}.`,
-            `Freight: ${freightLabel}.`,
-            "SHIP HOLD: do not fulfill until QBO invoice is paid.",
+            "Wholesale quick order (Invoice Me / Net 10).",
+            `${qty} ${pack.label.toLowerCase()}${qty > 1 ? "s" : ""} (${totalBags} bags) @ $${pricePerBag.toFixed(2)}/unit.`,
+            `Delivery: ${deliveryMethod === "in_person" ? "In-person handoff" : freightLabel}.`,
+            "PAYMENT HOLD: release after QBO invoice payment. No onboarding gate.",
             qboCustomerId ? `QBO customer: ${qboCustomerId}.` : "QBO customer: pending.",
           ].join(" "),
-          tags: ["wholesale", "booth", "invoice_me", tier, "awaiting_payment", "ship_hold"],
+          tags: ["wholesale", "quick_order", "invoice_me", packagingType, deliveryMethod, "awaiting_payment", "ship_hold"],
           lineItems: [
             {
-              title: lineItemTitle,
+              title: pack.shopifyTitle,
               originalUnitPriceWithCurrency: {
-                amount: pricePerUnit.toFixed(2),
+                amount: pricePerPack.toFixed(2),
                 currencyCode: "USD",
               },
               quantity: qty,
-              requiresShipping: true,
+              requiresShipping: deliveryMethod === "shipping",
               taxable: true,
             },
           ],
@@ -474,7 +539,7 @@ export async function POST(req: Request) {
           DueDate: dueDate,
           BillEmail: email?.trim() ? { Address: email.trim() } : undefined,
           CustomerMemo: {
-            value: "Net 10. Please pay before shipment releases. Order remains on ship hold until payment clears.",
+            value: "Net 10. This submit is a real order. No onboarding step is required; shipment or handoff releases per payment terms.",
           },
           Line: [
             {
@@ -485,7 +550,7 @@ export async function POST(req: Request) {
                 Qty: totalBags,
                 UnitPrice: pricePerBag,
               },
-              Description: `${qty} ${unitLabel}${qty > 1 ? "s" : ""} (${masterCasesCount} master cases · ${totalBags} bags)`,
+              Description: `${qty} ${pack.label}${qty > 1 ? "s" : ""} (${totalBags} bags)`,
             },
             ...(freightAmount > 0
               ? [{
@@ -543,31 +608,28 @@ export async function POST(req: Request) {
             closedate: closeDate,
             contactId: contact.id,
             payment_method: paymentMethod,
-            onboarding_complete: false,
+            onboarding_complete: true,
             payment_received: false,
             description: [
               `Booth order via usagummies.com/booth, submitted ${orderDate} PT`,
-              `${qty} ${unitLabel}${qty > 1 ? "s" : ""} (${masterCasesCount} MC · ${totalBags} bags) × $${pricePerBag.toFixed(2)}/bag${tier === "pallet" ? " landed" : ""}`,
+              `${qty} ${pack.label}${qty > 1 ? "s" : ""} (${totalBags} bags) × $${pricePerBag.toFixed(2)}/unit`,
               `Subtotal: $${subtotal.toFixed(2)}`,
-              `Shipping: ${freightLabel}`,
+              `Delivery: ${deliveryMethod === "in_person" ? "In-person handoff" : freightLabel}`,
               `Order total: $${orderTotal.toFixed(2)}`,
-              `Payment method: ${paymentMethod === "pay_now" ? "Pay Now by card (5% prepay discount applied)" : "Invoice Me / Net 10"}`,
-              `Pricing tier: ${tier === "pallet" ? "Pallet (LTL freight included in price)" : "Standard (UPS Ground billed separately)"}`,
+              `Payment method: ${paymentMethod === "pay_now" ? `Pay Now by card${prepayEligible ? " (5% prepay discount applied)" : ""}` : "Invoice Me / Net 10"}`,
+              `No onboarding gate. Process immediately after submit; release on payment terms.`,
               qboCustomerId ? `QBO Customer ID: ${qboCustomerId}` : "⚠ QBO customer not created",
               qboInvoiceDocNumber ? `QBO Invoice: ${qboInvoiceDocNumber}${qboInvoiceSent ? " (sent)" : " (created, not emailed)"}` : "",
               shopifyOrderName ? `Shopify Order: ${shopifyOrderName}` : shopifyDraftOrderId ? `Shopify Draft: ${shopifyDraftOrderId}` : "",
-              freightError ? `⚠ Freight quote error: ${freightError}` : "",
-              "",
-              "Ship gate: onboarding_complete=false + payment_received=false. No ship until both flip true.",
             ].filter(Boolean).join("\n"),
           });
           if (hubspotDealId) {
             await createNote({
               body: [
                 "<p><b>Booth order submitted</b></p>",
-                `<p>Quantity: <b>${qty} ${unitLabel}${qty > 1 ? "s" : ""} (${masterCasesCount} MC · ${totalBags} bags)</b><br/>`,
-                `Price: <b>$${pricePerBag.toFixed(2)}/bag</b> × ${totalBags} = <b>$${subtotal.toFixed(2)}</b>${tier === "pallet" ? " <i>(landed)</i>" : ""}<br/>`,
-                `Shipping: <b>${freightLabel}</b><br/>`,
+                `<p>Quantity: <b>${qty} ${pack.label}${qty > 1 ? "s" : ""} (${totalBags} bags)</b><br/>`,
+                `Price: <b>$${pricePerBag.toFixed(2)}/unit</b> × ${totalBags} = <b>$${subtotal.toFixed(2)}</b><br/>`,
+                `Delivery: <b>${deliveryMethod === "in_person" ? "In-person handoff" : freightLabel}</b><br/>`,
                 `Order total: <b>$${orderTotal.toFixed(2)}</b><br/>`,
                 `Payment: <b>${paymentMethod === "pay_now" ? "Pay Now by card" : "Invoice Me / Net 10"}</b><br/>`,
                 `Ship to: ${ship_address || "—"}${ship_city ? `, ${ship_city}` : ""}${ship_state ? ` ${ship_state}` : ""}${ship_zip ? ` ${ship_zip}` : ""}</p>`,
@@ -589,55 +651,50 @@ export async function POST(req: Request) {
 
     // ── Customer welcome email ──
     let welcomeEmailSent = false;
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "")
-      || "https://www.usagummies.com";
-    const onboardingUrl = hubspotDealId
-      ? `${siteUrl}/onboarding/${hubspotDealId}`
-      : `${siteUrl}/wholesale`;
     try {
       const firstName = contact_name.split(/\s+/)[0] || contact_name;
       const customerSubject = `USA Gummies — Order received (${company_name.trim()})`;
-      const payNowSuffix = paymentMethod === "pay_now"
-        ? " (5% prepay discount applied)" : "";
-      const shippingLine = tier === "pallet"
-        ? "Shipping: LTL freight — included in landed price"
-        : freightAmount > 0
-          ? `Shipping: $${freightAmount.toFixed(2)}${freightDays ? ` (UPS Ground, ~${freightDays} day${freightDays > 1 ? "s" : ""} from Ashford, WA)` : " (UPS Ground from Ashford, WA)"}`
-          : "Shipping: UPS Ground from Ashford, WA — final freight on invoice";
+      const payNowSuffix =
+        paymentMethod === "pay_now" && prepayEligible
+          ? " (5% prepay discount applied)"
+          : "";
+      const deliveryLine =
+        deliveryMethod === "in_person"
+          ? "Delivery: In-person handoff / local delivery"
+          : freightAmount > 0
+            ? `Shipping: $${freightAmount.toFixed(2)}${freightDays ? ` (UPS Ground, ~${freightDays} day${freightDays > 1 ? "s" : ""} from Ashford, WA)` : " (UPS Ground from Ashford, WA)"}`
+            : "Shipping: UPS Ground from Ashford, WA";
       const customerBody = [
         `Hi ${firstName},`,
         ``,
-        `Thanks for your order! We received it and we're on it.`,
+        `Thanks for your order. We received it and it is now in our wholesale queue.`,
         ``,
         `── Order summary ──`,
         `Product: All American Gummy Bears — 7.5 oz bag`,
-        `Quantity: ${qty} ${unitLabel}${qty > 1 ? "s" : ""} (${masterCasesCount} master case${masterCasesCount > 1 ? "s" : ""} · ${totalBags} bags total)`,
-        `Price: $${pricePerBag.toFixed(2)}/bag${tier === "pallet" ? " landed" : ""}${payNowSuffix}`,
+        `Quantity: ${qty} ${pack.label}${qty > 1 ? "s" : ""} (${totalBags} bags total)`,
+        `Price: $${pricePerBag.toFixed(2)}/unit${payNowSuffix}`,
         `Subtotal: $${subtotal.toFixed(2)}`,
-        shippingLine,
+        deliveryLine,
         `Order total: $${orderTotal.toFixed(2)}`,
         `Payment: ${
           paymentMethod === "pay_now"
-            ? "Paid by card — thank you!"
+            ? "Card checkout pending — complete the secure checkout that opens next"
             : qboInvoiceSent
               ? `Invoice ${qboInvoiceDocNumber || ""} sent separately (Net 10)`.trim()
               : "Invoice is being prepared now (Net 10)"
         }`,
         ``,
-        `── One quick step ──`,
         paymentMethod === "pay_now"
-          ? `We just need 5 fast details (30 seconds) so we can get this on the truck. Click here to finish your setup:`
+          ? deliveryMethod === "in_person"
+            ? `Your order is ready for in-person handoff as soon as checkout clears.`
+            : `I pack and ship your order personally from our warehouse in Ashford, WA once checkout clears.`
           : qboInvoiceSent
-            ? `We just need a quick customer info form so we can release shipment after payment clears. Click here to continue:`
-            : `We just need a quick customer info form so we can send your invoice and get this shipped. Click here to continue:`,
+            ? deliveryMethod === "in_person"
+              ? `Your invoice is already on the way. We can hand off inventory as soon as payment clears.`
+              : `Your invoice is already on the way. I pack and ship from Ashford, WA as soon as payment clears.`
+            : `We'll email your invoice shortly. We release the order as soon as payment clears.`,
         ``,
-        `${onboardingUrl}`,
-        ``,
-        paymentMethod === "pay_now"
-          ? `I pack and ship your order personally from our warehouse in Ashford, WA within 2 business days of receiving your info.`
-          : qboInvoiceSent
-            ? `Your invoice is already on the way. I pack and ship from Ashford, WA as soon as payment clears.`
-            : `We'll email your invoice once you complete the form. I pack and ship from Ashford, WA as soon as payment clears.`,
+        `No extra onboarding step is required for this order.`,
         ``,
         `Questions? Reply to this email — it goes straight to Ben.`,
         ``,
@@ -666,7 +723,7 @@ export async function POST(req: Request) {
       try {
         await logEmail({
           subject: `USA Gummies — Order received (${company_name.trim()})`,
-          body: `Welcome email sent. Onboarding portal: ${onboardingUrl}. Payment method: ${paymentMethod}. Order total: $${orderTotal.toFixed(2)} (${freightLabel}).`,
+          body: `Order receipt email sent. Payment method: ${paymentMethod}. Order total: $${orderTotal.toFixed(2)}. Delivery: ${deliveryMethod}.`,
           to: email.trim(),
           contactId: hubspotContactId,
           dealId: hubspotDealId ?? undefined,
@@ -698,21 +755,33 @@ export async function POST(req: Request) {
         subtotal,
         shipping_charged: freightAmount,
         total: orderTotal,
-        terms: paymentMethod === "pay_now" ? "Prepaid card — ship hold until checkout clears" : "Net 10 — ship hold until QBO payment",
+        terms:
+          paymentMethod === "pay_now"
+            ? deliveryMethod === "in_person"
+              ? "Prepaid card — handoff when checkout clears"
+              : "Prepaid card — ship once checkout clears"
+            : deliveryMethod === "in_person"
+              ? "Net 10 — awaiting invoice payment before handoff"
+              : "Net 10 — awaiting invoice payment before shipment",
         po_details: [
           {
             sku: "199284624702",
             description: "All American Gummy Bears 7.5 oz bag",
             quantity: totalBags,
             unit_price: pricePerBag,
-            packaging_format: tier === "pallet" ? "pallet" : "36-case",
+            packaging_format: pack.packagingFormat,
             total: subtotal,
           },
         ],
-        packaging_format: tier === "pallet" ? "pallet" : "36-case",
+        packaging_format: pack.packagingFormat,
         status: "received",
         notes: [
-          paymentMethod === "pay_now" ? "Checkout pending until Shopify payment completes." : "Awaiting invoice payment before ship release.",
+          deliveryMethod === "in_person"
+            ? "In-person delivery / handoff selected."
+            : `Shipping selected: ${freightLabel}`,
+          paymentMethod === "pay_now"
+            ? "Checkout pending until Shopify payment completes."
+            : "Awaiting invoice payment before release.",
           qboCustomerId ? `QBO customer: ${qboCustomerId}` : null,
           qboInvoiceDocNumber ? `QBO invoice: ${qboInvoiceDocNumber}${qboInvoiceSent ? " (sent)" : ""}` : null,
           shopifyOrderName ? `Shopify order: ${shopifyOrderName}` : null,
@@ -726,18 +795,17 @@ export async function POST(req: Request) {
     // Build Slack notification
     const methodTag = paymentMethod === "pay_now" ? "💳 PAY NOW" : "📄 INVOICE";
     const orderSummary = [
-      `🎪 *NEW BOOTH ORDER — ${methodTag}*`,
+      `🧾 *NEW WHOLESALE QUICK ORDER — ${methodTag}*`,
       ``,
       `*Company:* ${company_name}`,
       `*Contact:* ${contact_name}`,
       `*Email:* ${email}`,
       phone ? `*Phone:* ${phone}` : null,
       ``,
-      `*Order:* ${qty} ${unitLabel}${qty > 1 ? "s" : ""} (${masterCasesCount} MC · ${totalBags} bags)`,
-      `*Price:* $${pricePerBag.toFixed(2)}/bag${tier === "pallet" ? " (Pallet — landed)" : paymentMethod === "pay_now" ? " (Pay Now, 5% prepay discount)" : " (Standard)"}`,
+      `*Order:* ${qty} ${pack.label}${qty > 1 ? "s" : ""} (${totalBags} bags)`,
+      `*Price:* $${pricePerBag.toFixed(2)}/unit${paymentMethod === "pay_now" && prepayEligible ? " (5% prepay discount)" : ""}`,
       `*Product Subtotal:* $${subtotal.toFixed(2)}`,
-      `*Shipping:* ${freightLabel}`,
-      freightError ? `⚠️ Freight quote failed: ${freightError} — re-quote manually` : null,
+      `*Delivery:* ${deliveryMethod === "in_person" ? "In-person handoff" : freightLabel}`,
       `*Order Total:* $${orderTotal.toFixed(2)}`,
       ``,
       ship_address ? `*Ship To:* ${ship_address}, ${ship_city || ""} ${ship_state || ""} ${ship_zip || ""}` : null,
@@ -755,21 +823,17 @@ export async function POST(req: Request) {
             : shopifyDraftOrderId
               ? `*🧾 Shopify draft:* ${shopifyDraftOrderId} (could not complete to order)`
               : `⚠️ Invoice order not mirrored into Shopify — follow up manually`),
-      welcomeEmailSent ? `*✉️ Welcome email sent* → onboarding at <${onboardingUrl}|${onboardingUrl}>` : `⚠️ Welcome email NOT sent — follow up manually`,
+      welcomeEmailSent ? `*✉️ Receipt email sent*` : `⚠️ Welcome email NOT sent — follow up manually`,
       ``,
       `*Next steps:*`,
       paymentMethod === "pay_now"
-        ? `1. Customer completes 5-field Quick Ship form at onboarding portal`
-        : `1. Customer completes Full Setup form at onboarding portal`,
-      `2. Onboarding gate flips green in HubSpot`,
-      paymentMethod === "pay_now"
-        ? `3. Payment already collected by card ✅`
+        ? `1. Customer completes Shopify checkout`
         : qboInvoiceDocNumber
-          ? `3. QBO invoice ${qboInvoiceDocNumber}${qboInvoiceSent ? " emailed" : " created"}; customer pays invoice`
-          : `3. Create/send QBO invoice manually before shipment`,
-      tier === "pallet"
-        ? `4. Both gates green → Ben books LTL freight from Ashford, WA (cost absorbed in landed price)`
-        : `4. Both gates green → Ben packs and ships from Ashford, WA via UPS Ground`,
+          ? `1. Customer pays QBO invoice ${qboInvoiceDocNumber}`
+          : `1. Create/send QBO invoice manually`,
+      paymentMethod === "pay_now"
+        ? `2. Release ${deliveryMethod === "in_person" ? "handoff" : "shipment"} once payment clears`
+        : `2. Release ${deliveryMethod === "in_person" ? "handoff" : "shipment"} once payment clears`,
     ].filter(Boolean).join("\n");
 
     // Post to Slack (must await — serverless function exits before fire-and-forget completes)
@@ -790,11 +854,12 @@ export async function POST(req: Request) {
       ok: true,
       company: company_name,
       contact: contact_name,
-      quantity_cases: qty,
+      quantity: qty,
+      packaging_type: packagingType,
+      delivery_method: deliveryMethod,
       total_bags: totalBags,
       price_per_bag: pricePerBag,
       subtotal,
-      pricing_tier: tier,
       freight: {
         amount: freightAmount,
         carrier: freightCarrier,
@@ -812,7 +877,6 @@ export async function POST(req: Request) {
       hubspot_contact_id: hubspotContactId,
       hubspot_deal_id: hubspotDealId,
       welcome_email_sent: welcomeEmailSent,
-      onboarding_url: onboardingUrl,
       // Pay Now path — Shopify Draft Order + checkout URL
       shopify_draft_order_id: shopifyDraftOrderId,
       shopify_order_id: shopifyOrderId,
@@ -822,8 +886,8 @@ export async function POST(req: Request) {
         paymentMethod === "pay_now" && shopifyInvoiceUrl
           ? "Order received. Redirecting you to secure checkout…"
           : paymentMethod === "invoice_me" && qboInvoiceSent
-            ? "Order submitted successfully. Your invoice and onboarding link are on the way."
-            : "Order submitted successfully. Check your email for the onboarding link.",
+            ? "Order submitted successfully. Your invoice is on the way."
+            : "Order submitted successfully. No extra onboarding step is required.",
     });
   } catch (error) {
     console.error("[booth-order] POST failed:", error instanceof Error ? error.message : error);

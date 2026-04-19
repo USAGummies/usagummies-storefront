@@ -6,10 +6,20 @@
  * before submitting. Server re-quotes at submit time too — this endpoint is
  * for UX preview only, not for trust.
  *
- * Body: { to_state: string, to_zip: string, qty: number, residential?: boolean }
+ * Body: {
+ *   to_state: string,
+ *   to_zip: string,
+ *   qty: number,
+ *   packaging_type: "bag" | "case" | "master_carton",
+ *   residential?: boolean
+ * }
  */
 import { NextResponse } from "next/server";
-import { getUpsGroundRate, isShipStationConfigured } from "@/lib/ops/shipstation-client";
+import {
+  getUpsGroundRate,
+  isShipStationConfigured,
+  type ShippingPackageType,
+} from "@/lib/ops/shipstation-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,6 +36,7 @@ export async function POST(req: Request) {
     to_state?: string;
     to_zip?: string;
     qty?: number;
+    packaging_type?: ShippingPackageType;
     residential?: boolean;
   };
   try {
@@ -37,6 +48,12 @@ export async function POST(req: Request) {
   const toState = String(body.to_state ?? "").trim().toUpperCase();
   const toZip = String(body.to_zip ?? "").trim();
   const qty = Math.max(1, Math.floor(Number(body.qty) || 1));
+  const packagingType =
+    body.packaging_type === "bag" ||
+    body.packaging_type === "case" ||
+    body.packaging_type === "master_carton"
+      ? body.packaging_type
+      : null;
 
   if (!/^[A-Z]{2}$/.test(toState)) {
     return NextResponse.json(
@@ -50,11 +67,18 @@ export async function POST(req: Request) {
       { status: 400 },
     );
   }
+  if (!packagingType) {
+    return NextResponse.json(
+      { ok: false, error: "Select bag, case, or master carton" },
+      { status: 400 },
+    );
+  }
 
   const result = await getUpsGroundRate({
     toZip,
     toState,
-    qtyMasterCases: qty,
+    packagingType,
+    quantity: qty,
     residential: body.residential,
   });
 

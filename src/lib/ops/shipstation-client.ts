@@ -2,8 +2,8 @@
  * ShipStation Rate-Quote Client — USA Gummies
  *
  * Pulls real-time UPS Ground rates from Ashford, WA (origin) to a destination
- * ZIP for wholesale booth orders. Used by /api/booth-order/freight-quote so
- * the booth form can show a live freight number before the customer submits.
+ * ZIP for wholesale quick-order shipments. Used by /api/booth-order/freight-quote
+ * so the booth form can show a live freight number before the customer submits.
  *
  * Auth: HTTP Basic with `SHIPSTATION_API_KEY:SHIPSTATION_API_SECRET`.
  * Docs: https://www.shipstation.com/docs/api/shipments/get-rates/
@@ -11,16 +11,30 @@
 import { Buffer } from "node:buffer";
 
 // ---------------------------------------------------------------------------
-// Origin + master-case spec (Ashford, WA warehouse → wholesale buyer)
+// Origin + package specs (Ashford, WA warehouse → wholesale buyer)
 // ---------------------------------------------------------------------------
 
 export const BOOTH_ORIGIN_ZIP = "98304"; // Mettler warehouse, Ashford WA
 
-// Master case = 6 inner cases × 6 bags = 36 bags. Per Notion 3/18 packaging
-// notes: master carton ~21 × 14 × 8" estimated. Bag gross weight ~8.25 oz, so
-// 36 × 8.25 oz ≈ 18.6 lb of bags + boxes/strips ≈ ~24 lb finished MC.
-export const BOOTH_MC_DIMS = { length: 21, width: 14, height: 8 } as const;
-export const BOOTH_MC_WEIGHT_LBS = 24;
+export type ShippingPackageType = "bag" | "case" | "master_carton";
+
+// The quick-order flow needs workable shipping estimates for one-off bag,
+// case, and master-carton sales. The bag/case specs are conservative retail
+// shipping approximations; the master carton matches the existing 36-unit
+// shipper assumptions already used in the booth flow.
+const PACKAGE_PROFILES: Record<
+  ShippingPackageType,
+  {
+    length: number;
+    width: number;
+    height: number;
+    weightLbs: number;
+  }
+> = {
+  bag: { length: 10, width: 8, height: 3, weightLbs: 1 },
+  case: { length: 14, width: 10, height: 8, weightLbs: 6 },
+  master_carton: { length: 21, width: 14, height: 8, weightLbs: 24 },
+};
 
 // ---------------------------------------------------------------------------
 // Types
@@ -64,7 +78,8 @@ export function isShipStationConfigured(): boolean {
 export async function getUpsGroundRate(params: {
   toZip: string;
   toState: string;
-  qtyMasterCases: number;
+  packagingType: ShippingPackageType;
+  quantity: number;
   residential?: boolean;
 }): Promise<{ ok: true; quote: FreightQuote } | { ok: false; error: string }> {
   const auth = getAuthHeader();
@@ -72,7 +87,11 @@ export async function getUpsGroundRate(params: {
     return { ok: false, error: "ShipStation credentials not configured" };
   }
 
-  const qty = Math.max(1, Math.floor(params.qtyMasterCases));
+  const qty = Math.max(1, Math.floor(params.quantity));
+  const profile = PACKAGE_PROFILES[params.packagingType];
+  if (!profile) {
+    return { ok: false, error: "Invalid packaging type" };
+  }
   if (!/^\d{5}(-\d{4})?$/.test(params.toZip.trim())) {
     return { ok: false, error: "Invalid ZIP code" };
   }
@@ -80,10 +99,10 @@ export async function getUpsGroundRate(params: {
     return { ok: false, error: "Invalid state code" };
   }
 
-  // ShipStation rates a single package per call. For multi-MC orders we
-  // quote one MC and multiply. UPS Ground rate scales nearly linearly with
-  // package count when dims are identical; fine approximation for booth
-  // orders, and avoids needing a multi-package endpoint.
+  // ShipStation rates a single package per call. For multi-package orders we
+  // quote one package and multiply. UPS Ground scales closely enough for
+  // identical bag/case/carton packages, which is sufficient for the quick
+  // order flow.
   const body = {
     carrierCode: "ups",
     serviceCode: "ups_ground",
@@ -92,12 +111,12 @@ export async function getUpsGroundRate(params: {
     toState: params.toState.trim().toUpperCase(),
     toCountry: "US",
     toPostalCode: params.toZip.trim(),
-    weight: { value: BOOTH_MC_WEIGHT_LBS, units: "pounds" },
+    weight: { value: profile.weightLbs, units: "pounds" },
     dimensions: {
       units: "inches",
-      length: BOOTH_MC_DIMS.length,
-      width: BOOTH_MC_DIMS.width,
-      height: BOOTH_MC_DIMS.height,
+      length: profile.length,
+      width: profile.width,
+      height: profile.height,
     },
     confirmation: "delivery",
     residential: params.residential ?? false,
