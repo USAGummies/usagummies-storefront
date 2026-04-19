@@ -17,8 +17,9 @@
  */
 
 import { NextResponse } from "next/server";
-import { createQBOCustomer } from "@/lib/ops/qbo-client";
+import { createQBOCustomer, createQBOInvoice } from "@/lib/ops/qbo-client";
 import { isQBOConfigured } from "@/lib/ops/qbo-client";
+import { getRealmId, getValidAccessToken } from "@/lib/ops/qbo-auth";
 import { sendOpsEmail } from "@/lib/ops/email";
 import {
   isHubSpotConfigured,
@@ -33,9 +34,63 @@ import {
   getUpsGroundRate,
   isShipStationConfigured,
 } from "@/lib/ops/shipstation-client";
+import { upsertOrder } from "@/lib/ops/order-desk";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const QBO_TRADE_SHOW_ITEM_ID = process.env.QBO_TRADE_SHOW_ITEM_ID?.trim() || "15";
+
+type ShopifyDraftCreateResponse = {
+  data?: {
+    draftOrderCreate?: {
+      draftOrder?: { id: string; name: string; invoiceUrl: string };
+      userErrors?: { field?: string[]; message: string }[];
+    };
+  };
+};
+
+type ShopifyDraftCompleteResponse = {
+  data?: {
+    draftOrderComplete?: {
+      draftOrder?: {
+        id: string;
+        order?: {
+          id: string;
+          name: string;
+          displayFinancialStatus?: string | null;
+          displayFulfillmentStatus?: string | null;
+        } | null;
+      };
+      userErrors?: { field?: string[]; message: string }[];
+    };
+  };
+};
+
+async function sendQBOInvoiceEmail(invoiceId: string, customerEmail: string): Promise<boolean> {
+  const accessToken = await getValidAccessToken();
+  const realmId = await getRealmId();
+  if (!accessToken || !realmId || !customerEmail.trim()) return false;
+
+  const host = process.env.QBO_SANDBOX === "true"
+    ? "https://sandbox-quickbooks.api.intuit.com"
+    : "https://quickbooks.api.intuit.com";
+
+  const url = `${host}/v3/company/${realmId}/invoice/${invoiceId}/send?sendTo=${encodeURIComponent(customerEmail.trim())}&minorversion=75`;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/octet-stream",
+        Accept: "application/json",
+      },
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
 
 export async function POST(req: Request) {
   try {
@@ -145,6 +200,9 @@ export async function POST(req: Request) {
 
     // Create QBO customer if QBO is connected
     let qboCustomerId: string | null = null;
+    let qboInvoiceId: string | null = null;
+    let qboInvoiceDocNumber: string | null = null;
+    let qboInvoiceSent = false;
     if (await isQBOConfigured()) {
       try {
         const result = await createQBOCustomer({
@@ -184,6 +242,8 @@ export async function POST(req: Request) {
     // submit.
     let shopifyDraftOrderId: string | null = null;
     let shopifyInvoiceUrl: string | null = null;
+    let shopifyOrderId: string | null = null;
+    let shopifyOrderName: string | null = null;
     const shopifyDomain = process.env.SHOPIFY_STORE_DOMAIN?.replace(/^https?:\/\//, "").replace(/\/$/, "");
     const shopifyToken = process.env.SHOPIFY_ADMIN_TOKEN;
     if (paymentMethod === "pay_now" && shopifyDomain && shopifyToken) {
@@ -271,6 +331,186 @@ export async function POST(req: Request) {
       }
     }
 
+    // ── Shopify order (Invoice Me) ──
+    // Invoice-based booth orders need to appear in a real operational queue.
+    // We create a draft, then complete it as payment-pending so it shows up
+    // in Shopify Orders while staying on ship hold until payment clears.
+    if (paymentMethod === "invoice_me" && shopifyDomain && shopifyToken) {
+      try {
+        const lineItemTitle = tier === "pallet"
+          ? `USA Gummies — All American Gummy Bears Pallet (${masterCasesPerPallet} master cases / ${totalBags} bags · landed)`
+          : `USA Gummies — All American Gummy Bears Master Carton (${bagsPerCase} bags)`;
+        const pricePerUnit = tier === "pallet"
+          ? Number((masterCasesPerPallet * bagsPerCase * pricePerBag).toFixed(2))
+          : Number((bagsPerCase * pricePerBag).toFixed(2));
+        const firstName = contact_name.split(/\s+/)[0] || contact_name;
+        const lastName = contact_name.split(/\s+/).slice(1).join(" ") || "";
+        const shippingTitle =
+          tier === "pallet"
+            ? "Pallet (LTL) — included in landed price"
+            : freightAmount > 0
+              ? `UPS Ground (${qty} master case${qty > 1 ? "s" : ""} from Ashford, WA)`
+              : "Shipping — quote pending, billed on invoice";
+
+        const createDraftMutation = `
+          mutation draftOrderCreate($input: DraftOrderInput!) {
+            draftOrderCreate(input: $input) {
+              draftOrder { id name invoiceUrl }
+              userErrors { field message }
+            }
+          }
+        `;
+
+        const draftInput: Record<string, unknown> = {
+          email: email.trim(),
+          note: [
+            `Booth order (Invoice Me / Net 10).`,
+            `${qty} ${unitLabel.toLowerCase()}${qty > 1 ? "s" : ""} (${masterCasesCount} MC · ${totalBags} bags) @ $${pricePerBag.toFixed(2)}/bag${tier === "pallet" ? " landed" : ""}.`,
+            `Freight: ${freightLabel}.`,
+            "SHIP HOLD: do not fulfill until QBO invoice is paid.",
+            qboCustomerId ? `QBO customer: ${qboCustomerId}.` : "QBO customer: pending.",
+          ].join(" "),
+          tags: ["wholesale", "booth", "invoice_me", tier, "awaiting_payment", "ship_hold"],
+          lineItems: [
+            {
+              title: lineItemTitle,
+              originalUnitPriceWithCurrency: {
+                amount: pricePerUnit.toFixed(2),
+                currencyCode: "USD",
+              },
+              quantity: qty,
+              requiresShipping: true,
+              taxable: true,
+            },
+          ],
+          shippingLine: {
+            title: shippingTitle,
+            price: freightAmount.toFixed(2),
+          },
+        };
+
+        if (ship_address) {
+          draftInput.shippingAddress = {
+            firstName,
+            lastName,
+            company: company_name.trim(),
+            address1: ship_address.trim(),
+            city: ship_city?.trim() || "",
+            province: ship_state?.trim() || "",
+            zip: ship_zip?.trim() || "",
+            country: "United States",
+            phone: phone?.trim() || "",
+          };
+        }
+
+        const endpoint = `https://${shopifyDomain}/admin/api/2025-01/graphql.json`;
+        const createRes = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Shopify-Access-Token": shopifyToken,
+          },
+          body: JSON.stringify({ query: createDraftMutation, variables: { input: draftInput } }),
+        });
+        const createJson = await createRes.json() as ShopifyDraftCreateResponse;
+        const createErrors = createJson.data?.draftOrderCreate?.userErrors ?? [];
+        if (createErrors.length) {
+          console.error("[booth-order] Shopify invoice draft userErrors:", createErrors);
+        } else {
+          shopifyDraftOrderId = createJson.data?.draftOrderCreate?.draftOrder?.id ?? null;
+          shopifyInvoiceUrl = createJson.data?.draftOrderCreate?.draftOrder?.invoiceUrl ?? null;
+        }
+
+        if (shopifyDraftOrderId) {
+          const completeDraftMutation = `
+            mutation draftOrderComplete($id: ID!, $paymentPending: Boolean) {
+              draftOrderComplete(id: $id, paymentPending: $paymentPending) {
+                draftOrder {
+                  id
+                  order {
+                    id
+                    name
+                    displayFinancialStatus
+                    displayFulfillmentStatus
+                  }
+                }
+                userErrors { field message }
+              }
+            }
+          `;
+
+          const completeRes = await fetch(endpoint, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Shopify-Access-Token": shopifyToken,
+            },
+            body: JSON.stringify({
+              query: completeDraftMutation,
+              variables: { id: shopifyDraftOrderId, paymentPending: true },
+            }),
+          });
+          const completeJson = await completeRes.json() as ShopifyDraftCompleteResponse;
+          const completeErrors = completeJson.data?.draftOrderComplete?.userErrors ?? [];
+          if (completeErrors.length) {
+            console.error("[booth-order] Shopify invoice draft completion userErrors:", completeErrors);
+          } else {
+            shopifyOrderId = completeJson.data?.draftOrderComplete?.draftOrder?.order?.id ?? null;
+            shopifyOrderName = completeJson.data?.draftOrderComplete?.draftOrder?.order?.name ?? null;
+          }
+        }
+      } catch (err) {
+        console.error("[booth-order] Shopify invoice order failed:", err instanceof Error ? err.message : err);
+      }
+    }
+
+    // ── QBO invoice (Invoice Me) ──
+    // Immediate invoice creation keeps accounting and ship hold aligned on day 1.
+    if (paymentMethod === "invoice_me" && qboCustomerId) {
+      try {
+        const dueDate = new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10);
+        const qboInvoice = await createQBOInvoice({
+          CustomerRef: { value: qboCustomerId },
+          DueDate: dueDate,
+          BillEmail: email?.trim() ? { Address: email.trim() } : undefined,
+          CustomerMemo: {
+            value: "Net 10. Please pay before shipment releases. Order remains on ship hold until payment clears.",
+          },
+          Line: [
+            {
+              Amount: subtotal,
+              DetailType: "SalesItemLineDetail",
+              SalesItemLineDetail: {
+                ItemRef: { value: QBO_TRADE_SHOW_ITEM_ID, name: "Trade Show" },
+                Qty: totalBags,
+                UnitPrice: pricePerBag,
+              },
+              Description: `${qty} ${unitLabel}${qty > 1 ? "s" : ""} (${masterCasesCount} master cases · ${totalBags} bags)`,
+            },
+            ...(freightAmount > 0
+              ? [{
+                  Amount: freightAmount,
+                  DetailType: "SalesItemLineDetail" as const,
+                  SalesItemLineDetail: {
+                    ItemRef: { value: QBO_TRADE_SHOW_ITEM_ID, name: "Trade Show" },
+                    Qty: 1,
+                    UnitPrice: freightAmount,
+                  },
+                  Description: `Shipping — ${freightLabel}`,
+                }]
+              : []),
+          ],
+        });
+        qboInvoiceId = typeof qboInvoice?.Id === "string" ? qboInvoice.Id : null;
+        qboInvoiceDocNumber = typeof qboInvoice?.DocNumber === "string" ? qboInvoice.DocNumber : null;
+        if (qboInvoiceId && email?.trim()) {
+          qboInvoiceSent = await sendQBOInvoiceEmail(qboInvoiceId, email.trim());
+        }
+      } catch (err) {
+        console.error("[booth-order] QBO invoice creation failed:", err instanceof Error ? err.message : err);
+      }
+    }
+
     // ── HubSpot: upsert contact + create B2B Wholesale deal at PO Received ──
     let hubspotContactId: string | null = null;
     let hubspotDealId: string | null = null;
@@ -314,6 +554,8 @@ export async function POST(req: Request) {
               `Payment method: ${paymentMethod === "pay_now" ? "Pay Now by card (5% prepay discount applied)" : "Invoice Me / Net 10"}`,
               `Pricing tier: ${tier === "pallet" ? "Pallet (LTL freight included in price)" : "Standard (UPS Ground billed separately)"}`,
               qboCustomerId ? `QBO Customer ID: ${qboCustomerId}` : "⚠ QBO customer not created",
+              qboInvoiceDocNumber ? `QBO Invoice: ${qboInvoiceDocNumber}${qboInvoiceSent ? " (sent)" : " (created, not emailed)"}` : "",
+              shopifyOrderName ? `Shopify Order: ${shopifyOrderName}` : shopifyDraftOrderId ? `Shopify Draft: ${shopifyDraftOrderId}` : "",
               freightError ? `⚠ Freight quote error: ${freightError}` : "",
               "",
               "Ship gate: onboarding_complete=false + payment_received=false. No ship until both flip true.",
@@ -330,6 +572,8 @@ export async function POST(req: Request) {
                 `Payment: <b>${paymentMethod === "pay_now" ? "Pay Now by card" : "Invoice Me / Net 10"}</b><br/>`,
                 `Ship to: ${ship_address || "—"}${ship_city ? `, ${ship_city}` : ""}${ship_state ? ` ${ship_state}` : ""}${ship_zip ? ` ${ship_zip}` : ""}</p>`,
                 qboCustomerId ? `<p>QBO Customer: <code>${qboCustomerId}</code></p>` : "",
+                qboInvoiceDocNumber ? `<p>QBO Invoice: <code>${qboInvoiceDocNumber}</code>${qboInvoiceSent ? " — emailed" : ""}</p>` : "",
+                shopifyOrderName ? `<p>Shopify Order: <code>${shopifyOrderName}</code></p>` : "",
                 notes ? `<p>Customer notes: ${notes.replace(/[<>]/g, "")}</p>` : "",
               ].filter(Boolean).join(""),
               contactId: contact.id,
@@ -372,18 +616,28 @@ export async function POST(req: Request) {
         `Subtotal: $${subtotal.toFixed(2)}`,
         shippingLine,
         `Order total: $${orderTotal.toFixed(2)}`,
-        `Payment: ${paymentMethod === "pay_now" ? "Paid by card — thank you!" : "Invoice will arrive shortly (Net 10)"}`,
+        `Payment: ${
+          paymentMethod === "pay_now"
+            ? "Paid by card — thank you!"
+            : qboInvoiceSent
+              ? `Invoice ${qboInvoiceDocNumber || ""} sent separately (Net 10)`.trim()
+              : "Invoice is being prepared now (Net 10)"
+        }`,
         ``,
         `── One quick step ──`,
         paymentMethod === "pay_now"
           ? `We just need 5 fast details (30 seconds) so we can get this on the truck. Click here to finish your setup:`
-          : `We just need a quick customer info form so we can send your invoice and get this shipped. Click here to continue:`,
+          : qboInvoiceSent
+            ? `We just need a quick customer info form so we can release shipment after payment clears. Click here to continue:`
+            : `We just need a quick customer info form so we can send your invoice and get this shipped. Click here to continue:`,
         ``,
         `${onboardingUrl}`,
         ``,
         paymentMethod === "pay_now"
           ? `I pack and ship your order personally from our warehouse in Ashford, WA within 2 business days of receiving your info.`
-          : `We'll email your invoice once you complete the form. I pack and ship from Ashford, WA as soon as payment clears.`,
+          : qboInvoiceSent
+            ? `Your invoice is already on the way. I pack and ship from Ashford, WA as soon as payment clears.`
+            : `We'll email your invoice once you complete the form. I pack and ship from Ashford, WA as soon as payment clears.`,
         ``,
         `Questions? Reply to this email — it goes straight to Ben.`,
         ``,
@@ -422,6 +676,53 @@ export async function POST(req: Request) {
       }
     }
 
+    try {
+      const shipTo = [company_name, ship_address, [ship_city, ship_state, ship_zip].filter(Boolean).join(" ")].filter(Boolean).join(" — ");
+      const orderRef = shopifyOrderName
+        || qboInvoiceDocNumber
+        || (shopifyDraftOrderId ? `Draft ${shopifyDraftOrderId.split("/").pop()}` : null)
+        || hubspotDealId
+        || `Booth-${Date.now()}`;
+      await upsertOrder({
+        id: [
+          "wholesale",
+          paymentMethod,
+          shopifyOrderId || shopifyDraftOrderId || qboInvoiceId || hubspotDealId || Date.now(),
+        ].join(":"),
+        channel: "Wholesale",
+        order_ref: String(orderRef),
+        customer_name: company_name.trim(),
+        ship_to: shipTo,
+        date: new Date().toISOString().slice(0, 10),
+        units: totalBags,
+        subtotal,
+        shipping_charged: freightAmount,
+        total: orderTotal,
+        terms: paymentMethod === "pay_now" ? "Prepaid card — ship hold until checkout clears" : "Net 10 — ship hold until QBO payment",
+        po_details: [
+          {
+            sku: "199284624702",
+            description: "All American Gummy Bears 7.5 oz bag",
+            quantity: totalBags,
+            unit_price: pricePerBag,
+            packaging_format: tier === "pallet" ? "pallet" : "36-case",
+            total: subtotal,
+          },
+        ],
+        packaging_format: tier === "pallet" ? "pallet" : "36-case",
+        status: "received",
+        notes: [
+          paymentMethod === "pay_now" ? "Checkout pending until Shopify payment completes." : "Awaiting invoice payment before ship release.",
+          qboCustomerId ? `QBO customer: ${qboCustomerId}` : null,
+          qboInvoiceDocNumber ? `QBO invoice: ${qboInvoiceDocNumber}${qboInvoiceSent ? " (sent)" : ""}` : null,
+          shopifyOrderName ? `Shopify order: ${shopifyOrderName}` : null,
+          shopifyDraftOrderId && !shopifyOrderName ? `Shopify draft: ${shopifyDraftOrderId}` : null,
+        ].filter(Boolean).join("\n"),
+      });
+    } catch (err) {
+      console.error("[booth-order] order desk log failed:", err instanceof Error ? err.message : err);
+    }
+
     // Build Slack notification
     const methodTag = paymentMethod === "pay_now" ? "💳 PAY NOW" : "📄 INVOICE";
     const orderSummary = [
@@ -443,12 +744,17 @@ export async function POST(req: Request) {
       notes ? `*Notes:* ${notes}` : null,
       ``,
       qboCustomerId ? `*QBO Customer ID:* ${qboCustomerId}` : `⚠️ QBO customer not created — needs manual setup`,
+      qboInvoiceDocNumber ? `*QBO Invoice:* ${qboInvoiceDocNumber}${qboInvoiceSent ? " (sent)" : " (created only)"}` : null,
       hubspotDealId ? `*HubSpot Deal:* ${hubspotDealId} (B2B Wholesale → PO Received)` : `⚠️ HubSpot deal not created`,
       paymentMethod === "pay_now"
         ? (shopifyInvoiceUrl
             ? `*💳 Shop Pay checkout:* <${shopifyInvoiceUrl}|${shopifyInvoiceUrl}>`
             : `⚠️ Pay Now requested but Shopify draft order FAILED — follow up manually`)
-        : null,
+        : (shopifyOrderName
+            ? `*🧾 Shopify order:* ${shopifyOrderName} (payment pending / ship hold)`
+            : shopifyDraftOrderId
+              ? `*🧾 Shopify draft:* ${shopifyDraftOrderId} (could not complete to order)`
+              : `⚠️ Invoice order not mirrored into Shopify — follow up manually`),
       welcomeEmailSent ? `*✉️ Welcome email sent* → onboarding at <${onboardingUrl}|${onboardingUrl}>` : `⚠️ Welcome email NOT sent — follow up manually`,
       ``,
       `*Next steps:*`,
@@ -458,7 +764,9 @@ export async function POST(req: Request) {
       `2. Onboarding gate flips green in HubSpot`,
       paymentMethod === "pay_now"
         ? `3. Payment already collected by card ✅`
-        : `3. Viktor creates invoice using Trade Show item (ID 15, account 400015.15); customer pays invoice`,
+        : qboInvoiceDocNumber
+          ? `3. QBO invoice ${qboInvoiceDocNumber}${qboInvoiceSent ? " emailed" : " created"}; customer pays invoice`
+          : `3. Create/send QBO invoice manually before shipment`,
       tier === "pallet"
         ? `4. Both gates green → Ben books LTL freight from Ashford, WA (cost absorbed in landed price)`
         : `4. Both gates green → Ben packs and ships from Ashford, WA via UPS Ground`,
@@ -498,16 +806,24 @@ export async function POST(req: Request) {
       order_total: orderTotal,
       payment_method: paymentMethod,
       qbo_customer_id: qboCustomerId,
+      qbo_invoice_id: qboInvoiceId,
+      qbo_invoice_doc_number: qboInvoiceDocNumber,
+      qbo_invoice_sent: qboInvoiceSent,
       hubspot_contact_id: hubspotContactId,
       hubspot_deal_id: hubspotDealId,
       welcome_email_sent: welcomeEmailSent,
       onboarding_url: onboardingUrl,
       // Pay Now path — Shopify Draft Order + checkout URL
       shopify_draft_order_id: shopifyDraftOrderId,
+      shopify_order_id: shopifyOrderId,
+      shopify_order_name: shopifyOrderName,
       payment_url: shopifyInvoiceUrl,
-      message: shopifyInvoiceUrl
-        ? "Order received. Redirecting you to secure checkout…"
-        : "Order submitted successfully. Check your email for the onboarding link.",
+      message:
+        paymentMethod === "pay_now" && shopifyInvoiceUrl
+          ? "Order received. Redirecting you to secure checkout…"
+          : paymentMethod === "invoice_me" && qboInvoiceSent
+            ? "Order submitted successfully. Your invoice and onboarding link are on the way."
+            : "Order submitted successfully. Check your email for the onboarding link.",
     });
   } catch (error) {
     console.error("[booth-order] POST failed:", error instanceof Error ? error.message : error);
