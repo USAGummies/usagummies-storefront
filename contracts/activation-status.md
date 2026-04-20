@@ -1,0 +1,83 @@
+# Activation Status — USA Gummies 3.0
+
+**Last updated:** 2026-04-20
+**Source of truth:** this file (commit history shows activation events)
+**Companion docs:** [`governance.md`](governance.md), [`activation-triggers.md`](activation-triggers.md), [`approval-taxonomy.md`](approval-taxonomy.md)
+
+---
+
+## Live agents + runtimes
+
+| Agent | Contract | Runtime | Heartbeat | Audience |
+|---|---|---|---|---|
+| Executive Brief | [agents/executive-brief.md](agents/executive-brief.md) | [`/api/ops/daily-brief`](../src/app/api/ops/daily-brief/route.ts) | Weekday 08:00 PT morning + Tue-Sat 17:00 PT EOD | `#ops-daily` |
+| Platform Health | — (control plane) | [`/api/ops/control-plane/health`](../src/app/api/ops/control-plane/health/route.ts) | Weekday 07:00 PT | `#ops-audit` |
+| Drift Audit Runner | [agents/drift-audit-runner.md](agents/drift-audit-runner.md) | [`/api/ops/control-plane/drift-audit`](../src/app/api/ops/control-plane/drift-audit/route.ts) | Sunday 20:00 PT | `#ops-audit` |
+| Viktor (Sales) | [viktor.md](viktor.md) | existing Slack runtime | `@viktor` mentions + W-7 Rene capture | `#sales`, `#finance` |
+| Viktor W-7 Rene Capture | [agents/viktor-rene-capture.md](agents/viktor-rene-capture.md) | [`/api/ops/viktor/rene-capture`](../src/app/api/ops/viktor/rene-capture/route.ts) | Event (via Viktor's Slack loop) | `#finance` |
+| Shipping Hub | (derived from [agents/sample-order-dispatch.md](agents/sample-order-dispatch.md)) | [`/ops/fulfillment`](../src/app/ops/fulfillment) + [`/api/ops/fulfillment`](../src/app/api/ops/fulfillment) | Always-on (session) | `/ops/fulfillment` UI |
+| Finance Exception Agent | [agents/finance-exception.md](agents/finance-exception.md) | [`/api/ops/agents/finance-exception/run`](../src/app/api/ops/agents/finance-exception/run/route.ts) | Weekday 06:15 PT | `#finance` |
+| Ops Agent | [agents/ops.md](agents/ops.md) | [`/api/ops/agents/ops/run`](../src/app/api/ops/agents/ops/run/route.ts) | Weekday 09:00 PT | `#operations` |
+
+## Contracts with runtime pending (phase 2)
+
+| Contract | Scope | Owner | Runtime path (planned) |
+|---|---|---|---|
+| [agents/booke.md](agents/booke.md) | Auto-categorize bank transactions in QBO | Rene | External SaaS — the contract governs Booke's outputs; our orchestration is via Finance Exception Agent |
+| [agents/reconciliation-specialist.md](agents/reconciliation-specialist.md) | Thursday weekly reconcile prep | Rene | Subset of Finance Exception Agent — promote to standalone if scope grows |
+| [agents/inventory-specialist.md](agents/inventory-specialist.md) | Per-SKU cover-day scan | Drew | Subset of Ops Agent — promote to standalone when on-hand inventory integration lands |
+| [agents/faire-specialist.md](agents/faire-specialist.md) | Faire Direct-share uplift | Ben | Separate runtime; requires Faire portal scraper |
+| [agents/compliance-specialist.md](agents/compliance-specialist.md) | COI watcher + Approved Claims gate | Ben | Separate runtime; requires insurance + claims store |
+| [agents/research-librarian.md](agents/research-librarian.md) | Weekly cross-cutting synthesis | Ben | Orchestrates R-1..R-7; LLM synthesis build |
+| [agents/r1-consumer.md](agents/r1-consumer.md) … [r7-press.md](agents/r7-press.md) | On-demand research | Ben | 7 separate runtimes — LLM + tool-use |
+| [agents/platform-specialist.md](agents/platform-specialist.md) | Connector smoke + secret rotation | Ben | Extends the existing platform health cron |
+
+## Latent divisions (do NOT activate without a trigger)
+
+Per [`activation-triggers.md`](activation-triggers.md) the 5 latent divisions (marketing-brand, marketing-paid, trade-shows-field, outreach-partnerships-press, customer-experience, product-packaging-rd) each have a measurable activation trigger. Do not activate one "because it feels useful." §15.6 anti-pattern.
+
+## Deferred integrations (flagged in runtimes)
+
+These agents currently surface `unavailable` for their dependent data until these are wired:
+
+- **Booke queue → Finance Exception Agent** (uncategorized transaction count)
+- **Gmail labeled vendor threads → Ops Agent** (vendor-thread freshness)
+- **Shopify on-hand inventory → Ops Agent** (inventory-low threshold)
+- **ShipStation shipment history → Fulfillment hub** ("paid — verify shipped" flag clears when wired)
+- **Faire brand portal scraper** (Faire Specialist)
+- **COI + insurance store** (Compliance Specialist)
+
+The no-fabrication rule means every missing data point surfaces with an explicit reason. Wiring is a separate commit per integration; none of these gate the Monday cutover.
+
+## Runtime inventory
+
+### Cron jobs ([vercel.json](../vercel.json))
+
+| Path | Schedule UTC | Schedule PT |
+|---|---|---|
+| `/api/ops/control-plane/health` | `0 14 * * 1-5` | Weekday 07:00 |
+| `/api/ops/agents/finance-exception/run?post=true` | `15 14 * * 1-5` | Weekday 06:15 PT — Wait, that's wrong — 14:15 UTC is 06:15 PT (PDT 07:15). Check DST. |
+| `/api/ops/daily-brief?kind=morning&post=true` | `0 15 * * 1-5` | Weekday 08:00 PT (07:00 PST) |
+| `/api/ops/agents/ops/run?post=true` | `0 17 * * 1-5` | Weekday 10:00 PT (09:00 PST) |
+| `/api/ops/daily-brief?kind=eod&post=true` | `0 0 * * 2-6` | Tue-Sat 17:00 PT |
+| `/api/ops/control-plane/drift-audit` | `0 3 * * 1` | Monday 20:00 PT (Sunday evening PT wall-clock) |
+
+(Cron times are UTC. PT mappings drift with DST.)
+
+### Middleware self-auth prefixes ([src/middleware.ts](../src/middleware.ts))
+
+`/api/ops/scheduler/master`, `/api/ops/engine/`, `/api/ops/notify`, `/api/ops/slack/`, `/api/ops/control-plane/`, `/api/ops/daily-brief`, `/api/ops/abra/`, `/api/ops/department/`, `/api/ops/plaid/`, `/api/ops/gmail-callback`, `/api/ops/qbo/`, `/api/ops/amazon-ads/`, `/api/ops/puzzle/`, `/api/ops/sweeps/`, `/api/ops/workflows/`, `/api/ops/approvals`, `/api/ops/forge/`, `/api/ops/archive/`, `/api/ops/freight/`, `/api/ops/pulse/`, `/api/ops/ledger/`, `/api/ops/inventory/`, `/api/ops/orders/`, `/api/ops/docs/`, `/api/ops/pipeline/`, `/api/ops/amazon/`, `/api/ops/alerts/`, `/api/ops/claims/`, `/api/ops/fulfillment`, `/api/ops/viktor/`, `/api/ops/agents/`.
+
+## Activation gate
+
+Per [`agents/README.md`](agents/README.md) rule 5:
+
+> Monday activation gate: Ben, Rene, or Drew (owner per division) must approve the corresponding contracts in `#ops-approvals` before the agent is turned on.
+
+The 2 new agents (Finance Exception Agent, Ops Agent) are wired but require Rene's + Drew's acknowledgment before the cron is left running unsupervised. Smoke-test their output once (via POST with `post=false`) before the first live post.
+
+## Open questions
+
+1. **Vercel Hobby cron limit** — we currently have 6 cron entries. If the plan caps at 4, the drift-audit + one other cron move to Make.com (spec § blocked-items.md).
+2. **Booke integration contract** — [agents/booke.md](agents/booke.md) defines Booke's write scope but the actual data feed from Booke into our control plane isn't wired. Finance Exception Agent shows `unavailable` for the Booke queue until this lands.
+3. **R-1..R-7 research agent runtimes** — 7 separate LLM agents is a Phase 2 build; Research Librarian is their orchestrator. Scope: 1-2 weeks.
