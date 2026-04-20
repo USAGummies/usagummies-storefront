@@ -45,6 +45,8 @@ const SELF_AUTHENTICATED_PREFIXES = [
   "/api/ops/ledger/", // LEDGER — Bookkeeping, decisions, COA routing (isAuthorized)
   "/api/ops/inventory/", // INVENTORY — Batch register, unit costs, on-hand (isAuthorized)
   "/api/ops/orders/", // ORDER DESK — Order log, fulfillment, samples (isAuthorized)
+  "/api/ops/fulfillment", // FULFILLMENT — Unified ship-today queue (session or CRON_SECRET)
+  "/api/ops/viktor/", // VIKTOR runtime — W-7 Rene-capture etc. (isCronAuthorized bearer CRON_SECRET)
   "/api/ops/docs/", // DOCS — Document extraction, transcription, receipts (isAuthorized)
   "/api/ops/pipeline/", // PIPELINE — Sales CRM, follow-ups, lead scoring (isAuthorized)
   "/api/ops/amazon/", // AMAZON — FBA inventory, restock, PPC, listing health (isAuthorized)
