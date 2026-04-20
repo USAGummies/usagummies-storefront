@@ -24,7 +24,8 @@ import { kv } from "@vercel/kv";
 
 import { isAuthorized } from "@/lib/ops/abra-auth";
 import {
-  createUpsGroundLabel,
+  createShippingLabel,
+  getCheapestShipStationRate,
   type LabelDestination,
   type LabelResult,
 } from "@/lib/ops/shipstation-client";
@@ -62,6 +63,9 @@ interface BuyLabelRequest {
   cartons?: number;
   dryRun?: boolean;
   updatedBy?: string;
+  /** Pin a specific carrier+service (from a prior rate-shop). Optional. */
+  carrierCode?: string;
+  serviceCode?: string;
 }
 
 export async function POST(req: Request): Promise<Response> {
@@ -94,6 +98,37 @@ export async function POST(req: Request): Promise<Response> {
   }, 0);
   const cartonCount = Math.max(1, body.cartons ?? defaultCartonCount);
 
+  // Rate-shop to pick the cheapest connected carrier unless the caller
+  // already pinned one. Runs once for the whole order since every carton
+  // goes to the same destination with the same packaging profile.
+  let carrierCode = body.carrierCode;
+  let serviceCode = body.serviceCode;
+  let ratePreview: { perPackage: number; total: number; carrier: string; service: string } | null = null;
+
+  if (!carrierCode || !serviceCode) {
+    const rate = await getCheapestShipStationRate({
+      toZip: body.destination.postalCode,
+      toState: body.destination.state,
+      packagingType,
+      quantity: cartonCount,
+      residential: body.destination.residential,
+    });
+    if (!rate.ok) {
+      return NextResponse.json(
+        { ok: false, error: `rate-shop failed: ${rate.error}` },
+        { status: 502 },
+      );
+    }
+    carrierCode = rate.quote.carrierCode;
+    serviceCode = rate.quote.serviceCode;
+    ratePreview = {
+      perPackage: rate.quote.perPackage,
+      total: rate.quote.rate,
+      carrier: rate.quote.carrier,
+      service: rate.quote.service,
+    };
+  }
+
   if (body.dryRun) {
     return NextResponse.json({
       ok: true,
@@ -101,18 +136,23 @@ export async function POST(req: Request): Promise<Response> {
       wouldBuy: cartonCount,
       keys,
       destination: body.destination,
+      pickedCarrier: carrierCode,
+      pickedService: serviceCode,
+      ratePreview,
     });
   }
 
   const labels: LabelResult[] = [];
   const errors: string[] = [];
 
-  // Buy one label per carton, identical destination.
+  // Buy one label per carton, identical destination + carrier + service.
   for (let i = 0; i < cartonCount; i++) {
     const orderNumber = `${keys.join("+")}#${i + 1}/${cartonCount}`;
-    const res = await createUpsGroundLabel({
+    const res = await createShippingLabel({
       destination: body.destination,
       packagingType,
+      carrierCode,
+      serviceCode,
       orderNumber,
       customerNotes: keys.join(", "),
     });
@@ -150,6 +190,7 @@ export async function POST(req: Request): Promise<Response> {
       };
     const nextStage: StageEntry["stage"] =
       prev.stage === "shipped" ? "shipped" : "ready";
+    const firstLabel = labels[0];
     updatedStages[key] = {
       ...prev,
       stage: nextStage,
@@ -157,8 +198,8 @@ export async function POST(req: Request): Promise<Response> {
       tracking: trackingJoined,
       labelUrl: labelUrls[0] ?? prev.labelUrl,
       labelCost: (prev.labelCost ?? 0) + totalCost,
-      carrier: "UPS",
-      service: "UPS® Ground",
+      carrier: firstLabel?.carrier ?? prev.carrier,
+      service: firstLabel?.service ?? prev.service,
       updatedAt: now,
       updatedBy: body.updatedBy?.trim() || prev.updatedBy,
     };

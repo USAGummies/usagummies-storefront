@@ -60,8 +60,12 @@ const PACKAGE_PROFILES: Record<
     weightLbs: number;
   }
 > = {
+  // Inner case: 6 bags 7.5 oz + inserts. ~6 lb packed (weighed 2026-04-20).
   case: { length: 14, width: 10, height: 8, weightLbs: 6 },
-  master_carton: { length: 21, width: 14, height: 8, weightLbs: 24 },
+  // Master carton: 6 cases × 6 bags = 36 bags 7.5 oz. Packed weight
+  // measured 2026-04-20 by Ben = 21 lb 2 oz = 21.125 lb. Canonical for
+  // all future shipments until a SKU or case-pack change is logged.
+  master_carton: { length: 21, width: 14, height: 8, weightLbs: 21.125 },
 };
 
 // ---------------------------------------------------------------------------
@@ -209,6 +213,165 @@ export async function getUpsGroundRate(params: {
 }
 
 // ---------------------------------------------------------------------------
+// Carrier-agnostic rate shopping
+// ---------------------------------------------------------------------------
+//
+// Ben's ShipStation trial has USPS connected but not UPS. The legacy
+// `getUpsGroundRate` above hardcodes UPS and fails when UPS isn't
+// connected. This helper instead lists connected carriers via
+// `/carriers`, rate-quotes against each, and returns the cheapest.
+//
+// Scope: parcel services only. Pallet orders short-circuit to LTL
+// (priced landed; not quoted here). Returns null if no carriers are
+// connected — the caller surfaces that as a clean unavailable.
+
+export interface CarrierInfo {
+  name: string;
+  code: string;
+  requiresFundedAccount?: boolean;
+  primary?: boolean;
+}
+
+export async function listShipStationCarriers(): Promise<
+  { ok: true; carriers: CarrierInfo[] } | { ok: false; error: string }
+> {
+  const auth = getAuthHeader();
+  if (!auth) return { ok: false, error: "ShipStation credentials not configured" };
+  try {
+    const res = await fetch("https://ssapi.shipstation.com/carriers", {
+      headers: { Authorization: auth, Accept: "application/json" },
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      return { ok: false, error: `ShipStation ${res.status}: ${text.slice(0, 200)}` };
+    }
+    const raw = (await res.json()) as Array<{
+      Name?: string;
+      Code?: string;
+      RequiresFundedAccount?: boolean;
+      Primary?: boolean;
+    }>;
+    const carriers = raw.map(
+      (c): CarrierInfo => ({
+        name: c.Name ?? "",
+        code: String(c.Code ?? ""),
+        requiresFundedAccount: Boolean(c.RequiresFundedAccount),
+        primary: Boolean(c.Primary),
+      }),
+    );
+    return { ok: true, carriers };
+  } catch (err) {
+    return {
+      ok: false,
+      error: `ShipStation /carriers threw: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+}
+
+export interface CheapestRateQuote {
+  provider: "shipstation";
+  carrier: string;
+  carrierCode: string;
+  service: string;
+  serviceCode: string;
+  rate: number;
+  deliveryDays: number | null;
+  /** Per-package rate; multiply by quantity for multi-package orders. */
+  perPackage: number;
+}
+
+/**
+ * Rate-shop across every connected ShipStation carrier and return the
+ * cheapest parcel service for the given destination + packaging.
+ *
+ * Multi-package orders quote one package then multiply by qty — UPS
+ * Ground + USPS Ground Advantage both scale linearly at our weights,
+ * so this is close enough for the fulfillment hub's "which carrier
+ * wins" call. Actual buy-time rate may differ by pennies.
+ */
+export async function getCheapestShipStationRate(params: {
+  toZip: string;
+  toState: string;
+  packagingType: Exclude<ShippingPackageType, "pallet">;
+  quantity: number;
+  residential?: boolean;
+  weightOverrideLbs?: number;
+}): Promise<{ ok: true; quote: CheapestRateQuote } | { ok: false; error: string }> {
+  const auth = getAuthHeader();
+  if (!auth) return { ok: false, error: "ShipStation credentials not configured" };
+
+  const carriersRes = await listShipStationCarriers();
+  if (!carriersRes.ok) return carriersRes;
+
+  const profile = PACKAGE_PROFILES[params.packagingType];
+  const weightLbs = params.weightOverrideLbs ?? profile.weightLbs;
+
+  const baseBody = {
+    packageCode: "package",
+    fromPostalCode: BOOTH_ORIGIN_ZIP,
+    toState: params.toState.trim().toUpperCase(),
+    toCountry: "US",
+    toPostalCode: params.toZip.trim(),
+    weight: { value: weightLbs, units: "pounds" },
+    dimensions: {
+      units: "inches",
+      length: profile.length,
+      width: profile.width,
+      height: profile.height,
+    },
+    confirmation: "delivery",
+    residential: params.residential ?? false,
+  };
+
+  // Fetch rates across every connected carrier in parallel.
+  const rateResults = await Promise.all(
+    carriersRes.carriers.map(async (c) => {
+      try {
+        const res = await fetch("https://ssapi.shipstation.com/shipments/getrates", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: auth },
+          body: JSON.stringify({ ...baseBody, carrierCode: c.code }),
+        });
+        if (!res.ok) return { carrier: c, rates: [] as ShipStationRate[] };
+        const rates = (await res.json()) as ShipStationRate[];
+        return { carrier: c, rates };
+      } catch {
+        return { carrier: c, rates: [] as ShipStationRate[] };
+      }
+    }),
+  );
+
+  // Flatten + exclude any zero/unreasonable rates.
+  const candidates: CheapestRateQuote[] = [];
+  for (const { carrier, rates } of rateResults) {
+    for (const r of rates) {
+      const perPackage = (r.shipmentCost ?? 0) + (r.otherCost ?? 0);
+      if (!Number.isFinite(perPackage) || perPackage <= 0) continue;
+      candidates.push({
+        provider: "shipstation",
+        carrier: carrier.name,
+        carrierCode: carrier.code,
+        service: r.serviceName,
+        serviceCode: r.serviceCode,
+        rate: Math.round(perPackage * Math.max(1, params.quantity) * 100) / 100,
+        deliveryDays: r.transitDays ?? null,
+        perPackage: Math.round(perPackage * 100) / 100,
+      });
+    }
+  }
+  if (candidates.length === 0) {
+    return {
+      ok: false,
+      error: "No rates returned from any connected ShipStation carrier",
+    };
+  }
+
+  // Sort by total rate, return cheapest.
+  candidates.sort((a, b) => a.rate - b.rate);
+  return { ok: true, quote: candidates[0] };
+}
+
+// ---------------------------------------------------------------------------
 // Label purchase (Phase 2 — Shipping Hub)
 // ---------------------------------------------------------------------------
 
@@ -248,16 +411,26 @@ interface ShipStationLabelResponse {
 }
 
 /**
- * Buy a UPS Ground shipping label for one package.
+ * Buy a shipping label for one package via ShipStation.
+ *
+ * `carrierCode` + `serviceCode` default to UPS Ground for backward
+ * compatibility with the legacy booth flow. The fulfillment hub's
+ * Phase-2 buy-label path passes the winner from
+ * `getCheapestShipStationRate()` so the actual carrier/service used
+ * varies per destination (USPS for light / AK, UPS Ground for heavy
+ * cross-country, etc.).
  *
  * Ship-from is USA Gummies / Ashford WA (see env-driven getShipFromAddress).
  * Parcel dimensions come from PACKAGE_PROFILES unless overridden. The method
  * hits ShipStation's `/shipments/createlabel` which atomically rates + buys
  * + returns a tracking number.
  */
-export async function createUpsGroundLabel(params: {
+export async function createShippingLabel(params: {
   destination: LabelDestination;
   packagingType: Exclude<ShippingPackageType, "pallet">;
+  /** Defaults to UPS Ground; pass the winning carrier/service from rate-shop. */
+  carrierCode?: string;
+  serviceCode?: string;
   /** Optional override — useful when multiple master cartons go to one address. */
   weightLbsOverride?: number;
   /** Idempotency — ShipStation uses `orderNumber` as the duplicate-detect key. */
@@ -281,8 +454,8 @@ export async function createUpsGroundLabel(params: {
   const weightLbs = params.weightLbsOverride ?? profile.weightLbs;
 
   const body = {
-    carrierCode: "ups",
-    serviceCode: "ups_ground",
+    carrierCode: params.carrierCode ?? "ups",
+    serviceCode: params.serviceCode ?? "ups_ground",
     packageCode: "package",
     confirmation: "delivery",
     shipDate: new Date().toISOString().slice(0, 10),
@@ -360,18 +533,43 @@ export async function createUpsGroundLabel(params: {
     (typeof data.shipmentCost === "number" ? data.shipmentCost : 0) +
     (typeof data.insuranceCost === "number" ? data.insuranceCost : 0);
 
+  const carrierUsed = data.carrierCode ?? params.carrierCode ?? "ups";
+  const serviceUsed = data.serviceCode ?? params.serviceCode ?? "ups_ground";
   return {
     ok: true,
     label: {
-      carrier: "UPS",
-      service: "UPS® Ground",
-      serviceCode: data.serviceCode || "ups_ground",
+      carrier: carrierUsed.toUpperCase(),
+      service: humanizeService(serviceUsed),
+      serviceCode: serviceUsed,
       trackingNumber: tracking,
       labelUrl,
       cost: Math.round(cost * 100) / 100,
       shipmentId: data.shipmentId ?? null,
     },
   };
+}
+
+function humanizeService(code: string): string {
+  const map: Record<string, string> = {
+    ups_ground: "UPS® Ground",
+    usps_ground_advantage: "USPS Ground Advantage",
+    usps_priority_mail: "USPS Priority Mail",
+    usps_first_class_mail: "USPS First-Class",
+    usps_parcel_select_ground: "USPS Parcel Select",
+    fedex_ground: "FedEx Ground",
+    fedex_home_delivery: "FedEx Home Delivery",
+  };
+  return map[code] ?? code;
+}
+
+/**
+ * Backwards-compat shim: old callers that hardcoded UPS Ground.
+ * Prefer `createShippingLabel` + pass the winner from rate-shop.
+ */
+export async function createUpsGroundLabel(
+  params: Omit<Parameters<typeof createShippingLabel>[0], "carrierCode" | "serviceCode">,
+): Promise<{ ok: true; label: LabelResult } | { ok: false; error: string }> {
+  return createShippingLabel({ ...params, carrierCode: "ups", serviceCode: "ups_ground" });
 }
 
 // ---------------------------------------------------------------------------

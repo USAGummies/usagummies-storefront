@@ -40,7 +40,7 @@ const SELF_AUTHENTICATED_PREFIXES = [
   "/api/ops/approvals", // Approvals — GET uses hasApprovalsReadAccess (session + CRON_SECRET), POST requires session
   "/api/ops/forge/", // FORGE — Production & Supply Chain tracking (isAuthorized)
   "/api/ops/archive/", // ARCHIVE — Data backup & Notion sync (isAuthorized)
-  "/api/ops/freight/", // FREIGHT — Shipping & Logistics tracking (isAuthorized)
+  "/api/ops/freight/", // FREIGHT — Shipping & Logistics tracking + rate-shop (isAuthorized / CRON_SECRET)
   "/api/ops/pulse/", // PULSE — Fleet health monitoring (isAuthorized)
   "/api/ops/ledger/", // LEDGER — Bookkeeping, decisions, COA routing (isAuthorized)
   "/api/ops/inventory/", // INVENTORY — Batch register, unit costs, on-hand (isAuthorized)
