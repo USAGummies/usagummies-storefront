@@ -1,8 +1,8 @@
 # Activation Status — USA Gummies 3.0
 
-**Last updated:** 2026-04-20
+**Last updated:** 2026-04-20 (evening — post specialist-runtime sweep)
 **Source of truth:** this file (commit history shows activation events)
-**Companion docs:** [`governance.md`](governance.md), [`activation-triggers.md`](activation-triggers.md), [`approval-taxonomy.md`](approval-taxonomy.md)
+**Companion docs:** [`governance.md`](governance.md), [`activation-triggers.md`](activation-triggers.md), [`approval-taxonomy.md`](approval-taxonomy.md), [`build-sequence.md`](build-sequence.md)
 
 ---
 
@@ -17,19 +17,19 @@
 | Viktor W-7 Rene Capture | [agents/viktor-rene-capture.md](agents/viktor-rene-capture.md) | [`/api/ops/viktor/rene-capture`](../src/app/api/ops/viktor/rene-capture/route.ts) | Event (via Viktor's Slack loop) | `#finance` |
 | Shipping Hub | (derived from [agents/sample-order-dispatch.md](agents/sample-order-dispatch.md)) | [`/ops/fulfillment`](../src/app/ops/fulfillment) + [`/api/ops/fulfillment`](../src/app/api/ops/fulfillment) | Always-on (session) | `/ops/fulfillment` UI |
 | Finance Exception Agent | [agents/finance-exception.md](agents/finance-exception.md) | [`/api/ops/agents/finance-exception/run`](../src/app/api/ops/agents/finance-exception/run/route.ts) | Weekday 06:15 PT | `#finance` |
-| Ops Agent | [agents/ops.md](agents/ops.md) | [`/api/ops/agents/ops/run`](../src/app/api/ops/agents/ops/run/route.ts) | Weekday 09:00 PT | `#operations` |
+| Ops Agent (now with Shopify inventory + Gmail vendor-thread freshness) | [agents/ops.md](agents/ops.md) | [`/api/ops/agents/ops/run`](../src/app/api/ops/agents/ops/run/route.ts) | Weekday 09:00 PT | `#operations` |
+| Compliance Specialist | [agents/compliance-specialist.md](agents/compliance-specialist.md) | [`/api/ops/agents/compliance/run`](../src/app/api/ops/agents/compliance/run/route.ts) | Weekday 11:00 PT | `#operations` (degraded → `#ops-audit` until `/Legal/Compliance Calendar` exists in Notion) |
+| Faire Specialist | [agents/faire-specialist.md](agents/faire-specialist.md) | [`/api/ops/agents/faire/run`](../src/app/api/ops/agents/faire/run/route.ts) | Thursday 11:00 PT | `#finance` (reconcile prep) + `#sales` (Direct-share). Degraded until `FAIRE_ACCESS_TOKEN` is set. |
+| Research Librarian | [agents/research-librarian.md](agents/research-librarian.md) | [`/api/ops/agents/research/run`](../src/app/api/ops/agents/research/run/route.ts) + [`/api/ops/research/note`](../src/app/api/ops/research/note/route.ts) | Friday 11:00 PT | `#research` — weekly synthesis of notes captured via the note POST endpoint. |
+| Booke queue feed | [agents/booke.md](agents/booke.md) | [`/api/ops/booke/push`](../src/app/api/ops/booke/push/route.ts) | Event (Zapier / Make posts count) | Feeds Finance Exception Agent "Uncategorized" cell. |
 
 ## Contracts with runtime pending (phase 2)
 
 | Contract | Scope | Owner | Runtime path (planned) |
 |---|---|---|---|
-| [agents/booke.md](agents/booke.md) | Auto-categorize bank transactions in QBO | Rene | External SaaS — the contract governs Booke's outputs; our orchestration is via Finance Exception Agent |
 | [agents/reconciliation-specialist.md](agents/reconciliation-specialist.md) | Thursday weekly reconcile prep | Rene | Subset of Finance Exception Agent — promote to standalone if scope grows |
-| [agents/inventory-specialist.md](agents/inventory-specialist.md) | Per-SKU cover-day scan | Drew | Subset of Ops Agent — promote to standalone when on-hand inventory integration lands |
-| [agents/faire-specialist.md](agents/faire-specialist.md) | Faire Direct-share uplift | Ben | Separate runtime; requires Faire portal scraper |
-| [agents/compliance-specialist.md](agents/compliance-specialist.md) | COI watcher + Approved Claims gate | Ben | Separate runtime; requires insurance + claims store |
-| [agents/research-librarian.md](agents/research-librarian.md) | Weekly cross-cutting synthesis | Ben | Orchestrates R-1..R-7; LLM synthesis build |
-| [agents/r1-consumer.md](agents/r1-consumer.md) … [r7-press.md](agents/r7-press.md) | On-demand research | Ben | 7 separate runtimes — LLM + tool-use |
+| [agents/inventory-specialist.md](agents/inventory-specialist.md) | Per-SKU cover-day scan | Drew | Subset of Ops Agent (now that Shopify on-hand cross-ref is wired into Ops Agent directly) — promote to standalone if Drew needs a dedicated cover-day forecast surface. |
+| [agents/r1-consumer.md](agents/r1-consumer.md) … [r7-press.md](agents/r7-press.md) | On-demand research per stream | Ben | 7 separate LLM-driven runtimes (Feedly Pro / Muck Rack / SerpAPI / USPTO TESS / SEC EDGAR / Finbox). Note-capture infra live via POST /api/ops/research/note; Librarian synthesis live. Individual LLM agents blocked on Ben's tool-stack decision. |
 | [agents/platform-specialist.md](agents/platform-specialist.md) | Connector smoke + secret rotation | Ben | Extends the existing platform health cron |
 
 ## Latent divisions (do NOT activate without a trigger)
