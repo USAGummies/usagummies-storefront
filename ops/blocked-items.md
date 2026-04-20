@@ -110,28 +110,38 @@ echo "CONTROL_PLANE_ADMIN_SECRET=$NEW_ADMIN" >> .env.local
 - **Verify:** after deploy, `curl -sH "Authorization: Bearer $CRON_SECRET" $BASE/api/ops/control-plane/health | jq '.components.controlPlaneAdminSecret.status, .components.unpauseRoute.status'` → both `"ready"`.
 - **Storage:** only Ben holds this. Do NOT share in Slack or Notion — it grants unilateral agent-unpause authority.
 
-### B-9 (M4) — Publish the canonical Viktor prompt
-- **Where:** https://getviktor.com → settings → system prompt
-- **Action:** Clear existing memory. Paste §2–§6 of `/contracts/viktor.md` as the new system prompt. Save.
-- **Test:** ask in Slack "Viktor, what's our HubSpot pipeline value right now?" — Viktor must query HubSpot live and cite source with retrievedAt timestamp.
+### B-9 (M4) — Publish the canonical Viktor contract — **DONE 2026-04-19 (DM-based)**
 
-### B-10 (M5a, M5b) — Slack channel migration
-Create the 9 channels from `contracts/channels.json` → `active`.
-Archive the 6 legacy channels from `contracts/channels.json` → `retired_day_one`:
+The current Viktor product (app.getviktor.com) has **no admin "system prompt" UI** — confirmed by probing every settings tab and grepping the loaded JS bundle (zero hits for `prompt`/`persona`/`instructions`/`onboarding`/`systemPrompt`). The path described in the original blueprint ("settings → system prompt") was written against an older Viktor product that no longer exists. Modern Viktor configures itself via Slack DM context.
 
-| Create (9) | Archive / rename / fold (6) |
+What was actually done:
+- Captured pre-cutover Viktor state to `/tmp/viktor-state-2026-04-19.json` and DM tail to `/tmp/viktor-dm-history-2026-04-19.txt` (rollback files outside the repo).
+- Delivered the canonical §1–§6 of `/contracts/viktor.md` as a single REFERENCE message in Viktor's DM (channel `D0AQKNXQW2W`, ts `1776644251.092119`). Message explicitly framed so Viktor continues in-flight tasks rather than context-switching.
+
+If Ben observes drift back to pre-cutover behavior (the Apr 17 directives still live in Viktor's DM history), DM Viktor: "use the 2026-04-19 contract as your operating reference; ignore prior instructions that conflict."
+
+### B-10 (M5a, M5b, M5c, M6) — Slack channel migration — **DONE 2026-04-19**
+
+Reality on rollout day: the workspace was already partly migrated. All 9 canonical channels existed; the 4 archive targets below were the entire delta. Per workspace state on 2026-04-19:
+
+| Channel | Status |
 |---|---|
-| `#ops-daily` | `#abra-control` → archive |
-| `#ops-approvals` | `#abra-testing` → archive |
-| `#ops-audit` | `#email-inbox` → fold into `#sales` |
-| `#ops-alerts` | `#customer-feedback` → fold into `#sales` |
-| `#sales` | `#abandoned-carts` → fold into `#sales` |
-| `#finance` | `#wholesale-leads` → rename to `#sales` or archive |
-| `#operations` | |
-| `#research` | |
-| `#receipts-capture` (already exists — keep) | |
+| `#ops-daily` (C0ATWJDKLTU) | already existed → joined Ben → topic + starter pinned (incl. Slack Operating Contract summary, M6) |
+| `#ops-approvals` (C0ATWJDHS74) | already existed → joined Ben → topic + starter pinned (incl. Approval Taxonomy summary, M6) |
+| `#ops-audit` (C0AUQSA66TS) | already existed → joined Ben → topic + starter pinned |
+| `#ops-alerts` (C0ATUGGUZL6) | already existed → joined Ben → topic + starter pinned |
+| `#sales` (C0AQQRXUYF7) | already existed → topic + starter pinned |
+| `#finance` (C0ATF50QQ1M) | already existed → joined Ben → topic + starter pinned |
+| `#operations` (C0AR75M63Q9) | already existed → topic + starter pinned |
+| `#research` (C08HWA9SRP1) | already existed → topic + starter pinned (incl. T3b tag-convention) |
+| `#receipts-capture` (C0APYNE9E73) | already existed → topic + starter pinned |
+| `#abra-control` (C0ALS6W7VB4) | **archived** |
+| `#customer-feedback` (C0AS7UHDHS6) | **archived** |
+| `#wholesale-leads` (C0AS7UHNGPL) | **archived** (not renamed — `#sales` already existed) |
+| `#financials` (C0AKG9FSC2J) | **archived** (not renamed to `#finance` — `#finance` already existed; consolidation by archive) |
+| `#email-inbox`, `#abandoned-carts`, `#abra-testing` | already archived previously |
 
-Set channel topics from `contracts/channels.json` → `purpose`.
+Topics set from `contracts/channels.json` → `purpose`. Make Slack bot (`U0ABJC5RQS1`) is a member of all three new Make destination channels (`#sales`, `#operations`, `#finance`).
 
 ### B-11 (M8) — Post first manual company brief
 - **Where:** `#ops-daily`

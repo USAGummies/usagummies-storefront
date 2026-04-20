@@ -70,9 +70,11 @@ launchctl list | grep usagummies
 # should no longer show paperclip-heartbeat / -server / session-archive-monday
 ```
 
-## Step 3 — Provision the new Slack app (Ben, ~15 min)
+## Step 3 — Provision the new Slack app — **DONE 2026-04-19**
 
-The old Paperclip bot returns `account_inactive`. Create a fresh 3.0 bot:
+`SLACK_BOT_TOKEN` and `SLACK_SIGNING_SECRET` are set in Vercel production. Bot user `U0AUQRVPUN4` is invited to the canonical channels. Verified end-to-end via E.3 smoke (daily-brief composed and posted to `#ops-daily` ts `1776645767.195099` with Block Kit blocks) and F.2 smoke (bad-signature → 401 with `length mismatch` body).
+
+Original setup recipe kept here for reference / re-bootstrap:
 
 1. https://api.slack.com/apps → Create New App → From scratch → Name: "USA Gummies Ops 3.0".
 2. **Bot Token Scopes** (OAuth & Permissions):
@@ -86,27 +88,22 @@ The old Paperclip bot returns `account_inactive`. Create a fresh 3.0 bot:
 6. Re-deploy so the env is live: `vercel --prod` or push any trivial commit to main.
 7. Re-check health: `components.slackConfig.status = "ready"`.
 
-## Step 4 — Create the 9 day-one Slack channels (Ben, ~15 min)
+## Step 4 — Reconcile the 9 day-one Slack channels — **DONE 2026-04-19**
 
-From [`contracts/channels.json`](../contracts/channels.json) `active[]`:
+Reality on rollout day: all 9 canonical channels (`#ops-daily`, `#ops-approvals`, `#ops-audit`, `#ops-alerts`, `#sales`, `#finance`, `#operations`, `#research`, `#receipts-capture`) already existed in the workspace. No creates needed. Topics + first pinned starter messages set via Slack Web API on 2026-04-19 (the `#ops-daily` and `#ops-approvals` starters double as the M6 governance summaries; `#research` starter doubles as the T3b tag-convention pin).
 
-```
-#ops-daily  #ops-approvals  #ops-audit  #ops-alerts
-#sales  #finance  #operations  #research
-#receipts-capture  (already exists — keep)
-```
+Archives executed 2026-04-19 (channels.json `retired_day_one` set):
+- `#abra-control`, `#customer-feedback`, `#wholesale-leads` archived.
+- `#financials` archived (rename to `#finance` was blocked because `#finance` already existed; consolidation by archive instead of rename).
+- `#email-inbox`, `#abandoned-carts`, `#abra-testing` were already archived previously.
 
-For each:
-1. Create (public).
-2. Invite the new bot.
-3. Set topic to the channel's `purpose` field from `channels.json`.
-4. Post the `allowed` / `not_allowed` summary as the first pinned message.
+Detail in [`blocked-items.md`](blocked-items.md) B-10.
 
-Archive per `channels.json` → `retired_day_one`: `#abra-control`, `#abra-testing`, `#email-inbox`, `#customer-feedback`, `#abandoned-carts`, `#wholesale-leads` (or rename `#wholesale-leads` → `#sales`).
+## Step 5 — Publish the canonical Viktor contract — **DONE 2026-04-19 (DM-based)**
 
-## Step 5 — Publish the canonical Viktor prompt (Ben, ~5 min)
+The current Viktor product has **no admin "system prompt" UI** — the path described above ("settings → system prompt") was written against an older Viktor product. Modern Viktor configures itself via Slack DM context.
 
-Go to https://getviktor.com → settings → system prompt. Clear memory. Paste §2–§6 of [`/contracts/viktor.md`](../contracts/viktor.md) as the new system prompt. Save.
+Cutover delivered on 2026-04-19 as a single REFERENCE message to Viktor's DM (channel `D0AQKNXQW2W`, ts `1776644251.092119`) containing §1–§6 of [`/contracts/viktor.md`](../contracts/viktor.md). Pre-cutover state captured to `/tmp/viktor-state-2026-04-19.json` and `/tmp/viktor-dm-history-2026-04-19.txt` for rollback. Detail in [`blocked-items.md`](blocked-items.md) B-9.
 
 Test: ask "Viktor, what's our HubSpot pipeline value right now?" in `#sales`. Viktor must query HubSpot live and cite source with `retrievedAt` timestamp.
 
