@@ -205,6 +205,12 @@ export function FulfillmentView() {
       {data && (
         <>
           <SummaryBar data={data} />
+          {data.autoPromoted.length > 0 && (
+            <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-3 text-xs text-green-800">
+              <strong>Auto-cleared this refresh (ShipStation confirmed shipped):</strong>{" "}
+              {data.autoPromoted.join(" · ")}
+            </div>
+          )}
           {data.degraded.length > 0 && (
             <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
               <strong>Degraded sources:</strong> {data.degraded.join(" | ")}

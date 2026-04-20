@@ -29,6 +29,14 @@
       "schedule": "0 18 * * 4"
     },
     {
+      "path": "/api/ops/agents/reconciliation/run?post=true",
+      "schedule": "0 17 * * 4"
+    },
+    {
+      "path": "/api/ops/agents/amazon-settlement/run?post=true",
+      "schedule": "30 17 * * 4"
+    },
+    {
       "path": "/api/ops/agents/research/run?post=true",
       "schedule": "0 18 * * 5"
     },

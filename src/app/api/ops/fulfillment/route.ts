@@ -20,6 +20,11 @@ import { isAuthorized } from "@/lib/ops/abra-auth";
 import { getQBOInvoices } from "@/lib/ops/qbo-client";
 import { queryRecentOrders } from "@/lib/ops/shopify-admin-actions";
 import { searchEmails } from "@/lib/ops/gmail-reader";
+import {
+  getRecentShipments,
+  isShipStationConfigured,
+  type ShipStationShipment,
+} from "@/lib/ops/shipstation-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -212,6 +217,8 @@ export interface FulfillmentPayload {
   manualPending: ManualPending[];
   sampleShips: SampleShip[];
   samples: SampleLead[];
+  /** KV keys auto-promoted to shipped by this GET via ShipStation cross-ref. */
+  autoPromoted: string[];
   degraded: string[];
 }
 
@@ -249,16 +256,12 @@ function resolveStage(
 type ManualPendingSeed = Omit<ManualPending, "key" | "stage">;
 
 const MANUAL_PENDING: ManualPendingSeed[] = [
-  {
-    slug: "inderbitzin-po-009180-remainder",
-    customer: "Inderbitzin Distributors, Inc.",
-    cases: 5,
-    bags: 180,
-    reason:
-      "PO #009180 remainder: SO was 28 cartons, Invoice #1205 billed first 23. Ben committed the final 5 to Patrick McDonald on 2026-03-19 'within two weeks' as production caught up.",
-    source: "Gmail thread 19d0844a668c625f — ben@usagummies.com → patrickm@inderbitzin.com",
-    targetShipBy: "2026-04-02",
-  },
+  // Inderbitzin PO #009180 remainder (5 cartons / 180 bags) — CANCELLED
+  // 2026-04-20 per Ben. Ben committed the remainder to Patrick McDonald
+  // on 2026-03-19; that commitment was cancelled rather than shipped as
+  // production caught up. Kept in the codebase as a commit-history
+  // record via the removal diff; any future pending commitments land
+  // in this array or move to a KV-backed store when volume justifies.
 ];
 
 // ---- Sample ship entries (Phase 1d) -------------------------------------
@@ -304,6 +307,99 @@ function slugifyRecipient(raw: string): string {
     .slice(0, 40);
 }
 
+// ---- ShipStation cross-ref (auto-clear "paid, verify shipped") ----------
+//
+// Runs on every GET. Pulls the last 30 days of ShipStation shipments +
+// matches against every non-shipped KV entry. Matching rules, cheapest
+// first:
+//   1. Exact orderNumber match — labels bought through /api/ops/
+//      fulfillment/buy-label write `orderNumber = <keys>#<i>/<n>`, so
+//      any prefix hit = definite match.
+//   2. Tracking-number match — if the KV entry already has a tracking
+//      number recorded (e.g. Ben pasted it in) and ShipStation knows
+//      the same tracking, auto-promote.
+//
+// On match, we promote the stage to `shipped` and copy the tracking
+// number + carrier so the UI renders the shipped banner.
+//
+// Fails silently if ShipStation creds aren't provisioned — we surface
+// the reason as a degraded-source line. Governance §1.6 no-fabrication:
+// missing creds means we can't verify, so we say so rather than
+// asserting "not shipped."
+
+async function crossRefShipStation(
+  stages: StageMap,
+  degraded: string[],
+): Promise<{ stages: StageMap; autoPromoted: string[] }> {
+  if (!isShipStationConfigured()) {
+    degraded.push("shipstation-cross-ref: SHIPSTATION_API_KEY/SECRET not configured");
+    return { stages, autoPromoted: [] };
+  }
+
+  const res = await getRecentShipments({ pageSize: 200 });
+  if (!res.ok) {
+    degraded.push(`shipstation-cross-ref: ${res.error}`);
+    return { stages, autoPromoted: [] };
+  }
+
+  const openKeys = Object.entries(stages)
+    .filter(([, entry]) => entry.stage !== "shipped")
+    .map(([key]) => key);
+  if (openKeys.length === 0) return { stages, autoPromoted: [] };
+
+  // Build a lookup of shipments keyed by both orderNumber prefix + tracking #.
+  const byOrderPrefix = new Map<string, ShipStationShipment>();
+  const byTracking = new Map<string, ShipStationShipment>();
+  for (const s of res.shipments) {
+    if (s.orderNumber) {
+      // Strip the "#<i>/<n>" cartons suffix so the prefix matches the base key.
+      const base = s.orderNumber.split("#")[0];
+      if (!byOrderPrefix.has(base)) byOrderPrefix.set(base, s);
+    }
+    if (s.trackingNumber) byTracking.set(s.trackingNumber, s);
+  }
+
+  const next: StageMap = { ...stages };
+  const autoPromoted: string[] = [];
+  const now = new Date().toISOString();
+
+  for (const key of openKeys) {
+    const entry = next[key];
+    // Rule 1: order-number prefix match.
+    const byOrder = byOrderPrefix.get(key);
+    // Rule 2: tracking-number match (entry already has a tracking # recorded).
+    const byTrackMatch =
+      entry.tracking && !byOrder
+        ? entry.tracking
+            .split(/[,\s]+/)
+            .filter(Boolean)
+            .map((t) => byTracking.get(t))
+            .find(Boolean)
+        : null;
+    const match = byOrder ?? byTrackMatch;
+    if (!match) continue;
+
+    next[key] = {
+      ...entry,
+      stage: "shipped",
+      shippedAt: match.shipDate ?? now,
+      tracking: match.trackingNumber ?? entry.tracking,
+      carrier: match.carrierCode ?? entry.carrier,
+      service: match.serviceCode ?? entry.service,
+      updatedAt: now,
+      notes: entry.notes
+        ? `${entry.notes} · auto-shipped via ShipStation #${match.shipmentId}`
+        : `auto-shipped via ShipStation #${match.shipmentId}`,
+    };
+    autoPromoted.push(key);
+  }
+
+  if (autoPromoted.length > 0) {
+    await kv.set(KV_STAGES, next);
+  }
+  return { stages: next, autoPromoted };
+}
+
 // ---- Handler: GET --------------------------------------------------------
 
 export async function GET(req: Request): Promise<Response> {
@@ -314,7 +410,7 @@ export async function GET(req: Request): Promise<Response> {
   const degraded: string[] = [];
   const now = new Date().toISOString();
 
-  const [stages, wholesaleRaw, dtcRaw, samples, sampleShipSeeds] = await Promise.all([
+  const [stagesRaw, wholesaleRaw, dtcRaw, samples, sampleShipSeeds] = await Promise.all([
     getStageMap().catch(() => ({}) as StageMap),
     loadWholesale().catch((err) => {
       degraded.push(`wholesale: ${err instanceof Error ? err.message : String(err)}`);
@@ -333,6 +429,10 @@ export async function GET(req: Request): Promise<Response> {
       return [] as SampleShipSeed[];
     }),
   ]);
+
+  // Run the ShipStation cross-ref once we know the KV state — it reads
+  // the open keys and auto-promotes any that ShipStation confirms shipped.
+  const { stages, autoPromoted } = await crossRefShipStation(stagesRaw, degraded);
 
   const wholesale: WholesaleInvoice[] = wholesaleRaw.map((w) => ({
     ...w,
@@ -392,6 +492,7 @@ export async function GET(req: Request): Promise<Response> {
     manualPending: activeManualPending,
     sampleShips: activeSampleShips,
     samples,
+    autoPromoted,
     degraded,
   };
 

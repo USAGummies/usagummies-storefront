@@ -373,3 +373,142 @@ export async function createUpsGroundLabel(params: {
     },
   };
 }
+
+// ---------------------------------------------------------------------------
+// Shipment history (cross-ref for the fulfillment hub auto-clear)
+// ---------------------------------------------------------------------------
+
+export interface ShipStationShipment {
+  shipmentId: number;
+  orderId: number | null;
+  orderNumber: string | null;
+  createDate: string;
+  shipDate: string | null;
+  trackingNumber: string | null;
+  carrierCode: string | null;
+  serviceCode: string | null;
+  voided: boolean;
+  /** Customer-ship-to name — useful when orderNumber isn't matchable. */
+  shipToName: string | null;
+  /** Ship-to postal code — used in our fuzzy match. */
+  shipToPostalCode: string | null;
+}
+
+interface ShipStationShipmentsListResponse {
+  shipments?: Array<{
+    shipmentId: number;
+    orderId?: number;
+    orderNumber?: string | null;
+    createDate?: string;
+    shipDate?: string | null;
+    trackingNumber?: string | null;
+    carrierCode?: string | null;
+    serviceCode?: string | null;
+    voided?: boolean;
+    shipTo?: { name?: string; postalCode?: string };
+  }>;
+  total?: number;
+  page?: number;
+  pages?: number;
+}
+
+/**
+ * Pull shipment records from ShipStation's v1 API for the auto-clear
+ * cross-ref flow (Shipping Hub Phase 2/3). Filters to real outbound
+ * shipments only (voided + non-tracking entries excluded at the
+ * caller's option via `includeVoided`).
+ *
+ * Why we pass shipDateStart instead of createDateStart: a ShipStation
+ * shipment is "historically interesting" to our hub once it's been
+ * handed to the carrier — that's what `shipDate` captures. Orders
+ * still in "awaiting shipment" don't help us auto-clear the flag.
+ *
+ * Returns [] if ShipStation creds are missing or the request fails —
+ * callers surface that as a degraded line rather than asserting that
+ * "no shipments" means "nothing shipped."
+ */
+export async function getRecentShipments(opts: {
+  /** ISO date (YYYY-MM-DD) or ISO timestamp. Defaults to 30 days back. */
+  shipDateStart?: string;
+  shipDateEnd?: string;
+  includeVoided?: boolean;
+  pageSize?: number;
+}): Promise<{ ok: true; shipments: ShipStationShipment[] } | { ok: false; error: string }> {
+  const auth = getAuthHeader();
+  if (!auth) return { ok: false, error: "ShipStation credentials not configured" };
+
+  const pageSize = Math.max(1, Math.min(500, opts.pageSize ?? 200));
+  const start =
+    opts.shipDateStart ??
+    new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+  const end = opts.shipDateEnd ?? new Date().toISOString().slice(0, 10);
+
+  const url = new URL("https://ssapi.shipstation.com/shipments");
+  url.searchParams.set("shipDateStart", start);
+  url.searchParams.set("shipDateEnd", end);
+  url.searchParams.set("pageSize", String(pageSize));
+  url.searchParams.set("page", "1");
+  url.searchParams.set("sortBy", "ShipDate");
+  url.searchParams.set("sortDir", "DESC");
+  if (!opts.includeVoided) url.searchParams.set("includeShipmentItems", "false");
+
+  let res: Response;
+  try {
+    res = await fetch(url.toString(), {
+      headers: { Authorization: auth, Accept: "application/json" },
+    });
+  } catch (err) {
+    return {
+      ok: false,
+      error: `ShipStation request failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    return { ok: false, error: `ShipStation ${res.status}: ${text.slice(0, 300)}` };
+  }
+
+  const data = (await res.json()) as ShipStationShipmentsListResponse;
+  const raws = data.shipments ?? [];
+  const shipments: ShipStationShipment[] = raws
+    .filter((s) => (opts.includeVoided ? true : !s.voided))
+    .map(
+      (s): ShipStationShipment => ({
+        shipmentId: s.shipmentId,
+        orderId: s.orderId ?? null,
+        orderNumber: s.orderNumber ?? null,
+        createDate: s.createDate ?? "",
+        shipDate: s.shipDate ?? null,
+        trackingNumber: s.trackingNumber ?? null,
+        carrierCode: s.carrierCode ?? null,
+        serviceCode: s.serviceCode ?? null,
+        voided: Boolean(s.voided),
+        shipToName: s.shipTo?.name ?? null,
+        shipToPostalCode: s.shipTo?.postalCode ?? null,
+      }),
+    );
+
+  return { ok: true, shipments };
+}
+
+/**
+ * Look up shipments by their `orderNumber` field (the one we pass to
+ * `createUpsGroundLabel` when buying labels from the fulfillment hub).
+ * Returns every shipment whose orderNumber starts with the given
+ * prefix — useful when multi-carton labels write
+ * `orderNumber = <keys>#<i>/<n>`.
+ */
+export async function findShipmentsByOrderNumberPrefix(
+  prefix: string,
+  opts: { daysBack?: number } = {},
+): Promise<ShipStationShipment[]> {
+  const res = await getRecentShipments({
+    shipDateStart: new Date(Date.now() - (opts.daysBack ?? 60) * 24 * 3600 * 1000)
+      .toISOString()
+      .slice(0, 10),
+  });
+  if (!res.ok) return [];
+  return res.shipments.filter(
+    (s) => s.orderNumber !== null && s.orderNumber.startsWith(prefix),
+  );
+}
