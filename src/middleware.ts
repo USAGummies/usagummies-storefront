@@ -50,6 +50,7 @@ const SELF_AUTHENTICATED_PREFIXES = [
   "/api/ops/agents/", // Specialist agent runtimes — finance-exception, ops, etc. (isAuthorized session + CRON_SECRET)
   "/api/ops/booke/", // Booke queue push/query (isCronAuthorized bearer CRON_SECRET)
   "/api/ops/research/", // Research notes push/list (isCronAuthorized bearer CRON_SECRET)
+  "/api/ops/shipstation/", // ShipStation diagnostics (isCronAuthorized)
   "/api/ops/docs/", // DOCS — Document extraction, transcription, receipts (isAuthorized)
   "/api/ops/pipeline/", // PIPELINE — Sales CRM, follow-ups, lead scoring (isAuthorized)
   "/api/ops/amazon/", // AMAZON — FBA inventory, restock, PPC, listing health (isAuthorized)
