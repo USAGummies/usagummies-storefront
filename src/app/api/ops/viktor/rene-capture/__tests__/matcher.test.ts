@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { matchW7Message } from "../route";
+import { matchW7Message } from "../matcher";
 
 describe("matchW7Message", () => {
   it("matches a standard R.NN response", () => {
