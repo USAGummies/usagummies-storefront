@@ -12,7 +12,6 @@
  *   quantity, packaging_type ("case" | "master_carton" | "pallet"),
  *   delivery_method ("shipping" | "in_person"),
  *   payment_method ("pay_now" | "invoice_me"),
- *   agreed_to_terms,
  *   notes
  */
 
@@ -166,7 +165,6 @@ export async function POST(req: Request) {
       delivery_method,
       notes,
       payment_method,
-      agreed_to_terms,
     } = body;
 
     // Validate required fields
@@ -179,12 +177,20 @@ export async function POST(req: Request) {
     if (!email?.trim()) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
     }
-
-    if (!agreed_to_terms) {
-      return NextResponse.json(
-        { error: "You must confirm that this is a real order before submitting." },
-        { status: 400 },
-      );
+    if (!phone?.trim()) {
+      return NextResponse.json({ error: "Phone is required" }, { status: 400 });
+    }
+    if (!ship_address?.trim()) {
+      return NextResponse.json({ error: "Shipping address is required" }, { status: 400 });
+    }
+    if (!ship_city?.trim()) {
+      return NextResponse.json({ error: "Shipping city is required" }, { status: 400 });
+    }
+    if (!/^[A-Z]{2}$/.test(String(ship_state ?? "").trim().toUpperCase())) {
+      return NextResponse.json({ error: "Enter a valid 2-letter state code" }, { status: 400 });
+    }
+    if (!/^\d{5}(-\d{4})?$/.test(String(ship_zip ?? "").trim())) {
+      return NextResponse.json({ error: "Enter a valid ZIP code" }, { status: 400 });
     }
 
     const qty = Math.max(1, Number(quantity) || 1);
@@ -199,21 +205,6 @@ export async function POST(req: Request) {
       paymentMethod === "pay_now" && prepayEligible ? 0.95 : 1;
     const pricePerBag = Math.round(basePrice * prepayMultiplier * 100) / 100;
     const subtotal = Number((totalBags * pricePerBag).toFixed(2));
-
-    if (deliveryMethod === "shipping") {
-      if (!ship_address?.trim()) {
-        return NextResponse.json({ error: "Shipping address is required" }, { status: 400 });
-      }
-      if (!ship_city?.trim()) {
-        return NextResponse.json({ error: "Shipping city is required" }, { status: 400 });
-      }
-      if (!/^[A-Z]{2}$/.test(String(ship_state ?? "").trim().toUpperCase())) {
-        return NextResponse.json({ error: "Enter a valid 2-letter state code" }, { status: 400 });
-      }
-      if (!/^\d{5}(-\d{4})?$/.test(String(ship_zip ?? "").trim())) {
-        return NextResponse.json({ error: "Enter a valid ZIP code" }, { status: 400 });
-      }
-    }
 
     // ── Server-side freight handling ──
     // Parcel shipments get a live UPS Ground quote before submit. Pallets are
