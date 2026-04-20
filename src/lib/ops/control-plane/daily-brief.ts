@@ -36,6 +36,34 @@ export interface RevenueLine {
   source?: { system: string; id?: string; retrievedAt: string };
 }
 
+/**
+ * AR bucket — one side of the sent-only AR + drafts-separately split.
+ *
+ * Per the 2026-03-30 Ben correction (Finance / Register — Decision Log):
+ * "AR counts only SENT invoices; drafts are NOT AR. Drafts report
+ * separately: 'Drafts: $X in N unsent invoices (not yet AR)'."
+ *
+ * Every non-null amountUsd requires source.system + source.retrievedAt
+ * (no-fabrication rule). Every null amountUsd requires an unavailableReason.
+ */
+export interface ARBucket {
+  /** Sum of dollar amounts in USD, or null if unavailable. Never NaN. */
+  amountUsd: number | null;
+  /** Count of invoices in this bucket. Zero is a valid value; null means unavailable. */
+  count: number | null;
+  /** If amountUsd/count are null, why. Short human-readable. */
+  unavailableReason?: string;
+  /** Live source id/url — required when amountUsd is non-null. */
+  source?: { system: string; retrievedAt: string };
+}
+
+export interface ARPosition {
+  /** Sent invoices with open balance — the only bucket that counts as AR. */
+  outstanding: ARBucket;
+  /** Unsent invoice drafts — NOT AR per 2026-03-30 Ben correction. */
+  drafts: ARBucket;
+}
+
 export interface BriefInput {
   kind: BriefKind;
   /** Timestamp the brief is "as of". */
@@ -75,6 +103,14 @@ export interface BriefInput {
     unavailableReason?: string;
     source?: { system: string; retrievedAt: string };
   };
+  /**
+   * AR position — split per 2026-03-30 Ben correction. Outstanding AR
+   * counts ONLY sent invoices; drafts are reported separately and are
+   * explicitly NOT AR. If unavailable (QBO unreachable or Make.com
+   * scenario didn't provide), the composer renders "unavailable" with
+   * the reason — never fabricates.
+   */
+  arPosition?: ARPosition;
   /** Any degradations to call out at the top of the brief. */
   degradations?: string[];
 }
@@ -216,6 +252,30 @@ export function composeDailyBrief(input: BriefInput): BriefOutput {
     }
   }
 
+  // ---- AR position (sent-only) + Drafts (not yet AR) ----
+  //
+  // 2026-03-30 Ben correction (Finance Decision Log): AR counts only
+  // SENT invoices. Drafts report separately and are explicitly NOT AR.
+  // Each bucket follows the same no-fabrication rule as revenue/cash —
+  // live number + source or explicit unavailableReason.
+  if (input.arPosition) {
+    blocks.push({
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: renderARPositionMarkdown(input.arPosition),
+      },
+    });
+  } else {
+    blocks.push({
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*AR Outstanding (sent invoices)*  unavailable — QBO AR query not wired into this run; drafts are NOT AR per 2026-03-30 Ben correction.`,
+      },
+    });
+  }
+
   // ---- Pending approvals breakdown ----
   if (pendingCount > 0) {
     const grouped = groupApprovalsByDivision(input.pendingApprovals);
@@ -301,4 +361,33 @@ function groupApprovalsByDivision(reqs: ApprovalRequest[]): Record<string, Appro
     out[r.division].push(r);
   }
   return out;
+}
+
+/**
+ * Render the two-line AR block: Outstanding (sent invoices only) and
+ * Drafts (not yet AR). Enforces the same no-fabrication rule as revenue
+ * and cash — a non-null amountUsd requires source.system + source.retrievedAt,
+ * else the line prints "unavailable — <reason>".
+ *
+ * 2026-03-30 Ben correction: "AR counts only SENT invoices; drafts are
+ * NOT AR. Drafts report separately."
+ */
+function renderARPositionMarkdown(ar: ARPosition): string {
+  return [
+    `*AR Outstanding (sent invoices)*  ${renderARBucket(ar.outstanding)}`,
+    `*Drafts (not yet AR)*  ${renderARBucket(ar.drafts)}`,
+  ].join("\n");
+}
+
+function renderARBucket(bucket: ARBucket): string {
+  const hasValidSource =
+    !!bucket.source && !!bucket.source.system && !!bucket.source.retrievedAt;
+  if (bucket.amountUsd != null && bucket.count != null && hasValidSource) {
+    const src = ` _(${bucket.source!.system}, ${bucket.source!.retrievedAt})_`;
+    return `$${bucket.amountUsd.toFixed(2)} across ${bucket.count} invoice(s)${src}`;
+  }
+  if ((bucket.amountUsd != null || bucket.count != null) && !hasValidSource) {
+    return `unavailable — amount=${bucket.amountUsd} count=${bucket.count} suppressed: missing source.system or source.retrievedAt (no-fabrication rule)`;
+  }
+  return `unavailable — ${bucket.unavailableReason ?? "no reason given"}`;
 }

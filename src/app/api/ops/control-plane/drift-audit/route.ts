@@ -28,6 +28,20 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request): Promise<Response> {
+  return runAudit(req);
+}
+
+/**
+ * GET handler for Vercel Cron. Vercel Cron triggers a bearer-authenticated
+ * GET request; it cannot send POST. GET uses the same query-string params
+ * (`sampleSize`, `windowDays`) as the POST variant, so callers can tune
+ * ad-hoc runs via URL while still running on the Sunday 8 PM PT cron.
+ */
+export async function GET(req: Request): Promise<Response> {
+  return runAudit(req);
+}
+
+async function runAudit(req: Request): Promise<Response> {
   if (!isCronAuthorized(req)) return unauthorized();
 
   // Query params let the operator override defaults for ad-hoc runs.

@@ -76,6 +76,87 @@ async function call(
   }
 }
 
+// ---- conversations.history (read-side) ---------------------------------
+
+export interface SlackHistoryMessage {
+  /** Slack user id of the poster (absent for system messages / bot posts with `bot_id` only). */
+  user?: string;
+  /** Message text (may contain mrkdwn). */
+  text: string;
+  /** Epoch-seconds-with-fractional-suffix timestamp and permalink anchor. */
+  ts: string;
+  /** Present if the message is inside a thread; parent ts. */
+  thread_ts?: string;
+  /** Subtype e.g. "bot_message"; omitted for regular user messages. */
+  subtype?: string;
+}
+
+export interface SlackHistoryResult {
+  ok: boolean;
+  messages?: SlackHistoryMessage[];
+  /** True iff the channel has older messages past the current page. */
+  has_more?: boolean;
+  /** Cursor token for the next page (pass back as `cursor` param). */
+  next_cursor?: string;
+  error?: string;
+  degraded?: boolean;
+}
+
+/**
+ * Read recent messages from a channel. Used by Viktor W-5 (Rene response
+ * capture) to scan #finance for decision-queue responses matching the
+ * decision-id regex per /contracts/agents/viktor-rene-capture.md.
+ *
+ * Auth: SLACK_BOT_TOKEN with `channels:history` scope (public channels)
+ * and/or `groups:history` (private channels). If the token is missing,
+ * returns `{ ok: false, degraded: true }` — per §6 degraded-mode rule.
+ */
+export async function conversationsHistory(params: {
+  /** Channel id (e.g. "C0ATF50QQ1M" for #finance). */
+  channel: string;
+  /** Lower-bound Slack ts ("start of window") — inclusive. Optional. */
+  oldest?: string;
+  /** Upper-bound Slack ts ("end of window") — inclusive. Optional. */
+  latest?: string;
+  /** Max messages per page (Slack cap 999; default 100). */
+  limit?: number;
+  /** Pagination cursor from a prior call's `next_cursor`. */
+  cursor?: string;
+}): Promise<SlackHistoryResult> {
+  const bot = token();
+  if (!bot) {
+    return { ok: false, degraded: true, error: "SLACK_BOT_TOKEN not configured (degraded mode)" };
+  }
+  try {
+    const qs = new URLSearchParams({ channel: params.channel });
+    if (params.oldest) qs.set("oldest", params.oldest);
+    if (params.latest) qs.set("latest", params.latest);
+    if (params.limit) qs.set("limit", String(params.limit));
+    if (params.cursor) qs.set("cursor", params.cursor);
+    const res = await fetch(`https://slack.com/api/conversations.history?${qs.toString()}`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${bot}`,
+      },
+    });
+    const json = (await res.json()) as SlackHistoryResult & { response_metadata?: { next_cursor?: string } };
+    if (!json.ok) {
+      return { ok: false, error: json.error ?? `HTTP ${res.status}` };
+    }
+    return {
+      ok: true,
+      messages: json.messages ?? [],
+      has_more: json.has_more,
+      next_cursor: json.response_metadata?.next_cursor,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "unknown slack error",
+    };
+  }
+}
+
 export async function postMessage(params: PostMessageParams): Promise<SlackResult> {
   return call("chat.postMessage", {
     channel: params.channel,

@@ -118,6 +118,10 @@ Viktor's writes map to the canonical approval taxonomy (`/contracts/approval-tax
 
 If any of 1–5 fails, task is **not** complete — report the gap and fix it.
 
+### W-7 — Rene response capture (finance decision queue)
+**Trigger:** new message in `#finance` (C0ATF50QQ1M) from Rene (U0ALL27JM38) matching `(R.NN | J.NN | CF-NN | D.NNN | APPROVED | REDLINE): <answer>`; DM from Rene matching same pattern.
+**Steps:** see [`/contracts/agents/viktor-rene-capture.md`](agents/viktor-rene-capture.md). Viktor handles this via his own existing Slack presence on the Sales-division runtime — no Vercel Cron (per Ben 2026-04-20). Read the SOP on boot and add it to the normal Slack loop.
+
 ## 5. Communication protocol (AR / DA)
 
 **Action Request (AR)** — when Viktor needs a human decision:

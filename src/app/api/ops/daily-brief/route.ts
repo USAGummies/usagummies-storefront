@@ -21,6 +21,7 @@ import { NextResponse } from "next/server";
 
 import {
   composeDailyBrief,
+  type ARPosition,
   type BriefKind,
   type RevenueLine,
 } from "@/lib/ops/control-plane/daily-brief";
@@ -60,9 +61,35 @@ interface BriefBodyOverrides {
     unavailableReason?: string;
     source?: { system: string; retrievedAt: string };
   };
+  /**
+   * AR position — two buckets per the 2026-03-30 Ben correction.
+   * `outstanding` = sent invoices with open balance (the only bucket
+   * that counts as AR). `drafts` = unsent invoices (NOT AR; reported
+   * separately). Each bucket is an ARBucket following the same
+   * no-fabrication contract as revenueYesterday / cashPosition.
+   */
+  arPosition?: ARPosition;
 }
 
 export async function POST(req: Request): Promise<Response> {
+  return composeAndPost(req);
+}
+
+/**
+ * GET handler for Vercel Cron. Vercel Cron triggers a bearer-authenticated
+ * GET request; it cannot send a POST body. GET uses only the query-string
+ * params (`kind`, `post`) — revenue/cash overrides are not available from a
+ * cron trigger, so the brief renders "unavailable" for those lines unless
+ * they can be resolved server-side (Plaid live fetch for cash position).
+ *
+ * Make.com scenarios should continue to use POST with the JSON override
+ * body when they have pre-fetched revenue data.
+ */
+export async function GET(req: Request): Promise<Response> {
+  return composeAndPost(req);
+}
+
+async function composeAndPost(req: Request): Promise<Response> {
   if (!isCronAuthorized(req)) return unauthorized();
 
   const url = new URL(req.url);
@@ -170,6 +197,7 @@ export async function POST(req: Request): Promise<Response> {
     lastDriftAuditSummary,
     revenueYesterday: overrides.revenueYesterday,
     cashPosition,
+    arPosition: overrides.arPosition,
     degradations,
   } as const;
   let brief = composeDailyBrief(composeInput);
@@ -258,6 +286,11 @@ function validateOverrides(raw: unknown): ValidatedOverrides | InvalidOverrides 
     validateCashPosition(cashPosition, problems);
   }
 
+  const arPosition = body.arPosition;
+  if (arPosition !== undefined) {
+    validateARPosition(arPosition, problems);
+  }
+
   if (problems.length > 0) {
     return { ok: false, problems };
   }
@@ -293,6 +326,70 @@ function validateRevenueLine(line: unknown, i: number, problems: string[]): void
   const source = l.source;
   if (source === undefined || source === null || typeof source !== "object") {
     problems.push(`${here}: amountUsd=${amount} but source is missing. Every non-null amount requires source.`);
+    return;
+  }
+  const s = source as Record<string, unknown>;
+  if (typeof s.system !== "string" || s.system.trim() === "") {
+    problems.push(`${here}: source.system must be a non-empty string`);
+  }
+  if (typeof s.retrievedAt !== "string" || s.retrievedAt.trim() === "") {
+    problems.push(`${here}: source.retrievedAt must be a non-empty string (ISO 8601)`);
+  }
+}
+
+function validateARPosition(pos: unknown, problems: string[]): void {
+  const here = "arPosition";
+  if (pos === null || typeof pos !== "object") {
+    problems.push(`${here}: must be an object with outstanding + drafts buckets`);
+    return;
+  }
+  const p = pos as Record<string, unknown>;
+  if (p.outstanding === undefined) {
+    problems.push(`${here}.outstanding: required (sent-only AR bucket)`);
+  } else {
+    validateARBucket(p.outstanding, `${here}.outstanding`, problems);
+  }
+  if (p.drafts === undefined) {
+    problems.push(`${here}.drafts: required (unsent-drafts bucket; NOT AR)`);
+  } else {
+    validateARBucket(p.drafts, `${here}.drafts`, problems);
+  }
+}
+
+function validateARBucket(bucket: unknown, here: string, problems: string[]): void {
+  if (bucket === null || typeof bucket !== "object") {
+    problems.push(`${here}: must be an object with amountUsd + count + source|unavailableReason`);
+    return;
+  }
+  const b = bucket as Record<string, unknown>;
+  const amount = b.amountUsd;
+  const count = b.count;
+  if (amount === undefined) {
+    problems.push(`${here}: amountUsd is required (number | null)`);
+    return;
+  }
+  if (amount !== null && (typeof amount !== "number" || !Number.isFinite(amount))) {
+    problems.push(`${here}: amountUsd must be a finite number or null`);
+    return;
+  }
+  if (count === undefined) {
+    problems.push(`${here}: count is required (integer | null)`);
+    return;
+  }
+  if (count !== null && (typeof count !== "number" || !Number.isInteger(count) || count < 0)) {
+    problems.push(`${here}: count must be a non-negative integer or null`);
+    return;
+  }
+  if (amount === null || count === null) {
+    if (typeof b.unavailableReason !== "string" || b.unavailableReason.trim() === "") {
+      problems.push(`${here}: amountUsd or count is null so unavailableReason is required (non-empty string)`);
+    }
+    return;
+  }
+  // both non-null — source is required and well-formed
+  const source = b.source;
+  if (source === undefined || source === null || typeof source !== "object") {
+    problems.push(`${here}: amountUsd=${amount} count=${count} but source is missing. Every non-null bucket requires source.`);
     return;
   }
   const s = source as Record<string, unknown>;

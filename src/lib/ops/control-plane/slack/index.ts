@@ -42,5 +42,11 @@ export function __resetSurfaces(): void {
 }
 
 export { ApprovalSurface, AuditSurface };
-export { postMessage, updateMessage, verifySlackSignature, slackUserIdToHumanOwner } from "./client";
-export type { SlackResult } from "./client";
+export {
+  postMessage,
+  updateMessage,
+  verifySlackSignature,
+  slackUserIdToHumanOwner,
+  conversationsHistory,
+} from "./client";
+export type { SlackResult, SlackHistoryMessage, SlackHistoryResult } from "./client";

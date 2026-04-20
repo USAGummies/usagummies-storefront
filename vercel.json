@@ -1,3 +1,20 @@
 {
-  "crons": []
+  "crons": [
+    {
+      "path": "/api/ops/control-plane/health",
+      "schedule": "0 14 * * 1-5"
+    },
+    {
+      "path": "/api/ops/daily-brief?kind=morning&post=true",
+      "schedule": "0 15 * * 1-5"
+    },
+    {
+      "path": "/api/ops/daily-brief?kind=eod&post=true",
+      "schedule": "0 0 * * 2-6"
+    },
+    {
+      "path": "/api/ops/control-plane/drift-audit",
+      "schedule": "0 3 * * 1"
+    }
+  ]
 }
