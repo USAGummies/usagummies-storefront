@@ -24,48 +24,110 @@ import { searchEmails } from "@/lib/ops/gmail-reader";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// ---- "Marked shipped" persistence ---------------------------------------
+// ---- Stage machine persistence ------------------------------------------
 //
 // Fulfillment tracking isn't in QBO (QBO knows invoice+payment, not ship).
-// Until we wire ShipStation cross-reference, we keep a KV-backed set of
-// items Ben has manually marked shipped. Keys:
+// We keep a KV-backed stage state per shippable item:
+//   received → packed → ready → shipped
+//
+// Key format (stable across schema changes):
 //   inv:<qbo-invoice-id>      — e.g. inv:1492 for Inderbitzin #1205
 //   pending:<slug>            — e.g. pending:inderbitzin-po-009180-remainder
 //   dtc:<shopify-order-id>    — e.g. dtc:gid://shopify/Order/16623047573875
-const KV_SHIPPED = "fulfillment:shipped";
+//   sample:<slug>             — Phase 1d: manual sample-ship entries
+//
+// Backwards-compat note: `fulfillment:shipped` (binary map) is the
+// pre-stage schema; we lazy-migrate on first read so the Inderbitzin
+// #1205 entry that was written before the stage rollout still drops off
+// the queue correctly.
+const KV_STAGES = "fulfillment:stages";
+const KV_SHIPPED_LEGACY = "fulfillment:shipped";
 
-export interface ShippedEntry {
-  shippedAt: string; // ISO
+export type Stage = "received" | "packed" | "ready" | "shipped";
+
+export interface StageEntry {
+  stage: Stage;
+  cartonsRequired: number;
+  cartonsPacked: number;
+  tracking?: string;
+  labelUrl?: string;
+  labelCost?: number;
+  carrier?: string;
+  service?: string;
+  notes?: string;
+  receivedAt: string;
+  packedAt?: string;
+  readyAt?: string;
+  shippedAt?: string;
+  updatedBy?: string;
+  updatedAt: string;
+}
+
+export interface LegacyShippedEntry {
+  shippedAt: string;
   tracking?: string;
   notes?: string;
   shippedBy?: string;
 }
-type ShippedMap = Record<string, ShippedEntry>;
 
-async function getShippedMap(): Promise<ShippedMap> {
-  return ((await kv.get<ShippedMap>(KV_SHIPPED)) ?? {}) as ShippedMap;
+type StageMap = Record<string, StageEntry>;
+type LegacyShippedMap = Record<string, LegacyShippedEntry>;
+
+function legacyToStage(l: LegacyShippedEntry): StageEntry {
+  return {
+    stage: "shipped",
+    cartonsRequired: 0,
+    cartonsPacked: 0,
+    tracking: l.tracking,
+    notes: l.notes,
+    receivedAt: l.shippedAt,
+    shippedAt: l.shippedAt,
+    updatedBy: l.shippedBy,
+    updatedAt: l.shippedAt,
+  };
 }
 
-async function markShipped(
-  key: string,
-  entry: ShippedEntry,
-): Promise<ShippedMap> {
-  const current = await getShippedMap();
+async function getStageMap(): Promise<StageMap> {
+  const [stagesRaw, legacyRaw] = await Promise.all([
+    kv.get<StageMap>(KV_STAGES),
+    kv.get<LegacyShippedMap>(KV_SHIPPED_LEGACY),
+  ]);
+  const stages: StageMap = { ...(stagesRaw ?? {}) };
+  // Legacy entries fill in any keys not yet present in the new schema.
+  for (const [k, v] of Object.entries(legacyRaw ?? {})) {
+    if (!stages[k]) stages[k] = legacyToStage(v);
+  }
+  return stages;
+}
+
+async function writeStage(key: string, entry: StageEntry): Promise<StageMap> {
+  const current = await getStageMap();
   current[key] = entry;
-  await kv.set(KV_SHIPPED, current);
+  await kv.set(KV_STAGES, current);
   return current;
 }
 
-async function unmarkShipped(key: string): Promise<ShippedMap> {
-  const current = await getShippedMap();
-  delete current[key];
-  await kv.set(KV_SHIPPED, current);
-  return current;
+async function removeStage(key: string): Promise<StageMap> {
+  const [stagesRaw, legacyRaw] = await Promise.all([
+    kv.get<StageMap>(KV_STAGES),
+    kv.get<LegacyShippedMap>(KV_SHIPPED_LEGACY),
+  ]);
+  const stages: StageMap = { ...(stagesRaw ?? {}) };
+  delete stages[key];
+  const legacy: LegacyShippedMap = { ...(legacyRaw ?? {}) };
+  if (legacy[key]) {
+    delete legacy[key];
+    await kv.set(KV_SHIPPED_LEGACY, legacy);
+  }
+  await kv.set(KV_STAGES, stages);
+  // Re-merge legacy entries for anything we didn't just remove.
+  return getStageMap();
 }
 
 // ---- Types ---------------------------------------------------------------
 
 export interface WholesaleInvoice {
+  key: string; // "inv:<id>"
   id: string;
   docNumber: string | null;
   customer: string;
@@ -79,9 +141,11 @@ export interface WholesaleInvoice {
   shipAddr: string | null;
   memo: string | null;
   shipVerifyTodo: boolean;
+  stage: StageEntry;
 }
 
 export interface DtcOrder {
+  key: string; // "dtc:<shopify-gid>"
   id: string;
   name: string;
   customer: string;
@@ -90,9 +154,11 @@ export interface DtcOrder {
   financialStatus: string;
   fulfillmentStatus: string;
   createdAt: string;
+  stage: StageEntry;
 }
 
 export interface ManualPending {
+  key: string; // "pending:<slug>"
   slug: string;
   customer: string;
   cases: number;
@@ -100,6 +166,20 @@ export interface ManualPending {
   reason: string;
   source: string;
   targetShipBy: string | null;
+  stage: StageEntry;
+}
+
+export interface SampleShip {
+  key: string; // "sample:<slug>"
+  slug: string;
+  recipient: string;
+  company: string | null;
+  address: string;
+  bags: number;
+  purpose: string;
+  sourceThreadLink: string | null;
+  createdAt: string;
+  stage: StageEntry;
 }
 
 export interface SampleLead {
@@ -121,21 +201,54 @@ export interface FulfillmentPayload {
     dtcOrders: number;
     manualPendingCases: number;
     manualPendingBags: number;
-    samplesPending: number;
-    shippableTodayBags: number; // wholesaleBags + manualPendingBags + (DTC count is just count, no bag aggregation at this layer)
+    sampleShips: number;
+    sampleBags: number;
+    samplesPending: number; // Gmail leads (unqueued)
+    shippableTodayBags: number;
+    byStage: Record<Stage, number>;
   };
   wholesale: WholesaleInvoice[];
   dtc: DtcOrder[];
   manualPending: ManualPending[];
+  sampleShips: SampleShip[];
   samples: SampleLead[];
   degraded: string[];
+}
+
+// ---- Default stage + carton-required inference --------------------------
+
+function defaultStage(now: string, cartonsRequired = 0): StageEntry {
+  return {
+    stage: "received",
+    cartonsRequired,
+    cartonsPacked: 0,
+    receivedAt: now,
+    updatedAt: now,
+  };
+}
+
+function resolveStage(
+  key: string,
+  cartonsRequired: number,
+  map: StageMap,
+  now: string,
+): StageEntry {
+  const existing = map[key];
+  if (!existing) return defaultStage(now, cartonsRequired);
+  // Back-fill cartonsRequired if the source changed after creation.
+  if (!existing.cartonsRequired && cartonsRequired > 0) {
+    return { ...existing, cartonsRequired };
+  }
+  return existing;
 }
 
 // ---- Manual overrides (seed) --------------------------------------------
 // Move to KV once Ben+Drew want a UI for this; hardcoded here so tomorrow's
 // shipment doesn't miss the Inderbitzin remainder.
 
-const MANUAL_PENDING: ManualPending[] = [
+type ManualPendingSeed = Omit<ManualPending, "key" | "stage">;
+
+const MANUAL_PENDING: ManualPendingSeed[] = [
   {
     slug: "inderbitzin-po-009180-remainder",
     customer: "Inderbitzin Distributors, Inc.",
@@ -148,6 +261,49 @@ const MANUAL_PENDING: ManualPending[] = [
   },
 ];
 
+// ---- Sample ship entries (Phase 1d) -------------------------------------
+
+const KV_SAMPLE_SHIPS = "fulfillment:samples";
+
+export interface SampleShipSeed {
+  slug: string;
+  recipient: string;
+  company: string | null;
+  address: string;
+  bags: number;
+  purpose: string;
+  sourceThreadLink: string | null;
+  createdAt: string;
+}
+type SampleShipMap = Record<string, SampleShipSeed>;
+
+async function getSampleShips(): Promise<SampleShipSeed[]> {
+  const raw = (await kv.get<SampleShipMap>(KV_SAMPLE_SHIPS)) ?? {};
+  return Object.values(raw).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+
+async function writeSampleShip(seed: SampleShipSeed): Promise<SampleShipSeed> {
+  const current = ((await kv.get<SampleShipMap>(KV_SAMPLE_SHIPS)) ?? {}) as SampleShipMap;
+  current[seed.slug] = seed;
+  await kv.set(KV_SAMPLE_SHIPS, current);
+  return seed;
+}
+
+async function removeSampleShip(slug: string): Promise<void> {
+  const current = ((await kv.get<SampleShipMap>(KV_SAMPLE_SHIPS)) ?? {}) as SampleShipMap;
+  if (!current[slug]) return;
+  delete current[slug];
+  await kv.set(KV_SAMPLE_SHIPS, current);
+}
+
+function slugifyRecipient(raw: string): string {
+  return raw
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
+}
+
 // ---- Handler: GET --------------------------------------------------------
 
 export async function GET(req: Request): Promise<Response> {
@@ -156,47 +312,85 @@ export async function GET(req: Request): Promise<Response> {
   }
 
   const degraded: string[] = [];
+  const now = new Date().toISOString();
 
-  const [shipped, wholesaleRaw, dtcRaw, samples] = await Promise.all([
-    getShippedMap().catch(() => ({}) as ShippedMap),
+  const [stages, wholesaleRaw, dtcRaw, samples, sampleShipSeeds] = await Promise.all([
+    getStageMap().catch(() => ({}) as StageMap),
     loadWholesale().catch((err) => {
       degraded.push(`wholesale: ${err instanceof Error ? err.message : String(err)}`);
-      return [] as WholesaleInvoice[];
+      return [] as WholesaleInvoiceRaw[];
     }),
     loadDtc().catch((err) => {
       degraded.push(`dtc: ${err instanceof Error ? err.message : String(err)}`);
-      return [] as DtcOrder[];
+      return [] as DtcOrderRaw[];
     }),
     loadSampleQueue().catch((err) => {
       degraded.push(`samples: ${err instanceof Error ? err.message : String(err)}`);
       return [] as SampleLead[];
     }),
+    getSampleShips().catch((err) => {
+      degraded.push(`sample-ships: ${err instanceof Error ? err.message : String(err)}`);
+      return [] as SampleShipSeed[];
+    }),
   ]);
 
-  const wholesale = wholesaleRaw.filter((w) => !shipped[`inv:${w.id}`]);
-  const dtc = dtcRaw.filter((o) => !shipped[`dtc:${o.id}`]);
-  const manualPending = MANUAL_PENDING.filter((m) => !shipped[`pending:${m.slug}`]);
+  const wholesale: WholesaleInvoice[] = wholesaleRaw.map((w) => ({
+    ...w,
+    key: `inv:${w.id}`,
+    stage: resolveStage(`inv:${w.id}`, w.cases ?? 0, stages, now),
+  }));
+  const dtc: DtcOrder[] = dtcRaw.map((o) => ({
+    ...o,
+    key: `dtc:${o.id}`,
+    stage: resolveStage(`dtc:${o.id}`, 1, stages, now),
+  }));
+  const manualPending: ManualPending[] = MANUAL_PENDING.map((m) => ({
+    ...m,
+    key: `pending:${m.slug}`,
+    stage: resolveStage(`pending:${m.slug}`, m.cases, stages, now),
+  }));
+  const sampleShips: SampleShip[] = sampleShipSeeds.map((s) => ({
+    ...s,
+    key: `sample:${s.slug}`,
+    stage: resolveStage(`sample:${s.slug}`, 1, stages, now),
+  }));
 
-  const wholesaleCases = wholesale.reduce((a, w) => a + (w.cases ?? 0), 0);
-  const wholesaleBags = wholesale.reduce((a, w) => a + (w.bags ?? 0), 0);
-  const manualPendingCases = manualPending.reduce((a, m) => a + m.cases, 0);
-  const manualPendingBags = manualPending.reduce((a, m) => a + m.bags, 0);
+  // Active queue = everything not in the terminal shipped stage.
+  const activeWholesale = wholesale.filter((w) => w.stage.stage !== "shipped");
+  const activeDtc = dtc.filter((o) => o.stage.stage !== "shipped");
+  const activeManualPending = manualPending.filter((m) => m.stage.stage !== "shipped");
+  const activeSampleShips = sampleShips.filter((s) => s.stage.stage !== "shipped");
+
+  const wholesaleCases = activeWholesale.reduce((a, w) => a + (w.cases ?? 0), 0);
+  const wholesaleBags = activeWholesale.reduce((a, w) => a + (w.bags ?? 0), 0);
+  const manualPendingCases = activeManualPending.reduce((a, m) => a + m.cases, 0);
+  const manualPendingBags = activeManualPending.reduce((a, m) => a + m.bags, 0);
+  const sampleBags = activeSampleShips.reduce((a, s) => a + s.bags, 0);
+
+  const byStage: Record<Stage, number> = { received: 0, packed: 0, ready: 0, shipped: 0 };
+  for (const item of [...activeWholesale, ...activeDtc, ...activeManualPending, ...activeSampleShips]) {
+    byStage[item.stage.stage] += 1;
+  }
 
   const payload: FulfillmentPayload = {
     ok: true,
-    generatedAt: new Date().toISOString(),
+    generatedAt: now,
     totals: {
       wholesaleCases,
       wholesaleBags,
-      dtcOrders: dtc.length,
+      dtcOrders: activeDtc.length,
       manualPendingCases,
       manualPendingBags,
+      sampleShips: activeSampleShips.length,
+      sampleBags,
       samplesPending: samples.length,
-      shippableTodayBags: wholesaleBags + manualPendingBags,
+      shippableTodayBags: wholesaleBags + manualPendingBags + sampleBags,
+      byStage,
     },
-    wholesale,
-    dtc,
-    manualPending,
+    wholesale: activeWholesale,
+    dtc: activeDtc,
+    manualPending: activeManualPending,
+    sampleShips: activeSampleShips,
     samples,
     degraded,
   };
@@ -204,37 +398,132 @@ export async function GET(req: Request): Promise<Response> {
   return NextResponse.json(payload);
 }
 
-// ---- Handler: POST (mark shipped) + DELETE (unmark) ---------------------
+// ---- Handler: POST (stage transition / sample-add) ----------------------
+
+interface StagePostBody {
+  key?: string;
+  stage?: Stage;
+  cartonsPacked?: number;
+  cartonsRequired?: number;
+  tracking?: string;
+  labelUrl?: string;
+  labelCost?: number;
+  carrier?: string;
+  service?: string;
+  notes?: string;
+  updatedBy?: string;
+  // Phase 1d: inline sample-ship creation
+  createSample?: {
+    recipient: string;
+    company?: string;
+    address: string;
+    bags: number;
+    purpose?: string;
+    sourceThreadLink?: string;
+  };
+}
 
 export async function POST(req: Request): Promise<Response> {
   if (!(await isAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { key?: string; tracking?: string; notes?: string; shippedBy?: string };
+  let body: StagePostBody;
   try {
-    body = await req.json();
+    body = (await req.json()) as StagePostBody;
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
+  const now = new Date().toISOString();
+
+  // Branch 1: create a sample ship entry
+  if (body.createSample) {
+    const { recipient, address, bags, company, purpose, sourceThreadLink } = body.createSample;
+    if (!recipient?.trim() || !address?.trim() || !Number.isFinite(bags) || bags <= 0) {
+      return NextResponse.json(
+        { error: "createSample requires recipient, address, bags > 0" },
+        { status: 400 },
+      );
+    }
+    const base = slugifyRecipient(recipient) || `ship-${Date.now().toString(36)}`;
+    // Suffix a short timestamp so repeat recipients don't collide.
+    const slug = `${base}-${Date.now().toString(36).slice(-4)}`;
+    const seed = await writeSampleShip({
+      slug,
+      recipient: recipient.trim(),
+      company: company?.trim() || null,
+      address: address.trim(),
+      bags: Math.round(bags),
+      purpose: purpose?.trim() || "sample",
+      sourceThreadLink: sourceThreadLink?.trim() || null,
+      createdAt: now,
+    });
+    // Seed a default stage entry so the UI picks it up.
+    const key = `sample:${slug}`;
+    await writeStage(key, defaultStage(now, 1));
+    return NextResponse.json({ ok: true, createdSample: seed, key });
+  }
+
+  // Branch 2: stage transition
   const key = body.key?.trim();
-  if (!key || !/^(inv|pending|dtc):.+/.test(key)) {
+  if (!key || !/^(inv|pending|dtc|sample):.+/.test(key)) {
     return NextResponse.json(
-      { error: "Missing or malformed 'key' (expected inv:<id> | pending:<slug> | dtc:<id>)" },
+      { error: "Missing or malformed 'key' (expected inv: | pending: | dtc: | sample: + id)" },
       { status: 400 },
     );
   }
 
-  const entry: ShippedEntry = {
-    shippedAt: new Date().toISOString(),
-    tracking: body.tracking?.trim() || undefined,
-    notes: body.notes?.trim() || undefined,
-    shippedBy: body.shippedBy?.trim() || undefined,
-  };
-  const map = await markShipped(key, entry);
-  return NextResponse.json({ ok: true, key, entry, shippedCount: Object.keys(map).length });
+  const current = await getStageMap();
+  const existing: StageEntry =
+    current[key] ?? defaultStage(now, body.cartonsRequired ?? 0);
+
+  const next: StageEntry = { ...existing, updatedAt: now };
+  if (body.cartonsRequired !== undefined) next.cartonsRequired = body.cartonsRequired;
+  if (body.cartonsPacked !== undefined) {
+    next.cartonsPacked = Math.max(0, Math.min(next.cartonsRequired || Number.MAX_SAFE_INTEGER, body.cartonsPacked));
+  }
+  if (body.tracking !== undefined) next.tracking = body.tracking.trim() || undefined;
+  if (body.labelUrl !== undefined) next.labelUrl = body.labelUrl.trim() || undefined;
+  if (body.labelCost !== undefined) next.labelCost = body.labelCost;
+  if (body.carrier !== undefined) next.carrier = body.carrier.trim() || undefined;
+  if (body.service !== undefined) next.service = body.service.trim() || undefined;
+  if (body.notes !== undefined) next.notes = body.notes.trim() || undefined;
+  if (body.updatedBy !== undefined) next.updatedBy = body.updatedBy.trim() || undefined;
+
+  // Auto-advance / explicit stage
+  if (body.stage) {
+    next.stage = body.stage;
+  } else if (
+    next.cartonsRequired > 0 &&
+    next.cartonsPacked >= next.cartonsRequired &&
+    existing.stage === "received"
+  ) {
+    // Reached full pack count → promote to "packed" unless user went further.
+    next.stage = "packed";
+  }
+
+  // Timestamp whichever stage we just entered for the first time.
+  if (next.stage === "packed" && !next.packedAt) next.packedAt = now;
+  if (next.stage === "ready" && !next.readyAt) next.readyAt = now;
+  if (next.stage === "shipped" && !next.shippedAt) next.shippedAt = now;
+
+  // Tracking # arrival auto-promotes ready → shipped (Phase 3 will do this from a webhook).
+  if (next.tracking && next.stage !== "shipped" && existing.stage === "ready") {
+    next.stage = "shipped";
+    next.shippedAt = now;
+  }
+
+  const map = await writeStage(key, next);
+  return NextResponse.json({
+    ok: true,
+    key,
+    stage: next,
+    openCount: Object.values(map).filter((e) => e.stage !== "shipped").length,
+  });
 }
+
+// ---- Handler: DELETE ----------------------------------------------------
 
 export async function DELETE(req: Request): Promise<Response> {
   if (!(await isAuthorized(req))) {
@@ -245,13 +534,21 @@ export async function DELETE(req: Request): Promise<Response> {
   if (!key) {
     return NextResponse.json({ error: "Missing 'key' query param" }, { status: 400 });
   }
-  const map = await unmarkShipped(key);
-  return NextResponse.json({ ok: true, key, shippedCount: Object.keys(map).length });
+  await removeStage(key);
+  if (key.startsWith("sample:")) {
+    await removeSampleShip(key.slice("sample:".length));
+  }
+  return NextResponse.json({ ok: true, key });
 }
 
 // ---- Source: QBO invoices -----------------------------------------------
 
-async function loadWholesale(): Promise<WholesaleInvoice[]> {
+// Loader returns the pre-stage shape; the GET handler decorates each with
+// `key` + resolved `stage` when merging KV state.
+type WholesaleInvoiceRaw = Omit<WholesaleInvoice, "key" | "stage">;
+type DtcOrderRaw = Omit<DtcOrder, "key" | "stage">;
+
+async function loadWholesale(): Promise<WholesaleInvoiceRaw[]> {
   // Pull last 90 days so we catch anything paid-but-maybe-not-shipped plus drafts.
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - 90);
@@ -264,7 +561,7 @@ async function loadWholesale(): Promise<WholesaleInvoice[]> {
 
   return raw
     .map((inv) => mapInvoice(inv, today, paidShipVerifyWindowMs))
-    .filter((inv): inv is WholesaleInvoice => inv !== null)
+    .filter((inv): inv is WholesaleInvoiceRaw => inv !== null)
     .sort((a, b) => {
       // Draft first (block Rene), then unpaid-by-due-date, then paid-verify
       const order = { draft: 0, outstanding: 1, paid: 2 };
@@ -276,7 +573,7 @@ function mapInvoice(
   inv: Record<string, unknown>,
   nowMs: number,
   paidVerifyWindowMs: number,
-): WholesaleInvoice | null {
+): WholesaleInvoiceRaw | null {
   const id = String(inv.Id ?? "");
   if (!id) return null;
 
@@ -341,7 +638,7 @@ function mapInvoice(
 
 // ---- Source: Shopify DTC -------------------------------------------------
 
-async function loadDtc(): Promise<DtcOrder[]> {
+async function loadDtc(): Promise<DtcOrderRaw[]> {
   const orders = await queryRecentOrders({ status: "open", days: 30, limit: 50 });
   return orders
     .filter(
