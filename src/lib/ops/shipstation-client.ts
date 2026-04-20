@@ -36,7 +36,7 @@ function getShipFromAddress(): ShipFromAddress {
   return {
     name: process.env.SHIPSTATION_FROM_NAME?.trim() || "Benjamin Stutman",
     company: process.env.SHIPSTATION_FROM_COMPANY?.trim() || "USA Gummies",
-    street1: process.env.SHIPSTATION_FROM_STREET1?.trim() || "30815 SR 706 E",
+    street1: process.env.SHIPSTATION_FROM_STREET1?.trim() || "30027 SR 706 E",
     street2: process.env.SHIPSTATION_FROM_STREET2?.trim() || undefined,
     city: process.env.SHIPSTATION_FROM_CITY?.trim() || "Ashford",
     state: process.env.SHIPSTATION_FROM_STATE?.trim() || "WA",
