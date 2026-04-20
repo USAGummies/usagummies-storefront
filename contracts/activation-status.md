@@ -3,6 +3,8 @@
 **Last updated:** 2026-04-20 (evening — post specialist-runtime sweep)
 **Source of truth:** this file (commit history shows activation events)
 **Companion docs:** [`governance.md`](governance.md), [`activation-triggers.md`](activation-triggers.md), [`approval-taxonomy.md`](approval-taxonomy.md), [`build-sequence.md`](build-sequence.md)
+**Canonical sequence (Notion):** [22.B — Execution Sequences](https://www.notion.so/3484c0c42c2e81048158f9007dddc093) — Tuesday cutover + Week-1 + Pipelines + Specialists
+**Session-by-session build log (Notion):** [22.B.Log — Claude Code Build Log](https://www.notion.so/3484c0c42c2e812dbd62eb17b8c918c2) — one block per Claude Code session, mapped to 22.B rows
 
 ---
 

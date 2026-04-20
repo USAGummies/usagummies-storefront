@@ -2,7 +2,8 @@
 
 **Status:** CANONICAL — 2026-04-20
 **Companion:** [`activation-status.md`](activation-status.md) (live runtime inventory) · [`ops/blocked-items.md`](../ops/blocked-items.md) (human-action queue)
-**Source of truth for sequencing:** Notion blueprint §4.2, §14–15; gap analysis 2026-04-20.
+**Source of truth for sequencing:** [22.B — Execution Sequences](https://www.notion.so/3484c0c42c2e81048158f9007dddc093) (Notion, canonical). Child of the Codex Operating Addendum. This repo doc mirrors 22.B's forward-looking order for code-owned work.
+**Session log:** [22.B.Log — Claude Code Build Log](https://www.notion.so/3484c0c42c2e812dbd62eb17b8c918c2) (Notion). Every Claude Code session appends one block mapped to 22.B rows; this is what catches drift between doctrine and code.
 
 ---
 
