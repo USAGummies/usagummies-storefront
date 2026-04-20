@@ -376,3 +376,141 @@ export async function getProductVariants(
     sku: node.sku || "",
   }));
 }
+
+// ---------------------------------------------------------------------------
+// On-hand inventory across all products (Shipping Hub ATP + Ops Agent low-stock)
+// ---------------------------------------------------------------------------
+
+export interface OnHandRow {
+  productTitle: string;
+  variantId: string;
+  variantTitle: string;
+  sku: string;
+  /** Sum of on-hand across every location. */
+  onHand: number;
+  /** Per-location breakdown so Ben can see Ashford vs elsewhere. */
+  byLocation: Array<{ locationId: string; locationName: string; onHand: number }>;
+}
+
+const ON_HAND_QUERY = /* GraphQL */ `
+  query AllOnHand($first: Int!, $cursor: String) {
+    products(first: $first, after: $cursor, query: "status:active") {
+      edges {
+        cursor
+        node {
+          id
+          title
+          variants(first: 50) {
+            edges {
+              node {
+                id
+                title
+                sku
+                inventoryItem {
+                  id
+                  tracked
+                  inventoryLevels(first: 10) {
+                    edges {
+                      node {
+                        location {
+                          id
+                          name
+                        }
+                        quantities(names: ["on_hand"]) {
+                          name
+                          quantity
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+    }
+  }
+`;
+
+interface OnHandQueryResult {
+  products: {
+    edges: Array<{
+      cursor: string;
+      node: {
+        id: string;
+        title: string;
+        variants: {
+          edges: Array<{
+            node: {
+              id: string;
+              title: string;
+              sku: string | null;
+              inventoryItem: {
+                id: string;
+                tracked: boolean;
+                inventoryLevels: {
+                  edges: Array<{
+                    node: {
+                      location: { id: string; name: string };
+                      quantities: Array<{ name: string; quantity: number }>;
+                    };
+                  }>;
+                };
+              } | null;
+            };
+          }>;
+        };
+      };
+    }>;
+    pageInfo: { hasNextPage: boolean; endCursor: string | null };
+  };
+}
+
+/**
+ * Fetch on-hand inventory for every active product + variant, summed
+ * across all Shopify locations.
+ *
+ * Paginates through `products` until `hasNextPage` is false. At the 7
+ * SKUs USA Gummies has today this is one page; the pagination is here
+ * so we don't silently truncate as the catalog grows.
+ */
+export async function getAllOnHandInventory(): Promise<OnHandRow[]> {
+  const rows: OnHandRow[] = [];
+  let cursor: string | null = null;
+  for (let page = 0; page < 20; page++) {
+    const result: OnHandQueryResult = await shopifyAdminQuery<OnHandQueryResult>(ON_HAND_QUERY, {
+      first: 50,
+      cursor,
+    });
+    for (const { node: product } of result.products.edges) {
+      for (const { node: variant } of product.variants.edges) {
+        if (!variant.inventoryItem || !variant.inventoryItem.tracked) continue;
+        const levels = variant.inventoryItem.inventoryLevels.edges.map(({ node }) => {
+          const onHandQ = node.quantities.find((q) => q.name === "on_hand");
+          return {
+            locationId: node.location.id,
+            locationName: node.location.name,
+            onHand: Number(onHandQ?.quantity ?? 0),
+          };
+        });
+        rows.push({
+          productTitle: product.title,
+          variantId: variant.id,
+          variantTitle: variant.title,
+          sku: variant.sku || "",
+          onHand: levels.reduce((a, l) => a + l.onHand, 0),
+          byLocation: levels,
+        });
+      }
+    }
+    if (!result.products.pageInfo.hasNextPage) break;
+    cursor = result.products.pageInfo.endCursor;
+    if (!cursor) break;
+  }
+  return rows;
+}

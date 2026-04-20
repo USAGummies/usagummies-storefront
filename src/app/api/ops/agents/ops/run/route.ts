@@ -25,14 +25,20 @@ import { newRunContext } from "@/lib/ops/control-plane/run-id";
 import { auditStore } from "@/lib/ops/control-plane/stores";
 import { buildAuditEntry } from "@/lib/ops/control-plane/audit";
 import { getQBOPurchaseOrders } from "@/lib/ops/qbo-client";
+import { getAllOnHandInventory, type OnHandRow } from "@/lib/ops/shopify-admin-actions";
+import {
+  getAllVendorFreshness,
+  WATCHED_VENDORS as VENDOR_LIST,
+  type VendorFreshness,
+} from "@/lib/ops/vendor-threads";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const AGENT_ID = process.env.AGENT_ID_OPS ?? "ops";
 const DREW_SLACK_USER_ID = process.env.SLACK_USER_DREW ?? "";
-const WATCHED_VENDORS = ["Powers", "Belmark", "Inderbitzin", "Albanese"] as const;
 const INVENTORY_LOW_THRESHOLD = 5000;
+const VENDOR_STALE_DAYS = 7;
 
 // ---- Types --------------------------------------------------------------
 
@@ -53,12 +59,20 @@ interface POSummary {
   ageDays: number;
 }
 
+interface InventorySummary {
+  sku: string;
+  productTitle: string;
+  variantTitle: string;
+  onHand: number;
+}
+
 interface DigestData {
   openPOs: POSummary[];
   openPOCount: number;
   openPODollars: number;
-  staleVendorThreads: Array<{ vendor: string; note: string }>;
-  inventoryLow: string[];
+  vendorFreshness: VendorFreshness[];
+  inventoryLow: InventorySummary[];
+  inventoryOk: InventorySummary[];
   degraded: string[];
   provenance: Provenance[];
 }
@@ -149,32 +163,78 @@ async function gatherDigestData(): Promise<DigestData> {
   const degraded: string[] = [];
   const provenance: Provenance[] = [];
 
-  const openPOs = await loadOpenPOs(degraded, provenance);
+  const [openPOs, inventory, vendorFreshness] = await Promise.all([
+    loadOpenPOs(degraded, provenance),
+    loadInventory(degraded, provenance),
+    loadVendorFreshness(degraded, provenance),
+  ]);
+
   const openPOCount = openPOs.length;
   const openPODollars = openPOs.reduce((a, p) => a + (p.balance || 0), 0);
 
-  // Vendor-thread staleness and inventory threshold are doctrine in
-  // the ops.md contract but depend on integrations we haven't wired to
-  // the control plane yet (Gmail vendor-thread scraping, on-hand
-  // inventory). Surfacing as explicit "unavailable" per no-fabrication.
-  const staleVendorThreads: Array<{ vendor: string; note: string }> = [];
-  const inventoryLow: string[] = [];
-  degraded.push(
-    "vendor-threads: Gmail thread freshness check not yet wired (requires labeled-thread scraper)",
-  );
-  degraded.push(
-    "inventory-low: on-hand inventory query not yet wired (Shopify inventory cross-ref)",
-  );
+  const { low: inventoryLow, ok: inventoryOk } = inventory;
 
   return {
     openPOs,
     openPOCount,
     openPODollars: Math.round(openPODollars * 100) / 100,
-    staleVendorThreads,
+    vendorFreshness,
     inventoryLow,
+    inventoryOk,
     degraded,
     provenance,
   };
+}
+
+async function loadVendorFreshness(
+  degraded: string[],
+  provenance: Provenance[],
+): Promise<VendorFreshness[]> {
+  try {
+    const rows = await getAllVendorFreshness();
+    provenance.push({
+      system: "gmail:vendor-threads",
+      retrievedAt: new Date().toISOString(),
+    });
+    return rows;
+  } catch (err) {
+    degraded.push(
+      `vendor-threads: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return [];
+  }
+}
+
+async function loadInventory(
+  degraded: string[],
+  provenance: Provenance[],
+): Promise<{ low: InventorySummary[]; ok: InventorySummary[] }> {
+  try {
+    const rows = await getAllOnHandInventory();
+    provenance.push({
+      system: "shopify:inventory:on-hand",
+      retrievedAt: new Date().toISOString(),
+    });
+    const summary = (r: OnHandRow): InventorySummary => ({
+      sku: r.sku,
+      productTitle: r.productTitle,
+      variantTitle: r.variantTitle,
+      onHand: r.onHand,
+    });
+    const low: InventorySummary[] = [];
+    const ok: InventorySummary[] = [];
+    for (const row of rows) {
+      if (row.onHand < INVENTORY_LOW_THRESHOLD) low.push(summary(row));
+      else ok.push(summary(row));
+    }
+    low.sort((a, b) => a.onHand - b.onHand);
+    return { low, ok };
+  } catch (err) {
+    degraded.push(
+      `shopify-inventory: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return { low: [], ok: [] };
+  }
 }
 
 async function loadOpenPOs(
@@ -266,19 +326,36 @@ function renderDigest(digest: DigestData, startedAt: string): string {
     }
   }
 
+  const vendorListText = VENDOR_LIST.map((v) => v.name).join(", ");
   lines.push(
     "",
-    `*Watched vendors:* ${WATCHED_VENDORS.join(", ")}`,
-    digest.staleVendorThreads.length === 0
-      ? `  _Thread freshness not wired yet — check Gmail vendor threads manually._`
-      : digest.staleVendorThreads
-          .map((v) => `  • ${v.vendor}: ${v.note}`)
+    `*Watched vendors:* ${vendorListText}`,
+    digest.vendorFreshness.length === 0
+      ? `  _Gmail query failed — check Gmail integration._`
+      : digest.vendorFreshness
+          .map((v) => {
+            if (v.lastInboundISO === null) {
+              return `  • ${v.vendor}: _${v.unavailableReason || "no inbound mail"}_`;
+            }
+            const flag =
+              v.daysSince !== null && v.daysSince > VENDOR_STALE_DAYS
+                ? " ⚠️ stale"
+                : "";
+            return `  • ${v.vendor}: last inbound ${v.daysSince}d ago${flag} — _${v.lastSubject ?? ""}_`;
+          })
           .join("\n"),
     "",
-    `*Inventory low-threshold (< ${INVENTORY_LOW_THRESHOLD} units):*`,
-    digest.inventoryLow.length === 0
-      ? "  _On-hand cross-ref not wired yet — check Shopify Admin._"
-      : digest.inventoryLow.map((s) => `  • ${s}`).join("\n"),
+    `*Inventory low-threshold (< ${INVENTORY_LOW_THRESHOLD} units on-hand, Shopify):*`,
+    digest.inventoryLow.length === 0 && digest.inventoryOk.length === 0
+      ? "  _Shopify inventory query returned nothing — verify tracking enabled._"
+      : digest.inventoryLow.length === 0
+        ? `  :white_check_mark: All ${digest.inventoryOk.length} tracked SKUs above threshold.`
+        : digest.inventoryLow
+            .map(
+              (s) =>
+                `  • *${s.sku || s.variantTitle}* — ${s.onHand} on-hand (${s.productTitle})`,
+            )
+            .join("\n"),
   );
 
   if (digest.degraded.length > 0) {

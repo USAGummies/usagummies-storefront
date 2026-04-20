@@ -48,6 +48,7 @@ const SELF_AUTHENTICATED_PREFIXES = [
   "/api/ops/fulfillment", // FULFILLMENT — Unified ship-today queue (session or CRON_SECRET)
   "/api/ops/viktor/", // VIKTOR runtime — W-7 Rene-capture etc. (isCronAuthorized bearer CRON_SECRET)
   "/api/ops/agents/", // Specialist agent runtimes — finance-exception, ops, etc. (isAuthorized session + CRON_SECRET)
+  "/api/ops/booke/", // Booke queue push/query (isCronAuthorized bearer CRON_SECRET)
   "/api/ops/docs/", // DOCS — Document extraction, transcription, receipts (isAuthorized)
   "/api/ops/pipeline/", // PIPELINE — Sales CRM, follow-ups, lead scoring (isAuthorized)
   "/api/ops/amazon/", // AMAZON — FBA inventory, restock, PPC, listing health (isAuthorized)

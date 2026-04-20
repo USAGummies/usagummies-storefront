@@ -27,6 +27,7 @@ import { auditStore } from "@/lib/ops/control-plane/stores";
 import { buildAuditEntry } from "@/lib/ops/control-plane/audit";
 import { getQBOInvoices, getQBOBills } from "@/lib/ops/qbo-client";
 import { getBalances, isPlaidConfigured, isPlaidConnected } from "@/lib/finance/plaid";
+import { getBookeQueueState } from "@/lib/ops/booke-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -276,14 +277,21 @@ async function loadOpenAR(
   }
 }
 
-async function loadUncategorizedCount(_degraded: string[]): Promise<Cell> {
-  // The QBO SDK we ship doesn't expose a first-class "uncategorized" count.
-  // Booke (external SaaS) owns that queue. Rather than fabricate a number,
-  // surface unavailable and point Rene at Booke. Wire properly in the
-  // Booke-integration commit (contract: /contracts/agents/booke.md).
+async function loadUncategorizedCount(degraded: string[]): Promise<Cell> {
+  const state = await getBookeQueueState();
+  if (state.pendingCount === null) {
+    if (state.unavailableReason) degraded.push(`booke: ${state.unavailableReason}`);
+    return {
+      value: null,
+      unavailableReason: state.unavailableReason ?? "Booke queue unreachable",
+    };
+  }
   return {
-    value: null,
-    unavailableReason: "Booke queue not queried (see Booke dashboard for uncategorized)",
+    value: state.pendingCount,
+    provenance: {
+      system: `booke:${state.source ?? "unknown"}`,
+      retrievedAt: state.retrievedAt,
+    },
   };
 }
 
