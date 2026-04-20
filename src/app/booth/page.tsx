@@ -3,7 +3,7 @@ import { BoothOrderForm } from "./BoothOrderForm";
 
 export const metadata: Metadata = {
   title: "Quick Wholesale Order | USA Gummies",
-  description: "Place a wholesale order for USA Gummies bags, cases, and master cartons.",
+  description: "Place a wholesale order for USA Gummies cases, master cases, and pallets.",
   robots: { index: false, follow: false },
 };
 
@@ -27,7 +27,7 @@ export default function BoothOrderPage() {
             Quick Wholesale Order
           </h2>
           <p className="text-sm text-gray-500 mb-6">
-            Order bags, cases, or master cartons for shipping or in-person handoff.
+            Order cases, master cases, or pallets for shipping or in-person handoff.
           </p>
 
           <BoothOrderForm />

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 type FormState = "idle" | "submitting" | "success" | "error";
-type PackagingType = "bag" | "case" | "master_carton";
+type PackagingType = "case" | "master_carton" | "pallet";
 type PaymentMethod = "pay_now" | "invoice_me";
 type DeliveryMethod = "shipping" | "in_person";
 
@@ -21,24 +21,27 @@ type FreightStatus =
   | { kind: "error"; message: string };
 
 const PACK_LABELS: Record<PackagingType, string> = {
-  bag: "Bag",
   case: "Case",
-  master_carton: "Master Carton",
+  master_carton: "Master Case",
+  pallet: "Pallet",
 };
 
 const PACK_SUBLABELS: Record<PackagingType, string> = {
-  bag: "1 bag",
   case: "6 bags",
   master_carton: "36 bags",
+  pallet: "25 master cases · 900 bags",
 };
 
 const BAGS_PER_PACK: Record<PackagingType, number> = {
-  bag: 1,
   case: 6,
   master_carton: 36,
+  pallet: 900,
 };
 
 function getBasePrice(packagingType: PackagingType, qty: number) {
+  if (packagingType === "pallet") {
+    return 3;
+  }
   if (packagingType === "master_carton") {
     return qty >= 6 ? 3.1 : 3.25;
   }
@@ -294,7 +297,7 @@ export function BoothOrderForm() {
             Package
           </label>
           <div className="grid grid-cols-1 gap-3">
-            {(["bag", "case", "master_carton"] as PackagingType[]).map((option) => {
+            {(["case", "master_carton", "pallet"] as PackagingType[]).map((option) => {
               const selected = packagingType === option;
               const optionQty = option === "master_carton" ? Math.max(qty, 1) : 1;
               const optionBasePrice = getBasePrice(option, optionQty);
@@ -320,7 +323,9 @@ export function BoothOrderForm() {
                       <div className="text-xs text-gray-500 mt-1">
                         {PACK_SUBLABELS[option]}
                         {option === "master_carton"
-                          ? " · 6+ cartons drop to $3.10/unit"
+                          ? " · 6+ master cases drop to $3.10/unit"
+                          : option === "pallet"
+                            ? " · $2,700 per pallet · landed"
                           : " · One-off wholesale pricing"}
                       </div>
                     </div>
@@ -506,8 +511,8 @@ export function BoothOrderForm() {
                   <div className="text-xs text-gray-500 mt-0.5">
                     Shop Pay · Visa · MC · Amex · ACH
                     {prepayEligible
-                      ? " · 5% prepay discount on master-carton volume"
-                      : " · no upfront-pay discount on bags or cases"}
+                      ? " · 5% prepay discount on master-case volume"
+                      : " · no upfront-pay discount on cases or pallets"}
                   </div>
                 </div>
                 <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
@@ -567,7 +572,9 @@ export function BoothOrderForm() {
               {paymentMethod === "pay_now" && prepayEligible
                 ? "5% prepay discount applied"
                 : packagingType === "master_carton" && qty >= 6
-                  ? "6+ carton price break"
+                  ? "6+ master case price break"
+                  : packagingType === "pallet"
+                    ? "Pallet landed price"
                   : "Standard wholesale price"}
             </span>
           </div>
@@ -578,6 +585,8 @@ export function BoothOrderForm() {
             <span className="font-medium text-[#0a1e3d] text-right">
               {deliveryMethod === "in_person" ? (
                 <span className="text-green-700">In person · no shipping charge</span>
+              ) : packagingType === "pallet" && freight.kind === "ok" ? (
+                <span className="text-green-700">LTL freight included in pallet price</span>
               ) : freight.kind === "ok" ? (
                 <>
                   ${freight.quote.rate.toFixed(2)}

@@ -16,14 +16,13 @@ import { Buffer } from "node:buffer";
 
 export const BOOTH_ORIGIN_ZIP = "98304"; // Mettler warehouse, Ashford WA
 
-export type ShippingPackageType = "bag" | "case" | "master_carton";
+export type ShippingPackageType = "case" | "master_carton" | "pallet";
 
-// The quick-order flow needs workable shipping estimates for one-off bag,
-// case, and master-carton sales. The bag/case specs are conservative retail
-// shipping approximations; the master carton matches the existing 36-unit
-// shipper assumptions already used in the booth flow.
+// The quick-order flow needs workable shipping estimates for one-off case and
+// master-case sales. Pallets are priced landed, so they skip parcel quoting
+// and return a zero-dollar included-freight line instead.
 const PACKAGE_PROFILES: Record<
-  ShippingPackageType,
+  Exclude<ShippingPackageType, "pallet">,
   {
     length: number;
     width: number;
@@ -31,7 +30,6 @@ const PACKAGE_PROFILES: Record<
     weightLbs: number;
   }
 > = {
-  bag: { length: 10, width: 8, height: 3, weightLbs: 1 },
   case: { length: 14, width: 10, height: 8, weightLbs: 6 },
   master_carton: { length: 21, width: 14, height: 8, weightLbs: 24 },
 };
@@ -88,20 +86,32 @@ export async function getUpsGroundRate(params: {
   }
 
   const qty = Math.max(1, Math.floor(params.quantity));
-  const profile = PACKAGE_PROFILES[params.packagingType];
-  if (!profile) {
-    return { ok: false, error: "Invalid packaging type" };
-  }
   if (!/^\d{5}(-\d{4})?$/.test(params.toZip.trim())) {
     return { ok: false, error: "Invalid ZIP code" };
   }
   if (!/^[A-Z]{2}$/.test(params.toState.trim().toUpperCase())) {
     return { ok: false, error: "Invalid state code" };
   }
+  if (params.packagingType === "pallet") {
+    return {
+      ok: true,
+      quote: {
+        carrier: "LTL",
+        service: "LTL freight included",
+        service_code: "ltl_included",
+        rate: 0,
+        delivery_days: null,
+      },
+    };
+  }
+  const profile = PACKAGE_PROFILES[params.packagingType];
+  if (!profile) {
+    return { ok: false, error: "Invalid packaging type" };
+  }
 
   // ShipStation rates a single package per call. For multi-package orders we
   // quote one package and multiply. UPS Ground scales closely enough for
-  // identical bag/case/carton packages, which is sufficient for the quick
+  // identical case/master-case packages, which is sufficient for the quick
   // order flow.
   const body = {
     carrierCode: "ups",

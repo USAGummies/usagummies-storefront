@@ -9,7 +9,7 @@
  * Body (JSON):
  *   company_name, contact_name, email, phone,
  *   ship_address, ship_city, ship_state, ship_zip,
- *   quantity, packaging_type ("bag" | "case" | "master_carton"),
+ *   quantity, packaging_type ("case" | "master_carton" | "pallet"),
  *   delivery_method ("shipping" | "in_person"),
  *   payment_method ("pay_now" | "invoice_me"),
  *   agreed_to_terms,
@@ -41,7 +41,7 @@ export const dynamic = "force-dynamic";
 
 const QBO_TRADE_SHOW_ITEM_ID = process.env.QBO_TRADE_SHOW_ITEM_ID?.trim() || "15";
 
-type PackagingType = "bag" | "case" | "master_carton";
+type PackagingType = "case" | "master_carton" | "pallet";
 type DeliveryMethod = "shipping" | "in_person";
 type PaymentMethod = "pay_now" | "invoice_me";
 
@@ -50,16 +50,10 @@ const PACKAGING: Record<
   {
     label: string;
     unitsPerPack: number;
-    packagingFormat: "singles" | "36-case" | "custom";
+    packagingFormat: "singles" | "36-case" | "pallet" | "custom";
     shopifyTitle: string;
   }
 > = {
-  bag: {
-    label: "Bag",
-    unitsPerPack: 1,
-    packagingFormat: "singles",
-    shopifyTitle: "USA Gummies — Single Bag (1 bag)",
-  },
   case: {
     label: "Case",
     unitsPerPack: 6,
@@ -67,15 +61,21 @@ const PACKAGING: Record<
     shopifyTitle: "USA Gummies — Case (6 bags)",
   },
   master_carton: {
-    label: "Master Carton",
+    label: "Master Case",
     unitsPerPack: 36,
     packagingFormat: "36-case",
-    shopifyTitle: "USA Gummies — Master Carton (36 bags)",
+    shopifyTitle: "USA Gummies — Master Case (36 bags)",
+  },
+  pallet: {
+    label: "Pallet",
+    unitsPerPack: 900,
+    packagingFormat: "pallet",
+    shopifyTitle: "USA Gummies — Pallet (25 master cases / 900 bags)",
   },
 };
 
 function getPackagingType(value: unknown): PackagingType {
-  return value === "bag" || value === "case" || value === "master_carton"
+  return value === "case" || value === "master_carton" || value === "pallet"
     ? value
     : "case";
 }
@@ -89,6 +89,9 @@ function getPaymentMethod(value: unknown): PaymentMethod {
 }
 
 function getBasePrice(packagingType: PackagingType, quantity: number): number {
+  if (packagingType === "pallet") {
+    return 3;
+  }
   if (packagingType === "master_carton") {
     return quantity >= 6 ? 3.1 : 3.25;
   }
@@ -212,9 +215,9 @@ export async function POST(req: Request) {
       }
     }
 
-    // ── Server-side freight re-quote ──
-    // Shipping orders must have a real UPS Ground quote before we submit.
-    // In-person handoff skips freight entirely.
+    // ── Server-side freight handling ──
+    // Parcel shipments get a live UPS Ground quote before submit. Pallets are
+    // priced landed with freight included. In-person handoff skips freight.
     let freightAmount = 0;
     let freightLabel =
       deliveryMethod === "in_person"
@@ -251,9 +254,12 @@ export async function POST(req: Request) {
       freightCarrier = rateRes.quote.carrier;
       freightService = rateRes.quote.service;
       freightDays = rateRes.quote.delivery_days;
-      freightLabel = `${rateRes.quote.service} — $${freightAmount.toFixed(2)}${
-        freightDays ? ` (~${freightDays} day${freightDays > 1 ? "s" : ""})` : ""
-      }`;
+      freightLabel =
+        packagingType === "pallet"
+          ? "LTL freight included in pallet price"
+          : `${rateRes.quote.service} — $${freightAmount.toFixed(2)}${
+              freightDays ? ` (~${freightDays} day${freightDays > 1 ? "s" : ""})` : ""
+            }`;
     }
     const orderTotal = Number((subtotal + freightAmount).toFixed(2));
 
@@ -338,6 +344,8 @@ export async function POST(req: Request) {
         const shippingTitle =
           deliveryMethod === "in_person"
             ? "In-person delivery / handoff"
+            : packagingType === "pallet"
+              ? "LTL freight included in pallet price"
             : freightAmount > 0
               ? `UPS Ground (${qty} ${pack.label.toLowerCase()}${qty > 1 ? "s" : ""} from Ashford, WA)`
               : "Shipping";
@@ -415,6 +423,8 @@ export async function POST(req: Request) {
         const shippingTitle =
           deliveryMethod === "in_person"
             ? "In-person delivery / handoff"
+            : packagingType === "pallet"
+              ? "LTL freight included in pallet price"
             : `UPS Ground (${qty} ${pack.label.toLowerCase()}${qty > 1 ? "s" : ""} from Ashford, WA)`;
 
         const createDraftMutation = `
@@ -661,6 +671,8 @@ export async function POST(req: Request) {
       const deliveryLine =
         deliveryMethod === "in_person"
           ? "Delivery: In-person handoff / local delivery"
+          : packagingType === "pallet"
+            ? "Shipping: Included in pallet price (LTL freight included)"
           : freightAmount > 0
             ? `Shipping: $${freightAmount.toFixed(2)}${freightDays ? ` (UPS Ground, ~${freightDays} day${freightDays > 1 ? "s" : ""} from Ashford, WA)` : " (UPS Ground from Ashford, WA)"}`
             : "Shipping: UPS Ground from Ashford, WA";

@@ -10,7 +10,7 @@
  *   to_state: string,
  *   to_zip: string,
  *   qty: number,
- *   packaging_type: "bag" | "case" | "master_carton",
+ *   packaging_type: "case" | "master_carton" | "pallet",
  *   residential?: boolean
  * }
  */
@@ -49,9 +49,9 @@ export async function POST(req: Request) {
   const toZip = String(body.to_zip ?? "").trim();
   const qty = Math.max(1, Math.floor(Number(body.qty) || 1));
   const packagingType =
-    body.packaging_type === "bag" ||
     body.packaging_type === "case" ||
-    body.packaging_type === "master_carton"
+    body.packaging_type === "master_carton" ||
+    body.packaging_type === "pallet"
       ? body.packaging_type
       : null;
 
@@ -69,7 +69,7 @@ export async function POST(req: Request) {
   }
   if (!packagingType) {
     return NextResponse.json(
-      { ok: false, error: "Select bag, case, or master carton" },
+      { ok: false, error: "Select case, master case, or pallet" },
       { status: 400 },
     );
   }
