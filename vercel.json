@@ -21,6 +21,18 @@
       "schedule": "0 0 * * 2-6"
     },
     {
+      "path": "/api/ops/agents/compliance/run?post=true",
+      "schedule": "0 18 * * 1-5"
+    },
+    {
+      "path": "/api/ops/agents/faire/run?post=true",
+      "schedule": "0 18 * * 4"
+    },
+    {
+      "path": "/api/ops/agents/research/run?post=true",
+      "schedule": "0 18 * * 5"
+    },
+    {
       "path": "/api/ops/control-plane/drift-audit",
       "schedule": "0 3 * * 1"
     }
