@@ -166,19 +166,13 @@ Topics set from `contracts/channels.json` → `purpose`. Make Slack bot (`U0ABJC
 - **Contents:** yesterday's Shopify revenue (live query), Amazon settlement day-over-day, Faire relay orders, open approvals count, top priority for the week.
 - **Why blocked on Ben:** first brief sets tone and format.
 
-### B-13 (M9) — Register ShipStation tracking webhook + set FULFILLMENT_WEBHOOK_SECRET
-- **Provision secret:**
-  ```bash
-  NEW=$(openssl rand -hex 32)
-  printf '%s' "$NEW" | vercel env add FULFILLMENT_WEBHOOK_SECRET production
-  # echo for ShipStation admin entry below — then clear your terminal
-  echo "ShipStation URL: https://www.usagummies.com/api/ops/fulfillment/tracking-webhook?token=$NEW"
-  ```
-- **Register in ShipStation:** https://ship.shipstation.com/settings/webhooks → Add Webhook.
-  - Event types: `SHIP_NOTIFY`, `ITEM_SHIP_NOTIFY`.
-  - Target URL: the one emitted above (includes the shared-secret query param).
-- **Why blocked on Ben:** Ben owns ShipStation admin access + secret provisioning.
-- **What it unlocks:** when UPS scans a label, the webhook promotes the matching fulfillment-hub entry from `ready` → `shipped` automatically. No more manual mark-shipped clicks once a tracking scan fires.
+### B-13 (M9) — Register ShipStation tracking webhook  **[PARKED — MFA step]**
+- **FULFILLMENT_WEBHOOK_SECRET** is already set on Vercel production (2026-04-20 via Chrome).
+- **What's left:**
+  1. Navigate to `https://ship14.shipstation.com/settings/api` → **Generate API Key** (12-month expiration). Complete the ShipStation email MFA when it prompts (Claude Code can't reliably automate ShipStation's React-controlled per-digit inputs — this is a 30-second manual step).
+  2. The modal shows the new API key + secret **once**. Paste both into Vercel env as `SHIPSTATION_API_KEY` and `SHIPSTATION_API_SECRET` (production + preview).
+  3. Then Claude Code can run `POST /api/ops/fulfillment/webhook-register` with bearer `CRON_SECRET` — it's already deployed and reads the creds from Vercel to subscribe the `ITEM_SHIP_NOTIFY` webhook with the correct `?token=<FULFILLMENT_WEBHOOK_SECRET>` URL.
+- **What it unlocks:** when UPS scans a label, the webhook promotes the matching fulfillment-hub entry from `ready` → `shipped` automatically. Until then the hub works manually — click **Mark shipped** after the label prints and tracking is in hand.
 
 ### B-14 (M10) — Verify Ashford ship-from address
 - **Where:** Vercel env vars (production).
