@@ -11,9 +11,27 @@
 ## P0 manual tasks (tracked, not a build-pause)
 Items **B-3..B-8** and **B-12** (secret rotations + Paperclip Slack-bot revoke + admin-tier secret provisioning) are **P0 manual** for Ben. They gate Monday go-live sign-off per blueprint §15.5, but the control-plane build continues in parallel.
 
-## Code-complete status — 2026-04-18
+## Code-complete status — 2026-04-20
 
-The control plane, stores, Slack surfaces, approval route, daily brief, drift audit, admin API, CLI tools, health endpoint, runtime pause guard, and canonical contracts are all code-complete and tested (139+ green vitest tests, 0 new tsc errors).
+The control plane, stores, Slack surfaces, approval route, daily brief, drift audit, admin API, CLI tools, health endpoint, runtime pause guard, and canonical contracts are all code-complete and tested (174 green vitest tests, 0 new tsc errors).
+
+### New since 2026-04-18 (Block 3 + shipping hub + two specialist runtimes)
+
+- **Approval taxonomy v1.2** — 71 total slugs across A/B/C/D, CF-09 channel-segmentation rule encoded in code + doc.
+- **AR-split daily brief** — enforces 2026-03-30 Ben correction (drafts ≠ AR).
+- **8 specialist contracts added** — executive-brief, platform-specialist, drift-audit-runner, sample-order-dispatch, faire-specialist, compliance-specialist, reconciliation-specialist, inventory-specialist.
+- **Viktor W-7 Rene Response Capture** — [`/api/ops/viktor/rene-capture`](../src/app/api/ops/viktor/rene-capture/route.ts) + [`contracts/agents/viktor-rene-capture.md`](../contracts/agents/viktor-rene-capture.md). Live; Viktor handles via his existing Slack presence.
+- **Shipping Hub** — [`/ops/fulfillment`](../src/app/ops/fulfillment) with 4-stage machine (received → packed → ready → shipped), carton-progress tracker, tracking-# drop-off, Gmail sample-lead promotion, ShipStation `createLabel` integration, and ShipStation tracking webhook. Fully shipped (Phase 1, 2, 3).
+- **Finance Exception Agent runtime** — [`/api/ops/agents/finance-exception/run`](../src/app/api/ops/agents/finance-exception/run/route.ts). Weekday 06:15 PT digest to `#finance`. Live, returning real provenance-tagged data.
+- **Ops Agent runtime** — [`/api/ops/agents/ops/run`](../src/app/api/ops/agents/ops/run/route.ts). Weekday 09:00 PT digest to `#operations`. Live.
+- **6 cron entries wired** in [`vercel.json`](../vercel.json): health, finance-exception digest, morning brief, ops digest, EOD brief, weekly drift audit.
+- **Canonical runtime inventory** — [`contracts/activation-status.md`](../contracts/activation-status.md) (source of truth for "what's live").
+
+### New blocked items (2026-04-20, from shipping hub + agent rollout)
+
+- **B-13 (M9)** — Ben: set `FULFILLMENT_WEBHOOK_SECRET` env on Vercel + register ShipStation webhook (see new section below).
+- **B-14 (M10)** — Ben: verify `SHIPSTATION_FROM_STREET1` matches the Ashford warehouse (I defaulted to `30815 SR 706 E` based on the Mettler context — double-check before first real label buy).
+- **B-15 (M11)** — Ben + Rene + Drew: smoke-check the first live digest posts tomorrow morning in `#finance` and `#operations` before the 06:15 / 09:00 PT crons run unsupervised for a week.
 
 What's left is strictly manual/admin work — the items below plus the cutover sequence in [`cutover-sequence.md`](cutover-sequence.md).
 
@@ -148,45 +166,104 @@ Topics set from `contracts/channels.json` → `purpose`. Make Slack bot (`U0ABJC
 - **Contents:** yesterday's Shopify revenue (live query), Amazon settlement day-over-day, Faire relay orders, open approvals count, top priority for the week.
 - **Why blocked on Ben:** first brief sets tone and format.
 
+### B-13 (M9) — Register ShipStation tracking webhook + set FULFILLMENT_WEBHOOK_SECRET
+- **Provision secret:**
+  ```bash
+  NEW=$(openssl rand -hex 32)
+  printf '%s' "$NEW" | vercel env add FULFILLMENT_WEBHOOK_SECRET production
+  # echo for ShipStation admin entry below — then clear your terminal
+  echo "ShipStation URL: https://www.usagummies.com/api/ops/fulfillment/tracking-webhook?token=$NEW"
+  ```
+- **Register in ShipStation:** https://ship.shipstation.com/settings/webhooks → Add Webhook.
+  - Event types: `SHIP_NOTIFY`, `ITEM_SHIP_NOTIFY`.
+  - Target URL: the one emitted above (includes the shared-secret query param).
+- **Why blocked on Ben:** Ben owns ShipStation admin access + secret provisioning.
+- **What it unlocks:** when UPS scans a label, the webhook promotes the matching fulfillment-hub entry from `ready` → `shipped` automatically. No more manual mark-shipped clicks once a tracking scan fires.
+
+### B-14 (M10) — Verify Ashford ship-from address
+- **Where:** Vercel env vars (production).
+- **Action:** Set `SHIPSTATION_FROM_STREET1` / `_CITY` / `_STATE` / `_POSTALCODE` / `_PHONE` to match the Mettler warehouse. I defaulted to `30815 SR 706 E`, Ashford WA 98304, phone `3072094928` — verify these match the warehouse lease address before buying a label.
+- **Why blocked on Ben:** only Ben knows the canonical street number for the rental.
+- **Safety:** label purchase will return a 400 from UPS if the ship-from fails address validation; cheap to catch but worth verifying before a 30-case PO hits the street.
+
+### B-15 (M11) — Smoke the first two live agent digests
+- **Tomorrow (Tuesday) ~06:15 PT:** watch `#finance` for Finance Exception Agent's first live digest (cash / AP / AR / drafts / approvals, all provenance-tagged).
+- **Tomorrow (Tuesday) ~09:00 PT:** watch `#operations` for Ops Agent's first live digest (open POs / watched vendors / inventory low).
+- **If either is wrong or posts to the wrong channel:** Slack Ben + I'll hot-fix; then Rene/Drew approve the contract in `#ops-approvals` and we leave the cron running.
+
 ---
 
 ## Rene
 
-### R-1 — Confirm the Finance division contract
+### R-1 — Confirm the Finance division contracts
 - **Where:** `#ops-approvals`
-- **Action:** Read `/contracts/governance.md` §7 (secrets), `/contracts/approval-taxonomy.md` (Class B/C finance slugs), then post `Approved — Rene` with a link to this contract.
+- **What to read:**
+  - [`/contracts/governance.md`](../contracts/governance.md) §7 (secrets) + §1 (non-negotiables)
+  - [`/contracts/approval-taxonomy.md`](../contracts/approval-taxonomy.md) Class B/C finance slugs (v1.2, 2026-04-20 — includes the CF-09 channel-segmentation rule)
+  - [`/contracts/agents/finance-exception.md`](../contracts/agents/finance-exception.md) — the daily-digest agent that will post to `#finance` at 06:15 PT weekdays
+  - [`/contracts/agents/reconciliation-specialist.md`](../contracts/agents/reconciliation-specialist.md) — Thursday-weekly reconcile prep
+  - [`/contracts/agents/viktor-rene-capture.md`](../contracts/agents/viktor-rene-capture.md) — Viktor W-7 that captures Rene's `R.NN / J.NN / CF-NN / D.NNN / APPROVED / REDLINE` replies in `#finance`
+- **Action:** post `Approved — Rene` in `#ops-approvals` with links to the contracts above.
 
 ### R-2 — Confirm Booke's scope
-- **Where:** `/contracts/agents/booke.md` (created Tuesday by Claude Code)
-- **Action:** Read + approve Booke's contract before the drift audit starts scoring it.
+- **Where:** [`/contracts/agents/booke.md`](../contracts/agents/booke.md)
+- **Action:** Read + approve Booke's contract before the drift audit starts scoring it. (Booke is external SaaS; the contract governs what we expect from its feed.)
+
+### R-3 — Watch tomorrow's first live finance digest
+- **When:** Tuesday 06:15 PT (first live cron).
+- **Where:** `#finance`.
+- **What you'll see:** BoA checking balance (Plaid), open AP (unpaid bills from QBO), open AR split into sent-outstanding vs drafts-NOT-AR (per the 2026-03-30 rule you drove), pending financials approvals count, uncategorized count (currently "unavailable" until Booke integration lands). If any number is off, Slack Ben — we'll hot-fix.
 
 ---
 
 ## Drew
 
-### D-1 — Confirm the Production & Supply Chain contract
+### D-1 — Confirm the Production & Supply Chain contracts
 - **Where:** `#ops-approvals`
-- **Action:** Read `/contracts/governance.md` + the Ops agent contract at `/contracts/agents/ops.md` (Tuesday), post `Approved — Drew`.
+- **What to read:**
+  - [`/contracts/governance.md`](../contracts/governance.md) §1 (non-negotiables)
+  - [`/contracts/agents/ops.md`](../contracts/agents/ops.md) — the weekday 09:00 PT digest to `#operations`
+  - [`/contracts/agents/inventory-specialist.md`](../contracts/agents/inventory-specialist.md) — ATP + cover-day guard
+  - [`/contracts/agents/sample-order-dispatch.md`](../contracts/agents/sample-order-dispatch.md) — the origin rule agent (samples → you, East Coast; orders → Ben, Ashford)
+- **Action:** post `Approved — Drew` in `#ops-approvals`.
 
 ### D-2 — Acknowledge fulfillment rule
 Confirm in `#operations`:
 - Orders ship from Ashford WA via Ben.
 - Samples ship East Coast via Drew.
-- Drew does NOT ship customer orders. Viktor and agents cannot instruct Drew to ship — all shipment approvals come from Ben per `/contracts/viktor.md` §6.7 + blueprint fulfillment rules.
+- Drew does NOT ship customer orders. Viktor and agents cannot instruct Drew to ship — all shipment approvals come from Ben per [`/contracts/viktor.md`](../contracts/viktor.md) §6.7 + blueprint fulfillment rules.
+
+### D-3 — Watch tomorrow's first live ops digest
+- **When:** Tuesday 09:00 PT (first live cron).
+- **Where:** `#operations`.
+- **What you'll see:** open POs (age-sorted), watched vendors (Powers, Belmark, Inderbitzin, Albanese), inventory-low placeholder (will go live once Shopify on-hand cross-ref is wired — flagged "unavailable" until then).
 
 ---
 
 ## Claude Code (unblocked; listed for completeness)
 
-Tuesday–Wednesday implementation work that does not need Ben/Rene/Drew:
-- `src/lib/ops/control-plane/stores/kv-approval-store.ts`
-- `src/lib/ops/control-plane/stores/kv-audit-store.ts`
-- `src/lib/ops/control-plane/slack/approval-surface.ts`
-- `src/lib/ops/control-plane/slack/audit-surface.ts`
-- `src/app/api/slack/approvals/route.ts` (interactive-message handler)
-- `src/lib/ops/control-plane/drift-audit.ts` (Sunday 8 PM sampler)
-- Agent contracts under `/contracts/agents/`: booke.md, finance-exception.md, ops.md, research-librarian.md, r1-consumer.md through r7-press.md
-- Make.com scenario inventory at `ops/make-scenarios.md`
+### Done 2026-04-19..20
+
+- Control-plane stores, Slack surfaces, approval route, drift audit, daily brief — all code-complete, 174/174 vitest green.
+- Agent contracts under `/contracts/agents/`: booke.md, finance-exception.md, ops.md, research-librarian.md, r1-consumer.md through r7-press.md, sample-order-dispatch.md, viktor-rene-capture.md, reconciliation-specialist.md, inventory-specialist.md, faire-specialist.md, compliance-specialist.md, executive-brief.md, platform-specialist.md, drift-audit-runner.md.
+- Approval taxonomy v1.2 (71 slugs).
+- Viktor W-7 Rene Response Capture runtime.
+- Shipping Hub (3 phases): stage machine, sample queue, ShipStation `createLabel`, tracking webhook.
+- Finance Exception Agent runtime.
+- Ops Agent runtime.
+- Make.com scenario inventory at `ops/make-scenarios.md`.
+- Canonical runtime inventory at [`contracts/activation-status.md`](../contracts/activation-status.md).
+
+### Next (post-cutover, bigger impact first)
+
+1. **ShipStation shipment-history cross-ref** — auto-clears the "paid, verify shipped" flag on wholesale invoices in the fulfillment hub.
+2. **Shopify on-hand inventory integration** — lights up Ops Agent inventory-low threshold + ATP honesty in the shipping hub.
+3. **Gmail labeled vendor-thread scraper** — Ops Agent surfaces stale Powers/Belmark/Inderbitzin threads.
+4. **Booke queue feed** — Finance Exception Agent uncategorized count.
+5. **Compliance Specialist runtime** — COI watcher + Approved Claims gate.
+6. **Faire Specialist runtime** — Direct-share uplift (requires Faire brand-portal scraper).
+7. **Research Librarian + R-1..R-7 agent runtimes** — weekly synthesis + on-demand research. 1-2 week LLM + tool-use build.
+8. **Agent health dashboard** at `/ops/agents` — consolidate run history per agent, graduation gauge per non-negotiable §4.
 
 ## Outstanding open questions (needed before Monday sign-off per §9 of blueprint)
 
