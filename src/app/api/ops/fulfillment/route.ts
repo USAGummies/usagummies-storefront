@@ -14,6 +14,7 @@
  */
 
 import { NextResponse } from "next/server";
+import { kv } from "@vercel/kv";
 
 import { isAuthorized } from "@/lib/ops/abra-auth";
 import { getQBOInvoices } from "@/lib/ops/qbo-client";
@@ -22,6 +23,45 @@ import { searchEmails } from "@/lib/ops/gmail-reader";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+// ---- "Marked shipped" persistence ---------------------------------------
+//
+// Fulfillment tracking isn't in QBO (QBO knows invoice+payment, not ship).
+// Until we wire ShipStation cross-reference, we keep a KV-backed set of
+// items Ben has manually marked shipped. Keys:
+//   inv:<qbo-invoice-id>      — e.g. inv:1492 for Inderbitzin #1205
+//   pending:<slug>            — e.g. pending:inderbitzin-po-009180-remainder
+//   dtc:<shopify-order-id>    — e.g. dtc:gid://shopify/Order/16623047573875
+const KV_SHIPPED = "fulfillment:shipped";
+
+export interface ShippedEntry {
+  shippedAt: string; // ISO
+  tracking?: string;
+  notes?: string;
+  shippedBy?: string;
+}
+type ShippedMap = Record<string, ShippedEntry>;
+
+async function getShippedMap(): Promise<ShippedMap> {
+  return ((await kv.get<ShippedMap>(KV_SHIPPED)) ?? {}) as ShippedMap;
+}
+
+async function markShipped(
+  key: string,
+  entry: ShippedEntry,
+): Promise<ShippedMap> {
+  const current = await getShippedMap();
+  current[key] = entry;
+  await kv.set(KV_SHIPPED, current);
+  return current;
+}
+
+async function unmarkShipped(key: string): Promise<ShippedMap> {
+  const current = await getShippedMap();
+  delete current[key];
+  await kv.set(KV_SHIPPED, current);
+  return current;
+}
 
 // ---- Types ---------------------------------------------------------------
 
@@ -53,6 +93,7 @@ export interface DtcOrder {
 }
 
 export interface ManualPending {
+  slug: string;
   customer: string;
   cases: number;
   bags: number;
@@ -96,6 +137,7 @@ export interface FulfillmentPayload {
 
 const MANUAL_PENDING: ManualPending[] = [
   {
+    slug: "inderbitzin-po-009180-remainder",
     customer: "Inderbitzin Distributors, Inc.",
     cases: 5,
     bags: 180,
@@ -106,7 +148,7 @@ const MANUAL_PENDING: ManualPending[] = [
   },
 ];
 
-// ---- Handler -------------------------------------------------------------
+// ---- Handler: GET --------------------------------------------------------
 
 export async function GET(req: Request): Promise<Response> {
   if (!(await isAuthorized(req))) {
@@ -115,7 +157,8 @@ export async function GET(req: Request): Promise<Response> {
 
   const degraded: string[] = [];
 
-  const [wholesale, dtc, samples] = await Promise.all([
+  const [shipped, wholesaleRaw, dtcRaw, samples] = await Promise.all([
+    getShippedMap().catch(() => ({}) as ShippedMap),
     loadWholesale().catch((err) => {
       degraded.push(`wholesale: ${err instanceof Error ? err.message : String(err)}`);
       return [] as WholesaleInvoice[];
@@ -130,10 +173,14 @@ export async function GET(req: Request): Promise<Response> {
     }),
   ]);
 
+  const wholesale = wholesaleRaw.filter((w) => !shipped[`inv:${w.id}`]);
+  const dtc = dtcRaw.filter((o) => !shipped[`dtc:${o.id}`]);
+  const manualPending = MANUAL_PENDING.filter((m) => !shipped[`pending:${m.slug}`]);
+
   const wholesaleCases = wholesale.reduce((a, w) => a + (w.cases ?? 0), 0);
   const wholesaleBags = wholesale.reduce((a, w) => a + (w.bags ?? 0), 0);
-  const manualPendingCases = MANUAL_PENDING.reduce((a, m) => a + m.cases, 0);
-  const manualPendingBags = MANUAL_PENDING.reduce((a, m) => a + m.bags, 0);
+  const manualPendingCases = manualPending.reduce((a, m) => a + m.cases, 0);
+  const manualPendingBags = manualPending.reduce((a, m) => a + m.bags, 0);
 
   const payload: FulfillmentPayload = {
     ok: true,
@@ -149,12 +196,57 @@ export async function GET(req: Request): Promise<Response> {
     },
     wholesale,
     dtc,
-    manualPending: MANUAL_PENDING,
+    manualPending,
     samples,
     degraded,
   };
 
   return NextResponse.json(payload);
+}
+
+// ---- Handler: POST (mark shipped) + DELETE (unmark) ---------------------
+
+export async function POST(req: Request): Promise<Response> {
+  if (!(await isAuthorized(req))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  let body: { key?: string; tracking?: string; notes?: string; shippedBy?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const key = body.key?.trim();
+  if (!key || !/^(inv|pending|dtc):.+/.test(key)) {
+    return NextResponse.json(
+      { error: "Missing or malformed 'key' (expected inv:<id> | pending:<slug> | dtc:<id>)" },
+      { status: 400 },
+    );
+  }
+
+  const entry: ShippedEntry = {
+    shippedAt: new Date().toISOString(),
+    tracking: body.tracking?.trim() || undefined,
+    notes: body.notes?.trim() || undefined,
+    shippedBy: body.shippedBy?.trim() || undefined,
+  };
+  const map = await markShipped(key, entry);
+  return NextResponse.json({ ok: true, key, entry, shippedCount: Object.keys(map).length });
+}
+
+export async function DELETE(req: Request): Promise<Response> {
+  if (!(await isAuthorized(req))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const url = new URL(req.url);
+  const key = url.searchParams.get("key")?.trim();
+  if (!key) {
+    return NextResponse.json({ error: "Missing 'key' query param" }, { status: 400 });
+  }
+  const map = await unmarkShipped(key);
+  return NextResponse.json({ ok: true, key, shippedCount: Object.keys(map).length });
 }
 
 // ---- Source: QBO invoices -----------------------------------------------

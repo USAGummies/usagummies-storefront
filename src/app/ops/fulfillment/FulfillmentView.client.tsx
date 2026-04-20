@@ -33,6 +33,7 @@ export function FulfillmentView() {
   const [data, setData] = useState<FulfillmentPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [busyKey, setBusyKey] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -48,6 +49,31 @@ export function FulfillmentView() {
       setLoading(false);
     }
   }, []);
+
+  const markShipped = useCallback(
+    async (key: string, label: string) => {
+      const tracking = window.prompt(`Tracking # for "${label}" (optional):`, "");
+      if (tracking === null) return; // user cancelled
+      setBusyKey(key);
+      try {
+        const res = await fetch("/api/ops/fulfillment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key, tracking: tracking || undefined }),
+        });
+        const json = await res.json();
+        if (!res.ok || !json.ok) throw new Error(json.error || `HTTP ${res.status}`);
+        await load();
+      } catch (e) {
+        window.alert(
+          `Failed to mark shipped: ${e instanceof Error ? e.message : "unknown"}`,
+        );
+      } finally {
+        setBusyKey(null);
+      }
+    },
+    [load],
+  );
 
   useEffect(() => {
     void load();
@@ -87,9 +113,17 @@ export function FulfillmentView() {
             </div>
           )}
           <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-2">
-            <PendingCommitmentsCard items={data.manualPending} />
-            <WholesaleCard items={data.wholesale} />
-            <DtcCard items={data.dtc} />
+            <PendingCommitmentsCard
+              items={data.manualPending}
+              onMarkShipped={markShipped}
+              busyKey={busyKey}
+            />
+            <WholesaleCard
+              items={data.wholesale}
+              onMarkShipped={markShipped}
+              busyKey={busyKey}
+            />
+            <DtcCard items={data.dtc} onMarkShipped={markShipped} busyKey={busyKey} />
             <SamplesCard items={data.samples} />
           </div>
         </>
@@ -186,98 +220,161 @@ function Card({
   );
 }
 
-function PendingCommitmentsCard({ items }: { items: ManualPending[] }) {
+function PendingCommitmentsCard({
+  items,
+  onMarkShipped,
+  busyKey,
+}: {
+  items: ManualPending[];
+  onMarkShipped: (key: string, label: string) => void;
+  busyKey: string | null;
+}) {
   return (
     <Card
       title="Pending commitments"
       count={items.length}
       subtitle="Orders we committed to in email / Slack that are not yet on a QBO invoice. Ship, then invoice."
     >
-      {items.map((it, i) => (
-        <div key={i} className="rounded-md border-l-4 border-amber-400 bg-amber-50 p-3">
-          <div className="flex items-baseline justify-between">
-            <div className="font-semibold">{it.customer}</div>
-            <div className="text-sm font-semibold">
-              {it.cases} cases <span className="text-neutral-500">({it.bags} bags)</span>
+      {items.map((it) => {
+        const key = `pending:${it.slug}`;
+        return (
+          <div key={key} className="rounded-md border-l-4 border-amber-400 bg-amber-50 p-3">
+            <div className="flex items-baseline justify-between">
+              <div className="font-semibold">{it.customer}</div>
+              <div className="text-sm font-semibold">
+                {it.cases} cases <span className="text-neutral-500">({it.bags} bags)</span>
+              </div>
             </div>
+            {it.targetShipBy && (
+              <div className="mt-0.5 text-xs text-neutral-700">
+                Target ship-by: <strong>{it.targetShipBy}</strong> ({daysFromNow(it.targetShipBy)})
+              </div>
+            )}
+            <div className="mt-1 text-xs text-neutral-700">{it.reason}</div>
+            <div className="mt-1 text-[10px] text-neutral-500">Source: {it.source}</div>
+            <ShipButton
+              onClick={() => onMarkShipped(key, `${it.customer} — ${it.cases} cases (pending)`)}
+              busy={busyKey === key}
+            />
           </div>
-          {it.targetShipBy && (
-            <div className="mt-0.5 text-xs text-neutral-700">
-              Target ship-by: <strong>{it.targetShipBy}</strong> ({daysFromNow(it.targetShipBy)})
-            </div>
-          )}
-          <div className="mt-1 text-xs text-neutral-700">{it.reason}</div>
-          <div className="mt-1 text-[10px] text-neutral-500">Source: {it.source}</div>
-        </div>
-      ))}
+        );
+      })}
     </Card>
   );
 }
 
-function WholesaleCard({ items }: { items: WholesaleInvoice[] }) {
+function ShipButton({ onClick, busy }: { onClick: () => void; busy: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={busy}
+      className="mt-2 rounded-md border border-neutral-300 bg-white px-2.5 py-1 text-xs font-semibold hover:bg-neutral-50 disabled:opacity-50"
+    >
+      {busy ? "Saving…" : "Mark shipped →"}
+    </button>
+  );
+}
+
+function WholesaleCard({
+  items,
+  onMarkShipped,
+  busyKey,
+}: {
+  items: WholesaleInvoice[];
+  onMarkShipped: (key: string, label: string) => void;
+  busyKey: string | null;
+}) {
   return (
     <Card
       title="Wholesale invoices (QBO)"
       count={items.length}
       subtitle="Draft invoices sit first — Rene may need to send before ship. Paid = verify already shipped."
     >
-      {items.map((inv) => (
-        <div key={inv.id} className="rounded-md border border-neutral-200 p-3">
-          <div className="flex items-baseline justify-between">
-            <div className="font-semibold">{inv.customer}</div>
-            <span
-              className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase text-white"
-              style={{ background: STATUS_COLORS[inv.status] }}
-            >
-              {inv.status}
-            </span>
+      {items.map((inv) => {
+        const key = `inv:${inv.id}`;
+        return (
+          <div key={key} className="rounded-md border border-neutral-200 p-3">
+            <div className="flex items-baseline justify-between">
+              <div className="font-semibold">{inv.customer}</div>
+              <span
+                className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase text-white"
+                style={{ background: STATUS_COLORS[inv.status] }}
+              >
+                {inv.status}
+              </span>
+            </div>
+            <div className="mt-1 flex items-baseline justify-between text-sm">
+              <div className="text-neutral-700">
+                #{inv.docNumber || inv.id} · {inv.txnDate || "—"}
+                {inv.dueDate && <> · due {inv.dueDate}</>}
+              </div>
+              <div className="font-semibold">
+                {inv.cases !== null && <span>{inv.cases} cases </span>}
+                {inv.bags !== null && <span className="text-neutral-500">({inv.bags} bags)</span>}
+                <span className="ml-2">· {money(inv.amount)}</span>
+              </div>
+            </div>
+            {inv.shipAddr && (
+              <div className="mt-1 text-xs text-neutral-600">→ {inv.shipAddr}</div>
+            )}
+            {inv.memo && <div className="mt-1 text-xs italic text-neutral-600">{inv.memo}</div>}
+            {inv.shipVerifyTodo && (
+              <div className="mt-1 text-[11px] text-amber-700">
+                ⚠ Paid — verify shipment went out. (ShipStation cross-ref not yet wired.)
+              </div>
+            )}
+            <ShipButton
+              onClick={() =>
+                onMarkShipped(
+                  key,
+                  `${inv.customer} — Invoice #${inv.docNumber || inv.id}`,
+                )
+              }
+              busy={busyKey === key}
+            />
           </div>
-          <div className="mt-1 flex items-baseline justify-between text-sm">
-            <div className="text-neutral-700">
-              #{inv.docNumber || inv.id} · {inv.txnDate || "—"}
-              {inv.dueDate && <> · due {inv.dueDate}</>}
-            </div>
-            <div className="font-semibold">
-              {inv.cases !== null && <span>{inv.cases} cases </span>}
-              {inv.bags !== null && <span className="text-neutral-500">({inv.bags} bags)</span>}
-              <span className="ml-2">· {money(inv.amount)}</span>
-            </div>
-          </div>
-          {inv.shipAddr && (
-            <div className="mt-1 text-xs text-neutral-600">→ {inv.shipAddr}</div>
-          )}
-          {inv.memo && <div className="mt-1 text-xs italic text-neutral-600">{inv.memo}</div>}
-          {inv.shipVerifyTodo && (
-            <div className="mt-1 text-[11px] text-amber-700">
-              ⚠ Paid — verify shipment went out. (ShipStation cross-ref not yet wired.)
-            </div>
-          )}
-        </div>
-      ))}
+        );
+      })}
     </Card>
   );
 }
 
-function DtcCard({ items }: { items: DtcOrder[] }) {
+function DtcCard({
+  items,
+  onMarkShipped,
+  busyKey,
+}: {
+  items: DtcOrder[];
+  onMarkShipped: (key: string, label: string) => void;
+  busyKey: string | null;
+}) {
   return (
     <Card
       title="DTC orders (Shopify)"
       count={items.length}
       subtitle="Paid + unfulfilled Shopify orders, last 30 days."
     >
-      {items.map((o) => (
-        <div key={o.id} className="rounded-md border border-neutral-200 p-3">
-          <div className="flex items-baseline justify-between">
-            <div className="font-semibold">
-              {o.name} · {o.customer}
+      {items.map((o) => {
+        const key = `dtc:${o.id}`;
+        return (
+          <div key={key} className="rounded-md border border-neutral-200 p-3">
+            <div className="flex items-baseline justify-between">
+              <div className="font-semibold">
+                {o.name} · {o.customer}
+              </div>
+              <div className="text-sm font-semibold">{money(o.total)}</div>
             </div>
-            <div className="text-sm font-semibold">{money(o.total)}</div>
+            <div className="mt-1 text-xs text-neutral-600">
+              {o.email} · {new Date(o.createdAt).toLocaleDateString()} · {o.fulfillmentStatus}
+            </div>
+            <ShipButton
+              onClick={() => onMarkShipped(key, `${o.customer} — Shopify ${o.name}`)}
+              busy={busyKey === key}
+            />
           </div>
-          <div className="mt-1 text-xs text-neutral-600">
-            {o.email} · {new Date(o.createdAt).toLocaleDateString()} · {o.fulfillmentStatus}
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </Card>
   );
 }
