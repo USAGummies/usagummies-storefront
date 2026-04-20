@@ -189,7 +189,7 @@ Topics set from `contracts/channels.json` → `purpose`. Make Slack bot (`U0ABJC
 ### B-15 (M11) — Smoke the first two live agent digests
 - **Tomorrow (Tuesday) ~06:15 PT:** watch `#finance` for Finance Exception Agent's first live digest (cash / AP / AR / drafts / approvals, all provenance-tagged).
 - **Tomorrow (Tuesday) ~09:00 PT:** watch `#operations` for Ops Agent's first live digest (open POs / watched vendors / inventory low).
-- **If either is wrong or posts to the wrong channel:** Slack Ben + I'll hot-fix; then Rene/Drew approve the contract in `#ops-approvals` and we leave the cron running.
+- **If either is wrong or posts to the wrong channel:** Slack Ben + I'll hot-fix; Rene approves the finance contract in `#ops-approvals` and we leave the cron running. (Drew intentionally out of the loop until Ben re-engages him.)
 
 ---
 
@@ -218,25 +218,7 @@ Topics set from `contracts/channels.json` → `purpose`. Make Slack bot (`U0ABJC
 
 ## Drew
 
-### D-1 — Confirm the Production & Supply Chain contracts
-- **Where:** `#ops-approvals`
-- **What to read:**
-  - [`/contracts/governance.md`](../contracts/governance.md) §1 (non-negotiables)
-  - [`/contracts/agents/ops.md`](../contracts/agents/ops.md) — the weekday 09:00 PT digest to `#operations`
-  - [`/contracts/agents/inventory-specialist.md`](../contracts/agents/inventory-specialist.md) — ATP + cover-day guard
-  - [`/contracts/agents/sample-order-dispatch.md`](../contracts/agents/sample-order-dispatch.md) — the origin rule agent (samples → you, East Coast; orders → Ben, Ashford)
-- **Action:** post `Approved — Drew` in `#ops-approvals`.
-
-### D-2 — Acknowledge fulfillment rule
-Confirm in `#operations`:
-- Orders ship from Ashford WA via Ben.
-- Samples ship East Coast via Drew.
-- Drew does NOT ship customer orders. Viktor and agents cannot instruct Drew to ship — all shipment approvals come from Ben per [`/contracts/viktor.md`](../contracts/viktor.md) §6.7 + blueprint fulfillment rules.
-
-### D-3 — Watch tomorrow's first live ops digest
-- **When:** Tuesday 09:00 PT (first live cron).
-- **Where:** `#operations`.
-- **What you'll see:** open POs (age-sorted), watched vendors (Powers, Belmark, Inderbitzin, Albanese), inventory-low placeholder (will go live once Shopify on-hand cross-ref is wired — flagged "unavailable" until then).
+_No Drew assignments pending per Ben 2026-04-20. The Production & Supply Chain contracts (ops.md, inventory-specialist.md, sample-order-dispatch.md) remain canonical doctrine, and the Ops Agent runtime posts to `#operations` unassigned. Drew re-enters the blocked-items list when Ben brings him in._
 
 ---
 
