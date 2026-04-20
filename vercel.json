@@ -5,8 +5,16 @@
       "schedule": "0 14 * * 1-5"
     },
     {
+      "path": "/api/ops/agents/finance-exception/run?post=true",
+      "schedule": "15 14 * * 1-5"
+    },
+    {
       "path": "/api/ops/daily-brief?kind=morning&post=true",
       "schedule": "0 15 * * 1-5"
+    },
+    {
+      "path": "/api/ops/agents/ops/run?post=true",
+      "schedule": "0 17 * * 1-5"
     },
     {
       "path": "/api/ops/daily-brief?kind=eod&post=true",
