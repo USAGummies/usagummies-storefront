@@ -314,18 +314,14 @@ function money(value: number | null, fallback: string): string {
   return `${sign}$${abs.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-function renderCell(cell: Cell, label: string): string {
+type CellFormat = "money" | "count";
+
+function renderCell(cell: Cell, label: string, format: CellFormat): string {
   if (cell.value === null) {
     return `• *${label}:* _unavailable_ — ${cell.unavailableReason ?? "no data"}`;
   }
   const v = typeof cell.value === "number" ? cell.value : 0;
-  const fmt =
-    label.toLowerCase().includes("count") ||
-    label.toLowerCase().includes("invoices") ||
-    label.toLowerCase().includes("approvals") ||
-    label.toLowerCase().includes("uncategorized")
-      ? String(Math.round(v))
-      : money(v, "—");
+  const fmt = format === "count" ? String(Math.round(v)) : money(v, "—");
   const src = cell.provenance?.system ?? "?";
   return `• *${label}:* ${fmt}  \`[${src}]\``;
 }
@@ -343,12 +339,12 @@ function renderDigest(digest: DigestData, startedAt: string): string {
     `:bank: *Finance Exception Digest — ${dateLabel}* (<@${RENE_SLACK_USER_ID}>)`,
     "",
     "*Cash + queue*",
-    renderCell(digest.cashBoA, "BoA checking 7020"),
-    renderCell(digest.openApDollars, "Open AP (unpaid bills)"),
-    renderCell(digest.openArDollars, "Open AR (sent invoices)"),
-    renderCell(digest.draftInvoices, "Draft invoices (not AR)"),
-    renderCell(digest.uncategorizedCount, "Uncategorized transactions"),
-    renderCell(digest.pendingApprovalsCount, "Pending financials approvals"),
+    renderCell(digest.cashBoA, "BoA checking 7020", "money"),
+    renderCell(digest.openApDollars, "Open AP (unpaid bills)", "money"),
+    renderCell(digest.openArDollars, "Open AR (sent invoices)", "money"),
+    renderCell(digest.draftInvoices, "Draft invoices (not AR)", "money"),
+    renderCell(digest.uncategorizedCount, "Uncategorized transactions", "count"),
+    renderCell(digest.pendingApprovalsCount, "Pending financials approvals", "count"),
   ];
 
   if (digest.degraded.length > 0) {
