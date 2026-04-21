@@ -32,6 +32,7 @@ import {
 } from "@/lib/ops/freight-comp";
 import {
   KV_INVENTORY_SNAPSHOT,
+  decrementSnapshot,
   type InventorySnapshot,
 } from "@/lib/ops/inventory-snapshot";
 import {
@@ -382,6 +383,27 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   await kv.set(KV_STAGES, updatedStages);
+
+  // Inventory snapshot auto-decrement. Keeps the cached snapshot
+  // honest after a ship without waiting for the 10:00 PT Ops Agent
+  // refresh. Uses the BAGS_PER_CARTON constants via the ATP module's
+  // conventions: master_carton=36, case=6. Best-effort — snapshot
+  // miss doesn't fail the buy.
+  const BAGS_PER_CARTON_LOCAL: Record<"case" | "master_carton", number> = {
+    case: 6,
+    master_carton: 36,
+  };
+  const shippedBags = labels.length * (BAGS_PER_CARTON_LOCAL[packagingType] ?? 36);
+  if (inventorySnapshot && shippedBags > 0) {
+    try {
+      const decremented = decrementSnapshot(inventorySnapshot, shippedBags);
+      if (decremented) {
+        await kv.set(KV_INVENTORY_SNAPSHOT, decremented);
+      }
+    } catch {
+      // Best-effort — drift self-heals tomorrow.
+    }
+  }
 
   // BUILD #6 — CF-09 freight-comp auto-queue.
   // If the destination matches a delivered-pricing customer, auto-build

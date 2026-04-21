@@ -98,3 +98,66 @@ export function lookupSkuInSnapshot(
     snap.rows.find((r) => r.sku.trim().toLowerCase() === needle) ?? null
   );
 }
+
+/**
+ * Decrement the snapshot by a fixed bag count after a label buy.
+ *
+ * Problem: the snapshot only refreshes once a day (Ops Agent cron at
+ * 10:00 PT). If Ben ships 144 bags today at 11:00 PT, the cached
+ * snapshot still shows the pre-ship on-hand until tomorrow's run.
+ * The ATP gate + Slack preflight would read stale numbers all day.
+ *
+ * Fix: after every successful buy-label call, mutate the snapshot in
+ * place, subtracting the outbound bags proportionally across rows
+ * (largest-onHand row first → avoids negative balances on small SKUs).
+ * The next Ops Agent refresh at 10:00 PT next day reconciles from
+ * Shopify ground truth, so any drift is self-healing.
+ *
+ * Pure function — returns a new snapshot. Callers persist to KV.
+ * Returns the original snapshot unchanged when `decrementBags` ≤ 0
+ * or the snapshot is missing/empty.
+ */
+export function decrementSnapshot(
+  snap: InventorySnapshot | null,
+  decrementBags: number,
+): InventorySnapshot | null {
+  if (!snap) return null;
+  if (!(decrementBags > 0)) return snap;
+  if (snap.rows.length === 0) return snap;
+
+  // Sort rows by onHand desc so we drain the fullest SKU first — this
+  // matches the real-world order-picker pattern (pull from whichever
+  // has inventory) and keeps smaller SKUs from going negative.
+  const rows = [...snap.rows].sort((a, b) => b.onHand - a.onHand);
+  let remaining = decrementBags;
+  const newRows = rows.map((r) => {
+    if (remaining <= 0) return r;
+    const take = Math.min(r.onHand, remaining);
+    remaining -= take;
+    const newOnHand = Math.max(0, r.onHand - take);
+    return {
+      ...r,
+      onHand: newOnHand,
+      low: newOnHand < r.threshold,
+      byLocation:
+        r.byLocation.length > 0
+          ? r.byLocation.map((loc, idx) =>
+              idx === 0 ? { ...loc, onHand: Math.max(0, loc.onHand - take) } : loc,
+            )
+          : r.byLocation,
+    };
+  });
+
+  // If remaining > 0 after draining every row, the caller over-promised
+  // in KV. We floor at zero (no negative on-hand) — the next real
+  // snapshot refresh reconciles.
+  const preservedOrder = snap.rows.map(
+    (orig) =>
+      newRows.find((r) => r.variantId === orig.variantId) ?? orig,
+  );
+  return {
+    ...snap,
+    rows: preservedOrder,
+    lowCount: preservedOrder.filter((r) => r.low).length,
+  };
+}

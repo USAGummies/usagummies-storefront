@@ -45,6 +45,19 @@ export const dynamic = "force-dynamic";
 const AGENT_ID = process.env.AGENT_ID_OPS ?? "ops";
 const DREW_SLACK_USER_ID = process.env.SLACK_USER_DREW ?? "";
 const INVENTORY_LOW_THRESHOLD = 5000;
+/**
+ * Reorder trigger. When total bags on-hand (across every SKU) falls
+ * below this, fire a `🏭 Reorder Powers?` section in the digest so
+ * Drew sees a clear cue to raise a PO.
+ *
+ * Default 10k bags = ~277 master cartons = ~4-8 weeks runway at a
+ * 50-cartons/week ship pace (Ben's 2026-04-20 working rate). Env-
+ * overridable via `OPS_REORDER_THRESHOLD_BAGS`.
+ */
+const REORDER_THRESHOLD_BAGS = Number.parseInt(
+  process.env.OPS_REORDER_THRESHOLD_BAGS ?? "10000",
+  10,
+);
 const VENDOR_STALE_DAYS = 7;
 
 // ---- Types --------------------------------------------------------------
@@ -436,6 +449,20 @@ function renderDigest(digest: DigestData, startedAt: string): string {
             )
             .join("\n"),
   );
+
+  // Reorder trigger — only surfaces when Ben/Drew are close to needing
+  // to place a Powers PO. Uses the preflight's total-on-hand count
+  // (already computed), so no extra Shopify round-trip.
+  if (digest.preflight && digest.preflight.atp.totalBagsOnHand !== null) {
+    const totalOnHand = digest.preflight.atp.totalBagsOnHand;
+    if (totalOnHand < REORDER_THRESHOLD_BAGS) {
+      const weeksRunway = (totalOnHand / 1800).toFixed(1); // 1800 bags/week rough ship pace
+      lines.push(
+        "",
+        `:factory: *REORDER TRIGGER* — total on-hand ${totalOnHand.toLocaleString()} bags < ${REORDER_THRESHOLD_BAGS.toLocaleString()} threshold (~${weeksRunway} weeks runway at current pace). Drew, time to place a Powers PO.`,
+      );
+    }
+  }
 
   // Shipping Hub pre-flight — wallet / ATP / freight-comp / stale voids.
   if (digest.preflight) {
