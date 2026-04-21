@@ -94,8 +94,8 @@ Per [`activation-triggers.md`](activation-triggers.md): marketing-brand, marketi
 - HubSpot deal-stage automation for Sample-Requested → Sample-Shipped → Sample-Received — ✅ **DONE** (2026-04-20, `hubspotDealId` on buy-label → `advanceDealOnShipment` patches deal + attaches tracking note).
 - Make.com scenario consolidation (21 scenarios; some overlap with the 3.0 runtime and should retire). **Pending** — audit needs Make.com API access.
 - Unified daily digest (fold Finance Exception + Ops Agent into the Executive Brief rather than three separate posts). **Pending** — morning brief now includes preflight signals but retains separate Finance Exception + Ops digests. Consolidation deferred until signal overlap becomes a readability problem.
-- Fulfillment drift-audit checks — sample weekly for delivered-pricing compliance + wallet-floor adherence + ATP gate hit rate + stale-void SLA. **Pending.**
-- Sample Order Dispatch (S-08) runtime — event-driven Class-B proposal agent per `/contracts/agents/sample-order-dispatch.md`. **Pending.** Contract ready; event wiring (Shopify / Amazon / Faire / HubSpot webhooks) is the next real build.
+- Fulfillment drift-audit checks — sample weekly for delivered-pricing compliance + wallet-floor adherence + ATP gate hit rate + stale-void SLA. ✅ **DONE** (2026-04-20, commit `1063e9e` — `/api/ops/control-plane/fulfillment-drift-audit` weekly Mon 20:30 PT → `#ops-audit`).
+- Sample Order Dispatch (S-08) runtime — event-driven Class-B proposal agent per `/contracts/agents/sample-order-dispatch.md`. 🟡 **MVP LIVE** (2026-04-20). Pure classifier + proposal composer + dispatch route (18/18 vitest green, posts to `#ops-approvals`, refusals to `#ops-alerts`). Webhook-adapter wiring for Shopify / Amazon / Faire / HubSpot is the follow-on.
 
 ## Version history
 
