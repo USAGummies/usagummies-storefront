@@ -50,6 +50,15 @@ const AMZ_LWA_REFRESH_TOKEN = process.env.LWA_REFRESH_TOKEN || '';
 const AMZ_MARKETPLACE_ID = process.env.MARKETPLACE_ID || 'ATVPDKIKX0DER';
 const AMZ_SP_ENDPOINT = process.env.SP_API_ENDPOINT || 'https://sellingpartnerapi-na.amazon.com';
 
+// ShipStation (2026-04-20 — wallet + recent labels + stale voids)
+const SHIPSTATION_API_KEY = process.env.SHIPSTATION_API_KEY || '';
+const SHIPSTATION_API_SECRET = process.env.SHIPSTATION_API_SECRET || '';
+const SHIPSTATION_WALLET_FLOORS = {
+  stamps_com: Number(process.env.SHIPSTATION_WALLET_MIN_STAMPS_COM) || 100,
+  ups_walleted: Number(process.env.SHIPSTATION_WALLET_MIN_UPS_WALLETED) || 150,
+  fedex_walleted: Number(process.env.SHIPSTATION_WALLET_MIN_FEDEX_WALLETED) || 100,
+};
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 function pctChange(today, yesterday) {
   if (!yesterday || yesterday === 0) return today > 0 ? '+100%' : '0%';
@@ -319,6 +328,70 @@ async function fetchAmazon() {
 }
 
 // ── iMessage ────────────────────────────────────────────────────────────────
+// ── ShipStation: wallet balances + recent labels + stale voids ──────────────
+async function fetchShipStation() {
+  if (!SHIPSTATION_API_KEY || !SHIPSTATION_API_SECRET) return null;
+  const auth = 'Basic ' + Buffer.from(`${SHIPSTATION_API_KEY}:${SHIPSTATION_API_SECRET}`).toString('base64');
+  const headers = { Authorization: auth, Accept: 'application/json' };
+
+  // Fetch wallet balances and recent shipments in parallel.
+  const [carriersRes, shipRes] = await Promise.all([
+    fetch('https://ssapi.shipstation.com/carriers', { headers }),
+    (async () => {
+      const start = new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+      const url = `https://ssapi.shipstation.com/shipments?shipDateStart=${start}&pageSize=500&page=1&sortBy=ShipDate&sortDir=DESC`;
+      return fetch(url, { headers });
+    })(),
+  ]);
+
+  const wallets = [];
+  if (carriersRes.ok) {
+    const carriers = await carriersRes.json();
+    for (const c of carriers) {
+      const code = c.code || c.Code;
+      if (!code || !['stamps_com', 'ups_walleted', 'fedex_walleted'].includes(code)) continue;
+      const balance = typeof (c.balance ?? c.Balance) === 'number' ? (c.balance ?? c.Balance) : null;
+      const floor = SHIPSTATION_WALLET_FLOORS[code] ?? 100;
+      wallets.push({ code, balance, floor, belowFloor: balance !== null && balance < floor });
+    }
+  }
+
+  let labelsToday = 0;
+  let spendToday = 0;
+  let voidedStale = 0;
+  let voidedPending = 0;
+  if (shipRes.ok) {
+    const data = await shipRes.json();
+    const shipments = data.shipments || [];
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const staleCutoff = Date.now() - 72 * 3600 * 1000;
+    for (const s of shipments) {
+      const created = s.createDate ? new Date(s.createDate).getTime() : 0;
+      const cost = (s.shipmentCost || 0) + (s.insuranceCost || 0);
+      if (!s.voided && created >= todayStart.getTime()) {
+        labelsToday += 1;
+        spendToday += cost;
+      }
+      if (s.voided && s.voidDate) {
+        const voidedAt = new Date(s.voidDate).getTime();
+        if (voidedAt < staleCutoff) {
+          voidedStale += 1;
+          voidedPending += cost;
+        }
+      }
+    }
+  }
+
+  return {
+    wallets,
+    labelsToday,
+    spendToday: Math.round(spendToday * 100) / 100,
+    voidedStale,
+    voidedPending: Math.round(voidedPending * 100) / 100,
+  };
+}
+
 function sendIMessage(message) {
   const escaped = message.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
   for (const phone of PHONE_NUMBERS) {
@@ -370,10 +443,11 @@ function behaviorSummary(ga4) {
 async function main() {
   console.log(`[${new Date().toISOString()}] Running daily report...`);
 
-  const [ga4, shopify, amazon] = await Promise.all([
+  const [ga4, shopify, amazon, shipstation] = await Promise.all([
     fetchGA4().catch(e => { console.error('GA4 error:', e.message); return null; }),
     fetchShopify().catch(e => { console.error('Shopify error:', e.message); return null; }),
     fetchAmazon().catch(e => { console.error('Amazon error:', e.message); return null; }),
+    fetchShipStation().catch(e => { console.error('ShipStation error:', e.message); return null; }),
   ]);
 
   let msg = `USA Gummies Daily — ${todayStr()}\n`;
@@ -399,6 +473,22 @@ async function main() {
     msg += `\n\nAMAZON: ${amazon.orders} orders (${amazon.orderChange})`;
   } else {
     msg += `\n\nAMAZON: [unavailable]`;
+  }
+
+  if (shipstation) {
+    const alertWallets = shipstation.wallets.filter(w => w.belowFloor);
+    msg += `\n\nSHIPSTATION: ${shipstation.labelsToday} labels today ($${shipstation.spendToday})`;
+    if (alertWallets.length > 0) {
+      const alertLines = alertWallets
+        .map(w => `${w.code} $${w.balance?.toFixed(2) ?? '—'} < $${w.floor}`)
+        .join(', ');
+      msg += `\n⚠️ WALLET LOW: ${alertLines}`;
+    }
+    if (shipstation.voidedStale > 0) {
+      msg += `\n💸 STALE VOIDS: ${shipstation.voidedStale} (~$${shipstation.voidedPending}) pending refund`;
+    }
+  } else {
+    msg += `\n\nSHIPSTATION: [unavailable]`;
   }
 
   console.log('Report:\n' + msg);
