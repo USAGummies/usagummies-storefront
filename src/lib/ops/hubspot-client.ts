@@ -429,3 +429,148 @@ export async function advanceDealOnShipment(params: {
     noteId,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Deal fetcher with associated contact (BUILD — 2026-04-20)
+// ---------------------------------------------------------------------------
+//
+// Used by the S-08 webhook adapter. HubSpot deal-stage-change webhooks
+// send only `{ objectId, propertyName, newValue }` — we have to GET the
+// deal + any associated contact to build a dispatch proposal.
+
+export interface DealWithContact {
+  dealId: string;
+  dealname: string;
+  dealstage: string | null;
+  amount: number | null;
+  closedate: string | null;
+  description: string | null;
+  /** Free-form description tags we scan for sample markers. */
+  wholesale_payment_method: string | null;
+  wholesale_onboarding_complete: string | null;
+  wholesale_payment_received: string | null;
+  /** Associated contact's id (first if multiple), or null. */
+  contactId: string | null;
+  contact: {
+    firstname: string | null;
+    lastname: string | null;
+    email: string | null;
+    phone: string | null;
+    company: string | null;
+    address: string | null;
+    address2: string | null;
+    city: string | null;
+    state: string | null;
+    zip: string | null;
+    country: string | null;
+  } | null;
+}
+
+/**
+ * Fetch a deal + its primary associated contact in one trip. Returns
+ * null when the deal cannot be read (HubSpot 404 / 401 / outage).
+ *
+ * Deal properties retrieved: dealname, dealstage, amount, closedate,
+ * description, plus our three custom wholesale_* gates.
+ *
+ * Contact properties retrieved: name + email + phone + company +
+ * full address (the wholesale contact record carries the ship-to by
+ * our convention).
+ */
+export async function getDealWithContact(
+  dealId: string,
+): Promise<DealWithContact | null> {
+  if (!isHubSpotConfigured()) return null;
+
+  const dealProps = [
+    "dealname",
+    "dealstage",
+    "amount",
+    "closedate",
+    "description",
+    "wholesale_payment_method",
+    "wholesale_onboarding_complete",
+    "wholesale_payment_received",
+  ].join(",");
+
+  const dealRes = await hsRequest<{
+    id: string;
+    properties?: Record<string, string | null>;
+    associations?: {
+      contacts?: {
+        results?: Array<{ id: string; type: string }>;
+      };
+    };
+  }>(
+    "GET",
+    `/crm/v3/objects/deals/${encodeURIComponent(dealId)}?properties=${encodeURIComponent(dealProps)}&associations=contacts`,
+  );
+  if (!dealRes.ok || !dealRes.data) return null;
+
+  const p = dealRes.data.properties ?? {};
+  const contactId =
+    dealRes.data.associations?.contacts?.results?.[0]?.id ?? null;
+
+  // Contact fetch — optional; deal can be dispatched without a contact
+  // (ship-to provided inline) but the address fields live on the contact
+  // record per our Viktor / booth-order conventions.
+  let contact: DealWithContact["contact"] = null;
+  if (contactId) {
+    const contactProps = [
+      "firstname",
+      "lastname",
+      "email",
+      "phone",
+      "company",
+      "address",
+      "address2",
+      "city",
+      "state",
+      "zip",
+      "country",
+    ].join(",");
+    const contactRes = await hsRequest<{
+      id: string;
+      properties?: Record<string, string | null>;
+    }>(
+      "GET",
+      `/crm/v3/objects/contacts/${encodeURIComponent(contactId)}?properties=${encodeURIComponent(contactProps)}`,
+    );
+    if (contactRes.ok && contactRes.data) {
+      const cp = contactRes.data.properties ?? {};
+      contact = {
+        firstname: cp.firstname ?? null,
+        lastname: cp.lastname ?? null,
+        email: cp.email ?? null,
+        phone: cp.phone ?? null,
+        company: cp.company ?? null,
+        address: cp.address ?? null,
+        address2: cp.address2 ?? null,
+        city: cp.city ?? null,
+        state: cp.state ?? null,
+        zip: cp.zip ?? null,
+        country: cp.country ?? null,
+      };
+    }
+  }
+
+  const amountRaw = p.amount;
+  const amount =
+    typeof amountRaw === "string" && amountRaw.trim().length > 0
+      ? Number.parseFloat(amountRaw)
+      : null;
+
+  return {
+    dealId: dealRes.data.id,
+    dealname: p.dealname ?? "",
+    dealstage: p.dealstage ?? null,
+    amount: Number.isFinite(amount) ? amount : null,
+    closedate: p.closedate ?? null,
+    description: p.description ?? null,
+    wholesale_payment_method: p.wholesale_payment_method ?? null,
+    wholesale_onboarding_complete: p.wholesale_onboarding_complete ?? null,
+    wholesale_payment_received: p.wholesale_payment_received ?? null,
+    contactId,
+    contact,
+  };
+}

@@ -95,7 +95,7 @@ Per [`activation-triggers.md`](activation-triggers.md): marketing-brand, marketi
 - Make.com scenario consolidation (21 scenarios; some overlap with the 3.0 runtime and should retire). **Pending** — audit needs Make.com API access.
 - Unified daily digest (fold Finance Exception + Ops Agent into the Executive Brief rather than three separate posts). **Pending** — morning brief now includes preflight signals but retains separate Finance Exception + Ops digests. Consolidation deferred until signal overlap becomes a readability problem.
 - Fulfillment drift-audit checks — sample weekly for delivered-pricing compliance + wallet-floor adherence + ATP gate hit rate + stale-void SLA. ✅ **DONE** (2026-04-20, commit `1063e9e` — `/api/ops/control-plane/fulfillment-drift-audit` weekly Mon 20:30 PT → `#ops-audit`).
-- Sample Order Dispatch (S-08) runtime — event-driven Class-B proposal agent per `/contracts/agents/sample-order-dispatch.md`. 🟢 **MVP + Shopify adapter LIVE** (2026-04-20). Classifier + composer + dispatch route + Shopify `orders/paid` webhook with HMAC verify (30/30 vitest green). Amazon / Faire / HubSpot adapters are the follow-on.
+- Sample Order Dispatch (S-08) runtime — event-driven Class-B proposal agent per `/contracts/agents/sample-order-dispatch.md`. 🟢 **MVP + Shopify + HubSpot adapters LIVE** (2026-04-20). Classifier + composer + dispatch route + Shopify `orders/paid` webhook + HubSpot `deal.propertyChange` webhook. 45/45 vitest green across three adapters. Amazon SP-API + Faire adapters remain as the follow-on (Amazon = FBM-only polling path; Faire = blocked on `FAIRE_ACCESS_TOKEN`).
 
 ## Version history
 
