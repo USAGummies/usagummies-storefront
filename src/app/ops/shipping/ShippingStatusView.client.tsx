@@ -55,6 +55,33 @@ interface PreflightData {
   alerts: string[];
 }
 
+interface RecentLabel {
+  shipmentId: number;
+  orderNumber: string | null;
+  trackingNumber: string | null;
+  carrierCode: string | null;
+  serviceCode: string | null;
+  shipDate: string | null;
+  createDate: string;
+  voided: boolean;
+  voidDate: string | null;
+  shipmentCost: number | null;
+  shipToName: string | null;
+  shipToPostalCode: string | null;
+}
+
+interface RecentLabelsData {
+  ok: boolean;
+  totalCount: number;
+  activeSpend: number;
+  voidedSpend: number;
+  byCarrier: Record<
+    string,
+    { active: number; voided: number; activeDollars: number }
+  >;
+  shipments: RecentLabel[];
+}
+
 const GREEN = "#16a34a";
 const YELLOW = "#eab308";
 
@@ -67,21 +94,30 @@ function money(n: number): string {
 
 export function ShippingStatusView() {
   const [data, setData] = useState<PreflightData | null>(null);
+  const [recent, setRecent] = useState<RecentLabelsData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastFetchedAt, setLastFetchedAt] = useState<Date | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch("/api/ops/fulfillment/preflight", {
-        cache: "no-store",
-      });
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
+      const [preflightRes, recentRes] = await Promise.all([
+        fetch("/api/ops/fulfillment/preflight", { cache: "no-store" }),
+        fetch("/api/ops/fulfillment/recent-labels?daysBack=7&limit=25", {
+          cache: "no-store",
+        }),
+      ]);
+      if (!preflightRes.ok) {
+        const text = await preflightRes.text().catch(() => "");
+        throw new Error(`preflight HTTP ${preflightRes.status}: ${text.slice(0, 200)}`);
       }
-      const json = (await res.json()) as PreflightData;
-      setData(json);
+      const preflightJson = (await preflightRes.json()) as PreflightData;
+      setData(preflightJson);
+      // Recent labels is best-effort — the preflight is the primary.
+      if (recentRes.ok) {
+        const recentJson = (await recentRes.json()) as RecentLabelsData;
+        setRecent(recentJson);
+      }
       setError(null);
       setLastFetchedAt(new Date());
     } catch (err) {
@@ -354,6 +390,111 @@ export function ShippingStatusView() {
         </Card>
       </div>
 
+      {/* Recent labels table */}
+      {recent && recent.shipments.length > 0 && (
+        <div
+          style={{
+            marginTop: 22,
+            background: CARD,
+            border: `1px solid ${BORDER}`,
+            borderRadius: 12,
+            padding: 16,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "baseline",
+              marginBottom: 10,
+            }}
+          >
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: 0.8,
+                color: GOLD,
+                textTransform: "uppercase",
+              }}
+            >
+              Recent labels (last 7 days)
+            </div>
+            <div style={{ fontSize: 12, color: DIM }}>
+              {recent.totalCount} · active {money(recent.activeSpend)} · voided {money(recent.voidedSpend)}
+            </div>
+          </div>
+          <div style={{ overflowX: "auto" }}>
+            <table
+              style={{
+                width: "100%",
+                borderCollapse: "collapse",
+                fontSize: 12,
+              }}
+            >
+              <thead>
+                <tr style={{ color: DIM, textAlign: "left" }}>
+                  <Th>Ship date</Th>
+                  <Th>Carrier / Svc</Th>
+                  <Th>Cost</Th>
+                  <Th>Tracking</Th>
+                  <Th>Ship-to</Th>
+                  <Th>Status</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {recent.shipments.slice(0, 25).map((s) => (
+                  <tr
+                    key={s.shipmentId}
+                    style={{
+                      borderTop: `1px dashed ${BORDER}`,
+                      opacity: s.voided ? 0.55 : 1,
+                    }}
+                  >
+                    <Td>
+                      {s.shipDate?.slice(0, 10) ??
+                        s.createDate?.slice(0, 10) ??
+                        "—"}
+                    </Td>
+                    <Td>
+                      <Code>
+                        {s.carrierCode ?? "?"}
+                        {s.serviceCode ? ` · ${s.serviceCode}` : ""}
+                      </Code>
+                    </Td>
+                    <Td>
+                      {s.shipmentCost !== null ? money(s.shipmentCost) : "—"}
+                    </Td>
+                    <Td>
+                      {s.trackingNumber ? (
+                        <Code>{s.trackingNumber}</Code>
+                      ) : (
+                        "—"
+                      )}
+                    </Td>
+                    <Td>
+                      {s.shipToName ?? "—"}
+                      {s.shipToPostalCode ? ` · ${s.shipToPostalCode}` : ""}
+                    </Td>
+                    <Td>
+                      {s.voided ? (
+                        <span style={{ color: RED, fontWeight: 600 }}>
+                          VOIDED
+                        </span>
+                      ) : (
+                        <span style={{ color: GREEN, fontWeight: 600 }}>
+                          ACTIVE
+                        </span>
+                      )}
+                    </Td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       <div
         style={{
           marginTop: 22,
@@ -512,5 +653,28 @@ function Code({ children }: { children: React.ReactNode }) {
     >
       {children}
     </code>
+  );
+}
+
+function Th({ children }: { children: React.ReactNode }) {
+  return (
+    <th
+      style={{
+        textAlign: "left",
+        padding: "6px 8px",
+        fontWeight: 600,
+        fontSize: 11,
+        textTransform: "uppercase",
+        letterSpacing: 0.5,
+      }}
+    >
+      {children}
+    </th>
+  );
+}
+
+function Td({ children }: { children: React.ReactNode }) {
+  return (
+    <td style={{ padding: "8px 8px", verticalAlign: "top" }}>{children}</td>
   );
 }

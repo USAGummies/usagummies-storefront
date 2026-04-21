@@ -14,7 +14,7 @@
  */
 import { NextResponse } from "next/server";
 
-import { isCronAuthorized, unauthorized } from "@/lib/ops/control-plane/admin-auth";
+import { isAuthorized } from "@/lib/ops/abra-auth";
 import { getRecentShipments } from "@/lib/ops/shipstation-client";
 
 export const runtime = "nodejs";
@@ -33,7 +33,9 @@ function clampInt(
 }
 
 export async function GET(req: Request): Promise<Response> {
-  if (!isCronAuthorized(req)) return unauthorized();
+  if (!(await isAuthorized(req))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   const url = new URL(req.url);
   const daysBack = clampInt(url.searchParams.get("daysBack"), 7, 1, 30);
