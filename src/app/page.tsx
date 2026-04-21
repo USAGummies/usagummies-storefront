@@ -414,7 +414,7 @@ export default async function HomePage() {
                     src={heroMediaSrc}
                     alt="Bag of USA Gummies classic gummy bears"
                     fill
-                    fetchPriority="low"
+                    priority
                     sizes="(max-width: 640px) 92vw, (max-width: 1024px) 55vw, 640px"
                     className="object-contain drop-shadow-[0_18px_30px_rgba(13,28,51,0.22)] z-10"
                   />

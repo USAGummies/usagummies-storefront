@@ -10,11 +10,8 @@ import {
   SHIPPING_COST,
   subscriptionPricingForQty,
 } from "@/lib/bundles/pricing";
-import { SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
 import { AMAZON_LISTING_URL } from "@/lib/amazon";
 import { trackEvent, trackAddToCart } from "@/lib/analytics";
-import { fireCartToast } from "@/lib/cartFeedback";
-import { storeCartId, getStoredCartId } from "@/lib/cartClientUtils";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -249,7 +246,12 @@ export default function BagSlider({
   }, []);
 
   /* ---- CTA action ---- */
-  const handleCta = useCallback(async () => {
+  // One-click buy flow: fires analytics, then hard-navigates to /go/checkout,
+  // which creates a Shopify cart server-side and 302s to the hosted checkout.
+  // Intentionally does NOT use the /api/cart + cart-drawer flow: the prior
+  // wiring added the line item but never moved the user forward, so clicks
+  // landed with no visible next step and conversions died at zero.
+  const handleCta = useCallback(() => {
     if (busy) return;
 
     if (isAmazon) {
@@ -261,31 +263,19 @@ export default function BagSlider({
     setBusy(true);
     trackEvent("bag_slider_add_to_cart", { qty, per_bag: perBag, total });
 
-    // Fire Meta Pixel (AddToCart) + GA4 (add_to_cart) — direct import, no dynamic import
-    trackAddToCart({ id: "all-american-gummy-bears", name: "All American Gummy Bears", price: perBag, quantity: qty });
+    // Fire Meta Pixel (AddToCart) + GA4 (add_to_cart) synchronously before nav.
+    trackAddToCart({
+      id: "all-american-gummy-bears",
+      name: "All American Gummy Bears",
+      price: perBag,
+      quantity: qty,
+    });
 
-    try {
-      const existingCartId = getStoredCartId();
-      const res = await fetch("/api/cart", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "replace",
-          variantId: SINGLE_BAG_VARIANT_ID,
-          quantity: qty,
-          ...(existingCartId ? { cartId: existingCartId } : {}),
-        }),
-      });
-      const data = await res.json();
-      if (data.ok && data.cart?.id) {
-        storeCartId(data.cart.id);
-        fireCartToast(qty);
-        window.dispatchEvent(new Event("cart:updated"));
-      }
-    } catch {
-      // silent fail — toast will still show via event
-    } finally {
-      setBusy(false);
+    // Hard navigation — bypasses Next.js client router so there's no RSC
+    // prefetch against a route-handler URL (which would fail and strand the
+    // click). The /go/checkout GET handler does the cartCreate + redirect.
+    if (typeof window !== "undefined") {
+      window.location.href = `/go/checkout?qty=${qty}`;
     }
   }, [busy, isAmazon, qty, perBag, total]);
 
@@ -330,39 +320,29 @@ export default function BagSlider({
             <span>Made in USA</span>
           </div>
           <div className="flex items-center gap-2">
-          {/* Primary: Shopify CTA */}
+          {/* Primary: Shopify CTA — one-click buy, routes via /go/checkout */}
           <button
-            onClick={async () => {
-              if (!isAmazon) {
-                handleCta();
-              } else {
-                // If in Amazon range, snap to 5 bags and add to cart
+            onClick={() => {
+              if (isAmazon) {
+                // Amazon path: snap to 5 bags, then bounce to /go/checkout.
                 setQty(5);
-                setBusy(true);
-                trackEvent("bag_slider_sticky_upgrade", { from_qty: qty, to_qty: 5 });
-                trackAddToCart({ id: "all-american-gummy-bears", name: "All American Gummy Bears", price: pricingForQty(5).perBag, quantity: 5 });
-                try {
-                  const existingCartId = getStoredCartId();
-                  const res = await fetch("/api/cart", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      action: "replace",
-                      variantId: SINGLE_BAG_VARIANT_ID,
-                      quantity: 5,
-                      ...(existingCartId ? { cartId: existingCartId } : {}),
-                    }),
-                  });
-                  const data = await res.json();
-                  if (data.ok && data.cart?.id) {
-                    storeCartId(data.cart.id);
-                    fireCartToast(5);
-                    window.dispatchEvent(new Event("cart:updated"));
-                  }
-                } catch { /* silent */ } finally {
-                  setBusy(false);
+                trackEvent("bag_slider_sticky_upgrade", {
+                  from_qty: qty,
+                  to_qty: 5,
+                });
+                trackAddToCart({
+                  id: "all-american-gummy-bears",
+                  name: "All American Gummy Bears",
+                  price: pricingForQty(5).perBag,
+                  quantity: 5,
+                });
+                if (typeof window !== "undefined") {
+                  setBusy(true);
+                  window.location.href = `/go/checkout?qty=5`;
                 }
+                return;
               }
+              handleCta();
             }}
             disabled={busy}
             className={`flex-1 py-3 bg-[#c7362c] text-white font-display text-sm tracking-[1px] uppercase rounded-xl text-center transition-all hover:-translate-y-px hover:bg-[#a82920] ${busy ? "opacity-60 pointer-events-none" : ""}`}
