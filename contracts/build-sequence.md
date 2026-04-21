@@ -13,35 +13,32 @@
 |---|---|
 | Control plane (taxonomy v1.2, approvals, audit, stores, Slack surfaces) | **Live** |
 | 9 Slack channels (topics pinned, Make bot a member where needed) | **Live** |
-| Executive Brief — morning + EOD weekday to `#ops-daily` | **Live** |
+| Executive Brief — morning + EOD weekday to `#ops-daily` | **Live** (morning now includes Shipping Hub pre-flight; EOD now renders "today in review" with labels bought/voided + CF-09 queue transitions — 2026-04-20) |
 | Platform Health (weekday 07:00 PT) | **Live** |
 | Drift Audit Runner (Sunday 20:00 PT) | **Live** |
-| Finance Exception Agent (weekday 06:15 PT → `#finance`) | **Live** (real Plaid + QBO data) |
-| Ops Agent (weekday 09:00 PT → `#operations`) | **Live** (real QBO POs) |
+| Finance Exception Agent (weekday 06:15 PT → `#finance`) | **Live** — now drains CF-09 freight-comp queue + surfaces stale void refunds (2026-04-20) |
+| Ops Agent (weekday 09:00 PT → `#operations`) | **Live** — now includes Shipping Hub pre-flight + reorder trigger (2026-04-20) |
+| ShipStation wallet + void-refund watcher (weekday 09:00 PT → `#operations`) | **Live** — BUILDs #8 + #9 (2026-04-20) |
 | Viktor W-7 Rene response capture | **Live** on Viktor's Slack presence |
-| Shipping Hub + ShipStation label buying + tracking webhook | **Live** (webhook registration parked per MFA issue) |
+| Shipping Hub + ShipStation label buying + tracking webhook | **Live** — with 9 drift-prevention BUILDs + ATP gate + delivered-pricing guard + freight-comp auto-queue + HubSpot deal-stage auto-advance (2026-04-20). Webhook registration parked per MFA. |
+| `/ops/shipping` live preflight dashboard | **Live** (2026-04-20) — auto-refresh 30s, wallet/ATP/queue/voids cards + recent-labels table |
+| CF-09 freight-comp queue manager (`/api/ops/fulfillment/freight-comp-queue`) | **Live** (2026-04-20) — GET list, POST approve+post-to-QBO, DELETE reject with audit trail |
 | 174/174 vitest tests green | ✔ |
-| 6 Vercel crons | ✔ |
+| 12 Vercel crons | ✔ (watch Hobby-plan ceiling) |
 
 ## Gaps blocking "every engine cranking" (build order)
 
-### 1. ShipStation shipment-history cross-ref — ~1 hour
+### 1. ShipStation shipment-history cross-ref — ✅ **DONE**
 
-Auto-clear the "paid — verify shipped" flag on wholesale invoices in the shipping hub once UPS scans a tracking number. Uses ShipStation's `/shipments` API (same v1 API our rate-quote already hits). Keyed by tracking number → matches against `fulfillment:stages` KV.
+Auto-clear the "paid — verify shipped" flag on wholesale invoices via `findShipmentsByOrderNumberPrefix`. Webhook path still parked on ShipStation MFA (B-13).
 
-Unblocks: Finance Exception Agent "unavailable" rows + cleaner fulfillment queue.
+### 2. Shopify on-hand inventory integration — ✅ **DONE** (2026-04-20)
 
-### 2. Shopify on-hand inventory integration — ~3 days
+`getAllOnHandInventory` → Ops Agent writes `inventory:snapshot:v1` KV daily → `/api/ops/inventory/snapshot` GET/POST → buy-label route auto-decrements after each successful ship to keep the cache honest between daily refreshes. ATP gate in `src/lib/ops/atp-gate.ts` prevents over-promise (refuses buys with projected deficit > 24 bags, overridable).
 
-Hourly Shopify Admin GraphQL poll (`inventoryLevels` by location) → memory store → Ops Agent low-threshold alert + Shipping Hub ATP gate. Ashford is the canonical location.
+### 3. Gmail vendor-thread freshness scraper — ✅ **DONE** (pre-existing, 2026-04-18)
 
-Unblocks: Ops Agent inventory-low alerts, Shipping Hub "over-promise" prevention.
-
-### 3. Gmail vendor-thread freshness scraper — ~2 days
-
-Read Gmail labels `@powers`, `@belmark`, `@inderbitzen`, etc. Get last-inbound-date per label. Write `ops:vendor:<name>:last-contact:<ISO>` to Open Brain. Ops Agent consumes.
-
-Unblocks: "Thread freshness not wired" line in Ops Agent digest; auto-surface dormant vendor reps.
+`src/lib/ops/vendor-threads.ts` reads Gmail for Powers / Belmark / Inderbitzin / Albanese, computes `daysSince`. Ops Agent digest consumes.
 
 ### 4. Booke queue feed — ~2 days
 
@@ -92,12 +89,16 @@ Per [`activation-triggers.md`](activation-triggers.md): marketing-brand, marketi
 
 ## Phase 2 (after every engine is cranking)
 
-- `/ops/agents` dashboard — consolidated run history per agent, graduation gauge (governance §4)
-- Agent Open-Brain write-back in every specialist (every specialist should capture observations tagged by division)
-- HubSpot deal-stage automation for Sample-Requested → Sample-Shipped → Sample-Received
-- Make.com scenario consolidation (21 scenarios; some overlap with the 3.0 runtime and should retire)
-- Unified daily digest (fold Finance Exception + Ops Agent into the Executive Brief rather than three separate posts)
+- `/ops/agents` dashboard — consolidated run history per agent, graduation gauge (governance §4). **Pending.** (`/ops/shipping` live 2026-04-20 as the fulfillment-specific surface; agent run history is still TODO.)
+- Agent Open-Brain write-back in every specialist (every specialist should capture observations tagged by division). **Pending.**
+- HubSpot deal-stage automation for Sample-Requested → Sample-Shipped → Sample-Received — ✅ **DONE** (2026-04-20, `hubspotDealId` on buy-label → `advanceDealOnShipment` patches deal + attaches tracking note).
+- Make.com scenario consolidation (21 scenarios; some overlap with the 3.0 runtime and should retire). **Pending** — audit needs Make.com API access.
+- Unified daily digest (fold Finance Exception + Ops Agent into the Executive Brief rather than three separate posts). **Pending** — morning brief now includes preflight signals but retains separate Finance Exception + Ops digests. Consolidation deferred until signal overlap becomes a readability problem.
+- Fulfillment drift-audit checks — sample weekly for delivered-pricing compliance + wallet-floor adherence + ATP gate hit rate + stale-void SLA. **Pending.**
+- Sample Order Dispatch (S-08) runtime — event-driven Class-B proposal agent per `/contracts/agents/sample-order-dispatch.md`. **Pending.** Contract ready; event wiring (Shopify / Amazon / Faire / HubSpot webhooks) is the next real build.
 
 ## Version history
 
+- **1.2 — 2026-04-20** — Reality refresh: gaps #1-#3 marked done; HubSpot auto-advance done; 15-commit push from 2026-04-20 night session recorded. Phase 2 list carries remaining "pending" items.
+- **1.1 — 2026-04-20** — Stale deferrals corrected; #2 + #3 + HubSpot promoted to done.
 - **1.0 — 2026-04-20** — First canonical publication. Derived from the 2026-04-20 blueprint gap analysis.

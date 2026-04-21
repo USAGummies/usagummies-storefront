@@ -1,6 +1,6 @@
 # Activation Status — USA Gummies 3.0
 
-**Last updated:** 2026-04-20 (evening — post specialist-runtime sweep)
+**Last updated:** 2026-04-20 (late night — post 15-commit shipping-rush build arc)
 **Source of truth:** this file (commit history shows activation events)
 **Companion docs:** [`governance.md`](governance.md), [`activation-triggers.md`](activation-triggers.md), [`approval-taxonomy.md`](approval-taxonomy.md), [`build-sequence.md`](build-sequence.md)
 **Canonical sequence (Notion):** [22.B — Execution Sequences](https://www.notion.so/3484c0c42c2e81048158f9007dddc093) — Tuesday cutover + Week-1 + Pipelines + Specialists
@@ -24,6 +24,10 @@
 | Faire Specialist | [agents/faire-specialist.md](agents/faire-specialist.md) | [`/api/ops/agents/faire/run`](../src/app/api/ops/agents/faire/run/route.ts) | Thursday 11:00 PT | `#finance` (reconcile prep) + `#sales` (Direct-share). Degraded until `FAIRE_ACCESS_TOKEN` is set. |
 | Research Librarian | [agents/research-librarian.md](agents/research-librarian.md) | [`/api/ops/agents/research/run`](../src/app/api/ops/agents/research/run/route.ts) + [`/api/ops/research/note`](../src/app/api/ops/research/note/route.ts) | Friday 11:00 PT | `#research` — weekly synthesis of notes captured via the note POST endpoint. |
 | Booke queue feed | [agents/booke.md](agents/booke.md) | [`/api/ops/booke/push`](../src/app/api/ops/booke/push/route.ts) | Event (Zapier / Make posts count) | Feeds Finance Exception Agent "Uncategorized" cell. |
+| ShipStation Health (BUILDs #8 + #9) | [integrations/shipstation.md](integrations/shipstation.md) §11–§12 | [`/api/ops/shipstation/wallet-check`](../src/app/api/ops/shipstation/wallet-check/route.ts) | Weekday 09:00 PT | `#operations` (only when below floor or stale void) |
+| Shipping Hub pre-flight | [`src/lib/ops/fulfillment-preflight.ts`](../src/lib/ops/fulfillment-preflight.ts) | [`/api/ops/fulfillment/preflight`](../src/app/api/ops/fulfillment/preflight/route.ts) + [`/ops/shipping`](../src/app/ops/shipping) UI | Polled every 30s (UI) + embedded in morning Exec Brief + Ops Agent digest | Browser dashboard + `#ops-daily` + `#operations` |
+| Freight-comp queue manager (CF-09) | [distributor-pricing-commitments.md](distributor-pricing-commitments.md) §5 | [`/api/ops/fulfillment/freight-comp-queue`](../src/app/api/ops/fulfillment/freight-comp-queue/route.ts) | Event (writes on every buy-label for delivered-pricing customer; drained by Rene) | Finance Exception digest + direct HTTP approve |
+| Inventory snapshot cache | [`src/lib/ops/inventory-snapshot.ts`](../src/lib/ops/inventory-snapshot.ts) | [`/api/ops/inventory/snapshot`](../src/app/api/ops/inventory/snapshot/route.ts) | Daily (Ops Agent side-effect) + on-demand POST + auto-decrement on buy-label | Feeds ATP gate + preflight |
 
 ## Contracts with runtime pending (phase 2)
 
