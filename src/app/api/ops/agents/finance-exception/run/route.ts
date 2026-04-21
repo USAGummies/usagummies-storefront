@@ -19,6 +19,8 @@
 
 import { NextResponse } from "next/server";
 
+import { kv } from "@vercel/kv";
+
 import { isAuthorized } from "@/lib/ops/abra-auth";
 import { getChannel } from "@/lib/ops/control-plane/channels";
 import { postMessage } from "@/lib/ops/control-plane/slack";
@@ -28,6 +30,7 @@ import { buildAuditEntry } from "@/lib/ops/control-plane/audit";
 import { getQBOInvoices, getQBOBills } from "@/lib/ops/qbo-client";
 import { getBalances, isPlaidConfigured, isPlaidConnected } from "@/lib/finance/plaid";
 import { getBookeQueueState } from "@/lib/ops/booke-client";
+import { listVoidedLabels } from "@/lib/ops/shipstation-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -57,7 +60,51 @@ interface DigestData {
   draftInvoices: Cell; // drafts (NOT AR — 2026-03-30 rule)
   uncategorizedCount: Cell; // booke queue
   pendingApprovalsCount: Cell;
+  /**
+   * BUILD #6 — pending CF-09 freight-comp JE entries auto-queued by
+   * the buy-label route. Rene reviews + posts as Class B approvals.
+   */
+  freightCompQueue: {
+    queuedCount: number;
+    queuedDollars: number;
+    items: Array<{
+      queuedAt: string;
+      channelLabel: string;
+      customerName: string;
+      freightDollars: number;
+      customerRef: string;
+      trackingNumbers: string[];
+    }>;
+  };
+  /**
+   * BUILD #9 — ShipStation voided labels older than 72h without a
+   * verified wallet credit. Rene opens a Stamps.com ticket if the
+   * count stays non-zero for >14 days.
+   */
+  staleVoidRefunds: {
+    count: number;
+    pendingDollars: number;
+    oldestHours: number | null;
+    unavailableReason?: string;
+  };
   degraded: string[];
+}
+
+/** Keep in sync with buy-label/route.ts. */
+const KV_FREIGHT_COMP_QUEUE = "fulfillment:freight-comp-queue";
+
+interface FreightCompQueueEntry {
+  queuedAt: string;
+  channel: string;
+  channelLabel: string;
+  customerName: string;
+  customerMatch: string;
+  freightDollars: number;
+  trackingNumbers: string[];
+  shipmentIds: Array<string | number>;
+  customerRef: string;
+  status: "queued" | "approved" | "posted" | "rejected";
+  buyLoopKeys: string[];
 }
 
 interface RunResult {
@@ -162,12 +209,22 @@ async function runAgent(req: Request): Promise<Response> {
 async function gatherDigestData(): Promise<DigestData> {
   const degraded: string[] = [];
 
-  const [cashBoA, ap, ar, uncategorized, pendingApprovals] = await Promise.all([
+  const [
+    cashBoA,
+    ap,
+    ar,
+    uncategorized,
+    pendingApprovals,
+    freightCompQueue,
+    staleVoidRefunds,
+  ] = await Promise.all([
     loadCash(degraded),
     loadOpenAP(degraded),
     loadOpenAR(degraded),
     loadUncategorizedCount(degraded),
     loadPendingApprovalsCount(degraded),
+    loadFreightCompQueue(degraded),
+    loadStaleVoidRefunds(degraded),
   ]);
 
   return {
@@ -177,8 +234,81 @@ async function gatherDigestData(): Promise<DigestData> {
     draftInvoices: ar.draftTotal,
     uncategorizedCount: uncategorized,
     pendingApprovalsCount: pendingApprovals,
+    freightCompQueue,
+    staleVoidRefunds,
     degraded,
   };
+}
+
+async function loadFreightCompQueue(
+  degraded: string[],
+): Promise<DigestData["freightCompQueue"]> {
+  try {
+    const queue =
+      ((await kv.get<FreightCompQueueEntry[]>(KV_FREIGHT_COMP_QUEUE)) ??
+        []) as FreightCompQueueEntry[];
+    const queued = queue.filter((q) => q.status === "queued");
+    const queuedDollars =
+      Math.round(
+        queued.reduce((sum, q) => sum + (q.freightDollars || 0), 0) * 100,
+      ) / 100;
+    return {
+      queuedCount: queued.length,
+      queuedDollars,
+      items: queued.slice(0, 10).map((q) => ({
+        queuedAt: q.queuedAt,
+        channelLabel: q.channelLabel,
+        customerName: q.customerName,
+        freightDollars: q.freightDollars,
+        customerRef: q.customerRef,
+        trackingNumbers: q.trackingNumbers,
+      })),
+    };
+  } catch (err) {
+    degraded.push(
+      `freight-comp-queue: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return { queuedCount: 0, queuedDollars: 0, items: [] };
+  }
+}
+
+async function loadStaleVoidRefunds(
+  degraded: string[],
+): Promise<DigestData["staleVoidRefunds"]> {
+  try {
+    const res = await listVoidedLabels({ daysBack: 14, staleAfterHours: 72 });
+    if (!res.ok) {
+      degraded.push(`void-refund-scan: ${res.error}`);
+      return {
+        count: 0,
+        pendingDollars: 0,
+        oldestHours: null,
+        unavailableReason: res.error,
+      };
+    }
+    const totalDollars =
+      Math.round(
+        res.stale.reduce((sum, v) => sum + (v.shipmentCost ?? 0), 0) * 100,
+      ) / 100;
+    const oldestHours = res.stale.reduce<number | null>(
+      (max, v) => (v.ageHours !== null && (max === null || v.ageHours > max) ? v.ageHours : max),
+      null,
+    );
+    return {
+      count: res.stale.length,
+      pendingDollars: totalDollars,
+      oldestHours,
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    degraded.push(`void-refund-scan: ${msg}`);
+    return {
+      count: 0,
+      pendingDollars: 0,
+      oldestHours: null,
+      unavailableReason: msg,
+    };
+  }
 }
 
 async function loadCash(degraded: string[]): Promise<Cell> {
@@ -354,6 +484,47 @@ function renderDigest(digest: DigestData, startedAt: string): string {
     renderCell(digest.uncategorizedCount, "Uncategorized transactions", "count"),
     renderCell(digest.pendingApprovalsCount, "Pending financials approvals", "count"),
   ];
+
+  // BUILD #6 surface — pending CF-09 freight-comp JE entries.
+  if (digest.freightCompQueue.queuedCount > 0) {
+    lines.push(
+      "",
+      `*CF-09 freight-comp queue — ${digest.freightCompQueue.queuedCount} pending JE(s), ${money(digest.freightCompQueue.queuedDollars, "—")}*`,
+      `_Auto-queued by buy-label for delivered-pricing customers. Post as paired DEBIT 500050 / CREDIT 499010 (Class B). Source: /contracts/distributor-pricing-commitments.md §5._`,
+    );
+    for (const item of digest.freightCompQueue.items.slice(0, 5)) {
+      const tracking =
+        item.trackingNumbers.length > 0
+          ? ` (tracking: \`${item.trackingNumbers.slice(0, 2).join(", ")}${item.trackingNumbers.length > 2 ? "…" : ""}\`)`
+          : "";
+      lines.push(
+        `  • ${money(item.freightDollars, "—")} — ${item.customerName} · ${item.channelLabel} · ref \`${item.customerRef}\`${tracking}`,
+      );
+    }
+    if (digest.freightCompQueue.items.length < digest.freightCompQueue.queuedCount) {
+      lines.push(
+        `  … and ${digest.freightCompQueue.queuedCount - digest.freightCompQueue.items.length} more`,
+      );
+    }
+  }
+
+  // BUILD #9 surface — stale void refunds.
+  if (digest.staleVoidRefunds.count > 0) {
+    const oldestStr =
+      digest.staleVoidRefunds.oldestHours !== null
+        ? ` (oldest ${Math.round(digest.staleVoidRefunds.oldestHours)}h)`
+        : "";
+    lines.push(
+      "",
+      `*:money_with_wings: ShipStation stale voids — ${digest.staleVoidRefunds.count}, ${money(digest.staleVoidRefunds.pendingDollars, "—")} pending refund${oldestStr}*`,
+      `_Stamps.com refunds past SLA (>72h). Full list: \`/api/ops/shipstation/voided-labels\`. Open a Stamps.com ticket if > 14d._`,
+    );
+  } else if (digest.staleVoidRefunds.unavailableReason) {
+    lines.push(
+      "",
+      `_ShipStation void scan unavailable: ${digest.staleVoidRefunds.unavailableReason}_`,
+    );
+  }
 
   if (digest.degraded.length > 0) {
     lines.push("", `_Degraded sources:_ ${digest.degraded.join(" | ")}`);

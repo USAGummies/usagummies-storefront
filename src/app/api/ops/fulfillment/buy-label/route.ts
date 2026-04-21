@@ -23,12 +23,17 @@ import { NextResponse } from "next/server";
 import { kv } from "@vercel/kv";
 
 import { isAuthorized } from "@/lib/ops/abra-auth";
+import { evaluateAtp, type AtpGateResult } from "@/lib/ops/atp-gate";
 import { lookupDeliveredPricing } from "@/lib/ops/delivered-pricing-guard";
 import {
   buildFreightCompJournalEntry,
   FREIGHT_COMP_CHANNELS,
   type FreightCompChannel,
 } from "@/lib/ops/freight-comp";
+import {
+  KV_INVENTORY_SNAPSHOT,
+  type InventorySnapshot,
+} from "@/lib/ops/inventory-snapshot";
 import {
   createShippingLabel,
   findRecentShipmentByAddress,
@@ -110,6 +115,13 @@ interface BuyLabelRequest {
    * /carriers cache hasn't refreshed. BUILD #2.
    */
   preflightWallet?: boolean;
+  /**
+   * Escape hatch for the ATP (over-promise) gate. Default true → refuse
+   * to buy when projected deficit > blockDeficitThreshold (24 bags).
+   * Override with false when Ben knows inventory is short but wants to
+   * ship anyway (e.g. Shopify snapshot stale, or a planned backorder).
+   */
+  allowOverPromise?: boolean;
 }
 
 export async function POST(req: Request): Promise<Response> {
@@ -173,6 +185,33 @@ export async function POST(req: Request): Promise<Response> {
     };
   }
 
+  // ATP over-promise gate. Prevents buying labels for more bags than
+  // Ashford has on-hand + pending. Unknown-snapshot short-circuits to
+  // `ok` rather than blocking. See `src/lib/ops/atp-gate.ts`.
+  const inventorySnapshot =
+    ((await kv.get<InventorySnapshot>(KV_INVENTORY_SNAPSHOT)) ??
+      null) as InventorySnapshot | null;
+  const atpResult: AtpGateResult = evaluateAtp({
+    snapshot: inventorySnapshot,
+    stages,
+    excludeKeys: keys,
+    newCartons: cartonCount,
+    newPackagingType: packagingType,
+  });
+  const allowOverPromise = body.allowOverPromise === true;
+  if (atpResult.risk === "block" && !allowOverPromise) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: `ATP over-promise block: ${atpResult.reason}`,
+        atpGate: atpResult,
+        pickedCarrier: carrierCode,
+        ratePreview,
+      },
+      { status: 409 },
+    );
+  }
+
   // BUILD #2 — preflight wallet check. Refuses the buy loop if the
   // carrier's wallet can't cover cost × 1.2 (headroom for surcharges).
   // Skipped cleanly for non-walleted carriers. See shipstation-client.ts.
@@ -220,6 +259,7 @@ export async function POST(req: Request): Promise<Response> {
       pickedService: serviceCode,
       ratePreview,
       walletPreflight,
+      atpGate: atpResult,
     });
   }
 
@@ -399,6 +439,7 @@ export async function POST(req: Request): Promise<Response> {
     keysUpdated: keys,
     errors,
     walletPreflight,
+    atpGate: atpResult,
     recoveredCandidates,
     // BUILD #6 + #7 wiring surface — caller can see exactly what was
     // queued for Rene. `pricingDoctrineMatch` is null when the customer

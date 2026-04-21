@@ -42,14 +42,17 @@ Per [`activation-triggers.md`](activation-triggers.md) the 5 latent divisions (m
 
 These agents currently surface `unavailable` for their dependent data until these are wired:
 
-- **Booke queue → Finance Exception Agent** (uncategorized transaction count)
-- **Gmail labeled vendor threads → Ops Agent** (vendor-thread freshness)
-- **Shopify on-hand inventory → Ops Agent** (inventory-low threshold)
-- **ShipStation shipment history → Fulfillment hub** ("paid — verify shipped" flag clears when wired)
-- **Faire brand portal scraper** (Faire Specialist)
-- **COI + insurance store** (Compliance Specialist)
+- **Booke queue → Finance Exception Agent** — **code built** (see `src/lib/ops/booke-client.ts`); surfaces `unavailableReason: "BOOKE_API_TOKEN not configured"` until Ben/Rene provisions the env var OR the Zapier bridge writes `booke:uncategorized_count` to KV.
+- **Gmail labeled vendor threads → Ops Agent** — **LIVE** (2026-04-20). `src/lib/ops/vendor-threads.ts` reads Gmail for Powers / Belmark / Inderbitzin / Albanese, computes `daysSince`, consumed in Ops Agent digest.
+- **Shopify on-hand inventory → Ops Agent + snapshot cache** — **LIVE** (2026-04-20). Ops Agent daily `loadInventory()` writes `inventory:snapshot:v1` KV; readable via `GET /api/ops/inventory/snapshot`. Downstream consumers: Shipping Hub ATP gate (pending), ad-hoc status queries.
+- **ShipStation shipment history → Fulfillment hub** — cross-ref live (`findShipmentsByOrderNumberPrefix`); webhook auto-clear parked on ShipStation MFA (B-13).
+- **ShipStation wallet + void-refund watcher** — **LIVE** (2026-04-20). Daily `GET /api/ops/shipstation/wallet-check?post=true` at 09:00 PT → `#operations`. Paired BUILDs #8 + #9.
+- **CF-09 freight-comp auto-queue → Finance Exception Agent** — **LIVE** (2026-04-20). Buy-label writes paired DEBIT 500050 / CREDIT 499010 drafts to `fulfillment:freight-comp-queue`; Finance Exception digest drains the queue + surfaces stale voids.
+- **Delivered-pricing doctrine guard → QBO invoice POST** — **LIVE** (2026-04-20). Refuses freight lines on delivered-pricing customers unless Class C override attached.
+- **Faire brand portal scraper** (Faire Specialist) — still parked on `FAIRE_ACCESS_TOKEN` or scraper decision.
+- **COI + insurance store** (Compliance Specialist) — still blocked on `/Legal/Compliance Calendar` + `/Marketing/Approved Claims` Notion drafts (Ben + counsel).
 
-The no-fabrication rule means every missing data point surfaces with an explicit reason. Wiring is a separate commit per integration; none of these gate the Monday cutover.
+The no-fabrication rule means every missing data point surfaces with an explicit reason. Wiring is a separate commit per integration.
 
 ## Runtime inventory
 
@@ -60,11 +63,17 @@ The no-fabrication rule means every missing data point surfaces with an explicit
 | `/api/ops/control-plane/health` | `0 14 * * 1-5` | Weekday 07:00 |
 | `/api/ops/agents/finance-exception/run?post=true` | `15 14 * * 1-5` | Weekday 06:15 PT — Wait, that's wrong — 14:15 UTC is 06:15 PT (PDT 07:15). Check DST. |
 | `/api/ops/daily-brief?kind=morning&post=true` | `0 15 * * 1-5` | Weekday 08:00 PT (07:00 PST) |
+| `/api/ops/shipstation/wallet-check?post=true` | `0 16 * * 1-5` | Weekday 09:00 PT (BUILD #8 + #9 — wallet floor + stale-void watcher) |
 | `/api/ops/agents/ops/run?post=true` | `0 17 * * 1-5` | Weekday 10:00 PT (09:00 PST) |
+| `/api/ops/agents/compliance/run?post=true` | `0 18 * * 1-5` | Weekday 11:00 PT |
+| `/api/ops/agents/reconciliation/run?post=true` | `0 17 * * 4` | Thursday 10:00 PT |
+| `/api/ops/agents/amazon-settlement/run?post=true` | `30 17 * * 4` | Thursday 10:30 PT |
+| `/api/ops/agents/faire/run?post=true` | `0 18 * * 4` | Thursday 11:00 PT |
+| `/api/ops/agents/research/run?post=true` | `0 18 * * 5` | Friday 11:00 PT |
 | `/api/ops/daily-brief?kind=eod&post=true` | `0 0 * * 2-6` | Tue-Sat 17:00 PT |
 | `/api/ops/control-plane/drift-audit` | `0 3 * * 1` | Monday 20:00 PT (Sunday evening PT wall-clock) |
 
-(Cron times are UTC. PT mappings drift with DST.)
+(Cron times are UTC. PT mappings drift with DST. 12 crons total as of 2026-04-20 — watch Hobby-plan ceiling.)
 
 ### Middleware self-auth prefixes ([src/middleware.ts](../src/middleware.ts))
 
