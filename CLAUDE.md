@@ -58,6 +58,15 @@ These rules override all other behavior:
 - Amazon is consignment (FBA), not wholesale. Shipping TO Amazon = inventory transfer (still our asset). Revenue recorded when Amazon SELLS units.
 - PO = request from customer (not revenue). Invoice = our billing document (creates revenue + AR in QBO).
 
+## Packaging spec (6 × 6 × 1, canonical)
+
+- **Inner case** = 6 bags (7.5 oz) per case, ~6 lb packed
+- **Master carton** = 6 cases per carton = **36 bags / carton**, **21 lb 2 oz packed** (= 21.125 lb, measured by Ben 2026-04-20). Canonical for all ship-label + rate-quote calls until a case-pack change is logged.
+- Dimensions: master 21×14×8 in; inner 14×10×8 in
+- **Strip clip** = 1 per case · **Metal hook** = 1 per strip clip
+- Uline reorder per run: `12 masters + 72 cases + 72 strip clips + 72 hooks` for 432 bags (reference: 2026-04-20 shipping batch)
+- Full integration doctrine: [`/contracts/integrations/shipstation.md`](contracts/integrations/shipstation.md)
+
 ## QBO Integration
 
 QBO API routes are at `https://www.usagummies.com/api/ops/qbo/`. Auth via `CRON_SECRET` bearer token.
@@ -141,8 +150,18 @@ Next.js 15 App Router deployed on Vercel (Hobby plan).
 - **Critical**: Must use `zeMediaTracking=Continuous` mode — Gap mode causes blank labels between prints
 - **Print command** (no blanks):
   ```
-  lp -d _PL70e_BT -o PageSize=w288h432 -o zeMediaTracking=Continuous -o page-top=0 -o page-bottom=0 -o page-left=0 -o page-right=0 -o fit-to-page -n <QTY> '<file>.pdf'
+  lp -d _PL70e_BT -o PageSize=w288h432 -o zeMediaTracking=Continuous -o orientation-requested=3 -o page-top=0 -o page-bottom=0 -o page-left=0 -o page-right=0 -o fit-to-page -n <QTY> '<file>.pdf'
   ```
+- **Label files**: `labels/` directory — `case-label.html`, `master-carton-label.html`, `promo-label.html`, interactive generator (`index.html`)
+- **PDF generation**: `/tmp/print-labels.mjs` — Puppeteer `width: '100mm', height: '150mm'`, Chrome at `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`
+- **Logo for thermal**: `filter: grayscale(1)` only — aggressive invert/brightness muddies the logo
+- **Safe zones**: 0.22in top/bottom + 0.15in side padding on `body` — prevents bulk-print cutoff
+- **LOCKED label spec (approved 2026-04-20 for internal use)**:
+  - Case: 7"×7"×7", 6 bags/case, net 2.81 lbs, gross 3.4 lbs, UPC 199284715530, SKU UG-AAGB-6CT
+  - Master: 22"×14"×8", 6 cases × 6 = 36 units, net 16.88 lbs, gross 22.0 lbs, UPC 199284373242, SKU UG-AAGB-MC6, Ti×Hi 6×4
+  - Lot: 20260414 (MFG 04/14/26), Best By 10/14/27 (18 month shelf life)
+  - Internal labels — no ship-from, no ship-to, no PO
+- **Google Drive**: HTML sources saved to `Labels` folder (ID `1qRVAgN7DOK8HqBFnMkr_9dHPWQPKl0FF`)
 
 ### Testing
 No test suite configured. Verify changes via `npm run build` (catches TypeScript and build errors).

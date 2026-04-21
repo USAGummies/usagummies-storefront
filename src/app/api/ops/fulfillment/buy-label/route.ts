@@ -25,7 +25,9 @@ import { kv } from "@vercel/kv";
 import { isAuthorized } from "@/lib/ops/abra-auth";
 import {
   createShippingLabel,
+  findRecentShipmentByAddress,
   getCheapestShipStationRate,
+  preflightWalletCheck,
   type LabelDestination,
   type LabelResult,
 } from "@/lib/ops/shipstation-client";
@@ -66,6 +68,13 @@ interface BuyLabelRequest {
   /** Pin a specific carrier+service (from a prior rate-shop). Optional. */
   carrierCode?: string;
   serviceCode?: string;
+  /**
+   * Escape hatch for preflight wallet gating. Default: true (we fail
+   * closed when the wallet can't cover cost × 1.2). Set false to
+   * override — e.g. when Ben has just topped up out-of-band and the
+   * /carriers cache hasn't refreshed. BUILD #2.
+   */
+  preflightWallet?: boolean;
 }
 
 export async function POST(req: Request): Promise<Response> {
@@ -129,6 +138,42 @@ export async function POST(req: Request): Promise<Response> {
     };
   }
 
+  // BUILD #2 — preflight wallet check. Refuses the buy loop if the
+  // carrier's wallet can't cover cost × 1.2 (headroom for surcharges).
+  // Skipped cleanly for non-walleted carriers. See shipstation-client.ts.
+  const preflightEnabled = body.preflightWallet !== false;
+  const estimatedTotalCost = ratePreview?.total ?? 0;
+  let walletPreflight: {
+    balance: number | null;
+    required: number;
+    safetyMultiplier: number;
+    skipped: boolean;
+  } | null = null;
+  if (preflightEnabled && carrierCode && estimatedTotalCost > 0) {
+    const pf = await preflightWalletCheck({
+      carrierCode,
+      costDollars: estimatedTotalCost,
+    });
+    walletPreflight = {
+      balance: pf.balance,
+      required: pf.required,
+      safetyMultiplier: pf.safetyMultiplier,
+      skipped: pf.skipped,
+    };
+    if (!pf.ok) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: pf.error ?? "Wallet preflight failed",
+          walletPreflight,
+          pickedCarrier: carrierCode,
+          ratePreview,
+        },
+        { status: 402 },
+      );
+    }
+  }
+
   if (body.dryRun) {
     return NextResponse.json({
       ok: true,
@@ -139,13 +184,26 @@ export async function POST(req: Request): Promise<Response> {
       pickedCarrier: carrierCode,
       pickedService: serviceCode,
       ratePreview,
+      walletPreflight,
     });
   }
 
   const labels: LabelResult[] = [];
   const errors: string[] = [];
+  /** Candidate shipments the 504-recovery helper surfaced. Ops inspects. */
+  const recoveredCandidates: Array<{
+    carton: number;
+    candidates: Array<{
+      shipmentId: number;
+      trackingNumber: string | null;
+      carrierCode: string | null;
+      serviceCode: string | null;
+      createDate: string;
+    }>;
+  }> = [];
 
   // Buy one label per carton, identical destination + carrier + service.
+  const buyLoopStart = new Date();
   for (let i = 0; i < cartonCount; i++) {
     const orderNumber = `${keys.join("+")}#${i + 1}/${cartonCount}`;
     const res = await createShippingLabel({
@@ -158,15 +216,58 @@ export async function POST(req: Request): Promise<Response> {
     });
     if (res.ok) {
       labels.push(res.label);
-    } else {
-      errors.push(`carton ${i + 1}/${cartonCount}: ${res.error}`);
-      break; // fail-fast; leave already-purchased labels in place
+      continue;
     }
+
+    // BUILD #3 — 504 idempotency recovery. When the response was a
+    // gateway timeout (502/503/504/timeout), the shipment MAY have
+    // been created server-side. Do NOT auto-retry — that's how we
+    // triple-bought Red Dog on 2026-04-20. Instead: query recent
+    // shipments matching the destination, surface them to the
+    // operator, and stop the loop.
+    const errStr = res.error || "";
+    const looksLikeTimeout = /\b(504|502|503|timeout|ETIMEDOUT|ECONNRESET)\b/i.test(
+      errStr,
+    );
+    if (looksLikeTimeout) {
+      const candidates = await findRecentShipmentByAddress({
+        shipToPostalCode: body.destination.postalCode,
+        shipToName: body.destination.name,
+        withinMinutes: Math.max(
+          2,
+          Math.ceil((Date.now() - buyLoopStart.getTime()) / 60_000) + 2,
+        ),
+      });
+      recoveredCandidates.push({
+        carton: i + 1,
+        candidates: candidates.slice(0, 5).map((c) => ({
+          shipmentId: c.shipmentId,
+          trackingNumber: c.trackingNumber,
+          carrierCode: c.carrierCode,
+          serviceCode: c.serviceCode,
+          createDate: c.createDate,
+        })),
+      });
+      errors.push(
+        `carton ${i + 1}/${cartonCount}: TIMEOUT — ${errStr}. ` +
+          `Found ${candidates.length} candidate shipment(s) created in last few min — ` +
+          `verify in ShipStation UI before retrying (may be silent-success).`,
+      );
+      break; // DO NOT auto-retry
+    }
+
+    errors.push(`carton ${i + 1}/${cartonCount}: ${res.error}`);
+    break; // fail-fast; leave already-purchased labels in place
   }
 
   if (labels.length === 0) {
     return NextResponse.json(
-      { ok: false, error: errors.join(" | ") || "No labels purchased" },
+      {
+        ok: false,
+        error: errors.join(" | ") || "No labels purchased",
+        recoveredCandidates,
+        walletPreflight,
+      },
       { status: 502 },
     );
   }
@@ -215,5 +316,7 @@ export async function POST(req: Request): Promise<Response> {
     trackingNumbers: labels.map((l) => l.trackingNumber),
     keysUpdated: keys,
     errors,
+    walletPreflight,
+    recoveredCandidates,
   });
 }

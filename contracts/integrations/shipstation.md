@@ -24,10 +24,12 @@ SKU dimensions + weight profiles — these drive `createLabel` calls in [`src/li
 | Packaging type | Dimensions (in) | Weight (lb) | Used for |
 |---|---|---|---|
 | `case` (6-count inner) | 14 × 10 × 8 | 6 | Smaller wholesale / sample bundles |
-| `master_carton` (36-count) | 21 × 14 × 8 | 24 | Wholesale cases; default for invoice line qty ÷ 36 cartons |
+| `master_carton` (36-count) | 21 × 14 × 8 | **21.125** (= 21 lb 2 oz, measured packed by Ben 2026-04-20) | Wholesale cases; default for invoice line qty ÷ 36 cartons |
 | `pallet` | — (LTL) | — | Pallet orders skip parcel rate-quoting; LTL freight priced separately |
 
-Source: [`PACKAGE_PROFILES` in shipstation-client.ts](../../src/lib/ops/shipstation-client.ts). Any SKU/preset change updates that const + this table in lockstep. The fulfillment hub's "Buy UPS Ground label" modal exposes the same two options.
+**Canonical weight rule:** 21 lb 2 oz per master carton from 2026-04-20 forward. Any SKU or case-pack change revises this table + the `PACKAGE_PROFILES` const in lockstep, with the measurement date. Agents refuse to buy a label with a weight override that drifts more than ±2 lb from this without explicit per-instance Ben approval.
+
+Source: [`PACKAGE_PROFILES` in shipstation-client.ts](../../src/lib/ops/shipstation-client.ts). The fulfillment hub's "Buy UPS Ground label" modal exposes the same two options.
 
 ## 3. Automation rule: origin routing (22.B D.3)
 
@@ -87,8 +89,8 @@ This runs on each fulfillment hub GET so the queue self-heals even for orders Be
 
 | Key | Where | Purpose |
 |---|---|---|
-| `SHIPSTATION_API_KEY` | Vercel (not set as of 2026-04-20 evening) | v1 API auth (Basic) |
-| `SHIPSTATION_API_SECRET` | Vercel (not set) | v1 API auth (Basic) |
+| `SHIPSTATION_API_KEY` | Vercel + local `.env.local` (set 2026-04-20 evening) | v1 API auth (Basic) |
+| `SHIPSTATION_API_SECRET` | Vercel + local | v1 API auth (Basic) |
 | `FULFILLMENT_WEBHOOK_SECRET` | Vercel (set 2026-04-20) | Tracking webhook query-param token |
 | `SHIPSTATION_FROM_NAME` | Vercel | Defaults to `Benjamin Stutman` |
 | `SHIPSTATION_FROM_COMPANY` | Vercel | Defaults to `USA Gummies` |
@@ -97,6 +99,12 @@ This runs on each fulfillment hub GET so the queue self-heals even for orders Be
 | `SHIPSTATION_FROM_STATE` | Vercel | Defaults to `WA` |
 | `SHIPSTATION_FROM_POSTALCODE` | Vercel | Defaults to `98304` |
 | `SHIPSTATION_FROM_PHONE` | Vercel | Defaults to `3072094928` |
+| `SHIPSTATION_WALLET_MIN_STAMPS_COM` | Vercel | Minimum USD floor for Stamps.com wallet — Finance Exception Agent alerts if balance < this. BUILD #8. Default `100`. |
+| `SHIPSTATION_WALLET_MIN_UPS_WALLETED` | Vercel | Same for UPS by ShipStation. Default `150`. |
+| `SHIPSTATION_WALLET_MIN_FEDEX_WALLETED` | Vercel | Same for FedEx by ShipStation. Default `100`. |
+| `THERMAL_PRINTER_NAME` | Local (Ben's laptop) | Override name for 4×6 label printer. Default `_PL70e_BT`. BUILD #4. |
+| `LASER_PRINTER_NAME` | Local | Override name for letter packing-slip printer. Default `Brother_HL_L6200DW_series`. BUILD #4. |
+| `CHROME_BINARY` | Local | Override path for Chrome headless used by the packing-slip PDF generator. BUILD #5. Auto-discovered on macOS + Linux. |
 
 ## 9. Class-class-D (prohibited autonomous actions)
 
@@ -117,6 +125,33 @@ The weekly drift audit (Sunday 20:00 PT) samples 10 random ShipStation shipments
 
 Violations → auto-pause the shipping hub's Class B `shipment.create` action pending Ben review (governance §5 + §6).
 
+## 11. Wallet auto-reload (BUILD #8)
+
+ShipStation's connected carriers (`stamps_com`, `ups_walleted`, `fedex_walleted`) are **funded wallets** — every label buy debits the wallet. Running out in the middle of a buy-loop is a hard stop, and re-loading requires Ben to log into ShipStation's web UI. On 2026-04-20 this happened twice mid-rush; we lost time that Ben explicitly called out ("this is a real barrier... we need these to auto top off").
+
+**Doctrine (Ben's one-time setup, not an API action):**
+1. ShipStation UI → Settings → **Your Account / Billing** → **Stamps.com Balance** → **Auto-refill**.
+   - Trigger: balance < `$100`
+   - Refill amount: `$200`
+   - Funding source: BofA checking ending 7020 (the business account — **never** the emergency debit card).
+2. Repeat for UPS by ShipStation (trigger `$150`, refill `$300`) and FedEx by ShipStation (trigger `$100`, refill `$200`) once those carriers are used often enough to justify.
+
+**Code-side enforcement (BUILD #2 preflight):** every label buy calls `preflightWalletCheck()` which refuses the purchase if balance < cost × 1.2. This prevents the exact 2026-04-20 failure even if auto-reload hasn't fired yet (Stamps.com reload can take ~15 min).
+
+**Finance Exception Agent (BUILD #9):** the Thursday digest includes a wallet-floor line. If any walleted carrier reports a balance below its `SHIPSTATION_WALLET_MIN_*` env, the digest surfaces it as an exception so Ben can top up manually or raise the auto-refill trigger.
+
+## 12. Voided-label refund watcher (BUILD #9)
+
+Stamps.com issues void refunds in batches — typically 24-48h, occasionally up to 14 days. On 2026-04-20 we voided 3 Red Dog labels ($81.81) + discovered 17 orphaned Viktor triple-buy voids ($130.90). Neither batch had visible refund traces on the Stamps.com Activity view immediately.
+
+**Watcher (daily at 09:15 PT):** the Finance Exception Agent scans `/shipments?voided=true&voidDateStart=-14d` and produces a table of every void with: void date, days since void, label cost, refund status. Rule:
+
+- Void > 72h old AND no matching refund credit in the wallet ledger → **flag as exception**
+- Exception fires a Slack ping to `#financials` with the 17 specific tracking numbers so Rene can open a Stamps.com support ticket.
+
+The detection heuristic for "matching refund credit" = a positive wallet ledger entry within 14 days of the void date, within ± $0.50 of the voided label's cost. Stamps.com refunds are line-item'd in the wallet Activity view — if we ever get API access to it, the watcher can be 100% deterministic. Until then it's best-effort and human-verified.
+
 ## Version history
 
+- **1.1 — 2026-04-20** — Added §11 wallet auto-reload doctrine, §12 voided-label refund watcher, BUILD #1-#9 env vars. Carrier codes confirmed as `stamps_com` / `ups_walleted` / `fedex_walleted` (NOT `ups`) via `/carriers` endpoint on 2026-04-20.
 - **1.0 — 2026-04-20** — First canonical publication. Derived from 22.B §D + CLAUDE.md fulfillment rules.

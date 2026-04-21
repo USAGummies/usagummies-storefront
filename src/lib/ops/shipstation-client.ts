@@ -147,8 +147,17 @@ export async function getUpsGroundRate(params: {
   // quote one package and multiply. UPS Ground scales closely enough for
   // identical case/master-case packages, which is sufficient for the quick
   // order flow.
+  //
+  // Carrier code is `ups_walleted` (UPS by ShipStation funding) NOT `ups`.
+  // The `ups` code corresponds to a direct-UPS-account integration that
+  // USA Gummies does NOT have on this ShipStation account — asking for it
+  // returned "No applicable services" on 2026-04-20 and blocked the entire
+  // fulfillment hub until we confirmed via GET /carriers. The connected
+  // carriers are: stamps_com, ups_walleted, fedex_walleted, globalpost.
+  // Anyone changing this code MUST re-verify via listShipStationCarriers()
+  // and update the doctrine at /contracts/integrations/shipstation.md §4.
   const body = {
-    carrierCode: "ups",
+    carrierCode: "ups_walleted",
     serviceCode: "ups_ground",
     packageCode: "package",
     fromPostalCode: BOOTH_ORIGIN_ZIP,
@@ -230,6 +239,14 @@ export interface CarrierInfo {
   code: string;
   requiresFundedAccount?: boolean;
   primary?: boolean;
+  /**
+   * Wallet balance in USD for walleted carriers (stamps_com,
+   * ups_walleted, fedex_walleted). `undefined` for carriers that
+   * don't report a balance via `GET /carriers` (e.g. direct-account
+   * integrations). Used by `preflightWalletCheck()` to refuse label
+   * buys when the wallet can't cover them + the expected surcharge.
+   */
+  balance?: number;
 }
 
 export async function listShipStationCarriers(): Promise<
@@ -250,6 +267,7 @@ export async function listShipStationCarriers(): Promise<
       Code?: string;
       RequiresFundedAccount?: boolean;
       Primary?: boolean;
+      Balance?: number | null;
     }>;
     const carriers = raw.map(
       (c): CarrierInfo => ({
@@ -257,6 +275,7 @@ export async function listShipStationCarriers(): Promise<
         code: String(c.Code ?? ""),
         requiresFundedAccount: Boolean(c.RequiresFundedAccount),
         primary: Boolean(c.Primary),
+        balance: typeof c.Balance === "number" ? c.Balance : undefined,
       }),
     );
     return { ok: true, carriers };
@@ -301,7 +320,7 @@ export async function getCheapestShipStationRate(params: {
   if (!auth) return { ok: false, error: "ShipStation credentials not configured" };
 
   const carriersRes = await listShipStationCarriers();
-  if (!carriersRes.ok) return carriersRes;
+  if (!carriersRes.ok) return { ok: false, error: carriersRes.error };
 
   const profile = PACKAGE_PROFILES[params.packagingType];
   const weightLbs = params.weightOverrideLbs ?? profile.weightLbs;
@@ -453,9 +472,15 @@ export async function createShippingLabel(params: {
   const from = getShipFromAddress();
   const weightLbs = params.weightLbsOverride ?? profile.weightLbs;
 
+  // Map legacy `ups` carrier code to the correct `ups_walleted` so old
+  // callers don't silently fail against the trial ShipStation account.
+  // Remove this shim once every caller has been audited + migrated.
+  const carrierCode = params.carrierCode === "ups" ? "ups_walleted" : params.carrierCode ?? "ups_walleted";
+  const serviceCode = params.serviceCode ?? "ups_ground";
+
   const body = {
-    carrierCode: params.carrierCode ?? "ups",
-    serviceCode: params.serviceCode ?? "ups_ground",
+    carrierCode,
+    serviceCode,
     packageCode: "package",
     confirmation: "delivery",
     shipDate: new Date().toISOString().slice(0, 10),
@@ -565,11 +590,14 @@ function humanizeService(code: string): string {
 /**
  * Backwards-compat shim: old callers that hardcoded UPS Ground.
  * Prefer `createShippingLabel` + pass the winner from rate-shop.
+ *
+ * Carrier is `ups_walleted` (UPS by ShipStation funded wallet) — NOT `ups`.
+ * See the comment on the rate-quote body above for the full story.
  */
 export async function createUpsGroundLabel(
   params: Omit<Parameters<typeof createShippingLabel>[0], "carrierCode" | "serviceCode">,
 ): Promise<{ ok: true; label: LabelResult } | { ok: false; error: string }> {
-  return createShippingLabel({ ...params, carrierCode: "ups", serviceCode: "ups_ground" });
+  return createShippingLabel({ ...params, carrierCode: "ups_walleted", serviceCode: "ups_ground" });
 }
 
 // ---------------------------------------------------------------------------
@@ -586,6 +614,10 @@ export interface ShipStationShipment {
   carrierCode: string | null;
   serviceCode: string | null;
   voided: boolean;
+  /** ISO timestamp of the void, if shipment was voided. */
+  voidDate: string | null;
+  /** Label cost we paid — used by BUILD #9 refund reconciliation. */
+  shipmentCost: number | null;
   /** Customer-ship-to name — useful when orderNumber isn't matchable. */
   shipToName: string | null;
   /** Ship-to postal code — used in our fuzzy match. */
@@ -603,6 +635,9 @@ interface ShipStationShipmentsListResponse {
     carrierCode?: string | null;
     serviceCode?: string | null;
     voided?: boolean;
+    voidDate?: string | null;
+    shipmentCost?: number | null;
+    insuranceCost?: number | null;
     shipTo?: { name?: string; postalCode?: string };
   }>;
   total?: number;
@@ -681,6 +716,13 @@ export async function getRecentShipments(opts: {
         carrierCode: s.carrierCode ?? null,
         serviceCode: s.serviceCode ?? null,
         voided: Boolean(s.voided),
+        voidDate: s.voidDate ?? null,
+        shipmentCost:
+          typeof s.shipmentCost === "number"
+            ? Math.round(
+                (s.shipmentCost + (s.insuranceCost ?? 0)) * 100,
+              ) / 100
+            : null,
         shipToName: s.shipTo?.name ?? null,
         shipToPostalCode: s.shipTo?.postalCode ?? null,
       }),
@@ -709,4 +751,277 @@ export async function findShipmentsByOrderNumberPrefix(
   return res.shipments.filter(
     (s) => s.orderNumber !== null && s.orderNumber.startsWith(prefix),
   );
+}
+
+// ---------------------------------------------------------------------------
+// BUILD #2 — Preflight wallet-balance check
+// ---------------------------------------------------------------------------
+//
+// Origin: on 2026-04-20, mid-rush, ShipStation ran out of wallet funds
+// after buying Glacier's 2nd master-carton label. The next `createlabel`
+// call failed with a cryptic 400. Ben had to manually reload the wallet
+// ($50 + $100) from inside the ShipStation web UI twice — hard stop in
+// the middle of the Red Dog buy loop.
+//
+// Fix: before every label purchase, read the carrier's wallet balance
+// from `GET /carriers`, compare against `cost × safetyMultiplier`
+// (default 1.2 → 20% headroom for surcharges + residential fees), and
+// refuse the buy with a clear error message if the wallet would dip
+// below the required surcharge. Callers surface the error to the
+// operator (Slack ping or UI banner) so the human can top up.
+//
+// Non-walleted carriers (direct-account UPS / FedEx) don't report
+// Balance, so the helper passes (skipped=true, balance=null) and the
+// caller proceeds without blocking.
+
+export interface PreflightWalletResult {
+  /** `true` if either the balance covers the required threshold OR the
+   *  carrier doesn't report a balance (walled check skipped). */
+  ok: boolean;
+  /** Wallet balance in USD. `null` when the carrier doesn't report it. */
+  balance: number | null;
+  /** The computed threshold: cost × safetyMultiplier. */
+  required: number;
+  /** The safety multiplier actually applied. */
+  safetyMultiplier: number;
+  /** `true` when the carrier didn't report a balance and we skipped the check. */
+  skipped: boolean;
+  /** Human-readable error; only populated when ok = false. */
+  error?: string;
+}
+
+/**
+ * Look up ShipStation wallet balance for a specific carrier code.
+ *
+ * Returns `balance = null` when the carrier exists but doesn't report
+ * a balance (e.g. direct-account UPS — balance lives in the UPS
+ * billing portal, not ShipStation). Returns `ok = false` only when
+ * the /carriers call itself fails or the code isn't connected at all.
+ */
+export async function getShipStationWalletBalance(carrierCode: string): Promise<
+  | { ok: true; carrierCode: string; balance: number | null }
+  | { ok: false; error: string }
+> {
+  const res = await listShipStationCarriers();
+  if (!res.ok) return { ok: false, error: res.error };
+  const carrier = res.carriers.find((c) => c.code === carrierCode);
+  if (!carrier) {
+    return {
+      ok: false,
+      error: `Carrier '${carrierCode}' not connected on this ShipStation account`,
+    };
+  }
+  return {
+    ok: true,
+    carrierCode,
+    balance: typeof carrier.balance === "number" ? carrier.balance : null,
+  };
+}
+
+/**
+ * Refuse a label buy if the carrier's wallet balance can't cover the
+ * expected cost with headroom. Callers should invoke this before
+ * `createShippingLabel()` in any batch flow. See top-of-section
+ * comment for context.
+ */
+export async function preflightWalletCheck(params: {
+  carrierCode: string;
+  /** Expected label cost in USD (use `getCheapestShipStationRate()` first). */
+  costDollars: number;
+  /** Headroom multiplier. Default 1.2 = 20% above quoted cost. */
+  safetyMultiplier?: number;
+}): Promise<PreflightWalletResult> {
+  const safetyMultiplier = params.safetyMultiplier ?? 1.2;
+  const required = Math.round(params.costDollars * safetyMultiplier * 100) / 100;
+
+  const balRes = await getShipStationWalletBalance(params.carrierCode);
+  if (!balRes.ok) {
+    // /carriers failed outright — can't verify. Fail CLOSED so a
+    // silent API outage doesn't let us ring up a no-funds error
+    // mid-loop. Caller can override with safetyMultiplier=0.
+    return {
+      ok: false,
+      balance: null,
+      required,
+      safetyMultiplier,
+      skipped: false,
+      error: `Wallet preflight failed: ${balRes.error}`,
+    };
+  }
+  if (balRes.balance === null) {
+    // Carrier doesn't report balance — skip the check cleanly.
+    return {
+      ok: true,
+      balance: null,
+      required,
+      safetyMultiplier,
+      skipped: true,
+    };
+  }
+  if (balRes.balance < required) {
+    return {
+      ok: false,
+      balance: balRes.balance,
+      required,
+      safetyMultiplier,
+      skipped: false,
+      error:
+        `ShipStation ${params.carrierCode} wallet $${balRes.balance.toFixed(2)} ` +
+        `below required $${required.toFixed(2)} ` +
+        `(cost $${params.costDollars.toFixed(2)} × ${safetyMultiplier} safety). ` +
+        `Top up the ${params.carrierCode} wallet in ShipStation UI before retrying.`,
+    };
+  }
+  return {
+    ok: true,
+    balance: balRes.balance,
+    required,
+    safetyMultiplier,
+    skipped: false,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// BUILD #3 — 504 idempotency recovery
+// ---------------------------------------------------------------------------
+//
+// Origin: on 2026-04-20 (Red Dog buy loop), three createlabel calls
+// returned HTTP 504 Gateway Timeout after the carrier had ALREADY
+// created the shipment server-side. Stamps.com charged us $27.27
+// each (×3 = $81.81) but ShipStation's response was lost, so we
+// never got the PDFs. We voided all three to get refunds and re-bought.
+//
+// Fix: when createlabel returns a 5xx timeout, the caller should NOT
+// auto-retry. Instead: wait ~5s, query ShipStation for any shipment
+// created in the last ~2min matching our ship-to ZIP + name, and
+// surface the candidate(s) so an operator can:
+//   (a) accept the silent-success label if one appeared, or
+//   (b) confirm no shipment was created and safely retry.
+//
+// This helper does (a) — callers decide what to do with the matches.
+
+/**
+ * After a createlabel timeout, look for any ShipStation shipment
+ * created in the recent past that matches the destination we tried
+ * to ship to. Used to recover from 504 Gateway Timeouts where the
+ * shipment was created server-side but the response was dropped.
+ *
+ * Matches on ZIP + name (case-insensitive) and createDate within the
+ * `withinMinutes` window. Returns matches ordered newest-first.
+ */
+export async function findRecentShipmentByAddress(params: {
+  shipToPostalCode: string;
+  shipToName?: string;
+  /** Only consider shipments created within this many minutes. Default 10. */
+  withinMinutes?: number;
+}): Promise<ShipStationShipment[]> {
+  const windowMs = (params.withinMinutes ?? 10) * 60 * 1000;
+  const cutoff = Date.now() - windowMs;
+  const res = await getRecentShipments({
+    // ShipStation's shipDateStart filter is day-resolution — broad-cast
+    // yesterday + today so we don't miss anything near midnight UTC.
+    shipDateStart: new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString().slice(0, 10),
+    includeVoided: false,
+  });
+  if (!res.ok) return [];
+  const zip = params.shipToPostalCode.trim();
+  const name = params.shipToName?.trim().toLowerCase();
+  return res.shipments
+    .filter((s) => {
+      if (s.shipToPostalCode?.trim() !== zip) return false;
+      if (name && s.shipToName?.toLowerCase() !== name) return false;
+      if (!s.createDate) return false;
+      return new Date(s.createDate).getTime() >= cutoff;
+    })
+    .sort((a, b) => {
+      const aT = a.createDate ? new Date(a.createDate).getTime() : 0;
+      const bT = b.createDate ? new Date(b.createDate).getTime() : 0;
+      return bT - aT;
+    });
+}
+
+// ---------------------------------------------------------------------------
+// BUILD #9 — Voided-label refund watcher
+// ---------------------------------------------------------------------------
+//
+// Stamps.com refunds void labels in batches — typically 24-48h,
+// occasionally up to 14 days. On 2026-04-20 we voided 3 Red Dog labels
+// ($81.81) + discovered 17 orphaned Viktor triple-buy voids ($130.90).
+// Without a watcher, those could silently never refund and we'd eat
+// the cost.
+//
+// This helper lists every voided shipment in a window and flags any
+// whose void is older than `staleAfterHours` — those are exception
+// candidates the Finance Exception Agent surfaces in its daily digest.
+// Actual refund-credit reconciliation against the Stamps.com wallet
+// ledger happens in the agent (not here), since that requires matching
+// ledger transactions the v1 API doesn't expose.
+
+export interface VoidedLabelSummary {
+  shipmentId: number;
+  carrierCode: string | null;
+  trackingNumber: string | null;
+  shipmentCost: number | null;
+  createDate: string;
+  voidDate: string | null;
+  /** Hours elapsed since the void. null if voidDate is missing. */
+  ageHours: number | null;
+  /** True iff ageHours > staleAfterHours — worth checking the wallet ledger. */
+  stale: boolean;
+  shipToName: string | null;
+  shipToPostalCode: string | null;
+  orderNumber: string | null;
+}
+
+/**
+ * List voided shipments in the recent past, annotating each with
+ * an `ageHours` + `stale` flag. Used by the Finance Exception Agent's
+ * daily digest to surface refunds that haven't landed within the
+ * expected Stamps.com SLA window.
+ */
+export async function listVoidedLabels(opts: {
+  /** Default 14 — Stamps.com outer refund window. */
+  daysBack?: number;
+  /** Default 72 — threshold after which a void-without-refund is suspicious. */
+  staleAfterHours?: number;
+}): Promise<
+  | { ok: true; voided: VoidedLabelSummary[]; stale: VoidedLabelSummary[] }
+  | { ok: false; error: string }
+> {
+  const daysBack = Math.max(1, Math.min(60, opts.daysBack ?? 14));
+  const staleAfterHours = Math.max(1, opts.staleAfterHours ?? 72);
+  const now = Date.now();
+
+  const res = await getRecentShipments({
+    shipDateStart: new Date(now - daysBack * 24 * 3600 * 1000)
+      .toISOString()
+      .slice(0, 10),
+    includeVoided: true,
+    pageSize: 500,
+  });
+  if (!res.ok) return { ok: false, error: res.error };
+
+  const voided: VoidedLabelSummary[] = res.shipments
+    .filter((s) => s.voided)
+    .map((s) => {
+      const voidedAt = s.voidDate ? new Date(s.voidDate).getTime() : null;
+      const ageHours =
+        voidedAt !== null ? Math.round(((now - voidedAt) / 36_000)) / 100 : null;
+      return {
+        shipmentId: s.shipmentId,
+        carrierCode: s.carrierCode,
+        trackingNumber: s.trackingNumber,
+        shipmentCost: s.shipmentCost,
+        createDate: s.createDate,
+        voidDate: s.voidDate,
+        ageHours,
+        stale: ageHours !== null && ageHours > staleAfterHours,
+        shipToName: s.shipToName,
+        shipToPostalCode: s.shipToPostalCode,
+        orderNumber: s.orderNumber,
+      };
+    });
+
+  const stale = voided.filter((v) => v.stale);
+  return { ok: true, voided, stale };
 }
