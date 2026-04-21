@@ -111,8 +111,34 @@ export interface BriefInput {
    * the reason — never fabricates.
    */
   arPosition?: ARPosition;
+  /**
+   * Shipping Hub pre-flight snapshot. When provided, the morning brief
+   * renders wallet / ATP / freight-comp-queue / stale-voids so Ben
+   * knows before the 10:00 PT Ops Agent digest whether he can ship.
+   * Caller (daily-brief route) fetches from `computeFulfillmentPreflight()`.
+   */
+  preflight?: FulfillmentPreflightSlice;
   /** Any degradations to call out at the top of the brief. */
   degradations?: string[];
+}
+
+/** Minimal shape — matches fields used in the brief. */
+export interface FulfillmentPreflightSlice {
+  walletAlerts: Array<{
+    carrierCode: string;
+    balance: number | null;
+    floor: number;
+  }>;
+  atp: {
+    totalBagsOnHand: number | null;
+    pendingOutboundBags: number;
+    availableBags: number | null;
+    snapshotAgeHours: number | null;
+    unavailableReason?: string;
+  };
+  freightCompQueue: { queuedCount: number; queuedDollars: number };
+  staleVoids: { count: number; pendingDollars: number };
+  alerts: string[];
 }
 
 export interface BriefOutput {
@@ -276,6 +302,17 @@ export function composeDailyBrief(input: BriefInput): BriefOutput {
     });
   }
 
+  // ---- Shipping Hub pre-flight (morning only) ----
+  if (input.kind === "morning" && input.preflight) {
+    const pfLines = renderPreflightMarkdown(input.preflight);
+    if (pfLines) {
+      blocks.push({
+        type: "section",
+        text: { type: "mrkdwn", text: pfLines },
+      });
+    }
+  }
+
   // ---- Pending approvals breakdown ----
   if (pendingCount > 0) {
     const grouped = groupApprovalsByDivision(input.pendingApprovals);
@@ -390,4 +427,54 @@ function renderARBucket(bucket: ARBucket): string {
     return `unavailable — amount=${bucket.amountUsd} count=${bucket.count} suppressed: missing source.system or source.retrievedAt (no-fabrication rule)`;
   }
   return `unavailable — ${bucket.unavailableReason ?? "no reason given"}`;
+}
+
+function renderPreflightMarkdown(pf: FulfillmentPreflightSlice): string {
+  const lines: string[] = ["*Shipping Hub pre-flight*"];
+
+  // Wallet
+  if (pf.walletAlerts.length > 0) {
+    for (const w of pf.walletAlerts) {
+      const bal = w.balance === null ? "—" : `$${w.balance.toFixed(2)}`;
+      lines.push(
+        `🚨 \`${w.carrierCode}\` wallet ${bal} below floor $${w.floor.toFixed(0)} — top up before next buy`,
+      );
+    }
+  }
+
+  // ATP
+  const atp = pf.atp;
+  if (atp.unavailableReason) {
+    lines.push(`❓ ATP: _${atp.unavailableReason}_`);
+  } else if (atp.totalBagsOnHand !== null && atp.availableBags !== null) {
+    if (atp.availableBags < 36) {
+      lines.push(
+        `⚠️ ATP low: ${atp.availableBags} bags available (${atp.totalBagsOnHand} on-hand − ${atp.pendingOutboundBags} pending)`,
+      );
+    }
+    if (atp.snapshotAgeHours !== null && atp.snapshotAgeHours > 36) {
+      lines.push(
+        `📦 Inventory snapshot ${atp.snapshotAgeHours}h stale — POST /api/ops/inventory/snapshot to refresh`,
+      );
+    }
+  }
+
+  // Freight-comp queue
+  if (pf.freightCompQueue.queuedCount > 0) {
+    lines.push(
+      `📥 Freight-comp JE queue: ${pf.freightCompQueue.queuedCount} pending · $${pf.freightCompQueue.queuedDollars.toFixed(2)} (Rene approves)`,
+    );
+  }
+
+  // Stale voids
+  if (pf.staleVoids.count > 0) {
+    lines.push(
+      `💸 Stale ShipStation voids: ${pf.staleVoids.count} · $${pf.staleVoids.pendingDollars.toFixed(2)} pending refund`,
+    );
+  }
+
+  // Only render the section when there's actually something to say.
+  return lines.length > 1
+    ? lines.join("\n")
+    : "*Shipping Hub pre-flight*\n✅ All clear — wallets above floor, ATP healthy, queue empty, no stale voids.";
 }

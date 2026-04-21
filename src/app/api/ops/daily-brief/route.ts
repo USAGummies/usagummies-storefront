@@ -23,8 +23,10 @@ import {
   composeDailyBrief,
   type ARPosition,
   type BriefKind,
+  type FulfillmentPreflightSlice,
   type RevenueLine,
 } from "@/lib/ops/control-plane/daily-brief";
+import { computeFulfillmentPreflight } from "@/lib/ops/fulfillment-preflight";
 import { listDivisions } from "@/lib/ops/control-plane/divisions";
 import { getChannel } from "@/lib/ops/control-plane/channels";
 import {
@@ -187,6 +189,39 @@ async function composeAndPost(req: Request): Promise<Response> {
   // caller-supplied via the request body per ops/make-webhooks.md.
   const cashPosition = overrides.cashPosition ?? (await resolvePlaidCashPosition());
 
+  // Shipping Hub pre-flight — morning brief only. Ben's 08:00 PT read
+  // in #ops-daily surfaces wallet/ATP/queue/stale-voids so he knows
+  // before the 10:00 PT Ops Agent post whether shipping is gated.
+  let preflight: FulfillmentPreflightSlice | undefined;
+  if (kind === "morning") {
+    try {
+      const pf = await computeFulfillmentPreflight();
+      preflight = {
+        walletAlerts: pf.wallets
+          .filter((w) => w.belowFloor)
+          .map((w) => ({
+            carrierCode: w.carrierCode,
+            balance: w.balance,
+            floor: w.floor,
+          })),
+        atp: pf.atp,
+        freightCompQueue: {
+          queuedCount: pf.freightCompQueue.queuedCount,
+          queuedDollars: pf.freightCompQueue.queuedDollars,
+        },
+        staleVoids: {
+          count: pf.staleVoids.count,
+          pendingDollars: pf.staleVoids.pendingDollars,
+        },
+        alerts: pf.alerts,
+      };
+    } catch (err) {
+      degradations.push(
+        `preflight: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
   const composeInput = {
     kind,
     asOf: now,
@@ -198,6 +233,7 @@ async function composeAndPost(req: Request): Promise<Response> {
     revenueYesterday: overrides.revenueYesterday,
     cashPosition,
     arPosition: overrides.arPosition,
+    preflight,
     degradations,
   } as const;
   let brief = composeDailyBrief(composeInput);
