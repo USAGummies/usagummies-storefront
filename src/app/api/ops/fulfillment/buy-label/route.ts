@@ -23,6 +23,12 @@ import { NextResponse } from "next/server";
 import { kv } from "@vercel/kv";
 
 import { isAuthorized } from "@/lib/ops/abra-auth";
+import { lookupDeliveredPricing } from "@/lib/ops/delivered-pricing-guard";
+import {
+  buildFreightCompJournalEntry,
+  FREIGHT_COMP_CHANNELS,
+  type FreightCompChannel,
+} from "@/lib/ops/freight-comp";
 import {
   createShippingLabel,
   findRecentShipmentByAddress,
@@ -31,6 +37,7 @@ import {
   type LabelDestination,
   type LabelResult,
 } from "@/lib/ops/shipstation-client";
+import type { QBOJournalEntryInput } from "@/lib/ops/qbo-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -57,6 +64,34 @@ interface StageEntry {
 type StageMap = Record<string, StageEntry>;
 
 const KV_STAGES = "fulfillment:stages";
+const KV_FREIGHT_COMP_QUEUE = "fulfillment:freight-comp-queue";
+
+/** Pending freight-comp JE entry queued for Rene's Thursday digest. */
+interface FreightCompQueueEntry {
+  queuedAt: string;
+  channel: FreightCompChannel;
+  channelLabel: string;
+  customerName: string;
+  customerMatch: string;
+  freightDollars: number;
+  trackingNumbers: string[];
+  shipmentIds: Array<string | number>;
+  customerRef: string;
+  journalEntry: QBOJournalEntryInput;
+  status: "queued" | "approved" | "posted" | "rejected";
+  /** Ben's wallet + total cost bookkeeping for the Thursday digest. */
+  buyLoopKeys: string[];
+}
+
+/**
+ * Classify a delivered-pricing match into a FreightCompChannel code.
+ * Aligned with distributor-pricing-commitments.md §2/§3.
+ */
+function channelFromPricingTier(tier: string): FreightCompChannel {
+  if (tier === "show_special_325") return "trade_show";
+  if (tier.startsWith("option_") || tier === "sell_sheet_249") return "distributor";
+  return "dtc_absorbed";
+}
 
 interface BuyLabelRequest {
   keys?: string[];
@@ -308,6 +343,53 @@ export async function POST(req: Request): Promise<Response> {
 
   await kv.set(KV_STAGES, updatedStages);
 
+  // BUILD #6 — CF-09 freight-comp auto-queue.
+  // If the destination matches a delivered-pricing customer, auto-build
+  // the paired DEBIT 500050 / CREDIT 499010 QBO JournalEntry and park
+  // it in KV. Finance Exception Agent surfaces the queue in Rene's
+  // Thursday digest for one-click posting (Class B approval). Doctrine:
+  // /contracts/distributor-pricing-commitments.md §5.
+  let freightCompQueued: FreightCompQueueEntry | null = null;
+  const pricingMatch = lookupDeliveredPricing(body.destination.name);
+  if (pricingMatch && totalCost > 0) {
+    const channel = channelFromPricingTier(pricingMatch.tier);
+    const trackingNumbers = labels
+      .map((l) => l.trackingNumber)
+      .filter((t): t is string => Boolean(t));
+    const shipmentIds = labels
+      .map((l) => l.shipmentId)
+      .filter((id): id is number => id !== null);
+    const customerRef = keys.join("+");
+    const journalEntry = buildFreightCompJournalEntry({
+      freightCostDollars: totalCost,
+      channel,
+      shipmentId: shipmentIds[0] ?? "unknown",
+      trackingNumber: trackingNumbers.join(", "),
+      customerRef,
+    });
+    freightCompQueued = {
+      queuedAt: now,
+      channel,
+      channelLabel: FREIGHT_COMP_CHANNELS[channel].label,
+      customerName: body.destination.name,
+      customerMatch: pricingMatch.match,
+      freightDollars: Math.round(totalCost * 100) / 100,
+      trackingNumbers,
+      shipmentIds,
+      customerRef,
+      journalEntry,
+      status: "queued",
+      buyLoopKeys: keys,
+    };
+    const queue =
+      ((await kv.get<FreightCompQueueEntry[]>(KV_FREIGHT_COMP_QUEUE)) ??
+        []) as FreightCompQueueEntry[];
+    queue.unshift(freightCompQueued);
+    // Cap at 500 entries so KV doesn't unbounded-grow.
+    const trimmed = queue.slice(0, 500);
+    await kv.set(KV_FREIGHT_COMP_QUEUE, trimmed);
+  }
+
   return NextResponse.json({
     ok: true,
     purchased: labels.length,
@@ -318,5 +400,19 @@ export async function POST(req: Request): Promise<Response> {
     errors,
     walletPreflight,
     recoveredCandidates,
+    // BUILD #6 + #7 wiring surface — caller can see exactly what was
+    // queued for Rene. `pricingDoctrineMatch` is null when the customer
+    // isn't on delivered pricing (the default path).
+    pricingDoctrineMatch: pricingMatch
+      ? {
+          customerName: body.destination.name,
+          match: pricingMatch.match,
+          tier: pricingMatch.tier,
+          terms: pricingMatch.terms,
+          freightAbsorbed: pricingMatch.freightAbsorbed,
+          source: pricingMatch.source,
+        }
+      : null,
+    freightCompQueued,
   });
 }

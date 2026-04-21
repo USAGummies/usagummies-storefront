@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { isAuthorized } from "@/lib/ops/abra-auth";
+import { validateInvoiceAgainstPricingDoctrine } from "@/lib/ops/delivered-pricing-guard";
 import { getRealmId, getValidAccessToken } from "@/lib/ops/qbo-auth";
 import { validateQBOWrite, logQBOAudit } from "@/lib/ops/qbo-guardrails";
 
@@ -45,6 +46,18 @@ const RequestSchema = z.object({
   shipDate: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   trackingNum: z.string().trim().max(100).optional(),
   customerId: z.string().trim().optional(),  // pass QBO customer ID directly (skips lookup)
+  // BUILD #7 — delivered-pricing override. Set ONLY when Class C
+  // approval has been granted in writing for adding a freight line
+  // to a delivered-pricing customer. Default: no override → guard
+  // refuses such invoices. See
+  // /contracts/distributor-pricing-commitments.md §6 + src/lib/ops/delivered-pricing-guard.ts
+  deliveredPricingOverride: z
+    .object({
+      approver: z.enum(["Ben", "Rene"]),
+      reason: z.string().trim().min(8).max(500),
+      documentedAt: z.string().trim().min(1), // ISO timestamp
+    })
+    .optional(),
 });
 
 type QBOCustomer = {
@@ -250,6 +263,53 @@ export async function POST(req: Request) {
   const parsed = RequestSchema.safeParse(rawBody);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues.map((issue) => issue.message).join("; ") }, { status: 400 });
+  }
+
+  // BUILD #7 — delivered-pricing doctrine guard. Refuses to write an
+  // invoice that includes a freight/shipping line for a customer on
+  // delivered pricing (Inderbitzin, Glacier, Bryce, Reunion 2026,
+  // sell-sheet v3 customers) unless the caller passes a Class C
+  // override. See /contracts/distributor-pricing-commitments.md §6.
+  const hasFreightLine = parsed.data.lineItems.some((li) =>
+    /\b(freight|shipping|delivery|postage|label)\b/i.test(li.description),
+  );
+  const pricingGuard = validateInvoiceAgainstPricingDoctrine({
+    customer: parsed.data.customerName,
+    hasFreightLine,
+    freightAmount: parsed.data.lineItems
+      .filter((li) => /\b(freight|shipping|delivery|postage|label)\b/i.test(li.description))
+      .reduce((sum, li) => sum + li.quantity * li.unitPrice, 0),
+    overrideApprovedBy: parsed.data.deliveredPricingOverride,
+  });
+  if (!pricingGuard.ok) {
+    await logQBOAudit({
+      entity_type: "invoice",
+      action: "create",
+      endpoint: "/api/ops/qbo/invoice",
+      amount: 0,
+      vendor_or_customer: `customer:${parsed.data.customerName}`,
+      ref_number: parsed.data.docNumber,
+      dry_run: isDryRun,
+      validation_passed: false,
+      issues: [
+        {
+          severity: "error",
+          code: "DELIVERED_PRICING_VIOLATION",
+          message: pricingGuard.error,
+        },
+      ],
+      caller,
+    });
+    return NextResponse.json(
+      {
+        ok: false,
+        blocked: true,
+        pricingDoctrineViolation: pricingGuard.error,
+        pricingDoctrineMatch: pricingGuard.match,
+        message: pricingGuard.error,
+      },
+      { status: 422 },
+    );
   }
 
   const accessToken = await getValidAccessToken();

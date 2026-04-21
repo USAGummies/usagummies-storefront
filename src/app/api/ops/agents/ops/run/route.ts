@@ -18,12 +18,18 @@
 
 import { NextResponse } from "next/server";
 
+import { kv } from "@vercel/kv";
+
 import { isAuthorized } from "@/lib/ops/abra-auth";
 import { getChannel } from "@/lib/ops/control-plane/channels";
 import { postMessage } from "@/lib/ops/control-plane/slack";
 import { newRunContext } from "@/lib/ops/control-plane/run-id";
 import { auditStore } from "@/lib/ops/control-plane/stores";
 import { buildAuditEntry } from "@/lib/ops/control-plane/audit";
+import {
+  KV_INVENTORY_SNAPSHOT,
+  buildSnapshotFromOnHand,
+} from "@/lib/ops/inventory-snapshot";
 import { getQBOPurchaseOrders } from "@/lib/ops/qbo-client";
 import { getAllOnHandInventory, type OnHandRow } from "@/lib/ops/shopify-admin-actions";
 import {
@@ -215,6 +221,21 @@ async function loadInventory(
       system: "shopify:inventory:on-hand",
       retrievedAt: new Date().toISOString(),
     });
+
+    // Persist the snapshot to KV so downstream consumers (Shipping Hub
+    // ATP gate, ad-hoc status checks) don't have to re-hit Shopify.
+    // Best-effort: a KV write failure doesn't kill the digest.
+    try {
+      const snapshot = buildSnapshotFromOnHand(rows, {
+        lowThreshold: INVENTORY_LOW_THRESHOLD,
+      });
+      await kv.set(KV_INVENTORY_SNAPSHOT, snapshot);
+    } catch (err) {
+      degraded.push(
+        `inventory-snapshot-write: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+
     const summary = (r: OnHandRow): InventorySummary => ({
       sku: r.sku,
       productTitle: r.productTitle,

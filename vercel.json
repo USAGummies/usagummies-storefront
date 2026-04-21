@@ -43,6 +43,10 @@
     {
       "path": "/api/ops/control-plane/drift-audit",
       "schedule": "0 3 * * 1"
+    },
+    {
+      "path": "/api/ops/shipstation/wallet-check?post=true",
+      "schedule": "0 16 * * 1-5"
     }
   ]
 }
