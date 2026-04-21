@@ -490,7 +490,7 @@ function renderDigest(digest: DigestData, startedAt: string): string {
     lines.push(
       "",
       `*CF-09 freight-comp queue — ${digest.freightCompQueue.queuedCount} pending JE(s), ${money(digest.freightCompQueue.queuedDollars, "—")}*`,
-      `_Auto-queued by buy-label for delivered-pricing customers. Post as paired DEBIT 500050 / CREDIT 499010 (Class B). Source: /contracts/distributor-pricing-commitments.md §5._`,
+      `_One-click approve via \`POST /api/ops/fulfillment/freight-comp-queue { key, approver: "Rene" }\`. Paired DEBIT 500050 / CREDIT 499010 (Class B). Source: /contracts/distributor-pricing-commitments.md §5._`,
     );
     for (const item of digest.freightCompQueue.items.slice(0, 5)) {
       const tracking =
