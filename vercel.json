@@ -47,6 +47,10 @@
     {
       "path": "/api/ops/shipstation/wallet-check?post=true",
       "schedule": "0 16 * * 1-5"
+    },
+    {
+      "path": "/api/ops/control-plane/fulfillment-drift-audit?post=true",
+      "schedule": "30 3 * * 1"
     }
   ]
 }
