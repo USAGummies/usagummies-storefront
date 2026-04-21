@@ -58,6 +58,7 @@ export interface OrderIntent {
     state: string; // 2-letter US
     postalCode: string;
     country?: string; // default "US"
+    phone?: string;
     residential?: boolean;
   };
   /** Packaging intent. Defaults to master_carton for wholesale, case for samples. */

@@ -57,6 +57,7 @@ const SELF_AUTHENTICATED_PREFIXES = [
   "/api/ops/alerts/", // ALERTS — Dedup registry (isAuthorized)
   "/api/ops/claims/", // CLAIMS — Product claim verification gate (isAuthorized)
   "/api/ops/pulse/", // PULSE — Fleet health monitoring (isAuthorized)
+  "/api/ops/webhooks/", // WEBHOOKS — Upstream webhook ingress (Shopify HMAC, Amazon SNS, Faire token, etc.) — each route verifies its own signature
 ];
 
 function isSelfAuthenticated(pathname: string): boolean {
