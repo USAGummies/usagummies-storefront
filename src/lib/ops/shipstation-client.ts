@@ -262,22 +262,38 @@ export async function listShipStationCarriers(): Promise<
       const text = await res.text().catch(() => "");
       return { ok: false, error: `ShipStation ${res.status}: ${text.slice(0, 200)}` };
     }
+    // IMPORTANT: ShipStation's /carriers endpoint returns *lowercase*
+    // field names (`name`, `code`, `balance`, `requiresFundedAccount`,
+    // `primary`) — NOT PascalCase. Verified against live response
+    // 2026-04-20. Reading uppercase keys silently yields undefined
+    // and made BUILD #2 preflight a no-op. Accept both shapes
+    // defensively so a future ShipStation API change can't silently
+    // re-break the wallet preflight.
     const raw = (await res.json()) as Array<{
+      name?: string;
+      code?: string;
+      requiresFundedAccount?: boolean;
+      primary?: boolean;
+      balance?: number | null;
+      // Legacy-shape defensive fallback.
       Name?: string;
       Code?: string;
       RequiresFundedAccount?: boolean;
       Primary?: boolean;
       Balance?: number | null;
     }>;
-    const carriers = raw.map(
-      (c): CarrierInfo => ({
-        name: c.Name ?? "",
-        code: String(c.Code ?? ""),
-        requiresFundedAccount: Boolean(c.RequiresFundedAccount),
-        primary: Boolean(c.Primary),
-        balance: typeof c.Balance === "number" ? c.Balance : undefined,
-      }),
-    );
+    const carriers = raw.map((c): CarrierInfo => {
+      const balanceRaw = c.balance ?? c.Balance;
+      return {
+        name: c.name ?? c.Name ?? "",
+        code: String(c.code ?? c.Code ?? ""),
+        requiresFundedAccount: Boolean(
+          c.requiresFundedAccount ?? c.RequiresFundedAccount,
+        ),
+        primary: Boolean(c.primary ?? c.Primary),
+        balance: typeof balanceRaw === "number" ? balanceRaw : undefined,
+      };
+    });
     return { ok: true, carriers };
   } catch (err) {
     return {
