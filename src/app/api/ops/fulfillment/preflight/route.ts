@@ -1,0 +1,32 @@
+/**
+ * GET /api/ops/fulfillment/preflight
+ *
+ * Consolidated Shipping Hub pre-flight. One payload answering:
+ *   - Can I buy a label right now? (wallet + carriers)
+ *   - How much inventory is on hand + pending outbound? (ATP)
+ *   - What's in Rene's queue from my past buys? (freight-comp)
+ *   - Any refunds owed to me? (stale voids)
+ *
+ * Consumers:
+ *   - Ops Agent morning #operations digest (folds alerts inline)
+ *   - Executive Brief morning (future wire)
+ *   - Future Shipping Hub UI pre-ship banner
+ *
+ * Pure read. No side-effects. Implementation lives in
+ * `src/lib/ops/fulfillment-preflight.ts` so callers can share.
+ *
+ * Auth: bearer CRON_SECRET.
+ */
+import { NextResponse } from "next/server";
+
+import { isCronAuthorized, unauthorized } from "@/lib/ops/control-plane/admin-auth";
+import { computeFulfillmentPreflight } from "@/lib/ops/fulfillment-preflight";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+export async function GET(req: Request): Promise<Response> {
+  if (!isCronAuthorized(req)) return unauthorized();
+  const result = await computeFulfillmentPreflight();
+  return NextResponse.json(result);
+}

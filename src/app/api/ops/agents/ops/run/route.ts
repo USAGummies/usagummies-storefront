@@ -26,6 +26,7 @@ import { postMessage } from "@/lib/ops/control-plane/slack";
 import { newRunContext } from "@/lib/ops/control-plane/run-id";
 import { auditStore } from "@/lib/ops/control-plane/stores";
 import { buildAuditEntry } from "@/lib/ops/control-plane/audit";
+import { computeFulfillmentPreflight } from "@/lib/ops/fulfillment-preflight";
 import {
   KV_INVENTORY_SNAPSHOT,
   buildSnapshotFromOnHand,
@@ -72,6 +73,27 @@ interface InventorySummary {
   onHand: number;
 }
 
+/**
+ * Shipping Hub pre-flight signals folded into the digest. Sourced
+ * from `/api/ops/fulfillment/preflight` via a direct fetch against
+ * our own deployment. Surfacing lets Ben see wallet / ATP / stale
+ * voids / freight-comp queue depth in his morning #operations post
+ * without clicking through multiple tabs.
+ */
+interface PreflightSlice {
+  walletAlerts: Array<{ carrierCode: string; balance: number | null; floor: number }>;
+  atp: {
+    totalBagsOnHand: number | null;
+    pendingOutboundBags: number;
+    availableBags: number | null;
+    snapshotAgeHours: number | null;
+    unavailableReason?: string;
+  };
+  freightCompQueue: { queuedCount: number; queuedDollars: number };
+  staleVoids: { count: number; pendingDollars: number };
+  alerts: string[];
+}
+
 interface DigestData {
   openPOs: POSummary[];
   openPOCount: number;
@@ -79,6 +101,7 @@ interface DigestData {
   vendorFreshness: VendorFreshness[];
   inventoryLow: InventorySummary[];
   inventoryOk: InventorySummary[];
+  preflight: PreflightSlice | null;
   degraded: string[];
   provenance: Provenance[];
 }
@@ -169,10 +192,11 @@ async function gatherDigestData(): Promise<DigestData> {
   const degraded: string[] = [];
   const provenance: Provenance[] = [];
 
-  const [openPOs, inventory, vendorFreshness] = await Promise.all([
+  const [openPOs, inventory, vendorFreshness, preflight] = await Promise.all([
     loadOpenPOs(degraded, provenance),
     loadInventory(degraded, provenance),
     loadVendorFreshness(degraded, provenance),
+    loadPreflight(degraded, provenance),
   ]);
 
   const openPOCount = openPOs.length;
@@ -187,9 +211,43 @@ async function gatherDigestData(): Promise<DigestData> {
     vendorFreshness,
     inventoryLow,
     inventoryOk,
+    preflight,
     degraded,
     provenance,
   };
+}
+
+async function loadPreflight(
+  degraded: string[],
+  provenance: Provenance[],
+): Promise<PreflightSlice | null> {
+  try {
+    const pf = await computeFulfillmentPreflight();
+    provenance.push({
+      system: "fulfillment:preflight",
+      retrievedAt: pf.generatedAt,
+    });
+    return {
+      walletAlerts: pf.wallets
+        .filter((w) => w.belowFloor)
+        .map((w) => ({ carrierCode: w.carrierCode, balance: w.balance, floor: w.floor })),
+      atp: pf.atp,
+      freightCompQueue: {
+        queuedCount: pf.freightCompQueue.queuedCount,
+        queuedDollars: pf.freightCompQueue.queuedDollars,
+      },
+      staleVoids: {
+        count: pf.staleVoids.count,
+        pendingDollars: pf.staleVoids.pendingDollars,
+      },
+      alerts: pf.alerts,
+    };
+  } catch (err) {
+    degraded.push(
+      `preflight: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return null;
+  }
 }
 
 async function loadVendorFreshness(
@@ -378,6 +436,50 @@ function renderDigest(digest: DigestData, startedAt: string): string {
             )
             .join("\n"),
   );
+
+  // Shipping Hub pre-flight — wallet / ATP / freight-comp / stale voids.
+  if (digest.preflight) {
+    const pf = digest.preflight;
+    lines.push("", "*Shipping Hub pre-flight*");
+
+    // Wallet status
+    if (pf.walletAlerts.length > 0) {
+      for (const w of pf.walletAlerts) {
+        const bal = w.balance === null ? "—" : `$${w.balance.toFixed(2)}`;
+        lines.push(
+          `  :rotating_light: \`${w.carrierCode}\` wallet ${bal} (floor $${w.floor.toFixed(0)}) — top up before next buy`,
+        );
+      }
+    } else {
+      lines.push(`  :white_check_mark: All walleted carriers above floor.`);
+    }
+
+    // ATP
+    const { availableBags, totalBagsOnHand, pendingOutboundBags, snapshotAgeHours, unavailableReason } = pf.atp;
+    if (unavailableReason) {
+      lines.push(`  :grey_question: ATP: _${unavailableReason}_`);
+    } else if (totalBagsOnHand !== null && availableBags !== null) {
+      const atpIcon = availableBags < 36 ? ":warning:" : ":white_check_mark:";
+      const stale = snapshotAgeHours !== null && snapshotAgeHours > 36 ? ` _(snapshot ${snapshotAgeHours}h stale)_` : "";
+      lines.push(
+        `  ${atpIcon} ATP: ${availableBags} bags available (${totalBagsOnHand} on-hand − ${pendingOutboundBags} pending outbound)${stale}`,
+      );
+    }
+
+    // Freight-comp queue
+    if (pf.freightCompQueue.queuedCount > 0) {
+      lines.push(
+        `  :inbox_tray: Freight-comp queue: ${pf.freightCompQueue.queuedCount} JE(s) pending Rene · $${pf.freightCompQueue.queuedDollars.toFixed(2)}`,
+      );
+    }
+
+    // Stale voids
+    if (pf.staleVoids.count > 0) {
+      lines.push(
+        `  :money_with_wings: Stale voids: ${pf.staleVoids.count} · $${pf.staleVoids.pendingDollars.toFixed(2)} pending refund`,
+      );
+    }
+  }
 
   if (digest.degraded.length > 0) {
     lines.push("", `_Degraded sources:_ ${digest.degraded.join(" | ")}`);
