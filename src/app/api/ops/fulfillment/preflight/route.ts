@@ -19,14 +19,18 @@
  */
 import { NextResponse } from "next/server";
 
-import { isCronAuthorized, unauthorized } from "@/lib/ops/control-plane/admin-auth";
+import { isAuthorized } from "@/lib/ops/abra-auth";
 import { computeFulfillmentPreflight } from "@/lib/ops/fulfillment-preflight";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request): Promise<Response> {
-  if (!isCronAuthorized(req)) return unauthorized();
+  // Session OR bearer CRON_SECRET — so Ben's browser at /ops/shipping
+  // and the Vercel cron can both consume the same payload.
+  if (!(await isAuthorized(req))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const result = await computeFulfillmentPreflight();
   return NextResponse.json(result);
 }
