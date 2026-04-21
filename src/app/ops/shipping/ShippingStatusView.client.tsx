@@ -82,6 +82,39 @@ interface RecentLabelsData {
   shipments: RecentLabel[];
 }
 
+interface FreightCompQueueEntry {
+  key: string;
+  queuedAt: string;
+  channel: string;
+  channelLabel: string;
+  customerName: string;
+  customerMatch: string;
+  freightDollars: number;
+  trackingNumbers: string[];
+  customerRef: string;
+  status: "queued" | "approved" | "posted" | "rejected";
+  qboJeId?: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  postedAt?: string;
+  rejectedBy?: string;
+  rejectionReason?: string;
+}
+
+interface FreightCompQueueData {
+  ok: boolean;
+  total: number;
+  totals: {
+    queued: number;
+    approved: number;
+    posted: number;
+    rejected: number;
+    queuedDollars: number;
+    postedDollars: number;
+  };
+  entries: FreightCompQueueEntry[];
+}
+
 const GREEN = "#16a34a";
 const YELLOW = "#eab308";
 
@@ -95,15 +128,20 @@ function money(n: number): string {
 export function ShippingStatusView() {
   const [data, setData] = useState<PreflightData | null>(null);
   const [recent, setRecent] = useState<RecentLabelsData | null>(null);
+  const [queue, setQueue] = useState<FreightCompQueueData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastFetchedAt, setLastFetchedAt] = useState<Date | null>(null);
+  const [queueActionKey, setQueueActionKey] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [preflightRes, recentRes] = await Promise.all([
+      const [preflightRes, recentRes, queueRes] = await Promise.all([
         fetch("/api/ops/fulfillment/preflight", { cache: "no-store" }),
         fetch("/api/ops/fulfillment/recent-labels?daysBack=7&limit=25", {
+          cache: "no-store",
+        }),
+        fetch("/api/ops/fulfillment/freight-comp-queue?status=queued", {
           cache: "no-store",
         }),
       ]);
@@ -113,10 +151,12 @@ export function ShippingStatusView() {
       }
       const preflightJson = (await preflightRes.json()) as PreflightData;
       setData(preflightJson);
-      // Recent labels is best-effort — the preflight is the primary.
+      // Recent labels + queue are best-effort.
       if (recentRes.ok) {
-        const recentJson = (await recentRes.json()) as RecentLabelsData;
-        setRecent(recentJson);
+        setRecent((await recentRes.json()) as RecentLabelsData);
+      }
+      if (queueRes.ok) {
+        setQueue((await queueRes.json()) as FreightCompQueueData);
       }
       setError(null);
       setLastFetchedAt(new Date());
@@ -126,6 +166,64 @@ export function ShippingStatusView() {
       setLoading(false);
     }
   }, []);
+
+  const approveEntry = useCallback(
+    async (entry: FreightCompQueueEntry, approver: "Rene" | "Ben") => {
+      if (!confirm(
+          `Approve + post ${entry.customerName} freight-comp JE ($${entry.freightDollars.toFixed(2)}) to QBO?`,
+        )) return;
+      setQueueActionKey(entry.key);
+      try {
+        const res = await fetch("/api/ops/fulfillment/freight-comp-queue", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key: entry.key, approver }),
+        });
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          throw new Error(`approve HTTP ${res.status}: ${text.slice(0, 200)}`);
+        }
+        await load();
+      } catch (err) {
+        alert(`Approve failed: ${err instanceof Error ? err.message : String(err)}`);
+      } finally {
+        setQueueActionKey(null);
+      }
+    },
+    [load],
+  );
+
+  const rejectEntry = useCallback(
+    async (entry: FreightCompQueueEntry, approver: "Rene" | "Ben") => {
+      const reason = prompt(
+        `Reject freight-comp JE for ${entry.customerName} ($${entry.freightDollars.toFixed(2)})? Reason required (≥8 chars):`,
+        "",
+      );
+      if (!reason || reason.trim().length < 8) return;
+      setQueueActionKey(entry.key);
+      try {
+        const res = await fetch("/api/ops/fulfillment/freight-comp-queue", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            key: entry.key,
+            rejectedBy: approver,
+            reason: reason.trim(),
+          }),
+        });
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          throw new Error(`reject HTTP ${res.status}: ${text.slice(0, 200)}`);
+        }
+        await load();
+      } catch (err) {
+        alert(`Reject failed: ${err instanceof Error ? err.message : String(err)}`);
+      } finally {
+        setQueueActionKey(null);
+      }
+    },
+    [load],
+  );
 
   useEffect(() => {
     void load();
@@ -389,6 +487,121 @@ export function ShippingStatusView() {
           )}
         </Card>
       </div>
+
+      {/* Freight-comp queue approval table */}
+      {queue && queue.totals.queued > 0 && (
+        <div
+          style={{
+            marginTop: 22,
+            background: CARD,
+            border: `1px solid ${BORDER}`,
+            borderRadius: 12,
+            padding: 16,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "baseline",
+              marginBottom: 10,
+            }}
+          >
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: 0.8,
+                color: GOLD,
+                textTransform: "uppercase",
+              }}
+            >
+              CF-09 Freight-Comp Queue · Rene approves
+            </div>
+            <div style={{ fontSize: 12, color: DIM }}>
+              {queue.totals.queued} queued · {money(queue.totals.queuedDollars)} pending
+            </div>
+          </div>
+          <div style={{ overflowX: "auto" }}>
+            <table
+              style={{
+                width: "100%",
+                borderCollapse: "collapse",
+                fontSize: 12,
+              }}
+            >
+              <thead>
+                <tr style={{ color: DIM, textAlign: "left" }}>
+                  <Th>Queued</Th>
+                  <Th>Customer</Th>
+                  <Th>Channel</Th>
+                  <Th>Freight</Th>
+                  <Th>Ref</Th>
+                  <Th>Action</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {queue.entries.map((e) => (
+                  <tr
+                    key={e.key}
+                    style={{
+                      borderTop: `1px dashed ${BORDER}`,
+                      opacity: queueActionKey === e.key ? 0.5 : 1,
+                    }}
+                  >
+                    <Td>{e.queuedAt.slice(0, 16).replace("T", " ")}</Td>
+                    <Td>{e.customerName}</Td>
+                    <Td>
+                      <Code>{e.channelLabel}</Code>
+                    </Td>
+                    <Td>{money(e.freightDollars)}</Td>
+                    <Td>
+                      <Code>{e.customerRef}</Code>
+                    </Td>
+                    <Td>
+                      <button
+                        onClick={() => void approveEntry(e, "Rene")}
+                        disabled={queueActionKey !== null}
+                        style={{
+                          border: `1px solid ${GREEN}55`,
+                          background: `${GREEN}0f`,
+                          color: GREEN,
+                          borderRadius: 6,
+                          padding: "4px 10px",
+                          fontSize: 11,
+                          fontWeight: 700,
+                          cursor:
+                            queueActionKey !== null ? "default" : "pointer",
+                          marginRight: 6,
+                        }}
+                      >
+                        Approve + Post
+                      </button>
+                      <button
+                        onClick={() => void rejectEntry(e, "Rene")}
+                        disabled={queueActionKey !== null}
+                        style={{
+                          border: `1px solid ${RED}55`,
+                          background: `${RED}0f`,
+                          color: RED,
+                          borderRadius: 6,
+                          padding: "4px 10px",
+                          fontSize: 11,
+                          fontWeight: 700,
+                          cursor:
+                            queueActionKey !== null ? "default" : "pointer",
+                        }}
+                      >
+                        Reject
+                      </button>
+                    </Td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Recent labels table */}
       {recent && recent.shipments.length > 0 && (

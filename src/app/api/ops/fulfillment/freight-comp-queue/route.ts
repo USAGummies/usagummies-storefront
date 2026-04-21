@@ -18,7 +18,7 @@
 import { NextResponse } from "next/server";
 import { kv } from "@vercel/kv";
 
-import { isCronAuthorized, unauthorized } from "@/lib/ops/control-plane/admin-auth";
+import { isAuthorized } from "@/lib/ops/abra-auth";
 import { createQBOJournalEntry } from "@/lib/ops/qbo-client";
 import { logQBOAudit } from "@/lib/ops/qbo-guardrails";
 import type { QBOJournalEntryInput } from "@/lib/ops/qbo-client";
@@ -79,7 +79,7 @@ function entryKey(e: FreightCompQueueEntry): string {
 }
 
 export async function GET(req: Request): Promise<Response> {
-  if (!isCronAuthorized(req)) return unauthorized();
+  if (!(await isAuthorized(req))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const url = new URL(req.url);
   const statusFilter = url.searchParams.get("status") as FreightCompQueueStatus | null;
@@ -130,7 +130,7 @@ export async function GET(req: Request): Promise<Response> {
  *   }
  */
 export async function POST(req: Request): Promise<Response> {
-  if (!isCronAuthorized(req)) return unauthorized();
+  if (!(await isAuthorized(req))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   let body: {
     key?: string;
@@ -263,7 +263,7 @@ export async function POST(req: Request): Promise<Response> {
  *   }
  */
 export async function DELETE(req: Request): Promise<Response> {
-  if (!isCronAuthorized(req)) return unauthorized();
+  if (!(await isAuthorized(req))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   let body: { key?: string; rejectedBy?: string; reason?: string };
   try {
