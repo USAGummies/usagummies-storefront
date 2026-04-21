@@ -118,6 +118,12 @@ export interface BriefInput {
    * Caller (daily-brief route) fetches from `computeFulfillmentPreflight()`.
    */
   preflight?: FulfillmentPreflightSlice;
+  /**
+   * EOD-only: fulfillment activity since midnight PT. Populated by
+   * the daily-brief route when `kind === "eod"`. Renders a
+   * "today in review" section closing Ben's shipping day.
+   */
+  fulfillmentToday?: FulfillmentTodayBriefSlice;
   /** Any degradations to call out at the top of the brief. */
   degradations?: string[];
 }
@@ -139,6 +145,21 @@ export interface FulfillmentPreflightSlice {
   freightCompQueue: { queuedCount: number; queuedDollars: number };
   staleVoids: { count: number; pendingDollars: number };
   alerts: string[];
+}
+
+export interface FulfillmentTodayBriefSlice {
+  sinceIso: string;
+  labelsBought: {
+    count: number;
+    spendDollars: number;
+    byCarrier: Record<string, { count: number; dollars: number }>;
+  };
+  labelsVoided: { count: number; pendingRefundDollars: number };
+  freightCompQueue: {
+    queuedToday: { count: number; dollars: number };
+    postedToday: { count: number; dollars: number };
+    rejectedToday: { count: number; dollars: number };
+  };
 }
 
 export interface BriefOutput {
@@ -313,6 +334,14 @@ export function composeDailyBrief(input: BriefInput): BriefOutput {
     }
   }
 
+  // ---- Fulfillment today in review (EOD only) ----
+  if (input.kind === "eod" && input.fulfillmentToday) {
+    const ft = renderFulfillmentTodayMarkdown(input.fulfillmentToday);
+    if (ft) {
+      blocks.push({ type: "section", text: { type: "mrkdwn", text: ft } });
+    }
+  }
+
   // ---- Pending approvals breakdown ----
   if (pendingCount > 0) {
     const grouped = groupApprovalsByDivision(input.pendingApprovals);
@@ -477,4 +506,50 @@ function renderPreflightMarkdown(pf: FulfillmentPreflightSlice): string {
   return lines.length > 1
     ? lines.join("\n")
     : "*Shipping Hub pre-flight*\n✅ All clear — wallets above floor, ATP healthy, queue empty, no stale voids.";
+}
+
+function renderFulfillmentTodayMarkdown(ft: FulfillmentTodayBriefSlice): string {
+  const lines: string[] = ["*Fulfillment — today in review*"];
+
+  const bought = ft.labelsBought;
+  if (bought.count === 0) {
+    lines.push("• No labels bought today.");
+  } else {
+    const carrierBreakdown = Object.entries(bought.byCarrier)
+      .map(([c, b]) => `${c} ${b.count}`)
+      .join(" · ");
+    lines.push(
+      `• 📦 *${bought.count}* label(s) bought · *$${bought.spendDollars.toFixed(2)}*` +
+        (carrierBreakdown ? `  _(${carrierBreakdown})_` : ""),
+    );
+  }
+
+  if (ft.labelsVoided.count > 0) {
+    lines.push(
+      `• 💸 *${ft.labelsVoided.count}* label(s) voided · refund pending *$${ft.labelsVoided.pendingRefundDollars.toFixed(2)}*`,
+    );
+  }
+
+  const q = ft.freightCompQueue;
+  const qBits: string[] = [];
+  if (q.queuedToday.count > 0) {
+    qBits.push(
+      `${q.queuedToday.count} queued ($${q.queuedToday.dollars.toFixed(2)})`,
+    );
+  }
+  if (q.postedToday.count > 0) {
+    qBits.push(
+      `${q.postedToday.count} posted ($${q.postedToday.dollars.toFixed(2)})`,
+    );
+  }
+  if (q.rejectedToday.count > 0) {
+    qBits.push(
+      `${q.rejectedToday.count} rejected ($${q.rejectedToday.dollars.toFixed(2)})`,
+    );
+  }
+  if (qBits.length > 0) {
+    lines.push(`• 📋 CF-09 queue: ${qBits.join(" · ")}`);
+  }
+
+  return lines.length > 1 ? lines.join("\n") : "";
 }

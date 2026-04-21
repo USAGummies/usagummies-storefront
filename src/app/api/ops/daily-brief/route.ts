@@ -24,9 +24,11 @@ import {
   type ARPosition,
   type BriefKind,
   type FulfillmentPreflightSlice,
+  type FulfillmentTodayBriefSlice,
   type RevenueLine,
 } from "@/lib/ops/control-plane/daily-brief";
 import { computeFulfillmentPreflight } from "@/lib/ops/fulfillment-preflight";
+import { computeFulfillmentTodaySlice } from "@/lib/ops/fulfillment-today";
 import { listDivisions } from "@/lib/ops/control-plane/divisions";
 import { getChannel } from "@/lib/ops/control-plane/channels";
 import {
@@ -222,6 +224,26 @@ async function composeAndPost(req: Request): Promise<Response> {
     }
   }
 
+  // EOD brief only: today's fulfillment activity (labels bought,
+  // voided, freight-comp queue transitions since midnight PT).
+  let fulfillmentToday: FulfillmentTodayBriefSlice | undefined;
+  if (kind === "eod") {
+    try {
+      const slice = await computeFulfillmentTodaySlice(now);
+      for (const d of slice.degraded) degradations.push(`fulfillment-today: ${d}`);
+      fulfillmentToday = {
+        sinceIso: slice.sinceIso,
+        labelsBought: slice.labelsBought,
+        labelsVoided: slice.labelsVoided,
+        freightCompQueue: slice.freightCompQueue,
+      };
+    } catch (err) {
+      degradations.push(
+        `fulfillment-today: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
   const composeInput = {
     kind,
     asOf: now,
@@ -234,6 +256,7 @@ async function composeAndPost(req: Request): Promise<Response> {
     cashPosition,
     arPosition: overrides.arPosition,
     preflight,
+    fulfillmentToday,
     degradations,
   } as const;
   let brief = composeDailyBrief(composeInput);
