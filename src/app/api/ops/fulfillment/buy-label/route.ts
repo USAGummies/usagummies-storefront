@@ -26,6 +26,10 @@ import { isAuthorized } from "@/lib/ops/abra-auth";
 import { evaluateAtp, type AtpGateResult } from "@/lib/ops/atp-gate";
 import { lookupDeliveredPricing } from "@/lib/ops/delivered-pricing-guard";
 import {
+  advanceDealOnShipment,
+  type DealAdvanceResult,
+} from "@/lib/ops/hubspot-client";
+import {
   buildFreightCompJournalEntry,
   FREIGHT_COMP_CHANNELS,
   type FreightCompChannel,
@@ -123,6 +127,13 @@ interface BuyLabelRequest {
    * ship anyway (e.g. Shopify snapshot stale, or a planned backorder).
    */
   allowOverPromise?: boolean;
+  /**
+   * HubSpot deal to advance on successful label buy. If set, after the
+   * label is purchased we PATCH the deal to `STAGE_SHIPPED` and attach
+   * a tracking-number note to the deal timeline (best-effort; a
+   * HubSpot outage does not fail the label buy).
+   */
+  hubspotDealId?: string;
 }
 
 export async function POST(req: Request): Promise<Response> {
@@ -452,6 +463,36 @@ export async function POST(req: Request): Promise<Response> {
     await kv.set(KV_FREIGHT_COMP_QUEUE, trimmed);
   }
 
+  // HubSpot deal-stage auto-advance. When the caller supplies a
+  // `hubspotDealId`, we patch the deal to `STAGE_SHIPPED` + attach a
+  // note with tracking numbers. Best-effort — failures don't break
+  // the label buy response.
+  let hubspotAdvance: DealAdvanceResult | null = null;
+  if (body.hubspotDealId) {
+    try {
+      const firstLabel = labels[0];
+      hubspotAdvance = await advanceDealOnShipment({
+        dealId: body.hubspotDealId,
+        trackingNumbers: labels
+          .map((l) => l.trackingNumber)
+          .filter((t): t is string => Boolean(t)),
+        carrier: firstLabel?.carrier,
+        service: firstLabel?.service,
+        labelCostTotal: Math.round(totalCost * 100) / 100,
+        memo: `Keys: ${keys.join(", ")}${pricingMatch ? ` · ${pricingMatch.terms}` : ""}`,
+      });
+    } catch (err) {
+      hubspotAdvance = {
+        ok: false,
+        dealId: body.hubspotDealId,
+        stageUpdated: false,
+        newStage: null,
+        noteId: null,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+  }
+
   return NextResponse.json({
     ok: true,
     purchased: labels.length,
@@ -477,5 +518,6 @@ export async function POST(req: Request): Promise<Response> {
         }
       : null,
     freightCompQueued,
+    hubspotAdvance,
   });
 }

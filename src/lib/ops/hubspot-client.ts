@@ -330,3 +330,102 @@ export function splitName(full: string): { firstname: string; lastname: string }
   if (parts.length === 1) return { firstname: parts[0], lastname: "" };
   return { firstname: parts[0], lastname: parts.slice(1).join(" ") };
 }
+
+// ---------------------------------------------------------------------------
+// Deal stage advance + tracking pushback (BUILD #10 — 2026-04-20)
+// ---------------------------------------------------------------------------
+//
+// When the Shipping Hub buys a label for a HubSpot deal, we want to:
+//   1. Advance the deal to `STAGE_SHIPPED` so Viktor / Ben / the
+//      wholesale dashboard reflect reality without a manual click.
+//   2. Attach a note to the deal with the tracking number(s) + carrier
+//      so the customer-facing timeline has the receipt.
+//
+// Both are best-effort — a HubSpot API outage does NOT fail the label
+// buy. Callers pass `hubspotDealId` on the buy-label POST and this
+// module does the rest.
+
+/**
+ * Patch a deal's dealstage. Returns the updated stage or null on failure.
+ */
+export async function updateDealStage(
+  dealId: string,
+  stage: string,
+): Promise<string | null> {
+  const res = await hsRequest<{ id: string; properties?: { dealstage?: string } }>(
+    "PATCH",
+    `/crm/v3/objects/deals/${encodeURIComponent(dealId)}`,
+    { properties: { dealstage: stage } },
+  );
+  if (!res.ok) return null;
+  return res.data?.properties?.dealstage ?? stage;
+}
+
+export interface DealAdvanceResult {
+  ok: boolean;
+  dealId: string;
+  stageUpdated: boolean;
+  newStage: string | null;
+  noteId: string | null;
+  error?: string;
+}
+
+/**
+ * Happy-path orchestrator: when a label is bought for a known HubSpot
+ * deal, advance to `STAGE_SHIPPED` + attach a timeline note with the
+ * tracking numbers + carrier. Both operations independent — stage can
+ * succeed while note fails, or vice versa. Caller gets a full report.
+ */
+export async function advanceDealOnShipment(params: {
+  dealId: string;
+  /** Optional — overrides default `STAGE_SHIPPED`. */
+  stage?: string;
+  trackingNumbers: string[];
+  carrier?: string;
+  service?: string;
+  labelCostTotal?: number;
+  /** Pass-through customer note for the timeline. */
+  memo?: string;
+}): Promise<DealAdvanceResult> {
+  if (!isHubSpotConfigured()) {
+    return {
+      ok: false,
+      dealId: params.dealId,
+      stageUpdated: false,
+      newStage: null,
+      noteId: null,
+      error: "HUBSPOT_PRIVATE_APP_TOKEN not set",
+    };
+  }
+
+  const targetStage = params.stage ?? STAGE_SHIPPED;
+  const newStage = await updateDealStage(params.dealId, targetStage);
+
+  const bodyLines = [
+    `📦 Shipment created via Shipping Hub`,
+    params.carrier ? `Carrier: ${params.carrier}` : null,
+    params.service ? `Service: ${params.service}` : null,
+    params.trackingNumbers.length > 0
+      ? `Tracking: ${params.trackingNumbers.join(", ")}`
+      : null,
+    typeof params.labelCostTotal === "number"
+      ? `Label cost: $${params.labelCostTotal.toFixed(2)}`
+      : null,
+    params.memo ? params.memo : null,
+  ]
+    .filter((x): x is string => Boolean(x))
+    .join("\n");
+
+  const noteId = await createNote({
+    body: bodyLines,
+    dealId: params.dealId,
+  });
+
+  return {
+    ok: newStage !== null || noteId !== null,
+    dealId: params.dealId,
+    stageUpdated: newStage !== null,
+    newStage,
+    noteId,
+  };
+}
