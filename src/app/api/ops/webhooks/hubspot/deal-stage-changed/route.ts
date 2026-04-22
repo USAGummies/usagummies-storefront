@@ -204,10 +204,31 @@ export async function POST(req: Request): Promise<Response> {
       degraded.push("slack-approvals: #ops-approvals channel not registered");
     }
 
+    // Enqueue for retry when the Slack post failed.
+    let enqueuedForRetry = false;
+    if (!posted) {
+      try {
+        const { enqueueRetry } = await import("@/lib/ops/dispatch-retry-queue");
+        await enqueueRetry({
+          reason:
+            `deal ${dealId}: slack post did not succeed (${degraded.slice(-1)[0] ?? "unknown"})`,
+          intent: norm.intent,
+          classification,
+          proposal,
+        });
+        enqueuedForRetry = true;
+      } catch (err) {
+        degraded.push(
+          `retry-enqueue: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+
     results.push({
       eventId: ev.eventId,
       dealId,
       posted,
+      enqueuedForRetry,
       classification,
       proposalSummary: proposal.summary,
     });

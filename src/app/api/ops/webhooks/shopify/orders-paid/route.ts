@@ -151,6 +151,7 @@ export async function POST(req: Request): Promise<Response> {
   // Happy path — post Class B proposal to #ops-approvals.
   let posted = false;
   let postedTo: string | null = null;
+  let enqueuedForRetry = false;
   const approvals = getChannel("ops-approvals");
   if (!approvals) {
     degraded.push("slack-approvals: #ops-approvals channel not registered");
@@ -173,10 +174,32 @@ export async function POST(req: Request): Promise<Response> {
     }
   }
 
+  // Enqueue for retry when we failed to get the proposal into Slack.
+  // Shopify retries the webhook, but a Slack outage shouldn't mean the
+  // intent is lost — the retry cron re-posts from KV.
+  if (!posted) {
+    try {
+      const { enqueueRetry } = await import("@/lib/ops/dispatch-retry-queue");
+      await enqueueRetry({
+        reason:
+          degraded.join(" | ") || "slack post did not succeed",
+        intent: norm.intent,
+        classification,
+        proposal,
+      });
+      enqueuedForRetry = true;
+    } catch (err) {
+      degraded.push(
+        `retry-enqueue: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
   return NextResponse.json({
     ok: true,
     posted,
     postedTo,
+    enqueuedForRetry,
     classification,
     proposal: { summary: proposal.summary, actionSlug: proposal.actionSlug },
     degraded,
