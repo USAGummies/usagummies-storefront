@@ -373,6 +373,28 @@ export function ShippingStatusView() {
                 </Value>
               </Row>
             ))}
+          {data && data.wallets.some((w) => w.belowFloor) && (
+            <div style={{ marginTop: 10 }}>
+              <a
+                href="https://ship.shipstation.com/settings/shipping-providers"
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  display: "inline-block",
+                  border: `1px solid ${RED}55`,
+                  background: `${RED}0f`,
+                  color: RED,
+                  borderRadius: 6,
+                  padding: "6px 12px",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  textDecoration: "none",
+                }}
+              >
+                Top up in ShipStation →
+              </a>
+            </div>
+          )}
         </Card>
 
         {/* ---- ATP ---- */}
