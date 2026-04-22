@@ -2,7 +2,11 @@
 
 type EventPayload = Record<string, unknown>;
 const UTM_STORAGE_KEY = "usa_utms";
+const GCLID_STORAGE_KEY = "usa_gclid";
 const UTM_KEYS = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"] as const;
+// Google Ads click-through window: store GCLID for 90 days (matches default
+// conversion window) so offline-conversion backfill can attribute orders.
+const GCLID_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 
 declare global {
   interface Window {
@@ -37,6 +41,35 @@ function getUtmParams() {
     // ignore
   }
   return {} as Record<string, string>;
+}
+
+/**
+ * Captures the Google Ads click-ID (gclid) from the URL and persists it in
+ * localStorage with a 90-day TTL. Returns the active GCLID (fresh or
+ * previously-stored). Required so the offline-conversion backfill script can
+ * match Shopify orders to Google Ads clicks retroactively.
+ */
+export function captureGclid(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const url = new URL(window.location.href);
+    const fresh = url.searchParams.get("gclid") || url.searchParams.get("wbraid") || url.searchParams.get("gbraid");
+    if (fresh) {
+      window.localStorage.setItem(GCLID_STORAGE_KEY, JSON.stringify({ v: fresh, t: Date.now() }));
+      return fresh;
+    }
+    const raw = window.localStorage.getItem(GCLID_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { v?: string; t?: number } | null;
+    if (!parsed?.v || !parsed?.t) return null;
+    if (Date.now() - parsed.t > GCLID_TTL_MS) {
+      window.localStorage.removeItem(GCLID_STORAGE_KEY);
+      return null;
+    }
+    return parsed.v;
+  } catch {
+    return null;
+  }
 }
 
 export function trackEvent(event: string, payload: EventPayload = {}) {

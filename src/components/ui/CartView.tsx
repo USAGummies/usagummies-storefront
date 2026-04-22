@@ -7,8 +7,8 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { cn } from "@/lib/cn";
 import { pricingForQty, BASE_PRICE, FREE_SHIP_QTY, MIN_PER_BAG, SHIPPING_COST, shippingForQty } from "@/lib/bundles/pricing";
 import { SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
-import { trackEvent, trackInitiateCheckout } from "@/lib/analytics";
-import { getSafeCheckoutUrl, normalizeCheckoutUrl } from "@/lib/checkout";
+import { captureGclid, trackEvent, trackInitiateCheckout } from "@/lib/analytics";
+import { appendGclidToCheckoutUrl, getSafeCheckoutUrl, normalizeCheckoutUrl } from "@/lib/checkout";
 import { ReviewHighlights } from "@/components/reviews/ReviewHighlights";
 import { AMAZON_REVIEWS } from "@/data/amazonReviews";
 import { GummyIconRow, HeroPackIcon } from "@/components/ui/GummyIcon";
@@ -390,10 +390,13 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
     ? { href: "/cart", label: "View cart" }
     : { href: "/shop#bundle-pricing", label: "Shop bags" };
   const showStickyCheckout = !onClose && hasLines && Boolean(localCart?.checkoutUrl);
-  const checkoutHref = useMemo(
-    () => normalizeCheckoutUrl(localCart?.checkoutUrl) ?? localCart?.checkoutUrl,
-    [localCart?.checkoutUrl]
-  );
+  const checkoutHref = useMemo(() => {
+    const normalized = normalizeCheckoutUrl(localCart?.checkoutUrl) ?? localCart?.checkoutUrl;
+    if (!normalized) return normalized;
+    // Attach Google Ads click-ID so Shopify captures it in order.landing_site
+    // for offline-conversion backfill (scripts/google-ads-backfill-conversions.mjs).
+    return appendGclidToCheckoutUrl(normalized, captureGclid());
+  }, [localCart?.checkoutUrl]);
   const drawerStatus = bundleSavings > 0
     ? { label: "Savings applied", tone: "success" }
     : totalBags > 0
@@ -443,15 +446,16 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
     event?: MouseEvent<HTMLAnchorElement>,
     method: string = "secure"
   ) {
-    const safeCheckoutUrl = getSafeCheckoutUrl(
+    const baseCheckoutUrl = getSafeCheckoutUrl(
       localCart?.checkoutUrl,
       `cart_${cartContext}`,
       typeof window !== "undefined" ? window.location.host : undefined
     );
-    if (!safeCheckoutUrl) {
+    if (!baseCheckoutUrl) {
       event?.preventDefault();
       return;
     }
+    const safeCheckoutUrl = appendGclidToCheckoutUrl(baseCheckoutUrl, captureGclid());
     if (event?.currentTarget?.href && event.currentTarget.href !== safeCheckoutUrl) {
       event.preventDefault();
       window.location.href = safeCheckoutUrl;

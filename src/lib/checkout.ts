@@ -121,3 +121,26 @@ export function getSafeCheckoutUrl(
 
   return normalized;
 }
+
+/**
+ * Appends Google Ads click-ID (gclid/wbraid/gbraid) to the checkout URL so
+ * Shopify captures it in `order.landing_site` when the buyer completes
+ * checkout. Required for the offline-conversion backfill script and for
+ * future server-side conversion tracking. No-op when no GCLID is present.
+ */
+export function appendGclidToCheckoutUrl(
+  checkoutUrl: string,
+  gclid: string | null | undefined,
+): string {
+  if (!gclid) return checkoutUrl;
+  try {
+    const parsed = new URL(checkoutUrl);
+    // Don't overwrite an existing gclid (Shopify's decorated URL wins).
+    if (!parsed.searchParams.get("gclid") && !parsed.searchParams.get("wbraid") && !parsed.searchParams.get("gbraid")) {
+      parsed.searchParams.set("gclid", gclid);
+    }
+    return parsed.toString();
+  } catch {
+    return checkoutUrl;
+  }
+}
