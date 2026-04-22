@@ -37,6 +37,7 @@ import { kv } from "@vercel/kv";
 import { isAuthorized } from "@/lib/ops/abra-auth";
 import { getChannel } from "@/lib/ops/control-plane/channels";
 import { postMessage } from "@/lib/ops/control-plane/slack";
+import { auditDispatch } from "@/lib/ops/dispatch-audit";
 import {
   fetchOrderItems,
   fetchOrders,
@@ -170,6 +171,17 @@ export async function POST(req: Request): Promise<Response> {
         }
       }
     }
+    await auditDispatch({
+      agentId: "amazon-dispatch-bridge",
+      division: "production-supply-chain",
+      channel: "amazon",
+      sourceId: body.orderId,
+      orderNumber: body.orderId,
+      classification,
+      proposal: composeShipmentProposal(intent, classification),
+      action: "shipment.proposal.refuse",
+      refuseReason: classification.refuseReason,
+    });
     return NextResponse.json(
       {
         ok: false,
@@ -214,6 +226,22 @@ export async function POST(req: Request): Promise<Response> {
   });
   // Cap at 500 entries.
   await kv.set(KV_DISPATCHED, dispatched.slice(-500));
+
+  await auditDispatch({
+    agentId: "amazon-dispatch-bridge",
+    division: "production-supply-chain",
+    channel: "amazon",
+    sourceId: body.orderId,
+    orderNumber: body.orderId,
+    classification,
+    proposal,
+    action: proposalTs
+      ? "shipment.proposal.post"
+      : "shipment.proposal.post.failed",
+    proposalTs,
+    postedToChannel: proposalTs ? getChannel("ops-approvals")?.name : null,
+    error: !proposalTs ? degraded.join(" | ") : undefined,
+  });
 
   return NextResponse.json({
     ok: true,

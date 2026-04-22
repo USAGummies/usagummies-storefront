@@ -19,6 +19,7 @@ import crypto from "node:crypto";
 
 import { getChannel } from "@/lib/ops/control-plane/channels";
 import { postMessage } from "@/lib/ops/control-plane/slack";
+import { auditDispatch } from "@/lib/ops/dispatch-audit";
 import {
   getDealWithContact,
   HUBSPOT,
@@ -155,6 +156,7 @@ export async function POST(req: Request): Promise<Response> {
     }
 
     const classification = classifyDispatch(norm.intent);
+    const proposalForAudit = composeShipmentProposal(norm.intent, classification);
 
     if (classification.refuse) {
       // Hard refuse → #ops-alerts (e.g. ar_hold flipped on the deal).
@@ -173,6 +175,17 @@ export async function POST(req: Request): Promise<Response> {
           );
         }
       }
+      await auditDispatch({
+        agentId: "hubspot-webhook-adapter",
+        division: "sales",
+        channel: "hubspot",
+        sourceId: dealId,
+        orderNumber: deal.dealname,
+        classification,
+        proposal: proposalForAudit,
+        action: "shipment.proposal.refuse",
+        refuseReason: classification.refuseReason,
+      });
       results.push({
         eventId: ev.eventId,
         dealId,
@@ -182,7 +195,7 @@ export async function POST(req: Request): Promise<Response> {
       continue;
     }
 
-    const proposal = composeShipmentProposal(norm.intent, classification);
+    const proposal = proposalForAudit;
     const approvals = getChannel("ops-approvals");
     let posted = false;
     if (approvals) {
@@ -223,6 +236,23 @@ export async function POST(req: Request): Promise<Response> {
         );
       }
     }
+
+    await auditDispatch({
+      agentId: "hubspot-webhook-adapter",
+      division: "sales",
+      channel: "hubspot",
+      sourceId: dealId,
+      orderNumber: deal.dealname,
+      classification,
+      proposal,
+      action: posted
+        ? "shipment.proposal.post"
+        : enqueuedForRetry
+          ? "shipment.proposal.retry-enqueue"
+          : "shipment.proposal.post.failed",
+      postedToChannel: posted ? approvals?.name : null,
+      error: !posted ? degraded.slice(-1)[0] ?? undefined : undefined,
+    });
 
     results.push({
       eventId: ev.eventId,

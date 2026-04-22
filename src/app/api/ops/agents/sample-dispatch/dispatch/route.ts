@@ -37,6 +37,7 @@ import { NextResponse } from "next/server";
 import { isAuthorized } from "@/lib/ops/abra-auth";
 import { getChannel } from "@/lib/ops/control-plane/channels";
 import { postMessage } from "@/lib/ops/control-plane/slack";
+import { auditDispatch } from "@/lib/ops/dispatch-audit";
 import {
   classifyDispatch,
   composeShipmentProposal,
@@ -112,6 +113,18 @@ export async function POST(req: Request): Promise<Response> {
         degraded.push("slack-alerts: #ops-alerts channel not registered");
       }
     }
+    // Audit the refusal (§6 non-negotiable: every write logged).
+    await auditDispatch({
+      agentId: "sample-order-dispatch",
+      division: "production-supply-chain",
+      channel: body.channel,
+      sourceId: body.sourceId,
+      orderNumber: body.orderNumber,
+      classification,
+      proposal,
+      action: "shipment.proposal.refuse",
+      refuseReason: classification.refuseReason,
+    });
     return NextResponse.json(
       {
         ok: false,
@@ -127,6 +140,7 @@ export async function POST(req: Request): Promise<Response> {
   // Happy path: post the Class B proposal to #ops-approvals.
   let posted = false;
   let postedTo: string | null = null;
+  let proposalTs: string | null = null;
   if (shouldPost) {
     const approvals = getChannel("ops-approvals");
     if (!approvals) {
@@ -140,6 +154,7 @@ export async function POST(req: Request): Promise<Response> {
         if (res.ok) {
           posted = true;
           postedTo = approvals.name;
+          proposalTs = res.ts ?? null;
         } else {
           degraded.push("slack-approvals-post: not ok");
         }
@@ -150,6 +165,20 @@ export async function POST(req: Request): Promise<Response> {
       }
     }
   }
+
+  await auditDispatch({
+    agentId: "sample-order-dispatch",
+    division: "production-supply-chain",
+    channel: body.channel,
+    sourceId: body.sourceId,
+    orderNumber: body.orderNumber,
+    classification,
+    proposal,
+    action: posted ? "shipment.proposal.post" : "shipment.proposal.post.failed",
+    proposalTs,
+    postedToChannel: postedTo,
+    error: !posted ? degraded.join(" | ") : undefined,
+  });
 
   return NextResponse.json({
     ok: true,

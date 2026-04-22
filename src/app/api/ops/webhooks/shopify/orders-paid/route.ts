@@ -20,6 +20,7 @@ import crypto from "node:crypto";
 
 import { getChannel } from "@/lib/ops/control-plane/channels";
 import { postMessage } from "@/lib/ops/control-plane/slack";
+import { auditDispatch } from "@/lib/ops/dispatch-audit";
 import {
   classifyDispatch,
   composeShipmentProposal,
@@ -138,6 +139,17 @@ export async function POST(req: Request): Promise<Response> {
     } else {
       degraded.push("slack-alerts: #ops-alerts channel not registered");
     }
+    await auditDispatch({
+      agentId: "shopify-webhook-adapter",
+      division: "production-supply-chain",
+      channel: "shopify",
+      sourceId: norm.intent.sourceId,
+      orderNumber: norm.intent.orderNumber,
+      classification,
+      proposal,
+      action: "shipment.proposal.refuse",
+      refuseReason: classification.refuseReason,
+    });
     // 2xx so Shopify doesn't retry the refused order forever.
     return NextResponse.json({
       ok: false,
@@ -194,6 +206,23 @@ export async function POST(req: Request): Promise<Response> {
       );
     }
   }
+
+  await auditDispatch({
+    agentId: "shopify-webhook-adapter",
+    division: "production-supply-chain",
+    channel: "shopify",
+    sourceId: norm.intent.sourceId,
+    orderNumber: norm.intent.orderNumber,
+    classification,
+    proposal,
+    action: posted
+      ? "shipment.proposal.post"
+      : enqueuedForRetry
+        ? "shipment.proposal.retry-enqueue"
+        : "shipment.proposal.post.failed",
+    postedToChannel: postedTo,
+    error: !posted ? degraded.join(" | ") : undefined,
+  });
 
   return NextResponse.json({
     ok: true,

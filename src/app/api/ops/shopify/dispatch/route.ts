@@ -20,6 +20,7 @@ import { NextResponse } from "next/server";
 import { isAuthorized } from "@/lib/ops/abra-auth";
 import { getChannel } from "@/lib/ops/control-plane/channels";
 import { postMessage } from "@/lib/ops/control-plane/slack";
+import { auditDispatch } from "@/lib/ops/dispatch-audit";
 import {
   classifyDispatch,
   composeShipmentProposal,
@@ -136,6 +137,17 @@ export async function POST(req: Request): Promise<Response> {
         }
       }
     }
+    await auditDispatch({
+      agentId: "shopify-dispatch-bridge",
+      division: "production-supply-chain",
+      channel: "shopify",
+      sourceId: intent.sourceId,
+      orderNumber: intent.orderNumber,
+      classification,
+      proposal: composeShipmentProposal(intent, classification),
+      action: "shipment.proposal.refuse",
+      refuseReason: classification.refuseReason,
+    });
     return NextResponse.json(
       {
         ok: false,
@@ -169,6 +181,22 @@ export async function POST(req: Request): Promise<Response> {
       }
     }
   }
+
+  await auditDispatch({
+    agentId: "shopify-dispatch-bridge",
+    division: "production-supply-chain",
+    channel: "shopify",
+    sourceId: intent.sourceId,
+    orderNumber: intent.orderNumber,
+    classification,
+    proposal,
+    action: postedTs
+      ? "shipment.proposal.post"
+      : "shipment.proposal.post.failed",
+    proposalTs: postedTs,
+    postedToChannel: postedTs ? getChannel("ops-approvals")?.name : null,
+    error: !postedTs ? degraded.join(" | ") : undefined,
+  });
 
   return NextResponse.json({
     ok: true,
