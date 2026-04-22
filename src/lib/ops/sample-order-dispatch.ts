@@ -62,7 +62,7 @@ export interface OrderIntent {
     residential?: boolean;
   };
   /** Packaging intent. Defaults to master_carton for wholesale, case for samples. */
-  packagingType?: "case" | "master_carton";
+  packagingType?: "mailer" | "case" | "master_carton";
   /** Number of cartons to ship. Defaults to 1 for samples. */
   cartons?: number;
   /** Total order weight in lbs. Used to pick USPS vs UPS for light/heavy split. */
@@ -82,7 +82,7 @@ export interface DispatchClassification {
   originReason: string;
   carrierCode: "stamps_com" | "ups_walleted" | "fedex_walleted" | "globalpost";
   serviceCode: string;
-  packagingType: "case" | "master_carton";
+  packagingType: "mailer" | "case" | "master_carton";
   cartons: number;
   /**
    * Soft warnings — not refusals. Caller surfaces these to the
@@ -154,16 +154,30 @@ export function classifyDispatch(order: OrderIntent): DispatchClassification {
   // 4. Carrier + service selection.
   // Rules:
   //   - Pallet: not handled here (the hub short-circuits pallets elsewhere).
-  //   - ≤ 3 lb total: USPS Ground Advantage (stamps_com). Covers sample
-  //     packets + small DTC orders.
+  //   - Mailer (single-bag DTC / Amazon FBM): 0.55 lb packed. Always
+  //     stamps_com + usps_ground_advantage. Default for 1-bag orders.
+  //   - ≤ 3 lb total: USPS Ground Advantage (stamps_com).
   //   - > 3 lb: UPS Ground (ups_walleted). Default for master cartons.
-  //   - Alaska / Hawaii / PR (AK/HI/PR): USPS is always cheaper; force stamps_com.
+  //   - AK/HI/PR/VI/GU: USPS always; force stamps_com.
+  //
+  // Packaging inference:
+  //   - Explicit order.packagingType wins.
+  //   - Single-bag DTC / Amazon FBM (cartons ≤ 1, weightLbs < 1) → mailer.
+  //   - Sample flag → case (6-bag sample pack is Drew's default).
+  //   - Wholesale default → master_carton.
+  const inferredMailer =
+    order.cartons === 1 && (order.weightLbs ?? 0) > 0 && (order.weightLbs ?? 0) <= 1;
   const packagingType =
     order.packagingType ??
-    (isSample ? "case" : "master_carton");
+    (inferredMailer ? "mailer" : isSample ? "case" : "master_carton");
   const cartons = Math.max(1, order.cartons ?? 1);
-  // Rough per-carton weight: master 21.125 lb, case 6 lb. Override via order.weightLbs.
-  const inferredPerCartonWeight = packagingType === "master_carton" ? 21.125 : 6;
+  // Rough per-carton weight: master 21.125 lb, case 6 lb, mailer 0.55 lb.
+  const inferredPerCartonWeight =
+    packagingType === "master_carton"
+      ? 21.125
+      : packagingType === "case"
+        ? 6
+        : 0.55;
   const totalWeightLbs =
     order.weightLbs ?? inferredPerCartonWeight * cartons;
 

@@ -33,7 +33,11 @@ import type { InventorySnapshot } from "./inventory-snapshot";
 export type AtpRiskLevel = "ok" | "warn" | "block";
 
 /** Bag counts per packaging type — matches PACKAGE_PROFILES doctrine. */
-export const BAGS_PER_CARTON: Record<"case" | "master_carton", number> = {
+export const BAGS_PER_CARTON: Record<
+  "mailer" | "case" | "master_carton",
+  number
+> = {
+  mailer: 1,
   case: 6,
   master_carton: 36,
 };
@@ -46,7 +50,7 @@ export const BAGS_PER_CARTON: Record<"case" | "master_carton", number> = {
 export interface AtpStageEntry {
   stage: "received" | "packed" | "ready" | "shipped";
   cartonsRequired: number;
-  packagingType?: "case" | "master_carton";
+  packagingType?: "mailer" | "case" | "master_carton";
 }
 
 export type AtpStageMap = Record<string, AtpStageEntry>;
@@ -76,7 +80,7 @@ export interface AtpGateInput {
   /** Cartons about to be purchased in this label buy. */
   newCartons: number;
   /** Packaging type for the new cartons (case / master_carton). */
-  newPackagingType: "case" | "master_carton";
+  newPackagingType: "mailer" | "case" | "master_carton";
   /**
    * Hard-block threshold in bags. Default 24 — within a master carton
    * of deficit is `warn`; beyond that is `block`.

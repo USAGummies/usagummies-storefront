@@ -74,7 +74,7 @@ export interface FulfillmentPreflight {
 interface StageEntry {
   stage: "received" | "packed" | "ready" | "shipped";
   cartonsRequired: number;
-  packagingType?: "case" | "master_carton";
+  packagingType?: "mailer" | "case" | "master_carton";
 }
 
 interface FreightCompQueueEntry {
@@ -83,7 +83,8 @@ interface FreightCompQueueEntry {
   status: "queued" | "approved" | "posted" | "rejected";
 }
 
-const BAGS_PER_CARTON: Record<"case" | "master_carton", number> = {
+const BAGS_PER_CARTON: Record<"mailer" | "case" | "master_carton", number> = {
+  mailer: 1,
   case: 6,
   master_carton: 36,
 };

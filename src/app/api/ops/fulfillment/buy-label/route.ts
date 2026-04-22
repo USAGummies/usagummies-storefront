@@ -6,7 +6,7 @@
  *   {
  *     keys: string[],          // e.g. ["inv:1535", "pending:inderbitzin-po-009180-remainder"]
  *     destination: {...},      // ship-to address (mandatory for now — we don't auto-infer)
- *     packagingType: "case" | "master_carton",
+ *     packagingType: "mailer" | "case" | "master_carton",
  *     cartons?: number,        // defaults to sum of cartonsRequired across keys
  *     dryRun?: boolean         // if true, return a quote only (no purchase)
  *   }
@@ -106,7 +106,7 @@ function channelFromPricingTier(tier: string): FreightCompChannel {
 interface BuyLabelRequest {
   keys?: string[];
   destination?: LabelDestination;
-  packagingType?: "case" | "master_carton";
+  packagingType?: "mailer" | "case" | "master_carton";
   cartons?: number;
   dryRun?: boolean;
   updatedBy?: string;
@@ -400,7 +400,8 @@ export async function POST(req: Request): Promise<Response> {
   // refresh. Uses the BAGS_PER_CARTON constants via the ATP module's
   // conventions: master_carton=36, case=6. Best-effort — snapshot
   // miss doesn't fail the buy.
-  const BAGS_PER_CARTON_LOCAL: Record<"case" | "master_carton", number> = {
+  const BAGS_PER_CARTON_LOCAL: Record<"mailer" | "case" | "master_carton", number> = {
+    mailer: 1,
     case: 6,
     master_carton: 36,
   };

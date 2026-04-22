@@ -44,6 +44,7 @@ const PACKAGE_DIMS: Record<
   Exclude<ShippingPackageType, "pallet">,
   { length: number; width: number; height: number; weightLbs: number }
 > = {
+  mailer: { length: 9, width: 6, height: 2, weightLbs: 0.55 },
   case: { length: 14, width: 10, height: 8, weightLbs: 6 },
   master_carton: { length: 21, width: 14, height: 8, weightLbs: 21.125 },
 };

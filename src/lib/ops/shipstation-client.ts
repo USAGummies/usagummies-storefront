@@ -46,7 +46,11 @@ function getShipFromAddress(): ShipFromAddress {
   };
 }
 
-export type ShippingPackageType = "case" | "master_carton" | "pallet";
+export type ShippingPackageType =
+  | "mailer"
+  | "case"
+  | "master_carton"
+  | "pallet";
 
 // The quick-order flow needs workable shipping estimates for one-off case and
 // master-case sales. Pallets are priced landed, so they skip parcel quoting
@@ -60,6 +64,11 @@ const PACKAGE_PROFILES: Record<
     weightLbs: number;
   }
 > = {
+  // Branded mailer — single-bag DTC orders (Shopify + Amazon FBM).
+  // 6×9 padded mailer + 1 bag 7.5 oz = ~0.55 lb packed. Starting
+  // 2026-04-21 when Amazon FBM begins, this is the default for every
+  // 1-bag order. Dimensions fit USPS Ground Advantage w/o surcharge.
+  mailer: { length: 9, width: 6, height: 2, weightLbs: 0.55 },
   // Inner case: 6 bags 7.5 oz + inserts. ~6 lb packed (weighed 2026-04-20).
   case: { length: 14, width: 10, height: 8, weightLbs: 6 },
   // Master carton: 6 cases × 6 bags = 36 bags 7.5 oz. Packed weight

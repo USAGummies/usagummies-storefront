@@ -12,6 +12,7 @@
 import type {
   AmazonOrder,
   AmazonOrderItem,
+  AmazonOrderStatus,
   FBAInventorySummary,
   FeeEstimate,
   FinancialEventGroup,
@@ -278,6 +279,74 @@ export async function fetchOrderItems(
   }
 
   return res.payload?.OrderItems || [];
+}
+
+// ---------------------------------------------------------------------------
+// FBM (Merchant-Fulfilled) — unshipped-order queue for the Shipping Hub
+// ---------------------------------------------------------------------------
+
+export interface UnshippedFbmOrder {
+  orderId: string;
+  purchaseDate: string;
+  lastUpdateDate: string;
+  orderStatus: AmazonOrderStatus;
+  amount: number;
+  currency: string;
+  numberOfItemsUnshipped: number;
+  salesChannel: string;
+  /** Deeplink to Seller Central — Ben opens this to grab the ship-to. */
+  sellerCentralUrl: string;
+  /** Best-effort latest-ship-date from SP-API if available, else 2 business days. */
+  latestShipDateEstimate: string;
+}
+
+/**
+ * Fetch every Merchant-Fulfilled (MFN) order that's still awaiting
+ * shipment. Fires the Shipping Hub alert + powers the `/api/ops/amazon/unshipped-fbm`
+ * route so Ben + the dispatch specialist see new FBM orders fast.
+ *
+ * Scope note: SP-API `/orders/v0/orders` does NOT include the buyer's
+ * ship-to address without a Restricted Data Token (RDT). The MVP
+ * returns metadata + a Seller Central deeplink; Ben copies the
+ * address into the manual dispatch flow. An RDT path can be layered
+ * on later when the Amazon volume justifies the PII-approval burden.
+ */
+export async function fetchUnshippedFbmOrders(opts: {
+  daysBack?: number;
+} = {}): Promise<UnshippedFbmOrder[]> {
+  const daysBack = Math.max(1, Math.min(30, opts.daysBack ?? 7));
+  const createdAfter = new Date(Date.now() - daysBack * 24 * 3600 * 1000).toISOString();
+  const createdBefore = new Date().toISOString();
+  const all = await fetchOrders(createdAfter, createdBefore);
+
+  // Filter to MFN (merchant-fulfilled) + unshipped/pending-shipment.
+  const unshipped = all.filter((o) => {
+    if (o.FulfillmentChannel !== "MFN") return false;
+    if (o.OrderStatus === "Canceled" || o.OrderStatus === "Shipped") return false;
+    // "Pending" means Amazon's still verifying — we wait to ship
+    // until "Unshipped" / "PartiallyShipped".
+    return o.OrderStatus === "Unshipped" || o.OrderStatus === "PartiallyShipped";
+  });
+
+  return unshipped.map((o): UnshippedFbmOrder => {
+    const amount = Number.parseFloat(o.OrderTotal?.Amount ?? "0") || 0;
+    const currency = o.OrderTotal?.CurrencyCode ?? "USD";
+    const purchaseMs = new Date(o.PurchaseDate).getTime();
+    // Amazon's FBM handling promise is typically ≤ 2 business days.
+    const latestShip = new Date(purchaseMs + 2 * 24 * 3600 * 1000).toISOString();
+    return {
+      orderId: o.AmazonOrderId,
+      purchaseDate: o.PurchaseDate,
+      lastUpdateDate: o.LastUpdateDate,
+      orderStatus: o.OrderStatus,
+      amount,
+      currency,
+      numberOfItemsUnshipped: o.NumberOfItemsUnshipped ?? 0,
+      salesChannel: o.SalesChannel ?? "Amazon.com",
+      sellerCentralUrl: `https://sellercentral.amazon.com/orders-v3/order/${encodeURIComponent(o.AmazonOrderId)}`,
+      latestShipDateEstimate: latestShip,
+    };
+  });
 }
 
 // ---------------------------------------------------------------------------
