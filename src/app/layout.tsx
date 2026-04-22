@@ -8,7 +8,13 @@ import { AppShell } from "@/components/layout/AppShell.client";
 import { AMAZON_LISTING_URL } from "@/lib/amazon";
 
 const GA4_ID = process.env.NEXT_PUBLIC_GA4_ID?.trim() || "G-31X673PSVY";
-const GOOGLE_ADS_ID = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID?.trim() || "";
+// Google Ads customer 775-414-2374 (account tied to ben@usagummies.com).
+// AW-* remarketing tag = customer ID without dashes. Safe default so the base
+// tag fires even if Vercel env is empty — enables audiences, view-through
+// conversions, and enhanced-conversion payloads immediately. The conversion
+// LABEL must still be set via NEXT_PUBLIC_GOOGLE_ADS_CONVERSION_LABEL for
+// purchase events to register as a specific conversion action.
+const GOOGLE_ADS_ID = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID?.trim() || "AW-7754142374";
 const GOOGLE_ADS_CONVERSION_LABEL = process.env.NEXT_PUBLIC_GOOGLE_ADS_CONVERSION_LABEL?.trim() || "";
 const GOOGLE_SITE_VERIFICATION = process.env.NEXT_PUBLIC_GSC_VERIFICATION?.trim();
 const META_PIXEL_ID = "26033875762978520";

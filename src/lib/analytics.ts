@@ -186,6 +186,70 @@ export function trackInitiateCheckout(cart: {
   trackEvent("initiate_checkout", { value: cart.value, currency, event_id: eventId });
 }
 
+async function sha256Hex(value: string): Promise<string | null> {
+  try {
+    if (typeof window === "undefined" || !window.crypto?.subtle) return null;
+    const normalized = value.trim().toLowerCase();
+    if (!normalized) return null;
+    const buf = new TextEncoder().encode(normalized);
+    const digest = await window.crypto.subtle.digest("SHA-256", buf);
+    return Array.from(new Uint8Array(digest))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Sets Google Ads enhanced-conversion user_data on the gtag tag. Must be
+ * called BEFORE trackPurchase fires so the conversion hit carries the
+ * hashed identity. Shopify's order-status page exposes customer email via
+ * `Shopify.checkout.email` — but in our architecture the buyer bounces to
+ * Shop Pay, so we feed whatever identity bits we captured pre-checkout.
+ */
+export async function setEnhancedConversionUserData(data: {
+  email?: string | null;
+  phone?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  street?: string | null;
+  city?: string | null;
+  region?: string | null;
+  postalCode?: string | null;
+  country?: string | null;
+}) {
+  if (typeof window === "undefined" || typeof window.gtag !== "function") return;
+  if (!window.__usaGadsConversionId) return;
+
+  const [emailH, phoneH] = await Promise.all([
+    data.email ? sha256Hex(data.email) : Promise.resolve(null),
+    data.phone ? sha256Hex(data.phone.replace(/\D/g, "")) : Promise.resolve(null),
+  ]);
+
+  const userData: Record<string, unknown> = {};
+  if (emailH) userData.sha256_email_address = emailH;
+  if (phoneH) userData.sha256_phone_number = phoneH;
+  if (data.firstName || data.lastName || data.street || data.city || data.region || data.postalCode || data.country) {
+    userData.address = {
+      ...(data.firstName ? { sha256_first_name: await sha256Hex(data.firstName) } : {}),
+      ...(data.lastName ? { sha256_last_name: await sha256Hex(data.lastName) } : {}),
+      ...(data.street ? { sha256_street: await sha256Hex(data.street) } : {}),
+      ...(data.city ? { city: data.city.trim().toLowerCase() } : {}),
+      ...(data.region ? { region: data.region.trim().toLowerCase() } : {}),
+      ...(data.postalCode ? { postal_code: data.postalCode.trim() } : {}),
+      ...(data.country ? { country: data.country.trim().toUpperCase() } : {}),
+    };
+  }
+  if (!Object.keys(userData).length) return;
+
+  try {
+    window.gtag("set", "user_data", userData);
+  } catch {
+    // ignore
+  }
+}
+
 export function trackPurchase(order: { id: string; value: number; currency?: string; items?: Array<{ id: string; name: string; price: number; quantity: number }> }) {
   const currency = order.currency || "USD";
   const eventId = `pu_${order.id}_${Date.now()}`;
@@ -209,13 +273,17 @@ export function trackPurchase(order: { id: string; value: number; currency?: str
       items: order.items?.map((i) => ({ item_id: i.id, item_name: i.name, price: i.price, quantity: i.quantity })) || [],
     });
 
-    // Google Ads conversion (fires if AW-* ID configured)
-    window.gtag("event", "conversion", {
-      send_to: window.__usaGadsConversionId || "",
-      transaction_id: order.id,
-      value: order.value,
-      currency,
-    });
+    // Google Ads conversion — only fire when AW-*/label fully configured.
+    // Firing with an empty send_to produces useless "unknown conversion"
+    // hits that pollute Smart Bidding with malformed signal.
+    if (window.__usaGadsConversionId) {
+      window.gtag("event", "conversion", {
+        send_to: window.__usaGadsConversionId,
+        transaction_id: order.id,
+        value: order.value,
+        currency,
+      });
+    }
   }
 
   // Beacon to server for CAPI

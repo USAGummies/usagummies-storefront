@@ -16,9 +16,9 @@ const SECURITY_HEADERS = [
       "img-src 'self' data: blob: https:",
       "font-src 'self' data: https://fonts.gstatic.com",
       "style-src 'self' 'unsafe-inline'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com https://assets.apollo.io https://va.vercel-scripts.com https://cdn.plaid.com",
-      "connect-src 'self' https://www.google-analytics.com https://region1.google-analytics.com https://www.googletagmanager.com https://aplo-evnt.com https://assets.apollo.io https://vitals.vercel-insights.com https://*.myshopify.com https://cdn.shopify.com https://cdn.plaid.com https://production.plaid.com",
-      "frame-src 'self' https://cdn.plaid.com",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://assets.apollo.io https://va.vercel-scripts.com https://cdn.plaid.com",
+      "connect-src 'self' https://www.google-analytics.com https://region1.google-analytics.com https://www.googletagmanager.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://stats.g.doubleclick.net https://aplo-evnt.com https://assets.apollo.io https://vitals.vercel-insights.com https://*.myshopify.com https://cdn.shopify.com https://cdn.plaid.com https://production.plaid.com",
+      "frame-src 'self' https://cdn.plaid.com https://td.doubleclick.net",
       "form-action 'self' https://*.myshopify.com",
       "object-src 'none'",
     ].join("; "),
@@ -99,6 +99,31 @@ const nextConfig: NextConfig = {
       { source: "/subscribe", destination: "/shop", permanent: false },
       { source: "/rewards", destination: "/shop", permanent: false },
       { source: "/blog/rss.xml", destination: "/rss.xml", permanent: true },
+
+      // Google Ads disapproved-asset fix (2026-04-22): asset destination
+      // "all-american-gummy-bears-75oz-bag" returns 404 on Android, triggering
+      // "Destination not working" policy disapproval. Permanent redirect to
+      // real product handle keeps legacy ad assets valid during review.
+      {
+        source: "/products/all-american-gummy-bears-75oz-bag",
+        destination: "/products/all-american-gummy-bears-7-5-oz-single-bag",
+        permanent: true,
+      },
+      {
+        source: "/products/all-american-gummy-bears-7.5oz-bag",
+        destination: "/products/all-american-gummy-bears-7-5-oz-single-bag",
+        permanent: true,
+      },
+      {
+        source: "/products/all-american-gummy-bears-7-5oz-bag",
+        destination: "/products/all-american-gummy-bears-7-5-oz-single-bag",
+        permanent: true,
+      },
+      {
+        source: "/products/all-american-gummy-bears",
+        destination: "/products/all-american-gummy-bears-7-5-oz-single-bag",
+        permanent: true,
+      },
     ];
   },
 };
