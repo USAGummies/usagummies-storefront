@@ -67,6 +67,10 @@
     {
       "path": "/api/ops/fulfillment/retry-dispatches?alert=true",
       "schedule": "30 * * * *"
+    },
+    {
+      "path": "/api/ops/inventory/burn-rate?refresh=true",
+      "schedule": "30 3 * * 0"
     }
   ]
 }

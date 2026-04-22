@@ -19,6 +19,7 @@
  * consumers don't break.
  */
 
+import type { BurnRateCalibration } from "./burn-rate-calibration";
 import type { InventorySnapshot, InventorySnapshotRow } from "./inventory-snapshot";
 
 export type CoverUrgency = "urgent" | "soon" | "ok" | "unknown";
@@ -37,6 +38,17 @@ export interface CoverDaysRow {
 export interface CoverDaysForecast {
   generatedAt: string;
   defaultBurnRate: number;
+  /** Where the burn rate came from: "calibrated" (real sales) | "env" | "default". */
+  burnRateSource: "calibrated" | "env" | "default";
+  /** Calibration confidence when source = calibrated. null otherwise. */
+  calibrationConfidence?: BurnRateCalibration["confidence"];
+  /** Shopify + Amazon totals feeding the calibration, when available. */
+  calibrationDetail?: {
+    windowDays: number;
+    shopifyBagsPerDay: number;
+    amazonBagsPerDay: number;
+    totalOrders: number;
+  };
   totalOnHand: number;
   totalBurnRate: number;
   fleetCoverDays: number | null;
@@ -47,20 +59,44 @@ export interface CoverDaysForecast {
 const DEFAULT_BURN = Number.parseFloat(
   process.env.INVENTORY_BURN_RATE_BAGS_PER_DAY ?? "",
 );
+const ENV_BURN_CONFIGURED =
+  Number.isFinite(DEFAULT_BURN) && DEFAULT_BURN > 0;
 
-function defaultBurn(): number {
-  return Number.isFinite(DEFAULT_BURN) && DEFAULT_BURN > 0 ? DEFAULT_BURN : 250;
+/**
+ * Resolve the effective fleet burn rate for a given calibration.
+ * Precedence: calibrated (if confidence ≥ medium) > env > default(250).
+ * Per-SKU env overrides always win when set.
+ */
+function resolveFleetBurn(
+  calibration: BurnRateCalibration | null | undefined,
+): { rate: number; source: "calibrated" | "env" | "default" } {
+  if (
+    calibration &&
+    calibration.bagsPerDay !== null &&
+    calibration.bagsPerDay > 0 &&
+    (calibration.confidence === "high" || calibration.confidence === "medium")
+  ) {
+    return { rate: calibration.bagsPerDay, source: "calibrated" };
+  }
+  if (ENV_BURN_CONFIGURED) {
+    return { rate: DEFAULT_BURN, source: "env" };
+  }
+  return { rate: 250, source: "default" };
 }
 
-function burnFor(sku: string): number {
-  if (!sku) return defaultBurn();
+function defaultBurn(calibration?: BurnRateCalibration | null): number {
+  return resolveFleetBurn(calibration).rate;
+}
+
+function burnFor(sku: string, calibration?: BurnRateCalibration | null): number {
+  if (!sku) return defaultBurn(calibration);
   const envKey = `INVENTORY_BURN_RATE_${sku.replace(/[^A-Z0-9]/gi, "_").toUpperCase()}`;
   const raw = process.env[envKey];
   if (raw) {
     const n = Number.parseFloat(raw);
     if (Number.isFinite(n) && n > 0) return n;
   }
-  return defaultBurn();
+  return defaultBurn(calibration);
 }
 
 function urgencyFor(coverDays: number | null): CoverUrgency {
@@ -79,13 +115,28 @@ function projectStockout(onHand: number, burn: number): string | null {
 
 export function forecastCoverDays(
   snap: InventorySnapshot | null,
+  calibration?: BurnRateCalibration | null,
 ): CoverDaysForecast {
   const now = new Date().toISOString();
-  const dflt = defaultBurn();
+  const resolved = resolveFleetBurn(calibration);
+  const dflt = resolved.rate;
+  const calibrationDetail =
+    calibration && calibration.bagsPerDay !== null
+      ? {
+          windowDays: calibration.windowDays,
+          shopifyBagsPerDay: calibration.shopify.bagsPerDay,
+          amazonBagsPerDay: calibration.amazon.bagsPerDay,
+          totalOrders: calibration.shopify.orders + calibration.amazon.orders,
+        }
+      : undefined;
+
   if (!snap || snap.rows.length === 0) {
     return {
       generatedAt: now,
       defaultBurnRate: dflt,
+      burnRateSource: resolved.source,
+      calibrationConfidence: calibration?.confidence,
+      calibrationDetail,
       totalOnHand: 0,
       totalBurnRate: 0,
       fleetCoverDays: null,
@@ -95,7 +146,7 @@ export function forecastCoverDays(
   }
 
   const rows: CoverDaysRow[] = snap.rows.map((r: InventorySnapshotRow) => {
-    const burn = burnFor(r.sku);
+    const burn = burnFor(r.sku, calibration);
     const coverDays =
       burn > 0 ? Math.round((r.onHand / burn) * 10) / 10 : null;
     return {
@@ -124,6 +175,9 @@ export function forecastCoverDays(
   return {
     generatedAt: now,
     defaultBurnRate: dflt,
+    burnRateSource: resolved.source,
+    calibrationConfidence: calibration?.confidence,
+    calibrationDetail,
     totalOnHand,
     totalBurnRate,
     fleetCoverDays,

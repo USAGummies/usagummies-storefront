@@ -14,6 +14,7 @@ import { NextResponse } from "next/server";
 import { kv } from "@vercel/kv";
 
 import { isAuthorized } from "@/lib/ops/abra-auth";
+import { getCachedBurnRate } from "@/lib/ops/burn-rate-calibration";
 import { forecastCoverDays } from "@/lib/ops/inventory-forecast";
 import {
   KV_INVENTORY_SNAPSHOT,
@@ -28,10 +29,13 @@ export async function GET(req: Request): Promise<Response> {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const snap =
-    ((await kv.get<InventorySnapshot>(KV_INVENTORY_SNAPSHOT)) ??
-      null) as InventorySnapshot | null;
-  const forecast = forecastCoverDays(snap);
+  const [snap, calibration] = await Promise.all([
+    (async () =>
+      ((await kv.get<InventorySnapshot>(KV_INVENTORY_SNAPSHOT)) ??
+        null) as InventorySnapshot | null)(),
+    getCachedBurnRate(),
+  ]);
+  const forecast = forecastCoverDays(snap, calibration);
 
   return NextResponse.json({
     ok: true,
@@ -43,5 +47,12 @@ export async function GET(req: Request): Promise<Response> {
         ) / 10
       : null,
     snapshotGeneratedAt: snap?.generatedAt ?? null,
+    calibrationAgeHours: calibration
+      ? Math.round(
+          ((Date.now() - new Date(calibration.generatedAt).getTime()) /
+            3_600_000) *
+            10,
+        ) / 10
+      : null,
   });
 }

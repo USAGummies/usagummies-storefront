@@ -505,6 +505,48 @@ interface DispatchOrdersQueryResult {
 }
 
 /**
+ * Pull the last N days of paid Shopify orders — for burn-rate
+ * calibration. Returns total units shipped across all line items per
+ * order, so the caller can divide by window days to get bags/day.
+ */
+export interface PaidOrderSummary {
+  id: string;
+  name: string;
+  createdAt: string;
+  totalUnits: number;
+  totalAmount: number;
+}
+
+export async function queryPaidOrdersForBurnRate(opts: {
+  days?: number;
+  limit?: number;
+} = {}): Promise<PaidOrderSummary[]> {
+  const days = opts.days ?? 30;
+  const limit = Math.max(1, Math.min(250, opts.limit ?? 250));
+  const createdSince = new Date(Date.now() - days * 24 * 3600 * 1000)
+    .toISOString()
+    .slice(0, 10);
+  // Include refunded/cancelled-on-paid? Only `financial_status:paid`
+  // counts as a sale for burn calculation. Returns don't matter — we
+  // compute forward burn, not lifetime net.
+  const query = `financial_status:paid created_at:>${createdSince}`;
+  const result = await shopifyAdminQuery<DispatchOrdersQueryResult>(
+    DISPATCH_ORDERS_QUERY,
+    { limit, query },
+  );
+  return result.orders.edges.map(({ node }) => ({
+    id: node.id,
+    name: node.name,
+    createdAt: node.createdAt,
+    totalUnits: node.lineItems.edges.reduce(
+      (s, e) => s + (e.node.quantity ?? 0),
+      0,
+    ),
+    totalAmount: Number(node.totalPriceSet.shopMoney.amount ?? 0),
+  }));
+}
+
+/**
  * Query Shopify for unfulfilled paid orders with full ship-to + line
  * items. Paired with the UI queue at /ops/shopify-orders.
  */
