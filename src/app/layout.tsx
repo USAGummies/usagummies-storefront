@@ -18,7 +18,10 @@ const GOOGLE_ADS_ID = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID?.trim() || "AW-77541
 const GOOGLE_ADS_CONVERSION_LABEL = process.env.NEXT_PUBLIC_GOOGLE_ADS_CONVERSION_LABEL?.trim() || "";
 const GOOGLE_SITE_VERIFICATION = process.env.NEXT_PUBLIC_GSC_VERIFICATION?.trim();
 const META_PIXEL_ID = "26033875762978520";
-const CLARITY_ID = process.env.NEXT_PUBLIC_CLARITY_ID?.trim();
+// Microsoft Clarity project for usagummies.com. Safe default so session
+// replays, heatmaps, and rage-click detection fire even if Vercel env is
+// empty. Dashboard: https://clarity.microsoft.com/projects/view/w9qsgk41dp
+const CLARITY_ID = process.env.NEXT_PUBLIC_CLARITY_ID?.trim() || "w9qsgk41dp";
 
 function GoogleAnalytics() {
   if (!GA4_ID) return null;
