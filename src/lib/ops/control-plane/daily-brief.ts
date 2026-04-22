@@ -144,6 +144,12 @@ export interface FulfillmentPreflightSlice {
   };
   freightCompQueue: { queuedCount: number; queuedDollars: number };
   staleVoids: { count: number; pendingDollars: number };
+  amazonFbm?: {
+    unshippedCount: number;
+    urgentCount: number;
+    lateCount: number;
+    unavailableReason?: string;
+  };
   alerts: string[];
 }
 
@@ -500,6 +506,23 @@ function renderPreflightMarkdown(pf: FulfillmentPreflightSlice): string {
     lines.push(
       `💸 Stale ShipStation voids: ${pf.staleVoids.count} · $${pf.staleVoids.pendingDollars.toFixed(2)} pending refund`,
     );
+  }
+
+  // Amazon FBM queue
+  if (pf.amazonFbm && !pf.amazonFbm.unavailableReason) {
+    if (pf.amazonFbm.lateCount > 0) {
+      lines.push(
+        `🚨 Amazon FBM: ${pf.amazonFbm.lateCount} LATE order(s) past ship-by`,
+      );
+    } else if (pf.amazonFbm.urgentCount > 0) {
+      lines.push(
+        `⏰ Amazon FBM: ${pf.amazonFbm.urgentCount} urgent order(s) (<12h to ship-by) · ${pf.amazonFbm.unshippedCount} total unshipped`,
+      );
+    } else if (pf.amazonFbm.unshippedCount > 0) {
+      lines.push(
+        `📦 Amazon FBM: ${pf.amazonFbm.unshippedCount} unshipped order(s) in queue (/ops/amazon-fbm)`,
+      );
+    }
   }
 
   // Only render the section when there's actually something to say.

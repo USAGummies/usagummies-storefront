@@ -215,6 +215,7 @@ async function composeAndPost(req: Request): Promise<Response> {
           count: pf.staleVoids.count,
           pendingDollars: pf.staleVoids.pendingDollars,
         },
+        amazonFbm: pf.amazonFbm,
         alerts: pf.alerts,
       };
     } catch (err) {

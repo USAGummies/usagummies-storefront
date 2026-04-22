@@ -104,6 +104,12 @@ interface PreflightSlice {
   };
   freightCompQueue: { queuedCount: number; queuedDollars: number };
   staleVoids: { count: number; pendingDollars: number };
+  amazonFbm?: {
+    unshippedCount: number;
+    urgentCount: number;
+    lateCount: number;
+    unavailableReason?: string;
+  };
   alerts: string[];
 }
 
@@ -253,6 +259,7 @@ async function loadPreflight(
         count: pf.staleVoids.count,
         pendingDollars: pf.staleVoids.pendingDollars,
       },
+      amazonFbm: pf.amazonFbm,
       alerts: pf.alerts,
     };
   } catch (err) {
@@ -505,6 +512,24 @@ function renderDigest(digest: DigestData, startedAt: string): string {
       lines.push(
         `  :money_with_wings: Stale voids: ${pf.staleVoids.count} · $${pf.staleVoids.pendingDollars.toFixed(2)} pending refund`,
       );
+    }
+
+    // Amazon FBM queue
+    if (pf.amazonFbm && !pf.amazonFbm.unavailableReason) {
+      const fbm = pf.amazonFbm;
+      if (fbm.lateCount > 0) {
+        lines.push(
+          `  :rotating_light: Amazon FBM: ${fbm.lateCount} LATE · ${fbm.unshippedCount} total unshipped — /ops/amazon-fbm`,
+        );
+      } else if (fbm.urgentCount > 0) {
+        lines.push(
+          `  :clock1: Amazon FBM: ${fbm.urgentCount} urgent (<12h) · ${fbm.unshippedCount} total unshipped — /ops/amazon-fbm`,
+        );
+      } else if (fbm.unshippedCount > 0) {
+        lines.push(
+          `  :package: Amazon FBM: ${fbm.unshippedCount} unshipped in queue — /ops/amazon-fbm`,
+        );
+      }
     }
   }
 

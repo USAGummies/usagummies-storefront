@@ -13,6 +13,10 @@
 import { kv } from "@vercel/kv";
 
 import {
+  fetchUnshippedFbmOrders,
+  isAmazonConfigured,
+} from "@/lib/amazon/sp-api";
+import {
   KV_INVENTORY_SNAPSHOT,
   type InventorySnapshot,
 } from "./inventory-snapshot";
@@ -68,6 +72,12 @@ export interface FulfillmentPreflight {
     oldestAgeHours: number | null;
     unavailableReason?: string;
   };
+  amazonFbm: {
+    unshippedCount: number;
+    urgentCount: number; // ship-by within 12h
+    lateCount: number;
+    unavailableReason?: string;
+  };
   alerts: string[];
 }
 
@@ -93,21 +103,59 @@ export async function computeFulfillmentPreflight(): Promise<FulfillmentPrefligh
   const alerts: string[] = [];
   const generatedAt = new Date().toISOString();
 
-  const [walletsRes, voidsRes, stages, snapshot, queue] = await Promise.all([
-    listShipStationCarriers(),
-    listVoidedLabels({ daysBack: 14, staleAfterHours: 72 }),
-    (async () =>
-      ((await kv.get<Record<string, StageEntry>>(KV_STAGES)) ?? {}) as Record<
-        string,
-        StageEntry
-      >)(),
-    (async () =>
-      ((await kv.get<InventorySnapshot>(KV_INVENTORY_SNAPSHOT)) ??
-        null) as InventorySnapshot | null)(),
-    (async () =>
-      ((await kv.get<FreightCompQueueEntry[]>(KV_FREIGHT_COMP_QUEUE)) ??
-        []) as FreightCompQueueEntry[])(),
-  ]);
+  const [walletsRes, voidsRes, stages, snapshot, queue, fbmRes] =
+    await Promise.all([
+      listShipStationCarriers(),
+      listVoidedLabels({ daysBack: 14, staleAfterHours: 72 }),
+      (async () =>
+        ((await kv.get<Record<string, StageEntry>>(KV_STAGES)) ??
+          {}) as Record<string, StageEntry>)(),
+      (async () =>
+        ((await kv.get<InventorySnapshot>(KV_INVENTORY_SNAPSHOT)) ??
+          null) as InventorySnapshot | null)(),
+      (async () =>
+        ((await kv.get<FreightCompQueueEntry[]>(KV_FREIGHT_COMP_QUEUE)) ??
+          []) as FreightCompQueueEntry[])(),
+      // Amazon FBM — best-effort, degrades to "unavailable" when not configured.
+      (async (): Promise<{
+        ok: boolean;
+        count: number;
+        urgent: number;
+        late: number;
+        reason?: string;
+      }> => {
+        if (!isAmazonConfigured()) {
+          return {
+            ok: false,
+            count: 0,
+            urgent: 0,
+            late: 0,
+            reason: "Amazon SP-API not configured",
+          };
+        }
+        try {
+          const orders = await fetchUnshippedFbmOrders({ daysBack: 7 });
+          const now = Date.now();
+          let urgent = 0;
+          let late = 0;
+          for (const o of orders) {
+            const hoursLeft =
+              (new Date(o.latestShipDateEstimate).getTime() - now) / 3_600_000;
+            if (hoursLeft < 0) late += 1;
+            else if (hoursLeft < 12) urgent += 1;
+          }
+          return { ok: true, count: orders.length, urgent, late };
+        } catch (err) {
+          return {
+            ok: false,
+            count: 0,
+            urgent: 0,
+            late: 0,
+            reason: err instanceof Error ? err.message : String(err),
+          };
+        }
+      })(),
+    ]);
 
   // --- Wallets ---
   let walletDegraded: string | null = null;
@@ -208,6 +256,25 @@ export async function computeFulfillmentPreflight(): Promise<FulfillmentPrefligh
     }
   }
 
+  // --- Amazon FBM ---
+  const amazonFbm: FulfillmentPreflight["amazonFbm"] = {
+    unshippedCount: fbmRes.count,
+    urgentCount: fbmRes.urgent,
+    lateCount: fbmRes.late,
+    ...(!fbmRes.ok ? { unavailableReason: fbmRes.reason } : {}),
+  };
+  if (fbmRes.ok) {
+    if (fbmRes.late > 0) {
+      alerts.push(
+        `Amazon FBM: ${fbmRes.late} LATE order(s) past ship-by deadline`,
+      );
+    } else if (fbmRes.urgent > 0) {
+      alerts.push(
+        `Amazon FBM: ${fbmRes.urgent} order(s) with <12h to ship-by`,
+      );
+    }
+  }
+
   return {
     ok: true,
     generatedAt,
@@ -228,6 +295,7 @@ export async function computeFulfillmentPreflight(): Promise<FulfillmentPrefligh
         freightCompOldest !== null ? Math.round(freightCompOldest * 10) / 10 : null,
     },
     staleVoids,
+    amazonFbm,
     alerts,
   };
 }
