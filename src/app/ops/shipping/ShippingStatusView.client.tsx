@@ -52,6 +52,12 @@ interface PreflightData {
     oldestAgeHours: number | null;
     unavailableReason?: string;
   };
+  amazonFbm?: {
+    unshippedCount: number;
+    urgentCount: number;
+    lateCount: number;
+    unavailableReason?: string;
+  };
   alerts: string[];
 }
 
@@ -445,6 +451,48 @@ export function ShippingStatusView() {
               <Muted style={{ marginTop: 10 }}>
                 Rene approves via{" "}
                 <Code>POST /api/ops/fulfillment/freight-comp-queue</Code>
+              </Muted>
+            </>
+          )}
+        </Card>
+
+        {/* ---- Amazon FBM ---- */}
+        <Card title="Amazon FBM Queue">
+          {!data && <Muted>Loading…</Muted>}
+          {data?.amazonFbm?.unavailableReason && (
+            <Muted>Unavailable: {data.amazonFbm.unavailableReason}</Muted>
+          )}
+          {data?.amazonFbm && !data.amazonFbm.unavailableReason && (
+            <>
+              <Row>
+                <Label>Unshipped</Label>
+                <Value
+                  color={data.amazonFbm.unshippedCount > 0 ? YELLOW : GREEN}
+                  strong={data.amazonFbm.unshippedCount > 0}
+                >
+                  {data.amazonFbm.unshippedCount}
+                </Value>
+              </Row>
+              <Row>
+                <Label>Urgent (&lt;12h)</Label>
+                <Value
+                  color={data.amazonFbm.urgentCount > 0 ? YELLOW : DIM}
+                  strong={data.amazonFbm.urgentCount > 0}
+                >
+                  {data.amazonFbm.urgentCount}
+                </Value>
+              </Row>
+              <Row>
+                <Label>LATE</Label>
+                <Value
+                  color={data.amazonFbm.lateCount > 0 ? RED : GREEN}
+                  strong={data.amazonFbm.lateCount > 0}
+                >
+                  {data.amazonFbm.lateCount}
+                </Value>
+              </Row>
+              <Muted style={{ marginTop: 10 }}>
+                Dispatch queue at <Code>/ops/amazon-fbm</Code>
               </Muted>
             </>
           )}
