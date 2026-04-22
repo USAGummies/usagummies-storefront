@@ -15,7 +15,7 @@
  */
 import { NextResponse } from "next/server";
 
-import { isCronAuthorized, unauthorized } from "@/lib/ops/control-plane/admin-auth";
+import { isAuthorized } from "@/lib/ops/abra-auth";
 import { listVoidedLabels } from "@/lib/ops/shipstation-client";
 
 export const runtime = "nodejs";
@@ -34,7 +34,9 @@ function parseIntWithDefault(
 }
 
 export async function GET(req: Request): Promise<Response> {
-  if (!isCronAuthorized(req)) return unauthorized();
+  if (!(await isAuthorized(req))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   const url = new URL(req.url);
   const daysBack = parseIntWithDefault(url.searchParams.get("daysBack"), 14, 1, 60);
