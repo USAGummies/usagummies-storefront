@@ -58,14 +58,23 @@ These rules override all other behavior:
 - Amazon is consignment (FBA), not wholesale. Shipping TO Amazon = inventory transfer (still our asset). Revenue recorded when Amazon SELLS units.
 - PO = request from customer (not revenue). Invoice = our billing document (creates revenue + AR in QBO).
 
-## Packaging spec (6 × 6 × 1, canonical)
+## Packaging spec (canonical)
 
+- **Branded mailer** = 1 bag (7.5 oz) + 6×9 padded mailer, **~0.55 lb packed**, 9×6×2 in. Default for all single-bag Amazon FBM + Shopify DTC orders as of 2026-04-21.
 - **Inner case** = 6 bags (7.5 oz) per case, ~6 lb packed
-- **Master carton** = 6 cases per carton = **36 bags / carton**, **21 lb 2 oz packed** (= 21.125 lb, measured by Ben 2026-04-20). Canonical for all ship-label + rate-quote calls until a case-pack change is logged.
-- Dimensions: master 21×14×8 in; inner 14×10×8 in
+- **Master carton** = 6 cases per carton = **36 bags / carton**, **21 lb 2 oz packed** (= 21.125 lb, measured by Ben 2026-04-20). Canonical for all wholesale ship-label + rate-quote calls until a case-pack change is logged.
+- Dimensions: master 21×14×8 in; inner 14×10×8 in; mailer 9×6×2 in
 - **Strip clip** = 1 per case · **Metal hook** = 1 per strip clip
-- Uline reorder per run: `12 masters + 72 cases + 72 strip clips + 72 hooks` for 432 bags (reference: 2026-04-20 shipping batch)
+- Uline reorder per run: `12 masters + 72 cases + 72 strip clips + 72 hooks` for 432 bags (reference: 2026-04-20 shipping batch). Branded mailer SKU separate — reorder based on Amazon FBM burn rate.
 - Full integration doctrine: [`/contracts/integrations/shipstation.md`](contracts/integrations/shipstation.md)
+
+## Amazon FBM workflow (active 2026-04-21)
+
+- Single-bag orders ship from Ashford in our branded mailer (stamps_com / USPS Ground Advantage).
+- **Alert cron:** `/api/ops/amazon/unshipped-fbm-alert` fires weekdays 09:00 / 13:00 / 16:00 PT to `#operations`. Urgent orders (<12h to ship-by) flagged with `:rotating_light:`.
+- **Dispatch flow:** Ben copies ship-to from Seller Central → `POST /api/ops/amazon/dispatch {orderId, shipTo}` → S-08 classifier → Class B proposal in `#ops-approvals` → approve → buy-label → printed.
+- **Handling promise:** ≤ 2 business days from purchase to ship. Prime badge + account health depend on this.
+- **Why SP-API doesn't auto-fill ship-to:** Amazon requires an RDT (Restricted Data Token) for buyer PII. MVP is manual copy. Layer RDT later if FBM volume justifies the PII-approval process.
 
 ## QBO Integration
 

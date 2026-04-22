@@ -1,6 +1,6 @@
 # Activation Status — USA Gummies 3.0
 
-**Last updated:** 2026-04-20 (late night — post 15-commit shipping-rush build arc)
+**Last updated:** 2026-04-21 (overnight — post 36-commit shipping + Amazon FBM + S-08 build arc)
 **Source of truth:** this file (commit history shows activation events)
 **Companion docs:** [`governance.md`](governance.md), [`activation-triggers.md`](activation-triggers.md), [`approval-taxonomy.md`](approval-taxonomy.md), [`build-sequence.md`](build-sequence.md)
 **Canonical sequence (Notion):** [22.B — Execution Sequences](https://www.notion.so/3484c0c42c2e81048158f9007dddc093) — Tuesday cutover + Week-1 + Pipelines + Specialists
@@ -31,6 +31,14 @@
 | Sample/Order Dispatch (S-08) MVP — classifier + proposal composer + dispatch route | [agents/sample-order-dispatch.md](agents/sample-order-dispatch.md) + [`src/lib/ops/sample-order-dispatch.ts`](../src/lib/ops/sample-order-dispatch.ts) | [`/api/ops/agents/sample-dispatch/dispatch`](../src/app/api/ops/agents/sample-dispatch/dispatch/route.ts) | Event (POST from upstream webhook adapter or manual trigger) | Class B proposals to `#ops-approvals`; refusals to `#ops-alerts`. Webhook-adapter wiring for Shopify / Amazon / Faire / HubSpot is next. |
 | Fulfillment drift-audit (BUILDs #2/#6/#9 compliance) | [`src/lib/ops/fulfillment-drift.ts`](../src/lib/ops/fulfillment-drift.ts) | [`/api/ops/control-plane/fulfillment-drift-audit`](../src/app/api/ops/control-plane/fulfillment-drift-audit/route.ts) | Monday 20:30 PT (weekly) | `#ops-audit` — only posts when findings exist |
 | Fulfillment weekly summary | `GET /api/ops/fulfillment/summary` | [`/api/ops/fulfillment/summary`](../src/app/api/ops/fulfillment/summary/route.ts) | On-demand + consumed by drift audit | Labels / queue drain / wallets / stale voids / ATP rollup |
+| Amazon FBM unshipped alerts | — | [`/api/ops/amazon/unshipped-fbm-alert`](../src/app/api/ops/amazon/unshipped-fbm-alert/route.ts) | Weekdays 09:00 / 13:00 / 16:00 PT | `#operations` — urgency-tagged FBM order queue |
+| Amazon FBM dispatch bridge | — | [`/api/ops/amazon/dispatch`](../src/app/api/ops/amazon/dispatch/route.ts) | On-demand (Ben copies ship-to from Seller Central) | `#ops-approvals` — Class B shipment.create proposal |
+| Packing Slip renderer | [`src/lib/ops/html-to-pdf.ts`](../src/lib/ops/html-to-pdf.ts) | [`/api/ops/fulfillment/packing-slip`](../src/app/api/ops/fulfillment/packing-slip/route.ts) | On-demand (GET for browser print, POST for agents) | Letter-size HTML packing slips in brand template |
+| Inventory cover-day forecast (S-07 MVP) | [`src/lib/ops/inventory-forecast.ts`](../src/lib/ops/inventory-forecast.ts) | [`/api/ops/inventory/cover-days`](../src/app/api/ops/inventory/cover-days/route.ts) | On-demand | Fleet + per-SKU cover days, urgency buckets, reorder recommendations |
+| Sample/Order Dispatch webhook — Shopify | — | [`/api/ops/webhooks/shopify/orders-paid`](../src/app/api/ops/webhooks/shopify/orders-paid/route.ts) | Event (Shopify `orders/paid` webhook, HMAC-verified) | `#ops-approvals` Class B proposal |
+| Sample/Order Dispatch webhook — HubSpot | — | [`/api/ops/webhooks/hubspot/deal-stage-changed`](../src/app/api/ops/webhooks/hubspot/deal-stage-changed/route.ts) | Event (HubSpot `deal.propertyChange` webhook, signature-v3 verified) | `#ops-approvals` Class B proposal |
+| Agent Status UI | — | [`/ops/agents/status`](../src/app/ops/agents/status/page.tsx) + [`/api/ops/agents/status`](../src/app/api/ops/agents/status/route.ts) | Polled every 60s (UI) | Per-agent green/yellow/red health cards, 12 agents tracked |
+| Rene's Ledger UI | — | [`/ops/ledger`](../src/app/ops/ledger/page.tsx) | Polled every 60s (UI) | CF-09 freight-comp approve/reject + stale-void review |
 
 ## Contracts with runtime pending (phase 2)
 
