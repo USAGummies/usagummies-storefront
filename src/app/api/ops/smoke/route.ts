@@ -143,6 +143,29 @@ export async function GET(req: Request): Promise<Response> {
         detail: `${Object.keys(stages).length} stage entries`,
       };
     }),
+    timed("kv.dispatch-retry-queue", async () => {
+      const { pendingRetryCount, exhaustedRetryCount } = await import(
+        "@/lib/ops/dispatch-retry-queue"
+      );
+      const pending = await pendingRetryCount();
+      const exhausted = await exhaustedRetryCount();
+      if (exhausted > 0) {
+        return {
+          status: "red" as const,
+          detail: `${exhausted} exhausted dispatches pending manual review · ${pending} retrying`,
+        };
+      }
+      if (pending > 5) {
+        return {
+          status: "yellow" as const,
+          detail: `${pending} pending retries (Slack outage suspected)`,
+        };
+      }
+      return {
+        status: "green" as const,
+        detail: pending === 0 ? "queue empty" : `${pending} pending (retrying)`,
+      };
+    }),
   ]);
 
   const summary = checks.reduce(

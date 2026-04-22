@@ -36,6 +36,10 @@ Ordered by leverage × time-to-ship. Ben can hand these to Claude any time.
 - ✅ **Webhook signature verification audit** — `7cd7ace`. Shopify webhook recovered from `.gitignore` miss + added X-Shopify-Triggered-At replay protection (5-min tolerance matching HubSpot + Slack).
 - ✅ **Wallet top-up deeplink** — `b701263`. One-click button on /ops/shipping when wallet below floor.
 - ✅ **/ops/shopify-orders fallback queue** — `8e498bd`. Complements webhook auto-dispatch with a manual catch-up UI. One-click dispatch with full ship-to from Shopify payload (no form needed — unlike FBM). Gated on financial_status:paid fulfillment_status:unfulfilled.
+- ✅ **Shopify webhook vitest** — `b8f75ee`. 11/11 green covering HMAC accept/reject/tampered + triggered-at replay (fresh/stale/future/unparseable) + invalid JSON.
+- ✅ **Drift-audit weekly summary** — `b8f75ee`. Fulfillment drift audit now renders a weekly summary block (labels active/voided + queue drain rate %) + posts on meaningful activity even when no P1/P2/P3 findings.
+- ✅ **FBM bulk ship-to helper** — `b8f75ee`. Collapsible "📋 Bulk ship-to" at the top of /ops/amazon-fbm — paste once, apply to every pending card.
+- ✅ **Dispatch retry queue** — `6c81a06`. When Slack post fails from the Shopify/HubSpot webhook, intent gets enqueued to KV; hourly cron at :30 retries up to 5 attempts. Exhausted entries escalate to `#ops-alerts` for manual review. No more silent vanishes.
 
 ### 🟢 Small wins — still open (≤ 1 hour each)
 
