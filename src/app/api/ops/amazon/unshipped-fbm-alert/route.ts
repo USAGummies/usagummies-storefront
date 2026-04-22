@@ -36,12 +36,17 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const KV_ALERTED_IDS = "amazon:fbm:alerted";
+const KV_DISPATCHED = "amazon:fbm:dispatched";
 const ALERT_URGENT_HOURS = 12;
 const DEDUPE_WINDOW_DAYS = 3;
 
 interface AlertedEntry {
   orderId: string;
   alertedAt: string;
+}
+interface DispatchedEntry {
+  orderId: string;
+  dispatchedAt: string;
 }
 
 function hoursUntil(iso: string): number {
@@ -79,11 +84,14 @@ export async function GET(req: Request): Promise<Response> {
   const now = Date.now();
   const existing =
     ((await kv.get<AlertedEntry[]>(KV_ALERTED_IDS)) ?? []) as AlertedEntry[];
+  const dispatched =
+    ((await kv.get<DispatchedEntry[]>(KV_DISPATCHED)) ?? []) as DispatchedEntry[];
   const cutoff = now - DEDUPE_WINDOW_DAYS * 24 * 3600 * 1000;
   const stillValid = existing.filter(
     (e) => new Date(e.alertedAt).getTime() > cutoff,
   );
   const alertedSet = new Set(stillValid.map((e) => e.orderId));
+  const dispatchedSet = new Set(dispatched.map((e) => e.orderId));
 
   const fresh = orders.filter((o) => !alertedSet.has(o.orderId));
   const urgent = orders.filter(
@@ -114,9 +122,15 @@ export async function GET(req: Request): Promise<Response> {
       ];
       for (const o of toAlert.slice(0, 25)) {
         const hoursLeft = hoursUntil(o.latestShipDateEstimate);
-        const icon = hoursLeft < ALERT_URGENT_HOURS ? ":rotating_light:" : "•";
-        const urgencyTag =
-          hoursLeft < 0
+        const isDispatched = dispatchedSet.has(o.orderId);
+        const icon = isDispatched
+          ? ":outbox_tray:"
+          : hoursLeft < ALERT_URGENT_HOURS
+            ? ":rotating_light:"
+            : "•";
+        const urgencyTag = isDispatched
+          ? " *DISPATCHED — awaiting physical ship*"
+          : hoursLeft < 0
             ? " *LATE*"
             : hoursLeft < ALERT_URGENT_HOURS
               ? ` *${Math.round(hoursLeft)}h left*`
