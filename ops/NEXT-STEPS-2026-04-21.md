@@ -28,27 +28,32 @@ Everything else in the provisioning guide (Faire, Booke, Notion Compliance Calen
 
 Ordered by leverage × time-to-ship. Ben can hand these to Claude any time.
 
-### 🟢 Small wins (≤ 1 hour each)
+### 🟢 Small wins — shipped since last update
 
-1. **S-08 Slack trigger for `#operations`** — contract says a message matching `/sample\s+request|dispatch/i` should fire a dispatch proposal. Wire a handler in `/api/ops/slack/events` that verifies the signature, matches the pattern, extracts ship-to from the message body, and calls the dispatch classifier. Est 45 min.
+- ✅ **S-08 Slack trigger for `#operations`** — `d41ccb0`. Pattern `/sample\s*(request|dispatch)/i` + `/dispatch <channel>` shortcut. Threaded reply with copy-paste template.
+- ✅ **Inventory snapshot cron** — `d41ccb0`. Dedicated weekday 13:15 UTC cron with auto-refresh on ≥18h staleness + stale-cache fallback during Shopify outages.
+- ✅ **Viktor pipeline composer tests** — `c3d6792`. Extracted to pure function + 11 vitest green.
+- ✅ **Webhook signature verification audit** — `7cd7ace`. Shopify webhook recovered from `.gitignore` miss + added X-Shopify-Triggered-At replay protection (5-min tolerance matching HubSpot + Slack).
+- ✅ **Wallet top-up deeplink** — `b701263`. One-click button on /ops/shipping when wallet below floor.
+- ✅ **/ops/shopify-orders fallback queue** — `8e498bd`. Complements webhook auto-dispatch with a manual catch-up UI. One-click dispatch with full ship-to from Shopify payload (no form needed — unlike FBM). Gated on financial_status:paid fulfillment_status:unfulfilled.
 
-2. **Inventory snapshot cron** — promote the Ops Agent side-effect to a dedicated `/api/ops/inventory/snapshot` POST cron so the snapshot doesn't drift if Ops Agent fails. Just 1 new `vercel.json` entry + middleware. Est 30 min.
+### 🟢 Small wins — still open (≤ 1 hour each)
 
-3. **Drift-audit enhancement** — fold `/api/ops/fulfillment/summary` weekly totals into the Monday drift-audit scorecard post. Est 30 min.
+1. **Drift-audit enhancement** — fold `/api/ops/fulfillment/summary` weekly totals into the Monday drift-audit scorecard post. Est 30 min.
 
-4. **Viktor pipeline digest tests** — mock `listRecentDeals`, assert rollup counts + reorder recommendations. Est 30 min.
+2. **`/ops/amazon-fbm` bulk-dispatch** — select multiple FBM orders with shared ship-to (e.g. repeat corporate customers) and batch-dispatch. Est 1 hour.
 
-5. **`/ops/amazon-fbm` bulk-dispatch** — select multiple FBM orders with shared ship-to (e.g. repeat corporate customers) and batch-dispatch. Est 1 hour.
+3. **Ship-to autocomplete** — when Ben dispatches Amazon, pull prior ship-to addresses from ShipStation history for the same buyer name; offer autocomplete. Est 1 hour.
 
-6. **Ship-to autocomplete** — when Ben dispatches Amazon, pull prior ship-to addresses from ShipStation history for the same buyer name; offer autocomplete. Est 1 hour.
+4. **`/ops/shipping` + `/ops/ledger` + `/ops/agents/status` mobile polish** — verify the grid layouts work on phone widths; add `viewport` meta. Est 1 hour.
 
-7. **Webhook signature verification audit** — lock down replay-attack resistance + timestamp window on both Shopify + HubSpot handlers. Est 1 hour.
+5. **Compliance Specialist live-mode tests** — when Notion DB lands, lock down query/filter/render path with vitest mocks. Est 1 hour.
 
-8. **`/ops/shipping` + `/ops/ledger` + `/ops/agents/status` mobile polish** — verify the grid layouts work on phone widths; add `viewport` meta. Est 1 hour.
+6. **Amazon dispatch RDT (Restricted Data Token) flow** — eliminate the manual ship-to copy from Seller Central. SP-API `/tokens/2021-03-01` path. Requires PII-approval from Amazon first (separate Ben task). Code scope: ~2 hours once approved.
 
-9. **Compliance Specialist live-mode tests** — when Notion DB lands, lock down query/filter/render path with vitest mocks. Est 1 hour.
+7. **S-08 Shopify webhook vitest coverage** — unit tests for HMAC verify + triggered-at window + event parsing. Est 45 min.
 
-10. **Amazon dispatch RDT (Restricted Data Token) flow** — eliminate the manual ship-to copy from Seller Central. SP-API `/tokens/2021-03-01` path. Requires PII-approval from Amazon first (separate Ben task). Code scope: ~2 hours once approved.
+8. **`/ops/shopify-orders` empty-state polish + count in `/api/ops/smoke`** — when queue is empty, smoke reports green. Est 30 min.
 
 ### 🟡 Medium builds (2-4 hours)
 
