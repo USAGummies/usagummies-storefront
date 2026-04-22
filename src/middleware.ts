@@ -59,6 +59,7 @@ const SELF_AUTHENTICATED_PREFIXES = [
   "/api/ops/pulse/", // PULSE — Fleet health monitoring (isAuthorized)
   "/api/ops/webhooks/", // WEBHOOKS — Upstream webhook ingress (Shopify HMAC, Amazon SNS, Faire token, etc.) — each route verifies its own signature
   "/api/ops/smoke", // SMOKE — cross-integration health check (isAuthorized)
+  "/api/ops/shopify/", // SHOPIFY DTC — unfulfilled queue + dispatch bridge (isAuthorized)
 ];
 
 function isSelfAuthenticated(pathname: string): boolean {

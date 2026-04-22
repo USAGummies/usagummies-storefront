@@ -56,6 +56,7 @@ const NAV_SECTIONS: NavSection[] = [
       { href: "/ops/shipping", label: "Shipping Status", icon: "\u{1F69A}", roles: ["admin", "employee"] },
       { href: "/ops/fulfillment", label: "Fulfillment Queue", icon: "\u{1F4E6}", roles: ["admin", "employee"] },
       { href: "/ops/amazon-fbm", label: "Amazon FBM Queue", icon: "\u{1F4E6}", roles: ["admin", "employee"] },
+      { href: "/ops/shopify-orders", label: "Shopify DTC Queue", icon: "\u{1F6D2}", roles: ["admin", "employee"] },
       { href: "/ops/agents/status", label: "Agent Status", icon: "\u{1F916}", roles: ["admin", "employee"] },
     ],
   },

@@ -53,6 +53,10 @@ usagummies-storefront/
 !src/app/api/webhooks/shopify/**
 !src/app/api/ops/webhooks/shopify/
 !src/app/api/ops/webhooks/shopify/**
+!src/app/api/ops/shopify/
+!src/app/api/ops/shopify/**
+!src/app/ops/shopify-orders/
+!src/app/ops/shopify-orders/**
 
 node_modules/
 .env*

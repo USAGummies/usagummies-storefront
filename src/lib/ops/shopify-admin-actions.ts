@@ -364,6 +364,185 @@ export async function queryRecentOrders(opts: OrderQueryOpts = {}): Promise<Shop
   }));
 }
 
+// ---------------------------------------------------------------------------
+// Dispatch-ready orders — unfulfilled paid orders with shipping address
+// ---------------------------------------------------------------------------
+
+/**
+ * Extended Shopify order payload carrying everything the S-08 classifier
+ * + buy-label route need to dispatch without a second round-trip.
+ *
+ * Used by `/api/ops/shopify/unshipped` + `/ops/shopify-orders` as a
+ * fallback for when the `orders/paid` webhook misses or hasn't been
+ * configured yet (guide §2).
+ */
+export interface DispatchReadyOrder {
+  id: string;
+  name: string; // "#1018"
+  createdAt: string;
+  financialStatus: string;
+  fulfillmentStatus: string;
+  totalAmount: number;
+  currencyCode: string;
+  customer: {
+    displayName: string | null;
+    email: string | null;
+    phone: string | null;
+  } | null;
+  shippingAddress: {
+    name: string | null;
+    company: string | null;
+    address1: string | null;
+    address2: string | null;
+    city: string | null;
+    province: string | null;
+    provinceCode: string | null;
+    zip: string | null;
+    country: string | null;
+    countryCode: string | null;
+    phone: string | null;
+  } | null;
+  lineItems: Array<{
+    title: string;
+    sku: string | null;
+    quantity: number;
+  }>;
+  tags: string[];
+  note: string | null;
+}
+
+const DISPATCH_ORDERS_QUERY = /* GraphQL */ `
+  query UnshippedPaidOrders($limit: Int!, $query: String!) {
+    orders(first: $limit, query: $query, reverse: true, sortKey: CREATED_AT) {
+      edges {
+        node {
+          id
+          name
+          createdAt
+          displayFinancialStatus
+          displayFulfillmentStatus
+          totalPriceSet {
+            shopMoney {
+              amount
+              currencyCode
+            }
+          }
+          customer {
+            displayName
+            email
+            phone
+          }
+          shippingAddress {
+            name
+            company
+            address1
+            address2
+            city
+            province
+            provinceCode
+            zip
+            country
+            countryCode
+            phone
+          }
+          lineItems(first: 20) {
+            edges {
+              node {
+                title
+                sku
+                quantity
+              }
+            }
+          }
+          tags
+          note
+        }
+      }
+    }
+  }
+`;
+
+interface DispatchOrdersQueryResult {
+  orders: {
+    edges: Array<{
+      node: {
+        id: string;
+        name: string;
+        createdAt: string;
+        displayFinancialStatus: string | null;
+        displayFulfillmentStatus: string | null;
+        totalPriceSet: {
+          shopMoney: { amount: string; currencyCode: string };
+        };
+        customer: {
+          displayName: string | null;
+          email: string | null;
+          phone: string | null;
+        } | null;
+        shippingAddress: {
+          name: string | null;
+          company: string | null;
+          address1: string | null;
+          address2: string | null;
+          city: string | null;
+          province: string | null;
+          provinceCode: string | null;
+          zip: string | null;
+          country: string | null;
+          countryCode: string | null;
+          phone: string | null;
+        } | null;
+        lineItems: {
+          edges: Array<{
+            node: { title: string; sku: string | null; quantity: number };
+          }>;
+        };
+        tags: string[];
+        note: string | null;
+      };
+    }>;
+  };
+}
+
+/**
+ * Query Shopify for unfulfilled paid orders with full ship-to + line
+ * items. Paired with the UI queue at /ops/shopify-orders.
+ */
+export async function queryUnfulfilledPaidOrders(opts: {
+  days?: number;
+  limit?: number;
+} = {}): Promise<DispatchReadyOrder[]> {
+  const days = opts.days ?? 14;
+  const limit = Math.max(1, Math.min(100, opts.limit ?? 50));
+  // Shopify query syntax: financial_status:paid fulfillment_status:unfulfilled
+  const createdSince = new Date(Date.now() - days * 24 * 3600 * 1000)
+    .toISOString()
+    .slice(0, 10);
+  const query = `financial_status:paid fulfillment_status:unfulfilled created_at:>${createdSince}`;
+  const result = await shopifyAdminQuery<DispatchOrdersQueryResult>(
+    DISPATCH_ORDERS_QUERY,
+    { limit, query },
+  );
+  return result.orders.edges.map(({ node }) => ({
+    id: node.id,
+    name: node.name,
+    createdAt: node.createdAt,
+    financialStatus: node.displayFinancialStatus ?? "UNKNOWN",
+    fulfillmentStatus: node.displayFulfillmentStatus ?? "UNFULFILLED",
+    totalAmount: Number(node.totalPriceSet.shopMoney.amount ?? 0),
+    currencyCode: node.totalPriceSet.shopMoney.currencyCode,
+    customer: node.customer,
+    shippingAddress: node.shippingAddress,
+    lineItems: node.lineItems.edges.map((e) => ({
+      title: e.node.title,
+      sku: e.node.sku,
+      quantity: e.node.quantity,
+    })),
+    tags: node.tags ?? [],
+    note: node.note,
+  }));
+}
+
 export async function getProductVariants(
   productId: string,
 ): Promise<Array<{ id: string; title: string; sku: string }>> {
