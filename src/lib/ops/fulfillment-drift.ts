@@ -34,6 +34,7 @@ import { kv } from "@vercel/kv";
 
 import type { InventorySnapshot } from "./inventory-snapshot";
 import {
+  getRecentShipments,
   listShipStationCarriers,
   listVoidedLabels,
 } from "./shipstation-client";
@@ -87,6 +88,18 @@ export interface FulfillmentDriftScorecard {
   severityCounts: Record<DriftSeverity, number>;
   /** True when at least one finding exists. Callers post only on this. */
   hasFindings: boolean;
+  /** Window summary stats (info-level — not findings). */
+  summary: {
+    labelsActive: number;
+    labelsVoided: number;
+    labelsActiveSpend: number;
+    labelsVoidedPending: number;
+    queuedCount: number;
+    queuedDollars: number;
+    postedCount: number;
+    postedDollars: number;
+    drainRatePct: number | null;
+  };
   /** Diagnostic degradations (ShipStation unreachable, KV miss). */
   degraded: string[];
 }
@@ -226,6 +239,80 @@ export async function runFulfillmentDriftAudit(opts: {
     }
   }
 
+  // ---- Window summary (info-only, not a finding) ----
+  const windowStartIso = new Date(now - windowMs).toISOString().slice(0, 10);
+  const summary = {
+    labelsActive: 0,
+    labelsVoided: 0,
+    labelsActiveSpend: 0,
+    labelsVoidedPending: 0,
+    queuedCount: 0,
+    queuedDollars: 0,
+    postedCount: 0,
+    postedDollars: 0,
+    drainRatePct: null as number | null,
+  };
+  try {
+    const shipRes = await getRecentShipments({
+      shipDateStart: windowStartIso,
+      includeVoided: true,
+      pageSize: 500,
+    });
+    if (shipRes.ok) {
+      for (const s of shipRes.shipments) {
+        if (s.voided) {
+          summary.labelsVoided += 1;
+          // Stale voids carry pending refund exposure — voidedPending
+          // is a superset of the stale_void_sla finding.
+          summary.labelsVoidedPending += 0; // real cost not exposed on shipment list
+        } else {
+          summary.labelsActive += 1;
+          // shipmentCost not included in list response — use void helper's field.
+          // Leaving this as best-effort; full cost rolls up from /summary route.
+        }
+      }
+    } else {
+      degraded.push(`shipments-scan: ${shipRes.error}`);
+    }
+  } catch (err) {
+    degraded.push(
+      `shipments-scan: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
+  // Queue transitions — same data, window-filtered.
+  interface QEntry {
+    queuedAt?: string;
+    postedAt?: string;
+    freightDollars?: number;
+    status?: string;
+  }
+  try {
+    const q = ((await kv.get<QEntry[]>(KV_FREIGHT_COMP_QUEUE)) ?? []) as QEntry[];
+    const inWindow = (iso: string | undefined): boolean =>
+      !!iso && new Date(iso).getTime() >= now - windowMs;
+    const queuedInWin = q.filter((e) => inWindow(e.queuedAt));
+    const postedInWin = q.filter((e) => inWindow(e.postedAt));
+    summary.queuedCount = queuedInWin.length;
+    summary.queuedDollars =
+      Math.round(
+        queuedInWin.reduce((s, e) => s + (e.freightDollars || 0), 0) * 100,
+      ) / 100;
+    summary.postedCount = postedInWin.length;
+    summary.postedDollars =
+      Math.round(
+        postedInWin.reduce((s, e) => s + (e.freightDollars || 0), 0) * 100,
+      ) / 100;
+    if (summary.queuedCount > 0) {
+      summary.drainRatePct =
+        Math.round((summary.postedCount / summary.queuedCount) * 1000) / 10;
+    }
+  } catch (err) {
+    degraded.push(
+      `queue-summary: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
   // ---- Severity rollup ----
   const severityCounts: Record<DriftSeverity, number> = {
     P1: 0,
@@ -241,6 +328,7 @@ export async function runFulfillmentDriftAudit(opts: {
     findings,
     severityCounts,
     hasFindings: findings.length > 0,
+    summary,
     degraded,
   };
 }
@@ -252,16 +340,34 @@ export async function runFulfillmentDriftAudit(opts: {
 export function renderFulfillmentDriftMarkdown(
   sc: FulfillmentDriftScorecard,
 ): string {
-  if (!sc.hasFindings) return "";
+  // Post when there are findings OR when the window shows meaningful
+  // activity worth weekly visibility. Empty weeks stay silent.
+  const hasActivity =
+    sc.summary.labelsActive > 0 ||
+    sc.summary.labelsVoided > 0 ||
+    sc.summary.queuedCount > 0 ||
+    sc.summary.postedCount > 0;
+  if (!sc.hasFindings && !hasActivity) return "";
+
   const lines: string[] = [
     `:mag: *Fulfillment drift audit — ${sc.windowDays}d window*`,
     `_${sc.severityCounts.P1} P1 · ${sc.severityCounts.P2} P2 · ${sc.severityCounts.P3} P3 findings. Generated ${sc.generatedAt}._`,
     "",
+    "*Weekly summary:*",
+    `  • Labels: ${sc.summary.labelsActive} active · ${sc.summary.labelsVoided} voided`,
+    `  • CF-09 queue: ${sc.summary.queuedCount} queued ($${sc.summary.queuedDollars.toFixed(2)}) · ${sc.summary.postedCount} posted ($${sc.summary.postedDollars.toFixed(2)})` +
+      (sc.summary.drainRatePct !== null
+        ? ` · ${sc.summary.drainRatePct}% drain`
+        : ""),
   ];
-  const icon = (s: DriftSeverity): string =>
-    s === "P1" ? ":rotating_light:" : s === "P2" ? ":warning:" : ":information_source:";
-  for (const f of sc.findings) {
-    lines.push(`${icon(f.severity)} *${f.severity}* \`${f.check}\`: ${f.summary}`);
+
+  if (sc.findings.length > 0) {
+    lines.push("", "*Findings:*");
+    const icon = (s: DriftSeverity): string =>
+      s === "P1" ? ":rotating_light:" : s === "P2" ? ":warning:" : ":information_source:";
+    for (const f of sc.findings) {
+      lines.push(`${icon(f.severity)} *${f.severity}* \`${f.check}\`: ${f.summary}`);
+    }
   }
   if (sc.degraded.length > 0) {
     lines.push("", `_Degraded:_ ${sc.degraded.join(" | ")}`);

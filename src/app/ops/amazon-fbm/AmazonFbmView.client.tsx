@@ -87,6 +87,8 @@ export function AmazonFbmView() {
   const [dispatchResults, setDispatchResults] = useState<
     Record<string, { ok: boolean; message: string }>
   >({});
+  const [bulkShipTo, setBulkShipTo] = useState<ShipToForm>(EMPTY_SHIP_TO);
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -123,6 +125,17 @@ export function AmazonFbmView() {
       [orderId]: { ...getShipTo(orderId), ...patch },
     }));
   };
+
+  const pasteBulkToAll = useCallback(() => {
+    // Populate every undispatched card's form with the bulk ship-to.
+    // Ben can still tweak individual cards after.
+    const patch: Record<string, ShipToForm> = {};
+    for (const o of orders) {
+      if (dispatchResults[o.orderId]?.ok) continue;
+      patch[o.orderId] = { ...bulkShipTo };
+    }
+    setShipToByOrder((prev) => ({ ...prev, ...patch }));
+  }, [bulkShipTo, orders, dispatchResults]);
 
   const dispatch = useCallback(
     async (order: FbmOrder) => {
@@ -273,6 +286,112 @@ export function AmazonFbmView() {
         >
           ✅ No unshipped FBM orders.
         </div>
+      )}
+
+      {/* Bulk ship-to helper — for the rare case of a repeat customer
+          buying the same SKU multiple times in one day (common with
+          B2B2C drop-ship). Paste once, propagate to all remaining cards. */}
+      {orders.length > 1 && (
+        <details
+          style={{
+            border: `1px dashed ${BORDER}`,
+            borderRadius: 10,
+            padding: "10px 14px",
+            marginBottom: 14,
+            background: `${GOLD}08`,
+          }}
+        >
+          <summary
+            style={{
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: "pointer",
+              color: NAVY,
+              letterSpacing: 0.5,
+            }}
+          >
+            📋 Bulk ship-to (paste once, apply to every pending card)
+          </summary>
+          <div
+            style={{
+              display: "grid",
+              gap: 6,
+              marginTop: 10,
+            }}
+          >
+            <Input
+              label="Name"
+              value={bulkShipTo.name}
+              onChange={(v) => setBulkShipTo((p) => ({ ...p, name: v }))}
+            />
+            <Input
+              label="Street 1"
+              value={bulkShipTo.street1}
+              onChange={(v) => setBulkShipTo((p) => ({ ...p, street1: v }))}
+            />
+            <Input
+              label="Street 2"
+              value={bulkShipTo.street2}
+              onChange={(v) => setBulkShipTo((p) => ({ ...p, street2: v }))}
+            />
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 80px 110px",
+                gap: 6,
+              }}
+            >
+              <Input
+                label="City"
+                value={bulkShipTo.city}
+                onChange={(v) => setBulkShipTo((p) => ({ ...p, city: v }))}
+              />
+              <Input
+                label="State"
+                value={bulkShipTo.state}
+                onChange={(v) =>
+                  setBulkShipTo((p) => ({ ...p, state: v.toUpperCase() }))
+                }
+              />
+              <Input
+                label="ZIP"
+                value={bulkShipTo.postalCode}
+                onChange={(v) => setBulkShipTo((p) => ({ ...p, postalCode: v }))}
+              />
+            </div>
+            <button
+              onClick={() => {
+                setBulkBusy(true);
+                try {
+                  pasteBulkToAll();
+                } finally {
+                  setBulkBusy(false);
+                }
+              }}
+              disabled={
+                bulkBusy ||
+                !bulkShipTo.name ||
+                !bulkShipTo.street1 ||
+                !bulkShipTo.city ||
+                !bulkShipTo.state ||
+                !bulkShipTo.postalCode
+              }
+              style={{
+                marginTop: 8,
+                border: `1px solid ${GOLD}60`,
+                background: `${GOLD}10`,
+                color: NAVY,
+                borderRadius: 8,
+                padding: "8px 14px",
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: bulkBusy ? "default" : "pointer",
+              }}
+            >
+              Apply to all pending cards →
+            </button>
+          </div>
+        </details>
       )}
 
       <div

@@ -48,7 +48,10 @@ export async function GET(req: Request): Promise<Response> {
   let postedTo: string | null = null;
   const degraded: string[] = [...scorecard.degraded];
 
-  if (shouldPost && scorecard.hasFindings) {
+  // Post when there's findings OR meaningful weekly activity. The
+  // render helper returns "" when neither is true so we can just
+  // check for non-empty rendered output.
+  if (shouldPost && rendered.length > 0) {
     const channel = getChannel("ops-audit");
     if (!channel) {
       degraded.push("slack-post: #ops-audit channel not registered");
