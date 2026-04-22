@@ -31,6 +31,7 @@ import { postMessage } from "@/lib/ops/control-plane/slack";
 import { newRunContext } from "@/lib/ops/control-plane/run-id";
 import { auditStore } from "@/lib/ops/control-plane/stores";
 import { buildAuditEntry } from "@/lib/ops/control-plane/audit";
+import { renderComplianceDoctrineFallback } from "@/lib/ops/compliance-doctrine";
 import {
   isNotionConfigured,
   notionSearch,
@@ -236,25 +237,15 @@ function findFirstDate(row: { properties: Record<string, unknown> }) {
 }
 
 function renderDegraded(reason: string): string {
-  return [
-    `⚠️ *Compliance Specialist — degraded mode*`,
-    ``,
-    `Reason: ${reason}`,
-    ``,
-    `The specialist refuses to fabricate a clean digest when its source is unreachable (governance §1.6). Wire up the source and the next run posts normally.`,
-  ].join("\n");
+  // Doctrine-driven fallback list — categorical obligations only,
+  // no fabricated dates. Readers see `[FALLBACK]` on every row.
+  return renderComplianceDoctrineFallback(reason);
 }
 
 function renderMissingCalendar(): string {
-  return [
-    `⚠️ *Compliance Specialist — cannot start*`,
-    ``,
-    `Notion database \`/Legal/Compliance Calendar\` is missing or not shared with this integration. Canon §10.1 Lane E.1 requires this artifact before the specialist can run.`,
-    ``,
-    `*To unblock:* create the database with at minimum these columns — \`Name\` (title), \`Due\` (date), \`Owner\` (text), \`Status\` (status), \`Category\` (select). Share it with the Notion API integration this workspace uses.`,
-    ``,
-    `Each row populated = one more obligation Ben / Rene / counsel no longer has to track from memory.`,
-  ].join("\n");
+  return renderComplianceDoctrineFallback(
+    `Notion database '/Legal/Compliance Calendar' is missing or not shared with this integration. Canon §10.1 Lane E.1 requires this artifact before the specialist can run authoritatively. To unblock: create the database with columns Name (title), Due (date), Owner (text), Status (status), Category (select).`,
+  );
 }
 
 function renderDigest(input: {
