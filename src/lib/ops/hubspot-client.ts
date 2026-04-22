@@ -481,6 +481,100 @@ export async function getDealWithContact(
   dealId: string,
 ): Promise<DealWithContact | null> {
   if (!isHubSpotConfigured()) return null;
+  // (legacy path — implementation below)
+  return _getDealWithContact(dealId);
+}
+
+// ---------------------------------------------------------------------------
+// Pipeline digest — list deals (Viktor weekly)
+// ---------------------------------------------------------------------------
+
+export interface PipelineDeal {
+  id: string;
+  dealname: string;
+  dealstage: string;
+  amount: number | null;
+  closedate: string | null;
+  createdate: string;
+  lastmodifieddate: string;
+  daysSinceLastActivity: number;
+}
+
+/**
+ * Paginated GET of all deals on the B2B Wholesale pipeline with the
+ * properties we need for a pipeline digest. Stops at `limit`.
+ */
+export async function listRecentDeals(
+  opts: { pipeline?: string; limit?: number } = {},
+): Promise<PipelineDeal[]> {
+  if (!isHubSpotConfigured()) return [];
+  const pipeline = opts.pipeline ?? PIPELINE_B2B_WHOLESALE;
+  const limit = Math.min(500, Math.max(1, opts.limit ?? 200));
+  const props = [
+    "dealname",
+    "dealstage",
+    "amount",
+    "closedate",
+    "createdate",
+    "hs_lastmodifieddate",
+    "pipeline",
+  ].join(",");
+
+  const deals: PipelineDeal[] = [];
+  let after: string | undefined;
+  const PAGE = 100;
+
+  while (deals.length < limit) {
+    const qp = new URLSearchParams({
+      properties: props,
+      limit: String(Math.min(PAGE, limit - deals.length)),
+    });
+    if (after) qp.set("after", after);
+    const res = await hsRequest<{
+      results?: Array<{
+        id: string;
+        properties?: Record<string, string | null>;
+      }>;
+      paging?: { next?: { after?: string } };
+    }>("GET", `/crm/v3/objects/deals?${qp.toString()}`);
+    if (!res.ok || !res.data) break;
+    const now = Date.now();
+    for (const d of res.data.results ?? []) {
+      const p = d.properties ?? {};
+      if (p.pipeline && p.pipeline !== pipeline) continue;
+      const amountRaw = p.amount;
+      const amount =
+        typeof amountRaw === "string" && amountRaw.length > 0
+          ? Number.parseFloat(amountRaw)
+          : null;
+      const lastMod = p.hs_lastmodifieddate
+        ? new Date(p.hs_lastmodifieddate).getTime()
+        : 0;
+      const daysSince =
+        lastMod > 0 ? Math.floor((now - lastMod) / (24 * 3600 * 1000)) : 0;
+      deals.push({
+        id: d.id,
+        dealname: p.dealname ?? "",
+        dealstage: p.dealstage ?? "",
+        amount: Number.isFinite(amount) ? amount : null,
+        closedate: p.closedate ?? null,
+        createdate: p.createdate ?? "",
+        lastmodifieddate: p.hs_lastmodifieddate ?? "",
+        daysSinceLastActivity: daysSince,
+      });
+    }
+    after = res.data.paging?.next?.after;
+    if (!after) break;
+  }
+  return deals;
+}
+
+// Rename original implementation to a private helper so we can keep
+// the public name wrapper + add the listRecentDeals helper above.
+async function _getDealWithContact(
+  dealId: string,
+): Promise<DealWithContact | null> {
+  if (!isHubSpotConfigured()) return null;
 
   const dealProps = [
     "dealname",
