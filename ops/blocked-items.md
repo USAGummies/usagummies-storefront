@@ -33,6 +33,18 @@ The control plane, stores, Slack surfaces, approval route, daily brief, drift au
 - **B-14 (M10)** — Ben: verify `SHIPSTATION_FROM_STREET1` matches the Ashford warehouse (I defaulted to `30815 SR 706 E` based on the Mettler context — double-check before first real label buy).
 - **B-15 (M11)** — Ben + Rene + Drew: smoke-check the first live digest posts tomorrow morning in `#finance` and `#operations` before the 06:15 / 09:00 PT crons run unsupervised for a week.
 
+### New blocked items (2026-04-21, overnight build arc — 33 commits)
+
+- **B-16 (URGENT)** — Ben: top up Stamps.com wallet in ShipStation UI (currently $23.84; floor $100, preflight refuses label buys until $120+). Recommend $150-200.
+- **B-17** — Ben: Shopify webhook for `orders/paid`. Shopify Admin → Settings → Notifications → Webhooks. URL: `https://www.usagummies.com/api/ops/webhooks/shopify/orders-paid`. `SHOPIFY_WEBHOOK_SECRET` already set. Once configured, Shopify DTC orders auto-dispatch into `#ops-approvals`.
+- **B-18** — Ben: HubSpot webhook for `deal.propertyChange` (dealstage). HubSpot Settings → Integrations → Private Apps → Webhooks. URL: `https://www.usagummies.com/api/ops/webhooks/hubspot/deal-stage-changed`. Set `HUBSPOT_APP_SECRET` env on Vercel for signature-v3 verification.
+- **B-19** — Ben + counsel: create Notion `/Legal/Compliance Calendar` database. Minimum columns: Name (title), Due (date), Owner (text), Status (status), Category (select). Until populated, Compliance Specialist runs in `[FALLBACK]` doctrine mode (11 categories listed, no dates). Reference: `src/lib/ops/compliance-doctrine.ts`.
+- **B-20** — Ben: `FAIRE_ACCESS_TOKEN` on Vercel when Faire volume justifies. Without it, Faire Specialist stays degraded.
+- **B-21** — Ben OR Rene: `BOOKE_API_TOKEN` on Vercel OR wire a Zapier bridge posting to `/api/ops/booke/push` every few hours. Unblocks Finance Exception "Uncategorized transactions" cell.
+- **B-22** — Ben: tune `INVENTORY_BURN_RATE_BAGS_PER_DAY` env on Vercel (default 250 is a placeholder). Once sales velocity stabilizes, set this to the real rolling-30d burn. Per-SKU via `INVENTORY_BURN_RATE_<SKU>`.
+- **B-23** — Ben: follow up on Stamps.com refund escalation (2026-04-20 email). If no reply, hit the thread with a ping. $130.90 in flight for 17 Viktor voids.
+- **B-24** (monitor) — Vercel cron count = 14. Hobby plan historically capped lower; watch the deploy log for cron rejections. Fallback: migrate 2-3 to Make.com.
+
 What's left is strictly manual/admin work — the items below plus the cutover sequence in [`cutover-sequence.md`](cutover-sequence.md).
 
 **Recommended next human action:** go to [`go-live-runbook.md`](go-live-runbook.md) Step 1.
