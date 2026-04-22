@@ -40,6 +40,8 @@ Ordered by leverage × time-to-ship. Ben can hand these to Claude any time.
 - ✅ **Drift-audit weekly summary** — `b8f75ee`. Fulfillment drift audit now renders a weekly summary block (labels active/voided + queue drain rate %) + posts on meaningful activity even when no P1/P2/P3 findings.
 - ✅ **FBM bulk ship-to helper** — `b8f75ee`. Collapsible "📋 Bulk ship-to" at the top of /ops/amazon-fbm — paste once, apply to every pending card.
 - ✅ **Dispatch retry queue** — `6c81a06`. When Slack post fails from the Shopify/HubSpot webhook, intent gets enqueued to KV; hourly cron at :30 retries up to 5 attempts. Exhausted entries escalate to `#ops-alerts` for manual review. No more silent vanishes.
+- ✅ **#ops-audit mirror for every dispatch route** — `95ab0f5` (2026-04-22 morning). Blueprint §6 non-negotiable: "every autonomous write is logged to #ops-audit". 7 dispatch routes (webhook adapters, UI bridges, manual) were writing to #ops-approvals without mirroring. New shared `auditDispatch()` helper + wire. Drift audit + graduation gauge now see every dispatch.
+- ✅ **Burn-rate calibration from real sales** — `1de835d` (2026-04-22 morning). Cover-day forecast was using 250 bags/day placeholder. Now computes rolling 30-day burn from Shopify paid orders + Amazon shipped/unshipped with confidence ladder (high ≥30 / medium ≥7 / low <7 orders). Forecast picks calibrated > env > default. Weekly Sunday 03:30 UTC cron refresh.
 
 ### 🟢 Small wins — still open (≤ 1 hour each)
 
