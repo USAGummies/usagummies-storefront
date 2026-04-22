@@ -23,7 +23,7 @@
 import { NextResponse } from "next/server";
 import { kv } from "@vercel/kv";
 
-import { isCronAuthorized, unauthorized } from "@/lib/ops/control-plane/admin-auth";
+import { isAuthorized } from "@/lib/ops/abra-auth";
 import { getChannel } from "@/lib/ops/control-plane/channels";
 import { postMessage } from "@/lib/ops/control-plane/slack";
 import {
@@ -54,7 +54,9 @@ function hoursUntil(iso: string): number {
 }
 
 export async function GET(req: Request): Promise<Response> {
-  if (!isCronAuthorized(req)) return unauthorized();
+  if (!(await isAuthorized(req))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   const url = new URL(req.url);
   const shouldPost = url.searchParams.get("post") !== "false";
