@@ -194,8 +194,13 @@ async function composeAndPost(req: Request): Promise<Response> {
   // Shipping Hub pre-flight — morning brief only. Ben's 08:00 PT read
   // in #ops-daily surfaces wallet/ATP/queue/stale-voids so he knows
   // before the 10:00 PT Ops Agent post whether shipping is gated.
+  //
+  // Skipped entirely when ShipStation + Amazon creds aren't set (test
+  // env / dev). Silent failures during the fetch also don't taint the
+  // envelope — only a real throw bubbles into degradations.
   let preflight: FulfillmentPreflightSlice | undefined;
-  if (kind === "morning") {
+  const shipStationConfigured = !!process.env.SHIPSTATION_API_KEY?.trim();
+  if (kind === "morning" && shipStationConfigured) {
     try {
       const pf = await computeFulfillmentPreflight();
       preflight = {
