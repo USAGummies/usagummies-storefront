@@ -33,32 +33,29 @@ export interface ShipFromAddress {
 }
 
 function getShipFromAddress(): ShipFromAddress {
-  // Visible return address on every outbound label. Points to USA Gummies
-  // Inc.'s Wyoming corporate address (Wyoming Attorneys LLC's business
-  // suite) — NOT the Ashford warehouse, NOT Ben's personal name. Keeps
-  // home/warehouse off public packages. Mail handling is configured at
-  // that address; the company does not take returns, so packages that
-  // come back are minimal.
+  // Mirrors the "USA Gummies HQ" warehouse configured in ShipStation
+  // (Settings → Shipping → Ship From Locations). Canonical warehouse for
+  // all outbound — Ben fulfills every order from Ashford until Drew has
+  // inventory. Name is "USA Gummies" (no personal name — privacy +
+  // professionalism); `company` is left unset so the label doesn't stack
+  // "USA Gummies / USA Gummies" on two lines.
   //
-  // Postage-origin NOTE: USPS rates based on this postalCode, so zone
-  // pricing will be computed WY→destination. Packages are physically
-  // dropped at Ashford USPS (98304) — USPS Ground Advantage and
-  // First-Class do not strictly enforce origin-ZIP-matches-entry-facility
-  // the way Priority Mail does, so the physical discrepancy is
-  // tolerated. If any package gets an "origin mismatch" handling code,
-  // revisit the shipFrom split.
+  // Why mirror the SS warehouse exactly: UI-driven labels use the SS
+  // warehouse, API-driven labels (/shipments/createlabel) use these
+  // fields. Both must match or the audit will flag a drift. If Ben edits
+  // the warehouse in ShipStation, update these defaults in the same PR.
   //
-  // Env overrides win so we can change via Vercel env without a deploy.
+  // Env overrides still win so Vercel env can change without a redeploy.
   return {
     name: process.env.SHIPSTATION_FROM_NAME?.trim() || "USA Gummies",
     company: process.env.SHIPSTATION_FROM_COMPANY?.trim() || undefined,
-    street1: process.env.SHIPSTATION_FROM_STREET1?.trim() || "1309 Coffeen Ave",
-    street2: process.env.SHIPSTATION_FROM_STREET2?.trim() || "Ste. 1200",
-    city: process.env.SHIPSTATION_FROM_CITY?.trim() || "Sheridan",
-    state: process.env.SHIPSTATION_FROM_STATE?.trim() || "WY",
-    postalCode: process.env.SHIPSTATION_FROM_POSTALCODE?.trim() || "82801",
+    street1: process.env.SHIPSTATION_FROM_STREET1?.trim() || "30025 SR 706 E",
+    street2: process.env.SHIPSTATION_FROM_STREET2?.trim() || undefined,
+    city: process.env.SHIPSTATION_FROM_CITY?.trim() || "Ashford",
+    state: process.env.SHIPSTATION_FROM_STATE?.trim() || "WA",
+    postalCode: process.env.SHIPSTATION_FROM_POSTALCODE?.trim() || "98304",
     country: process.env.SHIPSTATION_FROM_COUNTRY?.trim() || "US",
-    phone: process.env.SHIPSTATION_FROM_PHONE?.trim() || "3072094928",
+    phone: process.env.SHIPSTATION_FROM_PHONE?.trim() || "3073211234",
   };
 }
 

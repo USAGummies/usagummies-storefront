@@ -57,6 +57,10 @@
       "schedule": "0 16,20,23 * * 1-5"
     },
     {
+      "path": "/api/ops/amazon/auto-ship",
+      "schedule": "*/30 * * * *"
+    },
+    {
       "path": "/api/ops/agents/viktor-pipeline/run?post=true",
       "schedule": "0 14 * * 1"
     },

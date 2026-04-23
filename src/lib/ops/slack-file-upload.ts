@@ -444,3 +444,119 @@ export async function uploadXlsxToThread(
     comment,
   });
 }
+
+/**
+ * Upload an arbitrary binary Buffer (e.g. a shipping-label PDF) to Slack.
+ *
+ * Uses the same 3-step files.getUploadURLExternal + external POST +
+ * files.completeUploadExternal flow as `uploadFileToSlack`, but skips
+ * the CSV/XLSX generation step — the caller provides the final bytes.
+ *
+ * Primary consumer: the Amazon FBM auto-ship pipeline (drops the label
+ * PDF into #operations or DM as soon as the label is purchased).
+ */
+export async function uploadBufferToSlack(opts: {
+  channelId: string;
+  filename: string;
+  buffer: Buffer | Uint8Array;
+  mimeType: string;
+  title?: string;
+  comment?: string;
+  threadTs?: string;
+}): Promise<SlackFileUploadResult> {
+  const token = process.env.SLACK_BOT_TOKEN;
+  if (!token) {
+    return { ok: false, error: "SLACK_BOT_TOKEN not configured" };
+  }
+  const fileBuffer =
+    opts.buffer instanceof Uint8Array ? Buffer.from(opts.buffer) : opts.buffer;
+
+  // Step 1: Get upload URL
+  let urlData: { ok: boolean; upload_url?: string; file_id?: string; error?: string };
+  try {
+    const urlRes = await fetch("https://slack.com/api/files.getUploadURLExternal", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        filename: opts.filename,
+        length: String(fileBuffer.byteLength),
+      }).toString(),
+      signal: AbortSignal.timeout(10000),
+    });
+    urlData = (await urlRes.json()) as typeof urlData;
+  } catch (err) {
+    return {
+      ok: false,
+      error: `getUploadURL error: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+  if (!urlData.ok || !urlData.upload_url || !urlData.file_id) {
+    return { ok: false, error: `getUploadURL failed: ${urlData.error || "unknown"}` };
+  }
+
+  // Step 2: POST bytes to the presigned URL.
+  try {
+    const uploadRes = await fetch(urlData.upload_url, {
+      method: "POST",
+      headers: { "Content-Type": opts.mimeType },
+      body: new Uint8Array(fileBuffer),
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!uploadRes.ok) {
+      return { ok: false, error: `Upload failed: HTTP ${uploadRes.status}` };
+    }
+  } catch (err) {
+    return {
+      ok: false,
+      error: `Upload error: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+
+  // Step 3: Attach to channel/thread.
+  const completePayload: Record<string, unknown> = {
+    files: [{ id: urlData.file_id, title: opts.title || opts.filename }],
+    channel_id: opts.channelId,
+  };
+  if (opts.comment) completePayload.initial_comment = opts.comment;
+  if (opts.threadTs) completePayload.thread_ts = opts.threadTs;
+
+  try {
+    const completeRes = await fetch(
+      "https://slack.com/api/files.completeUploadExternal",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(completePayload),
+        signal: AbortSignal.timeout(10000),
+      },
+    );
+    const completeData = (await completeRes.json()) as {
+      ok: boolean;
+      files?: Array<{ id: string; permalink?: string }>;
+      error?: string;
+    };
+    if (!completeData.ok) {
+      return {
+        ok: false,
+        error: `completeUpload failed: ${completeData.error || "unknown"}`,
+      };
+    }
+    const file = completeData.files?.[0];
+    return {
+      ok: true,
+      fileId: file?.id || urlData.file_id,
+      permalink: file?.permalink,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      error: `completeUpload error: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+}
