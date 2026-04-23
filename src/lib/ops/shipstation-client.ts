@@ -33,19 +33,30 @@ export interface ShipFromAddress {
 }
 
 function getShipFromAddress(): ShipFromAddress {
-  // The label's visible sender is just "USA Gummies" — no personal name.
-  // ShipStation's shipFrom requires a `name`, so we put the brand there
-  // and leave `company` unset so the label doesn't stack "USA Gummies /
-  // USA Gummies" on two lines. Env overrides still win if Ben decides
-  // to present e.g. "USA Gummies Shipping" in the future.
+  // Visible return address on every outbound label. Points to USA Gummies
+  // Inc.'s Wyoming corporate address (Wyoming Attorneys LLC's business
+  // suite) — NOT the Ashford warehouse, NOT Ben's personal name. Keeps
+  // home/warehouse off public packages. Mail handling is configured at
+  // that address; the company does not take returns, so packages that
+  // come back are minimal.
+  //
+  // Postage-origin NOTE: USPS rates based on this postalCode, so zone
+  // pricing will be computed WY→destination. Packages are physically
+  // dropped at Ashford USPS (98304) — USPS Ground Advantage and
+  // First-Class do not strictly enforce origin-ZIP-matches-entry-facility
+  // the way Priority Mail does, so the physical discrepancy is
+  // tolerated. If any package gets an "origin mismatch" handling code,
+  // revisit the shipFrom split.
+  //
+  // Env overrides win so we can change via Vercel env without a deploy.
   return {
     name: process.env.SHIPSTATION_FROM_NAME?.trim() || "USA Gummies",
     company: process.env.SHIPSTATION_FROM_COMPANY?.trim() || undefined,
-    street1: process.env.SHIPSTATION_FROM_STREET1?.trim() || "30027 SR 706 E",
-    street2: process.env.SHIPSTATION_FROM_STREET2?.trim() || undefined,
-    city: process.env.SHIPSTATION_FROM_CITY?.trim() || "Ashford",
-    state: process.env.SHIPSTATION_FROM_STATE?.trim() || "WA",
-    postalCode: process.env.SHIPSTATION_FROM_POSTALCODE?.trim() || BOOTH_ORIGIN_ZIP,
+    street1: process.env.SHIPSTATION_FROM_STREET1?.trim() || "1309 Coffeen Ave",
+    street2: process.env.SHIPSTATION_FROM_STREET2?.trim() || "Ste. 1200",
+    city: process.env.SHIPSTATION_FROM_CITY?.trim() || "Sheridan",
+    state: process.env.SHIPSTATION_FROM_STATE?.trim() || "WY",
+    postalCode: process.env.SHIPSTATION_FROM_POSTALCODE?.trim() || "82801",
     country: process.env.SHIPSTATION_FROM_COUNTRY?.trim() || "US",
     phone: process.env.SHIPSTATION_FROM_PHONE?.trim() || "3072094928",
   };
@@ -1404,4 +1415,197 @@ export async function createLabelForShipStationOrder(
     };
   }
   return { ok: true, label, markShippedOk: true };
+}
+
+// ---------------------------------------------------------------------------
+// Void + re-ship primitives
+// ---------------------------------------------------------------------------
+//
+// When we need to cancel an already-purchased label and re-buy it (common
+// reason: wrong ship-from, wrong service, address correction), these two
+// helpers handle the lookup + void. Re-buying uses the existing
+// createLabelForShipStationOrder() — ShipStation's /shipments/createlabel
+// is agnostic to whether the order already has a shipment attached.
+
+/**
+ * Find every non-voided shipment on a given ShipStation order. Used before
+ * a void-and-rebuy so we can void each outstanding label (ShipStation
+ * tracks one shipment per label, but multi-box orders can have several).
+ */
+export async function findShipmentsByOrderNumber(
+  orderNumber: string,
+  opts: { includeVoided?: boolean } = {},
+): Promise<
+  | { ok: true; shipments: ShipStationShipment[] }
+  | { ok: false; error: string }
+> {
+  const auth = getAuthHeader();
+  if (!auth) return { ok: false, error: "ShipStation credentials not configured" };
+
+  const url = new URL("https://ssapi.shipstation.com/shipments");
+  url.searchParams.set("orderNumber", orderNumber);
+  url.searchParams.set("pageSize", "50");
+  url.searchParams.set("sortBy", "CreateDate");
+  url.searchParams.set("sortDir", "DESC");
+  if (!opts.includeVoided) url.searchParams.set("includeShipmentItems", "false");
+
+  let res: Response;
+  try {
+    res = await fetch(url.toString(), {
+      headers: { Authorization: auth, Accept: "application/json" },
+    });
+  } catch (err) {
+    return {
+      ok: false,
+      error: `ShipStation request failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    return {
+      ok: false,
+      error: `ShipStation ${res.status}: ${text.slice(0, 200)}`,
+    };
+  }
+
+  const data = (await res.json()) as ShipStationShipmentsListResponse;
+  const shipments: ShipStationShipment[] = (data.shipments ?? []).map((s) => ({
+    shipmentId: s.shipmentId,
+    orderId: s.orderId ?? null,
+    orderNumber: s.orderNumber ?? null,
+    createDate: s.createDate ?? "",
+    shipDate: s.shipDate ?? null,
+    trackingNumber: s.trackingNumber ?? null,
+    carrierCode: s.carrierCode ?? null,
+    serviceCode: s.serviceCode ?? null,
+    voided: Boolean(s.voided),
+    voidDate: s.voidDate ?? null,
+    shipmentCost: s.shipmentCost ?? null,
+    shipToName: s.shipTo?.name ?? null,
+    shipToPostalCode: s.shipTo?.postalCode ?? null,
+  }));
+  const filtered = opts.includeVoided
+    ? shipments
+    : shipments.filter((s) => !s.voided);
+  return { ok: true, shipments: filtered };
+}
+
+/**
+ * Void a ShipStation label. Refunds the postage to the carrier's wallet
+ * (Stamps.com typically refunds in ~30 days). ShipStation keeps the
+ * shipment record but flags `voided: true` — the order itself does NOT
+ * revert to awaiting_shipment automatically.
+ */
+export async function voidShipStationLabel(
+  shipmentId: number,
+): Promise<
+  | { ok: true; message: string }
+  | { ok: false; error: string; approved?: boolean }
+> {
+  const auth = getAuthHeader();
+  if (!auth) return { ok: false, error: "ShipStation credentials not configured" };
+
+  let res: Response;
+  try {
+    res = await fetch("https://ssapi.shipstation.com/shipments/voidlabel", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: auth },
+      body: JSON.stringify({ shipmentId }),
+    });
+  } catch (err) {
+    return {
+      ok: false,
+      error: `ShipStation request failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    return {
+      ok: false,
+      error: `ShipStation voidlabel ${res.status}: ${text.slice(0, 200)}`,
+    };
+  }
+
+  const data = (await res.json().catch(() => ({}))) as {
+    approved?: boolean;
+    message?: string;
+  };
+  if (data.approved === false) {
+    return {
+      ok: false,
+      approved: false,
+      error: data.message || "ShipStation did not approve the void",
+    };
+  }
+  return { ok: true, message: data.message || "Label voided" };
+}
+
+/**
+ * Reset a ShipStation order back to `awaiting_shipment` by re-POSTing it
+ * via `/orders/createorder` (same endpoint creates + updates). Used after
+ * a void so we can re-buy a label on the same order without the UI
+ * showing it as "shipped with a voided shipment."
+ *
+ * We re-post the minimum fields to update orderStatus in place. Existing
+ * ship-to, items, etc. on the ShipStation side are preserved because we
+ * pass the full order payload we just fetched.
+ */
+export async function restoreOrderToAwaitingShipment(
+  existing: ShipStationOrderSummary,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const auth = getAuthHeader();
+  if (!auth) return { ok: false, error: "ShipStation credentials not configured" };
+
+  const body = {
+    orderNumber: existing.orderNumber,
+    orderDate: existing.orderDate || new Date().toISOString(),
+    orderStatus: "awaiting_shipment",
+    customerEmail: existing.customerEmail ?? undefined,
+    billTo: { name: existing.shipTo.name ?? "Buyer" },
+    shipTo: {
+      name: existing.shipTo.name,
+      company: existing.shipTo.company,
+      street1: existing.shipTo.street1,
+      street2: existing.shipTo.street2,
+      street3: existing.shipTo.street3,
+      city: existing.shipTo.city,
+      state: existing.shipTo.state,
+      postalCode: existing.shipTo.postalCode,
+      country: existing.shipTo.country ?? "US",
+      phone: existing.shipTo.phone,
+      residential: existing.shipTo.residential,
+    },
+    items: existing.items.map((i) => ({
+      sku: i.sku,
+      name: i.name,
+      quantity: i.quantity,
+    })),
+    advancedOptions: {
+      storeId: existing.advancedOptions.storeId ?? undefined,
+      source: existing.advancedOptions.source ?? undefined,
+      customField1: existing.advancedOptions.customField1 ?? undefined,
+    },
+  };
+
+  let res: Response;
+  try {
+    res = await fetch("https://ssapi.shipstation.com/orders/createorder", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: auth },
+      body: JSON.stringify(body),
+    });
+  } catch (err) {
+    return {
+      ok: false,
+      error: `ShipStation request failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    return {
+      ok: false,
+      error: `ShipStation createorder ${res.status}: ${text.slice(0, 200)}`,
+    };
+  }
+  return { ok: true };
 }
