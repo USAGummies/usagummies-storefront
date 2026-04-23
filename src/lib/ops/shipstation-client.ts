@@ -33,9 +33,14 @@ export interface ShipFromAddress {
 }
 
 function getShipFromAddress(): ShipFromAddress {
+  // The label's visible sender is just "USA Gummies" — no personal name.
+  // ShipStation's shipFrom requires a `name`, so we put the brand there
+  // and leave `company` unset so the label doesn't stack "USA Gummies /
+  // USA Gummies" on two lines. Env overrides still win if Ben decides
+  // to present e.g. "USA Gummies Shipping" in the future.
   return {
-    name: process.env.SHIPSTATION_FROM_NAME?.trim() || "Benjamin Stutman",
-    company: process.env.SHIPSTATION_FROM_COMPANY?.trim() || "USA Gummies",
+    name: process.env.SHIPSTATION_FROM_NAME?.trim() || "USA Gummies",
+    company: process.env.SHIPSTATION_FROM_COMPANY?.trim() || undefined,
     street1: process.env.SHIPSTATION_FROM_STREET1?.trim() || "30027 SR 706 E",
     street2: process.env.SHIPSTATION_FROM_STREET2?.trim() || undefined,
     city: process.env.SHIPSTATION_FROM_CITY?.trim() || "Ashford",
