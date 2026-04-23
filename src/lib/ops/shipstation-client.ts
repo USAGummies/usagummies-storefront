@@ -1050,3 +1050,268 @@ export async function listVoidedLabels(opts: {
   const stale = voided.filter((v) => v.stale);
   return { ok: true, voided, stale };
 }
+
+// ---------------------------------------------------------------------------
+// Order-linked label flow (Amazon FBM auto-ship pipeline)
+// ---------------------------------------------------------------------------
+//
+// When ShipStation has already ingested an order from Amazon (or Shopify),
+// the *correct* way to buy a label is `POST /orders/createlabel` with the
+// ShipStation-internal numeric `orderId` — NOT `/shipments/createlabel` with
+// free-form ship-to. The linked flow does three things we need:
+//
+//   1. Uses the ship-to already on the ShipStation order (full PII that
+//      the Amazon SP-API hides behind RDT for MFN orders).
+//   2. Marks the ShipStation order as `shipped` atomically, so ShipStation's
+//      own channel integration pushes tracking back to Amazon without a
+//      second `/orders/markasshipped` call.
+//   3. Attaches the carrier/service/tracking to the order record so the
+//      order page in ShipStation matches what actually shipped.
+//
+// This is the primitive for the unified shipping queue — every channel
+// (Amazon FBM, Shopify, Faire) that pushes orders into ShipStation uses
+// the same lookup + createlabel pair.
+
+export interface ShipStationOrderSummary {
+  /** ShipStation-internal integer id (needed for /orders/createlabel). */
+  orderId: number;
+  /** Channel order id ("114-...", "#12345", etc.) — the lookup key. */
+  orderNumber: string;
+  orderStatus: string; // "awaiting_payment" | "awaiting_shipment" | "shipped" | "on_hold" | "cancelled"
+  orderDate: string | null;
+  customerEmail: string | null;
+  /** Full ship-to (PII). */
+  shipTo: {
+    name: string | null;
+    company: string | null;
+    street1: string | null;
+    street2: string | null;
+    street3: string | null;
+    city: string | null;
+    state: string | null;
+    postalCode: string | null;
+    country: string | null;
+    phone: string | null;
+    residential: boolean | null;
+  };
+  /** Line items — for packaging + weight inference. */
+  items: Array<{ sku: string | null; name: string | null; quantity: number }>;
+  /** Order-level weight if ShipStation computed one. */
+  weight: { value: number; units: string } | null;
+  /** Advanced marketplace metadata (storeId identifies which channel). */
+  advancedOptions: {
+    storeId: number | null;
+    customField1: string | null;
+    source: string | null;
+  };
+}
+
+/**
+ * Fetch a single ShipStation order by its channel-side orderNumber.
+ *
+ * ShipStation's `/orders` endpoint supports `orderNumber` as a query
+ * param and returns any orders matching (usually just one per channel).
+ * We narrow to `awaiting_shipment` by default because that's what the
+ * queue feeds into — already-shipped matches would be no-ops.
+ *
+ * Returns null (ok: true, order: null) if no match — callers decide
+ * whether that's a degraded state or a normal "already shipped" skip.
+ */
+export async function findShipStationOrderByNumber(
+  orderNumber: string,
+  opts: { status?: string } = {},
+): Promise<
+  | { ok: true; order: ShipStationOrderSummary | null }
+  | { ok: false; error: string }
+> {
+  const auth = getAuthHeader();
+  if (!auth) return { ok: false, error: "ShipStation credentials not configured" };
+
+  const status = opts.status ?? "awaiting_shipment";
+  const url = new URL("https://ssapi.shipstation.com/orders");
+  url.searchParams.set("orderNumber", orderNumber);
+  url.searchParams.set("orderStatus", status);
+  url.searchParams.set("pageSize", "10");
+
+  let res: Response;
+  try {
+    res = await fetch(url.toString(), {
+      headers: { Authorization: auth, Accept: "application/json" },
+    });
+  } catch (err) {
+    return {
+      ok: false,
+      error: `ShipStation request failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    return {
+      ok: false,
+      error: `ShipStation ${res.status}: ${text.slice(0, 200)}`,
+    };
+  }
+
+  const data = (await res.json()) as {
+    orders?: Array<Record<string, unknown>>;
+  };
+  const raw = (data.orders ?? []).find((o) => {
+    const on = (o as { orderNumber?: string }).orderNumber;
+    return typeof on === "string" && on === orderNumber;
+  }) ?? (data.orders ?? [])[0];
+
+  if (!raw) return { ok: true, order: null };
+
+  const o = raw as {
+    orderId: number;
+    orderNumber: string;
+    orderStatus: string;
+    orderDate: string | null;
+    customerEmail: string | null;
+    shipTo?: Record<string, unknown> | null;
+    items?: Array<Record<string, unknown>>;
+    weight?: { value?: number; units?: string } | null;
+    advancedOptions?: Record<string, unknown>;
+  };
+
+  const shipToRaw = (o.shipTo ?? {}) as Record<string, unknown>;
+  const adv = (o.advancedOptions ?? {}) as Record<string, unknown>;
+
+  return {
+    ok: true,
+    order: {
+      orderId: o.orderId,
+      orderNumber: o.orderNumber,
+      orderStatus: o.orderStatus,
+      orderDate: o.orderDate ?? null,
+      customerEmail: o.customerEmail ?? null,
+      shipTo: {
+        name: (shipToRaw.name as string) ?? null,
+        company: (shipToRaw.company as string) ?? null,
+        street1: (shipToRaw.street1 as string) ?? null,
+        street2: (shipToRaw.street2 as string) ?? null,
+        street3: (shipToRaw.street3 as string) ?? null,
+        city: (shipToRaw.city as string) ?? null,
+        state: (shipToRaw.state as string) ?? null,
+        postalCode: (shipToRaw.postalCode as string) ?? null,
+        country: (shipToRaw.country as string) ?? null,
+        phone: (shipToRaw.phone as string) ?? null,
+        residential: (shipToRaw.residential as boolean) ?? null,
+      },
+      items: (o.items ?? []).map((i) => {
+        const it = i as { sku?: string; name?: string; quantity?: number };
+        return {
+          sku: it.sku ?? null,
+          name: it.name ?? null,
+          quantity: it.quantity ?? 0,
+        };
+      }),
+      weight:
+        o.weight && typeof o.weight.value === "number"
+          ? { value: o.weight.value, units: o.weight.units ?? "ounces" }
+          : null,
+      advancedOptions: {
+        storeId: (adv.storeId as number) ?? null,
+        customField1: (adv.customField1 as string) ?? null,
+        source: (adv.source as string) ?? null,
+      },
+    },
+  };
+}
+
+export interface OrderLinkedLabelParams {
+  /** ShipStation internal numeric orderId from findShipStationOrderByNumber(). */
+  orderId: number;
+  carrierCode: string;
+  serviceCode: string;
+  packageCode?: string; // "package" | "letter" | "large_envelope_or_flat" etc. Default "package".
+  confirmation?: "none" | "delivery" | "signature" | "adult_signature";
+  weight: { value: number; units: "ounces" | "pounds" | "grams" };
+  dimensions?: { length: number; width: number; height: number; units?: "inches" | "centimeters" };
+  shipDate?: string; // YYYY-MM-DD, defaults to today
+  testLabel?: boolean;
+}
+
+/**
+ * Atomically buy a label for a ShipStation-linked order and mark it shipped.
+ *
+ * Endpoint: `POST /orders/createlabel`
+ * Docs: https://www.shipstation.com/docs/api/orders/create-label/
+ *
+ * Unlike `createShippingLabel` (which posts to `/shipments/createlabel`
+ * with full free-form ship-to), this uses ShipStation's existing order
+ * record. ShipStation's channel integration auto-syncs the shipped
+ * status back to the source marketplace (Amazon Seller Central, Shopify
+ * Orders page) within a few minutes of the call returning.
+ *
+ * Returns the inline base64 label (converted to `data:` URL) + tracking
+ * + cost, same shape as `createShippingLabel` for caller compatibility.
+ */
+export async function createLabelForShipStationOrder(
+  params: OrderLinkedLabelParams,
+): Promise<{ ok: true; label: LabelResult } | { ok: false; error: string }> {
+  const auth = getAuthHeader();
+  if (!auth) return { ok: false, error: "ShipStation credentials not configured" };
+
+  const body = {
+    orderId: params.orderId,
+    carrierCode: params.carrierCode,
+    serviceCode: params.serviceCode,
+    packageCode: params.packageCode ?? "package",
+    confirmation: params.confirmation ?? "delivery",
+    shipDate: params.shipDate ?? new Date().toISOString().slice(0, 10),
+    weight: params.weight,
+    dimensions: params.dimensions,
+    testLabel: params.testLabel ?? false,
+  };
+
+  let res: Response;
+  try {
+    res = await fetch("https://ssapi.shipstation.com/orders/createlabel", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: auth },
+      body: JSON.stringify(body),
+    });
+  } catch (err) {
+    return {
+      ok: false,
+      error: `ShipStation request failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    return {
+      ok: false,
+      error: `ShipStation ${res.status}: ${text.slice(0, 400)}`,
+    };
+  }
+
+  const data = (await res.json()) as ShipStationLabelResponse;
+  const tracking = data.trackingNumber?.trim();
+  if (!tracking) {
+    return { ok: false, error: "ShipStation returned no tracking number" };
+  }
+
+  const labelUrl = data.labelData
+    ? `data:application/pdf;base64,${data.labelData}`
+    : "";
+  const cost =
+    (typeof data.shipmentCost === "number" ? data.shipmentCost : 0) +
+    (typeof data.insuranceCost === "number" ? data.insuranceCost : 0);
+  const carrierUsed = data.carrierCode ?? params.carrierCode ?? "";
+  const serviceUsed = data.serviceCode ?? params.serviceCode ?? "";
+
+  return {
+    ok: true,
+    label: {
+      carrier: carrierUsed.toUpperCase(),
+      service: humanizeService(serviceUsed),
+      serviceCode: serviceUsed,
+      trackingNumber: tracking,
+      labelUrl,
+      cost: Math.round(cost * 100) / 100,
+      shipmentId: data.shipmentId ?? null,
+    },
+  };
+}
