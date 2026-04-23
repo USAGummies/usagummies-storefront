@@ -1434,7 +1434,7 @@ export async function createLabelForShipStationOrder(
  */
 export async function findShipmentsByOrderNumber(
   orderNumber: string,
-  opts: { includeVoided?: boolean } = {},
+  opts: { includeVoided?: boolean; daysBack?: number } = {},
 ): Promise<
   | { ok: true; shipments: ShipStationShipment[] }
   | { ok: false; error: string }
@@ -1442,12 +1442,22 @@ export async function findShipmentsByOrderNumber(
   const auth = getAuthHeader();
   if (!auth) return { ok: false, error: "ShipStation credentials not configured" };
 
+  // ShipStation's /shipments endpoint filters silently unless you pass a
+  // createDate window; without one, recently-created shipments can be
+  // missed. Cover the last 30 days by default (adjust via daysBack for
+  // older look-ups, e.g. the weekly drift audit).
+  const daysBack = Math.max(1, opts.daysBack ?? 30);
+  const createStart = new Date(Date.now() - daysBack * 24 * 3600 * 1000)
+    .toISOString()
+    .slice(0, 10);
+
   const url = new URL("https://ssapi.shipstation.com/shipments");
   url.searchParams.set("orderNumber", orderNumber);
+  url.searchParams.set("createDateStart", createStart);
+  url.searchParams.set("includeShipmentItems", "false");
   url.searchParams.set("pageSize", "50");
   url.searchParams.set("sortBy", "CreateDate");
   url.searchParams.set("sortDir", "DESC");
-  if (!opts.includeVoided) url.searchParams.set("includeShipmentItems", "false");
 
   let res: Response;
   try {
