@@ -1232,6 +1232,118 @@ export async function findShipStationOrderByNumber(
   };
 }
 
+/**
+ * List every `awaiting_shipment` order across all connected stores.
+ *
+ * This is the unified-shipping-queue primitive: Amazon FBM, Shopify
+ * DTC, Faire (when wired), and manual orders all land in the same
+ * ShipStation awaiting-shipment bucket. Instead of polling each
+ * channel's source API separately, one call here returns them all.
+ *
+ * Returns the same `ShipStationOrderSummary` shape as
+ * `findShipStationOrderByNumber` so downstream consumers don't branch
+ * on channel — they just iterate and ship.
+ *
+ * Pagination: fetches up to `pageSize` orders in one shot (default
+ * 200). For a store this size that comfortably covers one ship day.
+ * Extend with a pagination loop if the queue ever grows past a page.
+ */
+export async function listOrdersAwaitingShipment(opts: {
+  storeId?: number;
+  pageSize?: number;
+} = {}): Promise<
+  | { ok: true; orders: ShipStationOrderSummary[] }
+  | { ok: false; error: string }
+> {
+  const auth = getAuthHeader();
+  if (!auth) return { ok: false, error: "ShipStation credentials not configured" };
+
+  const url = new URL("https://ssapi.shipstation.com/orders");
+  url.searchParams.set("orderStatus", "awaiting_shipment");
+  url.searchParams.set("pageSize", String(opts.pageSize ?? 200));
+  url.searchParams.set("sortBy", "CreateDate");
+  url.searchParams.set("sortDir", "ASC");
+  if (typeof opts.storeId === "number") {
+    url.searchParams.set("storeId", String(opts.storeId));
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(url.toString(), {
+      headers: { Authorization: auth, Accept: "application/json" },
+    });
+  } catch (err) {
+    return {
+      ok: false,
+      error: `ShipStation request failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    return {
+      ok: false,
+      error: `ShipStation ${res.status}: ${text.slice(0, 200)}`,
+    };
+  }
+
+  const data = (await res.json()) as {
+    orders?: Array<Record<string, unknown>>;
+  };
+  const orders: ShipStationOrderSummary[] = (data.orders ?? []).map((raw) => {
+    const o = raw as {
+      orderId: number;
+      orderNumber: string;
+      orderStatus: string;
+      orderDate: string | null;
+      customerEmail: string | null;
+      shipTo?: Record<string, unknown> | null;
+      items?: Array<Record<string, unknown>>;
+      weight?: { value?: number; units?: string } | null;
+      advancedOptions?: Record<string, unknown>;
+    };
+    const shipToRaw = (o.shipTo ?? {}) as Record<string, unknown>;
+    const adv = (o.advancedOptions ?? {}) as Record<string, unknown>;
+    return {
+      orderId: o.orderId,
+      orderNumber: o.orderNumber,
+      orderStatus: o.orderStatus,
+      orderDate: o.orderDate ?? null,
+      customerEmail: o.customerEmail ?? null,
+      shipTo: {
+        name: (shipToRaw.name as string) ?? null,
+        company: (shipToRaw.company as string) ?? null,
+        street1: (shipToRaw.street1 as string) ?? null,
+        street2: (shipToRaw.street2 as string) ?? null,
+        street3: (shipToRaw.street3 as string) ?? null,
+        city: (shipToRaw.city as string) ?? null,
+        state: (shipToRaw.state as string) ?? null,
+        postalCode: (shipToRaw.postalCode as string) ?? null,
+        country: (shipToRaw.country as string) ?? null,
+        phone: (shipToRaw.phone as string) ?? null,
+        residential: (shipToRaw.residential as boolean) ?? null,
+      },
+      items: (o.items ?? []).map((i) => {
+        const it = i as { sku?: string; name?: string; quantity?: number };
+        return {
+          sku: it.sku ?? null,
+          name: it.name ?? null,
+          quantity: it.quantity ?? 0,
+        };
+      }),
+      weight:
+        o.weight && typeof o.weight.value === "number"
+          ? { value: o.weight.value, units: o.weight.units ?? "ounces" }
+          : null,
+      advancedOptions: {
+        storeId: (adv.storeId as number) ?? null,
+        customField1: (adv.customField1 as string) ?? null,
+        source: (adv.source as string) ?? null,
+      },
+    };
+  });
+  return { ok: true, orders };
+}
+
 export interface OrderLinkedLabelParams {
   /** ShipStation internal numeric orderId from findShipStationOrderByNumber(). */
   orderId: number;
@@ -1439,33 +1551,27 @@ export async function findShipmentsByOrderNumber(
   const auth = getAuthHeader();
   if (!auth) return { ok: false, error: "ShipStation credentials not configured" };
 
-  // ShipStation's /shipments filters silently without a date window. We
-  // pass BOTH createDateStart AND shipDateStart because the endpoint's
-  // date-filter semantics are inconsistent — some accounts filter on
-  // ship-date, some on create-date. Covering both guarantees recently-
-  // purchased-and-voided labels show up.
+  // ShipStation's /shipments endpoint has inconsistent filter behavior:
+  // both `orderNumber` and `orderId` query params silently returned 0
+  // rows against live shipments (verified 2026-04-23 with orderNumber
+  // "114-6802942-8357867" / orderId 287563638). The SAME endpoint
+  // returns all recent shipments correctly when filtered only by
+  // `shipDateStart` (getRecentShipments proves this).
   //
-  // We also prefer `orderId` (integer) over `orderNumber` (string) when
-  // the caller has it — the integer filter is an exact match on the
-  // ShipStation-internal primary key. The string filter has been
-  // observed to silently return 0 rows against real orders (verified
-  // 2026-04-23 with orderNumber "114-6802942-8357867", which matched
-  // via orderId=287563638).
+  // Workaround: hit the endpoint with ONLY a ship-date window (no
+  // orderId/orderNumber filter), then filter client-side by matching
+  // orderId or orderNumber. This trades a larger page of data for
+  // guaranteed correctness. For the typical 7-day window this is ≤ a
+  // few hundred shipments — trivial to sift.
   const daysBack = Math.max(1, opts.daysBack ?? 30);
   const dateStart = new Date(Date.now() - daysBack * 24 * 3600 * 1000)
     .toISOString()
     .slice(0, 10);
 
   const url = new URL("https://ssapi.shipstation.com/shipments");
-  if (typeof opts.orderId === "number" && Number.isFinite(opts.orderId)) {
-    url.searchParams.set("orderId", String(opts.orderId));
-  } else {
-    url.searchParams.set("orderNumber", orderNumber);
-  }
-  url.searchParams.set("createDateStart", dateStart);
   url.searchParams.set("shipDateStart", dateStart);
   url.searchParams.set("includeShipmentItems", "false");
-  url.searchParams.set("pageSize", "50");
+  url.searchParams.set("pageSize", "500");
   url.searchParams.set("sortBy", "CreateDate");
   url.searchParams.set("sortDir", "DESC");
 
@@ -1504,9 +1610,22 @@ export async function findShipmentsByOrderNumber(
     shipToName: s.shipTo?.name ?? null,
     shipToPostalCode: s.shipTo?.postalCode ?? null,
   }));
+
+  // Client-side filter: match by orderId (preferred) or orderNumber.
+  // The API's server-side filters for these fields silently return 0
+  // rows — see the endpoint comment above for context.
+  const matchingOrderId =
+    typeof opts.orderId === "number" && Number.isFinite(opts.orderId)
+      ? opts.orderId
+      : null;
+  const matched = shipments.filter((s) => {
+    if (matchingOrderId !== null) return s.orderId === matchingOrderId;
+    return s.orderNumber === orderNumber;
+  });
+
   const filtered = opts.includeVoided
-    ? shipments
-    : shipments.filter((s) => !s.voided);
+    ? matched
+    : matched.filter((s) => !s.voided);
   return { ok: true, shipments: filtered };
 }
 

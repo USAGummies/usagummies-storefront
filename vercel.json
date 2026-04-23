@@ -57,7 +57,7 @@
       "schedule": "0 16,20,23 * * 1-5"
     },
     {
-      "path": "/api/ops/amazon/auto-ship",
+      "path": "/api/ops/shipping/auto-ship",
       "schedule": "*/30 * * * *"
     },
     {
