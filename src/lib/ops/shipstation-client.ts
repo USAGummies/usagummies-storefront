@@ -1222,55 +1222,111 @@ export async function findShipStationOrderByNumber(
 export interface OrderLinkedLabelParams {
   /** ShipStation internal numeric orderId from findShipStationOrderByNumber(). */
   orderId: number;
+  /** The channel orderNumber — passed through to the label so it matches the order. */
+  orderNumber: string;
+  /** Ship-to pulled from the ShipStation order (ship-to PII). */
+  shipTo: LabelDestination;
   carrierCode: string;
   serviceCode: string;
-  packageCode?: string; // "package" | "letter" | "large_envelope_or_flat" etc. Default "package".
+  packageCode?: string;
   confirmation?: "none" | "delivery" | "signature" | "adult_signature";
+  /** Packed weight — required. For USPS First-Class use ounces; otherwise pounds works too. */
   weight: { value: number; units: "ounces" | "pounds" | "grams" };
   dimensions?: { length: number; width: number; height: number; units?: "inches" | "centimeters" };
-  shipDate?: string; // YYYY-MM-DD, defaults to today
+  shipDate?: string;
   testLabel?: boolean;
+  /** Whether to notify the buyer / push tracking back to the source marketplace. */
+  notifyCustomer?: boolean;
+  notifySalesChannel?: boolean;
 }
 
 /**
- * Atomically buy a label for a ShipStation-linked order and mark it shipped.
+ * Buy a label via `/shipments/createlabel` AND mark the linked ShipStation
+ * order shipped via `/orders/markasshipped`. The v1 API has no single
+ * "createlabel on existing order" endpoint (the docs advertise one but
+ * it returns 404 in production — verified 2026-04-22 with orderId
+ * 287563638, 287853740, 287921615). So we do it in two calls:
  *
- * Endpoint: `POST /orders/createlabel`
- * Docs: https://www.shipstation.com/docs/api/orders/create-label/
+ *   1. POST /shipments/createlabel — creates a free-standing shipment
+ *      with the full ship-to pulled from the existing order. Returns
+ *      tracking + label PDF (base64).
+ *   2. POST /orders/markasshipped — links the tracking back to the
+ *      ShipStation order record. With `notifySalesChannel=true` this
+ *      pushes the tracking to the source marketplace (Amazon Seller
+ *      Central, Shopify Orders) within a few minutes.
  *
- * Unlike `createShippingLabel` (which posts to `/shipments/createlabel`
- * with full free-form ship-to), this uses ShipStation's existing order
- * record. ShipStation's channel integration auto-syncs the shipped
- * status back to the source marketplace (Amazon Seller Central, Shopify
- * Orders page) within a few minutes of the call returning.
- *
- * Returns the inline base64 label (converted to `data:` URL) + tracking
- * + cost, same shape as `createShippingLabel` for caller compatibility.
+ * If step 1 succeeds and step 2 fails, the label is already paid for
+ * and printable — caller gets `ok: true` with a `markShippedError`
+ * warning so Ben can mark manually. This avoids double-buying.
  */
 export async function createLabelForShipStationOrder(
   params: OrderLinkedLabelParams,
-): Promise<{ ok: true; label: LabelResult } | { ok: false; error: string }> {
+): Promise<
+  | { ok: true; label: LabelResult; markShippedOk: boolean; markShippedError?: string }
+  | { ok: false; error: string }
+> {
   const auth = getAuthHeader();
   if (!auth) return { ok: false, error: "ShipStation credentials not configured" };
 
-  const body = {
-    orderId: params.orderId,
+  // ---- Step 1: buy the label via /shipments/createlabel
+  const from = getShipFromAddress();
+  const weightOunces =
+    params.weight.units === "pounds"
+      ? params.weight.value * 16
+      : params.weight.units === "grams"
+        ? params.weight.value / 28.3495
+        : params.weight.value;
+  // Default mailer dimensions when caller didn't override.
+  const dims =
+    params.dimensions ??
+    { length: 9, width: 6, height: 2, units: "inches" as const };
+
+  const labelBody = {
     carrierCode: params.carrierCode,
     serviceCode: params.serviceCode,
     packageCode: params.packageCode ?? "package",
     confirmation: params.confirmation ?? "delivery",
     shipDate: params.shipDate ?? new Date().toISOString().slice(0, 10),
-    weight: params.weight,
-    dimensions: params.dimensions,
+    weight: { value: Math.round(weightOunces * 10) / 10, units: "ounces" },
+    dimensions: {
+      units: dims.units ?? "inches",
+      length: dims.length,
+      width: dims.width,
+      height: dims.height,
+    },
+    shipFrom: {
+      name: from.name,
+      company: from.company,
+      street1: from.street1,
+      street2: from.street2,
+      city: from.city,
+      state: from.state,
+      postalCode: from.postalCode,
+      country: from.country,
+      phone: from.phone,
+    },
+    shipTo: {
+      name: params.shipTo.name,
+      company: params.shipTo.company,
+      street1: params.shipTo.street1,
+      street2: params.shipTo.street2,
+      city: params.shipTo.city,
+      state: params.shipTo.state.trim().toUpperCase(),
+      postalCode: params.shipTo.postalCode.trim(),
+      country: (params.shipTo.country || "US").trim().toUpperCase(),
+      phone: params.shipTo.phone,
+      residential: params.shipTo.residential ?? true,
+    },
     testLabel: params.testLabel ?? false,
+    internalNotes: params.orderNumber,
   };
 
-  let res: Response;
+  let labelRes: Response;
   try {
-    res = await fetch("https://ssapi.shipstation.com/orders/createlabel", {
+    labelRes = await fetch("https://ssapi.shipstation.com/shipments/createlabel", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: auth },
-      body: JSON.stringify(body),
+      body: JSON.stringify(labelBody),
     });
   } catch (err) {
     return {
@@ -1278,40 +1334,69 @@ export async function createLabelForShipStationOrder(
       error: `ShipStation request failed: ${err instanceof Error ? err.message : String(err)}`,
     };
   }
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
+  if (!labelRes.ok) {
+    const text = await labelRes.text().catch(() => "");
     return {
       ok: false,
-      error: `ShipStation ${res.status}: ${text.slice(0, 400)}`,
+      error: `ShipStation createlabel ${labelRes.status}: ${text.slice(0, 400)}`,
     };
   }
-
-  const data = (await res.json()) as ShipStationLabelResponse;
-  const tracking = data.trackingNumber?.trim();
+  const labelData = (await labelRes.json()) as ShipStationLabelResponse;
+  const tracking = labelData.trackingNumber?.trim();
   if (!tracking) {
     return { ok: false, error: "ShipStation returned no tracking number" };
   }
-
-  const labelUrl = data.labelData
-    ? `data:application/pdf;base64,${data.labelData}`
+  const labelUrl = labelData.labelData
+    ? `data:application/pdf;base64,${labelData.labelData}`
     : "";
   const cost =
-    (typeof data.shipmentCost === "number" ? data.shipmentCost : 0) +
-    (typeof data.insuranceCost === "number" ? data.insuranceCost : 0);
-  const carrierUsed = data.carrierCode ?? params.carrierCode ?? "";
-  const serviceUsed = data.serviceCode ?? params.serviceCode ?? "";
-
-  return {
-    ok: true,
-    label: {
-      carrier: carrierUsed.toUpperCase(),
-      service: humanizeService(serviceUsed),
-      serviceCode: serviceUsed,
-      trackingNumber: tracking,
-      labelUrl,
-      cost: Math.round(cost * 100) / 100,
-      shipmentId: data.shipmentId ?? null,
-    },
+    (typeof labelData.shipmentCost === "number" ? labelData.shipmentCost : 0) +
+    (typeof labelData.insuranceCost === "number" ? labelData.insuranceCost : 0);
+  const carrierUsed = labelData.carrierCode ?? params.carrierCode ?? "";
+  const serviceUsed = labelData.serviceCode ?? params.serviceCode ?? "";
+  const label: LabelResult = {
+    carrier: carrierUsed.toUpperCase(),
+    service: humanizeService(serviceUsed),
+    serviceCode: serviceUsed,
+    trackingNumber: tracking,
+    labelUrl,
+    cost: Math.round(cost * 100) / 100,
+    shipmentId: labelData.shipmentId ?? null,
   };
+
+  // ---- Step 2: mark the ShipStation order shipped so it syncs back to Amazon
+  const markBody = {
+    orderId: params.orderId,
+    carrierCode: params.carrierCode,
+    shipDate: params.shipDate ?? new Date().toISOString().slice(0, 10),
+    trackingNumber: tracking,
+    notifyCustomer: params.notifyCustomer ?? false, // Amazon sends its own email
+    notifySalesChannel: params.notifySalesChannel ?? true,
+  };
+
+  let markRes: Response;
+  try {
+    markRes = await fetch("https://ssapi.shipstation.com/orders/markasshipped", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: auth },
+      body: JSON.stringify(markBody),
+    });
+  } catch (err) {
+    return {
+      ok: true,
+      label,
+      markShippedOk: false,
+      markShippedError: `markasshipped request failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+  if (!markRes.ok) {
+    const text = await markRes.text().catch(() => "");
+    return {
+      ok: true,
+      label,
+      markShippedOk: false,
+      markShippedError: `ShipStation markasshipped ${markRes.status}: ${text.slice(0, 200)}`,
+    };
+  }
+  return { ok: true, label, markShippedOk: true };
 }

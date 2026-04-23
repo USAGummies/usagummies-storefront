@@ -277,15 +277,30 @@ async function shipOne(
     };
   }
 
-  // ----- Step 4: buy label
+  // ----- Step 4: buy label + mark shipped (ShipStation syncs to Amazon)
   t0 = Date.now();
   const labelRes = await createLabelForShipStationOrder({
     orderId: ssOrder.orderId,
+    orderNumber,
+    shipTo: {
+      name: ssOrder.shipTo.name ?? "",
+      company: ssOrder.shipTo.company ?? undefined,
+      street1: ssOrder.shipTo.street1 ?? "",
+      street2: ssOrder.shipTo.street2 ?? undefined,
+      city: ssOrder.shipTo.city ?? "",
+      state: ssOrder.shipTo.state ?? "",
+      postalCode: ssOrder.shipTo.postalCode ?? "",
+      country: ssOrder.shipTo.country ?? "US",
+      phone: ssOrder.shipTo.phone ?? undefined,
+      residential: ssOrder.shipTo.residential ?? true,
+    },
     carrierCode: effectiveCarrier,
     serviceCode: effectiveService,
     packageCode: effectivePackage,
     confirmation: "delivery",
     weight: { value: plan.weightOunces, units: "ounces" },
+    notifyCustomer: false,
+    notifySalesChannel: true,
   });
   if (!labelRes.ok) {
     await logStep(
@@ -314,9 +329,21 @@ async function shipOne(
       tracking: labelRes.label.trackingNumber,
       cost: labelRes.label.cost,
       service: labelRes.label.service,
+      markShippedOk: labelRes.markShippedOk,
+      markShippedError: labelRes.markShippedError,
     },
     t0,
   );
+  if (!labelRes.markShippedOk) {
+    // Label bought but Amazon sync may need manual mark-shipped.
+    await logStep(steps, orderNumber, "shipstation.mark-shipped", false, {
+      error: labelRes.markShippedError,
+    });
+  } else {
+    await logStep(steps, orderNumber, "shipstation.mark-shipped", true, {
+      tracking: labelRes.label.trackingNumber,
+    });
+  }
 
   // ----- Step 5: persist dispatched so unshipped-alert dedupes
   try {
