@@ -191,9 +191,12 @@ async function reshipOne(
     t0,
   );
 
-  // 2. Find outstanding (non-voided) shipments
+  // 2. Find outstanding (non-voided) shipments (prefer orderId over orderNumber
+  //    — the integer filter is more reliable against ShipStation's /shipments).
   t0 = Date.now();
-  const shipmentsRes = await findShipmentsByOrderNumber(orderNumber);
+  const shipmentsRes = await findShipmentsByOrderNumber(orderNumber, {
+    orderId: ssOrder.orderId,
+  });
   if (!shipmentsRes.ok) {
     await logStep(steps, orderNumber, "shipstation.find-shipments", false, {
       error: shipmentsRes.error,

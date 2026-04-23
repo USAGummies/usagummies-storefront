@@ -53,6 +53,7 @@ const NAV_SECTIONS: NavSection[] = [
     collapsible: true,
     items: [
       { href: "/ops/wholesale", label: "Wholesale", icon: "\u{1F4E6}", roles: ["admin", "employee", "investor", "partner"] },
+      { href: "/ops/ap-packets", label: "Retailer AP Packets", icon: "\u{1F4DD}", roles: ["admin", "employee"] },
       { href: "/ops/shipping", label: "Shipping Status", icon: "\u{1F69A}", roles: ["admin", "employee"] },
       { href: "/ops/fulfillment", label: "Fulfillment Queue", icon: "\u{1F4E6}", roles: ["admin", "employee"] },
       { href: "/ops/amazon-fbm", label: "Amazon FBM Queue", icon: "\u{1F4E6}", roles: ["admin", "employee"] },

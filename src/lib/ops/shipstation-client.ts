@@ -1434,7 +1434,7 @@ export async function createLabelForShipStationOrder(
  */
 export async function findShipmentsByOrderNumber(
   orderNumber: string,
-  opts: { includeVoided?: boolean; daysBack?: number } = {},
+  opts: { includeVoided?: boolean; daysBack?: number; orderId?: number } = {},
 ): Promise<
   | { ok: true; shipments: ShipStationShipment[] }
   | { ok: false; error: string }
@@ -1442,18 +1442,31 @@ export async function findShipmentsByOrderNumber(
   const auth = getAuthHeader();
   if (!auth) return { ok: false, error: "ShipStation credentials not configured" };
 
-  // ShipStation's /shipments endpoint filters silently unless you pass a
-  // createDate window; without one, recently-created shipments can be
-  // missed. Cover the last 30 days by default (adjust via daysBack for
-  // older look-ups, e.g. the weekly drift audit).
+  // ShipStation's /shipments filters silently without a date window. We
+  // pass BOTH createDateStart AND shipDateStart because the endpoint's
+  // date-filter semantics are inconsistent — some accounts filter on
+  // ship-date, some on create-date. Covering both guarantees recently-
+  // purchased-and-voided labels show up.
+  //
+  // We also prefer `orderId` (integer) over `orderNumber` (string) when
+  // the caller has it — the integer filter is an exact match on the
+  // ShipStation-internal primary key. The string filter has been
+  // observed to silently return 0 rows against real orders (verified
+  // 2026-04-23 with orderNumber "114-6802942-8357867", which matched
+  // via orderId=287563638).
   const daysBack = Math.max(1, opts.daysBack ?? 30);
-  const createStart = new Date(Date.now() - daysBack * 24 * 3600 * 1000)
+  const dateStart = new Date(Date.now() - daysBack * 24 * 3600 * 1000)
     .toISOString()
     .slice(0, 10);
 
   const url = new URL("https://ssapi.shipstation.com/shipments");
-  url.searchParams.set("orderNumber", orderNumber);
-  url.searchParams.set("createDateStart", createStart);
+  if (typeof opts.orderId === "number" && Number.isFinite(opts.orderId)) {
+    url.searchParams.set("orderId", String(opts.orderId));
+  } else {
+    url.searchParams.set("orderNumber", orderNumber);
+  }
+  url.searchParams.set("createDateStart", dateStart);
+  url.searchParams.set("shipDateStart", dateStart);
   url.searchParams.set("includeShipmentItems", "false");
   url.searchParams.set("pageSize", "50");
   url.searchParams.set("sortBy", "CreateDate");
