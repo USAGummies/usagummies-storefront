@@ -1,5 +1,6 @@
 // Founder's letter — styled like a framed declaration / presidential address.
-// Image column uses crossing-freedom Americana scene with red multiply overlay.
+// Image column uses the cowboy + flag illustration on the desert background,
+// pulled from the brand ARTWORK ASSETS library (same art that's on the bag).
 
 import Image from "next/image";
 
@@ -7,23 +8,48 @@ export function FoundersLetter() {
   return (
     <section className="relative">
       <div className="mx-auto grid max-w-[1200px] grid-cols-1 gap-10 px-5 py-16 sm:px-8 sm:py-24 md:grid-cols-[1fr_1.25fr] md:gap-16">
-        {/* Scene column */}
+        {/* Scene column — cowboy + flag on desert */}
         <div className="relative order-2 md:order-1">
           <div
-            className="relative aspect-[4/5] w-full overflow-hidden border-[3px] border-[var(--lp-ink)]"
+            className="relative aspect-[5/6] w-full overflow-hidden border-[3px] border-[var(--lp-ink)] bg-[var(--lp-cream)]"
             style={{ boxShadow: "8px 8px 0 var(--lp-red)" }}
           >
             <Image
-              src="/brand/americana/crossing-freedom.jpg"
-              alt="American freedom scene"
+              src="/brand/illustrations/background-desert.png"
+              alt=""
               fill
               sizes="(max-width: 768px) 88vw, 480px"
               className="object-cover"
             />
-            <div
-              aria-hidden
-              className="absolute inset-0 bg-[var(--lp-navy)] mix-blend-multiply opacity-20"
-            />
+            <div className="absolute inset-0 flex items-end justify-center">
+              <div className="relative aspect-square w-[92%]">
+                <Image
+                  src="/brand/illustrations/cowboy.png"
+                  alt="Cowboy riding with American flag"
+                  fill
+                  sizes="(max-width: 768px) 82vw, 420px"
+                  className="object-contain drop-shadow-[4px_5px_0_rgba(14,22,56,0.45)]"
+                />
+              </div>
+            </div>
+            {/* Batch-number stamp in the corner */}
+            <div className="absolute right-2 top-2 rotate-[8deg]">
+              <div
+                className="lp-stamp"
+                style={{
+                  width: "5rem",
+                  height: "5rem",
+                  fontSize: "0.6rem",
+                  color: "var(--lp-navy)",
+                }}
+              >
+                <span>
+                  BATCH
+                  <br />
+                  №1402
+                </span>
+              </div>
+            </div>
           </div>
           <p className="lp-label mt-3 text-[var(--lp-ink)]/75">
             ★ Ashford, Washington · 46°45′ N, 121°57′ W

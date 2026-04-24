@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { HeroSection } from "@/components/lp/HeroSection";
 import { ScarcityBar } from "@/components/lp/ScarcityBar";
 import { ThreePromises } from "@/components/lp/ThreePromises";
+import { BombsAway } from "@/components/lp/BombsAway";
 import { FoundersLetter } from "@/components/lp/FoundersLetter";
 import { ReviewsStrip } from "@/components/lp/ReviewsStrip";
 import { GuaranteeBlock } from "@/components/lp/GuaranteeBlock";
@@ -35,6 +36,7 @@ export default function DyeFreeGummiesLandingPage() {
       <HeroSection />
       <ScarcityBar />
       <ThreePromises />
+      <BombsAway />
       <FoundersLetter />
       <ReviewsStrip />
       <GuaranteeBlock />

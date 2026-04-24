@@ -1,10 +1,42 @@
-// Guarantee + closing CTA — navy star-field panel with a giant red stamp.
+// Guarantee + closing CTA — navy star-field panel with a giant red stamp,
+// flanked by the Statue of Liberty and an Eagle illustration (bag art).
 
+import Image from "next/image";
 import Link from "next/link";
 
 export function GuaranteeBlock() {
   return (
     <section className="lp-starfield relative overflow-hidden">
+      {/* Liberty (left) + Eagle (right) at large screens — ornamental */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-y-0 left-0 hidden w-[22%] md:block"
+      >
+        <div className="relative h-full w-full">
+          <Image
+            src="/brand/illustrations/statue-liberty.png"
+            alt=""
+            fill
+            sizes="320px"
+            className="object-contain object-bottom opacity-90 drop-shadow-[3px_4px_0_rgba(0,0,0,0.4)]"
+          />
+        </div>
+      </div>
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-y-0 right-0 hidden w-[22%] md:block"
+      >
+        <div className="relative h-full w-full">
+          <Image
+            src="/brand/illustrations/eagle.png"
+            alt=""
+            fill
+            sizes="320px"
+            className="object-contain object-[right_center] opacity-90 drop-shadow-[3px_4px_0_rgba(0,0,0,0.4)]"
+          />
+        </div>
+      </div>
+
       <div className="relative mx-auto flex max-w-[1200px] flex-col items-center gap-8 px-5 py-16 text-center sm:px-8 sm:py-24">
         <div
           className="lp-stamp"
