@@ -604,6 +604,55 @@ export async function sendViaGmailApi(opts: SendGmailOpts): Promise<boolean> {
 }
 
 /**
+ * Create a Gmail DRAFT (not a send) via the Gmail API. The draft lives
+ * in the sender's Drafts folder; a human opens Gmail, reviews, and
+ * clicks Send. Used for any Class B+ outbound email where we want the
+ * human in the loop without making them hand-type the body.
+ *
+ * Supports attachments + reply threading the same way sendViaGmailApi
+ * does. Returns the Gmail draft id + permalink the user can open in
+ * their browser.
+ */
+export async function createGmailDraft(
+  opts: SendGmailOpts,
+): Promise<
+  | { ok: true; draftId: string; messageId: string; threadId: string | null; openUrl: string }
+  | { ok: false; error: string }
+> {
+  const gmail = getGmailSendClient();
+  if (!gmail) {
+    return { ok: false, error: "Gmail send client not available" };
+  }
+  try {
+    const raw = buildRawEmail(opts);
+    const response = await gmail.users.drafts.create({
+      userId: "me",
+      requestBody: {
+        message: {
+          raw,
+          ...(opts.threadId ? { threadId: opts.threadId } : {}),
+        },
+      },
+    });
+    const draftId = response.data?.id;
+    const messageId = response.data?.message?.id ?? "";
+    const threadId = response.data?.message?.threadId ?? null;
+    if (!draftId) {
+      return { ok: false, error: "Gmail API returned no draft id" };
+    }
+    // Gmail's deeplink to a specific draft. `#drafts/<id>` opens the
+    // Drafts view with the draft selected.
+    const openUrl = threadId
+      ? `https://mail.google.com/mail/u/0/#all/${threadId}`
+      : `https://mail.google.com/mail/u/0/#drafts`;
+    return { ok: true, draftId, messageId, threadId, openUrl };
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: `Gmail draft create failed: ${errMsg}` };
+  }
+}
+
+/**
  * Diagnostic version of sendViaGmailApi — returns detailed error info instead of boolean.
  */
 export async function testGmailApiSendDiagnostic(opts: SendGmailOpts): Promise<{
