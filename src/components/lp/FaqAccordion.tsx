@@ -34,11 +34,11 @@ export function FaqAccordion() {
   return (
     <section className="relative">
       <div className="mx-auto max-w-[820px] px-5 py-16 sm:px-8 sm:py-24">
-        <p className="lp-mono mb-3 text-[var(--lp-blood)]">Questions We Get</p>
-        <h2 className="lp-display text-[clamp(2rem,5vw,3.4rem)] leading-[0.95]">
+        <p className="lp-label mb-3 text-[var(--lp-red)]">★ Questions We Get ★</p>
+        <h2 className="lp-display text-[clamp(2rem,5vw,3.4rem)] text-[var(--lp-ink)]">
           Everything you&rsquo;d
           <br />
-          <span className="italic lp-editorial text-[var(--lp-blood)]">
+          <span className="lp-script text-[var(--lp-red)]">
             actually ask.
           </span>
         </h2>

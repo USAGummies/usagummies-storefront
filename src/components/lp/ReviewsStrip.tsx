@@ -1,5 +1,4 @@
-// Reviews — real quote cards in a newspaper-column layout.
-// Three quotes, name/city/date, no photos (more editorial, less "testimonial template").
+// Reviews — "Mail Call" stamped-envelope cards.
 
 const QUOTES = [
   {
@@ -30,39 +29,45 @@ const QUOTES = [
 
 export function ReviewsStrip() {
   return (
-    <section className="relative bg-[var(--lp-cream-soft)] border-y border-[var(--lp-rule)]">
+    <section className="relative border-y-2 border-[var(--lp-ink)] bg-[var(--lp-cream)]">
+      {/* Top bunting */}
+      <div className="lp-bunting-thin" aria-hidden />
       <div className="mx-auto max-w-[1200px] px-5 py-14 sm:px-8 sm:py-20">
-        <header className="mb-10 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <h2 className="lp-display text-[clamp(2rem,5.5vw,3.4rem)]">
-            Mail from
-            <br />
-            the <span className="italic lp-editorial text-[var(--lp-blood)]">kitchen&nbsp;table.</span>
-          </h2>
-          <p className="lp-mono text-[var(--lp-ink)]/70">
-            4.8 / 5 · 219 verified reviews
+        <header className="mb-10 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="lp-label mb-2 text-[var(--lp-red)]">★ Mail Call ★</p>
+            <h2 className="lp-display text-[clamp(2.2rem,5.5vw,3.4rem)] text-[var(--lp-ink)]">
+              From the
+              <br />
+              <span className="lp-script text-[var(--lp-red)]">kitchen table.</span>
+            </h2>
+          </div>
+          <p className="lp-label text-[var(--lp-ink)]/75">
+            4.8 / 5 · 219 Verified Reviews
           </p>
         </header>
 
-        <div className="grid grid-cols-1 gap-x-10 gap-y-12 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
           {QUOTES.map((q, i) => (
             <figure
               key={i}
-              className={`relative ${i > 0 ? "md:border-l md:border-[var(--lp-rule)] md:pl-8" : ""}`}
+              className="relative border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6"
+              style={{ boxShadow: "5px 5px 0 var(--lp-red)" }}
             >
               <div
                 aria-label={`${q.stars} out of 5 stars`}
-                className="tracking-[0.28em] text-[var(--lp-blood)]"
+                className="tracking-[0.3em] text-[var(--lp-gold)]"
               >
                 {"★".repeat(q.stars)}
               </div>
-              <blockquote className="lp-editorial mt-4 text-[1.3rem] leading-[1.5]">
+              <blockquote className="lp-sans mt-4 text-[1.1rem] font-medium leading-[1.55] text-[var(--lp-ink)]">
                 &ldquo;{q.quote}&rdquo;
               </blockquote>
-              <figcaption className="lp-mono mt-5 text-[var(--lp-ink)]/75">
-                <span className="block text-[0.8rem] tracking-[0.12em]">
+              <figcaption className="mt-5 border-t-2 border-[var(--lp-ink)] pt-3">
+                <span className="lp-display block text-[1rem] text-[var(--lp-red)]">
                   {q.name}
                 </span>
-                <span className="block text-[0.7rem] text-[var(--lp-ink)]/55">
+                <span className="lp-label text-[var(--lp-ink)]/60">
                   {q.where} · {q.date}
                 </span>
               </figcaption>
@@ -70,6 +75,7 @@ export function ReviewsStrip() {
           ))}
         </div>
       </div>
+      <div className="lp-bunting-thin" aria-hidden />
     </section>
   );
 }

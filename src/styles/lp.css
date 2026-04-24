@@ -1,191 +1,201 @@
-/* /lp route — scoped design tokens + textures.
- * Vintage Americana rebooted: slab-serif type, oxblood red, cream paper,
- * carbon-ink black, halftone grain. Overrides happen inside .lp-scope only,
- * keeping the rest of the site untouched.
+/* /lp route — bold patriotic Americana to match the bag art.
+ * Primary red + navy + gold. Chunky slab display, script accent,
+ * star/stripe ornaments, cartoon-friendly. No subtle vintage ink
+ * stuff — this is a 4th-of-July parade banner.
  */
 
 .lp-scope {
-  /* Tokens — poster shop, 1952 */
-  --lp-ink: #0f0d0b;
-  --lp-blood: #9c1f2b;         /* oxblood red, not fire-engine */
-  --lp-cream: #f1e6cc;         /* aged newsprint */
-  --lp-cream-soft: #f7eedb;
-  --lp-navy: #14223f;          /* deep navy, almost black */
-  --lp-gold: #b88742;          /* tarnished brass */
-  --lp-rule: rgba(15, 13, 11, 0.18);
-  --lp-shadow: 0 2px 0 var(--lp-ink);
+  /* Tokens — USA Gummies bag art palette */
+  --lp-ink: #0E1638;           /* deep navy — headline text, dark panels */
+  --lp-navy: #1D2E60;
+  --lp-navy-deep: #0A1A46;
+  --lp-red: #CF2932;           /* flag red — primary CTA + accent */
+  --lp-red-dark: #A51F27;
+  --lp-cream: #FDF4E0;         /* warm cream background */
+  --lp-cream-soft: #FFF8EA;
+  --lp-gold: #E3A929;          /* star gold */
+  --lp-gold-light: #F5C860;
+  --lp-off-white: #FDFDFD;
+  --lp-rule: rgba(14, 22, 56, 0.15);
 
   color: var(--lp-ink);
   background: var(--lp-cream);
-  font-family: var(--font-lp-body), Georgia, "Times New Roman", serif;
+  font-family: var(--font-lp-body), "Oswald", sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  font-feature-settings: "ss01" on, "kern" on, "liga" on;
+  font-feature-settings: "kern" on, "liga" on;
 }
 
-/* Paper grain — barely visible, earns you the "real ink" feeling */
-.lp-scope .lp-grain {
-  position: relative;
-}
-.lp-scope .lp-grain::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background-image:
-    radial-gradient(rgba(15, 13, 11, 0.08) 1px, transparent 1px),
-    radial-gradient(rgba(15, 13, 11, 0.05) 1px, transparent 1px);
-  background-size: 3px 3px, 7px 7px;
-  background-position: 0 0, 1px 2px;
-  opacity: 0.45;
-  pointer-events: none;
-  mix-blend-mode: multiply;
-  z-index: 0;
-}
-.lp-scope .lp-grain > * {
-  position: relative;
-  z-index: 1;
-}
-
-/* Halftone dot field, for decorative panels */
-.lp-scope .lp-halftone {
-  background-image: radial-gradient(var(--lp-ink) 1px, transparent 1.5px);
-  background-size: 8px 8px;
-  opacity: 0.08;
-}
-
-/* Letterpress heading — faint dark edge like the impression of ink into paper */
-.lp-scope .lp-letterpress {
-  text-shadow:
-    0 1px 0 rgba(15, 13, 11, 0.15),
-    0 2px 0 rgba(15, 13, 11, 0.08);
-}
-
-/* Monumental slab headline — tight, kerned, all caps */
+/* Chunky slab display — for the monumental headlines */
 .lp-scope .lp-display {
-  font-family: var(--font-lp-display), "Alfa Slab One", Georgia, serif;
+  font-family: var(--font-lp-display), "Ultra", "Bowlby One SC", serif;
   font-weight: 400;
-  letter-spacing: -0.01em;
-  line-height: 0.88;
+  letter-spacing: -0.005em;
+  line-height: 0.95;
   text-transform: uppercase;
 }
 
-/* Editorial serif — for short copy in the hero */
-.lp-scope .lp-editorial {
-  font-family: var(--font-lp-editorial), "Fraunces", Georgia, serif;
-  font-optical-sizing: auto;
-  font-style: italic;
-  font-weight: 400;
-}
-
-/* Mono for labels, batch numbers, and all-caps trust lines */
-.lp-scope .lp-mono {
-  font-family: var(--font-lp-mono), "IBM Plex Mono", ui-monospace, Menlo, monospace;
+/* Tall clean sans — for body and subheads */
+.lp-scope .lp-sans {
+  font-family: var(--font-lp-body), "Oswald", sans-serif;
   font-weight: 500;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.01em;
+}
+
+/* Patriotic script — the "Made in the U.S.A." tagline style */
+.lp-scope .lp-script {
+  font-family: var(--font-lp-script), "Yellowtail", cursive;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* Small caps label */
+.lp-scope .lp-label {
+  font-family: var(--font-lp-body), "Oswald", sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
 }
 
-/* Rule — old-timey horizontal divider built from stacked borders */
-.lp-scope .lp-rule {
-  border: 0;
-  height: 6px;
+/* Stars-and-stripes bunting bar */
+.lp-scope .lp-bunting {
+  height: 10px;
   background: repeating-linear-gradient(
-    to right,
-    var(--lp-ink) 0 24px,
-    transparent 24px 32px
+    90deg,
+    var(--lp-red) 0 60px,
+    var(--lp-off-white) 60px 120px
   );
-  mask-image: linear-gradient(to right, transparent 0, black 20%, black 80%, transparent 100%);
+}
+.lp-scope .lp-bunting-thin {
+  height: 4px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--lp-red) 0 24px,
+    var(--lp-off-white) 24px 48px
+  );
 }
 
-.lp-scope .lp-rule-thin {
-  border: 0;
-  height: 1px;
-  background: var(--lp-ink);
+/* Star row — decorative divider */
+.lp-scope .lp-stars {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--lp-gold);
+  font-size: 1rem;
+}
+.lp-scope .lp-stars::before,
+.lp-scope .lp-stars::after {
+  content: "";
+  flex: 1;
+  height: 2px;
+  background: currentColor;
   opacity: 0.35;
 }
 
-/* Stamp badge — rotated, two-ring, aged red ink */
-.lp-scope .lp-stamp {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.25rem;
-  border: 2px solid var(--lp-blood);
-  color: var(--lp-blood);
-  padding: 0.45rem 0.75rem;
-  font-family: var(--font-lp-mono), monospace;
-  letter-spacing: 0.14em;
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  transform: rotate(-4deg);
-  box-shadow: inset 0 0 0 2px var(--lp-cream), inset 0 0 0 3px var(--lp-blood);
-  position: relative;
-}
-.lp-scope .lp-stamp::before {
-  content: "";
-  position: absolute;
-  inset: -2px;
-  border: 1px dashed rgba(156, 31, 43, 0.35);
-  border-radius: 2px;
-  pointer-events: none;
+/* Star glyph — use as inline ornament */
+.lp-scope .lp-star-ornament {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  background: currentColor;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpolygon points='10,1 12.5,7 19,7 13.5,11 15.5,18 10,14 4.5,18 6.5,11 1,7 7.5,7' fill='black'/%3E%3C/svg%3E");
+  -webkit-mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpolygon points='10,1 12.5,7 19,7 13.5,11 15.5,18 10,14 4.5,18 6.5,11 1,7 7.5,7' fill='black'/%3E%3C/svg%3E");
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
 }
 
-/* Monumental CTA — stamped black button with blood-red shadow offset */
+/* Primary CTA — big red button with white border, drops into a hard shadow */
 .lp-scope .lp-cta {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.6rem;
-  background: var(--lp-ink);
-  color: var(--lp-cream);
-  padding: 1.05rem 1.5rem;
+  gap: 0.65rem;
+  background: var(--lp-red);
+  color: var(--lp-off-white);
+  padding: 1.1rem 1.75rem;
   font-family: var(--font-lp-display), serif;
-  font-size: 1.125rem;
-  letter-spacing: 0.02em;
+  font-size: 1.25rem;
+  line-height: 1;
+  letter-spacing: 0.015em;
   text-transform: uppercase;
-  border: 2px solid var(--lp-ink);
-  box-shadow: 5px 5px 0 var(--lp-blood);
-  transition: transform 120ms ease, box-shadow 120ms ease;
+  border: 3px solid var(--lp-off-white);
+  box-shadow: 0 0 0 3px var(--lp-ink), 6px 6px 0 var(--lp-ink);
+  transition: transform 140ms cubic-bezier(0.25, 0.9, 0.3, 1.1),
+              box-shadow 140ms ease;
   cursor: pointer;
   text-decoration: none;
+  text-align: center;
 }
 .lp-scope .lp-cta:hover,
 .lp-scope .lp-cta:focus-visible {
   transform: translate(-2px, -2px);
-  box-shadow: 7px 7px 0 var(--lp-blood);
+  box-shadow: 0 0 0 3px var(--lp-ink), 8px 8px 0 var(--lp-ink);
 }
 .lp-scope .lp-cta:active {
-  transform: translate(2px, 2px);
-  box-shadow: 2px 2px 0 var(--lp-blood);
+  transform: translate(3px, 3px);
+  box-shadow: 0 0 0 3px var(--lp-ink), 3px 3px 0 var(--lp-ink);
 }
 
-/* Secondary (outlined) CTA for below-fold repeat asks */
-.lp-scope .lp-cta-ghost {
+/* Inverted CTA for dark panels */
+.lp-scope .lp-cta-light {
+  background: var(--lp-off-white);
+  color: var(--lp-red);
+  border-color: var(--lp-red);
+  box-shadow: 0 0 0 3px var(--lp-off-white), 6px 6px 0 var(--lp-red);
+}
+.lp-scope .lp-cta-light:hover,
+.lp-scope .lp-cta-light:focus-visible {
+  box-shadow: 0 0 0 3px var(--lp-off-white), 8px 8px 0 var(--lp-red);
+}
+
+/* Big round stamp badge */
+.lp-scope .lp-stamp {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.85rem 1.25rem;
-  background: transparent;
-  color: var(--lp-ink);
-  border: 1.5px solid var(--lp-ink);
-  font-family: var(--font-lp-mono), monospace;
-  letter-spacing: 0.12em;
+  justify-content: center;
+  text-align: center;
+  color: var(--lp-red);
+  border: 3px solid currentColor;
+  border-radius: 999px;
+  width: 7rem;
+  height: 7rem;
+  font-family: var(--font-lp-display), serif;
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  font-size: 0.75rem;
-  text-decoration: none;
-  transition: background 120ms ease, color 120ms ease;
-}
-.lp-scope .lp-cta-ghost:hover,
-.lp-scope .lp-cta-ghost:focus-visible {
-  background: var(--lp-ink);
-  color: var(--lp-cream);
+  line-height: 1.05;
+  padding: 0.6rem;
+  transform: rotate(-8deg);
+  box-shadow: inset 0 0 0 3px var(--lp-off-white), inset 0 0 0 4px currentColor;
+  background: var(--lp-off-white);
+  font-weight: 400;
 }
 
-/* Duotone photo treatment — moody, vintage, on-brand */
-.lp-scope .lp-duotone {
-  filter: grayscale(1) contrast(1.05) brightness(1.02);
-  mix-blend-mode: multiply;
+/* Ribbon banner */
+.lp-scope .lp-ribbon {
+  position: relative;
+  display: inline-block;
+  background: var(--lp-navy);
+  color: var(--lp-gold);
+  padding: 0.55rem 1.4rem;
+  font-family: var(--font-lp-display), serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.9rem;
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    calc(100% - 12px) 50%,
+    100% 100%,
+    0 100%,
+    12px 50%
+  );
 }
 
 /* Accordion */
@@ -194,99 +204,135 @@
   cursor: pointer;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 1.25rem 0;
-  font-family: var(--font-lp-editorial), serif;
-  font-size: 1.2rem;
-  border-top: 1px solid var(--lp-rule);
-  transition: color 120ms ease;
+  gap: 0.8rem;
+  padding: 1.3rem 0;
+  font-family: var(--font-lp-display), serif;
+  font-size: 1.15rem;
+  text-transform: uppercase;
+  border-top: 2px solid var(--lp-ink);
 }
 .lp-scope details.lp-faq summary::-webkit-details-marker { display: none; }
+.lp-scope details.lp-faq summary::before {
+  content: "";
+  width: 1em;
+  height: 1em;
+  flex: 0 0 auto;
+  background: var(--lp-red);
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpolygon points='10,1 12.5,7 19,7 13.5,11 15.5,18 10,14 4.5,18 6.5,11 1,7 7.5,7' fill='black'/%3E%3C/svg%3E");
+  -webkit-mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpolygon points='10,1 12.5,7 19,7 13.5,11 15.5,18 10,14 4.5,18 6.5,11 1,7 7.5,7' fill='black'/%3E%3C/svg%3E");
+  mask-size: contain;
+  mask-repeat: no-repeat;
+}
 .lp-scope details.lp-faq summary::after {
   content: "+";
+  margin-left: auto;
   font-family: var(--font-lp-display), serif;
-  font-size: 1.6rem;
+  font-size: 1.5rem;
   line-height: 1;
-  transition: transform 200ms ease;
+  color: var(--lp-red);
+  transition: transform 220ms ease;
 }
-.lp-scope details.lp-faq[open] summary::after { content: "–"; transform: rotate(360deg); }
+.lp-scope details.lp-faq[open] summary::after { content: "–"; }
 .lp-scope details.lp-faq > div {
-  padding-bottom: 1.25rem;
-  padding-right: 2rem;
+  padding: 0 0 1.3rem 2.2rem;
+  font-family: var(--font-lp-body), sans-serif;
+  font-weight: 400;
   color: var(--lp-ink);
-  opacity: 0.82;
-  line-height: 1.6;
+  opacity: 0.9;
+  line-height: 1.65;
+  font-size: 1rem;
 }
-.lp-scope details.lp-faq:last-of-type { border-bottom: 1px solid var(--lp-rule); }
+.lp-scope details.lp-faq:last-of-type { border-bottom: 2px solid var(--lp-ink); }
 
-/* Sticky mobile buy bar — fixed thumb-zone CTA */
+/* Sticky mobile buy bar */
 .lp-scope .lp-sticky-buy {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 0.75rem 1rem calc(env(safe-area-inset-bottom, 0px) + 0.75rem);
-  background: var(--lp-ink);
-  border-top: 3px solid var(--lp-blood);
+  padding: 0.7rem 1rem calc(env(safe-area-inset-bottom, 0px) + 0.7rem);
+  background: var(--lp-navy);
+  border-top: 4px solid var(--lp-red);
   z-index: 40;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  transform: translateY(100%);
-  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  transform: translateY(110%);
+  transition: transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpolygon points='10,1 12.5,7 19,7 13.5,11 15.5,18 10,14 4.5,18 6.5,11 1,7 7.5,7' fill='%23E3A929' opacity='0.14'/%3E%3C/svg%3E");
+  background-size: 40px 40px;
 }
 .lp-scope .lp-sticky-buy[data-show="true"] { transform: translateY(0); }
 .lp-scope .lp-sticky-buy .lp-sticky-text {
   color: var(--lp-cream);
   font-family: var(--font-lp-display), serif;
-  font-size: 0.95rem;
+  font-size: 1rem;
   letter-spacing: 0.02em;
   text-transform: uppercase;
+  line-height: 1;
 }
 .lp-scope .lp-sticky-buy a {
-  background: var(--lp-cream);
-  color: var(--lp-ink);
-  padding: 0.7rem 1.1rem;
+  background: var(--lp-red);
+  color: var(--lp-off-white);
+  padding: 0.75rem 1.1rem;
   font-family: var(--font-lp-display), serif;
   text-transform: uppercase;
-  font-size: 0.9rem;
-  box-shadow: 3px 3px 0 var(--lp-blood);
+  font-size: 1rem;
+  letter-spacing: 0.01em;
+  border: 2px solid var(--lp-off-white);
+  box-shadow: 3px 3px 0 var(--lp-ink);
   text-decoration: none;
 }
 @media (min-width: 768px) {
   .lp-scope .lp-sticky-buy { display: none; }
 }
 
-/* Staggered reveal — runs once on page load */
+/* Staggered entrance */
 @keyframes lp-rise {
   from { opacity: 0; transform: translateY(16px); }
   to { opacity: 1; transform: translateY(0); }
 }
 .lp-scope [data-reveal] {
   opacity: 0;
-  animation: lp-rise 700ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: lp-rise 650ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
-.lp-scope [data-reveal="1"] { animation-delay: 60ms; }
-.lp-scope [data-reveal="2"] { animation-delay: 140ms; }
-.lp-scope [data-reveal="3"] { animation-delay: 240ms; }
-.lp-scope [data-reveal="4"] { animation-delay: 360ms; }
-.lp-scope [data-reveal="5"] { animation-delay: 500ms; }
-.lp-scope [data-reveal="6"] { animation-delay: 660ms; }
+.lp-scope [data-reveal="1"] { animation-delay: 40ms; }
+.lp-scope [data-reveal="2"] { animation-delay: 120ms; }
+.lp-scope [data-reveal="3"] { animation-delay: 220ms; }
+.lp-scope [data-reveal="4"] { animation-delay: 340ms; }
+.lp-scope [data-reveal="5"] { animation-delay: 480ms; }
+.lp-scope [data-reveal="6"] { animation-delay: 640ms; }
 @media (prefers-reduced-motion: reduce) {
   .lp-scope [data-reveal] { opacity: 1; animation: none; }
 }
 
-/* Subtle grain on the whole LP body */
-.lp-scope::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 1;
+/* Decorative panels */
+.lp-scope .lp-stripes-bg {
+  background: repeating-linear-gradient(
+    0deg,
+    var(--lp-red) 0 28px,
+    var(--lp-off-white) 28px 56px
+  );
+}
+
+.lp-scope .lp-starfield {
+  background-color: var(--lp-navy);
   background-image:
-    radial-gradient(rgba(15, 13, 11, 0.06) 1px, transparent 1px);
-  background-size: 4px 4px;
-  opacity: 0.5;
-  mix-blend-mode: multiply;
+    radial-gradient(var(--lp-gold-light) 1.5px, transparent 2px),
+    radial-gradient(var(--lp-gold-light) 1px, transparent 1.5px);
+  background-size: 42px 42px, 64px 64px;
+  background-position: 0 0, 21px 21px;
+  color: var(--lp-off-white);
+}
+
+/* Gummy bear float animation — tiny ambient motion */
+@keyframes lp-float {
+  0%, 100% { transform: translateY(0) rotate(var(--r, 0deg)); }
+  50%      { transform: translateY(-6px) rotate(calc(var(--r, 0deg) + 4deg)); }
+}
+.lp-scope .lp-float {
+  animation: lp-float 5s ease-in-out infinite;
 }

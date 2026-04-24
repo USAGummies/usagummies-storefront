@@ -1,58 +1,62 @@
-// Minimal footer — monumental mark, four links, legal line. That's it.
+// Minimal footer — monumental wordmark, three link columns, navy legal bar.
 
 import Link from "next/link";
 
 export function FooterMini() {
   return (
-    <footer className="relative border-t border-[var(--lp-rule)]">
+    <footer className="relative border-t-4 border-[var(--lp-red)] bg-[var(--lp-cream)]">
+      <div className="lp-bunting" aria-hidden />
       <div className="mx-auto grid max-w-[1200px] grid-cols-1 gap-8 px-5 py-14 sm:grid-cols-[1.5fr_1fr_1fr] sm:px-8">
         <div>
-          <p className="lp-display text-[2rem] leading-[0.9]">
-            USA <span className="text-[var(--lp-blood)]">Gummies.</span>
+          <p className="lp-display text-[2.25rem] leading-[0.9] text-[var(--lp-ink)]">
+            USA <span className="text-[var(--lp-red)]">★</span> Gummies.
           </p>
-          <p className="lp-editorial mt-3 max-w-[32ch] text-[1.05rem] text-[var(--lp-ink)]/80">
+          <p className="lp-script mt-1 text-[1.6rem] text-[var(--lp-red)]">
+            Made in the U.S.A.
+          </p>
+          <p className="lp-sans mt-3 max-w-[32ch] text-[1rem] font-normal text-[var(--lp-ink)]/80">
             Dye-free gummy bears, pressed in America. Shipped from Mt.
             Rainier country.
           </p>
         </div>
         <nav aria-label="Shop" className="space-y-2">
-          <p className="lp-mono mb-2 text-[var(--lp-ink)]/60">Shop</p>
-          <Link href="/shop" className="block text-[1rem] text-[var(--lp-ink)] hover:text-[var(--lp-blood)]">
+          <p className="lp-label mb-2 text-[var(--lp-red)]">Shop</p>
+          <Link href="/shop" className="lp-sans block text-[1rem] font-medium text-[var(--lp-ink)] hover:text-[var(--lp-red)]">
             All products
           </Link>
-          <Link href="/wholesale" className="block text-[1rem] text-[var(--lp-ink)] hover:text-[var(--lp-blood)]">
+          <Link href="/wholesale" className="lp-sans block text-[1rem] font-medium text-[var(--lp-ink)] hover:text-[var(--lp-red)]">
             Wholesale
           </Link>
-          <Link href="/bulk-gummy-bears" className="block text-[1rem] text-[var(--lp-ink)] hover:text-[var(--lp-blood)]">
+          <Link href="/bulk-gummy-bears" className="lp-sans block text-[1rem] font-medium text-[var(--lp-ink)] hover:text-[var(--lp-red)]">
             Bulk orders
           </Link>
         </nav>
         <nav aria-label="Company" className="space-y-2">
-          <p className="lp-mono mb-2 text-[var(--lp-ink)]/60">Company</p>
-          <Link href="/about" className="block text-[1rem] text-[var(--lp-ink)] hover:text-[var(--lp-blood)]">
+          <p className="lp-label mb-2 text-[var(--lp-red)]">Company</p>
+          <Link href="/about" className="lp-sans block text-[1rem] font-medium text-[var(--lp-ink)] hover:text-[var(--lp-red)]">
             About
           </Link>
-          <Link href="/ingredients" className="block text-[1rem] text-[var(--lp-ink)] hover:text-[var(--lp-blood)]">
+          <Link href="/ingredients" className="lp-sans block text-[1rem] font-medium text-[var(--lp-ink)] hover:text-[var(--lp-red)]">
             Ingredients
           </Link>
-          <Link href="/contact" className="block text-[1rem] text-[var(--lp-ink)] hover:text-[var(--lp-blood)]">
+          <Link href="/contact" className="lp-sans block text-[1rem] font-medium text-[var(--lp-ink)] hover:text-[var(--lp-red)]">
             Contact
           </Link>
         </nav>
       </div>
-      <div className="border-t border-[var(--lp-rule)]">
-        <div className="mx-auto flex max-w-[1200px] flex-col items-center justify-between gap-2 px-5 py-4 text-[var(--lp-ink)]/60 sm:flex-row sm:px-8">
-          <span className="lp-mono">
+      <div className="lp-starfield">
+        <div className="mx-auto flex max-w-[1200px] flex-col items-center justify-between gap-2 px-5 py-4 sm:flex-row sm:px-8">
+          <span className="lp-label text-[var(--lp-off-white)]/80">
             © USA Gummies · Ashford, WA · Est. 2025
           </span>
-          <span className="lp-mono flex gap-4">
-            <Link href="/policies/terms">Terms</Link>
-            <Link href="/policies/privacy">Privacy</Link>
-            <Link href="/policies/returns">Returns</Link>
+          <span className="lp-label flex gap-4 text-[var(--lp-off-white)]/80">
+            <Link href="/policies/terms" className="hover:text-[var(--lp-gold)]">Terms</Link>
+            <Link href="/policies/privacy" className="hover:text-[var(--lp-gold)]">Privacy</Link>
+            <Link href="/policies/returns" className="hover:text-[var(--lp-gold)]">Returns</Link>
           </span>
         </div>
       </div>
-      <div className="pb-28 md:pb-0" aria-hidden />
+      <div className="pb-24 md:pb-0" aria-hidden />
     </footer>
   );
 }

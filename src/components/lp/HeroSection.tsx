@@ -1,165 +1,208 @@
-// Hero — the entire sales pitch in 375×667.
-// Layout priorities (top to bottom on mobile):
-//   1. Batch line + 4.8★ (tiny, builds authority instantly)
-//   2. Monumental headline
-//   3. One editorial sub-line
-//   4. Product photograph (right-aligned, overlapping stamp)
-//   5. Price + "free shipping on 5+"
-//   6. CTA
-//   7. Trust row — made in USA · no dyes · ships in 24h
+// Hero — patriotic, bold, character-led.
+// Mobile (375×667) layout: bunting → wordmark strip → ribbon → chunky
+// headline → script subline → bag art with flying gummy bears →
+// big red CTA → 3-item trust row. Everything above the fold.
 
 import Image from "next/image";
 import Link from "next/link";
 
+const GUMMIES = [
+  { src: "/brand/gummies/gummy-red.png",    alt: "Cherry",      top: "6%",     left: "-4%",  size: 72, rot: -14 },
+  { src: "/brand/gummies/gummy-yellow.png", alt: "Lemon",       top: "2%",     right: "-6%", size: 84, rot: 18 },
+  { src: "/brand/gummies/gummy-green.png",  alt: "Green apple", bottom: "22%", left: "-8%",  size: 68, rot: 22 },
+  { src: "/brand/gummies/gummy-orange.png", alt: "Orange",      bottom: "8%",  right: "-2%", size: 76, rot: -10 },
+  { src: "/brand/gummies/gummy-pink.png",   alt: "Watermelon",  top: "48%",    right: "4%",  size: 56, rot: 8 },
+];
+
 export function HeroSection() {
   return (
     <section className="relative overflow-hidden">
-      {/* Top meta strip — batch + stars */}
-      <div className="relative border-b border-[var(--lp-rule)]">
+      <div className="lp-bunting" aria-hidden />
+
+      {/* Navy starfield header strip — wordmark + ★ rating */}
+      <div className="lp-starfield relative">
         <div className="mx-auto flex max-w-[1200px] items-center justify-between gap-3 px-5 py-2.5 sm:px-8">
-          <span className="lp-mono text-[0.65rem] sm:text-[0.7rem]">
-            Batch №1402 · Spokane, WA · 10 / 14 / 2027
+          <span className="lp-display text-[1.15rem] tracking-[0.04em] sm:text-[1.3rem]">
+            USA <span className="text-[var(--lp-red)]">★</span> Gummies
           </span>
-          <span className="lp-mono flex items-center gap-1.5 text-[0.65rem] sm:text-[0.7rem]">
-            <span aria-hidden className="tracking-[0.3em] text-[var(--lp-blood)]">★★★★★</span>
-            <span>4.8 · 219 reviews</span>
+          <span className="lp-label flex items-center gap-1.5 text-[var(--lp-gold)]">
+            <span aria-hidden className="tracking-[0.2em]">★★★★★</span>
+            <span className="hidden sm:inline">4.8 · 219 Reviews</span>
+            <span className="sm:hidden">4.8★</span>
           </span>
         </div>
       </div>
 
-      {/* Hero body */}
-      <div className="relative mx-auto grid max-w-[1200px] grid-cols-1 gap-6 px-5 pb-10 pt-8 sm:px-8 sm:pb-16 sm:pt-14 md:grid-cols-[1.1fr_1fr] md:gap-12 md:pb-24 md:pt-20">
-        {/* Left column — type does the work */}
-        <div className="relative">
-          <p
-            data-reveal="1"
-            className="lp-mono text-[var(--lp-blood)]"
-          >
-            Dye-Free Since 2025
-          </p>
-
-          <h1
-            data-reveal="2"
-            className="lp-display lp-letterpress mt-3 text-[clamp(3.2rem,11vw,7.75rem)]"
-          >
-            Real
-            <br />
-            <span className="text-[var(--lp-blood)]">Gummy</span>
-            <br />
-            Bears.
-          </h1>
-
-          <p
-            data-reveal="3"
-            className="lp-editorial mt-5 max-w-[28ch] text-[1.25rem] leading-[1.45] text-[var(--lp-ink)]/90 sm:text-[1.45rem]"
-          >
-            Made in America.{" "}
-            <span className="text-[var(--lp-blood)]">Colored by fruit.</span>{" "}
-            No Red 40, ever.
-          </p>
-
-          {/* Price + CTA block */}
-          <div data-reveal="4" className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center">
-            <Link
-              href="/go/checkout?qty=1&utm_source=lp&utm_medium=hero"
-              className="lp-cta"
-              aria-label="Order one 7.5 oz bag for $5.99"
-            >
-              Order a bag — $5.99
-            </Link>
-            <p className="lp-mono text-[var(--lp-ink)]/70">
-              Free shipping on orders 5+
-            </p>
-          </div>
-
-          {/* Trust row */}
-          <ul
-            data-reveal="5"
-            className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-[var(--lp-rule)] pt-5 text-sm"
-          >
-            <li className="lp-mono flex items-center gap-2 text-[var(--lp-ink)]">
-              <svg aria-hidden viewBox="0 0 24 24" className="h-[14px] w-[14px]" fill="none">
-                <path
-                  d="M4 8 L12 4 L20 8 L20 16 L12 20 L4 16 Z"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              Made in USA
-            </li>
-            <li className="lp-mono flex items-center gap-2">
-              <svg aria-hidden viewBox="0 0 24 24" className="h-[14px] w-[14px]" fill="none">
-                <path
-                  d="M5 19 L19 5 M5 5 L19 19"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                />
-              </svg>
-              No Artificial Dyes
-            </li>
-            <li className="lp-mono flex items-center gap-2">
-              <svg aria-hidden viewBox="0 0 24 24" className="h-[14px] w-[14px]" fill="none">
-                <path
-                  d="M4 12 L10 18 L20 6"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              Ships in 24 Hrs
-            </li>
-          </ul>
+      <div className="relative overflow-hidden">
+        {/* Soft meadow backdrop — adds depth without shouting */}
+        <div aria-hidden className="absolute inset-0 -z-10">
+          <Image
+            src="/brand/brand-scenes/home-bg-meadow-mountains.png"
+            alt=""
+            fill
+            priority
+            sizes="100vw"
+            className="object-cover opacity-30"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-[var(--lp-cream)]/70 via-[var(--lp-cream)]/60 to-[var(--lp-cream)]" />
         </div>
 
-        {/* Right column — product photo with overlapping stamp badge */}
-        <div
-          data-reveal="3"
-          className="relative mx-auto w-full max-w-[420px] md:max-w-none"
-        >
-          <div className="relative aspect-[4/5] w-full">
-            {/* Halftone backdrop panel */}
-            <div
-              aria-hidden
-              className="lp-halftone absolute inset-[6%] -z-0 rounded-[2px]"
-            />
-            {/* Blood-red rectangle behind photo for the "printed poster" effect */}
-            <div
-              aria-hidden
-              className="absolute left-[8%] top-[6%] bottom-[6%] right-[28%] -z-0 bg-[var(--lp-blood)]"
-            />
-            <Image
-              src="/brand/americana/bag-dramatic-smoke.jpg"
-              alt="USA Gummies All American Gummy Bears — 7.5 oz bag"
-              fill
-              priority
-              sizes="(max-width: 768px) 88vw, 520px"
-              className="object-contain drop-shadow-[4px_4px_0_rgba(15,13,11,0.95)]"
-            />
-            {/* Corner stamp — not rotated INTO the photo, it's bolted to the top-right of the frame */}
-            <div className="absolute right-0 top-0 translate-x-2 -translate-y-3 md:translate-x-4 md:-translate-y-4">
-              <div className="lp-stamp">
-                <span>No.&nbsp;1402</span>
+        <div className="relative mx-auto grid max-w-[1200px] grid-cols-1 gap-6 px-5 pb-10 pt-8 sm:px-8 sm:pb-16 sm:pt-12 md:grid-cols-[1.15fr_1fr] md:gap-10 md:pb-20 md:pt-16">
+          {/* Copy column */}
+          <div className="relative order-2 md:order-1">
+            <div data-reveal="1" className="lp-ribbon mb-5">
+              Dye-Free · Since 2025
+            </div>
+
+            <h1
+              data-reveal="2"
+              className="lp-display text-[clamp(3rem,10.5vw,6.8rem)] text-[var(--lp-ink)]"
+            >
+              <span className="block">All American</span>
+              <span className="block text-[var(--lp-red)]">Gummy Bears.</span>
+            </h1>
+
+            <p
+              data-reveal="3"
+              className="lp-script mt-2 text-[clamp(1.75rem,5vw,2.5rem)] text-[var(--lp-red)]"
+            >
+              Made in the U.S.A.
+            </p>
+
+            <p
+              data-reveal="3"
+              className="lp-sans mt-5 max-w-[30ch] text-[1.1rem] leading-[1.5] text-[var(--lp-ink)]/85 sm:text-[1.25rem]"
+            >
+              Real gummy bears, pressed in America. Colored by fruit.{" "}
+              <span className="font-bold text-[var(--lp-red)]">
+                No Red 40, ever.
+              </span>
+            </p>
+
+            <div data-reveal="4" className="mt-7 flex flex-col gap-4 sm:flex-row sm:items-center">
+              <Link
+                href="/go/checkout?qty=1&utm_source=lp&utm_medium=hero"
+                className="lp-cta"
+                aria-label="Order one 7.5 oz bag for $5.99"
+              >
+                Order a Bag · $5.99
+              </Link>
+              <p className="lp-label text-[var(--lp-ink)]/70">
+                Free shipping on 5+ · Ships in 24 hrs
+              </p>
+            </div>
+
+            <ul
+              data-reveal="5"
+              className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3 border-t-2 border-[var(--lp-ink)] pt-5"
+            >
+              {["Made in the USA", "No Artificial Dyes", "Ships in 24 Hrs"].map((t) => (
+                <li key={t} className="lp-label flex items-center gap-2 text-[var(--lp-ink)]">
+                  <span aria-hidden className="lp-star-ornament h-[14px] w-[14px] text-[var(--lp-red)]" />
+                  {t}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Bag column */}
+          <div
+            data-reveal="3"
+            className="relative order-1 mx-auto w-full max-w-[420px] md:order-2 md:max-w-none"
+          >
+            <div className="relative aspect-[4/5] w-full">
+              {/* Gold sunburst */}
+              <div
+                aria-hidden
+                className="absolute inset-[4%] rounded-full"
+                style={{
+                  background:
+                    "radial-gradient(closest-side, var(--lp-gold-light) 0%, var(--lp-gold) 45%, transparent 72%)",
+                  opacity: 0.55,
+                }}
+              />
+              {/* Red poster plate */}
+              <div
+                aria-hidden
+                className="absolute inset-[12%] rotate-[-3deg] bg-[var(--lp-red)]"
+                style={{ boxShadow: "6px 6px 0 var(--lp-ink)" }}
+              />
+              <Image
+                src="/brand/americana/bag-dramatic-smoke.jpg"
+                alt="USA Gummies All American Gummy Bears — 7.5 oz bag"
+                fill
+                priority
+                sizes="(max-width: 768px) 88vw, 520px"
+                className="relative object-contain drop-shadow-[4px_6px_0_rgba(14,22,56,0.85)]"
+              />
+
+              {/* Flying gummies */}
+              {GUMMIES.map((g, i) => (
+                <div
+                  key={i}
+                  className="lp-float absolute"
+                  style={{
+                    top: g.top,
+                    left: g.left,
+                    right: g.right,
+                    bottom: g.bottom,
+                    width: g.size,
+                    height: g.size,
+                    // @ts-expect-error CSS custom prop
+                    "--r": `${g.rot}deg`,
+                    transform: `rotate(${g.rot}deg)`,
+                    animationDelay: `${i * 320}ms`,
+                  }}
+                >
+                  <Image
+                    src={g.src}
+                    alt={g.alt}
+                    width={g.size}
+                    height={g.size}
+                    className="drop-shadow-[2px_3px_0_rgba(14,22,56,0.7)]"
+                  />
+                </div>
+              ))}
+
+              {/* Price stamp bottom-left */}
+              <div className="absolute -bottom-2 left-0 -translate-x-1">
+                <div className="lp-stamp">
+                  <span>
+                    <span className="block text-[0.6rem]">Net 7.5 oz</span>
+                    <span className="lp-display block text-[1.7rem] leading-none text-[var(--lp-red)]">
+                      $5.99
+                    </span>
+                    <span className="block text-[0.58rem]">Per Bag</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* Dye-free stamp top-right */}
+              <div className="absolute right-0 top-2 translate-x-2 -translate-y-2">
+                <div
+                  className="lp-stamp"
+                  style={{
+                    transform: "rotate(10deg)",
+                    color: "var(--lp-navy)",
+                    width: "5.5rem",
+                    height: "5.5rem",
+                    fontSize: "0.65rem",
+                  }}
+                >
+                  <span>
+                    100%
+                    <br />
+                    Dye
+                    <br />
+                    Free
+                  </span>
+                </div>
               </div>
             </div>
-            {/* Price tag — old-school hang tag in the bottom-left */}
-            <div className="absolute -bottom-2 left-0 -translate-x-1 rotate-[-6deg] bg-[var(--lp-cream-soft)] px-3 py-2 shadow-[3px_3px_0_rgba(15,13,11,0.9)]">
-              <span className="lp-mono block text-[0.55rem] text-[var(--lp-ink)]/70">
-                net 7.5 oz
-              </span>
-              <span className="lp-display block text-[1.25rem] leading-none">
-                $5.99
-              </span>
-            </div>
           </div>
         </div>
-      </div>
 
-      {/* Decorative monumental rule */}
-      <div className="mx-auto max-w-[1200px] px-5 sm:px-8">
-        <hr className="lp-rule" />
+        <div className="lp-bunting-thin" aria-hidden />
       </div>
     </section>
   );
