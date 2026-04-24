@@ -31,19 +31,33 @@ Each row uses the schema:
 
 ## Division 1 — Sales / B2B / HubSpot
 
-### S1.1 Email-intelligence triage (P0 — NEW 2026-04-24)
+### S1.1 Email-intelligence triage (P0 — CLOSED LOOP 2026-04-24)
 - **Trigger:** Cron at 8am / 12pm / 3pm / 6pm / 9pm PT
 - **Source:** Gmail INBOX since cursor
 - **Enrichment:** HubSpot contact lookup, KV processed-set, Gmail SENT thread scan
 - **AI role:** Deterministic classifier first (rules-based), LLM fallback only at confidence < 0.7
 - **Approver:** Ben for `gmail.send` (Class B, every reply)
 - **Slack:** Report → `#ops-daily`. Approval cards → `#ops-approvals`
-- **Writeback:** Gmail draft (Class A — `draft.email`), HubSpot timeline on send (deferred to send-on-approve)
-- **Audit:** Every classification + draft + approval logged to `#ops-audit` via `record()` / `requestApproval()`
-- **Failure:** Gmail unreachable → run logs error, posts partial report
-- **Tests:** 20 tests covering classifier, draft, cursor, report
-- **Monday MVP:** 🟢 — drafts + approval cards live. Send-on-approve hook is the next layer
-- **Later:** Add LLM fallback for ambiguous categories; auto-send for graduated low-risk patterns
+- **Writeback:** Gmail draft (Class A — `draft.email`); on Slack approval click, the handler calls `executeApprovedEmailReply()` → `sendGmailDraftDetailed()` + HubSpot `logEmail` + audit
+- **Audit:** Every classification + draft + approval + send logged to `#ops-audit` via `record()` / `requestApproval()` / `appendExecutionAudit()`
+- **Failure:** Gmail unreachable → run logs error, posts partial report. Send failure on approval → thread reply with `:warning:` and the approval row stays approved-but-unsent for retry
+- **Tests:** 32 tests across classifier, draft, cursor, report, sample-request, approval-executor
+- **Monday MVP:** 🟢 — fully closed loop: read → classify → dedupe → draft → approve → send → log → audit
+- **Later:** LLM fallback for ambiguous categories; auto-send for graduated low-risk patterns
+
+### S1.5 Sample-request → shipping bridge (P0 — NEW 2026-04-24)
+- **Trigger:** Side-effect of S1.1 — when classifier returns `category=sample_request`
+- **Source:** Email envelope (subject + snippet)
+- **Enrichment:** Deterministic ship-to extractor (`parseShipToFromEmail`): regex over body for `<number> <words> <USPS-suffix>` + `City, ST 12345` with `US_STATES` allowlist
+- **AI role:** None (regex + state-code/ZIP heuristics only — never invents addresses, hard-rules §7)
+- **Approver:** Ben (Class B `shipment.create`) — when address parses cleanly, the orchestrator POSTs an `OrderIntent` (channel=`manual`, tags=`["sample","from-email"]`, packagingType=`case`, cartons=1) to `/api/ops/agents/sample-dispatch/dispatch` which opens the existing approval card in `#ops-approvals`. When address is incomplete, the existing draft (which already asks for the missing fields) goes out as the reply — no dispatch, no invented data
+- **Slack:** Approval card → `#ops-approvals` (only when ready). Daily report (`#ops-daily`) includes count of sample dispatches opened in the run
+- **Writeback:** Approval store (proposalTs); never touches ShipStation directly — channel=`manual` keeps it OFF the auto-ship path (which only fires for Amazon FBM + Shopify). Drew is the origin for sample shipments
+- **Audit:** Dispatch attempt + classifier hit logged via the orchestrator's existing audit trail
+- **Failure:** Dispatch route 5xx → orchestrator records error, draft still goes out asking for confirmation. Address parse false-negative → caller falls through to draft asking for details (preferred over inventing)
+- **Tests:** Yes — `__tests__/sample-request.test.ts` (9 tests): classifier integration, ship-to extraction (clean, missing fields, fake state codes rejected), dispatch hand-off (manual channel, sample tags, intent shape), draft template asks for missing details, no auto-ship promise language
+- **Monday MVP:** 🟢
+- **Later:** Add HubSpot deal auto-create when sample → manual order conversion happens
 
 ### S1.2 HubSpot deal-stage automation
 - **Trigger:** Webhook on `deal.propertyChange` (HubSpot signature v3)
@@ -317,7 +331,7 @@ Each row uses the schema:
 
 | Status | Count | Workflows |
 |---|---|---|
-| 🟢 Green | 24 | Email-intel triage (NEW), HubSpot dispatch, Auto-ship, Sample dispatch, Wallet check, Inventory snapshot/forecast/burn-rate, Vendor threads, Outreach validate, Marketing content, Research Librarian, Compliance (fallback), Control plane, Slack approvals, Drift audit, Hard-rules pin, Customer chat, Finance Exception, Freight-comp manager, Stamps.com daily ping, Wholesale page, Gmail send/draft primitives, AP packet send (JJ-only), Reply composer (untested but live) |
+| 🟢 Green | 25 | Email-intel triage (CLOSED LOOP), Sample-request → shipping bridge (NEW), HubSpot dispatch, Auto-ship, Sample dispatch, Wallet check, Inventory snapshot/forecast/burn-rate, Vendor threads, Outreach validate, Marketing content, Research Librarian, Compliance (fallback), Control plane, Slack approvals, Drift audit, Hard-rules pin, Customer chat, Finance Exception, Freight-comp manager, Stamps.com daily ping, Wholesale page, Gmail send/draft primitives, AP packet send (JJ-only), Reply composer (untested but live) |
 | 🟡 Yellow | 6 | Reply composer + Pipeline enrich (no tests), Inbox triage (one-shot), AP packet send (Drive scope), QBO write paths (sparse tests), Approved Claims (KV-only), NCS upload (ephemeral FS) |
 | 🔴 Red | 11 | Faire Direct invites, Vendor master creation, Reorder triggers, Drew East-Coast routing, Klaviyo / social, R-1..R-7 specialists, Trade-show pod, USPTO/FDA tracking, Vendor onboarding portal, Receipts OCR, Compliance Calendar (Notion gap) |
 
@@ -325,14 +339,23 @@ Each row uses the schema:
 
 ## Top 5 P0 build items remaining for Monday
 
-1. **OAuth re-consent landing** — unblocks Drive scope for AP-packet attachments + Gmail compose for drafts. Action: Ben clicks, pastes new token to Vercel.
-2. **Send-on-approve hook for email-intel** — when an approval card's targetEntity.type is `email-reply`, the Slack approvals handler should dispatch a Gmail send + HubSpot logEmail. ~2hr.
-3. **Vendor master creation route** — `POST /api/ops/vendors/onboard` with QBO vendor + Notion dossier + Drive folder. ~4hr.
-4. **NCS upload writeback** — swap local FS for Vercel Blob or Drive so customer-uploaded forms persist past redeploys. ~1hr.
-5. **AP packet UI dashboard** — show every packet (not just JJ) with sent-status badges + send/record-sent buttons. ~1hr.
+1. **OAuth re-consent landing** — unblocks Drive scope for AP-packet attachments + Gmail compose for drafts. Ben already clicked through; verify new refresh token has `gmail.modify` + `drive.readonly`.
+2. ~~**Send-on-approve hook for email-intel**~~ — DONE 2026-04-24 (commit `16fa4ea`). `executeApprovedEmailReply()` wired into `/api/slack/approvals` click handler.
+3. ~~**Sample-request → shipping bridge**~~ — DONE 2026-04-24. See S1.5 above.
+4. **Vendor master creation route** — `POST /api/ops/vendors/onboard` with QBO vendor + Notion dossier + Drive folder. ~4hr. **NEXT BUILD.**
+5. **NCS upload writeback** — swap local FS for Vercel Blob or Drive so customer-uploaded forms persist past redeploys. ~1hr.
+6. **AP packet UI dashboard** — show every packet (not just JJ) with sent-status badges + send/record-sent buttons. ~1hr.
+
+### Recommended next workflow after sample-shipping bridge
+
+**Vendor master creation (I5.3 → green)** is the highest-leverage next build:
+- Today: Drew opens new vendor relationships ad-hoc via Gmail; Rene types vendor records into QBO by hand 1-2 weeks later. Receipts arrive in `#receipts-capture` with no canonical vendor record, so OCR'd transactions can't auto-categorize.
+- Build: a single `POST /api/ops/vendors/onboard` route that takes `{name, contact, terms, taxClass}` and writes (a) QBO vendor via existing `/api/ops/qbo/vendor`, (b) Notion vendor dossier, (c) shared Drive folder for W-9/COI. Class B approval (`vendor.master.create`) gates the QBO write. Closes the inbound side of Division 5 and unblocks AP-packet expansion (currently hardcoded to JJ).
+- Why this next: every other red item in Division 5/6 chains off having a vendor record. Once we have it, reorder triggers + Klaviyo segmentation + receipt auto-cat all become possible without manual vendor lookup.
 
 ---
 
 ## Version history
 
+- **1.1 — 2026-04-24** — Email-intel send-on-approve closed (commit `16fa4ea`). Sample-request → shipping bridge (S1.5) added with 9 tests. Top-5 list refreshed; vendor master creation flagged as next build.
 - **1.0 — 2026-04-24** — First publication. Synthesizes 2 division-audit agent reports + 5 P0 deliverables + email-intelligence build. Replaces ad-hoc workflow descriptions across other contract docs.

@@ -58,6 +58,7 @@ import { newRunContext } from "@/lib/ops/control-plane/run-id";
 import { getChannel } from "@/lib/ops/control-plane/channels";
 import { postMessage } from "@/lib/ops/control-plane/slack/client";
 import { listEmails, createGmailDraft } from "@/lib/ops/gmail-reader";
+import { evaluateSampleRequest } from "@/lib/ops/email-intelligence/sample-request";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -85,6 +86,7 @@ interface RunResult {
   skipped: number;
   drafted: number;
   approvalsOpened: number;
+  sampleDispatchesOpened: number;
   reportPostedTo?: string | null;
   errors: string[];
   perEmail: Array<{
@@ -96,6 +98,8 @@ interface RunResult {
     skippedReason?: string;
     draftId?: string | null;
     approvalId?: string | null;
+    sampleApprovalId?: string | null;
+    sampleMissing?: string[];
     error?: string;
   }>;
 }
@@ -144,6 +148,7 @@ async function runOnce(opts: RunBody): Promise<RunResult> {
       skipped: 0,
       drafted: 0,
       approvalsOpened: 0,
+      sampleDispatchesOpened: 0,
       errors,
       perEmail: [],
     };
@@ -153,6 +158,7 @@ async function runOnce(opts: RunBody): Promise<RunResult> {
   const scanned: ScannedEmail[] = [];
   let drafted = 0;
   let approvalsOpened = 0;
+  let sampleDispatchesOpened = 0;
   let skipped = 0;
 
   for (const env of envelopes) {
@@ -306,6 +312,70 @@ async function runOnce(opts: RunBody): Promise<RunResult> {
       }
     }
 
+    // 7b. Sample-request → shipping bridge.
+    //
+    // When the classifier flagged this as `sample_request` AND we
+    // could parse a complete US ship-to from the email, hand off to
+    // the existing sample-dispatch route (channel="manual"). That
+    // route opens its own Class B `shipment.create` approval card in
+    // #ops-approvals — the email-intel reply approval (`gmail.send`)
+    // and the shipment approval are TWO SEPARATE cards, so Ben can
+    // approve the reply without committing to ship.
+    //
+    // No address parsed → no dispatch; the existing sample-request
+    // draft template (from draft.ts) already asks for the missing
+    // ship-to fields. We do NOT invent addresses.
+    let sampleApprovalId: string | null = null;
+    let sampleMissing: string[] | undefined;
+    if (
+      classification.category === "sample_request" &&
+      !opts.dryRun
+    ) {
+      const evaluation = evaluateSampleRequest(env);
+      if (evaluation.ready && evaluation.intent) {
+        try {
+          // Use the local server origin since we're calling our own route.
+          const dispatchUrl = new URL(
+            "/api/ops/agents/sample-dispatch/dispatch",
+            process.env.NEXT_PUBLIC_SITE_URL ||
+              "https://www.usagummies.com",
+          );
+          const dispatchRes = await fetch(dispatchUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              // Forward CRON_SECRET so isAuthorized passes.
+              Authorization: `Bearer ${process.env.CRON_SECRET ?? ""}`,
+            },
+            body: JSON.stringify(evaluation.intent),
+          });
+          const dispatchBody = (await dispatchRes
+            .json()
+            .catch(() => ({}))) as {
+            proposalTs?: string | null;
+            classification?: { refuse?: boolean };
+            refuse?: boolean;
+          };
+          if (dispatchRes.ok && !dispatchBody.refuse) {
+            sampleApprovalId = dispatchBody.proposalTs ?? "dispatched";
+            sampleDispatchesOpened += 1;
+          } else {
+            errors.push(
+              `sample-dispatch failed for ${env.id}: HTTP ${dispatchRes.status}`,
+            );
+          }
+        } catch (err) {
+          errors.push(
+            `sample-dispatch exception for ${env.id}: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+      } else {
+        sampleMissing = evaluation.missing;
+        // Not an error — the draft template already asks for these
+        // fields. Just record what's missing in the per-email log.
+      }
+    }
+
     perEmail.push({
       messageId: env.id,
       subject: env.subject,
@@ -314,6 +384,8 @@ async function runOnce(opts: RunBody): Promise<RunResult> {
       confidence: classification.confidence,
       draftId,
       approvalId,
+      sampleApprovalId,
+      sampleMissing,
     });
     scanned.push(item);
     await markProcessed(env.id);
@@ -375,6 +447,7 @@ async function runOnce(opts: RunBody): Promise<RunResult> {
     skipped,
     drafted,
     approvalsOpened,
+    sampleDispatchesOpened,
     reportPostedTo: postedTo,
     errors,
     perEmail,
