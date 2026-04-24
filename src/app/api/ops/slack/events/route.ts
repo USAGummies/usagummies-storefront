@@ -79,9 +79,15 @@ export async function buildReadOnlyChatRouteRequest(input: {
     if (input.slackThreadTs) form.set("slackThreadTs", input.slackThreadTs);
     form.set("history", JSON.stringify(input.history));
     for (const file of files) {
+      // Copy Buffer contents into a fresh ArrayBuffer-backed Uint8Array.
+      // Blob's BlobPart contract requires ArrayBuffer (not the
+      // ArrayBufferLike union that Node's Buffer.buffer exposes, which
+      // could be SharedArrayBuffer). Uint8Array.from() allocates a
+      // clean owned ArrayBuffer, satisfying the type contract.
+      const owned = Uint8Array.from(file.buffer);
       form.append(
         "file",
-        new Blob([file.buffer], { type: file.mimeType }),
+        new Blob([owned], { type: file.mimeType }),
         file.name,
       );
     }
