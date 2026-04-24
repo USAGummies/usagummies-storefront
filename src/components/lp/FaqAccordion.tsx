@@ -1,32 +1,35 @@
 "use client";
 
-// FAQ — native <details> elements, zero client JS needed for basic
-// interaction. "use client" only to silence any future hydration work.
+// FAQ — every answer here is verifiable from (a) the bag ingredient
+// panel, (b) the published returns policy, or (c) the BagSlider copy
+// already live on the site. No fabricated shelf-life numbers, no
+// location reveals, no unverified allergen claims.
 
 const FAQ = [
   {
-    q: "What are they colored with, if not artificial dyes?",
-    a: "Real fruit and vegetable extract — black carrot, turmeric, apple, pumpkin, and spirulina — depending on the color. The colors are a little softer than a Red 40 bear, and we think that's a feature, not a bug.",
+    q: "How are they colored, if not with artificial dyes?",
+    // Straight off the bag ingredient panel:
+    // "Colors (From Fruits, Vegetables, Spirulina and Curcumin)"
+    a: "Colors come from fruits, vegetables, spirulina, and curcumin. That is the entire coloring line on the ingredient panel — no artificial dyes.",
   },
   {
-    q: "How are they made, and where?",
-    a: "Pressed and packaged in an FDA-registered confectionery in Spokane, Washington. Every batch gets a lot number (see your bag), which ties to a specific production run and best-by date — roughly 18 months out from press.",
+    q: "Where are they made?",
+    // Bag back panel: "Sourced, made, and packed right here in the USA!"
+    a: "Sourced, made, and packed right here in the United States of America.",
   },
   {
-    q: "Are they gluten-free? Peanut-free?",
-    a: "Yes to both. Gluten-free and produced in a facility that does not handle peanuts or tree nuts. Full ingredient panel on every bag.",
+    q: "What are the flavors?",
+    a: "Cherry, Lemon, Green Apple, Orange, and Watermelon — the five natural flavors printed on every 7.5 oz bag.",
   },
   {
     q: "How fast do orders ship?",
-    a: "Within 24 hours on weekdays, directly from our warehouse in Ashford, WA. Standard ground is 3–5 days nationwide. Free on orders of 5 bags or more.",
+    // From BagSlider copy already live on the site: "Ships within 24 hours"
+    a: "Within 24 hours. Standard ground is 3–5 days, free on orders of 5 bags or more.",
   },
   {
-    q: "Do you ship wholesale?",
-    a: "Yes — 50 bags and up at wholesale pricing, available through Faire or by emailing ben@usagummies.com. We supply several independent grocers, museum gift shops, and souvenir stores.",
-  },
-  {
-    q: "Refund policy?",
-    a: "Eat the bag. If you don't love it, reply to your order email within 30 days and we'll refund you. No questionnaires, no return shipping hoops.",
+    q: "What's your return policy?",
+    // Verified against /policies/returns: "30-day satisfaction guarantee"
+    a: "30-day satisfaction guarantee. If you're not happy with your order, reach out and we'll make it right.",
   },
 ];
 
@@ -36,16 +39,14 @@ export function FaqAccordion() {
       <div className="mx-auto max-w-[820px] px-5 py-16 sm:px-8 sm:py-24">
         <p className="lp-label mb-3 text-[var(--lp-red)]">★ Questions We Get ★</p>
         <h2 className="lp-display text-[clamp(2rem,5vw,3.4rem)] text-[var(--lp-ink)]">
-          Everything you&rsquo;d
+          The short
           <br />
-          <span className="lp-script text-[var(--lp-red)]">
-            actually ask.
-          </span>
+          <span className="lp-script text-[var(--lp-red)]">answers.</span>
         </h2>
 
         <div className="mt-10">
           {FAQ.map((f, i) => (
-            <details key={i} className="lp-faq" open={i === 0 ? undefined : undefined}>
+            <details key={i} className="lp-faq">
               <summary>{f.q}</summary>
               <div>{f.a}</div>
             </details>

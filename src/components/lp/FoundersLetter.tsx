@@ -1,6 +1,9 @@
-// Founder's letter — styled like a framed declaration / presidential address.
-// Image column uses the cowboy + flag illustration on the desert background,
-// pulled from the brand ARTWORK ASSETS library (same art that's on the bag).
+// Manifesto block — replaces the fabricated founder's letter. All copy
+// is paraphrased or lifted directly from the bag's back panel ("Land of
+// the Free, Home of the Brave / sourced, made, and packed right here
+// in the USA / symbol of strength, grit... / backing American jobs...").
+// No location reveals, no invented personal narrative. When Ben wants
+// to write a real founder note, drop it in where the <article> is.
 
 import Image from "next/image";
 
@@ -8,7 +11,7 @@ export function FoundersLetter() {
   return (
     <section className="relative">
       <div className="mx-auto grid max-w-[1200px] grid-cols-1 gap-10 px-5 py-16 sm:px-8 sm:py-24 md:grid-cols-[1fr_1.25fr] md:gap-16">
-        {/* Scene column — cowboy + flag on desert */}
+        {/* Scene column — cowboy + flag on desert (both from brand ARTWORK ASSETS) */}
         <div className="relative order-2 md:order-1">
           <div
             className="relative aspect-[5/6] w-full overflow-hidden border-[3px] border-[var(--lp-ink)] bg-[var(--lp-cream)]"
@@ -25,79 +28,44 @@ export function FoundersLetter() {
               <div className="relative aspect-square w-[92%]">
                 <Image
                   src="/brand/illustrations/cowboy.png"
-                  alt="Cowboy riding with American flag"
+                  alt="Cowboy with an American flag"
                   fill
                   sizes="(max-width: 768px) 82vw, 420px"
                   className="object-contain drop-shadow-[4px_5px_0_rgba(14,22,56,0.45)]"
                 />
               </div>
             </div>
-            {/* Batch-number stamp in the corner */}
-            <div className="absolute right-2 top-2 rotate-[8deg]">
-              <div
-                className="lp-stamp"
-                style={{
-                  width: "5rem",
-                  height: "5rem",
-                  fontSize: "0.6rem",
-                  color: "var(--lp-navy)",
-                }}
-              >
-                <span>
-                  BATCH
-                  <br />
-                  №1402
-                </span>
-              </div>
-            </div>
           </div>
-          <p className="lp-label mt-3 text-[var(--lp-ink)]/75">
-            ★ Ashford, Washington · 46°45′ N, 121°57′ W
-          </p>
         </div>
 
-        {/* Letter column */}
+        {/* Manifesto column — every line is on the bag */}
         <article className="order-1 md:order-2">
-          <p className="lp-label text-[var(--lp-red)]">A Letter From The Founder</p>
+          <p className="lp-label text-[var(--lp-red)]">
+            Land of the Free, Home of the Brave
+          </p>
           <h2 className="lp-display mt-3 text-[clamp(2.2rem,5.5vw,3.6rem)] text-[var(--lp-ink)]">
-            We Built
+            Sourced, made
             <br />
-            <span className="lp-script text-[var(--lp-red)]">
-              the gummy
-            </span>
+            <span className="lp-script text-[var(--lp-red)]">&amp; packed</span>
             <br />
-            we wanted
+            right here in
             <br />
-            our kids to eat.
+            <span className="text-[var(--lp-red)]">the U.S.A.</span>
           </h2>
           <div className="lp-sans mt-6 space-y-4 text-[1.05rem] font-normal leading-[1.75] text-[var(--lp-ink)]/88">
             <p>
-              <span className="lp-display float-left mr-3 pt-1 text-[3.5rem] leading-[0.85] text-[var(--lp-red)]">
-                I
-              </span>
-              grew up thinking a gummy bear was supposed to taste like Red 40
-              and corn syrup. Then I had kids, turned the bag over, and
-              realized the ingredient list read like a chemistry test.
+              A symbol of strength, grit, and the unstoppable American
+              spirit — in a resealable 7.5 oz bag.
             </p>
             <p>
-              So we made our own. Small batches, pressed in America, colored
-              by fruit and vegetable extract. No artificial dyes. No apology
-              for tasting like a proper gummy bear.
+              When you choose USA Gummies, you&rsquo;re backing American
+              jobs, American business, and the star-spangled pursuit of
+              greatness.
             </p>
-            <p>
-              If the first bag doesn&rsquo;t bring you back to being seven
-              years old on a porch in July, I&rsquo;ll refund it myself.
+            <p className="lp-display text-[1.35rem] text-[var(--lp-red)]">
+              Join the revolution.
             </p>
           </div>
-          <p className="mt-8">
-            <span className="lp-script text-[2rem] leading-none text-[var(--lp-red)]">
-              Ben Stutman
-            </span>
-            <br />
-            <span className="lp-label mt-2 inline-block text-[var(--lp-ink)]/70">
-              Founder · USA Gummies
-            </span>
-          </p>
         </article>
       </div>
     </section>

@@ -544,7 +544,11 @@ export type SendGmailOpts = {
   body: string;
   from?: string;
   cc?: string;
+  bcc?: string;
   threadId?: string; // Gmail thread ID to reply in-thread
+  inReplyTo?: string;
+  references?: string;
+  attachments?: Array<{ filename: string; mimeType: string; content: Buffer }>;
 };
 
 /**

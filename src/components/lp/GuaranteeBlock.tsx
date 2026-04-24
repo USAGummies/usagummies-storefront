@@ -1,5 +1,6 @@
-// Guarantee + closing CTA — navy star-field panel with a giant red stamp,
-// flanked by the Statue of Liberty and an Eagle illustration (bag art).
+// Guarantee + closing CTA. Copy is now only what's already published
+// elsewhere on the site (returns policy + BagSlider): "30-day
+// money-back guarantee" and "ships within 24 hours." No location claims.
 
 import Image from "next/image";
 import Link from "next/link";
@@ -7,7 +8,6 @@ import Link from "next/link";
 export function GuaranteeBlock() {
   return (
     <section className="lp-starfield relative overflow-hidden">
-      {/* Liberty (left) + Eagle (right) at large screens — ornamental */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-y-0 left-0 hidden w-[22%] md:block"
@@ -46,7 +46,8 @@ export function GuaranteeBlock() {
             fontSize: "0.85rem",
             color: "var(--lp-red)",
             background: "var(--lp-off-white)",
-            boxShadow: "inset 0 0 0 3px var(--lp-off-white), inset 0 0 0 5px var(--lp-red), 6px 6px 0 var(--lp-ink)",
+            boxShadow:
+              "inset 0 0 0 3px var(--lp-off-white), inset 0 0 0 5px var(--lp-red), 6px 6px 0 var(--lp-ink)",
           }}
         >
           <span>
@@ -63,18 +64,17 @@ export function GuaranteeBlock() {
         </div>
 
         <h2 className="lp-display text-[clamp(2.2rem,6vw,4.25rem)] leading-[0.95] text-[var(--lp-off-white)]">
-          Eat the bag.
+          Taste a bag.
           <br />
           <span className="lp-script text-[var(--lp-gold)]">
-            If you don&rsquo;t love it,
+            If it&rsquo;s not for you,
           </span>
           <br />
           we&rsquo;ll refund it.
         </h2>
 
         <p className="lp-sans max-w-[48ch] text-[1.15rem] font-normal text-[var(--lp-off-white)]/90">
-          No questionnaires. No photo of the half-eaten bag. Reply to your
-          order email and we wire the money back. That&rsquo;s the deal.
+          30-day satisfaction guarantee on every order. Ships within 24 hours.
         </p>
 
         <Link
@@ -85,7 +85,7 @@ export function GuaranteeBlock() {
         </Link>
 
         <p className="lp-label text-[var(--lp-off-white)]/70">
-          Free Shipping on 5+ · Ships From Washington State
+          Free Shipping on 5+ Bags
         </p>
       </div>
     </section>

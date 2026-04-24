@@ -15,8 +15,7 @@ export function FooterMini() {
             Made in the U.S.A.
           </p>
           <p className="lp-sans mt-3 max-w-[32ch] text-[1rem] font-normal text-[var(--lp-ink)]/80">
-            Dye-free gummy bears, pressed in America. Shipped from Mt.
-            Rainier country.
+            All-natural gummy bears. Sourced, made, and packed in the U.S.A.
           </p>
         </div>
         <nav aria-label="Shop" className="space-y-2">

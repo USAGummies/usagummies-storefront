@@ -1,5 +1,6 @@
-// Three promises — big chunky numerals, star bullets, flag stripe accents.
-// Each card leans into a character element (gummy bear illustration).
+// Three promises — tied directly to the bag panel. Everything here
+// appears on the product itself (the bag or the ingredient statement),
+// so no new unverified claims.
 
 import Image from "next/image";
 
@@ -7,20 +8,23 @@ const PROMISES = [
   {
     n: "01",
     icon: "/brand/gummies/gummy-red.png",
-    title: "No Dyes. None.",
-    body: "Colored with real fruit and vegetable extract. If it needs Red 40 to look like candy, it isn't candy we'll eat.",
+    title: "No Artificial Dyes.",
+    // Paraphrasing the ingredient panel on the bag.
+    body: "Colors come from fruits, vegetables, spirulina, and curcumin — the only coloring ingredients on the panel. Not one dye on the label.",
   },
   {
     n: "02",
     icon: "/brand/gummies/gummy-yellow.png",
-    title: "Made in the USA.",
-    body: "Pressed in Spokane, Washington in an FDA-registered facility. Packaged by hand. Shipped from Mt. Rainier country.",
+    title: "Made in the U.S.A.",
+    // Exact wording from the bag back panel.
+    body: "Sourced, made, and packed right here in the U.S.A. Backing American jobs and American business with every bag.",
   },
   {
     n: "03",
     icon: "/brand/gummies/gummy-green.png",
-    title: "Real Gummy Flavor.",
-    body: "Cherry, lemon, green apple, orange, watermelon — the five classics. Chewy, balanced, not overly sweet. How they should taste.",
+    title: "Five Natural Flavors.",
+    // Flavor list is printed on the bag's "5 All Natural Flavors" strip.
+    body: "Cherry, Lemon, Green Apple, Orange, Watermelon. The five classics in a 7.5 oz resealable bag.",
   },
 ] as const;
 
@@ -30,18 +34,15 @@ export function ThreePromises() {
       <div className="mx-auto max-w-[1200px] px-5 py-14 sm:px-8 sm:py-20">
         <div className="mb-10 flex flex-col items-start gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="lp-label mb-2 text-[var(--lp-red)]">Three Promises</p>
+            <p className="lp-label mb-2 text-[var(--lp-red)]">What&rsquo;s On the Bag</p>
             <h2 className="lp-display text-[clamp(2.2rem,6vw,3.75rem)] text-[var(--lp-ink)]">
-              The Reason
+              Straight from
               <br />
               <span className="lp-script text-[1.1em] text-[var(--lp-red)]">
-                we bother.
+                the label.
               </span>
             </h2>
           </div>
-          <p className="lp-label max-w-[28ch] text-[var(--lp-ink)]/75">
-            No fine print · No weird ingredients · No apology
-          </p>
         </div>
 
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-3 sm:gap-0">
@@ -53,7 +54,6 @@ export function ThreePromises() {
               }`}
               style={{ boxShadow: i === 0 ? "4px 4px 0 var(--lp-ink)" : undefined }}
             >
-              {/* Character */}
               <div className="relative mb-4 h-16 w-16">
                 <Image
                   src={p.icon}
@@ -76,10 +76,10 @@ export function ThreePromises() {
           ))}
         </div>
 
-        {/* Flavor strip */}
+        {/* Five flavor line-up — each bear character is verified bag art */}
         <div className="mt-12 rounded-sm border-2 border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-5 sm:mt-16 sm:p-7">
           <p className="lp-label mb-4 text-center text-[var(--lp-red)]">
-            ★ ★ ★ Five Classic Flavors ★ ★ ★
+            ★ ★ ★ Five Natural Flavors ★ ★ ★
           </p>
           <div className="flex items-center justify-between gap-2">
             {[

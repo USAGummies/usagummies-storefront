@@ -1,7 +1,7 @@
-// The bomber section — a big, silly, signature visual that pulls straight
-// from the bag art: a B-17 flying across a desert sky, dropping gummy bears
-// like candy paratroopers. Turns the "Made in America" claim into a piece
-// of theater instead of a bullet point.
+// Bomber scene — kept because the illustration itself is bag art.
+// Stripped all fabricated specifics (no Spokane / Ashford / Mt. Rainier,
+// no ship-time claims, no process bullets I couldn't verify). Copy is
+// paraphrased from the bag's back panel.
 
 import Image from "next/image";
 
@@ -18,7 +18,6 @@ const DROPS = [
 export function BombsAway() {
   return (
     <section className="relative overflow-hidden border-y-2 border-[var(--lp-ink)]">
-      {/* Desert background */}
       <div aria-hidden className="absolute inset-0 -z-10">
         <Image
           src="/brand/illustrations/background-desert.png"
@@ -31,45 +30,23 @@ export function BombsAway() {
       </div>
 
       <div className="relative mx-auto grid max-w-[1200px] grid-cols-1 gap-6 px-5 py-16 sm:px-8 sm:py-24 md:grid-cols-[1fr_1.1fr] md:gap-12">
-        {/* Copy column */}
+        {/* Copy column — generic American-made story only */}
         <div className="relative order-2 md:order-1">
-          <p className="lp-label text-[var(--lp-red)]">★ Small-Batch · Mighty Mission ★</p>
+          <p className="lp-label text-[var(--lp-red)]">★ Taste of Freedom ★</p>
           <h2 className="lp-display mt-3 text-[clamp(2.5rem,7vw,4.5rem)] text-[var(--lp-ink)] drop-shadow-[3px_3px_0_rgba(253,244,224,0.9)]">
-            Dropped
+            American
             <br />
-            <span className="text-[var(--lp-red)]">From&nbsp;the&nbsp;Sky.</span>
+            <span className="text-[var(--lp-red)]">by the bag.</span>
           </h2>
-          <p className="lp-script mt-2 text-[clamp(1.5rem,4vw,2rem)] text-[var(--lp-navy)]">
-            (Well, a warehouse in Washington.)
-          </p>
-
           <p className="lp-sans mt-6 max-w-[34ch] text-[1.05rem] leading-[1.65] text-[var(--lp-ink)]/88">
-            Every bag of USA Gummies is pressed in Spokane, packed by hand in
-            Ashford, and shipped from the foot of Mt. Rainier. No overseas
-            factory. No mystery ingredients. Just a small American batch of
-            the gummy bears we grew up with — rebuilt the right way.
+            Every bag you order is one more cheer for American jobs,
+            American business, and the star-spangled pursuit of greatness.
+            A proper gummy bear — built the American way.
           </p>
-
-          <ul className="lp-sans mt-6 space-y-2 text-[1rem] font-medium">
-            {[
-              "Spokane, WA — pressed in an FDA-registered confectionery",
-              "Ashford, WA — packaged, stamped, and shipped by hand",
-              "Nationwide — standard ground, 3-5 days, free on 5+",
-            ].map((t) => (
-              <li key={t} className="flex items-start gap-2 text-[var(--lp-ink)]">
-                <span
-                  aria-hidden
-                  className="lp-star-ornament mt-[0.35em] h-3 w-3 flex-none text-[var(--lp-red)]"
-                />
-                {t}
-              </li>
-            ))}
-          </ul>
         </div>
 
-        {/* Bomber column */}
+        {/* Bomber illustration column */}
         <div className="relative order-1 min-h-[420px] md:order-2 md:min-h-[560px]">
-          {/* Bomber itself */}
           <div className="absolute left-0 right-0 top-0 h-[45%]">
             <div
               className="relative h-full w-full"
@@ -85,7 +62,6 @@ export function BombsAway() {
             </div>
           </div>
 
-          {/* Falling gummy trail */}
           {DROPS.map((d, i) => (
             <div
               key={i}
@@ -111,7 +87,6 @@ export function BombsAway() {
         </div>
       </div>
 
-      {/* Keyframes scoped to this section */}
       <style>{`
         @keyframes lp-bomber {
           0%   { transform: translateX(-4%) translateY(0); }
