@@ -1,0 +1,292 @@
+/* /lp route — scoped design tokens + textures.
+ * Vintage Americana rebooted: slab-serif type, oxblood red, cream paper,
+ * carbon-ink black, halftone grain. Overrides happen inside .lp-scope only,
+ * keeping the rest of the site untouched.
+ */
+
+.lp-scope {
+  /* Tokens — poster shop, 1952 */
+  --lp-ink: #0f0d0b;
+  --lp-blood: #9c1f2b;         /* oxblood red, not fire-engine */
+  --lp-cream: #f1e6cc;         /* aged newsprint */
+  --lp-cream-soft: #f7eedb;
+  --lp-navy: #14223f;          /* deep navy, almost black */
+  --lp-gold: #b88742;          /* tarnished brass */
+  --lp-rule: rgba(15, 13, 11, 0.18);
+  --lp-shadow: 0 2px 0 var(--lp-ink);
+
+  color: var(--lp-ink);
+  background: var(--lp-cream);
+  font-family: var(--font-lp-body), Georgia, "Times New Roman", serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "ss01" on, "kern" on, "liga" on;
+}
+
+/* Paper grain — barely visible, earns you the "real ink" feeling */
+.lp-scope .lp-grain {
+  position: relative;
+}
+.lp-scope .lp-grain::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(rgba(15, 13, 11, 0.08) 1px, transparent 1px),
+    radial-gradient(rgba(15, 13, 11, 0.05) 1px, transparent 1px);
+  background-size: 3px 3px, 7px 7px;
+  background-position: 0 0, 1px 2px;
+  opacity: 0.45;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+  z-index: 0;
+}
+.lp-scope .lp-grain > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Halftone dot field, for decorative panels */
+.lp-scope .lp-halftone {
+  background-image: radial-gradient(var(--lp-ink) 1px, transparent 1.5px);
+  background-size: 8px 8px;
+  opacity: 0.08;
+}
+
+/* Letterpress heading — faint dark edge like the impression of ink into paper */
+.lp-scope .lp-letterpress {
+  text-shadow:
+    0 1px 0 rgba(15, 13, 11, 0.15),
+    0 2px 0 rgba(15, 13, 11, 0.08);
+}
+
+/* Monumental slab headline — tight, kerned, all caps */
+.lp-scope .lp-display {
+  font-family: var(--font-lp-display), "Alfa Slab One", Georgia, serif;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  line-height: 0.88;
+  text-transform: uppercase;
+}
+
+/* Editorial serif — for short copy in the hero */
+.lp-scope .lp-editorial {
+  font-family: var(--font-lp-editorial), "Fraunces", Georgia, serif;
+  font-optical-sizing: auto;
+  font-style: italic;
+  font-weight: 400;
+}
+
+/* Mono for labels, batch numbers, and all-caps trust lines */
+.lp-scope .lp-mono {
+  font-family: var(--font-lp-mono), "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+}
+
+/* Rule — old-timey horizontal divider built from stacked borders */
+.lp-scope .lp-rule {
+  border: 0;
+  height: 6px;
+  background: repeating-linear-gradient(
+    to right,
+    var(--lp-ink) 0 24px,
+    transparent 24px 32px
+  );
+  mask-image: linear-gradient(to right, transparent 0, black 20%, black 80%, transparent 100%);
+}
+
+.lp-scope .lp-rule-thin {
+  border: 0;
+  height: 1px;
+  background: var(--lp-ink);
+  opacity: 0.35;
+}
+
+/* Stamp badge — rotated, two-ring, aged red ink */
+.lp-scope .lp-stamp {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  border: 2px solid var(--lp-blood);
+  color: var(--lp-blood);
+  padding: 0.45rem 0.75rem;
+  font-family: var(--font-lp-mono), monospace;
+  letter-spacing: 0.14em;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  transform: rotate(-4deg);
+  box-shadow: inset 0 0 0 2px var(--lp-cream), inset 0 0 0 3px var(--lp-blood);
+  position: relative;
+}
+.lp-scope .lp-stamp::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border: 1px dashed rgba(156, 31, 43, 0.35);
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+/* Monumental CTA — stamped black button with blood-red shadow offset */
+.lp-scope .lp-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  background: var(--lp-ink);
+  color: var(--lp-cream);
+  padding: 1.05rem 1.5rem;
+  font-family: var(--font-lp-display), serif;
+  font-size: 1.125rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  border: 2px solid var(--lp-ink);
+  box-shadow: 5px 5px 0 var(--lp-blood);
+  transition: transform 120ms ease, box-shadow 120ms ease;
+  cursor: pointer;
+  text-decoration: none;
+}
+.lp-scope .lp-cta:hover,
+.lp-scope .lp-cta:focus-visible {
+  transform: translate(-2px, -2px);
+  box-shadow: 7px 7px 0 var(--lp-blood);
+}
+.lp-scope .lp-cta:active {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 var(--lp-blood);
+}
+
+/* Secondary (outlined) CTA for below-fold repeat asks */
+.lp-scope .lp-cta-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.85rem 1.25rem;
+  background: transparent;
+  color: var(--lp-ink);
+  border: 1.5px solid var(--lp-ink);
+  font-family: var(--font-lp-mono), monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  text-decoration: none;
+  transition: background 120ms ease, color 120ms ease;
+}
+.lp-scope .lp-cta-ghost:hover,
+.lp-scope .lp-cta-ghost:focus-visible {
+  background: var(--lp-ink);
+  color: var(--lp-cream);
+}
+
+/* Duotone photo treatment — moody, vintage, on-brand */
+.lp-scope .lp-duotone {
+  filter: grayscale(1) contrast(1.05) brightness(1.02);
+  mix-blend-mode: multiply;
+}
+
+/* Accordion */
+.lp-scope details.lp-faq summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 0;
+  font-family: var(--font-lp-editorial), serif;
+  font-size: 1.2rem;
+  border-top: 1px solid var(--lp-rule);
+  transition: color 120ms ease;
+}
+.lp-scope details.lp-faq summary::-webkit-details-marker { display: none; }
+.lp-scope details.lp-faq summary::after {
+  content: "+";
+  font-family: var(--font-lp-display), serif;
+  font-size: 1.6rem;
+  line-height: 1;
+  transition: transform 200ms ease;
+}
+.lp-scope details.lp-faq[open] summary::after { content: "–"; transform: rotate(360deg); }
+.lp-scope details.lp-faq > div {
+  padding-bottom: 1.25rem;
+  padding-right: 2rem;
+  color: var(--lp-ink);
+  opacity: 0.82;
+  line-height: 1.6;
+}
+.lp-scope details.lp-faq:last-of-type { border-bottom: 1px solid var(--lp-rule); }
+
+/* Sticky mobile buy bar — fixed thumb-zone CTA */
+.lp-scope .lp-sticky-buy {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 0.75rem 1rem calc(env(safe-area-inset-bottom, 0px) + 0.75rem);
+  background: var(--lp-ink);
+  border-top: 3px solid var(--lp-blood);
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  transform: translateY(100%);
+  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.lp-scope .lp-sticky-buy[data-show="true"] { transform: translateY(0); }
+.lp-scope .lp-sticky-buy .lp-sticky-text {
+  color: var(--lp-cream);
+  font-family: var(--font-lp-display), serif;
+  font-size: 0.95rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.lp-scope .lp-sticky-buy a {
+  background: var(--lp-cream);
+  color: var(--lp-ink);
+  padding: 0.7rem 1.1rem;
+  font-family: var(--font-lp-display), serif;
+  text-transform: uppercase;
+  font-size: 0.9rem;
+  box-shadow: 3px 3px 0 var(--lp-blood);
+  text-decoration: none;
+}
+@media (min-width: 768px) {
+  .lp-scope .lp-sticky-buy { display: none; }
+}
+
+/* Staggered reveal — runs once on page load */
+@keyframes lp-rise {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.lp-scope [data-reveal] {
+  opacity: 0;
+  animation: lp-rise 700ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.lp-scope [data-reveal="1"] { animation-delay: 60ms; }
+.lp-scope [data-reveal="2"] { animation-delay: 140ms; }
+.lp-scope [data-reveal="3"] { animation-delay: 240ms; }
+.lp-scope [data-reveal="4"] { animation-delay: 360ms; }
+.lp-scope [data-reveal="5"] { animation-delay: 500ms; }
+.lp-scope [data-reveal="6"] { animation-delay: 660ms; }
+@media (prefers-reduced-motion: reduce) {
+  .lp-scope [data-reveal] { opacity: 1; animation: none; }
+}
+
+/* Subtle grain on the whole LP body */
+.lp-scope::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background-image:
+    radial-gradient(rgba(15, 13, 11, 0.06) 1px, transparent 1px);
+  background-size: 4px 4px;
+  opacity: 0.5;
+  mix-blend-mode: multiply;
+}
