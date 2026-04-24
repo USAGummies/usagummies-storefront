@@ -30,6 +30,8 @@ import {
 import { recordDecision } from "@/lib/ops/control-plane/approvals";
 import { buildHumanAuditEntry } from "@/lib/ops/control-plane/audit";
 import type { ApprovalDecision, DivisionId } from "@/lib/ops/control-plane/types";
+import { postMessage } from "@/lib/ops/control-plane/slack/client";
+import { executeApprovedEmailReply } from "@/lib/ops/email-intelligence/approval-executor";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -151,10 +153,28 @@ export async function POST(req: Request): Promise<Response> {
   await auditStore().append(auditEntry);
   await auditSurface().mirror(auditEntry).catch(() => void 0);
 
+  let execution:
+    | Awaited<ReturnType<typeof executeApprovedEmailReply>>
+    | undefined;
+  if (decisionKind === "approve" && next.status === "approved") {
+    execution = await executeApprovedEmailReply(next);
+    if (execution.handled && existing.slackThread?.ts) {
+      const text = execution.ok
+        ? `:email: Email send executed. Gmail message \`${execution.messageId}\`${execution.hubspotLogId ? ` · HubSpot log \`${execution.hubspotLogId}\`` : " · HubSpot log pending/unavailable"}.`
+        : `:warning: Email approval recorded, but send failed: ${execution.error}`;
+      await postMessage({
+        channel: "#ops-approvals",
+        text,
+        threadTs: existing.slackThread.ts,
+      }).catch(() => void 0);
+    }
+  }
+
   return NextResponse.json({
     ok: true,
     approvalId,
     status: next.status,
     decisions: next.decisions.length,
+    execution,
   });
 }

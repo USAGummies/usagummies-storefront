@@ -73,7 +73,7 @@ async function checkKv(messageId: string): Promise<DedupeSignal> {
 
 async function checkGmailSent(
   threadId: string | null,
-  fromAddr: string,
+  _fromAddr: string,
 ): Promise<DedupeSignal> {
   if (!threadId) {
     return { hit: false, detail: "No threadId; Gmail check skipped" };

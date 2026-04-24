@@ -53,6 +53,17 @@ export type EmailMessage = {
   attachments: EmailAttachment[];
 };
 
+export type SentDraftDetails = {
+  ok: true;
+  draftId: string;
+  messageId: string;
+  threadId: string | null;
+  to: string;
+  from: string;
+  subject: string;
+  body: string;
+};
+
 export type ListEmailsOpts = {
   folder?: string; // Gmail label: INBOX, SENT, etc.
   count?: number;
@@ -800,6 +811,57 @@ export async function createGmailDraft(
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
     return { ok: false, error: `Gmail draft create failed: ${errMsg}` };
+  }
+}
+
+/**
+ * Send an existing Gmail draft by id. Used by the Slack approval closer:
+ * the draft is created during the email-intel scan, then Ben approves the
+ * Class B `gmail.send` card, then this sends exactly that reviewed draft.
+ */
+export async function sendGmailDraftDetailed(
+  draftId: string,
+): Promise<SentDraftDetails | { ok: false; error: string }> {
+  const gmail = getGmailSendClient();
+  if (!gmail) {
+    return { ok: false, error: "Gmail send client not available" };
+  }
+
+  try {
+    const draft = await gmail.users.drafts.get({
+      userId: "me",
+      id: draftId,
+      format: "full",
+    });
+    const message = draft.data.message;
+    const payload = message?.payload as GmailPayload | undefined;
+    const headers = (payload?.headers ?? []) as Array<{ name: string; value: string }>;
+    const bodyParts = payload ? extractTextBody(payload) : { text: "", html: "" };
+
+    const sent = await gmail.users.drafts.send({
+      userId: "me",
+      requestBody: { id: draftId },
+    });
+    const messageId = sent.data?.id ?? "";
+    if (!messageId) {
+      return { ok: false, error: "Gmail API returned no sent message id" };
+    }
+
+    return {
+      ok: true,
+      draftId,
+      messageId,
+      threadId: sent.data?.threadId ?? message?.threadId ?? null,
+      to: getHeader(headers, "To"),
+      from: getHeader(headers, "From"),
+      subject: getHeader(headers, "Subject"),
+      body: bodyParts.text || bodyParts.html || message?.snippet || "",
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
   }
 }
 

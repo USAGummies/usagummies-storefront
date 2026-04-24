@@ -39,18 +39,6 @@ export interface ReportRollup {
   byCategory: Record<EmailCategory, number>;
 }
 
-const CATEGORY_LABEL: Record<EmailCategory, string> = {
-  customer_support: "Customer support",
-  b2b_sales: "B2B sales",
-  ap_finance: "AP / finance",
-  vendor_supply: "Vendor / supply",
-  sample_request: "Sample request",
-  shipping_issue: "Shipping issue",
-  receipt_document: "Receipt / document",
-  marketing_pr: "Marketing / PR",
-  junk_fyi: "FYI / junk",
-};
-
 function senderName(env: EmailEnvelope): string {
   const m = env.from?.match(/^([^<]+)</);
   if (m) return m[1].trim();
