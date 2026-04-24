@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import type { ResponseInputItem } from "openai/resources/responses/responses";
 import { SUPPORT_SYSTEM_PROMPT } from "@/lib/support/chat";
+import { resolveOpenAiModel } from "@/lib/ops/ai/model-policy";
 
 export const runtime = "nodejs";
 
@@ -43,7 +44,7 @@ export async function POST(req: Request) {
   try {
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const response = await client.responses.create({
-      model: process.env.OPENAI_CHAT_MODEL || "gpt-4.1-mini",
+      model: resolveOpenAiModel("supportChat"),
       input: [
         { role: "system", content: SUPPORT_SYSTEM_PROMPT, type: "message" },
         ...cleaned,

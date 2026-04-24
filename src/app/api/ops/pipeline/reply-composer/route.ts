@@ -16,6 +16,11 @@
 
 import { NextResponse } from "next/server";
 import { isAuthorized } from "@/lib/ops/abra-auth";
+import {
+  HARD_RULES_PROMPT,
+  anthropicSamplingParams,
+  resolveAnthropicModel,
+} from "@/lib/ops/ai/model-policy";
 import { getProspect, getTouches } from "@/lib/ops/pipeline";
 import { validateOutreachClaims } from "@/lib/ops/product-claims";
 
@@ -31,6 +36,8 @@ function buildPrompt(prospect: NonNullable<Awaited<ReturnType<typeof getProspect
   ).join("\n");
 
   return [
+    HARD_RULES_PROMPT,
+    "",
     "You are writing a follow-up email for USA Gummies — a premium dye-free gummy candy company.",
     `Tone: ${tone}.`,
     "",
@@ -115,6 +122,7 @@ export async function POST(req: Request) {
 
     const touches = await getTouches({ prospect_id, limit: 10 });
     const prompt = buildPrompt(prospect, touches, tone, context);
+    const model = resolveAnthropicModel("replyComposer");
 
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -124,9 +132,9 @@ export async function POST(req: Request) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6",
+        model,
         max_tokens: 1000,
-        temperature: 0.4,
+        ...anthropicSamplingParams(model, 0.2),
         messages: [{ role: "user", content: prompt }],
       }),
       signal: AbortSignal.timeout(25000),

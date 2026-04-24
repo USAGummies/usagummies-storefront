@@ -60,17 +60,21 @@ function buildSummary(
   const assistantMessages = messages.filter(m => m.role === "assistant");
   const topics = extractTopics(messages);
 
-  // Extract decisions (look for definitive statements in assistant messages)
+  // Extract decisions only from human/user text. Assistant text can propose
+  // state, but it is not company memory until a human or source system confirms.
   const decisions: string[] = [];
   const openItems: string[] = [];
 
-  for (const msg of assistantMessages) {
+  for (const msg of userMessages) {
     const text = msg.content;
-    // Decisions: corrections, confirmations, recorded facts
-    if (/(?:logged|recorded|confirmed|updated|corrected)/i.test(text)) {
+    if (/(?:confirmed|approved|blessed|locked|corrected|use this|do this)/i.test(text)) {
       const snippet = text.slice(0, 100).replace(/\n/g, " ");
       decisions.push(snippet);
     }
+  }
+
+  for (const msg of assistantMessages) {
+    const text = msg.content;
     // Open items: things flagged for follow-up
     if (/(?:flag|follow.up|need to|should|open item|pending)/i.test(text)) {
       const match = text.match(/(?:flag|follow.up|need to|should)[^.]*\./i);

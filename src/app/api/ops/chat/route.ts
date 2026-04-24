@@ -9,6 +9,7 @@
 
 import { streamText, tool } from "ai";
 import { openai } from "@ai-sdk/openai";
+import { HARD_RULES_PROMPT, resolveOpenAiModel } from "@/lib/ops/ai/model-policy";
 // Zod v4's z.object({}) produces JSON Schema type:"None" which OpenAI rejects.
 // The zod/v3 compat layer generates correct type:"object", so we use it here.
 import { z as _z } from "zod/v3";
@@ -50,16 +51,19 @@ export const maxDuration = 30;
 // System prompt
 // ---------------------------------------------------------------------------
 
-const OPS_SYSTEM_PROMPT = `You are the USA Gummies operations AI assistant embedded in the ops dashboard.
+const OPS_SYSTEM_PROMPT = `${HARD_RULES_PROMPT}
+
+You are the USA Gummies operations AI assistant embedded in the ops dashboard.
 You have access to real-time business data through tools. Use them to answer questions accurately.
 
 ABOUT THE BUSINESS:
-- USA Gummies sells gummy vitamins/supplements via Shopify DTC and Amazon FBA
-- Single product line, multiple SKUs (variety packs, bundles)
+- USA Gummies sells dye-free gummy candy via Shopify DTC, Amazon, Faire, wholesale, and direct B2B
+- Current primary product: All American Gummy Bears, 7.5 oz bag
+- Ship-from truth: Ashford, WA. Do not mention Nashville, WA.
 - Amazon Seller ID: A16G27VYDSSEGO (US marketplace)
 - Shopify store: usagummies.com
 - The business also does B2B/wholesale via Faire and direct outreach
-- 80 automated agents run across 6 engines (B2B, SEO, DTC, Supply Chain, Revenue Intel, FinOps)
+- AI systems may observe, prepare, draft, alert, and request approval. Do not claim unsupported agent counts.
 
 CONTEXT:
 - All revenue figures are in USD
@@ -73,6 +77,9 @@ CONTEXT:
 
 BEHAVIOR:
 - Be concise and data-driven. Lead with numbers.
+- Treat runtime/source data as stronger than memory. If source data is missing, say what is missing.
+- Do not invent financial data, shipment status, customer status, vendor status, or prior engagement.
+- Customer-facing sends, payment releases, QBO sends/structure changes, and irreversible shipments require the control-plane approval flow.
 - When asked about trends, query the Notion KPI history for multi-day data.
 - When asked about "today" or "current", use the getKPIs tool.
 - When asked about cash/finance/balances, use the getBalances tool for account balances or getCashPosition for local financial data.
@@ -554,7 +561,7 @@ export async function POST(req: Request) {
     const { messages } = v.data;
 
     const result = streamText({
-      model: openai("gpt-4o-mini"),
+      model: openai(resolveOpenAiModel("opsChat")),
       system: OPS_SYSTEM_PROMPT,
       messages,
       tools,

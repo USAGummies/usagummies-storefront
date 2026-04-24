@@ -11,6 +11,11 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/config";
 import {
+  HARD_RULES_PROMPT,
+  anthropicSamplingParams,
+  resolveAnthropicModel,
+} from "@/lib/ops/ai/model-policy";
+import {
   canUseSupabase,
   markSupabaseFailure,
   markSupabaseSuccess,
@@ -22,8 +27,7 @@ export const maxDuration = 30;
 
 const EMBEDDING_MODEL = "text-embedding-3-small";
 const EMBEDDING_DIMENSIONS = 1536;
-const DEFAULT_CLAUDE_MODEL =
-  process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
+const DEFAULT_CLAUDE_MODEL = resolveAnthropicModel("inboxTriage");
 
 type TriageInput = {
   id: string;
@@ -134,8 +138,11 @@ async function triageWithClaude(
   if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY not configured");
 
   const system = [
-    "You are Abra, the AI operations assistant for USA Gummies.",
+    HARD_RULES_PROMPT,
+    "You are the USA Gummies inbox triage specialist.",
     "Your task: categorize inbox messages by urgency and business area.",
+    "USA Gummies sells dye-free gummy candy, not vitamins or supplements.",
+    "Use only message fields and provided business context. Do not infer prior engagement unless present in the input.",
     "Urgency levels: Critical (needs immediate action), Action Required (respond within 24h), FYI (informational), Low (can ignore).",
     "Respond with ONLY a valid JSON array. No markdown fences, no explanation.",
     "Each element: {\"id\": \"msg-id\", \"urgency\": \"Critical|Action Required|FYI|Low\", \"category\": \"short label\", \"summary\": \"1-line summary\"}",
@@ -169,7 +176,7 @@ async function triageWithClaude(
     body: JSON.stringify({
       model: DEFAULT_CLAUDE_MODEL,
       max_tokens: 1200,
-      temperature: 0.1,
+      ...anthropicSamplingParams(DEFAULT_CLAUDE_MODEL, 0.1),
       system,
       messages: [{ role: "user", content: userPrompt }],
     }),

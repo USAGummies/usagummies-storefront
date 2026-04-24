@@ -11,6 +11,11 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/config";
 import {
+  HARD_RULES_PROMPT,
+  anthropicSamplingParams,
+  resolveAnthropicModel,
+} from "@/lib/ops/ai/model-policy";
+import {
   canUseSupabase,
   markSupabaseFailure,
   markSupabaseSuccess,
@@ -22,8 +27,7 @@ export const maxDuration = 30;
 
 const EMBEDDING_MODEL = "text-embedding-3-small";
 const EMBEDDING_DIMENSIONS = 1536;
-const DEFAULT_CLAUDE_MODEL =
-  process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
+const DEFAULT_CLAUDE_MODEL = resolveAnthropicModel("pipelineEnrich");
 
 type DealInput = {
   id: string;
@@ -136,8 +140,11 @@ async function enrichWithClaude(
   if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY not configured");
 
   const system = [
-    "You are Abra, the AI operations assistant for USA Gummies.",
+    HARD_RULES_PROMPT,
+    "You are the USA Gummies B2B pipeline enrichment specialist.",
     "Your task: enrich B2B pipeline deals with brain intelligence.",
+    "USA Gummies sells dye-free gummy candy, not vitamins or supplements.",
+    "Do not invent prior engagement, pricing, shipment status, or customer interest. If source data is missing, say what is missing in nextStep.",
     "For each deal, provide a brief insight based on email history and brain context,",
     "a concrete next step recommendation, and list any related email subjects.",
     "Respond with ONLY a valid JSON array. No markdown fences, no explanation.",
@@ -172,7 +179,7 @@ async function enrichWithClaude(
     body: JSON.stringify({
       model: DEFAULT_CLAUDE_MODEL,
       max_tokens: 1500,
-      temperature: 0.15,
+      ...anthropicSamplingParams(DEFAULT_CLAUDE_MODEL, 0.15),
       system,
       messages: [{ role: "user", content: userPrompt }],
     }),
