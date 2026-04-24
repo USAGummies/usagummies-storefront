@@ -47,6 +47,7 @@ const SELF_AUTHENTICATED_PREFIXES = [
   "/api/ops/orders/", // ORDER DESK — Order log, fulfillment, samples (isAuthorized)
   "/api/ops/fulfillment", // FULFILLMENT — Unified ship-today queue (session or CRON_SECRET)
   "/api/ops/shipping/", // SHIPPING — Unified auto-ship pipeline (session or CRON_SECRET)
+  "/api/ops/ap-packets/", // AP PACKETS — vendor setup reply pipeline (Gmail send with dedup + approval gate)
   "/api/ops/viktor/", // VIKTOR runtime — W-7 Rene-capture etc. (isCronAuthorized bearer CRON_SECRET)
   "/api/ops/agents/", // Specialist agent runtimes — finance-exception, ops, etc. (isAuthorized session + CRON_SECRET)
   "/api/ops/booke/", // Booke queue push/query (isCronAuthorized bearer CRON_SECRET)
