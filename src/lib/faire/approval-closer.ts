@@ -55,7 +55,8 @@ import {
   type FaireInviteRecord,
 } from "./invites";
 import { sendViaGmailApiDetailed } from "@/lib/ops/gmail-reader";
-import { logEmail } from "@/lib/ops/hubspot-client";
+import { findContactByEmail, logEmail } from "@/lib/ops/hubspot-client";
+import { resolveHubSpotContactIdForInviteRecord } from "./hubspot-mirror";
 
 // ---------------------------------------------------------------------------
 // Strict gate constants
@@ -198,6 +199,12 @@ export async function executeApprovedFaireDirectInvite(
   options: {
     sendImpl?: typeof sendViaGmailApiDetailed;
     logEmailImpl?: typeof logEmail;
+    /**
+     * Test seam for the HubSpot contact lookup fallback. Production
+     * uses `findContactByEmail` from the HubSpot client; tests inject
+     * a vi.fn so the closer never touches the real HubSpot API.
+     */
+    findContactImpl?: typeof findContactByEmail;
     now?: Date;
   } = {},
 ): Promise<FaireInviteApprovalExecutionResult> {
@@ -371,14 +378,21 @@ export async function executeApprovedFaireDirectInvite(
   }
 
   // ---- HubSpot mirror (best-effort) ------------------------------------
+  // Phase 3.1: prefer the operator-pasted hubspotContactId, but fall
+  // back to a read-only findContactByEmail() lookup so the timeline
+  // email associates to the retailer's contact record when it exists.
+  // Mirrors the email-intelligence approval-executor pattern. Fail-soft.
   let hubspotEmailLogId: string | null = null;
   try {
+    const contactId = await resolveHubSpotContactIdForInviteRecord(record, {
+      findImpl: options.findContactImpl,
+    });
     hubspotEmailLogId = await logEmailImpl({
       subject: SUBJECT,
       body,
       direction: "EMAIL",
       to: record.email,
-      contactId: record.hubspotContactId,
+      contactId: contactId ?? undefined,
     });
   } catch {
     hubspotEmailLogId = null;

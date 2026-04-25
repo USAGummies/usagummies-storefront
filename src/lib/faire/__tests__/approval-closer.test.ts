@@ -571,3 +571,137 @@ describe("executeApprovedFaireDirectInvite — idempotency", () => {
     expect(sendImpl).toHaveBeenCalledTimes(1); // STILL one
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 3.1 — HubSpot contact-id fallback (lookup by email)
+// ---------------------------------------------------------------------------
+
+describe("executeApprovedFaireDirectInvite — HubSpot contact resolution", () => {
+  it("uses the operator-pasted hubspotContactId when present, no findImpl call", async () => {
+    // Seed an invite that ALREADY has a hubspotContactId — operator
+    // pasted it at ingest time.
+    await ingestInviteRows(
+      [fakeRow({ hubspotContactId: "operator-pasted-77" })],
+      { now: NOW },
+    );
+    const id = inviteIdFromEmail("ap@wholefoods.com");
+    await updateFaireInvite(id, { status: "approved" }, { now: NOW });
+
+    const sendImpl = vi.fn(async () => ({
+      ok: true as const,
+      messageId: "gmail-1",
+      threadId: null,
+    }));
+    const logEmailImpl = vi.fn(async () => "hs-log-1");
+    const findContactImpl = vi.fn(async () => "should-not-be-used");
+
+    await executeApprovedFaireDirectInvite(approvalForInvite(id), {
+      sendImpl: sendImpl as never,
+      logEmailImpl: logEmailImpl as never,
+      findContactImpl: findContactImpl as never,
+    });
+
+    // findImpl never called because operator-pasted id wins.
+    expect(findContactImpl).not.toHaveBeenCalled();
+    // logEmail was called WITH the pasted id.
+    expect(logEmailImpl).toHaveBeenCalledTimes(1);
+    const logArgs = (logEmailImpl.mock.calls as unknown as Array<
+      [{ contactId?: string }]
+    >)[0][0];
+    expect(logArgs.contactId).toBe("operator-pasted-77");
+  });
+
+  it("falls back to findContactByEmail when hubspotContactId is absent", async () => {
+    // Default fakeRow has NO hubspotContactId.
+    const id = await seedApprovedInvite();
+
+    const sendImpl = vi.fn(async () => ({
+      ok: true as const,
+      messageId: "gmail-2",
+      threadId: null,
+    }));
+    const logEmailImpl = vi.fn(async () => "hs-log-2");
+    const findContactImpl = vi.fn(async () => "found-by-email-123");
+
+    // Configure HubSpot so the resolver actually calls findImpl.
+    process.env.HUBSPOT_PRIVATE_APP_TOKEN = "test-hs-token";
+
+    await executeApprovedFaireDirectInvite(approvalForInvite(id), {
+      sendImpl: sendImpl as never,
+      logEmailImpl: logEmailImpl as never,
+      findContactImpl: findContactImpl as never,
+    });
+
+    delete process.env.HUBSPOT_PRIVATE_APP_TOKEN;
+
+    expect(findContactImpl).toHaveBeenCalledWith("ap@wholefoods.com");
+    const logArgs = (logEmailImpl.mock.calls as unknown as Array<
+      [{ contactId?: string }]
+    >)[0][0];
+    expect(logArgs.contactId).toBe("found-by-email-123");
+  });
+
+  it("emits an unassociated email engagement when neither pasted id nor email lookup hits", async () => {
+    const id = await seedApprovedInvite();
+
+    const sendImpl = vi.fn(async () => ({
+      ok: true as const,
+      messageId: "gmail-3",
+      threadId: null,
+    }));
+    const logEmailImpl = vi.fn(async () => "hs-log-3");
+    const findContactImpl = vi.fn(async () => null);
+
+    process.env.HUBSPOT_PRIVATE_APP_TOKEN = "test-hs-token";
+
+    const r = await executeApprovedFaireDirectInvite(approvalForInvite(id), {
+      sendImpl: sendImpl as never,
+      logEmailImpl: logEmailImpl as never,
+      findContactImpl: findContactImpl as never,
+    });
+
+    delete process.env.HUBSPOT_PRIVATE_APP_TOKEN;
+
+    expect(r.ok).toBe(true);
+    expect(findContactImpl).toHaveBeenCalledTimes(1);
+    // logEmail still ran — engagement lands in HubSpot but is unassociated.
+    expect(logEmailImpl).toHaveBeenCalledTimes(1);
+    const logArgs = (logEmailImpl.mock.calls as unknown as Array<
+      [{ contactId?: string }]
+    >)[0][0];
+    expect(logArgs.contactId).toBeUndefined();
+  });
+
+  it("HubSpot search throwing does NOT abort the success path", async () => {
+    const id = await seedApprovedInvite();
+
+    const sendImpl = vi.fn(async () => ({
+      ok: true as const,
+      messageId: "gmail-4",
+      threadId: null,
+    }));
+    const logEmailImpl = vi.fn(async () => "hs-log-4");
+    const findContactImpl = vi.fn(async () => {
+      throw new Error("HubSpot 502");
+    });
+
+    process.env.HUBSPOT_PRIVATE_APP_TOKEN = "test-hs-token";
+
+    const r = await executeApprovedFaireDirectInvite(approvalForInvite(id), {
+      sendImpl: sendImpl as never,
+      logEmailImpl: logEmailImpl as never,
+      findContactImpl: findContactImpl as never,
+    });
+
+    delete process.env.HUBSPOT_PRIVATE_APP_TOKEN;
+
+    // Gmail send + KV flip both still succeeded; only the contact
+    // association is missing.
+    expect(r.ok).toBe(true);
+    if (r.ok && r.handled && r.kind === "faire-direct-invite") {
+      expect(r.gmailMessageId).toBe("gmail-4");
+    }
+    const reloaded = (await kv.get(`faire:invites:${id}`)) as string;
+    expect(JSON.parse(reloaded).status).toBe("sent");
+  });
+});
