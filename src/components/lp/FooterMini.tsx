@@ -18,7 +18,7 @@ export function FooterMini() {
             All-natural gummy bears. Sourced, made, and packed in the U.S.A.
           </p>
           <p className="lp-label mt-3 text-[var(--lp-red)]">
-            ★ American supply chain · Smaller footprint
+            ★ 100% Made in the USA · Freedom from Artificial Dyes
           </p>
         </div>
         <nav aria-label="Shop" className="space-y-2">

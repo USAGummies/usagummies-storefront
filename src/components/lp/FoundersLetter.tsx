@@ -11,18 +11,22 @@ export function FoundersLetter() {
   return (
     <section className="relative">
       <div className="mx-auto grid max-w-[1200px] grid-cols-1 gap-10 px-5 py-16 sm:px-8 sm:py-24 md:grid-cols-[1fr_1.25fr] md:gap-16">
-        {/* Scene column — real USA Gummies "Founders" billboard photo */}
+        {/* Scene column — billboard is naturally panoramic (~2:1), so
+            the card aspect matches the asset instead of cropping
+            severely (Ben's audit: "the format of the other images are
+            incorrect"). object-contain with a cream backdrop preserves
+            the full billboard composition. */}
         <div className="relative order-2 md:order-1">
           <div
-            className="relative aspect-[5/6] w-full overflow-hidden border-[3px] border-[var(--lp-ink)] bg-[var(--lp-cream)]"
+            className="relative aspect-[16/9] w-full overflow-hidden border-[3px] border-[var(--lp-ink)] bg-[var(--lp-cream)]"
             style={{ boxShadow: "8px 8px 0 var(--lp-red)" }}
           >
             <Image
               src="/brand/billboards/founders.jpg"
               alt="USA Gummies Founders billboard"
               fill
-              sizes="(max-width: 768px) 88vw, 480px"
-              className="object-cover"
+              sizes="(max-width: 768px) 88vw, 540px"
+              className="object-contain"
             />
           </div>
         </div>

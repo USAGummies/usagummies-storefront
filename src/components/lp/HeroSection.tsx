@@ -37,34 +37,14 @@ export function HeroSection() {
         </div>
       </div>
 
-      {/* Hero body — `isolate` creates a local stacking context so the
-          backdrop (with z-0) sits above the .lp-scope cream body
-          background but below the foreground content (z-10). The
-          earlier `-z-10` was pushing the photo behind the lp-scope
-          wrapper's background-color, which is why the bag-1776 photo
-          wasn't visible. */}
-      <div className="relative isolate">
-        {/* Real product photo backdrop — replaced the illustrated
-            meadow with the actual bag-in-Americana photo so the top of
-            the page leads with real imagery (Ben's audit: "needs a real
-            image here at the top"). Cream wash keeps the H1 + bag
-            slider readable against a busy photograph. */}
-        <div aria-hidden className="absolute inset-0 z-0">
-          <Image
-            src="/brand/photos/bag-1776.jpg"
-            alt=""
-            fill
-            priority
-            sizes="100vw"
-            className="object-cover"
-          />
-          {/* Two-stop wash: top is mostly transparent so the real
-              photo carries the visual weight; the wash deepens behind
-              the headline + bag slider so type stays legible. */}
-          <div className="absolute inset-0 bg-gradient-to-b from-[var(--lp-cream)]/20 via-[var(--lp-cream)]/55 to-[var(--lp-cream)]/95" />
-        </div>
-
-        <div className="relative z-10 mx-auto grid max-w-[1200px] grid-cols-1 gap-8 px-5 pb-10 pt-10 sm:px-8 sm:pb-16 sm:pt-14 md:grid-cols-[1fr_1.05fr] md:gap-12 md:pb-20 md:pt-18">
+      {/* Hero body — solid cream backdrop. The bag-1776 background photo
+          was pulled per Ben's audit ("the image you used as the hero
+          image is the background, i am not a fan"). The hero now leads
+          with the actual product photo (hero.jpg) as a foreground
+          card, not a wash, so visitors immediately see what they're
+          buying. */}
+      <div className="relative bg-[var(--lp-cream)]">
+        <div className="relative mx-auto grid max-w-[1200px] grid-cols-1 items-center gap-8 px-5 pb-10 pt-10 sm:px-8 sm:pb-16 sm:pt-14 md:grid-cols-[1.05fr_1fr] md:gap-12 md:pb-20 md:pt-18">
           {/* Copy column */}
           <div className="relative">
             <h1
@@ -105,15 +85,68 @@ export function HeroSection() {
                 ),
               )}
             </ul>
+
+            {/* Bag slider tucked under the copy on mobile-first stacks;
+                on desktop it shares the right column with the product
+                photo (see grid below). */}
+            <div
+              data-reveal="3"
+              className="relative mt-8 rounded-sm border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-4 shadow-[6px_6px_0_var(--lp-red)] sm:p-6 md:hidden"
+            >
+              <BagSlider variant="full" defaultQty={5} />
+            </div>
           </div>
 
-          {/* Bag slider — the real purchase interaction */}
-          <div
-            data-reveal="3"
-            className="relative rounded-sm border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)]/95 p-4 shadow-[6px_6px_0_var(--lp-red)] sm:p-6"
-          >
-            <BagSlider variant="full" defaultQty={5} />
+          {/* Product hero column — actual product photo first
+              (so visitors immediately see what they're buying), bag
+              slider directly under it for the purchase action. Hidden
+              on small screens where the slider lives in the copy
+              column above. */}
+          <div className="relative hidden flex-col gap-6 md:flex">
+            <figure
+              data-reveal="3"
+              className="relative w-full overflow-hidden border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)]"
+              style={{ boxShadow: "8px 8px 0 var(--lp-red)" }}
+            >
+              <div className="relative aspect-[3/4] w-full">
+                <Image
+                  src="/brand/hero.jpg"
+                  alt="USA Gummies — All American Gummy Bears 7.5 oz bag"
+                  fill
+                  priority
+                  sizes="(max-width: 1200px) 50vw, 540px"
+                  className="object-cover"
+                />
+              </div>
+            </figure>
+
+            <div
+              data-reveal="3"
+              className="relative rounded-sm border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-4 shadow-[6px_6px_0_var(--lp-red)] sm:p-6"
+            >
+              <BagSlider variant="full" defaultQty={5} />
+            </div>
           </div>
+
+          {/* Mobile-only product photo — sits between the trust row
+              and the buy widget (in the copy column above) so the
+              product is still the first thing visitors see when the
+              page stacks. */}
+          <figure
+            className="relative -order-1 w-full overflow-hidden border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] md:hidden"
+            style={{ boxShadow: "6px 6px 0 var(--lp-red)" }}
+          >
+            <div className="relative aspect-[4/5] w-full">
+              <Image
+                src="/brand/hero.jpg"
+                alt="USA Gummies — All American Gummy Bears 7.5 oz bag"
+                fill
+                priority
+                sizes="100vw"
+                className="object-cover"
+              />
+            </div>
+          </figure>
         </div>
 
         <div className="lp-bunting-thin" aria-hidden />
