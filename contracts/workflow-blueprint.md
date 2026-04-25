@@ -81,10 +81,20 @@ Each row uses the schema:
 - **Monday MVP:** 🟡 — works but no test coverage on the composer
 - **Later:** Wire reply-composer into the email-intelligence triage as the LLM fallback drafter
 
-### S1.4 Faire Direct invites
-- **Status:** ❌ Stub
-- **Tests:** Missing
-- **Monday MVP:** 🔴 — slug exists in taxonomy, no route. Manual via Faire UI
+### S1.4 Faire Direct invites — Phase 1 review queue (NEW)
+- **Trigger (write):** Operator POSTs candidate rows to `POST /api/ops/faire/direct-invites`. Each row passes through `validateInvite()`. Valid rows are queued at `faire:invites:<id>` with `status="needs_review"`. Invalid rows go to `errors[]` with stable codes (`validation_failed`, `duplicate`).
+- **Trigger (read):** Operator opens `/ops/faire-direct` (auth-gated by `/ops/*` middleware) → `GET /api/ops/faire/direct-invites` → renders invites grouped by status + a degraded banner when `FAIRE_ACCESS_TOKEN` is missing.
+- **Source of truth:** KV (`faire:invites:<id>` + `:index`). Dedup key = lowercased email.
+- **Hard rules locked by tests:**
+  - **No email is sent. No Faire API call is made.** The module imports nothing from Gmail / Slack / faire-client beyond the read-only `isFaireConfigured()` flag. KV is the only mocked side effect in the test suite — any other network call would crash uninstrumented.
+  - Validation: `retailerName` + `email` (valid format) + `source` are required. Optional fields trimmed and dropped if blank.
+  - Duplicates (within batch + across queue) flagged as `duplicate`, not double-added.
+  - Missing `FAIRE_ACCESS_TOKEN` → `degraded: true` with reason on `GET`. Queue ingest still works.
+- **Approval class:** Class B `faire-direct.invite` per `/contracts/approval-taxonomy.md` and `/contracts/agents/faire-specialist.md`. Phase 1 builds the queue; Phase 2 will wire the Slack approve click → real Faire send (or manual hand-off if Faire's API doesn't expose invite send).
+- **Status response:** 201 on all-valid, 207 Multi-Status on mixed, 200 on all-errors, 400 on missing/non-array body or invalid JSON.
+- **Tests:** 23 helpers + 12 route = 35 total. Locked: validation rules (required fields, email shape, optional trims), in-batch + cross-batch dedup, status grouping, degraded-mode signal, no-sends-happen invariant.
+- **Required env (Phase 2):** `FAIRE_ACCESS_TOKEN` for the eventual send path. Phase 1 surfaces its absence as a banner; Phase 2 builds the send-on-approve closer.
+- **Monday MVP:** 🟢 — internal queue ready. Distributors / sales touchpoints can stage candidates; operator reviews on `/ops/faire-direct`. No emails fly without Phase 2 + an explicit Slack approve.
 
 ---
 
