@@ -188,6 +188,33 @@ Each row uses the schema:
   - Button disables itself when queued / sent / requesting; surfaces inline errors on 4xx/5xx from the route.
 - **Monday MVP:** 🟢 — full close-loop. Operator clicks Request follow-up → Slack card → Ben clicks → Gmail goes out on the original thread → KV stamps followUpSentAt → queue stops re-prompting.
 
+### S1.6 Sales Command Center — read-only revenue-action roll-up (NEW)
+- **Trigger (read):** Operator opens `/ops/sales` → client component calls `GET /api/ops/sales` → server-side aggregator reads each underlying source directly (no HTTP self-fetch) and returns the consolidated `SalesCommandCenterReport` shape.
+- **Sources surveyed:**
+  - Faire invites (wired via `listInvitesByStatus()`)
+  - Faire follow-ups due/overdue (wired via `reportFollowUps(listInvites())`, top-5 most-stale preview)
+  - Pending Slack approvals (wired via `approvalStore().listPending()`, bucketed by `targetEntity.type`, oldest-5 preview)
+  - AP packets (wired via `listApPackets()` + best-effort KV scan of `ap-packets:sent:*` rows for the sent count)
+  - Location drafts (wired via `listDraftsByStatus()`)
+  - Wholesale inquiries (**not_wired** — there is no internal list endpoint today; submissions land in `/api/leads` but aren't archived in a queryable store; surfaced honestly with reason in the Blockers panel)
+- **Hard rules locked by tests:**
+  - **Read-only.** No KV / Gmail / HubSpot / Faire / Slack / QBO / Shopify mutation; no approval opened, no email drafted. The aggregator helper has zero I/O — pure functions, two identical inputs produce identical outputs.
+  - **Never invents data.** A `not_wired` source surfaces as `null` in the top-of-page roll-ups (rendered as "—") and as a row in the Blockers panel with the caller's verbatim reason. Empty-but-wired sources surface as `0` (NOT null) so the dashboard distinguishes "wired but quiet" from "no API at all".
+  - **Sort order locked.** Follow-up `topActionable` preserves the caller-supplied most-stale-first order from `reportFollowUps`; aggregator slices to the top 5 without re-sorting. Pending-approvals preview is sorted oldest-`createdAt` first.
+  - **Each source independently wrapped.** A single source failure in the route handler converts to `{ status: "error" }` and lands in the Blockers panel; the rest of the dashboard still renders.
+- **Sections rendered:**
+  1. *Today's revenue actions* — five stat cards (Faire invites awaiting review, follow-ups due/overdue, Slack approvals pending, AP packets action-required, retail drafts to review). Cards link to their respective workflow pages. A `Nothing demands action right now` green note appears when every wired count is zero.
+  2. *Faire Direct* — invite counts by status with a "Open Faire Direct queue" deep-link.
+  3. *Follow-ups awaiting Ben* — overdue / due_soon / sent-total counts plus top-5 most-stale rows (retailer, email, days-since-sent, bucket badge).
+  4. *Wholesale / B2B onboarding* — wholesale inquiry status (currently `not_wired`) + AP packet status.
+  5. *Retail proof / store locator pipeline* — draft counts + `/ops/locations` link.
+  6. *Slack approvals awaiting Ben* — total pending + oldest-5 preview rows with `targetEntity.type`, action slug, and `createdAt`.
+  7. *Blockers / missing envs* — collected `not_wired`/`error` notes plus any unset env vars from a curated short list (`FAIRE_ACCESS_TOKEN`, `HUBSPOT_PRIVATE_APP_TOKEN`); links to `/ops/readiness`.
+- **Approval class:** None. Phase 1 ships zero new approvals — the dashboard has no Send/Approve/Action buttons by contract.
+- **Tests (Phase 1):** 16 aggregator-helper tests covering: not_wired surfaces as null in roll-ups, empty-but-wired surfaces as 0, exact-count propagation (no inflation), `anyAction` true iff a wired count > 0, follow-up sort preservation, top-5 slice, blockers panel collection, missingEnv passthrough, defaults, purity (same input → same output). No route or page tests in Phase 1 — the aggregator is the contract surface; the route is a thin reader.
+- **UI:** `/ops/sales` page server component → `<SalesCommandCenterView>` client component → fetches the route once, renders six sections + a refresh button. Stat cards are clickable when they carry a deep-link. `not_wired` sources render with an explicit "NOT WIRED" amber badge + the reason verbatim.
+- **Monday MVP:** 🟢 — Ben gets one read-only browser surface for the day's revenue actions without leaving the storefront repo. Phase 2 (deferred): wire wholesale inquiry archive + add a "Slack permalink" deep-link helper to the awaiting-Ben section.
+
 ---
 
 ## Division 2 — Email / Inbox / Customer replies
@@ -593,7 +620,7 @@ Each order row now carries a **Buy these again** button. Pure helper `intentFrom
 
 | Status | Count | Workflows |
 |---|---|---|
-| 🟢 Green | 29 | Email-intel triage (CLOSED LOOP), Sample-request → shipping bridge, Vendor master creation (QBO path), Faire Direct invites (CLOSED LOOP), HubSpot dispatch, Auto-ship, Sample dispatch, Shipping label artifacts, Durable NCS/vendor-doc upload, Wallet check, Inventory snapshot/forecast/burn-rate, Vendor threads, Outreach validate, Marketing content, Research Librarian, Compliance (fallback), Control plane, Slack approvals, Drift audit, Hard-rules pin, Customer chat, Finance Exception, Freight-comp manager, Stamps.com daily ping, Wholesale page, Gmail send/draft primitives, AP packet send (JJ-only), Reply composer (untested but live) |
+| 🟢 Green | 30 | Email-intel triage (CLOSED LOOP), Sample-request → shipping bridge, Vendor master creation (QBO path), Faire Direct invites (CLOSED LOOP), Sales Command Center (read-only roll-up), HubSpot dispatch, Auto-ship, Sample dispatch, Shipping label artifacts, Durable NCS/vendor-doc upload, Wallet check, Inventory snapshot/forecast/burn-rate, Vendor threads, Outreach validate, Marketing content, Research Librarian, Compliance (fallback), Control plane, Slack approvals, Drift audit, Hard-rules pin, Customer chat, Finance Exception, Freight-comp manager, Stamps.com daily ping, Wholesale page, Gmail send/draft primitives, AP packet send (JJ-only), Reply composer (untested but live) |
 | 🟡 Yellow | 7 | Reply composer + Pipeline enrich (no tests), Inbox triage (one-shot), AP packet send (Drive scope), QBO write paths (sparse tests), Approved Claims (KV-only), Vendor onboarding Notion/Drive dossier parent IDs/scopes, Receipts intake queue (review-only; no OCR/QBO write) |
 | 🔴 Red | 7 | Reorder triggers, Drew East-Coast routing confirmation, Klaviyo / social, R-1..R-7 specialists, Trade-show pod, USPTO/FDA tracking, external vendor portal |
 
@@ -625,4 +652,5 @@ Each order row now carries a **Buy these again** button. Pure helper `intentFrom
 - **1.4 — 2026-04-29** — S1.4 Faire Direct invites moved from red to green (CLOSED LOOP). Phase 3 added: `directLinkUrl` field with approval-readiness rule, request-approval route, `executeApprovedFaireDirectInvite` closer (chain step 5 in `/api/slack/approvals` after AP-packet), Request-send-approval UI button. Send is via Gmail (operator-pasted Faire Direct URL), never via Faire's API. 52 new tests; cumulative full suite: 834 green.
 - **1.5 — 2026-04-25** — S1.4 Phase 3.1: HubSpot contact-id fallback by email lookup landed in the Faire send closer (`src/lib/faire/hubspot-mirror.ts`). Read-only — never creates a contact, never patches lifecyclestage / deals / properties / tasks. +14 tests; full suite 848 green at commit `d08e4d5`. Phase 3.2: read-only follow-up queue (`/api/ops/faire/direct-invites/follow-ups` + `<FollowUpSection>` on `/ops/faire-direct`). 3-day "due soon" / 7-day "overdue" thresholds, most-stale-first sort, suggested-action copy. No writer for `followUpQueuedAt` ships; the field is forward-compat for the future Class B `faire-direct.follow-up` closer. +27 tests; full suite 875 green.
 - **1.6 — 2026-04-25** — S1.4 Phase 3.3: Faire Direct follow-up draft-for-approval close-loop. New taxonomy slug `faire-direct.follow-up` (Class B, Ben), `markFaireFollowUpQueued` / `markFaireFollowUpSent` writers, `POST /follow-up/request-approval` route, `executeApprovedFaireDirectFollowUp` closer (Slack chain step 6, after the initial-invite closer), Request-follow-up-approval UI button + queued/sent badges. Reply-on-thread keeps the follow-up in the same Gmail conversation as the initial invite. Faire API never called; no HubSpot stages/properties touched. +45 tests; full suite 920 green. Pre-existing account UI lint errors (`<a>` → `<Link>`) in `src/app/account/AccountView.client.tsx` and `src/app/account/login/LoginForm.client.tsx` fixed inline since the swaps were trivial.
+- **1.7 — 2026-04-25** — S1.6 Sales Command Center: read-only revenue-action roll-up at `/ops/sales` + `GET /api/ops/sales`. Aggregates Faire invites, follow-ups, AP packets, location drafts, pending Slack approvals; honestly marks wholesale-inquiries as `not_wired` (no list endpoint exists today). Pure aggregator helper in `src/lib/ops/sales-command-center.ts`; route is a thin server-side reader. No mutations, no buttons, only deep-links to existing surfaces. +16 tests; full suite 936 green. Green workflow count: 29 → 30.
 - **1.0 — 2026-04-24** — First publication. Synthesizes 2 division-audit agent reports + 5 P0 deliverables + email-intelligence build. Replaces ad-hoc workflow descriptions across other contract docs.
