@@ -338,7 +338,7 @@ export async function POST(req: Request) {
             : packagingType === "pallet"
               ? "LTL freight included in pallet price"
             : freightAmount > 0
-              ? `UPS Ground (${qty} ${pack.label.toLowerCase()}${qty > 1 ? "s" : ""} from Ashford, WA)`
+              ? `UPS Ground (${qty} ${pack.label.toLowerCase()}${qty > 1 ? "s" : ""})`
               : "Shipping";
         const draftInput: Record<string, unknown> = {
           email: email.trim(),
@@ -416,7 +416,7 @@ export async function POST(req: Request) {
             ? "In-person delivery / handoff"
             : packagingType === "pallet"
               ? "LTL freight included in pallet price"
-            : `UPS Ground (${qty} ${pack.label.toLowerCase()}${qty > 1 ? "s" : ""} from Ashford, WA)`;
+            : `UPS Ground (${qty} ${pack.label.toLowerCase()}${qty > 1 ? "s" : ""})`;
 
         const createDraftMutation = `
           mutation draftOrderCreate($input: DraftOrderInput!) {
@@ -665,8 +665,8 @@ export async function POST(req: Request) {
           : packagingType === "pallet"
             ? "Shipping: Included in pallet price (LTL freight included)"
           : freightAmount > 0
-            ? `Shipping: $${freightAmount.toFixed(2)}${freightDays ? ` (UPS Ground, ~${freightDays} day${freightDays > 1 ? "s" : ""} from Ashford, WA)` : " (UPS Ground from Ashford, WA)"}`
-            : "Shipping: UPS Ground from Ashford, WA";
+            ? `Shipping: $${freightAmount.toFixed(2)}${freightDays ? ` (UPS Ground, ~${freightDays} day${freightDays > 1 ? "s" : ""})` : " (UPS Ground)"}`
+            : "Shipping: UPS Ground";
       const customerBody = [
         `Hi ${firstName},`,
         ``,
@@ -690,20 +690,19 @@ export async function POST(req: Request) {
         paymentMethod === "pay_now"
           ? deliveryMethod === "in_person"
             ? `Your order is ready for in-person handoff as soon as checkout clears.`
-            : `I pack and ship your order personally from our warehouse in Ashford, WA once checkout clears.`
+            : `We pack and ship your order personally as soon as checkout clears.`
           : qboInvoiceSent
             ? deliveryMethod === "in_person"
               ? `Your invoice is already on the way. We can hand off inventory as soon as payment clears.`
-              : `Your invoice is already on the way. I pack and ship from Ashford, WA as soon as payment clears.`
+              : `Your invoice is already on the way. We pack and ship as soon as payment clears.`
             : `We'll email your invoice shortly. We release the order as soon as payment clears.`,
         ``,
         `No extra onboarding step is required for this order.`,
         ``,
-        `Questions? Reply to this email — it goes straight to Ben.`,
+        `Questions? Reply to this email — we'll get back to you.`,
         ``,
         `Thanks again,`,
-        `Ben Stutman`,
-        `Founder, USA Gummies`,
+        `The USA Gummies team`,
         `ben@usagummies.com  |  (307) 209-4928`,
       ].join("\n");
 

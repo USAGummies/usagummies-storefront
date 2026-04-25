@@ -3,6 +3,7 @@ import { HeroSection } from "@/components/lp/HeroSection";
 import { ScarcityBar } from "@/components/lp/ScarcityBar";
 import { ThreePromises } from "@/components/lp/ThreePromises";
 import { BombsAway } from "@/components/lp/BombsAway";
+import { RealMomentsStrip } from "@/components/lp/RealMomentsStrip";
 import { FoundersLetter } from "@/components/lp/FoundersLetter";
 import { SustainabilityBlock } from "@/components/lp/SustainabilityBlock";
 import { GuaranteeBlock } from "@/components/lp/GuaranteeBlock";
@@ -37,6 +38,7 @@ export default function DyeFreeGummiesLandingPage() {
       <ScarcityBar />
       <ThreePromises />
       <BombsAway />
+      <RealMomentsStrip />
       <FoundersLetter />
       <SustainabilityBlock />
       <GuaranteeBlock />

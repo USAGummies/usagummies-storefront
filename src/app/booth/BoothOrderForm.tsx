@@ -603,7 +603,7 @@ export function BoothOrderForm() {
                       <div className="text-xs text-gray-500 mt-0.5">
                         {packagingType === "pallet"
                           ? "LTL freight is included in pallet pricing."
-                          : "UPS Ground quote from Ashford, WA added live before submit."}
+                          : "UPS Ground quote added live before submit."}
                       </div>
                     </div>
                     <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${

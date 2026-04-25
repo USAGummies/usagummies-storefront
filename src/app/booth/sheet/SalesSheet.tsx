@@ -96,7 +96,7 @@ export function SalesSheet() {
                   <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em" }}>Standard</div>
                   <div style={{ fontSize: "1.875rem", fontWeight: 900, color: "#b22234", marginTop: "4px" }}>$3.25<span style={{ fontSize: "1rem", fontWeight: 600 }}>/bag</span></div>
                   <div style={{ fontSize: "0.875rem", color: "#6b7280", marginTop: "8px" }}>$117.00 per master case</div>
-                  <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "#0a1e3d", marginTop: "4px" }}>+ UPS Ground from Ashford, WA</div>
+                  <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "#0a1e3d", marginTop: "4px" }}>+ UPS Ground · ships from the U.S.</div>
                 </div>
                 <div style={{ border: "2px solid #0a1e3d", borderRadius: "12px", padding: "16px" }}>
                   <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em" }}>Pallet</div>

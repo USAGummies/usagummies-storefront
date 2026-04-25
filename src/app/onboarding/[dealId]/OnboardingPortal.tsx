@@ -173,9 +173,9 @@ export function OnboardingPortal({ dealId, deal, contact }: Props) {
             What happens next
           </div>
           <ol className="text-sm text-gray-700 space-y-1">
-            <li>1. Ben packs your order personally from Ashford, WA</li>
+            <li>1. We pack your order personally and ship from the U.S.</li>
             <li>2. You&apos;ll get a tracking email once it ships</li>
-            <li>3. Questions? Reply to your welcome email (goes straight to Ben)</li>
+            <li>3. Questions? Reply to your welcome email — we&apos;ll get back to you.</li>
           </ol>
         </div>
       </div>

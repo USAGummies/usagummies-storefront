@@ -122,7 +122,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isHome = pathname === "/";
   const isShop = pathname === "/shop";
   const isProduct = pathname?.startsWith("/products");
-  const isLandingPage = pathname?.startsWith("/go");
+  // /go/* and /lp/* are dedicated paid-traffic landing pages — they own
+  // their own header/footer chrome, so the global AppShell stays out of
+  // their way (otherwise the site nav stacks on top of the LP hero).
+  const isLandingPage = pathname?.startsWith("/go") || pathname?.startsWith("/lp");
   const experienceVariant = isHome || isShop || isProduct ? "full" : "compact";
   const showExperienceBand = isHome || isShop;
   const menuRef = useRef<HTMLDivElement | null>(null);

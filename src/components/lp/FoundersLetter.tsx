@@ -11,30 +11,19 @@ export function FoundersLetter() {
   return (
     <section className="relative">
       <div className="mx-auto grid max-w-[1200px] grid-cols-1 gap-10 px-5 py-16 sm:px-8 sm:py-24 md:grid-cols-[1fr_1.25fr] md:gap-16">
-        {/* Scene column — cowboy + flag on desert (both from brand ARTWORK ASSETS) */}
+        {/* Scene column — real USA Gummies "Founders" billboard photo */}
         <div className="relative order-2 md:order-1">
           <div
             className="relative aspect-[5/6] w-full overflow-hidden border-[3px] border-[var(--lp-ink)] bg-[var(--lp-cream)]"
             style={{ boxShadow: "8px 8px 0 var(--lp-red)" }}
           >
             <Image
-              src="/brand/illustrations/background-desert.png"
-              alt=""
+              src="/brand/billboards/founders.jpg"
+              alt="USA Gummies Founders billboard"
               fill
               sizes="(max-width: 768px) 88vw, 480px"
               className="object-cover"
             />
-            <div className="absolute inset-0 flex items-end justify-center">
-              <div className="relative aspect-square w-[92%]">
-                <Image
-                  src="/brand/illustrations/cowboy.png"
-                  alt="Cowboy with an American flag"
-                  fill
-                  sizes="(max-width: 768px) 82vw, 420px"
-                  className="object-contain drop-shadow-[4px_5px_0_rgba(14,22,56,0.45)]"
-                />
-              </div>
-            </div>
           </div>
         </div>
 

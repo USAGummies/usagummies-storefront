@@ -49,7 +49,7 @@ export function FooterMini() {
       <div className="lp-starfield">
         <div className="mx-auto flex max-w-[1200px] flex-col items-center justify-between gap-2 px-5 py-4 sm:flex-row sm:px-8">
           <span className="lp-label text-[var(--lp-off-white)]/80">
-            © USA Gummies · Ashford, WA · Est. 2025
+            © USA Gummies · Made in the U.S.A. · Est. 2025
           </span>
           <span className="lp-label flex gap-4 text-[var(--lp-off-white)]/80">
             <Link href="/policies/terms" className="hover:text-[var(--lp-gold)]">Terms</Link>
