@@ -53,7 +53,10 @@ export function HeroSection() {
             sizes="100vw"
             className="object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-[var(--lp-cream)]/55 via-[var(--lp-cream)]/65 to-[var(--lp-cream)]" />
+          {/* Two-stop wash: top is mostly transparent so the real
+              photo carries the visual weight; the wash deepens behind
+              the headline + bag slider so type stays legible. */}
+          <div className="absolute inset-0 bg-gradient-to-b from-[var(--lp-cream)]/15 via-[var(--lp-cream)]/55 to-[var(--lp-cream)]" />
         </div>
 
         <div className="relative mx-auto grid max-w-[1200px] grid-cols-1 gap-8 px-5 pb-10 pt-10 sm:px-8 sm:pb-16 sm:pt-14 md:grid-cols-[1fr_1.05fr] md:gap-12 md:pb-20 md:pt-18">
