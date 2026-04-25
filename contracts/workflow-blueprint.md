@@ -430,6 +430,20 @@ Follow this order **without rebuying the label**:
 #### Reorder ("Buy these again", Phase 3a)
 Each order row now carries a **Buy these again** button. Pure helper `intentFromOrder()` (in `src/lib/account/reorder.ts`) maps historical line items against the canonical single-bag variant and returns `{ addable, skipped, hasAnyAddable }`. The button is shown only when at least one line item is safely mappable. On click, the UI loops through the addable items and calls the existing `addToCart()` server action — **Shopify computes the current price; no historical price is ever reused** (locked by a `JSON.stringify(intent)` assertion that price strings are absent from the output). Unavailable lines (deleted product / different SKU / out of stock) surface inline with friendly copy via `copyForSkipReason`. The `CUSTOMER_ORDERS` GraphQL query was extended to surface `variant { id sku availableForSale }` per line item so the helper can classify safely. No new server-action signature, no new env var.
 
+### W10.6 Store locator (`/where-to-buy`)
+- **Trigger:** Customer visits `/where-to-buy` (linked from the AppShell nav). Server-rendered, public, read-only.
+- **Source of truth:** Hand-curated `src/data/retailers.ts` (5 stores at the time of this entry, across WA/NY/OK/MT/SC). Two channels tracked: `direct` (we ship + invoice) and `faire` (Faire-fulfilled).
+- **AI role:** None.
+- **Approver:** None — read-only page.
+- **Slack:** None.
+- **Writeback:** None. Zero side effects — page only reads the static `RETAILERS` array.
+- **Pure helpers:** `src/lib/locations/helpers.ts` exports `countStores`, `countStates`, `groupByState`, `normalizeStoreLocation` plus a `StoreLocation` re-export. Helpers fail-soft on null/undefined/empty input, dedup states case-insensitively, and refuse to fabricate a location when fields are missing.
+- **Page features:** headline, total-store count, states count, list grouped by state with canonical casing preserved, alphabetical state sort, and an explicit empty state ("Retail locations are being added as distributor sell-through is confirmed.") when `RETAILERS` is empty. Map placeholder rendered when there are no stores so the page never shows a broken / blank SVG.
+- **SEO:** WebPage JSON-LD + per-retailer `LocalBusiness` JSON-LD continue to render only when the record passes through the helper's filter (a partial record never produces fake structured data).
+- **Tests:** 18 unit tests in `helpers.test.ts` lock the no-fabrication contract: never throws on empty/null input, dedups states case-insensitively, ignores blank states, groups stable + alphabetical with canonical casing, `normalizeStoreLocation` returns null on partial input.
+- **Phase 1 boundary:** No external map provider, no Mapbox/Google Maps key, no env var. The existing `USStoreMap` SVG (manually-calibrated `mapX/mapY` per store) is enough until coverage demands a real provider.
+- **Monday MVP:** 🟢 — page is ready and adding new retailers is a single literal append to `src/data/retailers.ts`. New entries flow through the helpers automatically.
+
 ---
 
 ## Monday-readiness summary

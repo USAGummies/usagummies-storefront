@@ -5,6 +5,11 @@ import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { JsonLd } from "@/components/JsonLd";
 import { USStoreMap } from "@/components/USStoreMap";
 import { RETAILERS } from "@/data/retailers";
+import {
+  countStates,
+  countStores,
+  groupByState,
+} from "@/lib/locations/helpers";
 
 function resolveSiteUrl() {
   const preferred = "https://www.usagummies.com";
@@ -82,6 +87,10 @@ function retailerJsonLd(r: (typeof RETAILERS)[number]) {
 
 
 export default function WhereToBuyPage() {
+  const totalStores = countStores(RETAILERS);
+  const totalStates = countStates(RETAILERS);
+  const groupedStores = groupByState(RETAILERS);
+  const hasStores = totalStores > 0;
   return (
     <main className="relative overflow-hidden text-[var(--text)] min-h-screen pb-16">
       {/* Hero */}
@@ -146,77 +155,142 @@ export default function WhereToBuyPage() {
               Our retail partners
             </div>
             <h2 className="text-2xl font-black text-[var(--text)] sm:text-3xl">
-              {RETAILERS.length} stores and growing
+              {hasStores
+                ? `${totalStores} ${totalStores === 1 ? "store" : "stores"} carrying USA Gummies`
+                : "Stores carrying USA Gummies"}
             </h2>
             <p className="text-sm text-[var(--muted)] max-w-lg mx-auto">
-              We&rsquo;re a young brand adding new retail partners regularly.
-              Find a store near you or{" "}
-              <Link
-                href="/shop"
-                className="font-semibold text-[var(--navy)] underline underline-offset-4"
-              >
-                shop online
-              </Link>
-              .
+              {hasStores ? (
+                <>
+                  Across{" "}
+                  <span className="font-semibold text-[var(--text)]">
+                    {totalStates} {totalStates === 1 ? "state" : "states"}
+                  </span>{" "}
+                  and growing. Find a store near you or{" "}
+                  <Link
+                    href="/shop"
+                    className="font-semibold text-[var(--navy)] underline underline-offset-4"
+                  >
+                    shop online
+                  </Link>
+                  .
+                </>
+              ) : (
+                <>
+                  Retail locations are being added as distributor sell-through
+                  is confirmed. In the meantime, you can{" "}
+                  <Link
+                    href="/shop"
+                    className="font-semibold text-[var(--navy)] underline underline-offset-4"
+                  >
+                    shop online
+                  </Link>
+                  .
+                </>
+              )}
             </p>
           </div>
-          <USStoreMap retailers={RETAILERS} />
+          {hasStores ? (
+            <USStoreMap retailers={RETAILERS} />
+          ) : (
+            <div
+              className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface-strong)] p-10 text-center"
+              aria-label="Map of the United States — retail locations coming soon"
+            >
+              <div className="text-sm font-semibold text-[var(--text)]">
+                Map coming soon
+              </div>
+              <p className="mt-2 text-xs text-[var(--muted)] max-w-md mx-auto">
+                We&rsquo;ll light this up with state-by-state coverage as soon
+                as our first retail partners confirm sell-through. Check back
+                or join us on Faire below.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Retailer Cards */}
-        <div className="mt-8">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)] mb-4">
-            All locations
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {RETAILERS.map((r) => (
-              <div
-                key={r.slug}
-                className="rounded-2xl border border-[var(--border)] bg-white p-5 shadow-[0_6px_24px_rgba(15,27,45,0.06)] flex flex-col"
-              >
-                <div className="text-base font-black text-[var(--text)]">
-                  {r.name}
-                </div>
-                <div className="mt-1 text-sm text-[var(--muted)]">
-                  {r.address}
-                </div>
-                <div className="text-sm text-[var(--muted)]">
-                  {r.cityStateZip}
-                </div>
-                <div className="mt-3">
-                  <span className="inline-flex items-center rounded-full bg-[var(--surface-strong)] px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">
-                    {r.storeType}
+        {hasStores ? (
+          <div className="mt-8">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)] mb-4">
+              All locations · {totalStores} {totalStores === 1 ? "store" : "stores"}{" "}
+              · {totalStates} {totalStates === 1 ? "state" : "states"}
+            </div>
+            {groupedStores.map((group) => (
+              <div key={group.state} className="mb-6">
+                <div className="text-sm font-bold text-[var(--text)] mb-3">
+                  {group.state}{" "}
+                  <span className="text-xs font-normal text-[var(--muted)]">
+                    ({group.stores.length}{" "}
+                    {group.stores.length === 1 ? "store" : "stores"})
                   </span>
                 </div>
-                {r.note && (
-                  <p className="mt-2 text-xs text-[var(--muted)] italic">
-                    {r.note}
-                  </p>
-                )}
-                <div className="mt-auto pt-4 flex flex-wrap gap-x-4 gap-y-1">
-                  <a
-                    href={r.mapsUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm font-semibold text-[var(--navy)] underline underline-offset-4"
-                  >
-                    Get directions &rarr;
-                  </a>
-                  {r.website && (
-                    <a
-                      href={r.website}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm font-semibold text-[var(--navy)] underline underline-offset-4"
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {group.stores.map((r) => (
+                    <div
+                      key={r.slug}
+                      className="rounded-2xl border border-[var(--border)] bg-white p-5 shadow-[0_6px_24px_rgba(15,27,45,0.06)] flex flex-col"
                     >
-                      Visit website &rarr;
-                    </a>
-                  )}
+                      <div className="text-base font-black text-[var(--text)]">
+                        {r.name}
+                      </div>
+                      <div className="mt-1 text-sm text-[var(--muted)]">
+                        {r.address}
+                      </div>
+                      <div className="text-sm text-[var(--muted)]">
+                        {r.cityStateZip}
+                      </div>
+                      <div className="mt-3">
+                        <span className="inline-flex items-center rounded-full bg-[var(--surface-strong)] px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">
+                          {r.storeType}
+                        </span>
+                      </div>
+                      {r.note && (
+                        <p className="mt-2 text-xs text-[var(--muted)] italic">
+                          {r.note}
+                        </p>
+                      )}
+                      <div className="mt-auto pt-4 flex flex-wrap gap-x-4 gap-y-1">
+                        <a
+                          href={r.mapsUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm font-semibold text-[var(--navy)] underline underline-offset-4"
+                        >
+                          Get directions &rarr;
+                        </a>
+                        {r.website && (
+                          <a
+                            href={r.website}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm font-semibold text-[var(--navy)] underline underline-offset-4"
+                          >
+                            Visit website &rarr;
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             ))}
           </div>
-        </div>
+        ) : (
+          <div
+            className="mt-8 rounded-3xl border border-[var(--border)] bg-white p-6 text-center shadow-[0_6px_24px_rgba(15,27,45,0.06)]"
+            role="status"
+          >
+            <div className="text-sm font-bold text-[var(--text)]">
+              No retail locations listed yet
+            </div>
+            <p className="mt-2 text-sm text-[var(--muted)] max-w-md mx-auto">
+              Retail locations are being added as distributor sell-through is
+              confirmed. We&rsquo;ll publish stores here as soon as they&rsquo;re
+              live on shelf.
+            </p>
+          </div>
+        )}
 
         {/* Also available online */}
         <div className="mt-8 rounded-3xl border border-[var(--border)] bg-white p-5 shadow-[0_18px_44px_rgba(15,27,45,0.06)]">
