@@ -26,10 +26,11 @@
  * Folders are created on demand and cached for the process lifetime.
  *
  * Auth: shares OAuth client credentials with gmail-reader / drive-reader.
- * Required scope: `https://www.googleapis.com/auth/drive` (full) or at
- * minimum `drive.file` (files this app creates). `drive.readonly` is NOT
- * sufficient — the consent flow at /api/ops/fulfillment/oauth-consent-url
- * already requests the broader Drive scope.
+ * Required scope: `https://www.googleapis.com/auth/drive`. `drive.readonly`
+ * cannot write, and `drive.file` is not dependable for a pre-existing
+ * parent folder id unless the app created/opened that parent first. The
+ * consent flow at /api/ops/fulfillment/oauth-consent-url requests the full
+ * Drive scope so uploads can target the configured company folder.
  *
  * Required env (any one set + the GMAIL_OAUTH_* trio):
  *   GOOGLE_DRIVE_UPLOAD_PARENT_ID         <- preferred for public uploads
