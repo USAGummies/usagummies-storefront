@@ -3,6 +3,7 @@ import { kv } from "@vercel/kv";
 
 import { isAuthorized } from "@/lib/ops/abra-auth";
 import { buildCatalogCsv, getApPacket, listApPackets } from "@/lib/ops/ap-packets";
+import { listApPacketDrafts } from "@/lib/ops/ap-packets/templates";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -70,7 +71,26 @@ export async function GET(req: Request) {
         };
       }),
     );
-    return NextResponse.json({ ok: true, packets: enriched });
+    // Drafts live in their own KV store and are intentionally separate
+    // from the live packets array so consumers (including the send
+    // route) can't conflate them. Surface them under a sibling
+    // `drafts` field with a clear lifecycle marker.
+    let drafts: Awaited<ReturnType<typeof listApPacketDrafts>> = [];
+    try {
+      drafts = await listApPacketDrafts();
+    } catch {
+      drafts = [];
+    }
+    return NextResponse.json({
+      ok: true,
+      packets: enriched,
+      drafts,
+      counts: {
+        live: enriched.length,
+        drafts: drafts.length,
+        draftsIncomplete: drafts.filter((d) => !d.requiredFieldsComplete).length,
+      },
+    });
   }
 
   const packet = getApPacket(slug);

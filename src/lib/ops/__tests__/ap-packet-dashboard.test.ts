@@ -268,7 +268,7 @@ describe("summarizeDashboard", () => {
 });
 
 describe("hasPacketTemplateRegistry", () => {
-  it("returns false today (no template store yet — must stay false until a registry lands)", () => {
-    expect(hasPacketTemplateRegistry()).toBe(false);
+  it("returns true now that the templates module + draft-creation helper exist", () => {
+    expect(hasPacketTemplateRegistry()).toBe(true);
   });
 });

@@ -36,7 +36,32 @@ type PacketResponse = {
 type RosterResponse = {
   ok: boolean;
   packets?: PacketRosterRow[];
+  drafts?: ApPacketDraftSummary[];
+  counts?: {
+    live: number;
+    drafts: number;
+    draftsIncomplete: number;
+  };
   error?: string;
+};
+
+type ApPacketDraftSummary = {
+  slug: string;
+  templateSlug: string;
+  lifecycle: "draft";
+  accountName: string;
+  apEmail: string;
+  owner: string;
+  dueWindow: string;
+  createdAt: string;
+  requiredFieldsComplete: boolean;
+  missingRequired: string[];
+};
+
+type TemplateOption = {
+  slug: string;
+  label: string;
+  purpose: string;
 };
 
 const GREEN = "#15803d";
@@ -74,6 +99,8 @@ export function ApPacketsView() {
   const [copied, setCopied] = useState<string | null>(null);
   const [roster, setRoster] = useState<PacketRosterRow[]>([]);
   const [rosterErr, setRosterErr] = useState<string | null>(null);
+  const [drafts, setDrafts] = useState<ApPacketDraftSummary[]>([]);
+  const [templates, setTemplates] = useState<TemplateOption[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -95,14 +122,35 @@ export function ApPacketsView() {
         const rosterData = (await rosterRes.json()) as RosterResponse;
         if (rosterRes.ok && Array.isArray(rosterData.packets)) {
           setRoster(rosterData.packets);
+          setDrafts(Array.isArray(rosterData.drafts) ? rosterData.drafts : []);
           setRosterErr(null);
         } else {
           setRoster([]);
+          setDrafts([]);
           setRosterErr(rosterData.error || `Roster HTTP ${rosterRes.status}`);
         }
       } catch (err) {
         setRoster([]);
+        setDrafts([]);
         setRosterErr(err instanceof Error ? err.message : String(err));
+      }
+
+      // Templates — separate fetch keeps the create-from-template
+      // form's options decoupled from the roster shape.
+      try {
+        const tmplRes = await fetch("/api/ops/ap-packets/drafts", {
+          cache: "no-store",
+        });
+        const tmplData = (await tmplRes.json()) as {
+          ok: boolean;
+          templates?: TemplateOption[];
+        };
+        if (tmplRes.ok && Array.isArray(tmplData.templates)) {
+          setTemplates(tmplData.templates);
+        }
+      } catch {
+        // Non-fatal — the form just falls back to a single hardcoded
+        // option in the dropdown.
       }
 
       setError(null);
@@ -202,6 +250,13 @@ export function ApPacketsView() {
         rosterErr={rosterErr}
         loading={loading}
         activeSlug={packet?.slug ?? null}
+      />
+
+      <DraftsSection
+        drafts={drafts}
+        templates={templates}
+        loading={loading}
+        onCreated={() => void load()}
       />
 
       {!loading && packet ? (
@@ -813,8 +868,11 @@ function RosterSection(props: {
         }}
       >
         {templateRegistryWired ? (
-          <a href="#" style={{ color: GOLD, fontSize: 12, fontWeight: 600 }}>
-            Create packet from template
+          <a
+            href="#draft-creator"
+            style={{ color: GOLD, fontSize: 12, fontWeight: 600 }}
+          >
+            Create packet from template ↓
           </a>
         ) : (
           <span
@@ -899,4 +957,364 @@ const rosterTh: CSSProperties = {
 const rosterTd: CSSProperties = {
   padding: "8px 10px",
   verticalAlign: "top",
+};
+
+// ---------------------------------------------------------------------------
+// Drafts section — added 2026-04-26 with the template registry build.
+//
+// Shows drafts created from `usa-gummies-base` etc. Drafts are NEVER
+// sendable — they live in their own KV store and the live `getApPacket()`
+// (which the send route uses) returns null for any draft slug. To send
+// a draft, the operator must first promote it to a live packet via a
+// future flow (not built yet).
+// ---------------------------------------------------------------------------
+
+function DraftsSection(props: {
+  drafts: ApPacketDraftSummary[];
+  templates: TemplateOption[];
+  loading: boolean;
+  onCreated: () => void;
+}) {
+  const [slug, setSlug] = useState("");
+  const [accountName, setAccountName] = useState("");
+  const [apEmail, setApEmail] = useState("");
+  const [templateSlug, setTemplateSlug] = useState<string>("");
+  const [owner, setOwner] = useState("Rene Gonzalez");
+  const [dueWindow, setDueWindow] = useState(
+    "Return packet within 5 business days",
+  );
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [successSlug, setSuccessSlug] = useState<string | null>(null);
+
+  // Default the template to the first registered one (today: usa-gummies-base).
+  if (templateSlug === "" && props.templates.length > 0) {
+    setTemplateSlug(props.templates[0].slug);
+  }
+
+  const submit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      setSubmitting(true);
+      setError(null);
+      setSuccessSlug(null);
+      try {
+        const res = await fetch("/api/ops/ap-packets/drafts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            slug: slug.trim(),
+            templateSlug,
+            accountName: accountName.trim(),
+            apEmail: apEmail.trim(),
+            owner: owner.trim() || undefined,
+            dueWindow: dueWindow.trim() || undefined,
+          }),
+        });
+        const body = (await res.json().catch(() => ({}))) as {
+          ok?: boolean;
+          error?: string;
+          issues?: string[];
+          draft?: { slug: string };
+        };
+        if (!res.ok || body.ok !== true) {
+          setError(
+            body.error ||
+              `HTTP ${res.status}` +
+                (body.issues?.length ? `: ${body.issues.join("; ")}` : ""),
+          );
+          return;
+        }
+        setSuccessSlug(body.draft?.slug ?? slug.trim());
+        setSlug("");
+        setAccountName("");
+        setApEmail("");
+        // Don't reset owner / dueWindow / templateSlug — operator
+        // probably wants to create more from the same template.
+        props.onCreated();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [
+      slug,
+      templateSlug,
+      accountName,
+      apEmail,
+      owner,
+      dueWindow,
+      props,
+    ],
+  );
+
+  const incompleteCount = props.drafts.filter(
+    (d) => !d.requiredFieldsComplete,
+  ).length;
+
+  return (
+    <section
+      id="draft-creator"
+      style={{
+        background: CARD,
+        border: `1px solid ${BORDER}`,
+        borderRadius: 12,
+        padding: "16px 18px",
+        marginBottom: 18,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          gap: 12,
+          flexWrap: "wrap",
+          marginBottom: 10,
+        }}
+      >
+        <h2
+          style={{
+            color: GOLD,
+            fontSize: 13,
+            textTransform: "uppercase",
+            margin: 0,
+          }}
+        >
+          Drafts (template-built)
+        </h2>
+        <div style={{ fontSize: 12, color: DIM }}>
+          {props.drafts.length} total · {incompleteCount} incomplete · drafts
+          cannot be sent until promoted to live
+        </div>
+      </div>
+
+      {/* Drafts roster */}
+      {props.drafts.length === 0 ? (
+        <div
+          style={{
+            color: DIM,
+            fontSize: 12,
+            border: `1px dashed ${BORDER}`,
+            borderRadius: 8,
+            padding: "12px 14px",
+            marginBottom: 12,
+          }}
+        >
+          No drafts yet. Use the form below to create one from a template.
+        </div>
+      ) : (
+        <div style={{ overflowX: "auto", marginBottom: 14 }}>
+          <table
+            style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}
+          >
+            <thead>
+              <tr style={{ color: DIM, textAlign: "left" }}>
+                <th style={rosterTh}>Account</th>
+                <th style={rosterTh}>Slug</th>
+                <th style={rosterTh}>Owner</th>
+                <th style={rosterTh}>Template</th>
+                <th style={rosterTh}>Status</th>
+                <th style={rosterTh}>Missing</th>
+                <th style={rosterTh}>Created</th>
+              </tr>
+            </thead>
+            <tbody>
+              {props.drafts.map((d) => (
+                <tr
+                  key={d.slug}
+                  style={{ borderTop: `1px dashed ${BORDER}` }}
+                >
+                  <td style={rosterTd}>
+                    <div style={{ fontWeight: 600 }}>{d.accountName}</div>
+                    <div style={{ color: DIM, fontSize: 11 }}>{d.apEmail}</div>
+                  </td>
+                  <td style={rosterTd}>
+                    <code>{d.slug}</code>
+                  </td>
+                  <td style={rosterTd}>{d.owner}</td>
+                  <td style={rosterTd} title={d.templateSlug}>
+                    <code style={{ fontSize: 11 }}>{d.templateSlug}</code>
+                  </td>
+                  <td style={rosterTd}>
+                    {d.requiredFieldsComplete ? (
+                      <span style={{ color: GREEN, fontWeight: 600 }}>
+                        DRAFT — COMPLETE
+                      </span>
+                    ) : (
+                      <span style={{ color: AMBER, fontWeight: 600 }}>
+                        DRAFT — INCOMPLETE
+                      </span>
+                    )}
+                  </td>
+                  <td style={rosterTd}>
+                    {d.missingRequired.length > 0 ? (
+                      <span style={{ color: RED, fontSize: 11 }}>
+                        {d.missingRequired.join(", ")}
+                      </span>
+                    ) : (
+                      <span style={{ color: DIM }}>—</span>
+                    )}
+                  </td>
+                  <td style={rosterTd}>
+                    <span style={{ color: DIM }}>
+                      {d.createdAt?.slice(0, 16)}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Create-from-template form */}
+      <form
+        onSubmit={submit}
+        style={{
+          background: "#fff",
+          border: `1px solid ${BORDER}`,
+          borderRadius: 10,
+          padding: "12px 14px",
+        }}
+      >
+        <div style={{ fontSize: 12, color: DIM, marginBottom: 10 }}>
+          Create a new packet draft from a template. Stored in KV only — no
+          email, no QBO write, no Drive write. Drafts cannot be sent.
+        </div>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+            gap: 10,
+          }}
+        >
+          <Field label="Slug (kebab-case)">
+            <input
+              required
+              value={slug}
+              onChange={(e) => setSlug(e.target.value)}
+              placeholder="whole-foods"
+              style={inputStyle}
+              disabled={submitting}
+            />
+          </Field>
+          <Field label="Account name">
+            <input
+              required
+              value={accountName}
+              onChange={(e) => setAccountName(e.target.value)}
+              placeholder="Whole Foods Market"
+              style={inputStyle}
+              disabled={submitting}
+            />
+          </Field>
+          <Field label="AP email">
+            <input
+              required
+              type="email"
+              value={apEmail}
+              onChange={(e) => setApEmail(e.target.value)}
+              placeholder="vendorsetup@wholefoods.com"
+              style={inputStyle}
+              disabled={submitting}
+            />
+          </Field>
+          <Field label="Template">
+            <select
+              value={templateSlug}
+              onChange={(e) => setTemplateSlug(e.target.value)}
+              style={inputStyle}
+              disabled={submitting || props.templates.length === 0}
+            >
+              {props.templates.length === 0 ? (
+                <option value="">(loading templates…)</option>
+              ) : (
+                props.templates.map((t) => (
+                  <option key={t.slug} value={t.slug}>
+                    {t.label}
+                  </option>
+                ))
+              )}
+            </select>
+          </Field>
+          <Field label="Owner">
+            <input
+              value={owner}
+              onChange={(e) => setOwner(e.target.value)}
+              style={inputStyle}
+              disabled={submitting}
+            />
+          </Field>
+          <Field label="Due window">
+            <input
+              value={dueWindow}
+              onChange={(e) => setDueWindow(e.target.value)}
+              style={inputStyle}
+              disabled={submitting}
+            />
+          </Field>
+        </div>
+        <div
+          style={{
+            marginTop: 12,
+            display: "flex",
+            gap: 12,
+            alignItems: "center",
+            flexWrap: "wrap",
+          }}
+        >
+          <button
+            type="submit"
+            disabled={submitting || !templateSlug}
+            style={{
+              background: NAVY,
+              color: "#fff",
+              border: 0,
+              borderRadius: 6,
+              padding: "8px 14px",
+              fontSize: 13,
+              cursor: submitting ? "wait" : "pointer",
+            }}
+          >
+            {submitting ? "Creating…" : "Create draft"}
+          </button>
+          {error && (
+            <span style={{ color: RED, fontSize: 12 }}>{error}</span>
+          )}
+          {successSlug && !error && (
+            <span style={{ color: GREEN, fontSize: 12 }}>
+              Draft <code>{successSlug}</code> created. It&apos;s in the table
+              above — fill in the missing attachments next.
+            </span>
+          )}
+        </div>
+      </form>
+    </section>
+  );
+}
+
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label style={{ display: "block", fontSize: 12, color: DIM }}>
+      <div style={{ marginBottom: 4 }}>{label}</div>
+      {children}
+    </label>
+  );
+}
+
+const inputStyle: CSSProperties = {
+  width: "100%",
+  padding: "6px 8px",
+  border: `1px solid ${BORDER}`,
+  borderRadius: 6,
+  fontSize: 13,
+  background: "#fff",
 };

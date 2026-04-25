@@ -257,10 +257,11 @@ export function summarizeDashboard(rows: DashboardRow[]): DashboardSummary {
  * uses this to decide whether to show a real "Create from template"
  * link or the explicit "not wired yet" placeholder.
  *
- * Today: only the hardcoded JUNGLE_JIMS_PACKET in `ap-packets.ts`
- * exists — there is no separate template store. Returns `false` until
- * a template registry lands.
+ * Wired 2026-04-26 — `src/lib/ops/ap-packets/templates.ts` now
+ * exports the USA Gummies base template + a draft-creation helper.
+ * The dashboard form posts to /api/ops/ap-packets/drafts which
+ * persists drafts to KV without any email / QBO / Drive write.
  */
 export function hasPacketTemplateRegistry(): boolean {
-  return false;
+  return true;
 }

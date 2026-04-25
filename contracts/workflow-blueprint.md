@@ -228,7 +228,20 @@ Follow this order **without rebuying the label**:
 - **Failure mode:** Send route returns 502/424/409 → closer surfaces error in the Slack thread, audits as `result: "error"`, NEVER writes `lastSent`. Network error reaching the send route → same. The operator can fix the cause and POST `/api/ops/fulfillment/ap-packet/send` manually with the same approvalToken to retry; re-clicking Approve in Slack does NOT re-fire (recordDecision rejects state transitions on already-approved rows).
 - **Tests:** 18 dashboard helpers + **12 closer tests** locking: approved → POST /send exactly once with correct body and bearer; pending/rejected/draft/expired/stood-down → no /send call; non-ap-packet (`email-reply` / `vendor-master`) → ignored; missing or empty `targetEntity.id` → fail closed, no /send; send 502 → ok=false + threadMessage flags failure + audit error + no lastSent; 409 dedup conflict → surfaces reason; network error → ok=false + no double-fire; approvalToken passed to /send is the approval id (not the slack ts).
 - **Monday MVP:** 🟢 **CLOSED LOOP** — Ben clicks Approve in Slack, the AP packet sends, the dashboard shows lastSent, the audit trail records every step. No manual /send call required.
-- **Later:** Build a packet template registry (currently `hasPacketTemplateRegistry()` returns `false` and the "Create from template" link renders as a "not wired yet" pill).
+
+#### Templates + drafts (NEW 2026-04-26)
+
+- **Source:** `src/lib/ops/ap-packets/templates.ts` exports `USA_GUMMIES_BASE_TEMPLATE` — the USA-Gummies-side fields (legal name, EIN, remit-to, ACH/wire routing, catalog, reply-skeleton with `{{retailer}}` placeholder). Templates are pure constants; retailer data is never baked in.
+- **Trigger:** Operator opens `/ops/ap-packets`, scrolls to the "Drafts (template-built)" section, fills in `slug` + `accountName` + `apEmail` + (optional) `owner` / `dueWindow`, clicks **Create draft**. The form posts to `POST /api/ops/ap-packets/drafts`.
+- **AI role:** None.
+- **Approver:** None — drafts are operator-side scaffolding, not approval-class actions. They don't enter the Class B queue until they're promoted to a live packet (a separate, future flow).
+- **Slack:** None directly. Drafts never trigger an approval card.
+- **Writeback:** KV only (`ap-packets:drafts:<slug>` + `ap-packets:drafts:_index`). **No email, no QBO write, no Drive write, no Gmail draft.** Locked by tests — the templates module imports nothing from `googleapis`, `gmail-reader`, `hubspot-client`, or any QBO module.
+- **Safety:** Drafts are intentionally invisible to `getApPacket()` (the live registry function the send route uses). A draft slug POSTed to `/api/ops/fulfillment/ap-packet/send` returns 404 before any approval check. The dashboard shows drafts in their own table with a clear "DRAFT — INCOMPLETE" / "DRAFT — COMPLETE" badge plus the `missingRequired` field list.
+- **Required-field validation:** Slug (kebab-case 2-42 chars), templateSlug, accountName, apEmail (real email shape) — enforced by `buildApPacketDraft()` and the route's 400 path. Missing/invalid → `DraftValidationError` with structured `issues[]`.
+- **Completeness rules:** A draft is `requiredFieldsComplete=true` only when accountName + apEmail + owner + dueWindow are populated AND no attachment is in `status="missing"`. Marked `false` until then with `missingRequired[]` listing every gap.
+- **Tests:** **22 tests in `templates.test.ts`** (template registry exists, required-field enforcement, `{{retailer}}` substitution, `apEmail` lowercased, mutation safety, KV round-trip, fail-soft on KV outage, drafts not visible to `getApPacket()`, no email/QBO/Drive side effects). **10 tests in `drafts/route.test.ts`** (HTTP 201 on create, 400 on missing fields, 404 on unknown template, 409 on slug clobber, GET returns roster + templates + counts, getApPacket returns null for draft slugs).
+- **Monday MVP:** 🟢 — operator can create the next retailer's packet (Whole Foods, Kroger, etc.) from one form without touching code. `hasPacketTemplateRegistry()` now returns `true`.
 
 ### Fin4.6 Finance Review surface (`/ops/finance/review`)
 - **Trigger:** Operator opens the page (Rene + Ben). Read-only.
