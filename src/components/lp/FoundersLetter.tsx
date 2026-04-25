@@ -48,7 +48,7 @@ export function FoundersLetter() {
           <div className="lp-sans mt-6 space-y-4 text-[1.05rem] font-normal leading-[1.75] text-[var(--lp-ink)]/88">
             <p>
               A symbol of strength, grit, and the unstoppable American
-              spirit — in a resealable 7.5 oz bag.
+              spirit — in a 7.5 oz bag.
             </p>
             <p>
               When you choose USA Gummies, you&rsquo;re backing American

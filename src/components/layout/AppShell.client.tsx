@@ -20,14 +20,13 @@ const CartDrawer = dynamic(
   () => import("@/components/layout/CartDrawer.client").then((mod) => mod.CartDrawer),
   { ssr: false }
 );
-const ExitIntentPopup = dynamic(
-  () => import("@/components/engagement/ExitIntentPopup.client"),
-  { ssr: false }
-);
-const ScrollPopup = dynamic(
-  () => import("@/components/engagement/ScrollPopup.client"),
-  { ssr: false }
-);
+// Modal newsletter popups (ExitIntent + Scroll) were retired 2026-04-25
+// per Ben's audit: "the pop up ad the join 1,200+ gummy lovers is far
+// to aggressive." The "1,200+ Gummy Lovers" headline was a fabricated
+// count and the modal pattern punished every visitor. Newsletter signup
+// now lives only in the footer LeadCapture (one honest spot, no scroll
+// hijack). If we re-introduce a re-engagement nudge, it should be a
+// tasteful bottom-corner toast on second visit — not a screen blocker.
 
 function cx(...a: Array<string | false | null | undefined>) {
   return a.filter(Boolean).join(" ");
@@ -778,12 +777,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </footer>
-      )}
-      {isLandingPage ? null : (
-        <>
-          <ExitIntentPopup />
-          <ScrollPopup />
-        </>
       )}
     </div>
   );

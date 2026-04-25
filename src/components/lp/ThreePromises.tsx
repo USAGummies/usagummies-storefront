@@ -24,7 +24,7 @@ const PROMISES = [
     icon: "/brand/gummies/gummy-green.png",
     title: "Five Natural Flavors.",
     // Flavor list is printed on the bag's "5 All Natural Flavors" strip.
-    body: "Cherry, Lemon, Green Apple, Orange, Watermelon. The five classics in a 7.5 oz resealable bag.",
+    body: "Cherry, Lemon, Green Apple, Orange, Watermelon. The five classics in a 7.5 oz bag.",
   },
 ] as const;
 
