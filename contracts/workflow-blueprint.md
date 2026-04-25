@@ -81,7 +81,7 @@ Each row uses the schema:
 - **Monday MVP:** 🟡 — works but no test coverage on the composer
 - **Later:** Wire reply-composer into the email-intelligence triage as the LLM fallback drafter
 
-### S1.4 Faire Direct invites — Phase 1 review queue (NEW)
+### S1.4 Faire Direct invites — CLOSED LOOP (Phase 1 + 2 + 3)
 - **Trigger (write):** Operator POSTs candidate rows to `POST /api/ops/faire/direct-invites`. Each row passes through `validateInvite()`. Valid rows are queued at `faire:invites:<id>` with `status="needs_review"`. Invalid rows go to `errors[]` with stable codes (`validation_failed`, `duplicate`).
 - **Trigger (read):** Operator opens `/ops/faire-direct` (auth-gated by `/ops/*` middleware) → `GET /api/ops/faire/direct-invites` → renders invites grouped by status + a degraded banner when `FAIRE_ACCESS_TOKEN` is missing.
 - **Source of truth:** KV (`faire:invites:<id>` + `:index`). Dedup key = lowercased email.
@@ -107,9 +107,27 @@ Each row uses the schema:
 - **Status code mapping:** 200 ok / 400 no_changes or invalid JSON / 401 unauth / 404 not_found / 409 duplicate_email / 422 invalid_status | sent_status_forbidden | validation_failed.
 - **Tests (Phase 2):** 15 helper tests + 18 route tests = 33 total on top of Phase 1 (cumulative: 68 tests across the Faire Direct module + routes).
 - **UI:** `/ops/faire-direct` page now renders each candidate as a card with status dropdown + review-note textarea + **Save review** button. Section header copy: *"Approved means ready for a future Class B send approval, not sent."* Sent records render a read-only "terminal status" cue with no editable status dropdown.
-- **Monday MVP:** 🟢 — operators can classify candidates without ever sending. The send-on-approve closer remains a Phase 3 build.
 
-- **Required env (Phase 3, send closer only):** `FAIRE_ACCESS_TOKEN` for the eventual send path. Phase 1 + 2 surface its absence as a banner but do not require it.
+#### Phase 3 — send-on-approve closer (CLOSED LOOP, NEW)
+- **Trigger:** Operator approves a row + pastes the brand-portal Faire Direct URL into the row's `directLinkUrl` field. Operator clicks **Request send approval** on `/ops/faire-direct` → `POST /api/ops/faire/direct-invites/[id]/request-approval` opens a Class B `faire-direct.invite` approval, surfaces the card to `#ops-approvals` via `openApproval(approvalStore(), approvalSurface(), …)`. Ben's approve click in Slack hits `/api/slack/approvals`, which calls `executeApprovedFaireDirectInvite()` (chain step 5, after vendor-master + ap-packet).
+- **Send mechanics:** the closer sends a single plain-text Gmail message via `sendViaGmailApiDetailed` to the retailer's email. Subject is locked at `"USA Gummies on Faire Direct"`. Body contains a personalized greeting, a one-paragraph pitch (no medical / supplement / vitamin / cure / FDA / heal claims — all locked by tests), and the operator-pasted `directLinkUrl` verbatim. **The Faire API is never called.** Closing carries operator contact only — no recipient PII echo, no internal ids, no HubSpot ids.
+- **Approval-readiness rule:** The PATCH route refuses any `status="approved"` transition unless the merged candidate carries a valid `http(s)` `directLinkUrl`. A correction supplied in the same patch (`{ status: "approved", fieldCorrections: { directLinkUrl: "https://faire.com/…" } }`) satisfies the rule. Eligibility is then re-checked at `request-approval` time AND again inside the closer at send time — a row that drifted to `needs_review` between the approval card and the Slack click never sends.
+- **KV transition:** On Gmail-send success, `markFaireInviteSent()` flips the row to `status="sent"` in a single KV write, stamping `sentAt`, `sentBy`, `gmailMessageId`, `gmailThreadId`, `hubspotEmailLogId`, and `sentApprovalId`. The review route can never produce this transition (locked by `sent_status_forbidden`).
+- **HubSpot mirror:** `logEmail({ subject, body, direction: "EMAIL", to, contactId })` is best-effort. A HubSpot failure does NOT block the success path — the closer captures `hubspotEmailLogId: null` and continues. KV still flips to `sent`. (Locked by tests.)
+- **Idempotency:** A re-fire on the same approval id (Slack double-click, retry) detects `record.status === "sent" && record.sentApprovalId === approval.id` and short-circuits with `alreadySent=true`. Gmail is NOT called twice. The original `sentAt` and message id are preserved. (Locked.)
+- **Failure paths:** Gmail send failure → `ok=false`, KV NOT flipped to `"sent"`, audit recorded as error, Slack thread reply explains the failure. Operator must fix and re-approve. Network throw is caught and reported. (Locked.)
+- **Hard rules locked by tests:**
+  - Closer NEVER calls Faire's API (no import from `faire-client` in the closer or the Gmail-send path).
+  - Closer NEVER sends to a recipient other than `record.email`.
+  - Body contains the directLinkUrl verbatim.
+  - Subject is exactly `"USA Gummies on Faire Direct"`.
+  - Strict gating: `targetEntity.type === "faire-invite"` + `payloadRef === "faire-invite:<id>"` are both required. Cross-fire with email-reply / shipment.create / vendor-master / ap-packet closers is impossible.
+- **Approval class:** Class B `faire-direct.invite` per `/contracts/approval-taxonomy.md` — Ben single-approver, irreversible. Rollback plan: Gmail undo-send window (~30s), then manual correction email.
+- **Tests (Phase 3):** 21 invite-helper additions (URL validator + approval readiness + `markFaireInviteSent` idempotency) + 5 PATCH route additions + 8 request-approval route + 18 closer unit tests = **52 new tests**. Cumulative across S1.4: **141 tests**, all green; full suite: **834 tests** green.
+- **UI:** `/ops/faire-direct` row now exposes (a) a `directLinkUrl` URL input editable as a field correction, (b) a clickable read-only chip when the link is persisted, (c) a **Request send approval** button on approved+eligible rows that opens the Slack card via the API, (d) a sent-metadata banner showing `sentAt` + `gmailMessageId` for terminal rows. The button is disabled with an inline reason when the row isn't eligible (status not approved, link missing, dirty pending changes).
+- **Monday MVP:** 🟢 — full closed-loop. Operator pastes link → approves → clicks Request send approval → Ben clicks Slack → Gmail goes out → KV flips to sent.
+
+- **Required env:** `GMAIL_OAUTH_*` + `SLACK_SIGNING_SECRET` (for the slack approve click) + `CRON_SECRET` (for closer audits). `FAIRE_ACCESS_TOKEN` is NOT required by Phase 3 — the closer never calls Faire's API. The token is still surfaced as a degraded banner in case any future read-only Faire API integration lands.
 
 ---
 
@@ -516,9 +534,9 @@ Each order row now carries a **Buy these again** button. Pure helper `intentFrom
 
 | Status | Count | Workflows |
 |---|---|---|
-| 🟢 Green | 28 | Email-intel triage (CLOSED LOOP), Sample-request → shipping bridge, Vendor master creation (QBO path), HubSpot dispatch, Auto-ship, Sample dispatch, Shipping label artifacts, Durable NCS/vendor-doc upload, Wallet check, Inventory snapshot/forecast/burn-rate, Vendor threads, Outreach validate, Marketing content, Research Librarian, Compliance (fallback), Control plane, Slack approvals, Drift audit, Hard-rules pin, Customer chat, Finance Exception, Freight-comp manager, Stamps.com daily ping, Wholesale page, Gmail send/draft primitives, AP packet send (JJ-only), Reply composer (untested but live) |
+| 🟢 Green | 29 | Email-intel triage (CLOSED LOOP), Sample-request → shipping bridge, Vendor master creation (QBO path), Faire Direct invites (CLOSED LOOP), HubSpot dispatch, Auto-ship, Sample dispatch, Shipping label artifacts, Durable NCS/vendor-doc upload, Wallet check, Inventory snapshot/forecast/burn-rate, Vendor threads, Outreach validate, Marketing content, Research Librarian, Compliance (fallback), Control plane, Slack approvals, Drift audit, Hard-rules pin, Customer chat, Finance Exception, Freight-comp manager, Stamps.com daily ping, Wholesale page, Gmail send/draft primitives, AP packet send (JJ-only), Reply composer (untested but live) |
 | 🟡 Yellow | 7 | Reply composer + Pipeline enrich (no tests), Inbox triage (one-shot), AP packet send (Drive scope), QBO write paths (sparse tests), Approved Claims (KV-only), Vendor onboarding Notion/Drive dossier parent IDs/scopes, Receipts intake queue (review-only; no OCR/QBO write) |
-| 🔴 Red | 8 | Faire Direct invites, Reorder triggers, Drew East-Coast routing confirmation, Klaviyo / social, R-1..R-7 specialists, Trade-show pod, USPTO/FDA tracking, external vendor portal |
+| 🔴 Red | 7 | Reorder triggers, Drew East-Coast routing confirmation, Klaviyo / social, R-1..R-7 specialists, Trade-show pod, USPTO/FDA tracking, external vendor portal |
 
 ---
 
@@ -545,4 +563,5 @@ Each order row now carries a **Buy these again** button. Pure helper `intentFrom
 - **1.1 — 2026-04-24** — Email-intel send-on-approve closed (commit `16fa4ea`). Sample-request → shipping bridge (S1.5) added with 9 tests. Top-5 list refreshed; vendor master creation flagged as next build.
 - **1.2 — 2026-04-24** — Vendor master creation closed internally. Added `/ops/vendors/new`, `POST /api/ops/vendors/onboard`, `executeApprovedVendorMasterCreate()`, and Slack approval closer. QBO write is approval-gated; Notion/Drive dossier creation is best-effort until parent envs/scopes are verified.
 - **1.3 — 2026-04-25** — Durable uploads and shipping artifacts reflected. Receipts intake moved from red/manual to yellow review-queue: email/Gmail/Drive receipt docs can be captured, but OCR and QBO posting remain blocked behind Rene review.
+- **1.4 — 2026-04-29** — S1.4 Faire Direct invites moved from red to green (CLOSED LOOP). Phase 3 added: `directLinkUrl` field with approval-readiness rule, request-approval route, `executeApprovedFaireDirectInvite` closer (chain step 5 in `/api/slack/approvals` after AP-packet), Request-send-approval UI button. Send is via Gmail (operator-pasted Faire Direct URL), never via Faire's API. 52 new tests; cumulative full suite: 834 green.
 - **1.0 — 2026-04-24** — First publication. Synthesizes 2 division-audit agent reports + 5 P0 deliverables + email-intelligence build. Replaces ad-hoc workflow descriptions across other contract docs.

@@ -38,8 +38,10 @@ import {
   ingestInviteRows,
   inviteIdFromEmail,
   isFaireConfigured,
+  isValidDirectLinkUrl,
   listInvites,
   listInvitesByStatus,
+  markFaireInviteSent,
   REVIEWABLE_STATUSES,
   updateFaireInvite,
   validateInvite,
@@ -348,7 +350,15 @@ describe("REVIEWABLE_STATUSES — locked enum", () => {
 
 describe("updateFaireInvite — happy paths", () => {
   it("status update persists with reviewedAt + reviewedBy + updatedAt", async () => {
-    await ingestInviteRows([fakeRow({ email: "abc@x.com" })], { now: NOW });
+    await ingestInviteRows(
+      [
+        fakeRow({
+          email: "abc@x.com",
+          directLinkUrl: "https://faire.com/direct/usagummies/abc",
+        }),
+      ],
+      { now: NOW },
+    );
     const id = inviteIdFromEmail("abc@x.com");
     const later = new Date("2026-04-28T08:00:00Z");
     const r = await updateFaireInvite(
@@ -514,7 +524,14 @@ describe("updateFaireInvite — invalid input rejected", () => {
 
 describe("updateFaireInvite — no send / no network side effects", () => {
   it("KV is the only side effect (any other network call would crash uninstrumented)", async () => {
-    await ingestInviteRows([fakeRow()], { now: NOW });
+    await ingestInviteRows(
+      [
+        fakeRow({
+          directLinkUrl: "https://faire.com/direct/usagummies/abc",
+        }),
+      ],
+      { now: NOW },
+    );
     const id = inviteIdFromEmail("buyer@retailer.com");
     const before = (kv.set as unknown as ReturnType<typeof vi.fn>).mock.calls
       .length;
@@ -528,9 +545,305 @@ describe("updateFaireInvite — no send / no network side effects", () => {
 
   it("missing FAIRE_ACCESS_TOKEN does not block review", async () => {
     delete process.env.FAIRE_ACCESS_TOKEN;
-    await ingestInviteRows([fakeRow()], { now: NOW });
+    await ingestInviteRows(
+      [
+        fakeRow({
+          directLinkUrl: "https://faire.com/direct/usagummies/abc",
+        }),
+      ],
+      { now: NOW },
+    );
     const id = inviteIdFromEmail("buyer@retailer.com");
     const r = await updateFaireInvite(id, { status: "approved" }, { now: NOW });
     expect(r.ok).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 3 — directLinkUrl + approval readiness + markFaireInviteSent
+// ---------------------------------------------------------------------------
+
+describe("isValidDirectLinkUrl — pure validator", () => {
+  it("accepts https://faire.com URLs", () => {
+    expect(
+      isValidDirectLinkUrl("https://faire.com/direct/usagummies/abc"),
+    ).toBe(true);
+  });
+  it("accepts http URLs (operator may paste a redirect)", () => {
+    expect(isValidDirectLinkUrl("http://faire.com/direct")).toBe(true);
+  });
+  it("rejects non-http schemes (javascript, data, mailto)", () => {
+    expect(isValidDirectLinkUrl("javascript:alert(1)")).toBe(false);
+    expect(isValidDirectLinkUrl("data:text/html,<script>")).toBe(false);
+    expect(isValidDirectLinkUrl("mailto:x@y.com")).toBe(false);
+    expect(isValidDirectLinkUrl("ftp://faire.com")).toBe(false);
+  });
+  it("rejects malformed strings", () => {
+    expect(isValidDirectLinkUrl("not-a-url")).toBe(false);
+    expect(isValidDirectLinkUrl("")).toBe(false);
+    expect(isValidDirectLinkUrl("   ")).toBe(false);
+  });
+  it("rejects non-string inputs", () => {
+    expect(isValidDirectLinkUrl(undefined)).toBe(false);
+    expect(isValidDirectLinkUrl(null)).toBe(false);
+    expect(isValidDirectLinkUrl(123)).toBe(false);
+    expect(isValidDirectLinkUrl({})).toBe(false);
+  });
+  it("rejects URLs longer than 2048 chars (defensive)", () => {
+    const huge = "https://faire.com/" + "x".repeat(2050);
+    expect(isValidDirectLinkUrl(huge)).toBe(false);
+  });
+});
+
+describe("validateInvite — directLinkUrl support", () => {
+  it("accepts a valid http(s) directLinkUrl when present", () => {
+    const r = validateInvite(
+      fakeRow({
+        directLinkUrl: "https://faire.com/direct/usagummies/abc",
+      }),
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.candidate.directLinkUrl).toBe(
+        "https://faire.com/direct/usagummies/abc",
+      );
+    }
+  });
+  it("treats absent directLinkUrl as not-present (records remain valid)", () => {
+    const r = validateInvite(fakeRow());
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.candidate.directLinkUrl).toBeUndefined();
+  });
+  it("treats empty-string directLinkUrl as a clear (not-present)", () => {
+    const r = validateInvite(fakeRow({ directLinkUrl: "" }));
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.candidate.directLinkUrl).toBeUndefined();
+  });
+  it("rejects invalid directLinkUrl with a clear reason", () => {
+    const r = validateInvite(
+      fakeRow({ directLinkUrl: "javascript:alert(1)" }),
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toMatch(/directLinkUrl/);
+  });
+  it("trims directLinkUrl whitespace", () => {
+    const r = validateInvite(
+      fakeRow({
+        directLinkUrl: "  https://faire.com/direct/usagummies/abc  ",
+      }),
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.candidate.directLinkUrl).toBe(
+        "https://faire.com/direct/usagummies/abc",
+      );
+    }
+  });
+});
+
+describe("updateFaireInvite — approval-readiness rule (Phase 3)", () => {
+  it("status='approved' without a directLinkUrl → validation_failed", async () => {
+    await ingestInviteRows([fakeRow()], { now: NOW });
+    const id = inviteIdFromEmail("buyer@retailer.com");
+    const r = await updateFaireInvite(
+      id,
+      { status: "approved" },
+      { now: NOW },
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.error.code).toBe("validation_failed");
+      expect(r.error.message).toMatch(/directLinkUrl/);
+    }
+    // Original record unchanged.
+    const reloaded = await getInvite(id);
+    expect(reloaded?.status).toBe("needs_review");
+  });
+
+  it("status='approved' WITH a valid directLinkUrl already on record → ok", async () => {
+    await ingestInviteRows(
+      [
+        fakeRow({
+          directLinkUrl: "https://faire.com/direct/usagummies/abc",
+        }),
+      ],
+      { now: NOW },
+    );
+    const id = inviteIdFromEmail("buyer@retailer.com");
+    const r = await updateFaireInvite(
+      id,
+      { status: "approved" },
+      { now: NOW },
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.invite.status).toBe("approved");
+  });
+
+  it("status='approved' + directLinkUrl correction in the same patch → ok", async () => {
+    await ingestInviteRows([fakeRow()], { now: NOW });
+    const id = inviteIdFromEmail("buyer@retailer.com");
+    const r = await updateFaireInvite(
+      id,
+      {
+        status: "approved",
+        fieldCorrections: {
+          directLinkUrl: "https://faire.com/direct/usagummies/abc",
+        },
+      },
+      { now: NOW },
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.invite.status).toBe("approved");
+      expect(r.invite.directLinkUrl).toBe(
+        "https://faire.com/direct/usagummies/abc",
+      );
+    }
+  });
+
+  it("status='approved' + invalid directLinkUrl correction → validation_failed", async () => {
+    await ingestInviteRows([fakeRow()], { now: NOW });
+    const id = inviteIdFromEmail("buyer@retailer.com");
+    const r = await updateFaireInvite(
+      id,
+      {
+        status: "approved",
+        fieldCorrections: { directLinkUrl: "not-a-url" },
+      },
+      { now: NOW },
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.code).toBe("validation_failed");
+  });
+
+  it("clearing directLinkUrl while moving to needs_review is allowed", async () => {
+    await ingestInviteRows(
+      [
+        fakeRow({
+          directLinkUrl: "https://faire.com/direct/usagummies/abc",
+        }),
+      ],
+      { now: NOW },
+    );
+    const id = inviteIdFromEmail("buyer@retailer.com");
+    const r = await updateFaireInvite(
+      id,
+      {
+        status: "needs_review",
+        fieldCorrections: { directLinkUrl: "" },
+      },
+      { now: NOW },
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.invite.status).toBe("needs_review");
+      expect(r.invite.directLinkUrl).toBeUndefined();
+    }
+  });
+});
+
+describe("markFaireInviteSent — Phase 3 send transition", () => {
+  async function seedApproved(
+    email = "abc@x.com",
+    directLinkUrl = "https://faire.com/direct/usagummies/abc",
+  ) {
+    await ingestInviteRows([fakeRow({ email, directLinkUrl })], { now: NOW });
+    const id = inviteIdFromEmail(email);
+    await updateFaireInvite(id, { status: "approved" }, { now: NOW });
+    return id;
+  }
+
+  it("approved + valid url → flips to sent with all metadata", async () => {
+    const id = await seedApproved();
+    const r = await markFaireInviteSent(id, {
+      approvalId: "appr-1",
+      sentBy: "Ben",
+      gmailMessageId: "gmail-msg-abc",
+      gmailThreadId: "thr-1",
+      hubspotEmailLogId: "hs-1",
+      now: new Date("2026-04-30T10:00:00Z"),
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.alreadySent).toBe(false);
+      expect(r.invite.status).toBe("sent");
+      expect(r.invite.sentAt).toBe("2026-04-30T10:00:00.000Z");
+      expect(r.invite.sentBy).toBe("Ben");
+      expect(r.invite.gmailMessageId).toBe("gmail-msg-abc");
+      expect(r.invite.gmailThreadId).toBe("thr-1");
+      expect(r.invite.hubspotEmailLogId).toBe("hs-1");
+      expect(r.invite.sentApprovalId).toBe("appr-1");
+    }
+  });
+
+  it("non-approved record (needs_review) → wrong_status", async () => {
+    await ingestInviteRows(
+      [
+        fakeRow({
+          directLinkUrl: "https://faire.com/direct/usagummies/abc",
+        }),
+      ],
+      { now: NOW },
+    );
+    const id = inviteIdFromEmail("buyer@retailer.com");
+    const r = await markFaireInviteSent(id, {
+      approvalId: "appr-1",
+      sentBy: "Ben",
+      gmailMessageId: "x",
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.code).toBe("wrong_status");
+  });
+
+  it("unknown id → not_found", async () => {
+    const r = await markFaireInviteSent("ghost", {
+      approvalId: "x",
+      sentBy: "Ben",
+      gmailMessageId: "y",
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.code).toBe("not_found");
+  });
+
+  it("idempotent: re-firing with the same approvalId returns alreadySent=true and does NOT overwrite sentAt", async () => {
+    const id = await seedApproved();
+    const first = await markFaireInviteSent(id, {
+      approvalId: "appr-1",
+      sentBy: "Ben",
+      gmailMessageId: "msg-1",
+      now: new Date("2026-04-30T10:00:00Z"),
+    });
+    expect(first.ok).toBe(true);
+    const second = await markFaireInviteSent(id, {
+      approvalId: "appr-1",
+      sentBy: "Ben",
+      gmailMessageId: "DIFFERENT-msg",
+      now: new Date("2026-04-30T11:00:00Z"),
+    });
+    expect(second.ok).toBe(true);
+    if (second.ok) {
+      expect(second.alreadySent).toBe(true);
+      // Original metadata preserved — second call did NOT overwrite.
+      expect(second.invite.gmailMessageId).toBe("msg-1");
+      expect(second.invite.sentAt).toBe("2026-04-30T10:00:00.000Z");
+    }
+  });
+
+  it("a *different* approvalId on an already-sent record → wrong_status (does not double-send)", async () => {
+    const id = await seedApproved();
+    const first = await markFaireInviteSent(id, {
+      approvalId: "appr-1",
+      sentBy: "Ben",
+      gmailMessageId: "msg-1",
+      now: new Date("2026-04-30T10:00:00Z"),
+    });
+    expect(first.ok).toBe(true);
+    const second = await markFaireInviteSent(id, {
+      approvalId: "appr-2-different",
+      sentBy: "Ben",
+      gmailMessageId: "msg-2",
+    });
+    expect(second.ok).toBe(false);
+    if (!second.ok) expect(second.error.code).toBe("wrong_status");
   });
 });

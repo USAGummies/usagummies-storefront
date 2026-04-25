@@ -27,12 +27,17 @@ interface InviteRecord {
   source: string;
   notes?: string;
   hubspotContactId?: string;
+  directLinkUrl?: string;
   status: FaireInviteStatus;
   queuedAt: string;
   updatedAt: string;
   reviewedAt?: string;
   reviewedBy?: string;
   reviewNote?: string;
+  sentAt?: string;
+  sentBy?: string;
+  gmailMessageId?: string;
+  sentApprovalId?: string;
 }
 
 type ReviewableStatus = Exclude<FaireInviteStatus, "sent">;
@@ -121,11 +126,12 @@ export function FaireDirectView() {
           Faire Direct — invite candidates
         </h1>
         <p style={{ color: DIM, fontSize: 13, marginTop: 4 }}>
-          <strong>Review queue only — no emails or Faire invites are sent
-          from this page.</strong> Each candidate becomes a Class B{" "}
-          <code>faire-direct.invite</code> approval when Ben/Rene chooses to
-          dispatch it (a future Phase 2 build). Phase 1 just stages and
-          reviews.
+          Approve a candidate, paste the brand-portal Faire Direct link URL,
+          then click <strong>Request send approval</strong> to open a Class B{" "}
+          <code>faire-direct.invite</code> approval card in Slack. Ben&apos;s
+          click in <code>#ops-approvals</code> drives the actual Gmail send —
+          no Faire API call ever happens, and no email goes out from this page
+          directly.
         </p>
       </header>
 
@@ -206,10 +212,10 @@ export function FaireDirectView() {
             onUpdated={refresh}
           />
           <InviteTable
-            title="Approved (ready for a future Class B send approval, not sent)"
+            title="Approved — ready to request send approval"
             invites={data.invites.approved}
             color={STATUS_COLOR.approved}
-            note="Approved means ready for a future Class B send approval, not sent. The send closer doesn't exist yet — no Faire invite goes out from this surface."
+            note="An approved row with a valid directLinkUrl is eligible for a Class B send approval. Click 'Request send approval' to open the Slack card; Ben's click drives the Gmail send via the slack approval handler."
             onUpdated={refresh}
           />
           <InviteTable
@@ -217,7 +223,7 @@ export function FaireDirectView() {
             invites={data.invites.sent}
             color={STATUS_COLOR.sent}
             onUpdated={refresh}
-            note="Set only by the future faire-direct.invite send closer. Cannot be set from this review page."
+            note="Set only by the faire-direct.invite send closer after a successful Gmail send. Read-only here."
           />
           <InviteTable
             title="Rejected"
@@ -229,9 +235,12 @@ export function FaireDirectView() {
       )}
 
       <p style={{ fontSize: 11, color: DIM, marginTop: 22 }}>
-        This page is read-only. Staging happens via{" "}
-        <code>POST /api/ops/faire/direct-invites</code>. No Gmail, no Faire
-        API write, no Slack post happens from this surface.
+        Staging happens via{" "}
+        <code>POST /api/ops/faire/direct-invites</code>. The send happens only
+        after a Class B approval is opened (
+        <code>POST /api/ops/faire/direct-invites/&lt;id&gt;/request-approval</code>
+        ) and Ben clicks approve in <code>#ops-approvals</code>. The Faire API
+        is never called by this workflow.
       </p>
     </div>
   );
@@ -294,6 +303,16 @@ function InviteTable(props: {
   );
 }
 
+function isLikelyValidUrl(value: string): boolean {
+  if (!value) return false;
+  try {
+    const u = new URL(value);
+    return u.protocol === "https:" || u.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
 function InviteCard(props: {
   invite: InviteRecord;
   onUpdated: () => void;
@@ -307,13 +326,20 @@ function InviteCard(props: {
     invite.status === "sent" ? "approved" : invite.status;
   const [status, setStatus] = useState<ReviewableStatus>(initialStatus);
   const [note, setNote] = useState<string>(invite.reviewNote ?? "");
+  const [link, setLink] = useState<string>(invite.directLinkUrl ?? "");
   const [saving, setSaving] = useState(false);
+  const [requesting, setRequesting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [approvalInfo, setApprovalInfo] = useState<{
+    approvalId: string;
+    slackThread?: { channel: string; ts: string } | null;
+  } | null>(null);
 
-  const dirty =
-    (invite.status !== "sent" && status !== invite.status) ||
-    note.trim() !== (invite.reviewNote ?? "").trim();
+  const linkChanged = link.trim() !== (invite.directLinkUrl ?? "").trim();
+  const statusChanged = invite.status !== "sent" && status !== invite.status;
+  const noteChanged = note.trim() !== (invite.reviewNote ?? "").trim();
+  const dirty = statusChanged || noteChanged || linkChanged;
 
   async function save() {
     setSaving(true);
@@ -321,11 +347,10 @@ function InviteCard(props: {
     setSavedAt(null);
     try {
       const body: Record<string, unknown> = {};
-      if (invite.status !== "sent" && status !== invite.status) {
-        body.status = status;
-      }
-      if (note.trim() !== (invite.reviewNote ?? "").trim()) {
-        body.reviewNote = note.trim();
+      if (statusChanged) body.status = status;
+      if (noteChanged) body.reviewNote = note.trim();
+      if (linkChanged) {
+        body.fieldCorrections = { directLinkUrl: link.trim() };
       }
       if (Object.keys(body).length === 0) {
         setError("Nothing to save.");
@@ -362,7 +387,67 @@ function InviteCard(props: {
     }
   }
 
+  async function requestSendApproval() {
+    setRequesting(true);
+    setError(null);
+    setApprovalInfo(null);
+    try {
+      const res = await fetch(
+        `/api/ops/faire/direct-invites/${encodeURIComponent(invite.id)}/request-approval`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        },
+      );
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        code?: string;
+        approvalId?: string;
+        slackThread?: { channel: string; ts: string } | null;
+      };
+      if (!res.ok || data.ok !== true) {
+        setError(
+          data.error ??
+            `Approval request failed (HTTP ${res.status}${data.code ? `, code ${data.code}` : ""}).`,
+        );
+        return;
+      }
+      setApprovalInfo({
+        approvalId: data.approvalId ?? "(unknown)",
+        slackThread: data.slackThread ?? null,
+      });
+      props.onUpdated();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRequesting(false);
+    }
+  }
+
   const isSent = invite.status === "sent";
+  const isApproved = invite.status === "approved";
+  const linkPersisted = (invite.directLinkUrl ?? "").trim().length > 0;
+  const linkValidLocally = isLikelyValidUrl(link.trim());
+  const canRequestApproval =
+    isApproved &&
+    linkPersisted &&
+    isLikelyValidUrl(invite.directLinkUrl ?? "") &&
+    !linkChanged && // require save first if dirty — we don't want to request on a stale row
+    !statusChanged &&
+    !noteChanged;
+  const approvalBlockedReason = (() => {
+    if (!isApproved) return "Move status to approved first.";
+    if (!linkPersisted) return "Paste the Faire Direct link URL and Save it first.";
+    if (!isLikelyValidUrl(invite.directLinkUrl ?? "")) {
+      return "Saved link URL doesn't look like a valid http(s) URL.";
+    }
+    if (linkChanged || statusChanged || noteChanged) {
+      return "Save pending changes before requesting approval.";
+    }
+    return null;
+  })();
 
   return (
     <li style={{ borderTop: `1px dashed ${BORDER}`, padding: "10px 4px" }}>
@@ -397,6 +482,26 @@ function InviteCard(props: {
           {invite.notes && (
             <div style={{ color: DIM, fontSize: 11, marginTop: 4 }}>
               <em>Source notes:</em> {invite.notes}
+            </div>
+          )}
+          {invite.directLinkUrl && (
+            <div
+              style={{
+                color: DIM,
+                fontSize: 11,
+                marginTop: 4,
+                wordBreak: "break-all",
+              }}
+            >
+              <em>Faire Direct link:</em>{" "}
+              <a
+                href={invite.directLinkUrl}
+                target="_blank"
+                rel="noreferrer"
+                style={{ color: NAVY }}
+              >
+                {invite.directLinkUrl}
+              </a>
             </div>
           )}
         </div>
@@ -455,6 +560,39 @@ function InviteCard(props: {
               gap: 2,
             }}
           >
+            Faire Direct link URL (paste from brand portal)
+            <input
+              type="url"
+              value={link}
+              onChange={(e) => setLink(e.target.value)}
+              disabled={saving || isSent}
+              placeholder="https://faire.com/..."
+              maxLength={2048}
+              style={{
+                padding: "6px 8px",
+                fontSize: 12,
+                border: `1px solid ${
+                  link.length > 0 && !linkValidLocally ? RED : BORDER
+                }`,
+                borderRadius: 6,
+                background: isSent ? BG : "#fff",
+                fontFamily: "monospace",
+              }}
+            />
+            <span style={{ fontSize: 10, color: DIM, marginTop: 2 }}>
+              Required before approval. The closer drops this URL into the
+              Gmail body verbatim — never edit it after sending.
+            </span>
+          </label>
+          <label
+            style={{
+              fontSize: 11,
+              color: DIM,
+              display: "flex",
+              flexDirection: "column",
+              gap: 2,
+            }}
+          >
             Review note (optional)
             <textarea
               value={note}
@@ -472,10 +610,17 @@ function InviteCard(props: {
               }}
             />
           </label>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              alignItems: "center",
+              flexWrap: "wrap",
+            }}
+          >
             <button
               onClick={save}
-              disabled={!dirty || saving}
+              disabled={!dirty || saving || isSent}
               style={{
                 padding: "6px 12px",
                 fontSize: 12,
@@ -483,12 +628,40 @@ function InviteCard(props: {
                 color: "#fff",
                 border: 0,
                 borderRadius: 6,
-                cursor: !dirty || saving ? "not-allowed" : "pointer",
-                opacity: !dirty || saving ? 0.5 : 1,
+                cursor:
+                  !dirty || saving || isSent ? "not-allowed" : "pointer",
+                opacity: !dirty || saving || isSent ? 0.5 : 1,
               }}
             >
               {saving ? "Saving…" : "Save review"}
             </button>
+            {!isSent && (
+              <button
+                onClick={requestSendApproval}
+                disabled={!canRequestApproval || requesting}
+                title={
+                  approvalBlockedReason ??
+                  "Open a Class B faire-direct.invite approval card in #ops-approvals."
+                }
+                style={{
+                  padding: "6px 12px",
+                  fontSize: 12,
+                  background: GOLD,
+                  color: NAVY,
+                  border: 0,
+                  borderRadius: 6,
+                  cursor:
+                    !canRequestApproval || requesting
+                      ? "not-allowed"
+                      : "pointer",
+                  opacity:
+                    !canRequestApproval || requesting ? 0.5 : 1,
+                  fontWeight: 600,
+                }}
+              >
+                {requesting ? "Opening approval…" : "Request send approval"}
+              </button>
+            )}
             {savedAt && (
               <span style={{ fontSize: 11, color: GREEN }}>
                 Saved {savedAt}
@@ -498,21 +671,55 @@ function InviteCard(props: {
               <span style={{ fontSize: 11, color: RED }}>{error}</span>
             )}
           </div>
+          {!isSent && approvalBlockedReason && (
+            <div style={{ fontSize: 10, color: DIM, marginTop: -2 }}>
+              <em>{approvalBlockedReason}</em>
+            </div>
+          )}
+          {approvalInfo && (
+            <div
+              style={{
+                fontSize: 11,
+                color: GREEN,
+                background: `${GREEN}10`,
+                border: `1px solid ${GREEN}40`,
+                borderRadius: 6,
+                padding: "6px 8px",
+                marginTop: 4,
+              }}
+            >
+              Approval opened — id <code>{approvalInfo.approvalId}</code>.
+              {approvalInfo.slackThread
+                ? " Slack card posted to #ops-approvals — wait for Ben's click to drive the send."
+                : " Approval stored, but Slack post may have failed — check #ops-audit."}
+            </div>
+          )}
+          {isSent && (
+            <div
+              style={{
+                fontSize: 11,
+                color: NAVY,
+                background: `${NAVY}10`,
+                border: `1px solid ${NAVY}30`,
+                borderRadius: 6,
+                padding: "6px 8px",
+              }}
+            >
+              <strong>Sent</strong>
+              {invite.sentAt
+                ? ` ${invite.sentAt.slice(0, 16)}`
+                : ""}
+              {invite.sentBy ? ` by ${invite.sentBy}` : ""}.
+              {invite.gmailMessageId && (
+                <>
+                  {" "}
+                  Gmail message <code>{invite.gmailMessageId}</code>.
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </li>
   );
-}
-
-function Th({ children }: { children: React.ReactNode }) {
-  return <th style={{ padding: "6px 10px", fontWeight: 600 }}>{children}</th>;
-}
-function Td({
-  children,
-  style,
-}: {
-  children: React.ReactNode;
-  style?: React.CSSProperties;
-}) {
-  return <td style={{ padding: "6px 10px", ...style }}>{children}</td>;
 }

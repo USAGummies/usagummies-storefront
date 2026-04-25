@@ -51,6 +51,11 @@ function fakeRow(
     retailerName: "Test Retailer",
     email: "abc@x.com",
     source: "wholesale-page",
+    // Phase 3: tests that flip status to "approved" need a valid
+    // Faire Direct link URL on the seeded row, so we default it here.
+    // The dedicated approval-readiness test below seeds a row WITHOUT
+    // a link and asserts the rejection path.
+    directLinkUrl: "https://faire.com/direct/usagummies/abc123",
     ...overrides,
   };
 }
@@ -316,5 +321,72 @@ describe("GET single invite", () => {
     const { GET } = await import("../route");
     const res = await GET(makeGet("ghost"), ctx("ghost"));
     expect(res.status).toBe(404);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 3 — approval-readiness rule on PATCH route
+// ---------------------------------------------------------------------------
+
+describe("Phase 3 — PATCH refuses status='approved' without a directLinkUrl", () => {
+  async function seedNoLink(email = "no-link@x.com") {
+    await ingestInviteRows(
+      [
+        {
+          retailerName: "No Link Retailer",
+          email,
+          source: "wholesale-page",
+          // explicitly no directLinkUrl
+        },
+      ],
+      { now: new Date("2026-04-27T12:00:00Z") },
+    );
+    return inviteIdFromEmail(email);
+  }
+
+  it("status='approved' without link → 422 validation_failed", async () => {
+    const id = await seedNoLink();
+    const { PATCH } = await import("../route");
+    const res = await PATCH(makePatch(id, { status: "approved" }), ctx(id));
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code: string; error: string };
+    expect(body.code).toBe("validation_failed");
+    expect(body.error).toMatch(/directLinkUrl/);
+  });
+
+  it("status='approved' + directLinkUrl correction in same patch → 200", async () => {
+    const id = await seedNoLink("link-in-patch@x.com");
+    const { PATCH } = await import("../route");
+    const res = await PATCH(
+      makePatch(id, {
+        status: "approved",
+        fieldCorrections: {
+          directLinkUrl: "https://faire.com/direct/usagummies/abc",
+        },
+      }),
+      ctx(id),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      invite: { status: string; directLinkUrl: string };
+    };
+    expect(body.invite.status).toBe("approved");
+    expect(body.invite.directLinkUrl).toBe(
+      "https://faire.com/direct/usagummies/abc",
+    );
+  });
+
+  it("invalid directLinkUrl correction → 422 validation_failed", async () => {
+    const id = await seedNoLink("invalid-link@x.com");
+    const { PATCH } = await import("../route");
+    const res = await PATCH(
+      makePatch(id, {
+        fieldCorrections: { directLinkUrl: "javascript:alert(1)" },
+      }),
+      ctx(id),
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe("validation_failed");
   });
 });

@@ -61,6 +61,15 @@ export interface FaireInviteCandidate {
   source: string;
   notes?: string;
   hubspotContactId?: string;
+  /**
+   * Phase 3: the operator-pasted Faire Direct invite URL from the Faire
+   * brand portal (https://faire.com/...). The send closer drops this
+   * URL into the Gmail invite body — we never call the Faire API to
+   * generate a link. Required before the record can be approved for
+   * the send-on-approve closer; missing or non-http(s) → reject the
+   * approval transition with `validation_failed`.
+   */
+  directLinkUrl?: string;
 }
 
 export interface FaireInviteRecord extends FaireInviteCandidate {
@@ -74,6 +83,18 @@ export interface FaireInviteRecord extends FaireInviteCandidate {
   reviewedBy?: string;
   /** Operator notes added after review. */
   reviewNote?: string;
+  /**
+   * Phase 3 send-on-approve metadata — only set by the
+   * `executeApprovedFaireDirectInvite` closer when status flips to
+   * `sent`. Never mutable from the review route.
+   */
+  sentAt?: string;
+  sentBy?: string;
+  gmailMessageId?: string;
+  gmailThreadId?: string;
+  hubspotEmailLogId?: string;
+  /** Approval id that authorized the send (last successful close). */
+  sentApprovalId?: string;
 }
 
 export interface FaireInviteIngestErrorRow {
@@ -97,6 +118,32 @@ export interface FaireInviteIngestResult {
 const KV_INDEX = "faire:invites:index";
 const INDEX_CAP = 1000;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Phase 3 — validate the operator-pasted Faire Direct link URL.
+ *
+ * Rules:
+ *   - Must parse as a URL.
+ *   - Protocol must be http: or https: (no javascript:, no data:, etc.).
+ *   - Hostname must be present and non-empty.
+ *
+ * Pure — no fetch, no network call. The URL is sent to the retailer
+ * verbatim by the closer.
+ */
+export function isValidDirectLinkUrl(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  const trimmed = value.trim();
+  if (trimmed.length === 0 || trimmed.length > 2048) return false;
+  let url: URL;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "https:" && url.protocol !== "http:") return false;
+  if (!url.hostname || url.hostname.length === 0) return false;
+  return true;
+}
 
 function inviteKey(id: string): string {
   return `faire:invites:${id}`;
@@ -156,6 +203,23 @@ export function validateInvite(
     input.hubspotContactId.trim().length > 0
   ) {
     candidate.hubspotContactId = input.hubspotContactId.trim();
+  }
+  if (input.directLinkUrl !== undefined && input.directLinkUrl !== null) {
+    if (typeof input.directLinkUrl !== "string") {
+      return { ok: false, reason: "directLinkUrl must be a string" };
+    }
+    const trimmed = input.directLinkUrl.trim();
+    if (trimmed.length > 0) {
+      if (!isValidDirectLinkUrl(trimmed)) {
+        return {
+          ok: false,
+          reason:
+            "directLinkUrl must be a valid http(s) URL (paste from Faire brand portal)",
+        };
+      }
+      candidate.directLinkUrl = trimmed;
+    }
+    // Empty string clears the field — treated as not present.
   }
   return { ok: true, candidate };
 }
@@ -391,6 +455,7 @@ const ALLOWED_CORRECTION_KEYS: ReadonlySet<keyof FaireInviteCandidate> = new Set
     "source",
     "notes",
     "hubspotContactId",
+    "directLinkUrl",
   ],
 );
 
@@ -488,6 +553,7 @@ export async function updateFaireInvite(
     state: existing.state,
     notes: existing.notes,
     hubspotContactId: existing.hubspotContactId,
+    directLinkUrl: existing.directLinkUrl,
   };
   let corrected: Partial<FaireInviteCandidate> | null = null;
   if (hasCorrections) {
@@ -517,6 +583,27 @@ export async function updateFaireInvite(
       };
     }
     mergedCandidate = validation.candidate;
+  }
+
+  // ---- Phase 3 approval-readiness rule -------------------------------
+  // status="approved" requires a valid directLinkUrl on the merged
+  // candidate. Without the URL, the send closer would have nothing to
+  // paste into the Gmail body, so "approved but unsendable" rows are
+  // refused at the review-route boundary.
+  if (hasStatus && patch.status === "approved") {
+    if (
+      !mergedCandidate.directLinkUrl ||
+      !isValidDirectLinkUrl(mergedCandidate.directLinkUrl)
+    ) {
+      return {
+        ok: false,
+        error: {
+          code: "validation_failed",
+          message:
+            "Cannot approve a Faire Direct invite without a valid directLinkUrl. Paste the brand-portal Faire Direct invite URL on the row first, then approve.",
+        },
+      };
+    }
   }
 
   // ---- Duplicate-email guard ----------------------------------------
@@ -551,6 +638,7 @@ export async function updateFaireInvite(
     state: mergedCandidate.state,
     notes: mergedCandidate.notes,
     hubspotContactId: mergedCandidate.hubspotContactId,
+    directLinkUrl: mergedCandidate.directLinkUrl,
   };
   if (hasStatus) next.status = patch.status as FaireInviteStatus;
   if (hasNote) {
@@ -572,6 +660,101 @@ export async function updateFaireInvite(
   // `corrected` referenced solely as a structural marker — kept lint-clean.
   void corrected;
   return { ok: true, invite: next };
+}
+
+// ----- Phase 3 send transition --------------------------------------
+//
+// Only the `executeApprovedFaireDirectInvite` closer (gated on a Class B
+// `faire-direct.invite` approval) is allowed to flip a record to "sent"
+// and stamp the Gmail message metadata. The review route is NOT.
+//
+// Hard rules locked by tests:
+//   - Refuses if the record's current status is anything other than
+//     "approved" — protects against a closer mis-firing on a record
+//     that was never reviewed-approved.
+//   - Refuses if the record has no `directLinkUrl` (a stale row whose
+//     link was cleared after approval should not become "sent").
+//   - Stamps sentAt / sentBy / gmailMessageId / gmailThreadId /
+//     hubspotEmailLogId / sentApprovalId in one KV write.
+//   - Idempotent: a record that's already "sent" with the same approval
+//     id reports `alreadySent=true` and does not double-write.
+
+export interface MarkSentInput {
+  approvalId: string;
+  sentBy: string;
+  gmailMessageId: string;
+  gmailThreadId?: string | null;
+  hubspotEmailLogId?: string | null;
+  now?: Date;
+}
+
+export type MarkSentResult =
+  | { ok: true; alreadySent: false; invite: FaireInviteRecord }
+  | { ok: true; alreadySent: true; invite: FaireInviteRecord }
+  | {
+      ok: false;
+      error:
+        | { code: "not_found"; message: string }
+        | { code: "wrong_status"; message: string }
+        | { code: "missing_direct_link_url"; message: string };
+    };
+
+export async function markFaireInviteSent(
+  id: string,
+  input: MarkSentInput,
+): Promise<MarkSentResult> {
+  const existing = await getInvite(id);
+  if (!existing) {
+    return {
+      ok: false,
+      error: {
+        code: "not_found",
+        message: `Invite ${id} not found in the queue.`,
+      },
+    };
+  }
+  // Idempotency: if the record is already "sent" for this same approval,
+  // return the existing row without writing again. The slack chain may
+  // re-fire on retry, and we don't want to overwrite the original
+  // sentAt timestamp.
+  if (
+    existing.status === "sent" &&
+    existing.sentApprovalId === input.approvalId
+  ) {
+    return { ok: true, alreadySent: true, invite: existing };
+  }
+  if (existing.status !== "approved") {
+    return {
+      ok: false,
+      error: {
+        code: "wrong_status",
+        message: `Cannot mark invite ${id} as sent: current status is "${existing.status}". Only "approved" records may transition to "sent".`,
+      },
+    };
+  }
+  if (!existing.directLinkUrl || !isValidDirectLinkUrl(existing.directLinkUrl)) {
+    return {
+      ok: false,
+      error: {
+        code: "missing_direct_link_url",
+        message: `Cannot mark invite ${id} as sent without a valid directLinkUrl on the record.`,
+      },
+    };
+  }
+  const now = (input.now ?? new Date()).toISOString();
+  const next: FaireInviteRecord = {
+    ...existing,
+    status: "sent",
+    sentAt: now,
+    sentBy: input.sentBy.trim().slice(0, 80),
+    gmailMessageId: input.gmailMessageId,
+    gmailThreadId: input.gmailThreadId ?? undefined,
+    hubspotEmailLogId: input.hubspotEmailLogId ?? undefined,
+    sentApprovalId: input.approvalId,
+    updatedAt: now,
+  };
+  await kv.set(inviteKey(existing.id), JSON.stringify(next));
+  return { ok: true, alreadySent: false, invite: next };
 }
 
 /** Test helper — clear all invite KV keys + the index. */

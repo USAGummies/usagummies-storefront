@@ -32,6 +32,11 @@ function fakeRecord(
     retailerName: "Test Retailer",
     email: "buyer@x.com",
     source: "wholesale-page",
+    // Phase 3: a record eligible for send must carry an
+    // operator-pasted Faire Direct link URL. The default fake row
+    // includes one so existing eligibility tests keep passing;
+    // dedicated tests below cover the missing-link path.
+    directLinkUrl: "https://faire.com/direct/usagummies/abc123",
     status: "needs_review",
     queuedAt: NOW,
     updatedAt: NOW,
@@ -237,5 +242,55 @@ describe("Phase 3 first-step invariant — no I/O", () => {
     expect(() => classifyForSend(fakeRecord())).not.toThrow();
     expect(() => selectApprovedInviteCandidates([])).not.toThrow();
     expect(() => reportEligibility([])).not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 3 — directLinkUrl gate on eligibility
+// ---------------------------------------------------------------------------
+
+describe("classifyForSend — directLinkUrl gate", () => {
+  it("approved record without directLinkUrl → validation_failed", () => {
+    const r = classifyForSend(
+      fakeRecord({ status: "approved", directLinkUrl: undefined }),
+    );
+    expect(r.eligible).toBe(false);
+    expect(r.reason.code).toBe("validation_failed");
+    expect(r.reason.detail).toMatch(/Faire Direct link/i);
+  });
+  it("approved record with malformed directLinkUrl → validation_failed", () => {
+    const r = classifyForSend(
+      fakeRecord({ status: "approved", directLinkUrl: "not-a-url" }),
+    );
+    expect(r.eligible).toBe(false);
+    expect(r.reason.code).toBe("validation_failed");
+  });
+  it("approved record with javascript: scheme directLinkUrl → validation_failed", () => {
+    const r = classifyForSend(
+      fakeRecord({
+        status: "approved",
+        directLinkUrl: "javascript:alert(1)",
+      }),
+    );
+    expect(r.eligible).toBe(false);
+    expect(r.reason.code).toBe("validation_failed");
+  });
+});
+
+describe("summarizeForApproval — Phase 3 directLinkUrl line", () => {
+  it("includes the Faire Direct link when present", () => {
+    const out = summarizeForApproval(
+      fakeRecord({
+        directLinkUrl: "https://faire.com/direct/usagummies/zzz",
+      }),
+    );
+    expect(out).toContain("https://faire.com/direct/usagummies/zzz");
+    expect(out).toContain("Faire Direct link");
+  });
+  it("omits the link line when not present", () => {
+    const out = summarizeForApproval(
+      fakeRecord({ directLinkUrl: undefined }),
+    );
+    expect(out).not.toContain("Faire Direct link");
   });
 });

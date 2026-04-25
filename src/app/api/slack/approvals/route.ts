@@ -35,6 +35,7 @@ import { executeApprovedEmailReply } from "@/lib/ops/email-intelligence/approval
 import { executeApprovedShipmentCreate } from "@/lib/ops/sample-order-dispatch/approval-closer";
 import { executeApprovedVendorMasterCreate } from "@/lib/ops/vendor-onboarding";
 import { executeApprovedApPacketSend } from "@/lib/ops/ap-packets/approval-closer";
+import { executeApprovedFaireDirectInvite } from "@/lib/faire/approval-closer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -174,6 +175,9 @@ export async function POST(req: Request): Promise<Response> {
   let apPacketExecution:
     | Awaited<ReturnType<typeof executeApprovedApPacketSend>>
     | undefined;
+  let faireInviteExecution:
+    | Awaited<ReturnType<typeof executeApprovedFaireDirectInvite>>
+    | undefined;
   let postedThreadText: string | null = null;
 
   if (decisionKind === "approve" && next.status === "approved") {
@@ -220,6 +224,24 @@ export async function POST(req: Request): Promise<Response> {
       }
     }
 
+    // 5. Faire Direct invite closer: identified by
+    //    targetEntity.type = "faire-invite". Strict gating prevents
+    //    cross-fire with the other closers — the actionSlug here is
+    //    `faire-direct.invite`, not `gmail.send`, but we keep the
+    //    targetEntity gate as the canonical identifier so the chain
+    //    remains uniform.
+    if (
+      !emailExecution.handled &&
+      !shipmentExecution?.handled &&
+      !vendorExecution?.handled &&
+      !apPacketExecution?.handled
+    ) {
+      faireInviteExecution = await executeApprovedFaireDirectInvite(next);
+      if (faireInviteExecution.handled) {
+        postedThreadText = faireInviteExecution.threadMessage;
+      }
+    }
+
     if (postedThreadText && existing.slackThread?.ts) {
       await postMessage({
         channel: "#ops-approvals",
@@ -235,6 +257,7 @@ export async function POST(req: Request): Promise<Response> {
     status: next.status,
     decisions: next.decisions.length,
     apPacketExecution,
+    faireInviteExecution,
     execution: emailExecution,
     shipmentExecution,
     vendorExecution,

@@ -30,7 +30,11 @@
  * No fetch, no I/O, no Faire API call, no Gmail call. Easy to test.
  */
 
-import { validateInvite, type FaireInviteRecord } from "./invites";
+import {
+  isValidDirectLinkUrl,
+  validateInvite,
+  type FaireInviteRecord,
+} from "./invites";
 
 export interface EligibilityReason {
   code: "wrong_status" | "validation_failed" | "ok";
@@ -76,6 +80,7 @@ export function classifyForSend(record: FaireInviteRecord): EligibilityResult {
     state: record.state,
     notes: record.notes,
     hubspotContactId: record.hubspotContactId,
+    directLinkUrl: record.directLinkUrl,
   });
   if (!validation.ok) {
     return {
@@ -84,6 +89,25 @@ export function classifyForSend(record: FaireInviteRecord): EligibilityResult {
       reason: {
         code: "validation_failed",
         detail: `Approved record failed re-validation: ${validation.reason}. Move it back to needs_review and correct it.`,
+      },
+    };
+  }
+  // Phase 3 send-readiness gate: an approved record without a valid
+  // Faire Direct link URL is "approved but unsendable". The send
+  // closer would have nothing to paste into the Gmail body — so we
+  // exclude it here with a stable code so the dashboard banner can
+  // explain exactly why.
+  if (
+    !record.directLinkUrl ||
+    !isValidDirectLinkUrl(record.directLinkUrl)
+  ) {
+    return {
+      record,
+      eligible: false,
+      reason: {
+        code: "validation_failed",
+        detail:
+          "Approved record has no valid Faire Direct link URL. Paste the brand-portal invite URL on the row, then re-approve.",
       },
     };
   }
@@ -157,6 +181,9 @@ export function summarizeForApproval(record: FaireInviteRecord): string {
   const loc = [record.city, record.state].filter(Boolean).join(", ");
   if (loc) lines.push(`Location: ${loc}`);
   lines.push(`Source: ${record.source}`);
+  if (record.directLinkUrl) {
+    lines.push(`Faire Direct link: ${record.directLinkUrl}`);
+  }
   if (record.notes) {
     const trimmed = record.notes.slice(0, 160);
     lines.push(
