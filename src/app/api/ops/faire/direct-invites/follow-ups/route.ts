@@ -56,6 +56,13 @@ interface FollowUpRow {
   bucket: "overdue" | "due_soon" | "not_due";
   reason: { code: string; detail: string };
   suggestedAction: string | null;
+  // Phase 3.3 follow-up lifecycle metadata — surfaced so the UI can
+  // render "queued" / "sent" badges without a second round-trip.
+  followUpQueuedAt?: string;
+  followUpRequestApprovalId?: string;
+  followUpSentAt?: string;
+  followUpSentBy?: string;
+  followUpGmailMessageId?: string;
 }
 
 function toRow(c: FollowUpClassification): FollowUpRow {
@@ -78,6 +85,11 @@ function toRow(c: FollowUpClassification): FollowUpRow {
       c.bucket === "overdue" || c.bucket === "due_soon"
         ? suggestNextActionCopy(r, c.daysSinceSent ?? 0)
         : null,
+    followUpQueuedAt: r.followUpQueuedAt,
+    followUpRequestApprovalId: r.followUpRequestApprovalId,
+    followUpSentAt: r.followUpSentAt,
+    followUpSentBy: r.followUpSentBy,
+    followUpGmailMessageId: r.followUpGmailMessageId,
   };
 }
 

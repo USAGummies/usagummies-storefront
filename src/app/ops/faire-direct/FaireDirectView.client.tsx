@@ -727,16 +727,17 @@ function InviteCard(props: {
 }
 
 // ---------------------------------------------------------------------------
-// Follow-up section (READ-ONLY)
+// Follow-up section
 // ---------------------------------------------------------------------------
 //
 // Surfaces sent invites that have crossed the 3-day "due soon" or
-// 7-day "overdue" threshold without a follow-up being queued. Pure
-// observation — no buttons trigger a send. The operator either
-// replies on the original Gmail thread or marks it handled outside
-// the system. A future Class B `faire-direct.follow-up` closer will
-// add a Request follow-up approval button here; until then the panel
-// is intentionally action-light.
+// 7-day "overdue" threshold without a follow-up being queued. As of
+// Phase 3.3 each actionable card carries a **Request follow-up
+// approval** button that opens a Class B `faire-direct.follow-up`
+// approval card in #ops-approvals. Ben's click in Slack drives the
+// actual Gmail send via `executeApprovedFaireDirectFollowUp` (chain
+// step 6 in `/api/slack/approvals`). No follow-up email is ever sent
+// from this surface directly.
 
 interface FollowUpRow {
   id: string;
@@ -753,6 +754,14 @@ interface FollowUpRow {
   bucket: "overdue" | "due_soon" | "not_due";
   reason: { code: string; detail: string };
   suggestedAction: string | null;
+  // Phase 3.3 — follow-up lifecycle metadata. The route surfaces these
+  // on every row (actionable or not) so the UI can show "queued" /
+  // "sent" badges without a second round-trip.
+  followUpQueuedAt?: string;
+  followUpRequestApprovalId?: string;
+  followUpSentAt?: string;
+  followUpSentBy?: string;
+  followUpGmailMessageId?: string;
 }
 
 interface FollowUpResponse {
@@ -774,6 +783,7 @@ function FollowUpSection({ refreshTick }: { refreshTick: number }) {
   const [data, setData] = useState<FollowUpResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [localRefresh, setLocalRefresh] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -807,7 +817,9 @@ function FollowUpSection({ refreshTick }: { refreshTick: number }) {
     return () => {
       cancelled = true;
     };
-  }, [refreshTick]);
+  }, [refreshTick, localRefresh]);
+
+  const refreshLocal = () => setLocalRefresh((n) => n + 1);
 
   if (loading && !data) {
     return (
@@ -884,24 +896,27 @@ function FollowUpSection({ refreshTick }: { refreshTick: number }) {
         </span>
       </div>
       <p style={{ fontSize: 11, color: DIM, margin: "0 0 10px 0" }}>
-        Read-only view of sent invites that crossed the 3-day &ldquo;due
-        soon&rdquo; or 7-day &ldquo;overdue&rdquo; threshold. No follow-up
-        email is sent from this surface — Ben replies on the original
-        Gmail thread (or closes the loop manually). A future Class B{" "}
-        <code>faire-direct.follow-up</code> closer will add a Request
-        follow-up approval button here.
+        Sent invites past the 3-day &ldquo;due soon&rdquo; or 7-day
+        &ldquo;overdue&rdquo; threshold. Click <strong>Request follow-up
+        approval</strong> to open a Class B{" "}
+        <code>faire-direct.follow-up</code> approval card in{" "}
+        <code>#ops-approvals</code>; Ben&apos;s click in Slack drives the
+        Gmail send. No follow-up email is ever sent from this surface
+        directly.
       </p>
       <FollowUpBucket
         title="Overdue (≥7 days)"
         rows={data.overdue}
         color={RED}
         emptyText="(no overdue follow-ups)"
+        onUpdated={refreshLocal}
       />
       <FollowUpBucket
         title="Due soon (3–6 days)"
         rows={data.due_soon}
         color={AMBER}
         emptyText="(no follow-ups due soon)"
+        onUpdated={refreshLocal}
       />
     </section>
   );
@@ -912,6 +927,7 @@ function FollowUpBucket(props: {
   rows: FollowUpRow[];
   color: string;
   emptyText: string;
+  onUpdated: () => void;
 }) {
   return (
     <div style={{ marginTop: 8 }}>
@@ -934,7 +950,12 @@ function FollowUpBucket(props: {
       ) : (
         <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
           {props.rows.map((row) => (
-            <FollowUpCard key={row.id} row={row} color={props.color} />
+            <FollowUpCard
+              key={row.id}
+              row={row}
+              color={props.color}
+              onUpdated={props.onUpdated}
+            />
           ))}
         </ul>
       )}
@@ -945,10 +966,64 @@ function FollowUpBucket(props: {
 function FollowUpCard({
   row,
   color,
+  onUpdated,
 }: {
   row: FollowUpRow;
   color: string;
+  onUpdated: () => void;
 }) {
+  const [requesting, setRequesting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [approvalInfo, setApprovalInfo] = useState<{
+    approvalId: string;
+    slackThread?: { channel: string; ts: string } | null;
+  } | null>(null);
+
+  const isQueued = Boolean(row.followUpQueuedAt);
+  const isSent = Boolean(row.followUpSentAt);
+  // Disable Request when already queued/sent or while a request is
+  // in flight. The route also re-checks all of these server-side.
+  const canRequest = !isQueued && !isSent && !requesting;
+
+  async function requestFollowUp() {
+    setRequesting(true);
+    setError(null);
+    setApprovalInfo(null);
+    try {
+      const res = await fetch(
+        `/api/ops/faire/direct-invites/${encodeURIComponent(row.id)}/follow-up/request-approval`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        },
+      );
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        code?: string;
+        approvalId?: string;
+        slackThread?: { channel: string; ts: string } | null;
+      };
+      if (!res.ok || data.ok !== true) {
+        setError(
+          data.error ??
+            `Approval request failed (HTTP ${res.status}${data.code ? `, code ${data.code}` : ""}).`,
+        );
+        return;
+      }
+      setApprovalInfo({
+        approvalId: data.approvalId ?? "(unknown)",
+        slackThread: data.slackThread ?? null,
+      });
+      onUpdated();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRequesting(false);
+    }
+  }
+
   return (
     <li
       style={{
@@ -986,11 +1061,55 @@ function FollowUpCard({
           )}
           {row.gmailMessageId && (
             <div style={{ color: DIM, fontSize: 11, marginTop: 2 }}>
-              Gmail message <code>{row.gmailMessageId}</code>
+              Initial Gmail <code>{row.gmailMessageId}</code>
+            </div>
+          )}
+          {isSent && (
+            <div
+              style={{
+                color: GREEN,
+                fontSize: 11,
+                marginTop: 4,
+                background: `${GREEN}10`,
+                border: `1px solid ${GREEN}40`,
+                borderRadius: 6,
+                padding: "4px 6px",
+              }}
+            >
+              Follow-up sent
+              {row.followUpSentAt
+                ? ` ${row.followUpSentAt.slice(0, 16)}`
+                : ""}
+              {row.followUpSentBy ? ` by ${row.followUpSentBy}` : ""}
+              {row.followUpGmailMessageId
+                ? ` · Gmail \`${row.followUpGmailMessageId}\``
+                : ""}
+            </div>
+          )}
+          {!isSent && isQueued && (
+            <div
+              style={{
+                color: AMBER,
+                fontSize: 11,
+                marginTop: 4,
+                background: `${AMBER}10`,
+                border: `1px solid ${AMBER}40`,
+                borderRadius: 6,
+                padding: "4px 6px",
+              }}
+            >
+              Follow-up approval queued
+              {row.followUpQueuedAt
+                ? ` ${row.followUpQueuedAt.slice(0, 16)}`
+                : ""}
+              {row.followUpRequestApprovalId
+                ? ` · approval id ${row.followUpRequestApprovalId.slice(0, 8)}`
+                : ""}
+              . Waiting on Ben&apos;s click in <code>#ops-approvals</code>.
             </div>
           )}
         </div>
-        <div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {row.suggestedAction && (
             <div
               style={{
@@ -1016,6 +1135,54 @@ function FollowUpCard({
                 Suggested next action
               </div>
               {row.suggestedAction}
+            </div>
+          )}
+          {!isSent && (
+            <button
+              onClick={requestFollowUp}
+              disabled={!canRequest}
+              title={
+                isQueued
+                  ? "A follow-up approval is already queued for this invite."
+                  : "Open a Class B faire-direct.follow-up approval card in #ops-approvals."
+              }
+              style={{
+                padding: "6px 12px",
+                fontSize: 12,
+                background: GOLD,
+                color: NAVY,
+                border: 0,
+                borderRadius: 6,
+                cursor: !canRequest ? "not-allowed" : "pointer",
+                opacity: !canRequest ? 0.5 : 1,
+                fontWeight: 600,
+              }}
+            >
+              {requesting
+                ? "Opening approval…"
+                : isQueued
+                  ? "Approval already queued"
+                  : "Request follow-up approval"}
+            </button>
+          )}
+          {error && (
+            <span style={{ fontSize: 11, color: RED }}>{error}</span>
+          )}
+          {approvalInfo && (
+            <div
+              style={{
+                fontSize: 11,
+                color: GREEN,
+                background: `${GREEN}10`,
+                border: `1px solid ${GREEN}40`,
+                borderRadius: 6,
+                padding: "6px 8px",
+              }}
+            >
+              Approval opened — id <code>{approvalInfo.approvalId}</code>.
+              {approvalInfo.slackThread
+                ? " Slack card posted to #ops-approvals — wait for Ben's click to drive the send."
+                : " Approval stored, but Slack post may have failed — check #ops-audit."}
             </div>
           )}
         </div>

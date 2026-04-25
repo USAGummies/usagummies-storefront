@@ -41,6 +41,8 @@ import {
   isValidDirectLinkUrl,
   listInvites,
   listInvitesByStatus,
+  markFaireFollowUpQueued,
+  markFaireFollowUpSent,
   markFaireInviteSent,
   REVIEWABLE_STATUSES,
   updateFaireInvite,
@@ -845,5 +847,205 @@ describe("markFaireInviteSent — Phase 3 send transition", () => {
     });
     expect(second.ok).toBe(false);
     if (!second.ok) expect(second.error.code).toBe("wrong_status");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 3.3 — markFaireFollowUpQueued + markFaireFollowUpSent
+// ---------------------------------------------------------------------------
+
+describe("markFaireFollowUpQueued — request-approval marker", () => {
+  async function seedSent(opts: { followUpQueuedAt?: string; followUpSentAt?: string } = {}) {
+    await ingestInviteRows(
+      [
+        fakeRow({
+          email: "buyer@retailer.com",
+          directLinkUrl: "https://faire.com/direct/usagummies/abc",
+        }),
+      ],
+      { now: NOW },
+    );
+    const id = inviteIdFromEmail("buyer@retailer.com");
+    await updateFaireInvite(id, { status: "approved" }, { now: NOW });
+    await markFaireInviteSent(id, {
+      approvalId: "appr-initial",
+      sentBy: "Ben",
+      gmailMessageId: "gmail-initial",
+      gmailThreadId: "thr-initial",
+      now: NOW,
+    });
+    if (opts.followUpQueuedAt || opts.followUpSentAt) {
+      const key = `faire:invites:${id}`;
+      const raw = (await kv.get<string>(key)) as string;
+      const rec = JSON.parse(raw);
+      if (opts.followUpQueuedAt) {
+        rec.followUpQueuedAt = opts.followUpQueuedAt;
+        rec.followUpRequestApprovalId = "appr-old-followup";
+      }
+      if (opts.followUpSentAt) {
+        rec.followUpSentAt = opts.followUpSentAt;
+        rec.followUpSentApprovalId = "appr-already-sent";
+        rec.followUpGmailMessageId = "gmail-followup-old";
+      }
+      await kv.set(key, JSON.stringify(rec));
+    }
+    return id;
+  }
+
+  it("flips the record with followUpQueuedAt + followUpRequestApprovalId", async () => {
+    const id = await seedSent();
+    const r = await markFaireFollowUpQueued(id, {
+      approvalId: "appr-followup-1",
+      now: new Date("2026-05-08T10:00:00Z"),
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.alreadyQueued).toBe(false);
+      expect(r.invite.followUpQueuedAt).toBe("2026-05-08T10:00:00.000Z");
+      expect(r.invite.followUpRequestApprovalId).toBe("appr-followup-1");
+      // Initial-send fields untouched.
+      expect(r.invite.status).toBe("sent");
+      expect(r.invite.sentAt).toBeTruthy();
+      expect(r.invite.followUpSentAt).toBeUndefined();
+    }
+  });
+
+  it("idempotent: same approval id re-fired returns alreadyQueued=true", async () => {
+    const id = await seedSent();
+    await markFaireFollowUpQueued(id, { approvalId: "appr-1" });
+    const r = await markFaireFollowUpQueued(id, { approvalId: "appr-1" });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.alreadyQueued).toBe(true);
+  });
+
+  it("refuses a different approval id when one is already queued", async () => {
+    const id = await seedSent({
+      followUpQueuedAt: new Date("2026-05-01T00:00:00Z").toISOString(),
+    });
+    const r = await markFaireFollowUpQueued(id, {
+      approvalId: "appr-different",
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.code).toBe("already_queued");
+  });
+
+  it("refuses when followUpSentAt is already set (no second follow-up)", async () => {
+    const id = await seedSent({
+      followUpSentAt: new Date("2026-05-02T00:00:00Z").toISOString(),
+    });
+    const r = await markFaireFollowUpQueued(id, {
+      approvalId: "appr-second-attempt",
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.code).toBe("already_sent");
+  });
+
+  it("refuses when status is not 'sent'", async () => {
+    await ingestInviteRows([fakeRow()], { now: NOW });
+    const id = inviteIdFromEmail("buyer@retailer.com");
+    const r = await markFaireFollowUpQueued(id, { approvalId: "x" });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.code).toBe("wrong_status");
+  });
+
+  it("refuses unknown id with not_found", async () => {
+    const r = await markFaireFollowUpQueued("ghost", { approvalId: "x" });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.code).toBe("not_found");
+  });
+});
+
+describe("markFaireFollowUpSent — closer transition", () => {
+  async function seedSentAndQueued() {
+    await ingestInviteRows(
+      [
+        fakeRow({
+          email: "buyer@retailer.com",
+          directLinkUrl: "https://faire.com/direct/usagummies/abc",
+        }),
+      ],
+      { now: NOW },
+    );
+    const id = inviteIdFromEmail("buyer@retailer.com");
+    await updateFaireInvite(id, { status: "approved" }, { now: NOW });
+    await markFaireInviteSent(id, {
+      approvalId: "appr-initial",
+      sentBy: "Ben",
+      gmailMessageId: "gmail-initial",
+      now: NOW,
+    });
+    await markFaireFollowUpQueued(id, { approvalId: "appr-followup-1" });
+    return id;
+  }
+
+  it("stamps followUpSentAt + Gmail metadata; status STAYS at 'sent'", async () => {
+    const id = await seedSentAndQueued();
+    const r = await markFaireFollowUpSent(id, {
+      approvalId: "appr-followup-1",
+      sentBy: "Ben",
+      gmailMessageId: "gmail-followup-msg",
+      gmailThreadId: "thr-original",
+      hubspotEmailLogId: "hs-followup",
+      now: new Date("2026-05-08T10:00:00Z"),
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.alreadySent).toBe(false);
+      expect(r.invite.status).toBe("sent");
+      expect(r.invite.followUpSentAt).toBe("2026-05-08T10:00:00.000Z");
+      expect(r.invite.followUpSentBy).toBe("Ben");
+      expect(r.invite.followUpGmailMessageId).toBe("gmail-followup-msg");
+      expect(r.invite.followUpGmailThreadId).toBe("thr-original");
+      expect(r.invite.followUpHubspotEmailLogId).toBe("hs-followup");
+      expect(r.invite.followUpSentApprovalId).toBe("appr-followup-1");
+      // Initial-send metadata preserved.
+      expect(r.invite.gmailMessageId).toBe("gmail-initial");
+      expect(r.invite.sentApprovalId).toBe("appr-initial");
+    }
+  });
+
+  it("idempotent on same approvalId: alreadySent=true, original metadata preserved", async () => {
+    const id = await seedSentAndQueued();
+    const first = await markFaireFollowUpSent(id, {
+      approvalId: "appr-followup-1",
+      sentBy: "Ben",
+      gmailMessageId: "gmail-msg-1",
+      now: new Date("2026-05-08T10:00:00Z"),
+    });
+    expect(first.ok).toBe(true);
+    const second = await markFaireFollowUpSent(id, {
+      approvalId: "appr-followup-1",
+      sentBy: "Ben",
+      gmailMessageId: "DIFFERENT-msg",
+      now: new Date("2026-05-08T11:00:00Z"),
+    });
+    expect(second.ok).toBe(true);
+    if (second.ok) {
+      expect(second.alreadySent).toBe(true);
+      expect(second.invite.followUpGmailMessageId).toBe("gmail-msg-1");
+      expect(second.invite.followUpSentAt).toBe("2026-05-08T10:00:00.000Z");
+    }
+  });
+
+  it("refuses when status is not 'sent'", async () => {
+    await ingestInviteRows([fakeRow()], { now: NOW });
+    const id = inviteIdFromEmail("buyer@retailer.com");
+    const r = await markFaireFollowUpSent(id, {
+      approvalId: "x",
+      sentBy: "Ben",
+      gmailMessageId: "y",
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.code).toBe("wrong_status");
+  });
+
+  it("refuses unknown id with not_found", async () => {
+    const r = await markFaireFollowUpSent("ghost", {
+      approvalId: "x",
+      sentBy: "Ben",
+      gmailMessageId: "y",
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.code).toBe("not_found");
   });
 });

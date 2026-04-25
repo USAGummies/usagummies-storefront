@@ -36,6 +36,7 @@ import { executeApprovedShipmentCreate } from "@/lib/ops/sample-order-dispatch/a
 import { executeApprovedVendorMasterCreate } from "@/lib/ops/vendor-onboarding";
 import { executeApprovedApPacketSend } from "@/lib/ops/ap-packets/approval-closer";
 import { executeApprovedFaireDirectInvite } from "@/lib/faire/approval-closer";
+import { executeApprovedFaireDirectFollowUp } from "@/lib/faire/follow-up-closer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -178,6 +179,9 @@ export async function POST(req: Request): Promise<Response> {
   let faireInviteExecution:
     | Awaited<ReturnType<typeof executeApprovedFaireDirectInvite>>
     | undefined;
+  let faireFollowUpExecution:
+    | Awaited<ReturnType<typeof executeApprovedFaireDirectFollowUp>>
+    | undefined;
   let postedThreadText: string | null = null;
 
   if (decisionKind === "approve" && next.status === "approved") {
@@ -242,6 +246,23 @@ export async function POST(req: Request): Promise<Response> {
       }
     }
 
+    // 6. Faire Direct FOLLOW-UP closer: identified by
+    //    targetEntity.type = "faire-follow-up". Distinct gate from the
+    //    initial-invite closer (#5 above) so the same strict-type
+    //    pattern keeps the two from cross-firing.
+    if (
+      !emailExecution.handled &&
+      !shipmentExecution?.handled &&
+      !vendorExecution?.handled &&
+      !apPacketExecution?.handled &&
+      !faireInviteExecution?.handled
+    ) {
+      faireFollowUpExecution = await executeApprovedFaireDirectFollowUp(next);
+      if (faireFollowUpExecution.handled) {
+        postedThreadText = faireFollowUpExecution.threadMessage;
+      }
+    }
+
     if (postedThreadText && existing.slackThread?.ts) {
       await postMessage({
         channel: "#ops-approvals",
@@ -258,6 +279,7 @@ export async function POST(req: Request): Promise<Response> {
     decisions: next.decisions.length,
     apPacketExecution,
     faireInviteExecution,
+    faireFollowUpExecution,
     execution: emailExecution,
     shipmentExecution,
     vendorExecution,

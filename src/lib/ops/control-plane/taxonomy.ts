@@ -385,6 +385,16 @@ export const SINGLE_APPROVAL_ACTIONS: ActionSpec[] = [
     examples: ["invite Moccasin Mountain Art to Faire Direct (0% commission)"],
   },
   {
+    slug: "faire-direct.follow-up",
+    name: "Send a follow-up email to a retailer who already received a Faire Direct invite",
+    class: "B",
+    requiredApprovers: ["Ben"],
+    irreversible: true,
+    examples: [
+      "Whole Foods PNW invite went out 8 days ago with no reply — send a manual follow-up",
+    ],
+  },
+  {
     slug: "account.tier-upgrade.propose",
     name: "Propose a retailer tier upgrade (follow-up pricing.change C if material)",
     class: "B",

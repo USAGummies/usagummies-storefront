@@ -96,17 +96,40 @@ export interface FaireInviteRecord extends FaireInviteCandidate {
   /** Approval id that authorized the send (last successful close). */
   sentApprovalId?: string;
   /**
-   * Phase 3.2 follow-up queue marker. Forward-compat field hint —
-   * NO writer in this codebase sets this today. The follow-up queue
-   * (`/api/ops/faire/direct-invites/follow-ups`) is read-only and uses
-   * the *absence* of this timestamp to decide whether a sent invite
-   * needs a nudge. A future Class B `faire-direct.follow-up` send
-   * closer will be the only path allowed to stamp this field.
+   * Phase 3.2 / 3.3 follow-up queue marker. Set by
+   * `markFaireFollowUpQueued()` when the request-approval route opens
+   * a Class B `faire-direct.follow-up` approval card. Suppresses
+   * re-surface in the read-only follow-up queue immediately, so the
+   * operator doesn't see the row again while Ben's approval is in
+   * flight or while the closer is running.
    *
-   * Until that closer exists, this stays unset and the queue surfaces
-   * every sent invite past the 3-day threshold.
+   * NOTE: this stays set even if the approval is rejected. There is
+   * no in-Phase-3.3 path to clear it; if Ben rejects, an operator
+   * who wants to re-attempt must clear the field via a future patch
+   * surface (out of scope for 3.3). Stamping is one-way.
    */
   followUpQueuedAt?: string;
+  /**
+   * Approval id of the in-flight or last `faire-direct.follow-up`
+   * request. Stamped alongside followUpQueuedAt so the closer can
+   * idempotency-match a re-fired Slack click against this record.
+   */
+  followUpRequestApprovalId?: string;
+  /**
+   * Phase 3.3 — set by `markFaireFollowUpSent()` only after the
+   * `executeApprovedFaireDirectFollowUp` closer successfully sent
+   * the Gmail follow-up. Distinct from `followUpQueuedAt`:
+   * a record may be queued without ever being sent (rejection /
+   * Gmail failure). A record with `followUpSentAt` set is the only
+   * one that's guaranteed to have actually emailed the retailer.
+   */
+  followUpSentAt?: string;
+  followUpSentBy?: string;
+  followUpGmailMessageId?: string;
+  followUpGmailThreadId?: string;
+  followUpHubspotEmailLogId?: string;
+  /** Approval id that authorized the last successful follow-up send. */
+  followUpSentApprovalId?: string;
 }
 
 export interface FaireInviteIngestErrorRow {
@@ -763,6 +786,189 @@ export async function markFaireInviteSent(
     gmailThreadId: input.gmailThreadId ?? undefined,
     hubspotEmailLogId: input.hubspotEmailLogId ?? undefined,
     sentApprovalId: input.approvalId,
+    updatedAt: now,
+  };
+  await kv.set(inviteKey(existing.id), JSON.stringify(next));
+  return { ok: true, alreadySent: false, invite: next };
+}
+
+// ----- Phase 3.3 follow-up transitions -------------------------------
+//
+// Two new writers flank the request-approval route + the follow-up
+// closer. They are the ONLY callers allowed to mutate `followUp*`
+// fields. The PATCH /[id] review route does NOT carry these in its
+// allowed-correction allowlist (see ALLOWED_CORRECTION_KEYS below).
+//
+// `markFaireFollowUpQueued` is called by the request-approval route
+// when an approval card is opened. It refuses if status != "sent",
+// if there's no sentAt, or if the row is already queued/sent.
+//
+// `markFaireFollowUpSent` is called by the closer after a successful
+// Gmail send. Idempotent: a re-fire on the same approval id reports
+// `alreadySent=true` without overwriting the timestamps.
+
+export interface MarkFollowUpQueuedInput {
+  approvalId: string;
+  now?: Date;
+}
+
+export type MarkFollowUpQueuedResult =
+  | { ok: true; alreadyQueued: false; invite: FaireInviteRecord }
+  | { ok: true; alreadyQueued: true; invite: FaireInviteRecord }
+  | {
+      ok: false;
+      error:
+        | { code: "not_found"; message: string }
+        | { code: "wrong_status"; message: string }
+        | { code: "missing_sent_at"; message: string }
+        | { code: "already_queued"; message: string }
+        | { code: "already_sent"; message: string };
+    };
+
+export async function markFaireFollowUpQueued(
+  id: string,
+  input: MarkFollowUpQueuedInput,
+): Promise<MarkFollowUpQueuedResult> {
+  const existing = await getInvite(id);
+  if (!existing) {
+    return {
+      ok: false,
+      error: {
+        code: "not_found",
+        message: `Invite ${id} not found in the queue.`,
+      },
+    };
+  }
+  if (existing.status !== "sent") {
+    return {
+      ok: false,
+      error: {
+        code: "wrong_status",
+        message: `Cannot queue follow-up for invite ${id}: current status is "${existing.status}". Only "sent" invites are eligible for follow-up.`,
+      },
+    };
+  }
+  if (!existing.sentAt) {
+    return {
+      ok: false,
+      error: {
+        code: "missing_sent_at",
+        message: `Cannot queue follow-up for invite ${id}: no sentAt timestamp on record. Data-integrity gap.`,
+      },
+    };
+  }
+  // Idempotency on this same approval id: don't double-queue.
+  if (
+    existing.followUpQueuedAt &&
+    existing.followUpRequestApprovalId === input.approvalId
+  ) {
+    return { ok: true, alreadyQueued: true, invite: existing };
+  }
+  // A different approval id already in flight — refuse so we don't
+  // lose the audit pointer to the original.
+  if (existing.followUpQueuedAt) {
+    return {
+      ok: false,
+      error: {
+        code: "already_queued",
+        message: `A follow-up approval is already queued for invite ${id} (approvalId=${existing.followUpRequestApprovalId ?? "unknown"}). The follow-up queue does not re-open additional approvals while one is in flight.`,
+      },
+    };
+  }
+  if (existing.followUpSentAt) {
+    return {
+      ok: false,
+      error: {
+        code: "already_sent",
+        message: `A follow-up was already sent for invite ${id} at ${existing.followUpSentAt}. No second follow-up is opened from this surface.`,
+      },
+    };
+  }
+  const now = (input.now ?? new Date()).toISOString();
+  const next: FaireInviteRecord = {
+    ...existing,
+    followUpQueuedAt: now,
+    followUpRequestApprovalId: input.approvalId,
+    updatedAt: now,
+  };
+  await kv.set(inviteKey(existing.id), JSON.stringify(next));
+  return { ok: true, alreadyQueued: false, invite: next };
+}
+
+export interface MarkFollowUpSentInput {
+  approvalId: string;
+  sentBy: string;
+  gmailMessageId: string;
+  gmailThreadId?: string | null;
+  hubspotEmailLogId?: string | null;
+  now?: Date;
+}
+
+export type MarkFollowUpSentResult =
+  | { ok: true; alreadySent: false; invite: FaireInviteRecord }
+  | { ok: true; alreadySent: true; invite: FaireInviteRecord }
+  | {
+      ok: false;
+      error:
+        | { code: "not_found"; message: string }
+        | { code: "wrong_status"; message: string }
+        | { code: "missing_sent_at"; message: string };
+    };
+
+export async function markFaireFollowUpSent(
+  id: string,
+  input: MarkFollowUpSentInput,
+): Promise<MarkFollowUpSentResult> {
+  const existing = await getInvite(id);
+  if (!existing) {
+    return {
+      ok: false,
+      error: {
+        code: "not_found",
+        message: `Invite ${id} not found in the queue.`,
+      },
+    };
+  }
+  // Idempotency on the closer side too: a Slack double-click means
+  // the closer can fire twice. Detect and short-circuit.
+  if (
+    existing.followUpSentAt &&
+    existing.followUpSentApprovalId === input.approvalId
+  ) {
+    return { ok: true, alreadySent: true, invite: existing };
+  }
+  if (existing.status !== "sent") {
+    // Closer NEVER changes status away from "sent". If the record's
+    // status drifted to anything else (rejected / needs_review),
+    // refuse — something wider is wrong.
+    return {
+      ok: false,
+      error: {
+        code: "wrong_status",
+        message: `Cannot mark follow-up sent for invite ${id}: current status is "${existing.status}". Closer expects "sent".`,
+      },
+    };
+  }
+  if (!existing.sentAt) {
+    return {
+      ok: false,
+      error: {
+        code: "missing_sent_at",
+        message: `Cannot mark follow-up sent for invite ${id}: no sentAt timestamp on the original send.`,
+      },
+    };
+  }
+  const now = (input.now ?? new Date()).toISOString();
+  const next: FaireInviteRecord = {
+    ...existing,
+    // Status STAYS at "sent". Follow-up doesn't move the lifecycle.
+    followUpQueuedAt: existing.followUpQueuedAt ?? now,
+    followUpSentAt: now,
+    followUpSentBy: input.sentBy.trim().slice(0, 80),
+    followUpGmailMessageId: input.gmailMessageId,
+    followUpGmailThreadId: input.gmailThreadId ?? undefined,
+    followUpHubspotEmailLogId: input.hubspotEmailLogId ?? undefined,
+    followUpSentApprovalId: input.approvalId,
     updatedAt: now,
   };
   await kv.set(inviteKey(existing.id), JSON.stringify(next));

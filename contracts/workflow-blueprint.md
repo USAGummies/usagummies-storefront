@@ -154,7 +154,39 @@ Each row uses the schema:
 - **Approval class:** None. Phase 3.2 ships zero new approvals. The future follow-up send closer will be Class B.
 - **Tests (Phase 3.2):** 19 helper unit (`classifyForFollowUp`, `reportFollowUps`, `selectFollowUpsNeedingAction`, `suggestNextActionCopy`, plus boundary/edge-case coverage) + 8 route integration = **27 new tests**. Cumulative across S1.4: **182 tests**, all green; full suite: **875 tests** green.
 - **UI:** `/ops/faire-direct` page now renders the *Follow-up queue* section between the totals strip and the existing per-status invite tables. Each actionable card shows retailer + buyer + email + days-since-sent + sent-at timestamp + Gmail message id + HubSpot contact id (when present) + the suggested next-action copy. Two empty states are explicit: "no overdue follow-ups" / "no follow-ups due soon".
-- **Monday MVP:** 🟢 — Ben can spot which sent invites need a manual reply on the original Gmail thread without leaving the dashboard. No follow-up email is sent from this surface; that's the next phase.
+- **Monday MVP:** 🟢 — Ben can spot which sent invites need a manual reply on the original Gmail thread without leaving the dashboard. Phase 3.3 closes the loop with approval-gated send.
+
+#### Phase 3.3 — Follow-up draft-for-approval close-loop (NEW)
+- **Trigger:** Operator clicks **Request follow-up approval** on an actionable row in the `<FollowUpSection>` of `/ops/faire-direct`. The button POSTs to `/api/ops/faire/direct-invites/[id]/follow-up/request-approval`, which opens a Class B `faire-direct.follow-up` approval card in `#ops-approvals`. Ben's click in Slack drives `executeApprovedFaireDirectFollowUp` (chain step 6 in `/api/slack/approvals`, after the initial-invite closer).
+- **Send mechanics:** `sendViaGmailApiDetailed` with reply-on-thread when the original `gmailThreadId` is on the record — the follow-up lands in the same Gmail conversation as the initial invite. Subject is locked at `"Quick check-in — USA Gummies on Faire Direct"`. Body is a one-paragraph nudge plus the same `directLinkUrl` from the initial invite. **Faire's API is never called.**
+- **Body invariants locked by tests:**
+  - No medical / supplement / vitamin / immune / FDA / cure / treat / heal / "health benefit" claims.
+  - No pricing / commission / margin / lead-time / payment-terms / MOQ / "free shipping" promises.
+  - No personal cell phone, no SMS / WhatsApp / "text me" invitations — operator-only contact (`ben@usagummies.com`).
+  - No echo of recipient PII (HubSpot id, internal id, recipient email inside body copy).
+  - Body length under 1500 characters (it's a nudge, not a re-pitch).
+- **Eligibility gates (re-checked at request AND send time):**
+  - `status === "sent"` and `sentAt` parseable.
+  - `classifyForFollowUp` bucket is `due_soon` or `overdue`.
+  - `followUpQueuedAt` is unset OR matches the in-flight approval id (idempotent re-fire).
+  - `followUpSentAt` is unset (no second follow-up from this surface — the future would be a re-engagement workflow, not 3.3).
+- **KV transitions (only writers allowed to touch followUp\* fields):**
+  - `markFaireFollowUpQueued` — called by request-approval route after `openApproval` succeeds. Stamps `followUpQueuedAt` + `followUpRequestApprovalId`.
+  - `markFaireFollowUpSent` — called by closer after a successful Gmail send. Stamps `followUpSentAt`, `followUpSentBy`, `followUpGmailMessageId`, `followUpGmailThreadId`, `followUpHubspotEmailLogId`, `followUpSentApprovalId`. **Status STAYS at `"sent"`** — follow-up never moves the invite lifecycle.
+- **HubSpot mirror:** uses the same `resolveHubSpotContactIdForInviteRecord` helper as the initial invite (operator-pasted id wins; falls back to email lookup). `logEmail` is best-effort — a HubSpot failure does NOT roll back the Gmail send (locked by tests). **No HubSpot lifecyclestage / custom property / deal / task writes.**
+- **Failure modes (locked):**
+  - Gmail send failure → `ok=false`, `followUpSentAt` NOT stamped, audit error, Slack thread reply explains. `followUpQueuedAt` stays set so duplicate approvals can't be opened; operator clears manually for retry (out-of-scope future patch).
+  - HubSpot logEmail throw → KV still flips, `followUpHubspotEmailLogId: null`.
+  - Approval rejected in Slack → no closer fires, no Gmail send. `followUpQueuedAt` stays set; same manual-clear caveat.
+  - Idempotency: repeat Slack click on the same approval id short-circuits with `alreadySent=true` and does NOT re-send Gmail.
+- **Strict cross-fire gate:** chain step 6 in `/api/slack/approvals` is only invoked when `targetEntity.type === "faire-follow-up"` — distinct from the initial invite's `"faire-invite"` type. Tests assert non-faire-follow-up approvals (faire-invite, ap-packet, vendor-master, email-reply) never trigger this closer.
+- **Approval class:** Class B `faire-direct.follow-up` (NEW taxonomy slug in `src/lib/ops/control-plane/taxonomy.ts`). Ben single-approver, irreversible.
+- **Tests (Phase 3.3):** 8 template + 12 invite-writer (markFaireFollowUpQueued + markFaireFollowUpSent idempotency / wrong-status / refusal paths) + 10 request-approval route + 15 closer = **45 new tests**. Cumulative across S1.4: **227 tests**, all green; full suite: **920 tests** green.
+- **UI:** Each `<FollowUpCard>` now exposes a **Request follow-up approval** button (gold pill) plus inline state badges:
+  - "Follow-up sent {ts} by {operator} · Gmail \`{messageId}\`" (green) when `followUpSentAt` is set.
+  - "Follow-up approval queued {ts} · approval id {…}. Waiting on Ben's click in #ops-approvals" (amber) when only `followUpQueuedAt` is set.
+  - Button disables itself when queued / sent / requesting; surfaces inline errors on 4xx/5xx from the route.
+- **Monday MVP:** 🟢 — full close-loop. Operator clicks Request follow-up → Slack card → Ben clicks → Gmail goes out on the original thread → KV stamps followUpSentAt → queue stops re-prompting.
 
 ---
 
@@ -592,4 +624,5 @@ Each order row now carries a **Buy these again** button. Pure helper `intentFrom
 - **1.3 — 2026-04-25** — Durable uploads and shipping artifacts reflected. Receipts intake moved from red/manual to yellow review-queue: email/Gmail/Drive receipt docs can be captured, but OCR and QBO posting remain blocked behind Rene review.
 - **1.4 — 2026-04-29** — S1.4 Faire Direct invites moved from red to green (CLOSED LOOP). Phase 3 added: `directLinkUrl` field with approval-readiness rule, request-approval route, `executeApprovedFaireDirectInvite` closer (chain step 5 in `/api/slack/approvals` after AP-packet), Request-send-approval UI button. Send is via Gmail (operator-pasted Faire Direct URL), never via Faire's API. 52 new tests; cumulative full suite: 834 green.
 - **1.5 — 2026-04-25** — S1.4 Phase 3.1: HubSpot contact-id fallback by email lookup landed in the Faire send closer (`src/lib/faire/hubspot-mirror.ts`). Read-only — never creates a contact, never patches lifecyclestage / deals / properties / tasks. +14 tests; full suite 848 green at commit `d08e4d5`. Phase 3.2: read-only follow-up queue (`/api/ops/faire/direct-invites/follow-ups` + `<FollowUpSection>` on `/ops/faire-direct`). 3-day "due soon" / 7-day "overdue" thresholds, most-stale-first sort, suggested-action copy. No writer for `followUpQueuedAt` ships; the field is forward-compat for the future Class B `faire-direct.follow-up` closer. +27 tests; full suite 875 green.
+- **1.6 — 2026-04-25** — S1.4 Phase 3.3: Faire Direct follow-up draft-for-approval close-loop. New taxonomy slug `faire-direct.follow-up` (Class B, Ben), `markFaireFollowUpQueued` / `markFaireFollowUpSent` writers, `POST /follow-up/request-approval` route, `executeApprovedFaireDirectFollowUp` closer (Slack chain step 6, after the initial-invite closer), Request-follow-up-approval UI button + queued/sent badges. Reply-on-thread keeps the follow-up in the same Gmail conversation as the initial invite. Faire API never called; no HubSpot stages/properties touched. +45 tests; full suite 920 green. Pre-existing account UI lint errors (`<a>` → `<Link>`) in `src/app/account/AccountView.client.tsx` and `src/app/account/login/LoginForm.client.tsx` fixed inline since the swaps were trivial.
 - **1.0 — 2026-04-24** — First publication. Synthesizes 2 division-audit agent reports + 5 P0 deliverables + email-intelligence build. Replaces ad-hoc workflow descriptions across other contract docs.

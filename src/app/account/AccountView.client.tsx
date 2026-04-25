@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { addToCart } from "@/lib/cart";
@@ -228,13 +229,13 @@ function OrdersSection({ orders }: { orders: CustomerOrderShape[] }) {
       {orders.length === 0 ? (
         <div className="text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-md p-4">
           You don&apos;t have any orders yet.{" "}
-          <a href="/" className="text-[#b22234] underline">
+          <Link href="/" className="text-[#b22234] underline">
             Browse the storefront
-          </a>{" "}
+          </Link>{" "}
           or{" "}
-          <a href="/wholesale" className="text-[#b22234] underline">
+          <Link href="/wholesale" className="text-[#b22234] underline">
             request wholesale pricing
-          </a>
+          </Link>
           .
         </div>
       ) : (

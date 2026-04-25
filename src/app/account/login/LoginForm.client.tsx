@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 type FormState = "idle" | "submitting" | "error";
@@ -85,13 +86,13 @@ export function LoginForm() {
       </button>
       <p className="text-xs text-gray-500 text-center">
         New here?{" "}
-        <a href="/wholesale" className="underline">
+        <Link href="/wholesale" className="underline">
           Wholesale inquiry
-        </a>{" "}
+        </Link>{" "}
         or{" "}
-        <a href="/" className="underline">
+        <Link href="/" className="underline">
           shop the storefront
-        </a>
+        </Link>
         .
       </p>
     </form>
