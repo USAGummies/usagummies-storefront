@@ -8,9 +8,9 @@ import Link from "next/link";
 export function GuaranteeBlock() {
   return (
     <section className="lp-starfield relative overflow-hidden">
-      {/* Liberty bottom-left + Eagle top-right — sized down to ~14% column
-          width (was 22%) so they ornament the panel rather than compete
-          with the central headline / CTA stack. */}
+      {/* Liberty stays bottom-left as a single ornament — the eagle was
+          pulled (per Ben's audit) so the central guarantee stamp + CTA
+          can carry the panel without competing imagery. */}
       <div
         aria-hidden
         className="pointer-events-none absolute bottom-0 left-0 hidden w-[14%] max-w-[180px] md:block"
@@ -23,21 +23,6 @@ export function GuaranteeBlock() {
             fill
             sizes="180px"
             className="object-contain object-bottom opacity-85 drop-shadow-[3px_4px_0_rgba(0,0,0,0.45)]"
-          />
-        </div>
-      </div>
-      <div
-        aria-hidden
-        className="pointer-events-none absolute right-0 top-[12%] hidden w-[14%] max-w-[180px] md:block"
-        style={{ height: "55%" }}
-      >
-        <div className="relative h-full w-full">
-          <Image
-            src="/brand/illustrations/eagle.png"
-            alt=""
-            fill
-            sizes="180px"
-            className="object-contain object-[right_top] opacity-85 drop-shadow-[3px_4px_0_rgba(0,0,0,0.45)]"
           />
         </div>
       </div>

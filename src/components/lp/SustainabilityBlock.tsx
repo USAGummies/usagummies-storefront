@@ -30,26 +30,24 @@ export function SustainabilityBlock() {
   return (
     <section className="relative border-y-2 border-[var(--lp-ink)] bg-[var(--lp-cream)]">
       <div className="mx-auto grid max-w-[1200px] grid-cols-1 gap-10 px-5 py-16 sm:px-8 sm:py-24 md:grid-cols-[1fr_1.2fr] md:gap-16">
-        {/* Eagle ornament column */}
+        {/* Domestic-freight photo column — real billboard image,
+            ties directly to the "American supply chain · domestic-only
+            freight" story below. */}
         <div className="relative order-2 flex items-center justify-center md:order-1">
-          <div className="relative aspect-square w-full max-w-[420px]">
-            <div
-              aria-hidden
-              className="absolute inset-[8%] rounded-full"
-              style={{
-                background:
-                  "radial-gradient(closest-side, var(--lp-gold-light) 0%, var(--lp-gold) 45%, transparent 72%)",
-                opacity: 0.45,
-              }}
-            />
-            <Image
-              src="/brand/illustrations/eagle.png"
-              alt=""
-              fill
-              sizes="(max-width: 768px) 80vw, 420px"
-              className="relative object-contain drop-shadow-[4px_5px_0_rgba(14,22,56,0.4)]"
-            />
-          </div>
+          <figure
+            className="relative w-full max-w-[460px] overflow-hidden border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)]"
+            style={{ boxShadow: "6px 6px 0 var(--lp-red)" }}
+          >
+            <div className="relative aspect-[4/3] w-full">
+              <Image
+                src="/brand/billboards/truck.jpg"
+                alt="USA Gummies freight truck — domestic shipping"
+                fill
+                sizes="(max-width: 768px) 88vw, 460px"
+                className="object-cover"
+              />
+            </div>
+          </figure>
         </div>
 
         {/* Story column */}

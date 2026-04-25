@@ -14,8 +14,19 @@ export function HeroSection() {
     <section className="relative overflow-hidden">
       <div className="lp-bunting" aria-hidden />
 
-      {/* Navy starfield header — wordmark only. No review stats (not verified). */}
-      <div className="lp-starfield relative">
+      {/* Navy header — solid navy with a gold hairline. The dotted
+          starfield treatment was pulled here because the gold pin-dots
+          were visually peeking through the wordmark and "Made in the
+          U.S.A." script at small sizes (Ben's audit). Solid navy keeps
+          the patriotic palette without competing with the typography. */}
+      <div
+        className="relative"
+        style={{
+          backgroundColor: "var(--lp-navy)",
+          color: "var(--lp-off-white)",
+          borderBottom: "2px solid var(--lp-gold)",
+        }}
+      >
         <div className="mx-auto flex max-w-[1200px] items-center justify-between gap-3 px-5 py-2.5 sm:px-8">
           <span className="lp-display text-[1.2rem] tracking-[0.04em] sm:text-[1.35rem]">
             USA <span className="text-[var(--lp-red)]">★</span> Gummies
@@ -28,17 +39,21 @@ export function HeroSection() {
 
       {/* Hero body */}
       <div className="relative">
-        {/* Meadow backdrop (bag art) */}
+        {/* Real product photo backdrop — replaced the illustrated
+            meadow with the actual bag-in-Americana photo so the top of
+            the page leads with real imagery (Ben's audit: "needs a real
+            image here at the top"). Cream wash keeps the H1 + bag
+            slider readable against a busy photograph. */}
         <div aria-hidden className="absolute inset-0 -z-10">
           <Image
-            src="/brand/illustrations/background-meadow.png"
+            src="/brand/photos/bag-1776.jpg"
             alt=""
             fill
             priority
             sizes="100vw"
             className="object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-[var(--lp-cream)]/20 via-[var(--lp-cream)]/35 to-[var(--lp-cream)]" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[var(--lp-cream)]/55 via-[var(--lp-cream)]/65 to-[var(--lp-cream)]" />
         </div>
 
         <div className="relative mx-auto grid max-w-[1200px] grid-cols-1 gap-8 px-5 pb-10 pt-10 sm:px-8 sm:pb-16 sm:pt-14 md:grid-cols-[1fr_1.05fr] md:gap-12 md:pb-20 md:pt-18">

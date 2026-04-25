@@ -3,16 +3,23 @@
 // no ship-time claims, no process bullets I couldn't verify). Copy is
 // paraphrased from the bag's back panel.
 
+import type { CSSProperties } from "react";
 import Image from "next/image";
 
+// Drop trajectory — each gummy starts already tilted (matches the
+// angled-bear motif on the bag artwork) and tumbles further as it
+// falls. Earlier rows hold a stronger lead-tilt; lower rows have
+// already rotated through. Sizes shrink slightly with depth to fake
+// perspective. Falls drift to one side (wind catch) so the cluster
+// reads as a stream, not a column.
 const DROPS = [
-  { src: "/brand/gummies/gummy-red.png",    top: "18%", left: "38%", size: 56, rot: 12 },
-  { src: "/brand/gummies/gummy-yellow.png", top: "26%", left: "48%", size: 48, rot: -18 },
-  { src: "/brand/gummies/gummy-green.png",  top: "40%", left: "40%", size: 52, rot: 26 },
-  { src: "/brand/gummies/gummy-orange.png", top: "50%", left: "54%", size: 44, rot: -8 },
-  { src: "/brand/gummies/gummy-pink.png",   top: "62%", left: "42%", size: 46, rot: 14 },
-  { src: "/brand/gummies/gummy-red.png",    top: "72%", left: "52%", size: 38, rot: -22 },
-  { src: "/brand/gummies/gummy-yellow.png", top: "82%", left: "46%", size: 36, rot: 6 },
+  { src: "/brand/gummies/gummy-red.png",    top: "20%", left: "40%", size: 60, rot: 32, drift:  10, spin:  44, delay: 0 },
+  { src: "/brand/gummies/gummy-yellow.png", top: "28%", left: "52%", size: 52, rot: -38, drift: -8, spin: -52, delay: 220 },
+  { src: "/brand/gummies/gummy-green.png",  top: "40%", left: "44%", size: 56, rot: 56,  drift: 14, spin:  60, delay: 440 },
+  { src: "/brand/gummies/gummy-orange.png", top: "50%", left: "58%", size: 46, rot: -22, drift: -6, spin: -40, delay: 660 },
+  { src: "/brand/gummies/gummy-pink.png",   top: "62%", left: "46%", size: 48, rot: 70,  drift: 12, spin:  48, delay: 880 },
+  { src: "/brand/gummies/gummy-red.png",    top: "74%", left: "56%", size: 40, rot: -64, drift: -4, spin: -56, delay: 1100 },
+  { src: "/brand/gummies/gummy-yellow.png", top: "84%", left: "48%", size: 36, rot: 84,  drift:  8, spin:  36, delay: 1320 },
 ];
 
 export function BombsAway() {
@@ -66,14 +73,19 @@ export function BombsAway() {
             <div
               key={i}
               className="absolute"
-              style={{
-                top: d.top,
-                left: d.left,
-                width: d.size,
-                height: d.size,
-                transform: `rotate(${d.rot}deg)`,
-                animation: `lp-fall ${3 + (i % 3)}s ease-in-out ${i * 200}ms infinite alternate`,
-              }}
+              style={
+                {
+                  top: d.top,
+                  left: d.left,
+                  width: d.size,
+                  height: d.size,
+                  ["--lp-drop-rot" as string]: `${d.rot}deg`,
+                  ["--lp-drop-drift" as string]: `${d.drift}px`,
+                  ["--lp-drop-spin" as string]: `${d.spin}deg`,
+                  transform: `rotate(${d.rot}deg)`,
+                  animation: `lp-fall ${3.4 + (i % 3) * 0.6}s ease-in-out ${d.delay}ms infinite alternate`,
+                } as CSSProperties
+              }
             >
               <Image
                 src={d.src}
@@ -93,9 +105,16 @@ export function BombsAway() {
           50%  { transform: translateX(4%)  translateY(-6px); }
           100% { transform: translateX(-2%) translateY(2px); }
         }
+        /* Tumbling fall — start pre-tilted, drift to one side, and
+           continue rotating through the descent so each gummy reads as
+           a falling object, not a static sticker. */
         @keyframes lp-fall {
-          0%   { transform: translateY(0) rotate(0deg); }
-          100% { transform: translateY(22px) rotate(14deg); }
+          0%   { transform: translate(0, 0) rotate(var(--lp-drop-rot, 0deg)); }
+          100% {
+            transform:
+              translate(var(--lp-drop-drift, 0px), 28px)
+              rotate(calc(var(--lp-drop-rot, 0deg) + var(--lp-drop-spin, 18deg)));
+          }
         }
         @media (prefers-reduced-motion: reduce) {
           .lp-scope [style*="lp-bomber"],

@@ -1,8 +1,7 @@
-// Real moments strip — three actual lifestyle photos in the same
-// patriotic-Americana frame style as the Manifesto card. Drops in
-// real photography between the bomber and the manifesto sections so
-// the page isn't 100% illustration. Photos sourced from the brand
-// asset library at /brand/lifestyle/ and /brand/ad-assets/.
+// Real moments strip — three actual lifestyle photos. Ben's audit:
+// "we need to use real images. like the gummies in my hand". Swapped
+// the brand billboards out for the real product-in-the-wild
+// photography staged in /public/brand/photos/.
 //
 // No copy claims, no captions that aren't on the bag — the photos
 // carry the story. Headline is the bag's own back-panel phrasing
@@ -10,13 +9,10 @@
 
 import Image from "next/image";
 
-// Real USA Gummies brand billboards — copied from
-// ~/Desktop/USA Gummies/USA GUMMIES/BILLBOARDS into
-// /public/brand/billboards/. Real Americana photography.
 const SHOTS = [
-  { src: "/brand/billboards/truck.jpg",   alt: "USA Gummies truck billboard" },
-  { src: "/brand/billboards/train.jpg",   alt: "USA Gummies train billboard" },
-  { src: "/brand/billboards/trucker.jpg", alt: "USA Gummies trucker billboard" },
+  { src: "/brand/photos/hand-gummies.jpg",       alt: "A handful of USA Gummies dye-free gummy bears" },
+  { src: "/brand/photos/book-pages-gummies.jpg", alt: "USA Gummies bag with an open book and gummy bears" },
+  { src: "/brand/photos/diner-scene.png",        alt: "USA Gummies in an American diner setting" },
 ];
 
 export function RealMomentsStrip() {
