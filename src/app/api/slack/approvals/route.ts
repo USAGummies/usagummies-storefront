@@ -34,6 +34,7 @@ import { postMessage } from "@/lib/ops/control-plane/slack/client";
 import { executeApprovedEmailReply } from "@/lib/ops/email-intelligence/approval-executor";
 import { executeApprovedShipmentCreate } from "@/lib/ops/sample-order-dispatch/approval-closer";
 import { executeApprovedVendorMasterCreate } from "@/lib/ops/vendor-onboarding";
+import { executeApprovedApPacketSend } from "@/lib/ops/ap-packets/approval-closer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -170,6 +171,9 @@ export async function POST(req: Request): Promise<Response> {
   let vendorExecution:
     | Awaited<ReturnType<typeof executeApprovedVendorMasterCreate>>
     | undefined;
+  let apPacketExecution:
+    | Awaited<ReturnType<typeof executeApprovedApPacketSend>>
+    | undefined;
   let postedThreadText: string | null = null;
 
   if (decisionKind === "approve" && next.status === "approved") {
@@ -201,6 +205,21 @@ export async function POST(req: Request): Promise<Response> {
       }
     }
 
+    // 4. AP-packet closer: identified by targetEntity.type = "ap-packet".
+    //    Strict gating means email-reply (type="email-reply") never
+    //    accidentally triggers this even though both use the
+    //    `gmail.send` action slug.
+    if (
+      !emailExecution.handled &&
+      !shipmentExecution?.handled &&
+      !vendorExecution?.handled
+    ) {
+      apPacketExecution = await executeApprovedApPacketSend(next);
+      if (apPacketExecution.handled) {
+        postedThreadText = apPacketExecution.threadMessage;
+      }
+    }
+
     if (postedThreadText && existing.slackThread?.ts) {
       await postMessage({
         channel: "#ops-approvals",
@@ -215,6 +234,7 @@ export async function POST(req: Request): Promise<Response> {
     approvalId,
     status: next.status,
     decisions: next.decisions.length,
+    apPacketExecution,
     execution: emailExecution,
     shipmentExecution,
     vendorExecution,

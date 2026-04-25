@@ -209,20 +209,26 @@ Follow this order **without rebuying the label**:
 - **Slack:** Daily ping in `#operations` listing stale voids (FIXED today)
 - **Monday MVP:** 🟢 (alert) / 🟡 (auto-escalation email — next build)
 
-### Fin4.7 AP Packet Dashboard (`/ops/ap-packets`)
-- **Trigger:** Operator opens the page (Rene + Ben). Read-only.
+### Fin4.7 AP Packet Dashboard + send-on-approve (CLOSED LOOP)
+- **Trigger (dashboard):** Operator opens `/ops/ap-packets` (Rene + Ben). Read-only.
+- **Trigger (send-on-approve):** Ben clicks Approve on the AP-packet approval card in Slack `#ops-approvals` → `/api/slack/approvals` updates the canonical approvalStore via `recordDecision()` → `executeApprovedApPacketSend()` fires automatically. No manual `/send` call needed.
 - **Source:**
   - `/api/ops/ap-packets` (no slug) — roster of every packet with `attachmentSummary`, `nextActionsCount`, `firstNextAction`, and a per-slug `lastSent` join from KV `ap-packets:sent:<slug>`.
-  - `/api/ops/ap-packets?account=jungle-jims` — full detail for the JJ panel (existing flow).
-- **AI role:** None — pure derivation through `src/lib/ops/ap-packet-dashboard.ts`. `deriveDashboardRow()` picks one recommended next action per packet from the priority list: pricing review → missing docs → attachments needing review → recently sent → stale send → ready-to-send → first nextActions entry. Never invents copy.
-- **Approver:** N/A for the page. **Send/resend stays gated through `POST /api/ops/fulfillment/ap-packet/request-approval` (Class B `gmail.send`, Ben approves in `#ops-approvals`).** The dashboard never sends email directly.
-- **Slack:** None directly. The send route already posts the approval card to `#ops-approvals` and the audit to `#ops-audit`.
-- **Writeback:** None. Zero side effects — this surface only reads the existing GET endpoints.
-- **Audit:** None — read-only views are not auditable events.
-- **Failure mode:** Roster fetch fails → roster section shows the error string + "0 rows", JJ detail panel still loads independently. KV miss for `ap-packets:sent:<slug>` → "Last sent" shows "—", dashboard treats as `not_yet_sent`.
-- **Tests:** 18 unit tests in `ap-packet-dashboard.test.ts` lock the contract: missing/review counts, plural-aware copy, recent vs stale send classification (30-day boundary), pricing review precedence, action-required fallback to `firstNextAction`, no-fabrication when nextActions is empty, summary aggregation, `hasPacketTemplateRegistry()` returns false today.
-- **Monday MVP:** 🟢 — page is ready for Rene + Ben. Surfaces every packet with status, attachments, last sent (if any), and recommended next action. New packets land in the roster automatically when added to `listApPackets()`.
-- **Later:** (1) Build a packet template registry (currently `hasPacketTemplateRegistry()` returns false; the "Create from template" link is explicitly disabled with a "not wired yet" pill). (2) Wire the Slack approve button at `/api/slack/approvals` to dispatch the `ap-packet/send` execution automatically when the approval flips, instead of the caller-driven `?approvalToken=` path.
+  - `/api/ops/ap-packets?account=jungle-jims` — full detail for the JJ panel.
+- **Closer chain order at `/api/slack/approvals`** (each strictly gated by `targetEntity.type` so they never cross-fire):
+  1. `email-reply` → `executeApprovedEmailReply()`
+  2. `dispatch:<chan>:<id>` payloadRef → `executeApprovedShipmentCreate()`
+  3. `vendor-master` → `executeApprovedVendorMasterCreate()`
+  4. `ap-packet` → `executeApprovedApPacketSend()` *(new — commit 2026-04-25)*
+- **AI role:** None — `deriveDashboardRow()` picks one recommended next action per packet via priority list: pricing review → missing docs → attachments needing review → recently sent → stale send → ready-to-send → `firstNextAction`. Closer is also pure routing — strict gate, then HTTP POST to the existing send route.
+- **Approver:** Ben (Class B `gmail.send`). Strict: closer fires only when `approval.status === "approved"` AND `targetEntity.type === "ap-packet"` AND `targetEntity.id` parses as `ap-packet:<slug>`. Tests cover every other state (pending / rejected / expired / stood-down / draft) returning `handled=false` with no `/send` call.
+- **Slack:** Approval card → `#ops-approvals`. After approve click, the closer posts a thread reply with sent timestamp, recipient (label parsed from approval), packet slug, Gmail message id, thread id, and HubSpot log id. On failure: thread reply with `:warning:` and the failure reason; **`lastSent` is NOT written** — the send route is the only path that writes `ap-packets:sent:<slug>`, and it only writes on its own success path.
+- **Writeback:** Closer never writes Gmail / HubSpot / KV / Drive directly. All side effects flow through `POST /api/ops/fulfillment/ap-packet/send`, which re-validates the approval token, runs triple-gate dedup, fetches Drive attachments, sends via Gmail API, logs to HubSpot, and writes the `ap-packets:sent:<slug>` KV row.
+- **Audit:** Two entries per approve click: (1) `approval.approve` (already mirrored by the slack route), (2) `ap-packet.approved.send` written by the closer — `result: "ok"` on success with messageId/threadId/hubspotLogId, `result: "error"` on failure with the surfaced reason.
+- **Failure mode:** Send route returns 502/424/409 → closer surfaces error in the Slack thread, audits as `result: "error"`, NEVER writes `lastSent`. Network error reaching the send route → same. The operator can fix the cause and POST `/api/ops/fulfillment/ap-packet/send` manually with the same approvalToken to retry; re-clicking Approve in Slack does NOT re-fire (recordDecision rejects state transitions on already-approved rows).
+- **Tests:** 18 dashboard helpers + **12 closer tests** locking: approved → POST /send exactly once with correct body and bearer; pending/rejected/draft/expired/stood-down → no /send call; non-ap-packet (`email-reply` / `vendor-master`) → ignored; missing or empty `targetEntity.id` → fail closed, no /send; send 502 → ok=false + threadMessage flags failure + audit error + no lastSent; 409 dedup conflict → surfaces reason; network error → ok=false + no double-fire; approvalToken passed to /send is the approval id (not the slack ts).
+- **Monday MVP:** 🟢 **CLOSED LOOP** — Ben clicks Approve in Slack, the AP packet sends, the dashboard shows lastSent, the audit trail records every step. No manual /send call required.
+- **Later:** Build a packet template registry (currently `hasPacketTemplateRegistry()` returns `false` and the "Create from template" link renders as a "not wired yet" pill).
 
 ### Fin4.6 Finance Review surface (`/ops/finance/review`)
 - **Trigger:** Operator opens the page (Rene + Ben). Read-only.
