@@ -95,6 +95,18 @@ export interface FaireInviteRecord extends FaireInviteCandidate {
   hubspotEmailLogId?: string;
   /** Approval id that authorized the send (last successful close). */
   sentApprovalId?: string;
+  /**
+   * Phase 3.2 follow-up queue marker. Forward-compat field hint —
+   * NO writer in this codebase sets this today. The follow-up queue
+   * (`/api/ops/faire/direct-invites/follow-ups`) is read-only and uses
+   * the *absence* of this timestamp to decide whether a sent invite
+   * needs a nudge. A future Class B `faire-direct.follow-up` send
+   * closer will be the only path allowed to stamp this field.
+   *
+   * Until that closer exists, this stays unset and the queue surfaces
+   * every sent invite past the 3-day threshold.
+   */
+  followUpQueuedAt?: string;
 }
 
 export interface FaireInviteIngestErrorRow {

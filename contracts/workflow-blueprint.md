@@ -129,6 +129,33 @@ Each row uses the schema:
 
 - **Required env:** `GMAIL_OAUTH_*` + `SLACK_SIGNING_SECRET` (for the slack approve click) + `CRON_SECRET` (for closer audits). `FAIRE_ACCESS_TOKEN` is NOT required by Phase 3 — the closer never calls Faire's API. The token is still surfaced as a degraded banner in case any future read-only Faire API integration lands.
 
+#### Phase 3.1 — HubSpot contact-id fallback by email lookup (NEW)
+- **Trigger:** Side-effect of the Phase 3 send closer's HubSpot mirror block. When `record.hubspotContactId` is missing or empty, the closer now resolves the contact via `findContactByEmail(record.email)` before calling `logEmail`.
+- **Module:** `src/lib/faire/hubspot-mirror.ts` exposes `resolveHubSpotContactIdForInvite()` + `…ForInviteRecord()` overloads. Read-only by contract — never creates a contact, never patches `lifecyclestage`, deals, custom properties, or tasks. Mirrors the existing `email-intelligence/approval-executor` pattern.
+- **Hard rules:** Skips the network call entirely when `HUBSPOT_PRIVATE_APP_TOKEN` is unset. Fail-soft on HubSpot 5xx / throw — the closer's success path still completes and the email engagement lands in HubSpot's global activity feed (just unassociated). Tests assert this fallback never blocks a Gmail success path.
+- **Tests (Phase 3.1):** 10 helper unit + 4 closer fallback path = **14 new tests**. Cumulative across S1.4: **155 tests**, all green; full suite: **848 tests** green at commit `d08e4d5`.
+
+#### Phase 3.2 — Read-only follow-up queue (NEW)
+- **Trigger (read):** Operator opens `/ops/faire-direct` → the new `<FollowUpSection>` fetches `GET /api/ops/faire/direct-invites/follow-ups` independently → renders an *Overdue* / *Due soon* breakdown above the existing invite tables. The route is read-only — no KV writes, no Gmail/Faire/HubSpot/Slack network call. (Test asserts an exact zero-write count after seeding.)
+- **Eligibility rules locked by tests:**
+  - `status="sent"` AND `sentAt` ≥ 7 days ago AND no `followUpQueuedAt` → `bucket="overdue"`, `code="overdue"`.
+  - `status="sent"` AND `sentAt` ≥ 3 days ago (but < 7) AND no `followUpQueuedAt` → `bucket="due_soon"`, `code="due_soon"`.
+  - `status="sent"` AND `sentAt` < 3 days ago → `bucket="not_due"`, `code="fresh"`.
+  - `status="sent"` with `followUpQueuedAt` set → `bucket="not_due"`, `code="follow_up_queued"` (does NOT re-surface).
+  - `status="sent"` with no/unparseable `sentAt` → `bucket="not_due"`, `code="missing_sent_at"` (data-integrity gap, not actionable).
+  - Any non-sent record → `bucket="not_due"`, `code="wrong_status"`.
+- **Sort:** Overdue + due_soon are sorted most-stale first (largest `daysSinceSent` first) so the operator's eye lands on the most-overdue row at the top.
+- **Suggested-action copy:** A scrubbed string per actionable row, computed by `suggestNextActionCopy()`. Locked by tests to never promise pricing, lead times, or product effects, and to remind the operator to keep follow-up free of those claims.
+- **Forward-compat type field:** `FaireInviteRecord` gains `followUpQueuedAt?: string`. **No writer ships in Phase 3.2** — the field is the queue's "this is handled" marker. A future Class B `faire-direct.follow-up` send closer will be the only path allowed to stamp it.
+- **Hard rules locked by tests:**
+  - Helpers are pure: no fetch, no KV, no Gmail/Faire/HubSpot/Slack import (the test suite mocks ONLY `@vercel/kv`, and only for the route-level test that has to seed records).
+  - Route never calls `kv.set` (test asserts call count delta = 0 after seeding).
+  - UI has no Send / Approve / Action buttons — observation only.
+- **Approval class:** None. Phase 3.2 ships zero new approvals. The future follow-up send closer will be Class B.
+- **Tests (Phase 3.2):** 19 helper unit (`classifyForFollowUp`, `reportFollowUps`, `selectFollowUpsNeedingAction`, `suggestNextActionCopy`, plus boundary/edge-case coverage) + 8 route integration = **27 new tests**. Cumulative across S1.4: **182 tests**, all green; full suite: **875 tests** green.
+- **UI:** `/ops/faire-direct` page now renders the *Follow-up queue* section between the totals strip and the existing per-status invite tables. Each actionable card shows retailer + buyer + email + days-since-sent + sent-at timestamp + Gmail message id + HubSpot contact id (when present) + the suggested next-action copy. Two empty states are explicit: "no overdue follow-ups" / "no follow-ups due soon".
+- **Monday MVP:** 🟢 — Ben can spot which sent invites need a manual reply on the original Gmail thread without leaving the dashboard. No follow-up email is sent from this surface; that's the next phase.
+
 ---
 
 ## Division 2 — Email / Inbox / Customer replies
@@ -564,4 +591,5 @@ Each order row now carries a **Buy these again** button. Pure helper `intentFrom
 - **1.2 — 2026-04-24** — Vendor master creation closed internally. Added `/ops/vendors/new`, `POST /api/ops/vendors/onboard`, `executeApprovedVendorMasterCreate()`, and Slack approval closer. QBO write is approval-gated; Notion/Drive dossier creation is best-effort until parent envs/scopes are verified.
 - **1.3 — 2026-04-25** — Durable uploads and shipping artifacts reflected. Receipts intake moved from red/manual to yellow review-queue: email/Gmail/Drive receipt docs can be captured, but OCR and QBO posting remain blocked behind Rene review.
 - **1.4 — 2026-04-29** — S1.4 Faire Direct invites moved from red to green (CLOSED LOOP). Phase 3 added: `directLinkUrl` field with approval-readiness rule, request-approval route, `executeApprovedFaireDirectInvite` closer (chain step 5 in `/api/slack/approvals` after AP-packet), Request-send-approval UI button. Send is via Gmail (operator-pasted Faire Direct URL), never via Faire's API. 52 new tests; cumulative full suite: 834 green.
+- **1.5 — 2026-04-25** — S1.4 Phase 3.1: HubSpot contact-id fallback by email lookup landed in the Faire send closer (`src/lib/faire/hubspot-mirror.ts`). Read-only — never creates a contact, never patches lifecyclestage / deals / properties / tasks. +14 tests; full suite 848 green at commit `d08e4d5`. Phase 3.2: read-only follow-up queue (`/api/ops/faire/direct-invites/follow-ups` + `<FollowUpSection>` on `/ops/faire-direct`). 3-day "due soon" / 7-day "overdue" thresholds, most-stale-first sort, suggested-action copy. No writer for `followUpQueuedAt` ships; the field is forward-compat for the future Class B `faire-direct.follow-up` closer. +27 tests; full suite 875 green.
 - **1.0 — 2026-04-24** — First publication. Synthesizes 2 division-audit agent reports + 5 P0 deliverables + email-intelligence build. Replaces ad-hoc workflow descriptions across other contract docs.

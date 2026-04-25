@@ -205,6 +205,8 @@ export function FaireDirectView() {
             </span>
           </section>
 
+          <FollowUpSection refreshTick={refreshTick} />
+
           <InviteTable
             title="Needs review"
             invites={data.invites.needs_review}
@@ -716,6 +718,304 @@ function InviteCard(props: {
                   Gmail message <code>{invite.gmailMessageId}</code>.
                 </>
               )}
+            </div>
+          )}
+        </div>
+      </div>
+    </li>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Follow-up section (READ-ONLY)
+// ---------------------------------------------------------------------------
+//
+// Surfaces sent invites that have crossed the 3-day "due soon" or
+// 7-day "overdue" threshold without a follow-up being queued. Pure
+// observation — no buttons trigger a send. The operator either
+// replies on the original Gmail thread or marks it handled outside
+// the system. A future Class B `faire-direct.follow-up` closer will
+// add a Request follow-up approval button here; until then the panel
+// is intentionally action-light.
+
+interface FollowUpRow {
+  id: string;
+  retailerName: string;
+  buyerName?: string;
+  email: string;
+  source: string;
+  notes?: string;
+  hubspotContactId?: string;
+  sentAt?: string;
+  sentBy?: string;
+  gmailMessageId?: string;
+  daysSinceSent: number | null;
+  bucket: "overdue" | "due_soon" | "not_due";
+  reason: { code: string; detail: string };
+  suggestedAction: string | null;
+}
+
+interface FollowUpResponse {
+  ok: boolean;
+  now: string;
+  totals: {
+    overdue: number;
+    due_soon: number;
+    not_due: number;
+    total: number;
+    sent_total: number;
+  };
+  overdue: FollowUpRow[];
+  due_soon: FollowUpRow[];
+  not_due: FollowUpRow[];
+}
+
+function FollowUpSection({ refreshTick }: { refreshTick: number }) {
+  const [data, setData] = useState<FollowUpResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(
+          "/api/ops/faire/direct-invites/follow-ups",
+          { cache: "no-store" },
+        );
+        const body = (await res.json().catch(() => ({}))) as
+          | FollowUpResponse
+          | { error?: string };
+        if (cancelled) return;
+        if (!res.ok || (body as FollowUpResponse).ok !== true) {
+          setError(
+            (body as { error?: string }).error ?? `HTTP ${res.status}`,
+          );
+          setData(null);
+        } else {
+          setData(body as FollowUpResponse);
+          setError(null);
+        }
+      } catch (err) {
+        if (!cancelled)
+          setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshTick]);
+
+  if (loading && !data) {
+    return (
+      <section
+        style={{
+          background: CARD,
+          border: `1px solid ${BORDER}`,
+          borderRadius: 10,
+          padding: "12px 16px",
+          marginBottom: 14,
+          fontSize: 12,
+          color: DIM,
+        }}
+      >
+        Loading follow-up queue…
+      </section>
+    );
+  }
+  if (error) {
+    return (
+      <section
+        style={{
+          background: `${RED}10`,
+          border: `1px solid ${RED}40`,
+          borderRadius: 8,
+          padding: "10px 12px",
+          color: RED,
+          fontSize: 13,
+          marginBottom: 14,
+        }}
+      >
+        Follow-up queue error: {error}
+      </section>
+    );
+  }
+  if (!data) return null;
+
+  const actionable = data.overdue.length + data.due_soon.length;
+
+  return (
+    <section
+      style={{
+        background: CARD,
+        border: `1px solid ${BORDER}`,
+        borderRadius: 10,
+        padding: "12px 16px",
+        marginBottom: 14,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          gap: 12,
+          marginBottom: 8,
+          flexWrap: "wrap",
+        }}
+      >
+        <h2
+          style={{
+            color: NAVY,
+            fontSize: 13,
+            textTransform: "uppercase",
+            margin: 0,
+          }}
+        >
+          Follow-up queue
+        </h2>
+        <span style={{ fontSize: 12, color: DIM }}>
+          {actionable === 0
+            ? `No invites need follow-up · ${data.totals.sent_total} total sent`
+            : `${actionable} need follow-up · ${data.totals.sent_total} total sent`}
+        </span>
+      </div>
+      <p style={{ fontSize: 11, color: DIM, margin: "0 0 10px 0" }}>
+        Read-only view of sent invites that crossed the 3-day &ldquo;due
+        soon&rdquo; or 7-day &ldquo;overdue&rdquo; threshold. No follow-up
+        email is sent from this surface — Ben replies on the original
+        Gmail thread (or closes the loop manually). A future Class B{" "}
+        <code>faire-direct.follow-up</code> closer will add a Request
+        follow-up approval button here.
+      </p>
+      <FollowUpBucket
+        title="Overdue (≥7 days)"
+        rows={data.overdue}
+        color={RED}
+        emptyText="(no overdue follow-ups)"
+      />
+      <FollowUpBucket
+        title="Due soon (3–6 days)"
+        rows={data.due_soon}
+        color={AMBER}
+        emptyText="(no follow-ups due soon)"
+      />
+    </section>
+  );
+}
+
+function FollowUpBucket(props: {
+  title: string;
+  rows: FollowUpRow[];
+  color: string;
+  emptyText: string;
+}) {
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div
+        style={{
+          color: props.color,
+          fontSize: 12,
+          textTransform: "uppercase",
+          fontWeight: 600,
+          letterSpacing: 0.3,
+          marginBottom: 4,
+        }}
+      >
+        {props.title} · {props.rows.length}
+      </div>
+      {props.rows.length === 0 ? (
+        <div style={{ fontSize: 12, color: DIM, paddingLeft: 6 }}>
+          {props.emptyText}
+        </div>
+      ) : (
+        <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+          {props.rows.map((row) => (
+            <FollowUpCard key={row.id} row={row} color={props.color} />
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function FollowUpCard({
+  row,
+  color,
+}: {
+  row: FollowUpRow;
+  color: string;
+}) {
+  return (
+    <li
+      style={{
+        borderTop: `1px dashed ${BORDER}`,
+        padding: "8px 4px",
+      }}
+    >
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1.4fr 1fr",
+          gap: 14,
+          alignItems: "start",
+        }}
+      >
+        <div>
+          <div style={{ fontWeight: 600 }}>{row.retailerName}</div>
+          <div style={{ color: DIM, fontSize: 11, marginTop: 2 }}>
+            <code>{row.email}</code>
+            {row.buyerName ? ` · ${row.buyerName}` : ""}
+          </div>
+          <div style={{ color: DIM, fontSize: 12, marginTop: 4 }}>
+            Source <code>{row.source}</code>
+          </div>
+          <div style={{ color: color, fontSize: 12, marginTop: 4 }}>
+            <strong>{row.daysSinceSent ?? "?"}</strong> day
+            {row.daysSinceSent === 1 ? "" : "s"} since sent
+            {row.sentAt ? ` (${row.sentAt.slice(0, 16)})` : ""}
+            {row.sentBy ? ` · sent by ${row.sentBy}` : ""}
+          </div>
+          {row.hubspotContactId && (
+            <div style={{ color: DIM, fontSize: 11, marginTop: 2 }}>
+              HubSpot contact <code>{row.hubspotContactId}</code>
+            </div>
+          )}
+          {row.gmailMessageId && (
+            <div style={{ color: DIM, fontSize: 11, marginTop: 2 }}>
+              Gmail message <code>{row.gmailMessageId}</code>
+            </div>
+          )}
+        </div>
+        <div>
+          {row.suggestedAction && (
+            <div
+              style={{
+                fontSize: 11,
+                color: DIM,
+                background: BG,
+                border: `1px dashed ${BORDER}`,
+                borderRadius: 6,
+                padding: "8px 10px",
+                whiteSpace: "pre-wrap",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 10,
+                  textTransform: "uppercase",
+                  fontWeight: 600,
+                  color,
+                  letterSpacing: 0.4,
+                  marginBottom: 4,
+                }}
+              >
+                Suggested next action
+              </div>
+              {row.suggestedAction}
             </div>
           )}
         </div>
