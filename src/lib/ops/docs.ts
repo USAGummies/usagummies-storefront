@@ -61,14 +61,16 @@ export interface ReceiptRecord {
   id: string;
   source_url: string;
   source_channel: string;
-  vendor: string;
-  date: string;
-  amount: number;
+  vendor?: string;
+  date?: string;
+  amount?: number;
   payment_method?: string;
-  category: string;
+  category?: string;
   subcategory?: string;
   mileage?: { start: number; end: number; total: number; rate: number; deduction: number };
   ledger_entry_id?: string; // linked to LEDGER entry if staged
+  status: "needs_review" | "ready";
+  missing_fields?: string[];
   processed_at: string;
   notes?: string;
 }
@@ -340,17 +342,33 @@ export async function listTranscripts(
 export async function processReceipt(input: {
   source_url: string;
   source_channel: string;
-  vendor: string;
-  date: string;
-  amount: number;
+  vendor?: string;
+  date?: string;
+  amount?: number;
   payment_method?: string;
-  category: string;
+  category?: string;
   subcategory?: string;
   mileage?: { start: number; end: number; total: number; rate: number; deduction: number };
   notes?: string;
+  status?: "needs_review" | "ready";
 }): Promise<ReceiptRecord> {
   const now = new Date().toISOString();
   const id = `receipt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  const amount =
+    typeof input.amount === "number" && Number.isFinite(input.amount)
+      ? input.amount
+      : undefined;
+  const missingFields = [
+    input.vendor ? null : "vendor",
+    input.date ? null : "date",
+    amount === undefined ? "amount" : null,
+    input.category ? null : "category",
+  ].filter(Boolean) as string[];
+  const requestedStatus =
+    input.status === "needs_review" || input.status === "ready"
+      ? input.status
+      : undefined;
+  const status = requestedStatus || (missingFields.length > 0 ? "needs_review" : "ready");
 
   const record: ReceiptRecord = {
     id,
@@ -358,11 +376,13 @@ export async function processReceipt(input: {
     source_channel: input.source_channel,
     vendor: input.vendor,
     date: input.date,
-    amount: input.amount,
+    amount,
     payment_method: input.payment_method,
     category: input.category,
     subcategory: input.subcategory,
     mileage: input.mileage,
+    status,
+    missing_fields: missingFields.length > 0 ? missingFields : undefined,
     processed_at: now,
     notes: input.notes,
   };
@@ -382,7 +402,7 @@ export async function listReceipts(
   let filtered = all;
   if (filters?.vendor) {
     const v = filters.vendor.toLowerCase();
-    filtered = filtered.filter((r) => r.vendor.toLowerCase().includes(v));
+    filtered = filtered.filter((r) => r.vendor?.toLowerCase().includes(v));
   }
   if (filters?.category) {
     filtered = filtered.filter((r) => r.category === filters.category);
@@ -392,6 +412,8 @@ export async function listReceipts(
 
 export async function getReceiptSummary(): Promise<{
   total_receipts: number;
+  needs_review: number;
+  ready: number;
   total_amount: number;
   by_vendor: Record<string, { count: number; total: number }>;
   by_category: Record<string, { count: number; total: number }>;
@@ -400,18 +422,32 @@ export async function getReceiptSummary(): Promise<{
   const byVendor: Record<string, { count: number; total: number }> = {};
   const byCategory: Record<string, { count: number; total: number }> = {};
   let totalAmount = 0;
+  let needsReview = 0;
+  let ready = 0;
 
   for (const r of all) {
-    totalAmount += r.amount;
-    if (!byVendor[r.vendor]) byVendor[r.vendor] = { count: 0, total: 0 };
-    byVendor[r.vendor].count++;
-    byVendor[r.vendor].total += r.amount;
-    if (!byCategory[r.category]) byCategory[r.category] = { count: 0, total: 0 };
-    byCategory[r.category].count++;
-    byCategory[r.category].total += r.amount;
+    const amount = typeof r.amount === "number" && Number.isFinite(r.amount) ? r.amount : 0;
+    totalAmount += amount;
+    if (r.status === "needs_review") needsReview++;
+    if (r.status === "ready") ready++;
+    const vendor = r.vendor || "UNREVIEWED";
+    if (!byVendor[vendor]) byVendor[vendor] = { count: 0, total: 0 };
+    byVendor[vendor].count++;
+    byVendor[vendor].total += amount;
+    const category = r.category || "unreviewed";
+    if (!byCategory[category]) byCategory[category] = { count: 0, total: 0 };
+    byCategory[category].count++;
+    byCategory[category].total += amount;
   }
 
-  return { total_receipts: all.length, total_amount: totalAmount, by_vendor: byVendor, by_category: byCategory };
+  return {
+    total_receipts: all.length,
+    needs_review: needsReview,
+    ready,
+    total_amount: totalAmount,
+    by_vendor: byVendor,
+    by_category: byCategory,
+  };
 }
 
 // ---------------------------------------------------------------------------

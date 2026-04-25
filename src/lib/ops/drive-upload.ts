@@ -20,6 +20,7 @@
  *     ncs/           <- NCS-001 customer setup forms
  *     w9/            <- vendor W-9s (free-form, not the main onboarding)
  *     coi/           <- vendor certificates of insurance
+ *     receipt/       <- receipts / invoices awaiting finance review
  *     vendor-form/   <- arbitrary vendor-supplied paperwork
  *     other/         <- catch-all (always writeable, never blocking)
  *
@@ -45,6 +46,7 @@ export type DocType =
   | "ncs"
   | "w9"
   | "coi"
+  | "receipt"
   | "vendor-form"
   | "other";
 
@@ -52,6 +54,7 @@ export const DOC_TYPES: readonly DocType[] = [
   "ncs",
   "w9",
   "coi",
+  "receipt",
   "vendor-form",
   "other",
 ] as const;

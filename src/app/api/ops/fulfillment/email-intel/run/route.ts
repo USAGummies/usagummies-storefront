@@ -59,6 +59,7 @@ import { getChannel } from "@/lib/ops/control-plane/channels";
 import { postMessage } from "@/lib/ops/control-plane/slack/client";
 import { listEmails, createGmailDraft } from "@/lib/ops/gmail-reader";
 import { evaluateSampleRequest } from "@/lib/ops/email-intelligence/sample-request";
+import { processReceipt } from "@/lib/ops/docs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -87,6 +88,7 @@ interface RunResult {
   drafted: number;
   approvalsOpened: number;
   sampleDispatchesOpened: number;
+  receiptsQueued: number;
   reportPostedTo?: string | null;
   errors: string[];
   perEmail: Array<{
@@ -149,6 +151,7 @@ async function runOnce(opts: RunBody): Promise<RunResult> {
       drafted: 0,
       approvalsOpened: 0,
       sampleDispatchesOpened: 0,
+      receiptsQueued: 0,
       errors,
       perEmail: [],
     };
@@ -159,6 +162,7 @@ async function runOnce(opts: RunBody): Promise<RunResult> {
   let drafted = 0;
   let approvalsOpened = 0;
   let sampleDispatchesOpened = 0;
+  let receiptsQueued = 0;
   let skipped = 0;
 
   for (const env of envelopes) {
@@ -198,6 +202,27 @@ async function runOnce(opts: RunBody): Promise<RunResult> {
     // 5+6+7. Draft (if actionable) + maybe open approval
     const reply = generateDraftReply(env, classification);
     if (!reply.actionable || opts.dryRun) {
+      if (classification.category === "receipt_document" && !opts.dryRun) {
+        try {
+          await processReceipt({
+            source_url: `gmail:${env.id}`,
+            source_channel: "gmail",
+            vendor: deriveVendorFromHeader(env.from),
+            notes: [
+              `Email receipt/document queued by email-intel.`,
+              `Subject: ${env.subject || "(no subject)"}`,
+              `From: ${env.from || "(unknown)"}`,
+              `Thread: ${env.threadId || "(none)"}`,
+              env.snippet ? `Snippet: ${env.snippet.slice(0, 300)}` : null,
+            ].filter(Boolean).join("\n"),
+          });
+          receiptsQueued += 1;
+        } catch (err) {
+          errors.push(
+            `receipt queue failed for ${env.id}: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+      }
       perEmail.push({
         messageId: env.id,
         subject: env.subject,
@@ -457,10 +482,19 @@ async function runOnce(opts: RunBody): Promise<RunResult> {
     drafted,
     approvalsOpened,
     sampleDispatchesOpened,
+    receiptsQueued,
     reportPostedTo: postedTo,
     errors,
     perEmail,
   };
+}
+
+function deriveVendorFromHeader(from: string): string | undefined {
+  const display = from.match(/^([^<]+)</)?.[1]?.trim().replace(/^"|"$/g, "");
+  if (display) return display.slice(0, 80);
+  const domain = from.match(/@([^>\s]+)/)?.[1]?.trim();
+  if (!domain) return undefined;
+  return domain.replace(/^www\./, "").split(".")[0]?.slice(0, 80);
 }
 
 // ----- Handlers ----------------------------------------------------------

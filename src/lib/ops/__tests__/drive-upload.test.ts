@@ -52,7 +52,7 @@ afterEach(() => {
 
 describe("drive-upload module", () => {
   it("DOC_TYPES is the locked union of doc categories", () => {
-    expect(DOC_TYPES).toEqual(["ncs", "w9", "coi", "vendor-form", "other"]);
+    expect(DOC_TYPES).toEqual(["ncs", "w9", "coi", "receipt", "vendor-form", "other"]);
   });
 
   it("ALLOWED_UPLOAD_MIME_TYPES includes PDF + standard images + Word", () => {

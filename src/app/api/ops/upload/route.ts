@@ -13,7 +13,7 @@
  * Body (multipart/form-data):
  *   - file: the uploaded file        (required)
  *   - customer_name | submitter      (display name; sanitized for filename)
- *   - doc_type | form_type           ("ncs" | "w9" | "coi" | "vendor-form" | "other")
+ *   - doc_type | form_type           ("ncs" | "w9" | "coi" | "receipt" | "vendor-form" | "other")
  *   - notes                          (optional, ≤ 1000 chars)
  *
  * Validation:
