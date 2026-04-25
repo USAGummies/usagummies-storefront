@@ -385,6 +385,20 @@ Follow this order **without rebuying the label**:
 - **Status:** ✅ Live (`contracts/hard-rules.md`, `src/lib/ops/ai/model-policy.ts`)
 - **Monday MVP:** 🟢
 
+### P9.5 Production Readiness dashboard (`/ops/readiness`)
+- **Trigger:** Operator opens `/ops/readiness` (auth-gated by existing `/ops/*` middleware).
+- **Source:** `GET /api/ops/readiness` returns the env fingerprint (booleans only, never raw values), the smoke-checklist constants, and the list of read-only routes to probe. The page then probes each listed route from the operator's browser — session cookie travels naturally, no server-to-server auth gymnastics.
+- **AI role:** None.
+- **Approver:** None — read-only.
+- **Slack:** None.
+- **Writeback:** None. **Zero side effects** — no Slack post, no KV write, no Gmail send, no QBO write, no approval mutation, no label buy.
+- **Probed routes (GET only, all read-only):** `/api/ops/control-plane/health`, `/api/ops/fulfillment/recent-labels`, `/api/ops/docs/receipt?summary=true`, `/api/ops/ap-packets`, `/api/ops/locations/ingest`. Anything that mutates state (label buy, Gmail send, QBO write, approvals, KV writes) is intentionally NOT in the probe list.
+- **Env fingerprint:** boolean presence checks for the 12 env vars that gate the platform. Drive parent-folder fallback chain is surfaced explicitly — when `GOOGLE_DRIVE_SHIPPING_ARTIFACTS_PARENT_ID` is missing but `GOOGLE_DRIVE_UPLOAD_PARENT_ID` is set, the row reads "fallback · using GOOGLE_DRIVE_UPLOAD_PARENT_ID."
+- **No-secret-leak invariant:** locked by tests. The route input is boolean-only by construction; tests set known secret values in `process.env`, call the route, and assert the secret strings are absent from the response body.
+- **Smoke checklist:** stable list of click-through links operators visit by hand to verify public + operator surfaces (`/where-to-buy`, `/wholesale`, `/account/login`, `/account/recover`, `/ops/shipping`, `/ops/finance/review`, `/ops/ap-packets`, `/ops/locations`).
+- **Tests:** 16 helper tests (env-status derivation, fallback chain, probe outcome mapping, no-secret-leak invariant) + 5 route tests (auth gate, env fingerprint, no-secret-leak, missing-env reporting, fallback path).
+- **Monday MVP:** 🟢 — Ben opens `/ops/readiness`, sees what's red/yellow/green, sets the missing envs in Vercel, redeploys.
+
 ---
 
 ## Division 10 — Website / Vendor portal / Wholesale onboarding
