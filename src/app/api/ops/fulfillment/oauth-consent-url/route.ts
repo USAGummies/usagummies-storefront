@@ -9,6 +9,7 @@
  *   - Gmail send (already works, re-granted for completeness)
  *   - Gmail compose/modify (for drafts.create — missing today)
  *   - Drive readonly (for AP-packet attachment fetching — missing today)
+ *   - Drive file create (for vendor onboarding dossier folders)
  *
  * Flow:
  *   1. Ben opens the returned `authorizationUrl`
@@ -40,6 +41,9 @@ const REQUIRED_SCOPES = [
   "https://www.googleapis.com/auth/gmail.send",
   // Drive readonly — AP-packet W-9 / CIF / sell-sheet PDFs live here.
   "https://www.googleapis.com/auth/drive.readonly",
+  // Drive file — vendor onboarding creates dossier folders/files. This is
+  // narrower than full Drive and only grants files created/opened by the app.
+  "https://www.googleapis.com/auth/drive.file",
   // User profile — returned by default but listing it explicitly keeps
   // the consent screen truthful about what we're asking for.
   "openid",
@@ -89,7 +93,7 @@ export async function GET(req: Request): Promise<Response> {
     redirectUri,
     instructions: [
       "1. Open authorizationUrl in a browser where you're signed in as ben@usagummies.com",
-      "2. Click Allow on every scope (Gmail read + send + modify + Drive readonly)",
+      "2. Click Allow on every scope (Gmail read + send + modify + Drive readonly + Drive file create)",
       "3. Google redirects back to /api/ops/gmail-callback and displays a page with the new GMAIL_OAUTH_REFRESH_TOKEN",
       "4. Copy the token value, open Vercel → Settings → Environment Variables → edit GMAIL_OAUTH_REFRESH_TOKEN → paste → Save",
       "5. Redeploy or wait for next auto-deploy; scope-gated workflows (Gmail drafts, Drive file fetch) unblock on the next request",

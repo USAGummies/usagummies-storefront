@@ -33,6 +33,7 @@ import type { ApprovalDecision, DivisionId } from "@/lib/ops/control-plane/types
 import { postMessage } from "@/lib/ops/control-plane/slack/client";
 import { executeApprovedEmailReply } from "@/lib/ops/email-intelligence/approval-executor";
 import { executeApprovedShipmentCreate } from "@/lib/ops/sample-order-dispatch/approval-closer";
+import { executeApprovedVendorMasterCreate } from "@/lib/ops/vendor-onboarding";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -166,6 +167,9 @@ export async function POST(req: Request): Promise<Response> {
   let shipmentExecution:
     | Awaited<ReturnType<typeof executeApprovedShipmentCreate>>
     | undefined;
+  let vendorExecution:
+    | Awaited<ReturnType<typeof executeApprovedVendorMasterCreate>>
+    | undefined;
   let postedThreadText: string | null = null;
 
   if (decisionKind === "approve" && next.status === "approved") {
@@ -187,6 +191,16 @@ export async function POST(req: Request): Promise<Response> {
       }
     }
 
+    // 3. Vendor master closer: identified by targetEntity.type = "vendor-master".
+    if (!emailExecution.handled && !shipmentExecution?.handled) {
+      vendorExecution = await executeApprovedVendorMasterCreate(next);
+      if (vendorExecution.handled) {
+        postedThreadText = vendorExecution.ok
+          ? vendorExecution.threadMessage
+          : vendorExecution.threadMessage;
+      }
+    }
+
     if (postedThreadText && existing.slackThread?.ts) {
       await postMessage({
         channel: "#ops-approvals",
@@ -203,5 +217,6 @@ export async function POST(req: Request): Promise<Response> {
     decisions: next.decisions.length,
     execution: emailExecution,
     shipmentExecution,
+    vendorExecution,
   });
 }

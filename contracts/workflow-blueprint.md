@@ -204,8 +204,11 @@ Each row uses the schema:
 - **Monday MVP:** 🟢
 
 ### I5.3 Vendor master creation
-- **Status:** ❌ Stub — slug `vendor.master.create` exists, no route
-- **Monday MVP:** 🔴 — Rene manual; **next build item**
+- **Status:** ✅ Live — `/api/ops/vendors/onboard` + `/ops/vendors/new`
+- **Approver:** Rene (`vendor.master.create`)
+- **Flow:** Operator form → control-plane approval → Slack click → QBO vendor create → Notion/Drive dossier attempt → audit/thread result
+- **Tests:** Yes
+- **Monday MVP:** 🟢 for QBO vendor creation / 🟡 for Notion+Drive dossier until env scopes and parent IDs are verified
 
 ### I5.4 Reorder triggers (Powers PO, Belmark PO)
 - **Status:** ❌ Stub — Drew manual via Gmail thread
@@ -322,8 +325,8 @@ Each row uses the schema:
 - **Monday MVP:** 🟢
 
 ### W10.3 Vendor onboarding portal (proper)
-- **Status:** ❌ Missing — does not exist yet
-- **Monday MVP:** 🔴 — **Phase 2 build** (replaces Slack as intake per Ben's 2026-04-24 spec)
+- **Status:** 🟡 Internal operator portal live at `/ops/vendors/new`; external self-service vendor portal not built
+- **Monday MVP:** 🟡 — Rene can open approved vendor masters internally; public/self-service vendor portal remains Phase 2
 
 ---
 
@@ -331,9 +334,9 @@ Each row uses the schema:
 
 | Status | Count | Workflows |
 |---|---|---|
-| 🟢 Green | 25 | Email-intel triage (CLOSED LOOP), Sample-request → shipping bridge (NEW), HubSpot dispatch, Auto-ship, Sample dispatch, Wallet check, Inventory snapshot/forecast/burn-rate, Vendor threads, Outreach validate, Marketing content, Research Librarian, Compliance (fallback), Control plane, Slack approvals, Drift audit, Hard-rules pin, Customer chat, Finance Exception, Freight-comp manager, Stamps.com daily ping, Wholesale page, Gmail send/draft primitives, AP packet send (JJ-only), Reply composer (untested but live) |
-| 🟡 Yellow | 6 | Reply composer + Pipeline enrich (no tests), Inbox triage (one-shot), AP packet send (Drive scope), QBO write paths (sparse tests), Approved Claims (KV-only), NCS upload (ephemeral FS) |
-| 🔴 Red | 11 | Faire Direct invites, Vendor master creation, Reorder triggers, Drew East-Coast routing, Klaviyo / social, R-1..R-7 specialists, Trade-show pod, USPTO/FDA tracking, Vendor onboarding portal, Receipts OCR, Compliance Calendar (Notion gap) |
+| 🟢 Green | 26 | Email-intel triage (CLOSED LOOP), Sample-request → shipping bridge, Vendor master creation (QBO path), HubSpot dispatch, Auto-ship, Sample dispatch, Wallet check, Inventory snapshot/forecast/burn-rate, Vendor threads, Outreach validate, Marketing content, Research Librarian, Compliance (fallback), Control plane, Slack approvals, Drift audit, Hard-rules pin, Customer chat, Finance Exception, Freight-comp manager, Stamps.com daily ping, Wholesale page, Gmail send/draft primitives, AP packet send (JJ-only), Reply composer (untested but live) |
+| 🟡 Yellow | 7 | Reply composer + Pipeline enrich (no tests), Inbox triage (one-shot), AP packet send (Drive scope), QBO write paths (sparse tests), Approved Claims (KV-only), NCS upload (ephemeral FS), Vendor onboarding Notion/Drive dossier parent IDs/scopes |
+| 🔴 Red | 9 | Faire Direct invites, Reorder triggers, Drew East-Coast routing confirmation, Klaviyo / social, R-1..R-7 specialists, Trade-show pod, USPTO/FDA tracking, external vendor portal, Receipts OCR |
 
 ---
 
@@ -342,20 +345,21 @@ Each row uses the schema:
 1. **OAuth re-consent landing** — unblocks Drive scope for AP-packet attachments + Gmail compose for drafts. Ben already clicked through; verify new refresh token has `gmail.modify` + `drive.readonly`.
 2. ~~**Send-on-approve hook for email-intel**~~ — DONE 2026-04-24 (commit `16fa4ea`). `executeApprovedEmailReply()` wired into `/api/slack/approvals` click handler.
 3. ~~**Sample-request → shipping bridge**~~ — DONE 2026-04-24. See S1.5 above.
-4. **Vendor master creation route** — `POST /api/ops/vendors/onboard` with QBO vendor + Notion dossier + Drive folder. ~4hr. **NEXT BUILD.**
+4. ~~**Vendor master creation route**~~ — DONE 2026-04-24. `POST /api/ops/vendors/onboard`, `/ops/vendors/new`, Slack approval closer, QBO write after Rene approval.
 5. **NCS upload writeback** — swap local FS for Vercel Blob or Drive so customer-uploaded forms persist past redeploys. ~1hr.
 6. **AP packet UI dashboard** — show every packet (not just JJ) with sent-status badges + send/record-sent buttons. ~1hr.
 
 ### Recommended next workflow after sample-shipping bridge
 
-**Vendor master creation (I5.3 → green)** is the highest-leverage next build:
-- Today: Drew opens new vendor relationships ad-hoc via Gmail; Rene types vendor records into QBO by hand 1-2 weeks later. Receipts arrive in `#receipts-capture` with no canonical vendor record, so OCR'd transactions can't auto-categorize.
-- Build: a single `POST /api/ops/vendors/onboard` route that takes `{name, contact, terms, taxClass}` and writes (a) QBO vendor via existing `/api/ops/qbo/vendor`, (b) Notion vendor dossier, (c) shared Drive folder for W-9/COI. Class B approval (`vendor.master.create`) gates the QBO write. Closes the inbound side of Division 5 and unblocks AP-packet expansion (currently hardcoded to JJ).
-- Why this next: every other red item in Division 5/6 chains off having a vendor record. Once we have it, reorder triggers + Klaviyo segmentation + receipt auto-cat all become possible without manual vendor lookup.
+**Next workflow after vendor master creation:** persistent upload/writeback for NCS/vendor docs.
+- Today: uploaded/customer/vendor files can still land in fragile places unless they are already in Drive.
+- Build: replace `/api/ops/upload` local filesystem write with durable Drive or Blob storage, then point NCS/vendor document intake to it.
+- Why this next: vendor master can now exist; document intake still needs durable storage so W-9/COI/customer forms are not lost on redeploy.
 
 ---
 
 ## Version history
 
 - **1.1 — 2026-04-24** — Email-intel send-on-approve closed (commit `16fa4ea`). Sample-request → shipping bridge (S1.5) added with 9 tests. Top-5 list refreshed; vendor master creation flagged as next build.
+- **1.2 — 2026-04-24** — Vendor master creation closed internally. Added `/ops/vendors/new`, `POST /api/ops/vendors/onboard`, `executeApprovedVendorMasterCreate()`, and Slack approval closer. QBO write is approval-gated; Notion/Drive dossier creation is best-effort until parent envs/scopes are verified.
 - **1.0 — 2026-04-24** — First publication. Synthesizes 2 division-audit agent reports + 5 P0 deliverables + email-intelligence build. Replaces ad-hoc workflow descriptions across other contract docs.
