@@ -32,6 +32,7 @@ import { buildHumanAuditEntry } from "@/lib/ops/control-plane/audit";
 import type { ApprovalDecision, DivisionId } from "@/lib/ops/control-plane/types";
 import { postMessage } from "@/lib/ops/control-plane/slack/client";
 import { executeApprovedEmailReply } from "@/lib/ops/email-intelligence/approval-executor";
+import { executeApprovedShipmentCreate } from "@/lib/ops/sample-order-dispatch/approval-closer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -153,18 +154,43 @@ export async function POST(req: Request): Promise<Response> {
   await auditStore().append(auditEntry);
   await auditSurface().mirror(auditEntry).catch(() => void 0);
 
-  let execution:
+  // ---- Approved-action closers ---------------------------------------------
+  // Each closer is gated by its own targetEntity / payloadRef shape so we
+  // never invoke the wrong handler. They run sequentially; the first one
+  // that returns handled=true wins. None of them buy labels — label
+  // purchase happens only via the dedicated auto-ship pipeline AFTER
+  // additional human action.
+  let emailExecution:
     | Awaited<ReturnType<typeof executeApprovedEmailReply>>
     | undefined;
+  let shipmentExecution:
+    | Awaited<ReturnType<typeof executeApprovedShipmentCreate>>
+    | undefined;
+  let postedThreadText: string | null = null;
+
   if (decisionKind === "approve" && next.status === "approved") {
-    execution = await executeApprovedEmailReply(next);
-    if (execution.handled && existing.slackThread?.ts) {
-      const text = execution.ok
-        ? `:email: Email send executed. Gmail message \`${execution.messageId}\`${execution.hubspotLogId ? ` · HubSpot log \`${execution.hubspotLogId}\`` : " · HubSpot log pending/unavailable"}.`
-        : `:warning: Email approval recorded, but send failed: ${execution.error}`;
+    // 1. Email-reply closer: identified by targetEntity.type = "email-reply"
+    emailExecution = await executeApprovedEmailReply(next);
+    if (emailExecution.handled) {
+      postedThreadText = emailExecution.ok
+        ? `:email: Email send executed. Gmail message \`${emailExecution.messageId}\`${emailExecution.hubspotLogId ? ` · HubSpot log \`${emailExecution.hubspotLogId}\`` : " · HubSpot log pending/unavailable"}.`
+        : `:warning: Email approval recorded, but send failed: ${emailExecution.error}`;
+    }
+
+    // 2. Shipment.create closer: identified by payloadRef = "dispatch:<chan>:<id>"
+    if (!emailExecution.handled) {
+      shipmentExecution = await executeApprovedShipmentCreate(next);
+      if (shipmentExecution.handled) {
+        postedThreadText = shipmentExecution.ok
+          ? shipmentExecution.threadMessage
+          : `:warning: Shipment approval recorded, but closer failed: ${shipmentExecution.error}`;
+      }
+    }
+
+    if (postedThreadText && existing.slackThread?.ts) {
       await postMessage({
         channel: "#ops-approvals",
-        text,
+        text: postedThreadText,
         threadTs: existing.slackThread.ts,
       }).catch(() => void 0);
     }
@@ -175,6 +201,7 @@ export async function POST(req: Request): Promise<Response> {
     approvalId,
     status: next.status,
     decisions: next.decisions.length,
-    execution,
+    execution: emailExecution,
+    shipmentExecution,
   });
 }

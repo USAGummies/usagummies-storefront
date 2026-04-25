@@ -352,16 +352,25 @@ async function runOnce(opts: RunBody): Promise<RunResult> {
           const dispatchBody = (await dispatchRes
             .json()
             .catch(() => ({}))) as {
+            ok?: boolean;
+            posted?: boolean;
+            approvalId?: string | null;
             proposalTs?: string | null;
             classification?: { refuse?: boolean };
             refuse?: boolean;
           };
-          if (dispatchRes.ok && !dispatchBody.refuse) {
-            sampleApprovalId = dispatchBody.proposalTs ?? "dispatched";
+          if (dispatchRes.ok && !dispatchBody.refuse && dispatchBody.approvalId) {
+            // Record the canonical approvalId (from the control-plane
+            // ApprovalStore), NOT the Slack ts. This is what links the
+            // email-intel run back to the approval row when Ben clicks
+            // Approve and the closer fires.
+            sampleApprovalId = dispatchBody.approvalId;
             sampleDispatchesOpened += 1;
           } else {
             errors.push(
-              `sample-dispatch failed for ${env.id}: HTTP ${dispatchRes.status}`,
+              `sample-dispatch failed for ${env.id}: HTTP ${dispatchRes.status}${
+                dispatchBody.refuse ? ` refuse=true` : ""
+              }`,
             );
           }
         } catch (err) {
