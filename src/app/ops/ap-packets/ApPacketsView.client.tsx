@@ -11,10 +11,31 @@ import {
   SURFACE_TEXT_DIM as DIM,
 } from "@/app/ops/tokens";
 import type { ApPacket, ApPacketAttachment } from "@/lib/ops/ap-packets";
+import {
+  deriveDashboardRow,
+  hasPacketTemplateRegistry,
+  summarizeDashboard,
+  type DashboardRow,
+  type PacketRosterRow,
+} from "@/lib/ops/ap-packet-dashboard";
 
 type PacketResponse = {
   ok: boolean;
   packet?: ApPacket;
+  error?: string;
+  lastSent?: {
+    sentAt: string;
+    sentBy: string;
+    messageId: string;
+    threadId: string | null;
+    approvalId?: string | null;
+    subject?: string | null;
+  } | null;
+};
+
+type RosterResponse = {
+  ok: boolean;
+  packets?: PacketRosterRow[];
   error?: string;
 };
 
@@ -45,25 +66,50 @@ async function copy(text: string) {
 
 export function ApPacketsView() {
   const [packet, setPacket] = useState<ApPacket | null>(null);
+  const [packetLastSent, setPacketLastSent] = useState<
+    PacketResponse["lastSent"] | null
+  >(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [roster, setRoster] = useState<PacketRosterRow[]>([]);
+  const [rosterErr, setRosterErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/ops/ap-packets?account=jungle-jims", {
-        cache: "no-store",
-      });
-      const data = (await res.json()) as PacketResponse;
-      if (!res.ok || !data.packet) {
-        throw new Error(data.error || `HTTP ${res.status}`);
+      const [detailRes, rosterRes] = await Promise.all([
+        fetch("/api/ops/ap-packets?account=jungle-jims", { cache: "no-store" }),
+        fetch("/api/ops/ap-packets", { cache: "no-store" }),
+      ]);
+      const detailData = (await detailRes.json()) as PacketResponse;
+      if (!detailRes.ok || !detailData.packet) {
+        throw new Error(detailData.error || `HTTP ${detailRes.status}`);
       }
-      setPacket(data.packet);
+      setPacket(detailData.packet);
+      setPacketLastSent(detailData.lastSent ?? null);
+
+      // Roster — best-effort. A failure here doesn't block the JJ
+      // detail panel; surfaces as a banner in the roster section only.
+      try {
+        const rosterData = (await rosterRes.json()) as RosterResponse;
+        if (rosterRes.ok && Array.isArray(rosterData.packets)) {
+          setRoster(rosterData.packets);
+          setRosterErr(null);
+        } else {
+          setRoster([]);
+          setRosterErr(rosterData.error || `Roster HTTP ${rosterRes.status}`);
+        }
+      } catch (err) {
+        setRoster([]);
+        setRosterErr(err instanceof Error ? err.message : String(err));
+      }
+
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setPacket(null);
+      setPacketLastSent(null);
     } finally {
       setLoading(false);
     }
@@ -151,8 +197,16 @@ export function ApPacketsView() {
         </div>
       ) : null}
 
+      <RosterSection
+        roster={roster}
+        rosterErr={rosterErr}
+        loading={loading}
+        activeSlug={packet?.slug ?? null}
+      />
+
       {!loading && packet ? (
         <>
+          <PacketDetailHeader packet={packet} lastSent={packetLastSent} />
           <section
             style={{
               display: "grid",
@@ -561,4 +615,288 @@ const copyButtonStyle: CSSProperties = {
   fontWeight: 700,
   cursor: "pointer",
   marginTop: 8,
+};
+
+// ---------------------------------------------------------------------------
+// Dashboard sections — added 2026-04-25 to surface every packet, not just JJ.
+// All derivation goes through the pure helpers in
+// `@/lib/ops/ap-packet-dashboard`, which are unit-tested for
+// no-fabrication behavior. Send/resend stays gated behind the
+// existing Class B `request-approval` route — this surface never
+// fires Gmail directly.
+// ---------------------------------------------------------------------------
+
+const SEND_STATUS_COLOR: Record<string, string> = {
+  not_yet_sent: GOLD,
+  sent_recently: GREEN,
+  sent_long_ago: AMBER,
+  blocked_missing_docs: RED,
+  blocked_pricing_review: AMBER,
+};
+
+function RosterSection(props: {
+  roster: PacketRosterRow[];
+  rosterErr: string | null;
+  loading: boolean;
+  activeSlug: string | null;
+}) {
+  const rows = useMemo<DashboardRow[]>(
+    () => props.roster.map((r) => deriveDashboardRow(r)),
+    [props.roster],
+  );
+  const summary = useMemo(() => summarizeDashboard(rows), [rows]);
+  const templateRegistryWired = hasPacketTemplateRegistry();
+
+  return (
+    <section
+      style={{
+        background: CARD,
+        border: `1px solid ${BORDER}`,
+        borderRadius: 12,
+        padding: "16px 18px",
+        marginBottom: 18,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          gap: 12,
+          flexWrap: "wrap",
+          marginBottom: 10,
+        }}
+      >
+        <h2 style={{ color: GOLD, fontSize: 13, textTransform: "uppercase", margin: 0 }}>
+          Packet roster
+        </h2>
+        <div style={{ fontSize: 12, color: DIM }}>
+          {summary.total} total · {summary.notYetSent} not yet sent ·{" "}
+          {summary.sentRecently} sent (recent) · {summary.sentLongAgo} stale ·{" "}
+          {summary.blockedMissingDocs + summary.blockedPricingReview} blocked
+        </div>
+      </div>
+
+      {props.rosterErr ? (
+        <div
+          style={{
+            color: RED,
+            fontSize: 12,
+            marginBottom: 8,
+          }}
+        >
+          Roster fetch error: {props.rosterErr}
+        </div>
+      ) : null}
+
+      {props.loading && rows.length === 0 ? (
+        <div style={{ color: DIM, fontSize: 12 }}>Loading roster…</div>
+      ) : rows.length === 0 ? (
+        <div
+          style={{
+            color: DIM,
+            fontSize: 12,
+            border: `1px dashed ${BORDER}`,
+            borderRadius: 8,
+            padding: "12px 14px",
+          }}
+        >
+          No packets registered. Once `listApPackets()` returns more than the
+          Jungle Jim&apos;s template, they&apos;ll appear here automatically.
+        </div>
+      ) : (
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+            <thead>
+              <tr style={{ color: DIM, textAlign: "left" }}>
+                <th style={rosterTh}>Account</th>
+                <th style={rosterTh}>Owner</th>
+                <th style={rosterTh}>Status</th>
+                <th style={rosterTh}>Attachments</th>
+                <th style={rosterTh}>Last sent</th>
+                <th style={rosterTh}>Recommended next action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => {
+                const isActive = r.slug === props.activeSlug;
+                return (
+                  <tr
+                    key={r.slug}
+                    style={{
+                      borderTop: `1px dashed ${BORDER}`,
+                      background: isActive ? `${GOLD}15` : "transparent",
+                    }}
+                  >
+                    <td style={rosterTd}>
+                      <div style={{ fontWeight: 600 }}>{r.accountName}</div>
+                      <div style={{ color: DIM, fontSize: 11 }}>
+                        {r.apEmail} · slug `{r.slug}`
+                      </div>
+                    </td>
+                    <td style={rosterTd}>{r.owner}</td>
+                    <td style={rosterTd}>
+                      <span
+                        style={{
+                          color: SEND_STATUS_COLOR[r.sendStatus] ?? DIM,
+                          fontWeight: 600,
+                        }}
+                      >
+                        {r.statusLabel}
+                      </span>
+                    </td>
+                    <td style={rosterTd}>
+                      <span style={{ color: GREEN }}>{r.attachmentSummary.ready} ready</span>
+                      {r.attachmentSummary.missing > 0 ? (
+                        <>
+                          {" · "}
+                          <span style={{ color: RED }}>
+                            {r.attachmentSummary.missing} missing
+                          </span>
+                        </>
+                      ) : null}
+                      {r.attachmentSummary.review > 0 ? (
+                        <>
+                          {" · "}
+                          <span style={{ color: AMBER }}>
+                            {r.attachmentSummary.review} review
+                          </span>
+                        </>
+                      ) : null}
+                      {r.attachmentSummary.optional > 0 ? (
+                        <>
+                          {" · "}
+                          <span style={{ color: DIM }}>
+                            {r.attachmentSummary.optional} optional
+                          </span>
+                        </>
+                      ) : null}
+                    </td>
+                    <td style={rosterTd}>
+                      {r.lastSentAt ? (
+                        <>
+                          <div>{r.lastSentAt.slice(0, 10)}</div>
+                          <div style={{ color: DIM, fontSize: 11 }}>
+                            {r.lastSentBy ?? "—"}
+                            {r.daysSinceLastSent !== null
+                              ? ` · ${r.daysSinceLastSent}d ago`
+                              : ""}
+                          </div>
+                        </>
+                      ) : (
+                        <span style={{ color: DIM }}>—</span>
+                      )}
+                    </td>
+                    <td style={rosterTd}>
+                      <div style={{ fontWeight: 600 }}>{r.recommendedAction}</div>
+                      {r.secondaryActions.map((s) => (
+                        <div key={s} style={{ color: DIM, fontSize: 11, marginTop: 2 }}>
+                          {s}
+                        </div>
+                      ))}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div
+        style={{
+          marginTop: 12,
+          display: "flex",
+          gap: 12,
+          flexWrap: "wrap",
+          alignItems: "center",
+        }}
+      >
+        {templateRegistryWired ? (
+          <a href="#" style={{ color: GOLD, fontSize: 12, fontWeight: 600 }}>
+            Create packet from template
+          </a>
+        ) : (
+          <span
+            style={{
+              color: DIM,
+              fontSize: 12,
+              padding: "4px 8px",
+              border: `1px dashed ${BORDER}`,
+              borderRadius: 6,
+            }}
+            title="No template registry exists yet — add one in src/lib/ops/ap-packets.ts before wiring this button."
+          >
+            Create packet from template — not wired yet
+          </span>
+        )}
+        <span style={{ color: DIM, fontSize: 11 }}>
+          Send / resend goes through{" "}
+          <code style={{ color: NAVY }}>
+            POST /api/ops/fulfillment/ap-packet/request-approval
+          </code>{" "}
+          (Class B, Ben approves in Slack #ops-approvals). This page never sends
+          email directly.
+        </span>
+      </div>
+    </section>
+  );
+}
+
+function PacketDetailHeader(props: {
+  packet: ApPacket;
+  lastSent: PacketResponse["lastSent"] | null;
+}) {
+  if (!props.lastSent) {
+    return (
+      <div
+        style={{
+          background: `${GOLD}10`,
+          border: `1px solid ${GOLD}50`,
+          color: NAVY,
+          fontSize: 12,
+          padding: "10px 14px",
+          borderRadius: 10,
+          marginBottom: 14,
+        }}
+      >
+        <strong>{props.packet.accountName}</strong> packet has not been sent
+        yet. Once Ben approves a Class B `gmail.send` for slug{" "}
+        <code>{props.packet.slug}</code>, the send route stamps the
+        `ap-packets:sent:&lt;slug&gt;` KV row and this banner flips to
+        &quot;Sent&quot;.
+      </div>
+    );
+  }
+  return (
+    <div
+      style={{
+        background: `${GREEN}10`,
+        border: `1px solid ${GREEN}50`,
+        color: NAVY,
+        fontSize: 12,
+        padding: "10px 14px",
+        borderRadius: 10,
+        marginBottom: 14,
+      }}
+    >
+      <strong>{props.packet.accountName}</strong> packet sent on{" "}
+      {props.lastSent.sentAt?.slice(0, 16)} by {props.lastSent.sentBy}
+      {props.lastSent.messageId
+        ? ` · Gmail message ${props.lastSent.messageId}`
+        : ""}
+      {props.lastSent.threadId ? ` · thread ${props.lastSent.threadId}` : ""}.
+      To resend, open a new Class B approval at{" "}
+      <code>POST /api/ops/fulfillment/ap-packet/request-approval</code>.
+    </div>
+  );
+}
+
+const rosterTh: CSSProperties = {
+  padding: "6px 10px",
+  fontWeight: 600,
+};
+const rosterTd: CSSProperties = {
+  padding: "8px 10px",
+  verticalAlign: "top",
 };

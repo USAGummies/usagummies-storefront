@@ -209,6 +209,21 @@ Follow this order **without rebuying the label**:
 - **Slack:** Daily ping in `#operations` listing stale voids (FIXED today)
 - **Monday MVP:** 🟢 (alert) / 🟡 (auto-escalation email — next build)
 
+### Fin4.7 AP Packet Dashboard (`/ops/ap-packets`)
+- **Trigger:** Operator opens the page (Rene + Ben). Read-only.
+- **Source:**
+  - `/api/ops/ap-packets` (no slug) — roster of every packet with `attachmentSummary`, `nextActionsCount`, `firstNextAction`, and a per-slug `lastSent` join from KV `ap-packets:sent:<slug>`.
+  - `/api/ops/ap-packets?account=jungle-jims` — full detail for the JJ panel (existing flow).
+- **AI role:** None — pure derivation through `src/lib/ops/ap-packet-dashboard.ts`. `deriveDashboardRow()` picks one recommended next action per packet from the priority list: pricing review → missing docs → attachments needing review → recently sent → stale send → ready-to-send → first nextActions entry. Never invents copy.
+- **Approver:** N/A for the page. **Send/resend stays gated through `POST /api/ops/fulfillment/ap-packet/request-approval` (Class B `gmail.send`, Ben approves in `#ops-approvals`).** The dashboard never sends email directly.
+- **Slack:** None directly. The send route already posts the approval card to `#ops-approvals` and the audit to `#ops-audit`.
+- **Writeback:** None. Zero side effects — this surface only reads the existing GET endpoints.
+- **Audit:** None — read-only views are not auditable events.
+- **Failure mode:** Roster fetch fails → roster section shows the error string + "0 rows", JJ detail panel still loads independently. KV miss for `ap-packets:sent:<slug>` → "Last sent" shows "—", dashboard treats as `not_yet_sent`.
+- **Tests:** 18 unit tests in `ap-packet-dashboard.test.ts` lock the contract: missing/review counts, plural-aware copy, recent vs stale send classification (30-day boundary), pricing review precedence, action-required fallback to `firstNextAction`, no-fabrication when nextActions is empty, summary aggregation, `hasPacketTemplateRegistry()` returns false today.
+- **Monday MVP:** 🟢 — page is ready for Rene + Ben. Surfaces every packet with status, attachments, last sent (if any), and recommended next action. New packets land in the roster automatically when added to `listApPackets()`.
+- **Later:** (1) Build a packet template registry (currently `hasPacketTemplateRegistry()` returns false; the "Create from template" link is explicitly disabled with a "not wired yet" pill). (2) Wire the Slack approve button at `/api/slack/approvals` to dispatch the `ap-packet/send` execution automatically when the approval flips, instead of the caller-driven `?approvalToken=` path.
+
 ### Fin4.6 Finance Review surface (`/ops/finance/review`)
 - **Trigger:** Operator opens the page (Rene + Ben). Read-only.
 - **Source:** Aggregates four live APIs in parallel:
