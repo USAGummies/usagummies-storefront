@@ -402,6 +402,31 @@ Follow this order **without rebuying the label**:
 - **Status:** 🟡 Internal operator portal live at `/ops/vendors/new`; external self-service vendor portal not built
 - **Monday MVP:** 🟡 — Rene can open approved vendor masters internally; public/self-service vendor portal remains Phase 2
 
+### W10.4 Wholesale inquiry receipt page (`/wholesale/inquiry/[token]`)
+- **Trigger:** Customer submits the form at `/wholesale` → `/api/leads` returns an `inquiryUrl` → `WholesaleForm` redirects.
+- **Auth:** HMAC-signed token (no login). 30-day TTL. Verified via `verifyInquiryToken`.
+- **Data sources:** existing `/api/wholesale-status?email=` for HubSpot deal status; existing `/api/ops/upload` for doc capture.
+- **Writeback:** Drive (via /api/ops/upload). No QBO write, no email send, no HubSpot mutation.
+- **Tests:** 13 token + 6 inquiries-route + 5 leads-route.
+- **Required env:** `WHOLESALE_INQUIRY_SECRET` (long random secret). Without it, the form keeps working — just no inquiryUrl.
+- **Monday MVP:** 🟢 — Phase 1 portal live (commit 3f396af).
+
+### W10.5 Customer account UI (`/account`)
+- **Trigger:** Customer visits `/account/login` (or `/account` while signed-out → redirected to login).
+- **Auth:** Shopify customer accounts via the existing `/api/member` route. Cookie-based session (`usa_customer_token`, httpOnly, secure in prod, 30-day max age) — already plumbed before this build, just unsurfaced.
+- **Pages:**
+  - `/account/login` — email + password → `POST /api/member action=login`
+  - `/account/recover` — email-only → `POST /api/member action=recover` (Shopify sends the reset email)
+  - `/account` — `POST /api/member action=session` for customer + last 10 Shopify orders, plus a read-only B2B status panel for plausible business-domain emails (joins `/api/wholesale-status?email=` server-fetched by the client). Logout button calls `POST /api/member action=logout`.
+- **Source of truth:** Shopify Storefront API (orders), HubSpot (B2B deals — read-only).
+- **AI role:** None.
+- **Approver:** None — read-only customer surface.
+- **Slack:** None.
+- **Writeback:** Cookie set/clear via `/api/member`. No QBO, no Drive, no Gmail, no cart mutation, no checkout change.
+- **Failure mode:** session 401 → redirect to `/account/login`. /api/wholesale-status error → B2B panel shows a friendly "temporarily unavailable" message; orders still render. B2B panel is hidden entirely for consumer mailboxes (gmail/yahoo/etc.) to keep the noise down for DTC customers.
+- **Tests:** 19 unit tests in `display.test.ts` lock the no-fabrication contract on order date / total / financial status / fulfillment status / greeting / `shouldQueryB2BStatus` heuristic.
+- **Monday MVP:** 🟢 — Phase 2 surface live (commit pending). No reorder button (no safe multi-line cart-rebuild helper exists yet); no per-account pricing or terms (Phase 3).
+
 ---
 
 ## Monday-readiness summary
