@@ -16,6 +16,7 @@ import { NextResponse } from "next/server";
 
 import { isAuthorized } from "@/lib/ops/abra-auth";
 import { getRecentShipments } from "@/lib/ops/shipstation-client";
+import { bulkLookupArtifacts } from "@/lib/ops/shipping-artifacts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -85,6 +86,19 @@ export async function GET(req: Request): Promise<Response> {
     byCarrier[key] = bucket;
   }
 
+  // Bulk-join with artifact metadata (Drive label + packing slip + Slack
+  // permalink) recorded by the auto-ship pipeline. Best-effort: a KV
+  // miss / outage just leaves those fields null.
+  const orderNumbers = shipments
+    .map((s) => s.orderNumber)
+    .filter((n): n is string => Boolean(n));
+  const artifacts =
+    orderNumbers.length > 0
+      ? await bulkLookupArtifacts(
+          orderNumbers.map((n) => ({ orderNumber: n })),
+        ).catch(() => new Map())
+      : new Map();
+
   return NextResponse.json({
     ok: true,
     generatedAt: new Date().toISOString(),
@@ -95,19 +109,27 @@ export async function GET(req: Request): Promise<Response> {
     activeSpend: totalSpend,
     voidedSpend,
     byCarrier,
-    shipments: shipments.map((s) => ({
-      shipmentId: s.shipmentId,
-      orderNumber: s.orderNumber,
-      trackingNumber: s.trackingNumber,
-      carrierCode: s.carrierCode,
-      serviceCode: s.serviceCode,
-      shipDate: s.shipDate,
-      createDate: s.createDate,
-      voided: s.voided,
-      voidDate: s.voidDate,
-      shipmentCost: s.shipmentCost,
-      shipToName: s.shipToName,
-      shipToPostalCode: s.shipToPostalCode,
-    })),
+    shipments: shipments.map((s) => {
+      const artifact = s.orderNumber ? artifacts.get(s.orderNumber) : null;
+      return {
+        shipmentId: s.shipmentId,
+        orderNumber: s.orderNumber,
+        trackingNumber: s.trackingNumber,
+        carrierCode: s.carrierCode,
+        serviceCode: s.serviceCode,
+        shipDate: s.shipDate,
+        createDate: s.createDate,
+        voided: s.voided,
+        voidDate: s.voidDate,
+        shipmentCost: s.shipmentCost,
+        shipToName: s.shipToName,
+        shipToPostalCode: s.shipToPostalCode,
+        // New: artifact links surfaced when present.
+        labelDriveLink: artifact?.label?.webViewLink ?? null,
+        packingSlipDriveLink: artifact?.packingSlip?.webViewLink ?? null,
+        slackPermalink: artifact?.slackPermalink ?? null,
+        artifactSource: artifact?.source ?? null,
+      };
+    }),
   });
 }

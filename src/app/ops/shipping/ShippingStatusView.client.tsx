@@ -74,6 +74,13 @@ interface RecentLabel {
   shipmentCost: number | null;
   shipToName: string | null;
   shipToPostalCode: string | null;
+  /** Drive web view link to the label PDF (page 1). Set when auto-ship persisted to Drive. */
+  labelDriveLink?: string | null;
+  /** Drive web view link to the packing slip PDF (page 2). */
+  packingSlipDriveLink?: string | null;
+  /** Slack permalink to the label upload, when Slack file upload succeeded. */
+  slackPermalink?: string | null;
+  artifactSource?: string | null;
 }
 
 interface RecentLabelsData {
@@ -722,6 +729,7 @@ export function ShippingStatusView() {
                   <Th>Cost</Th>
                   <Th>Tracking</Th>
                   <Th>Ship-to</Th>
+                  <Th>Artifacts</Th>
                   <Th>Status</Th>
                 </tr>
               </thead>
@@ -758,6 +766,52 @@ export function ShippingStatusView() {
                     <Td>
                       {s.shipToName ?? "—"}
                       {s.shipToPostalCode ? ` · ${s.shipToPostalCode}` : ""}
+                    </Td>
+                    <Td>
+                      {s.labelDriveLink ||
+                      s.packingSlipDriveLink ||
+                      s.slackPermalink ? (
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            gap: 8,
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          {s.labelDriveLink && (
+                            <a
+                              href={s.labelDriveLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ color: GOLD, textDecoration: "underline" }}
+                            >
+                              Open label
+                            </a>
+                          )}
+                          {s.packingSlipDriveLink && (
+                            <a
+                              href={s.packingSlipDriveLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ color: GOLD, textDecoration: "underline" }}
+                            >
+                              Packing slip
+                            </a>
+                          )}
+                          {s.slackPermalink && (
+                            <a
+                              href={s.slackPermalink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ color: DIM, textDecoration: "underline" }}
+                            >
+                              Slack
+                            </a>
+                          )}
+                        </span>
+                      ) : (
+                        <span style={{ color: DIM }}>—</span>
+                      )}
                     </Td>
                     <Td>
                       {s.voided ? (
