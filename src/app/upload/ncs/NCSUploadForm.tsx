@@ -37,6 +37,9 @@ export function NCSUploadForm() {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("customer_name", customerName.trim());
+    // doc_type is the new canonical field; form_type kept for backward
+    // compatibility with any older callers / proxies.
+    formData.append("doc_type", "ncs");
     formData.append("form_type", "ncs");
     formData.append("notes", notes.trim());
 
