@@ -1,5 +1,6 @@
-// Minimal footer — monumental wordmark, three link columns, navy legal bar.
+// Minimal footer — main brand logo, three link columns, navy legal bar.
 
+import Image from "next/image";
 import Link from "next/link";
 
 export function FooterMini() {
@@ -8,13 +9,21 @@ export function FooterMini() {
       <div className="lp-bunting" aria-hidden />
       <div className="mx-auto grid max-w-[1200px] grid-cols-1 gap-8 px-5 py-14 sm:grid-cols-[1.5fr_1fr_1fr] sm:px-8">
         <div>
-          <p className="lp-display text-[2.25rem] leading-[0.9] text-[var(--lp-ink)]">
-            USA <span className="text-[var(--lp-red)]">★</span> Gummies.
-          </p>
-          <p className="lp-script mt-1 text-[1.6rem] text-[var(--lp-red)]">
-            Made in the U.S.A.
-          </p>
-          <p className="lp-sans mt-3 max-w-[32ch] text-[1rem] font-normal text-[var(--lp-ink)]/80">
+          {/* Main USA Gummies brand logo (USA wing crest + GUMMIES
+              wordmark + "Made in the U.S.A." script). Replaces the
+              typed wordmark per Ben's audit ("on the bottom of the
+              page, this should be the main logo"). */}
+          <Link href="/" aria-label="USA Gummies — home" className="block">
+            <Image
+              src="/brand/logo.png"
+              alt="USA Gummies — Made in the U.S.A."
+              width={1118}
+              height={645}
+              sizes="(max-width: 640px) 200px, 260px"
+              className="h-auto w-[200px] sm:w-[260px]"
+            />
+          </Link>
+          <p className="lp-sans mt-5 max-w-[32ch] text-[1rem] font-normal text-[var(--lp-ink)]/80">
             All-natural gummy bears. Sourced, made, and packed in the U.S.A.
           </p>
           <p className="lp-label mt-3 text-[var(--lp-red)]">
