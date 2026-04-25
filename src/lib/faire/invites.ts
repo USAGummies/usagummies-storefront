@@ -354,6 +354,226 @@ export async function ingestInviteRows(
   };
 }
 
+// ---- Phase 2 review actions -----------------------------------------
+
+/**
+ * Status values an operator may set via the review route. `"sent"` is
+ * intentionally NOT in this set — sent transitions only happen inside
+ * the future send-on-approve closer (Class B `faire-direct.invite`).
+ */
+export const REVIEWABLE_STATUSES: readonly Exclude<
+  FaireInviteStatus,
+  "sent"
+>[] = ["needs_review", "approved", "rejected"] as const;
+
+export type InviteUpdateError =
+  | { code: "not_found"; message: string }
+  | { code: "invalid_status"; message: string }
+  | { code: "sent_status_forbidden"; message: string }
+  | { code: "validation_failed"; message: string }
+  | { code: "duplicate_email"; message: string }
+  | { code: "no_changes"; message: string };
+
+export interface InviteUpdatePatch {
+  status?: FaireInviteStatus;
+  reviewNote?: string;
+  fieldCorrections?: Partial<FaireInviteCandidate>;
+  reviewedBy?: string;
+}
+
+const ALLOWED_CORRECTION_KEYS: ReadonlySet<keyof FaireInviteCandidate> = new Set(
+  [
+    "retailerName",
+    "buyerName",
+    "email",
+    "city",
+    "state",
+    "source",
+    "notes",
+    "hubspotContactId",
+  ],
+);
+
+/**
+ * Apply an operator review patch to an invite record. KV write is the
+ * only side effect — no Gmail / Slack / Faire / network call.
+ *
+ * Hard rules locked by tests:
+ *   - status MUST be one of REVIEWABLE_STATUSES. Setting `"sent"`
+ *     here is rejected with `code: "sent_status_forbidden"` so a
+ *     future send closer is the only path that can flip a record to
+ *     `sent`.
+ *   - Field corrections merge into the existing record AND re-run
+ *     through `validateInvite()`. Any correction that breaks
+ *     validation rejects the entire patch — no half-application.
+ *   - When a corrected `email` would land on an id already in the
+ *     queue (and that id isn't this record's own id), reject with
+ *     `code: "duplicate_email"`. The `id` itself is immutable —
+ *     a corrected email does NOT rotate the record's KV key.
+ *   - Empty patch → `code: "no_changes"`. Caller should 400.
+ *   - `updatedAt` and `reviewedAt` are stamped on every accepted
+ *     update; `reviewedBy` if supplied (trimmed, capped at 80 chars).
+ */
+export async function updateFaireInvite(
+  id: string,
+  patch: InviteUpdatePatch,
+  options: { now?: Date } = {},
+): Promise<
+  { ok: true; invite: FaireInviteRecord } | { ok: false; error: InviteUpdateError }
+> {
+  const existing = await getInvite(id);
+  if (!existing) {
+    return {
+      ok: false,
+      error: {
+        code: "not_found",
+        message: `Invite ${id} not found in the queue.`,
+      },
+    };
+  }
+
+  const hasStatus = patch.status !== undefined;
+  const hasNote = patch.reviewNote !== undefined;
+  const hasCorrections =
+    patch.fieldCorrections !== undefined &&
+    typeof patch.fieldCorrections === "object" &&
+    !Array.isArray(patch.fieldCorrections) &&
+    Object.keys(patch.fieldCorrections).length > 0;
+
+  if (!hasStatus && !hasNote && !hasCorrections) {
+    return {
+      ok: false,
+      error: {
+        code: "no_changes",
+        message:
+          "Patch must set at least one of status, reviewNote, or fieldCorrections.",
+      },
+    };
+  }
+
+  // ---- Status validation ----------------------------------------------
+  if (hasStatus) {
+    if (patch.status === "sent") {
+      return {
+        ok: false,
+        error: {
+          code: "sent_status_forbidden",
+          message:
+            "status='sent' cannot be set from the review route. The future Class B faire-direct.invite send closer is the only path that may flip an invite to 'sent'.",
+        },
+      };
+    }
+    if (
+      !REVIEWABLE_STATUSES.includes(
+        patch.status as Exclude<FaireInviteStatus, "sent">,
+      )
+    ) {
+      return {
+        ok: false,
+        error: {
+          code: "invalid_status",
+          message: `status must be one of ${REVIEWABLE_STATUSES.join(", ")}`,
+        },
+      };
+    }
+  }
+
+  // ---- Field corrections (merge + re-validate) -----------------------
+  let mergedCandidate: FaireInviteCandidate = {
+    retailerName: existing.retailerName,
+    email: existing.email,
+    source: existing.source,
+    buyerName: existing.buyerName,
+    city: existing.city,
+    state: existing.state,
+    notes: existing.notes,
+    hubspotContactId: existing.hubspotContactId,
+  };
+  let corrected: Partial<FaireInviteCandidate> | null = null;
+  if (hasCorrections) {
+    const safe: Partial<FaireInviteCandidate> = {};
+    const c = patch.fieldCorrections!;
+    for (const key of Object.keys(c) as Array<keyof FaireInviteCandidate>) {
+      if (!ALLOWED_CORRECTION_KEYS.has(key)) continue;
+      const v = c[key];
+      if (v === undefined) continue;
+      // Allow empty string for clearable optional fields, but not for
+      // required ones — `validateInvite` will catch that.
+      (safe as Record<string, unknown>)[key] = v;
+    }
+    corrected = safe;
+    const candidate: Partial<FaireInviteCandidate> = {
+      ...mergedCandidate,
+      ...safe,
+    };
+    const validation = validateInvite(candidate);
+    if (!validation.ok) {
+      return {
+        ok: false,
+        error: {
+          code: "validation_failed",
+          message: `Corrected invite fails validation: ${validation.reason}`,
+        },
+      };
+    }
+    mergedCandidate = validation.candidate;
+  }
+
+  // ---- Duplicate-email guard ----------------------------------------
+  // If the email changed, ensure no OTHER record in the queue uses it.
+  if (mergedCandidate.email !== existing.email) {
+    const newId = inviteIdFromEmail(mergedCandidate.email);
+    if (newId !== existing.id) {
+      const collision = await getInvite(newId);
+      if (collision) {
+        return {
+          ok: false,
+          error: {
+            code: "duplicate_email",
+            message: `An invite for ${mergedCandidate.email} is already in the queue (id=${newId}). Reject the duplicate or update the other record instead.`,
+          },
+        };
+      }
+    }
+  }
+
+  // ---- Apply lifecycle changes --------------------------------------
+  const now = (options.now ?? new Date()).toISOString();
+  const next: FaireInviteRecord = {
+    // Start from the existing record (preserves id, queuedAt, etc.).
+    ...existing,
+    // Then overlay the validated candidate fields.
+    retailerName: mergedCandidate.retailerName,
+    email: mergedCandidate.email,
+    source: mergedCandidate.source,
+    buyerName: mergedCandidate.buyerName,
+    city: mergedCandidate.city,
+    state: mergedCandidate.state,
+    notes: mergedCandidate.notes,
+    hubspotContactId: mergedCandidate.hubspotContactId,
+  };
+  if (hasStatus) next.status = patch.status as FaireInviteStatus;
+  if (hasNote) {
+    const note = (patch.reviewNote ?? "").trim();
+    if (note.length === 0) {
+      delete next.reviewNote;
+    } else {
+      next.reviewNote = note.slice(0, 1000);
+    }
+  }
+  next.updatedAt = now;
+  next.reviewedAt = now;
+  if (typeof patch.reviewedBy === "string" && patch.reviewedBy.trim().length > 0) {
+    next.reviewedBy = patch.reviewedBy.trim().slice(0, 80);
+  }
+
+  // ---- Persist (id is immutable; we never rotate the KV key) -------
+  await kv.set(inviteKey(existing.id), JSON.stringify(next));
+  // `corrected` referenced solely as a structural marker — kept lint-clean.
+  void corrected;
+  return { ok: true, invite: next };
+}
+
 /** Test helper — clear all invite KV keys + the index. */
 export async function __resetInvitesForTest(): Promise<void> {
   try {

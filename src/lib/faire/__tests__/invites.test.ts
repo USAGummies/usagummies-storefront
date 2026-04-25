@@ -34,11 +34,14 @@ vi.mock("@vercel/kv", () => {
 import { kv } from "@vercel/kv";
 import {
   __resetInvitesForTest,
+  getInvite,
   ingestInviteRows,
   inviteIdFromEmail,
   isFaireConfigured,
   listInvites,
   listInvitesByStatus,
+  REVIEWABLE_STATUSES,
+  updateFaireInvite,
   validateInvite,
   VALID_FAIRE_INVITE_STATUSES,
   type FaireInviteCandidate,
@@ -325,5 +328,209 @@ describe("Phase 1 invariant — no sends happen", () => {
     // Each created invite is one set + one index write at the end =
     // 3 writes total for 2 invites.
     expect(after - before).toBe(3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 2 — review actions (updateFaireInvite)
+// ---------------------------------------------------------------------------
+
+describe("REVIEWABLE_STATUSES — locked enum", () => {
+  it("intentionally excludes 'sent'", () => {
+    expect(REVIEWABLE_STATUSES).toEqual([
+      "needs_review",
+      "approved",
+      "rejected",
+    ]);
+    expect(REVIEWABLE_STATUSES).not.toContain("sent");
+  });
+});
+
+describe("updateFaireInvite — happy paths", () => {
+  it("status update persists with reviewedAt + reviewedBy + updatedAt", async () => {
+    await ingestInviteRows([fakeRow({ email: "abc@x.com" })], { now: NOW });
+    const id = inviteIdFromEmail("abc@x.com");
+    const later = new Date("2026-04-28T08:00:00Z");
+    const r = await updateFaireInvite(
+      id,
+      { status: "approved", reviewedBy: "rene@usagummies.com" },
+      { now: later },
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.invite.status).toBe("approved");
+      expect(r.invite.reviewedAt).toBe(later.toISOString());
+      expect(r.invite.updatedAt).toBe(later.toISOString());
+      expect(r.invite.reviewedBy).toBe("rene@usagummies.com");
+    }
+    const reloaded = await getInvite(id);
+    expect(reloaded?.status).toBe("approved");
+  });
+
+  it("review note persists; empty string clears", async () => {
+    await ingestInviteRows([fakeRow()], { now: NOW });
+    const id = inviteIdFromEmail("buyer@retailer.com");
+
+    let r = await updateFaireInvite(
+      id,
+      { reviewNote: "  Buyer wants ACH-only terms.  " },
+      { now: NOW },
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.invite.reviewNote).toBe("Buyer wants ACH-only terms.");
+
+    r = await updateFaireInvite(id, { reviewNote: "" }, { now: NOW });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.invite.reviewNote).toBeUndefined();
+  });
+
+  it("field correction passes when result still validates", async () => {
+    await ingestInviteRows(
+      [fakeRow({ retailerName: "Retailer Co.", email: "abc@x.com" })],
+      { now: NOW },
+    );
+    const id = inviteIdFromEmail("abc@x.com");
+    const r = await updateFaireInvite(
+      id,
+      { fieldCorrections: { retailerName: "Retailer Co. — Pacific NW" } },
+      { now: NOW },
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.invite.retailerName).toBe("Retailer Co. — Pacific NW");
+  });
+
+  it("changing email rotates the candidate but keeps the original id", async () => {
+    await ingestInviteRows([fakeRow({ email: "old@x.com" })], { now: NOW });
+    const oldId = inviteIdFromEmail("old@x.com");
+    const r = await updateFaireInvite(
+      oldId,
+      { fieldCorrections: { email: "new@x.com" } },
+      { now: NOW },
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.invite.email).toBe("new@x.com");
+      // id is immutable.
+      expect(r.invite.id).toBe(oldId);
+    }
+  });
+});
+
+describe("updateFaireInvite — invalid input rejected", () => {
+  it("unknown id → not_found", async () => {
+    const r = await updateFaireInvite(
+      "ghost",
+      { status: "approved" },
+      { now: NOW },
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.code).toBe("not_found");
+  });
+
+  it("empty patch → no_changes", async () => {
+    await ingestInviteRows([fakeRow()], { now: NOW });
+    const id = inviteIdFromEmail("buyer@retailer.com");
+    const r = await updateFaireInvite(id, {}, { now: NOW });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.code).toBe("no_changes");
+  });
+
+  it("invalid status value → invalid_status", async () => {
+    await ingestInviteRows([fakeRow()], { now: NOW });
+    const id = inviteIdFromEmail("buyer@retailer.com");
+    const r = await updateFaireInvite(
+      id,
+      { status: "totally-bogus" as unknown as "approved" },
+      { now: NOW },
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.code).toBe("invalid_status");
+  });
+
+  it("status='sent' rejected with sent_status_forbidden", async () => {
+    await ingestInviteRows([fakeRow()], { now: NOW });
+    const id = inviteIdFromEmail("buyer@retailer.com");
+    const r = await updateFaireInvite(id, { status: "sent" }, { now: NOW });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.code).toBe("sent_status_forbidden");
+  });
+
+  it("invalid email correction → validation_failed; original record untouched", async () => {
+    await ingestInviteRows([fakeRow({ email: "abc@x.com" })], { now: NOW });
+    const id = inviteIdFromEmail("abc@x.com");
+    const r = await updateFaireInvite(
+      id,
+      { fieldCorrections: { email: "not-an-email" } },
+      { now: NOW },
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.code).toBe("validation_failed");
+    const reloaded = await getInvite(id);
+    expect(reloaded?.email).toBe("abc@x.com");
+  });
+
+  it("missing-retailer correction → validation_failed", async () => {
+    await ingestInviteRows([fakeRow()], { now: NOW });
+    const id = inviteIdFromEmail("buyer@retailer.com");
+    const r = await updateFaireInvite(
+      id,
+      { fieldCorrections: { retailerName: "" } },
+      { now: NOW },
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.code).toBe("validation_failed");
+  });
+
+  it("missing-source correction → validation_failed", async () => {
+    await ingestInviteRows([fakeRow()], { now: NOW });
+    const id = inviteIdFromEmail("buyer@retailer.com");
+    const r = await updateFaireInvite(
+      id,
+      { fieldCorrections: { source: "" } },
+      { now: NOW },
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.code).toBe("validation_failed");
+  });
+
+  it("corrected email collides with another existing record → duplicate_email", async () => {
+    await ingestInviteRows(
+      [
+        fakeRow({ email: "first@x.com", retailerName: "First" }),
+        fakeRow({ email: "second@x.com", retailerName: "Second" }),
+      ],
+      { now: NOW },
+    );
+    const firstId = inviteIdFromEmail("first@x.com");
+    const r = await updateFaireInvite(
+      firstId,
+      { fieldCorrections: { email: "second@x.com" } },
+      { now: NOW },
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.code).toBe("duplicate_email");
+  });
+});
+
+describe("updateFaireInvite — no send / no network side effects", () => {
+  it("KV is the only side effect (any other network call would crash uninstrumented)", async () => {
+    await ingestInviteRows([fakeRow()], { now: NOW });
+    const id = inviteIdFromEmail("buyer@retailer.com");
+    const before = (kv.set as unknown as ReturnType<typeof vi.fn>).mock.calls
+      .length;
+    await updateFaireInvite(id, { status: "approved" }, { now: NOW });
+    const after = (kv.set as unknown as ReturnType<typeof vi.fn>).mock.calls
+      .length;
+    // Exactly one KV write per accepted update — no email, no Faire,
+    // no Slack call.
+    expect(after - before).toBe(1);
+  });
+
+  it("missing FAIRE_ACCESS_TOKEN does not block review", async () => {
+    delete process.env.FAIRE_ACCESS_TOKEN;
+    await ingestInviteRows([fakeRow()], { now: NOW });
+    const id = inviteIdFromEmail("buyer@retailer.com");
+    const r = await updateFaireInvite(id, { status: "approved" }, { now: NOW });
+    expect(r.ok).toBe(true);
   });
 });

@@ -30,7 +30,12 @@ interface InviteRecord {
   status: FaireInviteStatus;
   queuedAt: string;
   updatedAt: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  reviewNote?: string;
 }
+
+type ReviewableStatus = Exclude<FaireInviteStatus, "sent">;
 
 interface InvitesResponse {
   ok: boolean;
@@ -62,6 +67,7 @@ export function FaireDirectView() {
   const [data, setData] = useState<InvitesResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshTick, setRefreshTick] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -94,7 +100,9 @@ export function FaireDirectView() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refreshTick]);
+
+  const refresh = () => setRefreshTick((n) => n + 1);
 
   return (
     <div style={{ background: BG, minHeight: "100vh", padding: "24px 28px" }}>
@@ -195,22 +203,27 @@ export function FaireDirectView() {
             title="Needs review"
             invites={data.invites.needs_review}
             color={STATUS_COLOR.needs_review}
+            onUpdated={refresh}
           />
           <InviteTable
-            title="Approved (awaiting Phase 2 send-on-approve)"
+            title="Approved (ready for a future Class B send approval, not sent)"
             invites={data.invites.approved}
             color={STATUS_COLOR.approved}
-            note="No email is sent until Phase 2 wires the Class B faire-direct.invite approval click to the actual Faire invite path."
+            note="Approved means ready for a future Class B send approval, not sent. The send closer doesn't exist yet — no Faire invite goes out from this surface."
+            onUpdated={refresh}
           />
           <InviteTable
             title="Sent"
             invites={data.invites.sent}
             color={STATUS_COLOR.sent}
+            onUpdated={refresh}
+            note="Set only by the future faire-direct.invite send closer. Cannot be set from this review page."
           />
           <InviteTable
             title="Rejected"
             invites={data.invites.rejected}
             color={STATUS_COLOR.rejected}
+            onUpdated={refresh}
           />
         </>
       )}
@@ -229,6 +242,7 @@ function InviteTable(props: {
   invites: InviteRecord[];
   color: string;
   note?: string;
+  onUpdated: () => void;
 }) {
   return (
     <section
@@ -267,62 +281,226 @@ function InviteTable(props: {
       {props.invites.length === 0 ? (
         <div style={{ fontSize: 12, color: DIM }}>(empty)</div>
       ) : (
-        <div style={{ overflowX: "auto" }}>
-          <table
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              fontSize: 12,
-            }}
-          >
-            <thead>
-              <tr style={{ color: DIM, textAlign: "left" }}>
-                <Th>Retailer</Th>
-                <Th>Buyer</Th>
-                <Th>Email</Th>
-                <Th>Location</Th>
-                <Th>Source</Th>
-                <Th>Queued</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {props.invites.map((r) => (
-                <tr key={r.id} style={{ borderTop: `1px dashed ${BORDER}` }}>
-                  <Td>
-                    <div style={{ fontWeight: 600 }}>{r.retailerName}</div>
-                    {r.notes && (
-                      <div
-                        style={{ color: DIM, fontSize: 11, marginTop: 2 }}
-                      >
-                        {r.notes.length > 80
-                          ? `${r.notes.slice(0, 80)}…`
-                          : r.notes}
-                      </div>
-                    )}
-                  </Td>
-                  <Td>{r.buyerName ?? "—"}</Td>
-                  <Td>
-                    <code>{r.email}</code>
-                  </Td>
-                  <Td>
-                    {r.city || r.state
-                      ? `${r.city ?? ""}${r.city && r.state ? ", " : ""}${r.state ?? ""}`
-                      : "—"}
-                  </Td>
-                  <Td style={{ color: DIM }}>{r.source}</Td>
-                  <Td style={{ color: DIM }}>
-                    {r.queuedAt?.slice(0, 10)}
-                  </Td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+          {props.invites.map((r) => (
+            <InviteCard key={r.id} invite={r} onUpdated={props.onUpdated} />
+          ))}
+        </ul>
       )}
       {props.note && (
         <p style={{ fontSize: 11, color: DIM, marginTop: 8 }}>{props.note}</p>
       )}
     </section>
+  );
+}
+
+function InviteCard(props: {
+  invite: InviteRecord;
+  onUpdated: () => void;
+}) {
+  const { invite } = props;
+  // The dropdown intentionally excludes "sent". The route also rejects
+  // status="sent" with HTTP 422 sent_status_forbidden, so even if a
+  // future change adds the option, the server is still the source of
+  // truth for the lifecycle gate.
+  const initialStatus: ReviewableStatus =
+    invite.status === "sent" ? "approved" : invite.status;
+  const [status, setStatus] = useState<ReviewableStatus>(initialStatus);
+  const [note, setNote] = useState<string>(invite.reviewNote ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [savedAt, setSavedAt] = useState<string | null>(null);
+
+  const dirty =
+    (invite.status !== "sent" && status !== invite.status) ||
+    note.trim() !== (invite.reviewNote ?? "").trim();
+
+  async function save() {
+    setSaving(true);
+    setError(null);
+    setSavedAt(null);
+    try {
+      const body: Record<string, unknown> = {};
+      if (invite.status !== "sent" && status !== invite.status) {
+        body.status = status;
+      }
+      if (note.trim() !== (invite.reviewNote ?? "").trim()) {
+        body.reviewNote = note.trim();
+      }
+      if (Object.keys(body).length === 0) {
+        setError("Nothing to save.");
+        setSaving(false);
+        return;
+      }
+      const res = await fetch(
+        `/api/ops/faire/direct-invites/${encodeURIComponent(invite.id)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+      );
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        code?: string;
+      };
+      if (!res.ok || data.ok !== true) {
+        setError(
+          data.error ??
+            `Save failed (HTTP ${res.status}${data.code ? `, code ${data.code}` : ""}).`,
+        );
+        setSaving(false);
+        return;
+      }
+      setSavedAt(new Date().toLocaleTimeString("en-US"));
+      props.onUpdated();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const isSent = invite.status === "sent";
+
+  return (
+    <li style={{ borderTop: `1px dashed ${BORDER}`, padding: "10px 4px" }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1.4fr 1fr",
+          gap: 16,
+          alignItems: "start",
+        }}
+      >
+        <div>
+          <div style={{ fontWeight: 600 }}>{invite.retailerName}</div>
+          <div style={{ color: DIM, fontSize: 11, marginTop: 2 }}>
+            <code>{invite.email}</code>
+            {invite.buyerName ? ` · ${invite.buyerName}` : ""}
+          </div>
+          <div style={{ color: DIM, fontSize: 12, marginTop: 4 }}>
+            {invite.city || invite.state
+              ? `${invite.city ?? ""}${invite.city && invite.state ? ", " : ""}${invite.state ?? ""} · `
+              : ""}
+            source <code>{invite.source}</code>
+          </div>
+          <div style={{ color: DIM, fontSize: 11, marginTop: 2 }}>
+            Queued {invite.queuedAt?.slice(0, 10)}
+            {invite.reviewedAt
+              ? ` · Last reviewed ${invite.reviewedAt.slice(0, 16)}${
+                  invite.reviewedBy ? ` by ${invite.reviewedBy}` : ""
+                }`
+              : ""}
+          </div>
+          {invite.notes && (
+            <div style={{ color: DIM, fontSize: 11, marginTop: 4 }}>
+              <em>Source notes:</em> {invite.notes}
+            </div>
+          )}
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {isSent ? (
+            <div
+              style={{
+                fontSize: 11,
+                color: DIM,
+                background: BG,
+                border: `1px dashed ${BORDER}`,
+                borderRadius: 6,
+                padding: "8px 10px",
+              }}
+            >
+              Status: <strong>sent</strong> (terminal). Use the future
+              send closer to roll back if needed.
+            </div>
+          ) : (
+            <label
+              style={{
+                fontSize: 11,
+                color: DIM,
+                display: "flex",
+                flexDirection: "column",
+                gap: 2,
+              }}
+            >
+              Status
+              <select
+                value={status}
+                onChange={(e) =>
+                  setStatus(e.target.value as ReviewableStatus)
+                }
+                disabled={saving}
+                style={{
+                  padding: "6px 8px",
+                  fontSize: 12,
+                  border: `1px solid ${BORDER}`,
+                  borderRadius: 6,
+                  background: "#fff",
+                }}
+              >
+                <option value="needs_review">needs_review</option>
+                <option value="approved">approved</option>
+                <option value="rejected">rejected</option>
+              </select>
+            </label>
+          )}
+          <label
+            style={{
+              fontSize: 11,
+              color: DIM,
+              display: "flex",
+              flexDirection: "column",
+              gap: 2,
+            }}
+          >
+            Review note (optional)
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              disabled={saving}
+              rows={2}
+              maxLength={1000}
+              style={{
+                padding: "6px 8px",
+                fontSize: 12,
+                border: `1px solid ${BORDER}`,
+                borderRadius: 6,
+                background: "#fff",
+                resize: "vertical",
+              }}
+            />
+          </label>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <button
+              onClick={save}
+              disabled={!dirty || saving}
+              style={{
+                padding: "6px 12px",
+                fontSize: 12,
+                background: NAVY,
+                color: "#fff",
+                border: 0,
+                borderRadius: 6,
+                cursor: !dirty || saving ? "not-allowed" : "pointer",
+                opacity: !dirty || saving ? 0.5 : 1,
+              }}
+            >
+              {saving ? "Saving…" : "Save review"}
+            </button>
+            {savedAt && (
+              <span style={{ fontSize: 11, color: GREEN }}>
+                Saved {savedAt}
+              </span>
+            )}
+            {error && (
+              <span style={{ fontSize: 11, color: RED }}>{error}</span>
+            )}
+          </div>
+        </div>
+      </div>
+    </li>
   );
 }
 

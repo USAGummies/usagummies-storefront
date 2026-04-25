@@ -92,9 +92,24 @@ Each row uses the schema:
   - Missing `FAIRE_ACCESS_TOKEN` → `degraded: true` with reason on `GET`. Queue ingest still works.
 - **Approval class:** Class B `faire-direct.invite` per `/contracts/approval-taxonomy.md` and `/contracts/agents/faire-specialist.md`. Phase 1 builds the queue; Phase 2 will wire the Slack approve click → real Faire send (or manual hand-off if Faire's API doesn't expose invite send).
 - **Status response:** 201 on all-valid, 207 Multi-Status on mixed, 200 on all-errors, 400 on missing/non-array body or invalid JSON.
-- **Tests:** 23 helpers + 12 route = 35 total. Locked: validation rules (required fields, email shape, optional trims), in-batch + cross-batch dedup, status grouping, degraded-mode signal, no-sends-happen invariant.
-- **Required env (Phase 2):** `FAIRE_ACCESS_TOKEN` for the eventual send path. Phase 1 surfaces its absence as a banner; Phase 2 builds the send-on-approve closer.
-- **Monday MVP:** 🟢 — internal queue ready. Distributors / sales touchpoints can stage candidates; operator reviews on `/ops/faire-direct`. No emails fly without Phase 2 + an explicit Slack approve.
+- **Tests (Phase 1):** 23 helpers + 12 route = 35 total. Locked: validation rules (required fields, email shape, optional trims), in-batch + cross-batch dedup, status grouping, degraded-mode signal, no-sends-happen invariant.
+
+#### Phase 2 — review actions (`PATCH /api/ops/faire/direct-invites/[id]`, NEW)
+- **Trigger:** Operator opens `/ops/faire-direct`, picks an invite row, changes the status dropdown (`needs_review` / `approved` / `rejected` — `sent` is intentionally absent) and/or types a review note, optionally edits candidate fields, clicks **Save review**. The client `PATCH`es the id-specific endpoint.
+- **Body:** `{ status?, reviewNote?, fieldCorrections?, reviewedBy? }`. Field corrections cover any of `retailerName / buyerName / email / city / state / source / notes / hubspotContactId`.
+- **Validation:** every accepted change re-runs through `validateInvite()` AFTER the merge. A botched correction (blank `name`, malformed `email`, missing `source`) rejects the whole patch with HTTP 422 + stable `code: "validation_failed"`. Original record stays intact. Status enum enforced. Empty patches → 400 `code: "no_changes"`.
+- **Audit fields:** every accepted update stamps `updatedAt` + `reviewedAt` and optionally `reviewedBy` (operator email/username). UI surfaces "Last reviewed at <ts> by <whom>" next to each row.
+- **Hard rules locked by tests:**
+  - **`status="sent"` is rejected with HTTP 422 + stable code `sent_status_forbidden`.** Sent transitions only happen inside the future Class B `faire-direct.invite` send closer.
+  - **No email / Faire / Gmail / Slack network call.** Mocked KV is the only side effect — any other network call would crash uninstrumented in tests. Locked by an exact write-count assertion (one KV write per accepted update).
+  - **Missing `FAIRE_ACCESS_TOKEN` does not block review.** The token gates the future send path, not the review queue.
+  - **Id is immutable.** A corrected email rewrites the candidate fields but keeps the same KV key. Tests assert that a corrected email collision against another existing record returns HTTP 409 `code: "duplicate_email"`.
+- **Status code mapping:** 200 ok / 400 no_changes or invalid JSON / 401 unauth / 404 not_found / 409 duplicate_email / 422 invalid_status | sent_status_forbidden | validation_failed.
+- **Tests (Phase 2):** 15 helper tests + 18 route tests = 33 total on top of Phase 1 (cumulative: 68 tests across the Faire Direct module + routes).
+- **UI:** `/ops/faire-direct` page now renders each candidate as a card with status dropdown + review-note textarea + **Save review** button. Section header copy: *"Approved means ready for a future Class B send approval, not sent."* Sent records render a read-only "terminal status" cue with no editable status dropdown.
+- **Monday MVP:** 🟢 — operators can classify candidates without ever sending. The send-on-approve closer remains a Phase 3 build.
+
+- **Required env (Phase 3, send closer only):** `FAIRE_ACCESS_TOKEN` for the eventual send path. Phase 1 + 2 surface its absence as a banner but do not require it.
 
 ---
 
