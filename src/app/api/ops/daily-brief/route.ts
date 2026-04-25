@@ -29,6 +29,18 @@ import {
 } from "@/lib/ops/control-plane/daily-brief";
 import { computeFulfillmentPreflight } from "@/lib/ops/fulfillment-preflight";
 import { computeFulfillmentTodaySlice } from "@/lib/ops/fulfillment-today";
+import {
+  composeSalesCommandSlice,
+  type SalesCommandSlice,
+} from "@/lib/ops/sales-command-center";
+import {
+  readApPackets,
+  readFaireFollowUps,
+  readFaireInvites,
+  readLocationDrafts,
+  readPendingApprovals,
+  readWholesaleInquiries,
+} from "@/lib/ops/sales-command-readers";
 import { listDivisions } from "@/lib/ops/control-plane/divisions";
 import { getChannel } from "@/lib/ops/control-plane/channels";
 import {
@@ -230,6 +242,42 @@ async function composeAndPost(req: Request): Promise<Response> {
     }
   }
 
+  // Morning brief only: compact Sales Command summary. Phase 2 of
+  // the /ops/sales dashboard — same readers, projected down to a
+  // ~6-line slice that lives in the morning #ops-daily post instead
+  // of a separate noisy digest. Skipped on EOD because the
+  // cumulative dashboard is what closes the loop.
+  let salesCommand: SalesCommandSlice | undefined;
+  if (kind === "morning") {
+    try {
+      const [
+        faireInvites,
+        faireFollowUps,
+        pendingApprovalsForSales,
+        apPackets,
+        locationDrafts,
+      ] = await Promise.all([
+        readFaireInvites(),
+        readFaireFollowUps(now),
+        readPendingApprovals(),
+        readApPackets(),
+        readLocationDrafts(),
+      ]);
+      salesCommand = composeSalesCommandSlice({
+        faireInvites,
+        faireFollowUps,
+        pendingApprovals: pendingApprovalsForSales,
+        apPackets,
+        locationDrafts,
+        wholesaleInquiries: readWholesaleInquiries(),
+      });
+    } catch (err) {
+      degradations.push(
+        `sales-command: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
   // EOD brief only: today's fulfillment activity (labels bought,
   // voided, freight-comp queue transitions since midnight PT).
   let fulfillmentToday: FulfillmentTodayBriefSlice | undefined;
@@ -263,6 +311,7 @@ async function composeAndPost(req: Request): Promise<Response> {
     arPosition: overrides.arPosition,
     preflight,
     fulfillmentToday,
+    salesCommand,
     degradations,
   } as const;
   let brief = composeDailyBrief(composeInput);

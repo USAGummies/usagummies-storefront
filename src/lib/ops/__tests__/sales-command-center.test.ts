@@ -20,6 +20,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildSalesCommandCenter,
+  composeSalesCommandSlice,
   sourceError,
   sourceNotWired,
   sourceWired,
@@ -376,5 +377,130 @@ describe("Phase 1 invariant — pure aggregator", () => {
     expect(() =>
       buildSalesCommandCenter(emptyInput(), { now: NOW }),
     ).not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 2 — composeSalesCommandSlice (compact projection for the morning brief)
+// ---------------------------------------------------------------------------
+
+describe("composeSalesCommandSlice — compact projection", () => {
+  it("all not_wired → every numeric is null and anyAction=false", () => {
+    const slice = composeSalesCommandSlice(emptyInput());
+    expect(slice.faireInvitesNeedsReview).toBeNull();
+    expect(slice.faireFollowUpsOverdue).toBeNull();
+    expect(slice.faireFollowUpsDueSoon).toBeNull();
+    expect(slice.pendingApprovals).toBeNull();
+    expect(slice.apPacketsActionRequired).toBeNull();
+    expect(slice.apPacketsSent).toBeNull();
+    expect(slice.retailDraftsNeedsReview).toBeNull();
+    expect(slice.retailDraftsAccepted).toBeNull();
+    expect(slice.wholesaleInquiries).toBeNull();
+    expect(slice.anyAction).toBe(false);
+  });
+
+  it("empty-but-wired sources surface as 0 (not null) and do NOT trip anyAction", () => {
+    const slice = composeSalesCommandSlice({
+      ...emptyInput(),
+      faireInvites: sourceWired({
+        needs_review: 0,
+        approved: 0,
+        sent: 0,
+        rejected: 0,
+        total: 0,
+      }),
+      faireFollowUps: sourceWired({
+        counts: { overdue: 0, due_soon: 0, not_due: 0, sent_total: 0 },
+        actionable: [],
+      }),
+      apPackets: sourceWired({
+        total: 0,
+        ready_to_send: 0,
+        action_required: 0,
+        sent: 0,
+      }),
+      locationDrafts: sourceWired({
+        needs_review: 0,
+        accepted: 0,
+        rejected: 0,
+        total: 0,
+      }),
+      pendingApprovals: sourceWired({
+        total: 0,
+        byTargetType: {},
+        preview: [],
+      }),
+    });
+    expect(slice.faireInvitesNeedsReview).toBe(0);
+    expect(slice.faireFollowUpsOverdue).toBe(0);
+    expect(slice.faireFollowUpsDueSoon).toBe(0);
+    expect(slice.pendingApprovals).toBe(0);
+    expect(slice.apPacketsActionRequired).toBe(0);
+    expect(slice.apPacketsSent).toBe(0);
+    expect(slice.retailDraftsNeedsReview).toBe(0);
+    expect(slice.retailDraftsAccepted).toBe(0);
+    expect(slice.anyAction).toBe(false);
+  });
+
+  it("anyAction=true when at least one ACTIONABLE wired count is positive", () => {
+    const slice = composeSalesCommandSlice({
+      ...emptyInput(),
+      faireFollowUps: sourceWired({
+        counts: { overdue: 2, due_soon: 0, not_due: 0, sent_total: 5 },
+        actionable: [],
+      }),
+    });
+    expect(slice.faireFollowUpsOverdue).toBe(2);
+    expect(slice.anyAction).toBe(true);
+  });
+
+  it("a wholesale-inquiries-only positive count does NOT trip anyAction (read-only signal)", () => {
+    // Wholesale inquiries today is `not_wired`, but even when wired
+    // it shouldn't drive 'morning action' on its own — it's
+    // contextual data. anyAction only fires on rows the operator can
+    // act on. Locked here so future not_wired→wired flips don't
+    // accidentally noisify the morning brief.
+    const slice = composeSalesCommandSlice({
+      ...emptyInput(),
+      wholesaleInquiries: sourceWired({ total: 17 }),
+    });
+    expect(slice.wholesaleInquiries).toBe(17);
+    expect(slice.anyAction).toBe(false);
+  });
+
+  it("exact propagation — counts mirror the source (no inflation)", () => {
+    const slice = composeSalesCommandSlice({
+      ...emptyInput(),
+      faireInvites: sourceWired({
+        needs_review: 3,
+        approved: 1,
+        sent: 7,
+        rejected: 2,
+        total: 13,
+      }),
+      apPackets: sourceWired({
+        total: 4,
+        ready_to_send: 1,
+        action_required: 2,
+        sent: 1,
+      }),
+      pendingApprovals: sourceWired({
+        total: 5,
+        byTargetType: {},
+        preview: [],
+      }),
+    });
+    expect(slice.faireInvitesNeedsReview).toBe(3);
+    expect(slice.apPacketsActionRequired).toBe(2);
+    expect(slice.apPacketsSent).toBe(1);
+    expect(slice.pendingApprovals).toBe(5);
+  });
+
+  it("error-state source projects as null (matches not_wired) — no fabricated zero", () => {
+    const slice = composeSalesCommandSlice({
+      ...emptyInput(),
+      faireInvites: sourceError("KV outage"),
+    });
+    expect(slice.faireInvitesNeedsReview).toBeNull();
   });
 });

@@ -156,6 +156,149 @@ describe("composeDailyBrief()", () => {
     expect(JSON.stringify(out.blocks)).toContain("Last drift audit");
     expect(JSON.stringify(out.blocks)).toContain("enforcement=enforced");
   });
+
+  // ---- Phase 2 — Sales Command compact section -------------------------
+
+  it("morning brief includes Sales Command section when slice is provided", () => {
+    const out = composeDailyBrief({
+      ...baseInput(),
+      salesCommand: {
+        faireInvitesNeedsReview: 3,
+        faireFollowUpsOverdue: 2,
+        faireFollowUpsDueSoon: 1,
+        pendingApprovals: 5,
+        apPacketsActionRequired: 1,
+        apPacketsSent: 0,
+        retailDraftsNeedsReview: 4,
+        retailDraftsAccepted: 12,
+        wholesaleInquiries: null,
+        anyAction: true,
+      },
+    });
+    const json = JSON.stringify(out.blocks);
+    expect(json).toContain("Sales Command");
+    expect(json).toContain("Faire invites awaiting review:");
+    // Counts render with Slack bold markup.
+    expect(json).toContain("*3*");
+    expect(json).toContain("*2* overdue");
+    expect(json).toContain("*1* due soon");
+    expect(json).toContain("*5*"); // pending approvals
+    // not_wired wholesale renders honestly.
+    expect(json).toContain("Wholesale inquiries: _not wired_");
+    // Deep links present (they live in the footer line).
+    expect(json).toContain("/ops/sales");
+    expect(json).toContain("/ops/faire-direct");
+    expect(json).toContain("/ops/ap-packets");
+    expect(json).toContain("/ops/locations");
+  });
+
+  it("EOD brief skips the Sales Command section even when slice is provided", () => {
+    // The dashboard at /ops/sales is the cumulative close-loop; we
+    // don't want a redundant evening Slack post.
+    const out = composeDailyBrief({
+      ...baseInput(),
+      kind: "eod",
+      salesCommand: {
+        faireInvitesNeedsReview: 3,
+        faireFollowUpsOverdue: 2,
+        faireFollowUpsDueSoon: 1,
+        pendingApprovals: 5,
+        apPacketsActionRequired: 1,
+        apPacketsSent: 0,
+        retailDraftsNeedsReview: 4,
+        retailDraftsAccepted: 12,
+        wholesaleInquiries: null,
+        anyAction: true,
+      },
+    });
+    expect(JSON.stringify(out.blocks)).not.toContain("Sales Command");
+  });
+
+  it("Sales Command empty-state collapses to one quiet line when no actions", () => {
+    const out = composeDailyBrief({
+      ...baseInput(),
+      salesCommand: {
+        faireInvitesNeedsReview: 0,
+        faireFollowUpsOverdue: 0,
+        faireFollowUpsDueSoon: 0,
+        pendingApprovals: 0,
+        apPacketsActionRequired: 0,
+        apPacketsSent: 1,
+        retailDraftsNeedsReview: 0,
+        retailDraftsAccepted: 5,
+        wholesaleInquiries: null,
+        anyAction: false,
+      },
+    });
+    const json = JSON.stringify(out.blocks);
+    expect(json).toContain("Sales Command");
+    expect(json).toContain("No sales actions queued");
+    // Counts NOT rendered as line items in the empty state.
+    expect(json).not.toContain("Faire invites awaiting review:");
+    expect(json).not.toContain("Slack approvals awaiting Ben:");
+  });
+
+  it("not_wired sources render as 'not wired' (NEVER as 0)", () => {
+    const out = composeDailyBrief({
+      ...baseInput(),
+      salesCommand: {
+        faireInvitesNeedsReview: 1, // wired-but-actionable so anyAction=true
+        faireFollowUpsOverdue: null,
+        faireFollowUpsDueSoon: null,
+        pendingApprovals: null,
+        apPacketsActionRequired: null,
+        apPacketsSent: null,
+        retailDraftsNeedsReview: null,
+        retailDraftsAccepted: null,
+        wholesaleInquiries: null,
+        anyAction: true,
+      },
+    });
+    const json = JSON.stringify(out.blocks);
+    expect(json).toContain("Faire invites awaiting review: *1*");
+    expect(json).toContain("Faire follow-ups: not wired");
+    expect(json).toContain("Slack approvals awaiting Ben: _not wired_");
+    expect(json).toContain("AP packets: not wired");
+    expect(json).toContain("Retail drafts: not wired");
+    expect(json).toContain("Wholesale inquiries: _not wired_");
+    // Crucially: never a fabricated zero on a not_wired source.
+    expect(json).not.toContain("Faire follow-ups: *0*");
+    expect(json).not.toContain("AP packets: *0*");
+  });
+
+  it("Sales Command section is bounded — under 12 lines (header + body + footer)", () => {
+    const out = composeDailyBrief({
+      ...baseInput(),
+      salesCommand: {
+        faireInvitesNeedsReview: 9,
+        faireFollowUpsOverdue: 9,
+        faireFollowUpsDueSoon: 9,
+        pendingApprovals: 9,
+        apPacketsActionRequired: 9,
+        apPacketsSent: 9,
+        retailDraftsNeedsReview: 9,
+        retailDraftsAccepted: 9,
+        wholesaleInquiries: 9,
+        anyAction: true,
+      },
+    });
+    type Block = { type: string; text?: { text?: string } };
+    const blocks = out.blocks as Block[];
+    const salesBlock = blocks.find(
+      (b) =>
+        b.type === "section" &&
+        typeof b.text?.text === "string" &&
+        b.text.text.includes("Sales Command"),
+    );
+    expect(salesBlock).toBeDefined();
+    const lineCount = (salesBlock!.text!.text! as string).split("\n").length;
+    expect(lineCount).toBeLessThanOrEqual(12);
+  });
+
+  it("Sales Command section is not rendered when slice is omitted", () => {
+    const out = composeDailyBrief(baseInput()); // no salesCommand
+    expect(JSON.stringify(out.blocks)).not.toContain("Sales Command");
+  });
 });
 
 // ---------------------------------------------------------------------------

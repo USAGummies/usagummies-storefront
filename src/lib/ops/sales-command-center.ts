@@ -204,6 +204,107 @@ export interface SalesCommandCenterReport {
 }
 
 // ---------------------------------------------------------------------------
+// Compact slice for the morning Slack brief
+// ---------------------------------------------------------------------------
+//
+// Phase 2: the daily-brief composer needs a *tight* projection of the
+// dashboard report — not the full SalesCommandCenterReport. The slice
+// is small on purpose so the morning Slack section stays under ~10
+// lines and never duplicates pre-flight or finance content.
+//
+// Each numeric is `number | null`:
+//   - `number` when the underlying source is wired (zero is a real
+//     count — "wired but quiet").
+//   - `null` when the source is not_wired or errored (renders as
+//     "not wired" in the Slack section, never as 0).
+
+export interface SalesCommandSlice {
+  /** Faire invites awaiting operator review (status="needs_review"). */
+  faireInvitesNeedsReview: number | null;
+  faireFollowUpsOverdue: number | null;
+  faireFollowUpsDueSoon: number | null;
+  /** Pending Slack approvals across every workflow. */
+  pendingApprovals: number | null;
+  apPacketsActionRequired: number | null;
+  apPacketsSent: number | null;
+  retailDraftsNeedsReview: number | null;
+  retailDraftsAccepted: number | null;
+  /** Wholesale inquiries — currently `null` because the source is
+   *  not_wired. Keeping the shape uniform lets a future writer flip
+   *  this on without changing the renderer. */
+  wholesaleInquiries: number | null;
+  /** True when at least one wired count above is positive. The
+   *  composer uses this to decide between the empty-state copy and
+   *  the actionable rendering. */
+  anyAction: boolean;
+}
+
+/**
+ * Build the compact slice from the same `SalesCommandCenterInput`
+ * that the dashboard route uses. The projection is deterministic and
+ * pure — feeding identical inputs produces identical slices.
+ */
+export function composeSalesCommandSlice(
+  input: SalesCommandCenterInput,
+): SalesCommandSlice {
+  const faireInvitesNeedsReview = wiredOrNull(
+    input.faireInvites,
+    (c) => c.needs_review,
+  );
+  const faireFollowUpsOverdue = wiredOrNull(
+    input.faireFollowUps,
+    ({ counts }) => counts.overdue,
+  );
+  const faireFollowUpsDueSoon = wiredOrNull(
+    input.faireFollowUps,
+    ({ counts }) => counts.due_soon,
+  );
+  const pendingApprovals = wiredOrNull(
+    input.pendingApprovals,
+    (c) => c.total,
+  );
+  const apPacketsActionRequired = wiredOrNull(
+    input.apPackets,
+    (c) => c.action_required,
+  );
+  const apPacketsSent = wiredOrNull(input.apPackets, (c) => c.sent);
+  const retailDraftsNeedsReview = wiredOrNull(
+    input.locationDrafts,
+    (c) => c.needs_review,
+  );
+  const retailDraftsAccepted = wiredOrNull(
+    input.locationDrafts,
+    (c) => c.accepted,
+  );
+  const wholesaleInquiries = wiredOrNull(
+    input.wholesaleInquiries,
+    (c) => c.total,
+  );
+
+  const anyAction = [
+    faireInvitesNeedsReview,
+    faireFollowUpsOverdue,
+    faireFollowUpsDueSoon,
+    pendingApprovals,
+    apPacketsActionRequired,
+    retailDraftsNeedsReview,
+  ].some((n) => typeof n === "number" && n > 0);
+
+  return {
+    faireInvitesNeedsReview,
+    faireFollowUpsOverdue,
+    faireFollowUpsDueSoon,
+    pendingApprovals,
+    apPacketsActionRequired,
+    apPacketsSent,
+    retailDraftsNeedsReview,
+    retailDraftsAccepted,
+    wholesaleInquiries,
+    anyAction,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
