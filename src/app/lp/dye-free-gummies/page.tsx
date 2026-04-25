@@ -4,6 +4,7 @@ import { ScarcityBar } from "@/components/lp/ScarcityBar";
 import { ThreePromises } from "@/components/lp/ThreePromises";
 import { BombsAway } from "@/components/lp/BombsAway";
 import { FoundersLetter } from "@/components/lp/FoundersLetter";
+import { SustainabilityBlock } from "@/components/lp/SustainabilityBlock";
 import { GuaranteeBlock } from "@/components/lp/GuaranteeBlock";
 import { FaqAccordion } from "@/components/lp/FaqAccordion";
 import { StickyBuyBar } from "@/components/lp/StickyBuyBar";
@@ -37,6 +38,7 @@ export default function DyeFreeGummiesLandingPage() {
       <ThreePromises />
       <BombsAway />
       <FoundersLetter />
+      <SustainabilityBlock />
       <GuaranteeBlock />
       <FaqAccordion />
       <FooterMini />

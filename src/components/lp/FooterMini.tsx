@@ -17,6 +17,9 @@ export function FooterMini() {
           <p className="lp-sans mt-3 max-w-[32ch] text-[1rem] font-normal text-[var(--lp-ink)]/80">
             All-natural gummy bears. Sourced, made, and packed in the U.S.A.
           </p>
+          <p className="lp-label mt-3 text-[var(--lp-red)]">
+            ★ American supply chain · Smaller footprint
+          </p>
         </div>
         <nav aria-label="Shop" className="space-y-2">
           <p className="lp-label mb-2 text-[var(--lp-red)]">Shop</p>
