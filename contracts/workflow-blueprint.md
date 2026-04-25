@@ -118,11 +118,31 @@ Each row uses the schema:
 - **Source:** ShipStation `awaiting_shipment` queue (any store)
 - **AI role:** None (rules-based packaging picker)
 - **Approver:** Auto-buy when packaging is canonical (1-4 mailer / 5-12 box / 36 master); refuse + surface `#ops-approvals` otherwise
-- **Slack:** `#operations` (label PDF + summary on success); `#ops-approvals` (refusals)
-- **Writeback:** ShipStation order shipped + KV dedup + audit
-- **Audit:** Every ship attempt logged
-- **Tests:** Missing on the orchestrator (downstream primitives covered)
+- **Slack:** `#operations` (label PDF + summary on success); `#ops-approvals` (refusals); `#ops-alerts` (Slack file-upload failure with Drive label link inline)
+- **Writeback:** ShipStation order shipped + KV dedup + audit + Drive label artifact + Drive packing-slip artifact (commit `2f4e55d`)
+- **Audit:** Every ship attempt logged with `labelDriveLink`, `packingSlipDriveLink`, `slackPermalink`, `driveError`
+- **Tests:** Yes — auto-ship route (5) + shipping-artifacts module (13) + recent-labels enrichment (2). Locks the invariant that Slack/Drive failures NEVER trigger a second `createLabelForShipStationOrder` call.
 - **Monday MVP:** 🟢
+
+#### Runbook — "I got the label-purchased Slack notice but I can't find the file"
+
+Follow this order **without rebuying the label**:
+
+1. **`/ops/shipping` → Recent labels table.** New "Artifacts" column shows three links per row when present: **Open label** (Drive PDF, page 1), **Packing slip** (Drive PDF, page 2), **Slack** (Slack permalink). Click "Open label" → it opens the Drive-hosted PDF in a new tab → Cmd+P to print.
+2. **Slack `#operations`** — if the artifact column shows only "Slack" or only the Drive link is missing, search `label-<order-number>` or paste the tracking number. The Slack permalink in the table will jump you straight there.
+3. **Slack `#ops-alerts`** — if Slack file upload failed at the time of purchase, an explicit warning was posted here with the Drive label link inline. Search `Slack file upload FAILED <order-number>`.
+4. **ShipStation directly** (last resort) — open the order, click "Reprint label". This is the source of truth: the label was bought there, so it's printable from there even if every downstream artifact failed.
+
+**Hard rule:** Never re-run auto-ship and never call `createLabelForShipStationOrder` to "get a fresh PDF." That buys a second label and double-charges the postage account. The artifact pipeline is observability — the label only ever gets bought once.
+
+#### Required env (production, Vercel)
+
+| Var | Purpose | Failure mode if unset |
+|---|---|---|
+| `GOOGLE_DRIVE_SHIPPING_ARTIFACTS_PARENT_ID` | Drive folder for `labels/<source>/` artifacts | Drive write fail-soft → `driveError` populated, Slack still posts, label still bought. Artifacts column stays "—". |
+| `GOOGLE_DRIVE_UPLOAD_PARENT_ID` | Fallback parent for the artifact module + the upload route | Same as above (cascade fallback). |
+| `GMAIL_OAUTH_REFRESH_TOKEN` (with `https://www.googleapis.com/auth/drive` scope) | Drive uploads | `driveError: "GMAIL_OAUTH_* missing"` — no Drive write but no run failure. |
+| `SLACK_BOT_TOKEN` (with `files:write`) | Slack file upload | Slack upload fails, `#ops-alerts` warning posts, Drive link still works. |
 
 ### F3.2 AP packet send (Jungle Jim's-style)
 - **Trigger:** Manual via `/api/ops/fulfillment/ap-packet/request-approval`
