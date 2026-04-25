@@ -16,8 +16,11 @@ export async function GET(req: Request) {
     }
     const vendor = url.searchParams.get("vendor") || undefined;
     const category = url.searchParams.get("category") || undefined;
+    const rawStatus = url.searchParams.get("status");
+    const status =
+      rawStatus === "needs_review" || rawStatus === "ready" ? rawStatus : undefined;
     const limit = parseInt(url.searchParams.get("limit") || "100");
-    const receipts = await listReceipts({ vendor, category, limit });
+    const receipts = await listReceipts({ vendor, category, status, limit });
     return NextResponse.json({ ok: true, receipts, count: receipts.length });
   } catch {
     return NextResponse.json({ error: "Failed to list receipts" }, { status: 500 });

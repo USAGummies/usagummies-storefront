@@ -396,7 +396,13 @@ export async function processReceipt(input: {
 }
 
 export async function listReceipts(
-  filters?: { vendor?: string; category?: string; limit?: number }
+  filters?: {
+    vendor?: string;
+    category?: string;
+    /** Narrow by review status. Accepts the same union as `ReceiptRecord.status`. */
+    status?: ReceiptRecord["status"];
+    limit?: number;
+  }
 ): Promise<ReceiptRecord[]> {
   const all = (await kv.get<ReceiptRecord[]>(KV_RECEIPTS)) || [];
   let filtered = all;
@@ -406,6 +412,9 @@ export async function listReceipts(
   }
   if (filters?.category) {
     filtered = filtered.filter((r) => r.category === filters.category);
+  }
+  if (filters?.status) {
+    filtered = filtered.filter((r) => r.status === filters.status);
   }
   return filtered.slice(-(filters?.limit || 100));
 }

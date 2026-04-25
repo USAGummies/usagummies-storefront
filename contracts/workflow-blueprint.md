@@ -209,6 +209,22 @@ Follow this order **without rebuying the label**:
 - **Slack:** Daily ping in `#operations` listing stale voids (FIXED today)
 - **Monday MVP:** 🟢 (alert) / 🟡 (auto-escalation email — next build)
 
+### Fin4.6 Finance Review surface (`/ops/finance/review`)
+- **Trigger:** Operator opens the page (Rene + Ben). Read-only.
+- **Source:** Aggregates four live APIs in parallel:
+  - `/api/ops/docs/receipt?summary=true` + `?status=needs_review&limit=50`
+  - `/api/ops/control-plane/approvals?mode=pending` (canonical Class B/C queue)
+  - `/api/ops/fulfillment/freight-comp-queue?status=queued`
+  - `/api/ops/ap-packets`
+- **AI role:** None (pure aggregation + status derivation; never fabricates)
+- **Approver:** N/A — this surface only **shows** what's pending. Decisions still happen in Slack #ops-approvals (Class B/C cards) or via the existing decision endpoints. Future QBO bill/category write paths from this page would be Class B and Rene-approved per `/contracts/approval-taxonomy.md`.
+- **Slack:** None directly (the underlying queues already post to their own channels)
+- **Writeback:** None. Zero side effects: no QBO write, no Gmail send, no Drive write, no approval state mutation.
+- **Audit:** None — read-only views are not auditable events.
+- **Failure mode:** When a source errors or returns empty, the section shows **"Error"** or **"Empty"** wiring (not a fake "0 needs review"). Honest dashboard over flattering one.
+- **Tests:** Yes — `data.test.ts` (10 tests) locks the no-fabrication contract: error → wiring=error, empty → wiring=empty, populated → wiring=wired with the count summary; Monday-action list is sorted by priority. Receipt status filter covered by `docs-receipts.test.ts`.
+- **Monday MVP:** 🟢 — page is ready for Rene + Ben. Will populate as soon as receipts queue, vendor approvals open, or freight-comp items land.
+
 ---
 
 ## Division 5 — Inventory / Vendors / Powers / Albanese / Belmark

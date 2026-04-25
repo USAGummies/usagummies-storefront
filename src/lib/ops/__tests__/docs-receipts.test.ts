@@ -89,4 +89,35 @@ describe("receipt processing queue", () => {
     expect(summary.by_vendor.Belmark.total).toBe(0);
     expect(summary.by_category.unreviewed.count).toBe(1);
   });
+
+  it("listReceipts(status='needs_review') narrows to partial rows only", async () => {
+    await processReceipt({
+      source_url: "gmail:partial-1",
+      source_channel: "gmail",
+      vendor: "Belmark",
+    });
+    await processReceipt({
+      source_url: "gmail:complete-1",
+      source_channel: "gmail",
+      vendor: "Pirate Ship",
+      date: "2026-04-25",
+      amount: 12.34,
+      category: "postage",
+    });
+
+    const partial = await listReceipts({ status: "needs_review" });
+    expect(partial).toHaveLength(1);
+    expect(partial[0].vendor).toBe("Belmark");
+    expect(partial[0].status).toBe("needs_review");
+
+    const ready = await listReceipts({ status: "ready" });
+    expect(ready).toHaveLength(1);
+    expect(ready[0].status).toBe("ready");
+    expect(ready[0].amount).toBe(12.34);
+
+    // No filter still returns both — ensures we didn't accidentally
+    // narrow the default behavior.
+    const all = await listReceipts();
+    expect(all).toHaveLength(2);
+  });
 });
