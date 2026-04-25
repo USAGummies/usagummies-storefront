@@ -4,6 +4,7 @@
 // No fictional batch numbers, no review counts, no location reveals.
 
 import Image from "next/image";
+import Link from "next/link";
 // BagSlider is already a client component; App Router can render it directly
 // from a server component without `dynamic({ssr:false})` (which is banned
 // from server components in Next.js 15).
@@ -14,26 +15,31 @@ export function HeroSection() {
     <section className="relative overflow-hidden">
       <div className="lp-bunting" aria-hidden />
 
-      {/* Navy header — solid navy with a gold hairline. The dotted
-          starfield treatment was pulled here because the gold pin-dots
-          were visually peeking through the wordmark and "Made in the
-          U.S.A." script at small sizes (Ben's audit). Solid navy keeps
-          the patriotic palette without competing with the typography. */}
+      {/* Navy header — solid navy + gold hairline. The brand
+          horizontal logo replaces the typed wordmark per Ben's audit
+          ("we need to have the logo either the main logo or the
+          horizontal logo"). The "Made in the U.S.A." script comes
+          along inside the logo asset, so the right side stays empty
+          on desktop and just lets the logo breathe. */}
       <div
         className="relative"
         style={{
           backgroundColor: "var(--lp-navy)",
-          color: "var(--lp-off-white)",
           borderBottom: "2px solid var(--lp-gold)",
         }}
       >
-        <div className="mx-auto flex max-w-[1200px] items-center justify-between gap-3 px-5 py-2.5 sm:px-8">
-          <span className="lp-display text-[1.2rem] tracking-[0.04em] sm:text-[1.35rem]">
-            USA <span className="text-[var(--lp-red)]">★</span> Gummies
-          </span>
-          <span className="lp-script text-[1.2rem] text-[var(--lp-gold)] sm:text-[1.4rem]">
-            Made in the U.S.A.
-          </span>
+        <div className="mx-auto flex max-w-[1200px] items-center justify-center px-5 py-3 sm:px-8 sm:py-3.5">
+          <Link href="/" aria-label="USA Gummies — home" className="block">
+            <Image
+              src="/brand/logo-horizontal.png"
+              alt="USA Gummies — Made in the U.S.A."
+              width={1201}
+              height={307}
+              priority
+              sizes="(max-width: 640px) 220px, 280px"
+              className="h-9 w-auto sm:h-11"
+            />
+          </Link>
         </div>
       </div>
 
@@ -111,14 +117,17 @@ export function HeroSection() {
               className="relative w-full max-w-[360px] overflow-hidden border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)]"
               style={{ boxShadow: "6px 6px 0 var(--lp-red)" }}
             >
-              <div className="relative aspect-[4/3] w-full">
+              {/* Square aspect matches the hero-pack-icon asset
+                  natively (512×512) so the bag + 5-bear lineup shows
+                  in full without cropping. */}
+              <div className="relative aspect-square w-full">
                 <Image
-                  src="/brand/hero.jpg"
+                  src="/brand/hero-pack-icon.png"
                   alt="USA Gummies — All American Gummy Bears 7.5 oz bag"
                   fill
                   priority
                   sizes="(max-width: 1200px) 40vw, 360px"
-                  className="object-cover"
+                  className="object-contain p-3"
                 />
               </div>
             </figure>
@@ -137,17 +146,17 @@ export function HeroSection() {
               page stacks. Compact 4:3 keeps the headline above the
               fold even on narrow screens. */}
           <figure
-            className="relative -order-1 mx-auto w-full max-w-[420px] overflow-hidden border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] md:hidden"
+            className="relative -order-1 mx-auto w-full max-w-[360px] overflow-hidden border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] md:hidden"
             style={{ boxShadow: "6px 6px 0 var(--lp-red)" }}
           >
-            <div className="relative aspect-[4/3] w-full">
+            <div className="relative aspect-square w-full">
               <Image
-                src="/brand/hero.jpg"
+                src="/brand/hero-pack-icon.png"
                 alt="USA Gummies — All American Gummy Bears 7.5 oz bag"
                 fill
                 priority
                 sizes="100vw"
-                className="object-cover"
+                className="object-contain p-3"
               />
             </div>
           </figure>
