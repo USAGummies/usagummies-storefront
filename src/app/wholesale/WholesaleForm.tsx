@@ -30,9 +30,18 @@ export function WholesaleForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
         throw new Error(data.error || "Something went wrong.");
+      }
+      // If the API returned a sticky inquiry URL, send the customer
+      // straight to their bookmarkable receipt page. The receipt page
+      // is where they upload requested docs + see status. When the
+      // server can't mint a token (WHOLESALE_INQUIRY_SECRET unset)
+      // we fall through to the existing success state — no regression.
+      if (typeof data.inquiryUrl === "string" && data.inquiryUrl.length > 0) {
+        window.location.href = data.inquiryUrl;
+        return;
       }
       setState("success");
     } catch (err) {

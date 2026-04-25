@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 
+import {
+  isInquirySecretConfigured,
+  signInquiryToken,
+} from "@/lib/wholesale/inquiry-token";
+
 type LeadPayload = {
   email?: string;
   phone?: string;
@@ -180,5 +185,26 @@ export async function POST(req: Request) {
     addToB2BPipeline({ email, buyerName, storeName, location, interest, source }).catch(() => {});
   }
 
-  return json({ ok: true });
+  // Mint a sticky inquiry receipt URL for wholesale submissions when
+  // the secret is configured. The URL is what the WholesaleForm
+  // redirects to on success — the customer bookmarks it and returns
+  // later to see status + upload requested docs.
+  //
+  // Fail-soft: if WHOLESALE_INQUIRY_SECRET is unset, omit `inquiryUrl`
+  // from the response. The form's existing success state still works.
+  let inquiryUrl: string | undefined;
+  if (intent === "wholesale" && email && isInquirySecretConfigured()) {
+    try {
+      const token = signInquiryToken({ email, source });
+      // Use NEXT_PUBLIC_SITE_URL for absolute URLs in emails / Slack;
+      // fall back to a path-only string when not set (dev / preview).
+      const base = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? "";
+      inquiryUrl = `${base}/wholesale/inquiry/${encodeURIComponent(token)}`;
+    } catch {
+      // Token mint failed (shouldn't happen since we just checked the
+      // secret is set, but defensive). Don't break the lead capture.
+    }
+  }
+
+  return json({ ok: true, ...(inquiryUrl ? { inquiryUrl } : {}) });
 }

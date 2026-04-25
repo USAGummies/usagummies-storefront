@@ -62,7 +62,7 @@ const SELF_AUTHENTICATED_PREFIXES = [
   "/api/ops/webhooks/", // WEBHOOKS — Upstream webhook ingress (Shopify HMAC, Amazon SNS, Faire token, etc.) — each route verifies its own signature
   "/api/ops/smoke", // SMOKE — cross-integration health check (isAuthorized)
   "/api/ops/shopify/", // SHOPIFY DTC — unfulfilled queue + dispatch bridge (isAuthorized)
-  "/api/ops/upload", // UPLOAD — public-facing NCS-001 / vendor-doc capture. Route enforces its own perimeter: rate limit (5/min/IP), MIME allowlist, 10 MB cap, Drive-only writes (fail-closed if env missing).
+  "/api/ops/upload", // UPLOAD — public-facing NCS-001 / vendor-doc capture (used by /upload/ncs and the wholesale inquiry receipt page). Route enforces its own perimeter: rate limit (5/min/IP), MIME allowlist, 10 MB cap, Drive-only writes (fail-closed if env missing).
 ];
 
 function isSelfAuthenticated(pathname: string): boolean {
