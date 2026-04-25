@@ -9,10 +9,25 @@
 
 import Image from "next/image";
 
+// `objectPosition` aims the 5/4 crop at the most product-forward
+// part of each photo so the gummies + bag actually show in the card,
+// not just the background.
 const SHOTS = [
-  { src: "/brand/photos/hand-gummies.jpg",       alt: "A handful of USA Gummies dye-free gummy bears" },
-  { src: "/brand/photos/book-pages-gummies.jpg", alt: "USA Gummies bag with an open book and gummy bears" },
-  { src: "/brand/photos/diner-scene.png",        alt: "USA Gummies in an American diner setting" },
+  {
+    src: "/brand/photos/hand-gummies.jpg",
+    alt: "A handful of USA Gummies dye-free gummy bears",
+    position: "center 65%",
+  },
+  {
+    src: "/brand/photos/book-pages-gummies.jpg",
+    alt: "USA Gummies bag with an open book and gummy bears",
+    position: "center center",
+  },
+  {
+    src: "/brand/photos/diner-scene.png",
+    alt: "USA Gummies in an American diner setting",
+    position: "center center",
+  },
 ];
 
 export function RealMomentsStrip() {
@@ -39,7 +54,6 @@ export function RealMomentsStrip() {
               className="relative overflow-hidden border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)]"
               style={{ boxShadow: "5px 5px 0 var(--lp-red)" }}
             >
-              {/* Billboards are landscape — keep aspect close to original */}
               <div className="relative aspect-[5/4] w-full">
                 <Image
                   src={s.src}
@@ -47,6 +61,7 @@ export function RealMomentsStrip() {
                   fill
                   sizes="(max-width: 640px) 88vw, (max-width: 1200px) 30vw, 360px"
                   className="object-cover"
+                  style={{ objectPosition: s.position }}
                 />
                 {/* Subtle navy multiply for cohesion with the palette */}
                 <div

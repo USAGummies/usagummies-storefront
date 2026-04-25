@@ -6,20 +6,22 @@
 import type { CSSProperties } from "react";
 import Image from "next/image";
 
-// Drop trajectory — each gummy starts already tilted (matches the
-// angled-bear motif on the bag artwork) and tumbles further as it
-// falls. Earlier rows hold a stronger lead-tilt; lower rows have
-// already rotated through. Sizes shrink slightly with depth to fake
-// perspective. Falls drift to one side (wind catch) so the cluster
-// reads as a stream, not a column.
+// Drop trajectory — sized so each bear silhouette READS as a bear
+// at the page's normal viewing zoom (the previous 36-60px sizes
+// rendered as colored rectangles, per Ben's audit). Spread laterally
+// instead of stacking under the bomb bay so silhouettes don't overlap
+// into a confetti pile. Each bear starts pre-tilted (matches the
+// angled-bear motif on the bag artwork) and continues spinning as it
+// falls — the cluster reads as a stream of bears, not floating
+// stickers.
 const DROPS = [
-  { src: "/brand/gummies/gummy-red.png",    top: "20%", left: "40%", size: 60, rot: 32, drift:  10, spin:  44, delay: 0 },
-  { src: "/brand/gummies/gummy-yellow.png", top: "28%", left: "52%", size: 52, rot: -38, drift: -8, spin: -52, delay: 220 },
-  { src: "/brand/gummies/gummy-green.png",  top: "40%", left: "44%", size: 56, rot: 56,  drift: 14, spin:  60, delay: 440 },
-  { src: "/brand/gummies/gummy-orange.png", top: "50%", left: "58%", size: 46, rot: -22, drift: -6, spin: -40, delay: 660 },
-  { src: "/brand/gummies/gummy-pink.png",   top: "62%", left: "46%", size: 48, rot: 70,  drift: 12, spin:  48, delay: 880 },
-  { src: "/brand/gummies/gummy-red.png",    top: "74%", left: "56%", size: 40, rot: -64, drift: -4, spin: -56, delay: 1100 },
-  { src: "/brand/gummies/gummy-yellow.png", top: "84%", left: "48%", size: 36, rot: 84,  drift:  8, spin:  36, delay: 1320 },
+  { src: "/brand/gummies/gummy-red.png",    top: "22%", left: "42%", size: 100, rot:  28, drift:  14, spin:  42, delay: 0 },
+  { src: "/brand/gummies/gummy-yellow.png", top: "32%", left: "60%", size:  88, rot: -34, drift: -10, spin: -48, delay: 240 },
+  { src: "/brand/gummies/gummy-green.png",  top: "44%", left: "38%", size:  94, rot:  52, drift:  18, spin:  56, delay: 480 },
+  { src: "/brand/gummies/gummy-orange.png", top: "54%", left: "66%", size:  80, rot: -20, drift:  -8, spin: -36, delay: 720 },
+  { src: "/brand/gummies/gummy-pink.png",   top: "66%", left: "44%", size:  84, rot:  68, drift:  16, spin:  44, delay: 960 },
+  { src: "/brand/gummies/gummy-red.png",    top: "78%", left: "62%", size:  72, rot: -60, drift:  -6, spin: -52, delay: 1200 },
+  { src: "/brand/gummies/gummy-yellow.png", top: "88%", left: "50%", size:  64, rot:  82, drift:  10, spin:  32, delay: 1440 },
 ];
 
 export function BombsAway() {

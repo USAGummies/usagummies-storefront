@@ -46,7 +46,16 @@ export function FooterMini() {
           </Link>
         </nav>
       </div>
-      <div className="lp-starfield">
+      {/* Solid navy + gold hairline mirrors the hero header — keeps
+          the patriotic palette without the dotted starfield bleeding
+          through the small-cap legal copy. */}
+      <div
+        style={{
+          backgroundColor: "var(--lp-navy)",
+          color: "var(--lp-off-white)",
+          borderTop: "2px solid var(--lp-gold)",
+        }}
+      >
         <div className="mx-auto flex max-w-[1200px] flex-col items-center justify-between gap-2 px-5 py-4 sm:flex-row sm:px-8">
           <span className="lp-label text-[var(--lp-off-white)]/80">
             © USA Gummies · Made in the U.S.A. · Est. 2025

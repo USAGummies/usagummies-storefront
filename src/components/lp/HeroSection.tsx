@@ -37,14 +37,19 @@ export function HeroSection() {
         </div>
       </div>
 
-      {/* Hero body */}
-      <div className="relative">
+      {/* Hero body — `isolate` creates a local stacking context so the
+          backdrop (with z-0) sits above the .lp-scope cream body
+          background but below the foreground content (z-10). The
+          earlier `-z-10` was pushing the photo behind the lp-scope
+          wrapper's background-color, which is why the bag-1776 photo
+          wasn't visible. */}
+      <div className="relative isolate">
         {/* Real product photo backdrop — replaced the illustrated
             meadow with the actual bag-in-Americana photo so the top of
             the page leads with real imagery (Ben's audit: "needs a real
             image here at the top"). Cream wash keeps the H1 + bag
             slider readable against a busy photograph. */}
-        <div aria-hidden className="absolute inset-0 -z-10">
+        <div aria-hidden className="absolute inset-0 z-0">
           <Image
             src="/brand/photos/bag-1776.jpg"
             alt=""
@@ -56,10 +61,10 @@ export function HeroSection() {
           {/* Two-stop wash: top is mostly transparent so the real
               photo carries the visual weight; the wash deepens behind
               the headline + bag slider so type stays legible. */}
-          <div className="absolute inset-0 bg-gradient-to-b from-[var(--lp-cream)]/15 via-[var(--lp-cream)]/55 to-[var(--lp-cream)]" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[var(--lp-cream)]/20 via-[var(--lp-cream)]/55 to-[var(--lp-cream)]/95" />
         </div>
 
-        <div className="relative mx-auto grid max-w-[1200px] grid-cols-1 gap-8 px-5 pb-10 pt-10 sm:px-8 sm:pb-16 sm:pt-14 md:grid-cols-[1fr_1.05fr] md:gap-12 md:pb-20 md:pt-18">
+        <div className="relative z-10 mx-auto grid max-w-[1200px] grid-cols-1 gap-8 px-5 pb-10 pt-10 sm:px-8 sm:pb-16 sm:pt-14 md:grid-cols-[1fr_1.05fr] md:gap-12 md:pb-20 md:pt-18">
           {/* Copy column */}
           <div className="relative">
             <h1
