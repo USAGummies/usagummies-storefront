@@ -34,24 +34,20 @@ export function SustainabilityBlock() {
             ties directly to the "American supply chain · domestic-only
             freight" story below. */}
         <div className="relative order-2 flex items-center justify-center md:order-1">
-          {/* Aspect matches the panoramic billboard asset (~3.5:1) so
-              the truck composition is preserved instead of cropped.
-              Ben's audit: "the format of the other images are
-              incorrect". */}
-          <figure
-            className="relative w-full max-w-[520px] overflow-hidden border-[3px] border-[var(--lp-ink)] bg-[var(--lp-cream)]"
-            style={{ boxShadow: "6px 6px 0 var(--lp-red)" }}
-          >
-            <div className="relative aspect-[16/9] w-full">
+          {/* Truck illustration (no pricing, no false advertising) —
+              swapped in for the billboard asset that carried a
+              "$17.76 / 4 bags" promo unrelated to current pricing. */}
+          <div className="relative w-full max-w-[520px]">
+            <div className="relative aspect-[5/3] w-full">
               <Image
-                src="/brand/billboards/truck.jpg"
-                alt="USA Gummies freight truck — domestic shipping"
+                src="/brand/illustrations/truck.png"
+                alt="USA Gummies freight truck"
                 fill
                 sizes="(max-width: 768px) 88vw, 520px"
-                className="object-contain"
+                className="object-contain drop-shadow-[5px_6px_0_rgba(14,22,56,0.35)]"
               />
             </div>
-          </figure>
+          </div>
         </div>
 
         {/* Story column */}

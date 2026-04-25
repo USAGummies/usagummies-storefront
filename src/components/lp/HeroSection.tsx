@@ -101,20 +101,23 @@ export function HeroSection() {
               (so visitors immediately see what they're buying), bag
               slider directly under it for the purchase action. Hidden
               on small screens where the slider lives in the copy
-              column above. */}
-          <div className="relative hidden flex-col gap-6 md:flex">
+              column above. Capped width + 4:3 landscape aspect keeps
+              the photo from dominating the fold so the H1 + intro
+              copy still leads (Ben's audit: "the hero image is so
+              large, that you dont have any intro with text"). */}
+          <div className="relative hidden flex-col items-end gap-5 md:flex">
             <figure
               data-reveal="3"
-              className="relative w-full overflow-hidden border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)]"
-              style={{ boxShadow: "8px 8px 0 var(--lp-red)" }}
+              className="relative w-full max-w-[360px] overflow-hidden border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)]"
+              style={{ boxShadow: "6px 6px 0 var(--lp-red)" }}
             >
-              <div className="relative aspect-[3/4] w-full">
+              <div className="relative aspect-[4/3] w-full">
                 <Image
                   src="/brand/hero.jpg"
                   alt="USA Gummies — All American Gummy Bears 7.5 oz bag"
                   fill
                   priority
-                  sizes="(max-width: 1200px) 50vw, 540px"
+                  sizes="(max-width: 1200px) 40vw, 360px"
                   className="object-cover"
                 />
               </div>
@@ -122,7 +125,7 @@ export function HeroSection() {
 
             <div
               data-reveal="3"
-              className="relative rounded-sm border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-4 shadow-[6px_6px_0_var(--lp-red)] sm:p-6"
+              className="relative w-full rounded-sm border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-4 shadow-[6px_6px_0_var(--lp-red)] sm:p-6"
             >
               <BagSlider variant="full" defaultQty={5} />
             </div>
@@ -131,12 +134,13 @@ export function HeroSection() {
           {/* Mobile-only product photo — sits between the trust row
               and the buy widget (in the copy column above) so the
               product is still the first thing visitors see when the
-              page stacks. */}
+              page stacks. Compact 4:3 keeps the headline above the
+              fold even on narrow screens. */}
           <figure
-            className="relative -order-1 w-full overflow-hidden border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] md:hidden"
+            className="relative -order-1 mx-auto w-full max-w-[420px] overflow-hidden border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] md:hidden"
             style={{ boxShadow: "6px 6px 0 var(--lp-red)" }}
           >
-            <div className="relative aspect-[4/5] w-full">
+            <div className="relative aspect-[4/3] w-full">
               <Image
                 src="/brand/hero.jpg"
                 alt="USA Gummies — All American Gummy Bears 7.5 oz bag"
