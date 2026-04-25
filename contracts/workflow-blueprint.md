@@ -444,6 +444,20 @@ Each order row now carries a **Buy these again** button. Pure helper `intentFrom
 - **Phase 1 boundary:** No external map provider, no Mapbox/Google Maps key, no env var. The existing `USStoreMap` SVG (manually-calibrated `mapX/mapY` per store) is enough until coverage demands a real provider.
 - **Monday MVP:** 🟢 — page is ready and adding new retailers is a single literal append to `src/data/retailers.ts`. New entries flow through the helpers automatically.
 
+#### Phase 2 — internal ingest review queue (`/ops/locations`, NEW)
+- **Trigger (write):** Operator POSTs to `/api/ops/locations/ingest` with `{ rows: [...], ingestSource? }`. Each row passes through `normalizeStoreLocation()`. Valid rows land in KV at `locations:drafts:<slug>` with `status="needs_review"`. Invalid rows go into the response `errors[]` array (1-based `rowIndex` + stable `code`: `missing_required` / `duplicate` / `unknown`).
+- **Trigger (read):** Operator opens `/ops/locations` (auth-gated under existing `/ops/*` middleware) → fetches `GET /api/ops/locations/ingest` → renders drafts grouped by status + the most recent ingest's error envelope.
+- **Hard rules locked by tests:**
+  - **Public `src/data/retailers.ts` is never mutated.** Test asserts `JSON.stringify(RETAILERS)` is unchanged before/after ingest.
+  - **`/where-to-buy` is unchanged.** Drafts live in their own KV store and are intentionally invisible to the public locator. Promotion is a separate, manual PR.
+  - Partial / malformed rows never become drafts — the normalize gate refuses them, the route surfaces them in `errors[]`.
+  - Duplicates (within a single batch AND against existing drafts) are flagged in `errors[]` with `code: "duplicate"`, never double-added. Dedup key = slug; falls back to `name+state` slug if absent.
+  - Auth gate: middleware blocks `/api/ops/*` and `/ops/*` for unauthenticated traffic; `isAuthorized()` re-checks (session OR CRON_SECRET) inside the route.
+- **Status response:** 201 when every row produced a draft, 207 (Multi-Status) on a mix of created + errors, 200 when nothing was accepted.
+- **Tests:** 13 unit tests on the drafts module (lifecycle, normalize gate, in-batch + cross-batch dedup, KV last-errors envelope, RETAILERS-unchanged invariant) + 10 integration tests on the route (auth gate, happy path, multi-status, validation, GET grouping).
+- **Promotion to public:** intentionally NOT automated. To publish accepted drafts, an operator opens a PR appending the records to `src/data/retailers.ts` (which the helpers + `/where-to-buy` already consume). The page never publishes anything.
+- **Monday MVP:** 🟢 — internal queue ready. Distributors can send bulk lists; operator stages them via the route, reviews on `/ops/locations`, then promotes only the accepted records.
+
 ---
 
 ## Monday-readiness summary
