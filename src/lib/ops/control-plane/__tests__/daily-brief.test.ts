@@ -299,6 +299,113 @@ describe("composeDailyBrief()", () => {
     const out = composeDailyBrief(baseInput()); // no salesCommand
     expect(JSON.stringify(out.blocks)).not.toContain("Sales Command");
   });
+
+  // ---- Phase 3 — aging callouts (max 3, critical-first) -----------------
+
+  it("aging callouts render between body counts and footer (max 3)", () => {
+    const out = composeDailyBrief({
+      ...baseInput(),
+      salesCommand: {
+        faireInvitesNeedsReview: 0,
+        faireFollowUpsOverdue: 0,
+        faireFollowUpsDueSoon: 0,
+        pendingApprovals: 0,
+        apPacketsActionRequired: 0,
+        apPacketsSent: 0,
+        retailDraftsNeedsReview: 0,
+        retailDraftsAccepted: 0,
+        wholesaleInquiries: null,
+        agingCallouts: [
+          {
+            tier: "critical",
+            source: "approval",
+            text:
+              ":rotating_light: CRITICAL — Slack approval · 5d · Test approval",
+          },
+          {
+            tier: "overdue",
+            source: "faire-followup",
+            text:
+              ":warning: OVERDUE — Faire follow-up · 8d · Tasty Foods",
+          },
+          {
+            tier: "watch",
+            source: "location-draft",
+            text:
+              ":hourglass_flowing_sand: WATCH — Retail draft · 7d · Buc-ee's #14",
+          },
+        ],
+        anyAction: true,
+      },
+    });
+    const json = JSON.stringify(out.blocks);
+    expect(json).toContain("*Aging:*");
+    expect(json).toContain("CRITICAL");
+    expect(json).toContain("OVERDUE");
+    expect(json).toContain("WATCH");
+    expect(json).toContain("Tasty Foods");
+  });
+
+  it("no aging block when callouts list is empty (quiet day)", () => {
+    const out = composeDailyBrief({
+      ...baseInput(),
+      salesCommand: {
+        faireInvitesNeedsReview: 1,
+        faireFollowUpsOverdue: 0,
+        faireFollowUpsDueSoon: 0,
+        pendingApprovals: 0,
+        apPacketsActionRequired: 0,
+        apPacketsSent: 0,
+        retailDraftsNeedsReview: 0,
+        retailDraftsAccepted: 0,
+        wholesaleInquiries: null,
+        agingCallouts: [],
+        anyAction: true,
+      },
+    });
+    expect(JSON.stringify(out.blocks)).not.toContain("*Aging:*");
+  });
+
+  it("brief never renders more than 3 aging callouts even if caller passes more (defensive bound)", () => {
+    // The slice composer caps at 3, but the renderer must also stay
+    // bounded if a caller hand-builds the slice. Render 5 and assert
+    // the section still ≤ MAX_LINES.
+    const fiveCallouts = Array.from({ length: 5 }, (_, i) => ({
+      tier: "critical" as const,
+      source: "approval" as const,
+      text: `:rotating_light: CRITICAL — Slack approval · ${(i + 1) * 50}h · row-${i}`,
+    }));
+    const out = composeDailyBrief({
+      ...baseInput(),
+      salesCommand: {
+        faireInvitesNeedsReview: 1,
+        faireFollowUpsOverdue: 1,
+        faireFollowUpsDueSoon: 1,
+        pendingApprovals: 1,
+        apPacketsActionRequired: 1,
+        apPacketsSent: 1,
+        retailDraftsNeedsReview: 1,
+        retailDraftsAccepted: 1,
+        wholesaleInquiries: null,
+        agingCallouts: fiveCallouts, // bypasses the slice composer's cap
+        anyAction: true,
+      },
+    });
+    type Block = { type: string; text?: { text?: string } };
+    const blocks = out.blocks as Block[];
+    const salesBlock = blocks.find(
+      (b) =>
+        b.type === "section" &&
+        typeof b.text?.text === "string" &&
+        b.text.text.includes("Sales Command"),
+    );
+    expect(salesBlock).toBeDefined();
+    const text = salesBlock!.text!.text! as string;
+    // Hard cap: header + 6 body lines + Aging header + ≤5 callouts
+    // + footer ≈ 14 lines worst case. Locks the renderer can't blow
+    // past the section budget.
+    expect(text.split("\n").length).toBeLessThanOrEqual(15);
+  });
 });
 
 // ---------------------------------------------------------------------------

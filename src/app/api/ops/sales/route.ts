@@ -26,6 +26,7 @@ import { NextResponse } from "next/server";
 import { isAuthorized } from "@/lib/ops/abra-auth";
 import { buildSalesCommandCenter } from "@/lib/ops/sales-command-center";
 import {
+  readAllAgingItems,
   readApPackets,
   readFaireFollowUps,
   readFaireInvites,
@@ -74,12 +75,14 @@ export async function GET(req: Request): Promise<Response> {
     pendingApprovals,
     apPackets,
     locationDrafts,
+    aging,
   ] = await Promise.all([
     readFaireInvites(),
     readFaireFollowUps(now),
     readPendingApprovals(),
     readApPackets(),
     readLocationDrafts(),
+    readAllAgingItems(now),
   ]);
 
   const report = buildSalesCommandCenter(
@@ -91,6 +94,8 @@ export async function GET(req: Request): Promise<Response> {
       locationDrafts,
       wholesaleInquiries: readWholesaleInquiries(),
       missingEnv: readMissingEnv(),
+      agingItems: aging.items,
+      agingMissing: aging.missing,
     },
     { now },
   );

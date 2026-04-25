@@ -103,6 +103,33 @@ interface Report {
     state: SourceState<PendingApprovalSummary>;
     slackChannel: string;
   };
+  aging: {
+    topItems: Array<{
+      source: string;
+      id: string;
+      label: string;
+      link: string;
+      anchorAt: string;
+      ageHours: number;
+      ageDays: number;
+      tier: "fresh" | "watch" | "overdue" | "critical";
+    }>;
+    counts: {
+      critical: number;
+      overdue: number;
+      watch: number;
+      fresh: number;
+      total: number;
+    };
+    missingTimestamps: Array<{
+      source: string;
+      id: string;
+      label: string;
+      link: string;
+      reason: string;
+    }>;
+    link: { href: string; label: string };
+  };
   blockers: {
     missingEnv: string[];
     notes: Array<{
@@ -222,6 +249,7 @@ export function SalesCommandCenterView() {
           <WholesaleOnboardingSection report={data} />
           <RetailProofSection report={data} />
           <AwaitingBenSection report={data} />
+          <AgingSection report={data} />
           <BlockersSection report={data} />
         </>
       )}
@@ -496,6 +524,125 @@ function AwaitingBenSection({ report }: { report: Report }) {
           )}
         </>
       ))}
+    </Section>
+  );
+}
+
+function AgingSection({ report }: { report: Report }) {
+  const { topItems, counts, missingTimestamps, link } = report.aging;
+  const tierColor: Record<string, string> = {
+    critical: RED,
+    overdue: AMBER,
+    watch: NAVY,
+    fresh: DIM,
+  };
+  return (
+    <Section title="Aging / SLA" link={link}>
+      {counts.total === 0 && missingTimestamps.length === 0 ? (
+        <div style={{ fontSize: 12, color: DIM }}>
+          No actionable rows pending across approvals, Faire follow-ups, AP
+          packets, retail drafts, or receipts.
+        </div>
+      ) : (
+        <>
+          <div
+            style={{
+              display: "flex",
+              gap: 18,
+              fontSize: 13,
+              marginBottom: 8,
+              flexWrap: "wrap",
+            }}
+          >
+            <span style={{ color: tierColor.critical }}>
+              Critical: <strong>{counts.critical}</strong>
+            </span>
+            <span style={{ color: tierColor.overdue }}>
+              Overdue: <strong>{counts.overdue}</strong>
+            </span>
+            <span style={{ color: tierColor.watch }}>
+              Watch: <strong>{counts.watch}</strong>
+            </span>
+            <span style={{ color: DIM }}>
+              Fresh: <strong>{counts.fresh}</strong>
+            </span>
+            <span style={{ color: DIM }}>
+              Total tracked: <strong>{counts.total}</strong>
+            </span>
+          </div>
+          {topItems.length === 0 ? (
+            <div style={{ fontSize: 12, color: DIM }}>
+              All tracked rows are still in the &ldquo;fresh&rdquo; window.
+            </div>
+          ) : (
+            <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+              {topItems.map((row) => (
+                <li
+                  key={`${row.source}:${row.id}`}
+                  style={{
+                    borderTop: `1px dashed ${BORDER}`,
+                    padding: "6px 4px",
+                    display: "grid",
+                    gridTemplateColumns: "auto 1fr auto",
+                    gap: 12,
+                    alignItems: "center",
+                    fontSize: 12,
+                  }}
+                >
+                  <span
+                    style={{
+                      color: tierColor[row.tier] ?? NAVY,
+                      fontWeight: 600,
+                      textTransform: "uppercase",
+                      fontSize: 10,
+                      letterSpacing: 0.4,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {row.tier}
+                  </span>
+                  <span>
+                    <strong>{row.label}</strong>
+                    <span style={{ color: DIM, marginLeft: 8 }}>
+                      {row.source}
+                    </span>
+                  </span>
+                  <span style={{ color: tierColor[row.tier] ?? NAVY }}>
+                    {row.ageHours < 48
+                      ? `${Math.floor(row.ageHours)}h`
+                      : `${Math.floor(row.ageDays)}d`}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {missingTimestamps.length > 0 && (
+            <div style={{ marginTop: 12 }}>
+              <SubLabel>Timestamp missing — age cannot be computed</SubLabel>
+              <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                {missingTimestamps.map((row) => (
+                  <li
+                    key={`${row.source}:${row.id}`}
+                    style={{
+                      borderTop: `1px dashed ${BORDER}`,
+                      padding: "6px 4px",
+                      fontSize: 12,
+                    }}
+                  >
+                    <strong>{row.label}</strong>
+                    <span style={{ color: DIM, marginLeft: 8 }}>
+                      {row.source}
+                    </span>
+                    <div style={{ color: DIM, marginTop: 2 }}>
+                      {row.reason}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </>
+      )}
     </Section>
   );
 }

@@ -692,6 +692,18 @@ export function renderSalesCommandMarkdown(slice: SalesCommandSlice): string {
     `• Wholesale inquiries: ${formatCount(slice.wholesaleInquiries)}`,
   );
 
+  // Phase 3 — up to 3 aging callouts (critical → overdue → watch).
+  // The slice's agingCallouts list is pre-sorted + capped by
+  // `composeAgingBriefCallouts`. Empty array → no aging block, so
+  // the section stays tight on quiet days.
+  const callouts = slice.agingCallouts ?? [];
+  if (callouts.length > 0) {
+    lines.push("*Aging:*");
+    for (const c of callouts) {
+      lines.push(`• ${c.text}`);
+    }
+  }
+
   lines.push(footer);
   return lines.join("\n");
 }

@@ -504,3 +504,164 @@ describe("composeSalesCommandSlice — compact projection", () => {
     expect(slice.faireInvitesNeedsReview).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 3 — aging section assembly + slice agingCallouts
+// ---------------------------------------------------------------------------
+
+describe("buildSalesCommandCenter — aging section", () => {
+  function agingItem(
+    source:
+      | "approval"
+      | "faire-followup"
+      | "ap-packet"
+      | "location-draft"
+      | "receipt",
+    ageHours: number,
+    tier: "fresh" | "watch" | "overdue" | "critical",
+    id = `${source}-${ageHours}`,
+  ) {
+    return {
+      source,
+      id,
+      label: `${source} ${id}`,
+      link: "/ops/sales",
+      anchorAt: new Date(NOW.getTime() - ageHours * 3600_000).toISOString(),
+      ageHours,
+      ageDays: ageHours / 24,
+      tier,
+    };
+  }
+
+  it("counts every tier including fresh", () => {
+    const report = buildSalesCommandCenter(
+      {
+        ...emptyInput(),
+        agingItems: [
+          agingItem("approval", 100, "critical"),
+          agingItem("approval", 30, "overdue"),
+          agingItem("approval", 5, "watch"),
+          agingItem("approval", 1, "fresh"),
+          agingItem("approval", 0.5, "fresh", "f-2"),
+        ],
+      },
+      { now: NOW },
+    );
+    expect(report.aging.counts).toEqual({
+      critical: 1,
+      overdue: 1,
+      watch: 1,
+      fresh: 2,
+      total: 5,
+    });
+  });
+
+  it("topItems excludes fresh + caps at default limit (10)", () => {
+    const items = Array.from({ length: 15 }, (_, i) =>
+      agingItem("approval", 100 + i, "critical", `c-${i}`),
+    );
+    const report = buildSalesCommandCenter(
+      { ...emptyInput(), agingItems: items },
+      { now: NOW },
+    );
+    expect(report.aging.topItems).toHaveLength(10);
+  });
+
+  it("agingTopLimit override is honored", () => {
+    const items = Array.from({ length: 15 }, (_, i) =>
+      agingItem("approval", 100 + i, "critical", `c-${i}`),
+    );
+    const report = buildSalesCommandCenter(
+      { ...emptyInput(), agingItems: items, agingTopLimit: 3 },
+      { now: NOW },
+    );
+    expect(report.aging.topItems).toHaveLength(3);
+  });
+
+  it("missingTimestamps panel mirrors caller-supplied list", () => {
+    const report = buildSalesCommandCenter(
+      {
+        ...emptyInput(),
+        agingMissing: [
+          {
+            source: "ap-packet",
+            id: "jj",
+            label: "JJ Foods",
+            link: "/ops/ap-packets",
+            reason: "AP packet config has no readyAt timestamp.",
+          },
+        ],
+      },
+      { now: NOW },
+    );
+    expect(report.aging.missingTimestamps).toHaveLength(1);
+    expect(report.aging.missingTimestamps[0].source).toBe("ap-packet");
+    expect(report.aging.missingTimestamps[0].reason).toContain("readyAt");
+  });
+
+  it("empty inputs produce a clean empty aging section (no fabricated rows)", () => {
+    const report = buildSalesCommandCenter(emptyInput(), { now: NOW });
+    expect(report.aging.counts).toEqual({
+      critical: 0,
+      overdue: 0,
+      watch: 0,
+      fresh: 0,
+      total: 0,
+    });
+    expect(report.aging.topItems).toEqual([]);
+    expect(report.aging.missingTimestamps).toEqual([]);
+  });
+
+  it("topItems is sorted critical→overdue→watch (oldest-first within tier)", () => {
+    const report = buildSalesCommandCenter(
+      {
+        ...emptyInput(),
+        agingItems: [
+          agingItem("approval", 5, "watch", "w1"),
+          agingItem("approval", 30, "overdue", "o1"),
+          agingItem("approval", 100, "critical", "c1"),
+          agingItem("approval", 200, "critical", "c2-older"),
+        ],
+      },
+      { now: NOW },
+    );
+    expect(report.aging.topItems.map((r) => r.id)).toEqual([
+      "c2-older",
+      "c1",
+      "o1",
+      "w1",
+    ]);
+  });
+
+  it("composeSalesCommandSlice surfaces up to 3 aging callouts (critical-first)", () => {
+    const slice = composeSalesCommandSlice({
+      ...emptyInput(),
+      agingItems: [
+        agingItem("approval", 100, "critical", "c1"),
+        agingItem("approval", 200, "critical", "c2"),
+        agingItem("approval", 300, "critical", "c3"),
+        agingItem("approval", 400, "critical", "c4-dropped"),
+      ],
+    });
+    expect(slice.agingCallouts).toBeDefined();
+    expect(slice.agingCallouts!.length).toBe(3);
+    expect(slice.agingCallouts!.every((c) => c.tier === "critical")).toBe(true);
+  });
+
+  it("anyAction trips on aging-only signal (no per-source counts > 0)", () => {
+    const slice = composeSalesCommandSlice({
+      ...emptyInput(),
+      agingItems: [agingItem("approval", 100, "critical")],
+    });
+    expect(slice.anyAction).toBe(true);
+  });
+
+  it("anyAction stays false when only fresh items exist (no aging trip)", () => {
+    const slice = composeSalesCommandSlice({
+      ...emptyInput(),
+      agingItems: [agingItem("approval", 1, "fresh")],
+    });
+    expect(slice.anyAction).toBe(false);
+    expect(slice.agingCallouts).toEqual([]);
+  });
+});

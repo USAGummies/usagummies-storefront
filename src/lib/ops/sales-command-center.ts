@@ -132,6 +132,15 @@ export interface SalesCommandCenterInput {
    *  wired. The dashboard surfaces these as "Blockers" with a link to
    *  /ops/readiness. */
   missingEnv?: string[];
+  /** Phase 3 — aging stream from the unified aging readers. The
+   *  caller fetches via `readAllAgingItems(now)` and passes the
+   *  result here. Optional: when omitted, the report's `aging`
+   *  section is empty (no items, no missing-timestamp rows). */
+  agingItems?: AgingItem[];
+  agingMissing?: MissingTimestampItem[];
+  /** How many actionable aging rows to surface in the dashboard's
+   *  Aging section. Defaults to 10. */
+  agingTopLimit?: number;
 }
 
 export interface SectionTodaysRevenueActions {
@@ -200,7 +209,44 @@ export interface SalesCommandCenterReport {
   wholesaleOnboarding: SectionWholesaleOnboarding;
   retailProof: SectionRetailProof;
   awaitingBen: SectionAwaitingBen;
+  aging: SectionAging;
   blockers: SectionBlockers;
+}
+
+// ---------------------------------------------------------------------------
+// Aging / SLA section (Phase 3)
+// ---------------------------------------------------------------------------
+//
+// The aging section is a separate concern from the per-source counts
+// above. It surfaces the OLDEST actionable rows across every queue
+// in one place, plus a "timestamp missing" panel for sources that
+// can't compute an age (today: AP packets — see sales-aging.ts).
+
+import {
+  composeAgingBriefCallouts,
+  selectTopAging,
+  type AgingItem,
+  type AgingCallout,
+  type AgingTier,
+  type MissingTimestampItem,
+} from "./sales-aging";
+
+export interface SectionAging {
+  /** Top-N (default 10) actionable rows, sorted critical→overdue→watch,
+   *  oldest-first within each tier. */
+  topItems: AgingItem[];
+  /** Counts per tier across the whole stream, NOT just topItems. */
+  counts: {
+    critical: number;
+    overdue: number;
+    watch: number;
+    fresh: number;
+    total: number;
+  };
+  /** Rows whose source had no usable anchor timestamp. */
+  missingTimestamps: MissingTimestampItem[];
+  /** Stable deep-link to the dashboard for full triage. */
+  link: { href: string; label: string };
 }
 
 // ---------------------------------------------------------------------------
@@ -227,6 +273,11 @@ export interface SalesCommandSlice {
   pendingApprovals: number | null;
   apPacketsActionRequired: number | null;
   apPacketsSent: number | null;
+  /** Phase 3 — up to 3 aging callouts (critical-first, then overdue,
+   *  then watch). Empty array when nothing crosses the watch threshold.
+   *  The renderer skips the callouts block entirely when empty so the
+   *  morning brief stays quiet on quiet days. */
+  agingCallouts?: AgingCallout[];
   retailDraftsNeedsReview: number | null;
   retailDraftsAccepted: number | null;
   /** Wholesale inquiries — currently `null` because the source is
@@ -281,14 +332,27 @@ export function composeSalesCommandSlice(
     (c) => c.total,
   );
 
-  const anyAction = [
-    faireInvitesNeedsReview,
-    faireFollowUpsOverdue,
-    faireFollowUpsDueSoon,
-    pendingApprovals,
-    apPacketsActionRequired,
-    retailDraftsNeedsReview,
-  ].some((n) => typeof n === "number" && n > 0);
+  // Phase 3 — derive up to 3 aging callouts from the input's
+  // agingItems list. The aging stream is sorted critical→overdue→
+  // watch by `composeAgingBriefCallouts`; fresh rows are filtered.
+  const agingItems = Array.isArray(input.agingItems) ? input.agingItems : [];
+  const agingCallouts = composeAgingBriefCallouts(agingItems, {
+    maxCallouts: 3,
+  });
+
+  const anyAction =
+    [
+      faireInvitesNeedsReview,
+      faireFollowUpsOverdue,
+      faireFollowUpsDueSoon,
+      pendingApprovals,
+      apPacketsActionRequired,
+      retailDraftsNeedsReview,
+    ].some((n) => typeof n === "number" && n > 0) ||
+    // An aging callout means at least one watch/overdue/critical row
+    // exists — that's actionable even when the per-source counts are
+    // all zero (e.g. a follow-up that's been sitting too long).
+    agingCallouts.length > 0;
 
   return {
     faireInvitesNeedsReview,
@@ -300,6 +364,7 @@ export function composeSalesCommandSlice(
     retailDraftsNeedsReview,
     retailDraftsAccepted,
     wholesaleInquiries,
+    agingCallouts,
     anyAction,
   };
 }
@@ -441,10 +506,43 @@ export function buildSalesCommandCenter(
       state: input.pendingApprovals,
       slackChannel: "#ops-approvals",
     },
+    aging: buildAgingSection(input),
     blockers: {
       missingEnv: Array.isArray(input.missingEnv) ? [...input.missingEnv] : [],
       notes,
       link: { href: "/ops/readiness", label: "Open readiness dashboard" },
     },
+  };
+}
+
+/** Pure assembler for the aging section. Keeps the main builder lean. */
+function buildAgingSection(input: SalesCommandCenterInput): SectionAging {
+  const items = Array.isArray(input.agingItems) ? input.agingItems : [];
+  const missing = Array.isArray(input.agingMissing) ? input.agingMissing : [];
+  const limit = Math.max(0, input.agingTopLimit ?? 10);
+
+  const counts = {
+    critical: 0,
+    overdue: 0,
+    watch: 0,
+    fresh: 0,
+    total: items.length,
+  };
+  for (const item of items) {
+    counts[item.tier as AgingTier] += 1;
+  }
+  // Top items: actionable only (no fresh), oldest critical first.
+  const topItems = selectTopAging(items, limit);
+  // Sort the missing-timestamp panel by source name for determinism.
+  const missingSorted = [...missing].sort((a, b) =>
+    a.source === b.source
+      ? a.id.localeCompare(b.id)
+      : a.source.localeCompare(b.source),
+  );
+  return {
+    topItems,
+    counts,
+    missingTimestamps: missingSorted,
+    link: { href: "/ops/sales", label: "Open Sales Command" },
   };
 }
