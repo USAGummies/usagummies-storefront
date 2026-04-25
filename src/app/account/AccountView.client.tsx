@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { addToCart } from "@/lib/cart";
 import {
   formatFinancialStatus,
   formatFulfillmentStatus,
@@ -12,6 +13,11 @@ import {
   type CustomerOrderShape,
   type CustomerSummaryShape,
 } from "@/lib/account/display";
+import {
+  copyForSkipReason,
+  intentFromOrder,
+  type ReorderIntent,
+} from "@/lib/account/reorder";
 
 interface SessionResponse {
   ok: boolean;
@@ -234,36 +240,115 @@ function OrdersSection({ orders }: { orders: CustomerOrderShape[] }) {
       ) : (
         <ul className="divide-y divide-gray-100">
           {orders.map((o) => (
-            <li key={o.id} className="py-3 flex items-baseline justify-between gap-4">
-              <div className="min-w-0">
-                <div className="text-sm font-semibold">
-                  Order #{o.orderNumber}
-                </div>
-                <div className="text-xs text-gray-500 mt-0.5">
-                  {formatOrderDate(o.processedAt)} ·{" "}
-                  {formatFinancialStatus(o.financialStatus)} ·{" "}
-                  {formatFulfillmentStatus(o.fulfillmentStatus)}
-                </div>
-                {o.lineItems.length > 0 && (
-                  <div className="text-xs text-gray-500 mt-0.5 truncate">
-                    {o.lineItems
-                      .slice(0, 3)
-                      .map((li) => `${li.quantity}× ${li.title}`)
-                      .join(" · ")}
-                    {o.lineItems.length > 3
-                      ? ` +${o.lineItems.length - 3} more`
-                      : ""}
-                  </div>
-                )}
-              </div>
-              <div className="text-sm font-bold whitespace-nowrap">
-                {formatOrderTotal(o.currentTotalPrice)}
-              </div>
-            </li>
+            <OrderRow key={o.id} order={o} />
           ))}
         </ul>
       )}
     </section>
+  );
+}
+
+function OrderRow({ order }: { order: CustomerOrderShape }) {
+  const intent = intentFromOrder(order);
+  return (
+    <li className="py-3">
+      <div className="flex items-baseline justify-between gap-4">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold">Order #{order.orderNumber}</div>
+          <div className="text-xs text-gray-500 mt-0.5">
+            {formatOrderDate(order.processedAt)} ·{" "}
+            {formatFinancialStatus(order.financialStatus)} ·{" "}
+            {formatFulfillmentStatus(order.fulfillmentStatus)}
+          </div>
+          {order.lineItems.length > 0 && (
+            <div className="text-xs text-gray-500 mt-0.5 truncate">
+              {order.lineItems
+                .slice(0, 3)
+                .map((li) => `${li.quantity}× ${li.title}`)
+                .join(" · ")}
+              {order.lineItems.length > 3
+                ? ` +${order.lineItems.length - 3} more`
+                : ""}
+            </div>
+          )}
+        </div>
+        <div className="text-sm font-bold whitespace-nowrap">
+          {formatOrderTotal(order.currentTotalPrice)}
+        </div>
+      </div>
+      <ReorderControls intent={intent} />
+    </li>
+  );
+}
+
+function ReorderControls({ intent }: { intent: ReorderIntent }) {
+  const [state, setState] = useState<"idle" | "adding" | "added" | "error">(
+    "idle",
+  );
+  const [error, setError] = useState<string | null>(null);
+
+  // Nothing to add and nothing to flag → keep the row clean.
+  if (!intent.hasAnyAddable && intent.skipped.length === 0) {
+    return null;
+  }
+
+  async function handleClick() {
+    setState("adding");
+    setError(null);
+    try {
+      // Sequential calls through the existing single-variant
+      // `addToCart` server action. Shopify computes the current price.
+      for (const item of intent.addable) {
+        await addToCart(item.variantId, item.quantity);
+      }
+      setState("added");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setState("error");
+    }
+  }
+
+  return (
+    <div className="mt-2 flex items-center gap-3 flex-wrap">
+      {intent.hasAnyAddable && state !== "added" && (
+        <button
+          onClick={handleClick}
+          disabled={state === "adding"}
+          className="text-xs px-3 py-1.5 rounded-md bg-[#b22234] text-white font-semibold hover:bg-[#8b1a29] disabled:opacity-50"
+        >
+          {state === "adding"
+            ? "Adding…"
+            : intent.addable.length === 1
+              ? `Buy this again (${intent.addable[0].quantity})`
+              : `Buy these again (${intent.addable.reduce(
+                  (n, a) => n + a.quantity,
+                  0,
+                )})`}
+        </button>
+      )}
+      {state === "added" && (
+        <span className="text-xs text-green-700">
+          Added to your cart.{" "}
+          <a href="/cart" className="underline">
+            Open cart →
+          </a>
+        </span>
+      )}
+      {state === "error" && error && (
+        <span className="text-xs text-red-700">
+          Couldn&apos;t add to cart: {error}
+        </span>
+      )}
+      {intent.skipped.length > 0 && (
+        <span className="text-xs text-gray-500">
+          Skipped:{" "}
+          {intent.skipped
+            .map((s) => `"${s.title}" ${copyForSkipReason(s.reason)}`)
+            .join("; ")}
+          .
+        </span>
+      )}
+    </div>
   );
 }
 

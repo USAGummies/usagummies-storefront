@@ -11,6 +11,17 @@
  *   - currency falls back to USD when Shopify omits it
  */
 
+export interface CustomerOrderLineItemShape {
+  title: string;
+  quantity: number;
+  /** Null when Shopify can't resolve the variant (deleted product, etc.). */
+  variant: {
+    id: string;
+    sku: string | null;
+    availableForSale: boolean;
+  } | null;
+}
+
 export interface CustomerOrderShape {
   id: string;
   orderNumber: number;
@@ -18,7 +29,7 @@ export interface CustomerOrderShape {
   financialStatus: string;
   fulfillmentStatus: string | null;
   currentTotalPrice: { amount: string; currencyCode: string } | null;
-  lineItems: Array<{ title: string; quantity: number }>;
+  lineItems: CustomerOrderLineItemShape[];
 }
 
 export interface CustomerSummaryShape {

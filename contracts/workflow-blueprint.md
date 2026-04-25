@@ -424,8 +424,11 @@ Follow this order **without rebuying the label**:
 - **Slack:** None.
 - **Writeback:** Cookie set/clear via `/api/member`. No QBO, no Drive, no Gmail, no cart mutation, no checkout change.
 - **Failure mode:** session 401 → redirect to `/account/login`. /api/wholesale-status error → B2B panel shows a friendly "temporarily unavailable" message; orders still render. B2B panel is hidden entirely for consumer mailboxes (gmail/yahoo/etc.) to keep the noise down for DTC customers.
-- **Tests:** 19 unit tests in `display.test.ts` lock the no-fabrication contract on order date / total / financial status / fulfillment status / greeting / `shouldQueryB2BStatus` heuristic.
-- **Monday MVP:** 🟢 — Phase 2 surface live (commit pending). No reorder button (no safe multi-line cart-rebuild helper exists yet); no per-account pricing or terms (Phase 3).
+- **Tests:** 19 unit tests in `display.test.ts` lock the no-fabrication contract on order date / total / financial status / fulfillment status / greeting / `shouldQueryB2BStatus` heuristic. **Plus 9 reorder tests in `reorder.test.ts`** locking the no-historical-price contract.
+- **Monday MVP:** 🟢 — Phase 2 surface live (commit 45d63ac). No per-account pricing or terms (Phase 3).
+
+#### Reorder ("Buy these again", Phase 3a)
+Each order row now carries a **Buy these again** button. Pure helper `intentFromOrder()` (in `src/lib/account/reorder.ts`) maps historical line items against the canonical single-bag variant and returns `{ addable, skipped, hasAnyAddable }`. The button is shown only when at least one line item is safely mappable. On click, the UI loops through the addable items and calls the existing `addToCart()` server action — **Shopify computes the current price; no historical price is ever reused** (locked by a `JSON.stringify(intent)` assertion that price strings are absent from the output). Unavailable lines (deleted product / different SKU / out of stock) surface inline with friendly copy via `copyForSkipReason`. The `CUSTOMER_ORDERS` GraphQL query was extended to surface `variant { id sku availableForSale }` per line item so the helper can classify safely. No new server-action signature, no new env var.
 
 ---
 
