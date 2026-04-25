@@ -33,10 +33,13 @@ import { RETAILERS } from "@/data/retailers";
 
 import {
   __resetDraftsForTest,
+  getDraftLocation,
   ingestRows,
   listDraftLocations,
   listDraftsByStatus,
   readLastIngestErrors,
+  updateDraftLocation,
+  VALID_DRAFT_STATUSES,
   type DraftLocation,
 } from "../drafts";
 
@@ -256,5 +259,183 @@ describe("public RETAILERS data remains untouched", () => {
     // RETAILERS is still the hand-curated list — no drafted slug.
     const slugs = RETAILERS.map((r) => r.slug);
     expect(slugs).not.toContain("wfm-portland");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 3 — review actions (updateDraftLocation)
+// ---------------------------------------------------------------------------
+
+describe("VALID_DRAFT_STATUSES — locked enum", () => {
+  it("only the three lifecycle codes are valid", () => {
+    expect(VALID_DRAFT_STATUSES).toEqual([
+      "needs_review",
+      "accepted",
+      "rejected",
+    ]);
+  });
+});
+
+describe("updateDraftLocation — happy paths", () => {
+  it("status update persists with reviewedAt + reviewedBy + updatedAt", async () => {
+    await ingestRows([fakeRow({ slug: "abc" })], { now: NOW });
+    const later = new Date("2026-04-27T08:00:00Z");
+    const r = await updateDraftLocation(
+      "abc",
+      { status: "accepted", reviewedBy: "rene@usagummies.com" },
+      { now: later },
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.draft.status).toBe("accepted");
+      expect(r.draft.reviewedAt).toBe(later.toISOString());
+      expect(r.draft.updatedAt).toBe(later.toISOString());
+      expect(r.draft.reviewedBy).toBe("rene@usagummies.com");
+    }
+    const reloaded = await getDraftLocation("abc");
+    expect(reloaded?.status).toBe("accepted");
+  });
+
+  it("review note persists; empty string clears", async () => {
+    await ingestRows([fakeRow({ slug: "abc" })], { now: NOW });
+    let r = await updateDraftLocation(
+      "abc",
+      { reviewNote: "  Pricing confirmed with buyer.  " },
+      { now: NOW },
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.draft.reviewNote).toBe("Pricing confirmed with buyer.");
+
+    r = await updateDraftLocation("abc", { reviewNote: "" }, { now: NOW });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.draft.reviewNote).toBeUndefined();
+  });
+
+  it("field correction passes when result still validates", async () => {
+    await ingestRows([fakeRow({ slug: "abc", state: "Washingotn" })], {
+      now: NOW,
+    });
+    const r = await updateDraftLocation(
+      "abc",
+      { fieldCorrections: { state: "Washington" } },
+      { now: NOW },
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.draft.state).toBe("Washington");
+  });
+});
+
+describe("updateDraftLocation — invalid input is rejected", () => {
+  it("unknown slug → not_found", async () => {
+    const r = await updateDraftLocation(
+      "ghost",
+      { status: "accepted" },
+      { now: NOW },
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.code).toBe("not_found");
+  });
+
+  it("invalid status value → invalid_status", async () => {
+    await ingestRows([fakeRow({ slug: "abc" })], { now: NOW });
+    const r = await updateDraftLocation(
+      "abc",
+      { status: "totally-bogus" as unknown as "accepted" },
+      { now: NOW },
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.code).toBe("invalid_status");
+  });
+
+  it("empty patch → no_changes", async () => {
+    await ingestRows([fakeRow({ slug: "abc" })], { now: NOW });
+    const r = await updateDraftLocation("abc", {}, { now: NOW });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.code).toBe("no_changes");
+  });
+
+  it("field correction that breaks validation → validation_failed", async () => {
+    await ingestRows([fakeRow({ slug: "abc" })], { now: NOW });
+    const r = await updateDraftLocation(
+      "abc",
+      {
+        // Blank-string `name` makes the merged record invalid.
+        fieldCorrections: { name: "" },
+      },
+      { now: NOW },
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.code).toBe("validation_failed");
+    // Original record remains intact.
+    const reloaded = await getDraftLocation("abc");
+    expect(reloaded?.name).toBe("Test Store 1");
+  });
+
+  it("field correction with non-finite numeric → validation_failed", async () => {
+    await ingestRows([fakeRow({ slug: "abc" })], { now: NOW });
+    const r = await updateDraftLocation(
+      "abc",
+      { fieldCorrections: { lat: Number.NaN } },
+      { now: NOW },
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.code).toBe("validation_failed");
+  });
+});
+
+describe("updateDraftLocation — slug is immutable", () => {
+  it("slug-changing correction is silently dropped", async () => {
+    await ingestRows([fakeRow({ slug: "abc" })], { now: NOW });
+    const r = await updateDraftLocation(
+      "abc",
+      {
+        fieldCorrections: { slug: "changed" } as Partial<DraftLocation>,
+        reviewNote: "force a write",
+      },
+      { now: NOW },
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.draft.slug).toBe("abc");
+  });
+});
+
+describe("review actions never touch the public RETAILERS array", () => {
+  it("accepted draft stays out of RETAILERS", async () => {
+    await ingestRows([fakeRow({ slug: "wfm-pdx", name: "WFM Portland" })], {
+      now: NOW,
+    });
+    await updateDraftLocation(
+      "wfm-pdx",
+      { status: "accepted", reviewedBy: "rene" },
+      { now: NOW },
+    );
+    expect(RETAILERS.find((r) => r.slug === "wfm-pdx")).toBeUndefined();
+  });
+
+  it("rejected draft stays out of RETAILERS", async () => {
+    await ingestRows([fakeRow({ slug: "rejected-store" })], { now: NOW });
+    await updateDraftLocation(
+      "rejected-store",
+      { status: "rejected", reviewedBy: "ben" },
+      { now: NOW },
+    );
+    expect(RETAILERS.find((r) => r.slug === "rejected-store")).toBeUndefined();
+  });
+
+  it("RETAILERS JSON is unchanged across the full review cycle", async () => {
+    const before = JSON.stringify(RETAILERS);
+    await ingestRows([fakeRow({ slug: "cycle-1" })], { now: NOW });
+    await updateDraftLocation("cycle-1", { status: "accepted" }, { now: NOW });
+    await updateDraftLocation(
+      "cycle-1",
+      { reviewNote: "looks good" },
+      { now: NOW },
+    );
+    await updateDraftLocation(
+      "cycle-1",
+      { status: "rejected", reviewNote: "duplicate vendor" },
+      { now: NOW },
+    );
+    expect(JSON.stringify(RETAILERS)).toBe(before);
   });
 });

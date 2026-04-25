@@ -458,6 +458,19 @@ Each order row now carries a **Buy these again** button. Pure helper `intentFrom
 - **Promotion to public:** intentionally NOT automated. To publish accepted drafts, an operator opens a PR appending the records to `src/data/retailers.ts` (which the helpers + `/where-to-buy` already consume). The page never publishes anything.
 - **Monday MVP:** 🟢 — internal queue ready. Distributors can send bulk lists; operator stages them via the route, reviews on `/ops/locations`, then promotes only the accepted records.
 
+#### Phase 3 — review actions (`PATCH /api/ops/locations/ingest/[slug]`, NEW)
+- **Trigger:** Operator opens `/ops/locations`, picks a draft row, changes the status dropdown (`needs_review` / `accepted` / `rejected`) and/or types a review note, clicks **Save review**. The client `PATCH`es the slug-specific endpoint.
+- **Body:** `{ status?, reviewNote?, fieldCorrections?, reviewedBy? }`. Slug is immutable on update; slug-changing corrections are silently dropped.
+- **Validation:** every accepted change passes through `normalizeStoreLocation()` AFTER the merge — a botched correction (blank `name`, `lat: NaN`, etc.) rejects the entire patch with HTTP 422 + stable `code: "validation_failed"`. Original draft stays intact. Status enum is enforced (`code: "invalid_status"`, 422). Empty patches return `code: "no_changes"`, 400.
+- **Audit fields:** every accepted update stamps `updatedAt` + `reviewedAt` (now) and optionally `reviewedBy` (operator email/username). The page surfaces the last-reviewed timestamp + reviewer next to each row.
+- **Hard rules locked by tests:**
+  - **`src/data/retailers.ts` is NEVER mutated.** Both `accepted` and `rejected` updates are explicitly tested for "slug never appears in RETAILERS." A full review cycle (ingest → accept → field correction → reject) is asserted byte-identical against `JSON.stringify(RETAILERS)`.
+  - **No promote-to-public endpoint exists.** Promotion still requires a PR appending to `src/data/retailers.ts`.
+  - Slug is immutable across review actions.
+- **Tests:** 13 new on the drafts module (status enum, happy paths, no-changes guard, validation_failed on bad correction, slug immutability, RETAILERS-unchanged across the cycle) + 16 new on the PATCH route (auth gate, happy paths, error codes, RETAILERS untouched). Existing Phase 2 tests still pass.
+- **UI:** `/ops/locations` page now renders each draft as a card with status dropdown + review-note textarea + **Save review** button. Section copy: *"Accepted means ready for manual PR, not live."*
+- **Monday MVP:** 🟢 — operators can classify drafts into the lifecycle without ever publishing publicly.
+
 ---
 
 ## Monday-readiness summary

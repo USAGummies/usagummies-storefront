@@ -46,7 +46,17 @@ export interface DraftLocation extends StoreLocation {
   ingestSource: string;
   /** Operator notes added after review. */
   reviewNote?: string;
+  /** ISO when an operator last changed status / fields. Distinct from updatedAt. */
+  reviewedAt?: string;
+  /** Operator identifier (email / username) of the last reviewer. */
+  reviewedBy?: string;
 }
+
+export const VALID_DRAFT_STATUSES: readonly DraftStatus[] = [
+  "needs_review",
+  "accepted",
+  "rejected",
+] as const;
 
 export interface IngestErrorRow {
   /** 1-based row number from the submitted list (matches operator's view). */
@@ -347,6 +357,156 @@ export async function ingestRows(
     createdSlugs,
     ingestSource,
   };
+}
+
+// ---- Review actions ---------------------------------------------------
+
+export type DraftUpdateError =
+  | { code: "not_found"; message: string }
+  | { code: "invalid_status"; message: string }
+  | { code: "validation_failed"; message: string }
+  | { code: "no_changes"; message: string };
+
+export interface DraftUpdatePatch {
+  /** New lifecycle status. Must be one of the VALID_DRAFT_STATUSES. */
+  status?: DraftStatus;
+  /** Operator review note. Pass an empty string to clear. */
+  reviewNote?: string;
+  /**
+   * Optional corrections to a subset of the store fields. Each corrected
+   * draft is re-validated through `normalizeStoreLocation()` AFTER merge —
+   * any update that would invalidate the record is rejected.
+   */
+  fieldCorrections?: Partial<StoreLocation>;
+  /** Operator identifier (email / username) for the audit trail. */
+  reviewedBy?: string;
+}
+
+const ALLOWED_FIELD_KEYS: ReadonlySet<keyof StoreLocation> = new Set([
+  "name",
+  "address",
+  "cityStateZip",
+  "state",
+  "lat",
+  "lng",
+  "mapX",
+  "mapY",
+  "mapsUrl",
+  "channel",
+  "storeType",
+  "website",
+  "note",
+]);
+
+/**
+ * Apply an operator review patch to a draft. Pure-ish (KV write is the
+ * only side effect; no Slack, no email, no public publish, never
+ * touches src/data/retailers.ts). Returns the updated draft on
+ * success, or a structured error on failure.
+ *
+ * Hard rules locked by tests:
+ *   - status MUST be one of VALID_DRAFT_STATUSES.
+ *   - field corrections must merge into a record that still passes
+ *     `normalizeStoreLocation()`. Any partial / invalid corrections
+ *     reject the entire patch — no half-application.
+ *   - The slug is immutable. Slug-changing corrections are silently
+ *     dropped (the dedup key would otherwise drift).
+ *   - `updatedAt` and `reviewedAt` are stamped on every accepted
+ *     update, even when only `status` or `reviewNote` changed.
+ *   - Returns `no_changes` when the patch is empty (no status, no
+ *     note, no field corrections) so the caller can 400.
+ */
+export async function updateDraftLocation(
+  slug: string,
+  patch: DraftUpdatePatch,
+  options: { now?: Date } = {},
+): Promise<{ ok: true; draft: DraftLocation } | { ok: false; error: DraftUpdateError }> {
+  const existing = await getDraftLocation(slug);
+  if (!existing) {
+    return {
+      ok: false,
+      error: {
+        code: "not_found",
+        message: `Draft ${slug} not found in the review queue.`,
+      },
+    };
+  }
+
+  const hasStatus = patch.status !== undefined;
+  const hasNote = patch.reviewNote !== undefined;
+  const hasFieldCorrections =
+    patch.fieldCorrections !== undefined &&
+    Object.keys(patch.fieldCorrections).length > 0;
+
+  if (!hasStatus && !hasNote && !hasFieldCorrections) {
+    return {
+      ok: false,
+      error: {
+        code: "no_changes",
+        message: "Patch must set at least one of status, reviewNote, or fieldCorrections.",
+      },
+    };
+  }
+
+  // ---- Validate status ------------------------------------------------
+  if (hasStatus && !VALID_DRAFT_STATUSES.includes(patch.status as DraftStatus)) {
+    return {
+      ok: false,
+      error: {
+        code: "invalid_status",
+        message: `status must be one of ${VALID_DRAFT_STATUSES.join(", ")}`,
+      },
+    };
+  }
+
+  // ---- Apply field corrections (merge + re-normalize) ----------------
+  let merged: DraftLocation = { ...existing };
+  if (hasFieldCorrections) {
+    const corrections = patch.fieldCorrections!;
+    // Slug is immutable — silently drop any attempt.
+    const safeCorrections: Partial<StoreLocation> = {};
+    for (const key of Object.keys(corrections) as Array<keyof StoreLocation>) {
+      if (key === "slug") continue;
+      if (!ALLOWED_FIELD_KEYS.has(key)) continue;
+      const value = corrections[key];
+      if (value === undefined) continue;
+      (safeCorrections as Record<string, unknown>)[key] = value;
+    }
+    const candidate: StoreLocation = { ...existing, ...safeCorrections };
+    const validated = normalizeStoreLocation(candidate);
+    if (!validated) {
+      return {
+        ok: false,
+        error: {
+          code: "validation_failed",
+          message:
+            "Corrected draft fails normalizeStoreLocation — at least one required field is missing or invalid after the merge.",
+        },
+      };
+    }
+    merged = { ...merged, ...validated };
+  }
+
+  // ---- Apply lifecycle changes ---------------------------------------
+  const now = (options.now ?? new Date()).toISOString();
+  if (hasStatus) merged.status = patch.status as DraftStatus;
+  if (hasNote) {
+    const note = (patch.reviewNote ?? "").trim();
+    if (note.length === 0) {
+      delete merged.reviewNote;
+    } else {
+      merged.reviewNote = note.slice(0, 1000);
+    }
+  }
+  merged.updatedAt = now;
+  merged.reviewedAt = now;
+  if (typeof patch.reviewedBy === "string" && patch.reviewedBy.trim().length > 0) {
+    merged.reviewedBy = patch.reviewedBy.trim().slice(0, 80);
+  }
+
+  // ---- Persist --------------------------------------------------------
+  await kv.set(draftKey(slug), JSON.stringify(merged));
+  return { ok: true, draft: merged };
 }
 
 /** Test helper — clear all draft KV keys + the index + last-errors. */
