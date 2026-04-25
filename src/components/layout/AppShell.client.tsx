@@ -314,10 +314,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     };
   }, [mobileOpen]);
 
-  // Landing pages render standalone — no nav, footer, or shell chrome.
-  if (isLandingPage) {
-    return <>{children}</>;
-  }
+  // Landing pages keep the global header + cart chrome (per Ben's
+  // audit: "i do want back our header menu bar from the current
+  // website on this design") but render their own footer / popups,
+  // so we just flag the LP path and gate the bottom-of-page chrome
+  // below.
 
   return (
     <div className="min-h-screen bg-[var(--bg,#f8f5ef)] text-[var(--text)]">
@@ -532,20 +533,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <CartDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
       ) : null}
 
-      <main className="relative overflow-hidden pb-16 text-[var(--text)]">
-        <Image
-          src="/website%20assets/B17Bomber.png"
-          alt="Vintage B-17 bomber illustration"
-          aria-hidden="true"
-          width={1405}
-          height={954}
-          sizes="(max-width: 1024px) 1px, 520px"
-          className="site-watermark site-watermark--bomber"
-        />
+      <main
+        className={cx(
+          "relative text-[var(--text)]",
+          isLandingPage ? "" : "overflow-hidden pb-16",
+        )}
+      >
+        {isLandingPage ? null : (
+          <Image
+            src="/website%20assets/B17Bomber.png"
+            alt="Vintage B-17 bomber illustration"
+            aria-hidden="true"
+            width={1405}
+            height={954}
+            sizes="(max-width: 1024px) 1px, 520px"
+            className="site-watermark site-watermark--bomber"
+          />
+        )}
         <div className="relative z-10">{children}</div>
       </main>
 
-      {showExperienceBand ? (
+      {showExperienceBand && !isLandingPage ? (
         <section className="bg-transparent -mt-6">
           <div className="mx-auto max-w-6xl px-4 pb-6">
             <ExperienceBand variant={experienceVariant} />
@@ -553,6 +561,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </section>
       ) : null}
 
+      {isLandingPage ? null : (
       <footer className="border-t border-[var(--border)] bg-white/85 backdrop-blur-md text-[var(--text)]">
         <div
           className="h-[2px] w-full"
@@ -769,8 +778,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </footer>
-      <ExitIntentPopup />
-      <ScrollPopup />
+      )}
+      {isLandingPage ? null : (
+        <>
+          <ExitIntentPopup />
+          <ScrollPopup />
+        </>
+      )}
     </div>
   );
 }

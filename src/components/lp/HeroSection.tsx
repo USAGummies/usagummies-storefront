@@ -4,7 +4,6 @@
 // No fictional batch numbers, no review counts, no location reveals.
 
 import Image from "next/image";
-import Link from "next/link";
 // BagSlider is already a client component; App Router can render it directly
 // from a server component without `dynamic({ssr:false})` (which is banned
 // from server components in Next.js 15).
@@ -14,34 +13,6 @@ export function HeroSection() {
   return (
     <section className="relative overflow-hidden">
       <div className="lp-bunting" aria-hidden />
-
-      {/* Navy header — solid navy + gold hairline. The brand
-          horizontal logo replaces the typed wordmark per Ben's audit
-          ("we need to have the logo either the main logo or the
-          horizontal logo"). The "Made in the U.S.A." script comes
-          along inside the logo asset, so the right side stays empty
-          on desktop and just lets the logo breathe. */}
-      <div
-        className="relative"
-        style={{
-          backgroundColor: "var(--lp-navy)",
-          borderBottom: "2px solid var(--lp-gold)",
-        }}
-      >
-        <div className="mx-auto flex max-w-[1200px] items-center justify-center px-5 py-3 sm:px-8 sm:py-3.5">
-          <Link href="/" aria-label="USA Gummies — home" className="block">
-            <Image
-              src="/brand/logo-horizontal.png"
-              alt="USA Gummies — Made in the U.S.A."
-              width={1201}
-              height={307}
-              priority
-              sizes="(max-width: 640px) 220px, 280px"
-              className="h-9 w-auto sm:h-11"
-            />
-          </Link>
-        </div>
-      </div>
 
       {/* Hero body — solid cream backdrop. The bag-1776 background photo
           was pulled per Ben's audit ("the image you used as the hero
