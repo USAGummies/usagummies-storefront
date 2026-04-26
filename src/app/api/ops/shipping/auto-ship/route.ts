@@ -31,7 +31,7 @@
  *   5. `createLabelForShipStationOrder` — buys label + marks shipped +
  *      syncs tracking back to the source marketplace.
  *   6. Extract page 1 of the 2-page PDF (skip the packing slip page).
- *   7. Upload to Slack #operations (or configured channel) with
+ *   7. Upload to Slack #shipping (Phase 27 default — v1.0 protocol) with
  *      one-line summary.
  *   8. Persist to dedup KV + audit.
  *
@@ -60,6 +60,10 @@ import {
 } from "@/lib/ops/shipping-packaging";
 import { uploadBufferToSlack } from "@/lib/ops/slack-file-upload";
 import {
+  formatShipmentComment,
+  formatPackingSlipComment,
+} from "@/lib/ops/auto-ship-format";
+import {
   attachSlackPermalink,
   persistLabelArtifacts,
   splitLabelAndPackingSlip,
@@ -85,7 +89,7 @@ interface UnifiedAutoShipBody {
   orderNumbers?: string[];
   /** Preview only — pick plan but don't buy. */
   dryRun?: boolean;
-  /** Override the target Slack channel (default: operations). */
+  /** Override the target Slack channel (default: `shipping` per Phase 27). */
   slackChannel?: string;
   /** Cap the batch size — protects against runaway buys if something goes wrong. */
   maxOrders?: number;
@@ -319,7 +323,8 @@ async function autoShipOrder(
   // Two side-effects, both fail-soft (never roll back the label buy):
   //   (a) Persist label + packing slip to Google Drive so Ben can always
   //       re-print from a stable URL even if Slack drops the file.
-  //   (b) Upload the label PDF to Slack #operations as today.
+  //   (b) Upload the label PDF (and packing slip thread reply) to
+  //       Slack #shipping per the v1.0 SHIPPING PROTOCOL (Phase 27).
   //
   // The Drive write happens FIRST so the Slack message can include the
   // Drive link even if Slack file-upload itself fails. If Slack file
@@ -375,28 +380,36 @@ async function autoShipOrder(
         });
       }
 
-      // (3) Slack — same pre-existing flow, but message now includes
-      //     Drive links when present.
+      // (3) Slack — Phase 27: route through the channel registry's
+      //     `slackChannelId` (Cxxx) for the files-API path, fall
+      //     back to `name` (#shipping) for `chat.postMessage`-style
+      //     callers, then to the abstract `id` as a last resort.
+      //     Comment locked to the v1.0 SHIPPING PROTOCOL Ben pinned
+      //     in #shipping on 2026-04-10.
       const channelRegistry = getChannel(
         opts.slackChannel as Parameters<typeof getChannel>[0],
       );
       const destChannel =
-        channelRegistry?.id ?? channelRegistry?.name ?? opts.slackChannel;
-      const sourceEmoji =
-        source === "amazon"
-          ? ":amazon-color:"
-          : source === "shopify"
-            ? ":shopify-color:"
-            : ":package:";
-      const driveLines: string[] = [];
-      if (labelDriveLink) driveLines.push(`<${labelDriveLink}|Drive: label PDF>`);
-      if (packingSlipDriveLink) driveLines.push(`<${packingSlipDriveLink}|Drive: packing slip>`);
-      const comment =
-        `${sourceEmoji} *Auto-shipped — ${order.orderNumber}* (${source})\n` +
-        `${bags} bag${bags === 1 ? "" : "s"} · ${order.shipTo.city}, ${order.shipTo.state}\n` +
-        `${labelRes.label.service} · tracking ${labelRes.label.trackingNumber} · $${labelRes.label.cost.toFixed(2)}\n` +
-        (driveLines.length > 0 ? `${driveLines.join(" · ")}\n` : "") +
-        `_Print + drop at USPS. React :white_check_mark: when dropped._`;
+        channelRegistry?.slackChannelId ??
+        channelRegistry?.name ??
+        channelRegistry?.id ??
+        opts.slackChannel;
+
+      const comment = formatShipmentComment({
+        orderNumber: order.orderNumber,
+        source,
+        bags,
+        shipTo: order.shipTo,
+        carrier: {
+          service: labelRes.label.service,
+          trackingNumber: labelRes.label.trackingNumber,
+          costUsd: labelRes.label.cost,
+        },
+        driveLinks: {
+          label: labelDriveLink,
+          packingSlip: packingSlipDriveLink,
+        },
+      });
 
       try {
         const uploadRes = await uploadBufferToSlack({
@@ -416,6 +429,36 @@ async function autoShipOrder(
             orderNumber: order.orderNumber,
             slackPermalink: uploadRes.permalink ?? null,
           });
+          // Phase 27 — also upload the packing slip as a thread
+          // reply under the label post, so #shipping has both PDFs
+          // per shipment without cluttering the channel scroll.
+          // Best-effort: a packing-slip-upload failure does NOT
+          // roll back the label-shipped state.
+          if (split.packingSlipOnly && uploadRes.messageTs) {
+            try {
+              await uploadBufferToSlack({
+                channelId: destChannel,
+                filename: `packing-slip-${order.orderNumber}.pdf`,
+                buffer: split.packingSlipOnly,
+                mimeType: "application/pdf",
+                title: `Packing slip ${order.orderNumber}`,
+                comment: formatPackingSlipComment(order.orderNumber),
+                threadTs: uploadRes.messageTs,
+              });
+            } catch (psErr) {
+              await recordAudit(
+                "slack.packing-slip.upload-failed",
+                order.orderNumber,
+                source,
+                false,
+                {
+                  error:
+                    psErr instanceof Error ? psErr.message : String(psErr),
+                  parentMessageTs: uploadRes.messageTs,
+                },
+              );
+            }
+          }
         } else {
           await recordAudit("slack.upload-failed", order.orderNumber, source, false, {
             error: uploadRes.error,
@@ -623,7 +666,10 @@ export async function POST(req: Request): Promise<Response> {
       .map((e) => `${e.source}:${e.orderNumber}`),
   );
 
-  const slackChannel = body.slackChannel ?? "operations";
+  // Phase 27 — default to `#shipping` so every label + packing slip
+  // lands in the v1.0 SHIPPING PROTOCOL channel Ben pinned 2026-04-10.
+  // Callers can still override (`body.slackChannel`) for testing.
+  const slackChannel = body.slackChannel ?? "shipping";
   const results: UnifiedAutoShipResult[] = [];
   for (const order of queue) {
     const source = sourceLabelFor(order);

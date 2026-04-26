@@ -113,6 +113,26 @@
       "not_allowed": ["marketing work", "finance-only debate"]
     },
     {
+      "id": "shipping",
+      "name": "#shipping",
+      "slack_channel_id": "C0AS4635HFG",
+      "owning_division": "production-supply-chain",
+      "purpose": "Shipping labels, tracking, packing slips — auto-ship output",
+      "allowed": [
+        "label PDFs (4×6 thermal)",
+        "packing slip PDFs (4×6 thermal)",
+        "tracking numbers",
+        "ship-from + carrier selection",
+        "void / refund label coordination"
+      ],
+      "not_allowed": [
+        "marketing chatter",
+        "finance debate",
+        "DMs of labels (channel is single source of truth)"
+      ],
+      "phase_27_note": "Distinct from 'operations' (workflow registry concept). Live Slack channel where every label PDF + packing slip lands per the v1.0 SHIPPING PROTOCOL Ben pinned 2026-04-10."
+    },
+    {
       "id": "research",
       "name": "#research",
       "owning_division": "research-intelligence",

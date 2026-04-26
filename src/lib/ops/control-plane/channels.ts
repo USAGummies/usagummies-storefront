@@ -118,6 +118,34 @@ const CHANNELS: readonly Channel[] = Object.freeze([
     notAllowed: ["marketing work", "finance-only debate"],
   },
   {
+    // Phase 27 — distinct from "operations" (a workflow registry
+    // concept): `#shipping` is the live Slack channel where every
+    // label PDF + packing slip lands per the v1.0 SHIPPING PROTOCOL
+    // Ben pinned 2026-04-10. Single source of truth for buys /
+    // tracking / reprints. The auto-ship pipeline targets THIS
+    // channel; `slackChannelId` is the canonical Slack `Cxxx` ID
+    // required by `files.completeUploadExternal`.
+    id: "shipping",
+    name: "#shipping",
+    slackChannelId: "C0AS4635HFG",
+    state: "active",
+    owningDivision: "production-supply-chain",
+    divisions: ["production-supply-chain"],
+    purpose: "Shipping labels, tracking, packing slips — auto-ship output",
+    allowedContent: [
+      "label PDFs (4×6 thermal)",
+      "packing slip PDFs (4×6 thermal)",
+      "tracking numbers",
+      "ship-from + carrier selection",
+      "void / refund label coordination",
+    ],
+    notAllowed: [
+      "marketing chatter",
+      "finance debate",
+      "DMs of labels (channel is single source of truth)",
+    ],
+  },
+  {
     id: "research",
     name: "#research",
     state: "active",

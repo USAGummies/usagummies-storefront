@@ -24,9 +24,36 @@ export type SlackFileUploadResult = {
   ok: boolean;
   fileId?: string;
   permalink?: string;
+  /**
+   * Phase 27 — Slack `message_ts` of the parent file post. Lets the
+   * caller thread follow-up files (e.g. packing slip under the
+   * label). Parsed from `permalink` since
+   * `files.completeUploadExternal` doesn't return the parent
+   * message ts directly. `undefined` when permalink is missing or
+   * not parseable.
+   */
+  messageTs?: string;
   error?: string;
   skipped?: boolean;
 };
+
+/**
+ * Phase 27 — extract the Slack `message_ts` from a permalink.
+ * Slack permalinks are formatted as `…/archives/<channel>/p<digits>`
+ * where `<digits>` is the message_ts with the decimal removed (last
+ * 6 digits are microseconds). Returns `undefined` on any unparseable
+ * input (defensive — never fabricates a ts).
+ */
+export function permalinkToMessageTs(
+  permalink: string | undefined,
+): string | undefined {
+  if (typeof permalink !== "string" || permalink.length === 0) return undefined;
+  const m = permalink.match(/\/p(\d+)(?:\?|$|#)/);
+  if (!m) return undefined;
+  const digits = m[1];
+  if (digits.length < 7) return undefined;
+  return `${digits.slice(0, -6)}.${digits.slice(-6)}`;
+}
 
 export type SpreadsheetData = {
   /** Sheet name (for XLSX; ignored for CSV) */
@@ -394,6 +421,7 @@ export async function uploadFileToSlack(opts: {
       ok: true,
       fileId: file?.id || urlData.file_id,
       permalink: file?.permalink,
+      messageTs: permalinkToMessageTs(file?.permalink),
     };
   } catch (err) {
     return {
@@ -552,6 +580,7 @@ export async function uploadBufferToSlack(opts: {
       ok: true,
       fileId: file?.id || urlData.file_id,
       permalink: file?.permalink,
+      messageTs: permalinkToMessageTs(file?.permalink),
     };
   } catch (err) {
     return {

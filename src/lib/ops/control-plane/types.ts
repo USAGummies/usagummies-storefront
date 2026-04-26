@@ -60,6 +60,12 @@ export type ChannelId =
   | "operations"
   | "research"
   | "receipts-capture"
+  // Phase 27 — shipping/labels live channel. Distinct from
+  // "operations" (which is a workflow registry concept) because the
+  // workspace has a real `#shipping` channel where every label PDF
+  // + packing slip lands per the v1.0 shipping protocol Ben pinned
+  // on 2026-04-10.
+  | "shipping"
   // latent channels — created only on division activation
   | "marketing"
   | "trade-shows"
@@ -77,6 +83,15 @@ export interface Channel {
   divisions: DivisionId[];
   /** Division that owns this channel (sets rules, resolves routing disputes). */
   owningDivision: DivisionId;
+  /**
+   * Phase 27 — actual Slack channel ID (`Cxxx`) for routes that need
+   * the canonical ID rather than the human name. Specifically
+   * `files.completeUploadExternal` requires the channel ID, not the
+   * name. Optional because most chat.postMessage call sites accept
+   * the human `#name` form. Populate when the channel is known to
+   * exist in the workspace and a code path uses files-API uploads.
+   */
+  slackChannelId?: string;
 }
 
 // ----- Approval taxonomy (§15.3) ----------------------------------------
