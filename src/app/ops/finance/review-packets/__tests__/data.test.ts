@@ -20,11 +20,14 @@ import {
   buildReviewPacketsView,
   decodeReviewPacketCursor,
   encodeReviewPacketCursor,
+  escapeCsvCell,
   filterPacketsBySpec,
   formatAmountCell,
   formatVendorCell,
   paginateReviewPackets,
   parseReviewPacketsFilterSpec,
+  renderReviewPacketsCsv,
+  reviewPacketsCsvFilename,
   reviewPacketsFilterSpecToQuery,
 } from "../data";
 import { buildReceiptReviewPacket } from "@/lib/ops/receipt-review-packet";
@@ -1178,5 +1181,228 @@ describe("paginateReviewPackets", () => {
     const r = paginateReviewPackets(filtered, { limit: 10 });
     expect(r.page).toEqual([]);
     expect(r.nextCursor).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 18 — CSV export (pure)
+// ---------------------------------------------------------------------------
+
+describe("escapeCsvCell", () => {
+  it("returns empty string for null / undefined / empty input", () => {
+    expect(escapeCsvCell(null)).toBe("");
+    expect(escapeCsvCell(undefined)).toBe("");
+    expect(escapeCsvCell("")).toBe("");
+  });
+
+  it("passes through plain values without quoting", () => {
+    expect(escapeCsvCell("hello")).toBe("hello");
+    expect(escapeCsvCell("Belmark Inc")).toBe("Belmark Inc");
+    expect(escapeCsvCell("12.34")).toBe("12.34");
+  });
+
+  it("quotes cells containing commas", () => {
+    expect(escapeCsvCell("Belmark, Inc")).toBe('"Belmark, Inc"');
+  });
+
+  it("quotes cells containing newlines or carriage returns", () => {
+    expect(escapeCsvCell("line1\nline2")).toBe('"line1\nline2"');
+    expect(escapeCsvCell("line1\r\nline2")).toBe('"line1\r\nline2"');
+  });
+
+  it("doubles internal quotes per RFC-4180", () => {
+    expect(escapeCsvCell('She said "hi"')).toBe('"She said ""hi"""');
+  });
+
+  it("quotes leading/trailing whitespace cells (Excel-safe)", () => {
+    expect(escapeCsvCell(" leading")).toBe('" leading"');
+    expect(escapeCsvCell("trailing ")).toBe('"trailing "');
+  });
+});
+
+describe("renderReviewPacketsCsv", () => {
+  function rowFrom(
+    overrides: Partial<import("../data").ReviewPacketRow> = {},
+  ): import("../data").ReviewPacketRow {
+    return {
+      packetId: "pkt-v1-r-x",
+      packetIdShort: "pkt-v1-r-x",
+      receiptId: "r-x",
+      status: "draft",
+      color: "amber",
+      vendor: null,
+      vendorSource: "missing",
+      amountUsd: null,
+      amountSource: "missing",
+      eligibilityOk: false,
+      eligibilityMissing: ["vendor", "date", "amount", "category"],
+      createdAt: "2026-04-25T12:00:00.000Z",
+      approvalId: null,
+      approvalStatus: null,
+      ...overrides,
+    };
+  }
+
+  it("empty input → header-only CSV (1 line + trailing CRLF)", () => {
+    const csv = renderReviewPacketsCsv([]);
+    const lines = csv.split("\r\n");
+    // Header + empty trailing line from the final CRLF.
+    expect(lines.length).toBe(2);
+    expect(lines[1]).toBe("");
+    expect(lines[0]).toContain("status");
+    expect(lines[0]).toContain("packetId");
+    expect(lines[0]).toContain("createdAt");
+  });
+
+  it("locked column order — finance tooling depends on it", () => {
+    const csv = renderReviewPacketsCsv([]);
+    const header = csv.split("\r\n")[0];
+    expect(header).toBe(
+      "status,packetId,receiptId,vendor,vendorSource,amountUsd,amountSource,currency,eligibilityOk,eligibilityMissing,approvalId,approvalStatus,createdAt",
+    );
+  });
+
+  it("typical row formats correctly", () => {
+    const csv = renderReviewPacketsCsv([
+      rowFrom({
+        packetId: "pkt-v1-r-belmark",
+        packetIdShort: "pkt-v1-r-belm…",
+        receiptId: "r-belmark",
+        status: "rene-approved",
+        color: "green",
+        vendor: "Belmark Inc",
+        vendorSource: "canonical",
+        amountUsd: 250,
+        amountSource: "canonical",
+        eligibilityOk: true,
+        eligibilityMissing: [],
+        approvalId: "appr-abc",
+        approvalStatus: "approved",
+        createdAt: "2026-04-20T00:00:00.000Z",
+      }),
+    ]);
+    const lines = csv.split("\r\n");
+    expect(lines[1]).toBe(
+      [
+        "rene-approved",
+        "pkt-v1-r-belmark",
+        "r-belmark",
+        "Belmark Inc",
+        "canonical",
+        "250.00",
+        "canonical",
+        "",
+        "true",
+        "",
+        "appr-abc",
+        "approved",
+        "2026-04-20T00:00:00.000Z",
+      ].join(","),
+    );
+  });
+
+  it("null vendor / amount / approval render as empty cells (NEVER 'null' / NEVER '0')", () => {
+    const csv = renderReviewPacketsCsv([rowFrom()]);
+    const cells = csv.split("\r\n")[1].split(",");
+    // vendor (idx 3), amountUsd (idx 5), approvalId (idx 10),
+    // approvalStatus (idx 11) all empty.
+    expect(cells[3]).toBe("");
+    expect(cells[5]).toBe("");
+    expect(cells[10]).toBe("");
+    expect(cells[11]).toBe("");
+  });
+
+  it("OCR-suggested vendor renders with `(ocr)` suffix verbatim", () => {
+    const csv = renderReviewPacketsCsv([
+      rowFrom({ vendor: "OCR Vendor", vendorSource: "ocr-suggested" }),
+    ]);
+    const cells = csv.split("\r\n")[1].split(",");
+    expect(cells[3]).toBe("OCR Vendor (ocr)");
+  });
+
+  it("vendor containing a comma is quoted; internal quote doubled", () => {
+    const csv = renderReviewPacketsCsv([
+      rowFrom({ vendor: 'Belmark, "The Company"', vendorSource: "canonical" }),
+    ]);
+    expect(csv).toContain('"Belmark, ""The Company"""');
+  });
+
+  it("eligibilityMissing joined with `|` (NOT `,` — survives column boundary)", () => {
+    const csv = renderReviewPacketsCsv([
+      rowFrom({
+        eligibilityMissing: ["vendor", "date", "amount"],
+        eligibilityOk: false,
+      }),
+    ]);
+    expect(csv).toContain("vendor|date|amount");
+    // Verify it parses as a single CSV cell, not three.
+    const lines = csv.split("\r\n");
+    const cells = lines[1].split(",");
+    expect(cells[9]).toBe("vendor|date|amount");
+  });
+
+  it("eligibilityOk: true renders 'true', false renders 'false'", () => {
+    const csvT = renderReviewPacketsCsv([rowFrom({ eligibilityOk: true })]);
+    const csvF = renderReviewPacketsCsv([rowFrom({ eligibilityOk: false })]);
+    expect(csvT.split("\r\n")[1].split(",")[8]).toBe("true");
+    expect(csvF.split("\r\n")[1].split(",")[8]).toBe("false");
+  });
+
+  it("amountUsd is formatted to 2 decimals; NaN/Infinity render as empty", () => {
+    const ok = renderReviewPacketsCsv([
+      rowFrom({ amountUsd: 1234.5, amountSource: "canonical" }),
+    ]);
+    expect(ok.split("\r\n")[1].split(",")[5]).toBe("1234.50");
+    const nan = renderReviewPacketsCsv([
+      rowFrom({ amountUsd: Number.NaN, amountSource: "canonical" }),
+    ]);
+    expect(nan.split("\r\n")[1].split(",")[5]).toBe("");
+    const inf = renderReviewPacketsCsv([
+      rowFrom({
+        amountUsd: Number.POSITIVE_INFINITY,
+        amountSource: "canonical",
+      }),
+    ]);
+    expect(inf.split("\r\n")[1].split(",")[5]).toBe("");
+  });
+
+  it("multiple rows render in input order, separated by CRLF", () => {
+    const csv = renderReviewPacketsCsv([
+      rowFrom({ packetId: "pkt-v1-a", receiptId: "r-a" }),
+      rowFrom({ packetId: "pkt-v1-b", receiptId: "r-b" }),
+    ]);
+    const lines = csv.split("\r\n");
+    expect(lines.length).toBe(4); // header + 2 rows + trailing empty
+    expect(lines[1]).toContain("pkt-v1-a");
+    expect(lines[2]).toContain("pkt-v1-b");
+  });
+
+  it("ends with CRLF terminator (RFC-4180)", () => {
+    const csv = renderReviewPacketsCsv([rowFrom()]);
+    expect(csv.endsWith("\r\n")).toBe(true);
+  });
+
+  it("pure: same input → same output (deterministic)", () => {
+    const rows = [rowFrom({ vendor: "X" }), rowFrom({ vendor: "Y" })];
+    expect(renderReviewPacketsCsv(rows)).toBe(renderReviewPacketsCsv(rows));
+  });
+
+  it("does not mutate the input rows array", () => {
+    const rows = [rowFrom({ vendor: "X" })];
+    const before = JSON.stringify(rows);
+    renderReviewPacketsCsv(rows);
+    expect(JSON.stringify(rows)).toBe(before);
+  });
+});
+
+describe("reviewPacketsCsvFilename", () => {
+  it("formats as usa-gummies-review-packets-YYYY-MM-DD.csv", () => {
+    const fn = reviewPacketsCsvFilename(new Date("2026-04-25T12:34:56Z"));
+    expect(fn).toBe("usa-gummies-review-packets-2026-04-25.csv");
+  });
+
+  it("zero-pads single-digit months and days", () => {
+    const fn = reviewPacketsCsvFilename(new Date("2026-01-05T00:00:00Z"));
+    expect(fn).toBe("usa-gummies-review-packets-2026-01-05.csv");
   });
 });

@@ -379,22 +379,48 @@ export function ReviewPacketsView() {
               to add a row here. No QBO writes happen on this page.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => setRefreshKey((k) => k + 1)}
-            disabled={loading}
-            style={{
-              fontSize: 11,
-              padding: "4px 10px",
-              borderRadius: 4,
-              border: `1px solid ${BORDER}`,
-              background: "#fff",
-              color: NAVY,
-              cursor: loading ? "wait" : "pointer",
-            }}
-          >
-            {loading ? "Loading…" : "Refresh"}
-          </button>
+          <div style={{ display: "flex", gap: 6 }}>
+            <a
+              href={`/api/ops/docs/receipt-review-packets/export.csv?${(() => {
+                const params = reviewPacketsFilterSpecToQuery(filterSpec);
+                params.set("limit", "500");
+                return params.toString();
+              })()}`}
+              // The browser handles the CSV download via
+              // Content-Disposition: attachment from the route.
+              // Phase 18 (Option A): read-only export of the
+              // currently-filtered queue. Reuses the canonical
+              // filter spec — same set the table is showing.
+              style={{
+                fontSize: 11,
+                padding: "4px 10px",
+                borderRadius: 4,
+                border: `1px solid ${BORDER}`,
+                background: "#fff",
+                color: NAVY,
+                cursor: "pointer",
+                textDecoration: "none",
+              }}
+            >
+              Export CSV
+            </a>
+            <button
+              type="button"
+              onClick={() => setRefreshKey((k) => k + 1)}
+              disabled={loading}
+              style={{
+                fontSize: 11,
+                padding: "4px 10px",
+                borderRadius: 4,
+                border: `1px solid ${BORDER}`,
+                background: "#fff",
+                color: NAVY,
+                cursor: loading ? "wait" : "pointer",
+              }}
+            >
+              {loading ? "Loading…" : "Refresh"}
+            </button>
+          </div>
         </div>
 
         {/* ---- Filter strip (Phase 14) ---- */}

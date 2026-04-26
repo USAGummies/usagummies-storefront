@@ -544,6 +544,143 @@ export interface PaginatedReviewPackets {
   nextCursor: string | null;
 }
 
+// ---------------------------------------------------------------------------
+// Phase 18 — CSV export (server-safe, pure)
+// ---------------------------------------------------------------------------
+//
+// `renderReviewPacketsCsv(rows)` produces an RFC-4180-compatible
+// CSV string from the dashboard's typed row shape. Pure: same
+// input → same output. NEVER fabricates values — null / undefined
+// fields render as an empty cell, not the literal "null".
+//
+// Hard rules locked by tests:
+//   - Header row order is fixed (see CSV_COLUMNS below). Locked
+//     so downstream finance tooling can rely on it.
+//   - Empty input → header-only CSV (1 line). No empty-string
+//     rows, no fabricated zero-value rows.
+//   - Cells containing `,` / `"` / `\n` / `\r` are quoted; `"`
+//     inside a quoted cell is doubled. Locked separately.
+//   - Vendor / amount cells reuse the dashboard's `(ocr)` suffix
+//     so the operator sees the same source attribution in the
+//     CSV that they see in the table. Locked.
+//   - `eligibilityMissing` joins with `|` (NOT `,`) so it
+//     survives the CSV column boundary intact.
+//   - `approvalStatus` null renders as empty; non-null renders
+//     verbatim ("pending" / "approved" / etc.).
+
+const CSV_COLUMNS = [
+  "status",
+  "packetId",
+  "receiptId",
+  "vendor",
+  "vendorSource",
+  "amountUsd",
+  "amountSource",
+  "currency",
+  "eligibilityOk",
+  "eligibilityMissing",
+  "approvalId",
+  "approvalStatus",
+  "createdAt",
+] as const;
+
+type CsvColumn = (typeof CSV_COLUMNS)[number];
+
+/** RFC-4180-style cell escaping. Pure. Returns the escaped cell
+ *  string ready to drop into a comma-joined row. */
+export function escapeCsvCell(value: string | null | undefined): string {
+  if (value === null || value === undefined) return "";
+  const s = String(value);
+  if (s.length === 0) return "";
+  // Quote when the cell contains: comma, double-quote, CR, LF, or
+  // leading/trailing whitespace (which Excel is happy to strip).
+  const needsQuoting =
+    s.includes(",") ||
+    s.includes('"') ||
+    s.includes("\n") ||
+    s.includes("\r") ||
+    s !== s.trim();
+  if (!needsQuoting) return s;
+  // Double-up internal quotes per RFC-4180.
+  return `"${s.replace(/"/g, '""')}"`;
+}
+
+function cellFor(row: ReviewPacketRow, col: CsvColumn): string {
+  switch (col) {
+    case "status":
+      return row.status;
+    case "packetId":
+      return row.packetId;
+    case "receiptId":
+      return row.receiptId;
+    case "vendor":
+      // Empty string for missing vendor — never `"—"` in CSV (the
+      // em-dash is for the dashboard's table cell, not for finance
+      // ops tooling). Locked by the null-vendor test.
+      if (
+        row.vendor === null ||
+        row.vendor === undefined ||
+        row.vendor.trim().length === 0
+      ) {
+        return "";
+      }
+      return formatVendorCell(row.vendor, row.vendorSource);
+    case "vendorSource":
+      return row.vendorSource;
+    case "amountUsd":
+      return row.amountUsd === null ||
+        row.amountUsd === undefined ||
+        !Number.isFinite(row.amountUsd)
+        ? ""
+        : row.amountUsd.toFixed(2);
+    case "amountSource":
+      return row.amountSource;
+    case "currency":
+      // Currency lives on the OCR suggestion only — surfaced in
+      // the dashboard's Phase 7 sub-row but not directly on the
+      // ReviewPacketRow today. Reserved column for forward-compat.
+      return "";
+    case "eligibilityOk":
+      return row.eligibilityOk ? "true" : "false";
+    case "eligibilityMissing":
+      // Pipe-joined so the column boundary survives.
+      return row.eligibilityMissing.join("|");
+    case "approvalId":
+      return row.approvalId ?? "";
+    case "approvalStatus":
+      return row.approvalStatus ?? "";
+    case "createdAt":
+      return row.createdAt;
+  }
+}
+
+/**
+ * Render a packet rowset as RFC-4180 CSV. Pure.
+ *
+ * @returns A single string ending with `\r\n` (RFC-4180 line
+ *   terminator). Header is always present; empty input → header
+ *   only. Caller wraps in `Content-Type: text/csv` and
+ *   `Content-Disposition: attachment; filename=...`.
+ */
+export function renderReviewPacketsCsv(rows: ReviewPacketRow[]): string {
+  const lines: string[] = [];
+  lines.push(CSV_COLUMNS.join(","));
+  for (const row of rows) {
+    const cells = CSV_COLUMNS.map((col) => escapeCsvCell(cellFor(row, col)));
+    lines.push(cells.join(","));
+  }
+  return `${lines.join("\r\n")}\r\n`;
+}
+
+/** Stable filename helper for the CSV download. Pure. Format:
+ *  `usa-gummies-review-packets-YYYY-MM-DD.csv`. */
+export function reviewPacketsCsvFilename(now: Date = new Date()): string {
+  const yyyy = now.getUTCFullYear().toString().padStart(4, "0");
+  const mm = (now.getUTCMonth() + 1).toString().padStart(2, "0");
+  const dd = now.getUTCDate().toString().padStart(2, "0");
+  return `usa-gummies-review-packets-${yyyy}-${mm}-${dd}.csv`;
+}
+
 /**
  * Pure helper: take a packet array (assumed already filtered if
  * filters apply) and return the next page + cursor.

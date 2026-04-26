@@ -162,19 +162,21 @@ Potential code only if smoke fails:
 
 ### Lane B — Receipt-to-Rene approval promotion
 
-Phases 7-17 done. Phase 17 adds deterministic cursor-based
-pagination on the list route. The dashboard scrolls past 500
-packets via "Load more" without losing operator state. Cursor is
-opaque base64url JSON `{ts, packetId}` over the canonical
-`createdAt DESC, packetId ASC` sort — defensive on malformed input,
-falls back to first page on tampering. Phase 15's bounded passive
-poll respects accumulated pages (`pageCount > 1` → poll skips).
+Phases 7-18 done. Phase 18 (Option A) adds a one-click CSV export
+of the filtered review-packets queue at
+`/api/ops/docs/receipt-review-packets/export.csv`. Reuses the
+canonical filter spec so the CSV mirrors what's on screen. Pure
+RFC-4180 helpers handle escaping (`escapeCsvCell`,
+`renderReviewPacketsCsv`, `reviewPacketsCsvFilename`); column
+order is locked. Null/NaN cells empty (NEVER `"—"` / `"null"` /
+`"0"`). OCR-suggested vendor preserves `(ocr)` suffix. CRLF
+terminator. Cache-Control: no-store.
 
-Receipt-review queue management is feature-complete. Phase 18
-candidates (pick whichever surfaces operator value first):
-- CSV export of the filtered/paginated view for finance ops.
+Receipt-review queue management is feature-complete. Phase 19
+candidates (still on the table):
 - Server-side caching of the approval lookup if route latency
   becomes a concern.
+- CSV pagination via cursor (only matters once queue >500 packets).
 - Closing the loop into `qbo.bill.create` once Rene confirms a
   rene-approved packet should land in QBO. (Crosses the QBO-write
   boundary — would need a new Class B / Class C taxonomy slug
@@ -193,7 +195,8 @@ Boundary:
 - Server-side filtering + passive poll. ✅ Done (Phase 15).
 - Approval-status filter. ✅ Done (Phase 16).
 - Cursor-based pagination. ✅ Done (Phase 17).
-- Phase 18: TBD (CSV export / lookup caching / qbo.bill.create entry).
+- CSV export. ✅ Done (Phase 18 Option A).
+- Phase 19: TBD (lookup caching / CSV cursor / qbo.bill.create entry).
 - QBO posting remains a separate Rene-approved Class B/C action.
 - Do not auto-create bills, expenses, vendors, or categories.
 - Do not overwrite canonical receipt fields without explicit reviewer action.
