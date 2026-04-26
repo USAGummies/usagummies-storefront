@@ -162,18 +162,17 @@ Potential code only if smoke fails:
 
 ### Lane B — Receipt-to-Rene approval promotion
 
-Phases 7-12 done. Phase 12 adds the Slack-thread permalink + per-row
-poll. The `/ops/finance/review` pill now flips to "Rene approved"
-(green) or "Rene rejected" (amber, deliberate gap signal) within
-30 seconds of Rene clicking in `#ops-approvals`, without a full
-page refresh. The green pill carries an "Open thread →" link
-straight to the Slack thread when the bot token is set; falls back
-to a non-link pill when degraded.
+Phases 7-13 done. Phase 13 adds the aggregate dashboard at
+`/ops/finance/review-packets` showing every receipt review packet
+with current status, vendor, amount, eligibility, and creation
+time. Counts strip summarizes the queue (`N packets · X draft · Y
+rene-approved · Z rejected`). New list route
+`GET /api/ops/docs/receipt-review-packets` powers it; auth-gated,
+read-only, limit-clamped, no-fabrication on outage.
 
-Next sub-lane (Phase 13): aggregate dashboard at `/ops/finance/
-review-packets` listing every packet with current status + approval
-id + last polled at. Operator sees the full pipeline state instead
-of one packet per row.
+Next sub-lane (Phase 14): operator-driven filters on the dashboard
+(status / vendor / date range) + an inline "Re-promote" button on
+each row that calls the existing Phase 9 route. No new write paths.
 
 Boundary:
 
@@ -183,7 +182,8 @@ Boundary:
 - Closer transitions packet on Slack decide. ✅ Done (Phase 10).
 - UI button on /ops/finance/review. ✅ Done (Phase 11).
 - Slack-thread permalink + per-row poll. ✅ Done (Phase 12).
-- Aggregate review-packets dashboard — Phase 13.
+- Aggregate review-packets dashboard. ✅ Done (Phase 13).
+- Filters + inline re-promote — Phase 14.
 - QBO posting remains a separate Rene-approved Class B/C action.
 - Do not auto-create bills, expenses, vendors, or categories.
 - Do not overwrite canonical receipt fields without explicit reviewer action.
