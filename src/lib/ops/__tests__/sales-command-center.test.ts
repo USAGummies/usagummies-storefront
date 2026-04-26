@@ -665,3 +665,94 @@ describe("buildSalesCommandCenter — aging section", () => {
     expect(slice.agingCallouts).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 4 — KPI scorecard section + slice revenueKpi line
+// ---------------------------------------------------------------------------
+
+describe("buildSalesCommandCenter — KPI scorecard section", () => {
+  it("attaches a kpiScorecard to the report", () => {
+    const report = buildSalesCommandCenter(emptyInput(), { now: NOW });
+    expect(report.kpiScorecard).toBeDefined();
+    expect(report.kpiScorecard.target.usd).toBe(1_000_000);
+    expect(report.kpiScorecard.target.deadlineIso).toBe(
+      "2026-12-24T23:59:59-08:00",
+    );
+  });
+
+  it("with no revenueChannels supplied, actualLast7dUsd is null and confidence is 'none'", () => {
+    const report = buildSalesCommandCenter(emptyInput(), { now: NOW });
+    expect(report.kpiScorecard.actualLast7dUsd).toBeNull();
+    expect(report.kpiScorecard.gapToWeeklyPaceUsd).toBeNull();
+    expect(report.kpiScorecard.confidence).toBe("none");
+  });
+
+  it("daysRemaining uses the options.now (not real wall-clock) — deterministic", () => {
+    const report = buildSalesCommandCenter(emptyInput(), { now: NOW });
+    expect(report.kpiScorecard.daysRemaining).toBeGreaterThan(200);
+  });
+
+  it("propagates wired channels into the report (actual sums correctly)", () => {
+    const report = buildSalesCommandCenter(
+      {
+        ...emptyInput(),
+        revenueChannels: [
+          {
+            channel: "shopify",
+            status: "wired",
+            amountUsd: 1500,
+            source: { system: "shopify-test", retrievedAt: NOW.toISOString() },
+          },
+          {
+            channel: "amazon",
+            status: "wired",
+            amountUsd: 250.5,
+            source: { system: "amazon-test", retrievedAt: NOW.toISOString() },
+          },
+        ],
+      },
+      { now: NOW },
+    );
+    expect(report.kpiScorecard.actualLast7dUsd).toBe(1750.5);
+  });
+});
+
+describe("composeSalesCommandSlice — revenueKpi one-liner", () => {
+  it("falls back to 'not fully wired' when no channel is wired", () => {
+    const slice = composeSalesCommandSlice(emptyInput());
+    expect(slice.revenueKpi).toBeDefined();
+    expect(slice.revenueKpi!.text).toBe("Revenue pace not fully wired.");
+    expect(slice.revenueKpi!.fullyWired).toBe(false);
+  });
+
+  it("renders a compact line when at least one channel is wired", () => {
+    const slice = composeSalesCommandSlice({
+      ...emptyInput(),
+      revenueChannels: [
+        {
+          channel: "shopify",
+          status: "wired",
+          amountUsd: 12_000,
+        },
+      ],
+    });
+    expect(slice.revenueKpi!.text).toMatch(/Revenue pace:/);
+    expect(slice.revenueKpi!.text).toMatch(/last 7d/);
+    expect(slice.revenueKpi!.text).toMatch(/required\/wk/);
+  });
+
+  it("revenueKpi line never includes a $ when no actual is computed (no fabrication)", () => {
+    const slice = composeSalesCommandSlice({
+      ...emptyInput(),
+      revenueChannels: [
+        {
+          channel: "shopify",
+          status: "not_wired",
+          amountUsd: null,
+          reason: "no token",
+        },
+      ],
+    });
+    expect(slice.revenueKpi!.text).not.toMatch(/\$/);
+  });
+});

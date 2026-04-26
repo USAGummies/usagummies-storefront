@@ -130,6 +130,22 @@ interface Report {
     }>;
     link: { href: string; label: string };
   };
+  kpiScorecard: {
+    generatedAt: string;
+    target: { usd: number; deadlineIso: string };
+    daysRemaining: number;
+    requiredDailyUsd: number;
+    requiredWeeklyUsd: number;
+    actualLast7dUsd: number | null;
+    gapToWeeklyPaceUsd: number | null;
+    confidence: "full" | "partial" | "none";
+    channels: Array<{
+      channel: "shopify" | "amazon" | "faire" | "b2b" | "unknown";
+      status: "wired" | "not_wired" | "error";
+      amountUsd: number | null;
+      reason?: string;
+    }>;
+  };
   blockers: {
     missingEnv: string[];
     notes: Array<{
@@ -249,6 +265,7 @@ export function SalesCommandCenterView() {
           <WholesaleOnboardingSection report={data} />
           <RetailProofSection report={data} />
           <AwaitingBenSection report={data} />
+          <KpiScorecardSection report={data} />
           <AgingSection report={data} />
           <BlockersSection report={data} />
         </>
@@ -524,6 +541,144 @@ function AwaitingBenSection({ report }: { report: Report }) {
           )}
         </>
       ))}
+    </Section>
+  );
+}
+
+function KpiScorecardSection({ report }: { report: Report }) {
+  const k = report.kpiScorecard;
+  const targetUsd = k.target.usd;
+  const deadline = new Date(k.target.deadlineIso);
+  const deadlineLabel = deadline.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+  const actual = k.actualLast7dUsd;
+  const gap = k.gapToWeeklyPaceUsd;
+  const fmtUsd = (n: number | null): string => {
+    if (n === null || !Number.isFinite(n)) return "—";
+    if (Math.abs(n) >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
+    if (Math.abs(n) >= 10_000) return `$${(n / 1000).toFixed(1)}K`;
+    return `$${Math.round(n).toLocaleString("en-US")}`;
+  };
+  const channelLabel: Record<string, string> = {
+    shopify: "Shopify DTC",
+    amazon: "Amazon",
+    faire: "Faire",
+    b2b: "B2B (wholesale)",
+    unknown: "Unattributed",
+  };
+  const statusColor: Record<string, string> = {
+    wired: "#0a7c2f",
+    not_wired: AMBER,
+    error: RED,
+  };
+  const KpiTile = ({
+    label,
+    value,
+    color = NAVY,
+  }: {
+    label: string;
+    value: string;
+    color?: string;
+  }) => (
+    <div
+      style={{
+        background: "#fff",
+        border: `1px solid ${BORDER}`,
+        borderRadius: 8,
+        padding: "10px 12px",
+      }}
+    >
+      <div style={{ fontSize: 22, fontWeight: 700, color, lineHeight: 1.1 }}>
+        {value}
+      </div>
+      <div style={{ fontSize: 11, color: DIM, marginTop: 4 }}>{label}</div>
+    </div>
+  );
+  const gapText =
+    gap === null
+      ? "—"
+      : gap >= 0
+        ? `+${fmtUsd(gap)} ahead`
+        : `${fmtUsd(gap)} behind`;
+  const gapColor =
+    gap === null ? NAVY : gap >= 0 ? "#0a7c2f" : RED;
+  return (
+    <Section title="Weekly KPI Scorecard">
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+          gap: 10,
+          marginBottom: 10,
+        }}
+      >
+        <KpiTile
+          label={`Target by ${deadlineLabel}`}
+          value={fmtUsd(targetUsd)}
+        />
+        <KpiTile label="Days remaining" value={String(k.daysRemaining)} />
+        <KpiTile label="Required / week" value={fmtUsd(k.requiredWeeklyUsd)} />
+        <KpiTile
+          label="Actual last 7d"
+          value={actual === null ? "—" : fmtUsd(actual)}
+        />
+        <KpiTile label="Gap to pace" value={gapText} color={gapColor} />
+        <KpiTile label="Confidence" value={k.confidence} />
+      </div>
+      {actual === null && (
+        <div
+          style={{
+            fontSize: 12,
+            color: AMBER,
+            marginBottom: 8,
+          }}
+        >
+          No revenue source wired — actual last 7d cannot be computed.
+          Confidence: <strong>{k.confidence}</strong>.
+        </div>
+      )}
+      <SubLabel>Channel sources</SubLabel>
+      <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+        {k.channels.map((c) => (
+          <li
+            key={c.channel}
+            style={{
+              borderTop: `1px dashed ${BORDER}`,
+              padding: "6px 4px",
+              display: "grid",
+              gridTemplateColumns: "auto 1fr auto",
+              gap: 12,
+              alignItems: "center",
+              fontSize: 12,
+            }}
+          >
+            <span
+              style={{
+                color: statusColor[c.status] ?? NAVY,
+                fontWeight: 600,
+                textTransform: "uppercase",
+                fontSize: 10,
+                letterSpacing: 0.4,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {c.status === "not_wired" ? "not wired" : c.status}
+            </span>
+            <span>
+              <strong>{channelLabel[c.channel] ?? c.channel}</strong>
+              {c.reason && (
+                <div style={{ color: DIM, marginTop: 2 }}>{c.reason}</div>
+              )}
+            </span>
+            <span>
+              {c.status === "wired" ? fmtUsd(c.amountUsd) : "—"}
+            </span>
+          </li>
+        ))}
+      </ul>
     </Section>
   );
 }

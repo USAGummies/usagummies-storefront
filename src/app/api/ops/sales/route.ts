@@ -34,6 +34,7 @@ import {
   readPendingApprovals,
   readWholesaleInquiries,
 } from "@/lib/ops/sales-command-readers";
+import { readAllChannelsLast7d } from "@/lib/ops/revenue-kpi-readers";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -76,6 +77,7 @@ export async function GET(req: Request): Promise<Response> {
     apPackets,
     locationDrafts,
     aging,
+    revenueChannels,
   ] = await Promise.all([
     readFaireInvites(),
     readFaireFollowUps(now),
@@ -83,6 +85,7 @@ export async function GET(req: Request): Promise<Response> {
     readApPackets(),
     readLocationDrafts(),
     readAllAgingItems(now),
+    readAllChannelsLast7d(now),
   ]);
 
   const report = buildSalesCommandCenter(
@@ -96,6 +99,7 @@ export async function GET(req: Request): Promise<Response> {
       missingEnv: readMissingEnv(),
       agingItems: aging.items,
       agingMissing: aging.missing,
+      revenueChannels,
     },
     { now },
   );

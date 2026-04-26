@@ -634,7 +634,16 @@ export function renderSalesCommandMarkdown(slice: SalesCommandSlice): string {
     "<https://www.usagummies.com/ops/locations|Store locator>_";
 
   if (!slice.anyAction) {
-    return [header, "_No sales actions queued._", footer].join("\n");
+    // Even on a quiet day, surface the Weekly Revenue KPI one-liner
+    // when the slice carries it. The KPI is contextual (not an
+    // action); rendering it preserves the daily revenue pulse
+    // without making the section noisy.
+    const quietLines = [header, "_No sales actions queued._"];
+    if (slice.revenueKpi) {
+      quietLines.push(`• ${slice.revenueKpi.text}`);
+    }
+    quietLines.push(footer);
+    return quietLines.join("\n");
   }
 
   const lines: string[] = [header];
@@ -691,6 +700,13 @@ export function renderSalesCommandMarkdown(slice: SalesCommandSlice): string {
   lines.push(
     `• Wholesale inquiries: ${formatCount(slice.wholesaleInquiries)}`,
   );
+
+  // Phase 4 — Weekly Revenue KPI one-liner. NEVER fabricates a
+  // number — the renderer in revenue-kpi.ts falls back to
+  // "Revenue pace not fully wired." when no channel is wired.
+  if (slice.revenueKpi) {
+    lines.push(`• ${slice.revenueKpi.text}`);
+  }
 
   // Phase 3 — up to 3 aging callouts (critical → overdue → watch).
   // The slice's agingCallouts list is pre-sorted + capped by

@@ -404,7 +404,90 @@ describe("composeDailyBrief()", () => {
     // Hard cap: header + 6 body lines + Aging header + ≤5 callouts
     // + footer ≈ 14 lines worst case. Locks the renderer can't blow
     // past the section budget.
-    expect(text.split("\n").length).toBeLessThanOrEqual(15);
+    expect(text.split("\n").length).toBeLessThanOrEqual(16);
+  });
+
+  // ---- Phase 4 — Weekly Revenue KPI one-liner ---------------------------
+
+  it("brief includes the revenue KPI line when slice carries it (actionable day)", () => {
+    const out = composeDailyBrief({
+      ...baseInput(),
+      salesCommand: {
+        faireInvitesNeedsReview: 1,
+        faireFollowUpsOverdue: 0,
+        faireFollowUpsDueSoon: 0,
+        pendingApprovals: 0,
+        apPacketsActionRequired: 0,
+        apPacketsSent: 0,
+        retailDraftsNeedsReview: 0,
+        retailDraftsAccepted: 0,
+        wholesaleInquiries: null,
+        revenueKpi: {
+          text: "Revenue pace: $24.1K last 7d vs $43.5K required/wk — -$19.4K behind",
+          fullyWired: true,
+        },
+        anyAction: true,
+      },
+    });
+    const json = JSON.stringify(out.blocks);
+    expect(json).toContain("Revenue pace:");
+    expect(json).toContain("$24.1K last 7d");
+  });
+
+  it("brief surfaces 'not fully wired' KPI line when no channel is wired", () => {
+    const out = composeDailyBrief({
+      ...baseInput(),
+      salesCommand: {
+        faireInvitesNeedsReview: 1,
+        faireFollowUpsOverdue: 0,
+        faireFollowUpsDueSoon: 0,
+        pendingApprovals: 0,
+        apPacketsActionRequired: 0,
+        apPacketsSent: 0,
+        retailDraftsNeedsReview: 0,
+        retailDraftsAccepted: 0,
+        wholesaleInquiries: null,
+        revenueKpi: {
+          text: "Revenue pace not fully wired.",
+          fullyWired: false,
+        },
+        anyAction: true,
+      },
+    });
+    const json = JSON.stringify(out.blocks);
+    expect(json).toContain("Revenue pace not fully wired.");
+    // Critical: the brief MUST NOT fabricate a $ figure when the
+    // slice's revenueKpi is the not-fully-wired fallback.
+    // (We check the entire Sales Command block has no $-sign in the
+    // revenue line specifically by asserting the fallback is verbatim.)
+    expect(json).not.toMatch(/Revenue pace not fully wired.*\$/);
+  });
+
+  it("KPI line also appears on quiet days (empty-state still surfaces revenue pulse)", () => {
+    // anyAction=false → empty-state path. Even on a quiet day, the
+    // KPI line should render so the daily revenue signal isn't lost.
+    const out = composeDailyBrief({
+      ...baseInput(),
+      salesCommand: {
+        faireInvitesNeedsReview: 0,
+        faireFollowUpsOverdue: 0,
+        faireFollowUpsDueSoon: 0,
+        pendingApprovals: 0,
+        apPacketsActionRequired: 0,
+        apPacketsSent: 0,
+        retailDraftsNeedsReview: 0,
+        retailDraftsAccepted: 0,
+        wholesaleInquiries: null,
+        revenueKpi: {
+          text: "Revenue pace: $24.1K last 7d vs $43.5K required/wk — -$19.4K behind",
+          fullyWired: true,
+        },
+        anyAction: false,
+      },
+    });
+    const json = JSON.stringify(out.blocks);
+    expect(json).toContain("No sales actions queued");
+    expect(json).toContain("Revenue pace:");
   });
 });
 

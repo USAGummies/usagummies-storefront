@@ -141,6 +141,10 @@ export interface SalesCommandCenterInput {
   /** How many actionable aging rows to surface in the dashboard's
    *  Aging section. Defaults to 10. */
   agingTopLimit?: number;
+  /** Phase 4 — per-channel last-7-day revenue from
+   *  `readAllChannelsLast7d(now)`. The aggregator passes these to
+   *  `composeRevenueKpi` which assembles the scorecard report. */
+  revenueChannels?: ChannelRevenueState[];
 }
 
 export interface SectionTodaysRevenueActions {
@@ -210,6 +214,8 @@ export interface SalesCommandCenterReport {
   retailProof: SectionRetailProof;
   awaitingBen: SectionAwaitingBen;
   aging: SectionAging;
+  /** Phase 4 — Weekly Revenue KPI Scorecard (read-only). */
+  kpiScorecard: RevenueKpiReport;
   blockers: SectionBlockers;
 }
 
@@ -230,6 +236,13 @@ import {
   type AgingTier,
   type MissingTimestampItem,
 } from "./sales-aging";
+import {
+  composeRevenueKpi,
+  renderRevenueKpiBriefLine,
+  type ChannelRevenueState,
+  type RevenueKpiReport,
+  type RevenueKpiSlice,
+} from "./revenue-kpi";
 
 export interface SectionAging {
   /** Top-N (default 10) actionable rows, sorted critical→overdue→watch,
@@ -278,6 +291,10 @@ export interface SalesCommandSlice {
    *  The renderer skips the callouts block entirely when empty so the
    *  morning brief stays quiet on quiet days. */
   agingCallouts?: AgingCallout[];
+  /** Phase 4 — one-line Weekly Revenue KPI summary. NEVER fabricates
+   *  a number — when no channel is wired, `revenueKpi.text` carries
+   *  the explicit "Revenue pace not fully wired." copy. */
+  revenueKpi?: RevenueKpiSlice;
   retailDraftsNeedsReview: number | null;
   retailDraftsAccepted: number | null;
   /** Wholesale inquiries — currently `null` because the source is
@@ -340,6 +357,15 @@ export function composeSalesCommandSlice(
     maxCallouts: 3,
   });
 
+  // Phase 4 — Weekly Revenue KPI one-liner. Composes the full report
+  // pure (composeRevenueKpi is deterministic); the brief renderer
+  // never invents a number — when actual is null, it returns the
+  // explicit "Revenue pace not fully wired." copy.
+  const kpiReport = composeRevenueKpi(
+    { channels: Array.isArray(input.revenueChannels) ? input.revenueChannels : [] },
+  );
+  const revenueKpi = renderRevenueKpiBriefLine(kpiReport);
+
   const anyAction =
     [
       faireInvitesNeedsReview,
@@ -365,6 +391,7 @@ export function composeSalesCommandSlice(
     retailDraftsAccepted,
     wholesaleInquiries,
     agingCallouts,
+    revenueKpi,
     anyAction,
   };
 }
@@ -507,6 +534,10 @@ export function buildSalesCommandCenter(
       slackChannel: "#ops-approvals",
     },
     aging: buildAgingSection(input),
+    kpiScorecard: composeRevenueKpi(
+      { channels: input.revenueChannels ?? [] },
+      { now: options.now ?? new Date(generatedAt) },
+    ),
     blockers: {
       missingEnv: Array.isArray(input.missingEnv) ? [...input.missingEnv] : [],
       notes,
