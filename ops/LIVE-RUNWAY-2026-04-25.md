@@ -2,7 +2,7 @@
 
 **Last refreshed:** 2026-04-25  
 **Repo:** `/Users/ben/usagummies-storefront`  
-**Latest verified baseline before this doc:** `ea0b639 feat(ops): Phase 4 Sales Command — Weekly Revenue KPI Scorecard`  
+**Latest verified baseline before this doc:** `9b0709a feat(ops): Phase 5 Sales Command — B2B revenue wiring (audit + safe Phase 1 source)`
 **Mode:** keep building, but do not edit the same code lane as another active agent.
 
 This is the continuity document for Claude Code, Codex, or a human operator when one agent times out. It is intentionally operational: what is live, what is blocked, what to touch next, and what not to touch in parallel.
@@ -11,10 +11,10 @@ This is the continuity document for Claude Code, Codex, or a human operator when
 
 If Claude Code is actively working a lane, do not touch its files. Work on docs, env readiness, smoke tests, or a disjoint workflow only.
 
-Current active lane at the time this runway was written:
+Current active lane at the time this runway was refreshed:
 
-- **Claude Code:** B2B revenue / KPI reader wiring.
-- **Avoid while Claude owns it:** `src/lib/ops/revenue-kpi*`, `src/lib/ops/sales-command-center.ts`, `src/lib/ops/sales-command-readers.ts`, `/ops/sales`, `/api/ops/sales`, and daily-brief revenue/KPI sections.
+- **Claude Code:** B2B revenue / KPI reader wiring is complete at `9b0709a`.
+- **Next non-conflicting lane:** wholesale inquiry internal list API, then wire it into `/ops/sales`.
 - **Safe parallel work:** production envs, Notion handoff, blocker docs, smoke checklist, and operator runbooks.
 
 ## What Is Live
@@ -31,7 +31,7 @@ Current active lane at the time this runway was written:
 - `/ops/sales` is a read-only Sales Command Center.
 - It aggregates Faire invites, follow-ups, pending approvals, AP packets, location drafts, aging/SLA, and a weekly revenue KPI.
 - Wholesale inquiries are still explicitly `not_wired` in the Sales Command Center because there is no internal list API yet.
-- B2B revenue is still a known gap unless Claude's current lane closes it.
+- B2B revenue Phase 1 is wired from paid Shopify orders tagged `wholesale`; Shopify-DTC excludes the same tag to avoid double-count.
 
 ### Faire Direct
 
@@ -111,7 +111,7 @@ These are operator tasks, not code tasks:
 ### Known `not_wired` Sources
 
 - Wholesale inquiry internal list API.
-- B2B revenue join into the KPI scorecard, unless Claude's current B2B revenue lane lands it.
+- B2B revenue Phase 2 attribution through QBO Class/CustomField is deferred until Rene's chart/accounting reset stabilizes. Phase 1 Shopify `tag:wholesale` is live.
 - Unknown revenue catch-all by design.
 - R1-R7 research specialist runtimes.
 - Klaviyo/social/trade-show pods.
@@ -145,24 +145,15 @@ Acceptance:
 
 ## Next Build Lanes
 
-### Lane A — Let Claude finish B2B revenue
-
-Do not parallel-edit revenue files. After Claude finishes, verify:
-
-- B2B channel no longer reports `not_wired` unless intentionally still blocked.
-- Revenue KPI confidence/rationale remains honest.
-- Morning brief still includes bounded KPI line.
-- No QBO write path was added.
-- Tests, typecheck, lint pass.
-
-### Lane B — Wholesale inquiry internal list API
+### Lane A — Wholesale inquiry internal list API
 
 Goal: make wholesale inquiries visible in `/ops/sales` without fabricating data.
 
 Safe scope:
 
-- Store wholesale inquiry submissions in KV or existing durable store at `/api/leads`.
-- Add read-only internal list endpoint.
+- Preserve existing `/api/leads` behavior and webhook/Notion writes.
+- Add durable, queryable storage for wholesale inquiry submissions.
+- Add a read-only internal list endpoint.
 - Wire Sales Command's wholesale inquiries source from `not_wired` to `wired`.
 - No customer-facing stage changes.
 - No HubSpot lifecycle/stage writes.
@@ -173,9 +164,7 @@ Acceptance:
 - Morning brief does not become noisy from wholesale context-only data.
 - Tests prove `not_wired` never silently becomes `0`.
 
-### Lane C — Upload/readiness unblock
-
-Goal: make Drive upload + shipping artifacts green.
+### Lane B — Upload/readiness unblock
 
 Operator work:
 
@@ -189,7 +178,7 @@ Potential code only if smoke fails:
 - Fix Drive scope/env error handling.
 - Do not weaken file limits, MIME gates, or public upload rate limits.
 
-### Lane D — Receipt OCR/Rene queue
+### Lane C — Receipt OCR/Rene queue
 
 Goal: turn receipt capture from review-only into Rene-approved structured intake.
 
@@ -198,6 +187,16 @@ Boundary:
 - OCR/extraction can prepare suggestions.
 - QBO posting remains Rene-approved Class B/C.
 - Do not auto-create bills or expenses.
+
+### Lane D — B2B revenue Phase 2 attribution
+
+Goal: graduate B2B revenue from Shopify `tag:wholesale` Phase 1 to accounting-grade attribution only after Rene's accounting reset stabilizes.
+
+Boundary:
+
+- Do not use HubSpot Closed-Won as revenue.
+- Do not use QBO invoices/sales receipts until Class or CustomField channel attribution exists.
+- Do not double-count booth orders that create both QBO invoices and paid Shopify orders.
 
 ## Stop Rules
 
@@ -213,7 +212,7 @@ Stop and ask before changing:
 
 ## Next Prompt Template For Claude Code
 
-Use this when the active B2B revenue lane finishes:
+Use this as the next Claude prompt:
 
 ```text
 You are working in /Users/ben/usagummies-storefront on main.
@@ -226,12 +225,12 @@ Before coding, run:
 Read:
 - ops/LIVE-RUNWAY-2026-04-25.md
 - contracts/workflow-blueprint.md S1.6
+- src/app/api/leads/route.ts
 - src/lib/ops/sales-command-center.ts
 - src/lib/ops/sales-command-readers.ts
 
 Goal: pick the next non-conflicting green-to-green workflow. Do not touch pricing, cart, checkout, Shopify product logic, QBO writes, HubSpot lifecycle/stage writes, or any file currently modified by another agent.
 
-Preferred next lane if B2B revenue is complete:
 Build Wholesale inquiry internal list API so /ops/sales can replace wholesale-inquiries not_wired with a real read-only count.
 
 Acceptance:

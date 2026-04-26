@@ -15,8 +15,8 @@ This file contains historical April 20-21 tasks below. The current live runway i
 
 ### Current baseline
 
-- Latest verified baseline before this overlay: `ea0b639 feat(ops): Phase 4 Sales Command — Weekly Revenue KPI Scorecard`.
-- Latest reported full-suite result: **1030 tests passing**, `tsc --noEmit` clean, `npm run lint` clean.
+- Latest verified baseline before this overlay: `9b0709a feat(ops): Phase 5 Sales Command — B2B revenue wiring (audit + safe Phase 1 source)`.
+- Latest reported full-suite result: **1045 tests passing**, `tsc --noEmit` clean, `npm run lint` clean.
 - The old "174 tests" and April 20 agent activation language below is retained as history, not current state.
 
 ### Current P0 manual/env blockers
@@ -32,15 +32,15 @@ This file contains historical April 20-21 tasks below. The current live runway i
 ### Known not-wired sources
 
 - Wholesale inquiry internal list API.
-- B2B revenue join into the KPI scorecard, unless the active Claude Code lane has just closed it.
+- B2B revenue Phase 2 accounting attribution. Phase 1 Shopify `tag:wholesale` source is live; QBO Class/CustomField attribution is deferred.
 - Unknown revenue catch-all by design.
 - R1-R7 research specialist runtimes.
 - Klaviyo/social/trade-show pods.
 - External vendor self-service portal.
 
-### Do not parallel-edit while Claude owns B2B revenue
+### Current next code lane
 
-Avoid `src/lib/ops/revenue-kpi*`, `src/lib/ops/sales-command-center.ts`, `src/lib/ops/sales-command-readers.ts`, `/ops/sales`, `/api/ops/sales`, and daily-brief revenue/KPI sections until Claude Code finishes its current lane.
+Wholesale inquiry internal list API: preserve existing `/api/leads`, add durable queryable storage for wholesale submissions, add an auth-gated read-only internal list endpoint, then wire `/ops/sales` from `not_wired` to real counts without making the morning brief noisy.
 
 ## Secret handling rule
 - **Never paste full secret values into this file or any tracked repo file.** Use prefix-only references (`shpat_…`, `AKIA…`, `xoxb-…`, `sk-…`) or the literal placeholder `<ROTATE_THIS_TOKEN>`.
