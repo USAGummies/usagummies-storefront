@@ -30,11 +30,23 @@
  * On packet-not-found (e.g. KV evicted, packetId malformed) the
  * closer returns `{ ok: false, handled: true }` so the slack route
  * can surface the gap — never silently succeeds.
+ *
+ * Phase 20 — Cache-invalidation hook. After a successful packet
+ * status transition, this closer fires `invalidateApprovalLookupCache()`
+ * (Phase 19, KV-cached approval lookup with 30s TTL). The next
+ * dashboard / list-route / CSV-export request rebuilds from the
+ * fresh approval store state instead of waiting up to 30s for the
+ * TTL to expire. Best-effort — KV.del failures are swallowed
+ * inside the helper, so cache invalidation NEVER fails the
+ * transition. NOT fired on the error path (the packet didn't
+ * change → the cache is still correct) or on `handled: false`
+ * gating returns (no transition occurred).
  */
 import { buildAuditEntry } from "@/lib/ops/control-plane/audit";
 import { auditStore } from "@/lib/ops/control-plane/stores";
 import { auditSurface } from "@/lib/ops/control-plane/slack";
 import { updateReceiptReviewPacketStatus } from "@/lib/ops/docs";
+import { invalidateApprovalLookupCache } from "@/lib/ops/receipt-review-approval-lookup";
 import type {
   ApprovalRequest,
   RunContext,
@@ -199,6 +211,19 @@ export async function executeApprovedReceiptReviewPromote(
     packetId,
     newStatus,
   });
+
+  // Phase 20 — Closer cache-invalidation hook. The packet just
+  // transitioned, so the cached approval lookup (Phase 19) is now
+  // stale for this packetId. Bust the cache so the next dashboard
+  // / list-route / CSV-export request rebuilds from the fresh
+  // approval store state instead of waiting up to 30s for the TTL
+  // to expire. Best-effort — `invalidateApprovalLookupCache()`
+  // swallows KV.del failures internally, so this NEVER throws back
+  // through the closer's success path. The audit entry above is
+  // already recorded as `result: "ok"`; cache invalidation is a
+  // downstream observability concern, not part of the transition's
+  // correctness contract.
+  await invalidateApprovalLookupCache();
 
   const verb = newStatus === "rene-approved" ? "approved" : "rejected";
   const emoji = newStatus === "rene-approved" ? ":white_check_mark:" : ":x:";
