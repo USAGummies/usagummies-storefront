@@ -18,9 +18,11 @@ import {
   deriveApprovalsStatus,
   deriveFreightStatus,
   deriveReceiptStatus,
+  derivePromoteReviewPill,
   type ApPacketsPayload,
   type ControlPlaneApprovalsPayload,
   type FreightCompPayload,
+  type PromoteReviewState,
   type ReceiptSummaryPayload,
   type SectionWiring,
 } from "./data";
@@ -314,6 +316,7 @@ export function FinanceReviewView() {
                   <Th>Missing</Th>
                   <Th>Source</Th>
                   <Th>Captured</Th>
+                  <Th>Rene review</Th>
                 </tr>
               </thead>
               <tbody>
@@ -575,8 +578,106 @@ const CONFIDENCE_COLOR: Record<"high" | "medium" | "low", string> = {
  * and labelled "OCR" so reviewers can never confuse it with the
  * canonical (review-promoted) values.
  */
+/**
+ * Phase 11 button — POSTs to /api/ops/docs/receipt/promote-review and
+ * captures the response. The route opens a Class B Rene approval when
+ * the resulting packet's eligibility.ok is true; otherwise returns a
+ * draft-only packet. UI renders the response inline as a colored pill.
+ *
+ * Read-only contract: no inline edit of canonical receipt fields.
+ * The button NEVER auto-fires qbo.bill.create / vendor creation /
+ * category guess. The pill display is derived purely by
+ * `derivePromoteReviewPill(state)` so the rendering rules are
+ * unit-testable in `data.ts`.
+ */
+const PILL_COLOR: Record<"neutral" | "amber" | "green" | "red", string> = {
+  neutral: NAVY,
+  amber: GOLD,
+  green: "#1f7a3a",
+  red: RED,
+};
+
+interface PromoteReviewResponse {
+  ok?: boolean;
+  packet?: {
+    eligibility?: { ok?: boolean; missing?: string[] };
+  };
+  approval?:
+    | {
+        opened: true;
+        id: string;
+        status: string;
+        requiredApprovers: string[];
+      }
+    | { opened: false; reason: string };
+  error?: string;
+  reason?: string;
+}
+
+async function promoteReviewRequest(
+  receiptId: string,
+): Promise<PromoteReviewState> {
+  try {
+    const res = await fetch("/api/ops/docs/receipt/promote-review", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ receiptId }),
+      cache: "no-store",
+    });
+    let body: PromoteReviewResponse | null = null;
+    try {
+      body = (await res.json()) as PromoteReviewResponse;
+    } catch {
+      body = null;
+    }
+    if (!res.ok || !body) {
+      const reason =
+        body?.error ?? body?.reason ?? `HTTP ${res.status} ${res.statusText}`;
+      return { kind: "error", reason };
+    }
+    const approval = body.approval;
+    if (approval && approval.opened === true) {
+      return {
+        kind: "opened",
+        approvalId: approval.id,
+        status: approval.status,
+        requiredApprovers: approval.requiredApprovers,
+      };
+    }
+    if (approval && approval.opened === false) {
+      return {
+        kind: "draft-only",
+        reason: approval.reason,
+        missing: body.packet?.eligibility?.missing,
+      };
+    }
+    // Defensive: route returned 200 but no approval envelope.
+    return {
+      kind: "error",
+      reason: "Route returned ok but no approval envelope.",
+    };
+  } catch (err) {
+    return {
+      kind: "error",
+      reason: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
 function FragmentRow({ r }: { r: ReceiptListItem }) {
   const sug = r.ocr_suggestion;
+  const [promoteState, setPromoteState] = useState<PromoteReviewState>({
+    kind: "idle",
+  });
+  const pill = derivePromoteReviewPill(promoteState);
+  const isLoading = promoteState.kind === "loading";
+
+  async function onClickPromote() {
+    setPromoteState({ kind: "loading" });
+    const next = await promoteReviewRequest(r.id);
+    setPromoteState(next);
+  }
+
   return (
     <>
       <tr style={{ borderTop: `1px dashed ${BORDER}` }}>
@@ -595,6 +696,25 @@ function FragmentRow({ r }: { r: ReceiptListItem }) {
         </Td>
         <Td>{r.source_channel ?? "—"}</Td>
         <Td>{r.processed_at?.slice(0, 16)}</Td>
+        <Td>
+          <button
+            type="button"
+            onClick={onClickPromote}
+            disabled={isLoading}
+            style={{
+              fontSize: 11,
+              padding: "3px 8px",
+              borderRadius: 4,
+              border: `1px solid ${BORDER}`,
+              background: "#fff",
+              color: NAVY,
+              cursor: isLoading ? "wait" : "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {isLoading ? "Requesting…" : "Request Rene review"}
+          </button>
+        </Td>
       </tr>
       {sug && (
         <tr style={{ background: BG }}>
@@ -617,7 +737,7 @@ function FragmentRow({ r }: { r: ReceiptListItem }) {
               ? `${sug.currency ?? ""} $${sug.amount.toFixed(2)}`.trim()
               : "—"}
           </Td>
-          <Td colSpan={3} style={{ fontSize: 11, color: DIM }}>
+          <Td colSpan={4} style={{ fontSize: 11, color: DIM }}>
             <span
               style={{
                 fontWeight: 700,
@@ -640,6 +760,43 @@ function FragmentRow({ r }: { r: ReceiptListItem }) {
             )}
             <span style={{ display: "block", marginTop: 2, color: DIM }}>
               Suggestion only — review fields above are unchanged.
+            </span>
+          </Td>
+        </tr>
+      )}
+      {/* Phase 11 — promote-review pill (rendered only after operator clicks). */}
+      {promoteState.kind !== "idle" && (
+        <tr style={{ background: BG }}>
+          <Td
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              color: DIM,
+              textTransform: "uppercase",
+              letterSpacing: 0.4,
+              whiteSpace: "nowrap",
+            }}
+          >
+            Promote
+          </Td>
+          <Td colSpan={7} style={{ fontSize: 11 }}>
+            <span
+              style={{
+                fontWeight: 700,
+                color: PILL_COLOR[pill.color],
+                marginRight: 8,
+              }}
+            >
+              {pill.label}
+            </span>
+            {pill.detail && (
+              <span style={{ color: DIM }}>{pill.detail}</span>
+            )}
+            <span
+              style={{ display: "block", marginTop: 2, color: DIM }}
+            >
+              Read-only — review fields above are unchanged. QBO posting
+              still runs through a separate `qbo.bill.create` action.
             </span>
           </Td>
         </tr>

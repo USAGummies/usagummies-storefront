@@ -189,6 +189,115 @@ export function deriveApPacketsStatus(
   };
 }
 
+// ---- Phase 11 — Promote-review pill (per-receipt button feedback) ----------
+//
+// The "Request Rene review" button at each `needs_review` row POSTs to
+// `/api/ops/docs/receipt/promote-review`. The route returns either an
+// opened approval, a draft-only packet (eligibility failed or
+// taxonomy gap), or an HTTP error. This pure helper maps the
+// per-row state into a typed pill description so the client view can
+// render without inlining branch logic, and the unit suite can lock
+// the rendering rules without spinning up React.
+
+export type PromoteReviewState =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | {
+      kind: "opened";
+      approvalId: string;
+      status: string;
+      requiredApprovers: string[];
+    }
+  | {
+      kind: "draft-only";
+      reason: string;
+      missing?: string[];
+    }
+  | { kind: "error"; reason: string };
+
+export type PromoteReviewPillVariant =
+  | "idle"
+  | "loading"
+  | "opened"
+  | "draft-only"
+  | "error";
+
+export interface PromoteReviewPill {
+  variant: PromoteReviewPillVariant;
+  /** Operator-facing label rendered in the pill. */
+  label: string;
+  /** Tailwind/inline-style color hint. */
+  color: "neutral" | "amber" | "green" | "red";
+  /** Optional second-line detail (e.g. truncated approval id). Empty
+   *  string when no detail applies — keeps the renderer simple. */
+  detail: string;
+}
+
+/**
+ * Pure projection: PromoteReviewState → PromoteReviewPill.
+ *
+ * Locked rules (covered by data.test.ts):
+ *   - "idle" → invites the operator to click; no detail.
+ *   - "loading" → muted spinner-style copy.
+ *   - "opened" → green pill with the approval id (truncated) +
+ *     status + approvers. NEVER fabricates an id when missing.
+ *   - "draft-only" → amber pill with the route's verbatim reason
+ *     plus the missing-fields list when present.
+ *   - "error" → red pill with the underlying error message.
+ *   - Reasons / errors are surfaced verbatim — no rewriting,
+ *     no "approximately", no operator-friendly paraphrase that
+ *     could mask the real cause.
+ */
+export function derivePromoteReviewPill(
+  state: PromoteReviewState,
+): PromoteReviewPill {
+  switch (state.kind) {
+    case "idle":
+      return {
+        variant: "idle",
+        label: "Request Rene review",
+        color: "neutral",
+        detail: "",
+      };
+    case "loading":
+      return {
+        variant: "loading",
+        label: "Requesting…",
+        color: "neutral",
+        detail: "",
+      };
+    case "opened": {
+      const truncated = state.approvalId.slice(0, 8);
+      const approvers = state.requiredApprovers.join(", ");
+      return {
+        variant: "opened",
+        label: `Approval opened · ${state.status}`,
+        color: "green",
+        detail: `id: ${truncated}… · approvers: ${approvers || "(none)"}`,
+      };
+    }
+    case "draft-only": {
+      const missing =
+        Array.isArray(state.missing) && state.missing.length > 0
+          ? ` · missing: ${state.missing.join(", ")}`
+          : "";
+      return {
+        variant: "draft-only",
+        label: "Draft packet only — no Slack approval opened",
+        color: "amber",
+        detail: `${state.reason}${missing}`,
+      };
+    }
+    case "error":
+      return {
+        variant: "error",
+        label: "Request failed",
+        color: "red",
+        detail: state.reason,
+      };
+  }
+}
+
 // ---- Monday action list ----------------------------------------------------
 
 export function buildMondayActionList(args: {

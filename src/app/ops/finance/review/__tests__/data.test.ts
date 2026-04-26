@@ -15,6 +15,8 @@ import {
   deriveApprovalsStatus,
   deriveFreightStatus,
   deriveReceiptStatus,
+  derivePromoteReviewPill,
+  type PromoteReviewState,
 } from "../data";
 
 describe("deriveReceiptStatus", () => {
@@ -215,5 +217,125 @@ describe("buildMondayActionList", () => {
       expect(item.status).toBe("error");
       expect(item.count).toBe(0);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 11 — derivePromoteReviewPill (per-receipt button feedback)
+// ---------------------------------------------------------------------------
+
+describe("derivePromoteReviewPill — Phase 11 button state", () => {
+  it("idle → neutral pill inviting the operator to click", () => {
+    const p = derivePromoteReviewPill({ kind: "idle" });
+    expect(p.variant).toBe("idle");
+    expect(p.color).toBe("neutral");
+    expect(p.label).toMatch(/Request Rene review/i);
+    expect(p.detail).toBe("");
+  });
+
+  it("loading → neutral pill with muted copy", () => {
+    const p = derivePromoteReviewPill({ kind: "loading" });
+    expect(p.variant).toBe("loading");
+    expect(p.color).toBe("neutral");
+    expect(p.label).toMatch(/requesting/i);
+    expect(p.detail).toBe("");
+  });
+
+  it("opened → green pill with truncated approval id + status + approvers", () => {
+    const p = derivePromoteReviewPill({
+      kind: "opened",
+      approvalId: "abcdef12-3456-7890-abcd-ef1234567890",
+      status: "pending",
+      requiredApprovers: ["Rene"],
+    });
+    expect(p.variant).toBe("opened");
+    expect(p.color).toBe("green");
+    expect(p.label).toMatch(/Approval opened/);
+    expect(p.label).toContain("pending");
+    // Truncated id (first 8 chars) — locks the no-PII / scannable contract.
+    expect(p.detail).toContain("abcdef12");
+    expect(p.detail).toContain("Rene");
+  });
+
+  it("opened with no approvers (defensive) → '(none)' instead of empty string", () => {
+    const p = derivePromoteReviewPill({
+      kind: "opened",
+      approvalId: "12345678-aaaa-bbbb-cccc-dddddddddddd",
+      status: "pending",
+      requiredApprovers: [],
+    });
+    expect(p.detail).toContain("(none)");
+  });
+
+  it("draft-only → amber pill carrying the route's verbatim reason", () => {
+    const p = derivePromoteReviewPill({
+      kind: "draft-only",
+      reason:
+        "Packet ineligible — missing fields: vendor, date, amount, category.",
+    });
+    expect(p.variant).toBe("draft-only");
+    expect(p.color).toBe("amber");
+    expect(p.label).toMatch(/Draft packet only/);
+    // Reason surfaced verbatim — no rewriting / paraphrase.
+    expect(p.detail).toBe(
+      "Packet ineligible — missing fields: vendor, date, amount, category.",
+    );
+  });
+
+  it("draft-only with explicit missing[] appends the field list to the detail", () => {
+    const p = derivePromoteReviewPill({
+      kind: "draft-only",
+      reason: "Packet ineligible — missing fields.",
+      missing: ["vendor", "amount"],
+    });
+    expect(p.detail).toContain("Packet ineligible");
+    expect(p.detail).toContain("missing: vendor, amount");
+  });
+
+  it("draft-only with empty missing[] does NOT add a stray '· missing:' suffix", () => {
+    const p = derivePromoteReviewPill({
+      kind: "draft-only",
+      reason: "Taxonomy slug null.",
+      missing: [],
+    });
+    expect(p.detail).toBe("Taxonomy slug null.");
+    expect(p.detail).not.toContain("missing:");
+  });
+
+  it("error → red pill with the underlying error verbatim", () => {
+    const p = derivePromoteReviewPill({
+      kind: "error",
+      reason: "HTTP 503 Service Unavailable",
+    });
+    expect(p.variant).toBe("error");
+    expect(p.color).toBe("red");
+    expect(p.label).toMatch(/failed/i);
+    expect(p.detail).toBe("HTTP 503 Service Unavailable");
+  });
+
+  it("never paraphrases or 'softens' a reason — operator sees the real cause", () => {
+    // Locked invariant: if the route says ECONNREFUSED, the pill shows
+    // ECONNREFUSED — not "Couldn't reach service" or similar. This
+    // matches the wider blueprint rule on transparent failure surfaces.
+    const cause = "kv_read_failed: ECONNREFUSED";
+    const errorPill = derivePromoteReviewPill({ kind: "error", reason: cause });
+    expect(errorPill.detail).toBe(cause);
+    const draftPill = derivePromoteReviewPill({
+      kind: "draft-only",
+      reason: cause,
+    });
+    expect(draftPill.detail).toBe(cause);
+  });
+
+  it("output is deterministic for the same input (pure)", () => {
+    const state: PromoteReviewState = {
+      kind: "opened",
+      approvalId: "abc12345-1111-2222-3333-444444444444",
+      status: "pending",
+      requiredApprovers: ["Rene"],
+    };
+    expect(derivePromoteReviewPill(state)).toEqual(
+      derivePromoteReviewPill(state),
+    );
   });
 });

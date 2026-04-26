@@ -162,17 +162,17 @@ Potential code only if smoke fails:
 
 ### Lane B — Receipt-to-Rene approval promotion
 
-Phases 7-10 done. Phase 10 wires the closer: when Rene clicks
-approve/reject in Slack, the packet transitions to
-`rene-approved`/`rejected`. Closer mutates ONLY the packet's status
-field. The receipt-to-Rene loop is now end-to-end: capture → OCR
-→ packet → eligible-Slack-approval → Rene clicks → packet terminal
-state. Every step is review-only with respect to QBO/HubSpot/Shopify.
+Phases 7-11 done. Phase 11 surfaces a "Request Rene review" button
+inline on `/ops/finance/review` per receipt. Click → POST
+`/api/ops/docs/receipt/promote-review` → response renders inline
+as a colored pill (green = approval opened with id+status+approvers;
+amber = draft-only with verbatim reason + missing-fields list; red
+= error with underlying message verbatim, no paraphrase).
 
-Next sub-lane (Phase 11): UI button on `/ops/finance/review` per
-receipt that calls `POST /api/ops/docs/receipt/promote-review` and
-renders the resulting `approval.id` + `approval.status` so reviewers
-can follow the Slack-thread permalink without leaving the dashboard.
+Next sub-lane (Phase 12): Slack-thread permalink in the route's
+response so the green pill can deep-link to the approval's Slack
+thread in `#ops-approvals`. Optional: per-row poll so the operator
+sees `rene-approved`/`rejected` without a full page refresh.
 
 Boundary:
 
@@ -180,7 +180,8 @@ Boundary:
 - Promotion creates a draft review packet. ✅ Done (Phase 8).
 - Eligible packets open a Class B Rene approval. ✅ Done (Phase 9).
 - Closer transitions packet on Slack decide. ✅ Done (Phase 10).
-- UI button on /ops/finance/review — Phase 11.
+- UI button on /ops/finance/review. ✅ Done (Phase 11).
+- Slack-thread permalink + per-row poll — Phase 12.
 - QBO posting remains a separate Rene-approved Class B/C action.
 - Do not auto-create bills, expenses, vendors, or categories.
 - Do not overwrite canonical receipt fields without explicit reviewer action.
