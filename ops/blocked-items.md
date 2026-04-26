@@ -15,8 +15,8 @@ This file contains historical April 20-21 tasks below. The current live runway i
 
 ### Current baseline
 
-- Latest verified baseline before this overlay: `9b0709a feat(ops): Phase 5 Sales Command — B2B revenue wiring (audit + safe Phase 1 source)`.
-- Latest reported full-suite result: **1045 tests passing**, `tsc --noEmit` clean, `npm run lint` clean.
+- Latest verified baseline before this overlay: `4c66f70 feat(ops): Phase 6 Sales Command — wholesale inquiry archive + internal list API`.
+- Latest reported full-suite result: **1075 tests passing**, `tsc --noEmit` clean, `npm run lint` clean.
 - The old "174 tests" and April 20 agent activation language below is retained as history, not current state.
 
 ### Current P0 manual/env blockers
@@ -31,7 +31,7 @@ This file contains historical April 20-21 tasks below. The current live runway i
 
 ### Known not-wired sources
 
-- Wholesale inquiry internal list API.
+- ~Wholesale inquiry internal list API.~ Wired in Phase 6.
 - B2B revenue Phase 2 accounting attribution. Phase 1 Shopify `tag:wholesale` source is live; QBO Class/CustomField attribution is deferred.
 - Unknown revenue catch-all by design.
 - R1-R7 research specialist runtimes.
@@ -40,7 +40,7 @@ This file contains historical April 20-21 tasks below. The current live runway i
 
 ### Current next code lane
 
-Wholesale inquiry internal list API: preserve existing `/api/leads`, add durable queryable storage for wholesale submissions, add an auth-gated read-only internal list endpoint, then wire `/ops/sales` from `not_wired` to real counts without making the morning brief noisy.
+Receipt OCR/Rene review queue: add extraction suggestions to the existing receipt review flow without posting to QBO, auto-categorizing, or inventing missing vendor/date/amount data.
 
 ## Secret handling rule
 - **Never paste full secret values into this file or any tracked repo file.** Use prefix-only references (`shpat_…`, `AKIA…`, `xoxb-…`, `sk-…`) or the literal placeholder `<ROTATE_THIS_TOKEN>`.

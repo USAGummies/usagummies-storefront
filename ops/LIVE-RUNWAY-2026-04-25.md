@@ -2,7 +2,8 @@
 
 **Last refreshed:** 2026-04-25  
 **Repo:** `/Users/ben/usagummies-storefront`  
-**Latest verified baseline before this doc:** `9b0709a feat(ops): Phase 5 Sales Command — B2B revenue wiring (audit + safe Phase 1 source)`
+**Latest verified baseline before this doc:** `4c66f70 feat(ops): Phase 6 Sales Command — wholesale inquiry archive + internal list API`
+
 **Mode:** keep building, but do not edit the same code lane as another active agent.
 
 This is the continuity document for Claude Code, Codex, or a human operator when one agent times out. It is intentionally operational: what is live, what is blocked, what to touch next, and what not to touch in parallel.
@@ -13,8 +14,8 @@ If Claude Code is actively working a lane, do not touch its files. Work on docs,
 
 Current active lane at the time this runway was refreshed:
 
-- **Claude Code:** B2B revenue / KPI reader wiring is complete at `9b0709a`.
-- **Next non-conflicting lane:** wholesale inquiry internal list API, then wire it into `/ops/sales`.
+- **Claude Code:** wholesale inquiry archive + internal list API is complete at `4c66f70`.
+- **Next non-conflicting code lane:** receipt OCR/Rene review queue.
 - **Safe parallel work:** production envs, Notion handoff, blocker docs, smoke checklist, and operator runbooks.
 
 ## What Is Live
@@ -30,7 +31,7 @@ Current active lane at the time this runway was refreshed:
 
 - `/ops/sales` is a read-only Sales Command Center.
 - It aggregates Faire invites, follow-ups, pending approvals, AP packets, location drafts, aging/SLA, and a weekly revenue KPI.
-- Wholesale inquiries are now `wired` (Phase 6, commit upcoming): `/api/leads` mirrors submissions fail-soft into a durable KV archive; auth-gated `GET /api/ops/wholesale/inquiries` exposes the count; `/ops/sales` shows real `total` + `lastSubmittedAt`. Morning brief stays quiet (wholesale is context, not action).
+- Wholesale inquiries are now `wired` (Phase 6, `4c66f70`): `/api/leads` mirrors submissions fail-soft into a durable KV archive; auth-gated `GET /api/ops/wholesale/inquiries` exposes the count; `/ops/sales` shows real `total` + `lastSubmittedAt`. Morning brief stays quiet (wholesale is context, not action).
 - B2B revenue Phase 1 is wired from paid Shopify orders tagged `wholesale`; Shopify-DTC excludes the same tag to avoid double-count.
 
 ### Faire Direct
@@ -145,26 +146,7 @@ Acceptance:
 
 ## Next Build Lanes
 
-### Lane A — Wholesale inquiry internal list API
-
-Goal: make wholesale inquiries visible in `/ops/sales` without fabricating data.
-
-Safe scope:
-
-- Preserve existing `/api/leads` behavior and webhook/Notion writes.
-- Add durable, queryable storage for wholesale inquiry submissions.
-- Add a read-only internal list endpoint.
-- Wire Sales Command's wholesale inquiries source from `not_wired` to `wired`.
-- No customer-facing stage changes.
-- No HubSpot lifecycle/stage writes.
-
-Acceptance:
-
-- `/ops/sales` shows real inquiry count.
-- Morning brief does not become noisy from wholesale context-only data.
-- Tests prove `not_wired` never silently becomes `0`.
-
-### Lane B — Upload/readiness unblock
+### Lane A — Upload/readiness unblock
 
 Operator work:
 
@@ -178,7 +160,7 @@ Potential code only if smoke fails:
 - Fix Drive scope/env error handling.
 - Do not weaken file limits, MIME gates, or public upload rate limits.
 
-### Lane C — Receipt OCR/Rene queue
+### Lane B — Receipt OCR/Rene queue
 
 Goal: turn receipt capture from review-only into Rene-approved structured intake.
 
@@ -188,7 +170,7 @@ Boundary:
 - QBO posting remains Rene-approved Class B/C.
 - Do not auto-create bills or expenses.
 
-### Lane D — B2B revenue Phase 2 attribution
+### Lane C — B2B revenue Phase 2 attribution
 
 Goal: graduate B2B revenue from Shopify `tag:wholesale` Phase 1 to accounting-grade attribution only after Rene's accounting reset stabilizes.
 
@@ -224,20 +206,25 @@ Before coding, run:
 
 Read:
 - ops/LIVE-RUNWAY-2026-04-25.md
-- contracts/workflow-blueprint.md S1.6
-- src/app/api/leads/route.ts
-- src/lib/ops/sales-command-center.ts
-- src/lib/ops/sales-command-readers.ts
+- contracts/workflow-blueprint.md
+- src/app/api/ops/docs/receipt/route.ts
+- src/lib/ops/docs.ts
+- src/app/ops/finance/review/FinanceReviewView.client.tsx
 
-Goal: pick the next non-conflicting green-to-green workflow. Do not touch pricing, cart, checkout, Shopify product logic, QBO writes, HubSpot lifecycle/stage writes, or any file currently modified by another agent.
+Goal: build receipt OCR extraction into the existing receipts review flow. This is a prepare-for-review lane only; do not post to QBO.
 
-Build Wholesale inquiry internal list API so /ops/sales can replace wholesale-inquiries not_wired with a real read-only count.
+Build:
+1. Audit existing receipt capture/listing helpers and finance review surface.
+2. Add a pure OCR/extraction normalization helper that turns OCR text into a suggested receipt envelope: vendor, date, amount, currency, tax, last4/payment hint, confidence, and warnings.
+3. Add a route that can attach OCR suggestions to an existing receipt record or accept OCR text for a receipt id. Keep it auth-gated.
+4. Surface suggestions in /ops/finance/review as review-only fields.
+5. No QBO writes, no auto-categorization, no vendor creation, no payment classification beyond suggestion/warning.
+6. Tests for no-fabrication: missing amount/date/vendor stays null with warning, never guessed.
 
 Acceptance:
-- Existing /api/leads behavior preserved.
-- Wholesale submissions are durably queryable.
-- New internal list endpoint is read-only and auth-gated.
-- /ops/sales shows real count without making morning brief noisy.
-- No HubSpot stage/lifecycle writes.
+- Receipts still queue as needs_review.
+- OCR suggestions are visible to Rene/Ben as suggestions only.
+- No QBO write path added.
+- No fabricated vendor/date/amount.
 - Tests/typecheck/lint pass.
 ```
