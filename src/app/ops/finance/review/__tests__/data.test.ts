@@ -338,4 +338,92 @@ describe("derivePromoteReviewPill — Phase 11 button state", () => {
       derivePromoteReviewPill(state),
     );
   });
+
+  // ---- Phase 12 — permalink + packetStatus -------------------------------
+
+  it("opened with no permalink → pill.permalink is null (NEVER fabricated)", () => {
+    const p = derivePromoteReviewPill({
+      kind: "opened",
+      approvalId: "abc12345-1111-2222-3333-444444444444",
+      status: "pending",
+      requiredApprovers: ["Rene"],
+    });
+    expect(p.permalink).toBeNull();
+  });
+
+  it("opened with permalink → pill carries it verbatim", () => {
+    const url =
+      "https://usagummies.slack.com/archives/C0ALS6W7VB4/p1700000000000123";
+    const p = derivePromoteReviewPill({
+      kind: "opened",
+      approvalId: "abc12345-1111-2222-3333-444444444444",
+      status: "pending",
+      requiredApprovers: ["Rene"],
+      permalink: url,
+    });
+    expect(p.permalink).toBe(url);
+  });
+
+  it("opened with empty-string permalink → pill.permalink is null (defensive)", () => {
+    const p = derivePromoteReviewPill({
+      kind: "opened",
+      approvalId: "abc12345-1111-2222-3333-444444444444",
+      status: "pending",
+      requiredApprovers: ["Rene"],
+      permalink: "",
+    });
+    expect(p.permalink).toBeNull();
+  });
+
+  it("packetStatus = 'rene-approved' → label flips to 'Rene approved' + green", () => {
+    const p = derivePromoteReviewPill({
+      kind: "opened",
+      approvalId: "abc12345-1111-2222-3333-444444444444",
+      status: "approved",
+      requiredApprovers: ["Rene"],
+      packetStatus: "rene-approved",
+    });
+    expect(p.label).toBe("Rene approved");
+    expect(p.color).toBe("green");
+  });
+
+  it("packetStatus = 'rejected' → label flips to 'Rene rejected' + amber (visible gap signal)", () => {
+    const p = derivePromoteReviewPill({
+      kind: "opened",
+      approvalId: "abc12345-1111-2222-3333-444444444444",
+      status: "rejected",
+      requiredApprovers: ["Rene"],
+      packetStatus: "rejected",
+    });
+    expect(p.label).toBe("Rene rejected");
+    expect(p.color).toBe("amber");
+  });
+
+  it("packetStatus = 'draft' (pre-decision) → label still 'Approval opened · pending'", () => {
+    const p = derivePromoteReviewPill({
+      kind: "opened",
+      approvalId: "abc12345-1111-2222-3333-444444444444",
+      status: "pending",
+      requiredApprovers: ["Rene"],
+      packetStatus: "draft",
+    });
+    expect(p.label).toMatch(/Approval opened/);
+    expect(p.color).toBe("green");
+  });
+
+  it("non-opened states never carry a permalink (pill.permalink is undefined)", () => {
+    expect(derivePromoteReviewPill({ kind: "idle" }).permalink).toBeUndefined();
+    expect(
+      derivePromoteReviewPill({ kind: "loading" }).permalink,
+    ).toBeUndefined();
+    expect(
+      derivePromoteReviewPill({
+        kind: "draft-only",
+        reason: "x",
+      }).permalink,
+    ).toBeUndefined();
+    expect(
+      derivePromoteReviewPill({ kind: "error", reason: "x" }).permalink,
+    ).toBeUndefined();
+  });
 });

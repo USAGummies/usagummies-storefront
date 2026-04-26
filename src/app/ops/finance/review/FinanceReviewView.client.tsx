@@ -608,8 +608,18 @@ interface PromoteReviewResponse {
         id: string;
         status: string;
         requiredApprovers: string[];
+        /** Phase 12 — Slack permalink. May be null in degraded mode. */
+        permalink?: string | null;
       }
     | { opened: false; reason: string };
+  error?: string;
+  reason?: string;
+}
+
+interface PacketStatusResponse {
+  ok?: boolean;
+  packetStatus?: "draft" | "rene-approved" | "rejected";
+  approvalStatus?: string | null;
   error?: string;
   reason?: string;
 }
@@ -642,6 +652,11 @@ async function promoteReviewRequest(
         approvalId: approval.id,
         status: approval.status,
         requiredApprovers: approval.requiredApprovers,
+        permalink:
+          typeof approval.permalink === "string" && approval.permalink.length > 0
+            ? approval.permalink
+            : null,
+        packetStatus: "draft",
       };
     }
     if (approval && approval.opened === false) {
@@ -664,6 +679,39 @@ async function promoteReviewRequest(
   }
 }
 
+/**
+ * Phase 12 — read-only per-row poll. Once the operator clicks
+ * "Request Rene review" and the packet is in "opened" state, we
+ * poll the read-only status route every POLL_INTERVAL_MS for up to
+ * POLL_MAX_TICKS ticks (3 minutes total). When the packet's status
+ * flips to a terminal state (`rene-approved` / `rejected`), we
+ * update the pill and stop polling.
+ *
+ * Hard rules:
+ *   - GET-only. Never opens approvals, never mutates state.
+ *   - Bounded — max 6 ticks per row, then stops. Operator can
+ *     refresh the page to re-arm the poll if Rene takes longer.
+ *   - On 404 / non-200 / network throw → stop silently. The pill
+ *     keeps its last-known state.
+ */
+const POLL_INTERVAL_MS = 30_000;
+const POLL_MAX_TICKS = 6;
+
+async function fetchPacketStatus(
+  packetId: string,
+): Promise<PacketStatusResponse | null> {
+  try {
+    const res = await fetch(
+      `/api/ops/docs/receipt-review-packets/${encodeURIComponent(packetId)}`,
+      { method: "GET", cache: "no-store" },
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as PacketStatusResponse;
+  } catch {
+    return null;
+  }
+}
+
 function FragmentRow({ r }: { r: ReceiptListItem }) {
   const sug = r.ocr_suggestion;
   const [promoteState, setPromoteState] = useState<PromoteReviewState>({
@@ -677,6 +725,49 @@ function FragmentRow({ r }: { r: ReceiptListItem }) {
     const next = await promoteReviewRequest(r.id);
     setPromoteState(next);
   }
+
+  // Phase 12 — poll the status route once a packet is "opened".
+  // Stops automatically on terminal status or after POLL_MAX_TICKS.
+  useEffect(() => {
+    if (promoteState.kind !== "opened") return;
+    if (
+      promoteState.packetStatus === "rene-approved" ||
+      promoteState.packetStatus === "rejected"
+    ) {
+      return; // already terminal — no poll
+    }
+    const packetId = `pkt-v1-${r.id}`;
+    let ticks = 0;
+    let cancelled = false;
+    const interval = setInterval(async () => {
+      if (cancelled) return;
+      ticks += 1;
+      const status = await fetchPacketStatus(packetId);
+      if (cancelled) return;
+      if (status && status.ok && status.packetStatus) {
+        setPromoteState((current) => {
+          if (current.kind !== "opened") return current;
+          return { ...current, packetStatus: status.packetStatus };
+        });
+        if (
+          status.packetStatus === "rene-approved" ||
+          status.packetStatus === "rejected"
+        ) {
+          clearInterval(interval);
+          return;
+        }
+      }
+      if (ticks >= POLL_MAX_TICKS) clearInterval(interval);
+    }, POLL_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [
+    promoteState.kind,
+    promoteState.kind === "opened" ? promoteState.packetStatus : undefined,
+    r.id,
+  ]);
 
   return (
     <>
@@ -791,6 +882,16 @@ function FragmentRow({ r }: { r: ReceiptListItem }) {
             </span>
             {pill.detail && (
               <span style={{ color: DIM }}>{pill.detail}</span>
+            )}
+            {pill.permalink && (
+              <a
+                href={pill.permalink}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ marginLeft: 8, color: PILL_COLOR[pill.color] }}
+              >
+                Open thread →
+              </a>
             )}
             <span
               style={{ display: "block", marginTop: 2, color: DIM }}

@@ -303,7 +303,13 @@ describe("Phase 9 — approval-open behavior", () => {
     const body = (await res.json()) as {
       packet: { eligibility: { ok: boolean } };
       approval:
-        | { opened: true; id: string; status: string; requiredApprovers: string[] }
+        | {
+            opened: true;
+            id: string;
+            status: string;
+            requiredApprovers: string[];
+            permalink: string | null;
+          }
         | { opened: false; reason: string };
     };
     expect(body.packet.eligibility.ok).toBe(true);
@@ -312,6 +318,12 @@ describe("Phase 9 — approval-open behavior", () => {
       expect(body.approval.id).toMatch(/^[0-9a-f-]{36}$/i);
       expect(body.approval.status).toBe("pending");
       expect(body.approval.requiredApprovers).toEqual(["Rene"]);
+      // Phase 12 — permalink field is always present on eligible
+      // responses. In test env (SLACK_BOT_TOKEN unset → degraded
+      // mode), it's `null` — locked here so the no-fabrication
+      // contract holds: the route NEVER invents a Slack URL.
+      expect(body.approval).toHaveProperty("permalink");
+      expect(body.approval.permalink).toBeNull();
     }
   });
 

@@ -207,6 +207,15 @@ export type PromoteReviewState =
       approvalId: string;
       status: string;
       requiredApprovers: string[];
+      /** Phase 12 — Slack-thread permalink. `null` until resolved
+       *  (or when the bot token is missing / Slack rejected). The
+       *  pill renderer falls back to a non-link pill when null. */
+      permalink?: string | null;
+      /** Phase 12 — packet's current status, surfaced from the
+       *  status-read route during polling. Defaults to the closer's
+       *  pre-decision state (`"draft"`); flips to `"rene-approved"`
+       *  or `"rejected"` once the closer runs. */
+      packetStatus?: "draft" | "rene-approved" | "rejected";
     }
   | {
       kind: "draft-only";
@@ -231,6 +240,11 @@ export interface PromoteReviewPill {
   /** Optional second-line detail (e.g. truncated approval id). Empty
    *  string when no detail applies — keeps the renderer simple. */
   detail: string;
+  /** Phase 12 — Slack-thread permalink. `null` when not resolved
+   *  yet or in degraded mode. The pill renderer renders the
+   *  approval id as a clickable link when present, plain text
+   *  otherwise. NEVER fabricates. */
+  permalink?: string | null;
 }
 
 /**
@@ -269,11 +283,27 @@ export function derivePromoteReviewPill(
     case "opened": {
       const truncated = state.approvalId.slice(0, 8);
       const approvers = state.requiredApprovers.join(", ");
+      // Phase 12 — when `packetStatus` flips to a terminal state
+      // (closer ran), the label reflects Rene's decision. Color
+      // stays green for `rene-approved`; flips to amber on
+      // `rejected` so the operator sees the gap.
+      const labelStatus =
+        state.packetStatus === "rene-approved"
+          ? "Rene approved"
+          : state.packetStatus === "rejected"
+            ? "Rene rejected"
+            : `Approval opened · ${state.status}`;
+      const color: "green" | "amber" =
+        state.packetStatus === "rejected" ? "amber" : "green";
       return {
         variant: "opened",
-        label: `Approval opened · ${state.status}`,
-        color: "green",
+        label: labelStatus,
+        color,
         detail: `id: ${truncated}… · approvers: ${approvers || "(none)"}`,
+        permalink:
+          typeof state.permalink === "string" && state.permalink.length > 0
+            ? state.permalink
+            : null,
       };
     }
     case "draft-only": {

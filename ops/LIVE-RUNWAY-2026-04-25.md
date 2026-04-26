@@ -162,17 +162,18 @@ Potential code only if smoke fails:
 
 ### Lane B — Receipt-to-Rene approval promotion
 
-Phases 7-11 done. Phase 11 surfaces a "Request Rene review" button
-inline on `/ops/finance/review` per receipt. Click → POST
-`/api/ops/docs/receipt/promote-review` → response renders inline
-as a colored pill (green = approval opened with id+status+approvers;
-amber = draft-only with verbatim reason + missing-fields list; red
-= error with underlying message verbatim, no paraphrase).
+Phases 7-12 done. Phase 12 adds the Slack-thread permalink + per-row
+poll. The `/ops/finance/review` pill now flips to "Rene approved"
+(green) or "Rene rejected" (amber, deliberate gap signal) within
+30 seconds of Rene clicking in `#ops-approvals`, without a full
+page refresh. The green pill carries an "Open thread →" link
+straight to the Slack thread when the bot token is set; falls back
+to a non-link pill when degraded.
 
-Next sub-lane (Phase 12): Slack-thread permalink in the route's
-response so the green pill can deep-link to the approval's Slack
-thread in `#ops-approvals`. Optional: per-row poll so the operator
-sees `rene-approved`/`rejected` without a full page refresh.
+Next sub-lane (Phase 13): aggregate dashboard at `/ops/finance/
+review-packets` listing every packet with current status + approval
+id + last polled at. Operator sees the full pipeline state instead
+of one packet per row.
 
 Boundary:
 
@@ -181,7 +182,8 @@ Boundary:
 - Eligible packets open a Class B Rene approval. ✅ Done (Phase 9).
 - Closer transitions packet on Slack decide. ✅ Done (Phase 10).
 - UI button on /ops/finance/review. ✅ Done (Phase 11).
-- Slack-thread permalink + per-row poll — Phase 12.
+- Slack-thread permalink + per-row poll. ✅ Done (Phase 12).
+- Aggregate review-packets dashboard — Phase 13.
 - QBO posting remains a separate Rene-approved Class B/C action.
 - Do not auto-create bills, expenses, vendors, or categories.
 - Do not overwrite canonical receipt fields without explicit reviewer action.

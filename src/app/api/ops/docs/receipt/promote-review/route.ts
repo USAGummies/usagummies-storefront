@@ -55,9 +55,12 @@ import { isAuthorized } from "@/lib/ops/abra-auth";
 import { requestReceiptReviewPromotion } from "@/lib/ops/docs";
 import {
   buildApprovalRequest,
+  openApproval,
   UnknownActionError,
 } from "@/lib/ops/control-plane/approvals";
 import { approvalStore } from "@/lib/ops/control-plane/stores";
+import { approvalSurface } from "@/lib/ops/control-plane/slack";
+import { getPermalink } from "@/lib/ops/control-plane/slack/client";
 import type { ApprovalRequest } from "@/lib/ops/control-plane/types";
 import type { ReceiptReviewPacket } from "@/lib/ops/receipt-review-packet";
 
@@ -75,7 +78,13 @@ export const dynamic = "force-dynamic";
  * `actorAgentId` is `"ops-route:receipt-promote"` — this route is
  * operator-initiated, not autonomous-agent-initiated.
  */
-function buildPacketApproval(packet: ReceiptReviewPacket): ApprovalRequest {
+/**
+ * Build the param object passed to `openApproval` / `buildApprovalRequest`.
+ * Pure: same packet → same params (modulo the random `runId` suffix).
+ */
+function buildPacketApprovalParams(
+  packet: ReceiptReviewPacket,
+): Parameters<typeof buildApprovalRequest>[0] {
   // Build a compact, human-readable preview of what Rene is approving.
   const lines: string[] = [
     `Rene-review acknowledgment for receipt ${packet.receiptId}.`,
@@ -95,7 +104,7 @@ function buildPacketApproval(packet: ReceiptReviewPacket): ApprovalRequest {
     "Approval is review-only. NOT a QBO write — a separate `qbo.bill.create` runs later.",
   );
 
-  return buildApprovalRequest({
+  return {
     actionSlug: "receipt.review.promote",
     runId: `route:receipt-promote:${packet.packetId}:${randomUUID()}`,
     // Receipt review lives in the financials division (Rene-owned).
@@ -130,6 +139,23 @@ function buildPacketApproval(packet: ReceiptReviewPacket): ApprovalRequest {
     },
     rollbackPlan:
       "Reject the approval. The packet remains in `draft` status; canonical receipt fields are untouched and the receipt's `needs_review` status is preserved.",
+  };
+}
+
+/**
+ * Resolve the Slack thread permalink for an approval, when surfaced.
+ * Read-only — never posts. Returns `null` on any failure (Slack
+ * rejected, bot token missing, no thread recorded).
+ */
+async function resolveApprovalPermalink(
+  approval: ApprovalRequest,
+): Promise<string | null> {
+  const ts = approval.slackThread?.ts;
+  // Surface degraded mode returns ts: "" (locked in approval-surface.ts).
+  if (!ts) return null;
+  return getPermalink({
+    channel: approval.slackThread!.channel,
+    message_ts: ts,
   });
 }
 
@@ -185,6 +211,11 @@ export async function POST(req: Request): Promise<Response> {
       id: string;
       status: ApprovalRequest["status"];
       requiredApprovers: ApprovalRequest["requiredApprovers"];
+      /** Phase 12 — Slack permalink to the #ops-approvals thread.
+       *  `null` when SLACK_BOT_TOKEN is missing, the surface call
+       *  failed (degraded mode → ts: ""), or `chat.getPermalink`
+       *  rejected. Never invented; always read-only. */
+      permalink: string | null;
     } | { opened: false; reason: string };
 
     if (!packet.taxonomy.slug) {
@@ -220,16 +251,25 @@ export async function POST(req: Request): Promise<Response> {
           id: existing.id,
           status: existing.status,
           requiredApprovers: existing.requiredApprovers,
+          permalink: await resolveApprovalPermalink(existing),
         };
       } else {
         try {
-          const request = buildPacketApproval(packet);
-          await store.put(request);
+          // Phase 12: openApproval builds + stores + surfaces in one
+          // call. The surface populates `slackThread.ts` (or "" in
+          // degraded mode) so we can resolve a permalink immediately.
+          const params = buildPacketApprovalParams(packet);
+          const request = await openApproval(
+            store,
+            approvalSurface(),
+            params,
+          );
           approval = {
             opened: true,
             id: request.id,
             status: request.status,
             requiredApprovers: request.requiredApprovers,
+            permalink: await resolveApprovalPermalink(request),
           };
         } catch (err) {
           // Fail-soft: if the approval store throws or the slug isn't
