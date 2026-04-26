@@ -180,3 +180,95 @@ export function formatVendorCell(
   if (!value || value.trim().length === 0) return "—";
   return source === "ocr-suggested" ? `${value} (ocr)` : value;
 }
+
+// ---------------------------------------------------------------------------
+// Phase 14 — operator filters
+// ---------------------------------------------------------------------------
+//
+// Pure projection: takes a built `ReviewPacketsView` + a filter
+// spec and returns a new view with filtered rows + recomputed
+// counts. Same input → same output. The original view is not
+// mutated. Counts ALWAYS reflect the filtered rows verbatim — no
+// cached aggregates, no inflation.
+
+export interface ReviewPacketsFilterSpec {
+  /** Narrow to a single status. `"all"` (or undefined) = no filter. */
+  status?: ReviewPacketRowStatus | "all";
+  /** Case-insensitive substring match against the formatted
+   *  vendor cell. Empty / whitespace-only strings = no filter. */
+  vendorContains?: string;
+  /** ISO date or date-time. Inclusive lower bound on `createdAt`.
+   *  Unparseable values are treated as "no filter" (defensive —
+   *  the operator's keystroke shouldn't accidentally hide rows). */
+  createdAfter?: string;
+  /** Inclusive upper bound. Unparseable → no filter. */
+  createdBefore?: string;
+}
+
+/**
+ * Apply operator filters to a built view. Pure.
+ *
+ * Locked rules:
+ *   - `status: "all"` (or undefined) → all rows pass the status check.
+ *   - `vendorContains: ""` (or undefined / whitespace) → all rows pass.
+ *   - Vendor matching is case-insensitive AND tolerates the
+ *     `(ocr)` source suffix (so the operator's "belmark" matches
+ *     "Belmark Inc (ocr)" too).
+ *   - `createdAfter` / `createdBefore` use `Date.parse` — invalid
+ *     timestamps fall back to "no filter" (NEVER hides rows
+ *     unexpectedly).
+ *   - A row with an unparseable `createdAt` is treated as NOT
+ *     matching the date filter (defensive — we don't show data
+ *     we can't position in time).
+ *   - Counts are recomputed from the filtered rows verbatim.
+ */
+export function applyReviewPacketsFilters(
+  view: ReviewPacketsView,
+  spec: ReviewPacketsFilterSpec,
+): ReviewPacketsView {
+  const status =
+    spec.status && spec.status !== "all" ? spec.status : null;
+  const vendorNeedle =
+    typeof spec.vendorContains === "string" &&
+    spec.vendorContains.trim().length > 0
+      ? spec.vendorContains.trim().toLowerCase()
+      : null;
+  const afterMs = parseFilterDate(spec.createdAfter);
+  const beforeMs = parseFilterDate(spec.createdBefore);
+
+  const filtered = view.rows.filter((row) => {
+    if (status && row.status !== status) return false;
+    if (vendorNeedle) {
+      const haystack = formatVendorCell(row.vendor, row.vendorSource).toLowerCase();
+      if (!haystack.includes(vendorNeedle)) return false;
+    }
+    if (afterMs !== null || beforeMs !== null) {
+      const rowMs = Date.parse(row.createdAt);
+      if (!Number.isFinite(rowMs)) return false; // unparseable → excluded under any date filter
+      if (afterMs !== null && rowMs < afterMs) return false;
+      if (beforeMs !== null && rowMs > beforeMs) return false;
+    }
+    return true;
+  });
+
+  return {
+    rows: filtered,
+    counts: {
+      total: filtered.length,
+      draft: filtered.filter((r) => r.status === "draft").length,
+      reneApproved: filtered.filter((r) => r.status === "rene-approved").length,
+      rejected: filtered.filter((r) => r.status === "rejected").length,
+    },
+  };
+}
+
+/** Parse a filter date string. Returns `null` on missing /
+ *  whitespace / unparseable input — caller treats `null` as "no
+ *  filter". Pure. */
+function parseFilterDate(value: string | undefined): number | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return null;
+  const ms = Date.parse(trimmed);
+  return Number.isFinite(ms) ? ms : null;
+}

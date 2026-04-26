@@ -16,6 +16,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  applyReviewPacketsFilters,
   buildReviewPacketsView,
   formatAmountCell,
   formatVendorCell,
@@ -309,5 +310,263 @@ describe("formatVendorCell", () => {
     expect(formatVendorCell("OCR Vendor", "ocr-suggested")).toBe(
       "OCR Vendor (ocr)",
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 14 — applyReviewPacketsFilters (operator filters)
+// ---------------------------------------------------------------------------
+
+describe("applyReviewPacketsFilters", () => {
+  // Build a fixture view with one of each status + multiple vendors
+  // + spread createdAt values so each filter case has both
+  // matching and non-matching rows.
+  function fixture() {
+    return buildReviewPacketsView([
+      {
+        ...buildReceiptReviewPacket(
+          mkReceipt({
+            id: "r-belmark",
+            vendor: "Belmark Inc",
+            date: "2026-04-15",
+            amount: 250,
+            category: "supplies",
+          }),
+          { now: new Date("2026-04-15T00:00:00Z") },
+        ),
+        status: "draft",
+      },
+      {
+        ...buildReceiptReviewPacket(
+          mkReceipt({
+            id: "r-albanese",
+            vendor: "Albanese Confectionery",
+            date: "2026-04-20",
+            amount: 1200,
+            category: "supplies",
+          }),
+          { now: new Date("2026-04-20T00:00:00Z") },
+        ),
+        status: "rene-approved",
+      },
+      {
+        ...buildReceiptReviewPacket(
+          mkReceipt({
+            id: "r-uline",
+            vendor: "Uline",
+            date: "2026-04-22",
+            amount: 50,
+            category: "supplies",
+          }),
+          { now: new Date("2026-04-22T00:00:00Z") },
+        ),
+        status: "rejected",
+      },
+      {
+        ...buildReceiptReviewPacket(
+          mkReceipt({
+            id: "r-belmark2",
+            vendor: "Belmark Inc",
+            date: "2026-04-23",
+            amount: 100,
+            category: "supplies",
+          }),
+          { now: new Date("2026-04-23T00:00:00Z") },
+        ),
+        status: "rene-approved",
+      },
+    ]);
+  }
+
+  it("no spec / all-defaults → returns the input view verbatim", () => {
+    const v = fixture();
+    const filtered = applyReviewPacketsFilters(v, {});
+    expect(filtered.rows.length).toBe(v.rows.length);
+    expect(filtered.counts).toEqual(v.counts);
+  });
+
+  it("status filter narrows rows + recomputes counts", () => {
+    const v = fixture();
+    const filtered = applyReviewPacketsFilters(v, { status: "rene-approved" });
+    expect(filtered.rows.every((r) => r.status === "rene-approved")).toBe(true);
+    expect(filtered.counts).toEqual({
+      total: 2,
+      draft: 0,
+      reneApproved: 2,
+      rejected: 0,
+    });
+  });
+
+  it("status: 'all' → no filter applied (same as undefined)", () => {
+    const v = fixture();
+    const filteredAll = applyReviewPacketsFilters(v, { status: "all" });
+    expect(filteredAll.counts).toEqual(v.counts);
+  });
+
+  it("vendor substring filter is case-insensitive", () => {
+    const v = fixture();
+    const filtered = applyReviewPacketsFilters(v, {
+      vendorContains: "BELmark",
+    });
+    expect(filtered.rows.length).toBe(2);
+    expect(
+      filtered.rows.every((r) => r.vendor?.toLowerCase().includes("belmark")),
+    ).toBe(true);
+  });
+
+  it("vendor substring filter tolerates the (ocr) suffix on OCR-suggested cells", () => {
+    const v = buildReviewPacketsView([
+      {
+        ...buildReceiptReviewPacket(
+          mkReceipt({
+            id: "r-ocr",
+            ocr_suggestion: mkOcr({ vendor: "Belmark Inc" }),
+          }),
+          { now: new Date("2026-04-25T00:00:00Z") },
+        ),
+        status: "draft",
+      },
+    ]);
+    // The vendor source is ocr-suggested; the formatted cell reads
+    // "Belmark Inc (ocr)". The operator's "belmark" should still match.
+    const filtered = applyReviewPacketsFilters(v, {
+      vendorContains: "belmark",
+    });
+    expect(filtered.rows.length).toBe(1);
+  });
+
+  it("vendor substring with whitespace-only / empty → no filter applied", () => {
+    const v = fixture();
+    expect(applyReviewPacketsFilters(v, { vendorContains: "" }).counts).toEqual(
+      v.counts,
+    );
+    expect(
+      applyReviewPacketsFilters(v, { vendorContains: "   " }).counts,
+    ).toEqual(v.counts);
+  });
+
+  it("createdAfter filter excludes rows before the threshold", () => {
+    const v = fixture();
+    const filtered = applyReviewPacketsFilters(v, {
+      createdAfter: "2026-04-21",
+    });
+    // Drops r-belmark (2026-04-15) + r-albanese (2026-04-20).
+    expect(filtered.rows.length).toBe(2);
+    expect(
+      filtered.rows.every((r) => Date.parse(r.createdAt) >= Date.parse("2026-04-21")),
+    ).toBe(true);
+  });
+
+  it("createdBefore filter excludes rows after the threshold", () => {
+    const v = fixture();
+    const filtered = applyReviewPacketsFilters(v, {
+      createdBefore: "2026-04-21",
+    });
+    // Keeps r-belmark + r-albanese.
+    expect(filtered.rows.length).toBe(2);
+  });
+
+  it("date range (after + before) narrows correctly", () => {
+    const v = fixture();
+    const filtered = applyReviewPacketsFilters(v, {
+      createdAfter: "2026-04-19",
+      createdBefore: "2026-04-22",
+    });
+    // Keeps r-albanese (04-20) + r-uline (04-22).
+    expect(filtered.rows.length).toBe(2);
+  });
+
+  it("unparseable createdAfter / createdBefore → no filter applied (defensive)", () => {
+    const v = fixture();
+    const filtered = applyReviewPacketsFilters(v, {
+      createdAfter: "not-a-date",
+      createdBefore: "also-not-a-date",
+    });
+    expect(filtered.counts).toEqual(v.counts);
+  });
+
+  it("combined filters AND together (status + vendor + date)", () => {
+    const v = fixture();
+    const filtered = applyReviewPacketsFilters(v, {
+      status: "rene-approved",
+      vendorContains: "belmark",
+      createdAfter: "2026-04-22",
+    });
+    // Only r-belmark2 (rene-approved, Belmark, 04-23) matches.
+    expect(filtered.rows.length).toBe(1);
+    expect(filtered.rows[0].receiptId).toBe("r-belmark2");
+    expect(filtered.counts).toEqual({
+      total: 1,
+      draft: 0,
+      reneApproved: 1,
+      rejected: 0,
+    });
+  });
+
+  it("filter that excludes everything → empty rows + zero counts (no fabrication)", () => {
+    const v = fixture();
+    const filtered = applyReviewPacketsFilters(v, {
+      vendorContains: "no-such-vendor-anywhere",
+    });
+    expect(filtered.rows).toEqual([]);
+    expect(filtered.counts).toEqual({
+      total: 0,
+      draft: 0,
+      reneApproved: 0,
+      rejected: 0,
+    });
+  });
+
+  it("does NOT mutate the input view", () => {
+    const v = fixture();
+    const before = JSON.stringify(v);
+    applyReviewPacketsFilters(v, {
+      status: "draft",
+      vendorContains: "belmark",
+      createdAfter: "2026-04-22",
+    });
+    expect(JSON.stringify(v)).toBe(before);
+  });
+
+  it("pure: same input + same spec → same output", () => {
+    const v = fixture();
+    const spec = {
+      status: "rene-approved" as const,
+      vendorContains: "belmark",
+    };
+    const a = applyReviewPacketsFilters(v, spec);
+    const b = applyReviewPacketsFilters(v, spec);
+    expect(a).toEqual(b);
+  });
+
+  it("rows whose createdAt is unparseable get excluded under any date filter (no silent inclusion)", () => {
+    const v: ReturnType<typeof buildReviewPacketsView> = {
+      rows: [
+        {
+          packetId: "pkt-v1-bad",
+          packetIdShort: "pkt-v1-bad",
+          receiptId: "r-bad",
+          status: "draft",
+          color: "amber",
+          vendor: "Whatever",
+          vendorSource: "canonical",
+          amountUsd: 1,
+          amountSource: "canonical",
+          eligibilityOk: false,
+          eligibilityMissing: ["date"],
+          createdAt: "not-a-date",
+        },
+      ],
+      counts: {
+        total: 1,
+        draft: 1,
+        reneApproved: 0,
+        rejected: 0,
+      },
+    };
+    const filtered = applyReviewPacketsFilters(v, {
+      createdAfter: "2026-04-01",
+    });
+    expect(filtered.rows.length).toBe(0);
   });
 });

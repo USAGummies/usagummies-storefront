@@ -162,17 +162,16 @@ Potential code only if smoke fails:
 
 ### Lane B — Receipt-to-Rene approval promotion
 
-Phases 7-13 done. Phase 13 adds the aggregate dashboard at
-`/ops/finance/review-packets` showing every receipt review packet
-with current status, vendor, amount, eligibility, and creation
-time. Counts strip summarizes the queue (`N packets · X draft · Y
-rene-approved · Z rejected`). New list route
-`GET /api/ops/docs/receipt-review-packets` powers it; auth-gated,
-read-only, limit-clamped, no-fabrication on outage.
+Phases 7-14 done. Phase 14 adds operator filters (status / vendor /
+date range) + an inline Re-promote button per row on the aggregate
+dashboard. Filters run client-side via a pure helper so the entire
+projection is unit-testable. The Re-promote button reuses the
+existing Phase 9 route — no new write paths landed.
 
-Next sub-lane (Phase 14): operator-driven filters on the dashboard
-(status / vendor / date range) + an inline "Re-promote" button on
-each row that calls the existing Phase 9 route. No new write paths.
+Next sub-lane (Phase 15): server-side filtering on the list route
+(push the filter spec into the query string for larger datasets) +
+optional passive poll on the aggregate dashboard so the operator
+sees closer transitions without clicking Refresh.
 
 Boundary:
 
@@ -183,7 +182,8 @@ Boundary:
 - UI button on /ops/finance/review. ✅ Done (Phase 11).
 - Slack-thread permalink + per-row poll. ✅ Done (Phase 12).
 - Aggregate review-packets dashboard. ✅ Done (Phase 13).
-- Filters + inline re-promote — Phase 14.
+- Filters + inline re-promote. ✅ Done (Phase 14).
+- Server-side filtering + passive poll — Phase 15.
 - QBO posting remains a separate Rene-approved Class B/C action.
 - Do not auto-create bills, expenses, vendors, or categories.
 - Do not overwrite canonical receipt fields without explicit reviewer action.
