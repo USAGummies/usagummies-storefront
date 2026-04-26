@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import ContactForm from "@/components/forms/ContactForm";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
+import { PageHero } from "@/components/lp/PageHero";
 
 function resolveSiteUrl() {
   const preferred = "https://www.usagummies.com";
@@ -41,9 +42,36 @@ export const metadata: Metadata = {
   },
 };
 
+const SECTIONS = [
+  {
+    title: "Free shipping",
+    body:
+      "Free shipping on 5+ bags. The product page and cart will reflect this automatically.",
+  },
+  {
+    title: "Processing time",
+    body:
+      "Orders ship within 24 hours. If an order is placed after the daily carrier pickup time or on weekends/holidays, it ships the next business day. We prep and label orders within 24 hours.",
+  },
+  {
+    title: "Delivery time",
+    body:
+      "Delivery speed depends on the carrier and destination. Most customers receive orders within 2–7 business days after shipment.",
+  },
+  {
+    title: "Tracking",
+    body: "Tracking details are sent within 24 hours of your order.",
+  },
+  {
+    title: "Shipping issues",
+    body:
+      "If your package is delayed, missing, or arrives damaged, contact us using the form below. We'll make it right.",
+  },
+];
+
 export default function ShippingPolicyPage() {
   return (
-    <main className="min-h-screen text-[var(--text)]">
+    <main>
       <BreadcrumbJsonLd
         items={[
           { name: "Home", href: "/" },
@@ -51,91 +79,67 @@ export default function ShippingPolicyPage() {
           { name: "Shipping", href: "/policies/shipping" },
         ]}
       />
-      <div className="mx-auto max-w-4xl px-4 py-10">
-        <div className="mb-6 flex items-center justify-between gap-3">
-          <Link
-            href="/policies"
-            className="rounded-full border border-[var(--border)] bg-white px-3 py-1 text-sm text-[var(--text)] hover:bg-[var(--surface-strong)]"
-          >
-            Policies
-          </Link>
-          <Link
-            href="/shop"
-            className="rounded-full border border-[var(--border)] bg-white px-3 py-1 text-sm text-[var(--text)] hover:bg-[var(--surface-strong)]"
-          >
-            Shop USA Gummies
-          </Link>
+
+      <PageHero
+        eyebrow="Policies"
+        headline="Shipping"
+        scriptAccent="policy."
+        sub="Orders ship within 24 hours, with tracking sent fast. Free shipping on 5+ bags."
+      />
+
+      <section className="bg-[var(--lp-cream)]">
+        <div className="mx-auto max-w-[820px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="lp-sans space-y-6 text-[1.02rem] leading-[1.7] text-[var(--lp-ink)]/88">
+            {SECTIONS.map((section) => (
+              <div key={section.title} className="border-b-2 border-[var(--lp-ink)]/15 pb-6 last:border-b-0">
+                <h2 className="lp-display text-[1.5rem] text-[var(--lp-ink)]">{section.title}</h2>
+                <p className="mt-3">{section.body}</p>
+              </div>
+            ))}
+          </div>
         </div>
+      </section>
 
-        <section className="candy-panel p-7">
-          <h1 className="text-3xl font-semibold tracking-tight">Shipping Policy</h1>
-          <p className="mt-3 text-[var(--muted)]">
-            This shipping policy keeps delivery simple and predictable. Orders ship within 24 hours,
-            with tracking sent fast. Savings pricing is clear on every product page, plus shipping
-            updates. Free shipping on 5+ bags.
-          </p>
-
-          <div className="mt-8 divide-y divide-[var(--border)] text-[var(--muted)]">
-            <div className="py-4">
-              <h2 className="text-lg font-semibold text-[var(--text)]">Free shipping</h2>
-              <p className="mt-2 text-sm text-[var(--muted)]">
-                Free shipping on 5+ bags.
-                The product page and cart will reflect this automatically.
-              </p>
-            </div>
-
-            <div className="py-4">
-              <h2 className="text-lg font-semibold text-[var(--text)]">Processing time</h2>
-              <p className="mt-2 text-sm text-[var(--muted)]">
-                Orders ship within <strong className="text-[var(--text)]">24 hours</strong>.
-                If an order is placed after the daily carrier pickup time or on weekends/holidays,
-                it ships the next business day. We prep and label orders within 24 hours.
-              </p>
-            </div>
-
-            <div className="py-4">
-              <h2 className="text-lg font-semibold text-[var(--text)]">Delivery time</h2>
-              <p className="mt-2 text-sm text-[var(--muted)]">
-                Delivery speed depends on the carrier and destination. Most customers receive orders
-                within <strong className="text-[var(--text)]">2–7 business days</strong> after shipment.
-              </p>
-            </div>
-
-            <div className="py-4">
-              <h2 className="text-lg font-semibold text-[var(--text)]">Tracking</h2>
-              <p className="mt-2 text-sm text-[var(--muted)]">
-                Tracking details are sent within 24 hours of your order.
-              </p>
-            </div>
-
-            <div className="py-4">
-              <h2 className="text-lg font-semibold text-[var(--text)]">Shipping issues</h2>
-              <p className="mt-2 text-sm text-[var(--muted)]">
-                If your package is delayed, missing, or arrives damaged, contact us using the form below.
-                We’ll make it right.
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-10 border-t border-[var(--border)] pt-8">
-            <h2 className="text-xl font-semibold">Contact us</h2>
-            <p className="mt-2 text-[var(--muted)]">
-              Shipping question? Send a message and we’ll respond within one business day.
+      <section className="bg-[var(--lp-cream-soft)] border-y-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[820px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="mb-8 text-center">
+            <p className="lp-label mb-2 text-[var(--lp-red)]">★ Get In Touch ★</p>
+            <h2 className="lp-display text-[clamp(2rem,5vw,3rem)] text-[var(--lp-ink)]">
+              Shipping
+              <br />
+              <span className="lp-script text-[var(--lp-red)]">questions?</span>
+            </h2>
+            <p className="lp-sans mx-auto mt-4 max-w-[52ch] text-[1rem] leading-[1.6] text-[var(--lp-ink)]/82">
+              Send a message and we&rsquo;ll respond within one business day.
             </p>
+          </div>
+          <div
+            className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6 sm:p-7"
+            style={{ boxShadow: "5px 5px 0 var(--lp-red)" }}
+          >
+            <ContactForm context="Shipping Policy Question" />
+          </div>
+        </div>
+      </section>
 
-            <div className="mt-5">
-              <ContactForm context="Shipping Policy Question" />
-            </div>
-          </div>
-          <div className="mt-6 text-sm text-[var(--muted)]">
-            Browse the full lineup:{" "}
-            <Link href="/shop" className="underline underline-offset-4 text-[var(--text)]">
-              shop all-natural USA Gummies
+      <section className="bg-[var(--lp-cream-soft)] border-t-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[900px] px-5 py-14 text-center sm:px-8 sm:py-16">
+          <p className="lp-label mb-3 text-[var(--lp-red)]">★ Browse the Lineup ★</p>
+          <h2 className="lp-display text-[clamp(2rem,5vw,3rem)] text-[var(--lp-ink)]">
+            Shop all-natural
+            <br />
+            <span className="lp-script text-[var(--lp-red)]">USA Gummies.</span>
+          </h2>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+            <Link href="/shop" className="lp-cta">
+              Shop USA Gummies
             </Link>
-            .
+            <Link href="/policies" className="lp-cta lp-cta-light">
+              All policies
+            </Link>
           </div>
-        </section>
-      </div>
+        </div>
+      </section>
     </main>
   );
 }

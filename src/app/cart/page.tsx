@@ -1,10 +1,11 @@
 // src/app/cart/page.tsx
+// LIVE COMMERCE — preserves CartView, ReviewsSummary client logic. Wraps the
+// existing markup in a PageHero + cream section. Do not change cart behavior.
 import type { Metadata } from "next";
-import Link from "next/link";
 import { getCart } from "@/lib/cart";
 import { CartView } from "@/components/ui/CartView";
 import { ReviewsSummary } from "@/components/reviews/ReviewsSummary";
-import { PatriotBanner } from "@/components/ui/PatriotBanner";
+import { PageHero } from "@/components/lp/PageHero";
 
 function resolveSiteUrl() {
   const preferred = "https://www.usagummies.com";
@@ -53,39 +54,26 @@ export default async function CartPage() {
   }
 
   return (
-    <main className="relative overflow-hidden text-[var(--text)] min-h-screen pb-16">
+    <main>
       <h1 className="sr-only">Cart</h1>
-      <div className="mx-auto max-w-6xl px-4 pt-6">
-        {/* Top nav */}
-        <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-[#1B2A4A]/70">
-          <div className="flex items-center gap-2">
-            <Link href="/" className="link-underline text-[#1B2A4A]/70 hover:text-[#1B2A4A]">
-              Home
-            </Link>
-            <span>›</span>
-            <span className="font-black text-[#1B2A4A]">Cart</span>
-          </div>
 
-          <div className="flex gap-2">
-            <Link className="btn btn-outline" href="/shop#bundle-pricing">
-              Shop now
-            </Link>
-          </div>
-        </div>
+      <PageHero
+        eyebrow="Your Cart"
+        headline="Review"
+        scriptAccent="your bags."
+        sub="Adjust quantities, apply codes, and head to secure checkout when you're ready."
+        ctas={[{ href: "/shop", label: "Keep shopping", variant: "light" }]}
+      />
 
-        {/* Hero + mission */}
-        <div className="mt-4">
-          <PatriotBanner showRibbon={false} />
-        </div>
-
-        <div className="mt-6">
+      <section className="bg-[var(--lp-cream)]">
+        <div className="mx-auto max-w-[1100px] px-5 py-12 sm:px-8 sm:py-16">
           <CartView cart={cart} />
-        </div>
 
-        <div className="mt-6">
-          <ReviewsSummary />
+          <div className="mt-10">
+            <ReviewsSummary />
+          </div>
         </div>
-      </div>
+      </section>
     </main>
   );
 }

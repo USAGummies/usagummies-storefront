@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import Image from "next/image";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
+import { PageHero } from "@/components/lp/PageHero";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 
 function resolveSiteUrl() {
@@ -84,152 +84,150 @@ const BENEFITS = [
 
 export default function JoinTheRevolutionPage() {
   return (
-    <main className="relative overflow-hidden text-[var(--text)] min-h-screen home-candy">
-      <section className="relative overflow-hidden">
-        <div
-          className="absolute inset-0 pointer-events-none"
-          aria-hidden="true"
-          style={{
-            backgroundImage:
-              "radial-gradient(circle at 12% 18%, rgba(255,77,79,0.14), transparent 48%), radial-gradient(circle at 85% 5%, rgba(255,199,44,0.14), transparent 38%)",
-            opacity: 0.5,
-          }}
-        />
-        <div className="relative mx-auto max-w-6xl px-4 py-10">
-          <BreadcrumbJsonLd
-            items={[
-              { name: "Home", href: "/" },
-              { name: "Join the Revolution", href: "/join-the-revolution" },
-            ]}
-          />
+    <main>
+      <BreadcrumbJsonLd
+        items={[
+          { name: "Home", href: "/" },
+          { name: "Join the Revolution", href: "/join-the-revolution" },
+        ]}
+      />
 
-          <div className="candy-panel rounded-[36px] border border-[var(--border)] p-6 sm:p-8">
-            <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
-              <div className="space-y-4">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.32em] text-[var(--muted)]">
-                  Loyalty access
-                </div>
-                <h1 className="text-3xl font-black leading-[1.1] tracking-tight text-[var(--text)] sm:text-4xl lg:text-5xl">
-                  Join the Revolution
-                </h1>
-                <p className="text-sm text-[var(--muted)] sm:text-base max-w-prose">
-                  Purchasing these gummies is a vote in the America you believe in. The American Dream
-                  is something to always strive for and try to achieve. Join the Revolution by choosing
-                  USA Gummies and unlock member benefits after your first order.
+      <PageHero
+        eyebrow="Loyalty Access"
+        headline="Join the"
+        scriptAccent="revolution."
+        sub="Purchasing these gummies is a vote in the America you believe in. Join the Revolution by choosing USA Gummies and unlock member benefits after your first order."
+        ctas={[
+          { href: "/shop", label: "Shop now" },
+          { href: "/faq", label: "Read the FAQ", variant: "light" },
+        ]}
+      />
+
+      <section className="bg-[var(--lp-cream)]">
+        <div className="mx-auto max-w-[1100px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="mb-10 text-center">
+            <p className="lp-label mb-2 text-[var(--lp-red)]">★ How It Works ★</p>
+            <h2 className="lp-display text-[clamp(2rem,5vw,3rem)] text-[var(--lp-ink)]">
+              Three steps to
+              <br />
+              <span className="lp-script text-[var(--lp-red)]">membership.</span>
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+            {STEPS.map((step, i) => (
+              <div
+                key={step.title}
+                className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6"
+                style={{ boxShadow: i === 0 ? "5px 5px 0 var(--lp-red)" : "5px 5px 0 var(--lp-ink)" }}
+              >
+                <h3 className="lp-display text-[1.3rem] leading-tight text-[var(--lp-ink)]">
+                  {step.title}
+                </h3>
+                <p className="lp-sans mt-3 text-[0.95rem] leading-[1.55] text-[var(--lp-ink)]/82">
+                  {step.body}
                 </p>
-                <div className="flex flex-wrap items-center gap-3">
-                  <Link href="/shop" className="btn btn-candy">
-                    Shop now
-                  </Link>
-                  <span className="text-xs text-[var(--muted)]">{FREE_SHIPPING_PHRASE}</span>
-                </div>
               </div>
+            ))}
+          </div>
+          <p className="lp-label mt-6 text-center text-[var(--lp-ink)]/70">
+            {FREE_SHIPPING_PHRASE}
+          </p>
+        </div>
+      </section>
 
-              <div className="relative">
-                <div className="relative rounded-3xl border border-[var(--border)] bg-white p-2 text-[var(--text)] shadow-[0_20px_48px_rgba(15,27,45,0.12)]">
-                  <div className="relative aspect-[5/4] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-3">
-                    <Image
-                      src="/brand/usa-gummies-family.webp"
-                      alt="USA Gummies all-American gummy bear bags"
-                      fill
-                      sizes="(max-width: 768px) 90vw, 460px"
-                      className="object-contain"
-                    />
-                  </div>
-                  <div className="mt-2 space-y-1">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
-                      All American gummy bears
-                    </div>
-                    <div className="text-sm text-[var(--muted)]">
-                      All natural flavors, no artificial dyes or synthetic colors.
-                    </div>
-                    <div className="flex flex-wrap gap-2 pt-2">
-                      <span className="badge badge--navy">Made in USA</span>
-                      <span className="badge badge--navy">Classic gummy bear flavor</span>
-                    </div>
-                  </div>
-                </div>
+      <section className="bg-[var(--lp-cream-soft)] border-y-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[1100px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="mb-10 text-center">
+            <p className="lp-label mb-2 text-[var(--lp-red)]">★ Member Benefits ★</p>
+            <h2 className="lp-display text-[clamp(2rem,5vw,3rem)] text-[var(--lp-ink)]">
+              Worth
+              <br />
+              <span className="lp-script text-[var(--lp-red)]">joining.</span>
+            </h2>
+            <p className="lp-sans mx-auto mt-4 max-w-[52ch] text-[1rem] leading-[1.6] text-[var(--lp-ink)]/82">
+              USA Gummies members get priority access and premium perks that reward loyal buyers of
+              our All American gummy bears.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            {BENEFITS.map((benefit, i) => (
+              <div
+                key={benefit.title}
+                className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6"
+                style={{ boxShadow: i === 0 ? "5px 5px 0 var(--lp-red)" : "5px 5px 0 var(--lp-ink)" }}
+              >
+                <h3 className="lp-display text-[1.3rem] leading-tight text-[var(--lp-ink)]">
+                  {benefit.title}
+                </h3>
+                <p className="lp-sans mt-3 text-[0.95rem] leading-[1.55] text-[var(--lp-ink)]/82">
+                  {benefit.body}
+                </p>
               </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-[var(--lp-cream)]">
+        <div className="mx-auto max-w-[900px] px-5 py-14 sm:px-8 sm:py-20">
+          <div
+            className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-7 sm:p-8"
+            style={{ boxShadow: "5px 5px 0 var(--lp-red)" }}
+          >
+            <p className="lp-label text-[var(--lp-red)]">★ Member Portal ★</p>
+            <h2 className="lp-display mt-3 text-[1.8rem] leading-tight text-[var(--lp-ink)] sm:text-[2.2rem]">
+              Member access launches after your first purchase.
+            </h2>
+            <p className="lp-sans mt-4 text-[1rem] leading-[1.65] text-[var(--lp-ink)]/85">
+              Place your first order and you are in. We will email your sign-in link as soon as the
+              Revolution portal is live.
+            </p>
+
+            <div className="mt-6 border-2 border-[var(--lp-ink)] bg-[var(--lp-cream-soft)] p-5">
+              <p className="lp-label text-[var(--lp-ink)]">★ What members get ★</p>
+              <ul className="lp-sans mt-3 space-y-2 text-[0.95rem] text-[var(--lp-ink)]/85">
+                <li className="flex gap-2">
+                  <span className="text-[var(--lp-red)]">★</span>
+                  <span>Order history tied to your checkout email</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="text-[var(--lp-red)]">★</span>
+                  <span>Subscription eligibility after your first order</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="text-[var(--lp-red)]">★</span>
+                  <span>Early drops and premium savings alerts</span>
+                </li>
+              </ul>
             </div>
 
-            <div className="mt-6 grid gap-3 sm:grid-cols-3">
-              {STEPS.map((step) => (
-                <div key={step.title} className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-4">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
-                    {step.title}
-                  </div>
-                  <div className="mt-2 text-sm text-[var(--muted)]">{step.body}</div>
-                </div>
-              ))}
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Link href="/shop" className="lp-cta">
+                Shop now
+              </Link>
+              <Link href="/faq" className="lp-cta lp-cta-light">
+                Read the FAQ
+              </Link>
             </div>
           </div>
+        </div>
+      </section>
 
-          <div className="mt-6 grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
-            <div className="candy-panel rounded-[32px] border border-[var(--border)] p-5 sm:p-6">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-                Member benefits
-              </div>
-              <h2 className="mt-2 text-2xl font-black text-[var(--text)]">
-                Benefits that make joining worth it.
-              </h2>
-              <p className="mt-2 text-sm text-[var(--muted)]">
-                USA Gummies members get priority access and premium perks that reward loyal buyers of
-                our All American gummy bears.
-              </p>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                {BENEFITS.map((benefit) => (
-                  <div
-                    key={benefit.title}
-                    className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-4"
-                  >
-                    <div className="text-sm font-semibold text-[var(--text)]">{benefit.title}</div>
-                    <div className="mt-2 text-sm text-[var(--muted)]">{benefit.body}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="candy-panel rounded-[32px] border border-[var(--border)] p-5 sm:p-6">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-                Member portal
-              </div>
-              <h2 className="mt-2 text-2xl font-black text-[var(--text)]">
-                Member access launches after purchase.
-              </h2>
-              <p className="mt-2 text-sm text-[var(--muted)]">
-                Place your first order and you are in. We will email your sign-in link as soon as the
-                Revolution portal is live.
-              </p>
-              <div className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-4">
-                <div className="text-xs font-semibold text-[var(--text)]">What members get</div>
-                <ul className="mt-2 space-y-1 text-xs text-[var(--muted)]">
-                  <li>Order history tied to your checkout email</li>
-                  <li>Subscription eligibility after your first order</li>
-                  <li>Early drops and premium savings alerts</li>
-                </ul>
-              </div>
-
-              <div className="mt-5 border-t border-[var(--border)] pt-5">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-                  How you qualify
-                </div>
-                <h3 className="mt-2 text-xl font-black text-[var(--text)]">
-                  Membership unlocks after purchase.
-                </h3>
-                <p className="mt-2 text-sm text-[var(--muted)]">
-                  Place your first order for USA Gummies and you are in. Subscriptions are reserved
-                  for members who have already purchased.
-                </p>
-                <div className="mt-3 flex flex-wrap gap-3">
-                  <Link href="/shop" className="btn btn-candy">
-                    Shop now
-                  </Link>
-                  <Link href="/faq" className="btn btn-outline">
-                    Read the FAQ
-                  </Link>
-                </div>
-              </div>
-            </div>
+      <section className="bg-[var(--lp-cream-soft)] border-t-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[900px] px-5 py-14 text-center sm:px-8 sm:py-16">
+          <p className="lp-label mb-3 text-[var(--lp-red)]">★ A Vote for America ★</p>
+          <h2 className="lp-display text-[clamp(2rem,5vw,3rem)] text-[var(--lp-ink)]">
+            All natural.
+            <br />
+            <span className="lp-script text-[var(--lp-red)]">All American.</span>
+          </h2>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+            <Link href="/shop" className="lp-cta">
+              Shop USA Gummies
+            </Link>
+            <Link href="/about" className="lp-cta lp-cta-light">
+              Our story
+            </Link>
           </div>
         </div>
       </section>

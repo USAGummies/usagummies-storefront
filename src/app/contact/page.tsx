@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import Image from "next/image";
 import ContactForm from "@/components/forms/ContactForm";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
+import { PageHero } from "@/components/lp/PageHero";
 
 function resolveSiteUrl() {
   const preferred = "https://www.usagummies.com";
@@ -42,9 +42,32 @@ export const metadata: Metadata = {
   },
 };
 
+const HELP_TILES = [
+  {
+    title: "Fast response",
+    copy: "We reply within one business day on weekdays.",
+  },
+  {
+    title: "Order help",
+    copy: "Include your order number for faster support.",
+  },
+  {
+    title: "Shipping & guarantee",
+    copy: "See our policies for timing and how we make it right.",
+    link: "/policies",
+  },
+];
+
+const TOPICS = [
+  "Order questions",
+  "Shipping & delivery",
+  "Damaged or incorrect items",
+  "Wholesale / partnerships",
+];
+
 export default function ContactPage() {
   return (
-    <main className="min-h-screen text-[var(--text)]">
+    <main>
       <BreadcrumbJsonLd
         items={[
           { name: "Home", href: "/" },
@@ -52,95 +75,87 @@ export default function ContactPage() {
         ]}
       />
 
-      {/* ── HERO ── */}
-      <section className="relative flex min-h-[260px] items-center justify-center overflow-hidden bg-[#1B2A4A] sm:min-h-[320px]">
-        <Image
-          src="/brand/americana/crossing-freedom.jpg"
-          alt="USA Gummies brand background"
-          fill
-          priority
-          sizes="100vw"
-          className="object-cover opacity-30"
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#1B2A4A]/50 to-[#1B2A4A]/80" />
-        <div className="relative z-10 flex flex-col items-center gap-3 px-4 text-center">
-          <Image
-            src="/brand/logo-full.png"
-            alt="USA Gummies logo"
-            width={180}
-            height={115}
-            className="h-auto w-[120px] sm:w-[160px]"
-          />
-          <h1 className="font-display text-3xl font-black text-white sm:text-4xl lg:text-5xl">
-            Contact Us
-          </h1>
-          <p className="max-w-md text-sm text-white/80">
-            We reply within one business day.
-          </p>
-        </div>
-      </section>
+      <PageHero
+        eyebrow="Contact"
+        headline="Talk to"
+        scriptAccent="us."
+        sub="Customer support or business inquiries — we reply within one business day."
+      />
 
-      <div className="mx-auto max-w-4xl px-4 py-10">
-        <section className="candy-panel p-7">
-          <p className="text-[var(--muted)]">
-            Customer support or business inquiries — send a message below.
-          </p>
-
-          <div className="mt-6 grid gap-3 sm:grid-cols-3">
-            {[
-              {
-                title: "Fast response",
-                copy: "We reply within one business day on weekdays.",
-              },
-              {
-                title: "Order help",
-                copy: "Include your order number for faster support.",
-              },
-              {
-                title: "Shipping & satisfaction guarantee",
-                copy: "See our policies for timing and how we make it right.",
-                link: "/policies",
-              },
-            ].map((item) => (
+      <section className="bg-[var(--lp-cream)]">
+        <div className="mx-auto max-w-[1100px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+            {HELP_TILES.map((item, i) => (
               <div
                 key={item.title}
-                className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-4 text-sm text-[var(--muted)]"
+                className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6"
+                style={{ boxShadow: i === 0 ? "5px 5px 0 var(--lp-red)" : "5px 5px 0 var(--lp-ink)" }}
               >
-                <div className="text-sm font-semibold text-[var(--text)]">{item.title}</div>
-                <div className="mt-2">
+                <h3 className="lp-display text-[1.3rem] leading-tight text-[var(--lp-ink)]">
+                  {item.title}
+                </h3>
+                <p className="lp-sans mt-3 text-[0.95rem] leading-[1.55] text-[var(--lp-ink)]/82">
                   {item.copy}{" "}
                   {item.link ? (
-                    <Link href={item.link} className="underline underline-offset-4">
+                    <Link
+                      href={item.link}
+                      className="text-[var(--lp-red)] underline underline-offset-4"
+                    >
                       View policies
                     </Link>
                   ) : null}
-                </div>
+                </p>
               </div>
             ))}
           </div>
+        </div>
+      </section>
 
-          <div className="mt-6 border-t border-[var(--border)] pt-5 text-sm text-[var(--muted)]">
-            <div className="font-semibold text-[var(--text)]">What can we help with?</div>
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-[var(--muted)]">
-              <li>Order questions</li>
-              <li>Shipping & delivery</li>
-              <li>Damaged or incorrect items</li>
-              <li>Wholesale / partnerships</li>
+      <section className="bg-[var(--lp-cream-soft)] border-y-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[820px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="mb-8 text-center">
+            <p className="lp-label mb-2 text-[var(--lp-red)]">★ Send a Message ★</p>
+            <h2 className="lp-display text-[clamp(2rem,5vw,3rem)] text-[var(--lp-ink)]">
+              How can we
+              <br />
+              <span className="lp-script text-[var(--lp-red)]">help?</span>
+            </h2>
+            <ul className="lp-sans mx-auto mt-6 grid max-w-[480px] grid-cols-2 gap-x-6 gap-y-2 text-left text-[0.95rem] text-[var(--lp-ink)]/82">
+              {TOPICS.map((topic) => (
+                <li key={topic} className="flex items-start gap-2">
+                  <span className="text-[var(--lp-red)]">★</span>
+                  <span>{topic}</span>
+                </li>
+              ))}
             </ul>
           </div>
-
-          <div className="mt-6">
+          <div
+            className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6 sm:p-7"
+            style={{ boxShadow: "5px 5px 0 var(--lp-red)" }}
+          >
             <ContactForm context="Contact Page" />
           </div>
-          <div className="mt-6 text-sm text-[var(--muted)]">
-            Looking for American-made gummy bears?{" "}
-            <Link href="/shop" className="underline underline-offset-4 text-[var(--text)]">
-              Shop all-natural USA Gummies
+        </div>
+      </section>
+
+      <section className="bg-[var(--lp-cream-soft)] border-t-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[900px] px-5 py-14 text-center sm:px-8 sm:py-16">
+          <p className="lp-label mb-3 text-[var(--lp-red)]">★ Looking to Order? ★</p>
+          <h2 className="lp-display text-[clamp(2rem,5vw,3rem)] text-[var(--lp-ink)]">
+            Shop all-natural
+            <br />
+            <span className="lp-script text-[var(--lp-red)]">USA Gummies.</span>
+          </h2>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+            <Link href="/shop" className="lp-cta">
+              Shop USA Gummies
             </Link>
-            .
+            <Link href="/help" className="lp-cta lp-cta-light">
+              Help center
+            </Link>
           </div>
-        </section>
-      </div>
+        </div>
+      </section>
     </main>
   );
 }

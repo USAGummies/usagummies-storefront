@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import ContactForm from "@/components/forms/ContactForm";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
+import { PageHero } from "@/components/lp/PageHero";
 
 function resolveSiteUrl() {
   const preferred = "https://www.usagummies.com";
@@ -46,130 +47,104 @@ const POLICIES = [
     href: "/policies/shipping",
     title: "Shipping Policy",
     desc: "Processing times, delivery expectations, and tracking. Free shipping on 5+ bags.",
-    icon: (
-      <svg viewBox="0 0 24 24" className="h-5 w-5 text-[#DBAA79]" aria-hidden="true">
-        <path
-          fill="currentColor"
-          d="M4 6h10v4h6v8H4V6zm2 2v8h12v-4h-4V8H6zm1 8a2 2 0 1 0 4 0H7zm8 0a2 2 0 1 0 4 0h-4z"
-        />
-      </svg>
-    ),
   },
   {
     href: "/policies/returns",
     title: "Satisfaction Guarantee",
     desc: "Food-safety rules, damaged/incorrect orders, and how we make it right.",
-    icon: (
-      <svg viewBox="0 0 24 24" className="h-5 w-5 text-[#DBAA79]" aria-hidden="true">
-        <path
-          fill="currentColor"
-          d="M12 4a8 8 0 1 1-7.4 5h2.2A6 6 0 1 0 12 6V3l4 3-4 3V6z"
-        />
-      </svg>
-    ),
   },
   {
     href: "/policies/privacy",
     title: "Privacy Policy",
-    desc: "What we collect, how it’s used, and how Shopify checkout protects payments.",
-    icon: (
-      <svg viewBox="0 0 24 24" className="h-5 w-5 text-[#DBAA79]" aria-hidden="true">
-        <path
-          fill="currentColor"
-          d="M12 3 4 6v6c0 5 3.4 8.6 8 9 4.6-.4 8-4 8-9V6l-8-3zm0 4a3 3 0 0 1 3 3c0 1.7-1.3 3-3 3s-3-1.3-3-3a3 3 0 0 1 3-3zm0 10a6 6 0 0 1-4.7-2.3c.7-1.4 2.2-2.3 4.7-2.3s4 .9 4.7 2.3A6 6 0 0 1 12 17z"
-        />
-      </svg>
-    ),
+    desc: "What we collect, how it's used, and how Shopify checkout protects payments.",
   },
   {
     href: "/policies/terms",
     title: "Terms of Service",
     desc: "General terms for using the site and purchasing through Shopify checkout.",
-    icon: (
-      <svg viewBox="0 0 24 24" className="h-5 w-5 text-[#DBAA79]" aria-hidden="true">
-        <path
-          fill="currentColor"
-          d="M6 3h9l5 5v13H6V3zm8 1.5V9h4.5L14 4.5zM8 12h8v2H8v-2zm0 4h8v2H8v-2z"
-        />
-      </svg>
-    ),
   },
 ];
 
 export default function PoliciesIndexPage() {
   return (
-    <main className="min-h-screen text-[var(--text)]">
+    <main>
       <BreadcrumbJsonLd
         items={[
           { name: "Home", href: "/" },
           { name: "Policies", href: "/policies" },
         ]}
       />
-      <div className="mx-auto max-w-4xl px-4 py-10">
-        <div className="mb-6 flex items-center justify-between gap-3">
-          <Link
-            href="/"
-            className="rounded-full border border-[var(--border)] bg-white px-3 py-1 text-sm text-[var(--text)] hover:bg-[var(--surface-strong)]"
-          >
-            Home
-          </Link>
-          <Link
-            href="/shop"
-            className="rounded-full border border-[var(--border)] bg-white px-3 py-1 text-sm text-[var(--text)] hover:bg-[var(--surface-strong)]"
-          >
-            Shop USA Gummies
-          </Link>
-        </div>
 
-        <section className="candy-panel p-7">
-          <h1 className="text-3xl font-semibold tracking-tight">Policies</h1>
-          <p className="mt-3 text-[var(--muted)]">
-            Clear, customer-first policies covering shipping, satisfaction guarantee, privacy, and
-            terms of service so checkout stays simple and expectations stay transparent.
-          </p>
+      <PageHero
+        eyebrow="Policies"
+        headline="Customer-first"
+        scriptAccent="policies."
+        sub="Clear policies covering shipping, satisfaction guarantee, privacy, and terms of service so checkout stays simple and expectations stay transparent."
+      />
 
-          <div className="mt-7 grid gap-3 sm:grid-cols-2">
-            {POLICIES.map((p) => (
+      <section className="bg-[var(--lp-cream)]">
+        <div className="mx-auto max-w-[1100px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            {POLICIES.map((p, i) => (
               <Link
                 key={p.href}
                 href={p.href}
-                className="group rounded-3xl border border-[var(--border)] bg-[var(--surface-strong)] p-5 transition hover:border-[rgba(15,27,45,0.2)] hover:bg-white"
+                className="group block border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6 no-underline sm:p-7"
+                style={{ boxShadow: i === 0 ? "5px 5px 0 var(--lp-red)" : "5px 5px 0 var(--lp-ink)" }}
               >
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
-                      {p.icon}
-                      {p.title}
-                    </div>
-                    <div className="mt-2 text-sm text-[var(--muted)]">{p.desc}</div>
-                  </div>
-                  <div className="shrink-0 text-sm text-[#DBAA79] opacity-80 group-hover:opacity-100">
-                    View policy
-                  </div>
-                </div>
+                <h2 className="lp-display text-[1.5rem] leading-tight text-[var(--lp-ink)] group-hover:text-[var(--lp-red)] sm:text-[1.7rem]">
+                  {p.title}
+                </h2>
+                <p className="lp-sans mt-3 text-[0.98rem] leading-[1.55] text-[var(--lp-ink)]/82">
+                  {p.desc}
+                </p>
+                <p className="lp-label mt-4 text-[var(--lp-red)]">View policy →</p>
               </Link>
             ))}
           </div>
+        </div>
+      </section>
 
-          <div className="mt-10 border-t border-[var(--border)] pt-8">
-            <h2 className="text-xl font-semibold">Need help?</h2>
-            <p className="mt-2 text-[var(--muted)]">
-              Send a message below. We respond within one business day.
+      <section className="bg-[var(--lp-cream-soft)] border-y-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[820px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="mb-8 text-center">
+            <p className="lp-label mb-2 text-[var(--lp-red)]">★ Need Help? ★</p>
+            <h2 className="lp-display text-[clamp(2rem,5vw,3rem)] text-[var(--lp-ink)]">
+              Send a
+              <br />
+              <span className="lp-script text-[var(--lp-red)]">message.</span>
+            </h2>
+            <p className="lp-sans mx-auto mt-4 max-w-[52ch] text-[1rem] leading-[1.6] text-[var(--lp-ink)]/82">
+              We respond within one business day.
             </p>
+          </div>
+          <div
+            className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6 sm:p-7"
+            style={{ boxShadow: "5px 5px 0 var(--lp-red)" }}
+          >
+            <ContactForm context="Policies Index Question" />
+          </div>
+        </div>
+      </section>
 
-            <div className="mt-5">
-              <ContactForm context="Policies Index Question" />
-            </div>
-          </div>
-          <div className="mt-6 text-sm text-[var(--muted)]">
-            Ready to order?{" "}
-            <Link href="/shop" className="underline underline-offset-4 text-[var(--text)]">
-              Shop all-natural American gummy bears
+      <section className="bg-[var(--lp-cream-soft)] border-t-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[900px] px-5 py-14 text-center sm:px-8 sm:py-16">
+          <p className="lp-label mb-3 text-[var(--lp-red)]">★ Ready to Order? ★</p>
+          <h2 className="lp-display text-[clamp(2rem,5vw,3rem)] text-[var(--lp-ink)]">
+            All-natural
+            <br />
+            <span className="lp-script text-[var(--lp-red)]">gummy bears.</span>
+          </h2>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+            <Link href="/shop" className="lp-cta">
+              Shop USA Gummies
             </Link>
-            .
+            <Link href="/help" className="lp-cta lp-cta-light">
+              Help center
+            </Link>
           </div>
-        </section>
-      </div>
+        </div>
+      </section>
     </main>
   );
 }

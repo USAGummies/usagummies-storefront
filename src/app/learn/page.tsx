@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import Image from "next/image";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
+import { PageHero } from "@/components/lp/PageHero";
 import { getLearnPosts, formatLearnDate } from "@/lib/learn";
 
 export const metadata: Metadata = {
@@ -23,80 +23,39 @@ const LEARN_LINKS = [
     href: "/blog",
     label: "Read our blog",
     description: "Behind-the-scenes stories, recipes, and candy news.",
-    icon: "📝",
   },
   {
     href: "/no-artificial-dyes-gummy-bears",
     label: "Dye-free guide",
     description: "Why we skip artificial dyes and what we use instead.",
-    icon: "🌿",
   },
   {
     href: "/gummies-101",
     label: "Gummies 101",
     description: "How gummies are made, textures, and flavor science.",
-    icon: "🍬",
   },
   {
     href: "/ingredients",
     label: "Our ingredients",
     description: "Full ingredient list, allergen info, and sourcing details.",
-    icon: "📋",
   },
   {
     href: "/faq",
     label: "FAQ",
     description: "Answers to the most common questions about USA Gummies.",
-    icon: "❓",
   },
   {
     href: "/made-in-usa",
     label: "Made in USA",
     description: "Sourced, manufactured, and packed entirely in America.",
-    icon: "🇺🇸",
   },
 ];
 
-function LearnPostsSection() {
-  const posts = getLearnPosts();
-  if (!posts.length) return null;
-
-  return (
-    <section className="mx-auto max-w-4xl px-4 pt-12 pb-8">
-      <h2 className="mb-6 text-center text-2xl font-black text-[var(--text)]">
-        Latest Articles
-      </h2>
-      <div className="grid gap-4 sm:grid-cols-2">
-        {posts.map((post) => (
-          <Link
-            key={post.slug}
-            href={`/learn/${post.slug}`}
-            className="group flex flex-col gap-2 rounded-2xl border border-[rgba(15,27,45,0.1)] bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
-          >
-            <span className="inline-block self-start rounded-full bg-[#1B2A4A]/10 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider text-[#1B2A4A]">
-              {post.category}
-            </span>
-            <span className="text-base font-black text-[var(--text)] group-hover:text-[#c7362c]">
-              {post.title}
-            </span>
-            <span className="line-clamp-2 text-sm text-[var(--muted)]">
-              {post.description}
-            </span>
-            <span className="mt-auto flex items-center gap-2 pt-2 text-xs text-[var(--muted)]">
-              <span>{formatLearnDate(post.date)}</span>
-              <span aria-hidden="true">&middot;</span>
-              <span>{post.readingTime}</span>
-            </span>
-          </Link>
-        ))}
-      </div>
-    </section>
-  );
-}
-
 export default function LearnPage() {
+  const posts = getLearnPosts();
+
   return (
-    <main className="min-h-screen bg-[var(--surface-strong)] text-[var(--text)]">
+    <main>
       <BreadcrumbJsonLd
         items={[
           { name: "Home", href: "/" },
@@ -104,78 +63,104 @@ export default function LearnPage() {
         ]}
       />
 
-      {/* ── HERO ── */}
-      <section className="relative flex min-h-[300px] items-center justify-center overflow-hidden bg-[#1B2A4A] sm:min-h-[360px]">
-        <Image
-          src="/brand/americana/declaration-freedom.jpg"
-          alt="USA Gummies brand background"
-          fill
-          priority
-          sizes="100vw"
-          className="object-cover opacity-40"
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#1B2A4A]/60 to-[#1B2A4A]/80" />
-        <div className="relative z-10 flex flex-col items-center gap-4 px-4 text-center">
-          <Image
-            src="/brand/logo-full.png"
-            alt="USA Gummies logo"
-            width={200}
-            height={128}
-            className="h-auto w-[140px] sm:w-[180px]"
-          />
-          <h1 className="font-display text-3xl font-black text-white sm:text-4xl lg:text-5xl">
-            Learn
-          </h1>
-          <p className="max-w-md text-sm text-white/80 sm:text-base">
-            Guides, ingredients, FAQs, and everything you need to know about
-            dye-free gummy bears made in the USA.
-          </p>
+      <PageHero
+        eyebrow="Learn"
+        headline="Guides &"
+        scriptAccent="answers."
+        sub="Guides, ingredients, FAQs, and everything you need to know about dye-free gummy bears made in the USA."
+        ctas={[
+          { href: "/blog", label: "Read the blog" },
+          { href: "/shop", label: "Shop now", variant: "light" },
+        ]}
+      />
+
+      {posts.length ? (
+        <section className="bg-[var(--lp-cream)]">
+          <div className="mx-auto max-w-[1100px] px-5 py-14 sm:px-8 sm:py-20">
+            <div className="mb-10 text-center">
+              <p className="lp-label mb-2 text-[var(--lp-red)]">★ Latest Articles ★</p>
+              <h2 className="lp-display text-[clamp(2rem,5vw,3rem)] text-[var(--lp-ink)]">
+                Fresh from
+                <br />
+                <span className="lp-script text-[var(--lp-red)]">the kitchen.</span>
+              </h2>
+            </div>
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+              {posts.map((post, i) => (
+                <Link
+                  key={post.slug}
+                  href={`/learn/${post.slug}`}
+                  className="group block border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6 no-underline"
+                  style={{ boxShadow: i === 0 ? "5px 5px 0 var(--lp-red)" : "5px 5px 0 var(--lp-ink)" }}
+                >
+                  <span className="lp-label inline-flex items-center bg-[var(--lp-red)] px-3 py-1 text-[var(--lp-off-white)]">
+                    {post.category}
+                  </span>
+                  <h3 className="lp-display mt-4 text-[1.4rem] leading-tight text-[var(--lp-ink)] group-hover:text-[var(--lp-red)]">
+                    {post.title}
+                  </h3>
+                  <p className="lp-sans mt-3 line-clamp-2 text-[0.95rem] leading-[1.55] text-[var(--lp-ink)]/82">
+                    {post.description}
+                  </p>
+                  <div className="lp-label mt-5 flex items-center gap-x-3 text-[var(--lp-ink)]/65">
+                    <span>{formatLearnDate(post.date)}</span>
+                    <span aria-hidden="true">·</span>
+                    <span>{post.readingTime}</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      <section className="bg-[var(--lp-cream-soft)] border-y-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[1100px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="mb-10 text-center">
+            <p className="lp-label mb-2 text-[var(--lp-red)]">★ Quick Links ★</p>
+            <h2 className="lp-display text-[clamp(2rem,5vw,3rem)] text-[var(--lp-ink)]">
+              Browse the
+              <br />
+              <span className="lp-script text-[var(--lp-red)]">basics.</span>
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {LEARN_LINKS.map((link, i) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="group block border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6 no-underline"
+                style={{ boxShadow: i === 0 ? "5px 5px 0 var(--lp-red)" : "5px 5px 0 var(--lp-ink)" }}
+              >
+                <h3 className="lp-display text-[1.3rem] leading-tight text-[var(--lp-ink)] group-hover:text-[var(--lp-red)]">
+                  {link.label}
+                </h3>
+                <p className="lp-sans mt-3 text-[0.95rem] leading-[1.55] text-[var(--lp-ink)]/82">
+                  {link.description}
+                </p>
+                <p className="lp-label mt-4 text-[var(--lp-red)]">Explore →</p>
+              </Link>
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* ── LEARN POSTS ── */}
-      <LearnPostsSection />
-
-      {/* ── LOGO DIVIDER ── */}
-      <div
-        className="flex items-center justify-center gap-4 py-6 bg-[var(--surface-strong)]"
-        aria-hidden="true"
-      >
-        <div className="h-px flex-1 max-w-[120px] bg-[#1B2A4A]/10" />
-        <Image
-          src="/brand/logo.png"
-          alt=""
-          aria-hidden="true"
-          width={48}
-          height={16}
-          className="h-3 w-auto opacity-30"
-        />
-        <div className="h-px flex-1 max-w-[120px] bg-[#1B2A4A]/10" />
-      </div>
-
-      {/* ── LINK GRID ── */}
-      <section className="mx-auto max-w-4xl px-4 pb-16">
-        <h2 className="mb-6 text-center text-2xl font-black text-[var(--text)]">
-          Quick Links
-        </h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {LEARN_LINKS.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="group flex flex-col gap-3 rounded-2xl border border-[rgba(15,27,45,0.1)] bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
-            >
-              <span className="text-2xl" aria-hidden="true">
-                {link.icon}
-              </span>
-              <span className="text-base font-black text-[var(--text)] group-hover:text-[#c7362c]">
-                {link.label}
-              </span>
-              <span className="text-sm text-[var(--muted)]">
-                {link.description}
-              </span>
+      <section className="bg-[var(--lp-cream-soft)] border-t-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[900px] px-5 py-14 text-center sm:px-8 sm:py-16">
+          <p className="lp-label mb-3 text-[var(--lp-red)]">★ Ready to Try? ★</p>
+          <h2 className="lp-display text-[clamp(2rem,5vw,3rem)] text-[var(--lp-ink)]">
+            Dye-free
+            <br />
+            <span className="lp-script text-[var(--lp-red)]">gummy bears.</span>
+          </h2>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+            <Link href="/shop" className="lp-cta">
+              Shop USA Gummies
             </Link>
-          ))}
+            <Link href="/blog" className="lp-cta lp-cta-light">
+              Read the blog
+            </Link>
+          </div>
         </div>
       </section>
     </main>

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { PageHero } from "@/components/lp/PageHero";
 import { OrderStatusLookup } from "./OrderStatusLookup";
 
 export const metadata: Metadata = {
@@ -9,30 +10,35 @@ export const metadata: Metadata = {
 
 export default function WholesaleStatusPage() {
   return (
-    <main className="min-h-screen bg-[#f8f5f0] px-4 py-8">
-      <div className="w-full max-w-xl mx-auto">
-        <div className="text-center mb-6">
-          <h1 className="text-3xl font-bold text-[#0a1e3d] tracking-tight">
-            USA Gummies
-          </h1>
-          <p className="text-sm text-[#0a1e3d]/60 mt-1 tracking-widest uppercase">
-            Order Status
+    <main>
+      <PageHero
+        eyebrow="Wholesale"
+        headline="Order"
+        scriptAccent="status."
+        sub="Look up the latest on your USA Gummies wholesale order."
+      />
+
+      <section className="bg-[var(--lp-cream)]">
+        <div className="mx-auto max-w-[640px] px-5 py-14 sm:px-8 sm:py-20">
+          <div
+            className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6 sm:p-8"
+            style={{ boxShadow: "5px 5px 0 var(--lp-red)" }}
+          >
+            <OrderStatusLookup />
+          </div>
+
+          <p className="lp-sans mt-6 text-center text-[0.9rem] text-[var(--lp-ink)]/70">
+            Questions? Email{" "}
+            <a
+              href="mailto:ben@usagummies.com"
+              className="text-[var(--lp-red)] underline underline-offset-4"
+            >
+              ben@usagummies.com
+            </a>{" "}
+            or call (307) 209-4928
           </p>
         </div>
-
-        <OrderStatusLookup />
-
-        <p className="text-center text-xs text-gray-400 mt-6">
-          Questions? Email{" "}
-          <a
-            href="mailto:ben@usagummies.com"
-            className="text-[#b22234] hover:underline"
-          >
-            ben@usagummies.com
-          </a>{" "}
-          or call (307) 209-4928
-        </p>
-      </div>
+      </section>
     </main>
   );
 }

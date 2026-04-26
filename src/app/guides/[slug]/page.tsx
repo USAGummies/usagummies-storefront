@@ -159,7 +159,7 @@ export default async function GuidePage({
   const hasModules = relatedPosts.length || relatedProductCards.length || topGuides.length;
 
   return (
-    <main className="blog-shell blog-shell--post">
+    <main>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
@@ -183,88 +183,131 @@ export default async function GuidePage({
         ]}
       />
 
-      <article className="blog-article">
-        <header className="blog-post__header">
-          <div className="blog-post__eyebrow">
-            <span className="badge badge--red">{guide.topic}</span>
-          </div>
-          <h1 className="blog-post__title">{guide.title}</h1>
-          <p className="blog-post__subtitle">{guide.description}</p>
+      <section className="relative overflow-hidden">
+        <div className="lp-bunting" aria-hidden />
+        <div className="bg-[var(--lp-cream)]">
+          <div className="mx-auto max-w-[900px] px-5 py-12 text-center sm:px-8 sm:py-16">
+            <span className="lp-label inline-flex items-center bg-[var(--lp-red)] px-3 py-1.5 text-[var(--lp-off-white)]">
+              {guide.topic}
+            </span>
 
-          <div className="blog-post__meta">
-            <span>{formatBlogDate(guide.updated || guide.date)}</span>
-            <Link href="/shop" className="blog-link">
-              Shop gummies
-            </Link>
-          </div>
+            <h1 className="lp-display mt-5 text-[clamp(2.2rem,6vw,4rem)] leading-[1.05] text-[var(--lp-ink)]">
+              {guide.title}
+            </h1>
 
-          {guide.coverImage ? (
-            <div className="blog-post__cover">
+            <p className="lp-sans mx-auto mt-5 max-w-[60ch] text-[1.1rem] leading-[1.55] text-[var(--lp-ink)]/85">
+              {guide.description}
+            </p>
+
+            <div className="lp-label mt-6 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[var(--lp-ink)]/75">
+              <span>{formatBlogDate(guide.updated || guide.date)}</span>
+              <span aria-hidden>·</span>
+              <Link href="/shop" className="hover:text-[var(--lp-red)]">
+                Shop gummies
+              </Link>
+            </div>
+          </div>
+          <div className="lp-bunting-thin" aria-hidden />
+        </div>
+      </section>
+
+      {guide.coverImage ? (
+        <section className="bg-[var(--lp-cream-soft)]">
+          <div className="mx-auto max-w-[1100px] px-5 py-10 sm:px-8 sm:py-14">
+            <div
+              className="relative aspect-[16/9] w-full overflow-hidden border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)]"
+              style={{ boxShadow: "8px 8px 0 var(--lp-red)" }}
+            >
               <Image
                 src={guide.coverImage}
                 alt={guide.title}
                 fill
-                sizes="(max-width: 900px) 100vw, 900px"
-                className="blog-post__coverImage"
+                sizes="(max-width: 900px) 100vw, 1100px"
+                className="object-cover"
                 priority
               />
             </div>
-          ) : null}
+          </div>
+        </section>
+      ) : null}
+
+      <article className="bg-[var(--lp-cream)]">
+        <div className="mx-auto max-w-[800px] px-5 py-10 sm:px-8 sm:py-14">
+          <div className="lp-sans prose prose-lg max-w-none text-[var(--lp-ink)] [&_h2]:lp-display [&_h2]:text-[var(--lp-ink)] [&_h2]:mt-10 [&_h3]:lp-display [&_h3]:text-[var(--lp-ink)] [&_h3]:mt-8 [&_a]:text-[var(--lp-red)] [&_a]:underline [&_a]:underline-offset-4 [&_strong]:text-[var(--lp-ink)] [&_blockquote]:border-l-[3px] [&_blockquote]:border-[var(--lp-red)] [&_blockquote]:pl-5 [&_blockquote]:italic [&_li]:my-2">
+            {content}
+          </div>
 
           {guide.tags.length ? (
-            <div className="blog-post__tags">
+            <div className="mt-10 flex flex-wrap items-center gap-2 border-t-2 border-[var(--lp-ink)]/15 pt-6">
+              <span className="lp-label text-[var(--lp-ink)]/65">Tagged</span>
               {guide.tags.map((tag) => (
-                <span key={`${guide.slug}-tag-${tag}`} className="badge badge--navy">
+                <span
+                  key={`${guide.slug}-tag-${tag}`}
+                  className="lp-label inline-flex items-center border-2 border-[var(--lp-ink)] bg-[var(--lp-off-white)] px-2.5 py-1 text-[var(--lp-ink)]"
+                >
                   {tag}
                 </span>
               ))}
             </div>
           ) : null}
-        </header>
 
-        <div className="blog-content">{content}</div>
-
-        <footer className="blog-post__footer">
-          <div>
-            <div className="blog-post__footerLabel">Explore more</div>
-            <Link href="/bundle-guides" className="blog-link">
-              Bag count guides
-            </Link>
-          </div>
-          <div>
-            <div className="blog-post__footerLabel">Shop with savings</div>
-            <Link href="/shop" className="blog-link">
-              Shop gummies
-            </Link>
-          </div>
-        </footer>
+          <footer className="mt-10 grid gap-4 border-t-2 border-[var(--lp-ink)]/15 pt-6 sm:grid-cols-2">
+            <div>
+              <div className="lp-label mb-2 text-[var(--lp-ink)]/65">Explore more</div>
+              <Link
+                href="/bundle-guides"
+                className="lp-display text-[1.2rem] text-[var(--lp-ink)] hover:text-[var(--lp-red)]"
+              >
+                Bag count guides
+              </Link>
+            </div>
+            <div className="sm:text-right">
+              <div className="lp-label mb-2 text-[var(--lp-ink)]/65">Shop with savings</div>
+              <Link href="/shop" className="lp-cta">
+                Shop gummies
+              </Link>
+            </div>
+          </footer>
+        </div>
       </article>
 
       {hasModules ? (
-        <section className="link-modules" aria-label="Related content">
-          {relatedPosts.length ? (
-            <LinkModule title="Related Posts">
-              {relatedPosts.map((related) => (
-                <BlogPostCard key={related.slug} post={related} />
-              ))}
-            </LinkModule>
-          ) : null}
+        <section className="bg-[var(--lp-cream-soft)] border-y-2 border-[var(--lp-ink)]">
+          <div className="mx-auto max-w-[1200px] px-5 py-14 sm:px-8 sm:py-20">
+            <div className="mb-10 text-center">
+              <p className="lp-label mb-2 text-[var(--lp-red)]">★ Keep Reading ★</p>
+              <h2 className="lp-display text-[clamp(2rem,5vw,3.2rem)] text-[var(--lp-ink)]">
+                More from
+                <br />
+                <span className="lp-script text-[var(--lp-red)]">USA Gummies.</span>
+              </h2>
+            </div>
+            <div className="link-modules">
+              {relatedPosts.length ? (
+                <LinkModule title="Related Posts">
+                  {relatedPosts.map((related) => (
+                    <BlogPostCard key={related.slug} post={related} />
+                  ))}
+                </LinkModule>
+              ) : null}
 
-          {relatedProductCards.length ? (
-            <LinkModule title="Related Products">
-              {relatedProductCards.map((product) => (
-                <RelatedProductCard key={product.id} product={product} />
-              ))}
-            </LinkModule>
-          ) : null}
+              {relatedProductCards.length ? (
+                <LinkModule title="Related Products">
+                  {relatedProductCards.map((product) => (
+                    <RelatedProductCard key={product.id} product={product} />
+                  ))}
+                </LinkModule>
+              ) : null}
 
-          {topGuides.length ? (
-            <LinkModule title="Top Guides">
-              {topGuides.map((item) => (
-                <GuideCard key={item.href} guide={item} />
-              ))}
-            </LinkModule>
-          ) : null}
+              {topGuides.length ? (
+                <LinkModule title="Top Guides">
+                  {topGuides.map((item) => (
+                    <GuideCard key={item.href} guide={item} />
+                  ))}
+                </LinkModule>
+              ) : null}
+            </div>
+          </div>
         </section>
       ) : null}
     </main>

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
+import { PageHero } from "@/components/lp/PageHero";
 import { RewardsWaitlist } from "./RewardsWaitlist.client";
 
 export const metadata: Metadata = {
@@ -18,9 +19,40 @@ export const metadata: Metadata = {
   },
 };
 
+const STEPS = [
+  {
+    step: "1",
+    title: "Shop & earn",
+    desc: "Earn 1 point for every $1 you spend. Points added automatically.",
+  },
+  {
+    step: "2",
+    title: "Reach a reward",
+    desc: "100 points = 1 free bag. 250 points = a free 3-pack.",
+  },
+  {
+    step: "3",
+    title: "Redeem & enjoy",
+    desc: "Free bags added to your next order. Simple as that.",
+  },
+];
+
+const TIERS = [
+  {
+    points: "100",
+    title: "1 Free Bag",
+    desc: "One bag of classic gummy bears added to your next order",
+  },
+  {
+    points: "250",
+    title: "Free 3-Pack",
+    desc: "Three bags added to your next order — best value",
+  },
+];
+
 export default function RewardsPage() {
   return (
-    <main className="min-h-screen bg-[var(--surface)] text-[var(--text)]">
+    <main>
       <BreadcrumbJsonLd
         items={[
           { name: "Home", href: "/" },
@@ -28,111 +60,111 @@ export default function RewardsPage() {
         ]}
       />
 
-      {/* Hero */}
-      <section className="bg-gradient-to-b from-[#1B2A4A] to-[#0F1B2D] text-white">
-        <div className="mx-auto max-w-4xl px-4 py-12 text-center sm:py-16">
-          <span className="inline-block rounded-full border border-[#C9A44A]/40 bg-[#C9A44A]/20 px-3 py-0.5 text-[11px] font-bold uppercase tracking-wider text-[#C9A44A]">
-            Coming Soon
-          </span>
-          <h1 className="mt-4 text-3xl font-black sm:text-4xl lg:text-5xl">
-            Earn free gummy bears.
-          </h1>
-          <p className="mx-auto mt-3 max-w-lg text-sm text-white/70 sm:text-base">
-            We&rsquo;re building a rewards program where every dollar you spend earns points
-            toward free bags. Join the waitlist for early access.
-          </p>
-        </div>
-      </section>
+      <PageHero
+        eyebrow="Coming Soon"
+        headline="Earn free"
+        scriptAccent="gummy bears."
+        sub="We're building a rewards program where every dollar you spend earns points toward free bags. Join the waitlist for early access."
+        ctas={[{ href: "#waitlist", label: "Join the waitlist" }]}
+      />
 
-      {/* What we're building */}
-      <section className="bg-white">
-        <div className="mx-auto max-w-4xl px-4 py-8 sm:py-10">
-          <div className="text-center">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-              What we&rsquo;re building
-            </div>
-            <h2 className="mt-2 text-xl font-black text-[var(--text)] sm:text-2xl">
-              How it will work
+      <section className="bg-[var(--lp-cream)]">
+        <div className="mx-auto max-w-[1100px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="mb-10 text-center">
+            <p className="lp-label mb-2 text-[var(--lp-red)]">★ How It Works ★</p>
+            <h2 className="lp-display text-[clamp(2rem,5vw,3rem)] text-[var(--lp-ink)]">
+              Three simple
+              <br />
+              <span className="lp-script text-[var(--lp-red)]">steps.</span>
             </h2>
           </div>
-          <div className="mt-6 grid gap-4 sm:grid-cols-3">
-            {[
-              {
-                step: "1",
-                title: "Shop & earn",
-                desc: "Earn 1 point for every $1 you spend. Points added automatically.",
-              },
-              {
-                step: "2",
-                title: "Reach a reward",
-                desc: "100 points = 1 free bag. 250 points = a free 3-pack.",
-              },
-              {
-                step: "3",
-                title: "Redeem & enjoy",
-                desc: "Free bags added to your next order. Simple as that.",
-              },
-            ].map((item) => (
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+            {STEPS.map((item, i) => (
               <div
                 key={item.step}
-                className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-4 text-center"
+                className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6 text-center"
+                style={{ boxShadow: i === 0 ? "5px 5px 0 var(--lp-red)" : "5px 5px 0 var(--lp-ink)" }}
               >
-                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-[#C9A44A] text-lg font-black text-white">
+                <div className="lp-display text-[2.4rem] leading-none text-[var(--lp-red)]">
                   {item.step}
                 </div>
-                <div className="mt-3 text-sm font-black text-[var(--text)]">{item.title}</div>
-                <div className="mt-1 text-xs text-[var(--muted)]">{item.desc}</div>
+                <h3 className="lp-display mt-4 text-[1.3rem] leading-tight text-[var(--lp-ink)]">
+                  {item.title}
+                </h3>
+                <p className="lp-sans mt-3 text-[0.95rem] leading-[1.55] text-[var(--lp-ink)]/82">
+                  {item.desc}
+                </p>
               </div>
             ))}
           </div>
+        </div>
+      </section>
 
-          {/* Planned reward tiers */}
-          <div className="mt-8 grid gap-4 sm:grid-cols-2">
-            <div className="rounded-2xl border-2 border-[#C9A44A]/30 bg-[#C9A44A]/5 p-4 text-center">
-              <div className="text-3xl font-black text-[#C9A44A]">100</div>
-              <div className="text-xs font-semibold uppercase tracking-widest text-[var(--muted)]">
-                points
+      <section className="bg-[var(--lp-cream-soft)] border-y-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[1000px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="mb-10 text-center">
+            <p className="lp-label mb-2 text-[var(--lp-red)]">★ Reward Tiers ★</p>
+            <h2 className="lp-display text-[clamp(2rem,5vw,3rem)] text-[var(--lp-ink)]">
+              Free bags
+              <br />
+              <span className="lp-script text-[var(--lp-red)]">await.</span>
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            {TIERS.map((tier, i) => (
+              <div
+                key={tier.points}
+                className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6 text-center"
+                style={{ boxShadow: i === 0 ? "5px 5px 0 var(--lp-red)" : "5px 5px 0 var(--lp-ink)" }}
+              >
+                <div className="lp-display text-[3.5rem] leading-none text-[var(--lp-red)]">
+                  {tier.points}
+                </div>
+                <p className="lp-label mt-2 text-[var(--lp-ink)]/65">points</p>
+                <h3 className="lp-display mt-4 text-[1.4rem] leading-tight text-[var(--lp-ink)]">
+                  {tier.title}
+                </h3>
+                <p className="lp-sans mt-3 text-[0.95rem] leading-[1.55] text-[var(--lp-ink)]/82">
+                  {tier.desc}
+                </p>
               </div>
-              <div className="mt-2 text-sm font-black text-[var(--text)]">1 Free Bag</div>
-              <div className="mt-1 text-xs text-[var(--muted)]">
-                One bag of classic gummy bears added to your next order
-              </div>
-            </div>
-            <div className="rounded-2xl border-2 border-[#C9A44A]/30 bg-[#C9A44A]/5 p-4 text-center">
-              <div className="text-3xl font-black text-[#C9A44A]">250</div>
-              <div className="text-xs font-semibold uppercase tracking-widest text-[var(--muted)]">
-                points
-              </div>
-              <div className="mt-2 text-sm font-black text-[var(--text)]">Free 3-Pack</div>
-              <div className="mt-1 text-xs text-[var(--muted)]">
-                Three bags added to your next order — best value
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* Waitlist */}
-      <section className="bg-[var(--surface-strong)]">
-        <div className="mx-auto max-w-2xl px-4 py-8 sm:py-10">
-          <RewardsWaitlist />
+      <section id="waitlist" className="bg-[var(--lp-cream)]">
+        <div className="mx-auto max-w-[640px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="mb-8 text-center">
+            <p className="lp-label mb-2 text-[var(--lp-red)]">★ Early Access ★</p>
+            <h2 className="lp-display text-[clamp(2rem,5vw,3rem)] text-[var(--lp-ink)]">
+              Join the
+              <br />
+              <span className="lp-script text-[var(--lp-red)]">waitlist.</span>
+            </h2>
+          </div>
+          <div
+            className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6 sm:p-7"
+            style={{ boxShadow: "5px 5px 0 var(--lp-red)" }}
+          >
+            <RewardsWaitlist />
+          </div>
         </div>
       </section>
 
-      {/* Bottom CTA */}
-      <section className="bg-white">
-        <div className="mx-auto max-w-4xl px-4 py-8 text-center sm:py-10">
-          <h2 className="text-xl font-black text-[var(--text)] sm:text-2xl">
-            Shop now — rewards are coming soon.
+      <section className="bg-[var(--lp-cream-soft)] border-t-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[900px] px-5 py-14 text-center sm:px-8 sm:py-16">
+          <p className="lp-label mb-3 text-[var(--lp-red)]">★ Shop Now ★</p>
+          <h2 className="lp-display text-[clamp(2rem,5vw,3rem)] text-[var(--lp-ink)]">
+            Every purchase
+            <br />
+            <span className="lp-script text-[var(--lp-red)]">counts.</span>
           </h2>
-          <p className="mx-auto mt-2 max-w-md text-sm text-[var(--muted)]">
+          <p className="lp-sans mx-auto mt-6 max-w-[52ch] text-[1rem] leading-[1.6] text-[var(--lp-ink)]/82">
             Every purchase you make today will count toward your points balance when the program launches.
           </p>
-          <div className="mt-4">
-            <Link
-              href="/shop"
-              className="btn btn-candy pressable px-6 py-2.5 text-sm font-bold"
-            >
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+            <Link href="/shop" className="lp-cta">
               Shop now
             </Link>
           </div>

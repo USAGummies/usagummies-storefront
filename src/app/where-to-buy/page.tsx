@@ -1,8 +1,8 @@
 import Link from "next/link";
-import Image from "next/image";
 import type { Metadata } from "next";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { JsonLd } from "@/components/JsonLd";
+import { PageHero } from "@/components/lp/PageHero";
 import { USStoreMap } from "@/components/USStoreMap";
 import { RETAILERS } from "@/data/retailers";
 
@@ -80,136 +80,113 @@ function retailerJsonLd(r: (typeof RETAILERS)[number]) {
   };
 }
 
-
 export default function WhereToBuyPage() {
   return (
-    <main className="relative overflow-hidden text-[var(--text)] min-h-screen pb-16">
-      {/* Hero */}
-      <div className="relative w-full h-[280px] sm:h-[340px] lg:h-[400px] overflow-hidden">
-        <Image
-          src="/brand/americana/declaration-freedom.jpg"
-          alt="USA Gummies patriotic brand imagery"
-          fill
-          sizes="100vw"
-          className="object-cover"
-          priority
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#1B2A4A]/50 to-[#1B2A4A]/75" />
-        <div className="relative z-10 flex flex-col items-center justify-center h-full text-center px-4">
-          <div className="relative w-44 h-20 sm:w-52 sm:h-24 mb-3">
-            <Image
-              src="/brand/logo-full.png"
-              alt="USA Gummies"
-              fill
-              sizes="208px"
-              className="object-contain drop-shadow-[0_6px_24px_rgba(0,0,0,0.5)]"
-            />
-          </div>
-          <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold uppercase tracking-wide text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
-            Find Us In Stores
-          </h1>
-          <p className="mt-2 text-sm text-white/85 max-w-md drop-shadow-sm">
-            Dye-free gummy bears, available at stores across America.
-          </p>
-        </div>
-      </div>
+    <main>
+      <BreadcrumbJsonLd
+        items={[
+          { name: "Home", href: "/" },
+          { name: "Where to Buy", href: "/where-to-buy" },
+        ]}
+      />
+      <JsonLd data={pageJsonLd} />
+      {RETAILERS.map((r) => (
+        <JsonLd key={r.slug} data={retailerJsonLd(r)} />
+      ))}
 
-      <section className="mx-auto max-w-6xl px-4 py-8 lg:py-10">
-        <BreadcrumbJsonLd
-          items={[
-            { name: "Home", href: "/" },
-            { name: "Where to Buy", href: "/where-to-buy" },
-          ]}
-        />
-        <JsonLd data={pageJsonLd} />
-        {RETAILERS.map((r) => (
-          <JsonLd key={r.slug} data={retailerJsonLd(r)} />
-        ))}
+      <PageHero
+        eyebrow="Find Us In Stores"
+        headline="Stores"
+        scriptAccent="across America."
+        sub="Dye-free gummy bears, available at stores across the country. Find one near you or shop online."
+        ctas={[
+          { href: "/shop", label: "Shop online" },
+          { href: "#stores", label: "Browse stores", variant: "light" },
+        ]}
+      />
 
-        {/* Logo */}
-        <div className="flex justify-center py-6">
-          <div className="relative w-40 h-20">
-            <Image
-              src="/brand/logo-full.png"
-              alt="USA Gummies"
-              fill
-              sizes="160px"
-              className="object-contain"
-            />
-          </div>
-        </div>
-
-        {/* Map Section */}
-        <div className="candy-panel rounded-[36px] p-6 sm:p-8">
-          <div className="text-center space-y-2 mb-6">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-              Our retail partners
-            </div>
-            <h2 className="text-2xl font-black text-[var(--text)] sm:text-3xl">
-              {RETAILERS.length} stores and growing
+      <section id="stores" className="bg-[var(--lp-cream)]">
+        <div className="mx-auto max-w-[1200px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="mb-10 text-center">
+            <p className="lp-label mb-2 text-[var(--lp-red)]">★ Our Retail Partners ★</p>
+            <h2 className="lp-display text-[clamp(2rem,5vw,3.2rem)] text-[var(--lp-ink)]">
+              {RETAILERS.length} stores
+              <br />
+              <span className="lp-script text-[var(--lp-red)]">and growing.</span>
             </h2>
-            <p className="text-sm text-[var(--muted)] max-w-lg mx-auto">
-              We&rsquo;re a young brand adding new retail partners regularly.
-              Find a store near you or{" "}
+            <p className="lp-sans mx-auto mt-6 max-w-[52ch] text-[1rem] leading-[1.6] text-[var(--lp-ink)]/82">
+              We&rsquo;re a young brand adding new retail partners regularly. Find a store near you or{" "}
               <Link
                 href="/shop"
-                className="font-semibold text-[var(--navy)] underline underline-offset-4"
+                className="font-bold text-[var(--lp-red)] underline underline-offset-4"
               >
                 shop online
               </Link>
               .
             </p>
           </div>
-          <USStoreMap retailers={RETAILERS} />
-        </div>
-
-        {/* Retailer Cards */}
-        <div className="mt-8">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)] mb-4">
-            All locations
+          <div
+            className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-4 sm:p-6"
+            style={{ boxShadow: "5px 5px 0 var(--lp-ink)" }}
+          >
+            <USStoreMap retailers={RETAILERS} />
           </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {RETAILERS.map((r) => (
+        </div>
+      </section>
+
+      <section className="bg-[var(--lp-cream-soft)] border-y-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[1200px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="mb-10 text-center">
+            <p className="lp-label mb-2 text-[var(--lp-red)]">★ All Locations ★</p>
+            <h2 className="lp-display text-[clamp(2rem,5vw,3rem)] text-[var(--lp-ink)]">
+              Find a
+              <br />
+              <span className="lp-script text-[var(--lp-red)]">store.</span>
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {RETAILERS.map((r, i) => (
               <div
                 key={r.slug}
-                className="rounded-2xl border border-[var(--border)] bg-white p-5 shadow-[0_6px_24px_rgba(15,27,45,0.06)] flex flex-col"
+                className="flex flex-col border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6"
+                style={{ boxShadow: i === 0 ? "5px 5px 0 var(--lp-red)" : "5px 5px 0 var(--lp-ink)" }}
               >
-                <div className="text-base font-black text-[var(--text)]">
+                <h3 className="lp-display text-[1.3rem] leading-tight text-[var(--lp-ink)]">
                   {r.name}
-                </div>
-                <div className="mt-1 text-sm text-[var(--muted)]">
+                </h3>
+                <div className="lp-sans mt-2 text-[0.95rem] text-[var(--lp-ink)]/82">
                   {r.address}
                 </div>
-                <div className="text-sm text-[var(--muted)]">
+                <div className="lp-sans text-[0.95rem] text-[var(--lp-ink)]/82">
                   {r.cityStateZip}
                 </div>
                 <div className="mt-3">
-                  <span className="inline-flex items-center rounded-full bg-[var(--surface-strong)] px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">
+                  <span className="lp-label inline-flex items-center border-2 border-[var(--lp-ink)] bg-[var(--lp-cream-soft)] px-2.5 py-1 text-[var(--lp-ink)]">
                     {r.storeType}
                   </span>
                 </div>
                 {r.note && (
-                  <p className="mt-2 text-xs text-[var(--muted)] italic">
+                  <p className="lp-sans mt-3 text-[0.85rem] italic text-[var(--lp-ink)]/70">
                     {r.note}
                   </p>
                 )}
-                <div className="mt-auto pt-4 flex flex-wrap gap-x-4 gap-y-1">
+                <div className="mt-auto flex flex-wrap gap-x-4 gap-y-1 pt-4">
                   <a
                     href={r.mapsUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-sm font-semibold text-[var(--navy)] underline underline-offset-4"
+                    className="lp-label text-[var(--lp-red)] underline underline-offset-4"
                   >
-                    Get directions &rarr;
+                    Get directions →
                   </a>
                   {r.website && (
                     <a
                       href={r.website}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm font-semibold text-[var(--navy)] underline underline-offset-4"
+                      className="lp-label text-[var(--lp-red)] underline underline-offset-4"
                     >
-                      Visit website &rarr;
+                      Visit website →
                     </a>
                   )}
                 </div>
@@ -217,85 +194,84 @@ export default function WhereToBuyPage() {
             ))}
           </div>
         </div>
+      </section>
 
-        {/* Also available online */}
-        <div className="mt-8 rounded-3xl border border-[var(--border)] bg-white p-5 shadow-[0_18px_44px_rgba(15,27,45,0.06)]">
-          <div className="text-sm font-black text-[var(--text)]">
-            Also available online
-          </div>
-          <p className="mt-2 text-sm text-[var(--muted)]">
-            Can&rsquo;t find a store near you? Order direct from our website or
-            from Amazon with Prime shipping.
-          </p>
-          <div className="mt-4 flex flex-wrap gap-3">
-            <Link href="/shop" className="btn btn-candy pressable">
-              Shop online
-            </Link>
-            <a
-              href="https://www.amazon.com/dp/B0G1JK92TJ?maas=maas_adg_BA724FDB5D62533"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn-outline pressable"
+      <section className="bg-[var(--lp-cream)]">
+        <div className="mx-auto max-w-[1100px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="grid gap-5 lg:grid-cols-2">
+            <div
+              className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6 sm:p-7"
+              style={{ boxShadow: "5px 5px 0 var(--lp-red)" }}
             >
-              Buy on Amazon
-            </a>
-          </div>
-        </div>
-
-        {/* Wholesale CTA */}
-        <div className="mt-8 candy-panel rounded-[36px] p-6 sm:p-8">
-          <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
-            <div className="space-y-3">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-                Retail partners wanted
-              </div>
-              <h2 className="text-2xl font-black text-[var(--text)] sm:text-3xl">
-                Want to carry USA Gummies in your store?
-              </h2>
-              <p className="text-sm text-[var(--muted)] max-w-prose">
-                We&rsquo;re actively growing our retail footprint. Whether
-                you&rsquo;re an independent shop, gift store, or grocery chain,
-                we make it easy to stock dye-free gummy bears your customers
-                will love.
+              <p className="lp-label text-[var(--lp-red)]">★ Also Available Online ★</p>
+              <h3 className="lp-display mt-3 text-[1.5rem] leading-tight text-[var(--lp-ink)]">
+                Order direct or on Amazon.
+              </h3>
+              <p className="lp-sans mt-3 text-[0.98rem] leading-[1.6] text-[var(--lp-ink)]/82">
+                Can&rsquo;t find a store near you? Order direct from our website or from Amazon with
+                Prime shipping.
               </p>
-              <div className="flex flex-wrap gap-3 pt-2">
-                <Link href="/wholesale" className="btn btn-candy pressable">
+              <div className="mt-5 flex flex-wrap gap-3">
+                <Link href="/shop" className="lp-cta">
+                  Shop online
+                </Link>
+                <a
+                  href="https://www.amazon.com/dp/B0G1JK92TJ?maas=maas_adg_BA724FDB5D62533"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="lp-cta lp-cta-light"
+                >
+                  Buy on Amazon
+                </a>
+              </div>
+            </div>
+
+            <div
+              className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6 sm:p-7"
+              style={{ boxShadow: "5px 5px 0 var(--lp-ink)" }}
+            >
+              <p className="lp-label text-[var(--lp-red)]">★ Retail Partners Wanted ★</p>
+              <h3 className="lp-display mt-3 text-[1.5rem] leading-tight text-[var(--lp-ink)]">
+                Carry USA Gummies in your store.
+              </h3>
+              <p className="lp-sans mt-3 text-[0.98rem] leading-[1.6] text-[var(--lp-ink)]/82">
+                Whether you&rsquo;re an independent shop, gift store, or grocery chain, we make it easy
+                to stock dye-free gummy bears your customers will love.
+              </p>
+              <div className="mt-5 flex flex-wrap gap-3">
+                <Link href="/wholesale" className="lp-cta">
                   Apply for wholesale
                 </Link>
                 <a
                   href="https://www.faire.com/brand/bw_cqd5dvfzqu"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="btn btn-outline pressable"
+                  className="lp-cta lp-cta-light"
                 >
                   View on Faire
                 </a>
               </div>
             </div>
-            <div className="flex justify-center">
-              <div className="relative w-56 h-56 sm:w-64 sm:h-64">
-                <Image
-                  src="/brand/usa-gummies-family.webp"
-                  alt="Assorted USA Gummies gummy bear bags"
-                  fill
-                  sizes="256px"
-                  className="object-contain"
-                />
-              </div>
-            </div>
           </div>
         </div>
+      </section>
 
-        {/* Bottom details */}
-        <div className="mt-6 flex items-center justify-center gap-3 text-xs text-[var(--muted)]">
-          <Image
-            src="/brand/logo.png"
-            alt="USA Gummies logo"
-            width={72}
-            height={26}
-            className="h-auto w-16 object-contain"
-          />
-          <span>Made in the USA &bull; All natural &bull; No artificial dyes</span>
+      <section className="bg-[var(--lp-cream-soft)] border-t-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[900px] px-5 py-14 text-center sm:px-8 sm:py-16">
+          <p className="lp-label mb-3 text-[var(--lp-red)]">★ Made in the USA ★</p>
+          <h2 className="lp-display text-[clamp(2rem,5vw,3rem)] text-[var(--lp-ink)]">
+            All natural,
+            <br />
+            <span className="lp-script text-[var(--lp-red)]">no artificial dyes.</span>
+          </h2>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+            <Link href="/shop" className="lp-cta">
+              Shop USA Gummies
+            </Link>
+            <Link href="/about" className="lp-cta lp-cta-light">
+              Our story
+            </Link>
+          </div>
         </div>
       </section>
     </main>

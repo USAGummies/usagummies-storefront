@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
+import { PageHero } from "@/components/lp/PageHero";
 
 function resolveSiteUrl() {
   const preferred = "https://www.usagummies.com";
@@ -75,89 +76,78 @@ const SUPPORT_LINKS = [
 
 export default function HelpCenterPage() {
   return (
-    <main className="min-h-screen text-[var(--text)]">
+    <main>
       <BreadcrumbJsonLd
         items={[
           { name: "Home", href: "/" },
           { name: "Help Center", href: "/help" },
         ]}
       />
-      <div className="mx-auto max-w-5xl px-4 py-10">
-        <div className="mb-6 flex items-center justify-between gap-3">
-          <Link
-            href="/"
-            className="rounded-full border border-[var(--border)] bg-white px-3 py-1 text-sm text-[var(--text)] hover:bg-[var(--surface-strong)]"
-          >
-            Home
-          </Link>
-          <Link
-            href="/contact"
-            className="rounded-full border border-[var(--border)] bg-white px-3 py-1 text-sm text-[var(--text)] hover:bg-[var(--surface-strong)]"
-          >
-            Contact support
-          </Link>
-        </div>
 
-        <section className="candy-panel p-7">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-                Help Center
-              </div>
-              <h1 className="mt-2 text-3xl font-semibold tracking-tight">
-                How can we help?
-              </h1>
-              <p className="mt-3 text-[var(--muted)]">
-                Find fast answers about shipping, satisfaction guarantee, ingredients, and ordering. If you need
-                a human, contact support and we will reply within one business day.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-3">
-              <Link href="/shop" className="btn btn-candy">
-                Shop USA Gummies
-              </Link>
-              <Link href="/contact" className="btn btn-outline">
-                Email support
-              </Link>
-            </div>
+      <PageHero
+        eyebrow="Help Center"
+        headline="How can we"
+        scriptAccent="help?"
+        sub="Find fast answers about shipping, satisfaction guarantee, ingredients, and ordering. If you need a human, we reply within one business day."
+        ctas={[
+          { href: "/contact", label: "Email support", variant: "primary" },
+          { href: "/shop", label: "Shop now", variant: "light" },
+        ]}
+      />
+
+      <section className="bg-[var(--lp-cream)]">
+        <div className="mx-auto max-w-[1100px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="mb-10 text-center">
+            <p className="lp-label mb-2 text-[var(--lp-red)]">★ Quick Links ★</p>
+            <h2 className="lp-display text-[clamp(2rem,5vw,3rem)] text-[var(--lp-ink)]">
+              Start
+              <br />
+              <span className="lp-script text-[var(--lp-red)]">here.</span>
+            </h2>
           </div>
-
-          <div className="mt-6 grid gap-3 sm:grid-cols-2">
-            {SUPPORT_LINKS.map((item) => (
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {SUPPORT_LINKS.map((item, i) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className="rounded-3xl border border-[var(--border)] bg-[var(--surface-strong)] p-5 text-sm text-[var(--text)] transition hover:border-[rgba(15,27,45,0.2)] hover:bg-white"
+                className="group block border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6 no-underline"
+                style={{ boxShadow: i === 0 ? "5px 5px 0 var(--lp-red)" : "5px 5px 0 var(--lp-ink)" }}
               >
-                <div className="text-sm font-semibold">{item.title}</div>
-                <div className="mt-2 text-sm text-[var(--muted)]">{item.copy}</div>
-                <div className="mt-3 text-xs font-semibold text-[var(--navy)]">
-                  View details {"->"}
-                </div>
+                <h3 className="lp-display text-[1.3rem] leading-tight text-[var(--lp-ink)] group-hover:text-[var(--lp-red)]">
+                  {item.title}
+                </h3>
+                <p className="lp-sans mt-3 text-[0.95rem] leading-[1.55] text-[var(--lp-ink)]/82">
+                  {item.copy}
+                </p>
+                <p className="lp-label mt-4 text-[var(--lp-red)]">View details →</p>
               </Link>
             ))}
           </div>
+        </div>
+      </section>
 
-          <div className="mt-8 rounded-3xl border border-[var(--border)] bg-white p-5 text-sm text-[var(--muted)]">
-            <div className="text-sm font-semibold text-[var(--text)]">Still need help?</div>
-            <div className="mt-2">
-              Use the chat bubble or send a message on the{" "}
-              <Link href="/contact" className="underline underline-offset-4 text-[var(--text)]">
-                contact page
-              </Link>
-              . We typically respond within one business day.
-            </div>
-          </div>
-
-          <div className="mt-6 text-sm text-[var(--muted)]">
-            Looking for American-made gummy bears?{" "}
-            <Link href="/shop" className="underline underline-offset-4 text-[var(--text)]">
-              Shop all-natural USA Gummies
+      <section className="bg-[var(--lp-cream-soft)] border-y-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[820px] px-5 py-14 text-center sm:px-8 sm:py-16">
+          <p className="lp-label mb-2 text-[var(--lp-red)]">★ Still Need Help? ★</p>
+          <h2 className="lp-display text-[clamp(2rem,5vw,3rem)] text-[var(--lp-ink)]">
+            We&rsquo;re
+            <br />
+            <span className="lp-script text-[var(--lp-red)]">here.</span>
+          </h2>
+          <p className="lp-sans mx-auto mt-6 max-w-[52ch] text-[1rem] leading-[1.6] text-[var(--lp-ink)]/82">
+            Use the chat bubble or send a message on the contact page. We typically respond within one
+            business day.
+          </p>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+            <Link href="/contact" className="lp-cta">
+              Contact us
             </Link>
-            .
+            <Link href="/shop" className="lp-cta lp-cta-light">
+              Shop USA Gummies
+            </Link>
           </div>
-        </section>
-      </div>
+        </div>
+      </section>
     </main>
   );
 }

@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { compileMDX } from "next-mdx-remote/rsc";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
+import { PageHero } from "@/components/lp/PageHero";
 import {
   getLearnPosts,
   getLearnPostBySlug,
@@ -85,7 +85,7 @@ export default async function LearnPostPage({ params }: PageProps) {
   };
 
   return (
-    <main className="min-h-screen bg-[var(--surface-strong)] text-[var(--text)]">
+    <main>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }}
@@ -98,62 +98,59 @@ export default async function LearnPostPage({ params }: PageProps) {
         ]}
       />
 
-      {/* ── HERO ── */}
-      <section className="relative flex min-h-[300px] items-center justify-center overflow-hidden bg-[#1B2A4A] sm:min-h-[360px]">
-        <Image
-          src="/brand/americana/declaration-freedom.jpg"
-          alt="USA Gummies brand background"
-          fill
-          priority
-          sizes="100vw"
-          className="object-cover opacity-40"
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#1B2A4A]/60 to-[#1B2A4A]/80" />
-        <div className="relative z-10 flex flex-col items-center gap-4 px-4 text-center">
-          <Image
-            src="/brand/logo-full.png"
-            alt="USA Gummies logo"
-            width={200}
-            height={128}
-            className="h-auto w-[140px] sm:w-[180px]"
-          />
-          <span className="inline-block rounded-full bg-white/20 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-white">
-            {post.category}
-          </span>
-          <h1 className="font-display max-w-2xl text-3xl font-black text-white sm:text-4xl lg:text-5xl">
-            {post.title}
-          </h1>
-          <div className="flex items-center gap-3 text-sm text-white/70">
-            <span>{formatLearnDate(post.date)}</span>
-            <span aria-hidden="true">&middot;</span>
-            <span>{post.readingTime}</span>
+      <section className="relative overflow-hidden">
+        <div className="lp-bunting" aria-hidden />
+        <div className="bg-[var(--lp-cream)]">
+          <div className="mx-auto max-w-[900px] px-5 py-12 text-center sm:px-8 sm:py-16">
+            <span className="lp-label inline-flex items-center bg-[var(--lp-red)] px-3 py-1.5 text-[var(--lp-off-white)]">
+              {post.category}
+            </span>
+
+            <h1 className="lp-display mt-5 text-[clamp(2.2rem,6vw,4rem)] leading-[1.05] text-[var(--lp-ink)]">
+              {post.title}
+            </h1>
+
+            <p className="lp-sans mx-auto mt-5 max-w-[60ch] text-[1.1rem] leading-[1.55] text-[var(--lp-ink)]/85">
+              {post.description}
+            </p>
+
+            <div className="lp-label mt-6 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[var(--lp-ink)]/75">
+              <span>{formatLearnDate(post.date)}</span>
+              <span aria-hidden>·</span>
+              <span>{post.readingTime}</span>
+            </div>
           </div>
+          <div className="lp-bunting-thin" aria-hidden />
         </div>
       </section>
 
-      {/* ── ARTICLE CONTENT ── */}
-      <article className="mx-auto max-w-3xl px-4 py-12">
-        <div className="prose prose-lg prose-slate mx-auto max-w-none prose-headings:font-black prose-a:text-[#c7362c] prose-a:no-underline hover:prose-a:underline">
-          {content}
+      <article className="bg-[var(--lp-cream)]">
+        <div className="mx-auto max-w-[800px] px-5 py-10 sm:px-8 sm:py-14">
+          <div className="lp-sans prose prose-lg max-w-none text-[var(--lp-ink)] [&_h2]:lp-display [&_h2]:text-[var(--lp-ink)] [&_h2]:mt-10 [&_h3]:lp-display [&_h3]:text-[var(--lp-ink)] [&_h3]:mt-8 [&_a]:text-[var(--lp-red)] [&_a]:underline [&_a]:underline-offset-4 [&_strong]:text-[var(--lp-ink)] [&_blockquote]:border-l-[3px] [&_blockquote]:border-[var(--lp-red)] [&_blockquote]:pl-5 [&_blockquote]:italic [&_li]:my-2">
+            {content}
+          </div>
         </div>
       </article>
 
-      {/* ── CTA ── */}
-      <section className="mx-auto max-w-3xl px-4 pb-16">
-        <div className="rounded-2xl border border-[rgba(15,27,45,0.1)] bg-white p-8 text-center shadow-sm">
-          <h2 className="text-xl font-black text-[var(--text)]">
-            Ready to try dye-free gummy bears?
+      <section className="bg-[var(--lp-cream-soft)] border-t-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[900px] px-5 py-14 text-center sm:px-8 sm:py-16">
+          <p className="lp-label mb-3 text-[var(--lp-red)]">★ Ready to Try? ★</p>
+          <h2 className="lp-display text-[clamp(2rem,5vw,3rem)] text-[var(--lp-ink)]">
+            Dye-free
+            <br />
+            <span className="lp-script text-[var(--lp-red)]">gummy bears.</span>
           </h2>
-          <p className="mt-2 text-sm text-[var(--muted)]">
-            All American Gummy Bears &mdash; made in the USA with no artificial
-            dyes.
+          <p className="lp-sans mx-auto mt-6 max-w-[52ch] text-[1rem] leading-[1.6] text-[var(--lp-ink)]/82">
+            All American Gummy Bears &mdash; made in the USA with no artificial dyes.
           </p>
-          <Link
-            href="/products/all-american-gummy-bears"
-            className="mt-4 inline-block rounded-full bg-[#c7362c] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#a82d25]"
-          >
-            Shop Now
-          </Link>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+            <Link href="/products/all-american-gummy-bears" className="lp-cta">
+              Shop now
+            </Link>
+            <Link href="/learn" className="lp-cta lp-cta-light">
+              More articles
+            </Link>
+          </div>
         </div>
       </section>
     </main>

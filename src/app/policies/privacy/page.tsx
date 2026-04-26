@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import ContactForm from "@/components/forms/ContactForm";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
+import { PageHero } from "@/components/lp/PageHero";
 
 function resolveSiteUrl() {
   const preferred = "https://www.usagummies.com";
@@ -41,9 +42,36 @@ export const metadata: Metadata = {
   },
 };
 
+const SECTIONS = [
+  {
+    title: "What we collect",
+    body:
+      "When you place an order, we collect information required to fulfill it, such as your name, shipping address, email, and order details.",
+  },
+  {
+    title: "How we use it",
+    body:
+      "We use your information to process orders, provide updates, respond to support requests, and improve the site experience.",
+  },
+  {
+    title: "Payments",
+    body:
+      "Payment information is processed securely through Shopify checkout. We do not store your full payment card details on our servers.",
+  },
+  {
+    title: "Cookies",
+    body:
+      "We may use cookies and similar technologies to support site functionality and understand how visitors use the site.",
+  },
+  {
+    title: "Contact",
+    body: "If you have privacy questions, contact us using the form below.",
+  },
+];
+
 export default function PrivacyPolicyPage() {
   return (
-    <main className="min-h-screen text-[var(--text)]">
+    <main>
       <BreadcrumbJsonLd
         items={[
           { name: "Home", href: "/" },
@@ -51,90 +79,67 @@ export default function PrivacyPolicyPage() {
           { name: "Privacy", href: "/policies/privacy" },
         ]}
       />
-      <div className="mx-auto max-w-4xl px-4 py-10">
-        <div className="mb-6 flex items-center justify-between gap-3">
-          <Link
-            href="/policies"
-            className="rounded-full border border-[var(--border)] bg-white px-3 py-1 text-sm text-[var(--text)] hover:bg-[var(--surface-strong)]"
-          >
-            Policies
-          </Link>
-          <Link
-            href="/shop"
-            className="rounded-full border border-[var(--border)] bg-white px-3 py-1 text-sm text-[var(--text)] hover:bg-[var(--surface-strong)]"
-          >
-            Shop USA Gummies
-          </Link>
+
+      <PageHero
+        eyebrow="Policies"
+        headline="Privacy"
+        scriptAccent="policy."
+        sub="We only use information needed to process your order and improve your experience. Payments are handled securely through Shopify checkout."
+      />
+
+      <section className="bg-[var(--lp-cream)]">
+        <div className="mx-auto max-w-[820px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="lp-sans space-y-6 text-[1.02rem] leading-[1.7] text-[var(--lp-ink)]/88">
+            {SECTIONS.map((section) => (
+              <div key={section.title} className="border-b-2 border-[var(--lp-ink)]/15 pb-6 last:border-b-0">
+                <h2 className="lp-display text-[1.5rem] text-[var(--lp-ink)]">{section.title}</h2>
+                <p className="mt-3">{section.body}</p>
+              </div>
+            ))}
+          </div>
         </div>
+      </section>
 
-        <section className="candy-panel p-7">
-          <h1 className="text-3xl font-semibold tracking-tight">Privacy Policy</h1>
-          <p className="mt-3 text-[var(--muted)]">
-            This privacy policy keeps things simple: we only use information needed to process your
-            order and improve your experience. Payments are handled securely through Shopify checkout.
-          </p>
-
-          <div className="mt-8 divide-y divide-[var(--border)] text-[var(--muted)]">
-            <div className="py-4">
-              <h2 className="text-lg font-semibold text-[var(--text)]">What we collect</h2>
-              <p className="mt-2 text-sm text-[var(--muted)]">
-                When you place an order, we collect information required to fulfill it, such as
-                your name, shipping address, email, and order details.
-              </p>
-            </div>
-
-            <div className="py-4">
-              <h2 className="text-lg font-semibold text-[var(--text)]">How we use it</h2>
-              <p className="mt-2 text-sm text-[var(--muted)]">
-                We use your information to process orders, provide updates, respond to support requests,
-                and improve the site experience.
-              </p>
-            </div>
-
-            <div className="py-4">
-              <h2 className="text-lg font-semibold text-[var(--text)]">Payments</h2>
-              <p className="mt-2 text-sm text-[var(--muted)]">
-                Payment information is processed securely through{" "}
-                <strong className="text-[var(--text)]">Shopify checkout</strong>.
-                We do not store your full payment card details on our servers.
-              </p>
-            </div>
-
-            <div className="py-4">
-              <h2 className="text-lg font-semibold text-[var(--text)]">Cookies</h2>
-              <p className="mt-2 text-sm text-[var(--muted)]">
-                We may use cookies and similar technologies to support site functionality
-                and understand how visitors use the site.
-              </p>
-            </div>
-
-            <div className="py-4">
-              <h2 className="text-lg font-semibold text-[var(--text)]">Contact</h2>
-              <p className="mt-2 text-sm text-[var(--muted)]">
-                If you have privacy questions, contact us using the form below.
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-10 border-t border-[var(--border)] pt-8">
-            <h2 className="text-xl font-semibold">Contact us</h2>
-            <p className="mt-2 text-[var(--muted)]">
-              Privacy question? Send a message and we’ll respond within one business day.
+      <section className="bg-[var(--lp-cream-soft)] border-y-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[820px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="mb-8 text-center">
+            <p className="lp-label mb-2 text-[var(--lp-red)]">★ Get In Touch ★</p>
+            <h2 className="lp-display text-[clamp(2rem,5vw,3rem)] text-[var(--lp-ink)]">
+              Privacy
+              <br />
+              <span className="lp-script text-[var(--lp-red)]">questions?</span>
+            </h2>
+            <p className="lp-sans mx-auto mt-4 max-w-[52ch] text-[1rem] leading-[1.6] text-[var(--lp-ink)]/82">
+              Send a message and we&rsquo;ll respond within one business day.
             </p>
+          </div>
+          <div
+            className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6 sm:p-7"
+            style={{ boxShadow: "5px 5px 0 var(--lp-red)" }}
+          >
+            <ContactForm context="Privacy Policy Question" />
+          </div>
+        </div>
+      </section>
 
-            <div className="mt-5">
-              <ContactForm context="Privacy Policy Question" />
-            </div>
-          </div>
-          <div className="mt-6 text-sm text-[var(--muted)]">
-            Explore the shop:{" "}
-            <Link href="/shop" className="underline underline-offset-4 text-[var(--text)]">
-              all-natural American gummy bears
+      <section className="bg-[var(--lp-cream-soft)] border-t-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[900px] px-5 py-14 text-center sm:px-8 sm:py-16">
+          <p className="lp-label mb-3 text-[var(--lp-red)]">★ Ready to Order? ★</p>
+          <h2 className="lp-display text-[clamp(2rem,5vw,3rem)] text-[var(--lp-ink)]">
+            Explore the
+            <br />
+            <span className="lp-script text-[var(--lp-red)]">shop.</span>
+          </h2>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+            <Link href="/shop" className="lp-cta">
+              Shop USA Gummies
             </Link>
-            .
+            <Link href="/policies" className="lp-cta lp-cta-light">
+              All policies
+            </Link>
           </div>
-        </section>
-      </div>
+        </div>
+      </section>
     </main>
   );
 }

@@ -1,7 +1,8 @@
-import Image from "next/image";
 import type { Metadata } from "next";
+import Link from "next/link";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { JsonLd } from "@/components/JsonLd";
+import { PageHero } from "@/components/lp/PageHero";
 import { WholesaleForm } from "./WholesaleForm";
 
 function resolveSiteUrl() {
@@ -78,76 +79,69 @@ const pageJsonLd = {
 
 export default function WholesalePage() {
   return (
-    <main className="relative overflow-hidden text-[var(--text)] min-h-screen pb-16">
-      <div className="relative w-full h-[280px] sm:h-[340px] lg:h-[400px] overflow-hidden">
-        <Image
-          src="/brand/lifestyle/picnic-scene.jpg"
-          alt="USA Gummies on a picnic table in an American setting"
-          fill
-          sizes="100vw"
-          className="object-cover"
-          priority
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#1B2A4A]/50 to-[#1B2A4A]/75" />
-        <div className="relative z-10 flex flex-col items-center justify-center h-full text-center px-4">
-          <div className="relative w-44 h-20 sm:w-52 sm:h-24 mb-3">
-            <Image src="/brand/logo-full.png" alt="USA Gummies" fill sizes="208px" className="object-contain drop-shadow-[0_6px_24px_rgba(0,0,0,0.5)]" />
-          </div>
-          <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold uppercase tracking-wide text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
-            Wholesale
-          </h1>
-          <p className="mt-2 text-sm text-white/85 max-w-md drop-shadow-sm">
-            Bring America&rsquo;s favorite dye-free gummy bears to your shelves.
-          </p>
-        </div>
-      </div>
+    <main>
+      <BreadcrumbJsonLd
+        items={[
+          { name: "Home", href: "/" },
+          { name: "Wholesale", href: "/wholesale" },
+        ]}
+      />
+      <JsonLd data={pageJsonLd} />
 
-      <section className="mx-auto max-w-5xl px-4 py-10 lg:py-12">
-        <BreadcrumbJsonLd
-          items={[
-            { name: "Home", href: "/" },
-            { name: "Wholesale", href: "/wholesale" },
-          ]}
-        />
-        <JsonLd data={pageJsonLd} />
+      <PageHero
+        eyebrow="For Buyers"
+        headline="Wholesale"
+        scriptAccent="USA Gummies."
+        sub="Bring America's favorite dye-free gummy bears to your shelves. Pricing, MOQs, and lead times sent within one business day."
+        ctas={[
+          { href: "#wholesale-form", label: "Request pricing" },
+          { href: "/where-to-buy", label: "Find us in stores", variant: "light" },
+        ]}
+      />
 
-        <div className="candy-panel rounded-[36px] p-6 sm:p-8">
-          <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
-            <div className="space-y-5">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-                Wholesale USA Gummies
-              </div>
-              <h2 className="text-3xl font-black text-[var(--text)] sm:text-4xl">
-                Request wholesale pricing.
+      <section className="bg-[var(--lp-cream)]">
+        <div className="mx-auto max-w-[1100px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="grid gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
+            <div className="space-y-6">
+              <p className="lp-label text-[var(--lp-red)]">★ Wholesale Snapshot ★</p>
+              <h2 className="lp-display text-[clamp(2rem,5vw,3.2rem)] leading-tight text-[var(--lp-ink)]">
+                Request wholesale
+                <br />
+                <span className="lp-script text-[var(--lp-red)]">pricing.</span>
               </h2>
-              <p className="text-sm text-[var(--muted)] sm:text-base max-w-prose">
-                Built for retail partners who want clean ingredients, made-in-USA
-                credibility, and a bold patriotic brand story. Tell us a little
-                about your business and we&rsquo;ll send wholesale pricing,
-                MOQs, and lead times within one business day.
+              <p className="lp-sans text-[1.05rem] leading-[1.7] text-[var(--lp-ink)]/85">
+                Built for retail partners who want clean ingredients, made-in-USA credibility, and a
+                bold patriotic brand story. Tell us about your business and we&rsquo;ll send wholesale
+                pricing, MOQs, and lead times within one business day.
               </p>
 
-              <ul className="grid gap-2 text-sm text-[var(--text)]">
+              <ul className="lp-sans space-y-3 text-[1rem] text-[var(--lp-ink)]/88">
                 {VALUE_BULLETS.map((bullet) => (
-                  <li key={bullet} className="flex gap-2">
-                    <span className="mt-1 h-2 w-2 rounded-full bg-[var(--red)]" aria-hidden="true" />
+                  <li key={bullet} className="flex gap-3">
+                    <span className="text-[var(--lp-red)]">★</span>
                     <span>{bullet}</span>
                   </li>
                 ))}
               </ul>
 
-              <div className="rounded-3xl border border-[var(--border)] bg-white p-5 shadow-[0_18px_44px_rgba(15,27,45,0.08)]">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-                  Retailer snapshot
-                </div>
-                <div className="mt-2 text-base font-black text-[var(--text)]">
+              <div
+                className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6"
+                style={{ boxShadow: "5px 5px 0 var(--lp-ink)" }}
+              >
+                <p className="lp-label mb-3 text-[var(--lp-red)]">★ Retailer Snapshot ★</p>
+                <h3 className="lp-display text-[1.4rem] leading-tight text-[var(--lp-ink)]">
                   Wholesale-ready at a glance
-                </div>
-                <div className="mt-3 grid gap-2">
+                </h3>
+                <div className="mt-4 grid gap-3">
                   {PROOF_ITEMS.map((item) => (
-                    <div key={item.title} className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-3">
-                      <div className="text-sm font-black text-[var(--text)]">{item.title}</div>
-                      <div className="text-xs text-[var(--muted)]">{item.detail}</div>
+                    <div
+                      key={item.title}
+                      className="border-2 border-[var(--lp-ink)] bg-[var(--lp-cream-soft)] p-4"
+                    >
+                      <div className="lp-display text-[1.05rem] text-[var(--lp-ink)]">{item.title}</div>
+                      <div className="lp-sans mt-1 text-[0.92rem] leading-[1.5] text-[var(--lp-ink)]/75">
+                        {item.detail}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -155,11 +149,40 @@ export default function WholesalePage() {
             </div>
 
             <div id="wholesale-form" className="lg:sticky lg:top-6">
-              <WholesaleForm />
-              <p className="mt-3 text-center text-xs text-[var(--muted)]">
+              <div
+                className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6 sm:p-7"
+                style={{ boxShadow: "5px 5px 0 var(--lp-red)" }}
+              >
+                <WholesaleForm />
+              </div>
+              <p className="lp-sans mt-4 text-center text-[0.85rem] text-[var(--lp-ink)]/70">
                 Pricing, MOQs, and lead times sent to your inbox within one business day.
               </p>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-[var(--lp-cream-soft)] border-t-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[900px] px-5 py-14 text-center sm:px-8 sm:py-16">
+          <p className="lp-label mb-3 text-[var(--lp-red)]">★ Already a Buyer? ★</p>
+          <h2 className="lp-display text-[clamp(2rem,5vw,3rem)] text-[var(--lp-ink)]">
+            Check your
+            <br />
+            <span className="lp-script text-[var(--lp-red)]">order status.</span>
+          </h2>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+            <Link href="/wholesale/status" className="lp-cta">
+              Order status
+            </Link>
+            <a
+              href="https://www.faire.com/brand/bw_cqd5dvfzqu"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="lp-cta lp-cta-light"
+            >
+              View on Faire
+            </a>
           </div>
         </div>
       </section>
