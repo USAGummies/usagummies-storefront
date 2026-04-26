@@ -12,6 +12,7 @@
  */
 
 import { kv } from "@vercel/kv";
+import type { ReceiptOcrSuggestion } from "./receipt-ocr";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -73,6 +74,20 @@ export interface ReceiptRecord {
   missing_fields?: string[];
   processed_at: string;
   notes?: string;
+  /**
+   * Phase 7 — OCR suggestion attached to this receipt for review.
+   *
+   * **Review-only.** Suggestions live in their own field — the
+   * top-level review fields (`vendor`, `date`, `amount`, `category`)
+   * are deliberately NOT auto-populated from this. Reviewers (Rene/Ben)
+   * promote suggestions to canonical fields by hand. Status remains
+   * `needs_review` until a human edits the canonical fields.
+   *
+   * Attaching a suggestion is also fail-soft: an OCR provider error
+   * never breaks the receipt's review state — the receipt sits in
+   * the queue without the suggestion, the reviewer can re-attach later.
+   */
+  ocr_suggestion?: ReceiptOcrSuggestion;
 }
 
 export interface InvoiceWatchRule {
@@ -393,6 +408,42 @@ export async function processReceipt(input: {
   await kv.set(KV_RECEIPTS, all);
 
   return record;
+}
+
+/**
+ * Attach an OCR suggestion to an existing receipt. Phase 7.
+ *
+ * Hard contract:
+ *   - **Status stays unchanged.** A receipt in `needs_review` stays
+ *     in `needs_review`. Attaching a suggestion never auto-promotes
+ *     the receipt to `ready`. Reviewers (Rene/Ben) flip status by
+ *     editing the canonical review fields, separately.
+ *   - **Canonical review fields are NOT touched.** `vendor`, `date`,
+ *     `amount`, `category`, `subcategory`, `payment_method` are
+ *     left exactly as the reviewer entered them (or as
+ *     `processReceipt` left them — usually undefined for a fresh
+ *     capture). The suggestion lives in its own field.
+ *   - **Idempotent.** Calling twice with the same `receiptId` and
+ *     a new suggestion replaces the previous suggestion only —
+ *     it does not duplicate or merge.
+ *   - Returns the updated receipt; returns `null` if no receipt
+ *     with that id exists.
+ */
+export async function attachOcrSuggestion(
+  receiptId: string,
+  suggestion: ReceiptOcrSuggestion,
+): Promise<ReceiptRecord | null> {
+  const all = (await kv.get<ReceiptRecord[]>(KV_RECEIPTS)) || [];
+  const idx = all.findIndex((r) => r.id === receiptId);
+  if (idx === -1) return null;
+  const next: ReceiptRecord = {
+    ...all[idx],
+    // Status preserved verbatim — Phase 7 does NOT auto-promote.
+    ocr_suggestion: suggestion,
+  };
+  all[idx] = next;
+  await kv.set(KV_RECEIPTS, all);
+  return next;
 }
 
 export async function listReceipts(

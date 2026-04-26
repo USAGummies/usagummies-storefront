@@ -61,7 +61,7 @@ Current active lane at the time this runway was refreshed:
 - `/ops/finance/review` is read-only and aggregates finance review queues.
 - `/ops/ap-packets` has dashboard, template drafts, and AP packet send-on-approve.
 - `/api/ops/upload` writes durable docs to Drive when Drive parent env is configured.
-- Receipts intake is review-first; OCR/QBO posting remains a future Rene-gated lane.
+- Receipts intake is review-first. Phase 7 attaches a *suggestion* envelope (`ocr_suggestion`) to each receipt via auth-gated `POST /api/ops/docs/receipt/ocr` — extraction is review-only; status stays `needs_review`; canonical fields are NOT auto-filled; no QBO write path was added. QBO posting remains a future Rene-gated lane.
 
 ### Fulfillment / Shipping
 
@@ -162,11 +162,14 @@ Potential code only if smoke fails:
 
 ### Lane B — Receipt OCR/Rene queue
 
-Goal: turn receipt capture from review-only into Rene-approved structured intake.
+Phase 7 done (extraction prepares review-only suggestions; no QBO write
+path). Next sub-lane: Rene-approved promotion flow that turns a
+reviewed receipt into a Class B/C QBO posting via the existing
+approval taxonomy.
 
 Boundary:
 
-- OCR/extraction can prepare suggestions.
+- OCR/extraction can prepare suggestions. ✅ Done.
 - QBO posting remains Rene-approved Class B/C.
 - Do not auto-create bills or expenses.
 

@@ -25,6 +25,19 @@ import {
   type SectionWiring,
 } from "./data";
 
+interface OcrSuggestionShape {
+  vendor: string | null;
+  date: string | null;
+  amount: number | null;
+  currency: string | null;
+  tax: number | null;
+  last4: string | null;
+  paymentHint: string | null;
+  confidence: "high" | "medium" | "low";
+  warnings: string[];
+  extractedAt: string;
+}
+
 interface ReceiptListItem {
   id: string;
   vendor?: string;
@@ -36,6 +49,7 @@ interface ReceiptListItem {
   notes?: string;
   source_channel?: string;
   processed_at: string;
+  ocr_suggestion?: OcrSuggestionShape;
 }
 
 const STATUS_COLOR: Record<SectionWiring, string> = {
@@ -304,23 +318,7 @@ export function FinanceReviewView() {
               </thead>
               <tbody>
                 {needsReview.map((r) => (
-                  <tr key={r.id} style={{ borderTop: `1px dashed ${BORDER}` }}>
-                    <Td>{r.vendor ?? "—"}</Td>
-                    <Td>{r.date ?? "—"}</Td>
-                    <Td>{r.amount ? money(r.amount) : "—"}</Td>
-                    <Td>{r.category ?? "—"}</Td>
-                    <Td>
-                      {(r.missing_fields ?? []).length > 0 ? (
-                        <span style={{ color: RED }}>
-                          {(r.missing_fields ?? []).join(", ")}
-                        </span>
-                      ) : (
-                        "—"
-                      )}
-                    </Td>
-                    <Td>{r.source_channel ?? "—"}</Td>
-                    <Td>{r.processed_at?.slice(0, 16)}</Td>
-                  </tr>
+                  <FragmentRow key={r.id} r={r} />
                 ))}
               </tbody>
             </table>
@@ -552,9 +550,100 @@ function Th({ children }: { children: React.ReactNode }) {
 function Td({
   children,
   style,
+  colSpan,
 }: {
   children: React.ReactNode;
   style?: React.CSSProperties;
+  colSpan?: number;
 }) {
-  return <td style={{ padding: "6px 10px", ...style }}>{children}</td>;
+  return (
+    <td style={{ padding: "6px 10px", ...style }} colSpan={colSpan}>
+      {children}
+    </td>
+  );
+}
+
+const CONFIDENCE_COLOR: Record<"high" | "medium" | "low", string> = {
+  high: "#1f7a3a",
+  medium: GOLD,
+  low: RED,
+};
+
+/**
+ * Renders a receipt row plus, when present, a non-promotion review-only
+ * sub-row showing the OCR suggestion. The sub-row is visually muted
+ * and labelled "OCR" so reviewers can never confuse it with the
+ * canonical (review-promoted) values.
+ */
+function FragmentRow({ r }: { r: ReceiptListItem }) {
+  const sug = r.ocr_suggestion;
+  return (
+    <>
+      <tr style={{ borderTop: `1px dashed ${BORDER}` }}>
+        <Td>{r.vendor ?? "—"}</Td>
+        <Td>{r.date ?? "—"}</Td>
+        <Td>{r.amount ? `$${r.amount.toFixed(2)}` : "—"}</Td>
+        <Td>{r.category ?? "—"}</Td>
+        <Td>
+          {(r.missing_fields ?? []).length > 0 ? (
+            <span style={{ color: RED }}>
+              {(r.missing_fields ?? []).join(", ")}
+            </span>
+          ) : (
+            "—"
+          )}
+        </Td>
+        <Td>{r.source_channel ?? "—"}</Td>
+        <Td>{r.processed_at?.slice(0, 16)}</Td>
+      </tr>
+      {sug && (
+        <tr style={{ background: BG }}>
+          <Td
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              color: DIM,
+              textTransform: "uppercase",
+              letterSpacing: 0.4,
+              whiteSpace: "nowrap",
+            }}
+          >
+            OCR · suggestion
+          </Td>
+          <Td style={{ fontSize: 11, color: DIM }}>{sug.vendor ?? "—"}</Td>
+          <Td style={{ fontSize: 11, color: DIM }}>{sug.date ?? "—"}</Td>
+          <Td style={{ fontSize: 11, color: DIM }}>
+            {typeof sug.amount === "number"
+              ? `${sug.currency ?? ""} $${sug.amount.toFixed(2)}`.trim()
+              : "—"}
+          </Td>
+          <Td colSpan={3} style={{ fontSize: 11, color: DIM }}>
+            <span
+              style={{
+                fontWeight: 700,
+                color: CONFIDENCE_COLOR[sug.confidence],
+                textTransform: "uppercase",
+                marginRight: 8,
+              }}
+            >
+              {sug.confidence}
+            </span>
+            {sug.last4 ? `card ····${sug.last4}` : ""}
+            {sug.paymentHint ? `${sug.last4 ? " · " : ""}${sug.paymentHint}` : ""}
+            {sug.tax !== null && sug.tax !== undefined
+              ? ` · tax $${sug.tax.toFixed(2)}`
+              : ""}
+            {sug.warnings.length > 0 && (
+              <span style={{ color: RED, marginLeft: 8 }}>
+                ⚠ {sug.warnings.join("; ")}
+              </span>
+            )}
+            <span style={{ display: "block", marginTop: 2, color: DIM }}>
+              Suggestion only — review fields above are unchanged.
+            </span>
+          </Td>
+        </tr>
+      )}
+    </>
+  );
 }
