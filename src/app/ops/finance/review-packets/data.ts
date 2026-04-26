@@ -783,3 +783,39 @@ export function filterPacketsBySpec(
   const allowed = new Set(filtered.rows.map((r) => r.packetId));
   return packets.filter((p) => allowed.has(p.packetId));
 }
+
+// ---------------------------------------------------------------------------
+// Phase 24 — approval-lookup freshness formatter (server-safe, pure)
+// ---------------------------------------------------------------------------
+//
+// `formatLookupFreshness(cachedAt, now)` projects the Phase 19
+// cache age metadata into a human-readable label for the dashboard.
+// Pure: same input → same output. NEVER fabricates — null / NaN /
+// future-dated input collapses to `"fresh"` so a clock-skew or a
+// stale state on the route can't manufacture a bogus age.
+//
+// Contract:
+//   - `cachedAt: null` → `"fresh"` (the route just rebuilt the lookup).
+//   - `cachedAt` non-finite (NaN / Infinity) → `"fresh"` (defensive).
+//   - `cachedAt > now` (future-dated, clock skew) → `"fresh"`.
+//   - 0 ≤ ageSec → label string formatted as:
+//       - 0s → `"as of just now"`
+//       - 1–59s → `"as of <N>s ago"`
+//       - 60s+ → `"as of <N>m ago"` (rounded)
+//
+// Living in `data.ts` (server-safe, no React imports) so it's
+// easily unit-tested without JSX overhead and reusable from any
+// future server-rendered surface that wants the same label.
+
+export function formatLookupFreshness(
+  cachedAt: number | null,
+  now: number,
+): string {
+  if (cachedAt === null || !Number.isFinite(cachedAt)) return "fresh";
+  const ageMs = now - cachedAt;
+  if (ageMs < 0) return "fresh"; // future-dated → defensive (clock skew)
+  const ageSec = Math.round(ageMs / 1000);
+  if (ageSec === 0) return "as of just now";
+  if (ageSec < 60) return `as of ${ageSec}s ago`;
+  return `as of ${Math.round(ageSec / 60)}m ago`;
+}

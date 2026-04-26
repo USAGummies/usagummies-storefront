@@ -87,6 +87,7 @@ import {
   __INTERNAL,
   buildApprovalLookupFresh,
   getCachedApprovalLookup,
+  getCachedApprovalLookupWithMeta,
   invalidateApprovalLookupCache,
 } from "@/lib/ops/receipt-review-approval-lookup";
 
@@ -409,6 +410,138 @@ describe("invalidateApprovalLookupCache", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Phase 24 — getCachedApprovalLookupWithMeta (cache freshness)
+// ---------------------------------------------------------------------------
+//
+// Variant of getCachedApprovalLookup that ALSO returns `cachedAt` so
+// the dashboard can render an "as of Xs ago" / "fresh" freshness
+// indicator. Locked rules:
+//   - Cache miss / stale / garbage / future-dated cachedAt /
+//     KV.get throw → cachedAt: null (freshly built).
+//   - Cache hit (within TTL) → cachedAt: number from the cached
+//     value's cachedAt field (NOT Date.now() — the original write time).
+//   - Map content is bit-identical to the same call shape on
+//     getCachedApprovalLookup() (the wrapper).
+//   - cachedAt is NEVER fabricated as 0 / -1 / now on a fresh build —
+//     it's `null` honestly.
+
+describe("getCachedApprovalLookupWithMeta", () => {
+  it("cache miss → { map, cachedAt: null } (fresh build)", async () => {
+    pendingFixture = [
+      makeApproval({ id: "a1", targetEntityId: "pkt-1", status: "pending" }),
+    ];
+    const result = await getCachedApprovalLookupWithMeta();
+    expect(result.map.get("pkt-1")?.id).toBe("a1");
+    expect(result.cachedAt).toBeNull();
+    // Builder ran exactly once.
+    expect(listPendingCalls).toBe(1);
+  });
+
+  it("cache hit (within TTL) → { map, cachedAt: <cached value's cachedAt> }", async () => {
+    const cachedTimestamp = Date.now() - 5_000; // 5s old
+    kvBacking.set(__INTERNAL.CACHE_KEY, {
+      cachedAt: cachedTimestamp,
+      entries: { "pkt-cached": { id: "appr-cached", status: "pending" } },
+    });
+
+    const result = await getCachedApprovalLookupWithMeta();
+    // Map served from cache.
+    expect(result.map.get("pkt-cached")?.id).toBe("appr-cached");
+    // Builder did NOT run — value came from cache.
+    expect(listPendingCalls).toBe(0);
+    // cachedAt is the ORIGINAL write timestamp, NOT Date.now().
+    expect(result.cachedAt).toBe(cachedTimestamp);
+  });
+
+  it("KV.get throw → { map, cachedAt: null } (fresh build)", async () => {
+    pendingFixture = [
+      makeApproval({ id: "a1", targetEntityId: "pkt-1", status: "pending" }),
+    ];
+    kvGetShouldThrow = true;
+    const result = await getCachedApprovalLookupWithMeta();
+    expect(result.map.get("pkt-1")?.id).toBe("a1");
+    expect(result.cachedAt).toBeNull();
+  });
+
+  it("garbage cached value → { map, cachedAt: null } (fresh build)", async () => {
+    kvBacking.set(__INTERNAL.CACHE_KEY, "not-a-cached-shape" as unknown);
+    pendingFixture = [
+      makeApproval({ id: "a1", targetEntityId: "pkt-1", status: "pending" }),
+    ];
+    const result = await getCachedApprovalLookupWithMeta();
+    expect(result.cachedAt).toBeNull();
+    expect(result.map.get("pkt-1")?.id).toBe("a1");
+  });
+
+  it("stale cache (> TTL) → { map, cachedAt: null } (fresh build)", async () => {
+    kvBacking.set(__INTERNAL.CACHE_KEY, {
+      cachedAt: Date.now() - 60_000, // 60s old, > 30s TTL
+      entries: { "pkt-stale": { id: "stale-id", status: "approved" } },
+    });
+    pendingFixture = [
+      makeApproval({ id: "fresh-id", targetEntityId: "pkt-1", status: "pending" }),
+    ];
+    const result = await getCachedApprovalLookupWithMeta();
+    expect(result.cachedAt).toBeNull();
+    expect(result.map.has("pkt-stale")).toBe(false);
+    expect(result.map.get("pkt-1")?.id).toBe("fresh-id");
+  });
+
+  it("future-dated cachedAt → { map, cachedAt: null } (fresh build, defensive)", async () => {
+    kvBacking.set(__INTERNAL.CACHE_KEY, {
+      cachedAt: Date.now() + 10_000, // 10s in the future
+      entries: { "pkt-future": { id: "future-id", status: "pending" } },
+    });
+    pendingFixture = [
+      makeApproval({ id: "fresh-id", targetEntityId: "pkt-1", status: "pending" }),
+    ];
+    const result = await getCachedApprovalLookupWithMeta();
+    expect(result.cachedAt).toBeNull();
+    expect(result.map.has("pkt-future")).toBe(false);
+  });
+
+  it("KV.set throw on fresh build → { map, cachedAt: null } (write error swallowed)", async () => {
+    pendingFixture = [
+      makeApproval({ id: "a1", targetEntityId: "pkt-1", status: "pending" }),
+    ];
+    kvSetShouldThrow = true;
+    const result = await getCachedApprovalLookupWithMeta();
+    expect(result.map.get("pkt-1")?.id).toBe("a1");
+    expect(result.cachedAt).toBeNull();
+  });
+
+  it("getCachedApprovalLookup() is a thin wrapper — same map content on cache hit", async () => {
+    const cachedTimestamp = Date.now() - 1_000;
+    kvBacking.set(__INTERNAL.CACHE_KEY, {
+      cachedAt: cachedTimestamp,
+      entries: { "pkt-x": { id: "appr-x", status: "approved" } },
+    });
+
+    const meta = await getCachedApprovalLookupWithMeta();
+    const plain = await getCachedApprovalLookup();
+    // Same map content from both entry points.
+    expect(plain.get("pkt-x")).toEqual(meta.map.get("pkt-x"));
+    expect(plain.size).toBe(meta.map.size);
+  });
+
+  it("cachedAt is the cached value's timestamp, NOT Date.now() (defensive)", async () => {
+    // Pin the cached value 20s in the past.
+    const writeTime = Date.now() - 20_000;
+    kvBacking.set(__INTERNAL.CACHE_KEY, {
+      cachedAt: writeTime,
+      entries: {},
+    });
+    const before = Date.now();
+    const result = await getCachedApprovalLookupWithMeta();
+    const after = Date.now();
+    expect(result.cachedAt).toBe(writeTime);
+    // Asserting the test doesn't fabricate now() as the cachedAt:
+    expect(result.cachedAt).toBeLessThan(before);
+    void after;
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Static-source assertion — no forbidden imports / call sites
 // ---------------------------------------------------------------------------
 
@@ -432,7 +565,8 @@ describe("read-only contract — no forbidden imports", () => {
     expect(src).not.toMatch(/\bbuildApprovalRequest\s*\(/);
     // Module exports are limited to the canonical surface.
     expect(src).toMatch(/export\s+async\s+function\s+buildApprovalLookupFresh/);
-    expect(src).toMatch(/export\s+async\s+function\s+getCachedApprovalLookup/);
+    expect(src).toMatch(/export\s+async\s+function\s+getCachedApprovalLookup\s*\(/);
+    expect(src).toMatch(/export\s+async\s+function\s+getCachedApprovalLookupWithMeta/);
     expect(src).toMatch(/export\s+async\s+function\s+invalidateApprovalLookupCache/);
   });
 });

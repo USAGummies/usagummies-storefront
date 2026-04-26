@@ -411,6 +411,77 @@ describe("Phase 16 — approval-status filter + lookup", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Phase 24 — cache freshness metadata in response
+// ---------------------------------------------------------------------------
+//
+// The list route surfaces `approvalsLookupCachedAt` so the dashboard
+// can render an "as of Xs ago" indicator. Locked rules:
+//   - Cache miss / fresh build → `approvalsLookupCachedAt: null`
+//     (NEVER fabricated as 0 / -1 / now).
+//   - Cache hit (within 30s TTL) → `approvalsLookupCachedAt: number`
+//     equal to the cached value's `cachedAt` field.
+//   - Field is always present in the response (no missing-key
+//     ambiguity) so the client doesn't need to handle three cases.
+
+describe("Phase 24 — approvalsLookupCachedAt response field", () => {
+  beforeEach(() => isAuthorizedMock.mockResolvedValue(true));
+
+  it("fresh build (no cache primed) → approvalsLookupCachedAt: null", async () => {
+    const r = await processReceipt({
+      source_url: "https://example.com/x.jpg",
+      source_channel: "test",
+    });
+    await requestReceiptReviewPromotion(r.id);
+    const res = await GET(makeReq());
+    const body = (await res.json()) as {
+      approvalsLookupCachedAt: number | null;
+    };
+    expect(body).toHaveProperty("approvalsLookupCachedAt");
+    expect(body.approvalsLookupCachedAt).toBeNull();
+  });
+
+  it("cache hit → approvalsLookupCachedAt is a number equal to the cached value's cachedAt", async () => {
+    // Prime the cache directly with a sentinel timestamp.
+    const cachedTimestamp = Date.now() - 5_000; // 5s ago, well within TTL
+    store.set("approval-lookup:receipt-review:v1", {
+      cachedAt: cachedTimestamp,
+      entries: {},
+    });
+
+    const r = await processReceipt({
+      source_url: "https://example.com/x.jpg",
+      source_channel: "test",
+    });
+    await requestReceiptReviewPromotion(r.id);
+
+    // First call serves from the primed cache.
+    const res = await GET(makeReq());
+    const body = (await res.json()) as {
+      approvalsLookupCachedAt: number | null;
+    };
+    expect(body.approvalsLookupCachedAt).toBe(cachedTimestamp);
+  });
+
+  it("response shape ALWAYS includes approvalsLookupCachedAt (no missing-key ambiguity)", async () => {
+    const res = await GET(makeReq());
+    const body = (await res.json()) as Record<string, unknown>;
+    expect("approvalsLookupCachedAt" in body).toBe(true);
+  });
+
+  it("approvalsLookupCachedAt is NEVER fabricated as 0 / now on a fresh build", async () => {
+    const before = Date.now();
+    const res = await GET(makeReq());
+    const body = (await res.json()) as {
+      approvalsLookupCachedAt: number | null;
+    };
+    // Honest null on fresh build — not 0, not -1, not Date.now().
+    expect(body.approvalsLookupCachedAt).toBeNull();
+    expect(body.approvalsLookupCachedAt).not.toBe(0);
+    expect(body.approvalsLookupCachedAt).not.toBe(before);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Phase 23 — id-substring search
 // ---------------------------------------------------------------------------
 

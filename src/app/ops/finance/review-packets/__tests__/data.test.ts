@@ -23,6 +23,7 @@ import {
   escapeCsvCell,
   filterPacketsBySpec,
   formatAmountCell,
+  formatLookupFreshness,
   formatVendorCell,
   paginateReviewPackets,
   parseReviewPacketsFilterSpec,
@@ -1702,5 +1703,97 @@ describe("Phase 23 — filterPacketsBySpec idContains lockstep", () => {
     // matches NO row (packet/receipt ids don't contain "zzzz").
     const filtered = filterPacketsBySpec([packet], { idContains: "zzzz" });
     expect(filtered).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 24 — formatLookupFreshness (cache age formatter)
+// ---------------------------------------------------------------------------
+//
+// Pure formatter projecting Phase 19's cache age metadata into a
+// human-readable label for the dashboard. Locked rules:
+//   - null / NaN / Infinity → "fresh" (defensive — never fabricate).
+//   - future-dated (cachedAt > now, clock skew) → "fresh".
+//   - 0s ago → "as of just now".
+//   - 1-59s ago → "as of <N>s ago".
+//   - 60s+ → "as of <N>m ago" (rounded).
+//   - Pure: same (cachedAt, now) → same string output.
+//   - NEVER renders empty / "null" / "undefined" / "NaN" / "0".
+
+describe("Phase 24 — formatLookupFreshness", () => {
+  const NOW = 1_700_000_000_000; // arbitrary fixed clock for tests
+
+  it("null cachedAt → 'fresh'", () => {
+    expect(formatLookupFreshness(null, NOW)).toBe("fresh");
+  });
+
+  it("NaN cachedAt → 'fresh' (defensive)", () => {
+    expect(formatLookupFreshness(Number.NaN, NOW)).toBe("fresh");
+  });
+
+  it("Infinity cachedAt → 'fresh' (defensive)", () => {
+    expect(formatLookupFreshness(Number.POSITIVE_INFINITY, NOW)).toBe("fresh");
+  });
+
+  it("future-dated cachedAt (clock skew) → 'fresh' (defensive)", () => {
+    expect(formatLookupFreshness(NOW + 5_000, NOW)).toBe("fresh");
+  });
+
+  it("0s ago → 'as of just now'", () => {
+    expect(formatLookupFreshness(NOW, NOW)).toBe("as of just now");
+  });
+
+  it("1s ago → 'as of 1s ago'", () => {
+    expect(formatLookupFreshness(NOW - 1_000, NOW)).toBe("as of 1s ago");
+  });
+
+  it("5s ago → 'as of 5s ago'", () => {
+    expect(formatLookupFreshness(NOW - 5_000, NOW)).toBe("as of 5s ago");
+  });
+
+  it("29s ago (within 30s TTL) → 'as of 29s ago'", () => {
+    expect(formatLookupFreshness(NOW - 29_000, NOW)).toBe("as of 29s ago");
+  });
+
+  it("59s ago → 'as of 59s ago' (still in seconds)", () => {
+    expect(formatLookupFreshness(NOW - 59_000, NOW)).toBe("as of 59s ago");
+  });
+
+  it("60s ago → 'as of 1m ago'", () => {
+    expect(formatLookupFreshness(NOW - 60_000, NOW)).toBe("as of 1m ago");
+  });
+
+  it("90s ago → 'as of 2m ago' (rounded)", () => {
+    expect(formatLookupFreshness(NOW - 90_000, NOW)).toBe("as of 2m ago");
+  });
+
+  it("180s ago → 'as of 3m ago'", () => {
+    expect(formatLookupFreshness(NOW - 180_000, NOW)).toBe("as of 3m ago");
+  });
+
+  it("pure: same input → same output (called twice yields same string)", () => {
+    const a = formatLookupFreshness(NOW - 7_500, NOW);
+    const b = formatLookupFreshness(NOW - 7_500, NOW);
+    expect(a).toBe(b);
+  });
+
+  it("NEVER renders empty / 'null' / 'undefined' / 'NaN' / '0' on any input", () => {
+    const candidates: Array<number | null> = [
+      null,
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+      NOW + 1_000,
+      NOW,
+      NOW - 1,
+      NOW - 1_000_000,
+    ];
+    for (const c of candidates) {
+      const out = formatLookupFreshness(c, NOW);
+      expect(out.length).toBeGreaterThan(0);
+      expect(out).not.toBe("null");
+      expect(out).not.toBe("undefined");
+      expect(out).not.toBe("NaN");
+      expect(out).not.toBe("0");
+    }
   });
 });

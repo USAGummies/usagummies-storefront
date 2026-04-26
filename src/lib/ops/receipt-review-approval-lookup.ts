@@ -164,6 +164,39 @@ function serializeMap(map: ApprovalsByPacketId): CachedShape {
  *     the write error
  */
 export async function getCachedApprovalLookup(): Promise<ApprovalsByPacketId> {
+  const { map } = await getCachedApprovalLookupWithMeta();
+  return map;
+}
+
+/**
+ * Phase 24 — variant of `getCachedApprovalLookup` that ALSO returns
+ * the cache age metadata. Used by the list route to surface "as of
+ * Xs ago" to operators on the dashboard so they can tell whether
+ * the view they're seeing was just rebuilt or is being served from
+ * the 30s TTL window.
+ *
+ * `cachedAt` is:
+ *   - `null` when the lookup was freshly built (cache miss / stale /
+ *     garbage / future-dated cachedAt / KV.get throw fallthrough).
+ *   - The cached value's `cachedAt` Unix-ms timestamp when served
+ *     from cache (within the TTL window).
+ *
+ * The plain `getCachedApprovalLookup()` is a thin wrapper around
+ * this — preserved for backward-compat with the CSV export route
+ * and the Phase 20/22 callers that don't care about cache age.
+ *
+ * Same defensive fallthroughs and best-effort cache-write contract
+ * as the wrapper. KV.set throws are swallowed; the freshly-built
+ * map is still returned with `cachedAt: null`.
+ */
+export interface CachedApprovalLookupMeta {
+  map: ApprovalsByPacketId;
+  /** Unix-ms timestamp from the cache entry when served from cache;
+   *  `null` when freshly built. NEVER fabricated as 0 / -1 / now. */
+  cachedAt: number | null;
+}
+
+export async function getCachedApprovalLookupWithMeta(): Promise<CachedApprovalLookupMeta> {
   let cached: unknown = null;
   try {
     cached = await kv.get(CACHE_KEY);
@@ -173,7 +206,7 @@ export async function getCachedApprovalLookup(): Promise<ApprovalsByPacketId> {
   if (isValidCachedShape(cached)) {
     const ageMs = Date.now() - cached.cachedAt;
     if (ageMs >= 0 && ageMs <= CACHE_TTL_SECONDS * 1000) {
-      return deserializeMap(cached);
+      return { map: deserializeMap(cached), cachedAt: cached.cachedAt };
     }
   }
   // Cache miss / stale / garbage / KV throw → fresh build.
@@ -186,7 +219,7 @@ export async function getCachedApprovalLookup(): Promise<ApprovalsByPacketId> {
   } catch {
     // ignore
   }
-  return fresh;
+  return { map: fresh, cachedAt: null };
 }
 
 /**

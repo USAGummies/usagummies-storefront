@@ -51,7 +51,7 @@ import { NextResponse } from "next/server";
 
 import { isAuthorized } from "@/lib/ops/abra-auth";
 import { listReceiptReviewPackets } from "@/lib/ops/docs";
-import { getCachedApprovalLookup } from "@/lib/ops/receipt-review-approval-lookup";
+import { getCachedApprovalLookupWithMeta } from "@/lib/ops/receipt-review-approval-lookup";
 import {
   filterPacketsBySpec,
   paginateReviewPackets,
@@ -98,7 +98,12 @@ export async function GET(req: Request): Promise<Response> {
     // Phase 16/19 — read-only approval lookup, KV-cached (30s TTL)
     // through the shared canonical helper. Both reads inside the
     // helper fail-soft; the cache write is best-effort.
-    const approvalsByPacketId = await getCachedApprovalLookup();
+    // Phase 24 — also pull `cachedAt` so the dashboard can render
+    // an "as of Xs ago" / "fresh" freshness indicator. Operators
+    // can tell whether they're seeing a freshly-rebuilt view or
+    // one being served from the 30s TTL window.
+    const { map: approvalsByPacketId, cachedAt: approvalsLookupCachedAt } =
+      await getCachedApprovalLookupWithMeta();
 
     const filtered = filterApplied
       ? filterPacketsBySpec(allPackets, spec, approvalsByPacketId)
@@ -129,6 +134,13 @@ export async function GET(req: Request): Promise<Response> {
           paginated.page.some((p) => p.packetId === packetId),
         ),
       ),
+      // Phase 24 — cache freshness metadata. `null` means the
+      // approval lookup was freshly rebuilt for this request (cache
+      // miss / stale / KV throw fallthrough). A number means it
+      // came from the cache; the timestamp lets the client compute
+      // "as of Xs ago". NEVER fabricated as 0 / -1 / now on a fresh
+      // build — the route surfaces `null` honestly.
+      approvalsLookupCachedAt: approvalsLookupCachedAt,
     });
   } catch (err) {
     return NextResponse.json(

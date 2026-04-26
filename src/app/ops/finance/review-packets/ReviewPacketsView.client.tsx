@@ -16,6 +16,7 @@ import {
   applyReviewPacketsFilters,
   buildReviewPacketsView,
   formatAmountCell,
+  formatLookupFreshness,
   formatVendorCell,
   reviewPacketsFilterSpecToQuery,
   type ReviewPacketRowStatus,
@@ -58,6 +59,9 @@ interface ListResponse {
   /** Phase 17 — opaque cursor for the next page. `null` when no
    *  more pages remain. */
   nextCursor?: string | null;
+  /** Phase 24 — Unix-ms timestamp from the cached approval lookup,
+   *  or `null` when freshly built. NEVER fabricated. */
+  approvalsLookupCachedAt?: number | null;
   error?: string;
   reason?: string;
 }
@@ -70,6 +74,9 @@ interface FetchResult {
   /** Phase 17 — full filtered length BEFORE pagination. Lets the
    *  client render "showing X of Y" when paginating. */
   matchedTotal: number | null;
+  /** Phase 24 — cache age metadata. `null` on fresh build / route
+   *  error / route doesn't surface this field (older builds). */
+  approvalsLookupCachedAt: number | null;
   err: string | null;
 }
 
@@ -98,6 +105,7 @@ async function fetchPackets(
         view: null,
         nextCursor: null,
         matchedTotal: null,
+        approvalsLookupCachedAt: null,
         err: reason,
       };
     }
@@ -122,6 +130,10 @@ async function fetchPackets(
       nextCursor: typeof body.nextCursor === "string" ? body.nextCursor : null,
       matchedTotal:
         typeof body.matchedTotal === "number" ? body.matchedTotal : null,
+      approvalsLookupCachedAt:
+        typeof body.approvalsLookupCachedAt === "number"
+          ? body.approvalsLookupCachedAt
+          : null,
       err: null,
     };
   } catch (err) {
@@ -129,10 +141,15 @@ async function fetchPackets(
       view: null,
       nextCursor: null,
       matchedTotal: null,
+      approvalsLookupCachedAt: null,
       err: err instanceof Error ? err.message : String(err),
     };
   }
 }
+
+// Phase 24 — `formatLookupFreshness` lives in the server-safe
+// `data.ts` module so it can be unit-tested without React baggage
+// and shared with any future server-rendered surface. Imported above.
 
 async function repromoteReceipt(
   receiptId: string,
@@ -179,6 +196,21 @@ export function ReviewPacketsView() {
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [matchedTotal, setMatchedTotal] = useState<number | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  // Phase 24 — cache age metadata. `null` on fresh build (cache
+  // miss / route returned a fresh map). A number is the cached
+  // value's `cachedAt` Unix-ms timestamp from Phase 19's
+  // CachedShape — lets the indicator render "as of Xs ago".
+  const [approvalsLookupCachedAt, setApprovalsLookupCachedAt] = useState<
+    number | null
+  >(null);
+  // Phase 24 — clock tick that re-renders the indicator every
+  // second so "as of 5s ago" advances live without refetching.
+  // Uses a coarse 1s tick to keep CPU minimal.
+  const [now, setNow] = useState<number>(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
   // pageCount: 1 = first page only; >1 = user clicked Load more.
   // Phase 15's bounded passive poll skips when pageCount > 1 to
   // avoid yanking the operator's accumulated rows mid-scroll.
@@ -241,6 +273,7 @@ export function ReviewPacketsView() {
       setLoading(false);
       setNextCursor(r.nextCursor);
       setMatchedTotal(r.matchedTotal);
+      setApprovalsLookupCachedAt(r.approvalsLookupCachedAt);
       setRepromote({}); // fresh load → drop stale per-row pills
     });
     return () => {
@@ -280,6 +313,9 @@ export function ReviewPacketsView() {
     });
     setNextCursor(r.nextCursor);
     setPageCount((c) => c + 1);
+    // Phase 24 — refresh the freshness indicator on Load more too;
+    // the route's response carries the cachedAt for that fetch.
+    setApprovalsLookupCachedAt(r.approvalsLookupCachedAt);
   }
 
   // Phase 15 — bounded passive poll. Refreshes the list every
@@ -597,12 +633,31 @@ export function ReviewPacketsView() {
               borderTop: `1px solid ${BORDER}`,
               borderBottom: `1px solid ${BORDER}`,
               padding: "8px 0",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "baseline",
+              gap: 12,
+              flexWrap: "wrap",
             }}
           >
-            {headerSummary}
-            {filtersActive && (
-              <span style={{ marginLeft: 8, color: GOLD }}>(filtered)</span>
-            )}
+            <span>
+              {headerSummary}
+              {filtersActive && (
+                <span style={{ marginLeft: 8, color: GOLD }}>(filtered)</span>
+              )}
+            </span>
+            {/* Phase 24 — approval-lookup freshness indicator. Reads
+             *   the cachedAt timestamp surfaced by the list route and
+             *   renders "as of Xs ago" / "fresh". Closes the "is this
+             *   stale?" question without forcing operators to click
+             *   Refresh. The 1s clock tick (`now`) keeps the label
+             *   advancing live. */}
+            <span
+              style={{ fontSize: 11, color: DIM }}
+              title="Approval lookup freshness. Cache TTL is 30s; closer + Re-promote actions invalidate immediately (Phase 20 + Phase 22)."
+            >
+              Approvals: {formatLookupFreshness(approvalsLookupCachedAt, now)}
+            </span>
           </div>
         )}
 

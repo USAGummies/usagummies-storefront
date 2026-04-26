@@ -162,26 +162,45 @@ Potential code only if smoke fails:
 
 ### Lane B — Receipt-to-Rene approval promotion
 
-Phases 7-23 done. Phase 23 adds an ID-substring search input to
-the dashboard filter strip — operator pastes a packetId, receiptId,
-OR approvalId substring (from a Slack thread, audit log, or CSV
-row) and the table narrows to that row in one keystroke.
-Case-insensitive across all three id fields; AND semantics with
-the existing status/vendor/date/approvalStatus filters. Lockstep
-client/server semantics via the same `filterPacketsBySpec` parity
-contract. Empty/whitespace collapses to "no filter" (defensive).
-Approval-id match requires the approval map plumbed through (no
-fabrication of approvalId on a row that lacks one). Replaces the
-originally-earmarked Phase 23 (`qbo.bill.create`) — that QBO-write
-candidate is deferred to a later phase, blocked on Rene's
-chart-of-accounts mapping (Slack DM in flight).
+Phases 7-24 done. Phase 24 adds a cache freshness indicator to
+the dashboard — operators see "Approvals: as of 5s ago" / "fresh"
+on the right edge of the counts strip, so they can answer the
+"is this view stale?" question without clicking Refresh. New
+`getCachedApprovalLookupWithMeta` variant returns `{ map,
+cachedAt }`; the plain `getCachedApprovalLookup` becomes a thin
+wrapper preserving backward-compat for the CSV export + Phase
+20/22 callers. List route surfaces `approvalsLookupCachedAt:
+number | null` (always present, never fabricated as 0/-1/now).
+New pure `formatLookupFreshness(cachedAt, now)` helper in
+`data.ts` projects to human-readable buckets; defensive on
+null/NaN/Infinity/future-dated → "fresh". 1s clock tick in the
+client keeps the label advancing live without refetching. Replaces
+the originally-earmarked Phase 24 (`qbo.bill.create` entry) which
+is **PARKED** pending Rene's chart-of-accounts mapping.
 
-Receipt-review queue management is feature-complete. Remaining
-follow-ups (none currently scheduled, all blocked on external
-input):
-- Closing the loop into `qbo.bill.create` once Rene confirms the
-  chart-of-accounts mapping (per-category vs per-vendor default) +
-  Ben confirms Class C dual-approval flow. STOP-AND-ASK boundary.
+Phase 23 adds an ID-substring search input to the dashboard filter
+strip — operator pastes a packetId, receiptId, OR approvalId
+substring (from a Slack thread, audit log, or CSV row) and the
+table narrows to that row in one keystroke. Case-insensitive
+across all three id fields; AND semantics with the existing
+status/vendor/date/approvalStatus filters. Lockstep client/server
+semantics via the same `filterPacketsBySpec` parity contract.
+Empty/whitespace collapses to "no filter" (defensive). Approval-id
+match requires the approval map plumbed through (no fabrication of
+approvalId on a row that lacks one).
+
+Receipt-review queue management is feature-complete on the
+read-only side. The only remaining receipt-review candidate
+(`qbo.bill.create` entry) is **PARKED** pending Rene's
+chart-of-accounts mapping (Slack draft queued in 2026-04-25
+conversation history but not yet posted). When unblocked, the
+resume context is captured under the Parked Items list above and in
+`contracts/workflow-blueprint.md` v1.27 + Notion §7.
+
+Build continues on adjacent operator-value lanes that don't cross
+the QBO-write boundary (e.g. observability polish, audit feeds,
+operator-surface hardening on /ops/finance/review or related
+dashboards).
 
 Boundary:
 
@@ -202,7 +221,17 @@ Boundary:
 - CSV cursor pagination. ✅ Done (Phase 21).
 - Promote-review cache-invalidation hook. ✅ Done (Phase 22).
 - ID-substring search on dashboard. ✅ Done (Phase 23).
-- Phase 24: TBD (qbo.bill.create entry — STOP-AND-ASK; blocked on Rene's CoA mapping).
+- Cache freshness indicator on dashboard. ✅ Done (Phase 24).
+- **PARKED:** `qbo.bill.create` entry — STOP-AND-ASK on the
+  QBO-write boundary. Blocked on Rene's chart-of-accounts mapping
+  (per-category vs per-vendor account-default scheme). Slack draft
+  for Rene queued in 2026-04-25 conversation history but NOT YET
+  POSTED (awaiting Ben's wording approval). When unblocked, slug =
+  `qbo.bill.create.from-receipt`, Class C (Rene + Ben dual-approver),
+  idempotency = BOTH KV dedup (`qbo:bill:created:<packetId>`) AND
+  QBO `PrivateNote` tag (`usa-gummies-bill-from-packet:<packetId>`).
+  See `contracts/workflow-blueprint.md` v1.27 + Notion §7 for the
+  resume context.
 - QBO posting remains a separate Rene-approved Class B/C action.
 - Do not auto-create bills, expenses, vendors, or categories.
 - Do not overwrite canonical receipt fields without explicit reviewer action.
