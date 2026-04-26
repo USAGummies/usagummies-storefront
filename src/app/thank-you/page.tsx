@@ -1,11 +1,14 @@
-// src/app/thank-you/page.tsx
+// /thank-you — post-purchase confirmation page in LP design language.
+// PurchaseTracker fires the analytics + ad-platform conversion events
+// regardless of which sub-section the visitor scrolls to.
+
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
-import { Reveal } from "@/components/ui/Reveal";
+
+import { PageHero } from "@/components/lp/PageHero";
 import { LeadCapture } from "@/components/marketing/LeadCapture.client";
 import PurchaseTracker from "@/components/tracking/PurchaseTracker.client";
-// SubscriptionUnlock removed — replaced with direct subscription CTA
 
 function resolveSiteUrl() {
   const preferred = "https://www.usagummies.com";
@@ -22,7 +25,8 @@ function resolveSiteUrl() {
 
 const SITE_URL = resolveSiteUrl();
 const PAGE_TITLE = "Thank You | USA Gummies";
-const PAGE_DESCRIPTION = "Thanks for your USA Gummies order. You are officially part of the movement.";
+const PAGE_DESCRIPTION =
+  "Thanks for your USA Gummies order. You are officially part of the movement.";
 const OG_IMAGE = "/opengraph-image";
 
 const igImages = ["/home-patriotic-product.jpg", "/brand/hero.jpg", "/hero.jpg"];
@@ -52,96 +56,128 @@ export const metadata: Metadata = {
   },
 };
 
+const SHADOW_INK = { boxShadow: "5px 5px 0 var(--lp-ink)" };
+const SHADOW_RED = { boxShadow: "5px 5px 0 var(--lp-red)" };
+
 export default function ThankYouPage() {
   return (
-    <main className="relative overflow-hidden text-[var(--text)] min-h-screen home-candy pb-16">
+    <main>
       <PurchaseTracker />
-      <div className="mx-auto max-w-6xl px-4 pt-10">
-        <Reveal className="candy-panel rounded-3xl border border-[var(--border)] p-6 space-y-3 text-[var(--text)]">
-          <div className="text-xs font-semibold tracking-[0.22em] text-[var(--muted)] uppercase">
-            USA Gummies
-          </div>
-          <h1 className="text-3xl font-black text-[var(--text)] leading-tight">
-            You’re officially part of the movement.
-          </h1>
-          <div className="text-sm font-semibold text-[var(--muted)]">
-            Made in USA • All Natural • No Artificial Dyes
-          </div>
-        </Reveal>
 
-        <div className="mt-6 grid gap-4 md:grid-cols-2">
-          <Reveal className="candy-panel rounded-2xl border border-[var(--border)] p-5 space-y-3 text-[var(--text)]">
-            <div className="text-lg font-black text-[var(--text)]">America 250 perks</div>
-            <ul className="list-disc list-inside text-sm text-[var(--muted)] space-y-1">
-              <li>Early drops</li>
-              <li>Savings deals</li>
-              <li>First access to new runs</li>
-            </ul>
-            <Link
-              href="/america-250"
-              className="btn btn-candy pressable inline-flex w-fit"
+      <PageHero
+        eyebrow="Thank You"
+        headline="You're officially"
+        scriptAccent="part of the movement."
+        sub="Made in USA · All Natural Flavors · No Artificial Dyes — your bag of USA Gummies is on its way."
+      />
+
+      {/* Two-card grid: America 250 perks + Instagram follow */}
+      <section className="bg-[var(--lp-cream-soft)] border-y-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[1200px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="grid gap-6 md:grid-cols-2">
+            <div
+              className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6 sm:p-7"
+              style={SHADOW_RED}
             >
-              Claim America 250 perks
-            </Link>
-          </Reveal>
-
-          <Reveal className="candy-panel rounded-2xl border border-[var(--border)] p-5 space-y-3 text-[var(--text)]">
-            <div className="text-lg font-black text-[var(--text)]">Follow @usagummies</div>
-            <div className="grid grid-cols-3 gap-2">
-              {igImages.map((src) => (
-                <div key={src} className="relative aspect-square overflow-hidden rounded-xl border border-[var(--border)]">
-                  <Image
-                    src={src}
-                    alt={IG_IMAGE_ALTS[src] || "USA Gummies Instagram photo"}
-                    fill
-                    sizes="(max-width: 768px) 28vw, 120px"
-                    className="object-cover"
-                  />
-                </div>
-              ))}
+              <p className="lp-label mb-2 text-[var(--lp-red)]">★ America 250 Perks ★</p>
+              <h2 className="lp-display text-[1.6rem] text-[var(--lp-ink)]">
+                Early drops, savings,
+                <br />
+                <span className="lp-script text-[var(--lp-red)]">first access.</span>
+              </h2>
+              <ul className="lp-sans mt-4 list-disc space-y-1 pl-5 text-[1rem] text-[var(--lp-ink)]/82">
+                <li>Early drops on new runs</li>
+                <li>Member-only savings alerts</li>
+                <li>First access to limited bags</li>
+              </ul>
+              <div className="mt-5">
+                <Link href="/america-250" className="lp-cta">
+                  Claim America 250 perks
+                </Link>
+              </div>
             </div>
-            <Link
-              href="https://www.instagram.com/usagummies"
-              className="btn btn-outline pressable inline-flex w-fit"
-            >
-              Follow @usagummies
-            </Link>
-          </Reveal>
-        </div>
 
-        <div className="mt-6 grid gap-4 md:grid-cols-2">
-          <Reveal>
+            <div
+              className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6 sm:p-7"
+              style={SHADOW_INK}
+            >
+              <p className="lp-label mb-2 text-[var(--lp-red)]">★ Follow Along ★</p>
+              <h2 className="lp-display text-[1.6rem] text-[var(--lp-ink)]">
+                Follow
+                <br />
+                <span className="lp-script text-[var(--lp-red)]">@usagummies.</span>
+              </h2>
+              <div className="mt-4 grid grid-cols-3 gap-2">
+                {igImages.map((src) => (
+                  <div
+                    key={src}
+                    className="relative aspect-square overflow-hidden border-2 border-[var(--lp-ink)]"
+                  >
+                    <Image
+                      src={src}
+                      alt={IG_IMAGE_ALTS[src] || "USA Gummies Instagram photo"}
+                      fill
+                      sizes="(max-width: 768px) 28vw, 120px"
+                      className="object-cover"
+                    />
+                  </div>
+                ))}
+              </div>
+              <div className="mt-5">
+                <Link
+                  href="https://www.instagram.com/usagummies"
+                  className="lp-cta lp-cta-light"
+                >
+                  Follow @usagummies
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Newsletter / SMS capture */}
+      <section className="bg-[var(--lp-cream)]">
+        <div className="mx-auto max-w-[800px] px-5 py-14 sm:px-8 sm:py-20">
+          <div
+            className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6 sm:p-8"
+            style={SHADOW_RED}
+          >
             <LeadCapture
               source="thank-you"
               intent="newsletter"
               title="Stay in the circle"
-              subtitle="No spam. Only bold flavor news."
+              subtitle="No spam. Only bold flavor news + restock alerts."
               ctaLabel="Get first access"
+              variant="light"
               showSms
             />
-          </Reveal>
+          </div>
         </div>
+      </section>
 
-        <div className="mt-6">
-          <Reveal className="candy-panel rounded-2xl border border-[var(--border)] p-5 space-y-3 text-[var(--text)]">
-            <div className="text-lg font-black text-[var(--text)]">Choose your next bag count</div>
-            <div className="text-sm text-[var(--muted)]">
-              Free shipping on 5+ bags. Most customers go bigger on the next run.
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Link href="/shop" className="btn btn-candy pressable">
-                Shop now
-              </Link>
-              <Link href="/contact" className="btn btn-outline pressable">
-                Order support
-              </Link>
-            </div>
-            <div className="text-xs text-[var(--muted)]">
-              Ships fast. If you need help, we have you covered.
-            </div>
-          </Reveal>
+      {/* Bottom CTA — encourage next purchase */}
+      <section className="bg-[var(--lp-cream-soft)] border-t-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[900px] px-5 py-14 text-center sm:px-8 sm:py-16">
+          <p className="lp-label mb-3 text-[var(--lp-red)]">★ Already Hooked? ★</p>
+          <h2 className="lp-display text-[clamp(2rem,5vw,3.2rem)] text-[var(--lp-ink)]">
+            Pick your next
+            <br />
+            <span className="lp-script text-[var(--lp-red)]">bag count.</span>
+          </h2>
+          <p className="lp-sans mx-auto mt-4 max-w-[42ch] text-[1rem] text-[var(--lp-ink)]/82">
+            Free shipping on 5+ bags. Most customers go bigger on the next run.
+          </p>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+            <Link href="/shop" className="lp-cta">
+              Shop now
+            </Link>
+            <Link href="/contact" className="lp-cta lp-cta-light">
+              Order support
+            </Link>
+          </div>
         </div>
-      </div>
+      </section>
     </main>
   );
 }

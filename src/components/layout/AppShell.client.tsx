@@ -13,7 +13,9 @@ import { LeadCapture } from "@/components/marketing/LeadCapture.client";
 // SubscriptionUnlock removed — subscriptions not live in Shopify
 import { getCartToastMessage, readLastAdd } from "@/lib/cartFeedback";
 import { SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
-import { ExperienceBand } from "@/components/brand/ExperienceBand";
+// ExperienceBand retired in Phase 7 cleanup — its job (a brand
+// reassurance band on home + shop) is now done by ScarcityBar +
+// ThreePromises in the LP-language sections those pages use.
 import { getStoredCartId, storeCartId, getBagsPerUnit } from "@/lib/cartClientUtils";
 
 const CartDrawer = dynamic(
@@ -119,14 +121,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [hideHomeHeader, setHideHomeHeader] = useState(false);
   const pathname = usePathname();
   const isHome = pathname === "/";
-  const isShop = pathname === "/shop";
-  const isProduct = pathname?.startsWith("/products");
   // /go/* and /lp/* are dedicated paid-traffic landing pages — they own
-  // their own header/footer chrome, so the global AppShell stays out of
-  // their way (otherwise the site nav stacks on top of the LP hero).
+  // their own footer chrome, so the global footer + popups stay out of
+  // their way. The AppShell header still renders on /lp/* (per Ben's
+  // audit) — only the bottom-of-page chrome is gated below.
   const isLandingPage = pathname?.startsWith("/go") || pathname?.startsWith("/lp");
-  const experienceVariant = isHome || isShop || isProduct ? "full" : "compact";
-  const showExperienceBand = isHome || isShop;
   const menuRef = useRef<HTMLDivElement | null>(null);
   const toastTimerRef = useRef<number | null>(null);
   const amazonPrefireRef = useRef(0);
@@ -534,14 +533,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       >
         <div className="relative z-10">{children}</div>
       </main>
-
-      {showExperienceBand && !isLandingPage ? (
-        <section className="bg-transparent -mt-6">
-          <div className="mx-auto max-w-6xl px-4 pb-6">
-            <ExperienceBand variant={experienceVariant} />
-          </div>
-        </section>
-      ) : null}
 
       {isLandingPage ? null : (
       <footer className="border-t border-[var(--border)] bg-white/85 backdrop-blur-md text-[var(--text)]">
