@@ -54,6 +54,7 @@ import { listReceiptReviewPackets } from "@/lib/ops/docs";
 import { approvalStore } from "@/lib/ops/control-plane/stores";
 import {
   filterPacketsBySpec,
+  paginateReviewPackets,
   parseReviewPacketsFilterSpec,
   type ApprovalsByPacketId,
 } from "@/app/ops/finance/review-packets/data";
@@ -116,6 +117,7 @@ export async function GET(req: Request): Promise<Response> {
   const limit = Number.isFinite(rawLimit)
     ? Math.max(1, Math.min(500, rawLimit))
     : 100;
+  const cursor = url.searchParams.get("cursor");
 
   const spec = parseReviewPacketsFilterSpec(url.searchParams);
   const filterApplied =
@@ -126,29 +128,44 @@ export async function GET(req: Request): Promise<Response> {
     (spec.approvalStatus !== undefined && spec.approvalStatus !== "any");
 
   try {
-    const packets = await listReceiptReviewPackets({ limit });
+    // Phase 17: load the full sorted set (capped at the storage cap,
+    // 500). Filters apply BEFORE pagination so cursor traversal is
+    // over the FILTERED set — operator scrolling through "pending"
+    // approvals doesn't get half-empty pages.
+    const allPackets = await listReceiptReviewPackets({ limit: 500 });
 
-    // Phase 16 — build the read-only approval lookup. Pulls pending
-    // approvals + recent terminal-state approvals routed by the
-    // promote-review agent (`ops-route:receipt-promote`). Both reads
-    // are read-only; failure of either is non-fatal — we surface a
-    // partial map and rows with no match get `approvalStatus: null`.
+    // Phase 16 — read-only approval lookup. Both reads fail-soft.
     const approvalsByPacketId = await buildApprovalLookup();
 
     const filtered = filterApplied
-      ? filterPacketsBySpec(packets, spec, approvalsByPacketId)
-      : packets;
+      ? filterPacketsBySpec(allPackets, spec, approvalsByPacketId)
+      : allPackets;
+
+    // Phase 17 — paginate the filtered set with the canonical cursor.
+    const paginated = paginateReviewPackets(filtered, { limit, cursor });
+
     return NextResponse.json({
       ok: true,
-      count: filtered.length,
-      totalBeforeFilter: packets.length,
+      // Phase 17: count is page length; matchedTotal is the FULL
+      // filtered length (so the client can render "X of Y").
+      count: paginated.page.length,
+      matchedTotal: filtered.length,
+      totalBeforeFilter: allPackets.length,
       limit,
       filterApplied,
-      packets: filtered,
+      packets: paginated.page,
+      // Phase 17 — opaque cursor for the next page; null when no
+      // more pages remain. Client treats it verbatim.
+      nextCursor: paginated.nextCursor,
       // Phase 16 — flat lookup so the client view can attach
       // approvalId / approvalStatus to each row without a second
-      // fetch. Keys are packetId (= targetEntity.id).
-      approvals: Object.fromEntries(approvalsByPacketId.entries()),
+      // fetch. Keys are packetId (= targetEntity.id). Scoped to the
+      // current page's packets only — irrelevant entries dropped.
+      approvals: Object.fromEntries(
+        Array.from(approvalsByPacketId.entries()).filter(([packetId]) =>
+          paginated.page.some((p) => p.packetId === packetId),
+        ),
+      ),
     });
   } catch (err) {
     return NextResponse.json(
