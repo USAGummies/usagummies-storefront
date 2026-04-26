@@ -126,20 +126,38 @@ function ch(
 }
 
 describe("composeRevenueKpi — confidence rubric", () => {
-  it("all 3 primary wired → confidence='full'", () => {
+  it("all 4 primary wired (Shopify+Amazon+Faire+B2B) → confidence='full'", () => {
+    // Phase 5: B2B joined the primary set once Shopify wholesale-tagged
+    // paid orders became a defensible read-only source. "unknown"
+    // remains permanently outside the rubric (catch-all placeholder).
     const r = composeRevenueKpi(
       {
         channels: [
           ch("shopify", "wired", 1500),
           ch("amazon", "wired", 800),
           ch("faire", "wired", 200),
-          ch("b2b", "not_wired", null, "QBO/HubSpot revenue not wired"),
+          ch("b2b", "wired", 600),
           ch("unknown", "not_wired", null, "catch-all"),
         ],
       },
       { now: NOW },
     );
     expect(r.confidence).toBe("full");
+  });
+
+  it("3 primary wired but B2B not_wired → 'partial' (B2B is now primary)", () => {
+    const r = composeRevenueKpi(
+      {
+        channels: [
+          ch("shopify", "wired", 1500),
+          ch("amazon", "wired", 800),
+          ch("faire", "wired", 200),
+          ch("b2b", "not_wired", null, "SHOPIFY_ADMIN_API_TOKEN unset"),
+        ],
+      },
+      { now: NOW },
+    );
+    expect(r.confidence).toBe("partial");
   });
 
   it("at least one primary wired + one not_wired → 'partial'", () => {
@@ -170,17 +188,26 @@ describe("composeRevenueKpi — confidence rubric", () => {
     expect(r.confidence).toBe("none");
   });
 
-  it("b2b/unknown alone do NOT influence confidence (always not_wired by design)", () => {
+  it("only B2B wired → 'partial' (B2B is now primary; one of four)", () => {
     const r = composeRevenueKpi(
       {
         channels: [
-          ch("b2b", "not_wired", null, "QBO not wired"),
+          ch("b2b", "wired", 600),
           ch("unknown", "not_wired", null, "catch-all"),
         ],
       },
       { now: NOW },
     );
-    // No primary channels supplied at all → 'none'.
+    expect(r.confidence).toBe("partial");
+  });
+
+  it("'unknown' channel alone never moves the rubric (permanent placeholder)", () => {
+    const r = composeRevenueKpi(
+      {
+        channels: [ch("unknown", "not_wired", null, "catch-all")],
+      },
+      { now: NOW },
+    );
     expect(r.confidence).toBe("none");
   });
 });
@@ -302,6 +329,7 @@ describe("renderRevenueKpiBriefLine", () => {
           ch("shopify", "wired", 24_000),
           ch("amazon", "wired", 100),
           ch("faire", "wired", 0),
+          ch("b2b", "wired", 0),
         ],
       },
       { now: NOW },

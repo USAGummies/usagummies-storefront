@@ -44,6 +44,12 @@ async function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise
   }
 }
 
+/** Shopify orders carrying this tag are wholesale / B2B and are
+ *  attributed to the B2B channel, NOT to Shopify DTC. The booth-order
+ *  route applies it consistently. Future wholesale order paths must
+ *  either apply the same tag or extend the B2B reader's filter. */
+export const B2B_SHOPIFY_TAG = "wholesale";
+
 export async function readShopifyLast7d(now: Date): Promise<ChannelRevenueState> {
   if (!process.env.SHOPIFY_ADMIN_API_TOKEN?.trim()) {
     return {
@@ -54,7 +60,14 @@ export async function readShopifyLast7d(now: Date): Promise<ChannelRevenueState>
     };
   }
   try {
-    const orders = await queryPaidOrdersForBurnRate({ days: 7, limit: 250 });
+    // Exclude `tag:wholesale` so wholesale Shopify orders flow into
+    // the B2B channel (`readB2BLast7d`) instead of inflating Shopify
+    // DTC. This is the no-double-count contract — locked by tests.
+    const orders = await queryPaidOrdersForBurnRate({
+      days: 7,
+      limit: 250,
+      tagFilter: { exclude: [B2B_SHOPIFY_TAG] },
+    });
     const cutoff = now.getTime() - SEVEN_DAYS_MS;
     const sum = orders
       .filter((o) => Date.parse(o.createdAt) >= cutoff)
@@ -63,7 +76,7 @@ export async function readShopifyLast7d(now: Date): Promise<ChannelRevenueState>
       channel: "shopify",
       status: "wired",
       amountUsd: Math.round(sum * 100) / 100,
-      source: { system: "shopify-admin-graphql", retrievedAt: now.toISOString() },
+      source: { system: "shopify-admin-graphql (DTC; -tag:wholesale)", retrievedAt: now.toISOString() },
     };
   } catch (err) {
     return {
@@ -162,19 +175,67 @@ export async function readFaireLast7d(now: Date): Promise<ChannelRevenueState> {
 }
 
 /**
- * B2B (wholesale outside Faire) — there is NO direct revenue source
- * wired today. Invoiced wholesale revenue lives in QBO; HubSpot
- * holds deal stages but not a queryable revenue join. Surface this
- * honestly rather than guessing.
+ * B2B (wholesale outside Faire) — Phase 1 source: paid Shopify
+ * orders carrying `tag:wholesale`. The booth-order route at
+ * `/api/booth-order` applies that tag to every wholesale order
+ * (pay-now and invoice-me). `financial_status:paid` excludes
+ * unpaid invoice-me holds and drafts naturally.
+ *
+ * Hard contract:
+ *   - Reads ONLY Shopify (no QBO, no HubSpot, no AP packets, no
+ *     manual ledger). The KPI scorecard's no-fabrication and
+ *     no-pipeline-as-revenue rules forbid HubSpot Closed-Won deal
+ *     values and unattributed QBO invoices.
+ *   - Sums `financial_status:paid` only. Drafts and on-hold
+ *     invoice-me orders are NEVER counted.
+ *   - Pairs with `readShopifyLast7d` which excludes the same tag,
+ *     so a wholesale order appears in B2B and ONLY B2B (no double-
+ *     count with Shopify DTC).
+ *
+ * Known Phase 1 gap (documented, not papered over): wholesale
+ * orders created in Shopify Admin without `tag:wholesale` will be
+ * counted in Shopify DTC instead of B2B. Future Phase 2: add a
+ * QBO Class-attribution path or a Shopify customer-tag fallback.
  */
-export function readB2BLast7d(): ChannelRevenueState {
-  return {
-    channel: "b2b",
-    status: "not_wired",
-    amountUsd: null,
-    reason:
-      "B2B (wholesale outside Faire) revenue read not wired. QBO sent-invoice query + HubSpot deal-amount join would land here. Until then, KPI scorecard treats B2B as zero with confidence=partial.",
-  };
+export async function readB2BLast7d(now: Date): Promise<ChannelRevenueState> {
+  if (!process.env.SHOPIFY_ADMIN_API_TOKEN?.trim()) {
+    return {
+      channel: "b2b",
+      status: "not_wired",
+      amountUsd: null,
+      reason:
+        "SHOPIFY_ADMIN_API_TOKEN not configured. Phase 1 B2B revenue source is paid Shopify orders with `tag:wholesale`; without an admin token the read can't run.",
+    };
+  }
+  try {
+    const orders = await queryPaidOrdersForBurnRate({
+      days: 7,
+      limit: 250,
+      tagFilter: { include: [B2B_SHOPIFY_TAG] },
+    });
+    const cutoff = now.getTime() - SEVEN_DAYS_MS;
+    const filtered = orders.filter((o) => Date.parse(o.createdAt) >= cutoff);
+    const sum = filtered.reduce(
+      (s, o) => s + (Number.isFinite(o.totalAmount) ? o.totalAmount : 0),
+      0,
+    );
+    return {
+      channel: "b2b",
+      status: "wired",
+      amountUsd: Math.round(sum * 100) / 100,
+      source: {
+        system: "shopify-admin-graphql (B2B; tag:wholesale, financial_status:paid)",
+        retrievedAt: now.toISOString(),
+      },
+    };
+  } catch (err) {
+    return {
+      channel: "b2b",
+      status: "error",
+      amountUsd: null,
+      reason: `B2B Shopify wholesale-tagged paid-orders query failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
 }
 
 /**
@@ -199,10 +260,11 @@ export function readUnknownChannelLast7d(): ChannelRevenueState {
  * dashboard can render them deterministically.
  */
 export async function readAllChannelsLast7d(now: Date): Promise<ChannelRevenueState[]> {
-  const [shopify, amazon, faire] = await Promise.all([
+  const [shopify, amazon, faire, b2b] = await Promise.all([
     readShopifyLast7d(now),
     readAmazonLast7d(now),
     readFaireLast7d(now),
+    readB2BLast7d(now),
   ]);
-  return [shopify, amazon, faire, readB2BLast7d(), readUnknownChannelLast7d()];
+  return [shopify, amazon, faire, b2b, readUnknownChannelLast7d()];
 }

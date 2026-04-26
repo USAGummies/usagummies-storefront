@@ -74,10 +74,11 @@ export interface ChannelRevenueState {
  *   - "partial" — at least one wired and at least one not_wired/error
  *   - "none"    — zero wired channels (we have no actual to display)
  *
- * "b2b" and "unknown" don't move the needle on confidence today —
- * b2b is a known gap (QBO/HubSpot revenue join not yet wired) and
- * unknown is a permanent catch-all placeholder. The rubric applies
- * to the three primary online channels.
+ * b2b moved into the primary set in Phase 5 (audit + wire) once a
+ * defensible read-only source landed: Shopify orders with
+ * `tag:wholesale AND financial_status:paid`. "unknown" remains a
+ * permanent placeholder (catch-all for unattributed dollars) and
+ * does NOT move the needle.
  */
 export type KpiConfidence = "full" | "partial" | "none";
 
@@ -152,8 +153,13 @@ export function requiredWeeklyPaceUsd(
 // Composer
 // ---------------------------------------------------------------------------
 
-/** Primary online channels that count toward `confidence`. */
-const PRIMARY_CHANNELS: ChannelKey[] = ["shopify", "amazon", "faire"];
+/**
+ * Primary channels that count toward `confidence`. B2B joined the
+ * primary set in Phase 5 once Shopify wholesale-tagged paid orders
+ * became a defensible read-only source. "unknown" is permanently
+ * outside the rubric (catch-all placeholder).
+ */
+const PRIMARY_CHANNELS: ChannelKey[] = ["shopify", "amazon", "faire", "b2b"];
 
 /**
  * Pure projection from per-channel state into the full report.
@@ -207,16 +213,18 @@ export function composeRevenueKpi(
 }
 
 function computeConfidence(channels: ChannelRevenueState[]): KpiConfidence {
+  // Rubric uses the LITERAL primary set — not "primaries present in
+  // the input". A caller that omits a primary channel can't claim
+  // "full" confidence by silence; the missing primary counts as
+  // not-wired for the purposes of the rubric. This keeps the
+  // scorecard honest under partial inputs.
   let wiredPrimary = 0;
-  let totalPrimary = 0;
-  for (const c of channels) {
-    if (!PRIMARY_CHANNELS.includes(c.channel)) continue;
-    totalPrimary += 1;
-    if (c.status === "wired") wiredPrimary += 1;
+  for (const key of PRIMARY_CHANNELS) {
+    const c = channels.find((x) => x.channel === key);
+    if (c && c.status === "wired") wiredPrimary += 1;
   }
-  if (totalPrimary === 0) return "none";
   if (wiredPrimary === 0) return "none";
-  if (wiredPrimary === totalPrimary) return "full";
+  if (wiredPrimary === PRIMARY_CHANNELS.length) return "full";
   return "partial";
 }
 
