@@ -196,6 +196,10 @@ export function ReviewPacketsView() {
   // Phase 16 — approval-status filter (control-plane state).
   const [filterApprovalStatus, setFilterApprovalStatus] =
     useState<ReviewPacketsApprovalStatusFilter>("any");
+  // Phase 23 — id-substring search (packetId / receiptId / approvalId).
+  // Operator pastes any id from a Slack thread, audit log, or CSV
+  // row to find the matching packet.
+  const [filterIdSearch, setFilterIdSearch] = useState<string>("");
 
   // Per-row re-promote feedback (Phase 14). Map: receiptId → state.
   // Cleared on refresh so a stale "queued" or "failed" can't linger
@@ -214,6 +218,7 @@ export function ReviewPacketsView() {
       createdAfter: filterAfter,
       createdBefore: filterBefore,
       approvalStatus: filterApprovalStatus,
+      idContains: filterIdSearch,
     }),
     [
       filterStatus,
@@ -221,6 +226,7 @@ export function ReviewPacketsView() {
       filterAfter,
       filterBefore,
       filterApprovalStatus,
+      filterIdSearch,
     ],
   );
 
@@ -344,7 +350,8 @@ export function ReviewPacketsView() {
     filterVendor.trim().length > 0 ||
     filterAfter.trim().length > 0 ||
     filterBefore.trim().length > 0 ||
-    filterApprovalStatus !== "any";
+    filterApprovalStatus !== "any" ||
+    filterIdSearch.trim().length > 0;
 
   return (
     <div style={{ background: BG, minHeight: "100vh", padding: 16 }}>
@@ -535,6 +542,25 @@ export function ReviewPacketsView() {
               <option value="stood-down">Stood down</option>
             </select>
           </label>
+          <label>
+            ID search:{" "}
+            <input
+              type="text"
+              value={filterIdSearch}
+              onChange={(e) => setFilterIdSearch(e.target.value)}
+              placeholder="paste packet/receipt/approval id"
+              style={{
+                fontSize: 11,
+                padding: "2px 6px",
+                borderRadius: 4,
+                border: `1px solid ${BORDER}`,
+                background: "#fff",
+                color: NAVY,
+                minWidth: 200,
+              }}
+              title="Phase 23 — substring match on packetId, receiptId, or approvalId. Paste from a Slack thread or audit log to jump to that row."
+            />
+          </label>
           {filtersActive && (
             <button
               type="button"
@@ -544,6 +570,7 @@ export function ReviewPacketsView() {
                 setFilterAfter("");
                 setFilterBefore("");
                 setFilterApprovalStatus("any");
+                setFilterIdSearch("");
               }}
               style={{
                 fontSize: 11,

@@ -30,6 +30,7 @@ import {
   reviewPacketsCsvFilename,
   reviewPacketsFilterSpecToQuery,
 } from "../data";
+import type { ReviewPacketsView } from "../data";
 import { buildReceiptReviewPacket } from "@/lib/ops/receipt-review-packet";
 import type { ReceiptReviewPacket } from "@/lib/ops/receipt-review-packet";
 import type { ReceiptRecord } from "@/lib/ops/docs";
@@ -1404,5 +1405,302 @@ describe("reviewPacketsCsvFilename", () => {
   it("zero-pads single-digit months and days", () => {
     const fn = reviewPacketsCsvFilename(new Date("2026-01-05T00:00:00Z"));
     expect(fn).toBe("usa-gummies-review-packets-2026-01-05.csv");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 23 — id-substring search (packetId / receiptId / approvalId)
+// ---------------------------------------------------------------------------
+//
+// Operator pastes any id from a Slack thread, audit log, or CSV row
+// and the table narrows. Locked rules:
+//   - Substring (NOT exact match) — pasting a partial id still works.
+//   - Case-insensitive on all three fields (packetId / receiptId /
+//     approvalId).
+//   - Empty / whitespace collapses to "no filter" (defensive — a
+//     stray keystroke shouldn't hide rows).
+//   - Approval-id match requires the approval map plumbed through
+//     `buildReviewPacketsView` (otherwise approvalId is always null
+//     on every row, so only packetId / receiptId can match).
+//   - Filter composes with status / vendor / date / approvalStatus
+//     filters (AND semantics across all six dimensions).
+//   - URL roundtrip: parse(serialize({ idContains: "x" })) preserves it.
+//   - Server (`filterPacketsBySpec`) and client (`applyReviewPacketsFilters`)
+//     return the same packetIds for the same input + spec (lockstep).
+
+describe("Phase 23 — applyReviewPacketsFilters idContains", () => {
+  function fixture(): ReviewPacketsView {
+    return {
+      rows: [
+        {
+          packetId: "pkt-v1-receipt-belmark-001",
+          receiptId: "receipt-belmark-001",
+          packetIdShort: "pkt-belmark",
+          status: "draft",
+          color: "amber",
+          vendor: "Belmark Inc",
+          vendorSource: "canonical",
+          amountUsd: 250,
+          amountSource: "canonical",
+          eligibilityOk: true,
+          eligibilityMissing: [],
+          createdAt: "2026-04-15T00:00:00Z",
+          approvalId: "appr-uuid-belmark-aaa",
+          approvalStatus: "pending",
+        },
+        {
+          packetId: "pkt-v1-receipt-uline-002",
+          receiptId: "receipt-uline-002",
+          packetIdShort: "pkt-uline",
+          status: "draft",
+          color: "amber",
+          vendor: "Uline",
+          vendorSource: "canonical",
+          amountUsd: 50,
+          amountSource: "canonical",
+          eligibilityOk: true,
+          eligibilityMissing: [],
+          createdAt: "2026-04-22T00:00:00Z",
+          approvalId: null,
+          approvalStatus: null,
+        },
+      ],
+      counts: { total: 2, draft: 2, reneApproved: 0, rejected: 0 },
+    };
+  }
+
+  it("matches by packetId substring", () => {
+    const v = fixture();
+    const f = applyReviewPacketsFilters(v, { idContains: "belmark" });
+    expect(f.rows.map((r) => r.packetId)).toEqual([
+      "pkt-v1-receipt-belmark-001",
+    ]);
+    expect(f.counts.total).toBe(1);
+  });
+
+  it("matches by receiptId substring (when packetId doesn't contain the needle)", () => {
+    const v = fixture();
+    const f = applyReviewPacketsFilters(v, { idContains: "receipt-uline" });
+    expect(f.rows.map((r) => r.receiptId)).toEqual(["receipt-uline-002"]);
+  });
+
+  it("matches by approvalId substring (when only approvalId contains the needle)", () => {
+    const v = fixture();
+    const f = applyReviewPacketsFilters(v, { idContains: "uuid-belmark-aaa" });
+    expect(f.rows.map((r) => r.packetId)).toEqual([
+      "pkt-v1-receipt-belmark-001",
+    ]);
+  });
+
+  it("approvalId null on a row → that row CAN'T match an approval-id-only needle", () => {
+    const v = fixture();
+    // "appr-uuid" matches the belmark row's approvalId but the uline
+    // row has approvalId: null — so only belmark passes.
+    const f = applyReviewPacketsFilters(v, { idContains: "appr-uuid" });
+    expect(f.rows.map((r) => r.packetId)).toEqual([
+      "pkt-v1-receipt-belmark-001",
+    ]);
+  });
+
+  it("case-insensitive on all three id fields", () => {
+    const v = fixture();
+    const lower = applyReviewPacketsFilters(v, { idContains: "BELMARK" });
+    const upper = applyReviewPacketsFilters(v, { idContains: "belmark" });
+    expect(lower.rows.map((r) => r.packetId)).toEqual(
+      upper.rows.map((r) => r.packetId),
+    );
+    expect(lower.rows).toHaveLength(1);
+  });
+
+  it("empty / whitespace idContains → no filter (defensive)", () => {
+    const v = fixture();
+    expect(applyReviewPacketsFilters(v, { idContains: "" }).counts).toEqual(
+      v.counts,
+    );
+    expect(applyReviewPacketsFilters(v, { idContains: "   " }).counts).toEqual(
+      v.counts,
+    );
+  });
+
+  it("no match across any of the three fields → empty rows (no fabrication)", () => {
+    const v = fixture();
+    const f = applyReviewPacketsFilters(v, {
+      idContains: "no-such-id-anywhere",
+    });
+    expect(f.rows).toEqual([]);
+    expect(f.counts.total).toBe(0);
+  });
+
+  it("composes with status filter (AND semantics)", () => {
+    const v = fixture();
+    const f = applyReviewPacketsFilters(v, {
+      idContains: "belmark",
+      status: "rene-approved", // Belmark row is "draft"
+    });
+    expect(f.rows).toEqual([]);
+  });
+
+  it("composes with vendor filter (AND semantics)", () => {
+    const v = fixture();
+    const f = applyReviewPacketsFilters(v, {
+      idContains: "pkt-v1",
+      vendorContains: "uline",
+    });
+    expect(f.rows.map((r) => r.packetId)).toEqual([
+      "pkt-v1-receipt-uline-002",
+    ]);
+  });
+
+  it("composes with approvalStatus filter (AND semantics)", () => {
+    const v = fixture();
+    const f = applyReviewPacketsFilters(v, {
+      idContains: "pkt-v1",
+      approvalStatus: "pending",
+    });
+    expect(f.rows.map((r) => r.packetId)).toEqual([
+      "pkt-v1-receipt-belmark-001",
+    ]);
+  });
+});
+
+describe("Phase 23 — parseReviewPacketsFilterSpec id query param", () => {
+  function q(pairs: Record<string, string>): URLSearchParams {
+    return new URLSearchParams(pairs);
+  }
+
+  it("id query param parses to idContains", () => {
+    expect(parseReviewPacketsFilterSpec(q({ id: "pkt-v1-foo" }))).toEqual({
+      idContains: "pkt-v1-foo",
+    });
+  });
+
+  it("empty / whitespace id → omitted from spec", () => {
+    expect(parseReviewPacketsFilterSpec(q({ id: "" })).idContains).toBeUndefined();
+    expect(parseReviewPacketsFilterSpec(q({ id: "   " })).idContains).toBeUndefined();
+  });
+
+  it("preserves verbatim — no trimming on parse (helper preserves input shape)", () => {
+    // The helper trims at apply time, not at parse time, so the
+    // original string survives the parse step (matches vendor's
+    // existing parse semantics).
+    const spec = parseReviewPacketsFilterSpec(q({ id: "  pkt-v1-foo  " }));
+    expect(spec.idContains).toBe("  pkt-v1-foo  ");
+  });
+});
+
+describe("Phase 23 — reviewPacketsFilterSpecToQuery id roundtrip", () => {
+  it("trims before serializing", () => {
+    const params = reviewPacketsFilterSpecToQuery({
+      idContains: "  pkt-v1-foo  ",
+    });
+    expect(params.get("id")).toBe("pkt-v1-foo");
+  });
+
+  it("empty / whitespace idContains is omitted", () => {
+    expect(
+      reviewPacketsFilterSpecToQuery({ idContains: "" }).get("id"),
+    ).toBeNull();
+    expect(
+      reviewPacketsFilterSpecToQuery({ idContains: "   " }).get("id"),
+    ).toBeNull();
+  });
+
+  it("round-trip: parse(serialize({ idContains })) === { idContains }", () => {
+    const original: import("../data").ReviewPacketsFilterSpec = {
+      idContains: "pkt-v1-foo",
+    };
+    const params = reviewPacketsFilterSpecToQuery(original);
+    expect(parseReviewPacketsFilterSpec(params)).toEqual(original);
+  });
+
+  it("round-trip with all six dimensions composed together", () => {
+    const original: import("../data").ReviewPacketsFilterSpec = {
+      status: "draft",
+      vendorContains: "Belmark",
+      createdAfter: "2026-04-01",
+      createdBefore: "2026-04-30",
+      approvalStatus: "pending",
+      idContains: "pkt-v1-foo",
+    };
+    const params = reviewPacketsFilterSpecToQuery(original);
+    expect(parseReviewPacketsFilterSpec(params)).toEqual(original);
+  });
+});
+
+describe("Phase 23 — filterPacketsBySpec idContains lockstep", () => {
+  it("server filter produces the same packetIds as the client helper for an id needle", () => {
+    const packets = [
+      buildReceiptReviewPacket(
+        mkReceipt({
+          id: "receipt-belmark-zzz",
+          vendor: "Belmark Inc",
+          date: "2026-04-15",
+          amount: 250,
+          category: "supplies",
+        }),
+        { now: new Date("2026-04-15T00:00:00Z") },
+      ),
+      buildReceiptReviewPacket(
+        mkReceipt({
+          id: "receipt-uline-yyy",
+          vendor: "Uline",
+          date: "2026-04-22",
+          amount: 50,
+          category: "supplies",
+        }),
+        { now: new Date("2026-04-22T00:00:00Z") },
+      ),
+    ];
+
+    const spec = { idContains: "belmark" };
+    const view = buildReviewPacketsView(packets);
+    const clientFiltered = applyReviewPacketsFilters(view, spec);
+    const serverFiltered = filterPacketsBySpec(packets, spec);
+
+    expect(serverFiltered.map((p) => p.packetId).sort()).toEqual(
+      clientFiltered.rows.map((r) => r.packetId).sort(),
+    );
+    expect(serverFiltered).toHaveLength(1);
+    expect(serverFiltered[0].receiptId).toBe("receipt-belmark-zzz");
+  });
+
+  it("approvalId match works server-side when approvalsByPacketId is plumbed through", () => {
+    const packet = buildReceiptReviewPacket(
+      mkReceipt({
+        id: "receipt-x",
+        vendor: "Belmark Inc",
+        date: "2026-04-15",
+        amount: 250,
+        category: "supplies",
+      }),
+      { now: new Date("2026-04-15T00:00:00Z") },
+    );
+    const approvalsMap = new Map([
+      [packet.packetId, { id: "appr-zzzz-9999", status: "pending" }],
+    ]);
+
+    const filtered = filterPacketsBySpec(
+      [packet],
+      { idContains: "zzzz" },
+      approvalsMap,
+    );
+    expect(filtered).toHaveLength(1);
+  });
+
+  it("approvalId match returns 0 packetIds when the lookup map is missing (defensive)", () => {
+    const packet = buildReceiptReviewPacket(
+      mkReceipt({
+        id: "receipt-x",
+        vendor: "Belmark Inc",
+        date: "2026-04-15",
+        amount: 250,
+        category: "supplies",
+      }),
+      { now: new Date("2026-04-15T00:00:00Z") },
+    );
+    // No approvals map → server has no approvalId on row → "zzzz"
+    // matches NO row (packet/receipt ids don't contain "zzzz").
+    const filtered = filterPacketsBySpec([packet], { idContains: "zzzz" });
+    expect(filtered).toHaveLength(0);
   });
 });

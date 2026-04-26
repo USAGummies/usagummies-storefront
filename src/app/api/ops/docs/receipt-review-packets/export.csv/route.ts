@@ -102,7 +102,8 @@ export async function GET(req: Request): Promise<Response> {
     spec.vendorContains !== undefined ||
     spec.createdAfter !== undefined ||
     spec.createdBefore !== undefined ||
-    (spec.approvalStatus !== undefined && spec.approvalStatus !== "any");
+    (spec.approvalStatus !== undefined && spec.approvalStatus !== "any") ||
+    spec.idContains !== undefined;
 
   try {
     // Phase 21: load the full storage cap (500) and paginate the

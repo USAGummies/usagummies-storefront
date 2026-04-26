@@ -411,6 +411,149 @@ describe("Phase 16 — approval-status filter + lookup", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Phase 23 — id-substring search
+// ---------------------------------------------------------------------------
+
+describe("Phase 23 — id-substring search via ?id=...", () => {
+  beforeEach(() => isAuthorizedMock.mockResolvedValue(true));
+
+  async function seedThree() {
+    const r1 = await processReceipt({
+      source_url: "https://example.com/belmark.jpg",
+      source_channel: "test",
+      vendor: "Belmark Inc",
+      date: "2026-04-15",
+      amount: 250,
+      category: "supplies",
+    });
+    const r2 = await processReceipt({
+      source_url: "https://example.com/uline.jpg",
+      source_channel: "test",
+      vendor: "Uline",
+      date: "2026-04-22",
+      amount: 50,
+      category: "supplies",
+    });
+    const r3 = await processReceipt({
+      source_url: "https://example.com/albanese.jpg",
+      source_channel: "test",
+      vendor: "Albanese",
+      date: "2026-04-23",
+      amount: 1200,
+      category: "supplies",
+    });
+    await requestReceiptReviewPromotion(r1.id);
+    await requestReceiptReviewPromotion(r2.id);
+    await requestReceiptReviewPromotion(r3.id);
+    return { r1, r2, r3 };
+  }
+
+  it("?id=<unique-receiptId-suffix> narrows to that packet's row", async () => {
+    const { r1 } = await seedThree();
+    // Receipt ids include a random suffix; use the last 8 chars
+    // so the substring is unique to this receipt.
+    const unique = r1.id.slice(-8);
+    const res = await GET(
+      makeReq(
+        `/api/ops/docs/receipt-review-packets?id=${encodeURIComponent(unique)}`,
+      ),
+    );
+    const body = (await res.json()) as {
+      filterApplied: boolean;
+      count: number;
+      packets: Array<{ receiptId: string }>;
+    };
+    expect(body.filterApplied).toBe(true);
+    expect(body.count).toBe(1);
+    expect(body.packets[0].receiptId).toBe(r1.id);
+  });
+
+  it("?id=<full-packetId> matches exactly one row", async () => {
+    const { r1 } = await seedThree();
+    const packetId = `pkt-v1-${r1.id}`;
+    const res = await GET(
+      makeReq(
+        `/api/ops/docs/receipt-review-packets?id=${encodeURIComponent(packetId)}`,
+      ),
+    );
+    const body = (await res.json()) as {
+      count: number;
+      packets: Array<{ packetId: string }>;
+    };
+    expect(body.count).toBe(1);
+    expect(body.packets[0].packetId).toBe(packetId);
+  });
+
+  it("?id with no match → count: 0 (no fabrication)", async () => {
+    await seedThree();
+    const res = await GET(
+      makeReq("/api/ops/docs/receipt-review-packets?id=no-such-id-anywhere"),
+    );
+    const body = (await res.json()) as {
+      filterApplied: boolean;
+      count: number;
+      matchedTotal: number;
+      totalBeforeFilter: number;
+    };
+    expect(body.filterApplied).toBe(true);
+    expect(body.count).toBe(0);
+    expect(body.matchedTotal).toBe(0);
+    expect(body.totalBeforeFilter).toBe(3);
+  });
+
+  it("empty / whitespace ?id collapses to no filter", async () => {
+    await seedThree();
+    const res = await GET(
+      makeReq("/api/ops/docs/receipt-review-packets?id=%20%20%20"),
+    );
+    const body = (await res.json()) as {
+      filterApplied: boolean;
+      count: number;
+    };
+    expect(body.filterApplied).toBe(false);
+    expect(body.count).toBe(3);
+  });
+
+  it("composes with vendor filter (AND semantics)", async () => {
+    const { r1 } = await seedThree();
+    const res = await GET(
+      makeReq(
+        `/api/ops/docs/receipt-review-packets?id=${encodeURIComponent(r1.id)}&vendor=uline`,
+      ),
+    );
+    const body = (await res.json()) as { count: number };
+    // r1's id matches but vendor filter "uline" doesn't (r1 is Belmark)
+    // → AND of two filters produces zero rows.
+    expect(body.count).toBe(0);
+  });
+
+  it("server filter is bit-identical to the client helper for the same id needle", async () => {
+    const { r1, r2, r3 } = await seedThree();
+    void r1; void r2; void r3;
+    const { listReceiptReviewPackets } = await import("@/lib/ops/docs");
+    const { filterPacketsBySpec } = await import(
+      "@/app/ops/finance/review-packets/data"
+    );
+    const allPackets = await listReceiptReviewPackets({ limit: 100 });
+    // Use the last 8 chars for a unique substring (random suffix).
+    const unique = r1.id.slice(-8);
+    const clientFiltered = filterPacketsBySpec(allPackets, {
+      idContains: unique,
+    });
+
+    const res = await GET(
+      makeReq(
+        `/api/ops/docs/receipt-review-packets?id=${encodeURIComponent(unique)}`,
+      ),
+    );
+    const body = (await res.json()) as { packets: Array<{ packetId: string }> };
+    expect(body.packets.map((p) => p.packetId).sort()).toEqual(
+      clientFiltered.map((p) => p.packetId).sort(),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Phase 17 — cursor pagination
 // ---------------------------------------------------------------------------
 

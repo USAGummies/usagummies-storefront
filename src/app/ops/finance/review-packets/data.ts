@@ -270,6 +270,12 @@ export interface ReviewPacketsFilterSpec {
    *  no filter; `"no-approval"` matches rows where approvalStatus
    *  is null; any other value filters by exact match. */
   approvalStatus?: ReviewPacketsApprovalStatusFilter;
+  /** Phase 23 — case-insensitive substring match against
+   *  `packetId`, `receiptId`, OR `approvalId`. Operator pastes any
+   *  id from a Slack thread / audit log / CSV row and the table
+   *  narrows to the matching row(s). Empty / whitespace-only =
+   *  no filter. */
+  idContains?: string;
 }
 
 /**
@@ -308,6 +314,17 @@ export function applyReviewPacketsFilters(
       ? spec.approvalStatus
       : null;
 
+  // Phase 23 — id-substring filter. Defensive: empty / whitespace
+  // collapses to "no filter" so a stray keystroke can't hide rows.
+  // Match is case-insensitive on packetId / receiptId / approvalId
+  // (the three ids an operator might paste from a Slack thread or
+  // audit log).
+  const idNeedle =
+    typeof spec.idContains === "string" &&
+    spec.idContains.trim().length > 0
+      ? spec.idContains.trim().toLowerCase()
+      : null;
+
   const filtered = view.rows.filter((row) => {
     if (status && row.status !== status) return false;
     if (vendorNeedle) {
@@ -325,6 +342,18 @@ export function applyReviewPacketsFilters(
         if (row.approvalStatus !== null) return false;
       } else {
         if (row.approvalStatus !== approvalFilter) return false;
+      }
+    }
+    if (idNeedle) {
+      const packetIdLc = row.packetId.toLowerCase();
+      const receiptIdLc = row.receiptId.toLowerCase();
+      const approvalIdLc = row.approvalId?.toLowerCase() ?? "";
+      if (
+        !packetIdLc.includes(idNeedle) &&
+        !receiptIdLc.includes(idNeedle) &&
+        !approvalIdLc.includes(idNeedle)
+      ) {
+        return false;
       }
     }
     return true;
@@ -418,6 +447,13 @@ export function parseReviewPacketsFilterSpec(
       spec.approvalStatus = candidate as ReviewPacketsApprovalStatusFilter;
     }
   }
+  // Phase 23 — id-substring search. Operator pastes a packetId,
+  // receiptId, or approvalId from a Slack thread / audit log / CSV
+  // row and the table narrows. `id` is the canonical query name.
+  const rawId = query.get("id");
+  if (typeof rawId === "string" && rawId.trim().length > 0) {
+    spec.idContains = rawId;
+  }
   return spec;
 }
 
@@ -459,6 +495,12 @@ export function reviewPacketsFilterSpecToQuery(
   }
   if (spec.approvalStatus && spec.approvalStatus !== "any") {
     params.set("approvalStatus", spec.approvalStatus);
+  }
+  if (
+    typeof spec.idContains === "string" &&
+    spec.idContains.trim().length > 0
+  ) {
+    params.set("id", spec.idContains.trim());
   }
   return params;
 }

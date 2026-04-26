@@ -162,32 +162,26 @@ Potential code only if smoke fails:
 
 ### Lane B — Receipt-to-Rene approval promotion
 
-Phases 7-22 done. Phase 22 wires the second active state-transition
-entry point — `POST /api/ops/docs/receipt/promote-review` (the
-Re-promote button's backing route) — to fire
-`invalidateApprovalLookupCache()` after `openApproval()` succeeds.
-Mirror of Phase 20 on a different code path. Re-promote click now
-feels instant: the dashboard reflects the new pending approval
-sub-second after the click instead of waiting up to 30s for the
-Phase 19 TTL. NEVER fires on the idempotent existing-approval
-branch (cache already current), on ineligible / no-slug packets
-(no approval opened), on 401/400/404 surfaces, or on
-openApproval-throw catch path (operator sees `opened: false` so
-stale-by-30s aligns with their view). Best-effort: kv.del failures
-swallowed; route's success path is unaffected. Audit confirms
-`standDown()` and `checkExpiry()` have NO production callers today
-— documented inline that future callers persisting those
-transitions for receipt-review-packet targetEntity must also
-invalidate. With Phase 20 + Phase 22, both active receipt-review
-state-transition paths bust the cache; Phase 19 30s TTL becomes a
-safety floor for any future bypass paths.
+Phases 7-23 done. Phase 23 adds an ID-substring search input to
+the dashboard filter strip — operator pastes a packetId, receiptId,
+OR approvalId substring (from a Slack thread, audit log, or CSV
+row) and the table narrows to that row in one keystroke.
+Case-insensitive across all three id fields; AND semantics with
+the existing status/vendor/date/approvalStatus filters. Lockstep
+client/server semantics via the same `filterPacketsBySpec` parity
+contract. Empty/whitespace collapses to "no filter" (defensive).
+Approval-id match requires the approval map plumbed through (no
+fabrication of approvalId on a row that lacks one). Replaces the
+originally-earmarked Phase 23 (`qbo.bill.create`) — that QBO-write
+candidate is deferred to a later phase, blocked on Rene's
+chart-of-accounts mapping (Slack DM in flight).
 
 Receipt-review queue management is feature-complete. Remaining
-follow-ups (still on the table, none currently scheduled):
-- Closing the loop into `qbo.bill.create` once Rene confirms a
-  rene-approved packet should land in QBO. (Crosses the QBO-write
-  boundary — would need a new Class B / Class C taxonomy slug
-  registered first.)
+follow-ups (none currently scheduled, all blocked on external
+input):
+- Closing the loop into `qbo.bill.create` once Rene confirms the
+  chart-of-accounts mapping (per-category vs per-vendor default) +
+  Ben confirms Class C dual-approval flow. STOP-AND-ASK boundary.
 
 Boundary:
 
@@ -207,7 +201,8 @@ Boundary:
 - Closer cache-invalidation hook. ✅ Done (Phase 20).
 - CSV cursor pagination. ✅ Done (Phase 21).
 - Promote-review cache-invalidation hook. ✅ Done (Phase 22).
-- Phase 23: TBD (qbo.bill.create entry — crosses QBO-write boundary; STOP-AND-ASK).
+- ID-substring search on dashboard. ✅ Done (Phase 23).
+- Phase 24: TBD (qbo.bill.create entry — STOP-AND-ASK; blocked on Rene's CoA mapping).
 - QBO posting remains a separate Rene-approved Class B/C action.
 - Do not auto-create bills, expenses, vendors, or categories.
 - Do not overwrite canonical receipt fields without explicit reviewer action.
