@@ -467,6 +467,119 @@ export function reviewPacketsFilterSpecToQuery(
 // Phase 15 — server-side filter (operates on raw packets)
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Phase 17 — cursor-based pagination (server-safe, pure)
+// ---------------------------------------------------------------------------
+//
+// Deterministic cursor over the canonical sort order:
+//   primary: createdAt DESC (most-recent-first)
+//   tie-breaker: packetId ASC (stable when timestamps collide)
+//
+// Cursor is base64url-encoded JSON `{ts, packetId}` of the LAST
+// item shown. The client treats it as opaque — only `data.ts`
+// (server) reads it. Defensive on malformed input: `decode(...)`
+// returns `null` on any parse failure or schema mismatch, and the
+// route treats that as "first page".
+
+export interface ReviewPacketCursor {
+  ts: number;
+  packetId: string;
+}
+
+export function encodeReviewPacketCursor(cursor: ReviewPacketCursor): string {
+  const json = JSON.stringify({ ts: cursor.ts, packetId: cursor.packetId });
+  // base64url so it's URL-safe without explicit encodeURIComponent.
+  return Buffer.from(json, "utf8").toString("base64url");
+}
+
+export function decodeReviewPacketCursor(
+  cursor: string | null | undefined,
+): ReviewPacketCursor | null {
+  if (typeof cursor !== "string" || cursor.trim().length === 0) return null;
+  try {
+    const decoded = Buffer.from(cursor, "base64url").toString("utf8");
+    const parsed = JSON.parse(decoded) as unknown;
+    if (parsed === null || typeof parsed !== "object") return null;
+    const o = parsed as Record<string, unknown>;
+    if (typeof o.ts !== "number" || !Number.isFinite(o.ts)) return null;
+    if (typeof o.packetId !== "string" || o.packetId.length === 0) return null;
+    return { ts: o.ts, packetId: o.packetId };
+  } catch {
+    return null;
+  }
+}
+
+/** Canonical comparator over the dashboard's sort order: createdAt
+ *  desc, then packetId asc. Pure. */
+function comparePacketsCanonical(
+  a: ReceiptReviewPacket,
+  b: ReceiptReviewPacket,
+): number {
+  const tsA = Date.parse(a.createdAt);
+  const tsB = Date.parse(b.createdAt);
+  // Unparseable timestamps sort to the end (treat as oldest).
+  if (!Number.isFinite(tsA) && !Number.isFinite(tsB))
+    return a.packetId.localeCompare(b.packetId);
+  if (!Number.isFinite(tsA)) return 1;
+  if (!Number.isFinite(tsB)) return -1;
+  if (tsA !== tsB) return tsB - tsA;
+  return a.packetId.localeCompare(b.packetId);
+}
+
+/** Predicate: is `p` strictly AFTER the cursor in the canonical
+ *  sort? (i.e. paginate-next-page semantics). */
+function isAfterCursor(
+  p: ReceiptReviewPacket,
+  cursor: ReviewPacketCursor,
+): boolean {
+  const ts = Date.parse(p.createdAt);
+  if (!Number.isFinite(ts)) return true; // unparseable → after any cursor
+  if (ts < cursor.ts) return true;
+  if (ts > cursor.ts) return false;
+  return p.packetId > cursor.packetId;
+}
+
+export interface PaginatedReviewPackets {
+  page: ReceiptReviewPacket[];
+  nextCursor: string | null;
+}
+
+/**
+ * Pure helper: take a packet array (assumed already filtered if
+ * filters apply) and return the next page + cursor.
+ *
+ * Hard rules:
+ *   - **Sort is internal.** The function re-sorts via the canonical
+ *     comparator so callers don't have to. Idempotent when the input
+ *     is already sorted.
+ *   - **Limit is clamped** to [1, 500] mirroring the storage helper
+ *     and route.
+ *   - **`nextCursor` is null** when fewer than `limit` items remain
+ *     after the cursor — operator sees "Load more" disabled.
+ *   - **Malformed cursor** (e.g. tampered string) falls back to the
+ *     first page rather than throwing — defensive.
+ */
+export function paginateReviewPackets(
+  packets: ReceiptReviewPacket[],
+  opts: { limit?: number; cursor?: string | null } = {},
+): PaginatedReviewPackets {
+  const limit = Math.max(1, Math.min(500, opts.limit ?? 100));
+  const sorted = [...packets].sort(comparePacketsCanonical);
+  const cursor = decodeReviewPacketCursor(opts.cursor);
+  const afterCursor = cursor
+    ? sorted.filter((p) => isAfterCursor(p, cursor))
+    : sorted;
+  const page = afterCursor.slice(0, limit);
+  const nextCursor =
+    afterCursor.length > limit && page.length > 0
+      ? encodeReviewPacketCursor({
+          ts: Date.parse(page[page.length - 1].createdAt),
+          packetId: page[page.length - 1].packetId,
+        })
+      : null;
+  return { page, nextCursor };
+}
+
 /**
  * Apply the canonical filter spec to a raw packet list. Used
  * server-side by the list route. Internally projects through

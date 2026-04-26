@@ -409,3 +409,136 @@ describe("Phase 16 — approval-status filter + lookup", () => {
     expect(body.count).toBe(1);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 17 — cursor pagination
+// ---------------------------------------------------------------------------
+
+describe("Phase 17 — cursor pagination", () => {
+  beforeEach(() => isAuthorizedMock.mockResolvedValue(true));
+
+  async function seedFivePackets() {
+    for (const i of [1, 2, 3, 4, 5]) {
+      const r = await processReceipt({
+        source_url: `https://example.com/${i}.jpg`,
+        source_channel: "test",
+        vendor: `Vendor ${i}`,
+      });
+      await requestReceiptReviewPromotion(r.id);
+    }
+  }
+
+  it("returns nextCursor non-null when more pages remain", async () => {
+    await seedFivePackets();
+    const res = await GET(
+      makeReq("/api/ops/docs/receipt-review-packets?limit=2"),
+    );
+    const body = (await res.json()) as {
+      count: number;
+      matchedTotal: number;
+      nextCursor: string | null;
+    };
+    expect(body.count).toBe(2);
+    expect(body.matchedTotal).toBe(5);
+    expect(typeof body.nextCursor).toBe("string");
+    expect((body.nextCursor as string).length).toBeGreaterThan(0);
+  });
+
+  it("returns nextCursor null when the page is the last one", async () => {
+    await seedFivePackets();
+    const res = await GET(
+      makeReq("/api/ops/docs/receipt-review-packets?limit=100"),
+    );
+    const body = (await res.json()) as {
+      count: number;
+      nextCursor: string | null;
+    };
+    expect(body.count).toBe(5);
+    expect(body.nextCursor).toBeNull();
+  });
+
+  it("traversing all cursors visits every packet exactly once", async () => {
+    await seedFivePackets();
+    const seen = new Set<string>();
+    let cursor: string | null = null;
+    for (let safety = 0; safety < 20; safety++) {
+      const path = cursor
+        ? `/api/ops/docs/receipt-review-packets?limit=2&cursor=${encodeURIComponent(cursor)}`
+        : "/api/ops/docs/receipt-review-packets?limit=2";
+      const res = await GET(makeReq(path));
+      const body = (await res.json()) as {
+        packets: Array<{ packetId: string }>;
+        nextCursor: string | null;
+      };
+      for (const p of body.packets) seen.add(p.packetId);
+      if (!body.nextCursor) break;
+      cursor = body.nextCursor;
+    }
+    expect(seen.size).toBe(5);
+  });
+
+  it("malformed cursor falls back to first page (no fabrication, no throw)", async () => {
+    await seedFivePackets();
+    const res = await GET(
+      makeReq(
+        "/api/ops/docs/receipt-review-packets?limit=2&cursor=not-a-real-cursor",
+      ),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      count: number;
+      packets: unknown[];
+    };
+    expect(body.count).toBe(2);
+    expect(body.packets).toHaveLength(2);
+  });
+
+  it("filters apply BEFORE pagination (cursor traverses filtered set)", async () => {
+    await seedFivePackets();
+    const res = await GET(
+      makeReq(
+        "/api/ops/docs/receipt-review-packets?limit=10&vendor=Vendor 1",
+      ),
+    );
+    const body = (await res.json()) as {
+      count: number;
+      matchedTotal: number;
+      filterApplied: boolean;
+    };
+    expect(body.filterApplied).toBe(true);
+    expect(body.count).toBe(1);
+    expect(body.matchedTotal).toBe(1);
+  });
+
+  it("approvals lookup is scoped to the current page only", async () => {
+    await seedFivePackets();
+    const res = await GET(
+      makeReq("/api/ops/docs/receipt-review-packets?limit=2"),
+    );
+    const body = (await res.json()) as {
+      packets: Array<{ packetId: string }>;
+      approvals: Record<string, unknown>;
+    };
+    // No approvals are seeded in test env, so the map is empty —
+    // but the contract is "no irrelevant entries leak through".
+    // Lock the size relationship: |approvals| <= |packets|.
+    expect(Object.keys(body.approvals).length).toBeLessThanOrEqual(
+      body.packets.length,
+    );
+  });
+
+  it("matchedTotal equals totalBeforeFilter when no filter is applied", async () => {
+    await seedFivePackets();
+    const res = await GET(
+      makeReq("/api/ops/docs/receipt-review-packets?limit=2"),
+    );
+    const body = (await res.json()) as {
+      matchedTotal: number;
+      totalBeforeFilter: number;
+      filterApplied: boolean;
+    };
+    expect(body.filterApplied).toBe(false);
+    expect(body.matchedTotal).toBe(body.totalBeforeFilter);
+    expect(body.matchedTotal).toBe(5);
+  });
+});

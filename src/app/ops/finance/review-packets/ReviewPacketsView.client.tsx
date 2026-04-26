@@ -47,25 +47,40 @@ interface ListResponse {
    *  operator see "filter narrowed N → M". Optional for backwards
    *  compat with older route versions. */
   totalBeforeFilter?: number;
+  /** Phase 17 — full filtered length BEFORE pagination ("X of Y"). */
+  matchedTotal?: number;
   /** Phase 15 — true when the route applied any filter. */
   filterApplied?: boolean;
   packets?: ReceiptReviewPacket[];
   /** Phase 16 — read-only approval lookup keyed by packetId.
    *  Optional for backwards compat. */
   approvals?: Record<string, { id: string; status: string }>;
+  /** Phase 17 — opaque cursor for the next page. `null` when no
+   *  more pages remain. */
+  nextCursor?: string | null;
   error?: string;
   reason?: string;
 }
 
+interface FetchResult {
+  view: ReviewPacketsViewShape | null;
+  /** Phase 17 — opaque cursor for the next page. Empty string when
+   *  no more pages remain (mirrored from server's `nextCursor: null`). */
+  nextCursor: string | null;
+  /** Phase 17 — full filtered length BEFORE pagination. Lets the
+   *  client render "showing X of Y" when paginating. */
+  matchedTotal: number | null;
+  err: string | null;
+}
+
 async function fetchPackets(
   spec: ReviewPacketsFilterSpec = {},
-): Promise<{
-  view: ReviewPacketsViewShape | null;
-  err: string | null;
-}> {
+  options: { cursor?: string | null; limit?: number } = {},
+): Promise<FetchResult> {
   try {
     const params = reviewPacketsFilterSpecToQuery(spec);
-    params.set("limit", "200");
+    params.set("limit", String(options.limit ?? 100));
+    if (options.cursor) params.set("cursor", options.cursor);
     const res = await fetch(
       `/api/ops/docs/receipt-review-packets?${params.toString()}`,
       { method: "GET", cache: "no-store" },
@@ -79,7 +94,12 @@ async function fetchPackets(
     if (!res.ok || !body || body.ok !== true) {
       const reason =
         body?.error ?? body?.reason ?? `HTTP ${res.status} ${res.statusText}`;
-      return { view: null, err: reason };
+      return {
+        view: null,
+        nextCursor: null,
+        matchedTotal: null,
+        err: reason,
+      };
     }
     const packets = Array.isArray(body.packets) ? body.packets : [];
     // Phase 16 — rebuild the approval lookup map from the route's
@@ -99,11 +119,16 @@ async function fetchPackets(
     }
     return {
       view: buildReviewPacketsView(packets, approvalsByPacketId),
+      nextCursor: typeof body.nextCursor === "string" ? body.nextCursor : null,
+      matchedTotal:
+        typeof body.matchedTotal === "number" ? body.matchedTotal : null,
       err: null,
     };
   } catch (err) {
     return {
       view: null,
+      nextCursor: null,
+      matchedTotal: null,
       err: err instanceof Error ? err.message : String(err),
     };
   }
@@ -146,6 +171,18 @@ export function ReviewPacketsView() {
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
+  // Phase 17 — pagination state. `nextCursor` is the opaque server
+  // cursor for the next page; `null` means no more pages remain.
+  // `matchedTotal` is the full filtered length (so we can render
+  // "showing N of M"). `loadingMore` differentiates from initial
+  // load so the table can stay rendered while fetching.
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [matchedTotal, setMatchedTotal] = useState<number | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  // pageCount: 1 = first page only; >1 = user clicked Load more.
+  // Phase 15's bounded passive poll skips when pageCount > 1 to
+  // avoid yanking the operator's accumulated rows mid-scroll.
+  const [pageCount, setPageCount] = useState(1);
 
   // Phase 14 — operator filter state. Each input is a string so the
   // UI stays simple; the pure helper handles parsing + defensive
@@ -190,17 +227,54 @@ export function ReviewPacketsView() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setPageCount(1); // fresh fetch → reset accumulation
     void fetchPackets(filterSpec).then((r) => {
       if (cancelled) return;
       setView(r.view);
       setErr(r.err);
       setLoading(false);
+      setNextCursor(r.nextCursor);
+      setMatchedTotal(r.matchedTotal);
       setRepromote({}); // fresh load → drop stale per-row pills
     });
     return () => {
       cancelled = true;
     };
   }, [refreshKey, filterSpec]);
+
+  // Phase 17 — Load more handler. Fetches the next page and APPENDS
+  // its rows to the current view (preserves operator scroll state).
+  // The defensive client-side filter belt re-runs on each render so
+  // the appended rows are still constrained to the active filterSpec.
+  async function onClickLoadMore() {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    const r = await fetchPackets(filterSpec, { cursor: nextCursor });
+    setLoadingMore(false);
+    if (r.err) {
+      setErr(r.err);
+      return;
+    }
+    if (!r.view) return;
+    setView((current) => {
+      if (!current) return r.view;
+      // Concatenate rows + recompute counts from the appended set.
+      // Counts are trivial since rows already carry their status.
+      const merged = [...current.rows, ...r.view!.rows];
+      return {
+        rows: merged,
+        counts: {
+          total: merged.length,
+          draft: merged.filter((row) => row.status === "draft").length,
+          reneApproved: merged.filter((row) => row.status === "rene-approved")
+            .length,
+          rejected: merged.filter((row) => row.status === "rejected").length,
+        },
+      };
+    });
+    setNextCursor(r.nextCursor);
+    setPageCount((c) => c + 1);
+  }
 
   // Phase 15 — bounded passive poll. Refreshes the list every
   // POLL_INTERVAL_MS for at most POLL_MAX_TICKS ticks (10 min total
@@ -215,6 +289,10 @@ export function ReviewPacketsView() {
     let cancelled = false;
     const id = setInterval(() => {
       if (cancelled) return;
+      // Phase 17: skip the auto-refresh when the operator has loaded
+      // additional pages. Yanking accumulated rows mid-scroll is
+      // worse than slightly stale data; manual Refresh is one click.
+      if (pageCount > 1) return;
       ticks += 1;
       setRefreshKey((k) => k + 1);
       if (ticks >= POLL_MAX_TICKS) clearInterval(id);
@@ -225,8 +303,10 @@ export function ReviewPacketsView() {
     };
     // Re-arm whenever the filter changes (fresh user interaction).
     // refreshKey is intentionally NOT a dep — that would create a
-    // tight loop with the increment inside the interval.
-  }, [filterSpec]);
+    // tight loop with the increment inside the interval. pageCount
+    // IS a dep so the poll re-evaluates the skip condition when the
+    // operator clicks Load more.
+  }, [filterSpec, pageCount]);
 
   // Defensive client-side filter belt. Server pre-filters via the
   // same canonical helper, so this re-application is a no-op on
@@ -674,6 +754,49 @@ export function ReviewPacketsView() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* ---- Phase 17: Load more pager ---- */}
+        {rows.length > 0 && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              marginTop: 12,
+              fontSize: 11,
+              color: DIM,
+            }}
+          >
+            <span>
+              Showing <strong style={{ color: NAVY }}>{rows.length}</strong>
+              {matchedTotal !== null && matchedTotal !== rows.length
+                ? ` of ${matchedTotal}`
+                : ""}
+              {pageCount > 1 ? ` · ${pageCount} pages loaded` : ""}
+            </span>
+            {nextCursor ? (
+              <button
+                type="button"
+                onClick={onClickLoadMore}
+                disabled={loadingMore}
+                style={{
+                  fontSize: 11,
+                  padding: "4px 10px",
+                  borderRadius: 4,
+                  border: `1px solid ${BORDER}`,
+                  background: "#fff",
+                  color: NAVY,
+                  cursor: loadingMore ? "wait" : "pointer",
+                }}
+              >
+                {loadingMore ? "Loading…" : "Load more"}
+              </button>
+            ) : (
+              <span>End of queue.</span>
+            )}
           </div>
         )}
 

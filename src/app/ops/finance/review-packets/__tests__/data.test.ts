@@ -18,9 +18,12 @@ import { describe, expect, it } from "vitest";
 import {
   applyReviewPacketsFilters,
   buildReviewPacketsView,
+  decodeReviewPacketCursor,
+  encodeReviewPacketCursor,
   filterPacketsBySpec,
   formatAmountCell,
   formatVendorCell,
+  paginateReviewPackets,
   parseReviewPacketsFilterSpec,
   reviewPacketsFilterSpecToQuery,
 } from "../data";
@@ -987,5 +990,193 @@ describe("filterPacketsBySpec — approval-status filter parity (Phase 16)", () 
       filterPacketsBySpec(packets, { approvalStatus: "no-approval" })
         .length,
     ).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 17 — cursor encode/decode + paginateReviewPackets
+// ---------------------------------------------------------------------------
+
+describe("encodeReviewPacketCursor / decodeReviewPacketCursor", () => {
+  it("round-trips a {ts, packetId} cursor", () => {
+    const cursor = { ts: 1735000000000, packetId: "pkt-v1-belmark" };
+    const encoded = encodeReviewPacketCursor(cursor);
+    expect(decodeReviewPacketCursor(encoded)).toEqual(cursor);
+  });
+
+  it("encoded cursor is opaque (base64url, no plaintext)", () => {
+    const cursor = { ts: 1, packetId: "pkt-v1-x" };
+    const encoded = encodeReviewPacketCursor(cursor);
+    // base64url charset only: A-Z a-z 0-9 - _
+    expect(encoded).toMatch(/^[A-Za-z0-9_-]+$/);
+    // No raw "pkt-v1-x" leaking through.
+    expect(encoded).not.toContain("pkt-v1");
+  });
+
+  it("decode returns null for null / undefined / empty / whitespace", () => {
+    expect(decodeReviewPacketCursor(null)).toBeNull();
+    expect(decodeReviewPacketCursor(undefined)).toBeNull();
+    expect(decodeReviewPacketCursor("")).toBeNull();
+    expect(decodeReviewPacketCursor("   ")).toBeNull();
+  });
+
+  it("decode returns null for malformed base64", () => {
+    expect(decodeReviewPacketCursor("!!!not-base64!!!")).toBeNull();
+  });
+
+  it("decode returns null for valid base64 but non-JSON payload", () => {
+    const garbage = Buffer.from("not json", "utf8").toString("base64url");
+    expect(decodeReviewPacketCursor(garbage)).toBeNull();
+  });
+
+  it("decode returns null for JSON payload missing ts or packetId", () => {
+    const noTs = Buffer.from(
+      JSON.stringify({ packetId: "x" }),
+      "utf8",
+    ).toString("base64url");
+    expect(decodeReviewPacketCursor(noTs)).toBeNull();
+    const noPid = Buffer.from(
+      JSON.stringify({ ts: 1 }),
+      "utf8",
+    ).toString("base64url");
+    expect(decodeReviewPacketCursor(noPid)).toBeNull();
+  });
+
+  it("decode returns null for JSON payload with wrong types", () => {
+    const wrong = Buffer.from(
+      JSON.stringify({ ts: "not-a-number", packetId: "x" }),
+      "utf8",
+    ).toString("base64url");
+    expect(decodeReviewPacketCursor(wrong)).toBeNull();
+  });
+
+  it("decode rejects empty packetId (defensive — prevents pagination loop)", () => {
+    const empty = Buffer.from(
+      JSON.stringify({ ts: 1, packetId: "" }),
+      "utf8",
+    ).toString("base64url");
+    expect(decodeReviewPacketCursor(empty)).toBeNull();
+  });
+});
+
+describe("paginateReviewPackets", () => {
+  function packetAt(id: string, iso: string) {
+    return buildReceiptReviewPacket(mkReceipt({ id }), { now: new Date(iso) });
+  }
+
+  function fixture(): ReturnType<typeof packetAt>[] {
+    // Note: createdAt is NOT in canonical sort order — function
+    // must re-sort internally.
+    return [
+      packetAt("r-old-a", "2026-04-15T00:00:00Z"),
+      packetAt("r-new-a", "2026-04-25T00:00:00Z"),
+      packetAt("r-tied-b", "2026-04-20T00:00:00Z"),
+      packetAt("r-mid-a", "2026-04-18T00:00:00Z"),
+      packetAt("r-tied-a", "2026-04-20T00:00:00Z"),
+    ];
+  }
+
+  it("first page returns most-recent packets first; nextCursor non-null when more remain", () => {
+    const r = paginateReviewPackets(fixture(), { limit: 2 });
+    expect(r.page).toHaveLength(2);
+    // packetId is "pkt-v1-r-..." — the new-a packet has the most
+    // recent createdAt.
+    expect(r.page[0].receiptId).toBe("r-new-a");
+    expect(r.nextCursor).not.toBeNull();
+  });
+
+  it("traversing all pages with the returned cursors visits every packet exactly once, in canonical order", () => {
+    const packets = fixture();
+    const seen: string[] = [];
+    let cursor: string | null = null;
+    for (let safety = 0; safety < 20; safety++) {
+      const r: ReturnType<typeof paginateReviewPackets> = paginateReviewPackets(
+        packets,
+        { limit: 2, cursor },
+      );
+      for (const p of r.page) seen.push(p.receiptId);
+      if (!r.nextCursor) break;
+      cursor = r.nextCursor;
+    }
+    expect(seen).toEqual([
+      "r-new-a",   // 04-25
+      "r-tied-a",  // 04-20 (tie-broken asc by packetId pkt-v1-r-tied-a)
+      "r-tied-b",  // 04-20 (pkt-v1-r-tied-b)
+      "r-mid-a",   // 04-18
+      "r-old-a",   // 04-15
+    ]);
+    expect(seen.length).toBe(packets.length);
+    // No duplicates.
+    expect(new Set(seen).size).toBe(seen.length);
+  });
+
+  it("nextCursor is null when fewer than limit items remain", () => {
+    const r = paginateReviewPackets(fixture(), { limit: 100 });
+    expect(r.page.length).toBe(5);
+    expect(r.nextCursor).toBeNull();
+  });
+
+  it("limit clamped to [1, 500]", () => {
+    expect(paginateReviewPackets(fixture(), { limit: 0 }).page.length).toBe(1);
+    expect(paginateReviewPackets(fixture(), { limit: -5 }).page.length).toBe(1);
+    expect(paginateReviewPackets(fixture(), { limit: 999_999 }).page.length).toBe(
+      5,
+    );
+  });
+
+  it("malformed cursor falls back to first page (defensive — never throws)", () => {
+    const r = paginateReviewPackets(fixture(), {
+      cursor: "not-a-real-cursor",
+      limit: 2,
+    });
+    expect(r.page).toHaveLength(2);
+    expect(r.page[0].receiptId).toBe("r-new-a");
+  });
+
+  it("empty input → empty page + null cursor", () => {
+    const r = paginateReviewPackets([], { limit: 100 });
+    expect(r.page).toEqual([]);
+    expect(r.nextCursor).toBeNull();
+  });
+
+  it("does not mutate the input array", () => {
+    const packets = fixture();
+    const before = JSON.stringify(packets);
+    paginateReviewPackets(packets, { limit: 2 });
+    expect(JSON.stringify(packets)).toBe(before);
+  });
+
+  it("ties on createdAt break by packetId asc (stable order across pages)", () => {
+    // Three packets with identical createdAt, different ids.
+    const tied = [
+      packetAt("r-c", "2026-04-20T00:00:00Z"),
+      packetAt("r-a", "2026-04-20T00:00:00Z"),
+      packetAt("r-b", "2026-04-20T00:00:00Z"),
+    ];
+    const all: string[] = [];
+    let cursor: string | null = null;
+    for (let i = 0; i < 5; i++) {
+      const r: ReturnType<typeof paginateReviewPackets> = paginateReviewPackets(
+        tied,
+        { limit: 1, cursor },
+      );
+      if (r.page.length === 0) break;
+      all.push(r.page[0].receiptId);
+      if (!r.nextCursor) break;
+      cursor = r.nextCursor;
+    }
+    expect(all).toEqual(["r-a", "r-b", "r-c"]);
+  });
+
+  it("pagination is idempotent under filter+paginate composition", () => {
+    // The route's flow: filter the full set, then paginate. Verify
+    // that `paginateReviewPackets(filterPacketsBySpec(packets, spec))`
+    // gives a deterministic page that matches a single-pass filter.
+    const packets = fixture();
+    const spec = { vendorContains: "no-such" }; // matches nothing
+    const filtered = filterPacketsBySpec(packets, spec);
+    const r = paginateReviewPackets(filtered, { limit: 10 });
+    expect(r.page).toEqual([]);
+    expect(r.nextCursor).toBeNull();
   });
 });
