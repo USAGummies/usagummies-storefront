@@ -30,9 +30,9 @@ import { listApPackets } from "@/lib/ops/ap-packets";
 import { listDraftsByStatus } from "@/lib/locations/drafts";
 import { listReceipts } from "@/lib/ops/docs";
 import { approvalStore } from "@/lib/ops/control-plane/stores";
+import { getWholesaleInquirySummary } from "@/lib/wholesale/inquiries";
 import {
   sourceError,
-  sourceNotWired,
   sourceWired,
   type ApPacketCounts,
   type FaireFollowUpRowSummary,
@@ -203,17 +203,31 @@ export async function readLocationDrafts(): Promise<
 }
 
 /**
- * Wholesale inquiries — there is no internal list endpoint today.
- * Submissions land in `/api/leads` but aren't archived in a queryable
- * store. Surface this honestly rather than fabricating a count.
+ * Wholesale inquiries — Phase 6 wired.
+ *
+ * Reads the durable KV archive populated by `/api/leads` whenever
+ * `intent === "wholesale"`. Returns:
+ *   - `wired` with `{ total, lastSubmittedAt? }` on a successful read
+ *     (`total: 0` is a real, source-attested zero — KV reachable but
+ *     archive empty).
+ *   - `error` with reason on KV exception. NEVER `wired:0` on
+ *     failure — the no-fabricated-zero rule is locked by tests.
+ *
+ * Stays a context source (NOT an action source): the sales-command
+ * slice's `anyAction` calculation deliberately excludes wholesale
+ * inquiries so a positive count never makes the morning brief noisy.
  */
-export function readWholesaleInquiries(): SourceState<{
-  total: number;
-  lastSubmittedAt?: string;
-}> {
-  return sourceNotWired(
-    "No internal list endpoint for wholesale inquiries. Submissions land in /api/leads but aren't archived in a queryable store. Wire this when a /api/ops/wholesale/inquiries list route lands.",
-  );
+export async function readWholesaleInquiries(): Promise<
+  SourceState<{
+    total: number;
+    lastSubmittedAt?: string;
+  }>
+> {
+  const result = await getWholesaleInquirySummary();
+  if (!result.ok) {
+    return sourceError(`Wholesale inquiry archive read failed: ${result.reason}`);
+  }
+  return sourceWired(result.summary);
 }
 
 // ---------------------------------------------------------------------------

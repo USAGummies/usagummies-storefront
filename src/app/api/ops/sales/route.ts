@@ -78,6 +78,7 @@ export async function GET(req: Request): Promise<Response> {
     locationDrafts,
     aging,
     revenueChannels,
+    wholesaleInquiries,
   ] = await Promise.all([
     readFaireInvites(),
     readFaireFollowUps(now),
@@ -86,6 +87,7 @@ export async function GET(req: Request): Promise<Response> {
     readLocationDrafts(),
     readAllAgingItems(now),
     readAllChannelsLast7d(now),
+    readWholesaleInquiries(),
   ]);
 
   const report = buildSalesCommandCenter(
@@ -95,7 +97,7 @@ export async function GET(req: Request): Promise<Response> {
       pendingApprovals,
       apPackets,
       locationDrafts,
-      wholesaleInquiries: readWholesaleInquiries(),
+      wholesaleInquiries,
       missingEnv: readMissingEnv(),
       agingItems: aging.items,
       agingMissing: aging.missing,

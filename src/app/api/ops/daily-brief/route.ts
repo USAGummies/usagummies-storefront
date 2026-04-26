@@ -256,12 +256,14 @@ async function composeAndPost(req: Request): Promise<Response> {
         pendingApprovalsForSales,
         apPackets,
         locationDrafts,
+        wholesaleInquiries,
       ] = await Promise.all([
         readFaireInvites(),
         readFaireFollowUps(now),
         readPendingApprovals(),
         readApPackets(),
         readLocationDrafts(),
+        readWholesaleInquiries(),
       ]);
       salesCommand = composeSalesCommandSlice({
         faireInvites,
@@ -269,7 +271,7 @@ async function composeAndPost(req: Request): Promise<Response> {
         pendingApprovals: pendingApprovalsForSales,
         apPackets,
         locationDrafts,
-        wholesaleInquiries: readWholesaleInquiries(),
+        wholesaleInquiries,
       });
     } catch (err) {
       degradations.push(

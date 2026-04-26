@@ -4,6 +4,7 @@ import {
   isInquirySecretConfigured,
   signInquiryToken,
 } from "@/lib/wholesale/inquiry-token";
+import { appendWholesaleInquiry } from "@/lib/wholesale/inquiries";
 
 type LeadPayload = {
   email?: string;
@@ -183,6 +184,29 @@ export async function POST(req: Request) {
   if (intent === "wholesale" && email) {
     // Fire-and-forget — don't block the response on Notion write
     addToB2BPipeline({ email, buyerName, storeName, location, interest, source }).catch(() => {});
+  }
+
+  // Phase 6 — durable internal archive for wholesale inquiries.
+  // Powers the auth-gated /api/ops/wholesale/inquiries list endpoint
+  // and the Sales Command Center wholesale-inquiries source. Same
+  // fail-soft pattern as the Notion mirror above: if KV is down or
+  // unreachable, the public form submission still succeeds.
+  if (intent === "wholesale" && (email || phone)) {
+    appendWholesaleInquiry({
+      email,
+      phone,
+      source,
+      intent,
+      storeName,
+      buyerName,
+      location,
+      interest,
+    }).catch((err) => {
+      console.warn(
+        "[leads] Wholesale inquiry archive write failed:",
+        err instanceof Error ? err.message : err,
+      );
+    });
   }
 
   // Mint a sticky inquiry receipt URL for wholesale submissions when

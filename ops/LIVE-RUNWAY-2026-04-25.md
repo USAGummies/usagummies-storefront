@@ -30,7 +30,7 @@ Current active lane at the time this runway was refreshed:
 
 - `/ops/sales` is a read-only Sales Command Center.
 - It aggregates Faire invites, follow-ups, pending approvals, AP packets, location drafts, aging/SLA, and a weekly revenue KPI.
-- Wholesale inquiries are still explicitly `not_wired` in the Sales Command Center because there is no internal list API yet.
+- Wholesale inquiries are now `wired` (Phase 6, commit upcoming): `/api/leads` mirrors submissions fail-soft into a durable KV archive; auth-gated `GET /api/ops/wholesale/inquiries` exposes the count; `/ops/sales` shows real `total` + `lastSubmittedAt`. Morning brief stays quiet (wholesale is context, not action).
 - B2B revenue Phase 1 is wired from paid Shopify orders tagged `wholesale`; Shopify-DTC excludes the same tag to avoid double-count.
 
 ### Faire Direct
@@ -110,7 +110,7 @@ These are operator tasks, not code tasks:
 
 ### Known `not_wired` Sources
 
-- Wholesale inquiry internal list API.
+- ~Wholesale inquiry internal list API.~ ✅ Wired in Phase 6.
 - B2B revenue Phase 2 attribution through QBO Class/CustomField is deferred until Rene's chart/accounting reset stabilizes. Phase 1 Shopify `tag:wholesale` is live.
 - Unknown revenue catch-all by design.
 - R1-R7 research specialist runtimes.
