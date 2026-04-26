@@ -1,5 +1,4 @@
 import Link from "next/link";
-import Image from "next/image";
 import type { Metadata } from "next";
 import { OccasionBagPicker } from "@/components/guides/OccasionBagPicker.client";
 import { OCCASION_BAG_OPTIONS } from "@/data/occasionBagOptions";
@@ -120,19 +119,6 @@ export default async function BulkGummyBearsPage() {
                 Stock up with USA Gummies for teams, clients, and large gatherings. Add more bags to
                 save per bag with fast shipping and made in the USA quality.
               </p>
-            </div>
-            <div className="relative">
-              <div className="relative rounded-3xl border border-[var(--border)] bg-white p-2 shadow-[0_18px_44px_rgba(15,27,45,0.12)]">
-                <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-[var(--border)] bg-white">
-                  <Image
-                    src="/website%20assets/B17Bomber.png"
-                    alt="Vintage B-17 bomber illustration"
-                    fill
-                    sizes="(max-width: 768px) 90vw, 420px"
-                    className="object-contain"
-                  />
-                </div>
-              </div>
             </div>
           </div>
 

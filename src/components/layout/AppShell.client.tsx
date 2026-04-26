@@ -324,16 +324,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {cartToast ? (
         <div className="fixed right-4 top-20 z-50 max-w-[320px]">
           <div className="relative candy-panel rounded-2xl border border-[var(--border)] px-4 py-3 text-[var(--text)] shadow-[0_18px_42px_rgba(15,27,45,0.14)]">
-            <div className="pointer-events-none absolute -right-6 -top-4 h-20 w-20 opacity-12">
-              <Image
-                src="/website%20assets/StatueofLiberty.png"
-                alt="Statue of Liberty illustration"
-                aria-hidden="true"
-                fill
-                sizes="80px"
-                className="object-contain"
-              />
-            </div>
             <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
               Added to cart
             </div>
@@ -535,20 +525,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <main
         className={cx(
           "relative text-[var(--text)]",
-          isLandingPage ? "" : "overflow-hidden pb-16",
+          isLandingPage ? "" : "pb-16",
         )}
       >
-        {isLandingPage ? null : (
-          <Image
-            src="/website%20assets/B17Bomber.png"
-            alt="Vintage B-17 bomber illustration"
-            aria-hidden="true"
-            width={1405}
-            height={954}
-            sizes="(max-width: 1024px) 1px, 520px"
-            className="site-watermark site-watermark--bomber"
-          />
-        )}
         <div className="relative z-10">{children}</div>
       </main>
 

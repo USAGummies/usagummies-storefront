@@ -3,7 +3,16 @@ import "./globals.css";
 import type { Metadata } from "next";
 import Script from "next/script";
 import { Analytics } from "@vercel/analytics/react";
-import { Oswald, Space_Grotesk, Yellowtail } from "next/font/google";
+// Fallback fonts. Ben's typography spec is Zuume (headliner) + Rosseville
+// (script accent) — both commercial. Until the licensed font files are
+// dropped into `public/fonts/zuume/` and `public/fonts/rosseville/` (and
+// loaded via the @font-face block in globals.css), these Google Fonts
+// stand in as the closest visual match: Anton for Zuume's tall condensed
+// display weights, Inter for Zuume's lighter body weights, Allison for
+// Rosseville's casual script. The font-family stacks in globals.css /
+// lp.css already put `'Zuume'` and `'Rosseville'` first, so once the
+// real fonts load the swap is automatic — no app code changes needed.
+import { Anton, Inter, Allison } from "next/font/google";
 import { AppShell } from "@/components/layout/AppShell.client";
 import { AMAZON_LISTING_URL } from "@/lib/amazon";
 
@@ -113,26 +122,34 @@ function resolveSiteUrl() {
 const SITE_URL = resolveSiteUrl();
 const DEFAULT_DESCRIPTION = "All natural, American-made gummy bears with no artificial dyes.";
 
-const display = Oswald({
+// `--font-display` — Zuume fallback. Anton is a tall condensed bold
+// sans, single weight (400). Closest free match for Zuume Black.
+const display = Anton({
   subsets: ["latin"],
   variable: "--font-display",
-  weight: ["400", "700"],
+  weight: "400",
   display: "swap",
   preload: false,
 });
 
-const sans = Space_Grotesk({
+// `--font-sans` — Zuume body fallback. Inter is a clean modern sans
+// with a wide weight range; reasonable stand-in for Zuume Light/Regular
+// until the licensed variable Zuume file ships.
+const sans = Inter({
   subsets: ["latin"],
   variable: "--font-sans",
-  weight: ["400", "700"],
+  weight: ["400", "500", "600", "700"],
   display: "swap",
   preload: true,
 });
 
-const script = Yellowtail({
+// `--font-script` — Rosseville fallback. Allison is a casual handwritten
+// script, Google Fonts' closest match to Rosseville's loose romantic
+// flair. Used 10–30% sparingly per the typography spec.
+const script = Allison({
   subsets: ["latin"],
   variable: "--font-script",
-  weight: ["400"],
+  weight: "400",
   display: "swap",
   preload: false,
 });

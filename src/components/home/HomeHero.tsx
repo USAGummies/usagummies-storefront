@@ -1,6 +1,5 @@
 // src/components/home/HomeHero.tsx (FULL REPLACE)
 import Link from "next/link";
-import Image from "next/image";
 import { PatriotBanner } from "@/components/ui/PatriotBanner";
 import { GummyIconRow, HeroPackIcon } from "@/components/ui/GummyIcon";
 import { PatriotRibbon } from "@/components/ui/PatriotRibbon";
@@ -14,15 +13,6 @@ export function HomeHero() {
           style={{ padding: 22, overflow: "hidden", position: "relative" }}
         >
           <span className="usa-stamp usa-stamp--corner">Made in USA</span>
-          <Image
-            src="/website%20assets/B17Bomber.png"
-            alt="Vintage B-17 bomber illustration"
-            aria-hidden="true"
-            width={1200}
-            height={800}
-            sizes="(max-width: 980px) 1px, 420px"
-            className="hero-bomber"
-          />
           <div className="hero-gummy-trail" aria-hidden="true">
             <GummyIconRow size={14} className="opacity-90" />
           </div>
@@ -111,16 +101,6 @@ export function HomeHero() {
       </div>
 
       <style>{`
-        .hero-bomber{
-          position: absolute;
-          top: -20px;
-          right: -120px;
-          width: min(420px, 55vw);
-          height: auto;
-          opacity: 0.12;
-          filter: saturate(0.45);
-          pointer-events: none;
-        }
         .hero-gummy-trail{
           position: absolute;
           top: 52px;
@@ -160,7 +140,6 @@ export function HomeHero() {
         }
         .hero-grid{ grid-template-columns: 1.25fr 0.75fr; }
         @media (max-width: 980px){
-          .hero-bomber,
           .hero-gummy-trail{
             display: none;
           }

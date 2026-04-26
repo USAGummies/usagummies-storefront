@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import Image from "next/image";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import { LatestFromBlog } from "@/components/blog/LatestFromBlog";
@@ -166,19 +165,6 @@ export default function PatrioticCandyPage() {
               </div>
               <div className="mt-3 text-xs text-[var(--muted)]">
                 {FREE_SHIPPING_PHRASE}. Bundles ship fast for seasonal gifting.
-              </div>
-            </div>
-            <div className="relative">
-              <div className="relative rounded-3xl border border-[var(--border)] bg-white p-2 shadow-[0_18px_44px_rgba(15,27,45,0.12)]">
-                <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-[var(--border)] bg-white">
-                  <Image
-                    src="/website%20assets/StatueofLiberty.png"
-                    alt="Statue of Liberty illustration"
-                    fill
-                    sizes="(max-width: 768px) 90vw, 420px"
-                    className="object-contain"
-                  />
-                </div>
               </div>
             </div>
           </div>

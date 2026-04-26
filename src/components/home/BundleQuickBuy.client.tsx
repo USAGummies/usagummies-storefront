@@ -1290,17 +1290,6 @@ export default function BundleQuickBuy({
         className="bundle-integrated relative"
       >
         {showTrainAccent ? (
-          <Image
-            src="/website%20assets/B17Bomber.png"
-            alt="Vintage B-17 bomber illustration"
-            aria-hidden="true"
-            width={1405}
-            height={954}
-            sizes="(max-width: 640px) 90vw, 620px"
-            className="bundle-integrated__accent"
-          />
-        ) : null}
-        {showTrainAccent ? (
           <div className="bundle-integrated__trail" aria-hidden="true">
             <GummyIconRow size={14} className="opacity-90" />
           </div>
@@ -1771,17 +1760,6 @@ export default function BundleQuickBuy({
             </>
           ) : null}
         </div>
-        {showTrainAccent ? (
-          <Image
-            src="/website%20assets/B17Bomber.png"
-            alt="Vintage B-17 bomber illustration"
-            aria-hidden="true"
-            width={1405}
-            height={954}
-            sizes="(max-width: 640px) 110vw, 860px"
-            className="h-[190px] w-auto shrink-0 object-contain sm:ml-auto sm:h-[218px] lg:h-[236px]"
-          />
-        ) : null}
       </div>
       {showEducation && showHowItWorks ? (
         <div

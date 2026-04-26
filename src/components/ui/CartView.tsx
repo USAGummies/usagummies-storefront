@@ -661,14 +661,6 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                 </div>
                 <div className="relative mt-4 flex items-end justify-center gap-2">
                   <Image
-                    src="/website%20assets/StatueofLiberty.png"
-                    alt="Statue of Liberty illustration"
-                    aria-hidden="true"
-                    width={320}
-                    height={320}
-                    className="h-28 w-auto opacity-75"
-                  />
-                  <Image
                     src="/logo-mark.png"
                     alt="USA Gummies logo mark"
                     aria-hidden="true"
@@ -972,18 +964,6 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                 </div>
                 <div className="mt-2 text-[11px] text-[var(--muted)]">{freeShipLine}</div>
               </div>
-              {isDrawer ? (
-                <div className="relative h-28 w-24 shrink-0 self-center mr-8">
-                  <Image
-                    src="/website%20assets/StatueofLiberty.png"
-                    alt="Statue of Liberty illustration"
-                    fill
-                    sizes="96px"
-                    className="object-contain"
-                    aria-hidden="true"
-                  />
-                </div>
-              ) : null}
               <details className="mt-3 text-xs text-[var(--muted)]">
                 <summary className="cursor-pointer font-semibold text-[var(--text)]">
                   See pricing rules

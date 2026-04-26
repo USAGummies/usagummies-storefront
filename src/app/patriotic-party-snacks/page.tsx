@@ -1,5 +1,4 @@
 import Link from "next/link";
-import Image from "next/image";
 import type { Metadata } from "next";
 import { OccasionBagPicker } from "@/components/guides/OccasionBagPicker.client";
 import { OCCASION_BAG_OPTIONS } from "@/data/occasionBagOptions";
@@ -111,19 +110,6 @@ export default async function PatrioticPartySnacksPage() {
                 Hosting a July 4th party or an America-themed event? USA Gummies bags make easy
                 shareable snacks. Shop now for crowd-ready gummy bears.
               </p>
-            </div>
-            <div className="relative">
-              <div className="relative rounded-3xl border border-[var(--border)] bg-white p-2 shadow-[0_18px_44px_rgba(15,27,45,0.12)]">
-                <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-[var(--border)] bg-white">
-                  <Image
-                    src="/website%20assets/StatueofLiberty.png"
-                    alt="Statue of Liberty illustration"
-                    fill
-                    sizes="(max-width: 768px) 90vw, 420px"
-                    className="object-contain"
-                  />
-                </div>
-              </div>
             </div>
           </div>
 

@@ -23,15 +23,6 @@ export function ExperienceBand({ variant = "compact", className }: Props) {
         .join(" ")}
     >
       <span className="usa-stamp usa-stamp--corner">Made in USA</span>
-      <Image
-        src="/website%20assets/B17Bomber.png"
-        alt="Vintage B-17 bomber illustration"
-        aria-hidden="true"
-        width={1405}
-        height={954}
-        sizes="(max-width: 768px) 1px, 420px"
-        className="experience-band__accent"
-      />
       <div className="experience-band__trail" aria-hidden="true">
         <GummyIconRow size={12} className="opacity-90" />
       </div>

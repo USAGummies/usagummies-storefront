@@ -20,39 +20,41 @@
 
   color: var(--lp-ink);
   background: var(--lp-cream);
-  font-family: var(--font-lp-body), "Oswald", sans-serif;
+  font-family: "Zuume", var(--font-sans, "Inter"), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   font-feature-settings: "kern" on, "liga" on;
 }
 
-/* Chunky slab display — for the monumental headlines */
+/* The Headliner — Zuume Black for monumental display lines.
+ * Fallback: Anton (loaded via root layout as `--font-display`). */
 .lp-scope .lp-display {
-  font-family: var(--font-lp-display), "Ultra", "Bowlby One SC", serif;
-  font-weight: 400;
+  font-family: "Zuume", var(--font-display, "Anton"), "Bowlby One SC", sans-serif;
+  font-weight: 900;
   letter-spacing: -0.005em;
   line-height: 0.95;
   text-transform: uppercase;
 }
 
-/* Tall clean sans — for body and subheads */
+/* Body / subheads — Zuume Regular weight. */
 .lp-scope .lp-sans {
-  font-family: var(--font-lp-body), "Oswald", sans-serif;
+  font-family: "Zuume", var(--font-sans, "Inter"), system-ui, sans-serif;
   font-weight: 500;
   letter-spacing: 0.01em;
 }
 
-/* Patriotic script — the "Made in the U.S.A." tagline style */
+/* American Accent — Rosseville script, used 10–30% sparingly per spec.
+ * Fallback: Allison (loaded via root layout as `--font-script`). */
 .lp-scope .lp-script {
-  font-family: var(--font-lp-script), "Yellowtail", cursive;
+  font-family: "Rosseville", var(--font-script, "Allison"), cursive;
   font-weight: 400;
   letter-spacing: 0;
   text-transform: none;
 }
 
-/* Small caps label */
+/* Small caps label — Zuume Bold tracked out. */
 .lp-scope .lp-label {
-  font-family: var(--font-lp-body), "Oswald", sans-serif;
+  font-family: "Zuume", var(--font-sans, "Inter"), system-ui, sans-serif;
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
