@@ -37,6 +37,7 @@ import { executeApprovedVendorMasterCreate } from "@/lib/ops/vendor-onboarding";
 import { executeApprovedApPacketSend } from "@/lib/ops/ap-packets/approval-closer";
 import { executeApprovedFaireDirectInvite } from "@/lib/faire/approval-closer";
 import { executeApprovedFaireDirectFollowUp } from "@/lib/faire/follow-up-closer";
+import { executeApprovedReceiptReviewPromote } from "@/lib/ops/receipt-review-closer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -182,6 +183,9 @@ export async function POST(req: Request): Promise<Response> {
   let faireFollowUpExecution:
     | Awaited<ReturnType<typeof executeApprovedFaireDirectFollowUp>>
     | undefined;
+  let receiptReviewExecution:
+    | Awaited<ReturnType<typeof executeApprovedReceiptReviewPromote>>
+    | undefined;
   let postedThreadText: string | null = null;
 
   if (decisionKind === "approve" && next.status === "approved") {
@@ -272,6 +276,24 @@ export async function POST(req: Request): Promise<Response> {
     }
   }
 
+  // ---- Receipt-review closer (fires on BOTH approve AND reject) ----
+  // Phase 10: receipt-review packets need a status transition for
+  // either terminal decision. The closer is gated by
+  // `targetEntity.type === "receipt-review-packet"` so it can't
+  // cross-fire with the action-specific closers above. We invoke
+  // outside the approve-only block so a Slack reject also drives
+  // the packet to its `rejected` terminal state.
+  if (next.status === "approved" || next.status === "rejected") {
+    receiptReviewExecution = await executeApprovedReceiptReviewPromote(next);
+    if (receiptReviewExecution.handled && existing.slackThread?.ts) {
+      await postMessage({
+        channel: "#ops-approvals",
+        text: receiptReviewExecution.threadMessage,
+        threadTs: existing.slackThread.ts,
+      }).catch(() => void 0);
+    }
+  }
+
   return NextResponse.json({
     ok: true,
     approvalId,
@@ -280,6 +302,7 @@ export async function POST(req: Request): Promise<Response> {
     apPacketExecution,
     faireInviteExecution,
     faireFollowUpExecution,
+    receiptReviewExecution,
     execution: emailExecution,
     shipmentExecution,
     vendorExecution,

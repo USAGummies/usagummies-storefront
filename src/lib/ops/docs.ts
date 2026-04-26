@@ -515,6 +515,40 @@ export async function getReceiptReviewPacket(
   return packets.find((p) => p.packetId === packetId) ?? null;
 }
 
+/**
+ * Phase 10 — replace a packet's status. Used by the
+ * `receipt.review.promote` closer when Rene's Slack decision lands.
+ *
+ * **Hard contract:**
+ *   - Mutates ONLY the packet's `status` field. Canonical receipt
+ *     fields, eligibility, proposedFields, taxonomy, OCR suggestion,
+ *     and `receiptStatusAtBuild` are left exactly as the builder
+ *     produced them.
+ *   - Returns the updated packet on success, `null` if `packetId`
+ *     doesn't exist.
+ *   - Idempotent on terminal states: callers should pass a real
+ *     transition; re-setting a terminal status to itself is a no-op
+ *     here at the storage layer (we still write — the higher-level
+ *     `applyDecisionToPacket` is what enforces the no-double-fire
+ *     contract).
+ */
+export async function updateReceiptReviewPacketStatus(
+  packetId: string,
+  nextStatus: ReceiptReviewPacket["status"],
+): Promise<ReceiptReviewPacket | null> {
+  const packets =
+    (await kv.get<ReceiptReviewPacket[]>(KV_RECEIPT_REVIEW_PACKETS)) || [];
+  const idx = packets.findIndex((p) => p.packetId === packetId);
+  if (idx === -1) return null;
+  const updated: ReceiptReviewPacket = {
+    ...packets[idx],
+    status: nextStatus,
+  };
+  packets[idx] = updated;
+  await kv.set(KV_RECEIPT_REVIEW_PACKETS, packets);
+  return updated;
+}
+
 /** List packets, most-recent-first by `createdAt`. Bounded by `limit`
  *  (default 50; max 500). */
 export async function listReceiptReviewPackets(opts: {

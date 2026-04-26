@@ -103,10 +103,21 @@ export interface ReceiptReviewPacket {
   proposedFields: ProposedFields;
   eligibility: PacketEligibility;
   taxonomy: PacketTaxonomy;
-  /** Always 'draft' — this packet is a queue item, not an opened
-   *  approval. Promotion to a Slack-surfaced approval requires a
-   *  taxonomy slug to land first. */
-  status: "draft";
+  /**
+   * Phase 8: `"draft"` — packet is a queue item.
+   * Phase 10: `"rene-approved"` once Rene approves the Class B
+   *           `receipt.review.promote` request; `"rejected"` if
+   *           Rene rejects. Transitions are exclusively driven by
+   *           the closer at `src/lib/ops/receipt-review-closer.ts`
+   *           when the canonical approval store flips status.
+   *
+   * The transition NEVER auto-promotes the underlying receipt's
+   * status (`needs_review` / `ready` is unchanged), NEVER fills
+   * canonical receipt fields, and NEVER fires a QBO write. A
+   * separate Class B `qbo.bill.create` action runs later for the
+   * actual posting.
+   */
+  status: "draft" | "rene-approved" | "rejected";
   /** Receipt's `status` at packet build time. Locked for visibility
    *  — if a reviewer promoted this receipt to `ready` outside the
    *  packet flow, the packet still records what state it saw. */
@@ -256,5 +267,46 @@ export function buildReceiptReviewPacket(
     status: "draft",
     receiptStatusAtBuild: receipt.status,
     createdAt: now.toISOString(),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Phase 10 — pure status transitions
+// ---------------------------------------------------------------------------
+
+/**
+ * Map a control-plane approval decision to the packet's next status.
+ * Pure: same input → same output. No I/O. The closer
+ * (`src/lib/ops/receipt-review-closer.ts`) calls this after the
+ * approval store records the decision.
+ *
+ * Hard rules (locked by tests):
+ *   - `approve` → `"rene-approved"` (only valid when current is `"draft"`).
+ *   - `reject`  → `"rejected"` (only valid when current is `"draft"`).
+ *   - `ask`     → no transition (returns `null`). The approver is
+ *                 asking for clarification; the packet stays `"draft"`.
+ *   - Re-applying the same decision to a packet already in a
+ *     terminal state (`"rene-approved"`, `"rejected"`) is a no-op
+ *     (returns `null`). Idempotency preserves whatever the operator
+ *     already saw.
+ *   - The transition NEVER touches `canonical`, `proposedFields`,
+ *     `eligibility`, `taxonomy`, `ocrSuggestion`, or
+ *     `receiptStatusAtBuild`. Only the `status` field changes.
+ */
+export type PacketDecision = "approve" | "reject" | "ask";
+
+export function applyDecisionToPacket(
+  packet: ReceiptReviewPacket,
+  decision: PacketDecision,
+): ReceiptReviewPacket | null {
+  if (decision === "ask") return null;
+  if (packet.status !== "draft") return null; // idempotent on terminal state
+
+  const nextStatus: "rene-approved" | "rejected" =
+    decision === "approve" ? "rene-approved" : "rejected";
+
+  return {
+    ...packet,
+    status: nextStatus,
   };
 }
