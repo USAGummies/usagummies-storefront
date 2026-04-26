@@ -162,25 +162,24 @@ Potential code only if smoke fails:
 
 ### Lane B — Receipt-to-Rene approval promotion
 
-Phases 7-20 done. Phase 20 wires the Phase 10 closer
-(`src/lib/ops/receipt-review-closer.ts`) to fire
-`invalidateApprovalLookupCache()` AFTER the success audit lands —
-closing the up-to-30s window between "Slack closer ran" and
-"operator sees the transition on the dashboard". The invalidate
-NEVER fires on gating returns (non-receipt-review approval,
-pending status, missing targetEntity) or on the error path (packet
-not found, malformed targetEntity.id) — no transition occurred,
-cache is still correct. Best-effort: `kv.del` failures are
-swallowed inside the Phase 19 helper, so cache invalidation
-NEVER propagates back through the closer's success path. The
-packet's status flip remains the source of truth; cache is
-downstream observability. Phase 19 still owns the 30-second TTL
-ceiling — Phase 20 just opens a sub-second floor on the
-operator-decision path.
+Phases 7-21 done. Phase 21 adds cursor pagination to the CSV export
+route (`/api/ops/docs/receipt-review-packets/export.csv`). The
+dashboard's Export CSV button is unchanged (no cursor → first page,
+up to 500 rows; backward-compat with Phase 18). Programmatic
+clients chase `nextCursor` via standard RFC 5988 `Link: rel="next"`
+headers. Response gains `X-Matched-Total` (always set, full
+filtered set length), `X-Next-Cursor` (present iff more pages
+remain — NEVER fabricated empty / "null" / "0"), and `Link:
+<next-url>; rel="next"` (URL preserves all current filter params).
+Filters apply BEFORE pagination so cursor traversal of an active
+filter never emits half-empty pages. Malformed cursor falls back
+to first page (defensive). Body is CSV of paginated.page with same
+Phase 18 row schema, fixed header order, RFC-4180 escaping, CRLF
+terminator, and stable filename. Storage cap stays 500 today;
+Phase 21 just makes the route ready when storage grows.
 
 Receipt-review queue management is feature-complete. Remaining
 follow-ups (still on the table, none currently scheduled):
-- CSV pagination via cursor (only matters once queue >500 packets).
 - Closing the loop into `qbo.bill.create` once Rene confirms a
   rene-approved packet should land in QBO. (Crosses the QBO-write
   boundary — would need a new Class B / Class C taxonomy slug
@@ -202,7 +201,8 @@ Boundary:
 - CSV export. ✅ Done (Phase 18 Option A).
 - Approval-lookup caching + dedup. ✅ Done (Phase 19 Option B).
 - Closer cache-invalidation hook. ✅ Done (Phase 20).
-- Phase 21: TBD (CSV cursor / qbo.bill.create entry).
+- CSV cursor pagination. ✅ Done (Phase 21).
+- Phase 22: TBD (qbo.bill.create entry — crosses QBO-write boundary).
 - QBO posting remains a separate Rene-approved Class B/C action.
 - Do not auto-create bills, expenses, vendors, or categories.
 - Do not overwrite canonical receipt fields without explicit reviewer action.
