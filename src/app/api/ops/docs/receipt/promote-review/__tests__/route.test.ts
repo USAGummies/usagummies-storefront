@@ -24,12 +24,19 @@ vi.mock("@/lib/ops/abra-auth", () => ({
 }));
 
 const store = new Map<string, unknown>();
+const kvDelCalls: string[] = [];
+let kvDelShouldThrow = false;
 
 vi.mock("@vercel/kv", () => ({
   kv: {
     get: vi.fn(async (key: string) => store.get(key) ?? null),
     set: vi.fn(async (key: string, value: unknown) => {
       store.set(key, value);
+    }),
+    del: vi.fn(async (key: string) => {
+      kvDelCalls.push(key);
+      if (kvDelShouldThrow) throw new Error("kv-del-failed");
+      store.delete(key);
     }),
   },
 }));
@@ -40,6 +47,8 @@ import { extractReceiptFromText } from "@/lib/ops/receipt-ocr";
 
 beforeEach(() => {
   store.clear();
+  kvDelCalls.length = 0;
+  kvDelShouldThrow = false;
   isAuthorizedMock.mockReset();
 });
 
@@ -388,6 +397,149 @@ describe("Phase 9 — approval-open behavior", () => {
     const all = (store.get("docs:receipts") as StoredReceipt[] | null) ?? [];
     const found = all.find((r) => r.id === captured.id);
     expect(found?.status).toBe("ready"); // unchanged
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 22 — cache-invalidation hook on the new-approval edge
+// ---------------------------------------------------------------------------
+//
+// When `openApproval` succeeds (a brand-new pending approval lands in
+// the store), this route fires `invalidateApprovalLookupCache()` so
+// the dashboard reflects the new state sub-second after the operator
+// clicks Re-promote — instead of waiting up to 30s for the Phase 19
+// TTL to expire. Same shape as Phase 20 (closer cache-invalidation),
+// but on a different transition entry point.
+//
+// What we lock here:
+//   - New approval opened → kv.del called with the canonical
+//     cache key (`approval-lookup:receipt-review:v1`).
+//   - Idempotent existing-approval path → kv.del NOT called
+//     (cache already reflects the existing pending state).
+//   - Ineligible packet (no approval opened) → kv.del NOT called.
+//   - 401 / 400 / 404 surfaces → kv.del NOT called.
+//   - kv.del throw is swallowed inside the helper; the route
+//     still returns 200 with `approval.opened: true`.
+
+describe("Phase 22 — promote-review cache-invalidation hook", () => {
+  const CACHE_KEY = "approval-lookup:receipt-review:v1";
+
+  beforeEach(() => isAuthorizedMock.mockResolvedValue(true));
+
+  it("eligible packet → new approval opened → kv.del called with canonical cache key", async () => {
+    const captured = await processReceipt({
+      source_url: "https://example.com/receipt.jpg",
+      source_channel: "test",
+      vendor: "Belmark Inc",
+      date: "2026-04-20",
+      amount: 250,
+      category: "supplies",
+    });
+    expect(kvDelCalls).toEqual([]);
+
+    await POST(postJson({ receiptId: captured.id }));
+    expect(kvDelCalls).toContain(CACHE_KEY);
+  });
+
+  it("primed cache value is removed after a new approval is opened", async () => {
+    // Prime the cache directly with a sentinel value.
+    store.set(CACHE_KEY, {
+      cachedAt: Date.now(),
+      entries: { "pkt-stale": { id: "stale-id", status: "approved" } },
+    });
+    expect(store.has(CACHE_KEY)).toBe(true);
+
+    const captured = await processReceipt({
+      source_url: "https://example.com/receipt.jpg",
+      source_channel: "test",
+      vendor: "Belmark Inc",
+      date: "2026-04-20",
+      amount: 250,
+      category: "supplies",
+    });
+    await POST(postJson({ receiptId: captured.id }));
+
+    // After invalidation the cache key is gone from the backing map.
+    expect(store.has(CACHE_KEY)).toBe(false);
+  });
+
+  it("idempotent path (existing pending approval) → kv.del NOT called the second time", async () => {
+    const captured = await processReceipt({
+      source_url: "https://example.com/receipt.jpg",
+      source_channel: "test",
+      vendor: "Belmark Inc",
+      date: "2026-04-20",
+      amount: 250,
+      category: "supplies",
+    });
+    // First promotion → opens new approval → kv.del called once.
+    await POST(postJson({ receiptId: captured.id }));
+    const firstCallCount = kvDelCalls.length;
+    expect(firstCallCount).toBeGreaterThanOrEqual(1);
+
+    // Second promotion → idempotent (returns existing pending) →
+    // NO additional kv.del call.
+    await POST(postJson({ receiptId: captured.id }));
+    expect(kvDelCalls.length).toBe(firstCallCount);
+  });
+
+  it("ineligible packet (no approval opened) → kv.del NOT called", async () => {
+    const captured = await processReceipt({
+      source_url: "https://example.com/receipt.jpg",
+      source_channel: "test",
+      // No vendor/date/amount/category — eligibility.ok=false.
+    });
+    const res = await POST(postJson({ receiptId: captured.id }));
+    expect(res.status).toBe(200);
+    expect(kvDelCalls).toEqual([]);
+  });
+
+  it("401 (auth fail) → kv.del NOT called", async () => {
+    isAuthorizedMock.mockReset();
+    isAuthorizedMock.mockResolvedValueOnce(false);
+    const res = await POST(postJson({ receiptId: "any" }));
+    expect(res.status).toBe(401);
+    expect(kvDelCalls).toEqual([]);
+  });
+
+  it("400 (missing receiptId) → kv.del NOT called", async () => {
+    const res = await POST(postJson({}));
+    expect(res.status).toBe(400);
+    expect(kvDelCalls).toEqual([]);
+  });
+
+  it("404 (unknown receiptId) → kv.del NOT called", async () => {
+    const res = await POST(postJson({ receiptId: "no-such-receipt" }));
+    expect(res.status).toBe(404);
+    expect(kvDelCalls).toEqual([]);
+  });
+
+  it("kv.del throw is swallowed — route still returns 200 with opened: true", async () => {
+    kvDelShouldThrow = true;
+    const captured = await processReceipt({
+      source_url: "https://example.com/receipt.jpg",
+      source_channel: "test",
+      vendor: "Belmark Inc",
+      date: "2026-04-20",
+      amount: 250,
+      category: "supplies",
+    });
+    const res = await POST(postJson({ receiptId: captured.id }));
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      ok: boolean;
+      approval:
+        | { opened: true; id: string; status: string }
+        | { opened: false; reason: string };
+    };
+    expect(body.ok).toBe(true);
+    expect(body.approval.opened).toBe(true);
+    if (body.approval.opened) {
+      expect(body.approval.status).toBe("pending");
+    }
+    // We DID attempt the invalidate (the helper's internal try/catch
+    // is what swallowed the throw, so the call was made).
+    expect(kvDelCalls).toContain(CACHE_KEY);
   });
 });
 

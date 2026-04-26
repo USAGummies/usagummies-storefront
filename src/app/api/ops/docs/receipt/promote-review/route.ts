@@ -47,6 +47,22 @@
  *   - **No QBO/HubSpot/Shopify writes.** Static-source assertion
  *     in the test suite locks this — the route module imports
  *     nothing from `qbo*`, `hubspot*`, or any send helper.
+ *
+ * Phase 22 — Cache-invalidation hook on the new-approval edge.
+ * When `openApproval` succeeds (a brand-new pending approval lands
+ * in the store), this route fires `invalidateApprovalLookupCache()`
+ * (the same Phase 19 helper used by the Phase 20 closer hook) so
+ * the dashboard reflects the new pending state sub-second after
+ * the operator clicks Re-promote — instead of waiting up to 30s
+ * for the cache TTL to expire. NOT fired on:
+ *   - Idempotent existing-approval branch (cache already reflects
+ *     the existing pending state if it was loaded after the
+ *     original openApproval call).
+ *   - Ineligible packets / no-slug paths (no approval opened).
+ *   - Auth/validation 4xx surfaces (no approval opened).
+ *   - openApproval failure path (route surfaces `opened: false`;
+ *     stale-by-30s cache aligns with the operator's view).
+ * Best-effort: KV.del failures swallowed inside the helper.
  */
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
@@ -61,6 +77,7 @@ import {
 import { approvalStore } from "@/lib/ops/control-plane/stores";
 import { approvalSurface } from "@/lib/ops/control-plane/slack";
 import { getPermalink } from "@/lib/ops/control-plane/slack/client";
+import { invalidateApprovalLookupCache } from "@/lib/ops/receipt-review-approval-lookup";
 import type { ApprovalRequest } from "@/lib/ops/control-plane/types";
 import type { ReceiptReviewPacket } from "@/lib/ops/receipt-review-packet";
 
@@ -271,6 +288,17 @@ export async function POST(req: Request): Promise<Response> {
             requiredApprovers: request.requiredApprovers,
             permalink: await resolveApprovalPermalink(request),
           };
+          // Phase 22 — bust the Phase 19 approval-lookup cache. A
+          // brand-new pending approval just landed in the store; the
+          // dashboard's bounded poll would otherwise wait up to 30s
+          // for the TTL to expire before reflecting the new state.
+          // Best-effort — `invalidateApprovalLookupCache()` swallows
+          // KV.del failures internally, so this NEVER fails the
+          // route's success path. NOT fired on the idempotent
+          // existing-approval branch above (cache already reflects
+          // the existing pending state if it was loaded after the
+          // original openApproval call).
+          await invalidateApprovalLookupCache();
         } catch (err) {
           // Fail-soft: if the approval store throws or the slug isn't
           // registered (defensive), the packet is still returned.
