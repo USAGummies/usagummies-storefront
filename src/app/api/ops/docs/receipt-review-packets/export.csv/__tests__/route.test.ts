@@ -227,6 +227,196 @@ describe("error path", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Phase 21 — cursor pagination on the CSV export
+// ---------------------------------------------------------------------------
+//
+// The CSV route accepts `?cursor=...` (matching the Phase 17 cursor
+// shape used by the JSON list route) so queues larger than the
+// storage cap can be exported via repeated requests. Backward
+// compatibility for the dashboard's "Export CSV" button: a request
+// with no cursor returns the first page (up to `limit`, default 500),
+// just like Phase 18.
+//
+// What we lock here:
+//   - `X-Matched-Total` is always set, equals the FULL filtered set
+//     (NOT the page length).
+//   - `X-Next-Cursor` + `Link: rel="next"` are present iff more
+//     pages remain.
+//   - `X-Next-Cursor` + `Link` are absent (NOT empty string, NOT
+//     "null") on the final page.
+//   - Cursor traversal visits every packet exactly once.
+//   - Filters apply BEFORE pagination — cursor walks the FILTERED
+//     set, not the unfiltered storage.
+//   - Malformed cursor falls back to first page (no fabrication,
+//     no throw).
+//   - Backward compat: request with no cursor returns the same body
+//     as Phase 18 when the queue fits in one page.
+
+describe("Phase 21 — cursor pagination", () => {
+  beforeEach(() => isAuthorizedMock.mockResolvedValue(true));
+
+  async function seedFivePackets() {
+    for (const i of [1, 2, 3, 4, 5]) {
+      const r = await processReceipt({
+        source_url: `https://example.com/${i}.jpg`,
+        source_channel: "test",
+        vendor: `Vendor ${i}`,
+      });
+      await requestReceiptReviewPromotion(r.id);
+    }
+  }
+
+  it("X-Matched-Total reflects the filtered set length (not page length)", async () => {
+    await seedFivePackets();
+    const res = await GET(
+      makeReq("/api/ops/docs/receipt-review-packets/export.csv?limit=2"),
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get("X-Matched-Total")).toBe("5");
+    // Page is just 2 rows (header + 2 + trailing-empty).
+    const lines = (await res.text()).split("\r\n");
+    expect(lines.length).toBe(4);
+  });
+
+  it("X-Next-Cursor + Link rel=next present when more pages remain", async () => {
+    await seedFivePackets();
+    const res = await GET(
+      makeReq("/api/ops/docs/receipt-review-packets/export.csv?limit=2"),
+    );
+    const next = res.headers.get("X-Next-Cursor");
+    expect(typeof next).toBe("string");
+    expect((next as string).length).toBeGreaterThan(0);
+    const link = res.headers.get("Link");
+    expect(link).toContain('rel="next"');
+    expect(link).toContain(`cursor=${encodeURIComponent(next as string)}`);
+  });
+
+  it("X-Next-Cursor + Link rel=next ABSENT on the final page (never empty / 'null')", async () => {
+    await seedFivePackets();
+    const res = await GET(
+      makeReq("/api/ops/docs/receipt-review-packets/export.csv?limit=100"),
+    );
+    expect(res.headers.get("X-Next-Cursor")).toBeNull();
+    expect(res.headers.get("Link")).toBeNull();
+    expect(res.headers.get("X-Matched-Total")).toBe("5");
+  });
+
+  it("traversing all cursors visits every packet exactly once", async () => {
+    await seedFivePackets();
+    const seenPackets = new Set<string>();
+    let cursor: string | null = null;
+    for (let safety = 0; safety < 20; safety++) {
+      const path = cursor
+        ? `/api/ops/docs/receipt-review-packets/export.csv?limit=2&cursor=${encodeURIComponent(cursor)}`
+        : "/api/ops/docs/receipt-review-packets/export.csv?limit=2";
+      const res = await GET(makeReq(path));
+      const csv = await res.text();
+      // Each non-header / non-empty row's 2nd column is the packetId.
+      const lines = csv.split("\r\n");
+      for (const line of lines.slice(1)) {
+        if (line.length === 0) continue;
+        const cols = line.split(",");
+        // packetId is column index 1 (0-based) per the locked header.
+        seenPackets.add(cols[1]!);
+      }
+      cursor = res.headers.get("X-Next-Cursor");
+      if (!cursor) break;
+    }
+    expect(seenPackets.size).toBe(5);
+  });
+
+  it("malformed cursor falls back to first page (no fabrication, no throw)", async () => {
+    await seedFivePackets();
+    const res = await GET(
+      makeReq(
+        "/api/ops/docs/receipt-review-packets/export.csv?limit=2&cursor=not-a-real-cursor",
+      ),
+    );
+    expect(res.status).toBe(200);
+    const csv = await res.text();
+    const dataLines = csv.split("\r\n").filter((l) => l.length > 0);
+    // header + 2 data rows
+    expect(dataLines.length).toBe(3);
+    // X-Matched-Total still reflects full filtered set.
+    expect(res.headers.get("X-Matched-Total")).toBe("5");
+  });
+
+  it("filters apply BEFORE pagination — cursor walks the filtered set", async () => {
+    await seedFivePackets();
+    const res = await GET(
+      makeReq(
+        "/api/ops/docs/receipt-review-packets/export.csv?limit=10&vendor=Vendor 1",
+      ),
+    );
+    expect(res.status).toBe(200);
+    // Vendor "Vendor 1" matches just one packet; X-Matched-Total
+    // reports the filtered set size, not the unfiltered storage.
+    expect(res.headers.get("X-Matched-Total")).toBe("1");
+    // No more pages remain (1 row fits in limit=10).
+    expect(res.headers.get("X-Next-Cursor")).toBeNull();
+    expect(res.headers.get("Link")).toBeNull();
+  });
+
+  it("backward compat: no cursor + small queue fits in one page (Phase 18 behavior preserved)", async () => {
+    const r = await processReceipt({
+      source_url: "https://example.com/x.jpg",
+      source_channel: "test",
+      vendor: "Belmark Inc",
+      date: "2026-04-20",
+      amount: 250,
+      category: "supplies",
+    });
+    await requestReceiptReviewPromotion(r.id);
+
+    const res = await GET(makeReq());
+    const csv = await res.text();
+    expect(res.status).toBe(200);
+    // Same Phase 18 contract: header + 1 data row + trailing empty.
+    expect(csv.split("\r\n").length).toBe(3);
+    expect(res.headers.get("X-Matched-Total")).toBe("1");
+    // No nextCursor — entire set fit in default limit=500.
+    expect(res.headers.get("X-Next-Cursor")).toBeNull();
+    expect(res.headers.get("Link")).toBeNull();
+  });
+
+  it("Link header URL preserves filter params (next page keeps the same filter)", async () => {
+    await seedFivePackets();
+    const res = await GET(
+      makeReq(
+        "/api/ops/docs/receipt-review-packets/export.csv?limit=2&status=draft",
+      ),
+    );
+    const link = res.headers.get("Link");
+    expect(link).not.toBeNull();
+    // Extract the URL between < and >.
+    const match = (link as string).match(/^<([^>]+)>/);
+    expect(match).not.toBeNull();
+    const nextUrl = new URL(match![1]!);
+    expect(nextUrl.searchParams.get("status")).toBe("draft");
+    expect(nextUrl.searchParams.get("limit")).toBe("2");
+    expect(nextUrl.searchParams.get("cursor")).toBeTruthy();
+  });
+
+  it("limit clamps to [1, 500]", async () => {
+    await seedFivePackets();
+    const res0 = await GET(
+      makeReq("/api/ops/docs/receipt-review-packets/export.csv?limit=0"),
+    );
+    const resHi = await GET(
+      makeReq("/api/ops/docs/receipt-review-packets/export.csv?limit=999999"),
+    );
+    expect(res0.status).toBe(200);
+    expect(resHi.status).toBe(200);
+    // limit=0 clamps to 1 → page has 1 row + header + trailing empty
+    const lines0 = (await res0.text()).split("\r\n");
+    expect(lines0.length).toBe(3);
+    // limit=hi clamps to 500 → entire seeded set (5) fits
+    expect(resHi.headers.get("X-Matched-Total")).toBe("5");
+    expect(resHi.headers.get("X-Next-Cursor")).toBeNull();
+  });
+});
+
 describe("read-only contract — no forbidden imports", () => {
   it("the route imports nothing from QBO write helpers, HubSpot, Shopify writes, Slack send, openApproval/buildApprovalRequest", async () => {
     const fs = await import("node:fs/promises");

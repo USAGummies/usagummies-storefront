@@ -162,21 +162,28 @@ Potential code only if smoke fails:
 
 ### Lane B — Receipt-to-Rene approval promotion
 
-Phases 7-18 done. Phase 18 (Option A) adds a one-click CSV export
-of the filtered review-packets queue at
-`/api/ops/docs/receipt-review-packets/export.csv`. Reuses the
-canonical filter spec so the CSV mirrors what's on screen. Pure
-RFC-4180 helpers handle escaping (`escapeCsvCell`,
-`renderReviewPacketsCsv`, `reviewPacketsCsvFilename`); column
-order is locked. Null/NaN cells empty (NEVER `"—"` / `"null"` /
-`"0"`). OCR-suggested vendor preserves `(ocr)` suffix. CRLF
-terminator. Cache-Control: no-store.
+Phases 7-22 done. Phase 22 wires the second active state-transition
+entry point — `POST /api/ops/docs/receipt/promote-review` (the
+Re-promote button's backing route) — to fire
+`invalidateApprovalLookupCache()` after `openApproval()` succeeds.
+Mirror of Phase 20 on a different code path. Re-promote click now
+feels instant: the dashboard reflects the new pending approval
+sub-second after the click instead of waiting up to 30s for the
+Phase 19 TTL. NEVER fires on the idempotent existing-approval
+branch (cache already current), on ineligible / no-slug packets
+(no approval opened), on 401/400/404 surfaces, or on
+openApproval-throw catch path (operator sees `opened: false` so
+stale-by-30s aligns with their view). Best-effort: kv.del failures
+swallowed; route's success path is unaffected. Audit confirms
+`standDown()` and `checkExpiry()` have NO production callers today
+— documented inline that future callers persisting those
+transitions for receipt-review-packet targetEntity must also
+invalidate. With Phase 20 + Phase 22, both active receipt-review
+state-transition paths bust the cache; Phase 19 30s TTL becomes a
+safety floor for any future bypass paths.
 
-Receipt-review queue management is feature-complete. Phase 19
-candidates (still on the table):
-- Server-side caching of the approval lookup if route latency
-  becomes a concern.
-- CSV pagination via cursor (only matters once queue >500 packets).
+Receipt-review queue management is feature-complete. Remaining
+follow-ups (still on the table, none currently scheduled):
 - Closing the loop into `qbo.bill.create` once Rene confirms a
   rene-approved packet should land in QBO. (Crosses the QBO-write
   boundary — would need a new Class B / Class C taxonomy slug
@@ -196,7 +203,11 @@ Boundary:
 - Approval-status filter. ✅ Done (Phase 16).
 - Cursor-based pagination. ✅ Done (Phase 17).
 - CSV export. ✅ Done (Phase 18 Option A).
-- Phase 19: TBD (lookup caching / CSV cursor / qbo.bill.create entry).
+- Approval-lookup caching + dedup. ✅ Done (Phase 19 Option B).
+- Closer cache-invalidation hook. ✅ Done (Phase 20).
+- CSV cursor pagination. ✅ Done (Phase 21).
+- Promote-review cache-invalidation hook. ✅ Done (Phase 22).
+- Phase 23: TBD (qbo.bill.create entry — crosses QBO-write boundary; STOP-AND-ASK).
 - QBO posting remains a separate Rene-approved Class B/C action.
 - Do not auto-create bills, expenses, vendors, or categories.
 - Do not overwrite canonical receipt fields without explicit reviewer action.

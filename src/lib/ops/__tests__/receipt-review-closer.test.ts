@@ -125,12 +125,19 @@ describe("applyDecisionToPacket — pure transitions", () => {
 // ---------------------------------------------------------------------------
 
 const store = new Map<string, unknown>();
+const kvDelCalls: string[] = [];
+let kvDelShouldThrow = false;
 
 vi.mock("@vercel/kv", () => ({
   kv: {
     get: vi.fn(async (key: string) => store.get(key) ?? null),
     set: vi.fn(async (key: string, value: unknown) => {
       store.set(key, value);
+    }),
+    del: vi.fn(async (key: string) => {
+      kvDelCalls.push(key);
+      if (kvDelShouldThrow) throw new Error("kv-del-failed");
+      store.delete(key);
     }),
   },
 }));
@@ -157,6 +164,8 @@ import type { ApprovalRequest } from "@/lib/ops/control-plane/types";
 
 beforeEach(() => {
   store.clear();
+  kvDelCalls.length = 0;
+  kvDelShouldThrow = false;
 });
 
 afterEach(() => {
@@ -401,6 +410,206 @@ describe("executeApprovedReceiptReviewPromote — success path (approved)", () =
     if (!result.ok) {
       expect(result.error).toMatch(/not found/i);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 20 — closer cache-invalidation hook
+// ---------------------------------------------------------------------------
+//
+// The closer fires `invalidateApprovalLookupCache()` after a successful
+// packet status transition so the next dashboard / list-route /
+// CSV-export request rebuilds the (Phase 19) approval lookup from the
+// fresh approval-store state instead of waiting up to 30s for the TTL
+// to expire. Best-effort — KV.del failures are swallowed inside the
+// helper, so cache invalidation NEVER fails the transition.
+//
+// What we lock here:
+//   - On a successful approve transition, kv.del is called with the
+//     canonical cache key (`approval-lookup:receipt-review:v1`).
+//   - On a successful reject transition, kv.del is called too.
+//   - Cache-invalidation is observable: a primed cache entry no
+//     longer hits on the next `getCachedApprovalLookup()` call.
+//   - On gating returns (handled: false), kv.del is NOT called —
+//     no transition happened, the cache is still correct.
+//   - On the error path (packet not found / malformed targetEntity),
+//     kv.del is NOT called — no transition happened.
+//   - KV.del throwing inside `invalidateApprovalLookupCache` does
+//     NOT fail the closer's success path.
+describe("Phase 20 — closer fires invalidateApprovalLookupCache on success", () => {
+  const CACHE_KEY = "approval-lookup:receipt-review:v1";
+
+  it("approved transition → kv.del called with the canonical cache key", async () => {
+    const receipt = await processReceipt({
+      source_url: "https://example.com/receipt.jpg",
+      source_channel: "test",
+      vendor: "Belmark Inc",
+      date: "2026-04-20",
+      amount: 250,
+      category: "supplies",
+    });
+    const packet = await requestReceiptReviewPromotion(receipt.id);
+
+    expect(kvDelCalls).toEqual([]);
+
+    await executeApprovedReceiptReviewPromote(
+      mkApproval({
+        status: "approved",
+        targetEntity: {
+          type: "receipt-review-packet",
+          id: packet!.packetId,
+          label: "Belmark Inc",
+        },
+      }),
+    );
+
+    expect(kvDelCalls).toContain(CACHE_KEY);
+  });
+
+  it("rejected transition → kv.del called with the canonical cache key", async () => {
+    const receipt = await processReceipt({
+      source_url: "https://example.com/receipt.jpg",
+      source_channel: "test",
+      vendor: "Belmark Inc",
+      date: "2026-04-20",
+      amount: 250,
+      category: "supplies",
+    });
+    const packet = await requestReceiptReviewPromotion(receipt.id);
+
+    await executeApprovedReceiptReviewPromote(
+      mkApproval({
+        status: "rejected",
+        decisions: [
+          {
+            approver: "Rene",
+            decision: "reject",
+            reason: "wrong category",
+            decidedAt: FIXED_NOW.toISOString(),
+          },
+        ],
+        targetEntity: {
+          type: "receipt-review-packet",
+          id: packet!.packetId,
+          label: "Belmark Inc",
+        },
+      }),
+    );
+
+    expect(kvDelCalls).toContain(CACHE_KEY);
+  });
+
+  it("primed cache value is removed after successful transition (observable invalidation)", async () => {
+    // Prime the cache directly with a sentinel value.
+    store.set(CACHE_KEY, {
+      cachedAt: Date.now(),
+      entries: { "pkt-stale": { id: "stale-id", status: "approved" } },
+    });
+    expect(store.has(CACHE_KEY)).toBe(true);
+
+    const receipt = await processReceipt({
+      source_url: "https://example.com/receipt.jpg",
+      source_channel: "test",
+      vendor: "Belmark Inc",
+      date: "2026-04-20",
+      amount: 250,
+      category: "supplies",
+    });
+    const packet = await requestReceiptReviewPromotion(receipt.id);
+
+    await executeApprovedReceiptReviewPromote(
+      mkApproval({
+        status: "approved",
+        targetEntity: {
+          type: "receipt-review-packet",
+          id: packet!.packetId,
+          label: "Belmark Inc",
+        },
+      }),
+    );
+
+    // After invalidation the cache key is gone from the backing map.
+    expect(store.has(CACHE_KEY)).toBe(false);
+  });
+
+  it("gating return (non-receipt-review approval) → kv.del NOT called", async () => {
+    await executeApprovedReceiptReviewPromote(
+      mkApproval({
+        targetEntity: { type: "ap-packet", id: "ap-packet:foo" },
+      }),
+    );
+    expect(kvDelCalls).toEqual([]);
+  });
+
+  it("gating return (pending approval) → kv.del NOT called", async () => {
+    await executeApprovedReceiptReviewPromote(
+      mkApproval({ status: "pending" }),
+    );
+    expect(kvDelCalls).toEqual([]);
+  });
+
+  it("error path (malformed targetEntity.id) → kv.del NOT called", async () => {
+    await executeApprovedReceiptReviewPromote(
+      mkApproval({
+        targetEntity: { type: "receipt-review-packet", id: "wrong-prefix" },
+      }),
+    );
+    expect(kvDelCalls).toEqual([]);
+  });
+
+  it("error path (packet not found in KV) → kv.del NOT called", async () => {
+    const result = await executeApprovedReceiptReviewPromote(
+      mkApproval({
+        status: "approved",
+        targetEntity: {
+          type: "receipt-review-packet",
+          id: "pkt-v1-nonexistent",
+          label: "Phantom",
+        },
+      }),
+    );
+    expect(result.ok).toBe(false);
+    // Cache invalidation MUST NOT run on the error path — the packet
+    // did not transition, so the cache is still correct.
+    expect(kvDelCalls).toEqual([]);
+  });
+
+  it("KV.del throw is swallowed — closer success path NOT broken", async () => {
+    kvDelShouldThrow = true;
+    const receipt = await processReceipt({
+      source_url: "https://example.com/receipt.jpg",
+      source_channel: "test",
+      vendor: "Belmark Inc",
+      date: "2026-04-20",
+      amount: 250,
+      category: "supplies",
+    });
+    const packet = await requestReceiptReviewPromotion(receipt.id);
+
+    const result = await executeApprovedReceiptReviewPromote(
+      mkApproval({
+        status: "approved",
+        targetEntity: {
+          type: "receipt-review-packet",
+          id: packet!.packetId,
+          label: "Belmark Inc",
+        },
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.handled).toBe(true);
+    if (result.ok && result.handled) {
+      expect(result.newStatus).toBe("rene-approved");
+    }
+    // Packet status DID land regardless of the cache invalidation
+    // failure — the transition's correctness contract is unaffected
+    // by the cache layer.
+    const reread = await getReceiptReviewPacket(packet!.packetId);
+    expect(reread?.status).toBe("rene-approved");
+    // We DID attempt the invalidate (the helper's internal try/catch
+    // is what swallowed the throw, so the call was made).
+    expect(kvDelCalls).toContain(CACHE_KEY);
   });
 });
 
