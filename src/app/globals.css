@@ -9,6 +9,20 @@
  * declaration including weight ranges. */
 
 :root {
+  /* Landing-page brand palette — promoted to global so it's available
+   * site-wide (not just inside `.lp-scope`). USA Gummies bag-art tokens. */
+  --lp-ink: #0E1638;           /* deep navy — headline text, dark panels */
+  --lp-navy: #1D2E60;
+  --lp-navy-deep: #0A1A46;
+  --lp-red: #CF2932;           /* flag red — primary CTA + accent */
+  --lp-red-dark: #A51F27;
+  --lp-cream: #FDF4E0;         /* warm cream background */
+  --lp-cream-soft: #FFF8EA;
+  --lp-gold: #E3A929;          /* star gold */
+  --lp-gold-light: #F5C860;
+  --lp-off-white: #FDFDFD;
+  --lp-rule: rgba(14, 22, 56, 0.15);
+
   /* Brand palette — matches /go landing page design language */
   --navy: #1B2A4A;
   --red: #c7362c; /* Stripe Red */

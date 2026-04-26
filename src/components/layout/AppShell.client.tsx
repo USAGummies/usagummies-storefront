@@ -320,7 +320,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // below.
 
   return (
-    <div className="min-h-screen bg-[var(--bg,#f8f5ef)] text-[var(--text)]">
+    // `lp-scope` — applied site-wide so the LP-language CSS classes
+    // (lp-display, lp-script, lp-bunting, lp-cta, etc.) work on every
+    // page, not just /lp/*. The cream background + navy ink baseline
+    // come from the .lp-scope rule in lp.css.
+    <div className="lp-scope min-h-screen text-[var(--lp-ink)]">
       {cartToast ? (
         <div className="fixed right-4 top-20 z-50 max-w-[320px]">
           <div className="relative candy-panel rounded-2xl border border-[var(--border)] px-4 py-3 text-[var(--text)] shadow-[0_18px_42px_rgba(15,27,45,0.14)]">

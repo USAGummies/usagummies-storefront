@@ -119,7 +119,7 @@
   background: var(--lp-red);
   color: var(--lp-off-white);
   padding: 1.1rem 1.75rem;
-  font-family: var(--font-lp-display), serif;
+  font-family: var(--font-display), "Anton", sans-serif;
   font-size: 1.25rem;
   line-height: 1;
   letter-spacing: 0.015em;
@@ -165,7 +165,7 @@
   border-radius: 999px;
   width: 7rem;
   height: 7rem;
-  font-family: var(--font-lp-display), serif;
+  font-family: var(--font-display), "Anton", sans-serif;
   font-size: 0.8rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -184,7 +184,7 @@
   background: var(--lp-navy);
   color: var(--lp-gold);
   padding: 0.55rem 1.4rem;
-  font-family: var(--font-lp-display), serif;
+  font-family: var(--font-display), "Anton", sans-serif;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-size: 0.9rem;
@@ -206,7 +206,7 @@
   align-items: center;
   gap: 0.8rem;
   padding: 1.3rem 0;
-  font-family: var(--font-lp-display), serif;
+  font-family: var(--font-display), "Anton", sans-serif;
   font-size: 1.15rem;
   text-transform: uppercase;
   border-top: 2px solid var(--lp-ink);
@@ -228,7 +228,7 @@
 .lp-scope details.lp-faq summary::after {
   content: "+";
   margin-left: auto;
-  font-family: var(--font-lp-display), serif;
+  font-family: var(--font-display), "Anton", sans-serif;
   font-size: 1.5rem;
   line-height: 1;
   color: var(--lp-red);
@@ -237,7 +237,7 @@
 .lp-scope details.lp-faq[open] summary::after { content: "–"; }
 .lp-scope details.lp-faq > div {
   padding: 0 0 1.3rem 2.2rem;
-  font-family: var(--font-lp-body), sans-serif;
+  font-family: var(--font-sans), "Inter", sans-serif;
   font-weight: 400;
   color: var(--lp-ink);
   opacity: 0.9;
@@ -268,7 +268,7 @@
 .lp-scope .lp-sticky-buy[data-show="true"] { transform: translateY(0); }
 .lp-scope .lp-sticky-buy .lp-sticky-text {
   color: var(--lp-cream);
-  font-family: var(--font-lp-display), serif;
+  font-family: var(--font-display), "Anton", sans-serif;
   font-size: 1rem;
   letter-spacing: 0.02em;
   text-transform: uppercase;
@@ -278,7 +278,7 @@
   background: var(--lp-red);
   color: var(--lp-off-white);
   padding: 0.75rem 1.1rem;
-  font-family: var(--font-lp-display), serif;
+  font-family: var(--font-display), "Anton", sans-serif;
   text-transform: uppercase;
   font-size: 1rem;
   letter-spacing: 0.01em;

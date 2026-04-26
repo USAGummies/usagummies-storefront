@@ -1,5 +1,10 @@
 // src/app/layout.tsx
 import "./globals.css";
+// LP-language CSS (lp-bunting, lp-display, lp-cta, etc.) is now the
+// global brand standard, so it loads from the root layout — every page
+// gets it. The `.lp-scope` class is applied to the AppShell root in
+// `AppShell.client.tsx` so the rules resolve site-wide.
+import "@/styles/lp.css";
 import type { Metadata } from "next";
 import Script from "next/script";
 import { Analytics } from "@vercel/analytics/react";
