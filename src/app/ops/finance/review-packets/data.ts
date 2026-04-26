@@ -49,7 +49,32 @@ export interface ReviewPacketRow {
    *  when eligible. */
   eligibilityMissing: string[];
   createdAt: string;
+  /** Phase 16 — the matching control-plane approval's id when one
+   *  exists for this packet. `null` when the packet was never
+   *  promoted (or the lookup map omitted it). NEVER fabricated. */
+  approvalId: string | null;
+  /** Phase 16 — the matching control-plane approval's status:
+   *  `"pending"` / `"approved"` / `"rejected"` / `"expired"` /
+   *  `"stood-down"`. `null` when the packet has no associated
+   *  approval (Phase 8 path, or the closer hasn't surfaced one
+   *  yet, or the route caller omitted the lookup map). NEVER
+   *  fabricated. */
+  approvalStatus: string | null;
 }
+
+/**
+ * Phase 16 — read-only approval lookup map. The list route builds
+ * this from `approvalStore.listPending()` + `listByAgent(...)` and
+ * passes it to `buildReviewPacketsView` so each row carries the
+ * matching approval's id + status. The view helper NEVER fabricates
+ * these fields — when the map is omitted, rows have
+ * `{approvalId: null, approvalStatus: null}`.
+ */
+export interface ApprovalLookup {
+  id: string;
+  status: string;
+}
+export type ApprovalsByPacketId = Map<string, ApprovalLookup>;
 
 export interface ReviewPacketsCounts {
   total: number;
@@ -111,13 +136,21 @@ function packetAmount(packet: ReceiptReviewPacket): {
 /**
  * Build the dashboard view from a list of packets. Pure: same
  * input → same output.
+ *
+ * Phase 16: accepts an optional `approvalsByPacketId` lookup map so
+ * each row can carry its matching control-plane approval's id +
+ * status. When the map is omitted (Phase 13/14 callers), rows have
+ * `{approvalId: null, approvalStatus: null}` — the view helper
+ * NEVER fabricates these fields.
  */
 export function buildReviewPacketsView(
   packets: ReceiptReviewPacket[],
+  approvalsByPacketId?: ApprovalsByPacketId,
 ): ReviewPacketsView {
   const rows: ReviewPacketRow[] = packets.map((p) => {
     const vendor = packetVendor(p);
     const amount = packetAmount(p);
+    const approval = approvalsByPacketId?.get(p.packetId);
     return {
       packetId: p.packetId,
       packetIdShort:
@@ -132,6 +165,8 @@ export function buildReviewPacketsView(
       eligibilityOk: p.eligibility.ok,
       eligibilityMissing: [...p.eligibility.missing],
       createdAt: p.createdAt,
+      approvalId: approval?.id ?? null,
+      approvalStatus: approval?.status ?? null,
     };
   });
 
@@ -191,6 +226,34 @@ export function formatVendorCell(
 // mutated. Counts ALWAYS reflect the filtered rows verbatim — no
 // cached aggregates, no inflation.
 
+/**
+ * Phase 16 — approval-status filter values.
+ *
+ * `"any"` (default) = no filter; `"no-approval"` matches rows
+ * where the packet was never promoted (approvalStatus is null);
+ * any other string filters by exact match against the row's
+ * `approvalStatus`. The route currently surfaces `"pending"` /
+ * `"approved"` / `"rejected"` / `"expired"` / `"stood-down"`.
+ */
+export type ReviewPacketsApprovalStatusFilter =
+  | "any"
+  | "no-approval"
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "expired"
+  | "stood-down";
+
+const APPROVAL_STATUS_FILTER_VALUES: ReviewPacketsApprovalStatusFilter[] = [
+  "any",
+  "no-approval",
+  "pending",
+  "approved",
+  "rejected",
+  "expired",
+  "stood-down",
+];
+
 export interface ReviewPacketsFilterSpec {
   /** Narrow to a single status. `"all"` (or undefined) = no filter. */
   status?: ReviewPacketRowStatus | "all";
@@ -203,6 +266,10 @@ export interface ReviewPacketsFilterSpec {
   createdAfter?: string;
   /** Inclusive upper bound. Unparseable → no filter. */
   createdBefore?: string;
+  /** Phase 16 — approval-status filter. `"any"` (or undefined) =
+   *  no filter; `"no-approval"` matches rows where approvalStatus
+   *  is null; any other value filters by exact match. */
+  approvalStatus?: ReviewPacketsApprovalStatusFilter;
 }
 
 /**
@@ -236,6 +303,11 @@ export function applyReviewPacketsFilters(
   const afterMs = parseFilterDate(spec.createdAfter);
   const beforeMs = parseFilterDate(spec.createdBefore);
 
+  const approvalFilter =
+    spec.approvalStatus && spec.approvalStatus !== "any"
+      ? spec.approvalStatus
+      : null;
+
   const filtered = view.rows.filter((row) => {
     if (status && row.status !== status) return false;
     if (vendorNeedle) {
@@ -247,6 +319,13 @@ export function applyReviewPacketsFilters(
       if (!Number.isFinite(rowMs)) return false; // unparseable → excluded under any date filter
       if (afterMs !== null && rowMs < afterMs) return false;
       if (beforeMs !== null && rowMs > beforeMs) return false;
+    }
+    if (approvalFilter) {
+      if (approvalFilter === "no-approval") {
+        if (row.approvalStatus !== null) return false;
+      } else {
+        if (row.approvalStatus !== approvalFilter) return false;
+      }
     }
     return true;
   });
@@ -330,6 +409,15 @@ export function parseReviewPacketsFilterSpec(
   if (typeof rawBefore === "string" && rawBefore.trim().length > 0) {
     spec.createdBefore = rawBefore;
   }
+  const rawApprovalStatus = query.get("approvalStatus");
+  if (rawApprovalStatus !== null) {
+    const candidate = rawApprovalStatus.trim();
+    if (
+      (APPROVAL_STATUS_FILTER_VALUES as string[]).includes(candidate)
+    ) {
+      spec.approvalStatus = candidate as ReviewPacketsApprovalStatusFilter;
+    }
+  }
   return spec;
 }
 
@@ -369,6 +457,9 @@ export function reviewPacketsFilterSpecToQuery(
   ) {
     params.set("createdBefore", spec.createdBefore.trim());
   }
+  if (spec.approvalStatus && spec.approvalStatus !== "any") {
+    params.set("approvalStatus", spec.approvalStatus);
+  }
   return params;
 }
 
@@ -383,12 +474,19 @@ export function reviewPacketsFilterSpecToQuery(
  * server's filter behavior is bit-identical to the client's. The
  * matching packets are returned in the same order they came in
  * (the route returns raw packets; the client re-derives the view).
+ *
+ * Phase 16: accepts the same optional `approvalsByPacketId` lookup
+ * as `buildReviewPacketsView`. When the spec includes an
+ * `approvalStatus` filter, the map is required for that filter to
+ * have any effect — without it, every row's approvalStatus is null
+ * and only `"any"` / `"no-approval"` will match.
  */
 export function filterPacketsBySpec(
   packets: ReceiptReviewPacket[],
   spec: ReviewPacketsFilterSpec,
+  approvalsByPacketId?: ApprovalsByPacketId,
 ): ReceiptReviewPacket[] {
-  const view = buildReviewPacketsView(packets);
+  const view = buildReviewPacketsView(packets, approvalsByPacketId);
   const filtered = applyReviewPacketsFilters(view, spec);
   const allowed = new Set(filtered.rows.map((r) => r.packetId));
   return packets.filter((p) => allowed.has(p.packetId));

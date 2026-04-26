@@ -558,6 +558,8 @@ describe("applyReviewPacketsFilters", () => {
           eligibilityOk: false,
           eligibilityMissing: ["date"],
           createdAt: "not-a-date",
+          approvalId: null,
+          approvalStatus: null,
         },
       ],
       counts: {
@@ -755,5 +757,235 @@ describe("filterPacketsBySpec — lockstep with applyReviewPacketsFilters", () =
     const a = filterPacketsBySpec(packets, spec);
     const b = filterPacketsBySpec(packets, spec);
     expect(a).toEqual(b);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 16 — approval-status enrichment + filter
+// ---------------------------------------------------------------------------
+
+describe("buildReviewPacketsView — approval enrichment (Phase 16)", () => {
+  it("returns approvalId/Status as null when no map is passed", () => {
+    const v = buildReviewPacketsView([
+      buildReceiptReviewPacket(mkReceipt({ id: "r-x" }), { now: FIXED_NOW }),
+    ]);
+    expect(v.rows[0].approvalId).toBeNull();
+    expect(v.rows[0].approvalStatus).toBeNull();
+  });
+
+  it("returns approvalId/Status as null when map omits the packet", () => {
+    const packet = buildReceiptReviewPacket(mkReceipt({ id: "r-x" }), {
+      now: FIXED_NOW,
+    });
+    const v = buildReviewPacketsView(
+      [packet],
+      new Map([["pkt-v1-OTHER", { id: "appr-other", status: "pending" }]]),
+    );
+    expect(v.rows[0].approvalId).toBeNull();
+    expect(v.rows[0].approvalStatus).toBeNull();
+  });
+
+  it("attaches approvalId/Status when the map has a matching entry", () => {
+    const packet = buildReceiptReviewPacket(mkReceipt({ id: "r-x" }), {
+      now: FIXED_NOW,
+    });
+    const v = buildReviewPacketsView(
+      [packet],
+      new Map([
+        [packet.packetId, { id: "appr-123", status: "pending" }],
+      ]),
+    );
+    expect(v.rows[0].approvalId).toBe("appr-123");
+    expect(v.rows[0].approvalStatus).toBe("pending");
+  });
+});
+
+describe("applyReviewPacketsFilters — approvalStatus (Phase 16)", () => {
+  function fixtureWithApprovals() {
+    const packets = [
+      buildReceiptReviewPacket(mkReceipt({ id: "r-pending" }), {
+        now: FIXED_NOW,
+      }),
+      buildReceiptReviewPacket(mkReceipt({ id: "r-approved" }), {
+        now: FIXED_NOW,
+      }),
+      buildReceiptReviewPacket(mkReceipt({ id: "r-no-appr" }), {
+        now: FIXED_NOW,
+      }),
+    ];
+    const map = new Map<string, { id: string; status: string }>();
+    map.set(packets[0].packetId, { id: "a-pending", status: "pending" });
+    map.set(packets[1].packetId, { id: "a-approved", status: "approved" });
+    // packets[2] intentionally omitted → no-approval row
+    return buildReviewPacketsView(packets, map);
+  }
+
+  it('"any" / undefined → all rows pass (no filter)', () => {
+    const v = fixtureWithApprovals();
+    expect(applyReviewPacketsFilters(v, {}).rows).toHaveLength(3);
+    expect(
+      applyReviewPacketsFilters(v, { approvalStatus: "any" }).rows,
+    ).toHaveLength(3);
+  });
+
+  it('"no-approval" → only rows with null approvalStatus', () => {
+    const v = fixtureWithApprovals();
+    const filtered = applyReviewPacketsFilters(v, {
+      approvalStatus: "no-approval",
+    });
+    expect(filtered.rows).toHaveLength(1);
+    expect(filtered.rows[0].receiptId).toBe("r-no-appr");
+  });
+
+  it('"pending" → only rows whose approvalStatus is exactly "pending"', () => {
+    const v = fixtureWithApprovals();
+    const filtered = applyReviewPacketsFilters(v, {
+      approvalStatus: "pending",
+    });
+    expect(filtered.rows).toHaveLength(1);
+    expect(filtered.rows[0].receiptId).toBe("r-pending");
+  });
+
+  it('"approved" → only rows whose approvalStatus is exactly "approved"', () => {
+    const v = fixtureWithApprovals();
+    const filtered = applyReviewPacketsFilters(v, {
+      approvalStatus: "approved",
+    });
+    expect(filtered.rows).toHaveLength(1);
+    expect(filtered.rows[0].receiptId).toBe("r-approved");
+  });
+
+  it("approvalStatus filter combines AND with status / vendor / date filters", () => {
+    const v = fixtureWithApprovals();
+    const filtered = applyReviewPacketsFilters(v, {
+      status: "draft",
+      approvalStatus: "pending",
+    });
+    expect(filtered.rows).toHaveLength(1);
+    expect(filtered.rows[0].receiptId).toBe("r-pending");
+  });
+
+  it("counts re-aggregate after the approvalStatus filter", () => {
+    const v = fixtureWithApprovals();
+    const filtered = applyReviewPacketsFilters(v, {
+      approvalStatus: "pending",
+    });
+    expect(filtered.counts).toEqual({
+      total: 1,
+      draft: 1,
+      reneApproved: 0,
+      rejected: 0,
+    });
+  });
+
+  it("approvalStatus filter on a view built without a map → only no-approval matches", () => {
+    const v = buildReviewPacketsView([
+      buildReceiptReviewPacket(mkReceipt({ id: "r-x" }), { now: FIXED_NOW }),
+    ]);
+    expect(
+      applyReviewPacketsFilters(v, { approvalStatus: "pending" }).rows,
+    ).toHaveLength(0);
+    expect(
+      applyReviewPacketsFilters(v, { approvalStatus: "no-approval" }).rows,
+    ).toHaveLength(1);
+  });
+});
+
+describe("parseReviewPacketsFilterSpec — approvalStatus param (Phase 16)", () => {
+  function q(pairs: Record<string, string>): URLSearchParams {
+    return new URLSearchParams(pairs);
+  }
+
+  it("known approval-status values pass through", () => {
+    for (const v of [
+      "any",
+      "no-approval",
+      "pending",
+      "approved",
+      "rejected",
+      "expired",
+      "stood-down",
+    ]) {
+      expect(
+        parseReviewPacketsFilterSpec(q({ approvalStatus: v })).approvalStatus,
+      ).toBe(v);
+    }
+  });
+
+  it("unknown approvalStatus → omitted (defensive)", () => {
+    const spec = parseReviewPacketsFilterSpec(
+      q({ approvalStatus: "fubar" }),
+    );
+    expect(spec.approvalStatus).toBeUndefined();
+  });
+
+  it("empty / whitespace approvalStatus → omitted", () => {
+    expect(
+      parseReviewPacketsFilterSpec(q({ approvalStatus: "" })).approvalStatus,
+    ).toBeUndefined();
+    expect(
+      parseReviewPacketsFilterSpec(q({ approvalStatus: "   " })).approvalStatus,
+    ).toBeUndefined();
+  });
+});
+
+describe("reviewPacketsFilterSpecToQuery — approvalStatus serialization", () => {
+  it('approvalStatus: "any" omits the param (default at server)', () => {
+    expect(
+      reviewPacketsFilterSpecToQuery({ approvalStatus: "any" })
+        .toString(),
+    ).toBe("");
+  });
+
+  it("non-default approvalStatus is set", () => {
+    expect(
+      reviewPacketsFilterSpecToQuery({ approvalStatus: "pending" })
+        .toString(),
+    ).toContain("approvalStatus=pending");
+  });
+
+  it('approvalStatus: "no-approval" round-trips', () => {
+    const spec: import("../data").ReviewPacketsFilterSpec = {
+      approvalStatus: "no-approval",
+    };
+    const params = reviewPacketsFilterSpecToQuery(spec);
+    expect(parseReviewPacketsFilterSpec(params)).toEqual(spec);
+  });
+});
+
+describe("filterPacketsBySpec — approval-status filter parity (Phase 16)", () => {
+  it("with map, server filter packetId set matches client helper output", () => {
+    const packets = [
+      buildReceiptReviewPacket(mkReceipt({ id: "r-pending" }), {
+        now: FIXED_NOW,
+      }),
+      buildReceiptReviewPacket(mkReceipt({ id: "r-approved" }), {
+        now: FIXED_NOW,
+      }),
+    ];
+    const map = new Map<string, { id: string; status: string }>([
+      [packets[0].packetId, { id: "a1", status: "pending" }],
+      [packets[1].packetId, { id: "a2", status: "approved" }],
+    ]);
+    const spec = { approvalStatus: "pending" as const };
+    const view = buildReviewPacketsView(packets, map);
+    const clientFiltered = applyReviewPacketsFilters(view, spec);
+    const serverFiltered = filterPacketsBySpec(packets, spec, map);
+    expect(serverFiltered.map((p) => p.packetId).sort()).toEqual(
+      clientFiltered.rows.map((r) => r.packetId).sort(),
+    );
+  });
+
+  it("without map, approval-status filter (other than 'any'/'no-approval') excludes everything", () => {
+    const packets = [
+      buildReceiptReviewPacket(mkReceipt({ id: "r-x" }), { now: FIXED_NOW }),
+    ];
+    expect(
+      filterPacketsBySpec(packets, { approvalStatus: "pending" }),
+    ).toEqual([]);
+    expect(
+      filterPacketsBySpec(packets, { approvalStatus: "no-approval" })
+        .length,
+    ).toBe(1);
   });
 });

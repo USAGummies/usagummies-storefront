@@ -311,3 +311,101 @@ describe("Phase 15 — server-side filtering", () => {
     expect(body.filterApplied).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 16 — approval-status filter + route join
+// ---------------------------------------------------------------------------
+
+describe("Phase 16 — approval-status filter + lookup", () => {
+  beforeEach(() => isAuthorizedMock.mockResolvedValue(true));
+
+  it("response carries an approvals lookup keyed by packetId (empty when no approvals exist)", async () => {
+    const r = await processReceipt({
+      source_url: "https://example.com/x.jpg",
+      source_channel: "test",
+    });
+    await requestReceiptReviewPromotion(r.id);
+
+    const res = await GET(makeReq());
+    const body = (await res.json()) as {
+      packets: Array<{ packetId: string }>;
+      approvals: Record<string, unknown>;
+    };
+    expect(body.approvals).toBeDefined();
+    expect(typeof body.approvals).toBe("object");
+    expect(body.approvals[body.packets[0].packetId]).toBeUndefined();
+  });
+
+  it("approvalStatus=any → no filter (filterApplied=false)", async () => {
+    const r = await processReceipt({
+      source_url: "https://example.com/x.jpg",
+      source_channel: "test",
+    });
+    await requestReceiptReviewPromotion(r.id);
+
+    const res = await GET(
+      makeReq("/api/ops/docs/receipt-review-packets?approvalStatus=any"),
+    );
+    const body = (await res.json()) as { filterApplied: boolean; count: number };
+    expect(body.filterApplied).toBe(false);
+    expect(body.count).toBe(1);
+  });
+
+  it("approvalStatus=no-approval narrows to packets with no matching approval", async () => {
+    const r1 = await processReceipt({
+      source_url: "https://example.com/a.jpg",
+      source_channel: "test",
+    });
+    const r2 = await processReceipt({
+      source_url: "https://example.com/b.jpg",
+      source_channel: "test",
+    });
+    await requestReceiptReviewPromotion(r1.id);
+    await requestReceiptReviewPromotion(r2.id);
+
+    // Test environment has no approvalStore entries → all packets
+    // are no-approval. Filter should match both.
+    const res = await GET(
+      makeReq(
+        "/api/ops/docs/receipt-review-packets?approvalStatus=no-approval",
+      ),
+    );
+    const body = (await res.json()) as {
+      filterApplied: boolean;
+      count: number;
+    };
+    expect(body.filterApplied).toBe(true);
+    expect(body.count).toBe(2);
+  });
+
+  it("approvalStatus=pending filters to zero in test env (no approvals seeded)", async () => {
+    const r1 = await processReceipt({
+      source_url: "https://example.com/a.jpg",
+      source_channel: "test",
+    });
+    await requestReceiptReviewPromotion(r1.id);
+
+    const res = await GET(
+      makeReq(
+        "/api/ops/docs/receipt-review-packets?approvalStatus=pending",
+      ),
+    );
+    const body = (await res.json()) as { count: number };
+    expect(body.count).toBe(0);
+  });
+
+  it("unknown approvalStatus value collapses to no filter (defensive)", async () => {
+    const r = await processReceipt({
+      source_url: "https://example.com/x.jpg",
+      source_channel: "test",
+    });
+    await requestReceiptReviewPromotion(r.id);
+
+    const res = await GET(
+      makeReq("/api/ops/docs/receipt-review-packets?approvalStatus=fubar"),
+    );
+    const body = (await res.json()) as { filterApplied: boolean; count: number };
+    expect(body.filterApplied).toBe(false);
+    expect(body.count).toBe(1);
+  });
+});

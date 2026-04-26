@@ -51,13 +51,60 @@ import { NextResponse } from "next/server";
 
 import { isAuthorized } from "@/lib/ops/abra-auth";
 import { listReceiptReviewPackets } from "@/lib/ops/docs";
+import { approvalStore } from "@/lib/ops/control-plane/stores";
 import {
   filterPacketsBySpec,
   parseReviewPacketsFilterSpec,
+  type ApprovalsByPacketId,
 } from "@/app/ops/finance/review-packets/data";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+/**
+ * Phase 16 — read-only approval lookup builder. Indexes by
+ * `targetEntity.id` so the canonical view helper can attach the
+ * matching approval to each packet row.
+ *
+ * Both `listPending()` and `listByAgent()` are read-only. Either
+ * source failing is non-fatal — we return a partial map; rows with
+ * no match end up with `approvalStatus: null`.
+ */
+async function buildApprovalLookup(): Promise<ApprovalsByPacketId> {
+  const map: ApprovalsByPacketId = new Map();
+  const store = approvalStore();
+  try {
+    const pending = await store.listPending();
+    for (const a of pending) {
+      const id = a.targetEntity?.id;
+      if (typeof id === "string" && id.length > 0) {
+        map.set(id, { id: a.id, status: a.status });
+      }
+    }
+  } catch {
+    // partial — continue with the listByAgent fallback
+  }
+  try {
+    // Terminal-state approvals routed by the promote-review route's
+    // agent id. Cap at 200 — the operator-facing dashboard only
+    // shows the most-recent batch; older closer history lives in
+    // the audit log.
+    const recent = await store.listByAgent("ops-route:receipt-promote", 200);
+    for (const a of recent) {
+      const id = a.targetEntity?.id;
+      if (typeof id === "string" && id.length > 0) {
+        // Don't overwrite a pending entry with the older terminal
+        // state; the pending lookup wins on conflict.
+        if (!map.has(id)) {
+          map.set(id, { id: a.id, status: a.status });
+        }
+      }
+    }
+  } catch {
+    // partial — already accumulated whatever listPending returned
+  }
+  return map;
+}
 
 export async function GET(req: Request): Promise<Response> {
   if (!(await isAuthorized(req))) {
@@ -75,11 +122,22 @@ export async function GET(req: Request): Promise<Response> {
     (spec.status !== undefined && spec.status !== "all") ||
     spec.vendorContains !== undefined ||
     spec.createdAfter !== undefined ||
-    spec.createdBefore !== undefined;
+    spec.createdBefore !== undefined ||
+    (spec.approvalStatus !== undefined && spec.approvalStatus !== "any");
 
   try {
     const packets = await listReceiptReviewPackets({ limit });
-    const filtered = filterApplied ? filterPacketsBySpec(packets, spec) : packets;
+
+    // Phase 16 — build the read-only approval lookup. Pulls pending
+    // approvals + recent terminal-state approvals routed by the
+    // promote-review agent (`ops-route:receipt-promote`). Both reads
+    // are read-only; failure of either is non-fatal — we surface a
+    // partial map and rows with no match get `approvalStatus: null`.
+    const approvalsByPacketId = await buildApprovalLookup();
+
+    const filtered = filterApplied
+      ? filterPacketsBySpec(packets, spec, approvalsByPacketId)
+      : packets;
     return NextResponse.json({
       ok: true,
       count: filtered.length,
@@ -87,6 +145,10 @@ export async function GET(req: Request): Promise<Response> {
       limit,
       filterApplied,
       packets: filtered,
+      // Phase 16 — flat lookup so the client view can attach
+      // approvalId / approvalStatus to each row without a second
+      // fetch. Keys are packetId (= targetEntity.id).
+      approvals: Object.fromEntries(approvalsByPacketId.entries()),
     });
   } catch (err) {
     return NextResponse.json(
