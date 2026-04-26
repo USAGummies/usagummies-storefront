@@ -28,6 +28,26 @@ These are the ONLY current team members.
 - **#receipts-capture** (C0APYNE9E73) — Receipt uploads ONLY. Every image here is a transaction receipt. Always OCR/extract vendor, date, amount, payment method, category.
 - **#abra-testing** (C0A9S88E1FT) — Testing channel. Not production.
 
+## Public-Facing Copy Rules (HARD)
+
+These apply to every customer-facing surface — site copy, ad copy, email
+templates, blog posts, social, press, OG/Twitter, JSON-LD descriptions:
+
+- **Never name the warehouse city** (Ashford / Ashford, WA / Pierce County
+  / Mount Rainier / "the Ashford warehouse"). It's fine in `/ops/*`,
+  `/api/*`, internal Slack, and operations runbooks. Never in public
+  copy. If origin needs to be named, use "the U.S.A." or omit.
+- **Never use Ben's full name (Ben Stutman / Benjamin Stutman) in
+  customer-facing copy.** It's fine in internal ops, code comments,
+  HubSpot owner IDs, etc. The brand voice is "USA Gummies" or "we", not
+  a founder's personal name.
+- Reasonable phrasings: "ships within 24 hours", "made in the U.S.A.",
+  "packed in America", "ships from our U.S. warehouse" (all fine).
+- Unreasonable phrasings (forbidden): "ships from Ashford", "ships from
+  WA", "Ben Stutman packs every order", "our founder Ben…".
+- When writing new content, sweep your own draft for `ashford`,
+  `stutman`, `ben`, `benjamin` BEFORE shipping.
+
 ## Execution Rules
 
 - When asked to do something, DO IT. Never say "I recommend you..." when you can just do it.
