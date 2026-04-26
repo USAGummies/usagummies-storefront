@@ -1,5 +1,12 @@
-import Image from "next/image";
+// LP-language blog archive shell — drives the index, category, tag,
+// author, and paginated archive pages from one component. Uses the
+// PageHero + LP section pattern instead of the legacy `blog-shell`
+// CSS namespace.
+
 import Link from "next/link";
+import Image from "next/image";
+
+import { PageHero } from "@/components/lp/PageHero";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { BlogPagination } from "@/components/blog/BlogPagination";
 import { BlogPostCard } from "@/components/blog/BlogPostCard";
@@ -41,74 +48,105 @@ export function BlogArchive({
   };
 }) {
   return (
-    <main className="blog-shell">
+    <main>
       <BreadcrumbJsonLd items={breadcrumbs} />
 
-      <div className="blog-hero">
-        {heroBadge ? <span className="badge badge--navy">{heroBadge}</span> : null}
-        <div className="blog-hero__header">
-          <div>
-            <h1 className="blog-title">{title}</h1>
-            <p className="blog-subtitle">{description}</p>
-          </div>
-          <Link href="/blog/rss.xml" className="btn btn-outline btn-compact">
-            RSS feed
-          </Link>
-        </div>
+      <PageHero
+        eyebrow={heroBadge || "From the Journal"}
+        headline={title}
+        sub={description}
+        ctas={[{ href: "/blog/rss.xml", label: "RSS feed", variant: "light" }]}
+      />
 
-        {heroMeta ? (
-          <div className="blog-hero__meta">
+      {/* Author / category / tag meta strip — only renders when an
+       * author archive provides a portrait + bio. */}
+      {heroMeta ? (
+        <section className="bg-[var(--lp-cream)]">
+          <div className="mx-auto flex max-w-[1100px] items-center gap-5 px-5 py-8 sm:px-8">
             {heroMeta.avatar ? (
-              <div className="blog-hero__avatar">
+              <div className="relative h-20 w-20 shrink-0 overflow-hidden border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)]">
                 <Image
                   src={heroMeta.avatar}
-                  alt={heroMeta.name ? `Portrait of ${heroMeta.name}` : "Author portrait"}
+                  alt={
+                    heroMeta.name ? `Portrait of ${heroMeta.name}` : "Author portrait"
+                  }
                   fill
-                  sizes="72px"
-                  className="blog-hero__avatarImage"
+                  sizes="80px"
+                  className="object-cover"
                 />
               </div>
             ) : null}
             <div>
-              {heroMeta.name ? <div className="blog-hero__name">{heroMeta.name}</div> : null}
-              {heroMeta.title ? <div className="blog-hero__title">{heroMeta.title}</div> : null}
+              {heroMeta.name ? (
+                <div className="lp-display text-[1.4rem] text-[var(--lp-ink)]">
+                  {heroMeta.name}
+                </div>
+              ) : null}
+              {heroMeta.title ? (
+                <div className="lp-sans mt-1 text-[0.95rem] text-[var(--lp-ink)]/80">
+                  {heroMeta.title}
+                </div>
+              ) : null}
             </div>
-          </div>
-        ) : null}
-      </div>
-
-      {featuredGuide ? (
-        <section className="mt-8 rounded-3xl border border-[var(--border)] bg-white p-5 shadow-[0_18px_40px_rgba(15,27,45,0.08)]">
-          <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
-            {featuredGuide.eyebrow || "Featured guide"}
-          </div>
-          <div className="mt-3 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <div className="text-xl font-black text-[var(--text)]">
-                {featuredGuide.title}
-              </div>
-              <p className="mt-2 text-sm text-[var(--muted)]">{featuredGuide.description}</p>
-            </div>
-            <Link href={featuredGuide.href} className="btn btn-outline btn-compact">
-              {featuredGuide.ctaLabel || "Read guide"}
-            </Link>
           </div>
         </section>
       ) : null}
 
-      {posts.length ? (
-        <div className="blog-grid">
-          {posts.map((post) => (
-            <BlogPostCard key={post.slug} post={post} />
-          ))}
-        </div>
-      ) : (
-        <div className="blog-empty">
-          <p>No posts yet. Check back soon.</p>
-        </div>
-      )}
+      {/* Featured guide callout — for pillar guide spotlights. */}
+      {featuredGuide ? (
+        <section className="bg-[var(--lp-cream-soft)] border-y-2 border-[var(--lp-ink)]">
+          <div className="mx-auto max-w-[1100px] px-5 py-10 sm:px-8 sm:py-12">
+            <div
+              className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6 sm:p-8"
+              style={{ boxShadow: "5px 5px 0 var(--lp-red)" }}
+            >
+              <p className="lp-label mb-2 text-[var(--lp-red)]">
+                ★ {featuredGuide.eyebrow || "Featured Guide"} ★
+              </p>
+              <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                <div className="flex-1">
+                  <h2 className="lp-display text-[clamp(1.6rem,4vw,2.4rem)] text-[var(--lp-ink)]">
+                    {featuredGuide.title}
+                  </h2>
+                  <p className="lp-sans mt-3 text-[1rem] leading-[1.55] text-[var(--lp-ink)]/82">
+                    {featuredGuide.description}
+                  </p>
+                </div>
+                <Link href={featuredGuide.href} className="lp-cta whitespace-nowrap">
+                  {featuredGuide.ctaLabel || "Read guide"}
+                </Link>
+              </div>
+            </div>
+          </div>
+        </section>
+      ) : null}
 
-      <BlogPagination currentPage={currentPage} totalPages={totalPages} basePath={basePath} />
+      {/* Post grid */}
+      <section className="bg-[var(--lp-cream)]">
+        <div className="mx-auto max-w-[1200px] px-5 py-12 sm:px-8 sm:py-16">
+          {posts.length ? (
+            <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:gap-10">
+              {posts.map((post) => (
+                <BlogPostCard key={post.slug} post={post} />
+              ))}
+            </div>
+          ) : (
+            <div className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-10 text-center">
+              <p className="lp-sans text-[1rem] text-[var(--lp-ink)]/80">
+                No posts yet. Check back soon.
+              </p>
+            </div>
+          )}
+
+          <div className="mt-10">
+            <BlogPagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              basePath={basePath}
+            />
+          </div>
+        </div>
+      </section>
     </main>
   );
 }

@@ -228,7 +228,7 @@ export default async function BlogPostPage({ params }: PageProps) {
   const hasModules = relatedPosts.length || relatedProductCards.length || topGuides.length;
 
   return (
-    <main className="blog-shell blog-shell--post">
+    <main>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(blogPostingJsonLd) }}
@@ -241,111 +241,164 @@ export default async function BlogPostPage({ params }: PageProps) {
         ]}
       />
 
-      <article className="blog-article">
-        <header className="blog-post__header">
-          <div className="blog-post__eyebrow">
-            <Link href={`/blog/category/${post.categorySlug}`} className="badge badge--red">
+      {/* Post hero — LP language. Eyebrow = category. Striped bunting
+       * + cream backdrop. Title + lede + meta + tags. */}
+      <section className="relative overflow-hidden">
+        <div className="lp-bunting" aria-hidden />
+        <div className="bg-[var(--lp-cream)]">
+          <div className="mx-auto max-w-[900px] px-5 py-12 text-center sm:px-8 sm:py-16">
+            <Link
+              href={`/blog/category/${post.categorySlug}`}
+              className="lp-label inline-flex items-center bg-[var(--lp-red)] px-3 py-1.5 text-[var(--lp-off-white)] no-underline"
+            >
               {post.category}
             </Link>
-          </div>
-          <h1 className="blog-post__title">{post.title}</h1>
-          <p className="blog-post__subtitle">{post.description}</p>
 
-          <div className="blog-post__meta">
-            <span>{formatBlogDate(post.updated || post.date)}</span>
-            <span>{post.readingTime}</span>
-            <Link href={`/blog/author/${post.authorSlug}`} className="blog-link">
-              {post.authorName}
-            </Link>
-          </div>
+            <h1 className="lp-display mt-5 text-[clamp(2.2rem,6vw,4rem)] leading-[1.05] text-[var(--lp-ink)]">
+              {post.title}
+            </h1>
 
-          {post.coverImage ? (
-            <div className="blog-post__cover">
+            <p className="lp-sans mx-auto mt-5 max-w-[60ch] text-[1.1rem] leading-[1.55] text-[var(--lp-ink)]/85">
+              {post.description}
+            </p>
+
+            <div className="lp-label mt-6 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[var(--lp-ink)]/75">
+              <span>{formatBlogDate(post.updated || post.date)}</span>
+              <span aria-hidden>·</span>
+              <span>{post.readingTime}</span>
+              <span aria-hidden>·</span>
+              <Link
+                href={`/blog/author/${post.authorSlug}`}
+                className="hover:text-[var(--lp-red)]"
+              >
+                {post.authorName}
+              </Link>
+            </div>
+          </div>
+          <div className="lp-bunting-thin" aria-hidden />
+        </div>
+      </section>
+
+      {/* Cover image, framed in LP shadow card */}
+      {post.coverImage ? (
+        <section className="bg-[var(--lp-cream-soft)]">
+          <div className="mx-auto max-w-[1100px] px-5 py-10 sm:px-8 sm:py-14">
+            <div
+              className="relative aspect-[16/9] w-full overflow-hidden border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)]"
+              style={{ boxShadow: "8px 8px 0 var(--lp-red)" }}
+            >
               <Image
                 src={post.coverImage}
                 alt={post.title}
                 fill
-                sizes="(max-width: 900px) 100vw, 900px"
-                className="blog-post__coverImage"
+                sizes="(max-width: 900px) 100vw, 1100px"
+                className="object-cover"
                 priority
               />
             </div>
-          ) : null}
+          </div>
+        </section>
+      ) : null}
+
+      {/* MDX article body */}
+      <article className="bg-[var(--lp-cream)]">
+        <div className="mx-auto max-w-[800px] px-5 py-10 sm:px-8 sm:py-14">
+          <div className="lp-sans prose prose-lg max-w-none text-[var(--lp-ink)] [&_h2]:lp-display [&_h2]:text-[var(--lp-ink)] [&_h2]:mt-10 [&_h3]:lp-display [&_h3]:text-[var(--lp-ink)] [&_h3]:mt-8 [&_a]:text-[var(--lp-red)] [&_a]:underline [&_a]:underline-offset-4 [&_strong]:text-[var(--lp-ink)] [&_blockquote]:border-l-[3px] [&_blockquote]:border-[var(--lp-red)] [&_blockquote]:pl-5 [&_blockquote]:italic [&_li]:my-2">
+            {content}
+          </div>
 
           {post.tags.length ? (
-            <div className="blog-post__tags">
+            <div className="mt-10 flex flex-wrap items-center gap-2 border-t-2 border-[var(--lp-ink)]/15 pt-6">
+              <span className="lp-label text-[var(--lp-ink)]/65">Tagged</span>
               {post.tags.map((tag, index) => (
                 <Link
                   key={`${post.slug}-tag-${tag}`}
                   href={`/blog/tag/${post.tagSlugs[index]}`}
-                  className="badge badge--navy"
+                  className="lp-label inline-flex items-center border-2 border-[var(--lp-ink)] bg-[var(--lp-off-white)] px-2.5 py-1 text-[var(--lp-ink)] no-underline hover:bg-[var(--lp-ink)] hover:text-[var(--lp-cream)]"
                 >
                   {tag}
                 </Link>
               ))}
             </div>
           ) : null}
-        </header>
 
-        <div className="blog-content">{content}</div>
+          {shouldShowPillarGuide ? (
+            <aside
+              className="mt-10 border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6 sm:p-7"
+              style={{ boxShadow: "5px 5px 0 var(--lp-red)" }}
+            >
+              <p className="lp-label mb-2 text-[var(--lp-red)]">★ Related Guide ★</p>
+              <h2 className="lp-display text-[1.6rem] text-[var(--lp-ink)]">
+                <Link
+                  href="/no-artificial-dyes-gummy-bears"
+                  className="hover:text-[var(--lp-red)]"
+                >
+                  No Artificial Dyes Gummy Bears
+                </Link>
+              </h2>
+              <p className="lp-sans mt-3 text-[1rem] leading-[1.55] text-[var(--lp-ink)]/82">
+                Explore the science, label rules, and FAQs behind red 40 free
+                gummies and dye-free candy.
+              </p>
+            </aside>
+          ) : null}
 
-        {shouldShowPillarGuide ? (
-          <aside className="mt-10 rounded-3xl border border-[var(--border)] bg-[var(--surface-strong)] p-5">
-            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
-              Related guide
-            </div>
-            <h2 className="mt-2 text-xl font-black text-[var(--text)]">
-              <Link href="/no-artificial-dyes-gummy-bears" className="hover:text-[var(--navy)]">
-                No Artificial Dyes Gummy Bears
+          <footer className="mt-10 grid gap-4 border-t-2 border-[var(--lp-ink)]/15 pt-6 sm:grid-cols-2">
+            <div>
+              <div className="lp-label mb-2 text-[var(--lp-ink)]/65">Filed under</div>
+              <Link
+                href={`/blog/category/${post.categorySlug}`}
+                className="lp-display text-[1.2rem] text-[var(--lp-ink)] hover:text-[var(--lp-red)]"
+              >
+                {post.category}
               </Link>
-            </h2>
-            <p className="mt-2 text-sm text-[var(--muted)]">
-              Explore the science, label rules, and FAQs behind red 40 free gummies and dye-free candy.
-            </p>
-          </aside>
-        ) : null}
-
-        <footer className="blog-post__footer">
-          <div>
-            <div className="blog-post__footerLabel">Filed under</div>
-            <Link href={`/blog/category/${post.categorySlug}`} className="blog-link">
-              {post.category}
-            </Link>
-          </div>
-          <div>
-            <div className="blog-post__footerLabel">Share with</div>
-            <Link href="/shop" className="blog-link">
-              Shop gummies
-            </Link>
-          </div>
-        </footer>
+            </div>
+            <div className="sm:text-right">
+              <div className="lp-label mb-2 text-[var(--lp-ink)]/65">Loved this?</div>
+              <Link href="/shop" className="lp-cta">
+                Shop USA Gummies
+              </Link>
+            </div>
+          </footer>
+        </div>
       </article>
 
+      {/* Related modules — posts, products, guides */}
       {hasModules ? (
-        <section className="link-modules" aria-label="Related content">
-          {relatedPosts.length ? (
-            <LinkModule title="Related Posts">
-              {relatedPosts.map((related) => (
-                <BlogPostCard key={related.slug} post={related} />
-              ))}
-            </LinkModule>
-          ) : null}
-
-          {relatedProductCards.length ? (
-            <LinkModule title="Related Products">
-              {relatedProductCards.map((product) => (
-                <RelatedProductCard key={product.id} product={product} />
-              ))}
-            </LinkModule>
-          ) : null}
-
-          {topGuides.length ? (
-            <LinkModule title="Top Guides">
-              {topGuides.map((guide) => (
-                <GuideCard key={guide.href} guide={guide} />
-              ))}
-            </LinkModule>
-          ) : null}
+        <section className="bg-[var(--lp-cream-soft)] border-y-2 border-[var(--lp-ink)]">
+          <div className="mx-auto max-w-[1200px] px-5 py-14 sm:px-8 sm:py-20">
+            <div className="mb-10 text-center">
+              <p className="lp-label mb-2 text-[var(--lp-red)]">★ Keep Reading ★</p>
+              <h2 className="lp-display text-[clamp(2rem,5vw,3.2rem)] text-[var(--lp-ink)]">
+                More from
+                <br />
+                <span className="lp-script text-[var(--lp-red)]">USA Gummies.</span>
+              </h2>
+            </div>
+            <div className="link-modules">
+              {relatedPosts.length ? (
+                <LinkModule title="Related Posts">
+                  {relatedPosts.map((related) => (
+                    <BlogPostCard key={related.slug} post={related} />
+                  ))}
+                </LinkModule>
+              ) : null}
+              {relatedProductCards.length ? (
+                <LinkModule title="Related Products">
+                  {relatedProductCards.map((product) => (
+                    <RelatedProductCard key={product.id} product={product} />
+                  ))}
+                </LinkModule>
+              ) : null}
+              {topGuides.length ? (
+                <LinkModule title="Top Guides">
+                  {topGuides.map((guide) => (
+                    <GuideCard key={guide.href} guide={guide} />
+                  ))}
+                </LinkModule>
+              ) : null}
+            </div>
+          </div>
         </section>
       ) : null}
     </main>
