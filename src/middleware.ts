@@ -47,6 +47,7 @@ const SELF_AUTHENTICATED_PREFIXES = [
   "/api/ops/orders/", // ORDER DESK — Order log, fulfillment, samples (isAuthorized)
   "/api/ops/fulfillment", // FULFILLMENT — Unified ship-today queue (session or CRON_SECRET)
   "/api/ops/shipping/", // SHIPPING — Unified auto-ship pipeline (session or CRON_SECRET)
+  "/api/ops/ap-packets", // AP PACKETS — vendor setup reply pipeline (Gmail send with dedup + approval gate). No trailing slash so both /ap-packets and /ap-packets/send match.
   "/api/ops/viktor/", // VIKTOR runtime — W-7 Rene-capture etc. (isCronAuthorized bearer CRON_SECRET)
   "/api/ops/agents/", // Specialist agent runtimes — finance-exception, ops, etc. (isAuthorized session + CRON_SECRET)
   "/api/ops/booke/", // Booke queue push/query (isCronAuthorized bearer CRON_SECRET)
@@ -61,6 +62,7 @@ const SELF_AUTHENTICATED_PREFIXES = [
   "/api/ops/webhooks/", // WEBHOOKS — Upstream webhook ingress (Shopify HMAC, Amazon SNS, Faire token, etc.) — each route verifies its own signature
   "/api/ops/smoke", // SMOKE — cross-integration health check (isAuthorized)
   "/api/ops/shopify/", // SHOPIFY DTC — unfulfilled queue + dispatch bridge (isAuthorized)
+  "/api/ops/upload", // UPLOAD — public-facing NCS-001 / vendor-doc capture (used by /upload/ncs and the wholesale inquiry receipt page). Route enforces its own perimeter: rate limit (5/min/IP), MIME allowlist, 10 MB cap, Drive-only writes (fail-closed if env missing).
 ];
 
 function isSelfAuthenticated(pathname: string): boolean {

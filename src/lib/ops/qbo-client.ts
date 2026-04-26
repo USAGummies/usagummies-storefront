@@ -450,13 +450,21 @@ export type QBOVendorInput = {
   CompanyName?: string;
   PrimaryEmailAddr?: { Address: string };
   PrimaryPhone?: { FreeFormNumber: string };
+  Mobile?: { FreeFormNumber: string };
+  WebAddr?: { URI: string };
   BillAddr?: {
     Line1?: string;
+    Line2?: string;
     City?: string;
     CountrySubDivisionCode?: string;
     PostalCode?: string;
+    Country?: string;
   };
   PrintOnCheckName?: string;
+  AcctNum?: string;
+  TaxIdentifier?: string;
+  TermRef?: { value: string; name?: string };
+  Notes?: string;
 };
 
 /**

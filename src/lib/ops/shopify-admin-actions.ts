@@ -520,6 +520,18 @@ export interface PaidOrderSummary {
 export async function queryPaidOrdersForBurnRate(opts: {
   days?: number;
   limit?: number;
+  /**
+   * Optional Shopify tag filter. `include` adds positive `tag:X`
+   * clauses (AND-joined) to the search. `exclude` adds negative
+   * `-tag:X` clauses. The KPI scorecard uses this to split paid
+   * orders into Shopify DTC (exclude:["wholesale"]) and B2B
+   * (include:["wholesale"]) without double-counting.
+   *
+   * When omitted, behaves identically to the original signature
+   * (every paid order in the window, no tag discrimination) — so
+   * existing callers (e.g. `burn-rate-calibration.ts`) are unaffected.
+   */
+  tagFilter?: { include?: string[]; exclude?: string[] };
 } = {}): Promise<PaidOrderSummary[]> {
   const days = opts.days ?? 30;
   const limit = Math.max(1, Math.min(250, opts.limit ?? 250));
@@ -529,7 +541,14 @@ export async function queryPaidOrdersForBurnRate(opts: {
   // Include refunded/cancelled-on-paid? Only `financial_status:paid`
   // counts as a sale for burn calculation. Returns don't matter — we
   // compute forward burn, not lifetime net.
-  const query = `financial_status:paid created_at:>${createdSince}`;
+  const queryParts = [`financial_status:paid`, `created_at:>${createdSince}`];
+  for (const t of opts.tagFilter?.include ?? []) {
+    if (t.trim()) queryParts.push(`tag:${t.trim()}`);
+  }
+  for (const t of opts.tagFilter?.exclude ?? []) {
+    if (t.trim()) queryParts.push(`-tag:${t.trim()}`);
+  }
+  const query = queryParts.join(" ");
   const result = await shopifyAdminQuery<DispatchOrdersQueryResult>(
     DISPATCH_ORDERS_QUERY,
     { limit, query },

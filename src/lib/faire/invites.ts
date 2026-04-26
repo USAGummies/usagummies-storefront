@@ -1,0 +1,989 @@
+/**
+ * Internal Faire Direct invite review queue.
+ *
+ * Why this exists
+ * ---------------
+ * Faire Direct orders carry 0% commission vs. the marketplace's
+ * standard rate. The strategic move is to invite retailers we already
+ * have a relationship with into Faire Direct so future POs flow
+ * through the 0%-commission channel.
+ *
+ * BUT — every invite is a Class B `faire-direct.invite` per
+ * /contracts/approval-taxonomy.md and /contracts/agents/faire-specialist.md.
+ * No agent auto-sends invites; an operator approves each one. This
+ * Phase 1 build stages the candidates in KV as `needs_review`. A
+ * later phase wires the approved click to the real Faire send (or to
+ * a manual hand-off if Faire's API doesn't support invite send).
+ *
+ * Hard rules locked by tests:
+ *   - `ingestInviteRows()` runs every input through `validateInvite()`.
+ *     Invalid rows go into the `errors[]` envelope with row index +
+ *     reason — they never become queue records.
+ *   - Duplicates (within batch + against existing queue) are dedup'd
+ *     by lowercased email. Re-importing the same retailer never
+ *     produces a second row.
+ *   - **No email / Faire invite is sent.** Phase 1 is review-only.
+ *     The module imports nothing from Gmail / Slack / Faire client.
+ *   - When `FAIRE_ACCESS_TOKEN` is missing, `isFaireConfigured()`
+ *     returns false and the dashboard surfaces a degraded banner.
+ *     Queue ingest still works — the reason to stage candidates
+ *     doesn't depend on the token, only the eventual send does.
+ *
+ * KV schema:
+ *   `faire:invites:index`           — Array<string> invite ids (cap 1000)
+ *   `faire:invites:<id>`            — FaireInviteRecord
+ */
+import { kv } from "@vercel/kv";
+
+// Re-export the existing isFaireConfigured() so the dashboard has one
+// import surface for the degraded check.
+export { isFaireConfigured } from "@/lib/ops/faire-client";
+
+export type FaireInviteStatus =
+  | "needs_review"
+  | "approved"
+  | "sent"
+  | "rejected";
+
+export const VALID_FAIRE_INVITE_STATUSES: readonly FaireInviteStatus[] = [
+  "needs_review",
+  "approved",
+  "sent",
+  "rejected",
+] as const;
+
+export interface FaireInviteCandidate {
+  retailerName: string;
+  buyerName?: string;
+  email: string;
+  city?: string;
+  state?: string;
+  source: string;
+  notes?: string;
+  hubspotContactId?: string;
+  /**
+   * Phase 3: the operator-pasted Faire Direct invite URL from the Faire
+   * brand portal (https://faire.com/...). The send closer drops this
+   * URL into the Gmail invite body — we never call the Faire API to
+   * generate a link. Required before the record can be approved for
+   * the send-on-approve closer; missing or non-http(s) → reject the
+   * approval transition with `validation_failed`.
+   */
+  directLinkUrl?: string;
+}
+
+export interface FaireInviteRecord extends FaireInviteCandidate {
+  /** Stable id derived from lowercased email — also the dedup key. */
+  id: string;
+  status: FaireInviteStatus;
+  queuedAt: string;
+  updatedAt: string;
+  /** ISO of the most recent operator review (set by Phase 2 review actions). */
+  reviewedAt?: string;
+  reviewedBy?: string;
+  /** Operator notes added after review. */
+  reviewNote?: string;
+  /**
+   * Phase 3 send-on-approve metadata — only set by the
+   * `executeApprovedFaireDirectInvite` closer when status flips to
+   * `sent`. Never mutable from the review route.
+   */
+  sentAt?: string;
+  sentBy?: string;
+  gmailMessageId?: string;
+  gmailThreadId?: string;
+  hubspotEmailLogId?: string;
+  /** Approval id that authorized the send (last successful close). */
+  sentApprovalId?: string;
+  /**
+   * Phase 3.2 / 3.3 follow-up queue marker. Set by
+   * `markFaireFollowUpQueued()` when the request-approval route opens
+   * a Class B `faire-direct.follow-up` approval card. Suppresses
+   * re-surface in the read-only follow-up queue immediately, so the
+   * operator doesn't see the row again while Ben's approval is in
+   * flight or while the closer is running.
+   *
+   * NOTE: this stays set even if the approval is rejected. There is
+   * no in-Phase-3.3 path to clear it; if Ben rejects, an operator
+   * who wants to re-attempt must clear the field via a future patch
+   * surface (out of scope for 3.3). Stamping is one-way.
+   */
+  followUpQueuedAt?: string;
+  /**
+   * Approval id of the in-flight or last `faire-direct.follow-up`
+   * request. Stamped alongside followUpQueuedAt so the closer can
+   * idempotency-match a re-fired Slack click against this record.
+   */
+  followUpRequestApprovalId?: string;
+  /**
+   * Phase 3.3 — set by `markFaireFollowUpSent()` only after the
+   * `executeApprovedFaireDirectFollowUp` closer successfully sent
+   * the Gmail follow-up. Distinct from `followUpQueuedAt`:
+   * a record may be queued without ever being sent (rejection /
+   * Gmail failure). A record with `followUpSentAt` set is the only
+   * one that's guaranteed to have actually emailed the retailer.
+   */
+  followUpSentAt?: string;
+  followUpSentBy?: string;
+  followUpGmailMessageId?: string;
+  followUpGmailThreadId?: string;
+  followUpHubspotEmailLogId?: string;
+  /** Approval id that authorized the last successful follow-up send. */
+  followUpSentApprovalId?: string;
+}
+
+export interface FaireInviteIngestErrorRow {
+  rowIndex: number;
+  code: "validation_failed" | "duplicate" | "unknown";
+  detail: string;
+  /** Submitter-supplied identifier for trace; truncated. */
+  identifier: string;
+}
+
+export interface FaireInviteIngestResult {
+  ok: boolean;
+  /** Number of candidates that became `needs_review` records. */
+  queued: number;
+  /** Total invites in the queue after this ingest. */
+  totalInQueue: number;
+  errors: FaireInviteIngestErrorRow[];
+  createdIds: string[];
+}
+
+const KV_INDEX = "faire:invites:index";
+const INDEX_CAP = 1000;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Phase 3 — validate the operator-pasted Faire Direct link URL.
+ *
+ * Rules:
+ *   - Must parse as a URL.
+ *   - Protocol must be http: or https: (no javascript:, no data:, etc.).
+ *   - Hostname must be present and non-empty.
+ *
+ * Pure — no fetch, no network call. The URL is sent to the retailer
+ * verbatim by the closer.
+ */
+export function isValidDirectLinkUrl(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  const trimmed = value.trim();
+  if (trimmed.length === 0 || trimmed.length > 2048) return false;
+  let url: URL;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "https:" && url.protocol !== "http:") return false;
+  if (!url.hostname || url.hostname.length === 0) return false;
+  return true;
+}
+
+function inviteKey(id: string): string {
+  return `faire:invites:${id}`;
+}
+
+/**
+ * Stable id derived from email (lowercased + URL-friendly). Same email
+ * always produces the same id, which is the dedup key.
+ */
+export function inviteIdFromEmail(email: string): string {
+  return email.trim().toLowerCase().replace(/[^a-z0-9.@_+-]/g, "");
+}
+
+// ----- Validation ----------------------------------------------------
+
+export type ValidateResult =
+  | { ok: true; candidate: FaireInviteCandidate }
+  | { ok: false; reason: string };
+
+export function validateInvite(
+  input: Partial<FaireInviteCandidate> | null | undefined,
+): ValidateResult {
+  if (!input || typeof input !== "object") {
+    return { ok: false, reason: "input must be an object" };
+  }
+  const retailerName = (input.retailerName ?? "").trim();
+  const email = (input.email ?? "").trim();
+  const source = (input.source ?? "").trim();
+  if (!retailerName) {
+    return { ok: false, reason: "retailerName is required" };
+  }
+  if (!email || !EMAIL_RE.test(email)) {
+    return { ok: false, reason: "email is required and must be a valid email" };
+  }
+  if (!source) {
+    return { ok: false, reason: "source is required (e.g. 'wholesale-page', 'faire-batch-2026-04')" };
+  }
+  const candidate: FaireInviteCandidate = {
+    retailerName,
+    email: email.toLowerCase(),
+    source,
+  };
+  if (typeof input.buyerName === "string" && input.buyerName.trim().length > 0) {
+    candidate.buyerName = input.buyerName.trim();
+  }
+  if (typeof input.city === "string" && input.city.trim().length > 0) {
+    candidate.city = input.city.trim();
+  }
+  if (typeof input.state === "string" && input.state.trim().length > 0) {
+    candidate.state = input.state.trim();
+  }
+  if (typeof input.notes === "string" && input.notes.trim().length > 0) {
+    candidate.notes = input.notes.trim().slice(0, 1000);
+  }
+  if (
+    typeof input.hubspotContactId === "string" &&
+    input.hubspotContactId.trim().length > 0
+  ) {
+    candidate.hubspotContactId = input.hubspotContactId.trim();
+  }
+  if (input.directLinkUrl !== undefined && input.directLinkUrl !== null) {
+    if (typeof input.directLinkUrl !== "string") {
+      return { ok: false, reason: "directLinkUrl must be a string" };
+    }
+    const trimmed = input.directLinkUrl.trim();
+    if (trimmed.length > 0) {
+      if (!isValidDirectLinkUrl(trimmed)) {
+        return {
+          ok: false,
+          reason:
+            "directLinkUrl must be a valid http(s) URL (paste from Faire brand portal)",
+        };
+      }
+      candidate.directLinkUrl = trimmed;
+    }
+    // Empty string clears the field — treated as not present.
+  }
+  return { ok: true, candidate };
+}
+
+// ----- KV CRUD --------------------------------------------------------
+
+async function readIndex(): Promise<string[]> {
+  try {
+    const v = await kv.get<string[]>(KV_INDEX);
+    return Array.isArray(v) ? v : [];
+  } catch {
+    return [];
+  }
+}
+
+async function writeIndex(ids: string[]): Promise<void> {
+  try {
+    const unique = Array.from(new Set(ids)).slice(-INDEX_CAP);
+    await kv.set(KV_INDEX, unique);
+  } catch {
+    /* fail-soft */
+  }
+}
+
+export async function getInvite(id: string): Promise<FaireInviteRecord | null> {
+  if (!id) return null;
+  try {
+    const v = await kv.get<string | FaireInviteRecord>(inviteKey(id));
+    if (!v) return null;
+    if (typeof v === "string") {
+      try {
+        return JSON.parse(v) as FaireInviteRecord;
+      } catch {
+        return null;
+      }
+    }
+    return v as FaireInviteRecord;
+  } catch {
+    return null;
+  }
+}
+
+export async function listInvites(): Promise<FaireInviteRecord[]> {
+  const ids = await readIndex();
+  if (ids.length === 0) return [];
+  const out: FaireInviteRecord[] = [];
+  for (const id of ids) {
+    const r = await getInvite(id);
+    if (r) out.push(r);
+  }
+  // Newest first.
+  return out.sort((a, b) => {
+    const aT = Date.parse(a.queuedAt) || 0;
+    const bT = Date.parse(b.queuedAt) || 0;
+    if (aT !== bT) return bT - aT;
+    return a.id.localeCompare(b.id, "en");
+  });
+}
+
+export interface InvitesByStatus {
+  needs_review: FaireInviteRecord[];
+  approved: FaireInviteRecord[];
+  sent: FaireInviteRecord[];
+  rejected: FaireInviteRecord[];
+}
+
+export async function listInvitesByStatus(): Promise<InvitesByStatus> {
+  const all = await listInvites();
+  const out: InvitesByStatus = {
+    needs_review: [],
+    approved: [],
+    sent: [],
+    rejected: [],
+  };
+  for (const r of all) {
+    const bucket = out[r.status] ?? out.needs_review;
+    bucket.push(r);
+  }
+  return out;
+}
+
+// ----- Ingest --------------------------------------------------------
+
+interface IngestOptions {
+  now?: Date;
+}
+
+/**
+ * Stage submitted rows as `needs_review` invite candidates. Returns
+ * a `{ queued, errors[] }` envelope so the route can map to HTTP
+ * codes cleanly.
+ *
+ * Pure with respect to email/Faire: never sends an invite, never
+ * touches Gmail or the Faire client.
+ */
+export async function ingestInviteRows(
+  rows: Array<Partial<FaireInviteCandidate>>,
+  options: IngestOptions = {},
+): Promise<FaireInviteIngestResult> {
+  const now = options.now ?? new Date();
+  const nowIso = now.toISOString();
+  const errors: FaireInviteIngestErrorRow[] = [];
+  const createdIds: string[] = [];
+
+  if (!Array.isArray(rows)) {
+    return {
+      ok: false,
+      queued: 0,
+      totalInQueue: (await readIndex()).length,
+      errors: [
+        {
+          rowIndex: 0,
+          code: "unknown",
+          detail: "rows must be an array",
+          identifier: "",
+        },
+      ],
+      createdIds: [],
+    };
+  }
+
+  const existingIndex = await readIndex();
+  const existingIdSet = new Set(existingIndex.map((s) => s.toLowerCase()));
+  const seenInBatch = new Set<string>();
+
+  let i = 0;
+  for (const raw of rows) {
+    i += 1;
+    const identifier = (raw?.email ?? raw?.retailerName ?? "")
+      .toString()
+      .slice(0, 64);
+    const validation = validateInvite(raw);
+    if (!validation.ok) {
+      errors.push({
+        rowIndex: i,
+        code: "validation_failed",
+        detail: validation.reason,
+        identifier,
+      });
+      continue;
+    }
+    const id = inviteIdFromEmail(validation.candidate.email);
+    if (seenInBatch.has(id)) {
+      errors.push({
+        rowIndex: i,
+        code: "duplicate",
+        detail: "Duplicate email earlier in this batch.",
+        identifier,
+      });
+      continue;
+    }
+    seenInBatch.add(id);
+    if (existingIdSet.has(id)) {
+      errors.push({
+        rowIndex: i,
+        code: "duplicate",
+        detail:
+          "An invite for this email is already in the queue. Update it via the review action instead of re-ingesting.",
+        identifier,
+      });
+      continue;
+    }
+
+    const record: FaireInviteRecord = {
+      ...validation.candidate,
+      id,
+      status: "needs_review",
+      queuedAt: nowIso,
+      updatedAt: nowIso,
+    };
+    try {
+      await kv.set(inviteKey(id), JSON.stringify(record));
+      createdIds.push(id);
+      existingIdSet.add(id);
+    } catch (err) {
+      errors.push({
+        rowIndex: i,
+        code: "unknown",
+        detail: `KV write failed: ${err instanceof Error ? err.message : String(err)}`,
+        identifier,
+      });
+    }
+  }
+
+  if (createdIds.length > 0) {
+    await writeIndex([...existingIndex, ...createdIds]);
+  }
+
+  const totalInQueue = (await readIndex()).filter((s) => Boolean(s)).length;
+  return {
+    ok: errors.length === 0 || createdIds.length > 0,
+    queued: createdIds.length,
+    totalInQueue,
+    errors,
+    createdIds,
+  };
+}
+
+// ---- Phase 2 review actions -----------------------------------------
+
+/**
+ * Status values an operator may set via the review route. `"sent"` is
+ * intentionally NOT in this set — sent transitions only happen inside
+ * the future send-on-approve closer (Class B `faire-direct.invite`).
+ */
+export const REVIEWABLE_STATUSES: readonly Exclude<
+  FaireInviteStatus,
+  "sent"
+>[] = ["needs_review", "approved", "rejected"] as const;
+
+export type InviteUpdateError =
+  | { code: "not_found"; message: string }
+  | { code: "invalid_status"; message: string }
+  | { code: "sent_status_forbidden"; message: string }
+  | { code: "validation_failed"; message: string }
+  | { code: "duplicate_email"; message: string }
+  | { code: "no_changes"; message: string };
+
+export interface InviteUpdatePatch {
+  status?: FaireInviteStatus;
+  reviewNote?: string;
+  fieldCorrections?: Partial<FaireInviteCandidate>;
+  reviewedBy?: string;
+}
+
+const ALLOWED_CORRECTION_KEYS: ReadonlySet<keyof FaireInviteCandidate> = new Set(
+  [
+    "retailerName",
+    "buyerName",
+    "email",
+    "city",
+    "state",
+    "source",
+    "notes",
+    "hubspotContactId",
+    "directLinkUrl",
+  ],
+);
+
+/**
+ * Apply an operator review patch to an invite record. KV write is the
+ * only side effect — no Gmail / Slack / Faire / network call.
+ *
+ * Hard rules locked by tests:
+ *   - status MUST be one of REVIEWABLE_STATUSES. Setting `"sent"`
+ *     here is rejected with `code: "sent_status_forbidden"` so a
+ *     future send closer is the only path that can flip a record to
+ *     `sent`.
+ *   - Field corrections merge into the existing record AND re-run
+ *     through `validateInvite()`. Any correction that breaks
+ *     validation rejects the entire patch — no half-application.
+ *   - When a corrected `email` would land on an id already in the
+ *     queue (and that id isn't this record's own id), reject with
+ *     `code: "duplicate_email"`. The `id` itself is immutable —
+ *     a corrected email does NOT rotate the record's KV key.
+ *   - Empty patch → `code: "no_changes"`. Caller should 400.
+ *   - `updatedAt` and `reviewedAt` are stamped on every accepted
+ *     update; `reviewedBy` if supplied (trimmed, capped at 80 chars).
+ */
+export async function updateFaireInvite(
+  id: string,
+  patch: InviteUpdatePatch,
+  options: { now?: Date } = {},
+): Promise<
+  { ok: true; invite: FaireInviteRecord } | { ok: false; error: InviteUpdateError }
+> {
+  const existing = await getInvite(id);
+  if (!existing) {
+    return {
+      ok: false,
+      error: {
+        code: "not_found",
+        message: `Invite ${id} not found in the queue.`,
+      },
+    };
+  }
+
+  const hasStatus = patch.status !== undefined;
+  const hasNote = patch.reviewNote !== undefined;
+  const hasCorrections =
+    patch.fieldCorrections !== undefined &&
+    typeof patch.fieldCorrections === "object" &&
+    !Array.isArray(patch.fieldCorrections) &&
+    Object.keys(patch.fieldCorrections).length > 0;
+
+  if (!hasStatus && !hasNote && !hasCorrections) {
+    return {
+      ok: false,
+      error: {
+        code: "no_changes",
+        message:
+          "Patch must set at least one of status, reviewNote, or fieldCorrections.",
+      },
+    };
+  }
+
+  // ---- Status validation ----------------------------------------------
+  if (hasStatus) {
+    if (patch.status === "sent") {
+      return {
+        ok: false,
+        error: {
+          code: "sent_status_forbidden",
+          message:
+            "status='sent' cannot be set from the review route. The future Class B faire-direct.invite send closer is the only path that may flip an invite to 'sent'.",
+        },
+      };
+    }
+    if (
+      !REVIEWABLE_STATUSES.includes(
+        patch.status as Exclude<FaireInviteStatus, "sent">,
+      )
+    ) {
+      return {
+        ok: false,
+        error: {
+          code: "invalid_status",
+          message: `status must be one of ${REVIEWABLE_STATUSES.join(", ")}`,
+        },
+      };
+    }
+  }
+
+  // ---- Field corrections (merge + re-validate) -----------------------
+  let mergedCandidate: FaireInviteCandidate = {
+    retailerName: existing.retailerName,
+    email: existing.email,
+    source: existing.source,
+    buyerName: existing.buyerName,
+    city: existing.city,
+    state: existing.state,
+    notes: existing.notes,
+    hubspotContactId: existing.hubspotContactId,
+    directLinkUrl: existing.directLinkUrl,
+  };
+  let corrected: Partial<FaireInviteCandidate> | null = null;
+  if (hasCorrections) {
+    const safe: Partial<FaireInviteCandidate> = {};
+    const c = patch.fieldCorrections!;
+    for (const key of Object.keys(c) as Array<keyof FaireInviteCandidate>) {
+      if (!ALLOWED_CORRECTION_KEYS.has(key)) continue;
+      const v = c[key];
+      if (v === undefined) continue;
+      // Allow empty string for clearable optional fields, but not for
+      // required ones — `validateInvite` will catch that.
+      (safe as Record<string, unknown>)[key] = v;
+    }
+    corrected = safe;
+    const candidate: Partial<FaireInviteCandidate> = {
+      ...mergedCandidate,
+      ...safe,
+    };
+    const validation = validateInvite(candidate);
+    if (!validation.ok) {
+      return {
+        ok: false,
+        error: {
+          code: "validation_failed",
+          message: `Corrected invite fails validation: ${validation.reason}`,
+        },
+      };
+    }
+    mergedCandidate = validation.candidate;
+  }
+
+  // ---- Phase 3 approval-readiness rule -------------------------------
+  // status="approved" requires a valid directLinkUrl on the merged
+  // candidate. Without the URL, the send closer would have nothing to
+  // paste into the Gmail body, so "approved but unsendable" rows are
+  // refused at the review-route boundary.
+  if (hasStatus && patch.status === "approved") {
+    if (
+      !mergedCandidate.directLinkUrl ||
+      !isValidDirectLinkUrl(mergedCandidate.directLinkUrl)
+    ) {
+      return {
+        ok: false,
+        error: {
+          code: "validation_failed",
+          message:
+            "Cannot approve a Faire Direct invite without a valid directLinkUrl. Paste the brand-portal Faire Direct invite URL on the row first, then approve.",
+        },
+      };
+    }
+  }
+
+  // ---- Duplicate-email guard ----------------------------------------
+  // If the email changed, ensure no OTHER record in the queue uses it.
+  if (mergedCandidate.email !== existing.email) {
+    const newId = inviteIdFromEmail(mergedCandidate.email);
+    if (newId !== existing.id) {
+      const collision = await getInvite(newId);
+      if (collision) {
+        return {
+          ok: false,
+          error: {
+            code: "duplicate_email",
+            message: `An invite for ${mergedCandidate.email} is already in the queue (id=${newId}). Reject the duplicate or update the other record instead.`,
+          },
+        };
+      }
+    }
+  }
+
+  // ---- Apply lifecycle changes --------------------------------------
+  const now = (options.now ?? new Date()).toISOString();
+  const next: FaireInviteRecord = {
+    // Start from the existing record (preserves id, queuedAt, etc.).
+    ...existing,
+    // Then overlay the validated candidate fields.
+    retailerName: mergedCandidate.retailerName,
+    email: mergedCandidate.email,
+    source: mergedCandidate.source,
+    buyerName: mergedCandidate.buyerName,
+    city: mergedCandidate.city,
+    state: mergedCandidate.state,
+    notes: mergedCandidate.notes,
+    hubspotContactId: mergedCandidate.hubspotContactId,
+    directLinkUrl: mergedCandidate.directLinkUrl,
+  };
+  if (hasStatus) next.status = patch.status as FaireInviteStatus;
+  if (hasNote) {
+    const note = (patch.reviewNote ?? "").trim();
+    if (note.length === 0) {
+      delete next.reviewNote;
+    } else {
+      next.reviewNote = note.slice(0, 1000);
+    }
+  }
+  next.updatedAt = now;
+  next.reviewedAt = now;
+  if (typeof patch.reviewedBy === "string" && patch.reviewedBy.trim().length > 0) {
+    next.reviewedBy = patch.reviewedBy.trim().slice(0, 80);
+  }
+
+  // ---- Persist (id is immutable; we never rotate the KV key) -------
+  await kv.set(inviteKey(existing.id), JSON.stringify(next));
+  // `corrected` referenced solely as a structural marker — kept lint-clean.
+  void corrected;
+  return { ok: true, invite: next };
+}
+
+// ----- Phase 3 send transition --------------------------------------
+//
+// Only the `executeApprovedFaireDirectInvite` closer (gated on a Class B
+// `faire-direct.invite` approval) is allowed to flip a record to "sent"
+// and stamp the Gmail message metadata. The review route is NOT.
+//
+// Hard rules locked by tests:
+//   - Refuses if the record's current status is anything other than
+//     "approved" — protects against a closer mis-firing on a record
+//     that was never reviewed-approved.
+//   - Refuses if the record has no `directLinkUrl` (a stale row whose
+//     link was cleared after approval should not become "sent").
+//   - Stamps sentAt / sentBy / gmailMessageId / gmailThreadId /
+//     hubspotEmailLogId / sentApprovalId in one KV write.
+//   - Idempotent: a record that's already "sent" with the same approval
+//     id reports `alreadySent=true` and does not double-write.
+
+export interface MarkSentInput {
+  approvalId: string;
+  sentBy: string;
+  gmailMessageId: string;
+  gmailThreadId?: string | null;
+  hubspotEmailLogId?: string | null;
+  now?: Date;
+}
+
+export type MarkSentResult =
+  | { ok: true; alreadySent: false; invite: FaireInviteRecord }
+  | { ok: true; alreadySent: true; invite: FaireInviteRecord }
+  | {
+      ok: false;
+      error:
+        | { code: "not_found"; message: string }
+        | { code: "wrong_status"; message: string }
+        | { code: "missing_direct_link_url"; message: string };
+    };
+
+export async function markFaireInviteSent(
+  id: string,
+  input: MarkSentInput,
+): Promise<MarkSentResult> {
+  const existing = await getInvite(id);
+  if (!existing) {
+    return {
+      ok: false,
+      error: {
+        code: "not_found",
+        message: `Invite ${id} not found in the queue.`,
+      },
+    };
+  }
+  // Idempotency: if the record is already "sent" for this same approval,
+  // return the existing row without writing again. The slack chain may
+  // re-fire on retry, and we don't want to overwrite the original
+  // sentAt timestamp.
+  if (
+    existing.status === "sent" &&
+    existing.sentApprovalId === input.approvalId
+  ) {
+    return { ok: true, alreadySent: true, invite: existing };
+  }
+  if (existing.status !== "approved") {
+    return {
+      ok: false,
+      error: {
+        code: "wrong_status",
+        message: `Cannot mark invite ${id} as sent: current status is "${existing.status}". Only "approved" records may transition to "sent".`,
+      },
+    };
+  }
+  if (!existing.directLinkUrl || !isValidDirectLinkUrl(existing.directLinkUrl)) {
+    return {
+      ok: false,
+      error: {
+        code: "missing_direct_link_url",
+        message: `Cannot mark invite ${id} as sent without a valid directLinkUrl on the record.`,
+      },
+    };
+  }
+  const now = (input.now ?? new Date()).toISOString();
+  const next: FaireInviteRecord = {
+    ...existing,
+    status: "sent",
+    sentAt: now,
+    sentBy: input.sentBy.trim().slice(0, 80),
+    gmailMessageId: input.gmailMessageId,
+    gmailThreadId: input.gmailThreadId ?? undefined,
+    hubspotEmailLogId: input.hubspotEmailLogId ?? undefined,
+    sentApprovalId: input.approvalId,
+    updatedAt: now,
+  };
+  await kv.set(inviteKey(existing.id), JSON.stringify(next));
+  return { ok: true, alreadySent: false, invite: next };
+}
+
+// ----- Phase 3.3 follow-up transitions -------------------------------
+//
+// Two new writers flank the request-approval route + the follow-up
+// closer. They are the ONLY callers allowed to mutate `followUp*`
+// fields. The PATCH /[id] review route does NOT carry these in its
+// allowed-correction allowlist (see ALLOWED_CORRECTION_KEYS below).
+//
+// `markFaireFollowUpQueued` is called by the request-approval route
+// when an approval card is opened. It refuses if status != "sent",
+// if there's no sentAt, or if the row is already queued/sent.
+//
+// `markFaireFollowUpSent` is called by the closer after a successful
+// Gmail send. Idempotent: a re-fire on the same approval id reports
+// `alreadySent=true` without overwriting the timestamps.
+
+export interface MarkFollowUpQueuedInput {
+  approvalId: string;
+  now?: Date;
+}
+
+export type MarkFollowUpQueuedResult =
+  | { ok: true; alreadyQueued: false; invite: FaireInviteRecord }
+  | { ok: true; alreadyQueued: true; invite: FaireInviteRecord }
+  | {
+      ok: false;
+      error:
+        | { code: "not_found"; message: string }
+        | { code: "wrong_status"; message: string }
+        | { code: "missing_sent_at"; message: string }
+        | { code: "already_queued"; message: string }
+        | { code: "already_sent"; message: string };
+    };
+
+export async function markFaireFollowUpQueued(
+  id: string,
+  input: MarkFollowUpQueuedInput,
+): Promise<MarkFollowUpQueuedResult> {
+  const existing = await getInvite(id);
+  if (!existing) {
+    return {
+      ok: false,
+      error: {
+        code: "not_found",
+        message: `Invite ${id} not found in the queue.`,
+      },
+    };
+  }
+  if (existing.status !== "sent") {
+    return {
+      ok: false,
+      error: {
+        code: "wrong_status",
+        message: `Cannot queue follow-up for invite ${id}: current status is "${existing.status}". Only "sent" invites are eligible for follow-up.`,
+      },
+    };
+  }
+  if (!existing.sentAt) {
+    return {
+      ok: false,
+      error: {
+        code: "missing_sent_at",
+        message: `Cannot queue follow-up for invite ${id}: no sentAt timestamp on record. Data-integrity gap.`,
+      },
+    };
+  }
+  // Idempotency on this same approval id: don't double-queue.
+  if (
+    existing.followUpQueuedAt &&
+    existing.followUpRequestApprovalId === input.approvalId
+  ) {
+    return { ok: true, alreadyQueued: true, invite: existing };
+  }
+  // A different approval id already in flight — refuse so we don't
+  // lose the audit pointer to the original.
+  if (existing.followUpQueuedAt) {
+    return {
+      ok: false,
+      error: {
+        code: "already_queued",
+        message: `A follow-up approval is already queued for invite ${id} (approvalId=${existing.followUpRequestApprovalId ?? "unknown"}). The follow-up queue does not re-open additional approvals while one is in flight.`,
+      },
+    };
+  }
+  if (existing.followUpSentAt) {
+    return {
+      ok: false,
+      error: {
+        code: "already_sent",
+        message: `A follow-up was already sent for invite ${id} at ${existing.followUpSentAt}. No second follow-up is opened from this surface.`,
+      },
+    };
+  }
+  const now = (input.now ?? new Date()).toISOString();
+  const next: FaireInviteRecord = {
+    ...existing,
+    followUpQueuedAt: now,
+    followUpRequestApprovalId: input.approvalId,
+    updatedAt: now,
+  };
+  await kv.set(inviteKey(existing.id), JSON.stringify(next));
+  return { ok: true, alreadyQueued: false, invite: next };
+}
+
+export interface MarkFollowUpSentInput {
+  approvalId: string;
+  sentBy: string;
+  gmailMessageId: string;
+  gmailThreadId?: string | null;
+  hubspotEmailLogId?: string | null;
+  now?: Date;
+}
+
+export type MarkFollowUpSentResult =
+  | { ok: true; alreadySent: false; invite: FaireInviteRecord }
+  | { ok: true; alreadySent: true; invite: FaireInviteRecord }
+  | {
+      ok: false;
+      error:
+        | { code: "not_found"; message: string }
+        | { code: "wrong_status"; message: string }
+        | { code: "missing_sent_at"; message: string };
+    };
+
+export async function markFaireFollowUpSent(
+  id: string,
+  input: MarkFollowUpSentInput,
+): Promise<MarkFollowUpSentResult> {
+  const existing = await getInvite(id);
+  if (!existing) {
+    return {
+      ok: false,
+      error: {
+        code: "not_found",
+        message: `Invite ${id} not found in the queue.`,
+      },
+    };
+  }
+  // Idempotency on the closer side too: a Slack double-click means
+  // the closer can fire twice. Detect and short-circuit.
+  if (
+    existing.followUpSentAt &&
+    existing.followUpSentApprovalId === input.approvalId
+  ) {
+    return { ok: true, alreadySent: true, invite: existing };
+  }
+  if (existing.status !== "sent") {
+    // Closer NEVER changes status away from "sent". If the record's
+    // status drifted to anything else (rejected / needs_review),
+    // refuse — something wider is wrong.
+    return {
+      ok: false,
+      error: {
+        code: "wrong_status",
+        message: `Cannot mark follow-up sent for invite ${id}: current status is "${existing.status}". Closer expects "sent".`,
+      },
+    };
+  }
+  if (!existing.sentAt) {
+    return {
+      ok: false,
+      error: {
+        code: "missing_sent_at",
+        message: `Cannot mark follow-up sent for invite ${id}: no sentAt timestamp on the original send.`,
+      },
+    };
+  }
+  const now = (input.now ?? new Date()).toISOString();
+  const next: FaireInviteRecord = {
+    ...existing,
+    // Status STAYS at "sent". Follow-up doesn't move the lifecycle.
+    followUpQueuedAt: existing.followUpQueuedAt ?? now,
+    followUpSentAt: now,
+    followUpSentBy: input.sentBy.trim().slice(0, 80),
+    followUpGmailMessageId: input.gmailMessageId,
+    followUpGmailThreadId: input.gmailThreadId ?? undefined,
+    followUpHubspotEmailLogId: input.hubspotEmailLogId ?? undefined,
+    followUpSentApprovalId: input.approvalId,
+    updatedAt: now,
+  };
+  await kv.set(inviteKey(existing.id), JSON.stringify(next));
+  return { ok: true, alreadySent: false, invite: next };
+}
+
+/** Test helper — clear all invite KV keys + the index. */
+export async function __resetInvitesForTest(): Promise<void> {
+  try {
+    const ids = await readIndex();
+    for (const id of ids) {
+      await kv.set(inviteKey(id), null);
+    }
+    await kv.set(KV_INDEX, []);
+  } catch {
+    /* fail-soft */
+  }
+}

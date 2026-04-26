@@ -4,6 +4,44 @@
 
 **Convention:** items are keyed to Monday checklist IDs (M1, M2a…) where applicable.
 
+## Current read-this-first overlay — 2026-04-25
+
+This file contains historical April 20-21 tasks below. The current live runway is now:
+
+- [`ops/LIVE-RUNWAY-2026-04-25.md`](LIVE-RUNWAY-2026-04-25.md) — active continuation path for Claude/Codex/human operators.
+- [`contracts/workflow-blueprint.md`](../contracts/workflow-blueprint.md) — canonical workflow map and current version history.
+- [`/ops/readiness`](https://www.usagummies.com/ops/readiness) — production env/smoke dashboard.
+- [`/ops/sales`](https://www.usagummies.com/ops/sales) — read-only revenue/action command center.
+
+### Current baseline
+
+- Latest verified baseline before this overlay: `260eab8 feat(ops): Phase 7 receipts — OCR extraction (prepare-for-review only)`.
+- Latest reported full-suite result: **1132 tests passing**, `tsc --noEmit` clean, `npm run lint` clean.
+- The old "174 tests" and April 20 agent activation language below is retained as history, not current state.
+
+### Current P0 manual/env blockers
+
+1. `WHOLESALE_INQUIRY_SECRET` — enables `/wholesale/inquiry/<token>` receipt redirects.
+2. `GOOGLE_DRIVE_UPLOAD_PARENT_ID` — required for public NCS/vendor/receipt uploads and can cover shipping artifacts as fallback.
+3. `GOOGLE_DRIVE_SHIPPING_ARTIFACTS_PARENT_ID` — preferred parent for label + packing-slip artifact storage.
+4. `FAIRE_ACCESS_TOKEN` — required for Faire read-only API/specialist data, not for Gmail-based Faire Direct invite/follow-up sending.
+5. `BOOKE_API_TOKEN` or Zapier bridge — required for Finance Exception uncategorized count.
+6. Legal/compliance Notion databases — `/Legal/Compliance Calendar` and `/Marketing/Approved Claims`.
+7. ShipStation tracking webhook creds/MFA — required for tracking webhook auto-clear.
+
+### Known not-wired sources
+
+- ~Wholesale inquiry internal list API.~ Wired in Phase 6.
+- B2B revenue Phase 2 accounting attribution. Phase 1 Shopify `tag:wholesale` source is live; QBO Class/CustomField attribution is deferred.
+- Unknown revenue catch-all by design.
+- R1-R7 research specialist runtimes.
+- Klaviyo/social/trade-show pods.
+- External vendor self-service portal.
+
+### Current next code lane
+
+Drive/readiness unblock first if envs are still red; otherwise receipt-to-Rene approval promotion. Receipt OCR suggestions exist, but QBO posting remains explicitly out of scope until Rene approves a separate Class B/C write path.
+
 ## Secret handling rule
 - **Never paste full secret values into this file or any tracked repo file.** Use prefix-only references (`shpat_…`, `AKIA…`, `xoxb-…`, `sk-…`) or the literal placeholder `<ROTATE_THIS_TOKEN>`.
 - If a secret was previously pasted here, it was redacted on **2026-04-18**. Assume leak; treat rotation as already-overdue.

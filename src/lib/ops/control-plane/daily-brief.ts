@@ -22,6 +22,7 @@
 
 import type { ApprovalRequest, AuditLogEntry } from "./types";
 import type { PausedAgentRecord } from "./enforcement";
+import type { SalesCommandSlice } from "@/lib/ops/sales-command-center";
 
 export type BriefKind = "morning" | "eod";
 
@@ -124,6 +125,16 @@ export interface BriefInput {
    * "today in review" section closing Ben's shipping day.
    */
   fulfillmentToday?: FulfillmentTodayBriefSlice;
+  /**
+   * Morning-only: compact sales-command summary covering Faire
+   * invites/follow-ups, pending Slack approvals, AP packets, retail
+   * drafts, wholesale inquiries. The route populates this from the
+   * shared sales-command readers + `composeSalesCommandSlice`. The
+   * composer renders it ONLY when `kind === "morning"` and the slice
+   * is present. Skipped on EOD to avoid duplicating the cumulative
+   * #ops-daily picture.
+   */
+  salesCommand?: SalesCommandSlice;
   /** Any degradations to call out at the top of the brief. */
   degradations?: string[];
 }
@@ -338,6 +349,21 @@ export function composeDailyBrief(input: BriefInput): BriefOutput {
         text: { type: "mrkdwn", text: pfLines },
       });
     }
+  }
+
+  // ---- Sales Command compact section (morning only) ----
+  // Phase 2 of the Sales Command Center — surfaces the day's revenue
+  // actions in one block on Ben's morning brief instead of a
+  // separate noisy digest. Skipped on EOD because the cumulative
+  // dashboard view at /ops/sales is what closes the loop.
+  if (input.kind === "morning" && input.salesCommand) {
+    blocks.push({
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: renderSalesCommandMarkdown(input.salesCommand),
+      },
+    });
   }
 
   // ---- Fulfillment today in review (EOD only) ----
@@ -575,4 +601,132 @@ function renderFulfillmentTodayMarkdown(ft: FulfillmentTodayBriefSlice): string 
   }
 
   return lines.length > 1 ? lines.join("\n") : "";
+}
+
+/**
+ * Render the compact Sales Command section for the morning brief.
+ *
+ * Locked rules (every one tested):
+ *   - Section is bounded — under ~10 lines including header and
+ *     deep-link footer. (We assert ≤ 12 lines as the upper bound to
+ *     accommodate a full actionable state plus the empty footer.)
+ *   - When every wired count is zero (and `anyAction` is false), the
+ *     rendering collapses to a single empty-state line:
+ *     "*Sales Command*\n_No sales actions queued._" — so the morning
+ *     brief stays quiet on quiet days.
+ *   - `null` numerics render as "not wired", NEVER as 0. (Zero is a
+ *     real "wired but quiet" count and earns its own line; null is
+ *     a missing source.)
+ *   - Wholesale inquiries always renders honestly. While the source
+ *     is `not_wired`, the line reads "Wholesale inquiries: not wired"
+ *     instead of being silently dropped — so we don't pretend the
+ *     pipe doesn't exist.
+ *   - Deep links are static (`/ops/sales`, `/ops/faire-direct`,
+ *     `/ops/ap-packets`, `/ops/locations`) and live in the footer
+ *     line so the body counts stay scannable.
+ */
+export function renderSalesCommandMarkdown(slice: SalesCommandSlice): string {
+  const header = "*Sales Command — today's actions*";
+  const footer =
+    "_Open: <https://www.usagummies.com/ops/sales|/ops/sales> · " +
+    "<https://www.usagummies.com/ops/faire-direct|Faire Direct> · " +
+    "<https://www.usagummies.com/ops/ap-packets|AP packets> · " +
+    "<https://www.usagummies.com/ops/locations|Store locator>_";
+
+  if (!slice.anyAction) {
+    // Even on a quiet day, surface the Weekly Revenue KPI one-liner
+    // when the slice carries it. The KPI is contextual (not an
+    // action); rendering it preserves the daily revenue pulse
+    // without making the section noisy.
+    const quietLines = [header, "_No sales actions queued._"];
+    if (slice.revenueKpi) {
+      quietLines.push(`• ${slice.revenueKpi.text}`);
+    }
+    quietLines.push(footer);
+    return quietLines.join("\n");
+  }
+
+  const lines: string[] = [header];
+
+  // Faire invites awaiting review.
+  lines.push(
+    `• Faire invites awaiting review: ${formatCount(
+      slice.faireInvitesNeedsReview,
+    )}`,
+  );
+
+  // Faire follow-ups (combined line — overdue first to match dashboard sort).
+  if (
+    slice.faireFollowUpsOverdue === null &&
+    slice.faireFollowUpsDueSoon === null
+  ) {
+    lines.push("• Faire follow-ups: not wired");
+  } else {
+    const overdue = formatCount(slice.faireFollowUpsOverdue);
+    const dueSoon = formatCount(slice.faireFollowUpsDueSoon);
+    lines.push(`• Faire follow-ups: ${overdue} overdue · ${dueSoon} due soon`);
+  }
+
+  // Pending Slack approvals.
+  lines.push(
+    `• Slack approvals awaiting Ben: ${formatCount(slice.pendingApprovals)}`,
+  );
+
+  // AP packets — only render when any of the AP counts has signal.
+  if (
+    slice.apPacketsActionRequired === null &&
+    slice.apPacketsSent === null
+  ) {
+    lines.push("• AP packets: not wired");
+  } else {
+    const action = formatCount(slice.apPacketsActionRequired);
+    const sent = formatCount(slice.apPacketsSent);
+    lines.push(`• AP packets: ${action} action-required · ${sent} sent`);
+  }
+
+  // Retail drafts.
+  if (
+    slice.retailDraftsNeedsReview === null &&
+    slice.retailDraftsAccepted === null
+  ) {
+    lines.push("• Retail drafts: not wired");
+  } else {
+    const need = formatCount(slice.retailDraftsNeedsReview);
+    const accepted = formatCount(slice.retailDraftsAccepted);
+    lines.push(`• Retail drafts: ${need} to review · ${accepted} accepted`);
+  }
+
+  // Wholesale inquiries — surfaced honestly even when not_wired.
+  lines.push(
+    `• Wholesale inquiries: ${formatCount(slice.wholesaleInquiries)}`,
+  );
+
+  // Phase 4 — Weekly Revenue KPI one-liner. NEVER fabricates a
+  // number — the renderer in revenue-kpi.ts falls back to
+  // "Revenue pace not fully wired." when no channel is wired.
+  if (slice.revenueKpi) {
+    lines.push(`• ${slice.revenueKpi.text}`);
+  }
+
+  // Phase 3 — up to 3 aging callouts (critical → overdue → watch).
+  // The slice's agingCallouts list is pre-sorted + capped by
+  // `composeAgingBriefCallouts`. Empty array → no aging block, so
+  // the section stays tight on quiet days.
+  const callouts = slice.agingCallouts ?? [];
+  if (callouts.length > 0) {
+    lines.push("*Aging:*");
+    for (const c of callouts) {
+      lines.push(`• ${c.text}`);
+    }
+  }
+
+  lines.push(footer);
+  return lines.join("\n");
+}
+
+/** Format a wired count or render "not wired" for null. NEVER returns
+ *  "0" for null; that would erase the difference between an empty
+ *  queue and a missing source. */
+function formatCount(value: number | null): string {
+  return value === null ? "_not wired_" : `*${value}*`;
 }

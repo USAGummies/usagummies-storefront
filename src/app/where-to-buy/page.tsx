@@ -5,6 +5,11 @@ import { JsonLd } from "@/components/JsonLd";
 import { PageHero } from "@/components/lp/PageHero";
 import { USStoreMap } from "@/components/USStoreMap";
 import { RETAILERS } from "@/data/retailers";
+import {
+  countStates,
+  countStores,
+  groupByState,
+} from "@/lib/locations/helpers";
 
 function resolveSiteUrl() {
   const preferred = "https://www.usagummies.com";
@@ -81,6 +86,10 @@ function retailerJsonLd(r: (typeof RETAILERS)[number]) {
 }
 
 export default function WhereToBuyPage() {
+  const totalStores = countStores(RETAILERS);
+  const totalStates = countStates(RETAILERS);
+  const groupedStores = groupByState(RETAILERS);
+  const hasStores = totalStores > 0;
   return (
     <main>
       <BreadcrumbJsonLd
@@ -105,96 +114,164 @@ export default function WhereToBuyPage() {
         ]}
       />
 
+      {/* Map section — count + state-grouped headline + empty state. */}
       <section id="stores" className="bg-[var(--lp-cream)]">
         <div className="mx-auto max-w-[1200px] px-5 py-14 sm:px-8 sm:py-20">
           <div className="mb-10 text-center">
             <p className="lp-label mb-2 text-[var(--lp-red)]">★ Our Retail Partners ★</p>
             <h2 className="lp-display text-[clamp(2rem,5vw,3.2rem)] text-[var(--lp-ink)]">
-              {RETAILERS.length} stores
-              <br />
-              <span className="lp-script text-[var(--lp-red)]">and growing.</span>
+              {hasStores ? (
+                <>
+                  {totalStores} {totalStores === 1 ? "store" : "stores"}
+                  <br />
+                  <span className="lp-script text-[var(--lp-red)]">across America.</span>
+                </>
+              ) : (
+                <>
+                  Stores
+                  <br />
+                  <span className="lp-script text-[var(--lp-red)]">coming soon.</span>
+                </>
+              )}
             </h2>
             <p className="lp-sans mx-auto mt-6 max-w-[52ch] text-[1rem] leading-[1.6] text-[var(--lp-ink)]/82">
-              We&rsquo;re a young brand adding new retail partners regularly. Find a store near you or{" "}
-              <Link
-                href="/shop"
-                className="font-bold text-[var(--lp-red)] underline underline-offset-4"
-              >
-                shop online
-              </Link>
-              .
+              {hasStores ? (
+                <>
+                  Across{" "}
+                  <span className="font-bold text-[var(--lp-ink)]">
+                    {totalStates} {totalStates === 1 ? "state" : "states"}
+                  </span>{" "}
+                  and growing. Find a store near you or{" "}
+                  <Link
+                    href="/shop"
+                    className="font-bold text-[var(--lp-red)] underline underline-offset-4"
+                  >
+                    shop online
+                  </Link>
+                  .
+                </>
+              ) : (
+                <>
+                  Retail locations are being added as distributor sell-through is confirmed.
+                  In the meantime, you can{" "}
+                  <Link
+                    href="/shop"
+                    className="font-bold text-[var(--lp-red)] underline underline-offset-4"
+                  >
+                    shop online
+                  </Link>
+                  .
+                </>
+              )}
             </p>
           </div>
-          <div
-            className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-4 sm:p-6"
-            style={{ boxShadow: "5px 5px 0 var(--lp-ink)" }}
-          >
-            <USStoreMap retailers={RETAILERS} />
-          </div>
+          {hasStores ? (
+            <div
+              className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-4 sm:p-6"
+              style={{ boxShadow: "5px 5px 0 var(--lp-ink)" }}
+            >
+              <USStoreMap retailers={RETAILERS} />
+            </div>
+          ) : (
+            <div
+              className="border-[3px] border-dashed border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-10 text-center"
+              role="status"
+              aria-label="Map of the United States — retail locations coming soon"
+            >
+              <p className="lp-display text-[1.4rem] text-[var(--lp-ink)]">
+                Map coming soon.
+              </p>
+              <p className="lp-sans mx-auto mt-3 max-w-md text-[0.95rem] text-[var(--lp-ink)]/75">
+                We&rsquo;ll light this up with state-by-state coverage as soon as our
+                first retail partners confirm sell-through.
+              </p>
+            </div>
+          )}
         </div>
       </section>
 
-      <section className="bg-[var(--lp-cream-soft)] border-y-2 border-[var(--lp-ink)]">
-        <div className="mx-auto max-w-[1200px] px-5 py-14 sm:px-8 sm:py-20">
-          <div className="mb-10 text-center">
-            <p className="lp-label mb-2 text-[var(--lp-red)]">★ All Locations ★</p>
-            <h2 className="lp-display text-[clamp(2rem,5vw,3rem)] text-[var(--lp-ink)]">
-              Find a
-              <br />
-              <span className="lp-script text-[var(--lp-red)]">store.</span>
-            </h2>
-          </div>
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {RETAILERS.map((r, i) => (
-              <div
-                key={r.slug}
-                className="flex flex-col border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6"
-                style={{ boxShadow: i === 0 ? "5px 5px 0 var(--lp-red)" : "5px 5px 0 var(--lp-ink)" }}
-              >
-                <h3 className="lp-display text-[1.3rem] leading-tight text-[var(--lp-ink)]">
-                  {r.name}
-                </h3>
-                <div className="lp-sans mt-2 text-[0.95rem] text-[var(--lp-ink)]/82">
-                  {r.address}
-                </div>
-                <div className="lp-sans text-[0.95rem] text-[var(--lp-ink)]/82">
-                  {r.cityStateZip}
-                </div>
-                <div className="mt-3">
-                  <span className="lp-label inline-flex items-center border-2 border-[var(--lp-ink)] bg-[var(--lp-cream-soft)] px-2.5 py-1 text-[var(--lp-ink)]">
-                    {r.storeType}
+      {/* All locations — grouped by state, LP shadow cards. */}
+      {hasStores ? (
+        <section className="bg-[var(--lp-cream-soft)] border-y-2 border-[var(--lp-ink)]">
+          <div className="mx-auto max-w-[1200px] px-5 py-14 sm:px-8 sm:py-20">
+            <div className="mb-10 text-center">
+              <p className="lp-label mb-2 text-[var(--lp-red)]">
+                ★ All Locations · {totalStores} {totalStores === 1 ? "store" : "stores"} · {totalStates}{" "}
+                {totalStates === 1 ? "state" : "states"} ★
+              </p>
+              <h2 className="lp-display text-[clamp(2rem,5vw,3rem)] text-[var(--lp-ink)]">
+                Find a
+                <br />
+                <span className="lp-script text-[var(--lp-red)]">store.</span>
+              </h2>
+            </div>
+            {groupedStores.map((group) => (
+              <div key={group.state} className="mb-10 last:mb-0">
+                <div className="lp-label mb-4 text-[var(--lp-ink)]">
+                  {group.state}{" "}
+                  <span className="text-[var(--lp-ink)]/60">
+                    ({group.stores.length} {group.stores.length === 1 ? "store" : "stores"})
                   </span>
                 </div>
-                {r.note && (
-                  <p className="lp-sans mt-3 text-[0.85rem] italic text-[var(--lp-ink)]/70">
-                    {r.note}
-                  </p>
-                )}
-                <div className="mt-auto flex flex-wrap gap-x-4 gap-y-1 pt-4">
-                  <a
-                    href={r.mapsUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="lp-label text-[var(--lp-red)] underline underline-offset-4"
-                  >
-                    Get directions →
-                  </a>
-                  {r.website && (
-                    <a
-                      href={r.website}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="lp-label text-[var(--lp-red)] underline underline-offset-4"
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                  {group.stores.map((r, i) => (
+                    <div
+                      key={r.slug}
+                      className="flex flex-col border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6"
+                      style={{
+                        boxShadow:
+                          i === 0
+                            ? "5px 5px 0 var(--lp-red)"
+                            : "5px 5px 0 var(--lp-ink)",
+                      }}
                     >
-                      Visit website →
-                    </a>
-                  )}
+                      <h3 className="lp-display text-[1.3rem] leading-tight text-[var(--lp-ink)]">
+                        {r.name}
+                      </h3>
+                      <div className="lp-sans mt-2 text-[0.95rem] text-[var(--lp-ink)]/82">
+                        {r.address}
+                      </div>
+                      <div className="lp-sans text-[0.95rem] text-[var(--lp-ink)]/82">
+                        {r.cityStateZip}
+                      </div>
+                      <div className="mt-3">
+                        <span className="lp-label inline-flex items-center border-2 border-[var(--lp-ink)] bg-[var(--lp-cream-soft)] px-2.5 py-1 text-[var(--lp-ink)]">
+                          {r.storeType}
+                        </span>
+                      </div>
+                      {r.note && (
+                        <p className="lp-sans mt-3 text-[0.85rem] italic text-[var(--lp-ink)]/70">
+                          {r.note}
+                        </p>
+                      )}
+                      <div className="mt-auto flex flex-wrap gap-x-4 gap-y-1 pt-4">
+                        <a
+                          href={r.mapsUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="lp-label text-[var(--lp-red)] underline underline-offset-4"
+                        >
+                          Get directions →
+                        </a>
+                        {r.website && (
+                          <a
+                            href={r.website}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="lp-label text-[var(--lp-red)] underline underline-offset-4"
+                          >
+                            Visit website →
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             ))}
           </div>
-        </div>
-      </section>
+        </section>
+      ) : null}
 
       <section className="bg-[var(--lp-cream)]">
         <div className="mx-auto max-w-[1100px] px-5 py-14 sm:px-8 sm:py-20">

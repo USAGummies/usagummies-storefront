@@ -156,6 +156,339 @@ describe("composeDailyBrief()", () => {
     expect(JSON.stringify(out.blocks)).toContain("Last drift audit");
     expect(JSON.stringify(out.blocks)).toContain("enforcement=enforced");
   });
+
+  // ---- Phase 2 — Sales Command compact section -------------------------
+
+  it("morning brief includes Sales Command section when slice is provided", () => {
+    const out = composeDailyBrief({
+      ...baseInput(),
+      salesCommand: {
+        faireInvitesNeedsReview: 3,
+        faireFollowUpsOverdue: 2,
+        faireFollowUpsDueSoon: 1,
+        pendingApprovals: 5,
+        apPacketsActionRequired: 1,
+        apPacketsSent: 0,
+        retailDraftsNeedsReview: 4,
+        retailDraftsAccepted: 12,
+        wholesaleInquiries: null,
+        anyAction: true,
+      },
+    });
+    const json = JSON.stringify(out.blocks);
+    expect(json).toContain("Sales Command");
+    expect(json).toContain("Faire invites awaiting review:");
+    // Counts render with Slack bold markup.
+    expect(json).toContain("*3*");
+    expect(json).toContain("*2* overdue");
+    expect(json).toContain("*1* due soon");
+    expect(json).toContain("*5*"); // pending approvals
+    // not_wired wholesale renders honestly.
+    expect(json).toContain("Wholesale inquiries: _not wired_");
+    // Deep links present (they live in the footer line).
+    expect(json).toContain("/ops/sales");
+    expect(json).toContain("/ops/faire-direct");
+    expect(json).toContain("/ops/ap-packets");
+    expect(json).toContain("/ops/locations");
+  });
+
+  it("EOD brief skips the Sales Command section even when slice is provided", () => {
+    // The dashboard at /ops/sales is the cumulative close-loop; we
+    // don't want a redundant evening Slack post.
+    const out = composeDailyBrief({
+      ...baseInput(),
+      kind: "eod",
+      salesCommand: {
+        faireInvitesNeedsReview: 3,
+        faireFollowUpsOverdue: 2,
+        faireFollowUpsDueSoon: 1,
+        pendingApprovals: 5,
+        apPacketsActionRequired: 1,
+        apPacketsSent: 0,
+        retailDraftsNeedsReview: 4,
+        retailDraftsAccepted: 12,
+        wholesaleInquiries: null,
+        anyAction: true,
+      },
+    });
+    expect(JSON.stringify(out.blocks)).not.toContain("Sales Command");
+  });
+
+  it("Sales Command empty-state collapses to one quiet line when no actions", () => {
+    const out = composeDailyBrief({
+      ...baseInput(),
+      salesCommand: {
+        faireInvitesNeedsReview: 0,
+        faireFollowUpsOverdue: 0,
+        faireFollowUpsDueSoon: 0,
+        pendingApprovals: 0,
+        apPacketsActionRequired: 0,
+        apPacketsSent: 1,
+        retailDraftsNeedsReview: 0,
+        retailDraftsAccepted: 5,
+        wholesaleInquiries: null,
+        anyAction: false,
+      },
+    });
+    const json = JSON.stringify(out.blocks);
+    expect(json).toContain("Sales Command");
+    expect(json).toContain("No sales actions queued");
+    // Counts NOT rendered as line items in the empty state.
+    expect(json).not.toContain("Faire invites awaiting review:");
+    expect(json).not.toContain("Slack approvals awaiting Ben:");
+  });
+
+  it("not_wired sources render as 'not wired' (NEVER as 0)", () => {
+    const out = composeDailyBrief({
+      ...baseInput(),
+      salesCommand: {
+        faireInvitesNeedsReview: 1, // wired-but-actionable so anyAction=true
+        faireFollowUpsOverdue: null,
+        faireFollowUpsDueSoon: null,
+        pendingApprovals: null,
+        apPacketsActionRequired: null,
+        apPacketsSent: null,
+        retailDraftsNeedsReview: null,
+        retailDraftsAccepted: null,
+        wholesaleInquiries: null,
+        anyAction: true,
+      },
+    });
+    const json = JSON.stringify(out.blocks);
+    expect(json).toContain("Faire invites awaiting review: *1*");
+    expect(json).toContain("Faire follow-ups: not wired");
+    expect(json).toContain("Slack approvals awaiting Ben: _not wired_");
+    expect(json).toContain("AP packets: not wired");
+    expect(json).toContain("Retail drafts: not wired");
+    expect(json).toContain("Wholesale inquiries: _not wired_");
+    // Crucially: never a fabricated zero on a not_wired source.
+    expect(json).not.toContain("Faire follow-ups: *0*");
+    expect(json).not.toContain("AP packets: *0*");
+  });
+
+  it("Sales Command section is bounded — under 12 lines (header + body + footer)", () => {
+    const out = composeDailyBrief({
+      ...baseInput(),
+      salesCommand: {
+        faireInvitesNeedsReview: 9,
+        faireFollowUpsOverdue: 9,
+        faireFollowUpsDueSoon: 9,
+        pendingApprovals: 9,
+        apPacketsActionRequired: 9,
+        apPacketsSent: 9,
+        retailDraftsNeedsReview: 9,
+        retailDraftsAccepted: 9,
+        wholesaleInquiries: 9,
+        anyAction: true,
+      },
+    });
+    type Block = { type: string; text?: { text?: string } };
+    const blocks = out.blocks as Block[];
+    const salesBlock = blocks.find(
+      (b) =>
+        b.type === "section" &&
+        typeof b.text?.text === "string" &&
+        b.text.text.includes("Sales Command"),
+    );
+    expect(salesBlock).toBeDefined();
+    const lineCount = (salesBlock!.text!.text! as string).split("\n").length;
+    expect(lineCount).toBeLessThanOrEqual(12);
+  });
+
+  it("Sales Command section is not rendered when slice is omitted", () => {
+    const out = composeDailyBrief(baseInput()); // no salesCommand
+    expect(JSON.stringify(out.blocks)).not.toContain("Sales Command");
+  });
+
+  // ---- Phase 3 — aging callouts (max 3, critical-first) -----------------
+
+  it("aging callouts render between body counts and footer (max 3)", () => {
+    const out = composeDailyBrief({
+      ...baseInput(),
+      salesCommand: {
+        faireInvitesNeedsReview: 0,
+        faireFollowUpsOverdue: 0,
+        faireFollowUpsDueSoon: 0,
+        pendingApprovals: 0,
+        apPacketsActionRequired: 0,
+        apPacketsSent: 0,
+        retailDraftsNeedsReview: 0,
+        retailDraftsAccepted: 0,
+        wholesaleInquiries: null,
+        agingCallouts: [
+          {
+            tier: "critical",
+            source: "approval",
+            text:
+              ":rotating_light: CRITICAL — Slack approval · 5d · Test approval",
+          },
+          {
+            tier: "overdue",
+            source: "faire-followup",
+            text:
+              ":warning: OVERDUE — Faire follow-up · 8d · Tasty Foods",
+          },
+          {
+            tier: "watch",
+            source: "location-draft",
+            text:
+              ":hourglass_flowing_sand: WATCH — Retail draft · 7d · Buc-ee's #14",
+          },
+        ],
+        anyAction: true,
+      },
+    });
+    const json = JSON.stringify(out.blocks);
+    expect(json).toContain("*Aging:*");
+    expect(json).toContain("CRITICAL");
+    expect(json).toContain("OVERDUE");
+    expect(json).toContain("WATCH");
+    expect(json).toContain("Tasty Foods");
+  });
+
+  it("no aging block when callouts list is empty (quiet day)", () => {
+    const out = composeDailyBrief({
+      ...baseInput(),
+      salesCommand: {
+        faireInvitesNeedsReview: 1,
+        faireFollowUpsOverdue: 0,
+        faireFollowUpsDueSoon: 0,
+        pendingApprovals: 0,
+        apPacketsActionRequired: 0,
+        apPacketsSent: 0,
+        retailDraftsNeedsReview: 0,
+        retailDraftsAccepted: 0,
+        wholesaleInquiries: null,
+        agingCallouts: [],
+        anyAction: true,
+      },
+    });
+    expect(JSON.stringify(out.blocks)).not.toContain("*Aging:*");
+  });
+
+  it("brief never renders more than 3 aging callouts even if caller passes more (defensive bound)", () => {
+    // The slice composer caps at 3, but the renderer must also stay
+    // bounded if a caller hand-builds the slice. Render 5 and assert
+    // the section still ≤ MAX_LINES.
+    const fiveCallouts = Array.from({ length: 5 }, (_, i) => ({
+      tier: "critical" as const,
+      source: "approval" as const,
+      text: `:rotating_light: CRITICAL — Slack approval · ${(i + 1) * 50}h · row-${i}`,
+    }));
+    const out = composeDailyBrief({
+      ...baseInput(),
+      salesCommand: {
+        faireInvitesNeedsReview: 1,
+        faireFollowUpsOverdue: 1,
+        faireFollowUpsDueSoon: 1,
+        pendingApprovals: 1,
+        apPacketsActionRequired: 1,
+        apPacketsSent: 1,
+        retailDraftsNeedsReview: 1,
+        retailDraftsAccepted: 1,
+        wholesaleInquiries: null,
+        agingCallouts: fiveCallouts, // bypasses the slice composer's cap
+        anyAction: true,
+      },
+    });
+    type Block = { type: string; text?: { text?: string } };
+    const blocks = out.blocks as Block[];
+    const salesBlock = blocks.find(
+      (b) =>
+        b.type === "section" &&
+        typeof b.text?.text === "string" &&
+        b.text.text.includes("Sales Command"),
+    );
+    expect(salesBlock).toBeDefined();
+    const text = salesBlock!.text!.text! as string;
+    // Hard cap: header + 6 body lines + Aging header + ≤5 callouts
+    // + footer ≈ 14 lines worst case. Locks the renderer can't blow
+    // past the section budget.
+    expect(text.split("\n").length).toBeLessThanOrEqual(16);
+  });
+
+  // ---- Phase 4 — Weekly Revenue KPI one-liner ---------------------------
+
+  it("brief includes the revenue KPI line when slice carries it (actionable day)", () => {
+    const out = composeDailyBrief({
+      ...baseInput(),
+      salesCommand: {
+        faireInvitesNeedsReview: 1,
+        faireFollowUpsOverdue: 0,
+        faireFollowUpsDueSoon: 0,
+        pendingApprovals: 0,
+        apPacketsActionRequired: 0,
+        apPacketsSent: 0,
+        retailDraftsNeedsReview: 0,
+        retailDraftsAccepted: 0,
+        wholesaleInquiries: null,
+        revenueKpi: {
+          text: "Revenue pace: $24.1K last 7d vs $43.5K required/wk — -$19.4K behind",
+          fullyWired: true,
+        },
+        anyAction: true,
+      },
+    });
+    const json = JSON.stringify(out.blocks);
+    expect(json).toContain("Revenue pace:");
+    expect(json).toContain("$24.1K last 7d");
+  });
+
+  it("brief surfaces 'not fully wired' KPI line when no channel is wired", () => {
+    const out = composeDailyBrief({
+      ...baseInput(),
+      salesCommand: {
+        faireInvitesNeedsReview: 1,
+        faireFollowUpsOverdue: 0,
+        faireFollowUpsDueSoon: 0,
+        pendingApprovals: 0,
+        apPacketsActionRequired: 0,
+        apPacketsSent: 0,
+        retailDraftsNeedsReview: 0,
+        retailDraftsAccepted: 0,
+        wholesaleInquiries: null,
+        revenueKpi: {
+          text: "Revenue pace not fully wired.",
+          fullyWired: false,
+        },
+        anyAction: true,
+      },
+    });
+    const json = JSON.stringify(out.blocks);
+    expect(json).toContain("Revenue pace not fully wired.");
+    // Critical: the brief MUST NOT fabricate a $ figure when the
+    // slice's revenueKpi is the not-fully-wired fallback.
+    // (We check the entire Sales Command block has no $-sign in the
+    // revenue line specifically by asserting the fallback is verbatim.)
+    expect(json).not.toMatch(/Revenue pace not fully wired.*\$/);
+  });
+
+  it("KPI line also appears on quiet days (empty-state still surfaces revenue pulse)", () => {
+    // anyAction=false → empty-state path. Even on a quiet day, the
+    // KPI line should render so the daily revenue signal isn't lost.
+    const out = composeDailyBrief({
+      ...baseInput(),
+      salesCommand: {
+        faireInvitesNeedsReview: 0,
+        faireFollowUpsOverdue: 0,
+        faireFollowUpsDueSoon: 0,
+        pendingApprovals: 0,
+        apPacketsActionRequired: 0,
+        apPacketsSent: 0,
+        retailDraftsNeedsReview: 0,
+        retailDraftsAccepted: 0,
+        wholesaleInquiries: null,
+        revenueKpi: {
+          text: "Revenue pace: $24.1K last 7d vs $43.5K required/wk — -$19.4K behind",
+          fullyWired: true,
+        },
+        anyAction: false,
+      },
+    });
+    const json = JSON.stringify(out.blocks);
+    expect(json).toContain("No sales actions queued");
+    expect(json).toContain("Revenue pace:");
+  });
 });
 
 // ---------------------------------------------------------------------------

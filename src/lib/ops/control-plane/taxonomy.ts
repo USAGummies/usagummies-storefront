@@ -385,6 +385,16 @@ export const SINGLE_APPROVAL_ACTIONS: ActionSpec[] = [
     examples: ["invite Moccasin Mountain Art to Faire Direct (0% commission)"],
   },
   {
+    slug: "faire-direct.follow-up",
+    name: "Send a follow-up email to a retailer who already received a Faire Direct invite",
+    class: "B",
+    requiredApprovers: ["Ben"],
+    irreversible: true,
+    examples: [
+      "Whole Foods PNW invite went out 8 days ago with no reply — send a manual follow-up",
+    ],
+  },
+  {
     slug: "account.tier-upgrade.propose",
     name: "Propose a retailer tier upgrade (follow-up pricing.change C if material)",
     class: "B",
@@ -407,6 +417,19 @@ export const SINGLE_APPROVAL_ACTIONS: ActionSpec[] = [
     requiredApprovers: ["Ben"],
     irreversible: true, // external comm to counsel
     examples: ["'supports immunity' claim review before publish"],
+  },
+
+  // ---- v1.3 additions (Class B) — Phase 9 receipt review ----
+  {
+    slug: "receipt.review.promote",
+    name: "Acknowledge a captured receipt + OCR suggestion as Rene-reviewed",
+    class: "B",
+    requiredApprovers: ["Rene"],
+    irreversible: false,
+    examples: [
+      "Belmark $250 receipt with OCR suggestion + canonical category 'supplies' → Rene reviews and approves the in-repo packet (no QBO write)",
+      "Albanese receipt with eligible canonical fields → packet transitions draft → rene-approved (separate qbo.bill.create runs later)",
+    ],
   },
 ];
 

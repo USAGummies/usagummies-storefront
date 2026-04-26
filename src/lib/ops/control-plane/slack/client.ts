@@ -1,7 +1,7 @@
 /**
  * Slack Web API client — minimal. Used by the 3.0 control-plane surfaces.
  *
- * Scope: chat.postMessage + chat.update + chat.postEphemeral.
+ * Scope: chat.postMessage + chat.update + chat.postEphemeral + chat.getPermalink.
  * Zero imports from legacy abra-* modules.
  *
  * Environment:
@@ -209,6 +209,58 @@ export async function verifySlackSignature(params: {
   const b = Buffer.from(params.signature, "utf8");
   if (a.length !== b.length) return { ok: false, reason: "length mismatch" };
   return timingSafeEqual(a, b) ? { ok: true } : { ok: false, reason: "hmac mismatch" };
+}
+
+// ---- chat.getPermalink (read-side, Phase 12) ---------------------------
+//
+// Read-only — never posts, never updates, never deletes. Used by the
+// promote-review route to deep-link the green pill on /ops/finance/review
+// to the approval's #ops-approvals thread. Returns `null` when the bot
+// token is missing (degraded), when the channel/ts pair is empty, or
+// when Slack itself rejects the lookup.
+
+interface GetPermalinkParams {
+  /** Slack channel id (e.g. `C0123…`). The control-plane stores
+   *  `slackThread.channel` on `ApprovalRequest`. */
+  channel: string;
+  /** Slack message ts. */
+  message_ts: string;
+}
+
+/**
+ * Resolve a Slack message permalink. Defensive — returns `null` on
+ * any failure; never throws. Caller decides how to surface the gap
+ * (the pill renderer falls back to the plain approval id).
+ */
+export async function getPermalink(
+  params: GetPermalinkParams,
+): Promise<string | null> {
+  const bot = token();
+  if (!bot) return null;
+  const ch = params.channel?.trim();
+  const ts = params.message_ts?.trim();
+  if (!ch || !ts) return null;
+  try {
+    const url =
+      `https://slack.com/api/chat.getPermalink` +
+      `?channel=${encodeURIComponent(ch)}` +
+      `&message_ts=${encodeURIComponent(ts)}`;
+    const res = await fetch(url, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${bot}` },
+    });
+    const json = (await res.json()) as {
+      ok: boolean;
+      permalink?: string;
+      error?: string;
+    };
+    if (!json.ok) return null;
+    return typeof json.permalink === "string" && json.permalink.length > 0
+      ? json.permalink
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 /**

@@ -108,6 +108,11 @@ const CUSTOMER_ORDERS = /* GraphQL */ `
                 node {
                   title
                   quantity
+                  variant {
+                    id
+                    sku
+                    availableForSale
+                  }
                 }
               }
             }
@@ -154,7 +159,17 @@ type CustomerOrdersResponse = {
           fulfillmentStatus: string | null;
           currentTotalPrice: { amount: string; currencyCode: string } | null;
           lineItems: {
-            edges: Array<{ node: { title: string; quantity: number } }>;
+            edges: Array<{
+              node: {
+                title: string;
+                quantity: number;
+                variant: {
+                  id: string;
+                  sku: string | null;
+                  availableForSale: boolean;
+                } | null;
+              };
+            }>;
           };
         };
       }>;
@@ -211,6 +226,17 @@ export async function recoverCustomer(email: string) {
   return { ok: true } as const;
 }
 
+export type CustomerOrderLineItem = {
+  title: string;
+  quantity: number;
+  /** Null when Shopify can't resolve the variant (deleted product, etc.). */
+  variant: {
+    id: string;
+    sku: string | null;
+    availableForSale: boolean;
+  } | null;
+};
+
 export type CustomerOrder = {
   id: string;
   orderNumber: number;
@@ -218,7 +244,7 @@ export type CustomerOrder = {
   financialStatus: string;
   fulfillmentStatus: string | null;
   currentTotalPrice: { amount: string; currencyCode: string } | null;
-  lineItems: Array<{ title: string; quantity: number }>;
+  lineItems: CustomerOrderLineItem[];
 };
 
 export type CustomerSummary = {
@@ -240,11 +266,18 @@ export async function getCustomerOrders(accessToken: string): Promise<CustomerSu
     customer.orders?.edges?.map((edge) => {
       const node = edge?.node;
       if (!node) return null;
-      const items =
-        node.lineItems?.edges?.map((item) => item?.node).filter(Boolean) as Array<{
+      const items: CustomerOrderLineItem[] =
+        (node.lineItems?.edges
+          ?.map((item) => item?.node)
+          .filter(Boolean) as Array<{
           title: string;
           quantity: number;
-        }>;
+          variant: {
+            id: string;
+            sku: string | null;
+            availableForSale: boolean;
+          } | null;
+        }>) ?? [];
       return {
         id: node.id,
         orderNumber: node.orderNumber,

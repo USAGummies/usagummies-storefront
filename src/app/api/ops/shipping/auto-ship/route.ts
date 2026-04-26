@@ -59,6 +59,12 @@ import {
   totalBagsForItems,
 } from "@/lib/ops/shipping-packaging";
 import { uploadBufferToSlack } from "@/lib/ops/slack-file-upload";
+import {
+  attachSlackPermalink,
+  persistLabelArtifacts,
+  splitLabelAndPackingSlip,
+  type ShippingArtifactRecord,
+} from "@/lib/ops/shipping-artifacts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -98,6 +104,12 @@ interface UnifiedAutoShipResult {
   carrier?: string;
   service?: string;
   slackPermalink?: string;
+  /** Drive web view link to the label-only PDF (page 1). null when Drive unavailable. */
+  labelDriveLink?: string | null;
+  /** Drive web view link to the packing-slip PDF (page 2). null when not present. */
+  packingSlipDriveLink?: string | null;
+  /** Surfaces in the response when Drive write failed but label buy succeeded. */
+  driveError?: string | null;
   error?: string;
 }
 
@@ -303,13 +315,68 @@ async function autoShipOrder(
     };
   }
 
-  // Upload label (page 1 only — strip packing slip) to Slack.
+  // ---- Artifact persistence + notification --------------------------------
+  // Two side-effects, both fail-soft (never roll back the label buy):
+  //   (a) Persist label + packing slip to Google Drive so Ben can always
+  //       re-print from a stable URL even if Slack drops the file.
+  //   (b) Upload the label PDF to Slack #operations as today.
+  //
+  // The Drive write happens FIRST so the Slack message can include the
+  // Drive link even if Slack file-upload itself fails. If Slack file
+  // upload fails, we post a warning to #ops-alerts that includes the
+  // Drive link, so Ben never has to chase a missing label across surfaces.
   let slackPermalink: string | undefined;
+  let labelDriveLink: string | null = null;
+  let packingSlipDriveLink: string | null = null;
+  let driveError: string | null = null;
+  let artifactRecord: ShippingArtifactRecord | null = null;
+
   const labelBase64 = labelRes.label.labelUrl.split(",", 2)[1] ?? "";
   if (labelBase64) {
+    let pdfBytes: Buffer | null = null;
     try {
-      const pdfBytes = Buffer.from(labelBase64, "base64");
-      const labelOnlyBytes = await stripPackingSlipPage(pdfBytes);
+      pdfBytes = Buffer.from(labelBase64, "base64");
+    } catch (err) {
+      await recordAudit("artifact.decode-failed", order.orderNumber, source, false, {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    if (pdfBytes) {
+      // (1) Split the 2-page PDF once, so Drive + Slack both consume the
+      //     same already-parsed pages.
+      const split = await splitLabelAndPackingSlip(pdfBytes);
+      const labelOnlyBytes = split.labelOnly ?? pdfBytes;
+
+      // (2) Drive — fail-soft. Records a row in KV either way.
+      try {
+        artifactRecord = await persistLabelArtifacts({
+          orderNumber: order.orderNumber,
+          source,
+          trackingNumber: labelRes.label.trackingNumber,
+          fullPdf: pdfBytes,
+          labelOnlyPdf: split.labelOnly ?? undefined,
+          packingSlipOnlyPdf: split.packingSlipOnly ?? undefined,
+        });
+        labelDriveLink = artifactRecord.label?.webViewLink ?? null;
+        packingSlipDriveLink = artifactRecord.packingSlip?.webViewLink ?? null;
+        driveError = artifactRecord.driveError;
+        await recordAudit("artifact.drive.write", order.orderNumber, source, !driveError, {
+          labelFileId: artifactRecord.label?.fileId ?? null,
+          packingSlipFileId: artifactRecord.packingSlip?.fileId ?? null,
+          driveError,
+        });
+      } catch (err) {
+        // The module catches its own errors, so a throw here is unexpected.
+        // Audit and continue — never block the Slack post on Drive.
+        driveError = err instanceof Error ? err.message : String(err);
+        await recordAudit("artifact.drive.exception", order.orderNumber, source, false, {
+          error: driveError,
+        });
+      }
+
+      // (3) Slack — same pre-existing flow, but message now includes
+      //     Drive links when present.
       const channelRegistry = getChannel(
         opts.slackChannel as Parameters<typeof getChannel>[0],
       );
@@ -321,30 +388,72 @@ async function autoShipOrder(
           : source === "shopify"
             ? ":shopify-color:"
             : ":package:";
+      const driveLines: string[] = [];
+      if (labelDriveLink) driveLines.push(`<${labelDriveLink}|Drive: label PDF>`);
+      if (packingSlipDriveLink) driveLines.push(`<${packingSlipDriveLink}|Drive: packing slip>`);
       const comment =
         `${sourceEmoji} *Auto-shipped — ${order.orderNumber}* (${source})\n` +
         `${bags} bag${bags === 1 ? "" : "s"} · ${order.shipTo.city}, ${order.shipTo.state}\n` +
         `${labelRes.label.service} · tracking ${labelRes.label.trackingNumber} · $${labelRes.label.cost.toFixed(2)}\n` +
+        (driveLines.length > 0 ? `${driveLines.join(" · ")}\n` : "") +
         `_Print + drop at USPS. React :white_check_mark: when dropped._`;
-      const uploadRes = await uploadBufferToSlack({
-        channelId: destChannel,
-        filename: `label-${order.orderNumber}.pdf`,
-        buffer: labelOnlyBytes,
-        mimeType: "application/pdf",
-        title: `Label ${order.orderNumber}`,
-        comment,
-      });
-      if (uploadRes.ok) {
-        slackPermalink = uploadRes.permalink;
-      } else {
-        await recordAudit("slack.upload-failed", order.orderNumber, source, false, {
-          error: uploadRes.error,
+
+      try {
+        const uploadRes = await uploadBufferToSlack({
+          channelId: destChannel,
+          filename: `label-${order.orderNumber}.pdf`,
+          buffer: labelOnlyBytes,
+          mimeType: "application/pdf",
+          title: `Label ${order.orderNumber}`,
+          comment,
+        });
+        if (uploadRes.ok) {
+          slackPermalink = uploadRes.permalink;
+          // Tag the artifact record with the Slack permalink so
+          // recent-labels can surface a stable link.
+          await attachSlackPermalink({
+            source,
+            orderNumber: order.orderNumber,
+            slackPermalink: uploadRes.permalink ?? null,
+          });
+        } else {
+          await recordAudit("slack.upload-failed", order.orderNumber, source, false, {
+            error: uploadRes.error,
+            labelDriveLink,
+            packingSlipDriveLink,
+          });
+          // Surface a clear warning to #ops-alerts WITH the Drive link so
+          // Ben can still print. This is the whole point of the rebuild:
+          // Slack failure must never silently swallow the label.
+          await postAlertOnSlackUploadFailure({
+            orderNumber: order.orderNumber,
+            source,
+            tracking: labelRes.label.trackingNumber,
+            cost: labelRes.label.cost,
+            service: labelRes.label.service,
+            slackError: uploadRes.error ?? "unknown Slack upload error",
+            labelDriveLink,
+            packingSlipDriveLink,
+          });
+        }
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        await recordAudit("slack.upload-exception", order.orderNumber, source, false, {
+          error: errMsg,
+          labelDriveLink,
+          packingSlipDriveLink,
+        });
+        await postAlertOnSlackUploadFailure({
+          orderNumber: order.orderNumber,
+          source,
+          tracking: labelRes.label.trackingNumber,
+          cost: labelRes.label.cost,
+          service: labelRes.label.service,
+          slackError: errMsg,
+          labelDriveLink,
+          packingSlipDriveLink,
         });
       }
-    } catch (err) {
-      await recordAudit("slack.upload-exception", order.orderNumber, source, false, {
-        error: err instanceof Error ? err.message : String(err),
-      });
     }
   }
 
@@ -369,6 +478,9 @@ async function autoShipOrder(
     packaging: pkg.id,
     bags,
     slackPermalink,
+    labelDriveLink,
+    packingSlipDriveLink,
+    driveError,
   });
 
   return {
@@ -382,38 +494,64 @@ async function autoShipOrder(
     carrier: labelRes.label.carrier,
     service: labelRes.label.service,
     slackPermalink,
+    labelDriveLink,
+    packingSlipDriveLink,
+    driveError,
   };
 }
 
 /**
- * ShipStation's label download is a 2-page PDF: page 1 = label,
- * page 2 = packing slip. We only want the label — page 2 wastes thermal
- * media on wrong content (learned the hard way 2026-04-22).
+ * Post a clear, actionable warning when Slack file upload fails.
  *
- * Uses pypdf-equivalent via the pure-JS `pdf-lib` if available, else
- * falls back to returning the full PDF (still better than failing the
- * upload). In practice pdf-lib ships with Next.js; we just import it
- * dynamically to keep the cold-start lean.
+ * Goes to #ops-alerts so it cuts through normal audit noise, with the
+ * Drive link inline so Ben can click straight through to the label PDF
+ * without bouncing through ShipStation. Audit is mirrored separately so
+ * the failure is visible in #ops-audit too.
+ *
+ * Best-effort — wrapped in try/catch so a Slack outage on top of a
+ * Slack file-upload failure can't escalate into a thrown error inside
+ * the auto-ship pipeline.
  */
-async function stripPackingSlipPage(pdfBytes: Buffer): Promise<Buffer> {
+async function postAlertOnSlackUploadFailure(args: {
+  orderNumber: string;
+  source: string;
+  tracking: string | null | undefined;
+  cost: number;
+  service: string;
+  slackError: string;
+  labelDriveLink: string | null;
+  packingSlipDriveLink: string | null;
+}): Promise<void> {
   try {
-    // Dynamic import so we don't pull pdf-lib into every cold start.
-    const { PDFDocument } = await import("pdf-lib");
-    const src = await PDFDocument.load(pdfBytes);
-    if (src.getPageCount() < 2) return pdfBytes; // single-page — already label only
-    const dest = await PDFDocument.create();
-    const [labelPage] = await dest.copyPages(src, [0]);
-    dest.addPage(labelPage);
-    const outBytes = await dest.save();
-    return Buffer.from(outBytes);
-  } catch (err) {
-    console.warn(
-      "[shipping-auto-ship] stripPackingSlipPage failed, returning full PDF:",
-      err instanceof Error ? err.message : String(err),
-    );
-    return pdfBytes;
+    const alertsChannel = getChannel("ops-alerts");
+    if (!alertsChannel) return;
+    const lines: string[] = [
+      `:warning: *Slack file upload FAILED for ${args.orderNumber}* (${args.source}) — label is bought, just couldn't post the PDF.`,
+      `Tracking: \`${args.tracking ?? "?"}\` · ${args.service} · $${args.cost.toFixed(2)}`,
+      `Slack error: \`${args.slackError}\``,
+    ];
+    if (args.labelDriveLink) {
+      lines.push(`*Drive label PDF:* <${args.labelDriveLink}|click to open + print>`);
+    } else {
+      lines.push(
+        ":no_entry: No Drive backup either. Open ShipStation and re-print from the order.",
+      );
+    }
+    if (args.packingSlipDriveLink) {
+      lines.push(`Drive packing slip: <${args.packingSlipDriveLink}|open>`);
+    }
+    await postMessage({
+      channel: alertsChannel.name,
+      text: lines.join("\n"),
+    });
+  } catch {
+    /* swallow — alert posting failure must not break the pipeline */
   }
 }
+
+// `stripPackingSlipPage` was retired in favor of
+// `splitLabelAndPackingSlip` from src/lib/ops/shipping-artifacts.ts,
+// which returns BOTH pages so we can persist the packing slip too.
 
 export async function POST(req: Request): Promise<Response> {
   if (!(await isAuthorized(req))) {

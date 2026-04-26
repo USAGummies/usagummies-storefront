@@ -60,12 +60,8 @@ type SlackPayload =
   | SlackUrlVerification
   | { type: string; [k: string]: unknown };
 
-// Helpers moved to ./helpers.ts so Next.js 15's strict Route-file
-// typing stops failing the build. Re-imported below for local use.
-import {
-  buildReadOnlyChatRouteRequest,
-  isRedundantMentionMirrorEvent,
-} from "./helpers";
+// Pure helpers extracted to src/lib/ops/slack-events-helpers.ts —
+// Next.js App Router forbids non-handler exports from route files.
 
 export async function POST(req: Request): Promise<Response> {
   const rawBody = await req.text();

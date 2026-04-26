@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   buildReadOnlyChatRouteRequest,
   isRedundantMentionMirrorEvent,
-} from "@/app/api/ops/slack/events/helpers";
+} from "@/lib/ops/slack-events-helpers";
 import {
   buildProactiveAlertSignature,
   shouldSuppressSameDayAlertType,

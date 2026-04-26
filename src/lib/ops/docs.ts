@@ -12,6 +12,12 @@
  */
 
 import { kv } from "@vercel/kv";
+import type { ReceiptOcrSuggestion } from "./receipt-ocr";
+import {
+  buildReceiptReviewPacket,
+  type BuildPacketOptions,
+  type ReceiptReviewPacket,
+} from "./receipt-review-packet";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -61,16 +67,32 @@ export interface ReceiptRecord {
   id: string;
   source_url: string;
   source_channel: string;
-  vendor: string;
-  date: string;
-  amount: number;
+  vendor?: string;
+  date?: string;
+  amount?: number;
   payment_method?: string;
-  category: string;
+  category?: string;
   subcategory?: string;
   mileage?: { start: number; end: number; total: number; rate: number; deduction: number };
   ledger_entry_id?: string; // linked to LEDGER entry if staged
+  status: "needs_review" | "ready";
+  missing_fields?: string[];
   processed_at: string;
   notes?: string;
+  /**
+   * Phase 7 — OCR suggestion attached to this receipt for review.
+   *
+   * **Review-only.** Suggestions live in their own field — the
+   * top-level review fields (`vendor`, `date`, `amount`, `category`)
+   * are deliberately NOT auto-populated from this. Reviewers (Rene/Ben)
+   * promote suggestions to canonical fields by hand. Status remains
+   * `needs_review` until a human edits the canonical fields.
+   *
+   * Attaching a suggestion is also fail-soft: an OCR provider error
+   * never breaks the receipt's review state — the receipt sits in
+   * the queue without the suggestion, the reviewer can re-attach later.
+   */
+  ocr_suggestion?: ReceiptOcrSuggestion;
 }
 
 export interface InvoiceWatchRule {
@@ -93,6 +115,11 @@ const KV_EXTRACTED_DOCS = "docs:extracted";
 const KV_TRANSCRIPTS = "docs:transcripts";
 const KV_RECEIPTS = "docs:receipts";
 const KV_INVOICE_RULES = "docs:invoice_watch_rules";
+// Phase 8 — review-packet store. Packets are draft-only queue
+// items: building one never opens a Slack/control-plane approval
+// (no taxonomy slug exists yet) and never mutates the underlying
+// receipt's canonical fields or status.
+const KV_RECEIPT_REVIEW_PACKETS = "docs:receipt_review_packets";
 
 // ---------------------------------------------------------------------------
 // Document Extraction
@@ -340,17 +367,33 @@ export async function listTranscripts(
 export async function processReceipt(input: {
   source_url: string;
   source_channel: string;
-  vendor: string;
-  date: string;
-  amount: number;
+  vendor?: string;
+  date?: string;
+  amount?: number;
   payment_method?: string;
-  category: string;
+  category?: string;
   subcategory?: string;
   mileage?: { start: number; end: number; total: number; rate: number; deduction: number };
   notes?: string;
+  status?: "needs_review" | "ready";
 }): Promise<ReceiptRecord> {
   const now = new Date().toISOString();
   const id = `receipt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  const amount =
+    typeof input.amount === "number" && Number.isFinite(input.amount)
+      ? input.amount
+      : undefined;
+  const missingFields = [
+    input.vendor ? null : "vendor",
+    input.date ? null : "date",
+    amount === undefined ? "amount" : null,
+    input.category ? null : "category",
+  ].filter(Boolean) as string[];
+  const requestedStatus =
+    input.status === "needs_review" || input.status === "ready"
+      ? input.status
+      : undefined;
+  const status = requestedStatus || (missingFields.length > 0 ? "needs_review" : "ready");
 
   const record: ReceiptRecord = {
     id,
@@ -358,11 +401,13 @@ export async function processReceipt(input: {
     source_channel: input.source_channel,
     vendor: input.vendor,
     date: input.date,
-    amount: input.amount,
+    amount,
     payment_method: input.payment_method,
     category: input.category,
     subcategory: input.subcategory,
     mileage: input.mileage,
+    status,
+    missing_fields: missingFields.length > 0 ? missingFields : undefined,
     processed_at: now,
     notes: input.notes,
   };
@@ -375,23 +420,178 @@ export async function processReceipt(input: {
   return record;
 }
 
+/**
+ * Attach an OCR suggestion to an existing receipt. Phase 7.
+ *
+ * Hard contract:
+ *   - **Status stays unchanged.** A receipt in `needs_review` stays
+ *     in `needs_review`. Attaching a suggestion never auto-promotes
+ *     the receipt to `ready`. Reviewers (Rene/Ben) flip status by
+ *     editing the canonical review fields, separately.
+ *   - **Canonical review fields are NOT touched.** `vendor`, `date`,
+ *     `amount`, `category`, `subcategory`, `payment_method` are
+ *     left exactly as the reviewer entered them (or as
+ *     `processReceipt` left them — usually undefined for a fresh
+ *     capture). The suggestion lives in its own field.
+ *   - **Idempotent.** Calling twice with the same `receiptId` and
+ *     a new suggestion replaces the previous suggestion only —
+ *     it does not duplicate or merge.
+ *   - Returns the updated receipt; returns `null` if no receipt
+ *     with that id exists.
+ */
+export async function attachOcrSuggestion(
+  receiptId: string,
+  suggestion: ReceiptOcrSuggestion,
+): Promise<ReceiptRecord | null> {
+  const all = (await kv.get<ReceiptRecord[]>(KV_RECEIPTS)) || [];
+  const idx = all.findIndex((r) => r.id === receiptId);
+  if (idx === -1) return null;
+  const next: ReceiptRecord = {
+    ...all[idx],
+    // Status preserved verbatim — Phase 7 does NOT auto-promote.
+    ocr_suggestion: suggestion,
+  };
+  all[idx] = next;
+  await kv.set(KV_RECEIPTS, all);
+  return next;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 8 — Receipt review packet store
+// ---------------------------------------------------------------------------
+//
+// A packet is a draft-only queue item that pairs the canonical
+// (human-edited) fields on a receipt with the OCR suggestion (when
+// present) plus a per-field "canonical | ocr-suggested | missing"
+// merge. Promoting a receipt builds a packet — it does NOT change
+// the receipt's status, never overwrites canonical fields, and
+// never opens a Slack/control-plane approval (no taxonomy slug
+// exists for receipt promotion today).
+
+/**
+ * Request a Rene-review packet for a captured receipt.
+ *
+ * Hard contract:
+ *   - **Status preserved.** The receipt's `status` is left exactly
+ *     as it was. A `needs_review` receipt stays in `needs_review`.
+ *   - **Canonical fields untouched.** vendor / date / amount /
+ *     category / payment_method are left exactly as they were
+ *     entered (or as `processReceipt` left them — usually undefined
+ *     until a human edit).
+ *   - **Idempotent.** Re-requesting for the same receiptId
+ *     overwrites the packet under the same `packetId`.
+ *   - Returns `null` if no receipt with that id exists — the
+ *     route caller maps this to HTTP 404.
+ */
+export async function requestReceiptReviewPromotion(
+  receiptId: string,
+  options: BuildPacketOptions = {},
+): Promise<ReceiptReviewPacket | null> {
+  const all = (await kv.get<ReceiptRecord[]>(KV_RECEIPTS)) || [];
+  const receipt = all.find((r) => r.id === receiptId);
+  if (!receipt) return null;
+  const packet = buildReceiptReviewPacket(receipt, options);
+  const packets =
+    (await kv.get<ReceiptReviewPacket[]>(KV_RECEIPT_REVIEW_PACKETS)) || [];
+  // Idempotent: replace by packetId (deterministic in receipt.id).
+  const idx = packets.findIndex((p) => p.packetId === packet.packetId);
+  if (idx === -1) {
+    packets.push(packet);
+  } else {
+    packets[idx] = packet;
+  }
+  // Soft cap so the KV blob doesn't grow unbounded.
+  if (packets.length > 500) packets.splice(0, packets.length - 500);
+  await kv.set(KV_RECEIPT_REVIEW_PACKETS, packets);
+  return packet;
+}
+
+/** Read a single packet by id. Returns `null` if not present. */
+export async function getReceiptReviewPacket(
+  packetId: string,
+): Promise<ReceiptReviewPacket | null> {
+  const packets =
+    (await kv.get<ReceiptReviewPacket[]>(KV_RECEIPT_REVIEW_PACKETS)) || [];
+  return packets.find((p) => p.packetId === packetId) ?? null;
+}
+
+/**
+ * Phase 10 — replace a packet's status. Used by the
+ * `receipt.review.promote` closer when Rene's Slack decision lands.
+ *
+ * **Hard contract:**
+ *   - Mutates ONLY the packet's `status` field. Canonical receipt
+ *     fields, eligibility, proposedFields, taxonomy, OCR suggestion,
+ *     and `receiptStatusAtBuild` are left exactly as the builder
+ *     produced them.
+ *   - Returns the updated packet on success, `null` if `packetId`
+ *     doesn't exist.
+ *   - Idempotent on terminal states: callers should pass a real
+ *     transition; re-setting a terminal status to itself is a no-op
+ *     here at the storage layer (we still write — the higher-level
+ *     `applyDecisionToPacket` is what enforces the no-double-fire
+ *     contract).
+ */
+export async function updateReceiptReviewPacketStatus(
+  packetId: string,
+  nextStatus: ReceiptReviewPacket["status"],
+): Promise<ReceiptReviewPacket | null> {
+  const packets =
+    (await kv.get<ReceiptReviewPacket[]>(KV_RECEIPT_REVIEW_PACKETS)) || [];
+  const idx = packets.findIndex((p) => p.packetId === packetId);
+  if (idx === -1) return null;
+  const updated: ReceiptReviewPacket = {
+    ...packets[idx],
+    status: nextStatus,
+  };
+  packets[idx] = updated;
+  await kv.set(KV_RECEIPT_REVIEW_PACKETS, packets);
+  return updated;
+}
+
+/** List packets, most-recent-first by `createdAt`. Bounded by `limit`
+ *  (default 50; max 500). */
+export async function listReceiptReviewPackets(opts: {
+  limit?: number;
+} = {}): Promise<ReceiptReviewPacket[]> {
+  const limit = Math.max(1, Math.min(500, opts.limit ?? 50));
+  const packets =
+    (await kv.get<ReceiptReviewPacket[]>(KV_RECEIPT_REVIEW_PACKETS)) || [];
+  return [...packets]
+    .sort(
+      (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt),
+    )
+    .slice(0, limit);
+}
+
 export async function listReceipts(
-  filters?: { vendor?: string; category?: string; limit?: number }
+  filters?: {
+    vendor?: string;
+    category?: string;
+    /** Narrow by review status. Accepts the same union as `ReceiptRecord.status`. */
+    status?: ReceiptRecord["status"];
+    limit?: number;
+  }
 ): Promise<ReceiptRecord[]> {
   const all = (await kv.get<ReceiptRecord[]>(KV_RECEIPTS)) || [];
   let filtered = all;
   if (filters?.vendor) {
     const v = filters.vendor.toLowerCase();
-    filtered = filtered.filter((r) => r.vendor.toLowerCase().includes(v));
+    filtered = filtered.filter((r) => r.vendor?.toLowerCase().includes(v));
   }
   if (filters?.category) {
     filtered = filtered.filter((r) => r.category === filters.category);
+  }
+  if (filters?.status) {
+    filtered = filtered.filter((r) => r.status === filters.status);
   }
   return filtered.slice(-(filters?.limit || 100));
 }
 
 export async function getReceiptSummary(): Promise<{
   total_receipts: number;
+  needs_review: number;
+  ready: number;
   total_amount: number;
   by_vendor: Record<string, { count: number; total: number }>;
   by_category: Record<string, { count: number; total: number }>;
@@ -400,18 +600,32 @@ export async function getReceiptSummary(): Promise<{
   const byVendor: Record<string, { count: number; total: number }> = {};
   const byCategory: Record<string, { count: number; total: number }> = {};
   let totalAmount = 0;
+  let needsReview = 0;
+  let ready = 0;
 
   for (const r of all) {
-    totalAmount += r.amount;
-    if (!byVendor[r.vendor]) byVendor[r.vendor] = { count: 0, total: 0 };
-    byVendor[r.vendor].count++;
-    byVendor[r.vendor].total += r.amount;
-    if (!byCategory[r.category]) byCategory[r.category] = { count: 0, total: 0 };
-    byCategory[r.category].count++;
-    byCategory[r.category].total += r.amount;
+    const amount = typeof r.amount === "number" && Number.isFinite(r.amount) ? r.amount : 0;
+    totalAmount += amount;
+    if (r.status === "needs_review") needsReview++;
+    if (r.status === "ready") ready++;
+    const vendor = r.vendor || "UNREVIEWED";
+    if (!byVendor[vendor]) byVendor[vendor] = { count: 0, total: 0 };
+    byVendor[vendor].count++;
+    byVendor[vendor].total += amount;
+    const category = r.category || "unreviewed";
+    if (!byCategory[category]) byCategory[category] = { count: 0, total: 0 };
+    byCategory[category].count++;
+    byCategory[category].total += amount;
   }
 
-  return { total_receipts: all.length, total_amount: totalAmount, by_vendor: byVendor, by_category: byCategory };
+  return {
+    total_receipts: all.length,
+    needs_review: needsReview,
+    ready,
+    total_amount: totalAmount,
+    by_vendor: byVendor,
+    by_category: byCategory,
+  };
 }
 
 // ---------------------------------------------------------------------------

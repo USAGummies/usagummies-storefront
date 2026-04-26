@@ -53,6 +53,17 @@ export type EmailMessage = {
   attachments: EmailAttachment[];
 };
 
+export type SentDraftDetails = {
+  ok: true;
+  draftId: string;
+  messageId: string;
+  threadId: string | null;
+  to: string;
+  from: string;
+  subject: string;
+  body: string;
+};
+
 export type ListEmailsOpts = {
   folder?: string; // Gmail label: INBOX, SENT, etc.
   count?: number;
@@ -546,28 +557,175 @@ export type SendGmailOpts = {
   cc?: string;
   bcc?: string;
   threadId?: string; // Gmail thread ID to reply in-thread
-  inReplyTo?: string;
-  references?: string;
-  attachments?: Array<{ filename: string; mimeType: string; content: Buffer }>;
+  inReplyTo?: string; // RFC 2822 Message-ID of the message we're replying to
+  references?: string; // RFC 2822 References chain
+  attachments?: Array<{
+    filename: string;
+    mimeType: string;
+    content: Buffer | Uint8Array;
+  }>;
+  htmlBody?: string;
 };
 
 /**
  * Build a raw RFC 2822 email message encoded as base64url for the Gmail API.
+ *
+ * Supports:
+ *   - plain text body (opts.body)
+ *   - optional HTML alternative (opts.htmlBody)
+ *   - file attachments (opts.attachments) as base64-encoded MIME parts
+ *   - reply threading via In-Reply-To / References headers
+ *
+ * Format picked:
+ *   - No attachments, plain only     → text/plain top-level
+ *   - No attachments, plain + html   → multipart/alternative
+ *   - Any attachments                → multipart/mixed with an
+ *                                       alternative part inside
  */
 function buildRawEmail(opts: SendGmailOpts): string {
   const from = opts.from || "Ben Stutman <ben@usagummies.com>";
+  const hasAttachments = Array.isArray(opts.attachments) && opts.attachments.length > 0;
+  const hasHtml = typeof opts.htmlBody === "string" && opts.htmlBody.length > 0;
+
+  // Simple case: no attachments, plain-text only.
+  if (!hasAttachments && !hasHtml) {
+    const lines = [
+      `From: ${from}`,
+      `To: ${opts.to}`,
+      ...(opts.cc ? [`Cc: ${opts.cc}`] : []),
+      ...(opts.bcc ? [`Bcc: ${opts.bcc}`] : []),
+      ...(opts.inReplyTo ? [`In-Reply-To: ${opts.inReplyTo}`] : []),
+      ...(opts.references ? [`References: ${opts.references}`] : []),
+      `Subject: ${opts.subject}`,
+      "MIME-Version: 1.0",
+      "Content-Type: text/plain; charset=UTF-8",
+      "",
+      opts.body,
+    ];
+    return Buffer.from(lines.join("\r\n")).toString("base64url");
+  }
+
+  // Boundaries — independent for alternative vs mixed so nesting is clean.
+  const altBoundary = `alt-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  const mixBoundary = `mix-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+  // Body part (text/plain optionally with html alternative).
+  const bodyBlock: string[] = [];
+  if (hasHtml) {
+    bodyBlock.push(`Content-Type: multipart/alternative; boundary="${altBoundary}"`);
+    bodyBlock.push("");
+    bodyBlock.push(`--${altBoundary}`);
+    bodyBlock.push("Content-Type: text/plain; charset=UTF-8");
+    bodyBlock.push("Content-Transfer-Encoding: 7bit");
+    bodyBlock.push("");
+    bodyBlock.push(opts.body);
+    bodyBlock.push("");
+    bodyBlock.push(`--${altBoundary}`);
+    bodyBlock.push("Content-Type: text/html; charset=UTF-8");
+    bodyBlock.push("Content-Transfer-Encoding: 7bit");
+    bodyBlock.push("");
+    bodyBlock.push(opts.htmlBody ?? "");
+    bodyBlock.push("");
+    bodyBlock.push(`--${altBoundary}--`);
+  } else {
+    bodyBlock.push("Content-Type: text/plain; charset=UTF-8");
+    bodyBlock.push("Content-Transfer-Encoding: 7bit");
+    bodyBlock.push("");
+    bodyBlock.push(opts.body);
+  }
+
+  if (!hasAttachments) {
+    const lines = [
+      `From: ${from}`,
+      `To: ${opts.to}`,
+      ...(opts.cc ? [`Cc: ${opts.cc}`] : []),
+      ...(opts.bcc ? [`Bcc: ${opts.bcc}`] : []),
+      ...(opts.inReplyTo ? [`In-Reply-To: ${opts.inReplyTo}`] : []),
+      ...(opts.references ? [`References: ${opts.references}`] : []),
+      `Subject: ${opts.subject}`,
+      "MIME-Version: 1.0",
+      ...bodyBlock,
+    ];
+    return Buffer.from(lines.join("\r\n")).toString("base64url");
+  }
+
+  // Multipart/mixed with attachments.
+  const parts: string[] = [];
+  parts.push(`--${mixBoundary}`);
+  parts.push(...bodyBlock);
+  parts.push("");
+
+  for (const att of opts.attachments ?? []) {
+    const b64 =
+      att.content instanceof Buffer
+        ? att.content.toString("base64")
+        : Buffer.from(att.content).toString("base64");
+    // Wrap base64 at 76 chars per RFC 2045.
+    const wrapped = b64.replace(/(.{76})/g, "$1\r\n");
+    parts.push(`--${mixBoundary}`);
+    parts.push(`Content-Type: ${att.mimeType}; name="${att.filename}"`);
+    parts.push(`Content-Disposition: attachment; filename="${att.filename}"`);
+    parts.push("Content-Transfer-Encoding: base64");
+    parts.push("");
+    parts.push(wrapped);
+  }
+  parts.push(`--${mixBoundary}--`);
+
   const lines = [
     `From: ${from}`,
     `To: ${opts.to}`,
     ...(opts.cc ? [`Cc: ${opts.cc}`] : []),
+    ...(opts.bcc ? [`Bcc: ${opts.bcc}`] : []),
+    ...(opts.inReplyTo ? [`In-Reply-To: ${opts.inReplyTo}`] : []),
+    ...(opts.references ? [`References: ${opts.references}`] : []),
     `Subject: ${opts.subject}`,
     "MIME-Version: 1.0",
-    "Content-Type: text/plain; charset=UTF-8",
+    `Content-Type: multipart/mixed; boundary="${mixBoundary}"`,
     "",
-    opts.body,
+    ...parts,
   ];
-  const raw = lines.join("\r\n");
-  return Buffer.from(raw).toString("base64url");
+  return Buffer.from(lines.join("\r\n")).toString("base64url");
+}
+
+/**
+ * Detailed variant of `sendViaGmailApi` that returns the Gmail message
+ * id + thread id on success, and a structured error on failure. Callers
+ * that need to log the sent message id (e.g. AP-packet send flow) use
+ * this; legacy callers that just need ok/fail keep using the boolean
+ * `sendViaGmailApi` below.
+ */
+export async function sendViaGmailApiDetailed(
+  opts: SendGmailOpts,
+): Promise<
+  | { ok: true; messageId: string; threadId: string | null }
+  | { ok: false; error: string }
+> {
+  const gmail = getGmailSendClient();
+  if (!gmail) {
+    return { ok: false, error: "Gmail send client not available" };
+  }
+  try {
+    const raw = buildRawEmail(opts);
+    const response = await gmail.users.messages.send({
+      userId: "me",
+      requestBody: {
+        raw,
+        ...(opts.threadId ? { threadId: opts.threadId } : {}),
+      },
+    });
+    const messageId = response.data?.id ?? "";
+    if (!messageId) {
+      return { ok: false, error: "Gmail API returned no message id" };
+    }
+    return {
+      ok: true,
+      messageId,
+      threadId: response.data?.threadId ?? null,
+    };
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: errMsg };
+  }
 }
 
 /**
@@ -653,6 +811,57 @@ export async function createGmailDraft(
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
     return { ok: false, error: `Gmail draft create failed: ${errMsg}` };
+  }
+}
+
+/**
+ * Send an existing Gmail draft by id. Used by the Slack approval closer:
+ * the draft is created during the email-intel scan, then Ben approves the
+ * Class B `gmail.send` card, then this sends exactly that reviewed draft.
+ */
+export async function sendGmailDraftDetailed(
+  draftId: string,
+): Promise<SentDraftDetails | { ok: false; error: string }> {
+  const gmail = getGmailSendClient();
+  if (!gmail) {
+    return { ok: false, error: "Gmail send client not available" };
+  }
+
+  try {
+    const draft = await gmail.users.drafts.get({
+      userId: "me",
+      id: draftId,
+      format: "full",
+    });
+    const message = draft.data.message;
+    const payload = message?.payload as GmailPayload | undefined;
+    const headers = (payload?.headers ?? []) as Array<{ name: string; value: string }>;
+    const bodyParts = payload ? extractTextBody(payload) : { text: "", html: "" };
+
+    const sent = await gmail.users.drafts.send({
+      userId: "me",
+      requestBody: { id: draftId },
+    });
+    const messageId = sent.data?.id ?? "";
+    if (!messageId) {
+      return { ok: false, error: "Gmail API returned no sent message id" };
+    }
+
+    return {
+      ok: true,
+      draftId,
+      messageId,
+      threadId: sent.data?.threadId ?? message?.threadId ?? null,
+      to: getHeader(headers, "To"),
+      from: getHeader(headers, "From"),
+      subject: getHeader(headers, "Subject"),
+      body: bodyParts.text || bodyParts.html || message?.snippet || "",
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
   }
 }
 
